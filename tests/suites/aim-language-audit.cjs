@@ -6,7 +6,8 @@ const assert = require('node:assert/strict');
 const { integrationTest, load, plannerReview, aimPhase, fixture, coverageSetup, coverageThreeAnswers } = require('../support.cjs');
 
 // ---- exceptions: every entry says why the text is allowed to be in the other language -------------------------------
-const FRAME_HEADINGS = /^## (Current Summary|Prompt|Rules|Preview|預覽|Detail|Working Findings|Thinking Origin|Visual References|Reference Links|參考連結)\s*$/;
+// The zh-TW names (C8) are the same frame headings, written in a Chinese note's own language.
+const FRAME_HEADINGS = /^## (Current Summary|Prompt|Rules|Preview|預覽|Detail|Working Findings|Thinking Origin|Visual References|Reference Links|參考連結|目前摘要|詳細內容|規則|進行中的發現|思考起點|關聯連結)\s*$/;
 const COMMON = [
   [/### AIM (incomplete|stale)-attempt diagnostic[\s\S]*?(?=### Original draft response|$)/g, 'retired-draft diagnostic block (research-run-store.ts retireDraftNote, incl. its Stop reason line) is machine-read and stays English; only this block is exempt'],
   [/<!--[\s\S]*?-->/g, 'machine markers (<!-- aim-* -->, detail frame markers) are parsed by VAM and stay English'],
@@ -40,7 +41,7 @@ function residual(raw) {
   // The Prompt section holds the task text sent to the model; it sits above Preview (older layout) or after it.
   text = text.replace(/## Prompt[\s\S]*?(?=\n## |$)/, '## Prompt');
   // Preview and Prompt as collapsed callouts: the titles are frame labels and the Prompt holds the model task text.
-  text = text.replace(/^> \[!info\]- Prompt\n(?:>.*(?:\n|$))*/m, '');
+  text = text.replace(/^> \[!info\]- (?:Prompt|提示)\n(?:>.*(?:\n|$))*/m, '');
   text = text.replace(/^> \[!info\]- (Preview|預覽)$/gm, '');
   text = text.split('\n').filter(line => !FRAME_HEADINGS.test(line)).join('\n');
   // A callout type such as [!warning] is Obsidian syntax and is not shown; the callout's own title text is still checked.

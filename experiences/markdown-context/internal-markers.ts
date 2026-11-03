@@ -2,7 +2,14 @@ import { editorLivePreviewField, type Plugin } from "obsidian";
 import { RangeSetBuilder } from "@codemirror/state";
 import { Decoration, ViewPlugin, type DecorationSet, type EditorView, type ViewUpdate } from "@codemirror/view";
 
-const markerLine = /^\s*<!-- visual-agent-map:(?:detail|references):(?:start|end) -->\s*$/;
+/**
+ * VAM's machine markers in a note: the Detail and Reference Links frame comments and the AIM open-items marker saved
+ * after Detail. Reading view does not show an HTML comment block; this also hides a marker line in Live Preview and
+ * one that a renderer passed through as text, so a note reads without them (C8).
+ */
+export const INTERNAL_MARKER_LINE =
+  /^\s*<!--\s*(?:visual-agent-map:(?:detail|references):(?:start|end)|aim-open-items\s+\[[^\n]*\])\s*-->\s*$/;
+const markerLine = INTERNAL_MARKER_LINE;
 
 function decorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();

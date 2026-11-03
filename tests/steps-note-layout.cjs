@@ -97,10 +97,11 @@ test('P1-a: Preview (after the summary) and Prompt (after Detail) are collapsed 
   const { repo, note, text } = await calloutNote();
   assert.ok(!/預覽|Preview|Prompt/.test(text()), 'a new note shows neither an empty Preview nor an empty Prompt');
   await repo.updateNote(note.path, { summary: '一句結論。', detail: '### 答案\n\n內容。' });
-  assert.match(text(), /## Current Summary\n\n一句結論。\n\n> \[!info\]- 預覽\n> 一句結論。\n\n## Detail\n/);
-  assert.ok(!/^## (預覽|Preview|Prompt)\s*$/m.test(text()), 'no ## Preview or ## Prompt section');
+  // A note made under the zh-TW interface writes zh-TW headings, the Prompt callout titled 提示 (C8).
+  assert.match(text(), /## 目前摘要\n\n一句結論。\n\n> \[!info\]- 預覽\n> 一句結論。\n\n## 詳細內容\n/);
+  assert.ok(!/^## (預覽|Preview|Prompt|提示)\s*$/m.test(text()), 'no ## Preview or ## Prompt section');
   await repo.updateNote(note.path, { prompt: '研究路線。\n第二行。' });
-  assert.match(text(), /> \[!info\]- 預覽\n> 一句結論。\n\n## Detail[\s\S]*<!-- visual-agent-map:detail:end -->\n\n> \[!info\]- Prompt\n> 研究路線。\n> 第二行。\n/);
+  assert.match(text(), /> \[!info\]- 預覽\n> 一句結論。\n\n## 詳細內容[\s\S]*<!-- visual-agent-map:detail:end -->\n\n> \[!info\]- 提示\n> 研究路線。\n> 第二行。\n/);
   const read = await repo.readNote(note.path);
   assert.equal(read.preview, '一句結論。');
   assert.equal(read.prompt, '研究路線。\n第二行。');

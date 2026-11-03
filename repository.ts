@@ -13,12 +13,19 @@ import { addTopicLink, readTopicLinks, removeTopicLink, type AddTopicLinkResult 
 import { readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
 import { createHash } from "node:crypto";
 import {
+  contentLocale,
   isNoteLanguage,
+  NOTE_HEADING_SETS,
+  noteHeadingsOf,
   noteLanguageOf,
   tNote,
   translate,
   type ContentLanguage,
   translateNote,
+  uiLanguageOfHeadings,
+  uiLocale,
+  type NoteHeadingName,
+  type NoteHeadings,
   type NoteLanguage,
   type TranslationKey,
   type UiLanguage
@@ -556,13 +563,99 @@ export const isPlaceholder = (value: string): boolean =>
 const previewHeading = (language: NoteLanguage): NoteSection => translate(language, "detail.preview") as NoteSection;
 
 /**
+ * Managed section headings in the note's own language (C8). Every function of this module works with the English
+ * names; `decodeCalloutSections` turns a localized heading back into its English name when it reads a note, and
+ * `localizeHeadings` writes it in the note's heading set again. The sets live in the language registry
+ * (`noteHeadings`), not in the dictionaries: they are note format, and every registered set is always read.
+ */
+const CANONICAL_HEADINGS: NoteHeadings = Object.freeze(
+  Object.fromEntries(Object.keys(NOTE_HEADING_SETS[0]).map(name => [name, name])) as Record<NoteHeadingName, string>
+);
+const isCanonical = (set: NoteHeadings): boolean => set.Detail === CANONICAL_HEADINGS.Detail;
+/**
+ * The heading set a note is already written with, read from its managed Detail heading (the `## ` heading right
+ * before the Detail start marker) alone; undefined when it has no marker. Any other heading there reads as English, so
+ * a user's own heading that happens to read like a localized one is never taken for a managed section in older notes.
+ */
+function noteHeadingSet(content: string): NoteHeadings | undefined {
+  const start = content.indexOf(DETAIL_START);
+  if (start < 0) return undefined;
+  const heading = [...content.slice(0, start).matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)?.[1];
+  return NOTE_HEADING_SETS.find(set => !isCanonical(set) && set.Detail === heading) ?? CANONICAL_HEADINGS;
+}
+/** The interface language whose headings a note is written with (for tests and diagnostics); English without a marker. */
+export function noteHeadingLanguage(content: string): UiLanguage {
+  return uiLanguageOfHeadings(noteHeadingSet(content) ?? CANONICAL_HEADINGS);
+}
+/**
+ * The heading set a write gives a note: the one it is written with; a note with no managed section yet (no Detail
+ * marker and no English managed heading, such as a bare stub) gets `fallback`, the set of a new note.
+ */
+function writtenHeadingSet(content: string, fallback: NoteHeadings): NoteHeadings {
+  const set = noteHeadingSet(content);
+  if (set) return set;
+  return /^## (?:Current Summary|Detail|Prompt)[ \t]*\r?$/m.test(content) ? CANONICAL_HEADINGS : fallback;
+}
+const CALLOUT_TITLE = /^(> \[!info\][+-]? )(.+?)([ \t]*\r?)$/;
+/**
+ * Walks a note body's lines outside fenced code, the Detail block and the quoted Thinking Origin text (the places
+ * where a heading-like line is content), and lets `rename` replace a `## ` heading text or a callout title.
+ */
+function renameManagedHeadings(
+  content: string,
+  rename: (text: string, kind: "heading" | "callout") => string | undefined
+): string {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  let inDetail = false;
+  let origin: "none" | "heading" | "quote" = "none";
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    if (line.trim() === DETAIL_START) inDetail = true;
+    if (line.trim() === DETAIL_END) inDetail = false;
+    if (inDetail || code[index]) continue;
+    if (origin === "heading" && line.startsWith(">")) origin = "quote";
+    else if (origin === "heading" && line.trim()) origin = "none";
+    else if (origin === "quote" && !line.startsWith(">")) origin = "none";
+    if (origin === "quote") continue;
+    const heading = /^## (.+?)([ \t]*\r?)$/.exec(line);
+    const callout = heading ? null : CALLOUT_TITLE.exec(line);
+    const current = heading?.[1] ?? callout?.[2];
+    const next = current === undefined ? undefined : rename(current, heading ? "heading" : "callout");
+    if (next !== undefined && next !== current)
+      lines[index] = heading ? `## ${next}${heading[2]}` : `${callout![1]}${next}${callout![3]}`;
+    // The English name on either side of the rename: decoding meets it after, encoding before.
+    if (heading && (current === "Thinking Origin" || next === "Thinking Origin")) origin = "heading";
+  }
+  return lines.join("\n");
+}
+/** Localized managed headings back to their English names (the inverse of localizeHeadings). */
+function canonicalHeadings(content: string, set: NoteHeadings): string {
+  if (isCanonical(set)) return content;
+  const back = new Map(Object.entries(set).map(([english, local]) => [local, english]));
+  // Prompt is written as a callout only (a "## 提示" heading is the user's own); every other name is a "## " heading.
+  return renameManagedHeadings(content, (text, kind) => {
+    const english = back.get(text);
+    return (kind === "callout") === (english === "Prompt") ? english : undefined;
+  });
+}
+/** English managed headings to the names of `set`; the English set leaves the text as it is. */
+export function localizeHeadings(content: string, set: NoteHeadings): string {
+  if (isCanonical(set)) return content;
+  const names = set as Readonly<Record<string, string>>;
+  return renameManagedHeadings(content, (text, kind) =>
+    Object.hasOwn(names, text) && (kind === "callout") === (text === "Prompt") ? names[text] : undefined
+  );
+}
+
+/**
  * Preview (right after the summary) and Prompt (after Detail) are written as collapsed callouts (`> [!info]- 預覽`,
  * `> [!info]- Prompt`) so the note opens on the answer. Every read and write first turns these callouts back into the `## ` sections the rest
  * of this module works with; `noteBody` writes them as callouts again. Older notes keep their `## ` sections.
  */
 const CALLOUT_SECTION = /^> \[!info\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
 function decodeCalloutSections(content: string): string {
-  const lines = content.split("\n");
+  const lines = canonicalHeadings(content, noteHeadingSet(content) ?? CANONICAL_HEADINGS).split("\n");
   const code = fencedLines(lines);
   const out: string[] = [];
   let inDetail = false;
@@ -1044,7 +1137,12 @@ export class Repository {
    * of such text uses this, so no write path can relabel a note just because the UI language differs.
    */
   scaffoldLanguage(content: string, fm: Record<string, unknown>): NoteLanguage {
-    return derivedLabelLanguage(content, fm) ?? this.noteLanguage;
+    const headings = noteHeadingSet(content) ?? CANONICAL_HEADINGS;
+    return (
+      derivedLabelLanguage(canonicalHeadings(content, headings), fm) ??
+      (isCanonical(headings) ? undefined : noteLanguageOf(uiLanguageOfHeadings(headings))) ??
+      this.noteLanguage
+    );
   }
 
   /** Called from onunload: no later write (including a rollback) may happen. */
@@ -1063,6 +1161,14 @@ export class Repository {
   /** The language fixed note text is written in for the current interface language (always "zh-TW" or "en"). */
   private get noteLanguage(): NoteLanguage {
     return noteLanguageOf(this.settings.language);
+  }
+
+  /**
+   * The language a new note's section headings are written in (C8): the interface language, unless the note's fixed
+   * text is in another language (an AIM note in English under a Chinese interface keeps English headings).
+   */
+  private headingsFor(textLanguage: NoteLanguage): NoteHeadings {
+    return noteHeadingsOf(contentLocale(textLanguage, uiLocale(this.settings.language)));
   }
 
   private message(key: TranslationKey): string {
@@ -1464,7 +1570,8 @@ export class Repository {
       language,
       textLanguage
     );
-    return `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm, language)}`;
+    // Headings stay in the language the note was written in: a language switch never relabels an existing note.
+    return `---\n${stringifyYaml(fm)}---\n${localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
   }
 
   async createNote(
@@ -1506,7 +1613,7 @@ export class Repository {
     const created = await this.createUniqueNote(
       folder,
       title,
-      `---\n${stringifyYaml(metadata)}---\n${noteBody(title, initial.summary ?? placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), initial.detail ?? "", "", "", origin)}`,
+      `---\n${stringifyYaml(metadata)}---\n${localizeHeadings(noteBody(title, initial.summary ?? placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), initial.detail ?? "", "", "", origin), this.headingsFor(this.noteLanguage))}`,
       onCreate
     );
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -1546,7 +1653,7 @@ export class Repository {
     path: string,
     id: string,
     initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "prompt"> & {
-      /** Language of the placeholder text only (AIM content language); section headings stay in the interface language. */
+      /** Language of the placeholder text (AIM content language); headings follow it too: English content, English headings (C8). */
       contentLanguage?: NoteLanguage;
     } = {}
   ): Promise<MapNode> {
@@ -1583,7 +1690,7 @@ export class Repository {
     const origin = initial.thinkingOrigin ? `## Thinking Origin\n\n${originMarkdown(initial.thinkingOrigin)}` : "";
     await this.app.vault.create(
       path,
-      `---\n${stringifyYaml(metadata)}---\n${noteBody(title, metadata.summary, this.noteLanguage, initial.prompt ?? "", "", placeholder(textLanguage), initial.detail ?? "", "", "", origin)}`
+      `---\n${stringifyYaml(metadata)}---\n${localizeHeadings(noteBody(title, metadata.summary, this.noteLanguage, initial.prompt ?? "", "", placeholder(textLanguage), initial.detail ?? "", "", "", origin), this.headingsFor(textLanguage))}`
     );
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
@@ -2456,7 +2563,7 @@ export class Repository {
       language,
       textLanguage
     );
-    return `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm, language)}`;
+    return `---\n${stringifyYaml(fm)}---\n${localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
   }
 
   async ensureNodePresentation(): Promise<void> {

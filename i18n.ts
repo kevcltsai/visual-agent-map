@@ -11,6 +11,8 @@ import {
   type LanguageEntry,
   type OutputLanguageEntry,
   type OutputOnlyId,
+  type NoteHeadings,
+  type NoteHeadingName,
   type NoteLanguage,
   type PromptNameForm,
   type UiLanguage
@@ -21,7 +23,7 @@ import {
  * Interface surfaces (`UiLanguage`) never take the output-only ids.
  */
 export type ContentLanguage = UiLanguage | OutputOnlyId;
-export type { FollowAnchor, FollowAnchorKind, InstructionLanguage, NoteLanguage, OutputLanguageEntry, OutputOnlyId, PromptNameForm, TranslationKey, UiLanguage };
+export type { FollowAnchor, FollowAnchorKind, InstructionLanguage, NoteHeadingName, NoteHeadings, NoteLanguage, OutputLanguageEntry, OutputOnlyId, PromptNameForm, TranslationKey, UiLanguage };
 export { FOLLOW_INPUT_ID, LANGUAGES, OUTPUT_LANGUAGES };
 
 const registry: ReadonlyArray<LanguageEntry> = LANGUAGES;
@@ -33,6 +35,16 @@ const entryOf = (locale: ContentLanguage): LanguageEntry | OutputLanguageEntry =
   outputRegistry.find(item => item.id === locale) ??
   registry.find(item => item.id === FALLBACK_LANGUAGE)!;
 
+/** The section headings a new note gets under interface language `locale` (an unknown id reads the fallback row). */
+export function noteHeadingsOf(locale: UiLanguage): NoteHeadings {
+  return (registry.find(item => item.id === locale) ?? registry.find(item => item.id === FALLBACK_LANGUAGE)!).noteHeadings;
+}
+/** Every registered heading set, in registry order: a note written with any of them is read (C8). */
+export const NOTE_HEADING_SETS: readonly NoteHeadings[] = registry.map(item => item.noteHeadings);
+/** The interface language a registered heading set belongs to (the fallback language for a set not in the registry). */
+export function uiLanguageOfHeadings(set: NoteHeadings): UiLanguage {
+  return (registry.find(item => item.noteHeadings === set)?.id ?? FALLBACK_LANGUAGE) as UiLanguage;
+}
 /** Every language fixed note text can be written in (the registry's distinct `note` values), in registry order. */
 export const NOTE_LANGUAGES: readonly NoteLanguage[] = [...new Set(registry.map(item => item.note))];
 

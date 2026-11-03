@@ -96,15 +96,16 @@ test('hover helpers extract image and table from user notes markdown', () => {
 integrationTest('new notes omit inactive rules and working findings; clearing legacy findings removes the section', async () => {
   const { repo, contents } = fixture(), n = await topicNote(repo, 'Direct write', 'a');
   // Answer first: summary, Preview (when written), Detail; an empty Prompt is not written.
-  assert.match(contents.get(n.path), /## Current Summary[\s\S]*## Detail/);
+  // The zh-TW interface writes zh-TW headings (C8).
+  assert.match(contents.get(n.path), /## 目前摘要[\s\S]*## 詳細內容/);
   assert.doesNotMatch(contents.get(n.path), /## 預覽|\[!info\]- 預覽/, 'an empty (placeholder) Preview is not written');
-  assert.doesNotMatch(contents.get(n.path), /## Prompt/);
-  assert.doesNotMatch(contents.get(n.path), /## Rules/);
-  assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
+  assert.doesNotMatch(contents.get(n.path), /## Prompt|\[!info\]- (Prompt|提示)/);
+  assert.doesNotMatch(contents.get(n.path), /## (Rules|規則)/);
+  assert.doesNotMatch(contents.get(n.path), /## (Working Findings|進行中的發現)/);
   await repo.updateNote(n.path, { newFindings: 'Legacy finding' });
-  assert.match(contents.get(n.path), /## Working Findings\n\nLegacy finding/);
+  assert.match(contents.get(n.path), /## 進行中的發現\n\nLegacy finding/);
   await repo.updateNote(n.path, { newFindings: '' });
-  assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
+  assert.doesNotMatch(contents.get(n.path), /## (Working Findings|進行中的發現)/);
   assert.equal((await repo.readNote(n.path)).newFindings, '');
 });
 integrationTest('the "no conclusion yet" placeholder in a task prompt follows the output language, not the interface language (D-2026-10-96)', async () => {

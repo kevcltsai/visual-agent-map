@@ -24,6 +24,16 @@ export type NoteLanguage = "zh-TW" | "en";
 export type PromptNameForm = "plain" | "region" | "usage";
 export type PromptNames = Readonly<Record<InstructionLanguage, Readonly<Record<PromptNameForm, string>>>>;
 
+/** The managed section headings of a topic note, by their English (canonical) names. */
+export type NoteHeadingName =
+  "Current Summary" | "Detail" | "Prompt" | "Rules" | "Working Findings" | "Thinking Origin" | "Reference Links";
+/**
+ * A note's section headings in one interface language (C8). They are part of the note format: a note keeps the
+ * headings it was written with, and VAM reads every row's headings, so a published row's texts must never change
+ * (a change would leave older notes unreadable). Keep them out of the dictionaries for that reason.
+ */
+export type NoteHeadings = Readonly<Record<NoteHeadingName, string>>;
+
 export interface LanguageEntry {
   /** Persisted interface-language value. */
   readonly id: string;
@@ -38,6 +48,8 @@ export interface LanguageEntry {
   readonly prompt: PromptNames;
   /** The language's dictionary; keys it lacks fall back to English at lookup time. */
   readonly dictionary: Readonly<Partial<Record<TranslationKey, string>>>;
+  /** Section headings a new note is written with under this interface language. */
+  readonly noteHeadings: NoteHeadings;
 }
 
 /**
@@ -61,7 +73,16 @@ export const LANGUAGES = [
         usage: "Traditional Chinese (Taiwan usage)"
       }
     },
-    dictionary: zhTW
+    dictionary: zhTW,
+    noteHeadings: {
+      "Current Summary": "目前摘要",
+      Detail: "詳細內容",
+      Prompt: "提示",
+      Rules: "規則",
+      "Working Findings": "進行中的發現",
+      "Thinking Origin": "思考起點",
+      "Reference Links": "關聯連結"
+    }
   },
   {
     id: "zh-CN",
@@ -80,7 +101,16 @@ export const LANGUAGES = [
         usage: "Simplified Chinese (Mainland China usage)"
       }
     },
-    dictionary: zhCN
+    dictionary: zhCN,
+    noteHeadings: {
+      "Current Summary": "当前摘要",
+      Detail: "详细内容",
+      Prompt: "提示",
+      Rules: "规则",
+      "Working Findings": "进行中的发现",
+      "Thinking Origin": "思考起点",
+      "Reference Links": "关联链接"
+    }
   },
   {
     id: "en",
@@ -93,7 +123,16 @@ export const LANGUAGES = [
       zh: { plain: "英文", region: "英文", usage: "英文" },
       en: { plain: "English", region: "English", usage: "English" }
     },
-    dictionary: en
+    dictionary: en,
+    noteHeadings: {
+      "Current Summary": "Current Summary",
+      Detail: "Detail",
+      Prompt: "Prompt",
+      Rules: "Rules",
+      "Working Findings": "Working Findings",
+      "Thinking Origin": "Thinking Origin",
+      "Reference Links": "Reference Links"
+    }
   }
 ] as const satisfies ReadonlyArray<LanguageEntry>;
 

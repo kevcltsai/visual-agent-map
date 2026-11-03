@@ -46,7 +46,8 @@ module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 var import_state = require("@codemirror/state");
 var import_view = require("@codemirror/view");
-var markerLine = /^\s*<!-- visual-agent-map:(?:detail|references):(?:start|end) -->\s*$/;
+var INTERNAL_MARKER_LINE = /^\s*<!--\s*(?:visual-agent-map:(?:detail|references):(?:start|end)|aim-open-items\s+\[[^\n]*\])\s*-->\s*$/;
+var markerLine = INTERNAL_MARKER_LINE;
 function decorations(view) {
   const builder = new import_state.RangeSetBuilder();
   if (!view.state.field(import_obsidian.editorLivePreviewField, false)) return builder.finish();
@@ -7384,7 +7385,16 @@ var LANGUAGES = [
         usage: "Traditional Chinese (Taiwan usage)"
       }
     },
-    dictionary: zhTW
+    dictionary: zhTW,
+    noteHeadings: {
+      "Current Summary": "\u76EE\u524D\u6458\u8981",
+      Detail: "\u8A73\u7D30\u5167\u5BB9",
+      Prompt: "\u63D0\u793A",
+      Rules: "\u898F\u5247",
+      "Working Findings": "\u9032\u884C\u4E2D\u7684\u767C\u73FE",
+      "Thinking Origin": "\u601D\u8003\u8D77\u9EDE",
+      "Reference Links": "\u95DC\u806F\u9023\u7D50"
+    }
   },
   {
     id: "zh-CN",
@@ -7403,7 +7413,16 @@ var LANGUAGES = [
         usage: "Simplified Chinese (Mainland China usage)"
       }
     },
-    dictionary: zhCN
+    dictionary: zhCN,
+    noteHeadings: {
+      "Current Summary": "\u5F53\u524D\u6458\u8981",
+      Detail: "\u8BE6\u7EC6\u5185\u5BB9",
+      Prompt: "\u63D0\u793A",
+      Rules: "\u89C4\u5219",
+      "Working Findings": "\u8FDB\u884C\u4E2D\u7684\u53D1\u73B0",
+      "Thinking Origin": "\u601D\u8003\u8D77\u70B9",
+      "Reference Links": "\u5173\u8054\u94FE\u63A5"
+    }
   },
   {
     id: "en",
@@ -7416,7 +7435,16 @@ var LANGUAGES = [
       zh: { plain: "\u82F1\u6587", region: "\u82F1\u6587", usage: "\u82F1\u6587" },
       en: { plain: "English", region: "English", usage: "English" }
     },
-    dictionary: en
+    dictionary: en,
+    noteHeadings: {
+      "Current Summary": "Current Summary",
+      Detail: "Detail",
+      Prompt: "Prompt",
+      Rules: "Rules",
+      "Working Findings": "Working Findings",
+      "Thinking Origin": "Thinking Origin",
+      "Reference Links": "Reference Links"
+    }
   }
 ];
 var FOLLOW_ANCHOR_KINDS = {
@@ -7577,6 +7605,15 @@ var entryOf = (locale) => {
   var _a2, _b2;
   return (_b2 = (_a2 = registry.find((item) => item.id === locale)) != null ? _a2 : outputRegistry.find((item) => item.id === locale)) != null ? _b2 : registry.find((item) => item.id === FALLBACK_LANGUAGE);
 };
+function noteHeadingsOf(locale) {
+  var _a2;
+  return ((_a2 = registry.find((item) => item.id === locale)) != null ? _a2 : registry.find((item) => item.id === FALLBACK_LANGUAGE)).noteHeadings;
+}
+var NOTE_HEADING_SETS = registry.map((item) => item.noteHeadings);
+function uiLanguageOfHeadings(set) {
+  var _a2, _b2;
+  return (_b2 = (_a2 = registry.find((item) => item.noteHeadings === set)) == null ? void 0 : _a2.id) != null ? _b2 : FALLBACK_LANGUAGE;
+}
 var NOTE_LANGUAGES = [...new Set(registry.map((item) => item.note))];
 var SUPPORTED_LANGUAGES = LANGUAGES.map(({ id, label, name }) => ({ id, label, name }));
 var OUTPUT_LANGUAGE_CHOICES = outputRegistry.filter((item) => !item.followsInput).map(({ id, label, name }) => ({ id, label, name }));
@@ -22112,9 +22149,68 @@ var noteContentLanguage = (fm) => isNoteLanguage(fm["content-language"]) ? fm["c
 var placeholder = (language2) => translate(language2, "detail.no_conclusion_yet");
 var isPlaceholder = (value) => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
 var previewHeading = (language2) => translate(language2, "detail.preview");
+var CANONICAL_HEADINGS = Object.freeze(
+  Object.fromEntries(Object.keys(NOTE_HEADING_SETS[0]).map((name) => [name, name]))
+);
+var isCanonical = (set) => set.Detail === CANONICAL_HEADINGS.Detail;
+function noteHeadingSet(content) {
+  var _a2, _b2;
+  const start = content.indexOf(DETAIL_START);
+  if (start < 0) return void 0;
+  const heading = (_a2 = [...content.slice(0, start).matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)) == null ? void 0 : _a2[1];
+  return (_b2 = NOTE_HEADING_SETS.find((set) => !isCanonical(set) && set.Detail === heading)) != null ? _b2 : CANONICAL_HEADINGS;
+}
+function writtenHeadingSet(content, fallback) {
+  const set = noteHeadingSet(content);
+  if (set) return set;
+  return /^## (?:Current Summary|Detail|Prompt)[ \t]*\r?$/m.test(content) ? CANONICAL_HEADINGS : fallback;
+}
+var CALLOUT_TITLE = /^(> \[!info\][+-]? )(.+?)([ \t]*\r?)$/;
+function renameManagedHeadings(content, rename) {
+  var _a2;
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  let inDetail = false;
+  let origin = "none";
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    if (line.trim() === DETAIL_START) inDetail = true;
+    if (line.trim() === DETAIL_END) inDetail = false;
+    if (inDetail || code[index]) continue;
+    if (origin === "heading" && line.startsWith(">")) origin = "quote";
+    else if (origin === "heading" && line.trim()) origin = "none";
+    else if (origin === "quote" && !line.startsWith(">")) origin = "none";
+    if (origin === "quote") continue;
+    const heading = /^## (.+?)([ \t]*\r?)$/.exec(line);
+    const callout = heading ? null : CALLOUT_TITLE.exec(line);
+    const current = (_a2 = heading == null ? void 0 : heading[1]) != null ? _a2 : callout == null ? void 0 : callout[2];
+    const next = current === void 0 ? void 0 : rename(current, heading ? "heading" : "callout");
+    if (next !== void 0 && next !== current)
+      lines[index] = heading ? `## ${next}${heading[2]}` : `${callout[1]}${next}${callout[3]}`;
+    if (heading && (current === "Thinking Origin" || next === "Thinking Origin")) origin = "heading";
+  }
+  return lines.join("\n");
+}
+function canonicalHeadings(content, set) {
+  if (isCanonical(set)) return content;
+  const back = new Map(Object.entries(set).map(([english, local]) => [local, english]));
+  return renameManagedHeadings(content, (text11, kind) => {
+    const english = back.get(text11);
+    return kind === "callout" === (english === "Prompt") ? english : void 0;
+  });
+}
+function localizeHeadings(content, set) {
+  if (isCanonical(set)) return content;
+  const names3 = set;
+  return renameManagedHeadings(
+    content,
+    (text11, kind) => Object.hasOwn(names3, text11) && kind === "callout" === (text11 === "Prompt") ? names3[text11] : void 0
+  );
+}
 var CALLOUT_SECTION = /^> \[!info\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
 function decodeCalloutSections(content) {
-  const lines = content.split("\n");
+  var _a2;
+  const lines = canonicalHeadings(content, (_a2 = noteHeadingSet(content)) != null ? _a2 : CANONICAL_HEADINGS).split("\n");
   const code = fencedLines(lines);
   const out = [];
   let inDetail = false;
@@ -22544,8 +22640,9 @@ var Repository = class {
    * of such text uses this, so no write path can relabel a note just because the UI language differs.
    */
   scaffoldLanguage(content, fm) {
-    var _a2;
-    return (_a2 = derivedLabelLanguage(content, fm)) != null ? _a2 : this.noteLanguage;
+    var _a2, _b2, _c;
+    const headings = (_a2 = noteHeadingSet(content)) != null ? _a2 : CANONICAL_HEADINGS;
+    return (_c = (_b2 = derivedLabelLanguage(canonicalHeadings(content, headings), fm)) != null ? _b2 : isCanonical(headings) ? void 0 : noteLanguageOf(uiLanguageOfHeadings(headings))) != null ? _c : this.noteLanguage;
   }
   /** Called from onunload: no later write (including a rollback) may happen. */
   dispose() {
@@ -22557,6 +22654,13 @@ var Repository = class {
   /** The language fixed note text is written in for the current interface language (always "zh-TW" or "en"). */
   get noteLanguage() {
     return noteLanguageOf(this.settings.language);
+  }
+  /**
+   * The language a new note's section headings are written in (C8): the interface language, unless the note's fixed
+   * text is in another language (an AIM note in English under a Chinese interface keeps English headings).
+   */
+  headingsFor(textLanguage) {
+    return noteHeadingsOf(contentLocale(textLanguage, uiLocale(this.settings.language)));
   }
   message(key2) {
     return translate(this.settings.language, key2);
@@ -22888,7 +22992,7 @@ var Repository = class {
     );
     return `---
 ${(0, import_obsidian11.stringifyYaml)(fm)}---
-${withReferenceLinks(body, fm, language2)}`;
+${localizeHeadings(withReferenceLinks(body, fm, language2), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
   }
   async createNote(title, model, map, mapPath, modelSource, initial = {}, onCreate) {
     var _a2, _b2, _c, _d;
@@ -22922,7 +23026,7 @@ ${originMarkdown(initial.thinkingOrigin)}` : "";
       title,
       `---
 ${(0, import_obsidian11.stringifyYaml)(metadata)}---
-${noteBody(title, (_c = initial.summary) != null ? _c : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_d = initial.detail) != null ? _d : "", "", "", origin)}`,
+${localizeHeadings(noteBody(title, (_c = initial.summary) != null ? _c : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_d = initial.detail) != null ? _d : "", "", "", origin), this.headingsFor(this.noteLanguage))}`,
       onCreate
     );
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -22985,7 +23089,7 @@ ${originMarkdown(initial.thinkingOrigin)}` : "";
       path,
       `---
 ${(0, import_obsidian11.stringifyYaml)(metadata)}---
-${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != null ? _d : "", "", placeholder(textLanguage), (_e = initial.detail) != null ? _e : "", "", "", origin)}`
+${localizeHeadings(noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != null ? _d : "", "", placeholder(textLanguage), (_e = initial.detail) != null ? _e : "", "", "", origin), this.headingsFor(textLanguage))}`
     );
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
@@ -23751,7 +23855,7 @@ ${body}`);
     );
     return `---
 ${(0, import_obsidian11.stringifyYaml)(fm)}---
-${withReferenceLinks(body, fm, language2)}`;
+${localizeHeadings(withReferenceLinks(body, fm, language2), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
   }
   async ensureNodePresentation() {
     for (const file of await this.markedFiles("agent-map-node")) {

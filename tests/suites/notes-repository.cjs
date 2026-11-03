@@ -13,7 +13,7 @@ integrationTest('editing note fields preserves latest AI detail and unrelated fr
   assert.equal(result.detail, '## Nested heading\n\nAI result with $& and ```code```'); assert.equal(result.prompt, 'A task with $&'); assert.equal(result.model, 'model-b'); assert.equal(result.status, 'completed');
   assert.equal(result.reasoning, 'high');
   assert.equal(result.newFindings, 'Fresh research');
-  assert.match(contents.get(n.path), /## Working Findings\n\nFresh research/);
+  assert.match(contents.get(n.path), /## 進行中的發現\n\nFresh research/, 'a note made with the zh-TW interface has zh-TW headings (C8)');
   assert.match(contents.get(n.path), /custom: retain me/);
 });
 integrationTest('local research mode persists; a missing or unrecognised research-mode reads as Quick, an explicit research stays Standard; a stored research-depth line is ignored on read and left as it is on write', async () => {
@@ -53,11 +53,11 @@ integrationTest('a new topic note stores research-mode only when its creator ask
 });
 integrationTest('current summary is editable in the Markdown body', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Editable summary');
-  assert.match(contents.get(n.path), /## Current Summary\n\n尚未形成結論/);
+  assert.match(contents.get(n.path), /## 目前摘要\n\n尚未形成結論/);
   await repo.updateNote(n.path, { summary: 'AI conclusion that can be edited' });
   assert.match(contents.get(n.path), /summary: AI conclusion that can be edited/);
-  assert.match(contents.get(n.path), /## Current Summary\n\nAI conclusion that can be edited/);
-  contents.set(n.path, contents.get(n.path).replace('## Current Summary\n\nAI conclusion that can be edited', '## Current Summary\n\nUser-edited conclusion'));
+  assert.match(contents.get(n.path), /## 目前摘要\n\nAI conclusion that can be edited/);
+  contents.set(n.path, contents.get(n.path).replace('## 目前摘要\n\nAI conclusion that can be edited', '## 目前摘要\n\nUser-edited conclusion'));
   assert.equal((await repo.readNote(n.path)).summary, 'User-edited conclusion');
 });
 integrationTest('English notes use English preview, pending summary, and managed reference labels', async () => {
@@ -96,7 +96,7 @@ integrationTest('a language switch never relabels an existing note: writes and r
   await repo.updateNote(note.path, { model: 'model-b' });
   let markdown = contents.get(note.path);
   assert.doesNotMatch(markdown, /\[!info\]- (預覽|Preview)/, 'an empty (placeholder) Preview is not written');
-  assert.match(markdown, /## Current Summary\n\n尚未形成結論/);
+  assert.match(markdown, /## 目前摘要\n\n尚未形成結論/, 'the headings stay in the language the note was written in');
   assert.match(markdown, /- 所屬主題：\[\[/);
   assert.match(markdown, /- 來源議題：\[\[Source\]\]/);
   assert.match(markdown, /Keep detail/);
@@ -110,7 +110,8 @@ integrationTest('a language switch never relabels an existing note: writes and r
   assert.equal((await repo.readNote(note.path)).preview, 'My own preview');
   const fresh = await repo.createNote('Fresh', 'model-a', map, mapPath, 'workspace');
   map.nodes.push(fresh); await repo.saveMap(mapPath, map); await repo.rebuildDerivedData();
-  assert.doesNotMatch(contents.get(fresh.path), /預覽|尚未形成結論/, 'a new note uses the current UI language');
+  assert.doesNotMatch(contents.get(fresh.path), /預覽|尚未形成結論|目前摘要|詳細內容/, 'a new note uses the current UI language');
+  assert.match(contents.get(fresh.path), /## Current Summary\n/);
   assert.match(contents.get(fresh.path), /- Topic: \[\[/);
   const bare = 'Agent Workspace/Unfiled/Bare.md';
   await repo.folder('Agent Workspace/Unfiled');
@@ -178,7 +179,7 @@ integrationTest('managed references stay outside Detail and preserve user-author
   await repo.rebuildDerivedData();
   let text = contents.get(n.path);
   assert.match(text, /visual-agent-map:references:start/);
-  assert.match(text, /## Reference Links/);
+  assert.match(text, /## 關聯連結/);
   assert.match(text, /agent-map-references:/);
   assert.doesNotMatch((await repo.readNote(n.path)).detail, /關聯議題/);
   text = text.replace('<!-- visual-agent-map:detail:end -->', '<!-- visual-agent-map:detail:end -->\n\n## User notes\n\nUser content'); contents.set(n.path, text);
@@ -391,7 +392,7 @@ integrationTest('full auto layout can be undone without changing parent links', 
 integrationTest('legacy User Notes move to preview without losing either section or duplicating on save', async () => {
   const { repo, contents } = fixture(), n = await topicNote(repo, 'Legacy preview');
   await repo.updateNote(n.path, { preview: 'New preview' });
-  contents.set(n.path, contents.get(n.path).replace('## Detail', '## User Notes\n\nLegacy text\n\n## Detail'));
+  contents.set(n.path, contents.get(n.path).replace('## 詳細內容', '## User Notes\n\nLegacy text\n\n## 詳細內容'));
   assert.equal((await repo.readNote(n.path)).preview, 'New preview\n\nLegacy text');
   await repo.updateNote(n.path, { summary: 'AI summary' });
   await repo.updateNote(n.path, { detail: 'AI detail' });
@@ -425,7 +426,7 @@ integrationTest('Rewire 形狀舊筆記更新: legacy single-paragraph preview w
   const { repo, contents } = fixture(), n = await topicNote(repo, 'Rewire');
   await repo.updateNote(n.path, { summary: '舊摘要' });
   const legacy = () => contents.get(n.path).replace(/^preview-auto-hash:.*\n/m, '');
-  contents.set(n.path, legacy().replace('## Detail', '## User Notes\n\n![[image 2.png]]\n\n## Detail'));
+  contents.set(n.path, legacy().replace('## 詳細內容', '## User Notes\n\n![[image 2.png]]\n\n## 詳細內容'));
   assert.doesNotMatch(contents.get(n.path), /preview-auto-hash/);
   assert.equal((await repo.readNote(n.path)).preview, '舊摘要\n\n![[image 2.png]]');
   await repo.updateNote(n.path, { summary: '新摘要' });
@@ -505,7 +506,7 @@ integrationTest('undo and redo of a summary change restore the preview text, pre
 integrationTest('counterexample: undo of a card summary change on a note with an unmerged User Notes image keeps the image, redo restores summary plus image (packet 1-fix F1)', async () => {
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo usernotes');
   await repo.updateNote(n.path, { summary: '舊摘要' });
-  contents.set(n.path, contents.get(n.path).replace(/^preview-auto-hash:.*\n/m, '').replace('## Detail', '## User Notes\n\n![[image 2.png]]\n\n## Detail'));
+  contents.set(n.path, contents.get(n.path).replace(/^preview-auto-hash:.*\n/m, '').replace('## 詳細內容', '## User Notes\n\n![[image 2.png]]\n\n## 詳細內容'));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
   view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
@@ -594,10 +595,10 @@ integrationTest('references in synthesized notes remain clickable after rebuildi
   await repo.updateNote(integrated.path, {sourcePaths: [first.path, second.path], detail: 'Knowledge'});
   await repo.rebuildDerivedData(); await repo.updateNote(integrated.path, {summary: 'Updated'}); await repo.rebuildDerivedData();
   const text = contents.get(integrated.path);
-  assert.match(text, /## Reference Links/);
+  assert.match(text, /## 關聯連結/);
   assert.ok(text.includes('[[' + first.path.replace(/\.md$/, '') + ']]'));
   assert.ok(text.includes('[[' + second.path.replace(/\.md$/, '') + ']]'));
-  assert.equal((text.match(/## Reference Links/g) || []).length, 1);
+  assert.equal((text.match(/## 關聯連結/g) || []).length, 1);
   assert.equal((await repo.readNote(integrated.path)).detail, 'Knowledge');
   const renamed = await repo.renameNote(first.path, 'Source renamed'); await repo.rebuildDerivedData();
   assert.ok(contents.get(integrated.path).includes('[[' + renamed.replace(/\.md$/, '') + ']]'));
@@ -2218,4 +2219,89 @@ integrationTest('C3: mapSwitcherItems gives each readable map its topic count, M
   assert.equal(byPath.get(empty).topicCount, 0);
   const root = withTopic.slice(0, withTopic.lastIndexOf('/'));
   assert.equal(byPath.get(withTopic).folder, root.slice(0, root.lastIndexOf('/')), 'the folder holding the topic folder');
+});
+// ---- C8: section headings in the note's language; old English notes keep reading and keep their headings ----------
+const c8Strip = text => text.replace(/^updated:.*\n/m, '');
+const c8Legacy = (extra = '') => `---\nagent-map-node: true\nnode-id: legacy-1\ntitle: Old note\nsummary: Old summary\nstatus: completed\ncssclasses:\n  - visual-agent-map-node\n---\n# Old note\n\n## Current Summary\n\nOld summary\n\n> [!info]- 預覽\n> Old preview\n\n## Detail\n\n<!-- visual-agent-map:detail:start -->\n### Facts\n\nOld detail\n<!-- visual-agent-map:detail:end -->\n\n> [!info]- Prompt\n> Old task\n\n## Rules\n\nOld rule\n\n## Working Findings\n\nOld finding\n${extra}`;
+integrationTest('C8 old format: a note with English headings and the current markers reads every section under the zh-TW interface, and writes keep its English headings', async () => {
+  const { repo, contents, app } = fixture();
+  const path = 'Agent Workspace/Topics/map-a/Notes/Old note.md';
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-a');
+  await app.vault.create(path, c8Legacy('\n## 規則\n\nMy own heading that only reads like a managed one\n'));
+  let note = await repo.readNote(path);
+  assert.equal(note.summary, 'Old summary'); assert.equal(note.detail, '### Facts\n\nOld detail'); assert.equal(note.prompt, 'Old task');
+  assert.equal(note.rules, 'Old rule'); assert.equal(note.newFindings, 'Old finding'); assert.equal(note.preview, 'Old preview');
+  await repo.updateNote(path, { summary: 'New summary', detail: 'New detail' });
+  const text = contents.get(path);
+  for (const heading of ['## Current Summary', '## Detail', '> [!info]- Prompt', '## Rules', '## Working Findings']) assert.ok(text.includes(heading), `${heading} stays`);
+  assert.doesNotMatch(text, /目前摘要|詳細內容|\[!info\]- 提示|進行中的發現/, 'no forced migration');
+  assert.match(text, /## 規則\n\nMy own heading/, 'a user heading in an English note is the user\'s own section, not Rules');
+  note = await repo.readNote(path);
+  assert.equal(note.rules, 'Old rule'); assert.equal(note.summary, 'New summary'); assert.equal(note.detail, 'New detail');
+  const once = c8Strip(contents.get(path));
+  await repo.updateNote(path, {}); await repo.rebuildDerivedData();
+  assert.equal(c8Strip(contents.get(path)), once, 'a write that changes nothing leaves the old note as it was');
+});
+integrationTest('C8 new format: a note made under zh-TW gets zh-TW headings and the Prompt callout title 提示, and every section reads back', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo, '新議題');
+  await repo.updateNote(n.path, { summary: '結論', detail: '### 重點\n\n## 目前摘要 (a line in Detail is content)\n\n正文', prompt: '研究這個', rules: '只用中文', newFindings: '發現', thinkingOrigin: '來源文字\n## 目前摘要' });
+  const text = contents.get(n.path);
+  for (const heading of ['## 目前摘要\n\n結論', '## 詳細內容\n\n<!-- visual-agent-map:detail:start -->', '> [!info]- 提示\n> 研究這個', '## 規則\n\n只用中文', '## 進行中的發現\n\n發現', '## 思考起點\n\n> 來源文字'])
+    assert.ok(text.includes(heading), `${JSON.stringify(heading)} in\n${text}`);
+  assert.doesNotMatch(text, /^## (Current Summary|Detail|Rules|Working Findings|Thinking Origin)\s*$|\[!info\]- Prompt/m);
+  assert.match(text, /## 目前摘要 \(a line in Detail is content\)/, 'Detail text is never renamed');
+  const note = await repo.readNote(n.path);
+  assert.equal(note.summary, '結論'); assert.equal(note.prompt, '研究這個'); assert.equal(note.rules, '只用中文'); assert.equal(note.newFindings, '發現');
+  assert.equal(note.thinkingOrigin, '來源文字\n## 目前摘要'); assert.match(note.detail, /^### 重點/);
+  const once = c8Strip(contents.get(n.path));
+  await repo.updateNote(n.path, {});
+  assert.equal(c8Strip(contents.get(n.path)), once, 'writing the same note again changes nothing');
+  await repo.createMap('Map A', [n]); await repo.rebuildDerivedData();
+  const owned = c8Strip(contents.get(n.path));
+  assert.match(owned, /## 關聯連結/, 'the rebuild writes Reference Links in the note\'s heading language');
+  await repo.rebuildDerivedData();
+  assert.equal(c8Strip(contents.get(n.path)), owned, 'a second rebuild changes nothing');
+});
+integrationTest('C8 language switch: a note keeps the heading language it was written in; new notes follow the interface (zh-CN gets Simplified headings, English content keeps English ones)', async () => {
+  const { repo, contents } = fixture(); const tw = await topicNote(repo, '繁中議題');
+  repo.settings.language = 'en';
+  await repo.updateNote(tw.path, { summary: 'Written after the switch', newFindings: 'More' });
+  assert.match(contents.get(tw.path), /## 目前摘要\n\nWritten after the switch/);
+  assert.match(contents.get(tw.path), /## 進行中的發現\n\nMore/);
+  assert.equal((await repo.readNote(tw.path)).summary, 'Written after the switch');
+  const en = await topicNote(repo, 'English topic', 'model-a', 'map-b');
+  assert.match(contents.get(en.path), /## Current Summary\n[\s\S]*## Detail\n/);
+  repo.settings.language = 'zh-CN';
+  const cn = await topicNote(repo, '简体议题', 'model-a', 'map-c');
+  await repo.updateNote(cn.path, { rules: '规则内容' });
+  assert.match(contents.get(cn.path), /## 当前摘要\n[\s\S]*## 详细内容\n[\s\S]*## 规则\n\n规则内容/);
+  repo.settings.language = 'zh-TW';
+  await repo.updateNote(cn.path, { summary: '切換後' }); await repo.updateNote(en.path, { summary: 'Still English' });
+  assert.match(contents.get(cn.path), /## 当前摘要\n\n切換後/, 'zh-CN headings stay Simplified');
+  assert.match(contents.get(en.path), /## Current Summary\n\nStill English/, 'English headings stay English');
+  assert.equal((await repo.readNote(cn.path)).rules, '规则内容');
+  const mapPath = await repo.createMap('AIM English'); const map = await repo.readMap(mapPath);
+  const reserved = `${repo.topicFolder(mapPath, 'Notes')}/English AIM note.md`;
+  const aim = await repo.createNoteAt('English AIM note', 'model-a', map, mapPath, 'workspace', reserved, 'aim-en', { contentLanguage: 'en' });
+  assert.match(contents.get(aim.path), /## Current Summary\n\nNo conclusion yet/, 'an English-content note keeps English headings under a Chinese interface');
+  assert.doesNotMatch(contents.get(aim.path), /目前摘要|詳細內容/);
+});
+test('C8 heading language: only the managed Detail heading decides; the marker line is hidden in Live Preview and when shown as text', () => {
+  const { noteHeadingLanguage, localizeHeadings } = load('repository.ts', { obsidian });
+  const body = heading => `# T\n\n## Current Summary\n\nx\n\n## ${heading}\n\n<!-- visual-agent-map:detail:start -->\nd\n<!-- visual-agent-map:detail:end -->\n`;
+  assert.equal(noteHeadingLanguage(body('Detail')), 'en');
+  assert.equal(noteHeadingLanguage(body('詳細內容')), 'zh-TW');
+  assert.equal(noteHeadingLanguage(body('详细内容')), 'zh-CN');
+  assert.equal(noteHeadingLanguage('# T\n\n## 詳細內容\n\nno marker'), 'en', 'no marker: an older note, English');
+  const { noteHeadingsOf, LANGUAGES } = load('i18n.ts');
+  assert.equal(localizeHeadings(body('Detail'), noteHeadingsOf('en')), body('Detail'));
+  const fenced = '## Current Summary\n\n```\n## Current Summary\n```\n';
+  assert.equal(localizeHeadings(fenced, noteHeadingsOf('zh-TW')), '## 目前摘要\n\n```\n## Current Summary\n```\n', 'code is never renamed');
+  // Every registered row names every heading, and no two rows share a Detail heading (it decides a note's set).
+  const details = LANGUAGES.map(row => row.noteHeadings.Detail);
+  assert.equal(new Set(details).size, details.length);
+  for (const row of LANGUAGES) assert.deepEqual(Object.keys(row.noteHeadings).sort(), Object.keys(noteHeadingsOf('en')).sort(), row.id);
+  const { INTERNAL_MARKER_LINE } = load('experiences/markdown-context/internal-markers.ts', { obsidian: { ...obsidian, editorLivePreviewField: {} } });
+  for (const line of ['<!-- visual-agent-map:detail:start -->', '<!-- visual-agent-map:references:end -->', '<!-- aim-open-items ["a","b"] -->']) assert.ok(INTERNAL_MARKER_LINE.test(line), line);
+  assert.equal(INTERNAL_MARKER_LINE.test('<!-- a user comment -->'), false, 'a user comment is left alone');
 });

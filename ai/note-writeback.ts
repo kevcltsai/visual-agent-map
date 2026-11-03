@@ -190,11 +190,21 @@ function logMarker(oldLines: string[]): string {
   return last ? (/^\s*[-*+]\s+/.exec(last)?.[0] ?? "") : "";
 }
 
-/** The log section's body lines: non-empty, placeholders left out. */
+/** Line indexes that belong to a footnote definition (first line and indented continuation lines). */
+function definitionLines(view: Scan): Set<number> {
+  const found = new Set<number>();
+  for (const item of definitions(view)) for (let line = item.first; line <= item.last; line++) found.add(line);
+  return found;
+}
+
+/** The log section's body lines: non-empty, placeholders and footnote definitions left out. */
 function logLines(view: Scan, key: string): string[] {
   const range = sectionRange(view, key);
   if (!range) return [];
-  return view.lines.slice(range.from, range.to).filter(line => line.trim() && !isPlaceholder(line));
+  const definition = definitionLines(view);
+  return view.lines
+    .slice(range.from, range.to)
+    .filter((line, offset) => line.trim() && !isPlaceholder(line) && !definition.has(range.from + offset));
 }
 
 function logHeadingName(template: DetailTemplate, language: NoteLanguage): string {
@@ -211,8 +221,14 @@ function withLogLines(
 ): string {
   const range = sectionRange(view, key);
   const existing = range ? logLines(view, key) : [];
-  const body = linesFor(existing).join("\n");
+  let body = linesFor(existing).join("\n");
   if (!range) return `${detail.trimEnd()}\n\n### ${heading}\n\n${body}`;
+  // Footnote definitions that sit in the log section stay right after the rewritten log lines.
+  const definition = definitionLines(view);
+  const kept = view.lines
+    .slice(range.from, range.to)
+    .filter((line, offset) => line.trim() && definition.has(range.from + offset));
+  if (kept.length) body = `${body}\n\n${kept.join("\n")}`;
   const before = view.lines.slice(0, range.from).join("\n");
   const after = range.to < view.lines.length ? `\n\n${view.lines.slice(range.to).join("\n")}` : "";
   return `${before}\n\n${body}${after}`;

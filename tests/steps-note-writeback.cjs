@@ -944,3 +944,41 @@ test('F1 log line marker: top, fresh and a merge supplement follow the old log l
   assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, oldDetail: none, mode: 'top', aiDetail: section(names.core, '新') }).detail)).filter(line => !line.includes('本次無新增')), [`${TODAY}　摘要`]);
   assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, oldDetail: section(names.core, '舊'), mode: 'top', aiDetail: section(names.core, '新') }).detail)), [`${TODAY}　摘要`]);
 });
+
+// T8 F1: a footnote definition after the log lines is not a log line (marker, merge, fresh); replayed from the live top case.
+const LOG_DEF_OLD = [
+  `### ${names.core}`, '', '- 舊判斷 CANARY：影響取決於團隊規模。[^1]', '',
+  `### ${names.log}`, '', '- 2026-10-02　整理早期文獻回顧。', '',
+  '[^1]: 早期文獻回顧，2025 年整理。', '  續行文字'
+].join('\n');
+const LOG_DEF_TAIL = ['[^1]: 早期文獻回顧，2025 年整理。', '  續行文字'];
+const logDefBase = { oldDetail: LOG_DEF_OLD, summary: '摘要', template: standard, language: 'zh-TW', now: NOW, backupPath: 'B/x.md' };
+
+test('T8 F1 top: the new log line starts with "- ", follows the old log line and comes before the footnote definition; old text byte-identical', () => {
+  const result = W.composeWriteback({ ...logDefBase, mode: 'top', aiDetail: section(names.core, '新結論') });
+  assert.equal(result.ok, true);
+  const lines = result.detail.split('\n');
+  const at = lines.indexOf(`- ${TODAY}　摘要`);
+  assert.ok(at > 0, 'new line carries the list marker');
+  assert.equal(lines[at - 1], '- 2026-10-02　整理早期文獻回顧。');
+  assert.deepEqual(lines.slice(at + 1).filter(line => line.trim()), LOG_DEF_TAIL);
+  assert.equal(cutInserts(result), LOG_DEF_OLD);
+});
+
+test('T8 F1 merge: a footnote definition after the log is not a log line; the new line has the marker and the definition survives after the log', () => {
+  const ai = `${section(names.core, '新結論[^1][^2]')}\n\n${section(names.log, '- 2026-10-02　整理早期文獻回顧。\n- 2026-11-03　AI 第一行\n- 2026-11-03　AI 第二行')}\n\n${LOG_DEF_TAIL.join('\n')}\n[^2]: 新來源`;
+  const result = W.composeWriteback({ ...logDefBase, mode: 'merge', aiDetail: ai });
+  const log = plain(logBody(result.detail)).filter(line => !line.startsWith('[^') && !line.startsWith('  '));
+  assert.deepEqual(log, ['- 2026-10-02　整理早期文獻回顧。', '- 2026-11-03　AI 第一行；AI 第二行'], 'old line plus exactly one new line');
+  assert.ok(result.detail.includes('[^2]: 新來源'), 'the AI definition stays');
+  assert.equal(result.detail.split('[^1]:').length, 2, 'the definition appears once');
+  assert.ok(result.detail.indexOf('[^1]:') > result.detail.indexOf('AI 第一行'), 'the definition follows the log lines');
+});
+
+test('T8 F1 fresh: the old footnote definition is not copied into the new log; marker kept; the AI definition stays after the log', () => {
+  const ai = `${section(names.core, '全新[^2]')}\n\n${section(names.log, '本次無新增內容。')}\n\n[^2]: 新來源`;
+  const result = W.composeWriteback({ ...logDefBase, mode: 'fresh', aiDetail: ai });
+  assert.deepEqual(plain(logBody(result.detail).slice(0, 2)), ['- 2026-10-02　整理早期文獻回顧。', `- ${TODAY}　已用新研究取代，舊版備份在 B/x.md`]);
+  assert.ok(!result.detail.includes('早期文獻回顧，2025'), 'old definition not copied');
+  assert.ok(result.detail.trimEnd().endsWith('[^2]: 新來源'));
+});

@@ -27668,10 +27668,16 @@ function logMarker(oldLines) {
   const last = oldLines.at(-1);
   return last ? (_b2 = (_a2 = /^\s*[-*+]\s+/.exec(last)) == null ? void 0 : _a2[0]) != null ? _b2 : "" : "";
 }
+function definitionLines(view) {
+  const found = /* @__PURE__ */ new Set();
+  for (const item of definitions(view)) for (let line = item.first; line <= item.last; line++) found.add(line);
+  return found;
+}
 function logLines(view, key2) {
   const range = sectionRange(view, key2);
   if (!range) return [];
-  return view.lines.slice(range.from, range.to).filter((line) => line.trim() && !isPlaceholder2(line));
+  const definition = definitionLines(view);
+  return view.lines.slice(range.from, range.to).filter((line, offset) => line.trim() && !isPlaceholder2(line) && !definition.has(range.from + offset));
 }
 function logHeadingName(template2, language2) {
   var _a2, _b2;
@@ -27680,12 +27686,17 @@ function logHeadingName(template2, language2) {
 function withLogLines(detail, view, key2, heading, linesFor) {
   const range = sectionRange(view, key2);
   const existing = range ? logLines(view, key2) : [];
-  const body = linesFor(existing).join("\n");
+  let body = linesFor(existing).join("\n");
   if (!range) return `${detail.trimEnd()}
 
 ### ${heading}
 
 ${body}`;
+  const definition = definitionLines(view);
+  const kept = view.lines.slice(range.from, range.to).filter((line, offset) => line.trim() && definition.has(range.from + offset));
+  if (kept.length) body = `${body}
+
+${kept.join("\n")}`;
   const before = view.lines.slice(0, range.from).join("\n");
   const after = range.to < view.lines.length ? `
 

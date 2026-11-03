@@ -928,14 +928,28 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     // Committed (change or blur), not while typing: the status rows and the entry value follow the new path.
     if (key === "codexPath" || key === "claudePath") this.updateKeepingFocus();
   }
-  /** Redraws the page; the control that had the keyboard (Tab just moved it) is focused again by its position. */
+  /**
+   * Redraws the page; the control that had the keyboard (Tab just moved it) is focused again. The control is found by what
+   * it is (its setting's name, which of the same-named settings, its label), not by its position: an invalid path adds an
+   * "Installation guide" button, so the number of controls before it changes with the redraw.
+   */
   private updateKeepingFocus(): void {
     const root = this.containerEl as HTMLElement | undefined;
     const controls = (): Element[] =>
       Array.from(root?.querySelectorAll("input, select, textarea, button, [tabindex]") ?? []);
+    const identity = (control: Element): string => {
+      const item = control.closest(".setting-item");
+      const items = Array.from(root?.querySelectorAll(".setting-item") ?? []);
+      const name = item?.querySelector(".setting-item-name")?.textContent?.trim() ?? "";
+      const sameName = items.filter(other => other.querySelector(".setting-item-name")?.textContent?.trim() === name);
+      const label = (element: Element): string =>
+        element.getAttribute("aria-label") ?? (element.textContent?.trim() || element.tagName.toLowerCase());
+      const own = controls().filter(other => other.closest(".setting-item") === item && label(other) === label(control));
+      return JSON.stringify([name, sameName.indexOf(item as Element), label(control), own.indexOf(control)]);
+    };
     const active = root?.doc?.activeElement ?? null;
-    const index = active && root?.contains(active) ? controls().indexOf(active) : -1;
+    const wanted = active && root?.contains(active) ? identity(active) : null;
     this.update();
-    if (index >= 0) (controls()[index] as HTMLElement | undefined)?.focus();
+    if (wanted !== null) (controls().find(control => identity(control) === wanted) as HTMLElement | undefined)?.focus();
   }
 }

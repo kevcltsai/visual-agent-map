@@ -65637,7 +65637,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
     if (key2 === "claudePath") void this.plugin.refreshModelDiscovery("claude");
     if (key2 === "codexPath" || key2 === "claudePath") this.updateKeepingFocus();
   }
-  /** Redraws the page; the control that had the keyboard (Tab just moved it) is focused again by its position. */
+  /**
+   * Redraws the page; the control that had the keyboard (Tab just moved it) is focused again. The control is found by what
+   * it is (its setting's name, which of the same-named settings, its label), not by its position: an invalid path adds an
+   * "Installation guide" button, so the number of controls before it changes with the redraw.
+   */
   updateKeepingFocus() {
     var _a2, _b2, _c;
     const root = this.containerEl;
@@ -65645,10 +65649,26 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
       var _a3;
       return Array.from((_a3 = root == null ? void 0 : root.querySelectorAll("input, select, textarea, button, [tabindex]")) != null ? _a3 : []);
     };
+    const identity = (control) => {
+      var _a3, _b3, _c2, _d;
+      const item = control.closest(".setting-item");
+      const items = Array.from((_a3 = root == null ? void 0 : root.querySelectorAll(".setting-item")) != null ? _a3 : []);
+      const name = (_d = (_c2 = (_b3 = item == null ? void 0 : item.querySelector(".setting-item-name")) == null ? void 0 : _b3.textContent) == null ? void 0 : _c2.trim()) != null ? _d : "";
+      const sameName = items.filter((other) => {
+        var _a4, _b4;
+        return ((_b4 = (_a4 = other.querySelector(".setting-item-name")) == null ? void 0 : _a4.textContent) == null ? void 0 : _b4.trim()) === name;
+      });
+      const label = (element) => {
+        var _a4, _b4;
+        return (_b4 = element.getAttribute("aria-label")) != null ? _b4 : ((_a4 = element.textContent) == null ? void 0 : _a4.trim()) || element.tagName.toLowerCase();
+      };
+      const own2 = controls().filter((other) => other.closest(".setting-item") === item && label(other) === label(control));
+      return JSON.stringify([name, sameName.indexOf(item), label(control), own2.indexOf(control)]);
+    };
     const active = (_b2 = (_a2 = root == null ? void 0 : root.doc) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
-    const index = active && (root == null ? void 0 : root.contains(active)) ? controls().indexOf(active) : -1;
+    const wanted = active && (root == null ? void 0 : root.contains(active)) ? identity(active) : null;
     this.update();
-    if (index >= 0) (_c = controls()[index]) == null ? void 0 : _c.focus();
+    if (wanted !== null) (_c = controls().find((control) => identity(control) === wanted)) == null ? void 0 : _c.focus();
   }
 };
 

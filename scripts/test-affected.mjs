@@ -119,13 +119,16 @@ export function scanTestFile(root, rel, text = readFileSync(join(root, rel), "ut
   const dir = join(root, dirname(rel));
   const sources = new Set(), prefixes = new Set(), requires = new Set();
   const inRepo = abs => { const r = relative(root, abs).split("\\").join("/"); return r && !r.startsWith("..") && !r.startsWith("node_modules/") ? r : null; };
-  const addAbs = abs => {
+  const addAbs = (abs, exact = false) => {
     const r = inRepo(abs);
-    if (!r || !existsSync(abs)) return;
+    if (!r) return;
+    // A path a test asserts to be absent (existsSync(...) === false) is still a dependency: creating that file must reach the test.
+    if (!existsSync(abs)) { if (exact && /\.\w+$/.test(r)) sources.add(r); return; }
     if (statSync(abs).isDirectory()) prefixes.add(`${r.replace(/\/$/, "")}/`);
     else sources.add(r);
   };
   const reasons = [];
+  let bareReads = 0;
   if (SPAWN.test(text)) reasons.push("spawns a child process");
   if (rel !== "tests/build.cjs" && OWN_ESBUILD.test(text)) reasons.push("uses esbuild directly");
   const env = { root, dir, consts: {} };
@@ -146,12 +149,34 @@ export function scanTestFile(root, rel, text = readFileSync(join(root, rel), "ut
     const value = evalPartial(first, env);
     const rooted = MENTIONS_ROOT.test(first);
     // A bare variable (a temp directory, a parameter) has its repo paths in the literals scanned below; a path rooted in the repo but finished at run time is covered by its literal prefix.
-    if (!value) { if (rooted) reasons.push(`reads a path built at run time: ${first.replace(/\s+/g, " ").slice(0, 60)}`); continue; }
+    if (!value) { if (rooted) reasons.push(`reads a path built at run time: ${first.replace(/\s+/g, " ").slice(0, 60)}`); else if (/^[A-Za-z_$][\w$]*$/.test(first)) bareReads++; continue; }
     const abs = resolve(root, value.value);
-    if (value.exact) { addAbs(abs); continue; }
+    if (value.exact) { addAbs(abs, true); continue; }
     // A literal prefix only bounds the read when the path cannot climb out of it again.
     if (!/['"]\.\.\/?['"]|\.\.\//.test(first) && inRepo(abs) && existsSync(abs)) { prefixes.add(`${inRepo(abs).replace(/\/$/, "")}/`); continue; }
     if (rooted) reasons.push(`reads a path built at run time: ${first.replace(/\s+/g, " ").slice(0, 60)}`);
+  }
+  // A test that reads files through a bare variable (a walker such as readSources(directory), a data-driven scan) and also refers to the repo
+  // may read any file below the repo root: the directory comes from a helper argument or a JSON file the static scan cannot follow.
+  if (bareReads && MENTIONS_ROOT.test(text)) reasons.push("reads files by a variable path");
+  // Every join/resolve call, wherever its result goes (a function argument, a loop): the path it builds is one the test can reach.
+  for (const match of text.matchAll(/\b(?:path\.)?(join|resolve)\(/g)) {
+    const args = argumentsAt(text, match.index + match[0].length);
+    if (args === null) continue;
+    const value = evalPartial(`${match[1]}(${args})`, env);
+    if (!value) continue;
+    const abs = resolve(root, value.value);
+    if (value.exact) addAbs(abs, true);
+    else if (inRepo(abs) && existsSync(abs) && statSync(abs).isDirectory()) addAbs(abs);
+  }
+  // Any text that looks like a repo path, quoted or not, so a comment or a template literal the quote scan mis-pairs cannot hide one.
+  for (const match of text.matchAll(/[\w.@-]+(?:\/[\w.@-]+)+\/?|[\w@-]+\.(?:ts|md|json|css|js|mjs|cjs|html|svg|txt|yml|yaml|png)\b/g)) {
+    const bare = match[0].replace(/^(?:\.{1,2}\/)+/, "").replace(/\/$/, "");
+    if (!bare || bare.length > 200) continue;
+    for (const base of [root, join(root, "tests"), join(root, "tests/suites"), dir]) {
+      const abs = join(base, bare);
+      if (existsSync(abs) && inRepo(abs)) addAbs(abs);
+    }
   }
   // Any string that names a repo file or directory (load('core/x.ts'), a JSON path, a fixture directory).
   for (const match of text.matchAll(LITERAL)) {
@@ -193,7 +218,7 @@ export function buildDeps({ testFiles, records, bundles = {}, scans, sha, genera
       for (const entry of scans[member]?.cachedLoads ?? []) for (const source of [entry, ...(bundles[entry] ?? [])]) sources.add(source);
       for (const prefix of scans[member]?.prefixes ?? []) prefixes.add(prefix);
       // A helper's own run-time reads take their paths from the callers, whose literals are scanned; only spawning and direct esbuild carry over.
-      for (const reason of scans[member]?.reasons ?? []) if (member === file) reasons.push(reason); else if (/^(?:spawns|uses esbuild)/.test(reason)) reasons.push(`${reason} (in ${member})`);
+      for (const reason of scans[member]?.reasons ?? []) if (member === file) reasons.push(reason); else if (/^(?:spawns|uses esbuild|reads files by a variable)/.test(reason)) reasons.push(`${reason} (in ${member})`);
       if (member !== file) sources.add(member);
     }
     tests[file] = { ...(reasons.length ? { always: [...new Set(reasons)].join("; ") } : {}), sources: [...sources].sort().map(id), prefixes: [...prefixes].sort() };
@@ -236,6 +261,8 @@ export function selectTests({ changed, deps, testFiles, shaIsAncestor = true }) 
     relevant++;
     if (!readers.length && !isTest) return full(`${file} is not in the dependency table`);
     if (isTest && current.has(file)) pick(file, `${file} changed`);
+    // Suites of one run.cjs shard share a process and the support.cjs module state, so a changed suite can pollute or be polluted by any other suite.
+    if (isTest && current.has(file) && file.startsWith("tests/suites/")) for (const test of testFiles) if (test.startsWith("tests/suites/")) pick(test, `${file} changed and suites share a process`);
     for (const [test] of readers) pick(test, `uses ${file}`);
   }
   for (const [test, entry] of Object.entries(deps.tests)) if (entry.always) pick(test, `always runs: ${entry.always}`);
@@ -247,12 +274,16 @@ export function selectTests({ changed, deps, testFiles, shaIsAncestor = true }) 
 
 // ---------- git ----------
 const git = (root, ...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
-export function changedFiles(root, base) {
+// --no-renames: a rename lists both the old and the new path, so the readers of the old path are not lost.
+// tableSha (the commit the dependency table was made at) adds every file that differs between that commit and HEAD, in both directions: the table does not know
+// the imports added since it was made, nor those a branch lacks that were added before it (two-dot diff).
+export function changedFiles(root, base, tableSha = null) {
   const lines = out => out.split("\n").map(line => line.trim()).filter(Boolean);
   return [...new Set([
-    ...lines(git(root, "diff", "--name-only", `${base}...HEAD`)),
-    ...lines(git(root, "diff", "--name-only", "HEAD")),
+    ...lines(git(root, "diff", "--name-only", "--no-renames", `${base}...HEAD`)),
+    ...lines(git(root, "diff", "--name-only", "--no-renames", "HEAD")),
     ...lines(git(root, "ls-files", "--others", "--exclude-standard")),
+    ...(tableSha ? lines(git(root, "diff", "--name-only", "--no-renames", tableSha, "HEAD")) : []),
   ])];
 }
 export function isAncestor(root, ancestor, descendant) {
@@ -262,9 +293,9 @@ export function isAncestor(root, ancestor, descendant) {
 /** The whole decision for a working tree; never throws: an error is a full-suite answer. */
 export function plan(root = defaultRoot, base = "origin/main") {
   try {
-    const changed = changedFiles(root, base);
     let deps = null;
     try { deps = parseDeps(readFileSync(depsPath(root), "utf8")); } catch { /* absent or unreadable: selectTests answers full */ }
+    const changed = changedFiles(root, base, deps?.sha ?? null);
     return selectTests({ changed, deps, testFiles: listTestFiles(root), shaIsAncestor: deps ? isAncestor(root, deps.sha, base) : false });
   } catch (error) {
     return full(`test-affected failed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);

@@ -49,6 +49,21 @@ jobs:
           else
             echo "no reusable green full run for $GITHUB_SHA; running verify"
           fi
+      # Reusing a full run skips verify, so the table it made is carried over: downloaded from that run and cached for main. A failure here only leaves the table older (test-affected still selects soundly from an older table).
+      - if: steps.reuse.outputs.run != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh run download "${{ steps.reuse.outputs.run }}" -n test-deps -D "$RUNNER_TEMP/test-deps-download"
+          cp "$RUNNER_TEMP/test-deps-download/test-deps.json" test-deps.json
+      - if: steps.reuse.outputs.run != ''
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: test-deps.json
+          key: test-deps-${{ github.sha }}
       - uses: actions/setup-node@v5
         if: steps.reuse.outputs.run == ''
         with:
@@ -78,3 +93,9 @@ jobs:
         with:
           path: test-deps.json
           key: test-deps-${{ github.sha }}
+      - if: steps.reuse.outputs.run == '' && env.MODE == 'full'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-deps
+          path: test-deps.json
+          retention-days: 30

@@ -109,6 +109,60 @@ test('test-affected: the static scan lists literal paths and helpers, and marks 
     assert.deepEqual(scan("X ??= load('ai/a.ts').X; if (!Y) Y = load(\"core/b.ts\"); const Z = load('c.ts');").cachedLoads, ['ai/a.ts', 'core/b.ts']);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+test('test-affected: the static scan marks a bare-variable read in a repo-aware test as always run, and keeps paths hidden by quotes, calls and absent files', async () => {
+  const { scanTestFile } = await affected();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-scan-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'tests'), { recursive: true }); fs.mkdirSync(path.join(dir, 'core'), { recursive: true }); fs.mkdirSync(path.join(dir, 'experiences/x'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'core/ai-calls.ts'), '');
+    const scan = text => scanTestFile(dir, 'tests/t.cjs', text);
+    // A walker that gets its directory from a parameter, in a test that refers to the repo root.
+    assert.match(scan("const root = process.cwd(); function walk(directory) { return fs.readdirSync(directory); } walk(root);").reasons.join(), /variable path/);
+    assert.deepEqual(scan("const out = os.tmpdir(); fs.readdirSync(out);").reasons, []); // no repo reference: a scratch directory
+    // A backtick in a comment pairs with a later one and swallows the quoted path; the plain path scan still finds it.
+    const swallowed = scan("// uses `x\nconst f = `${a}`; const s = sources['core/ai-calls.ts']; // end `");
+    assert.deepEqual(swallowed.sources, ['core/ai-calls.ts']);
+    // A directory built by join and handed to a function, not to an fs call.
+    assert.deepEqual(scan("const root = process.cwd(); visit(path.join(root, 'experiences', 'x'));").prefixes, ['experiences/x/']);
+    // A path the test asserts to be absent still counts.
+    assert.deepEqual(scan("const root = process.cwd(); assert.equal(fs.existsSync(path.join(root, 'experiences', 'x', 'gone.ts')), false);").sources, ['experiences/x/gone.ts']);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+test('test-affected: a changed suite runs every suite, because the suites of a shard share one process', async () => {
+  const { selectTests } = await affected();
+  const deps = await table();
+  const all = ['tests/suites/map-model.cjs', 'tests/suites/spawner.cjs', 'tests/suites/other.cjs', 'tests/steps-x.cjs'];
+  const result = selectTests({ changed: ['tests/suites/other.cjs'], deps, testFiles: all });
+  assert.deepEqual(result.files, ['tests/suites/map-model.cjs', 'tests/suites/other.cjs', 'tests/suites/spawner.cjs']);
+  assert.deepEqual(selectTests({ changed: ['tests/steps-x.cjs'], deps, testFiles: all }).files, ['tests/steps-x.cjs', 'tests/suites/other.cjs', 'tests/suites/spawner.cjs']); // other.cjs: not in the table
+});
+test('test-affected: a rename lists both paths, and a table older or newer than HEAD adds every file that differs from its commit', async () => {
+  const { changedFiles, plan, buildDeps } = await affected();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-git-'));
+  const git = (...args) => spawnSync('git', ['-c', 'user.email=a@b.c', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+  try {
+    fs.mkdirSync(path.join(dir, 'core'), { recursive: true }); fs.mkdirSync(path.join(dir, 'tests/suites'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'core/old-name.ts'), 'export const a = 1;\n'.repeat(20)); fs.writeFileSync(path.join(dir, 'core/other.ts'), 'x\n'); fs.writeFileSync(path.join(dir, 'tests/suites/s.cjs'), '');
+    git('init', '-q', '-b', 'main'); git('add', '.'); git('commit', '-q', '-m', 'one');
+    const tableSha = git('rev-parse', 'HEAD');
+    git('checkout', '-q', '-b', 'branch'); git('mv', 'core/old-name.ts', 'core/new-name.ts'); git('commit', '-q', '-m', 'rename');
+    assert.deepEqual(changedFiles(dir, 'main').sort(), ['core/new-name.ts', 'core/old-name.ts']);
+    // The table was made at a commit before main gained core/other.ts's new import: that file differs from the table's commit even though the branch did not touch it.
+    git('checkout', '-q', 'main'); fs.writeFileSync(path.join(dir, 'core/other.ts'), 'import "./x";\n'); git('commit', '-q', '-am', 'main moves on');
+    git('checkout', '-q', 'branch'); fs.writeFileSync(path.join(dir, 'core/new-name.ts'), 'export const b = 2;\n'); git('commit', '-q', '-am', 'edit');
+    const upToMain = git('rev-parse', 'main');
+    assert.ok(!changedFiles(dir, 'main').includes('core/other.ts')); // a plain three-dot diff misses it
+    assert.ok(changedFiles(dir, 'main', upToMain).includes('core/other.ts')); // HEAD lacks main's newer commit: it differs from a table made at main
+    assert.ok(changedFiles(dir, 'main', tableSha).includes('core/new-name.ts'));
+    const deps = buildDeps({ testFiles: ['tests/suites/s.cjs'], records: { 'tests/suites/s.cjs': ['core/other.ts'] }, scans: {}, sha: tableSha });
+    fs.writeFileSync(path.join(dir, 'deps.json'), JSON.stringify(deps));
+    process.env.VAM_TEST_DEPS_FILE = path.join(dir, 'deps.json');
+    try {
+      const result = plan(dir, 'main');
+      assert.equal(result.mode, 'full'); // core/new-name.ts is not in the table, and neither is the suite directory's reader
+    } finally { delete process.env.VAM_TEST_DEPS_FILE; }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
 test('test-affected: tests/build.cjs records the sources of every bundle for the calling test file, cache hits included', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-deps-'));
   try {

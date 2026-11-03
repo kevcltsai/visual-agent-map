@@ -344,7 +344,7 @@ test('map chat 15: the reader hears each stage name once through the live region
 
 class MarkdownView {}
 
-async function harness({ aim = false, document = false, empty = false, realRender = false, viaSync = false } = {}) {
+async function harness({ aim = false, document = false, empty = false, realRender = false, viaSync = false, language = 'en' } = {}) {
   const { repo, app, contents, files } = fixture('en');
   app.vault.configDir = '.obsidian';
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'claude:sonnet' };
@@ -402,7 +402,13 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const handlers = []; const linkOpens = [];
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: (fn, delay) => { ctx.timers.push(fn); const id = ctx.timers.length; ctx.clock.pending.push({ id, fn, at: ctx.clock.now + (delay ?? 0) }); return id; }, clearTimeout: id => { ctx.clock.pending = ctx.clock.pending.filter(entry => entry.id !== id); }, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
+  const { VisualAgentMapView, default: LanguagePlugin } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: (fn, delay) => { ctx.timers.push(fn); const id = ctx.timers.length; ctx.clock.pending.push({ id, fn, at: ctx.clock.now + (delay ?? 0) }); return id; }, clearTimeout: id => { ctx.clock.pending = ctx.clock.pending.filter(entry => entry.id !== id); }, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
+  // A real language switch of this bundle (like languageView below), so the view's fixed words follow `language`.
+  if (language !== 'en') {
+    const switcher = new LanguagePlugin(); switcher.settings = { ...DEFAULT_SETTINGS, language: 'en' }; switcher.saveData = async () => {}; switcher.repo = { settings: switcher.settings };
+    switcher.views = () => []; switcher.coffeeViews = () => []; switcher.refreshLocalizedEntrypoints = () => {}; switcher.settingTab = { update() {}, refreshAfterLanguageChange() {} };
+    await switcher.changeLanguage(language);
+  }
   ctx.timers = []; ctx.intervals = new Map(); ctx.intervalSeq = 0;
   // A fake clock for the timers the view sets: `advance(n)` runs every timer that falls due within n milliseconds, in order. Nothing waits in real time.
   ctx.clock = { now: 0, pending: [], advance(by) { const target = this.now + by; for (;;) { const due = this.pending.filter(entry => entry.at <= target).sort((l, r) => l.at - r.at)[0]; if (!due) break; this.pending = this.pending.filter(entry => entry !== due); this.now = due.at; due.fn(); } this.now = target; } };
@@ -4621,32 +4627,48 @@ test('MS-09: buildMapChatContext keeps retryWith next to a failure and drops it 
 
 // ---- bug bash C, packet 1 (#10 #14 #28 #29 #31) ---------------------------------------------------------------
 
-test('bug bash #10: a language change sets the chat window\'s fixed words again, keeps the draft and the messages, and builds nothing new', () => {
-  const f = panelFixture(); f.panel.setOpen(true);
-  f.panel.begin('question one', { text: 'question one', chips: [], selectedIds: [] }); f.panel.finish('answer one', []);
-  f.parts.input().value = 'half-typed';
-  const el = f.panel.el; const row = f.parts.log().children[0];
-  f.setLanguage('zh-TW'); f.panel.relabel();
-  assert.equal(f.panel.el, el, 'not rebuilt');
-  assert.equal(visibleText(f.panel.headEl.children[0]), '詢問 AI 關於這張圖');
-  assert.equal(f.panel.sendEl.text, '送出'); assert.equal(f.panel.sendEl.attrs['aria-label'], '送出');
-  assert.equal(f.panel.stopEl.text, '停止'); assert.equal(f.panel.inputEl.attrs['aria-label'], '傳給 AI 的訊息');
-  assert.equal(f.panel.styleEls.concise.text, '精簡'); assert.equal(f.panel.bodyEl.attrs['aria-label'], '詢問 AI 關於這張圖');
-  assert.equal(f.panel.toggleEl.attrs['aria-label'], '關閉 AI 對話');
-  const roles = findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-role')).map(i => i.text); eq(roles, ['你', 'AI']);
-  assert.ok(find(f.panel.bodyEl, i => hasClass(i, 'vam-map-chat-log-label') && i.text === '對話紀錄'), 'the log label follows');
-  assert.equal(f.panel.draft, 'half-typed'); eq(f.panel.transcript().map(m => m.text), ['question one', 'answer one']);
-  assert.ok(f.parts.log().children[0], 'rows are still there'); void row;
-  f.setLanguage('en'); f.panel.relabel(); assert.equal(f.panel.sendEl.text, 'Send');
-  eq(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['You', 'AI']);
+// Bug bash C #10 through the real entry: plugin.changeLanguage() refreshes every open view (view.refreshFromPlugin), which must
+// set the chat window's fixed words again. The real view mounts its own chat panel, so panel and language share one bundle.
+async function chatLanguageView() {
+  const out = await languageView('en');
+  const { view, plugin } = out;
+  const p = page();
+  const workspace = p.root.createDiv('vam-workspace'); const overlay = p.attach(workspace.createDiv('vam-canvas-overlay'));
+  view.map = { id: 'map-a', title: 'Sleep map', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  view.app = { workspace: { getLeavesOfType: () => [], getActiveViewOfType: () => null, on() {}, requestSaveLayout() {} }, vault: { configDir: '.obsidian' } };
+  view.path = MAP; view.contentEl = p.root; view.closed = false;
+  view.hydrate = async () => {}; view.render = () => {};
+  plugin.views = () => [view];
+  view.mountMapChat(workspace, overlay);
+  view.chat.setOpen(true);
+  return { ...out, chat: view.chat, p };
+}
+test('bug bash #10: a language change sets the chat window\'s fixed words again, keeps the draft and the messages, and builds nothing new', async () => {
+  const { plugin, chat } = await chatLanguageView();
+  chat.begin('question one', { text: 'question one', chips: [], selectedIds: [] }); chat.finish('answer one', []);
+  chat.inputEl.value = 'half-typed';
+  const el = chat.el;
+  assert.equal(chat.sendEl.text, 'Send');
+  await plugin.changeLanguage('zh-TW');
+  assert.ok(chat.el === el, 'not rebuilt');
+  assert.equal(visibleText(chat.headEl.children[0]), '詢問 AI 關於這張圖');
+  assert.equal(chat.sendEl.text, '送出'); assert.equal(chat.sendEl.attrs['aria-label'], '送出');
+  assert.equal(chat.stopEl.text, '停止'); assert.equal(chat.inputEl.attrs['aria-label'], '傳給 AI 的訊息');
+  assert.equal(chat.bodyEl.attrs['aria-label'], '詢問 AI 關於這張圖');
+  assert.equal(chat.toggleEl.attrs['aria-label'], '關閉 AI 對話');
+  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['你', 'AI']);
+  assert.ok(find(chat.bodyEl, i => hasClass(i, 'vam-map-chat-log-label') && i.text === '對話紀錄'), 'the log label follows');
+  assert.equal(chat.draft, 'half-typed'); eq(chat.transcript().map(m => m.text), ['question one', 'answer one']);
+  await plugin.changeLanguage('en'); assert.equal(chat.sendEl.text, 'Send');
+  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['You', 'AI']);
 });
 
-test('bug bash #10: the "say it in more detail" and Retry buttons of an existing row change language too', () => {
-  const f = panelFixture(); f.panel.setOpen(true);
-  f.panel.begin('q', { text: 'q', chips: [], selectedIds: [] }); f.panel.finish('a', []);
-  const more = () => find(f.parts.log(), i => hasClass(i, 'vam-map-chat-more'));
+test('bug bash #10: the "say it in more detail" and Retry buttons of an existing row change language too', async () => {
+  const { plugin, chat } = await chatLanguageView();
+  chat.begin('q', { text: 'q', chips: [], selectedIds: [] }); chat.finish('a', []);
+  const more = () => find(chat.logEl, i => hasClass(i, 'vam-map-chat-more'));
   assert.equal(more().text, 'Say it in more detail');
-  f.setLanguage('zh-TW'); f.panel.relabel();
+  await plugin.changeLanguage('zh-TW');
   assert.equal(more().text, '說詳細一點');
 });
 
@@ -4693,6 +4715,20 @@ test('bug bash #29: the log is named by a hidden label (aria-labelledby), not an
   assert.ok(label, 'the labelledby target exists'); assert.equal(label.text, 'Conversation'); assert.ok(hasClass(label, 'vam-map-chat-log-label'));
 });
 
+integrationTest('bug bash #31: the plan card lists an add_child without a parent as a root topic and one with a parent as a subtopic', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: [
+    ...Array.from({ length: 13 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Child ${i}`, summary: '' })),
+    { kind: 'add_child', title: 'Rootling', summary: '' }, { kind: 'add_child', parentId: null, title: 'Nullroot', summary: '' },
+    { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body!' }, { kind: 'delete_topic', nodeId: h.ids.b, branch: false }
+  ], rejected: [] });
+  h.type('many'); await h.view.sendMapChat();
+  const lines = findAll(planCard(h)[0], i => i.tag === 'li').map(i => i.text);
+  assert.ok(lines.includes('Add root topic “Rootling”'), JSON.stringify(lines));
+  assert.ok(lines.includes('Add root topic “Nullroot”'), JSON.stringify(lines));
+  assert.ok(lines.includes('Add subtopic “Child 0”'), JSON.stringify(lines));
+  assert.ok(!lines.some(line => line.startsWith('Add subtopic “Rootling')), 'a root topic is not called a subtopic');
+});
 integrationTest('bug bash #31: a chat add_child without a parent is labelled as a root topic; with a parent it stays a subtopic', async () => {
   const h = await harness(); await h.view.hydrate();
   const add = parentId => ({ kind: 'add_child', title: 'T', summary: '', ...(parentId === undefined ? {} : { parentId }) });
@@ -4713,8 +4749,20 @@ async function languageView(language) {
   await plugin.changeLanguage(language);
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.app = {};
-  return { view, modals };
+  return { view, modals, plugin };
 }
+integrationTest('bug bash #27: the Rename tool on a card opens a dialog titled 重新命名 (zh-TW), not the new-topic title', async () => {
+  const h = await harness({ language: 'zh-TW' }); await h.view.hydrate();
+  const { view } = h; const node = view.map.nodes.find(n => n.id === h.ids.a);
+  view.stageEl = element('div'); view.viewportEl = element('div');
+  view.labelCard = () => {}; // the card's accessible-name bookkeeping needs a real DOM; the tools do not
+  view.renderNode(node);
+  const rename = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-rename-tool')); assert.ok(rename, 'the card has a Rename tool');
+  assert.equal(rename.text, '改名', 'the tool itself is in zh-TW');
+  rename.click(); await tick();
+  assert.ok((h.control.modals ?? []).length === 1, 'one dialog opened');
+  assert.equal(h.control.modals[0].titleText, '重新命名');
+});
 test('bug bash #27: Rename opens a dialog titled "Rename", not the new-topic title', async () => {
   const { view, modals } = await languageView('zh-TW');
   view.renameNode({ id: 'n1', title: 'Old' }, 'Old');

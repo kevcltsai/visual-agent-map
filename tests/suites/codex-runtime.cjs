@@ -623,3 +623,35 @@ test('bug bash #32: a Codex turn that ends without an error message reports a tr
   assert.equal(codexTurnFailureMessage(undefined, zh), 'Codex 回合未完成：失敗');
   assert.equal(codexTurnFailureMessage({ status: 'failed', error: { message: 'boom' } }, zh), 'boom', 'a real error message still wins');
 });
+
+// Bug bash C #32 through the runtime's real turn-end path: a turn/completed notification that is not "completed" rejects the task
+// with the status in the interface language. The runtime and the language setter come from one bundle (a bundle has its own copy of the language).
+integrationTest('bug bash #32: a Codex turn/completed with status failed or interrupted rejects with a zh-TW status, not the raw English word', async () => {
+  const { EventEmitter } = require('node:events');
+  const os = require('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-codex-entry-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'entry.ts'), `export { CodexAppServerRuntime } from ${JSON.stringify(path.join(root, 'ai/runtime/codex-app-server'))};\nexport { setUiLanguage } from ${JSON.stringify(path.join(root, 'i18n'))};\n`);
+    const { CodexAppServerRuntime, setUiLanguage } = load(path.relative(root, path.join(dir, 'entry.ts')), { 'node:child_process': { spawn: () => child } });
+    var child;
+    const messageOf = async turn => {
+      child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+      const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+      child.stdin = { write: line => {
+        const message = JSON.parse(line.trim());
+        if (message.method === 'initialize') emit({ id: message.id, result: {} });
+        else if (message.method === 'config/read') emit({ id: message.id, result: { config: {} } });
+        else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
+        else if (message.method === 'turn/start') { emit({ id: message.id, result: { turn: { id: 'turn-1' } } }); emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn } }); }
+        else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: { status: 'unsubscribed' } });
+      } };
+      const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+      try { await runtime.runTask('chat', 'gpt-6-luna', 'low', { type: 'object' }, {}); return null; } catch (error) { return error.message; } finally { runtime.stop(); }
+    };
+    setUiLanguage('zh-TW');
+    assert.equal(await messageOf({ status: 'failed' }), 'Codex 回合未完成：失敗');
+    assert.equal(await messageOf({ status: 'interrupted' }), 'Codex 回合未完成：已中斷');
+    assert.equal(await messageOf({ status: 'weird_new_status' }), 'Codex 回合未完成：weird_new_status');
+    assert.equal(await messageOf({ status: 'failed', error: { message: 'boom' } }), 'boom');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

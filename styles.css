@@ -666,7 +666,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-text.is-markdown .vam-map-chat-plain { white-space: pre-wrap; }
 .vam-map-chat-text.is-markdown .vam-map-chat-overflow-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-chip.is-note { border-style: solid; }
-.vam-map-chat-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Many selected cards would push the message field out of the window: the chips get about five rows, then scroll. */
+.vam-map-chat-chips { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 4px; max-height: 9em; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--background-modifier-border-hover) transparent; }
 .vam-map-chat-chips:empty { display: none; }
 .vam-map-chat-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 1px 4px 1px 8px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-secondary); font-size: var(--font-ui-smaller); }
 .vam-map-chat-chip.is-auto { padding-right: 8px; border-style: dashed; }

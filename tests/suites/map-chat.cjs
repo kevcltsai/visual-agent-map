@@ -2761,18 +2761,23 @@ integrationTest('45 ui: the opening screen has a secondary "create an empty mind
   const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl || i === button); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : i === chat.suggestEl ? 'examples' : 'empty'), ['title', 'input', 'examples', 'empty']);
 });
 
-integrationTest('45 ui: the button opens the name box, makes no request, and cancelling the box makes no file', async () => {
+integrationTest('45 ui: the button turns the opening screen into this map\'s empty canvas: no name box, no new file, no AI request', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
-  const created = []; h.plugin.repo.createMap = async title => { created.push(title); return 'Maps/x.vam'; }; h.view.openMapInMutation = async () => {};
+  const created = []; h.plugin.repo.createMap = async title => { created.push(title); return 'Maps/x.vam'; };
   const requests = h.control.requests.length, modals = (h.control.modals ?? []).length;
+  assert.equal(chat.isHero, true);
   chat.emptyMapEl.click(); await tick();
-  assert.equal(h.control.modals.length, modals + 1, 'the name box opened'); assert.equal(h.control.modals.at(-1).constructor.name, 'NameModal');
-  // Cancel = the submit callback is never called.
-  h.control.modals.at(-1).close(); await tick();
-  assert.equal(created.length, 0, 'cancel creates nothing'); assert.equal(h.control.requests.length, requests, 'no AI request'); assert.equal(chat.isHero, true);
-  // Confirm = the callback runs and the map is made, still with no AI request.
-  chat.emptyMapEl.click(); await tick(); h.control.modals.at(-1).submit('My map'); await tick();
-  assert.deepEqual(created, ['My map']); assert.equal(h.control.requests.length, requests, 'still no AI request');
+  assert.equal((h.control.modals ?? []).length, modals, 'no name box'); assert.equal(created.length, 0, 'no new map file'); assert.equal(h.control.requests.length, requests, 'no AI request');
+  assert.equal(h.view.path, MAP, 'still the same map'); assert.equal(chat.isHero, false, 'the opening screen is gone');
+  assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined);
+  // A later repaint of the same empty map keeps the empty canvas.
+  h.repaint(); assert.equal(chat.isHero, false);
+});
+
+integrationTest('B1 ui: many chips scroll inside their own box, so the message field stays in the window', async () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = css.match(/\.vam-map-chat-chips \{([^}]*)\}/)[1];
+  assert.match(rule, /max-height: 9em/); assert.match(rule, /overflow-y: auto/); assert.match(rule, /flex: 0 0 auto/);
 });
 
 integrationTest('45 ui: after the first message the button is hidden, and a map with cards never shows it', async () => {

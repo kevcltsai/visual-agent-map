@@ -170,34 +170,82 @@ test('08: a repaint keeps focus on the same toolbar control even when the contro
   assert.ok(h.active().classes.has('vam-layout-button'), 'the new Layout button, not whatever sits at the old index');
 });
 
-test('#18: a repaint triggered while another window is active (Settings pop-out) moves no focus in the map; the active map window keeps the old behaviour', async () => {
-  const h = await harness();
-  const mapWin = { name: 'main' }, popout = { name: 'popout' };
+// Other windows are expressed only through Obsidian's activeWindow; the main document's activeElement stays a map element or the body.
+function inactive(h, { mapIsPopout = false } = {}) {
+  const mapWin = { name: mapIsPopout ? 'popout' : 'main' }, other = { name: mapIsPopout ? 'main' : 'popout' };
   h.doc.defaultView = mapWin;
   const focused = [];
-  const track = el => { const orig = el.focus; el.focus = function (...a) { focused.push(this); return orig.apply(this, a); }; };
-  h.contentEl.querySelector('.vam-layout-button').focus();
-  const popSelect = { tag: 'popout-select' };
+  const track = el => { const orig = el.focus; el.focus = function (...a) { focused.push(this.tagName + '.' + [...this.classes].join('.')); return orig.apply(this, a); }; };
+  const origBuild = h.build;
+  h.view.render = () => { const keep = h.view.holdMapFocus?.() ?? (() => {}); origBuild(); for (const e of h.contentEl.all()) track(e); track(h.contentEl); keep(); };
+  return { mapWin, other, focused, track };
+}
+
+test('#18: a repaint while another window is active (Settings pop-out) moves no focus in the map; the active map window keeps the old behaviour', async () => {
+  for (const mapIsPopout of [false, true]) {
+    const h = await harness();
+    const w = inactive(h, { mapIsPopout });
+    try {
+      h.contentEl.querySelector('.vam-layout-button').focus(); // the map had focus when the user went to the other window
+      globalWin.activeWindow = w.other;
+      w.focused.length = 0;
+      await h.view.refreshFromPlugin();
+      assert.deepEqual(w.focused, [], `renderPreservingFocus does not refocus (map in ${mapIsPopout ? 'a pop-out' : 'main'})`);
+      h.doc.activeElement = h.doc.body;
+      h.view.restoreMapFocus(null);
+      assert.deepEqual(w.focused, [], 'restoreMapFocus does nothing either');
+      globalWin.activeWindow = w.mapWin;
+      h.contentEl.querySelector('.vam-layout-button').focus();
+      await h.view.refreshFromPlugin();
+      assert.ok(h.active().classes.has('vam-layout-button'), 'active map window: focus is restored as before');
+    } finally { delete globalWin.activeWindow; }
+  }
+});
+
+test('#18: the focus that was skipped comes back when the map window is focused again', async () => {
+  const h = await harness();
+  const w = inactive(h);
   try {
-    globalWin.activeWindow = popout;
-    h.doc.activeElement = h.doc.body; // focus left the map (the user is in the pop-out)
-    const origBuild = h.build;
-    h.view.render = () => { origBuild(); for (const e of h.contentEl.all()) track(e); track(h.contentEl); };
     h.contentEl.querySelector('.vam-layout-button').focus();
-    h.doc.activeElement = popSelect; // lastly focused elsewhere
-    focused.length = 0;
+    globalWin.activeWindow = w.other;
     await h.view.refreshFromPlugin();
-    assert.deepEqual(focused.map(e => e.tagName), [], 'no map element was focused');
-    h.view.restoreMapFocus(null);
-    assert.deepEqual(focused.map(e => e.tagName), [], 'restoreMapFocus does nothing either');
-    // Same repaint with a map control focused, while the pop-out is active.
-    h.doc.activeElement = h.contentEl.querySelector('.vam-layout-button');
-    await h.view.refreshFromPlugin();
-    assert.deepEqual(focused.map(e => e.tagName), [], 'renderPreservingFocus does not refocus');
-    globalWin.activeWindow = mapWin;
-    h.contentEl.querySelector('.vam-layout-button').focus();
-    await h.view.refreshFromPlugin();
-    assert.ok(h.active().classes.has('vam-layout-button'), 'active map window: focus is restored as before');
+    assert.equal(h.inMap(), false, 'nothing was focused while the other window was active');
+    globalWin.activeWindow = w.mapWin;
+    h.view.onMapWindowFocus();
+    assert.ok(h.active().classes.has('vam-layout-button'), 'the same control (new element) has focus again');
+    h.doc.activeElement = h.doc.body;
+    h.view.onMapWindowFocus();
+    assert.equal(h.inMap(), false, 'nothing pending: a plain window focus takes no focus');
+  } finally { delete globalWin.activeWindow; }
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /registerDomEvent\([^\n]*"focus", \(\) => this\.onMapWindowFocus\(\)\)/, 'onOpen wires the window focus event');
+});
+
+test('#18: the repaint restorers for the chat field, the search field and the relevance bar also keep still while another window is active', async () => {
+  const h = await harness();
+  const w = inactive(h);
+  try {
+    const input = h.contentEl.add('textarea', { cls: 'vam-map-chat-input' });
+    h.view.chat = { isInput: e => e === input, captureFocus: () => () => input.focus(), detach() {} };
+    const search = h.contentEl.add('input', { cls: 'vam-map-search-input' }); search.setSelectionRange = () => {}; search.selectionStart = 0; search.selectionEnd = 0;
+    h.view.mapSearch = { query: '' }; h.view.mapSearchBar = { input: search };
+    h.view.mountMapSearch = () => { h.view.mapSearchBar = { input: search }; }; h.view.applySearchMarks = () => {};
+    const bar = h.contentEl.add('div', { cls: 'vam-relevance-statusbar' }); const barButton = bar.add('button'); const goal = h.contentEl.add('div', { cls: 'vam-relevance-goal' });
+    for (const [name, element, hold] of [['chat', input, () => h.view.detachMapChat()], ['search', search, () => h.view.holdMapSearch()], ['relevance bar', barButton, () => h.view.keepRelevanceBarFocus()]]) {
+      element.focus();
+      globalWin.activeWindow = w.mapWin;
+      const restore = hold();
+      h.doc.activeElement = h.doc.body;
+      globalWin.activeWindow = w.other;
+      restore();
+      assert.equal(h.doc.activeElement, h.doc.body, `${name}: not refocused while another window is active`);
+      globalWin.activeWindow = w.mapWin;
+      element.focus();
+      const again = hold();
+      h.doc.activeElement = h.doc.body;
+      again();
+      assert.ok(h.doc.activeElement !== h.doc.body, `${name}: refocused when the map window is active`);
+    }
   } finally { delete globalWin.activeWindow; }
 });
 

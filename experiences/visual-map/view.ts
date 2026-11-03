@@ -1105,6 +1105,13 @@ export class VisualAgentMapView extends ItemView {
   private renderingCard = false;
   /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
   private restoringFocus = false;
+  private onMapWindowFocus(): void {
+    if (!this.focusRestorePending) return;
+    this.focusRestorePending = false;
+    this.restoreMapFocus(this.lastMapFocus);
+  }
+  /** A focus restore was skipped because another window was active; done when this window is focused again. */
+  private focusRestorePending = false;
   /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
   private lastMapFocus: MapFocusAnchor | null = null;
   /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
@@ -1262,6 +1269,7 @@ export class VisualAgentMapView extends ItemView {
     this.registerDomEvent(this.contentEl.win ?? window, "blur", () => {
       this.spaceHeld = false;
     });
+    this.registerDomEvent(this.contentEl.ownerDocument?.defaultView ?? window, "focus", () => this.onMapWindowFocus());
     // Copy and paste of branches: on the document, popout windows included (decision #29, evidence/clipboard-mime.md).
     this.bindClipboard();
     // The listener belongs to the element (it goes away with it); a move to another window binds the new document.
@@ -1453,7 +1461,7 @@ export class VisualAgentMapView extends ItemView {
       this.mountMapSearch();
       this.applySearchMarks();
       const input = this.mapSearchBar?.input;
-      if (!focused || !input) return;
+      if (!focused || !input || !this.mapWindowIsActive()) return;
       input.focus({ preventScroll: true });
       if (start !== null && end !== null) input.setSelectionRange(start, end);
     };
@@ -1858,11 +1866,17 @@ export class VisualAgentMapView extends ItemView {
     )
       (target as HTMLInputElement).setSelectionRange(selection[0], selection[1]);
   }
-  /** False while another Obsidian window (for example Settings in a pop-out) is the active one: the map must not take focus then. */
+  /**
+   * The one gate for every focus the map gives itself during a repaint. False while another Obsidian window (for example Settings
+   * in a pop-out) is the active one: the map must not take focus then. It remembers the skipped restore and does it when the
+   * map's own window gets focus again (see onOpen).
+   */
   private mapWindowIsActive(): boolean {
     const active = typeof activeWindow === "undefined" ? undefined : activeWindow;
     const own = this.contentEl?.ownerDocument?.defaultView;
-    return !active || !own || active === own;
+    if (!active || !own || active === own) return true;
+    this.focusRestorePending = true;
+    return false;
   }
   private firstCardId(): string | undefined {
     return this.cardEls.keys().next().value as string | undefined;
@@ -3065,6 +3079,7 @@ export class VisualAgentMapView extends ItemView {
     const active = this.contentEl?.ownerDocument?.activeElement ?? null;
     if (!bar || !active || !bar.contains?.(active)) return () => {};
     return () => {
+      if (!this.mapWindowIsActive()) return;
       const target =
         this.contentEl?.querySelector?.(".vam-relevance-statusbar")?.querySelector?.<HTMLElement>("button") ??
         this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-goal");
@@ -6215,7 +6230,7 @@ export class VisualAgentMapView extends ItemView {
       this.startTextEdit(pending);
     } else if (wanted && this.textEls.has(wanted)) {
       this.focusItemId = null;
-      this.textEls.get(wanted)?.focus({ preventScroll: true });
+      if (this.mapWindowIsActive()) this.textEls.get(wanted)?.focus({ preventScroll: true });
     }
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
@@ -6490,6 +6505,7 @@ export class VisualAgentMapView extends ItemView {
       }
     });
     input.addEventListener("blur", commit);
+    if (!this.mapWindowIsActive()) return;
     input.focus({ preventScroll: true });
     input.select?.();
   }
@@ -15091,9 +15107,14 @@ export class VisualAgentMapView extends ItemView {
   // ---- AI chat window -------------------------------------------------------------------------------------------
   /** Before a repaint: takes the chat window out of the page and returns what gives its text field focus back after it. */
   private detachMapChat(): () => void {
+    const active = this.contentEl?.ownerDocument?.activeElement ?? null;
+    const held = !!active && !!this.chat?.isInput(active);
     const restore = this.chat?.captureFocus() ?? ((): void => {});
     this.chat?.detach();
-    return restore;
+    if (!held) return restore;
+    return () => {
+      if (this.mapWindowIsActive()) restore();
+    };
   }
   /**
    * Puts the chat window into this repaint. Normally it is the first child of `workspace`, the window left of the canvas. On an

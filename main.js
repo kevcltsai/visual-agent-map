@@ -47850,6 +47850,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "renderingCard", false);
     /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
     __publicField(this, "restoringFocus", false);
+    /** A focus restore was skipped because another window was active; done when this window is focused again. */
+    __publicField(this, "focusRestorePending", false);
     /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
     __publicField(this, "lastMapFocus", null);
     /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
@@ -47975,6 +47977,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
   }
+  onMapWindowFocus() {
+    if (!this.focusRestorePending) return;
+    this.focusRestorePending = false;
+    this.restoreMapFocus(this.lastMapFocus);
+  }
   getViewType() {
     return VIEW_TYPE;
   }
@@ -48034,7 +48041,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       );
   }
   async onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     this.closed = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = (_c = (_b2 = this.containerEl) == null ? void 0 : _b2.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
@@ -48059,8 +48066,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "blur", () => {
       this.spaceHeld = false;
     });
+    this.registerDomEvent((_n = (_m = this.contentEl.ownerDocument) == null ? void 0 : _m.defaultView) != null ? _n : window, "focus", () => this.onMapWindowFocus());
     this.bindClipboard();
-    (_n = (_m = this.contentEl).onWindowMigrated) == null ? void 0 : _n.call(_m, () => this.bindClipboard());
+    (_p = (_o = this.contentEl).onWindowMigrated) == null ? void 0 : _p.call(_o, () => this.bindClipboard());
     this.registerDomEvent(this.contentEl, "keydown", (event) => this.presentationKey(event), { capture: true });
     this.registerDomEvent(this.contentEl, "keydown", (event) => this.onMapKeydown(event));
     this.registerDomEvent(this.contentEl, "focusin", (event) => this.trackMapFocus(event.target));
@@ -48236,7 +48244,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       this.mountMapSearch();
       this.applySearchMarks();
       const input2 = (_a3 = this.mapSearchBar) == null ? void 0 : _a3.input;
-      if (!focused || !input2) return;
+      if (!focused || !input2 || !this.mapWindowIsActive()) return;
       input2.focus({ preventScroll: true });
       if (start !== null && end !== null) input2.setSelectionRange(start, end);
     };
@@ -48632,12 +48640,18 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     if (selection && ((target == null ? void 0 : target.tagName) === "INPUT" || (target == null ? void 0 : target.tagName) === "TEXTAREA") && selection[0] !== null && selection[1] !== null)
       target.setSelectionRange(selection[0], selection[1]);
   }
-  /** False while another Obsidian window (for example Settings in a pop-out) is the active one: the map must not take focus then. */
+  /**
+   * The one gate for every focus the map gives itself during a repaint. False while another Obsidian window (for example Settings
+   * in a pop-out) is the active one: the map must not take focus then. It remembers the skipped restore and does it when the
+   * map's own window gets focus again (see onOpen).
+   */
   mapWindowIsActive() {
     var _a2, _b2;
     const active = typeof activeWindow === "undefined" ? void 0 : activeWindow;
     const own2 = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.defaultView;
-    return !active || !own2 || active === own2;
+    if (!active || !own2 || active === own2) return true;
+    this.focusRestorePending = true;
+    return false;
   }
   firstCardId() {
     return this.cardEls.keys().next().value;
@@ -49789,6 +49803,7 @@ ${request.requirements}` : preset.text,
     };
     return () => {
       var _a3, _b3, _c2, _d2, _e2, _f2, _g;
+      if (!this.mapWindowIsActive()) return;
       const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.contentEl) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-relevance-goal");
       target == null ? void 0 : target.focus();
     };
@@ -52679,7 +52694,7 @@ ${request.requirements}` : preset.text,
       this.startTextEdit(pending2);
     } else if (wanted && this.textEls.has(wanted)) {
       this.focusItemId = null;
-      (_b2 = this.textEls.get(wanted)) == null ? void 0 : _b2.focus({ preventScroll: true });
+      if (this.mapWindowIsActive()) (_b2 = this.textEls.get(wanted)) == null ? void 0 : _b2.focus({ preventScroll: true });
     }
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
@@ -52952,6 +52967,7 @@ ${request.requirements}` : preset.text,
       }
     });
     input2.addEventListener("blur", commit);
+    if (!this.mapWindowIsActive()) return;
     input2.focus({ preventScroll: true });
     (_c = input2.select) == null ? void 0 : _c.call(input2);
   }
@@ -60887,11 +60903,16 @@ ${note.detail.trim()}` : "",
   // ---- AI chat window -------------------------------------------------------------------------------------------
   /** Before a repaint: takes the chat window out of the page and returns what gives its text field focus back after it. */
   detachMapChat() {
-    var _a2, _b2, _c;
-    const restore = (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.captureFocus()) != null ? _b2 : () => {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const active = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.activeElement) != null ? _c : null;
+    const held = !!active && !!((_d = this.chat) == null ? void 0 : _d.isInput(active));
+    const restore = (_f = (_e = this.chat) == null ? void 0 : _e.captureFocus()) != null ? _f : () => {
     };
-    (_c = this.chat) == null ? void 0 : _c.detach();
-    return restore;
+    (_g = this.chat) == null ? void 0 : _g.detach();
+    if (!held) return restore;
+    return () => {
+      if (this.mapWindowIsActive()) restore();
+    };
   }
   /**
    * Puts the chat window into this repaint. Normally it is the first child of `workspace`, the window left of the canvas. On an

@@ -137,6 +137,28 @@ var en = {
   "ui.interface_language": "Interface language",
   "ui.interface_language_description": "Controls VAM and Coffee Tables only; it is independent of Obsidian\u2019s language. Existing notes and conversation text are preserved.",
   "ui.open_map": "Open mind map",
+  "ui.command_open_map": "Open mind map",
+  "ui.command_new_aim": "New AIM research map",
+  "ui.map_chat_toggle_command": "Toggle map AI chat",
+  "ui.command_selection_ai": "Use AI on selected text",
+  "ui.command_open_coffee_tables": "Open Coffee Tables",
+  "ui.command_import_outline": "Import outline",
+  "ui.command_import_exchange": "Import OPML or FreeMind file",
+  "ui.command_add_text_node": "Add text node",
+  "ui.command_add_summary_bracket": "Add summary bracket to selected topics",
+  "ui.command_share_map": "Share map as HTML",
+  "ui.command_open_topic_outline": "Open topic outline",
+  "ui.command_open_note_styles_folder": "Open note styles folder",
+  "ui.command_preview_prompt": "Preview AI instructions",
+  "ui.command_refresh_data": "Maintenance: Refresh VAM data",
+  "ui.command_sync_filenames": "Maintenance: Sync topic names and filenames",
+  "ui.command_repair_note_display": "Maintenance: Repair topic note display",
+  "ui.command_fix_math": "Maintenance: Fix math formulas in notes",
+  "ui.command_organize_folders": "Maintenance: Organize workspace folders",
+  "ui.command_repair_workspace": "Maintenance: Repair Agent Workspace",
+  "ui.command_reconnect_workspace": "Maintenance: Reconnect existing workspace",
+  "ui.command_prompt_monitor": "Diagnostics: Open AI prompt monitor",
+  "ui.command_debug_log": "Diagnostics: Open debug log",
   "ui.open_coffee_tables": "Open Coffee Tables",
   "ui.model_discovery_summary_0_1": "Codex: {0} \xB7 Claude CLI candidates: {1}",
   "ui.my_editable_mind_map": "My editable mind map",
@@ -187,7 +209,6 @@ var en = {
   "ui.outline_import_log_file": "Imported from an outline ({0}): {1}",
   "ui.outline_import_map_save_failed": "The topic notes were created but the map could not be saved: {0}",
   "ui.outline_import": "Import outline",
-  "ui.exchange_import": "Import OPML or FreeMind file",
   "ui.exchange_refused": "Not imported: {0} ({1})",
   "ui.exchange_reason_too_large": "the file is larger than {0} MB",
   "ui.exchange_reason_unsafe": "it contains a DOCTYPE, entity or processing instruction, which are not accepted",
@@ -764,7 +785,6 @@ var en = {
   "ui.presentation_last": "Already the last topic",
   "ui.presentation_exited": "Left the presentation",
   "ui.text_node_add": "Add text",
-  "ui.text_node_add_command": "Add a text node (on the selected topic, or free on the canvas)",
   "ui.text_node_label": "Text node: {0}",
   "ui.text_nodes_group": "Text nodes",
   "ui.text_node_edit_label": "Edit text node",
@@ -803,7 +823,6 @@ var en = {
   "ui.canvas_boundary_edit": "Edit frame label\u2026",
   "ui.canvas_boundary_remove": "Remove frame",
   "ui.summary_add": "Add summary bracket",
-  "ui.summary_add_command": "Add a summary bracket over the selected topics",
   "ui.summaries_group": "Summary brackets",
   "ui.summary_label": "Summary bracket: {0}",
   "ui.summary_new_label": "New summary bracket",
@@ -1067,11 +1086,9 @@ var en = {
   "ui.low": "Low",
   "ui.medium": "Medium",
   "ui.high": "High",
-  "ui.refresh_vam_data": "Refresh VAM data",
   "ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri": "Rescan maps and topic notes, then rebuild references and derived data. Original content is not overwritten.",
   "ui.full_rebuild": "Full rebuild",
   "ui.vam_data_has_been_refreshed": "VAM data has been refreshed.",
-  "ui.sync_topic_names_and_filenames": "Sync topic names and filenames",
   "ui.topic_filenames_are_up_to_date": "Topic filenames are up to date.",
   "ui.open_as_mind_map": "Open as mind map",
   "ui.unable_to_open_the_right_details_sidebar": "Unable to open the right details sidebar.",
@@ -1123,7 +1140,6 @@ var en = {
   "ui.map_folder_name_desc": "Folder name inside {0} where new maps are created. Changing it renames the existing folder, so its maps move with it. Settings closes while it runs, and Obsidian may ask about links for each map.",
   "ui.synced_0_subtopic_filenames_with_their_names": "Synced {0} subtopic filenames with their names.",
   "ui.synced_0_topic_filenames": "Synced {0} topic filenames.",
-  "ui.repair_topic_note_display": "Repair topic note display",
   "ui.topic_note_display_repaired": "Topic note display repaired.",
   "ui.map_saved_but_reference_update_failed_0": "Map saved, but reference update failed: {0}",
   "ui.0_1_notes": "{0} ({1} notes)",
@@ -1351,7 +1367,6 @@ var en = {
   "ui.map_chat_resend": "Resend",
   "ui.map_chat_skip_stopped": "you stopped it",
   "ui.map_chat_live_plan_0": "A plan is waiting for you: {0}",
-  "ui.map_chat_toggle_command": "Toggle the map AI chat",
   "ui.map_chat_do_find_images_0": "Start looking for pictures for \u201C{0}\u201D",
   "ui.map_chat_skip_images_one_card": "name exactly one card first",
   "ui.map_chat_skip_images_limit_0": "at most {0} picture searches per reply",
@@ -1447,7 +1462,6 @@ var en = {
   "ui.there_are_no_ai_exchanges_yet": "There are no AI exchanges yet.",
   "ui.prompt_monitor_elapsed": "Elapsed: {0}",
   "ui.prompt_monitor_repair_reason": "Repair reason: {0}",
-  "ui.prompt_monitor": "Open AI prompt monitor",
   "ui.prompt_monitor_copy_all": "Copy all recorded prompts",
   "ui.prompt_monitor_full_prompt": "Full prompt",
   "ui.prompt_monitor_size": "{0} characters \xB7 approximately {1} tokens (estimate, not billed usage)",
@@ -1537,7 +1551,6 @@ var en = {
   "ui.preview_sample_sources": "[S1] A source passage the research found (sample).",
   "ui.preview_prompt_title": "AI instructions preview",
   "ui.preview_prompt_open": "Preview AI instructions",
-  "ui.preview_prompt_command": "Preview AI instructions",
   "ui.preview_prompt_hint": "Read-only. This is the exact text the AI receives for the step you pick, with sample task input. Nothing is saved or sent.",
   "ui.preview_prompt_step_label": "Step",
   "ui.preview_prompt_text_0": "Instruction text: {0}",
@@ -1578,7 +1591,6 @@ var en = {
   "ui.note_style_kind_aim": "AIM conclusion note",
   "ui.note_style_kind_missing_0_1": 'The structure set for {0} topics, "{1}", was not found; this topic uses the next one in line.',
   "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" has a problem (line {1}): {2}',
-  "ui.note_style_open_folder_command": "Open the note styles folder",
   "ui.note_style_folder_opened_0": "Note styles folder: {0}",
   "ui.note_style_edit_missing_0": 'Cannot find the style file "{0}".',
   "ui.note_style_open_file": "Open this file",
@@ -2289,7 +2301,6 @@ var en = {
   "share.viewer_color_blue": "Blue",
   "share.viewer_color_purple": "Purple",
   // Share dialog
-  "share.command": "Share this map",
   "share.button": "Share this map",
   "share.title": "Share this map",
   "share.intro": "Creates one HTML file that opens in any browser, even offline. You choose where it is saved. Nothing is uploaded.",
@@ -2523,6 +2534,28 @@ var zhCN = {
   "ui.interface_language": "\u754C\u9762\u8BED\u8A00",
   "ui.interface_language_description": "\u53EA\u63A7\u5236 VAM \u4E0E Coffee Tables\uFF0C\u548C Obsidian \u7684\u8BED\u8A00\u8BBE\u7F6E\u5206\u5F00\u3002\u65E2\u6709\u7B14\u8BB0\u53CA\u5BF9\u8BDD\u5185\u5BB9\u4F1A\u4FDD\u7559\u539F\u6587\u3002",
   "ui.open_map": "\u6253\u5F00\u5FC3\u667A\u56FE",
+  "ui.command_open_map": "\u6253\u5F00\u5FC3\u667A\u56FE",
+  "ui.command_new_aim": "\u65B0\u5EFA AIM \u7814\u7A76\u5FC3\u667A\u56FE",
+  "ui.map_chat_toggle_command": "\u5F00\u5173\u5FC3\u667A\u56FE AI \u5BF9\u8BDD",
+  "ui.command_selection_ai": "\u7528 AI \u5904\u7406\u9009\u53D6\u6587\u5B57",
+  "ui.command_open_coffee_tables": "\u6253\u5F00 Coffee Tables",
+  "ui.command_import_outline": "\u5BFC\u5165\u5927\u7EB2",
+  "ui.command_import_exchange": "\u5BFC\u5165 OPML \u6216 FreeMind \u6587\u4EF6",
+  "ui.command_add_text_node": "\u6DFB\u52A0\u6587\u5B57\u533A\u5757",
+  "ui.command_add_summary_bracket": "\u4E3A\u9009\u53D6\u7684\u8BAE\u9898\u52A0\u6458\u8981\u62EC\u53F7",
+  "ui.command_share_map": "\u5C06\u5FC3\u667A\u56FE\u5206\u4EAB\u4E3A HTML",
+  "ui.command_open_topic_outline": "\u6253\u5F00\u8BAE\u9898\u5927\u7EB2",
+  "ui.command_open_note_styles_folder": "\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939",
+  "ui.command_preview_prompt": "\u9884\u89C8 AI \u6307\u4EE4",
+  "ui.command_refresh_data": "\u7EF4\u62A4\uFF1A\u5237\u65B0 VAM \u6570\u636E",
+  "ui.command_sync_filenames": "\u7EF4\u62A4\uFF1A\u540C\u6B65\u8BAE\u9898\u540D\u79F0\u4E0E\u6587\u4EF6\u540D",
+  "ui.command_repair_note_display": "\u7EF4\u62A4\uFF1A\u4FEE\u590D\u8BAE\u9898\u7B14\u8BB0\u663E\u793A",
+  "ui.command_fix_math": "\u7EF4\u62A4\uFF1A\u4FEE\u6B63\u7B14\u8BB0\u91CC\u7684\u6570\u5B66\u516C\u5F0F",
+  "ui.command_organize_folders": "\u7EF4\u62A4\uFF1A\u6574\u7406\u5DE5\u4F5C\u533A\u6587\u4EF6\u5939",
+  "ui.command_repair_workspace": "\u7EF4\u62A4\uFF1A\u4FEE\u590D Agent \u5DE5\u4F5C\u533A",
+  "ui.command_reconnect_workspace": "\u7EF4\u62A4\uFF1A\u627E\u56DE\u65E2\u6709\u5DE5\u4F5C\u533A",
+  "ui.command_prompt_monitor": "\u8BCA\u65AD\uFF1A\u6253\u5F00 AI \u63D0\u793A\u76D1\u770B\u5668",
+  "ui.command_debug_log": "\u8BCA\u65AD\uFF1A\u6253\u5F00\u8C03\u8BD5\u65E5\u5FD7",
   "ui.open_coffee_tables": "\u6253\u5F00 Coffee Tables",
   "ui.model_discovery_summary_0_1": "Codex\uFF1A{0} \xB7 Claude CLI \u5019\u9009\u6A21\u578B\uFF1A{1}",
   "ui.my_editable_mind_map": "\u6211\u7684\u53EF\u7F16\u8F91\u5FC3\u667A\u56FE",
@@ -2573,7 +2606,6 @@ var zhCN = {
   "ui.outline_import_log_file": "\u4ECE\u5927\u7EB2\u5BFC\u5165\uFF08{0}\uFF09\uFF1A{1}",
   "ui.outline_import_map_save_failed": "\u8BAE\u9898\u7B14\u8BB0\u5DF2\u521B\u5EFA\uFF0C\u4F46\u5FC3\u667A\u56FE\u65E0\u6CD5\u4FDD\u5B58\uFF1A{0}",
   "ui.outline_import": "\u5BFC\u5165\u5927\u7EB2",
-  "ui.exchange_import": "\u5BFC\u5165 OPML \u6216 FreeMind \u6587\u4EF6",
   "ui.exchange_refused": "\u672A\u5BFC\u5165\uFF1A{0}\uFF08{1}\uFF09",
   "ui.exchange_reason_too_large": "\u6587\u4EF6\u8D85\u8FC7 {0} MB",
   "ui.exchange_reason_unsafe": "\u6587\u4EF6\u542B\u6709 DOCTYPE\u3001\u5B9E\u4F53\u6216\u5904\u7406\u6307\u4EE4\uFF0C\u8FD9\u4E9B\u4E00\u5F8B\u4E0D\u63A5\u53D7",
@@ -3150,7 +3182,6 @@ var zhCN = {
   "ui.presentation_last": "\u5DF2\u662F\u6700\u540E\u4E00\u4E2A\u8BAE\u9898",
   "ui.presentation_exited": "\u5DF2\u9000\u51FA\u6F14\u793A",
   "ui.text_node_add": "\u6DFB\u52A0\u6587\u5B57",
-  "ui.text_node_add_command": "\u6DFB\u52A0\u6587\u5B57\u8282\u70B9\uFF08\u9009\u4E86\u8BAE\u9898\u5C31\u6302\u5728\u8BAE\u9898\u4E0B\uFF0C\u6CA1\u9009\u5C31\u653E\u5728\u753B\u5E03\u4E0A\uFF09",
   "ui.text_node_label": "\u6587\u5B57\u8282\u70B9\uFF1A{0}",
   "ui.text_nodes_group": "\u6587\u5B57\u8282\u70B9",
   "ui.text_node_edit_label": "\u7F16\u8F91\u6587\u5B57\u8282\u70B9",
@@ -3189,7 +3220,6 @@ var zhCN = {
   "ui.canvas_boundary_edit": "\u4FEE\u6539\u5916\u6846\u6807\u7B7E\u2026",
   "ui.canvas_boundary_remove": "\u79FB\u9664\u5916\u6846",
   "ui.summary_add": "\u52A0\u6458\u8981\u62EC\u53F7",
-  "ui.summary_add_command": "\u4E3A\u9009\u53D6\u7684\u8BAE\u9898\u52A0\u6458\u8981\u62EC\u53F7",
   "ui.summaries_group": "\u6458\u8981\u62EC\u53F7",
   "ui.summary_label": "\u6458\u8981\u62EC\u53F7\uFF1A{0}",
   "ui.summary_new_label": "\u65B0\u7684\u6458\u8981\u62EC\u53F7",
@@ -3453,11 +3483,9 @@ var zhCN = {
   "ui.low": "\u4F4E (Low)",
   "ui.medium": "\u4E2D (Medium)",
   "ui.high": "\u9AD8 (High)",
-  "ui.refresh_vam_data": "\u5237\u65B0 VAM \u6570\u636E",
   "ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri": "\u91CD\u65B0\u626B\u63CF\u5FC3\u667A\u56FE\u4E0E\u8BAE\u9898\u7B14\u8BB0\uFF0C\u91CD\u5EFA reference \u4E0E\u884D\u751F\u6570\u636E\u3002\u539F\u59CB\u5185\u5BB9\u4E0D\u4F1A\u88AB\u8986\u5199\u3002",
   "ui.full_rebuild": "\u5B8C\u6574\u91CD\u5EFA",
   "ui.vam_data_has_been_refreshed": "VAM \u6570\u636E\u5DF2\u5237\u65B0\u3002",
-  "ui.sync_topic_names_and_filenames": "\u540C\u6B65\u8BAE\u9898\u540D\u79F0\u4E0E\u6587\u4EF6\u540D",
   "ui.topic_filenames_are_up_to_date": "\u8BAE\u9898\u6587\u4EF6\u540D\u5DF2\u662F\u6700\u65B0\u72B6\u6001\u3002",
   "ui.open_as_mind_map": "\u4EE5\u5FC3\u667A\u56FE\u6253\u5F00",
   "ui.unable_to_open_the_right_details_sidebar": "\u65E0\u6CD5\u6253\u5F00\u53F3\u4FA7\u8BE6\u60C5\u680F\u3002",
@@ -3509,7 +3537,6 @@ var zhCN = {
   "ui.map_folder_name_desc": "\u65B0\u7684\u9879\u76EE\u4F1A\u521B\u5EFA\u5728 {0} \u5185\u7684\u8FD9\u4E2A\u6587\u4EF6\u5939\u3002\u4FEE\u6539\u540D\u79F0\u4F1A\u4E00\u5E76\u91CD\u547D\u540D\u65E2\u6709\u6587\u4EF6\u5939\uFF0C\u91CC\u9762\u7684\u9879\u76EE\u4F1A\u8DDF\u7740\u79FB\u52A8\u3002\u8FD0\u884C\u65F6\u8BBE\u7F6E\u7A97\u53E3\u4F1A\u5173\u95ED\uFF0CObsidian \u53EF\u80FD\u4F1A\u9010\u4EFD\u8BE2\u95EE\u94FE\u63A5\u5904\u7406\u65B9\u5F0F\u3002",
   "ui.synced_0_subtopic_filenames_with_their_names": "\u5DF2\u5C06 {0} \u4EFD\u5B50\u8BAE\u9898\u6587\u4EF6\u540D\u540C\u6B65\u4E3A\u8BAE\u9898\u540D\u79F0\u3002",
   "ui.synced_0_topic_filenames": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8BAE\u9898\u6587\u4EF6\u540D\u3002",
-  "ui.repair_topic_note_display": "\u4FEE\u590D\u8BAE\u9898\u7B14\u8BB0\u663E\u793A",
   "ui.topic_note_display_repaired": "\u5DF2\u4FEE\u590D\u8BAE\u9898\u7B14\u8BB0\u663E\u793A\u3002",
   "ui.map_saved_but_reference_update_failed_0": "\u5FC3\u667A\u56FE\u5DF2\u4FDD\u5B58\uFF0C\u4F46 reference \u66F4\u65B0\u5931\u8D25\uFF1A{0}",
   "ui.0_1_notes": "{0}\uFF08{1} \u4EFD Notes\uFF09",
@@ -3737,7 +3764,6 @@ var zhCN = {
   "ui.map_chat_resend": "\u91CD\u65B0\u9001\u51FA",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8BA1\u5212\u7B49\u4F60\u786E\u8BA4\uFF1A{0}",
-  "ui.map_chat_toggle_command": "\u5F00\u5173\u5730\u56FE AI \u5BF9\u8BDD",
   "ui.map_chat_do_find_images_0": "\u5F00\u59CB\u4E3A\u201C{0}\u201D\u627E\u56FE",
   "ui.map_chat_skip_images_one_card": "\u8BF7\u6307\u5B9A\u4E00\u5F20\u5361",
   "ui.map_chat_skip_images_limit_0": "\u4E00\u6B21\u6700\u591A\u627E {0} \u7EC4\u56FE",
@@ -3833,7 +3859,6 @@ var zhCN = {
   "ui.there_are_no_ai_exchanges_yet": "\u5F53\u524D\u6CA1\u6709 AI \u5F80\u8FD4\u8BB0\u5F55\u3002",
   "ui.prompt_monitor_elapsed": "\u8017\u65F6\uFF1A{0}",
   "ui.prompt_monitor_repair_reason": "\u4FEE\u590D\u539F\u56E0\uFF1A{0}",
-  "ui.prompt_monitor": "\u6253\u5F00 AI Prompt Monitor",
   "ui.prompt_monitor_copy_all": "\u590D\u5236\u5168\u90E8 Prompt \u8BB0\u5F55",
   "ui.prompt_monitor_full_prompt": "\u5B8C\u6574 Prompt \u6307\u4EE4",
   "ui.prompt_monitor_size": "{0} \u5B57\u7B26 \xB7 \u7EA6 {1} tokens\uFF08\u4F30\u7B97\uFF0C\u975E\u5B9E\u9645\u8BA1\u8D39\u7528\u91CF\uFF09",
@@ -3923,7 +3948,6 @@ var zhCN = {
   "ui.preview_sample_sources": "[S1] \u7814\u7A76\u627E\u5230\u7684\u4E00\u6BB5\u6765\u6E90\u5185\u5BB9\uFF08\u793A\u4F8B\uFF09\u3002",
   "ui.preview_prompt_title": "AI \u6307\u4EE4\u9884\u89C8",
   "ui.preview_prompt_open": "\u9884\u89C8 AI \u6307\u4EE4",
-  "ui.preview_prompt_command": "\u9884\u89C8 AI \u6307\u4EE4",
   "ui.preview_prompt_hint": "\u53EA\u8BFB\u3002\u8FD9\u662F\u4F60\u9009\u7684\u6B65\u9AA4\u5B9E\u9645\u53D1\u9001\u7ED9 AI \u7684\u6587\u5B57\uFF0C\u4EFB\u52A1\u8F93\u5165\u7528\u793A\u4F8B\u3002\u4E0D\u4F1A\u4FDD\u5B58\u4E5F\u4E0D\u4F1A\u53D1\u9001\u3002",
   "ui.preview_prompt_step_label": "\u6B65\u9AA4",
   "ui.preview_prompt_text_0": "\u6307\u4EE4\u6587\u5B57\uFF1A{0}",
@@ -3964,7 +3988,6 @@ var zhCN = {
   "ui.note_style_kind_aim": "AIM \u7ED3\u8BBA\u7B14\u8BB0",
   "ui.note_style_kind_missing_0_1": "\u4E3A\u201C{0}\u201D\u8BAE\u9898\u7C7B\u578B\u6307\u5B9A\u7684\u7B14\u8BB0\u7ED3\u6784\u201C{1}\u201D\u627E\u4E0D\u5230\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u7ED3\u6784\u3002",
   "ui.note_style_file_invalid_0_1_2": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
-  "ui.note_style_open_folder_command": "\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939",
   "ui.note_style_folder_opened_0": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A{0}",
   "ui.note_style_edit_missing_0": "\u627E\u4E0D\u5230\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u3002",
   "ui.note_style_open_file": "\u6253\u5F00\u8FD9\u4E2A\u6587\u4EF6",
@@ -4675,7 +4698,6 @@ var zhCN = {
   "share.viewer_color_blue": "\u84DD\u8272",
   "share.viewer_color_purple": "\u7D2B\u8272",
   // Share dialog
-  "share.command": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
   "share.button": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
   "share.title": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
   "share.intro": "\u751F\u6210\u4E00\u4E2A HTML \u6587\u4EF6\uFF0C\u4EFB\u4F55\u6D4F\u89C8\u5668\u90FD\u80FD\u6253\u5F00\uFF0C\u79BB\u7EBF\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u51B3\u5B9A\uFF0C\u4E0D\u4F1A\u4E0A\u4F20\u4EFB\u4F55\u5185\u5BB9\u3002",
@@ -4909,6 +4931,28 @@ var zhTW = {
   "ui.interface_language": "\u4ECB\u9762\u8A9E\u8A00",
   "ui.interface_language_description": "\u53EA\u63A7\u5236 VAM \u8207 Coffee Tables\uFF0C\u548C Obsidian \u7684\u8A9E\u8A00\u8A2D\u5B9A\u5206\u958B\u3002\u65E2\u6709\u7B46\u8A18\u53CA\u5C0D\u8AC7\u5167\u5BB9\u6703\u4FDD\u7559\u539F\u6587\u3002",
   "ui.open_map": "\u958B\u555F\u5FC3\u667A\u5716",
+  "ui.command_open_map": "\u958B\u555F\u5FC3\u667A\u5716",
+  "ui.command_new_aim": "\u65B0\u589E AIM \u7814\u7A76\u5FC3\u667A\u5716",
+  "ui.map_chat_toggle_command": "\u958B\u95DC\u5FC3\u667A\u5716 AI \u5C0D\u8A71",
+  "ui.command_selection_ai": "\u7528 AI \u8655\u7406\u9078\u53D6\u6587\u5B57",
+  "ui.command_open_coffee_tables": "\u958B\u555F Coffee Tables",
+  "ui.command_import_outline": "\u532F\u5165\u5927\u7DB1",
+  "ui.command_import_exchange": "\u532F\u5165 OPML \u6216 FreeMind \u6A94",
+  "ui.command_add_text_node": "\u65B0\u589E\u6587\u5B57\u5340\u584A",
+  "ui.command_add_summary_bracket": "\u70BA\u9078\u53D6\u7684\u8B70\u984C\u52A0\u6458\u8981\u62EC\u865F",
+  "ui.command_share_map": "\u5C07\u5FC3\u667A\u5716\u5206\u4EAB\u70BA HTML",
+  "ui.command_open_topic_outline": "\u958B\u555F\u8B70\u984C\u5927\u7DB1",
+  "ui.command_open_note_styles_folder": "\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E",
+  "ui.command_preview_prompt": "\u9810\u89BD AI \u6307\u793A",
+  "ui.command_refresh_data": "\u7DAD\u8B77\uFF1A\u91CD\u65B0\u6574\u7406 VAM \u8CC7\u6599",
+  "ui.command_sync_filenames": "\u7DAD\u8B77\uFF1A\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D",
+  "ui.command_repair_note_display": "\u7DAD\u8B77\uFF1A\u4FEE\u5FA9\u8B70\u984C\u7B46\u8A18\u986F\u793A",
+  "ui.command_fix_math": "\u7DAD\u8B77\uFF1A\u4FEE\u6B63\u7B46\u8A18\u88E1\u7684\u6578\u5B78\u516C\u5F0F",
+  "ui.command_organize_folders": "\u7DAD\u8B77\uFF1A\u6574\u7406\u5DE5\u4F5C\u5340\u8CC7\u6599\u593E",
+  "ui.command_repair_workspace": "\u7DAD\u8B77\uFF1A\u4FEE\u5FA9 Agent \u5DE5\u4F5C\u5340",
+  "ui.command_reconnect_workspace": "\u7DAD\u8B77\uFF1A\u627E\u56DE\u65E2\u6709\u5DE5\u4F5C\u5340",
+  "ui.command_prompt_monitor": "\u8A3A\u65B7\uFF1A\u958B\u555F AI \u63D0\u793A\u76E3\u770B\u5668",
+  "ui.command_debug_log": "\u8A3A\u65B7\uFF1A\u958B\u555F\u5075\u932F\u65E5\u8A8C",
   "ui.open_coffee_tables": "\u958B\u555F Coffee Tables",
   "ui.model_discovery_summary_0_1": "Codex\uFF1A{0} \xB7 Claude CLI \u5019\u9078\u6A21\u578B\uFF1A{1}",
   "ui.my_editable_mind_map": "\u6211\u7684\u53EF\u7DE8\u8F2F\u5FC3\u667A\u5716",
@@ -4959,7 +5003,6 @@ var zhTW = {
   "ui.outline_import_log_file": "\u5F9E\u5927\u7DB1\u532F\u5165\uFF08{0}\uFF09\uFF1A{1}",
   "ui.outline_import_map_save_failed": "\u8B70\u984C\u7B46\u8A18\u5DF2\u5EFA\u7ACB\uFF0C\u4F46\u5FC3\u667A\u5716\u7121\u6CD5\u5132\u5B58\uFF1A{0}",
   "ui.outline_import": "\u532F\u5165\u5927\u7DB1",
-  "ui.exchange_import": "\u532F\u5165 OPML \u6216 FreeMind \u6A94",
   "ui.exchange_refused": "\u672A\u532F\u5165\uFF1A{0}\uFF08{1}\uFF09",
   "ui.exchange_reason_too_large": "\u6A94\u6848\u8D85\u904E {0} MB",
   "ui.exchange_reason_unsafe": "\u6A94\u6848\u542B\u6709 DOCTYPE\u3001\u5BE6\u9AD4\u6216\u8655\u7406\u6307\u4EE4\uFF0C\u9019\u4E9B\u4E00\u5F8B\u4E0D\u63A5\u53D7",
@@ -5536,7 +5579,6 @@ var zhTW = {
   "ui.presentation_last": "\u5DF2\u662F\u6700\u5F8C\u4E00\u500B\u8B70\u984C",
   "ui.presentation_exited": "\u5DF2\u96E2\u958B\u7C21\u5831",
   "ui.text_node_add": "\u65B0\u589E\u6587\u5B57",
-  "ui.text_node_add_command": "\u65B0\u589E\u6587\u5B57\u5340\u584A\uFF08\u9078\u4E86\u8B70\u984C\u5C31\u639B\u5728\u8B70\u984C\u4E0B\uFF0C\u6C92\u9078\u5C31\u653E\u5728\u756B\u5E03\u4E0A\uFF09",
   "ui.text_node_label": "\u6587\u5B57\u5340\u584A\uFF1A{0}",
   "ui.text_nodes_group": "\u6587\u5B57\u5340\u584A",
   "ui.text_node_edit_label": "\u7DE8\u8F2F\u6587\u5B57\u5340\u584A",
@@ -5575,7 +5617,6 @@ var zhTW = {
   "ui.canvas_boundary_edit": "\u4FEE\u6539\u5916\u6846\u6A19\u7C64\u2026",
   "ui.canvas_boundary_remove": "\u79FB\u9664\u5916\u6846",
   "ui.summary_add": "\u52A0\u6458\u8981\u62EC\u865F",
-  "ui.summary_add_command": "\u70BA\u9078\u53D6\u7684\u8B70\u984C\u52A0\u6458\u8981\u62EC\u865F",
   "ui.summaries_group": "\u6458\u8981\u62EC\u865F",
   "ui.summary_label": "\u6458\u8981\u62EC\u865F\uFF1A{0}",
   "ui.summary_new_label": "\u65B0\u7684\u6458\u8981\u62EC\u865F",
@@ -5839,11 +5880,9 @@ var zhTW = {
   "ui.low": "\u4F4E (Low)",
   "ui.medium": "\u4E2D (Medium)",
   "ui.high": "\u9AD8 (High)",
-  "ui.refresh_vam_data": "\u91CD\u65B0\u6574\u7406 VAM \u8CC7\u6599",
   "ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri": "\u91CD\u65B0\u6383\u63CF\u5FC3\u667A\u5716\u8207\u8B70\u984C\u7B46\u8A18\uFF0C\u91CD\u5EFA reference \u8207\u884D\u751F\u8CC7\u6599\u3002\u539F\u59CB\u5167\u5BB9\u4E0D\u6703\u88AB\u8986\u5BEB\u3002",
   "ui.full_rebuild": "\u5B8C\u6574\u91CD\u5EFA",
   "ui.vam_data_has_been_refreshed": "VAM \u8CC7\u6599\u5DF2\u91CD\u65B0\u6574\u7406\u3002",
-  "ui.sync_topic_names_and_filenames": "\u540C\u6B65\u8B70\u984C\u540D\u7A31\u8207\u6A94\u540D",
   "ui.topic_filenames_are_up_to_date": "\u8B70\u984C\u6A94\u540D\u5DF2\u662F\u6700\u65B0\u72C0\u614B\u3002",
   "ui.open_as_mind_map": "\u4EE5\u5FC3\u667A\u5716\u958B\u555F",
   "ui.unable_to_open_the_right_details_sidebar": "\u7121\u6CD5\u958B\u555F\u53F3\u5074\u8A73\u60C5\u6B04\u3002",
@@ -5895,7 +5934,6 @@ var zhTW = {
   "ui.map_folder_name_desc": "\u65B0\u7684\u9805\u76EE\u6703\u5EFA\u7ACB\u5728 {0} \u5167\u7684\u9019\u500B\u8CC7\u6599\u593E\u3002\u4FEE\u6539\u540D\u7A31\u6703\u4E00\u4F75\u91CD\u65B0\u547D\u540D\u65E2\u6709\u8CC7\u6599\u593E\uFF0C\u88E1\u9762\u7684\u9805\u76EE\u6703\u8DDF\u8457\u79FB\u52D5\u3002\u57F7\u884C\u6642\u8A2D\u5B9A\u8996\u7A97\u6703\u95DC\u9589\uFF0CObsidian \u53EF\u80FD\u6703\u9010\u4EFD\u8A62\u554F\u9023\u7D50\u8655\u7406\u65B9\u5F0F\u3002",
   "ui.synced_0_subtopic_filenames_with_their_names": "\u5DF2\u5C07 {0} \u4EFD\u5B50\u8B70\u984C\u6A94\u540D\u540C\u6B65\u70BA\u8B70\u984C\u540D\u7A31\u3002",
   "ui.synced_0_topic_filenames": "\u5DF2\u540C\u6B65 {0} \u4EFD\u8B70\u984C\u6A94\u540D\u3002",
-  "ui.repair_topic_note_display": "\u4FEE\u5FA9\u8B70\u984C\u7B46\u8A18\u986F\u793A",
   "ui.topic_note_display_repaired": "\u5DF2\u4FEE\u5FA9\u8B70\u984C\u7B46\u8A18\u986F\u793A\u3002",
   "ui.map_saved_but_reference_update_failed_0": "\u5FC3\u667A\u5716\u5DF2\u5132\u5B58\uFF0C\u4F46 reference \u66F4\u65B0\u5931\u6557\uFF1A{0}",
   "ui.0_1_notes": "{0}\uFF08{1} \u4EFD Notes\uFF09",
@@ -6123,7 +6161,6 @@ var zhTW = {
   "ui.map_chat_resend": "\u91CD\u65B0\u9001\u51FA",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8A08\u756B\u7B49\u4F60\u78BA\u8A8D\uFF1A{0}",
-  "ui.map_chat_toggle_command": "\u958B\u95DC\u5FC3\u667A\u5716 AI \u5C0D\u8A71",
   "ui.map_chat_do_find_images_0": "\u958B\u59CB\u70BA\u300C{0}\u300D\u627E\u5716",
   "ui.map_chat_skip_images_one_card": "\u8ACB\u6307\u5B9A\u4E00\u5F35\u5361",
   "ui.map_chat_skip_images_limit_0": "\u4E00\u6B21\u6700\u591A\u627E {0} \u7D44\u5716",
@@ -6219,7 +6256,6 @@ var zhTW = {
   "ui.there_are_no_ai_exchanges_yet": "\u76EE\u524D\u6C92\u6709 AI \u5F80\u8FD4\u7D00\u9304\u3002",
   "ui.prompt_monitor_elapsed": "\u8017\u6642\uFF1A{0}",
   "ui.prompt_monitor_repair_reason": "\u4FEE\u5FA9\u539F\u56E0\uFF1A{0}",
-  "ui.prompt_monitor": "\u958B\u555F AI Prompt Monitor",
   "ui.prompt_monitor_copy_all": "\u8907\u88FD\u5168\u90E8 Prompt \u7D00\u9304",
   "ui.prompt_monitor_full_prompt": "\u5B8C\u6574 Prompt \u6307\u4EE4",
   "ui.prompt_monitor_size": "{0} \u5B57\u5143 \xB7 \u7D04 {1} tokens\uFF08\u4F30\u7B97\uFF0C\u975E\u5BE6\u969B\u8A08\u8CBB\u7528\u91CF\uFF09",
@@ -6309,7 +6345,6 @@ var zhTW = {
   "ui.preview_sample_sources": "[S1] \u7814\u7A76\u627E\u5230\u7684\u4E00\u6BB5\u4F86\u6E90\u5167\u5BB9\uFF08\u7BC4\u4F8B\uFF09\u3002",
   "ui.preview_prompt_title": "AI \u6307\u793A\u9810\u89BD",
   "ui.preview_prompt_open": "\u9810\u89BD AI \u6307\u793A",
-  "ui.preview_prompt_command": "\u9810\u89BD AI \u6307\u793A",
   "ui.preview_prompt_hint": "\u552F\u8B80\u3002\u9019\u662F\u4F60\u9078\u7684\u6B65\u9A5F\u5BE6\u969B\u9001\u7D66 AI \u7684\u6587\u5B57\uFF0C\u4EFB\u52D9\u8F38\u5165\u7528\u7BC4\u4F8B\u3002\u4E0D\u6703\u5132\u5B58\u4E5F\u4E0D\u6703\u9001\u51FA\u3002",
   "ui.preview_prompt_step_label": "\u6B65\u9A5F",
   "ui.preview_prompt_text_0": "\u6307\u793A\u6587\u5B57\uFF1A{0}",
@@ -6350,7 +6385,6 @@ var zhTW = {
   "ui.note_style_kind_aim": "AIM \u7D50\u8AD6\u7B46\u8A18",
   "ui.note_style_kind_missing_0_1": "\u70BA\u300C{0}\u300D\u8B70\u984C\u985E\u578B\u6307\u5B9A\u7684\u7B46\u8A18\u7D50\u69CB\u300C{1}\u300D\u627E\u4E0D\u5230\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u7D50\u69CB\u3002",
   "ui.note_style_file_invalid_0_1_2": "\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
-  "ui.note_style_open_folder_command": "\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E",
   "ui.note_style_folder_opened_0": "\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A{0}",
   "ui.note_style_edit_missing_0": "\u627E\u4E0D\u5230\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u3002",
   "ui.note_style_open_file": "\u958B\u555F\u9019\u500B\u6A94",
@@ -7061,7 +7095,6 @@ var zhTW = {
   "share.viewer_color_blue": "\u85CD\u8272",
   "share.viewer_color_purple": "\u7D2B\u8272",
   // Share dialog
-  "share.command": "\u5206\u4EAB\u9019\u5F35\u5FC3\u667A\u5716",
   "share.button": "\u5206\u4EAB\u9019\u5F35\u5FC3\u667A\u5716",
   "share.title": "\u5206\u4EAB\u9019\u5F35\u5FC3\u667A\u5716",
   "share.intro": "\u7522\u751F\u4E00\u500B HTML \u6A94\uFF0C\u4EFB\u4F55\u700F\u89BD\u5668\u90FD\u80FD\u958B\u555F\uFF0C\u96E2\u7DDA\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u6C7A\u5B9A\uFF0C\u4E0D\u6703\u4E0A\u50B3\u4EFB\u4F55\u6771\u897F\u3002",
@@ -73527,12 +73560,12 @@ var VisualAgentMapPlugin = class extends import_obsidian43.Plugin {
     this.localizedCommands.push({
       command: this.addCommand({
         id: "markdown-selection-ai",
-        name: t("ui.context_ai_open"),
+        name: t("ui.command_selection_ai"),
         checkCallback: (checking) => markdownSelectionAi.openForSelection(checking)
       }),
-      key: "ui.context_ai_open"
+      key: "ui.command_selection_ai"
     });
-    this.addLocalizedCommand("preview-full-prompt", "ui.preview_prompt_command", () => this.openPromptPreview());
+    this.addLocalizedCommand("preview-full-prompt", "ui.command_preview_prompt", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof import_obsidian43.FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
@@ -73591,7 +73624,7 @@ var VisualAgentMapPlugin = class extends import_obsidian43.Plugin {
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
     this.coffeeRibbonIcon = coffeeRibbonIcon;
-    this.addLocalizedCommand("open-coffee-tables", "ui.open_coffee_tables", openCoffee);
+    this.addLocalizedCommand("open-coffee-tables", "ui.command_open_coffee_tables", openCoffee);
     this.registerView(VIEW_TYPE, (leaf) => new VisualAgentMapView(leaf, this));
     this.registerView(
       OUTLINE_VIEW_TYPE,
@@ -73626,22 +73659,22 @@ var VisualAgentMapPlugin = class extends import_obsidian43.Plugin {
       }),
       key: "ui.map_chat_toggle_command"
     });
-    this.addLocalizedCommand("open-map", "ui.open_map", () => {
+    this.addLocalizedCommand("open-map", "ui.command_open_map", () => {
       void this.activateView().catch((error) => new import_obsidian43.Notice(String(error)));
     });
-    this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.aim_create_map", () => {
+    this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
       }).catch((error) => new import_obsidian43.Notice(String(error)));
     });
-    this.addLocalizedCommand("import-outline", "ui.outline_import", () => {
+    this.addLocalizedCommand("import-outline", "ui.command_import_outline", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openOutlineImport();
       }).catch((error) => new import_obsidian43.Notice(String(error)));
     });
-    this.addLocalizedCommand("import-outline-exchange", "ui.exchange_import", () => {
+    this.addLocalizedCommand("import-outline-exchange", "ui.command_import_exchange", () => {
       void this.activateView().then(() => {
         const view = this.views()[0];
         if (view) chooseAndImportExchange(view);
@@ -73650,7 +73683,7 @@ var VisualAgentMapPlugin = class extends import_obsidian43.Plugin {
     this.localizedCommands.push({
       command: this.addCommand({
         id: "add-text-node",
-        name: t("ui.text_node_add_command"),
+        name: t("ui.command_add_text_node"),
         checkCallback: (checking) => {
           const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
           if (!view) return false;
@@ -73658,12 +73691,12 @@ var VisualAgentMapPlugin = class extends import_obsidian43.Plugin {
           return true;
         }
       }),
-      key: "ui.text_node_add_command"
+      key: "ui.command_add_text_node"
     });
     this.localizedCommands.push({
       command: this.addCommand({
         id: "add-summary-bracket",
-        name: t("ui.summary_add_command"),
+        name: t("ui.command_add_summary_bracket"),
         checkCallback: (checking) => {
           const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
           if (!view) return false;
@@ -73671,46 +73704,46 @@ var VisualAgentMapPlugin = class extends import_obsidian43.Plugin {
           return true;
         }
       }),
-      key: "ui.summary_add_command"
+      key: "ui.command_add_summary_bracket"
     });
-    this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
-    this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
+    this.addLocalizedCommand("share-map", "ui.command_share_map", () => this.openShare());
+    this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
       void this.activateOutline().catch((error) => new import_obsidian43.Notice(String(error)));
     });
-    this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => {
+    this.addLocalizedCommand("rebuild-references", "ui.command_refresh_data", () => {
       this.runMutation(() => this.fullRebuild());
     });
-    this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => {
+    this.addLocalizedCommand("normalize-note-filenames", "ui.command_sync_filenames", () => {
       this.runMutation(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         new import_obsidian43.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
-    this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => {
+    this.addLocalizedCommand("repair-note-presentation", "ui.command_repair_note_display", () => {
       this.runMutation(async () => {
         await this.repo.ensureNodePresentation();
         new import_obsidian43.Notice(t("ui.topic_note_display_repaired"));
       });
     });
-    this.addLocalizedCommand("fix-math-formulas", "ui.fix_math_formulas", () => {
+    this.addLocalizedCommand("fix-math-formulas", "ui.command_fix_math", () => {
       void this.offerFixMathFormulas().catch(
         (error) => new import_obsidian43.Notice(error instanceof Error ? error.message : String(error))
       );
     });
-    this.addLocalizedCommand("organize-workspace-folders", "ui.organize_workspace_folders", () => {
+    this.addLocalizedCommand("organize-workspace-folders", "ui.command_organize_folders", () => {
       void this.offerOrganizeWorkspaceFolders().catch(
         (error) => new import_obsidian43.Notice(error instanceof Error ? error.message : String(error))
       );
     });
-    this.addLocalizedCommand("repair-workspace", "ui.repair_agent_workspace", () => {
+    this.addLocalizedCommand("repair-workspace", "ui.command_repair_workspace", () => {
       this.runMutation(() => this.repairWorkspace());
     });
-    this.addLocalizedCommand("reconnect-workspace", "ui.reconnect_existing_workspace", () => {
+    this.addLocalizedCommand("reconnect-workspace", "ui.command_reconnect_workspace", () => {
       void this.offerWorkspaceReconnect();
     });
     this.addLocalizedCommand(
       "open-prompt-monitor",
-      "ui.prompt_monitor",
+      "ui.command_prompt_monitor",
       () => new DebugLogModal(
         this.app,
         this.logs,
@@ -73724,7 +73757,7 @@ var VisualAgentMapPlugin = class extends import_obsidian43.Plugin {
     );
     this.addLocalizedCommand(
       "open-debug-log",
-      "ui.open_debug_log",
+      "ui.command_debug_log",
       () => new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open()
     );
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
@@ -74293,7 +74326,7 @@ ${t("ui.organize_link_wait_hint")}`;
           void this.noteStyles.followFolderRename((0, import_obsidian43.normalizePath)(oldPath), file.path).catch(() => void 0);
       })
     );
-    this.addLocalizedCommand("open-note-styles-folder", "ui.note_style_open_folder_command", () => {
+    this.addLocalizedCommand("open-note-styles-folder", "ui.command_open_note_styles_folder", () => {
       void this.openNoteStylesFolder();
     });
   }
@@ -74415,11 +74448,11 @@ ${t("ui.organize_link_wait_hint")}`;
     this.localizedCommands.push({ command: this.addCommand({ id, name: t(key2), callback }), key: key2 });
   }
   refreshLocalizedEntrypoints() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     (_a2 = this.ribbonIcon) == null ? void 0 : _a2.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     (_b2 = this.coffeeRibbonIcon) == null ? void 0 : _b2.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
     for (const { command, key: key2 } of this.localizedCommands)
-      command.name = `Visual Agent Map (VAM): ${translate(this.settings.language, key2)}`;
+      command.name = `${(_d = (_c = this.manifest) == null ? void 0 : _c.name) != null ? _d : "Visual Agent Map"}: ${translate(this.settings.language, key2)}`;
   }
   coffeeViews() {
     return this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE).map((leaf) => leaf.view).filter((view) => view instanceof CoffeeTablesView);

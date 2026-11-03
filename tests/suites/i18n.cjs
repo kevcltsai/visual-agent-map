@@ -115,12 +115,38 @@ test('localized command and ribbon labels follow the selected VAM language', () 
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin(), attributes = {}, command = { name: '' };
   plugin.ribbonIcon = { setAttribute: (key, value) => { attributes[key] = value; } };
-  plugin.localizedCommands = [{ command, key: 'ui.open_map' }];
+  plugin.manifest = { name: 'Visual Agent Map' };
+  plugin.localizedCommands = [{ command, key: 'ui.command_open_map' }];
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' }; plugin.refreshLocalizedEntrypoints();
-  assert.equal(command.name, 'Visual Agent Map (VAM): Open mind map');
+  // The same prefix Obsidian gives a command when it is added (the plugin name), so a language change never renames it.
+  assert.equal(command.name, 'Visual Agent Map: Open mind map');
   assert.equal(attributes['aria-label'], 'Open mind map');
   plugin.settings.language = 'zh-TW'; plugin.refreshLocalizedEntrypoints();
-  assert.equal(command.name, 'Visual Agent Map (VAM): 開啟心智圖');
+  assert.equal(command.name, 'Visual Agent Map: 開啟心智圖');
+});
+test('C4: every command keeps its id, takes its name from a ui.command_* key without the plugin name, and maintenance and diagnostics commands share a category word in every language', () => {
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  const { translate } = load('i18n.ts');
+  const ids = [], keys = new Map();
+  for (const match of source.matchAll(/addLocalizedCommand\(\s*("[^"]+"|AIM_CREATE_MAP_COMMAND_ID),\s*"([^"]+)"/g)) { ids.push(match[1].replace(/"/g, '')); keys.set(ids.at(-1), match[2]); }
+  for (const match of source.matchAll(/id: "([^"]+)",\s*name: t\("([^"]+)"\)/g)) { ids.push(match[1]); keys.set(match[1], match[2]); }
+  assert.deepEqual(ids.slice().sort(), ['AIM_CREATE_MAP_COMMAND_ID', 'add-summary-bracket', 'add-text-node', 'fix-math-formulas', 'import-outline', 'import-outline-exchange', 'markdown-selection-ai', 'normalize-note-filenames', 'open-coffee-tables', 'open-debug-log', 'open-map', 'open-note-styles-folder', 'open-prompt-monitor', 'open-topic-outline', 'organize-workspace-folders', 'preview-full-prompt', 'rebuild-references', 'reconnect-workspace', 'repair-note-presentation', 'repair-workspace', 'share-map', 'toggle-map-chat'].sort(), 'the 22 command ids are unchanged, so hotkeys keep working');
+  const category = { en: ['Maintenance: ', 'Diagnostics: '], 'zh-TW': ['維護：', '診斷：'], 'zh-CN': ['维护：', '诊断：'] };
+  const maintenance = ['rebuild-references', 'normalize-note-filenames', 'repair-note-presentation', 'fix-math-formulas', 'organize-workspace-folders', 'repair-workspace', 'reconnect-workspace'];
+  const diagnostics = ['open-prompt-monitor', 'open-debug-log'];
+  for (const [id, key] of keys) {
+    // toggle-map-chat keeps its older key (the map chat's own tests name it); every other command has a ui.command_* key.
+    assert.match(key, id === 'toggle-map-chat' ? /^ui\.map_chat_toggle_command$/ : /^ui\.command_/, `${id} has its own command name key`);
+    for (const language of ['en', 'zh-TW', 'zh-CN']) {
+      const name = translate(language, key);
+      assert.doesNotMatch(name, /Visual Agent Map|VAM\)|^VAM:/, `${language} ${id}: Obsidian adds the plugin name`);
+      assert.ok(name.length <= 45, `${language} ${id} is short: ${name}`);
+      if (language !== 'en') assert.doesNotMatch(name, /\([A-Za-z ]+\)/, `${language} ${id} has no English gloss in brackets`);
+      const [care, diag] = category[language];
+      assert.equal(name.startsWith(care), maintenance.includes(id), `${language} ${id}: ${name}`);
+      assert.equal(name.startsWith(diag), diagnostics.includes(id), `${language} ${id}: ${name}`);
+    }
+  }
 });
 test('map switch closes only the VAM note that remains in its right pane and clears Obsidian Outline', () => {
   class MarkdownView { constructor(path) { this.file = { path }; } }

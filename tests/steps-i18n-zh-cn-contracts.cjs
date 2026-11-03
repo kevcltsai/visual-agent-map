@@ -120,16 +120,17 @@ test('B1 and B5: the selection-AI and Coffee Tables commands and ribbon refresh 
   const selection = { name: '' }, coffee = { name: '' };
   plugin.ribbonIcon = { setAttribute: (key, value) => { attributes[key] = value; } };
   plugin.coffeeRibbonIcon = { setAttribute: (key, value) => { coffeeAttributes[key] = value; } };
-  plugin.localizedCommands = [{ command: selection, key: 'ui.context_ai_open' }, { command: coffee, key: 'ui.open_coffee_tables' }];
+  plugin.manifest = { name: 'Visual Agent Map' };
+  plugin.localizedCommands = [{ command: selection, key: 'ui.command_selection_ai' }, { command: coffee, key: 'ui.command_open_coffee_tables' }];
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'zh-CN' };
   plugin.refreshLocalizedEntrypoints();
-  assert.equal(selection.name, 'Visual Agent Map (VAM): ' + i18n.translate('zh-CN', 'ui.context_ai_open'));
-  assert.equal(coffee.name, 'Visual Agent Map (VAM): 打开 Coffee Tables');
+  assert.equal(selection.name, 'Visual Agent Map: ' + i18n.translate('zh-CN', 'ui.command_selection_ai'));
+  assert.equal(coffee.name, 'Visual Agent Map: 打开 Coffee Tables');
   assert.equal(coffeeAttributes['aria-label'], '打开 Coffee Tables');
   plugin.settings.language = 'en'; plugin.refreshLocalizedEntrypoints();
   assert.equal(coffeeAttributes['aria-label'], 'Open Coffee Tables');
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  assert.ok(/id: "markdown-selection-ai"[\s\S]{0,200}key: "ui\.context_ai_open"/.test(source), 'the selection command is registered as localized');
+  assert.ok(/id: "markdown-selection-ai"[\s\S]{0,200}key: "ui\.command_selection_ai"/.test(source), 'the selection command is registered as localized');
   assert.ok(!/Open \$\{COFFEE_TABLES_NAME\}/.test(source));
 });
 

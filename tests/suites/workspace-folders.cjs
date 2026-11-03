@@ -300,9 +300,9 @@ integrationTest('Organize leaves pre-0.4 maps, Inbox notes and Coffee Tables whe
 integrationTest('the Organize command is registered in both languages and writes nothing until the preview is confirmed', async () => {
   const fs = require('node:fs'), pathModule = require('node:path');
   const { translate } = load('i18n.ts');
-  assert.equal(translate('en', 'ui.organize_workspace_folders'), 'Organize workspace folders');
-  assert.equal(translate('zh-TW', 'ui.organize_workspace_folders'), '整理工作區資料夾');
-  assert.match(fs.readFileSync(pathModule.join(__dirname, '..', '..', 'main.ts'), 'utf8'), /addLocalizedCommand\(\s*"organize-workspace-folders",\s*"ui\.organize_workspace_folders"/);
+  assert.equal(translate('en', 'ui.command_organize_folders'), 'Maintenance: Organize workspace folders');
+  assert.equal(translate('zh-TW', 'ui.command_organize_folders'), '維護：整理工作區資料夾');
+  assert.match(fs.readFileSync(pathModule.join(__dirname, '..', '..', 'main.ts'), 'utf8'), /addLocalizedCommand\(\s*"organize-workspace-folders",\s*"ui\.command_organize_folders"/);
 
   const vault = await legacyVault();
   const notices = [], opened = [], progress = [];

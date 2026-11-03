@@ -600,12 +600,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.localizedCommands.push({
       command: this.addCommand({
         id: "markdown-selection-ai",
-        name: t("ui.context_ai_open"),
+        name: t("ui.command_selection_ai"),
         checkCallback: checking => markdownSelectionAi.openForSelection(checking)
       }),
-      key: "ui.context_ai_open"
+      key: "ui.command_selection_ai"
     });
-    this.addLocalizedCommand("preview-full-prompt", "ui.preview_prompt_command", () => this.openPromptPreview());
+    this.addLocalizedCommand("preview-full-prompt", "ui.command_preview_prompt", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
@@ -666,7 +666,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
     this.coffeeRibbonIcon = coffeeRibbonIcon;
-    this.addLocalizedCommand("open-coffee-tables", "ui.open_coffee_tables", openCoffee);
+    this.addLocalizedCommand("open-coffee-tables", "ui.command_open_coffee_tables", openCoffee);
     this.registerView(VIEW_TYPE, leaf => new VisualAgentMapView(leaf, this));
     this.registerView(
       OUTLINE_VIEW_TYPE,
@@ -706,20 +706,20 @@ export default class VisualAgentMapPlugin extends Plugin {
       }),
       key: "ui.map_chat_toggle_command"
     });
-    this.addLocalizedCommand("open-map", "ui.open_map", () => {
+    this.addLocalizedCommand("open-map", "ui.command_open_map", () => {
       void this.activateView().catch(error => new Notice(String(error)));
     });
-    this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.aim_create_map", () => {
+    this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
       void this.activateView()
         .then(() => this.views()[0]?.openAimStart())
         .catch(error => new Notice(String(error)));
     });
-    this.addLocalizedCommand("import-outline", "ui.outline_import", () => {
+    this.addLocalizedCommand("import-outline", "ui.command_import_outline", () => {
       void this.activateView()
         .then(() => this.views()[0]?.openOutlineImport())
         .catch(error => new Notice(String(error)));
     });
-    this.addLocalizedCommand("import-outline-exchange", "ui.exchange_import", () => {
+    this.addLocalizedCommand("import-outline-exchange", "ui.command_import_exchange", () => {
       void this.activateView()
         .then(() => {
           const view = this.views()[0];
@@ -730,7 +730,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.localizedCommands.push({
       command: this.addCommand({
         id: "add-text-node",
-        name: t("ui.text_node_add_command"),
+        name: t("ui.command_add_text_node"),
         checkCallback: checking => {
           const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
           if (!view) return false;
@@ -738,12 +738,12 @@ export default class VisualAgentMapPlugin extends Plugin {
           return true;
         }
       }),
-      key: "ui.text_node_add_command"
+      key: "ui.command_add_text_node"
     });
     this.localizedCommands.push({
       command: this.addCommand({
         id: "add-summary-bracket",
-        name: t("ui.summary_add_command"),
+        name: t("ui.command_add_summary_bracket"),
         checkCallback: checking => {
           const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
           if (!view) return false;
@@ -751,44 +751,44 @@ export default class VisualAgentMapPlugin extends Plugin {
           return true;
         }
       }),
-      key: "ui.summary_add_command"
+      key: "ui.command_add_summary_bracket"
     });
-    this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
-    this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
+    this.addLocalizedCommand("share-map", "ui.command_share_map", () => this.openShare());
+    this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
       void this.activateOutline().catch(error => new Notice(String(error)));
     });
-    this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => {
+    this.addLocalizedCommand("rebuild-references", "ui.command_refresh_data", () => {
       this.runMutation(() => this.fullRebuild());
     });
-    this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => {
+    this.addLocalizedCommand("normalize-note-filenames", "ui.command_sync_filenames", () => {
       this.runMutation(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         new Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
-    this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => {
+    this.addLocalizedCommand("repair-note-presentation", "ui.command_repair_note_display", () => {
       this.runMutation(async () => {
         await this.repo.ensureNodePresentation();
         new Notice(t("ui.topic_note_display_repaired"));
       });
     });
-    this.addLocalizedCommand("fix-math-formulas", "ui.fix_math_formulas", () => {
+    this.addLocalizedCommand("fix-math-formulas", "ui.command_fix_math", () => {
       void this.offerFixMathFormulas().catch(
         error => new Notice(error instanceof Error ? error.message : String(error))
       );
     });
-    this.addLocalizedCommand("organize-workspace-folders", "ui.organize_workspace_folders", () => {
+    this.addLocalizedCommand("organize-workspace-folders", "ui.command_organize_folders", () => {
       void this.offerOrganizeWorkspaceFolders().catch(
         error => new Notice(error instanceof Error ? error.message : String(error))
       );
     });
-    this.addLocalizedCommand("repair-workspace", "ui.repair_agent_workspace", () => {
+    this.addLocalizedCommand("repair-workspace", "ui.command_repair_workspace", () => {
       this.runMutation(() => this.repairWorkspace());
     });
-    this.addLocalizedCommand("reconnect-workspace", "ui.reconnect_existing_workspace", () => {
+    this.addLocalizedCommand("reconnect-workspace", "ui.command_reconnect_workspace", () => {
       void this.offerWorkspaceReconnect();
     });
-    this.addLocalizedCommand("open-prompt-monitor", "ui.prompt_monitor", () =>
+    this.addLocalizedCommand("open-prompt-monitor", "ui.command_prompt_monitor", () =>
       new DebugLogModal(
         this.app,
         this.logs,
@@ -800,7 +800,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         }
       ).open()
     );
-    this.addLocalizedCommand("open-debug-log", "ui.open_debug_log", () =>
+    this.addLocalizedCommand("open-debug-log", "ui.command_debug_log", () =>
       new DebugLogModal(this.app, this.logs, this.exchanges, () => this.settings.aiExchangeLoggingEnabled).open()
     );
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
@@ -1416,7 +1416,7 @@ export default class VisualAgentMapPlugin extends Plugin {
           void this.noteStyles.followFolderRename(normalizePath(oldPath), file.path).catch(() => undefined);
       })
     );
-    this.addLocalizedCommand("open-note-styles-folder", "ui.note_style_open_folder_command", () => {
+    this.addLocalizedCommand("open-note-styles-folder", "ui.command_open_note_styles_folder", () => {
       void this.openNoteStylesFolder();
     });
   }
@@ -1544,7 +1544,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     this.coffeeRibbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
     for (const { command, key } of this.localizedCommands)
-      command.name = `Visual Agent Map (VAM): ${translate(this.settings.language, key)}`;
+      command.name = `${this.manifest?.name ?? "Visual Agent Map"}: ${translate(this.settings.language, key)}`;
   }
   coffeeViews(): CoffeeTablesView[] {
     return this.app.workspace

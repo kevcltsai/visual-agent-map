@@ -10667,16 +10667,16 @@ export class VisualAgentMapView extends ItemView {
     );
     // Measured in its natural single row: forget what an earlier fit did first.
     tools.toggleClass("is-wrapped", false);
-    tools.style.removeProperty("--vam-tools-max");
-    tools.style.removeProperty("--vam-tools-shift");
+    tools.style.removeProperty("max-width");
+    tools.style.removeProperty("margin-left");
     const visible = { left: visibleLeft, right: this.viewportEl.getBoundingClientRect().right };
     const place = cardToolsPlacement(cardRect, tools.getBoundingClientRect().width, visible, 10 * zoom);
     tools.toggleClass("is-align-left", place.side === "left");
     if (place.maxWidth !== null) {
       tools.toggleClass("is-wrapped", true);
-      tools.style.setProperty("--vam-tools-max", `${place.maxWidth / zoom}px`);
+      tools.style.maxWidth = `${place.maxWidth / zoom}px`;
     }
-    if (place.shift) tools.style.setProperty("--vam-tools-shift", `${place.shift / zoom}px`);
+    if (place.shift) tools.style.marginLeft = `${place.shift / zoom}px`;
   }
   /** Repaints only the named cards from the current selection state (class, aria-selected, roving tabindex, checkbox). */
   private paintCards(ids: Iterable<string | null>): void {

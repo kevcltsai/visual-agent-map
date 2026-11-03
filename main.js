@@ -56594,16 +56594,16 @@ ${request.requirements}` : preset.text,
       chat ? chat.getBoundingClientRect().right : 0
     );
     tools.toggleClass("is-wrapped", false);
-    tools.style.removeProperty("--vam-tools-max");
-    tools.style.removeProperty("--vam-tools-shift");
+    tools.style.removeProperty("max-width");
+    tools.style.removeProperty("margin-left");
     const visible = { left: visibleLeft, right: this.viewportEl.getBoundingClientRect().right };
     const place = cardToolsPlacement(cardRect, tools.getBoundingClientRect().width, visible, 10 * zoom);
     tools.toggleClass("is-align-left", place.side === "left");
     if (place.maxWidth !== null) {
       tools.toggleClass("is-wrapped", true);
-      tools.style.setProperty("--vam-tools-max", `${place.maxWidth / zoom}px`);
+      tools.style.maxWidth = `${place.maxWidth / zoom}px`;
     }
-    if (place.shift) tools.style.setProperty("--vam-tools-shift", `${place.shift / zoom}px`);
+    if (place.shift) tools.style.marginLeft = `${place.shift / zoom}px`;
   }
   /** Repaints only the named cards from the current selection state (class, aria-selected, roving tabindex, checkbox). */
   paintCards(ids) {
@@ -67847,7 +67847,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
 .vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }
 .vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; }
-.vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; max-width: var(--vam-tools-max); margin-left: var(--vam-tools-shift, 0); }
+.vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }

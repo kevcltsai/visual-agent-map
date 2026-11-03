@@ -4093,8 +4093,8 @@ function toolsHarness({ cardLeft, cardWidth = 280, toolsWidth = 345, canvasLeft 
     window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o)
   });
   const classes = new Set();
-  const vars = {};
-  const tools = { style: { setProperty: (key, value) => { vars[key] = value; }, removeProperty: key => { delete vars[key]; } }, getBoundingClientRect() { const max = parseFloat(vars['--vam-tools-max']) * zoom; return { width: Number.isFinite(max) ? Math.min(toolsWidth, max) : toolsWidth }; }, toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
+  const style = { removeProperty: key => { delete style[key.replace(/-(\w)/g, (m, c) => c.toUpperCase())]; } };
+  const tools = { style, getBoundingClientRect() { const max = parseFloat(style.maxWidth) * zoom; return { width: Number.isFinite(max) ? Math.min(toolsWidth, max) : toolsWidth }; }, toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
   const card = { offsetWidth: cardWidth, getBoundingClientRect: () => ({ left: cardLeft, right: cardLeft + cardWidth, width: cardWidth }), querySelector: () => tools };
   const chat = chatRight === null ? null : { getBoundingClientRect: () => ({ left: 0, right: chatRight }) };
   const view = Object.create(VisualAgentMapView.prototype);
@@ -4102,7 +4102,7 @@ function toolsHarness({ cardLeft, cardWidth = 280, toolsWidth = 345, canvasLeft 
   view.alignCardTools(card);
   // The rendered row: right edge of the tools = card right - 10; so its left = cardLeft + cardWidth - 10 - toolsWidth.
   const align = classes.has('is-align-left') ? 'left' : 'right';
-  const shift = (parseFloat(vars['--vam-tools-shift']) || 0) * zoom;
+  const shift = (parseFloat(style.marginLeft) || 0) * zoom;
   const width = tools.getBoundingClientRect().width;
   const toolsLeft = align === 'left' ? cardLeft + 10 * zoom + shift : cardLeft + cardWidth - 10 * zoom - width;
   return { align, toolsLeft, toolsRight: toolsLeft + width, wrapped: classes.has('is-wrapped') };

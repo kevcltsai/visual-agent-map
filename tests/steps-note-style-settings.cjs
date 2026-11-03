@@ -9,10 +9,11 @@ const S = require('./support.cjs');
 const dom = require('./support-dom.cjs');
 const { loadSource } = require('./support-replay.cjs');
 
-class FakeModal { constructor(app) { this.app = app; } open() {} close() {} }
+const openedModals = [];
+class FakeModal { constructor(app) { this.app = app; } open() { openedModals.push(this); } close() {} }
 const notices = [];
 const obsidian = { ...S.obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: FakeModal, Notice: dom.makeNotice(notices) };
-const { renderNoteStyleIntro, renderNoteLocationSetting, renderNoteKindSetting, shownStyleRef, missingStyleRef } = S.load('ui/settings-tab.ts', { obsidian });
+const { renderNoteStyleIntro, renderNoteLocationSetting, renderNoteKindSetting, renderNoteCustomSetting, shownStyleRef, missingStyleRef } = S.load('ui/settings-tab.ts', { obsidian });
 const { styleIssueText } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
 const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: dom.createFragment });
 const { parseNoteStyleFile } = loadSource('export { parseNoteStyleFile } from "./ai/note-style-file";');
@@ -350,4 +351,55 @@ test('Low 4: the File location description is rewritten when its update runs aft
   update();
   await flush();
   assert.equal(loc.view.desc, 'Structures and voices you edited or created are stored here.');
+});
+
+// ---- the "Custom" rows (Note style recipe T5 P3) ----
+function customRow(tab, { recipes = RECIPES(), parts = [] } = {}) {
+  const { setting, view } = fakeSetting();
+  const refreshes = { n: 0 };
+  const plugin = { app: { marker: 'app' }, settings: { language: 'en' }, noteStyles: { refresh: async () => { refreshes.n++; }, listRecipes: () => recipes, listParts: () => parts } };
+  renderNoteCustomSetting(setting, plugin, tab);
+  return { view, plugin, refreshes };
+}
+const part = (ref, name) => ({ ref, kind: ref.startsWith('builtin:') ? 'builtin' : 'file', name, issues: [], usedBy: [] });
+
+test('Custom rows: each row is named after its tab, says how many built-in and own items exist, and its Manage button (named after the row) opens the window on that tab with itself as the trigger', async () => {
+  openedModals.length = 0;
+  const parts = [part('builtin:a', 'A'), part('builtin:b', 'B'), part('file:Mine', 'Mine')];
+  const styles = customRow('recipe', { recipes: [...RECIPES(), rec('file:Mine', 'Mine'), rec('file:Other', 'Other')] });
+  assert.equal(styles.view.name, 'Note styles');
+  assert.equal(styles.view.desc, '7 built-in, 2 mine');
+  const names = [];
+  for (const [tab, name] of [['structure', 'Structures'], ['voice', 'Voices'], ['format', 'Format rules']]) {
+    const row = customRow(tab, { parts });
+    names.push(row.view.name);
+    assert.equal(row.view.name, name);
+    assert.equal(row.view.desc, '2 built-in, 1 mine');
+    assert.equal(row.view.buttons.length, 1);
+    assert.equal(row.view.buttons[0].text, 'Manage');
+    assert.equal(row.view.buttons[0].buttonEl.attrs['aria-label'], `Manage ${name}`);
+    row.view.buttons[0].click();
+    const modal = openedModals.at(-1);
+    assert.equal(modal.tab, tab);
+    assert.equal(modal.trigger, row.view.buttons[0].buttonEl);
+    assert.equal(modal.plugin, row.plugin);
+    await flush();
+    assert.equal(row.refreshes.n, 1, 'the files are read again after drawing');
+  }
+  assert.equal(new Set(names).size, 3);
+  assert.equal(i18n.translate('zh-TW', 'ui.manage_count_0_1', 8, 2), '內建 8 份、我的 2 份');
+  assert.equal(i18n.translate('zh-TW', 'ui.manage_tab_recipe'), '筆記風格');
+  assert.equal(i18n.translate('zh-TW', 'ui.settings_group_custom'), '自訂');
+});
+
+test('Custom rows: the count is written again when the window closes (after files were made in it), and drawing the row writes no setting', async () => {
+  openedModals.length = 0;
+  const parts = [part('builtin:a', 'A')];
+  const row = customRow('voice', { parts });
+  assert.equal(row.view.desc, '1 built-in, 0 mine');
+  row.view.buttons[0].click();
+  parts.push(part('file:New', 'New'));
+  openedModals.at(-1).onClosed();
+  assert.equal(row.view.desc, '1 built-in, 1 mine');
+  assert.equal(row.plugin.settings.noteStyleByKind, undefined);
 });

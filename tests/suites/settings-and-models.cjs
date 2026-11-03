@@ -499,12 +499,13 @@ test('AI connection entry: shows how many CLIs are connected and warns only when
   assert.equal(statusOf(page), null);
 });
 
-test('Note style page: a "Topic types" group of seven rows in kind order (the AIM row last), then "More" with only File location; no Structure, Voice or By topic type row', () => {
+test('Note style page: a "Topic types" group of seven rows in kind order (the AIM row last), then "Custom" with four manage rows, then "More" with only File location; no Structure, Voice or By topic type row', () => {
   const note = pageNamed(groupedTab().tab, 'Note style');
   const groups = note.items.filter(item => item.type === 'group');
-  assert.deepEqual(plain(groups.map(group => group.heading)), ['Topic types', 'More']);
+  assert.deepEqual(plain(groups.map(group => group.heading)), ['Topic types', 'Custom', 'More']);
   assert.deepEqual(plain(groups[0].items.map(row => row.name)), ['Topic', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion', 'Action', 'AIM conclusion note']);
-  assert.deepEqual(plain(groups[1].items.map(row => row.name)), ['File location']);
+  assert.deepEqual(plain(groups[1].items.map(row => row.name)), ['Note styles', 'Structures', 'Voices', 'Format rules']);
+  assert.deepEqual(plain(groups[2].items.map(row => row.name)), ['File location']);
   const names = flattenDefinitions(note.items).map(row => row.name);
   for (const gone of ['Structure', 'Voice', 'By topic type']) assert.ok(!names.includes(gone), `${gone} row is gone`);
 });

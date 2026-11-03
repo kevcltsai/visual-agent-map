@@ -357,3 +357,374 @@ test('reading never writes: the list calls, the suggested name, the draft and re
   assert.equal(store.suggestPartName('structure', 'builtin:standard'), 'My Standard six');
   assert.equal(store.suggestPartName('structure', null), 'New structure');
 });
+
+// ---- Note style recipe T5 P3: the manage window (NoteStyleManageModal) over a real store on an in-memory vault ----
+const S = require('./support.cjs');
+const dom = require('./support-dom.cjs');
+const notices = [];
+const opened = [];
+class FakeSetting {
+  constructor(container) {
+    this.settingEl = container.createDiv('setting-item');
+    this.nameEl = this.settingEl.createDiv('setting-item-name');
+    this.descEl = this.settingEl.createDiv('setting-item-description');
+    this.controlEl = this.settingEl.createDiv('setting-item-control');
+  }
+  setName(name) { this.nameEl.setText(name); return this; }
+  setDesc(text) { this.descEl.setText(text); return this; }
+  addButton(build) {
+    const el = this.controlEl.createEl('button');
+    const component = { buttonEl: el, setButtonText(text) { el.setText(text); return component; }, onClick(fn) { el.addEventListener('click', fn); return component; }, setCta() { return component; }, setDisabled(value) { el.disabled = value; return component; } };
+    build(component);
+    return this;
+  }
+  addDropdown(build) {
+    const el = this.controlEl.createEl('select');
+    const component = { selectEl: el, onChange(fn) { el.addEventListener('change', () => fn(el.value)); return component; } };
+    build(component);
+    return this;
+  }
+  addText(build) {
+    const el = this.controlEl.createEl('input', { type: 'text' });
+    const component = { inputEl: el, onChange(fn) { el.addEventListener('input', () => fn(el.value)); return component; } };
+    build(component);
+    return this;
+  }
+}
+const obsidian = { ...S.obsidian, Modal: dom.makeModal(), Setting: FakeSetting, Notice: dom.makeNotice(notices) };
+const { NoteStyleManageModal, MANAGE_TABS } = S.load('ui/modals/note-style-manage-modal.ts', { obsidian });
+const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: dom.createFragment });
+
+const flush = () => new Promise(resolve => setImmediate(resolve));
+const settle = async () => { for (let n = 0; n < 6; n++) await flush(); };
+
+/** A plugin over a real store: editNotePart and saveNoteRecipe are main's own methods; opening a file is recorded. */
+async function manageSetup(files = {}, settingsPatch = {}) {
+  const made = await makeStore(files, settingsPatch);
+  const { store, v, settings } = made;
+  notices.length = 0;
+  opened.length = 0;
+  const app = {
+    vault: { getAbstractFileByPath: path => (path in v.files ? new S.TFile(path) : null) },
+    workspace: { getLeaf: () => ({ openFile: async file => { opened.push(file.path); } }) }
+  };
+  const plugin = { app, settings, noteStyles: store, saveSettings: async () => { made.settingSaves = (made.settingSaves ?? 0) + 1; } };
+  plugin.editNotePart = (...args) => Plugin.prototype.editNotePart.apply(plugin, args);
+  plugin.saveNoteRecipe = (...args) => Plugin.prototype.saveNoteRecipe.apply(plugin, args);
+  return { ...made, plugin, app };
+}
+async function openManage(setup, tab = 'recipe') {
+  const trigger = dom.element('button');
+  const modal = new NoteStyleManageModal(setup.app, setup.plugin, tab, trigger);
+  modal.open();
+  await settle();
+  return { modal, trigger, root: modal.contentEl };
+}
+const tabsOf = root => dom.findAll(root, node => node.attrs.role === 'tab');
+const panelOf = (root, tab) => dom.find(root, node => node.attrs.id === `vam-manage-panel-${tab}`);
+const rowsOf = root => dom.findAll(root, node => node.hasClass('setting-item') && node.hasClass('vam-manage-row'));
+const rowName = row => row.children[0].text;
+const rowFor = (root, name) => rowsOf(root).find(row => rowName(row) === name);
+const rowTexts = row => row.children[1].children.map(child => child.text);
+const editOf = row => dom.find(row, node => node.tag === 'button');
+const formOf = (root, tab) => dom.find(root, node => node.attrs.id === `vam-manage-form-${tab}`);
+const nameInputOf = form => dom.find(form, node => node.tag === 'input' && node.type === 'text');
+const errorOf = form => dom.find(form, node => node.hasClass('vam-manage-error'));
+const createOf = form => dom.button(form, 'Create');
+const sourceOf = form => dom.find(form, node => node.tag === 'select');
+const newButton = (root, tab) => dom.find(panelOf(root, tab), node => node.tag === 'button' && node.text === 'New…');
+const typeName = (form, value) => { const input = nameInputOf(form); input.value = value; input.fire('input'); };
+
+test('P3: the window is a tablist of four tabs with a tabpanel each; aria-selected, tabindex and the arrow, Home and End keys follow the selected tab; the focus returns to the trigger on close', async () => {
+  const setup = await manageSetup();
+  const { modal, trigger, root } = await openManage(setup, 'voice');
+  assert.equal(modal.titleEl.text, 'Custom note styles');
+  assert.deepEqual([...MANAGE_TABS], ['recipe', 'structure', 'voice', 'format']);
+  const list = dom.find(root, node => node.attrs.role === 'tablist');
+  assert.ok(list.attrs['aria-label']);
+  const tabs = tabsOf(root);
+  assert.deepEqual(tabs.map(tab => tab.text), ['Note styles', 'Structures', 'Voices', 'Format rules']);
+  const state = () => tabs.map(tab => tab.attrs['aria-selected']);
+  assert.deepEqual(state(), ['false', 'false', 'true', 'false'], 'opens on the asked tab');
+  assert.deepEqual(tabs.map(tab => tab.attrs.tabindex), ['-1', '-1', '0', '-1']);
+  assert.equal(tabs[2].focused, true);
+  for (const tab of tabs) {
+    const panel = dom.find(root, node => node.attrs.id === tab.attrs['aria-controls']);
+    assert.equal(panel.attrs.role, 'tabpanel');
+    assert.equal(panel.attrs['aria-labelledby'], tab.attrs.id);
+  }
+  assert.equal(panelOf(root, 'voice').hidden, false);
+  assert.equal(panelOf(root, 'structure').hidden, true);
+  tabs[2].keydown({ key: 'ArrowRight' });
+  assert.deepEqual(state(), ['false', 'false', 'false', 'true']);
+  assert.equal(tabs[3].focused, true);
+  tabs[3].keydown({ key: 'ArrowRight' });
+  assert.deepEqual(state(), ['true', 'false', 'false', 'false'], 'wraps around');
+  tabs[0].keydown({ key: 'ArrowLeft' });
+  assert.deepEqual(state(), ['false', 'false', 'false', 'true']);
+  tabs[3].keydown({ key: 'Home' });
+  assert.deepEqual(state(), ['true', 'false', 'false', 'false']);
+  tabs[0].keydown({ key: 'End' });
+  assert.deepEqual(state(), ['false', 'false', 'false', 'true']);
+  assert.equal(panelOf(root, 'format').hidden, false);
+  assert.ok(rowsOf(panelOf(root, 'format')).length === 3 && rowsOf(panelOf(root, 'voice')).length === 0, 'only the selected panel is filled');
+  tabs[3].keydown({ key: 'a' });
+  assert.deepEqual(state(), ['false', 'false', 'false', 'true']);
+  modal.close();
+  assert.equal(trigger.focused, true);
+});
+
+test('counter 1: opening the window, switching all four tabs, opening the New form and typing writes nothing (no create, createFolder, modify; no settings save; settings unchanged)', async () => {
+  const setup = await manageSetup({ [`${dirOf('en', 'template')}/Mine.md`]: '## A\nx\n' });
+  const before = JSON.stringify(setup.settings);
+  const { modal, root } = await openManage(setup);
+  for (const tab of tabsOf(root)) { tab.click(); await settle(); }
+  newButton(root, 'format').click();
+  typeName(formOf(root, 'format'), 'Something');
+  tabsOf(root)[0].click();
+  await settle();
+  modal.close();
+  assert.equal(writes(setup.v), 0);
+  assert.equal(setup.v.trashes, 0);
+  assert.equal(setup.settingSaves ?? 0, 0);
+  assert.equal(JSON.stringify(setup.settings), before);
+  assert.equal(opened.length, 0);
+});
+
+test('P3: each row names the item (built-ins marked), says "Used in: ..." or that nothing uses it, shows a style\'s four small labels, and lists problems with the line', async () => {
+  const setup = await manageSetup({
+    [`${dirOf('en', 'template')}/Mine.md`]: '## A\nx\n',
+    [`${dirOf('en', 'template')}/Broken.md`]: '## A\nCount: x\nbody\n',
+    [`${dirOf('en', 'template')}/Standard six.md`]: '## A\nx\n',
+    [`${dirOf('en', 'recipe')}/Weekly.md`]: '---\nstructure: Mine\nvoice: Gone\nupdate: top\n---\nWeekly notes\n'
+  }, { noteStyleByKind: { hypothesis: 'file:Weekly' } });
+  const { root } = await openManage(setup, 'structure');
+  const standard = rowFor(root, 'Standard six');
+  const usedBy = setup.store.listParts('structure').find(item => item.ref === 'builtin:standard').usedBy;
+  assert.equal(rowTexts(standard)[0], `Used in: ${usedBy.join(', ')}`);
+  assert.ok(standard.children[0].children.some(child => child.text === 'Built-in'), 'marked built-in');
+  const mine = rowFor(root, 'Mine');
+  assert.equal(mine.children[0].children.some(child => child.text === 'Built-in'), false);
+  assert.deepEqual(rowTexts(mine), ['Used in: Weekly']);
+  const broken = rowFor(root, 'Broken');
+  assert.equal(rowTexts(broken)[0], 'No style uses it now');
+  assert.match(rowTexts(broken)[1], /^⚠ Line 2: /);
+  assert.equal(dom.findAll(broken, node => node.hasClass('vam-block-status-error')).length, 1);
+  // #22: a file with a built-in's name is a user's file with a problem, not a changed built-in
+  const fileRows = rowsOf(root).filter(row => rowName(row) === 'Standard six');
+  assert.equal(fileRows.length, 2);
+  const userCopy = fileRows.find(row => !row.children[0].children.some(child => child.text === 'Built-in'));
+  assert.match(rowTexts(userCopy).join('|'), /built-in name/);
+  // styles: topic type names and the four labels
+  dom.find(root, node => node.attrs.id === 'vam-manage-tab-recipe').click();
+  await settle();
+  const weekly = rowFor(root, 'Weekly');
+  assert.deepEqual(rowTexts(weekly).slice(0, 2), ['Used in: Hypothesis', `Mine · Gone · Standard format · ${'New on top'}`]);
+  assert.match(rowTexts(weekly)[2], /^⚠ Line 3: /);
+  const general = rowFor(root, 'General research');
+  assert.equal(rowTexts(general)[0], 'Used in: Topic');
+  assert.equal(rowTexts(rowFor(root, 'Textbook'))[0], 'No topic type uses it now');
+});
+
+test('counter 14: the AIM report is listed with its topic type but has no Edit button, and is not offered as the start of a new style', async () => {
+  const setup = await manageSetup();
+  const { root } = await openManage(setup, 'recipe');
+  const aim = rowFor(root, 'AIM report');
+  assert.ok(aim);
+  assert.equal(rowTexts(aim)[0], 'Used in: AIM conclusion note');
+  assert.equal(editOf(aim), undefined);
+  assert.ok(editOf(rowFor(root, 'General research')));
+  newButton(root, 'recipe').click();
+  const options = dom.findAll(sourceOf(formOf(root, 'recipe')), node => node.tag === 'option').map(node => node.text);
+  assert.equal(options.includes('AIM report'), false);
+  assert.equal(options.length, 7);
+});
+
+test('counter 5: Edit on a built-in part saves "My <name>" (a new file) and opens it, the list shows it and the focus is on its row; an existing "My ..." file is never overwritten', async () => {
+  const taken = '## Taken\nkeep me\n';
+  const setup = await manageSetup({ [`${dirOf('en', 'template')}/My Standard six.md`]: taken });
+  const { root } = await openManage(setup, 'structure');
+  editOf(rowFor(root, 'Standard six')).click();
+  await settle();
+  const created = `${dirOf('en', 'template')}/My Standard six (2).md`;
+  assert.deepEqual(setup.v.creates, [created]);
+  assert.equal(setup.v.files[`${dirOf('en', 'template')}/My Standard six.md`], taken, 'the taken file keeps its bytes');
+  assert.deepEqual(opened, [created]);
+  const row = rowFor(root, 'My Standard six (2)');
+  assert.ok(row, 'the list was redrawn');
+  assert.equal(editOf(row).focused, true);
+  assert.equal(setup.settingSaves ?? 0, 0, 'editing changes no setting');
+  // a file is opened as it is, nothing is written
+  editOf(rowFor(root, 'My Standard six')).click();
+  await settle();
+  assert.equal(setup.v.creates.length, 1);
+  assert.equal(opened.at(-1), `${dirOf('en', 'template')}/My Standard six.md`);
+});
+
+test('P3: Edit on a built-in style saves "My <name>" with the same four parts and opens the file; on a user\'s style it only opens the file', async () => {
+  const setup = await manageSetup();
+  const { root } = await openManage(setup, 'recipe');
+  editOf(rowFor(root, 'Hypothesis test')).click();
+  await settle();
+  const path = `${dirOf('en', 'recipe')}/My Hypothesis test.md`;
+  assert.deepEqual(setup.v.creates, [path]);
+  const read = M.parseRecipeFile(setup.v.files[path]);
+  const hypothesis = setup.store.listRecipes().find(item => item.ref === 'builtin:hypothesis');
+  assert.deepEqual(plain({ structure: read.structure, voice: read.voice, format: read.format, update: read.update }), plain({ structure: hypothesis.structure.ref, voice: hypothesis.voice.ref, format: hypothesis.format.ref, update: hypothesis.update }));
+  assert.deepEqual(opened, [path]);
+  assert.equal(editOf(rowFor(root, 'My Hypothesis test')).focused, true);
+  assert.equal(JSON.stringify(setup.settings.noteStyleByKind ?? null), 'null', 'no topic type is switched in this packet');
+  editOf(rowFor(root, 'My Hypothesis test')).click();
+  await settle();
+  assert.equal(setup.v.creates.length, 1);
+  assert.equal(setup.v.modifies.length, 0);
+});
+
+test('P3: the New form starts hidden, opens on a "start from" choice with a suggested name, follows the chosen source until the name is typed, and Blank turns the source off', async () => {
+  const setup = await manageSetup();
+  const { root } = await openManage(setup, 'structure');
+  const form = formOf(root, 'structure');
+  const toggle = newButton(root, 'structure');
+  assert.equal(form.hidden, true);
+  assert.equal(toggle.attrs['aria-expanded'], 'false');
+  assert.equal(form.tag, 'fieldset');
+  toggle.click();
+  assert.equal(form.hidden, false);
+  assert.equal(toggle.attrs['aria-expanded'], 'true');
+  const radios = dom.findAll(form, node => node.type === 'radio');
+  assert.equal(radios.length, 2);
+  for (const radio of radios) assert.ok(dom.find(form, node => node.tag === 'label' && node.attrs.for === radio.attrs.id), 'a label for each radio');
+  assert.equal(radios[0].checked, true);
+  assert.equal(radios[0].focused, true);
+  assert.equal(nameInputOf(form).value, 'My Standard six');
+  const select = sourceOf(form);
+  assert.equal(select.value, 'builtin:standard');
+  select.value = 'builtin:hypothesis';
+  select.change();
+  assert.equal(nameInputOf(form).value, 'My Claim to verdict');
+  radios[1].checked = true;
+  radios[1].fire('change');
+  assert.equal(select.disabled, true);
+  assert.equal(nameInputOf(form).value, 'New structure');
+  typeName(form, 'Mine');
+  radios[0].checked = true;
+  radios[0].fire('change');
+  assert.equal(select.disabled, false);
+  assert.equal(nameInputOf(form).value, 'Mine', 'a typed name is kept');
+  assert.equal(errorOf(form).text, '');
+  assert.equal(errorOf(form).attrs['aria-live'], 'polite');
+  assert.equal(nameInputOf(form).attrs['aria-describedby'], errorOf(form).attrs.id);
+});
+
+test('counter 4: a name that is empty, padded, has / or \\ or .., is a built-in\'s name in any language or case, has an unsafe character, or is taken shows an error in the live region, disables Create, and writes nothing', async () => {
+  const setup = await manageSetup({ [`${dirOf('en', 'tone')}/Taken.md`]: 'x' });
+  const { root } = await openManage(setup, 'voice');
+  newButton(root, 'voice').click();
+  const form = formOf(root, 'voice');
+  const cases = [['', /Enter a name/], [' x ', /start or end with a space/], ['a/b', /cannot contain \//], ['a\\b', /cannot contain \//], ['..', /"\.\."/], ['a..b', /"\.\."/], ['Academic rigor', /built-in/], ['ACADEMIC RIGOR', /built-in/], ['學術嚴謹', /built-in/], ['a:b', /any of/], ['a#b', /any of/], ['taken', /already exists/]];
+  const academic = M.translate('en', 'ui.preset_name_academic');
+  cases.push([academic, /built-in/], [M.translate('zh-TW', 'ui.preset_name_academic'), /built-in/], [M.translate('zh-CN', 'ui.preset_name_academic'), /built-in/]);
+  for (const [value, pattern] of cases) {
+    typeName(form, value);
+    assert.match(errorOf(form).text, pattern, JSON.stringify(value));
+    assert.equal(createOf(form).disabled, true, JSON.stringify(value));
+    createOf(form).click();
+    nameInputOf(form).keydown({ key: 'Enter' });
+    await settle();
+  }
+  assert.equal(writes(setup.v), 0);
+  assert.equal(opened.length, 0);
+  typeName(form, 'Fine name');
+  assert.equal(errorOf(form).text, '');
+  assert.equal(createOf(form).disabled, false);
+});
+
+test('P3: Create on a part writes the copy (or the blank text), opens it, closes the form and puts the focus on the new row; no setting is saved', async () => {
+  const setup = await manageSetup();
+  const { root } = await openManage(setup, 'structure');
+  newButton(root, 'structure').click();
+  let form = formOf(root, 'structure');
+  sourceOf(form).value = 'builtin:hypothesis';
+  sourceOf(form).change();
+  typeName(form, 'My own');
+  createOf(form).click();
+  await settle();
+  const path = `${dirOf('en', 'template')}/My own.md`;
+  assert.deepEqual(setup.v.creates, [path]);
+  assert.match(setup.v.files[path], /^## /m);
+  assert.notEqual(setup.v.files[path], M.translate('en', 'ui.part_blank_structure'), 'a copy, not the blank text');
+  assert.deepEqual(opened, [path]);
+  assert.equal(form.hidden, true);
+  assert.equal(editOf(rowFor(root, 'My own')).focused, true);
+  assert.equal(setup.settingSaves ?? 0, 0);
+  // a blank structure gets the starter text, a blank voice is an empty file
+  newButton(root, 'structure').click();
+  const radios = dom.findAll(form, node => node.type === 'radio');
+  radios[1].checked = true; radios[1].fire('change');
+  assert.equal(nameInputOf(form).value, 'New structure');
+  createOf(form).click();
+  await settle();
+  assert.equal(setup.v.files[`${dirOf('en', 'template')}/New structure.md`], M.translate('en', 'ui.part_blank_structure'));
+  tabsOf(root)[2].click();
+  await settle();
+  newButton(root, 'voice').click();
+  form = formOf(root, 'voice');
+  dom.findAll(form, node => node.type === 'radio')[1].fire('change');
+  createOf(form).click();
+  await settle();
+  assert.equal(setup.v.files[`${dirOf('en', 'tone')}/New voice.md`], '');
+  assert.equal(editOf(rowFor(root, 'New voice')).focused, true);
+});
+
+test('P3: Create on a style writes a style file with the four parts of the chosen style (blank = the general research parts); it reads back and the new row has the focus', async () => {
+  const setup = await manageSetup();
+  const { root } = await openManage(setup, 'recipe');
+  newButton(root, 'recipe').click();
+  const form = formOf(root, 'recipe');
+  assert.equal(nameInputOf(form).value, 'My General research');
+  sourceOf(form).value = 'builtin:evidence';
+  sourceOf(form).change();
+  assert.equal(nameInputOf(form).value, 'My Evidence record');
+  typeName(form, 'Lab log');
+  createOf(form).click();
+  await settle();
+  const path = `${dirOf('en', 'recipe')}/Lab log.md`;
+  const read = M.parseRecipeFile(setup.v.files[path]);
+  const evidence = setup.store.listRecipes().find(item => item.ref === 'builtin:evidence');
+  assert.deepEqual(plain({ structure: read.structure, voice: read.voice, format: read.format, update: read.update }), plain({ structure: evidence.structure.ref, voice: evidence.voice.ref, format: evidence.format.ref, update: evidence.update }));
+  assert.equal(editOf(rowFor(root, 'Lab log')).focused, true);
+  assert.equal(form.hidden, true);
+  newButton(root, 'recipe').click();
+  dom.findAll(form, node => node.type === 'radio')[1].fire('change');
+  assert.equal(nameInputOf(form).value, 'New style');
+  createOf(form).click();
+  await settle();
+  const blank = M.parseRecipeFile(setup.v.files[`${dirOf('en', 'recipe')}/New style.md`]);
+  const general = setup.store.listRecipes().find(item => item.ref === 'builtin:general');
+  assert.deepEqual(plain({ structure: blank.structure, voice: blank.voice, format: blank.format, update: blank.update }), plain({ structure: general.structure.ref, voice: general.voice.ref, format: general.format.ref, update: general.update }));
+});
+
+test('counter 15: every control in the window has a readable name (text, aria-label, or a label for it)', async () => {
+  const setup = await manageSetup({ [`${dirOf('en', 'template')}/Mine.md`]: '## A\nx\n' });
+  const { root } = await openManage(setup, 'structure');
+  newButton(root, 'structure').click();
+  const controls = dom.findAll(root, node => ['button', 'select', 'input'].includes(node.tag));
+  assert.ok(controls.length > 8);
+  for (const control of controls) {
+    const named = control.text || control.attrs['aria-label'] || dom.find(root, node => node.tag === 'label' && node.attrs.for === control.attrs.id);
+    assert.ok(named, `${control.tag} ${control.attrs.id ?? ''}`);
+  }
+  const edits = dom.findAll(root, node => node.tag === 'button' && node.text === 'Edit');
+  assert.equal(new Set(edits.map(edit => edit.attrs['aria-label'])).size, edits.length, 'each Edit names its row');
+});
+
+test('P3: a window closed while the files are still being read draws nothing afterwards, and the closing callback runs once', async () => {
+  const setup = await manageSetup();
+  let closedCalls = 0;
+  const modal = new NoteStyleManageModal(setup.app, setup.plugin, 'recipe', undefined, () => { closedCalls++; });
+  modal.open();
+  modal.close();
+  await settle();
+  assert.equal(closedCalls, 1);
+  assert.equal(modal.contentEl.children.length, 0);
+});

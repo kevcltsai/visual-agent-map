@@ -7,9 +7,17 @@ import { App, Modal, normalizePath, PluginSettingTab, Setting } from "obsidian";
 import type { SettingDefinition, SettingDefinitionGroup, SettingDefinitionItem, SettingDefinitionPage } from "obsidian";
 import type { DropdownComponent } from "obsidian";
 import type { RecipeListItem } from "../ai/note-style-store";
-import { KIND_DEFAULT_RECIPE, STYLE_KINDS, UPDATE_MODE_KEYS, type StyleKind } from "../ai/note-style-recipe";
+import { KIND_DEFAULT_RECIPE, STYLE_KINDS, type StyleKind } from "../ai/note-style-recipe";
 import { parseBlockRef } from "../core/blocks/block-files";
-import { styleIssueText } from "../experiences/visual-map/note-style-picker";
+import {
+  MANAGE_TABS,
+  NoteStyleManageModal,
+  manageTabName,
+  recipeIssueText,
+  styleKindName,
+  styleTags,
+  type ManageTab
+} from "./modals/note-style-manage-modal";
 
 /**
  * A sub-page's opening sentence as a grey description-only row. Obsidian puts the definition `name` into the row
@@ -103,11 +111,6 @@ export function renderNoteLocationSetting(
   return update;
 }
 
-/** A kind's row name: the topic type, or the AIM conclusion note. */
-function styleKindName(kind: StyleKind): string {
-  return kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`);
-}
-
 /** The style ref a kind uses: the saved choice, else the kind's own built-in style. */
 export function shownStyleRef(plugin: VisualAgentMapPlugin, kind: StyleKind): string {
   const saved = plugin.settings.noteStyleByKind?.[kind];
@@ -124,28 +127,6 @@ export function missingStyleRef(plugin: VisualAgentMapPlugin, kind: StyleKind): 
   const saved = plugin.settings.noteStyleByKind?.[kind];
   if (typeof saved !== "string" || !saved) return undefined;
   return offeredStyles(plugin, kind).some(item => item.ref === saved) ? undefined : saved;
-}
-
-/** Problem codes only style files raise; `styleIssueText` covers the codes of the part files. */
-const RECIPE_ISSUE_CODES: ReadonlySet<string> = new Set([
-  "format_zone_moved",
-  "update_invalid",
-  "part_name_invalid",
-  "part_missing",
-  "builtin_name"
-]);
-
-function recipeIssueText(issue: RecipeListItem["issues"][number]): string {
-  return RECIPE_ISSUE_CODES.has(issue.code)
-    ? t(`ui.note_style_issue_${issue.code}` as TranslationKey, ...issue.values)
-    : styleIssueText(issue);
-}
-
-/** The four small labels of a style: structure, voice, format, update mode (the AIM report has no update mode). */
-function styleTags(item: RecipeListItem): string {
-  const tags = [item.structure.name, item.voice.name, item.format.name];
-  if (!item.aimOnly) tags.push(t(UPDATE_MODE_KEYS[item.update]));
-  return tags.join(" · ");
 }
 
 /**
@@ -230,6 +211,29 @@ export function renderNoteKindSetting(setting: Setting, plugin: VisualAgentMapPl
     },
     () => undefined
   );
+}
+
+/**
+ * One "Custom" row: the number of built-in and own items of a tab and a Manage button that opens the manage window on it.
+ * The count is written from what was read last, then again after the files are read and after the window closes.
+ */
+export function renderNoteCustomSetting(setting: Setting, plugin: VisualAgentMapPlugin, tab: ManageTab): void {
+  const { noteStyles: store } = plugin;
+  const name = manageTabName(tab);
+  setting.setName(name);
+  const describe = (): void => {
+    const items = tab === "recipe" ? store.listRecipes() : store.listParts(tab);
+    const builtin = items.filter(item => item.kind === "builtin").length;
+    setting.setDesc(t("ui.manage_count_0_1", builtin, items.length - builtin));
+  };
+  describe();
+  setting.addButton(button => {
+    button.setButtonText(t("ui.manage_button")).onClick(() => {
+      new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, describe).open();
+    });
+    button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name));
+  });
+  void store.refresh().then(describe, () => undefined);
 }
 
 export const CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
@@ -542,6 +546,14 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
           items: STYLE_KINDS.map(kind => ({
             name: kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`),
             render: (setting: Setting) => renderNoteKindSetting(setting, this.plugin, kind)
+          }))
+        },
+        {
+          type: "group",
+          heading: t("ui.settings_group_custom"),
+          items: MANAGE_TABS.map(tab => ({
+            name: manageTabName(tab),
+            render: (setting: Setting) => renderNoteCustomSetting(setting, this.plugin, tab)
           }))
         },
         {

@@ -2,7 +2,7 @@ name: CI
 
 # The run name tells find-green-ci-run.sh which runs are full. A full run is a push to main or a manual run with full=true;
 # every other push (feature branches, pull requests) runs only the tests a change can reach (scripts/test-affected.mjs).
-run-name: CI ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.ref_name }}
+run-name: "CI ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.ref_name }}"
 
 on:
   push:

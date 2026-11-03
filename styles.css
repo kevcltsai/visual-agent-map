@@ -29,6 +29,8 @@
 .vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }
 .vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }
 .vam-map-switcher-current { color: var(--text-muted); font-weight: normal; }
+.vam-shortcuts td { padding: var(--size-4-1) var(--size-4-2); vertical-align: top; }
+.vam-shortcuts-keys { white-space: nowrap; }
 .vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
 .vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }

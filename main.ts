@@ -5,7 +5,7 @@ import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE } from "./experiences/coffee-
 import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/types";
 import { CoffeeManager } from "./experiences/coffee-tables/engine";
 import { CoffeeStorage } from "./experiences/coffee-tables/storage";
-import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
+import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
 import { errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
@@ -753,6 +753,30 @@ export default class VisualAgentMapPlugin extends Plugin {
       }),
       key: "ui.command_add_summary_bracket"
     });
+    // Map actions with no default hotkey (the user binds one in Obsidian's hotkey settings); each applies only while a
+    // map view is active, and the topic ones only with a selected card.
+    const mapCommands: [string, TranslationKey, MapCommandAction][] = [
+      ["map-add-topic", "ui.command_map_add_topic", "add-topic"],
+      ["map-add-subtopic", "ui.command_map_add_subtopic", "add-subtopic"],
+      ["map-add-sibling", "ui.command_map_add_sibling", "add-sibling"],
+      ["map-ai-explore-selected", "ui.command_map_ai_explore", "ai-explore"],
+      ["map-rename-selected", "ui.command_map_rename", "rename"],
+      ["map-open-selected-details", "ui.command_map_open_details", "open-details"],
+      ["map-zoom-to-fit", "ui.command_map_zoom_fit", "zoom-fit"],
+      ["map-zoom-reset", "ui.command_map_zoom_reset", "zoom-reset"],
+      ["map-search", "ui.command_map_search", "search"],
+      ["map-keyboard-shortcuts", "ui.command_map_shortcuts", "shortcuts"]
+    ];
+    for (const [id, key, action] of mapCommands)
+      this.localizedCommands.push({
+        command: this.addCommand({
+          id,
+          name: t(key),
+          checkCallback: checking =>
+            this.app.workspace.getActiveViewOfType(VisualAgentMapView)?.mapCommand(action, checking) ?? false
+        }),
+        key
+      });
     this.addLocalizedCommand("share-map", "ui.command_share_map", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
       void this.activateOutline().catch(error => new Notice(String(error)));

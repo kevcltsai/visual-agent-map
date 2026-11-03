@@ -157,6 +157,7 @@ import { NameModal } from "../../ui/modals/name-modal";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import { MapSwitcherModal } from "../../ui/modals/map-switcher-modal";
+import { KeyboardShortcutsModal } from "../../ui/modals/keyboard-shortcuts-modal";
 import {
   applyCollapseLevel,
   canParent,
@@ -777,6 +778,18 @@ function relationPairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
+/** The map actions the command palette offers (`VisualAgentMapView.mapCommand`). */
+export type MapCommandAction =
+  | "add-topic"
+  | "add-subtopic"
+  | "add-sibling"
+  | "ai-explore"
+  | "rename"
+  | "open-details"
+  | "zoom-fit"
+  | "zoom-reset"
+  | "search"
+  | "shortcuts";
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -9184,6 +9197,49 @@ export class VisualAgentMapView extends ItemView {
       if (isCurrent()) new Notice(t("ui.export_failed", errorMessage(error)));
     }
   }
+  /**
+   * The map commands of the command palette (they can take a hotkey): `checking` answers whether the command applies to
+   * this view now. Editing commands need an editable map (no AIM map, no presentation); the topic ones a selected card.
+   */
+  mapCommand(action: MapCommandAction, checking: boolean): boolean {
+    const map = this.map;
+    if (!map || this.closed) return false;
+    const editable = !map.aim && !this.presentation && !this.selection.state.multiSelectMode;
+    const selected = map.nodes.find(node => node.id === this.selection.state.selected);
+    const note = selected ? this.notes.get(selected.id) : undefined;
+    const run = (applies: boolean, work: () => void): boolean => {
+      if (!applies) return false;
+      if (!checking) work();
+      return true;
+    };
+    switch (action) {
+      case "add-topic":
+        return run(editable, () => this.enqueue(() => this.addNode(null)));
+      case "add-subtopic":
+        return run(editable && !!selected, () => this.enqueue(() => this.addNode(selected!)));
+      case "add-sibling":
+        return run(editable && !!selected, () =>
+          this.enqueue(() => this.addNode(map.nodes.find(node => node.id === selected!.parentId) ?? null))
+        );
+      case "ai-explore":
+        return run(editable && !!selected, () => this.openNextStep(selected!));
+      case "rename":
+        return run(editable && !!note, () => this.renameNode(selected!, note!.title));
+      case "open-details":
+        return run(!!selected, () => this.openDetails(selected!));
+      case "zoom-fit":
+        return run(!!this.viewportEl, () => this.fit());
+      case "zoom-reset":
+        return run(!!this.viewportEl, () => this.zoomBy(1 / map.viewport.zoom));
+      case "search":
+        return run(!this.presentation, () => this.openMapSearch());
+      case "shortcuts":
+        return run(true, () => this.openKeyboardShortcuts());
+    }
+  }
+  openKeyboardShortcuts(): void {
+    this.openMapModal(new KeyboardShortcutsModal(this.app));
+  }
   /** The header's "More mind map actions": an Obsidian menu under the button, each entry a verb. */
   private openMapActions(event?: MouseEvent): void {
     const menu = this.newMenu();
@@ -9196,6 +9252,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
     if (this.map && !this.map.aim) add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
+    menu.addSeparator();
+    add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
     if (this.map) {
       menu.addSeparator();
       add(t("ui.delete_current_mind_map"), "trash-2", () => this.deleteCurrentMap(), true);

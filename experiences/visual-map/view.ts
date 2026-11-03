@@ -7360,6 +7360,77 @@ export class VisualAgentMapView extends ItemView {
       }
     }
   }
+  /**
+   * A card's right-click actions, the same ones as its hover tools plus adding a sibling and opening the note in a tab.
+   * Groups: AI and new topics, editing, opening; the summary bracket, note style and remove follow in the caller.
+   */
+  private addCardMenuActions(menu: Menu, node: MapNode): void {
+    const note = this.notes.get(node.id);
+    const map = this.map;
+    if (!map) return;
+    const add = (title: string, icon: string, action: () => void): void => {
+      menu.addItem(item =>
+        item
+          .setTitle(title)
+          .setIcon(icon)
+          .onClick(() => this.whenEditing(action))
+      );
+    };
+    add(t("ui.ai_explore"), "sparkles", () => this.openNextStep(node));
+    add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
+    add(t("ui.card_menu_add_sibling"), "list-plus", () =>
+      this.enqueue(() => this.addNode(map.nodes.find(item => item.id === node.parentId) ?? null))
+    );
+    menu.addSeparator();
+    if (note) add(t("ui.node_tool_rename"), "pencil", () => this.renameNode(node, note.title));
+    add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
+    const hasChildren = map.nodes.some(item => item.parentId === node.id);
+    if (hasChildren && !node.collapsed) add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
+    if (hasChildren)
+      add(
+        node.collapsed ? t("ui.expand") : t("ui.collapse"),
+        node.collapsed ? "chevrons-up-down" : "chevrons-down-up",
+        () => this.toggleCollapsed(node)
+      );
+    if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
+    menu.addSeparator();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.open_details_in_right_sidebar"))
+        .setIcon("panel-right")
+        .onClick(() => this.openDetails(node))
+    );
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.card_menu_open_note_tab"))
+        .setIcon("file-text")
+        .onClick(() => this.openNoteInTab(node))
+    );
+    menu.addSeparator();
+  }
+  /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
+  private openNoteInTab(node: MapNode): void {
+    const file = this.app.vault.getAbstractFileByPath(node.path);
+    if (!(file instanceof TFile)) {
+      new Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+      return;
+    }
+    void this.app.workspace
+      .getLeaf("tab")
+      .openFile(file)
+      .catch(error => new Notice(error instanceof Error ? error.message : String(error)));
+  }
+  /** Folds or unfolds a card's branch: the card's fold tool and its menu entry. */
+  private toggleCollapsed(node: MapNode): void {
+    this.enqueue(() =>
+      this.mapChange(map => {
+        const n = map.nodes.find(item => item.id === node.id);
+        if (!n) return;
+        n.collapsed = !n.collapsed;
+        this.arrangeAll(map);
+      })
+    );
+  }
   private onCanvasContextMenu(event: MouseEvent): void {
     const hit = event.target as Element | null;
     const card = hit?.closest?.<HTMLElement>(".vam-node");
@@ -7369,6 +7440,10 @@ export class VisualAgentMapView extends ItemView {
         event.preventDefault();
         const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
         const menu = this.newMenu(cardId);
+        // One topic outside topic selection: the card's own actions come first, in groups (the toolbar's actions).
+        const topic = ids.length === 1 ? this.map?.nodes.find(item => item.id === cardId) : undefined;
+        const single = topic && !topic.aimKind && !this.selection.state.multiSelectMode ? topic : undefined;
+        if (single) this.addCardMenuActions(menu, single);
         menu.addItem(item =>
           item
             .setTitle(t("ui.summary_add"))
@@ -7376,7 +7451,6 @@ export class VisualAgentMapView extends ItemView {
             .onClick(() => this.addSummaryOver(ids))
         );
         // One topic only; the AIM conclusion cards have their own style row in the settings.
-        const topic = ids.length === 1 ? this.map?.nodes.find(item => item.id === cardId) : undefined;
         if (topic && !topic.aimKind)
           menu.addItem(item =>
             item
@@ -7384,6 +7458,16 @@ export class VisualAgentMapView extends ItemView {
               .setIcon("palette")
               .onClick(() => void this.chooseTopicStyle(topic))
           );
+        if (single) {
+          menu.addSeparator();
+          menu.addItem(item =>
+            item
+              .setTitle(t("ui.remove_from_map"))
+              .setIcon("trash-2")
+              .setWarning(true)
+              .onClick(() => this.whenEditing(() => this.removeByKey(single)))
+          );
+        }
         // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the card, where a keyboard user is.
         if (event.clientX === 0 && event.clientY === 0) {
           const box = card.getBoundingClientRect();
@@ -10110,16 +10194,7 @@ export class VisualAgentMapView extends ItemView {
       const collapse = this.button(
         node.collapsed ? header : tools,
         node.collapsed ? t("ui.expand_0", count) : t("ui.collapse"),
-        () =>
-          this.whenEditing(() =>
-            this.enqueue(() =>
-              this.mapChange(map => {
-                const n = map.nodes.find(n => n.id === node.id)!;
-                n.collapsed = !n.collapsed;
-                this.arrangeAll(map);
-              })
-            )
-          )
+        () => this.whenEditing(() => this.toggleCollapsed(node))
       );
       collapse.addClass("vam-collapse-button", ...(node.collapsed ? ["is-collapsed"] : []));
       collapse.setAttr("aria-expanded", String(!node.collapsed));

@@ -1001,6 +1001,8 @@ export const en = {
   "ui.no_preview_content_yet": "No preview content yet",
   "ui.confirm_research_task": "Confirm research task",
   "ui.add_subtopic_manually": "Add subtopic manually",
+  "ui.card_menu_add_sibling": "Add sibling topic",
+  "ui.card_menu_open_note_tab": "Open note in new tab",
   "ui.ai_running_ai": "AI running…",
   "ui.model_and_advanced_settings": "Model and advanced settings",
   "ui.model": "Model",

@@ -1009,6 +1009,8 @@ var en = {
   "ui.no_preview_content_yet": "No preview content yet",
   "ui.confirm_research_task": "Confirm research task",
   "ui.add_subtopic_manually": "Add subtopic manually",
+  "ui.card_menu_add_sibling": "Add sibling topic",
+  "ui.card_menu_open_note_tab": "Open note in new tab",
   "ui.ai_running_ai": "AI running\u2026",
   "ui.model_and_advanced_settings": "Model and advanced settings",
   "ui.model": "Model",
@@ -3384,6 +3386,8 @@ var zhCN = {
   "ui.no_preview_content_yet": "\u5C1A\u672A\u52A0\u5165\u9884\u89C8\u5185\u5BB9",
   "ui.confirm_research_task": "\u786E\u8BA4\u7814\u7A76\u4EFB\u52A1",
   "ui.add_subtopic_manually": "\u624B\u52A8\u6DFB\u52A0\u5B50\u8BAE\u9898",
+  "ui.card_menu_add_sibling": "\u6DFB\u52A0\u540C\u5C42\u8BAE\u9898",
+  "ui.card_menu_open_note_tab": "\u5728\u65B0\u6807\u7B7E\u9875\u6253\u5F00\u7B14\u8BB0",
   "ui.ai_running_ai": "AI \u8FD0\u884C\u4E2D\u2026",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u4E0E\u9AD8\u7EA7\u8BBE\u7F6E",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
@@ -5759,6 +5763,8 @@ var zhTW = {
   "ui.no_preview_content_yet": "\u5C1A\u672A\u52A0\u5165\u9810\u89BD\u5167\u5BB9",
   "ui.confirm_research_task": "\u78BA\u8A8D\u7814\u7A76\u4EFB\u52D9",
   "ui.add_subtopic_manually": "\u624B\u52D5\u65B0\u589E\u5B50\u8B70\u984C",
+  "ui.card_menu_add_sibling": "\u65B0\u589E\u540C\u5C64\u8B70\u984C",
+  "ui.card_menu_open_note_tab": "\u5728\u65B0\u5206\u9801\u958B\u555F\u7B46\u8A18",
   "ui.ai_running_ai": "AI \u57F7\u884C\u4E2D\u2026",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u8207\u9032\u968E\u8A2D\u5B9A",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
@@ -53656,6 +53662,70 @@ ${request.requirements}` : preset.text,
       }
     }
   }
+  /**
+   * A card's right-click actions, the same ones as its hover tools plus adding a sibling and opening the note in a tab.
+   * Groups: AI and new topics, editing, opening; the summary bracket, note style and remove follow in the caller.
+   */
+  addCardMenuActions(menu, node) {
+    const note = this.notes.get(node.id);
+    const map = this.map;
+    if (!map) return;
+    const add = (title, icon, action) => {
+      menu.addItem(
+        (item) => item.setTitle(title).setIcon(icon).onClick(() => this.whenEditing(action))
+      );
+    };
+    add(t("ui.ai_explore"), "sparkles", () => this.openNextStep(node));
+    add(t("ui.add_subtopic_manually"), "plus", () => this.enqueue(() => this.addNode(node)));
+    add(
+      t("ui.card_menu_add_sibling"),
+      "list-plus",
+      () => this.enqueue(() => {
+        var _a2;
+        return this.addNode((_a2 = map.nodes.find((item) => item.id === node.parentId)) != null ? _a2 : null);
+      })
+    );
+    menu.addSeparator();
+    if (note) add(t("ui.node_tool_rename"), "pencil", () => this.renameNode(node, note.title));
+    add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
+    const hasChildren = map.nodes.some((item) => item.parentId === node.id);
+    if (hasChildren && !node.collapsed) add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
+    if (hasChildren)
+      add(
+        node.collapsed ? t("ui.expand") : t("ui.collapse"),
+        node.collapsed ? "chevrons-up-down" : "chevrons-down-up",
+        () => this.toggleCollapsed(node)
+      );
+    if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
+    menu.addSeparator();
+    menu.addItem(
+      (item) => item.setTitle(t("ui.open_details_in_right_sidebar")).setIcon("panel-right").onClick(() => this.openDetails(node))
+    );
+    menu.addItem(
+      (item) => item.setTitle(t("ui.card_menu_open_note_tab")).setIcon("file-text").onClick(() => this.openNoteInTab(node))
+    );
+    menu.addSeparator();
+  }
+  /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
+  openNoteInTab(node) {
+    const file = this.app.vault.getAbstractFileByPath(node.path);
+    if (!(file instanceof import_obsidian31.TFile)) {
+      new import_obsidian31.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+      return;
+    }
+    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian31.Notice(error instanceof Error ? error.message : String(error)));
+  }
+  /** Folds or unfolds a card's branch: the card's fold tool and its menu entry. */
+  toggleCollapsed(node) {
+    this.enqueue(
+      () => this.mapChange((map) => {
+        const n = map.nodes.find((item) => item.id === node.id);
+        if (!n) return;
+        n.collapsed = !n.collapsed;
+        this.arrangeAll(map);
+      })
+    );
+  }
   onCanvasContextMenu(event) {
     var _a2, _b2, _c, _d;
     const hit = event.target;
@@ -53666,14 +53736,22 @@ ${request.requirements}` : preset.text,
         event.preventDefault();
         const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
         const menu2 = this.newMenu(cardId);
+        const topic = ids.length === 1 ? (_d = this.map) == null ? void 0 : _d.nodes.find((item) => item.id === cardId) : void 0;
+        const single = topic && !topic.aimKind && !this.selection.state.multiSelectMode ? topic : void 0;
+        if (single) this.addCardMenuActions(menu2, single);
         menu2.addItem(
           (item) => item.setTitle(t("ui.summary_add")).setIcon("brackets").onClick(() => this.addSummaryOver(ids))
         );
-        const topic = ids.length === 1 ? (_d = this.map) == null ? void 0 : _d.nodes.find((item) => item.id === cardId) : void 0;
         if (topic && !topic.aimKind)
           menu2.addItem(
             (item) => item.setTitle(t("ui.note_style_menu")).setIcon("palette").onClick(() => void this.chooseTopicStyle(topic))
           );
+        if (single) {
+          menu2.addSeparator();
+          menu2.addItem(
+            (item) => item.setTitle(t("ui.remove_from_map")).setIcon("trash-2").setWarning(true).onClick(() => this.whenEditing(() => this.removeByKey(single)))
+          );
+        }
         if (event.clientX === 0 && event.clientY === 0) {
           const box = card.getBoundingClientRect();
           menu2.showAtPosition({ x: box.left, y: box.bottom });
@@ -56100,15 +56178,7 @@ ${request.requirements}` : preset.text,
       const collapse = this.button(
         node.collapsed ? header : tools,
         node.collapsed ? t("ui.expand_0", count) : t("ui.collapse"),
-        () => this.whenEditing(
-          () => this.enqueue(
-            () => this.mapChange((map) => {
-              const n = map.nodes.find((n2) => n2.id === node.id);
-              n.collapsed = !n.collapsed;
-              this.arrangeAll(map);
-            })
-          )
-        )
+        () => this.whenEditing(() => this.toggleCollapsed(node))
       );
       collapse.addClass("vam-collapse-button", ...node.collapsed ? ["is-collapsed"] : []);
       collapse.setAttr("aria-expanded", String(!node.collapsed));

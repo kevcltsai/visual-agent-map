@@ -54,7 +54,7 @@ async function harness({ direction, build, boxes } = {}) {
   const layout = (typeof boxes === 'function' ? boxes(ids) : boxes) ?? { [ids.root]: [100, 200], [ids.a]: [500, 0], [ids.b]: [500, 150], [ids.c]: [500, 300], [ids.d]: [500, 450], [ids.b1]: [900, 150] };
   let pending = Promise.resolve();
   const notices = [], menus = [];
-  const Menu = class { constructor() { this.items = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } };
+  const Menu = class { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -320,7 +320,7 @@ test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regu
   const opened = [];
   h.view.chooseTopicStyle = node => opened.push(node.id);
   h.view.onCanvasContextMenu(event());
-  h.menus.at(-1).items[1].click();
+  h.menus.at(-1).items.find(i => i.title === 'Note style…').click();
   assert.deepEqual(opened, [h.ids.b], 'the entry opens the chooser for the right-clicked topic');
   h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
   h.view.onCanvasContextMenu(event());
@@ -359,9 +359,10 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
   h.view.onCanvasContextMenu(event());
-  assert.deepEqual(h.menus.at(-1).items.map(i => i.title), ['Add summary bracket', 'Note style…'], 'T6 P3 added the topic note style entry after the bracket (D4)');
+  const entryTitles = h.menus.at(-1).items.map(i => i.title);
+  assert.deepEqual(entryTitles.slice(entryTitles.indexOf('Add summary bracket'), entryTitles.indexOf('Add summary bracket') + 2), ['Add summary bracket', 'Note style…'], 'T6 P3 added the topic note style entry after the bracket (D4)');
   assert.equal(h.menus.at(-1).mouse, true, 'a mouse right-click opens the menu at the pointer');
-  h.menus.at(-1).items[0].click();
+  h.menus.at(-1).items.find(i => i.title === 'Add summary bracket').click();
   assert.ok(h.area(), 'one card is enough; the editor opens');
   assert.deepEqual(plain(h.view.pendingSummary.members), [h.ids.b]);
   for (const mode of ['aim', 'presentation']) {
@@ -436,4 +437,36 @@ test('bug bash #26 view: bracket text beside a card that is not a member is push
   assert.ok(x >= 1230 + 280, 'the text starts beyond the neighbouring card (right edge 1510)');
   assert.equal(y, 275, 'only moved along the outward axis');
   assert.equal(find(h.el('s1'), i => i.tag === 'path').attrs.d, find(plainRun.el('s1'), i => i.tag === 'path').attrs.d, 'the brace is unchanged');
+});
+
+test('C1 card context menu: one topic gets its card actions in groups (AI and new topics, editing, opening), then the bracket and style, then Remove; each entry runs the same action as the card tool', async () => {
+  const h = await harness();
+  const card = h.view.cardEls.get(h.ids.b);
+  const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
+  const calls = [];
+  h.view.openNextStep = node => calls.push(['ai', node.id]);
+  h.view.addNode = async parent => { calls.push(['add', parent?.id ?? null]); };
+  h.view.renameNode = (node, title) => calls.push(['rename', node.id, title]);
+  h.view.openNodePanel = (node, mode) => calls.push(['panel', node.id, mode]);
+  h.view.selectSubtopics = node => calls.push(['select', node.id]);
+  h.view.toggleCollapsed = node => calls.push(['fold', node.id]);
+  h.view.addTextNodeUnder = node => calls.push(['text', node.id]);
+  h.view.openDetails = node => calls.push(['details', node.id]);
+  h.view.openNoteInTab = node => calls.push(['tab', node.id]);
+  h.view.removeByKey = node => calls.push(['remove', node.id]);
+  h.view.onCanvasContextMenu(event());
+  const menu = h.menus.at(-1);
+  const titles = menu.items.map(i => i.title);
+  assert.deepEqual(titles, ['AI explore', 'Add subtopic manually', 'Add sibling topic', 'Rename', 'Structure and links', 'Select subtopics', 'Collapse', 'Add text', 'Open details in right sidebar', 'Open note in new tab', 'Add summary bracket', 'Note style…', 'Remove from map']);
+  assert.deepEqual(menu.separators, [3, 8, 10, 12], 'separators between the groups');
+  assert.equal(menu.items.at(-1).warning, true, 'Remove is marked as a warning');
+  for (const item of menu.items) if (!['Add summary bracket', 'Note style…'].includes(item.title)) item.click();
+  await h.settle();
+  const b = h.view.map.nodes.find(n => n.id === h.ids.b);
+  // The two add entries go through the map's work queue, so they land after the direct ones; the order is not the point.
+  const sorted = list => plain(list).map(item => JSON.stringify(item)).sort();
+  assert.deepEqual(sorted(calls), sorted([['ai', h.ids.b], ['add', h.ids.b], ['add', b.parentId], ['rename', h.ids.b, h.view.notes.get(h.ids.b).title], ['panel', h.ids.b, 'structure'], ['select', h.ids.b], ['fold', h.ids.b], ['text', h.ids.b], ['details', h.ids.b], ['tab', h.ids.b], ['remove', h.ids.b]]));
+  h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
+  h.view.onCanvasContextMenu(event());
+  assert.deepEqual(h.menus.at(-1).items.map(i => i.title), ['Add summary bracket'], 'several topics: only the bracket');
 });

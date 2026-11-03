@@ -940,6 +940,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.no_preview_content_yet": "尚未加入預覽內容",
   "ui.confirm_research_task": "確認研究任務",
   "ui.add_subtopic_manually": "手動新增子議題",
+  "ui.card_menu_add_sibling": "新增同層議題",
+  "ui.card_menu_open_note_tab": "在新分頁開啟筆記",
   "ui.ai_running_ai": "AI 執行中…",
   "ui.model_and_advanced_settings": "模型與進階設定",
   "ui.model": "使用模型",

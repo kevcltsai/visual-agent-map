@@ -938,6 +938,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.no_preview_content_yet": "尚未加入预览内容",
   "ui.confirm_research_task": "确认研究任务",
   "ui.add_subtopic_manually": "手动添加子议题",
+  "ui.card_menu_add_sibling": "添加同层议题",
+  "ui.card_menu_open_note_tab": "在新标签页打开笔记",
   "ui.ai_running_ai": "AI 运行中…",
   "ui.model_and_advanced_settings": "模型与高级设置",
   "ui.model": "使用模型",

@@ -7,10 +7,15 @@
 // The lock is one file, <VAM_HEAVY_LOCK_DIR or ~/Library/Caches/vam>/heavy-test.lock, created atomically with link(2); it holds
 // {token, pid, worktree, command, startedAt}. VAM_HEAVY_LOCK_DIR only moves the file, nothing skips the lock.
 // Re-entry: the holder exports VAM_HEAVY_LOCK_HELD=<token>; a child passes through only when that token is the one in the lock file
-// AND the holder pid is one of its ancestors, so a forged token or a stranger's lock never passes.
-// CI=true takes no lock (the check at the end still runs). Waiting never times out; a holder pid that no longer exists is reclaimed.
+// AND the holder pid is one of its ancestors, so a forged token or a stranger's lock never passes. The CI marker ci-<pid> counts only
+// when CI=true.
+// CI=true takes no lock (the check at the end still runs). Waiting never times out. A holder is gone when its pid no longer exists or
+// the pid now belongs to another process (the lock records the process start time); a gone holder's lock is reclaimed only after every
+// process still carrying its token (children of a SIGKILLed run) has ended, and test-profile processes among them are reported and stopped.
+// Ownership of a leaked process = a descendant of this run, or a process whose environment carries this run's token (children inherit it,
+// so it survives reparenting to pid 1; `open`-launched apps and other runs' processes never carry it).
 import { randomBytes } from "node:crypto";
-import { existsSync, linkSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, join, relative, sep } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
@@ -29,6 +34,19 @@ export function lockDir(env = process.env) {
 
 export function pidAlive(pid) {
   try { process.kill(pid, 0); return true; } catch (error) { return error.code !== "ESRCH"; }
+}
+
+// Start time of a pid as ps prints it ("Tue Nov  3 19:20:13 2026"); null when ps cannot say. Recorded in the lock so a recycled pid is not mistaken for the holder.
+export function startTimeOf(pid) {
+  try { return execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], { encoding: "utf8", env: { ...process.env, LC_ALL: "C" }, stdio: ["ignore", "pipe", "ignore"] }).trim() || null; } catch { return null; }
+}
+
+// The recorded process is still the one that took the lock: its pid exists and (when recorded) still started at the same time.
+export function ownerAlive(owner, startOf = startTimeOf) {
+  if (!Number.isInteger(owner?.pid) || !pidAlive(owner.pid)) return false;
+  if (!owner.procStart) return true;
+  const now = startOf(owner.pid);
+  return now === null || now === owner.procStart;
 }
 
 const sleepSync = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -59,6 +77,19 @@ export function descendantsOf(pid, procs) {
   return found;
 }
 
+// pids (a Set; null when ps cannot run) whose environment carries VAM_HEAVY_LOCK_HELD=<token> (own-user processes only; ps prints the environment after the arguments).
+export function tokenCarriers(token, selfPid = process.pid) {
+  let text;
+  try { text = execFileSync("ps", ["eww", "-axo", "pid=,command="], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; }
+  const marker = new RegExp(`(?:^|\\s)VAM_HEAVY_LOCK_HELD=${token.replace(/[^\w-]/g, "")}(?:\\s|$)`);
+  const found = [];
+  for (const line of text.split("\n")) {
+    const match = /^\s*(\d+)\s+(.*)$/.exec(line);
+    if (match && Number(match[1]) !== selfPid && marker.test(match[2])) found.push(Number(match[1]));
+  }
+  return new Set(found);
+}
+
 // ---- the lock ----
 const lockPath = dir => join(dir, LOCK_NAME);
 export function readOwner(dir) {
@@ -73,25 +104,68 @@ export function tryAcquire(dir, record) {
   try { linkSync(mine, lockPath(dir)); return true; } catch (error) { if (error.code === "EEXIST") return false; throw error; } finally { rmSync(mine, { force: true }); }
 }
 
-// Only the one process holding the short reclaim mutex may remove a stale lock, and it re-reads the lock inside, so two waiters cannot
-// both delete and one of them remove the lock the other just took.
-export function reclaimStale(dir, log = out) {
+// ---- reclaiming a dead holder ----
+const readJson = file => { try { return JSON.parse(readFileSync(file, "utf8")); } catch { return null; } };
+
+// The reclaim mutex is a folder created complete (it already holds its owner file) and renamed into place, so it is never seen half-made.
+// A held mutex is broken only when its owner process is gone; a live but stalled owner (Ctrl-Z, sleeping laptop) keeps it.
+function takeMutex(dir) {
   const mutex = join(dir, MUTEX_NAME);
-  try { mkdirSync(mutex); } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-    try { if (Date.now() - statSync(mutex).mtimeMs > 10_000) rmSync(mutex, { recursive: true, force: true }); } catch { /* gone already */ }
-    return false;
+  const nonce = randomBytes(6).toString("hex");
+  const pending = join(dir, `.mutex-${nonce}`);
+  mkdirSync(pending, { recursive: true });
+  writeFileSync(join(pending, "owner"), JSON.stringify({ nonce, pid: process.pid, procStart: startTimeOf(process.pid) }));
+  try { renameSync(pending, mutex); return nonce; } catch (error) {
+    rmSync(pending, { recursive: true, force: true });
+    if (error.code !== "EEXIST" && error.code !== "ENOTEMPTY") throw error;
   }
+  const held = readJson(join(mutex, "owner"));
+  let stale;
+  try { stale = held ? !ownerAlive(held) : Date.now() - statSync(mutex).mtimeMs > 10_000; } catch { return null; }
+  if (stale) { // move it away first (atomic), so two breakers cannot both remove and one remove a mutex the other just took
+    const tomb = join(dir, `.mutex-stale-${nonce}`);
+    try { renameSync(mutex, tomb); } catch { return null; }
+    rmSync(tomb, { recursive: true, force: true });
+  }
+  return null;
+}
+const dropMutex = (dir, nonce) => { if (readJson(join(dir, MUTEX_NAME, "owner"))?.nonce === nonce) rmSync(join(dir, MUTEX_NAME), { recursive: true, force: true }); };
+
+// Processes still alive that carry a dead holder's token: the test-profile ones are its leaks, anything else is still running its tests.
+function afterlife(owner) {
+  const carriers = tokenCarriers(owner.token);
+  if (!carriers?.size) return { busy: [], leaks: [] };
+  let procs;
+  try { procs = snapshot(); } catch { return { busy: [], leaks: [] }; }
+  const roots = tmpRoots();
+  const busy = [], leaks = [];
+  for (const p of procs) {
+    if (!carriers.has(p.pid)) continue;
+    const profile = profileOf(p.command);
+    if (profile && classify(profile, roots)) leaks.push(p); else busy.push(p);
+  }
+  return { busy, leaks };
+}
+
+// Removes the lock of a gone holder. Returns true when the lock is free to take. A holder whose children still run is not reclaimed.
+export function reclaimStale(dir, log = out, { onDraining } = {}) {
+  const nonce = takeMutex(dir);
+  if (!nonce) return false;
   try {
     const owner = readOwner(dir);
-    if (owner && Number.isInteger(owner.pid) && !pidAlive(owner.pid)) {
+    if (owner && Number.isInteger(owner.pid) && !ownerAlive(owner)) {
+      const { busy, leaks } = afterlife(owner);
+      if (busy.length) { onDraining?.(owner, busy); return false; }
+      for (const leak of leaks) log(`持有者 pid ${owner.pid} 留下仍存活的測試程序：pid ${leak.pid} profile ${profileOf(leak.command)}，推得的測試檔 ${inferTestFile(profileOf(leak.command))}，結束它`);
+      if (leaks.length) killPids(leaks.map(l => l.pid), leaks.filter(l => l.pgid === l.pid).map(l => l.pgid));
+      if (readOwner(dir)?.token !== owner.token) return false; // the lock changed hands while we looked
       unlinkSync(lockPath(dir));
       log(`收回鎖：持有者 pid ${owner.pid}（${owner.worktree}，${owner.command}）已不存在。`);
       return true;
     }
     if (!owner && existsSync(lockPath(dir)) && Date.now() - statSync(lockPath(dir)).mtimeMs > 10_000) { unlinkSync(lockPath(dir)); log("收回鎖：鎖檔損毀。"); return true; }
     return false;
-  } catch (error) { if (error.code === "ENOENT") return false; throw error; } finally { rmSync(mutex, { recursive: true, force: true }); }
+  } catch (error) { if (error.code === "ENOENT") return false; throw error; } finally { dropMutex(dir, nonce); }
 }
 
 export function releaseLock(dir, token) {
@@ -99,36 +173,41 @@ export function releaseLock(dir, token) {
   if (owner?.token === token) rmSync(lockPath(dir), { force: true });
 }
 
-// True when this process runs under the holder: same token as the lock file (or the CI marker) and the holder pid is an ancestor.
+// True when this process runs under the holder: same token as the lock file and the holder pid is an ancestor. The CI marker ci-<pid>
+// counts only when CI=true (a shell variable such as ci-$$ must not pass for a local run).
 export function isReentrant(env, dir, pid = process.pid, procs = snapshot()) {
   const token = env.VAM_HEAVY_LOCK_HELD;
   if (!token) return false;
   const ancestors = ancestorsOf(pid, procs);
   const ci = /^ci-(\d+)$/.exec(token);
-  if (ci) return ancestors.includes(Number(ci[1]));
+  if (ci) return env.CI === "true" && ancestors.includes(Number(ci[1]));
   const owner = readOwner(dir);
-  return Boolean(owner && owner.token === token && ancestors.includes(owner.pid) && pidAlive(owner.pid));
+  return Boolean(owner && owner.token === token && ancestors.includes(owner.pid) && ownerAlive(owner));
 }
 
 export async function acquire({ dir, label, worktree = root, pollMs = 1000, reportMs = 30_000, log = out, sleep = delay, now = Date.now } = {}) {
   const token = randomBytes(8).toString("hex");
-  const record = { token, pid: process.pid, worktree, command: label, startedAt: new Date().toISOString() };
+  const record = { token, pid: process.pid, procStart: startTimeOf(process.pid), worktree, command: label, startedAt: new Date().toISOString() };
   const waitStart = now();
   let lastReport = -Infinity;
+  const report = line => { if (now() - lastReport >= reportMs) { lastReport = now(); log(line); } };
+  const onDraining = (owner, busy) => report(`持有者 ${owner.pid} 已結束，但它的 ${busy.length} 個子程序還在跑（pid ${busy.slice(0, 5).map(p => p.pid).join(" ")}），等它們結束`);
   for (;;) {
     if (tryAcquire(dir, record)) return { token, record };
-    if (reclaimStale(dir, log)) continue;
+    if (reclaimStale(dir, log, { onDraining })) continue;
     const owner = readOwner(dir);
-    if (owner && now() - lastReport >= reportMs) {
-      lastReport = now();
-      log(`等 ${owner.pid} ${owner.worktree} ${owner.command}，已等 ${Math.round((now() - waitStart) / 1000)} 秒`);
-    }
+    if (owner && ownerAlive(owner)) report(`等 ${owner.pid} ${owner.worktree} ${owner.command}，已等 ${Math.round((now() - waitStart) / 1000)} 秒`);
     await sleep(pollMs);
   }
 }
 
 // ---- the end-of-run check ----
-const profileOf = command => /--user-data-dir=(.*?)(?=\s--|$)/.exec(command)?.[1]?.replace(/^"|"$/g, "") ?? null;
+// The argument is "--user-data-dir=<path>" on its own; a shell or grep that only mentions it in text does not count.
+const NOT_A_BROWSER = new Set(["sh", "bash", "zsh", "dash", "fish", "ksh", "csh", "tcsh", "pgrep", "pkill", "grep", "egrep", "rg", "ps", "awk", "sed", "tail", "head", "cat", "less", "watch", "tee", "xargs", "env", "time", "sudo"]);
+export const profileOf = command => {
+  if (NOT_A_BROWSER.has(basename(command.trim().split(/\s/)[0]).replace(/^-/, ""))) return null;
+  return /(?:^|\s)--user-data-dir=(.*?)(?=\s--|$)/.exec(command)?.[1]?.replace(/^"|"$/g, "") ?? null;
+};
 const realOrSame = path => { try { return realpathSync(path); } catch { return path; } };
 
 // A test profile is a headless-Chrome profile under the temp dir whose first folder starts with "vam-", or a Obsidian ".vam-app" profile.
@@ -144,17 +223,11 @@ export function classify(profile, tmpRoots) {
 
 export const tmpRoots = () => [...new Set([tmpdir(), realOrSame(tmpdir()), "/tmp", "/private/tmp"])];
 
-// What exists when the run starts: a later orphan with a profile or pid from this set is not ours.
-export function baseline(procs, roots = tmpRoots()) {
-  const profiles = new Set();
-  for (const p of procs) { const profile = profileOf(p.command); if (profile && classify(profile, roots)) profiles.add(profile); }
-  return { pids: new Set(procs.map(p => p.pid)), profiles };
-}
-
-// Test processes this run left alive. Ours = the main process of a test profile is a descendant of this process, or it was orphaned
-// (parent 1) with a pid and profile that did not exist when the run started. A process whose parent is alive and elsewhere belongs to
-// another run (or to the user) and is never listed; a profile that is not a test profile is never listed.
-export function findLeaks({ procs, selfPid = process.pid, start, roots = tmpRoots(), keep = [] }) {
+// Test processes this run left alive. A profile group is ours when its main process is a descendant of this process, or its environment
+// carries this run's token (`carries(pid)`; an orphan keeps the token after it is reparented to pid 1). Nothing else is ever listed: a
+// run without the token (another worktree, a smoke or --session Obsidian opened through `open`, the user's own apps) is not ours, however
+// new it is. A profile that is not a test profile is never listed.
+export function findLeaks({ procs, selfPid = process.pid, roots = tmpRoots(), keep = [], carries = () => false }) {
   const mine = new Set(descendantsOf(selfPid, procs));
   const byProfile = new Map();
   for (const p of procs) {
@@ -167,11 +240,11 @@ export function findLeaks({ procs, selfPid = process.pid, start, roots = tmpRoot
     if (keep.includes(profile)) continue;
     const pids = new Set(group.map(p => p.pid));
     const mains = group.filter(p => !pids.has(p.ppid));
-    const owned = mains.some(p => mine.has(p.pid) || (p.ppid === 1 && !start.pids.has(p.pid) && !start.profiles.has(profile)));
-    if (!owned) continue;
+    const ours = mains.filter(p => mine.has(p.pid) || carries(p.pid));
+    if (!ours.length) continue;
     const tree = new Set(group.map(p => p.pid));
-    for (const main of mains) for (const pid of descendantsOf(main.pid, procs)) tree.add(pid);
-    leaks.push({ kind: classify(profile, roots), profile, pid: mains[0].pid, pids: [...tree], groups: mains.filter(p => p.pgid === p.pid).map(p => p.pgid) });
+    for (const main of ours) for (const pid of descendantsOf(main.pid, procs)) tree.add(pid);
+    leaks.push({ kind: classify(profile, roots), profile, pid: ours[0].pid, pids: [...tree], groups: ours.filter(p => p.pgid === p.pid).map(p => p.pgid) });
   }
   return leaks;
 }
@@ -191,19 +264,23 @@ export function inferTestFile(profile, repo = root, roots = tmpRoots()) {
   return "unknown";
 }
 
-export function killLeaks(leaks, selfPgid) {
-  const all = [...new Set(leaks.flatMap(l => l.pids))];
+function killPids(all, groups, selfPgid) {
   const send = (pid, signal) => { try { process.kill(pid, signal); } catch { /* gone */ } };
-  for (const leak of leaks) for (const group of leak.groups) if (group !== selfPgid) send(-group, "SIGTERM");
+  for (const group of groups) if (group !== selfPgid) send(-group, "SIGTERM");
   for (const pid of all) send(pid, "SIGTERM");
   for (let i = 0; i < 20 && all.some(pidAlive); i++) sleepSync(100);
   for (const pid of all) if (pidAlive(pid)) send(pid, "SIGKILL");
 }
+export function killLeaks(leaks, selfPgid) {
+  killPids([...new Set(leaks.flatMap(l => l.pids))], leaks.flatMap(l => l.groups), selfPgid);
+}
 
-export function checkAtEnd({ start, repo = root, keep = [], log = out, kill = true }) {
+export function checkAtEnd({ token, repo = root, keep = [], log = out, kill = true, carriersOf = tokenCarriers }) {
   let procs;
   try { procs = snapshot(); } catch (error) { log(`結束時檢查略過，原因：ps 無法執行（${error.message}）`); return []; }
-  const leaks = findLeaks({ procs, start, keep });
+  let carriers;
+  const carries = pid => { carriers ??= (token && carriersOf(token)) || new Set(); return carriers.has(pid); };
+  const leaks = findLeaks({ procs, keep, carries });
   for (const leak of leaks) log(`本次 run 留下仍存活的測試程序（${leak.kind}）：pid ${leak.pid}（共 ${leak.pids.length} 個）profile ${leak.profile}，推得的測試檔 ${inferTestFile(leak.profile, repo)}`);
   if (leaks.length && kill) killLeaks(leaks, procs.find(p => p.pid === process.pid)?.pgid);
   return leaks;
@@ -213,39 +290,66 @@ export function checkAtEnd({ start, repo = root, keep = [], log = out, kill = tr
 const kept = [];
 export const keepProfile = profile => { kept.push(profile); };
 
+// SIGTERM the whole subtree of this process (npm, sh, node --test, shards, Chrome), wait for it, then SIGKILL what is left.
+export async function stopTree(selfPid = process.pid, graceMs = 5000) {
+  let procs;
+  try { procs = snapshot(); } catch { return; }
+  const tree = descendantsOf(selfPid, procs);
+  const send = signal => { for (const pid of tree) try { process.kill(pid, signal); } catch { /* gone */ } };
+  send("SIGTERM");
+  for (let waited = 0; waited < graceMs && tree.some(pidAlive); waited += 100) await delay(100);
+  send("SIGKILL");
+}
+
 // ---- entry ----
+// { blocking: true } for entries that run their children with spawnSync: their event loop is blocked, so a signal listener would only
+// run after everything finished and would turn SIGTERM into "ignored". After the lock is taken they keep the default signal behaviour
+// (the process dies, the lock stays until its children have ended, then a waiter reclaims it).
 let entered = false;
-export async function enterHeavy(label, { env = process.env, dir = lockDir(env), ...options } = {}) {
+export async function enterHeavy(label, { env = process.env, dir = lockDir(env), blocking = false, ...options } = {}) {
   if (entered) return;
   if (isReentrant(env, dir)) return; // under the holder: it locks and checks for this whole tree
   entered = true;
   const ci = env.CI === "true";
-  let held = null, finished = false, start;
-  try { start = baseline(snapshot()); } catch { start = { pids: new Set(), profiles: new Set() }; }
+  let held = null, finished = false, signalled = false;
+  const token = ci ? `ci-${process.pid}` : randomBytes(8).toString("hex");
   const finish = () => {
     if (finished) return;
     finished = true;
     if (held) releaseLock(dir, held.token);
-    const leaks = checkAtEnd({ start, keep: kept });
+    const leaks = checkAtEnd({ token: held?.token ?? token, keep: kept });
     if (leaks.length && !process.exitCode) process.exitCode = 1;
   };
-  const onSignal = signal => { finish(); process.exit(128 + ({ SIGINT: 2, SIGTERM: 15, SIGHUP: 1 }[signal] ?? 1)); };
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(signal, () => onSignal(signal));
+  const onSignal = async signal => {
+    if (signalled) return;
+    signalled = true;
+    await stopTree(); // the lock must not be released while this run's processes still run
+    finish();
+    process.exit(128 + ({ SIGINT: 2, SIGTERM: 15, SIGHUP: 1 }[signal] ?? 1));
+  };
+  const listeners = ["SIGINT", "SIGTERM", "SIGHUP"].map(signal => [signal, () => onSignal(signal)]);
+  for (const [signal, listener] of listeners) process.on(signal, listener);
   process.on("exit", finish);
-  if (ci) { env.VAM_HEAVY_LOCK_HELD = `ci-${process.pid}`; return; }
+  if (ci) { env.VAM_HEAVY_LOCK_HELD = token; return; }
+  if (env.VAM_HEAVY_LOCK_DIR && dir !== lockDir({})) out(`鎖位置改為 ${dir}（不與預設位置的鎖互斥）`);
   held = await acquire({ dir, label, ...options });
   env.VAM_HEAVY_LOCK_HELD = held.token;
+  if (blocking) for (const [signal, listener] of listeners) process.off(signal, listener);
 }
 
 // CLI wrapper: node scripts/heavy-lock.mjs <label> -- <command> [args...]
+//              node scripts/heavy-lock.mjs --require-held     (guard for a script that must only run under the lock)
 async function cli(argv) {
+  if (argv[0] === "--require-held") {
+    if (isReentrant(process.env, lockDir())) return;
+    process.stderr.write("heavy-lock: 這個 script 只能在重量級鎖內執行；請用會排隊的入口（例如 npm run test:aim）。\n");
+    process.exit(1);
+  }
   const split = argv.indexOf("--");
   if (split < 1 || split === argv.length - 1) { process.stderr.write("usage: heavy-lock.mjs <label> -- <command> [args...]\n"); process.exit(2); }
-  let child = null;
-  for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child?.kill(signal)); // before enterHeavy's handler, which exits
   await enterHeavy(argv.slice(0, split).join(" "));
   const [command, ...args] = argv.slice(split + 1);
-  child = spawn(command, args, { stdio: "inherit", env: process.env });
+  const child = spawn(command, args, { stdio: "inherit", env: process.env });
   child.on("close", (code, signal) => { process.exitCode = code ?? (signal ? 128 : 1); });
   child.on("error", error => { out(`cannot start ${command}: ${error.message}`); process.exitCode = 1; });
 }

@@ -17,7 +17,7 @@
     "test": "node scripts/test-harness.mjs",
     "test:unit": "node scripts/test-unit.mjs",
     "test:aim": "node scripts/heavy-lock.mjs npm run test:aim -- npm run test:aim:run",
-    "test:aim:run": "VAM_SUITES=aim node --test tests/run.cjs tests/aim-*.cjs tests/steps-aim-*.cjs tests/codex-parallel-runtime.cjs && VAM_SUITES=other node --test --test-name-pattern='AIM|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs",
+    "test:aim:run": "node scripts/heavy-lock.mjs --require-held && VAM_SUITES=aim node --test tests/run.cjs tests/aim-*.cjs tests/steps-aim-*.cjs tests/codex-parallel-runtime.cjs && VAM_SUITES=other node --test --test-name-pattern='AIM|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs",
     "test:aim:node": "node tests/tools/aim-node.cjs",
     "test:affected": "node scripts/test-affected.mjs --run",
     "test:integration": "node scripts/test-integration.mjs",

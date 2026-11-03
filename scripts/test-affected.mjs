@@ -351,7 +351,7 @@ async function main(argv) {
   if (!argv.includes("--run")) return;
   if (result.mode === "none") return;
   const { enterHeavy } = await import("./heavy-lock.mjs");
-  await enterHeavy("npm run test:affected");
+  await enterHeavy("npm run test:affected", { blocking: true }); // spawnSync below: see enterHeavy
   const env = { ...process.env };
   if (result.mode === "files") env.VAM_AFFECTED_TESTS = result.files.join(",");
   for (const script of ["test:unit", "test:integration"]) {

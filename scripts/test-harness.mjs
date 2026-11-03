@@ -346,6 +346,6 @@ export function main(args = process.argv.slice(2)) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   // --smoke and --session= are the Obsidian-only setup paths; every other form builds and runs the test layers.
-  if (!argv.includes("--smoke") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim());
+  if (!argv.includes("--smoke") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim(), { blocking: true }); // main() runs spawnSync: see enterHeavy
   main();
 }

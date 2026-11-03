@@ -68,13 +68,12 @@ export function settledLine(line: MapChatLine): MapChatLine {
   }
 }
 
-/** What a question was sent with, kept so "say it in more detail" can send the same question again. */
+/** What a question was sent with, kept so a failed turn can be sent again. */
 export interface MapChatOrigin {
   text: string;
   chips: MapChatChip[];
   selectedIds: string[];
 }
-export type MapChatStyleChoice = "concise" | "detailed";
 
 /** A reply that waits for the user's yes: what it would do, what it costs, and the two buttons. */
 export interface MapChatPlanCard {
@@ -147,11 +146,6 @@ export interface MapChatSavedTurn {
  * thinking cannot be seen.
  */
 export type MapChatStage = "preparing" | "consent" | "waiting" | "writing" | "applying";
-/** The tooltip of an answer-length button: what that length means. */
-const styleHintKey = (
-  style: MapChatStyleChoice
-): "ui.map_chat_style_concise_hint" | "ui.map_chat_style_detailed_hint" =>
-  style === "concise" ? "ui.map_chat_style_concise_hint" : "ui.map_chat_style_detailed_hint";
 const STAGE_ORDER: Record<MapChatStage, number> = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 
 /** What {@link MapChatPanel.begin} returns: the two messages it added, so {@link MapChatPanel.retract} can take exactly them back. */
@@ -177,6 +171,8 @@ export interface MapChatMessage {
   linesOpen?: boolean;
   /** Picture candidates the reply asked for (`find_images`), oldest first. */
   images?: MapChatImages[];
+  /** On an assistant message: the name of the model that was current when its question was sent; it never changes afterwards. */
+  modelLabel?: string;
 }
 
 /** What the panel needs from the view that owns it. */
@@ -203,10 +199,6 @@ export interface MapChatHost {
   openLink(href: string, newLeaf: boolean | "tab" | "split" | "window"): void;
   /** The element that has keyboard focus right now. */
   activeElement(): Element | null;
-  /** Remembered answer length (from settings). */
-  style(): MapChatStyleChoice;
-  /** The user picked an answer length; the view remembers it. */
-  setStyle(style: MapChatStyleChoice): void;
   /** Models the chat can use (the current model is one of them, or an "unavailable" entry). */
   modelChoices(): { value: string; label: string; short?: string }[];
   /** The current model (shared with the settings page). */
@@ -215,8 +207,8 @@ export interface MapChatHost {
   setModel(model: string): void;
   /** Calls `changed` whenever the available models or the current model change, and starts a refresh; the returned function stops listening. */
   watchModels(changed: () => void): () => void;
-  /** "Say it in more detail": send `origin` again with the detailed style. */
-  moreDetail(origin: MapChatOrigin): void;
+  /** The name the model menu shows for a model id (without any "unavailable" note); absent: the menu entry's label is used. */
+  modelName?(id: string): string;
   /** The panel opened, closed, folded to the narrow edge or went to the opening screen; the view makes room for it. */
   layoutChanged(open: boolean): void;
   /** Width in pixels of the side window (the view remembers it). */
@@ -307,8 +299,6 @@ export class MapChatPanel {
   private heroTitleEl!: HTMLElement;
   private titleEl!: HTMLElement;
   private closeEl!: HTMLButtonElement;
-  private styleGroupEl!: HTMLElement;
-  private styleTagEl!: HTMLElement;
   private logLabelEl!: HTMLElement;
   private guideEl!: HTMLElement;
   private hintEl!: HTMLElement;
@@ -327,7 +317,6 @@ export class MapChatPanel {
   private modelEl!: HTMLSelectElement;
   /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
   private modelTagEl!: HTMLElement;
-  private styleEls: Record<MapChatStyleChoice, HTMLButtonElement> | null = null;
   private stopEl!: HTMLButtonElement;
   private saveEl!: HTMLButtonElement;
   /** The note is being written; a second press does nothing. */
@@ -662,7 +651,14 @@ export class MapChatPanel {
     );
     this.retireChoices();
     const user: MapChatMessage = { role: "user", text: userText, lines: [], ...(origin ? { origin } : {}) };
-    const assistant: MapChatMessage = { role: "assistant", text: "", lines: [], streaming: true };
+    const modelLabel = this.replyModelLabel();
+    const assistant: MapChatMessage = {
+      role: "assistant",
+      text: "",
+      lines: [],
+      streaming: true,
+      ...(modelLabel ? { modelLabel } : {})
+    };
     this.messages.push(user, assistant);
     this.busy = true;
     this.stage = { kind: stage, since: this.clockNow() };
@@ -744,6 +740,12 @@ export class MapChatPanel {
     const active = this.host.activeElement();
     if (!active || (active as HTMLElement).tagName === "BODY" || this.el.contains(active)) return true;
     return (active as HTMLElement).isConnected === false;
+  }
+  /** The model name written above a reply: the current model's menu name, or "" when there is none (the row then says "AI"). */
+  private replyModelLabel(): string {
+    const id = this.host.model();
+    if (!id) return "";
+    return (this.host.modelName?.(id) ?? this.currentModelLabel()).trim();
   }
   private currentModelLabel(): string {
     const model = this.host.model();
@@ -1172,32 +1174,6 @@ export class MapChatPanel {
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
     const side = form.createDiv("vam-map-chat-side");
-    // "Answer length" is written next to the toggle: "Concise" and "Detailed" alone do not say what they change. The group's
-    // own label says the same to a screen reader, so the visible word is hidden from it.
-    const length = side.createDiv("vam-map-chat-length");
-    this.styleTagEl = length.createSpan({
-      cls: "vam-map-chat-style-tag",
-      text: t("ui.map_chat_style_label"),
-      attr: { "aria-hidden": "true" }
-    });
-    const styleGroup = (this.styleGroupEl = length.createDiv({
-      cls: "vam-map-chat-style",
-      attr: { role: "group", "aria-label": t("ui.map_chat_style_label") }
-    }));
-    const styleButton = (style: MapChatStyleChoice): HTMLButtonElement => {
-      const label = t(style === "concise" ? "ui.map_chat_style_concise" : "ui.map_chat_style_detailed");
-      const button = styleGroup.createEl("button", {
-        cls: "vam-map-chat-style-option",
-        text: label,
-        attr: { type: "button", "aria-pressed": "false", title: t(styleHintKey(style)) }
-      });
-      button.addEventListener("click", () => {
-        this.host.setStyle(style);
-        this.refreshControls();
-      });
-      return button;
-    };
-    this.styleEls = { concise: styleButton("concise"), detailed: styleButton("detailed") };
     this.sendEl = side.createEl("button", {
       cls: "vam-map-chat-send mod-cta",
       text: t("ui.map_chat_send"),
@@ -1293,12 +1269,6 @@ export class MapChatPanel {
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
     this.inputEl.setAttr("placeholder", t("ui.map_chat_input_placeholder"));
-    this.styleGroupEl.setAttr("aria-label", t("ui.map_chat_style_label"));
-    this.styleEls?.concise.setText(t("ui.map_chat_style_concise"));
-    this.styleEls?.detailed.setText(t("ui.map_chat_style_detailed"));
-    this.styleTagEl.setText(t("ui.map_chat_style_label"));
-    this.styleEls?.concise.setAttr("title", t(styleHintKey("concise")));
-    this.styleEls?.detailed.setAttr("title", t(styleHintKey("detailed")));
     this.sendEl.setText(t("ui.map_chat_send"));
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
     this.stopEl.setText(t("ui.map_chat_stop"));
@@ -1660,14 +1630,9 @@ export class MapChatPanel {
     this.logEl.toggleClass("is-hidden", empty);
   }
 
-  /** Puts the answer-length buttons and the model list back in step with what the view remembers. */
+  /** Puts the model list back in step with what the view remembers. */
   private refreshControls(): void {
-    if (!this.built || !this.styleEls) return;
-    const style = this.host.style();
-    for (const choice of ["concise", "detailed"] as const) {
-      this.styleEls[choice].setAttr("aria-pressed", String(style === choice));
-      this.styleEls[choice].toggleClass("is-active", style === choice);
-    }
+    if (!this.built) return;
     const choices = this.host.modelChoices();
     this.modelEl.empty();
     // A choice may carry a shorter list label; the full one is its tooltip.
@@ -1734,14 +1699,12 @@ export class MapChatPanel {
   /** Everything a message row shows; the row is rebuilt only when this changes. */
   private rowKey(message: MapChatMessage): string {
     const asked = this.messages[this.messages.indexOf(message) - 1];
-    const more = this.hasMore(message, asked);
     return [
       message.role,
       message.error ? "e" : "",
       message.streaming ? "s" : "",
       // Only whether the stage line is there (its words and seconds change in place, never the row).
       this.stageMessage() === message ? "p" : "",
-      more ? "m" : "",
       this.canRetry(message, asked) ? "r" : "",
       message.linesOpen ? "o" : "",
       t("ui.map_chat_retry"),
@@ -1751,10 +1714,10 @@ export class MapChatPanel {
       t("ui.map_chat_plan_title_applied"),
       t("ui.map_chat_plan_title_cancelled"),
       t("ui.map_chat_role_you"),
+      message.role === "assistant" ? (message.modelLabel ?? "") : "",
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
-      more ? t("ui.map_chat_more_detail") : "",
       message.lines
         .map(settledLine)
         .map(line => `${line.status}:${line.text}`)
@@ -1779,18 +1742,6 @@ export class MapChatPanel {
       message.role === "assistant" && !!message.error && !message.streaming && !!asked?.origin && !!this.host.retry
     );
   }
-  private hasMore(message: MapChatMessage, asked: MapChatMessage | undefined): boolean {
-    return (
-      message.role === "assistant" &&
-      !message.streaming &&
-      !message.error &&
-      !!message.text.trim() &&
-      !!asked?.origin &&
-      // Saying it again would replace the plan that waits for its answer.
-      message.plan?.state !== "pending"
-    );
-  }
-
   private renderLog(forceEnd = false): void {
     if (!this.built) return;
     this.cancelFrame();
@@ -1832,7 +1783,7 @@ export class MapChatPanel {
     });
     row.createSpan({
       cls: "vam-map-chat-role",
-      text: t(message.role === "user" ? "ui.map_chat_role_you" : "ui.map_chat_role_ai")
+      text: message.role === "user" ? t("ui.map_chat_role_you") : message.modelLabel || t("ui.map_chat_role_ai")
     });
     const markdown = message.role === "assistant" && !message.error;
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
@@ -1846,18 +1797,6 @@ export class MapChatPanel {
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more: HTMLButtonElement | null = null;
-    if (this.hasMore(message, asked) && asked?.origin) {
-      const origin = asked.origin;
-      more = row.createEl("button", {
-        cls: "vam-map-chat-more",
-        text: t("ui.map_chat_more_detail"),
-        attr: { type: "button" }
-      });
-      more.disabled = this.working;
-      more.addEventListener("click", () => {
-        if (!this.working) this.handOffFocus(() => this.host.moreDetail(origin));
-      });
-    }
     if (this.canRetry(message, asked) && asked?.origin) {
       const origin = asked.origin;
       more = row.createEl("button", {
@@ -2084,7 +2023,7 @@ export class MapChatPanel {
   }
   /**
    * Remembers what the keyboard is on in the row that shows `block` (a candidate's button or source link, or the row's
-   * "more detail" or retry button) and returns how to put it back once that row was built again.
+   * retry button) and returns how to put it back once that row was built again.
    */
   private keepRowFocus(block: MapChatImages): () => void {
     const active = this.host.activeElement();

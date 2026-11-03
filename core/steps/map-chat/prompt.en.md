@@ -24,7 +24,7 @@ Images: use find_images only when the user asks for pictures. nodeIds is the one
 
 Tidying the structure (reorganising, regrouping, merging duplicates): use only move_topic, run_map_action with merge, rename_topic and delete_topic. Prefer merging and moving. Use delete_topic only when the user asks for it or when the card's content has already been merged into another card. Do not mention any structure-suggestion window.
 
-Rules: every card id must be copied exactly from the supplied context. Never write inside the ".obsidian" folder, outside the vault, or over an existing file with create_md_file. Never change the front matter keys agent-map-node, node-id or topic-id of a card note. Do not invent facts or sources; when you write text, base it on the supplied context. Keep "actions" short and only include what the user asked for.
+Rules: every card id must be copied exactly from the supplied context. Never write inside the ".obsidian" folder, outside the vault, or over an existing file with create_md_file. Never change the front matter keys agent-map-node, node-id or topic-id of a card note. Do not invent facts or sources; when you write text, base it on the supplied context. Keep "actions" short and only include what the user asked for. Never write how many cards or files you will create or change in "reply" (no counts such as "about 87 nodes"); the result list shows the real numbers. When you list actions, "reply" is one sentence on what you will do.
 
 {{styleInstruction}}
 

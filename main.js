@@ -23599,7 +23599,8 @@ ${body}`);
     if (!marker2(fm["agent-map-node"])) return null;
     const language2 = this.scaffoldLanguage(content, fm);
     ensureNoteCssClass(fm);
-    fm.title = noteTitle(content, fm, file.basename);
+    const title = noteTitle(content, fm, file.basename);
+    if (fm.title !== void 0) fm.title = title;
     const owner = ownership2.get(file.path);
     let state = file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text5(fm["topic-state"], "unassigned");
     if (owner) {
@@ -23648,13 +23649,7 @@ ${body}`);
       delete fm["agent-map-references"];
       body = withoutReference(body);
     }
-    body = normalizeBodyOrder(
-      body,
-      text5(fm.title, file.basename),
-      text5(fm.summary, placeholder(textLanguage)),
-      language2,
-      textLanguage
-    );
+    body = normalizeBodyOrder(body, title, text5(fm.summary, placeholder(textLanguage)), language2, textLanguage);
     return `---
 ${(0, import_obsidian11.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm, language2)}`;

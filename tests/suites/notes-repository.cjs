@@ -2171,13 +2171,13 @@ integrationTest('topic-color: writeTopicColor sets, overwrites an unknown old va
   assert.equal(contents.get(n.path), original.replace('---\n', '---\ncustom: retain me\n'), 'everything else is byte-identical');
 });
 async function copySource(content, name = 'beta') {
-  const { repo, app } = fixture();
+  const { repo, app, contents } = fixture();
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   const sourcePath = `Agent Workspace/Topics/map-a/Notes/${name}.md`;
   await app.vault.create(sourcePath, content);
   const read = async copy => app.vault.read(app.vault.getAbstractFileByPath(copy.path));
-  return { repo, mapDoc, mapPath, sourcePath, read };
+  return { repo, app, contents, mapDoc, mapPath, sourcePath, read };
 }
 integrationTest('duplicating a note that only has a body heading uses that heading as the title, for a paste and for Copy to… (#06)', async () => {
   const { repo, mapDoc, mapPath, sourcePath, read } = await copySource('---\nagent-map-node: true\nnode-id: original\ntopic-id: map-a\n---\n# Fixture Beta\n\nBody\n', 'beta');
@@ -2197,6 +2197,18 @@ integrationTest('duplicating a note takes the title from the front matter withou
   const none = await copySource('---\nagent-map-node: true\nnode-id: original\n---\nBody only\n', 'file-name');
   const b = await none.repo.duplicateNote(none.sourcePath, none.mapDoc, none.mapPath, { keepTitle: true });
   assert.match(await none.read(b), /^title: file-name$/m);
+});
+integrationTest('the rebuild after a paste leaves a source note without a frontmatter title byte-identical; an existing title still follows the heading', async () => {
+  const { repo, contents, mapDoc, mapPath, sourcePath } = await copySource('---\nagent-map-node: true\nnode-id: original\ntopic-id: map-a\ntitle: Fixture Beta\n---\n# Fixture Beta\n\nBody\n', 'beta');
+  await repo.rebuildDerivedData();
+  const settled = contents.get(sourcePath).replace(/^title: .*\n/m, '');
+  contents.set(sourcePath, settled);
+  await repo.duplicateNote(sourcePath, mapDoc, mapPath, { keepTitle: true });
+  await repo.rebuildDerivedData();
+  assert.equal(contents.get(sourcePath), settled, 'the source gains no title line');
+  contents.set(sourcePath, settled.replace('---\n#', 'title: Old Name\n---\n#'));
+  await repo.rebuildDerivedData();
+  assert.match(contents.get(sourcePath), /^title: Fixture Beta$/m, 'a stale title is synced to the heading');
 });
 integrationTest('a copied note title with $ replacement patterns reaches the body heading verbatim (#25)', async () => {
   for (const title of ['Cost $& plan', 'Cost $1 plan', 'Cost $$ plan', 'Cost $` plan']) {

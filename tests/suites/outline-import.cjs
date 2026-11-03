@@ -254,7 +254,7 @@ test('outline modal: the one-line style choice sits in the research options and 
   const mine = { ref: 'file:Template one', kind: 'file', name: 'Template one', fileName: 'Template one.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [] };
   const styles = { refresh: async () => {}, list: () => [], recipes: () => [mine], edit: async () => {} };
   const submit = async (shallowOn, picked) => {
-    const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, [], undefined, undefined, undefined, { styles });
+    const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, undefined, undefined, undefined, { styles });
     modal.open();
     const options = h.find(modal.contentEl, item => /vam-outline-research-options/.test(item.cls));
     assert.ok(h.find(options, item => /vam-style-choice-text/.test(item.cls)), 'the line sits inside the research options');
@@ -527,7 +527,7 @@ integrationTest('importOutline: a chosen style shapes the root note\'s sections 
 
 function placementModal(target) {
   const h = modalHarness(); const requests = [];
-  const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, [], target);
+  const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, target);
   modal.open();
   const radios = h.all(modal.contentEl, item => item.tag === 'input' && item.type === 'radio' && ['new', 'tree', 'under'].includes(item.value));
   const label = value => h.find(modal.contentEl, item => item.tag === 'label' && item.children.some(child => child === radios.find(radio => radio.value === value)));

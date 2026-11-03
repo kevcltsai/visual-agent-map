@@ -103,14 +103,14 @@ integrationTest('multi-select research dialog: the line says each topic keeps it
   const { MultiResearchModal } = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
   const submitted = [];
   const models = { list: () => [], watch: () => () => {} };
-  const modal = new MultiResearchModal({}, ['A', 'B'], models, [], request => submitted.push(request));
+  const modal = new MultiResearchModal({}, ['A', 'B'], models, request => submitted.push(request));
   modal.open();
   // The separate "Writing tone" select is gone: the tone comes with the chosen note style.
   assert.equal(byLabel(modal.contentEl, 'Writing tone'), undefined);
   assert.equal(styleLine(modal.contentEl), "Note style: Each topic's own setting");
   button(modal.modalEl, 'Start research (2)').click();
   noStyleKeys(submitted[0]);
-  const second = new MultiResearchModal({}, ['A', 'B'], models, [], request => submitted.push(request));
+  const second = new MultiResearchModal({}, ['A', 'B'], models, request => submitted.push(request));
   second.open(); pick(openStyle(second.contentEl), 'builtin:textbook'); button(second.modalEl, 'Start research (2)').click();
   assert.equal(submitted[1].noteStyle, 'builtin:textbook');
   assert.equal('toneId' in submitted[1], false); assert.equal('detailTemplateId' in submitted[1], false);
@@ -119,8 +119,7 @@ integrationTest('tone picker: the research dialog has no tone library link any m
   const Modal = dom.makeModal();
   const { MultiResearchModal } = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
   const models = { list: () => [], watch: () => () => {} };
-  const tones = [{ id: 'plain', name: 'Plain' }, { id: 'custom-1', name: 'Mine' }];
-  const modal = new MultiResearchModal({}, ['A', 'B'], models, [], () => {}, tones, () => {});
+  const modal = new MultiResearchModal({}, ['A', 'B'], models, () => {});
   modal.open();
   assert.equal(byLabel(modal.contentEl, 'Writing tone'), undefined, 'no tone select: the tone comes with the note style');
   assert.equal(button(modal.contentEl, 'Edit tones…'), undefined);
@@ -139,7 +138,7 @@ integrationTest('style and model pickers: a style file with a problem offers Ope
   const recipes = [{ ref: 'file:Mine', kind: 'file', name: 'Mine', fileName: 'Mine.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [] },
     { ref: 'file:Broken', kind: 'file', name: 'Broken', fileName: 'Broken.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [{ line: 3, code: 'ui.detail_template_error_section_name_taken', values: [2], message: 'x' }] }];
   const styles = { refresh: async () => {}, list: () => [], recipes: () => recipes, edit: async ref => { opened.push(ref); } };
-  const modal = new MultiResearchModal({}, ['A', 'B'], models, [], () => {}, [], undefined, { repair: model => repaired.push(model), styles });
+  const modal = new MultiResearchModal({}, ['A', 'B'], models, () => {}, { repair: model => repaired.push(model), styles });
   modal.open();
   // The template and tone selects are gone, and so is "Edit this style": a problem row opens its file instead.
   assert.equal(byLabel(modal.contentEl, 'Content template'), undefined);
@@ -151,7 +150,7 @@ integrationTest('style and model pickers: a style file with a problem offers Ope
   byLabel(modal.contentEl, 'Model').value = 'gpt-a';
   button(modal.contentEl, 'Fix connection…').click();
   assert.deepEqual(repaired, ['gpt-a'], 'the fix link checks the chosen model');
-  const bare = new MultiResearchModal({}, ['A'], models, [], () => {}); bare.open();
+  const bare = new MultiResearchModal({}, ['A'], models, () => {}); bare.open();
   assert.equal(button(bare.contentEl, 'Open this file'), undefined, 'no file link without a style folder');
   assert.equal(button(bare.contentEl, 'Fix connection…'), undefined);
 });
@@ -579,7 +578,7 @@ integrationTest('one AI-mode widget with one default: the Next Step dialog and t
   const modal = new outline.OutlineImportModal({}, async () => {}); modal.open();
   assert.deepEqual(findAll(modal.contentEl, i => i.tag === 'button' && i.attrs.role === 'radio').map(r => [r.text, r.attrs['aria-checked']]), [['Quick', 'true'], ['Standard', 'false']], 'the outline window starts on Quick');
   const multi = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
-  const dialog = new multi.MultiResearchModal({}, ['A'], { list: () => [], watch: () => () => {} }, [], () => {}, []); dialog.open();
+  const dialog = new multi.MultiResearchModal({}, ['A'], { list: () => [], watch: () => () => {} }, () => {}); dialog.open();
   assert.equal(findAll(dialog.contentEl, i => i.type === 'radio' || i.attrs?.role === 'radio').length, 0, 'multi-research has no mode choice of its own');
 });
 integrationTest('map stylesheet: the AI-mode choice uses JS-toggled classes, so no :has() is left on the map or the AI dialog', () => {
@@ -1158,7 +1157,7 @@ integrationTest('multi-select research dialog: one style line "Each topic\'s own
   const Modal = dom.makeModal();
   const { MultiResearchModal } = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
   const submitted = []; const models = { list: () => [], watch: () => () => {} };
-  const modal = new MultiResearchModal({}, ['A', 'B'], models, [], request => submitted.push(request));
+  const modal = new MultiResearchModal({}, ['A', 'B'], models, request => submitted.push(request));
   modal.open();
   assert.equal(findAll(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style for this run').length, 1);
   assert.equal(styleSelect(modal.contentEl).children[0].text, "Keep (Each topic's own setting)");
@@ -1170,7 +1169,7 @@ integrationTest('outline import dialog: the line says "Follow the topic type"; t
   const { OutlineImportModal } = load('experiences/visual-map/outline-import-modal.ts', { obsidian: { ...obsidian, Modal } });
   const requests = [];
   const open = (shallowOn, value, prefill) => {
-    const modal = new OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, [], { map: 'none' }, 'tree');
+    const modal = new OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, { map: 'none' }, 'tree');
     modal.open();
     if (value) pick(openStyle(modal.contentEl), value);
     const textarea = find(modal.contentEl, i => i.tag === 'textarea'); textarea.value = '# R\n## A'; textarea.fire('input');

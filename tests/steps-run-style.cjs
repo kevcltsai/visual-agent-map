@@ -70,8 +70,9 @@ test('slice 2 (was: choice, topic, map, workspace default; grilling Q10/Q15): th
   assert.deepEqual(names(ask({})), ['atomic', 'Definition & example', 'kind']);
   assert.deepEqual(names(ask({ map: { template: 'A' } })), ['atomic', 'Definition & example', 'kind']);
   assert.deepEqual(names(ask({ topic: { template: 'B' }, map: { template: 'A' } })), ['B', 'Template B', 'topic']);
-  assert.deepEqual(names(ask({ choice: { template: 'C' }, topic: { template: 'B' }, map: { template: 'A' } })), ['C', 'Template C', 'run']);
-  assert.deepEqual(names(ask({ choice: { template: 'standard' }, topic: { template: 'B' } })), ['standard', 'Standard six', 'run']);
+  // #18: the run's old structure id is gone; a run names a whole style
+  assert.deepEqual(names(ask({ choice: { style: 'builtin:textbook' }, topic: { template: 'B' }, map: { template: 'A' } })), ['textbook', 'Intro + six', 'run']);
+  assert.deepEqual(names(ask({ choice: { style: 'builtin:general' }, topic: { template: 'B' } })), ['standard', 'Standard six', 'run']);
 });
 
 const TONE_FILES = {
@@ -84,12 +85,9 @@ test('slice 3 (was: the tone chain choice, topic, map; grilling Q10/Q15): the vo
   const { store } = await world({}, TONE_FILES);
   const ask = request => store.runStyle({ outputLanguage: 'en', ...request });
   const tone = got => [got.toneText, got.label.toneName];
-  assert.deepEqual(tone(ask({ choice: { tone: 'file:Pirate' }, topic: { tone: 'plain' } })), ['Talk like a pirate.', 'Pirate']);
-  assert.deepEqual(tone(ask({ choice: { tone: 'file:Poet' } })), ['Write as a poet.', 'Poet']);
   assert.deepEqual(tone(ask({ topic: { tone: 'custom-tone-1' }, map: { tone: 'file:Clerk' } })), ['Talk like a pirate.', 'Pirate']);
   assert.deepEqual(tone(ask({ map: { tone: 'file:Clerk' } })), [undefined, 'Academic rigor'], 'the map is no level');
-  assert.deepEqual(tone(ask({ topic: { tone: 'plain' }, choice: { tone: 'academic' } })), [undefined, 'Academic rigor'], 'academic named by the run beats the topic');
-  assert.deepEqual(tone(ask({ topic: { tone: 'plain' }, choice: { tone: 'gone' } })), [M.lookupBuiltinBlock('tone', 'plain', 'en'), 'Plain explanation'], 'a run tone that does not exist leaves the lower level');
+  assert.deepEqual(tone(ask({ topic: { tone: 'plain' } })), [M.lookupBuiltinBlock('tone', 'plain', 'en'), 'Plain explanation']);
   assert.deepEqual(tone(ask({ topic: { tone: 'gone' } })), [undefined, 'Academic rigor']);
 });
 
@@ -99,8 +97,6 @@ test('slice 4 (was: the workspace tone block fills in; grilling Q10): the kind s
   const tone = got => [got.toneText, got.label.toneName];
   assert.deepEqual(tone(ask({})), ['Talk like a pirate.', 'Pirate']);
   assert.deepEqual(tone(ask({ topic: {}, map: {} })), ['Talk like a pirate.', 'Pirate']);
-  assert.deepEqual(tone(ask({ choice: { tone: 'file:Poet' } })), ['Write as a poet.', 'Poet']);
-  assert.deepEqual(tone(ask({ choice: { tone: 'academic' } })), [undefined, 'Academic rigor'], 'academic named by the run beats the style\'s voice');
   assert.equal(ask({}).label.styleName, 'Mix', 'the style is shown by its name');
 });
 
@@ -109,7 +105,6 @@ test('slice 5 (was: a style file brings its own tone; grilling Q12): a style fil
   const ask = request => store.runStyle({ outputLanguage: 'en', ...request });
   const tone = got => [got.template.id, got.toneText, got.label.toneName];
   assert.deepEqual(tone(ask({})), ['textbook', 'Talk like a pirate.', 'Pirate']);
-  assert.deepEqual(tone(ask({ choice: { tone: 'file:Poet' } })), ['textbook', 'Write as a poet.', 'Poet'], 'the run names a tone');
   assert.deepEqual(tone(ask({ topic: { template: 'standard' } })), ['standard', undefined, 'Academic rigor'], 'an old topic structure is a style of its own: the voice is the kind default');
   assert.deepEqual(tone(ask({ topic: { template: 'standard' }, map: { tone: 'file:Poet' } })), ['standard', undefined, 'Academic rigor']);
   assert.equal(ask({}).label.styleName, 'Mix');
@@ -179,7 +174,7 @@ test('slice 8 (was: ids that are gone, most specific first; grilling Q10/Q15): r
   assert.deepEqual(plain(all.issues.missing), ['file:Gone', 'builtin:nope', 'gone-id'], 'the kind ref is not asked once the topic reads');
   assert.equal(all.template.id, 'standard', 'an unknown old id is Standard');
   assert.equal(all.recipe.source, 'topic');
-  const some = store.runStyle({ outputLanguage: 'en', choice: { template: 'style:Gone' }, topic: { template: 'A' } });
+  const some = store.runStyle({ outputLanguage: 'en', choice: { style: 'style:Gone' }, topic: { template: 'A' } });
   assert.deepEqual(plain(some.issues.missing), ['style:Gone']);
   assert.equal(some.template.id, 'A');
   const kind = store.runStyle({ outputLanguage: 'en' });
@@ -220,12 +215,9 @@ const textOfName = name => { const text = TEXT_OF_NAME[name]; return typeof text
 test('slice 10: in every case the tone name shown is the tone whose text is sent; the style names match the known literals', async () => {
   const rows = [
     { name: 'empty', request: {}, style: 'General research', tone: 'Academic rigor' },
-    { name: 'tone on the run', request: { choice: { tone: 'file:Pirate' }, topic: { tone: 'plain' } }, files: TONE_FILES, tone: 'Pirate' },
     { name: 'tone on the topic', request: { topic: { tone: 'custom-tone-1' }, map: { tone: 'file:Clerk' } }, files: TONE_FILES, tone: 'Pirate' },
     { name: 'unknown topic tone', request: { topic: { tone: 'gone' } }, files: TONE_FILES, tone: 'Academic rigor' },
-    { name: 'academic stops it', request: { topic: { tone: 'plain' }, choice: { tone: 'academic' } }, files: TONE_FILES, tone: 'Academic rigor' },
     { name: 'style voice', settings: MIX_KIND, request: {}, files: { ...TONE_FILES, ...mix('Standard six', 'Pirate') }, tone: 'Pirate', style: 'Mix' },
-    { name: 'style voice beaten by the run', settings: MIX_KIND, request: { choice: { tone: 'file:Clerk' } }, files: { ...TONE_FILES, ...mix('Standard six', 'Pirate') }, tone: 'Clerk', style: 'Mix' },
     { name: 'unreadable structure with a voice', settings: MIX_KIND, request: {}, files: { ...TONE_FILES, ...mix('Bad', 'Pirate'), [`${TPL}/Bad.md`]: BROKEN }, tone: 'Pirate' },
     { name: 'missing template', settings: { detailTemplates: CUSTOM() }, request: { topic: { template: 'gone-id', tone: 'plain' } }, tone: 'Plain explanation', style: 'Old setting (Standard six · Plain explanation)' },
     // literal names from the dialog
@@ -266,16 +258,16 @@ test('slice 11: the result is a frozen value; the same input twice is equal; a l
   assert.equal(counter.saves, 0);
 });
 
-test('slice 12 (was: the run tone takes no part in finding the template; grilling Q10): the run\'s own tone changes only the voice, never the structure', async () => {
+test('slice 12 (replaces the run-tone test; #18, counter-example 13): an old run choice { template, tone } is ignored: the result equals a run with no choice', async () => {
   const free = await world({}, TONE_FILES);
-  const got = free.store.runStyle({ outputLanguage: 'en', choice: { tone: 'file:Pirate' }, topic: { template: 'textbook' } });
-  assert.equal(got.template.id, 'textbook');
-  assert.equal(got.toneText, 'Talk like a pirate.');
-  assert.equal(got.label.toneName, 'Pirate');
-  assert.equal(got.recipe.source, 'run');
-  const without = free.store.runStyle({ outputLanguage: 'en', topic: { template: 'textbook' } });
-  assert.equal(without.template.id, 'textbook');
-  assert.equal(without.recipe.source, 'topic');
+  const request = { outputLanguage: 'en', topic: { template: 'textbook' } };
+  const without = free.store.runStyle(request);
+  const old = free.store.runStyle({ ...request, choice: { template: 'standard', tone: 'file:Pirate' } });
+  assert.deepEqual(plain(old), plain(without));
+  assert.equal(old.template.id, 'textbook');
+  assert.equal(old.recipe.source, 'topic');
+  const bare = await world({});
+  assert.deepEqual(plain(bare.store.runStyle({ outputLanguage: 'en', choice: { template: 'textbook', tone: 'plain' } })), plain(bare.store.runStyle({ outputLanguage: 'en' })));
 });
 
 test('toneOnly and map (was: a proposal run takes no tone from the workspace default; grilling Q10/Q15): neither the map nor toneOnly changes anything, and the workspace default styles are not read', async () => {

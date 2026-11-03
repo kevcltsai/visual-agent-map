@@ -7,7 +7,8 @@ const S = require('./support.cjs');
 const dom = require('./support-dom.cjs');
 
 const notices = [];
-const { default: Plugin } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: dom.makeNotice(notices) } });
+const Main = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: dom.makeNotice(notices) } });
+const { default: Plugin } = Main;
 
 /** `options.layoutReady: false` keeps the layout-ready callbacks back; `options.saves` records every saveData; `options.failSave` makes it throw. */
 async function onloadWrites(saved, options = {}) {
@@ -57,6 +58,19 @@ test('onload with only the unpublished workspace keys (no 0.28.0 custom template
   assert.deepEqual(writes, []);
   assert.equal(saves.at(-1).noteStyleRecipe.migrated, 1, 'only data.json gets the marker (D6)');
   assert.equal('noteTemplateByKind' in saves.at(-1), false, 'the removed key is gone from data.json after the save (T5 P2b, #31)');
+});
+
+test('#40 (counter-example 14): noteTemplateBlock and noteToneBlock are not read, and are gone after a save; every other key is unchanged', async () => {
+  const withKeys = { ...BASE, noteTemplateBlock: 'builtin:textbook', noteToneBlock: 'builtin:plain', defaultNoteStyleId: 'textbook', defaultDetailTemplateId: 'u1', detailTemplates: [CUSTOM], promptPresets: [{ id: 'p1', kind: 'tone', name: 'P', text: 'x' }] };
+  const { noteTemplateBlock, noteToneBlock, ...without } = withKeys;
+  const parse = value => JSON.parse(JSON.stringify(Main.settingsFromSaved(value)));
+  assert.deepEqual(parse(withKeys), parse(without), 'parsed the same as without the two keys');
+  const savedWith = [], savedWithout = [];
+  await onloadWrites(withKeys, { saves: savedWith });
+  await onloadWrites(without, { saves: savedWithout });
+  assert.equal('noteTemplateBlock' in savedWith.at(-1), false);
+  assert.equal('noteToneBlock' in savedWith.at(-1), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(savedWith.at(-1))), JSON.parse(JSON.stringify(savedWithout.at(-1))));
 });
 
 test('onload with only an outline preset writes nothing to the vault (D6: data.json marker only)', async () => {

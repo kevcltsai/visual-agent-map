@@ -26856,32 +26856,16 @@ var NoteStyleStore = class {
       const own2 = saved && Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : void 0;
       chosen = (_d = tryRef(typeof own2 === "string" ? own2 : void 0)) != null ? _d : this.recipeFromRef(KIND_DEFAULT_RECIPE[kind], kind, language2);
     }
-    return this.assemble(chosen, source, missing, language2, request.choice);
+    return this.assemble(chosen, source, missing, language2);
   }
   /**
-   * The value of a style from the candidate that was chosen: the old dialog's structure and voice (`choice`) only replace
-   * that part of what the lower levels gave. Shared by `runStyle` and `draftStyle`, so both give the same shape.
+   * The value of a style from the candidate that was chosen. Shared by `runStyle` and `draftStyle`, so both give the same shape.
    */
-  assemble(chosen, sourceOf, missing, language2, choice2) {
+  assemble(chosen, sourceOf, missing, language2) {
     var _a2, _b2;
-    let source = sourceOf;
-    let { structure: structure2, voice } = chosen;
-    let aimDelivery = chosen.aimDelivery;
-    if (choice2 == null ? void 0 : choice2.template) {
-      const replaced = this.legacyStructure(choice2.template, language2, true);
-      if (replaced) {
-        structure2 = replaced;
-        aimDelivery = void 0;
-        source = "run";
-      } else if (!missing.includes(choice2.template)) missing.push(choice2.template);
-    }
-    if (choice2 == null ? void 0 : choice2.tone) {
-      const replaced = this.legacyVoice(choice2.tone, language2, true);
-      if (replaced) {
-        voice = replaced;
-        source = "run";
-      }
-    }
+    const source = sourceOf;
+    const { structure: structure2, voice } = chosen;
+    const aimDelivery = chosen.aimDelivery;
     const { format } = chosen;
     const needsSelection = structure2.choice !== void 0 || format.choice !== void 0;
     const contextFields = needsSelection ? {
@@ -27021,9 +27005,8 @@ var NoteStyleStore = class {
   }
   /**
    * An old detail template id as a structure: the conversion table, then a built-in id, then a custom template (read only).
-   * With `refs` (the old dialog of a run) a part ref such as `file:<name>` is read too.
    */
-  legacyStructure(id, language2, refs = false) {
+  legacyStructure(id, language2) {
     var _a2, _b2;
     const mapped = (_b2 = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy) == null ? void 0 : _b2.templates;
     if (mapped && Object.prototype.hasOwnProperty.call(mapped, id)) {
@@ -27033,14 +27016,12 @@ var NoteStyleStore = class {
     if (BUILTIN_BLOCKS.some((block) => block.category === "template" && block.id === id))
       return this.structurePart(`builtin:${id}`, language2);
     const custom = this.settings.detailTemplates.find((template2) => template2.id === id);
-    if (!custom && refs) return this.structurePart(id, language2);
     return custom ? { template: custom, name: custom.name, issues: [], notices: [] } : void 0;
   }
   /**
-   * An old tone id as a voice: the conversion table, then a built-in id, then a custom tone preset (read only). With `refs`
-   * (the old dialog of a run) a part ref such as `file:<name>` is read too.
+   * An old tone id as a voice: the conversion table, then a built-in id, then a custom tone preset (read only).
    */
-  legacyVoice(id, language2, refs = false) {
+  legacyVoice(id, language2) {
     var _a2, _b2;
     const mapped = (_b2 = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy) == null ? void 0 : _b2.tones;
     if (mapped && Object.prototype.hasOwnProperty.call(mapped, id)) {
@@ -27050,7 +27031,6 @@ var NoteStyleStore = class {
     if (BUILTIN_BLOCKS.some((block) => block.category === "tone" && block.id === id))
       return this.voicePart(`builtin:${id}`, language2);
     const preset = findPreset(this.settings.promptPresets, "tone", id, language2);
-    if (!preset && refs) return this.voicePart(id, language2);
     return preset ? {
       text: preset.id === DEFAULT_TONE_ID ? void 0 : preset.text.trim() || void 0,
       name: preset.name,
@@ -28047,61 +28027,13 @@ async function backupNote(port, input2) {
 
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian14 = require("obsidian");
-
-// ai/note-style-label.ts
-var NOTE_STYLE_PRESETS = [
-  {
-    id: "standard",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: DEFAULT_TONE_ID,
-    name: "ui.note_style_standard",
-    short: "ui.note_style_standard_short",
-    hint: "ui.note_style_standard_hint"
-  },
-  {
-    id: "textbook",
-    templateId: TEXTBOOK_TEMPLATE_ID,
-    toneId: DEFAULT_TONE_ID,
-    name: "ui.note_style_textbook",
-    short: "ui.note_style_textbook_short",
-    hint: "ui.note_style_textbook_hint"
-  },
-  {
-    id: "summary",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "summary",
-    name: "ui.note_style_summary",
-    short: "ui.note_style_summary",
-    hint: "ui.note_style_summary_hint"
-  },
-  {
-    id: "plain",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "plain",
-    name: "ui.note_style_plain",
-    short: "ui.note_style_plain",
-    hint: "ui.note_style_plain_hint"
-  },
-  {
-    id: "guide",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "guide",
-    name: "ui.note_style_guide",
-    short: "ui.note_style_guide",
-    hint: "ui.note_style_guide_hint"
-  }
-];
-function runStyleLabelText(label, language2) {
-  return label.templateSource === "kind" ? translate(
-    language2,
-    "ui.note_style_label_0_1_2",
-    label.templateName,
-    label.toneName,
-    translate(language2, "ui.note_style_source_kind")
-  ) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
-}
-
-// experiences/visual-map/note-style-picker.ts
+var BUILTIN_STRUCTURE_BLOCK = {
+  standard: "standard",
+  textbook: "textbook",
+  summary: "standard",
+  plain: "standard",
+  guide: "standard"
+};
 function builtinRecipeItems() {
   const nameOf = (list, id) => {
     const found = list.find((item) => item.id === id);
@@ -28163,10 +28095,10 @@ async function openVaultFile(app, path) {
   return true;
 }
 async function openStyleFile(app, store, ref) {
-  var _a2, _b2;
+  var _a2;
   const name = ref.kind === "file" ? `${ref.id.slice("file:".length)}.md` : ref.id;
   try {
-    const blockRef = ref.kind === "file" ? ref.id : builtinRef((_b2 = (_a2 = NOTE_STYLE_PRESETS.find((item) => item.id === ref.id)) == null ? void 0 : _a2.templateId) != null ? _b2 : ref.id);
+    const blockRef = ref.kind === "file" ? ref.id : builtinRef((_a2 = BUILTIN_STRUCTURE_BLOCK[ref.id]) != null ? _a2 : ref.id);
     const { path } = await store.ensureBlockFile("template", blockRef);
     if (!await openVaultFile(app, path)) new import_obsidian14.Notice(t("ui.note_style_edit_missing_0", name));
   } catch (e) {
@@ -36071,7 +36003,7 @@ var messageOf = (error) => {
 };
 var OutlineImportModal = class extends import_obsidian18.Modal {
   constructor(app, create, models = { list: () => [], watch: () => () => {
-  } }, _retiredTemplates = [], target = { map: "none" }, initialPlacement = "tree", generator, links = {}, _retiredTones = [], _retiredDefaultLabel = "", defaultModelLabel) {
+  } }, target = { map: "none" }, initialPlacement = "tree", generator, links = {}, defaultModelLabel) {
     super(app);
     this.create = create;
     this.models = models;
@@ -36993,7 +36925,7 @@ async function exportMapWithNotice(vault, request) {
 // experiences/visual-map/multi-research-modal.ts
 var import_obsidian20 = require("obsidian");
 var MultiResearchModal = class extends import_obsidian20.Modal {
-  constructor(app, names3, models, _retiredTemplates, submit, _retiredTones = [], _retired, links = {}, modes = []) {
+  constructor(app, names3, models, submit, links = {}, modes = []) {
     super(app);
     this.names = names3;
     this.models = models;
@@ -48732,13 +48664,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       this.app,
       (request) => this.importOutline(request),
       this.modelChoices(),
-      [],
       target,
       placement,
       this.outlineGenerator(prefill ? prefill.inputs.topic : (_a2 = target.selected) == null ? void 0 : _a2.title, prefill),
       this.fieldLinks(),
-      [],
-      "",
       (parentId) => this.outlineModelLabel(parentId)
     ).open();
   }
@@ -58768,10 +58697,7 @@ ${request.requirements}` : preset.text,
       this.app,
       names3,
       this.modelChoices(),
-      [],
       (request) => void this.startMultiResearch(request, retryBatchKey),
-      [],
-      void 0,
       this.fieldLinks(),
       shown.map((item) => item.mode)
     ).open();
@@ -69969,6 +69895,17 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
   ].join("\n");
 }
 
+// ai/note-style-label.ts
+function runStyleLabelText(label, language2) {
+  return label.templateSource === "kind" ? translate(
+    language2,
+    "ui.note_style_label_0_1_2",
+    label.templateName,
+    label.toneName,
+    translate(language2, "ui.note_style_source_kind")
+  ) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
+}
+
 // experiences/visual-map/topic-run.ts
 var CHART_JOB_LIMIT = 3;
 var TopicRuns = class {
@@ -70582,8 +70519,8 @@ var TopicRuns = class {
       },
       note
     );
-    const styleLabel2 = runStyle.recipe.source !== "kind" || runStyle.recipe.ref !== "builtin:general" ? runStyleLabelText(runStyle.label, this.ports.settings().language) : void 0;
-    return { note, used, context, styleLabel: styleLabel2 };
+    const styleLabel = runStyle.recipe.source !== "kind" || runStyle.recipe.ref !== "builtin:general" ? runStyleLabelText(runStyle.label, this.ports.settings().language) : void 0;
+    return { note, used, context, styleLabel };
   }
   async startResearch(path, kind, options) {
     var _a2, _b2, _c, _d, _e, _f, _g;
@@ -70609,7 +70546,7 @@ var TopicRuns = class {
       handle.release();
       return null;
     }
-    const { note, used, context, styleLabel: styleLabel2 } = prelude;
+    const { note, used, context, styleLabel } = prelude;
     const language2 = settings().language;
     this.pendingSuggestions.delete(path);
     this.abortCharts(path);
@@ -70620,7 +70557,7 @@ var TopicRuns = class {
     activeTasks.set(path, controller);
     const progress = this.ports.progress();
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(path, progressAttempt, Date.now(), used.model, styleLabel2);
+    progress == null ? void 0 : progress.begin(path, progressAttempt, Date.now(), used.model, styleLabel);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;
@@ -72566,8 +72503,6 @@ function settingsFromSaved(saved) {
     promptPresets: normalizePresets(saved == null ? void 0 : saved.promptPresets),
     defaultDetailTemplateId: typeof (saved == null ? void 0 : saved.defaultDetailTemplateId) === "string" ? saved.defaultDetailTemplateId : void 0,
     ...typeof (saved == null ? void 0 : saved.defaultNoteStyleId) === "string" && saved.defaultNoteStyleId ? { defaultNoteStyleId: saved.defaultNoteStyleId } : {},
-    ...typeof (saved == null ? void 0 : saved.noteTemplateBlock) === "string" && saved.noteTemplateBlock ? { noteTemplateBlock: saved.noteTemplateBlock } : {},
-    ...typeof (saved == null ? void 0 : saved.noteToneBlock) === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {},
     ...normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) ? { noteStyleByKind: normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) } : {},
     ...normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) } : {},
     ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},

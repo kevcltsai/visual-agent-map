@@ -32,13 +32,7 @@ export class MultiResearchModal extends Modal {
     app: App,
     private names: string[],
     private models: ModelChoices,
-    /** Retired with the template list: the one-line style choice reads the style store. Callers pass `[]`. */
-    _retiredTemplates: { id: string; name: string }[],
     private submit: (request: MultiResearchRequest) => void,
-    /** Retired with the tone list. */
-    _retiredTones: { id: string; name: string }[] = [],
-    /** The old "Manage tones" callback slot: the tone library link is gone (the tones are blocks now); callers pass nothing. */
-    _retired?: undefined,
     private links: FieldLinks = {},
     /** The mode each listed topic will run in (parallel to `names`), shown beside its name. */
     private modes: MapAiMode[] = []

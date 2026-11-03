@@ -280,9 +280,11 @@ test('kind level (was: the kind structure wins over the map and the workspace; g
   const topic = store.runStyle(request({ topic: { template: 'textbook' } }));
   assert.equal(topic.template.id, 'textbook');
   assert.equal(topic.label.templateSource, 'topic');
-  const run = store.runStyle(request({ topic: { template: 'textbook' }, choice: { template: 'file:Mine2' } }));
-  assert.equal(run.template.id, 'file:Mine2');
+  const run = store.runStyle(request({ topic: { template: 'textbook' }, choice: { style: 'builtin:evidence' } }));
+  assert.equal(run.template.id, 'evidence');
   assert.equal(run.label.templateSource, 'run');
+  // #18: the old structure id on a run is ignored
+  assert.equal(store.runStyle(request({ topic: { template: 'textbook' }, choice: { template: 'file:Mine2' } })).label.templateSource, 'topic');
   const evidence = store.runStyle({ outputLanguage: 'en', kind: 'evidence', map: { template: 'standard' } });
   assert.equal(evidence.template.id, 'evidence', 'a kind with no entry has its built-in style, whatever the map holds');
   assert.equal(evidence.label.templateSource, 'kind');

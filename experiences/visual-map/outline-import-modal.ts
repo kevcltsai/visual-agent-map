@@ -141,16 +141,10 @@ export class OutlineImportModal extends Modal {
     app: App,
     private create: (request: OutlineImportRequest) => Promise<void>,
     private models: ModelChoices = { list: () => [], watch: () => () => {} },
-    /** Retired with the template list: the one-line style choice reads the style store. */
-    _retiredTemplates: { id: string; name: string }[] = [],
     private target: OutlineImportTarget = { map: "none" },
     initialPlacement: OutlinePlacement["kind"] = "tree",
     private generator?: OutlineGenerator,
     private links: FieldLinks = {},
-    /** Retired with the tone list. */
-    _retiredTones: { id: string; name: string }[] = [],
-    /** Retired: the line says "follow the topic type". */
-    _retiredDefaultLabel = "",
     /**
      * The text of the model menu's default entry for a position: "Follow current model (X)" or, under a topic that
      * has a manual upper topic, "Follow upper topic (X)". `parentId` is the topic the outline goes under, else null.

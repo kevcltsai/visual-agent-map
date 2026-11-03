@@ -7,13 +7,23 @@ import { t, type TranslationKey } from "../../i18n";
 import type { NoteStyleIssue } from "../../ai/note-style-file";
 import { backgroundResultNotice } from "../../ui/background-run";
 import { ChoiceModal, type Choice } from "../../ui/modals/choice-modal";
-import { NOTE_STYLE_PRESETS } from "./note-style";
-import { styleRefOf, type StyleRef } from "../../ai/note-style-label";
 import { BUILTIN_BLOCKS, BUILTIN_FORMATS } from "../../core/blocks/builtin";
 import { AIM_DELIVERY_STRUCTURE, BUILTIN_RECIPES, UPDATE_MODE_KEYS, type UpdateMode } from "../../ai/note-style-recipe";
 
-export { styleRefOf };
-export type { StyleRef };
+/** Which style a picker row stands for: a built-in style id, or `file:<name>` of a template block the user wrote. */
+export interface StyleRef {
+  kind: "builtin" | "file";
+  id: string;
+}
+
+/** The structure block a built-in style id opens (the five 0.28.0 menu styles share the Standard and Textbook structures). */
+const BUILTIN_STRUCTURE_BLOCK: Readonly<Record<string, string>> = {
+  standard: "standard",
+  textbook: "textbook",
+  summary: "standard",
+  plain: "standard",
+  guide: "standard"
+};
 
 /** One template block of the user in a picker, with the reasons it cannot be read (empty when it can). */
 export interface StyleListItem {
@@ -142,10 +152,7 @@ export async function openVaultFile(app: App, path: string): Promise<boolean> {
 export async function openStyleFile(app: App, store: NoteStyleStore, ref: StyleRef): Promise<void> {
   const name = ref.kind === "file" ? `${ref.id.slice("file:".length)}.md` : ref.id;
   try {
-    const blockRef =
-      ref.kind === "file"
-        ? ref.id
-        : builtinRef(NOTE_STYLE_PRESETS.find(item => item.id === ref.id)?.templateId ?? ref.id);
+    const blockRef = ref.kind === "file" ? ref.id : builtinRef(BUILTIN_STRUCTURE_BLOCK[ref.id] ?? ref.id);
     const { path } = await store.ensureBlockFile("template", blockRef);
     if (!(await openVaultFile(app, path))) new Notice(t("ui.note_style_edit_missing_0", name));
   } catch {

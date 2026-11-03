@@ -2139,13 +2139,10 @@ export class VisualAgentMapView extends ItemView {
       this.app,
       request => this.importOutline(request),
       this.modelChoices(),
-      [],
       target,
       placement,
       this.outlineGenerator(prefill ? prefill.inputs.topic : target.selected?.title, prefill),
       this.fieldLinks(),
-      [],
-      "",
       parentId => this.outlineModelLabel(parentId)
     ).open();
   }
@@ -12987,10 +12984,7 @@ export class VisualAgentMapView extends ItemView {
       this.app,
       names,
       this.modelChoices(),
-      [],
       request => void this.startMultiResearch(request, retryBatchKey),
-      [],
-      undefined,
       this.fieldLinks(),
       shown.map(item => item.mode)
     ).open();

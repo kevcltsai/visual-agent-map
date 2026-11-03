@@ -23,13 +23,8 @@ test('error Notice: a style file error offers Open this file; other errors are p
   assert.equal(plainNotice.message, 'boom');
 });
 
-test('styleRefOf names the style behind a stored pair', () => {
-  assert.deepEqual(plain(picker.styleRefOf('textbook', 'academic')), { kind: 'builtin', id: 'textbook' });
-  assert.deepEqual(plain(picker.styleRefOf('file:Mine', undefined)), { kind: 'file', id: 'file:Mine' });
-  // decisions #32: no alias table; an old id stands for nothing, even when a third argument still names it
-  assert.equal(picker.styleRefOf('u1', undefined), undefined);
-  assert.equal(picker.styleRefOf('style:S', undefined, { 'style:S': { template: 'file:S', tone: 'builtin:academic' } }), undefined);
-  assert.equal(picker.styleRefOf.length, 2, 'two parameters: the alias table is gone');
+test('D9 (replaces styleRefOf names the style behind a stored pair): the picker no longer maps a stored template and tone pair to a style; StyleRef is only a row of the picker', () => {
+  assert.equal(picker.styleRefOf, undefined);
 });
 
 test('plugin.mutate: a style file error from a queued write shows Open this file; other errors stay plain', async () => {

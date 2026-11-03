@@ -637,11 +637,11 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   // As in Obsidian, the content sits inside modalEl; the action bar is modalEl's last child.
   class Modal { constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); this.closed = 0; } open() { this.onOpen(); } close() { this.closed++; } }
   const mod = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
-  const requests = []; const templates = [];
+  const requests = [];
   const styles = { refresh: async () => {}, list: () => [], recipes: () => [alphaStyle], edit: async () => {} };
   let models = [], changed = null, unwatched = 0;
   const live = { list: () => models, watch: fn => { changed = fn; return () => { unwatched++; }; } };
-  const modal = new mod.MultiResearchModal({}, ['Alpha', 'Beta'], live, templates, request => requests.push(request), [], undefined, { styles }, ['quick', 'standard']); modal.open();
+  const modal = new mod.MultiResearchModal({}, ['Alpha', 'Beta'], live, request => requests.push(request), { styles }, ['quick', 'standard']); modal.open();
   assert.ok(find(modal.contentEl, i => i.text === 'Alpha')); assert.ok(find(modal.contentEl, i => i.text === 'Beta'));
   // D-2026-10-233 / D-2026-10-247: no web, image or depth choice; the list says which mode each topic runs in.
   assert.equal(find(modal.contentEl, i => i.tag === 'input' && i.type === 'checkbox'), undefined);
@@ -665,7 +665,7 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   start.listeners.click(); start.listeners.click();
   assert.equal(modal.closed, 1); assert.equal(requests.length, 1); modal.onClose(); assert.equal(unwatched, 1);
   assert.deepEqual(plain(requests[0]), { requirements: '' }, 'the request carries no mode: each topic runs in its own note\'s mode');
-  const second = []; const m2 = new mod.MultiResearchModal({}, ['A'], { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, templates, r => second.push(r), [], undefined, { styles }); m2.open();
+  const second = []; const m2 = new mod.MultiResearchModal({}, ['A'], { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, r => second.push(r), { styles }); m2.open();
   find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model').value = 'm1';
   // A style file is picked in the one-line choice itself.
   find(m2.contentEl, i => i.tag === 'button' && i.text === 'Use another style this time').listeners.click({ preventDefault() {} });

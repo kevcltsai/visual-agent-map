@@ -101,11 +101,8 @@ export interface StyleLevel {
 
 /** What a run asks of the store: the levels it knows (most specific first) and the language its output is written in. */
 export interface RunStyleRequest {
-  /**
-   * This run's own choice. `style` is a whole style; `template` and `tone` (the old dialog) only replace the structure or
-   * the voice of whatever the lower levels gave.
-   */
-  choice?: StyleLevel;
+  /** This run's own choice: a whole style (`builtin:<id>` or `file:<name>`). */
+  choice?: { style?: string };
   /** The topic's stored values: `note-style`, else the old `detail-template` and `tone` as an implicit style. */
   topic?: StyleLevel;
   /** The kind of the note ("topic" for a note with no type). */
@@ -456,38 +453,21 @@ export class NoteStyleStore {
         tryRef(typeof own === "string" ? own : undefined) ??
         this.recipeFromRef(KIND_DEFAULT_RECIPE[kind], kind, language)!;
     }
-    return this.assemble(chosen, source, missing, language, request.choice);
+    return this.assemble(chosen, source, missing, language);
   }
 
   /**
-   * The value of a style from the candidate that was chosen: the old dialog's structure and voice (`choice`) only replace
-   * that part of what the lower levels gave. Shared by `runStyle` and `draftStyle`, so both give the same shape.
+   * The value of a style from the candidate that was chosen. Shared by `runStyle` and `draftStyle`, so both give the same shape.
    */
   private assemble(
     chosen: Candidate,
     sourceOf: TemplateSource,
     missing: string[],
-    language: ContentLanguage,
-    choice?: StyleLevel
+    language: ContentLanguage
   ): RunStyle {
-    let source = sourceOf;
-    let { structure, voice } = chosen;
-    let aimDelivery = chosen.aimDelivery;
-    if (choice?.template) {
-      const replaced = this.legacyStructure(choice.template, language, true);
-      if (replaced) {
-        structure = replaced;
-        aimDelivery = undefined;
-        source = "run";
-      } else if (!missing.includes(choice.template)) missing.push(choice.template);
-    }
-    if (choice?.tone) {
-      const replaced = this.legacyVoice(choice.tone, language, true);
-      if (replaced) {
-        voice = replaced;
-        source = "run";
-      }
-    }
+    const source = sourceOf;
+    const { structure, voice } = chosen;
+    const aimDelivery = chosen.aimDelivery;
     const { format } = chosen;
     const needsSelection = structure.choice !== undefined || format.choice !== undefined;
     const contextFields = needsSelection
@@ -646,9 +626,8 @@ export class NoteStyleStore {
 
   /**
    * An old detail template id as a structure: the conversion table, then a built-in id, then a custom template (read only).
-   * With `refs` (the old dialog of a run) a part ref such as `file:<name>` is read too.
    */
-  private legacyStructure(id: string, language: ContentLanguage, refs = false): StructurePart | undefined {
+  private legacyStructure(id: string, language: ContentLanguage): StructurePart | undefined {
     const mapped = this.settings.noteStyleRecipe?.legacy?.templates;
     if (mapped && Object.prototype.hasOwnProperty.call(mapped, id)) {
       const part = this.structurePart(mapped[id], language);
@@ -657,15 +636,13 @@ export class NoteStyleStore {
     if (BUILTIN_BLOCKS.some(block => block.category === "template" && block.id === id))
       return this.structurePart(`builtin:${id}`, language);
     const custom = this.settings.detailTemplates.find(template => template.id === id);
-    if (!custom && refs) return this.structurePart(id, language);
     return custom ? { template: custom, name: custom.name, issues: [], notices: [] } : undefined;
   }
 
   /**
-   * An old tone id as a voice: the conversion table, then a built-in id, then a custom tone preset (read only). With `refs`
-   * (the old dialog of a run) a part ref such as `file:<name>` is read too.
+   * An old tone id as a voice: the conversion table, then a built-in id, then a custom tone preset (read only).
    */
-  private legacyVoice(id: string, language: ContentLanguage, refs = false): VoicePart | undefined {
+  private legacyVoice(id: string, language: ContentLanguage): VoicePart | undefined {
     const mapped = this.settings.noteStyleRecipe?.legacy?.tones;
     if (mapped && Object.prototype.hasOwnProperty.call(mapped, id)) {
       const part = this.voicePart(mapped[id], language);
@@ -674,7 +651,6 @@ export class NoteStyleStore {
     if (BUILTIN_BLOCKS.some(block => block.category === "tone" && block.id === id))
       return this.voicePart(`builtin:${id}`, language);
     const preset = findPreset(this.settings.promptPresets, "tone", id, language);
-    if (!preset && refs) return this.voicePart(id, language);
     return preset
       ? {
           text: preset.id === DEFAULT_TONE_ID ? undefined : preset.text.trim() || undefined,

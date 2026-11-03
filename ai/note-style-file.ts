@@ -45,8 +45,6 @@ export interface NoteStyle {
 }
 export type NoteStyleParse = { ok: true; style: NoteStyle } | { ok: false; issues: NoteStyleIssue[] };
 
-export const NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"] as const;
-export type NoteStyleBuiltinId = (typeof NOTE_STYLE_BUILTIN_IDS)[number];
 export const CANONICAL_LANGUAGES: readonly NoteStyleLanguage[] = ["zh-TW", "zh-CN", "en"];
 
 /** A per-language record built from entries, so no source line branches on a language id (language gate). */

@@ -3272,6 +3272,9 @@ test('C-#14: when the run ends and Stop is hidden while it holds the keyboard, t
   // Counterexample: the keyboard was elsewhere when the run ended; it stays there.
   f = run(() => {}); const elsewhere = f.page.attach(f.page.root.createDiv('other-leaf')).createEl('input'); elsewhere.focus(); f.panel.finish('ok', []);
   assert.ok(f.page.doc.activeElement === elsewhere, 'focus elsewhere is not taken');
+  // Counterexample: Stop did not hold the keyboard (the page did); the end of the run does not move it.
+  f = run(() => {}); const page = { tagName: 'BODY' }; f.page.doc.activeElement = page; f.panel.finish('ok', []);
+  assert.ok(f.page.doc.activeElement === page, 'only a keyboard that was on Stop moves to the field');
 });
 
 integrationTest('UX B1: while the usage notice is open the empty canvas waits for the user (no skeleton, no Stop); agreeing builds, declining puts the draft back', async () => {

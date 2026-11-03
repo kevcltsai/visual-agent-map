@@ -1844,6 +1844,8 @@ export class VisualAgentMapView extends ItemView {
         ? ([active.selectionStart, active.selectionEnd] as const)
         : null;
     this.render();
+    // Another window (Settings in a pop-out) is the active one: a focus move here would make Obsidian blur the element the user is on there.
+    if (!this.mapWindowIsActive()) return;
     const target = anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null;
     if (focusedContainer) this.contentEl.focus();
     else if (target) target.focus();
@@ -1855,6 +1857,12 @@ export class VisualAgentMapView extends ItemView {
       selection[1] !== null
     )
       (target as HTMLInputElement).setSelectionRange(selection[0], selection[1]);
+  }
+  /** False while another Obsidian window (for example Settings in a pop-out) is the active one: the map must not take focus then. */
+  private mapWindowIsActive(): boolean {
+    const active = typeof activeWindow === "undefined" ? undefined : activeWindow;
+    const own = this.contentEl?.ownerDocument?.defaultView;
+    return !active || !own || active === own;
   }
   private firstCardId(): string | undefined {
     return this.cardEls.keys().next().value as string | undefined;
@@ -1909,7 +1917,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private restoreMapFocus(anchor: MapFocusAnchor | null, fallbackNodeId?: string): void {
     const doc = this.contentEl?.ownerDocument;
-    if (!doc || this.closed || !focusIsLost(doc, this.contentEl)) return;
+    if (!doc || this.closed || !this.mapWindowIsActive() || !focusIsLost(doc, this.contentEl)) return;
     const selected = this.selection.state.selected;
     const candidates = [
       anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null,

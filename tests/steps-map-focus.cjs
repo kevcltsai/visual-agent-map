@@ -62,7 +62,9 @@ class Setting { constructor() { return chain(); } }
 const MAP = 'Agent Workspace/Topics/map-f/Map.md';
 const timers = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+let globalWin = {};
 async function harness() {
+  globalWin = { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: tag => new El(new Doc(), tag) };
   const { repo, app } = fixture('en');
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings; app.scope = { appScope: true };
@@ -80,7 +82,7 @@ async function harness() {
   const Base = dom.makeModal();
   class Modal extends Base { open() { modals.push(this); super.open(); } }
   class Menu { constructor() { menus.push(this); } addItem(cb) { cb({ setTitle() { return this; }, setIcon() { return this; }, onClick() { return this; }, setChecked() { return this; } }); return this; } addSeparator() { return this; } onHide(fn) { this.hide = fn; return this; } showAtMouseEvent() {} showAtPosition() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Menu, Notice: dom.makeNotice(notices), Setting, setTooltip() {} } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: tag => new El(new Doc(), tag) });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Menu, Notice: dom.makeNotice(notices), Setting, setTooltip() {} } }, globalWin);
   const plugin = withExpansionCoordinator({
     availableModels: () => ['gpt-6-luna'], modelLabel: model => model, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async () => {},
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -166,6 +168,37 @@ test('08: a repaint keeps focus on the same toolbar control even when the contro
   h.view.renderPreservingFocus();
   assert.equal(h.inMap(), true);
   assert.ok(h.active().classes.has('vam-layout-button'), 'the new Layout button, not whatever sits at the old index');
+});
+
+test('#18: a repaint triggered while another window is active (Settings pop-out) moves no focus in the map; the active map window keeps the old behaviour', async () => {
+  const h = await harness();
+  const mapWin = { name: 'main' }, popout = { name: 'popout' };
+  h.doc.defaultView = mapWin;
+  const focused = [];
+  const track = el => { const orig = el.focus; el.focus = function (...a) { focused.push(this); return orig.apply(this, a); }; };
+  h.contentEl.querySelector('.vam-layout-button').focus();
+  const popSelect = { tag: 'popout-select' };
+  try {
+    globalWin.activeWindow = popout;
+    h.doc.activeElement = h.doc.body; // focus left the map (the user is in the pop-out)
+    const origBuild = h.build;
+    h.view.render = () => { origBuild(); for (const e of h.contentEl.all()) track(e); track(h.contentEl); };
+    h.contentEl.querySelector('.vam-layout-button').focus();
+    h.doc.activeElement = popSelect; // lastly focused elsewhere
+    focused.length = 0;
+    await h.view.refreshFromPlugin();
+    assert.deepEqual(focused.map(e => e.tagName), [], 'no map element was focused');
+    h.view.restoreMapFocus(null);
+    assert.deepEqual(focused.map(e => e.tagName), [], 'restoreMapFocus does nothing either');
+    // Same repaint with a map control focused, while the pop-out is active.
+    h.doc.activeElement = h.contentEl.querySelector('.vam-layout-button');
+    await h.view.refreshFromPlugin();
+    assert.deepEqual(focused.map(e => e.tagName), [], 'renderPreservingFocus does not refocus');
+    globalWin.activeWindow = mapWin;
+    h.contentEl.querySelector('.vam-layout-button').focus();
+    await h.view.refreshFromPlugin();
+    assert.ok(h.active().classes.has('vam-layout-button'), 'active map window: focus is restored as before');
+  } finally { delete globalWin.activeWindow; }
 });
 
 test('08: a dialog that changed the map closes and the opener is gone: focus comes back to the map; cancel keeps the opener; another leaf is left alone', async () => {

@@ -48624,12 +48624,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     const active = current;
     const selection = active.tagName === "INPUT" || active.tagName === "TEXTAREA" ? [active.selectionStart, active.selectionEnd] : null;
     this.render();
+    if (!this.mapWindowIsActive()) return;
     const target = anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null;
     if (focusedContainer) this.contentEl.focus();
     else if (target) target.focus();
     else this.restoreMapFocus(anchor);
     if (selection && ((target == null ? void 0 : target.tagName) === "INPUT" || (target == null ? void 0 : target.tagName) === "TEXTAREA") && selection[0] !== null && selection[1] !== null)
       target.setSelectionRange(selection[0], selection[1]);
+  }
+  /** False while another Obsidian window (for example Settings in a pop-out) is the active one: the map must not take focus then. */
+  mapWindowIsActive() {
+    var _a2, _b2;
+    const active = typeof activeWindow === "undefined" ? void 0 : activeWindow;
+    const own2 = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.defaultView;
+    return !active || !own2 || active === own2;
   }
   firstCardId() {
     return this.cardEls.keys().next().value;
@@ -48684,7 +48692,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   restoreMapFocus(anchor, fallbackNodeId) {
     var _a2;
     const doc = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument;
-    if (!doc || this.closed || !focusIsLost(doc, this.contentEl)) return;
+    if (!doc || this.closed || !this.mapWindowIsActive() || !focusIsLost(doc, this.contentEl)) return;
     const selected = this.selection.state.selected;
     const candidates = [
       anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null,

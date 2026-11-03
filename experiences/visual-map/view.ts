@@ -5141,6 +5141,11 @@ export class VisualAgentMapView extends ItemView {
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
   }
+  /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
+  private whenEditing(action: () => void): void {
+    if (this.presentation) return;
+    action();
+  }
   private button(parent: HTMLElement, text: string, action: () => void, disabled = false): HTMLButtonElement {
     const button = parent.createEl("button", { text });
     if (this.renderingCard) button.tabIndex = -1;
@@ -10069,12 +10074,14 @@ export class VisualAgentMapView extends ItemView {
         node.collapsed ? header : tools,
         node.collapsed ? t("ui.expand_0", count) : t("ui.collapse"),
         () =>
-          this.enqueue(() =>
-            this.mapChange(map => {
-              const n = map.nodes.find(n => n.id === node.id)!;
-              n.collapsed = !n.collapsed;
-              this.arrangeAll(map);
-            })
+          this.whenEditing(() =>
+            this.enqueue(() =>
+              this.mapChange(map => {
+                const n = map.nodes.find(n => n.id === node.id)!;
+                n.collapsed = !n.collapsed;
+                this.arrangeAll(map);
+              })
+            )
           )
       );
       collapse.addClass("vam-collapse-button", ...(node.collapsed ? ["is-collapsed"] : []));
@@ -10082,29 +10089,37 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!this.selection.state.multiSelectMode) {
       if (!this.map?.aim) {
-        const structure = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
+        const structure = this.button(tools, t("ui.node_tool_links"), () =>
+          this.whenEditing(() => this.openNodePanel(node, "structure"))
+        );
         structure.addClass("vam-node-tool", "vam-structure-tool");
         structure.setAttr("aria-label", t("ui.structure_and_links"));
         if (note)
           this.button(tools, t("ui.node_tool_rename"), () =>
-            new NameModal(this.app, t("ui.rename_topic"), note.title, title =>
-              this.enqueue(() => this.noteChange(node, { title }))
-            ).open()
+            this.whenEditing(() =>
+              new NameModal(this.app, t("ui.rename_topic"), note.title, title =>
+                this.enqueue(() => this.noteChange(node, { title }))
+              ).open()
+            )
           ).addClass("vam-node-tool", "vam-rename-tool");
         // Select every direct subtopic in one press. A folded card hides them, so it offers Expand instead.
         if (!node.collapsed && this.map!.nodes.some(item => item.parentId === node.id)) {
-          const select = this.button(tools, t("ui.select_subtopics"), () => this.selectSubtopics(node));
+          const select = this.button(tools, t("ui.select_subtopics"), () =>
+            this.whenEditing(() => this.selectSubtopics(node))
+          );
           select.addClass("vam-node-tool", "vam-select-subtopics-tool");
           select.setAttr("aria-label", t("ui.select_subtopics_hint"));
         }
         if (this.canEditText() && !node.aimKind)
-          this.button(tools, t("ui.text_node_add"), () => this.addTextNodeUnder(node)).addClass(
+          this.button(tools, t("ui.text_node_add"), () => this.whenEditing(() => this.addTextNodeUnder(node))).addClass(
             "vam-node-tool",
             "vam-add-text-tool"
           );
       }
       if (node.aimKind === "question") {
-        const remove = this.button(tools, t("ui.node_tool_remove"), () => this.confirmRemoveNode(node));
+        const remove = this.button(tools, t("ui.node_tool_remove"), () =>
+          this.whenEditing(() => this.confirmRemoveNode(node))
+        );
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
@@ -10152,9 +10167,12 @@ export class VisualAgentMapView extends ItemView {
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
     if (!this.selection.state.multiSelectMode && !this.map?.aim)
-      this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
+      this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openNextStep(node))).addClass(
+        "vam-node-tool",
+        "vam-ai-explore"
+      );
     if (!this.selection.state.multiSelectMode && !this.map?.aim) {
-      const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
+      const add = this.button(card, "+", () => this.whenEditing(() => this.enqueue(() => this.addNode(node))));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
@@ -11209,6 +11227,7 @@ export class VisualAgentMapView extends ItemView {
     return `selection:${this.path}`;
   }
   private openNextStep(node: MapNode): void {
+    if (this.presentation) return;
     this.enqueue(async () => {
       const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
       const currentLabel = t("ui.reference_current_topic_included", note.title);
@@ -12665,7 +12684,7 @@ export class VisualAgentMapView extends ItemView {
     kind: TopicKind = "topic",
     keyboardFocus = false
   ): Promise<void> {
-    if (!this.map) return;
+    if (!this.map || this.presentation) return;
     const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;

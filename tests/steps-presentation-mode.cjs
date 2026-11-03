@@ -40,7 +40,11 @@ async function harness() {
   await app.vault.create(MAP, core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   const notices = [];
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), setTooltip() {} } }, { createFragment: dom.createFragment });
+  const modals = [];
+  const BaseModal = dom.makeModal();
+  let recordOnly = false;
+  class Modal extends BaseModal { open() { modals.push(this); if (!recordOnly) super.open(); } }
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: dom.makeNotice(notices), setTooltip() {} } }, { createFragment: dom.createFragment });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, closeStaleDetails() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
@@ -83,7 +87,7 @@ async function harness() {
   const current = () => view.presentation?.currentId ?? null;
   const spoken = () => view.announcer.text;
   const barText = () => { const bar = view.contentEl.children.flatMap(c => c.children).find(c => c.hasClass('vam-presentation-bar')); return bar; };
-  return { repo, app, contents, view, plugin, ids, doc, stage, card, press, settle, centred, build, notices, current, spoken, barText, spied, spyKeys, renders: () => renders, saved: () => repo.readMap(MAP) };
+  return { modals, recordModalsOnly: () => { recordOnly = true; }, repo, app, contents, view, plugin, ids, doc, stage, card, press, settle, centred, build, notices, current, spoken, barText, spied, spyKeys, renders: () => renders, saved: () => repo.readMap(MAP) };
 }
 
 test('42: pure helpers: key table, start position, no-wrap stepping and the neighbour that takes a vanished current', () => {
@@ -353,4 +357,31 @@ test('42: the new CSS stays out of the share viewer (every rule starts with .vam
   for (const rule of rules) assert.ok(rule.startsWith('.vam-view '), rule);
   assert.match(block, /\[data-presenting\] \.vam-node \{[^}]*opacity: 0\.35/);
   assert.match(block, /\.vam-node\.is-presenting \{[^}]*opacity: 1/);
+});
+
+// bug bash A #05: a presentation is read-only; the current card's tools and its "+" neither show nor act.
+test('bug bash #05: during a presentation the card tools and the "+" do nothing; after leaving they work again', async () => {
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8'), /\.vam-stage\[data-presenting\] \.vam-node-tools[^{]*\.vam-add-child[^{]*\{[^}]*display: none/, 'the stylesheet hides the tools and the plus while presenting');
+  const h = await harness();
+  h.recordModalsOnly();
+  const find = (root, pred) => { const out = []; const walk = n => { if (pred(n)) out.push(n); (n.children ?? []).forEach(walk); }; walk(root); return out; };
+  const byClass = (key, name) => find(h.card(key), n => n.classes?.has(name))[0];
+  const click = el => el.handlers.get('click')({ stopPropagation() {}, preventDefault() {} });
+  const mapBefore = (await h.saved()).nodes.map(n => ({ id: n.id, collapsed: n.collapsed }));
+  const bytes = () => h.contents.get(MAP);
+  const before = bytes();
+  h.view.selection.setSelected(h.ids.root);
+  h.view.startPresentation();
+  const tools = [byClass('root', 'vam-rename-tool'), byClass('root', 'vam-add-child'), byClass('root', 'vam-ai-explore'), byClass('root', 'vam-structure-tool'), byClass('root', 'vam-add-text-tool'), byClass('root', 'vam-collapse-button')];
+  assert.ok(tools.every(Boolean), 'every tool exists on the card');
+  for (const el of tools) click(el);
+  await h.settle();
+  assert.deepEqual(h.modals, [], 'no dialog opens');
+  assert.equal(bytes(), before, 'Map.md is unchanged');
+  assert.deepEqual((await h.saved()).nodes.map(n => ({ id: n.id, collapsed: n.collapsed })), mapBefore, 'nothing was folded');
+  await h.view.addNode(h.view.map.nodes[0]); await h.settle();
+  assert.deepEqual(h.modals, [], 'addNode itself refuses');
+  h.view.exitPresentation();
+  click(byClass('root', 'vam-add-child')); await h.settle();
+  assert.equal(h.modals.length, 1, 'after leaving, the "+" opens its dialog again');
 });

@@ -10681,7 +10681,8 @@ export class VisualAgentMapView extends ItemView {
     tools.toggleClass("is-align-left", place.side === "left");
     if (place.maxWidth !== null) {
       tools.toggleClass("is-wrapped", true);
-      tools.style.maxWidth = `${place.maxWidth / zoom}px`;
+      // The row is drawn at `zoom * toolsScale` on screen (the stylesheet counter-scales it below 100%); max-width is in its own units.
+      tools.style.maxWidth = `${place.maxWidth / (zoom * Math.max(1, 1 / zoom))}px`;
     }
     if (place.shift) tools.style.marginLeft = `${place.shift / zoom}px`;
   }
@@ -14647,10 +14648,21 @@ export class VisualAgentMapView extends ItemView {
       throw error;
     }
   }
+  /** The zoom the selected card's tool row was last fitted at. */
+  private toolsZoom: number | null = null;
   private transform(): void {
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    // The stylesheet counter-scales each card's tool row by this, so its buttons stay a tappable size when zoomed out.
+    this.stageEl.style.setProperty("--vam-zoom", String(zoom));
+    if (zoom !== this.toolsZoom) {
+      this.toolsZoom = zoom;
+      // The open row was fitted at the old zoom: its max-width and shift would linger.
+      const selected = this.selection?.state.selected;
+      const card = selected ? this.cardEls?.get(selected) : undefined;
+      if (card) this.alignCardTools(card);
+    }
     // Small enough that a name would only crowd the lines: the stylesheet hides every relation label on this attribute.
     if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
     else this.stageEl.removeAttribute("data-relation-labels");

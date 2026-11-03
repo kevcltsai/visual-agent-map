@@ -3099,7 +3099,7 @@ integrationTest('hypothesis-evidence: a long note is cut to 60 characters with a
 });
 integrationTest('hypothesis-evidence: relation labels are hidden below 60% zoom (0.59 hidden, 0.6 shown) through an attribute on the stage', () => {
   const { view } = heFixture();
-  const attrs = {}; view.stageEl = { style: {}, setAttribute(n, v) { attrs[n] = v; }, removeAttribute(n) { delete attrs[n]; } };
+  const attrs = {}; view.stageEl = { style: { setProperty() {} }, setAttribute(n, v) { attrs[n] = v; }, removeAttribute(n) { delete attrs[n]; } };
   for (const [zoom, hidden] of [[0.25, true], [0.59, true], [0.6, false], [1, false], [2, false]]) {
     view.map.viewport.zoom = zoom; view.transform();
     assert.equal(attrs['data-relation-labels'], hidden ? 'hidden' : undefined, `zoom ${zoom}`);
@@ -4094,7 +4094,7 @@ function toolsHarness({ cardLeft, cardWidth = 280, toolsWidth = 345, canvasLeft 
   });
   const classes = new Set();
   const style = { removeProperty: key => { delete style[key.replace(/-(\w)/g, (m, c) => c.toUpperCase())]; } };
-  const tools = { style, getBoundingClientRect() { const max = parseFloat(style.maxWidth) * zoom; return { width: Number.isFinite(max) ? Math.min(toolsWidth, max) : toolsWidth }; }, toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
+  const tools = { style, getBoundingClientRect() { const max = parseFloat(style.maxWidth) * zoom * Math.max(1, 1 / zoom); return { width: Number.isFinite(max) ? Math.min(toolsWidth, max) : toolsWidth }; }, toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
   const card = { offsetWidth: cardWidth, getBoundingClientRect: () => ({ left: cardLeft, right: cardLeft + cardWidth, width: cardWidth }), querySelector: () => tools };
   const chat = chatRight === null ? null : { getBoundingClientRect: () => ({ left: 0, right: chatRight }) };
   const view = Object.create(VisualAgentMapView.prototype);
@@ -4130,4 +4130,20 @@ test('bug bash #12: a tool row wider than the whole visible canvas wraps and eve
   assert.equal(wide.wrapped, false); assert.equal(wide.align, 'right', 'a wide canvas keeps the single right-aligned row');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-wrapped\s*\{[^}]*flex-wrap:\s*wrap/);
+});
+
+// ---- UX review A theme 1: the tool row counter-scales below 100% so its buttons stay tappable ----
+test('UX-A canvas: zoomed out, the tool row wraps in screen pixels (its own scale included) and the stylesheet counter-scales it only below 100%', () => {
+  // Zoom 0.5: the row is drawn at 0.5 * 2 = 1x on screen. Its max-width is in its own units: available / (zoom * 2).
+  const narrow = toolsHarness({ cardLeft: 700, toolsWidth: 480, zoom: 0.5, canvasLeft: 664, canvasRight: 1024 });
+  assert.ok(narrow.wrapped && narrow.toolsLeft >= 674 && narrow.toolsRight <= 1014, `zoomed out, every button lies inside the canvas (${narrow.toolsLeft}..${narrow.toolsRight})`);
+  // Zoom >= 1: no extra scale, the max-width divides by the zoom alone (the existing 1.5 case stays valid).
+  const zoomedIn = toolsHarness({ cardLeft: 700, toolsWidth: 480, zoom: 1.5, canvasLeft: 664, canvasRight: 1024 });
+  assert.ok(zoomedIn.wrapped && zoomedIn.toolsRight <= 1014);
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-node > \.vam-node-tools \{[^}]*scale: max\(1, calc\(1 \/ var\(--vam-zoom, 1\)\)\);[^}]*transform-origin: right bottom;/, 'counter-scale with a fallback of 1; never shrinks at zoom >= 1');
+  assert.match(css, /\.vam-node > \.vam-node-tools\.is-align-left \{[^}]*transform-origin: left bottom/);
+  assert.match(css, /\.vam-node > \.vam-node-tools \{[^}]*transform: translateY\(4px\)/, 'the reveal animation keeps its own transform');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.stageEl\.style\.setProperty\("--vam-zoom", String\(zoom\)\)/);
 });

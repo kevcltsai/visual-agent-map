@@ -47746,6 +47746,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
     /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
     __publicField(this, "unbindClipboard", null);
+    /** The zoom the selected card's tool row was last fitted at. */
+    __publicField(this, "toolsZoom", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
@@ -56625,7 +56627,7 @@ ${request.requirements}` : preset.text,
     tools.toggleClass("is-align-left", place.side === "left");
     if (place.maxWidth !== null) {
       tools.toggleClass("is-wrapped", true);
-      tools.style.maxWidth = `${place.maxWidth / zoom}px`;
+      tools.style.maxWidth = `${place.maxWidth / (zoom * Math.max(1, 1 / zoom))}px`;
     }
     if (place.shift) tools.style.marginLeft = `${place.shift / zoom}px`;
   }
@@ -60356,14 +60358,21 @@ ${note.detail.trim()}` : "",
     }
   }
   transform() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    this.stageEl.style.setProperty("--vam-zoom", String(zoom));
+    if (zoom !== this.toolsZoom) {
+      this.toolsZoom = zoom;
+      const selected = (_a2 = this.selection) == null ? void 0 : _a2.state.selected;
+      const card = selected ? (_b2 = this.cardEls) == null ? void 0 : _b2.get(selected) : void 0;
+      if (card) this.alignCardTools(card);
+    }
     if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
     else this.stageEl.removeAttribute("data-relation-labels");
-    (_a2 = this.zoomLabel) == null ? void 0 : _a2.setText(`${Math.round(zoom * 100)}%`);
-    (_b2 = this.zoomLabel) == null ? void 0 : _b2.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
+    (_c = this.zoomLabel) == null ? void 0 : _c.setText(`${Math.round(zoom * 100)}%`);
+    (_d = this.zoomLabel) == null ? void 0 : _d.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   saveViewport() {
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
@@ -67738,6 +67747,8 @@ var SHARE_VIEWER_JS = '(()=>{function nn(t){if(!(typeof t!="number"||!Number.isF
 var SHARE_VIEWER_CSS = `/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */
 :root {
   color-scheme: light;
+  /* The plugin sets this on the stage while zooming; the viewer has no card tool row, so 1 keeps the shared rule inert. */
+  --vam-zoom: 1;
   --background-primary: #ffffff;
   --background-secondary: #f6f6f6;
   --background-modifier-border: #e0e0e0;
@@ -67870,8 +67881,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
-.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }
-.vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; }
+.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
+.vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; transform-origin: left bottom; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }

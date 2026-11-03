@@ -1,6 +1,8 @@
 /* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */
 :root {
   color-scheme: light;
+  /* The plugin sets this on the stage while zooming; the viewer has no card tool row, so 1 keeps the shared rule inert. */
+  --vam-zoom: 1;
   --background-primary: #ffffff;
   --background-secondary: #f6f6f6;
   --background-modifier-border: #e0e0e0;

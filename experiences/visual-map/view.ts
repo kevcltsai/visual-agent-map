@@ -1291,11 +1291,14 @@ export class VisualAgentMapView extends ItemView {
     if (target?.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
     // Something that already took this Esc (a menu, a dialog), or a menu still open, closes alone; only a bare Esc clears the selection.
     // A menu that this very key just closed is already gone from the page, so its hide is remembered for the rest of the key event.
-    if (
-      event.key === "Escape" &&
-      (event.defaultPrevented || this.menuClosedByKey || this.contentEl.ownerDocument.querySelector(".menu"))
-    )
+    if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
       return;
+    if (event.key === "Escape" && this.menuClosedByKey) {
+      // Still claimed: unhandled, Obsidian would activate a sidebar note with this same Esc and focus its editor.
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
       this.applySelectionChange(this.selection.escape());

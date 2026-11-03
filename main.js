@@ -47957,8 +47957,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   onMapKeydown(event) {
     const target = event.target;
     if (target == null ? void 0 : target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
-    if (event.key === "Escape" && (event.defaultPrevented || this.menuClosedByKey || this.contentEl.ownerDocument.querySelector(".menu")))
+    if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
       return;
+    if (event.key === "Escape" && this.menuClosedByKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
       this.applySelectionChange(this.selection.escape());

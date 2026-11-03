@@ -437,8 +437,12 @@ for (const [name, open] of Object.entries(MENU_OPENERS)) {
     assert.equal(h.menus.length, count + 1, 'the opener built one menu');
     h.doc.body.add('div', { cls: 'menu' }).detach(); // Obsidian removes the menu on keydown, before the event bubbles to the view
     h.menus.at(-1).hide?.(); // a menu with no onHide hook is the bug: nothing tells the view this Escape closed it
-    h.view.onMapKeydown(keydown(h, h.card('leaf')));
+    let stopped = false;
+    const closing = keydown(h, h.card('leaf'), 'Escape', { stopPropagation() { stopped = true; } });
+    h.view.onMapKeydown(closing);
     assert.equal(h.view.selection.state.selected, h.ids.leaf, 'the Escape that closed the menu keeps the selection');
+    // Unclaimed, Obsidian answers the same Esc by activating the sidebar note, and focus lands in its editor (parent UI smoke on aaefff0).
+    assert.equal(closing.defaultPrevented && stopped, true, 'the Escape that closed the menu is claimed by the map');
     await timers(20);
     h.view.onMapKeydown(keydown(h, h.card('leaf')));
     assert.equal(h.view.selection.state.selected, null, 'a later Escape clears it');

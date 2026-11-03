@@ -445,3 +445,9 @@ test('theme 5: the chat body adds the status bar clearance to its bottom padding
   assert.match(css, /^\.vam-map-chat > \.vam-map-chat-body \{ padding-bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
   assert.ok(css.indexOf('.vam-map-chat > .vam-map-chat-body {') > css.indexOf('.vam-map-chat-body { display: flex'), 'after the base rule');
 });
+
+test('theme 7: the outline row buttons keep a transparent background under Obsidian\'s button rule, hover and active still tint', () => {
+  assert.match(css, /^\.vam-outline-tree \.vam-outline-toggle, \.vam-outline-tree \.vam-outline-note \{ border: 0; box-shadow: none; background: transparent;/m);
+  assert.match(css, /^\.vam-outline-tree \.vam-outline-note:hover, \.vam-outline-tree \.vam-outline-note\.is-active \{ background: var\(--background-modifier-hover\); \}$/m);
+  assert.doesNotMatch(css, /^\.vam-outline-(toggle|note)(, |:hover|\.is-active)[^{]*\{[^}]*background/m, 'no unscoped (0,1,0) outline background rule is left');
+});

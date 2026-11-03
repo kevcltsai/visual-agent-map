@@ -47880,6 +47880,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "aimProgressRenderTimer", null);
     __publicField(this, "aimFailedReports", /* @__PURE__ */ new Map());
     __publicField(this, "aimAnswerRequestIds", /* @__PURE__ */ new Map());
+    /** True only while refreshFromPlugin repaints (synchronously: every restorer it triggers runs inside that call). */
+    __publicField(this, "externalRefresh", false);
     /** True while a drag that started inside this view (for example a card's own cover image) is under way. */
     __publicField(this, "internalDrag", false);
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
@@ -48625,7 +48627,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     var _a2;
     await this.hydrate();
     (_a2 = this.chat) == null ? void 0 : _a2.relabel();
-    this.renderPreservingFocus();
+    this.externalRefresh = true;
+    try {
+      this.renderPreservingFocus();
+    } finally {
+      this.externalRefresh = false;
+    }
   }
   renderPreservingFocus() {
     var _a2, _b2, _c;
@@ -48649,12 +48656,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       target.setSelectionRange(selection[0], selection[1]);
   }
   /**
-   * The one gate for every focus the map gives itself during a repaint. False while another Obsidian window (for example Settings
-   * in a pop-out) is the active one: the map must not take focus then. It remembers the skipped restore and does it when the
+   * The one gate for the focus the map gives itself during an external refresh (refreshFromPlugin: a setting changed in another
+   * window). False then while another Obsidian window (for example Settings in a pop-out) is the active one: the map must not take
+   * focus. Repaints from the map's own work are never gated (activeWindow stays the pop-out even after clicks in the main window). It remembers the skipped restore and does it when the
    * map's own window gets focus again (see onOpen).
    */
   mapWindowIsActive() {
     var _a2, _b2;
+    if (!this.externalRefresh) return true;
     const active = typeof activeWindow === "undefined" ? void 0 : activeWindow;
     const own2 = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.defaultView;
     if (!active || !own2 || active === own2) return true;

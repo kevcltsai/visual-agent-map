@@ -191,9 +191,8 @@ test('#18: a repaint while another window is active (Settings pop-out) moves no 
       w.focused.length = 0;
       await h.view.refreshFromPlugin();
       assert.deepEqual(w.focused, [], `renderPreservingFocus does not refocus (map in ${mapIsPopout ? 'a pop-out' : 'main'})`);
-      h.doc.activeElement = h.doc.body;
-      h.view.restoreMapFocus(null);
-      assert.deepEqual(w.focused, [], 'restoreMapFocus does nothing either');
+      assert.equal(h.view.focusRestorePending, true, 'the skipped restore is remembered');
+      assert.equal(h.view.externalRefresh, false, 'the gate closes again after the refresh');
       globalWin.activeWindow = w.mapWin;
       h.contentEl.querySelector('.vam-layout-button').focus();
       await h.view.refreshFromPlugin();
@@ -240,32 +239,51 @@ test('#18: a text editor reopened while another window was active gets the focus
   assert.equal(h.active(), elsewhere, 'focus that is not lost is not taken');
 });
 
-test('#18: the repaint restorers for the chat field, the search field and the relevance bar also keep still while another window is active', async () => {
+test('#18: the repaint restorers for the chat field, the search field and the relevance bar keep still during an external refresh while another window is active', async () => {
   const h = await harness();
   const w = inactive(h);
   try {
     const input = h.contentEl.add('textarea', { cls: 'vam-map-chat-input' });
-    h.view.chat = { isInput: e => e === input, captureFocus: () => () => input.focus(), detach() {} };
+    h.view.chat = { isInput: e => e === input, captureFocus: () => () => input.focus(), detach() {}, relabel() {} };
     const search = h.contentEl.add('input', { cls: 'vam-map-search-input' }); search.setSelectionRange = () => {}; search.selectionStart = 0; search.selectionEnd = 0;
     h.view.mapSearch = { query: '' }; h.view.mapSearchBar = { input: search };
     h.view.mountMapSearch = () => { h.view.mapSearchBar = { input: search }; }; h.view.applySearchMarks = () => {};
     const bar = h.contentEl.add('div', { cls: 'vam-relevance-statusbar' }); const barButton = bar.add('button'); const goal = h.contentEl.add('div', { cls: 'vam-relevance-goal' });
     for (const [name, element, hold] of [['chat', input, () => h.view.detachMapChat()], ['search', search, () => h.view.holdMapSearch()], ['relevance bar', barButton, () => h.view.keepRelevanceBarFocus()]]) {
+      // The repaint: hold, the page is rebuilt (focus drops to the body), then the restorer runs.
+      h.view.render = () => { const restore = hold(); h.doc.activeElement = h.doc.body; restore(); };
       element.focus();
-      globalWin.activeWindow = w.mapWin;
-      const restore = hold();
-      h.doc.activeElement = h.doc.body;
       globalWin.activeWindow = w.other;
-      restore();
-      assert.equal(h.doc.activeElement, h.doc.body, `${name}: not refocused while another window is active`);
+      await h.view.refreshFromPlugin();
+      assert.equal(h.doc.activeElement, h.doc.body, `${name}: an external refresh does not refocus while another window is active`);
+      element.focus();
+      h.view.renderPreservingFocus();
+      assert.ok(h.doc.activeElement !== h.doc.body, `${name}: the map's own repaint refocuses even though activeWindow is still the other window`);
       globalWin.activeWindow = w.mapWin;
       element.focus();
-      const again = hold();
-      h.doc.activeElement = h.doc.body;
-      again();
+      await h.view.refreshFromPlugin();
       assert.ok(h.doc.activeElement !== h.doc.body, `${name}: refocused when the map window is active`);
     }
   } finally { delete globalWin.activeWindow; }
+});
+
+test('C-#14: the map\'s own repaint (chat reply) restores the chat input although activeWindow is still the Settings pop-out', async () => {
+  for (const mapIsPopout of [false, true]) {
+    const h = await harness();
+    const w = inactive(h, { mapIsPopout });
+    try {
+      const input = h.contentEl.add('textarea', { cls: 'vam-map-chat-input' });
+      h.view.chat = { isInput: e => e === input, captureFocus: () => () => input.focus(), detach() {}, relabel() {} };
+      h.view.render = () => { const restore = h.view.detachMapChat(); h.doc.activeElement = h.doc.body; restore(); };
+      input.focus();
+      globalWin.activeWindow = w.other; // the pop-out stays the active window even after clicks in the map window
+      h.view.renderPreservingFocus();
+      assert.equal(h.doc.activeElement, input, 'the chat input has focus after the reply repaint');
+      h.doc.activeElement = h.doc.body;
+      h.view.restoreMapFocus(null);
+      assert.equal(h.inMap(), true, 'restoreMapFocus is not gated outside an external refresh');
+    } finally { delete globalWin.activeWindow; }
+  }
 });
 
 test('08: a dialog that changed the map closes and the opener is gone: focus comes back to the map; cancel keeps the opener; another leaf is left alone', async () => {

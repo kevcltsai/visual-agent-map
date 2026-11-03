@@ -1322,6 +1322,7 @@ var en = {
   "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
   "ui.map_chat_empty_log": "No messages yet. Type below, or pick a suggestion.",
   "ui.map_chat_canvas_building": "Building the map\u2026",
+  "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
   "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",
   "ui.map_chat_plan_replace_hint": "Sending a new message cancels this plan.",
   "ui.map_chat_plan_irreversible": "Cannot be undone once applied.",
@@ -1332,6 +1333,7 @@ var en = {
   "ui.map_chat_stage_preparing": "Preparing",
   "ui.map_chat_not_sent_draft": "Not sent. Your message is back in the box.",
   "ui.map_chat_not_sent_kept": "Not sent. The conversation is unchanged.",
+  "ui.map_chat_stage_consent": "Waiting for you to confirm AI usage",
   "ui.map_chat_stage_waiting": "Waiting for the model",
   "ui.map_chat_stage_writing": "Writing",
   "ui.map_chat_stage_applying": "Applying",
@@ -3697,6 +3699,7 @@ var zhCN = {
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8BDD\u8BF4\u8BF4\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48",
   "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002\u5728\u4E0B\u9762\u8F93\u5165\uFF0C\u6216\u70B9\u4E00\u6761\u5EFA\u8BAE\u3002",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5730\u56FE\u2026",
+  "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u786E\u8BA4\u4F7F\u7528\u989D\u5EA6\u3002\u540C\u610F\u540E\u624D\u4F1A\u5F00\u59CB\u5EFA\u7ACB\u5730\u56FE\u3002",
   "ui.map_chat_canvas_plan": "\u786E\u8BA4\u8BA1\u5212\u540E\uFF0C\u5730\u56FE\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC",
   "ui.map_chat_plan_replace_hint": "\u53D1\u9001\u65B0\u6D88\u606F\u4F1A\u53D6\u6D88\u8FD9\u4EFD\u8BA1\u5212",
   "ui.map_chat_plan_irreversible": "\u5E94\u7528\u540E\u4E0D\u53EF\u64A4\u9500",
@@ -3707,6 +3710,7 @@ var zhCN = {
   "ui.map_chat_stage_preparing": "\u51C6\u5907\u4E2D",
   "ui.map_chat_not_sent_draft": "\u6CA1\u6709\u53D1\u9001\uFF0C\u6D88\u606F\u5DF2\u653E\u56DE\u8F93\u5165\u6846\u3002",
   "ui.map_chat_not_sent_kept": "\u6CA1\u6709\u53D1\u9001\uFF0C\u539F\u6765\u7684\u5BF9\u8BDD\u6CA1\u6709\u6539\u53D8\u3002",
+  "ui.map_chat_stage_consent": "\u7B49\u5F85\u4F60\u786E\u8BA4\u4F7F\u7528\u989D\u5EA6",
   "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
   "ui.map_chat_stage_writing": "\u64B0\u5199\u4E2D",
   "ui.map_chat_stage_applying": "\u5E94\u7528\u4E2D",
@@ -6072,6 +6076,7 @@ var zhTW = {
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8A71\u8AAA\u8AAA\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC",
   "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002\u5728\u4E0B\u9762\u8F38\u5165\uFF0C\u6216\u9EDE\u4E00\u5247\u5EFA\u8B70\u3002",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5FC3\u667A\u5716\u2026",
+  "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u78BA\u8A8D\u4F7F\u7528\u984D\u5EA6\u3002\u540C\u610F\u5F8C\u624D\u6703\u958B\u59CB\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002",
   "ui.map_chat_canvas_plan": "\u78BA\u8A8D\u8A08\u756B\u5F8C\uFF0C\u5FC3\u667A\u5716\u6703\u51FA\u73FE\u5728\u9019\u88E1",
   "ui.map_chat_plan_replace_hint": "\u9001\u51FA\u65B0\u8A0A\u606F\u6703\u53D6\u6D88\u9019\u4EFD\u8A08\u756B",
   "ui.map_chat_plan_irreversible": "\u5957\u7528\u5F8C\u4E0D\u53EF\u5FA9\u539F",
@@ -6082,6 +6087,7 @@ var zhTW = {
   "ui.map_chat_stage_preparing": "\u6E96\u5099\u4E2D",
   "ui.map_chat_not_sent_draft": "\u6C92\u6709\u9001\u51FA\uFF0C\u8A0A\u606F\u5DF2\u653E\u56DE\u8F38\u5165\u6846\u3002",
   "ui.map_chat_not_sent_kept": "\u6C92\u6709\u9001\u51FA\uFF0C\u539F\u672C\u7684\u5C0D\u8A71\u6C92\u6709\u6539\u8B8A\u3002",
+  "ui.map_chat_stage_consent": "\u7B49\u5F85\u4F60\u78BA\u8A8D\u4F7F\u7528\u984D\u5EA6",
   "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
   "ui.map_chat_stage_writing": "\u64B0\u5BEB\u4E2D",
   "ui.map_chat_stage_applying": "\u5957\u7528\u4E2D",
@@ -29033,7 +29039,7 @@ function settledLine(line) {
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
   }
 }
-var STAGE_ORDER = { preparing: 0, waiting: 1, writing: 2, applying: 3 };
+var STAGE_ORDER = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 var LABEL_LIMIT2 = 40;
 var clip2 = (value, limit = LABEL_LIMIT2) => {
   const text11 = value.replace(/\s+/g, " ").trim();
@@ -29180,6 +29186,16 @@ var MapChatPanel = class {
   /** A turn is running (a request or its actions). */
   get isBusy() {
     return this.busy;
+  }
+  /** The progress stage of the running turn, or null when nothing runs. */
+  get stageKind() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.stage) == null ? void 0 : _a2.kind) != null ? _b2 : null;
+  }
+  /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
+  get awaitingConsent() {
+    var _a2;
+    return this.busy && ((_a2 = this.stage) == null ? void 0 : _a2.kind) === "consent";
   }
   /** The window is laid over the canvas of a narrow pane. */
   get isOverlay() {
@@ -29468,9 +29484,11 @@ ${typed}` : draft;
     const current = this.stage;
     if (!current || STAGE_ORDER[kind] <= STAGE_ORDER[current.kind]) return;
     this.slow = null;
-    this.stage = { kind, since: kind === "applying" ? this.clockNow() : current.since };
+    const fresh = kind === "applying" || current.kind === "consent";
+    this.stage = { kind, since: fresh ? this.clockNow() : current.since };
     this.paintStage();
     this.speakStage();
+    if (kind === "consent" || current.kind === "consent") this.renderBusy();
   }
   currentModelLabel() {
     var _a2, _b2;
@@ -29480,7 +29498,7 @@ ${typed}` : draft;
   /** The stage name, with the model that does the work after it; applying a plan is local work and names none. */
   stageLabel(kind) {
     const name = t(`ui.map_chat_stage_${kind}`);
-    return kind === "applying" || !this.stageModel ? name : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
+    return kind === "applying" || kind === "consent" || !this.stageModel ? name : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
   }
   elapsedText() {
     const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1e3)) : 0;
@@ -30793,8 +30811,9 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.el.toggleClass("is-busy", this.working);
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
-    this.stopEl.hidden = !this.working;
-    this.stopEl.toggleClass("is-hidden", !this.working);
+    const stoppable = this.working && !this.awaitingConsent;
+    this.stopEl.hidden = !stoppable;
+    this.stopEl.toggleClass("is-hidden", !stoppable);
     this.renderHint();
     (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
   }
@@ -55832,9 +55851,11 @@ ${request.requirements}` : preset.text,
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   emptyCanvasState() {
-    var _a2;
+    var _a2, _b2, _c;
     const chat = this.chat;
     if (!chat || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return "idle";
+    if (chat.awaitingConsent || chat.isBusy && chat.stageKind === "preparing" && ((_c = (_b2 = this.plugin).usageNoticePending) == null ? void 0 : _c.call(_b2, this.plugin.settings.cliModel)))
+      return "consent";
     if (chat.isBusy || this.chatApplying) return "building";
     return chat.pendingPlan() ? "plan" : "idle";
   }
@@ -55842,7 +55863,7 @@ ${request.requirements}` : preset.text,
     if (!this.map) return;
     const state = this.emptyCanvasState();
     box.toggleClass("is-building", state === "building");
-    box.toggleClass("is-waiting", state === "plan");
+    box.toggleClass("is-waiting", state === "plan" || state === "consent");
     if (state === "building") {
       box.createSpan({ text: t("ui.map_chat_canvas_building") });
       const skeleton = box.createDiv({ cls: "vam-chat-skeleton", attr: { "aria-hidden": "true" } });
@@ -55851,6 +55872,10 @@ ${request.requirements}` : preset.text,
     }
     if (state === "plan") {
       box.createSpan({ text: t("ui.map_chat_canvas_plan") });
+      return;
+    }
+    if (state === "consent") {
+      box.createSpan({ text: t("ui.map_chat_canvas_consent") });
       return;
     }
     box.createSpan({
@@ -61131,134 +61156,143 @@ ${note.detail.trim()}` : "",
     }
     let went = false;
     try {
-      went = await this.plugin.confirmAiUsage(request.model, async () => {
-        var _a2, _b2;
-        if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
-          abandon();
-          return;
-        }
-        sent = true;
-        if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-        const openAttempt = () => {
-          var _a3;
-          const controller = new AbortController();
-          const key2 = `map-chat-view:${++mapChatTaskSequence}`;
-          this.chatController = controller;
-          this.chatTaskKey = key2;
-          (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.set(key2, controller);
-          return {
-            controller,
-            alive: () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path
+      went = await this.plugin.confirmAiUsage(
+        request.model,
+        async () => {
+          var _a2, _b2;
+          if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
+            abandon();
+            return;
+          }
+          sent = true;
+          if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+          const openAttempt = () => {
+            var _a3;
+            const controller = new AbortController();
+            const key2 = `map-chat-view:${++mapChatTaskSequence}`;
+            this.chatController = controller;
+            this.chatTaskKey = key2;
+            (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.set(key2, controller);
+            return {
+              controller,
+              alive: () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path
+            };
           };
-        };
-        let attempt = openAttempt();
-        this.supersedeChatPlan();
-        this.relocateMapChat();
-        chat.setStage("waiting");
-        const modelName = this.plugin.modelLabel(request.model);
-        for (; ; ) {
-          const { controller, alive } = attempt;
-          if (!alive()) return;
-          let replaced = false;
-          let wake = () => void 0;
-          const swapped = new Promise((resolve) => {
-            wake = resolve;
-          });
-          let watching = true;
-          let timer = null;
-          const stopWatching = () => {
-            watching = false;
-            if (timer !== null) window.clearTimeout(timer);
-            timer = null;
-          };
-          const modelEvent = () => {
-            stopWatching();
-            if (alive()) chat.clearSlow();
-          };
-          const resend = () => {
-            if (!alive() || replaced || !watching) return;
-            replaced = true;
-            stopWatching();
-            this.releaseChatTask();
-            controller.abort();
-            attempt = openAttempt();
-            chat.restartWaiting();
-            wake();
-          };
-          timer = window.setTimeout(() => {
-            timer = null;
-            if (watching && alive() && !replaced) chat.showSlow(t("ui.map_chat_slow_0", modelName), resend);
-          }, FIRST_EVENT_WAIT_MS);
-          try {
-            const outcome = await Promise.race([
-              this.plugin.mapChat.chat(
-                request,
-                controller.signal,
-                (text11) => {
-                  if (!alive()) return;
-                  modelEvent();
-                  chat.streamReply(text11);
-                },
-                (event) => {
-                  if (!alive()) return;
-                  if (event.kind === "stream-mode") {
-                    if (event.mode !== "stream-json") stopWatching();
-                    return;
-                  }
-                  if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
-                  if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
-                }
-              ),
-              swapped.then(() => null)
-            ]);
-            stopWatching();
-            if (outcome === null) continue;
+          let attempt = openAttempt();
+          this.supersedeChatPlan();
+          this.relocateMapChat();
+          chat.setStage("waiting");
+          const modelName = this.plugin.modelLabel(request.model);
+          for (; ; ) {
+            const { controller, alive } = attempt;
             if (!alive()) return;
-            const result = outcome;
-            if (redo) {
-              const lines2 = result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [];
-              if (alive() && chat.isBusy) chat.finish(result.reply, lines2);
+            let replaced = false;
+            let wake = () => void 0;
+            const swapped = new Promise((resolve) => {
+              wake = resolve;
+            });
+            let watching = true;
+            let timer = null;
+            const stopWatching = () => {
+              watching = false;
+              if (timer !== null) window.clearTimeout(timer);
+              timer = null;
+            };
+            const modelEvent = () => {
+              stopWatching();
+              if (alive()) chat.clearSlow();
+            };
+            const resend = () => {
+              if (!alive() || replaced || !watching) return;
+              replaced = true;
+              stopWatching();
+              this.releaseChatTask();
+              controller.abort();
+              attempt = openAttempt();
+              chat.restartWaiting();
+              wake();
+            };
+            timer = window.setTimeout(() => {
+              timer = null;
+              if (watching && alive() && !replaced) chat.showSlow(t("ui.map_chat_slow_0", modelName), resend);
+            }, FIRST_EVENT_WAIT_MS);
+            try {
+              const outcome = await Promise.race([
+                this.plugin.mapChat.chat(
+                  request,
+                  controller.signal,
+                  (text11) => {
+                    if (!alive()) return;
+                    modelEvent();
+                    chat.streamReply(text11);
+                  },
+                  (event) => {
+                    if (!alive()) return;
+                    if (event.kind === "stream-mode") {
+                      if (event.mode !== "stream-json") stopWatching();
+                      return;
+                    }
+                    if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
+                    if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                  }
+                ),
+                swapped.then(() => null)
+              ]);
+              stopWatching();
+              if (outcome === null) continue;
+              if (!alive()) return;
+              const result = outcome;
+              if (redo) {
+                const lines2 = result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [];
+                if (alive() && chat.isBusy) chat.finish(result.reply, lines2);
+                return;
+              }
+              const plan = result.actions.length ? planFor(result.actions, request.context, {
+                diagrams: this.plugin.settings.addDiagramsAfterResearch,
+                mapAiMode: (_b2 = this.map) == null ? void 0 : _b2.aiMode
+              }) : null;
+              if (plan) {
+                if (chat.isBusy) {
+                  chat.finish(result.reply, []);
+                  this.offerChatPlan(
+                    result,
+                    plan,
+                    request.context,
+                    { path: anchor.path, id: anchor.id },
+                    request.message
+                  );
+                }
+                return;
+              }
+              if (result.actions.length) chat.setStage("applying");
+              const lines = await this.applyMapChatActions(
+                { ...result, message: request.message },
+                request.context,
+                alive,
+                anchor
+              );
+              if (alive() && chat.isBusy) chat.finish(result.reply, lines);
               return;
-            }
-            const plan = result.actions.length ? planFor(result.actions, request.context, {
-              diagrams: this.plugin.settings.addDiagramsAfterResearch,
-              mapAiMode: (_b2 = this.map) == null ? void 0 : _b2.aiMode
-            }) : null;
-            if (plan) {
-              if (chat.isBusy) {
-                chat.finish(result.reply, []);
-                this.offerChatPlan(
-                  result,
-                  plan,
-                  request.context,
-                  { path: anchor.path, id: anchor.id },
-                  request.message
-                );
+            } catch (error) {
+              stopWatching();
+              if (replaced) continue;
+              if (alive()) {
+                const failure = this.chatErrorText(error);
+                chat.fail(failure.text, failure.wrapped ? failure.text : void 0);
               }
               return;
+            } finally {
+              if (!replaced && this.chatController === controller) this.releaseChatTask();
             }
-            if (result.actions.length) chat.setStage("applying");
-            const lines = await this.applyMapChatActions(
-              { ...result, message: request.message },
-              request.context,
-              alive,
-              anchor
-            );
-            if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-            return;
-          } catch (error) {
-            stopWatching();
-            if (replaced) continue;
-            if (alive()) {
-              const failure = this.chatErrorText(error);
-              chat.fail(failure.text, failure.wrapped ? failure.text : void 0);
-            }
-            return;
-          } finally {
-            if (!replaced && this.chatController === controller) this.releaseChatTask();
+          }
+        },
+        // The usage notice opens: the bubble and an empty canvas say the send waits for the user, not that a map is being built.
+        {
+          noticeOpening: () => {
+            if (chat.hasTurn(turn)) chat.setStage("consent");
           }
         }
-      });
+      );
     } catch (error) {
       if (sent) throw error;
       abandon(this.closed ? void 0 : errorMessage(error));
@@ -74289,10 +74323,13 @@ ${t("ui.organize_link_wait_hint")}`;
     new import_obsidian42.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
-  async confirmAiUsage(model, run) {
+  /** `noticeOpening` is called just before the usage notice opens (only when it really does), so a caller can say it waits for it. */
+  async confirmAiUsage(model, run, hooks) {
+    var _a2;
     if (!await this.aiReadyForModel(model)) return false;
     if (!this.usageNoticeSeen(model)) {
       const provider = this.runtimeIdFor(model);
+      (_a2 = hooks == null ? void 0 : hooks.noticeOpening) == null ? void 0 : _a2.call(hooks);
       const confirmed = await new Promise((resolve) => new AiUsageModal(this.app, provider, resolve).open());
       if (!confirmed) return false;
       await this.setUsageNoticeSeen(model);

@@ -9765,9 +9765,15 @@ export class VisualAgentMapView extends ItemView {
     restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
-  private emptyCanvasState(): "idle" | "building" | "plan" {
+  private emptyCanvasState(): "idle" | "building" | "consent" | "plan" {
     const chat = this.chat;
     if (!chat || this.map?.aim) return "idle";
+    // The usage notice is open (or about to open, while the request is prepared): nothing is built until the user agrees.
+    if (
+      chat.awaitingConsent ||
+      (chat.isBusy && chat.stageKind === "preparing" && this.plugin.usageNoticePending?.(this.plugin.settings.cliModel))
+    )
+      return "consent";
     if (chat.isBusy || this.chatApplying) return "building";
     return chat.pendingPlan() ? "plan" : "idle";
   }
@@ -9775,7 +9781,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return;
     const state = this.emptyCanvasState();
     box.toggleClass("is-building", state === "building");
-    box.toggleClass("is-waiting", state === "plan");
+    box.toggleClass("is-waiting", state === "plan" || state === "consent");
     if (state === "building") {
       // Three faint card outlines, no motion: the map is on its way.
       box.createSpan({ text: t("ui.map_chat_canvas_building") });
@@ -9785,6 +9791,10 @@ export class VisualAgentMapView extends ItemView {
     }
     if (state === "plan") {
       box.createSpan({ text: t("ui.map_chat_canvas_plan") });
+      return;
+    }
+    if (state === "consent") {
+      box.createSpan({ text: t("ui.map_chat_canvas_consent") });
       return;
     }
     box.createSpan({
@@ -15470,166 +15480,175 @@ export class VisualAgentMapView extends ItemView {
     }
     let went = false;
     try {
-      went = await this.plugin.confirmAiUsage(request.model, async () => {
-        // The view closed, the map changed or a plan began applying while the notice was open: nothing is sent.
-        if (
-          this.closed ||
-          this.chatApplying ||
-          !chat.hasTurn(turn) ||
-          this.path !== anchor.path ||
-          this.map?.id !== anchor.id
-        ) {
-          abandon();
-          return;
-        }
-        sent = true;
-        if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-        // One attempt is one request to the model. "Resend" (the slow notice) replaces it with another attempt of the same
-        // question: a reply that arrives from a replaced attempt changes nothing, like one that arrives after Stop.
-        const openAttempt = (): { controller: AbortController; alive: () => boolean } => {
-          const controller = new AbortController();
-          const key = `map-chat-view:${++mapChatTaskSequence}`;
-          this.chatController = controller;
-          this.chatTaskKey = key;
-          this.plugin.activeTasks?.set(key, controller);
-          // A reply that arrives after Stop, a resend, closing the view or switching maps changes nothing.
-          return {
-            controller,
-            alive: () =>
-              !this.closed &&
-              !controller.signal.aborted &&
-              this.chatController === controller &&
-              this.path === anchor.path
+      went = await this.plugin.confirmAiUsage(
+        request.model,
+        async () => {
+          // The view closed, the map changed or a plan began applying while the notice was open: nothing is sent.
+          if (
+            this.closed ||
+            this.chatApplying ||
+            !chat.hasTurn(turn) ||
+            this.path !== anchor.path ||
+            this.map?.id !== anchor.id
+          ) {
+            abandon();
+            return;
+          }
+          sent = true;
+          if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+          // One attempt is one request to the model. "Resend" (the slow notice) replaces it with another attempt of the same
+          // question: a reply that arrives from a replaced attempt changes nothing, like one that arrives after Stop.
+          const openAttempt = (): { controller: AbortController; alive: () => boolean } => {
+            const controller = new AbortController();
+            const key = `map-chat-view:${++mapChatTaskSequence}`;
+            this.chatController = controller;
+            this.chatTaskKey = key;
+            this.plugin.activeTasks?.set(key, controller);
+            // A reply that arrives after Stop, a resend, closing the view or switching maps changes nothing.
+            return {
+              controller,
+              alive: () =>
+                !this.closed &&
+                !controller.signal.aborted &&
+                this.chatController === controller &&
+                this.path === anchor.path
+            };
           };
-        };
-        let attempt = openAttempt();
-        // A plan still waiting for its yes belongs to the question before this one.
-        this.supersedeChatPlan();
-        // The first message of a conversation moves the opening screen's panel into the side window.
-        this.relocateMapChat();
-        // From here the request goes out: the bubble leaves "Preparing".
-        chat.setStage("waiting");
-        const modelName = this.plugin.modelLabel(request.model);
-        for (;;) {
-          const { controller, alive } = attempt;
-          // Stop came between a resend and its request: nothing more is sent.
-          if (!alive()) return;
-          // Set when the user presses "Resend" on this attempt; the loop then runs the next one.
-          let replaced = false;
-          let wake: () => void = () => undefined;
-          const swapped = new Promise<void>(resolve => {
-            wake = resolve;
-          });
-          // The slow notice: no model event for FIRST_EVENT_WAIT_MS from the start of the wait. Any model event ends the watch;
-          // so does a mode where events cannot be seen at all (Claude json), where the notice would be a false alarm.
-          let watching = true;
-          let timer: number | null = null;
-          const stopWatching = (): void => {
-            watching = false;
-            if (timer !== null) window.clearTimeout(timer);
-            timer = null;
-          };
-          const modelEvent = (): void => {
-            stopWatching();
-            if (alive()) chat.clearSlow();
-          };
-          const resend = (): void => {
-            // Stop wins: an attempt that was stopped or replaced already cannot be replaced again.
-            if (!alive() || replaced || !watching) return;
-            replaced = true;
-            stopWatching();
-            this.releaseChatTask();
-            controller.abort();
-            attempt = openAttempt();
-            chat.restartWaiting();
-            wake();
-          };
-          timer = window.setTimeout(() => {
-            timer = null;
-            if (watching && alive() && !replaced) chat.showSlow(t("ui.map_chat_slow_0", modelName), resend);
-          }, FIRST_EVENT_WAIT_MS);
-          try {
-            const outcome = await Promise.race([
-              this.plugin.mapChat.chat(
-                request,
-                controller.signal,
-                text => {
-                  if (!alive()) return;
-                  modelEvent();
-                  chat.streamReply(text);
-                },
-                event => {
-                  if (!alive()) return;
-                  if (event.kind === "stream-mode") {
-                    if (event.mode !== "stream-json") stopWatching();
-                    return;
-                  }
-                  // Claude's first event, and Codex's searching / reading / writing, are model events. Codex's `started` is not: the
-                  // runtime sends it for any `item/*`, including the echo of our own prompt (`userMessage`, about 3 s in), so it
-                  // proves nothing about the model. Codex text arrives through the reply callback above.
-                  if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
-                  // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
-                  if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
-                }
-              ),
-              swapped.then(() => null)
-            ]);
-            stopWatching();
-            if (outcome === null) continue;
+          let attempt = openAttempt();
+          // A plan still waiting for its yes belongs to the question before this one.
+          this.supersedeChatPlan();
+          // The first message of a conversation moves the opening screen's panel into the side window.
+          this.relocateMapChat();
+          // From here the request goes out: the bubble leaves "Preparing".
+          chat.setStage("waiting");
+          const modelName = this.plugin.modelLabel(request.model);
+          for (;;) {
+            const { controller, alive } = attempt;
+            // Stop came between a resend and its request: nothing more is sent.
             if (!alive()) return;
-            const result: MapChatResult = outcome;
-            // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
-            if (redo) {
-              const lines = result.actions.length
-                ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
-                : [];
+            // Set when the user presses "Resend" on this attempt; the loop then runs the next one.
+            let replaced = false;
+            let wake: () => void = () => undefined;
+            const swapped = new Promise<void>(resolve => {
+              wake = resolve;
+            });
+            // The slow notice: no model event for FIRST_EVENT_WAIT_MS from the start of the wait. Any model event ends the watch;
+            // so does a mode where events cannot be seen at all (Claude json), where the notice would be a false alarm.
+            let watching = true;
+            let timer: number | null = null;
+            const stopWatching = (): void => {
+              watching = false;
+              if (timer !== null) window.clearTimeout(timer);
+              timer = null;
+            };
+            const modelEvent = (): void => {
+              stopWatching();
+              if (alive()) chat.clearSlow();
+            };
+            const resend = (): void => {
+              // Stop wins: an attempt that was stopped or replaced already cannot be replaced again.
+              if (!alive() || replaced || !watching) return;
+              replaced = true;
+              stopWatching();
+              this.releaseChatTask();
+              controller.abort();
+              attempt = openAttempt();
+              chat.restartWaiting();
+              wake();
+            };
+            timer = window.setTimeout(() => {
+              timer = null;
+              if (watching && alive() && !replaced) chat.showSlow(t("ui.map_chat_slow_0", modelName), resend);
+            }, FIRST_EVENT_WAIT_MS);
+            try {
+              const outcome = await Promise.race([
+                this.plugin.mapChat.chat(
+                  request,
+                  controller.signal,
+                  text => {
+                    if (!alive()) return;
+                    modelEvent();
+                    chat.streamReply(text);
+                  },
+                  event => {
+                    if (!alive()) return;
+                    if (event.kind === "stream-mode") {
+                      if (event.mode !== "stream-json") stopWatching();
+                      return;
+                    }
+                    // Claude's first event, and Codex's searching / reading / writing, are model events. Codex's `started` is not: the
+                    // runtime sends it for any `item/*`, including the echo of our own prompt (`userMessage`, about 3 s in), so it
+                    // proves nothing about the model. Codex text arrives through the reply callback above.
+                    if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
+                    // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
+                    if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                  }
+                ),
+                swapped.then(() => null)
+              ]);
+              stopWatching();
+              if (outcome === null) continue;
+              if (!alive()) return;
+              const result: MapChatResult = outcome;
+              // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
+              if (redo) {
+                const lines = result.actions.length
+                  ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
+                  : [];
+                if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+                return;
+              }
+              const plan = result.actions.length
+                ? planFor(result.actions, request.context, {
+                    diagrams: this.plugin.settings.addDiagramsAfterResearch,
+                    mapAiMode: this.map?.aiMode
+                  })
+                : null;
+              if (plan) {
+                // Nothing is touched until the user applies the plan.
+                if (chat.isBusy) {
+                  chat.finish(result.reply, []);
+                  this.offerChatPlan(
+                    result,
+                    plan,
+                    request.context,
+                    { path: anchor.path, id: anchor.id },
+                    request.message
+                  );
+                }
+                return;
+              }
+              // A pure answer has nothing to apply: the reader is not told "applying" for it.
+              if (result.actions.length) chat.setStage("applying");
+              const lines = await this.applyMapChatActions(
+                { ...result, message: request.message },
+                request.context,
+                alive,
+                anchor
+              );
               if (alive() && chat.isBusy) chat.finish(result.reply, lines);
               return;
-            }
-            const plan = result.actions.length
-              ? planFor(result.actions, request.context, {
-                  diagrams: this.plugin.settings.addDiagramsAfterResearch,
-                  mapAiMode: this.map?.aiMode
-                })
-              : null;
-            if (plan) {
-              // Nothing is touched until the user applies the plan.
-              if (chat.isBusy) {
-                chat.finish(result.reply, []);
-                this.offerChatPlan(
-                  result,
-                  plan,
-                  request.context,
-                  { path: anchor.path, id: anchor.id },
-                  request.message
-                );
+            } catch (error) {
+              stopWatching();
+              // The attempt that was replaced reports nothing; a later one is already running.
+              if (replaced) continue;
+              if (alive()) {
+                const failure = this.chatErrorText(error);
+                chat.fail(failure.text, failure.wrapped ? failure.text : undefined);
               }
               return;
+            } finally {
+              if (!replaced && this.chatController === controller) this.releaseChatTask();
             }
-            // A pure answer has nothing to apply: the reader is not told "applying" for it.
-            if (result.actions.length) chat.setStage("applying");
-            const lines = await this.applyMapChatActions(
-              { ...result, message: request.message },
-              request.context,
-              alive,
-              anchor
-            );
-            if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-            return;
-          } catch (error) {
-            stopWatching();
-            // The attempt that was replaced reports nothing; a later one is already running.
-            if (replaced) continue;
-            if (alive()) {
-              const failure = this.chatErrorText(error);
-              chat.fail(failure.text, failure.wrapped ? failure.text : undefined);
-            }
-            return;
-          } finally {
-            if (!replaced && this.chatController === controller) this.releaseChatTask();
+          }
+        },
+        // The usage notice opens: the bubble and an empty canvas say the send waits for the user, not that a map is being built.
+        {
+          noticeOpening: () => {
+            if (chat.hasTurn(turn)) chat.setStage("consent");
           }
         }
-      });
+      );
     } catch (error) {
       // Only a failure before the request went out is taken back; once sent, the turn reports its own failures.
       if (sent) throw error;

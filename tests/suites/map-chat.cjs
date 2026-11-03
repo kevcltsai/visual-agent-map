@@ -3151,6 +3151,42 @@ integrationTest('B1 fix 15: the empty canvas follows the chat: building while it
   h.control.reply = async () => { throw new Error('boom'); }; h.type('again'); await h.view.sendMapChat(); assert.match(shown(), /no topics/, 'failed: the usual hint');
 });
 
+test('UX B1: the "consent" stage names no model, offers no Stop, and the model\'s seconds start when the user agrees', () => {
+  const s = stageFixture(); const { f } = s;
+  f.panel.begin('ask', undefined, false, 'preparing'); assert.equal(f.panel.awaitingConsent, false); assert.equal(f.parts.stop().hidden, false, 'preparing: Stop is offered');
+  s.tickSeconds(3); f.panel.setStage('consent');
+  assert.equal(f.panel.awaitingConsent, true); assert.equal(f.panel.stageKind, 'consent');
+  assert.equal(s.label(), 'Waiting for you to confirm AI usage'); assert.equal(f.panel.liveEl.text, 'Waiting for you to confirm AI usage');
+  assert.equal(f.parts.stop().hidden, true, 'the notice has its own Cancel: no Stop beside it'); assert.equal(f.parts.send().hidden, true, 'and no Send either');
+  s.tickSeconds(20); f.panel.setStage('waiting');
+  assert.equal(f.panel.awaitingConsent, false); assert.equal(f.parts.stop().hidden, false, 'agreed: Stop is back');
+  assert.equal(s.label(), 'Waiting for the model (Haiku)'); assert.equal(s.elapsed().text, ' · 0:00', 'the time spent reading the notice is not the model\'s');
+  f.panel.setStage('consent'); assert.equal(f.panel.awaitingConsent, false, 'a stage never goes back to consent');
+});
+
+integrationTest('UX B1: while the usage notice is open the empty canvas waits for the user (no skeleton, no Stop); agreeing builds, declining puts the draft back', async () => {
+  for (const agree of [true, false]) {
+    const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
+    const shown = () => visibleText(box); const skeleton = () => findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length;
+    let seen = false; h.plugin.usageNoticePending = () => !seen;
+    const answer = deferred(); const opened = deferred(); const gate = deferred();
+    h.plugin.confirmAiUsage = async (model, run, hooks) => { h.control.usageAsks++; hooks?.noticeOpening?.(); opened.resolve(); if (!(await answer.promise)) return false; seen = true; await run(); return true; };
+    h.control.reply = async () => { await gate.promise; return { reply: 'just text', actions: [], rejected: [] }; };
+    h.type('Coffee'); const sent = h.view.sendMapChat();
+    assert.match(shown(), /Waiting for you to confirm AI usage/, 'preparing with the notice still to come: no "building" yet'); assert.equal(skeleton(), 0);
+    await opened.promise;
+    assert.equal(chat.awaitingConsent, true); assert.match(shown(), /Waiting for you to confirm AI usage\. The map is built after you agree\./); assert.equal(skeleton(), 0, 'no skeleton while the notice is open');
+    assert.doesNotMatch(shown(), /Building the map/); assert.equal(chat.stopEl.hidden, true, 'no Stop while the notice is open');
+    answer.resolve(agree);
+    if (agree) {
+      await requestOut(chat); assert.match(shown(), /Building the map…/, 'agreed: now the map is being built'); assert.equal(skeleton(), 3); assert.equal(chat.stopEl.hidden, false);
+      gate.resolve(); await sent; assert.match(shown(), /no topics/);
+    } else {
+      await sent; assert.equal(chat.isBusy, false); assert.equal(chat.draft, 'Coffee', 'declined: the draft is back in the box'); assert.match(shown(), /no topics/); assert.equal(h.control.requests.length, 0);
+    }
+  }
+});
+
 integrationTest('B1 fix 16: the plan card says before Apply that it cannot be undone, marks the group that removes cards in words, and its title follows what became of it', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: [...planActions(h, 15), { kind: 'delete_topic', nodeId: h.ids.a, branch: true }], rejected: [] });

@@ -1593,10 +1593,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     new Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
-  async confirmAiUsage(model: string, run: () => Promise<void>): Promise<boolean> {
+  /** `noticeOpening` is called just before the usage notice opens (only when it really does), so a caller can say it waits for it. */
+  async confirmAiUsage(
+    model: string,
+    run: () => Promise<void>,
+    hooks?: { noticeOpening?: () => void }
+  ): Promise<boolean> {
     if (!(await this.aiReadyForModel(model))) return false;
     if (!this.usageNoticeSeen(model)) {
       const provider = this.runtimeIdFor(model);
+      hooks?.noticeOpening?.();
       const confirmed = await new Promise<boolean>(resolve => new AiUsageModal(this.app, provider, resolve).open());
       if (!confirmed) return false;
       await this.setUsageNoticeSeen(model);

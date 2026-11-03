@@ -176,6 +176,20 @@ for (const [name, model, flag, other, provider] of [['Claude', CLAUDE, 'claudeUs
   });
 }
 
+test('UX B1: confirmAiUsage calls noticeOpening just before the notice opens, and never when no notice opens', async () => {
+  const { plugin } = fixture();
+  const order = [];
+  const asking = plugin.confirmAiUsage(CLAUDE, async () => { order.push('run'); }, { noticeOpening: () => order.push(`opening:${modals.length}`) });
+  await S.until(() => modals.length === 1);
+  modals[0].resolve(true); assert.equal(await asking, true);
+  assert.deepEqual(order, ['opening:0', 'run'], 'once, before the modal exists');
+  order.length = 0;
+  assert.equal(await plugin.confirmAiUsage(CLAUDE, async () => { order.push('run'); }, { noticeOpening: () => order.push('opening') }), true);
+  assert.deepEqual(order, ['run'], 'the notice was seen: no opening');
+  const missing = fixture({ refresh: state('missing') }); let opened = 0;
+  assert.equal(await missing.plugin.confirmAiUsage(CODEX, async () => {}, { noticeOpening: () => { opened++; } }), false); assert.equal(opened, 0, 'not ready: no notice');
+});
+
 test('A2 usageNoticePending reads the flag of the model\'s own service', () => {
   const { plugin } = fixture();
   plugin.settings.claudeUsageNoticeSeen = true;

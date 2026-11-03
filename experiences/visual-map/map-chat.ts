@@ -140,10 +140,12 @@ export interface MapChatSavedTurn {
 
 /**
  * The progress stage shown inside the AI bubble while a turn runs. "Preparing" is the time before the request reaches the
- * model (checking the AI, building the request, the usage notice); there is no "thinking": the model's thinking cannot be seen.
+ * model (checking the AI, building the request); "consent" is the time the AI usage notice is open and waits for the user's
+ * answer (nothing is being built, and Stop is not offered: the notice itself has Cancel). There is no "thinking": the model's
+ * thinking cannot be seen.
  */
-export type MapChatStage = "preparing" | "waiting" | "writing" | "applying";
-const STAGE_ORDER: Record<MapChatStage, number> = { preparing: 0, waiting: 1, writing: 2, applying: 3 };
+export type MapChatStage = "preparing" | "consent" | "waiting" | "writing" | "applying";
+const STAGE_ORDER: Record<MapChatStage, number> = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 
 /** What {@link MapChatPanel.begin} returns: the two messages it added, so {@link MapChatPanel.retract} can take exactly them back. */
 export interface MapChatTurnHandle {
@@ -388,6 +390,14 @@ export class MapChatPanel {
   /** A turn is running (a request or its actions). */
   get isBusy(): boolean {
     return this.busy;
+  }
+  /** The progress stage of the running turn, or null when nothing runs. */
+  get stageKind(): MapChatStage | null {
+    return this.stage?.kind ?? null;
+  }
+  /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
+  get awaitingConsent(): boolean {
+    return this.busy && this.stage?.kind === "consent";
   }
   /** The window is laid over the canvas of a narrow pane. */
   get isOverlay(): boolean {
@@ -691,10 +701,14 @@ export class MapChatPanel {
     if (!current || STAGE_ORDER[kind] <= STAGE_ORDER[current.kind]) return;
     // A later stage is a model event (or the actions): the slow notice has nothing left to say.
     this.slow = null;
-    // The seconds of waiting and writing run together from the question; applying counts its own.
-    this.stage = { kind, since: kind === "applying" ? this.clockNow() : current.since };
+    // The seconds of waiting and writing run together from the question; applying counts its own, and so does the model's work
+    // after the usage notice (the time the user took to answer it is not the model's).
+    const fresh = kind === "applying" || current.kind === "consent";
+    this.stage = { kind, since: fresh ? this.clockNow() : current.since };
     this.paintStage();
     this.speakStage();
+    // Entering or leaving "consent" changes whether Stop is offered and what an empty canvas says.
+    if (kind === "consent" || current.kind === "consent") this.renderBusy();
   }
   private currentModelLabel(): string {
     const model = this.host.model();
@@ -703,7 +717,7 @@ export class MapChatPanel {
   /** The stage name, with the model that does the work after it; applying a plan is local work and names none. */
   private stageLabel(kind: MapChatStage): string {
     const name = t(`ui.map_chat_stage_${kind}`);
-    return kind === "applying" || !this.stageModel
+    return kind === "applying" || kind === "consent" || !this.stageModel
       ? name
       : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
   }
@@ -2070,8 +2084,10 @@ export class MapChatPanel {
     this.el.toggleClass("is-busy", this.working);
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
-    this.stopEl.hidden = !this.working;
-    this.stopEl.toggleClass("is-hidden", !this.working);
+    // While the usage notice is open, its own Cancel is the way out: no Stop beside it.
+    const stoppable = this.working && !this.awaitingConsent;
+    this.stopEl.hidden = !stoppable;
+    this.stopEl.toggleClass("is-hidden", !stoppable);
     this.renderHint();
     this.host.stateChanged?.();
   }

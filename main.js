@@ -55925,31 +55925,6 @@ ${request.requirements}` : preset.text,
     this.applyPresentationMarks();
     restoreSearch();
   }
-  /**
-   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics" and the
-   * goal control. An empty map has nothing to select or prioritise, so those two are left out rather than disabled: Tab never
-   * reaches a control that cannot do anything yet. An AIM map has none of them.
-   */
-  renderMapTools(tools) {
-    if (!this.map || this.map.aim) return;
-    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
-      "mod-cta"
-    );
-    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
-      "vam-topic-more"
-    );
-    if (!this.map.nodes.length) return;
-    const integrate = this.button(
-      tools,
-      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
-      () => {
-        this.applySelectionChange(this.selection.toggleMultiSelect());
-      }
-    );
-    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
-    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
-    this.renderRelevanceGoalControl(tools);
-  }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   emptyCanvasState() {
     var _a2, _b2, _c;
@@ -55982,6 +55957,31 @@ ${request.requirements}` : preset.text,
     box.createSpan({
       text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
     });
+  }
+  /**
+   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics" and the
+   * goal control. An empty map has nothing to select or prioritise, so those two are left out rather than disabled: Tab never
+   * reaches a control that cannot do anything yet. An AIM map has none of them.
+   */
+  renderMapTools(tools) {
+    if (!this.map || this.map.aim) return;
+    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
+      "mod-cta"
+    );
+    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
+      "vam-topic-more"
+    );
+    if (!this.map.nodes.length) return;
+    const integrate = this.button(
+      tools,
+      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
+      () => {
+        this.applySelectionChange(this.selection.toggleMultiSelect());
+      }
+    );
+    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
+    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    this.renderRelevanceGoalControl(tools);
   }
   /** The chat started or ended something: an empty canvas follows it. */
   refreshEmptyMap() {

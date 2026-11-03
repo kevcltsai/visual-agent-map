@@ -22211,10 +22211,24 @@ var CANONICAL_HEADINGS = Object.freeze(
   Object.fromEntries(Object.keys(NOTE_HEADING_SETS[0]).map((name) => [name, name]))
 );
 var isCanonical = (set) => set.Detail === CANONICAL_HEADINGS.Detail;
+function markerlessHeadingSet(content) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  const headings = /* @__PURE__ */ new Set();
+  lines.forEach((line, index) => {
+    var _a2;
+    const text11 = code[index] ? void 0 : (_a2 = /^## (.+?)[ \t]*\r?$/.exec(line)) == null ? void 0 : _a2[1];
+    if (text11 !== void 0) headings.add(text11);
+  });
+  if (headings.has("Current Summary") || headings.has("Detail")) return void 0;
+  return NOTE_HEADING_SETS.filter((set) => !isCanonical(set)).find(
+    (set) => headings.has(set.Detail) && headings.has(set["Current Summary"])
+  );
+}
 function noteHeadingSet(content) {
   var _a2, _b2, _c;
   const start = content.indexOf(DETAIL_START);
-  if (start < 0) return void 0;
+  if (start < 0) return markerlessHeadingSet(content);
   const before = content.slice(0, start);
   const heading = (_a2 = [...before.matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)) == null ? void 0 : _a2[1];
   const localized = NOTE_HEADING_SETS.filter((set) => !isCanonical(set));

@@ -2342,3 +2342,42 @@ integrationTest('C8 review: an unclosed code fence in Detail does not hide the l
   assert.equal((text.match(/^## 目前摘要$/gm) || []).length, 1);
   assert.equal((await repo.readNote(n.path)).summary, 'S2');
 });
+const NO_MARKERS = /<!-- visual-agent-map:detail:(start|end) -->\n?/g;
+integrationTest('C8 review: a zh-TW note whose Detail markers were deleted still reads, and writes and rebuilds never add a second managed heading pair', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo, '標記');
+  await repo.updateNote(n.path, { summary: 'S1', detail: 'D1', rules: 'R1' });
+  contents.set(n.path, contents.get(n.path).replace(NO_MARKERS, ''));
+  assert.doesNotMatch(contents.get(n.path), /visual-agent-map:detail/);
+  const note = await repo.readNote(n.path);
+  assert.equal(note.summary, 'S1'); assert.equal(note.detail, 'D1'); assert.equal(note.rules, 'R1');
+  const headings = ['目前摘要', '詳細內容', '規則'];
+  const once = (text) => { for (const h of headings) assert.equal((text.match(new RegExp(`^## ${h}$`, 'gm')) || []).length, 1, `${h}\n${text}`); assert.doesNotMatch(text, /^## (Current Summary|Detail|Rules)$/m, text); };
+  await repo.updateNote(n.path, { summary: 'S2' });
+  once(contents.get(n.path));
+  await repo.rebuildDerivedData(); await repo.rebuildDerivedData();
+  const text = contents.get(n.path);
+  once(text);
+  assert.match(text, /D1/); assert.match(text, /R1/);
+  const after = await repo.readNote(n.path);
+  assert.equal(after.summary, 'S2'); assert.equal(after.detail, 'D1'); assert.equal(after.rules, 'R1');
+});
+integrationTest('C8 review: without Detail markers an English note stays English and its user-written 規則 / 詳細內容 headings are untouched; a zh-TW note with only a Detail heading is not adopted', async () => {
+  const { repo, contents } = fixture(); repo.settings.language = 'en'; const n = await topicNote(repo, 'eng');
+  await repo.updateNote(n.path, { summary: 'S1', detail: 'D1', rules: 'R1' });
+  contents.set(n.path, contents.get(n.path).replace(NO_MARKERS, '') + '\n## 規則\n\nmine\n\n## 詳細內容\n\nmine too\n');
+  const { noteHeadingLanguage } = load('repository.ts', { obsidian });
+  const before = contents.get(n.path);
+  assert.match(before, /^## Current Summary$/m);
+  {
+    assert.equal(noteHeadingLanguage(before), 'en');
+    await repo.updateNote(n.path, { summary: 'S2' });
+    const text = contents.get(n.path);
+    assert.match(text, /## 規則\n\nmine\n\n## 詳細內容\n\nmine too\n/);
+    assert.doesNotMatch(text, /^## 目前摘要$/m);
+  }
+  // zh-TW detail heading without the zh-TW summary heading and without markers: today's behaviour (English)
+  assert.equal(noteHeadingLanguage('# T\n\n## 詳細內容\n\nx\n\n## 規則\n\ny'), 'en');
+  assert.equal(noteHeadingLanguage('# T\n\n## 目前摘要\n\n```\n## 詳細內容\n```\n'), 'en', 'a heading inside fenced code does not count');
+  assert.equal(noteHeadingLanguage('# T\n\n## 目前摘要\n\n## 詳細內容\n\nx'), 'zh-TW');
+  assert.equal(noteHeadingLanguage('# T\n\n## Current Summary\n\n## 目前摘要\n\n## 詳細內容\n\nx'), 'en', 'an English managed heading keeps it English');
+});

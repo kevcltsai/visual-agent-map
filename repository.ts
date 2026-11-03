@@ -574,12 +574,27 @@ const CANONICAL_HEADINGS: NoteHeadings = Object.freeze(
 const isCanonical = (set: NoteHeadings): boolean => set.Detail === CANONICAL_HEADINGS.Detail;
 /**
  * The heading set a note is already written with, read from its managed Detail heading (the `## ` heading right
- * before the Detail start marker) alone; undefined when it has no marker. Any other heading there reads as English, so
+ * before the Detail start marker) alone; undefined when it has no marker, unless the user (or a tool) removed the
+ * markers of a localized note: then a localized set whose Detail and Current Summary headings are both there (outside
+ * fenced code) and no English managed heading is adopted, so such a note keeps decoding and does not gain a second pair. Any other heading there reads as English, so
  * a user's own heading that happens to read like a localized one is never taken for a managed section in older notes.
  */
+function markerlessHeadingSet(content: string): NoteHeadings | undefined {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  const headings = new Set<string>();
+  lines.forEach((line, index) => {
+    const text = code[index] ? undefined : /^## (.+?)[ \t]*\r?$/.exec(line)?.[1];
+    if (text !== undefined) headings.add(text);
+  });
+  if (headings.has("Current Summary") || headings.has("Detail")) return undefined;
+  return NOTE_HEADING_SETS.filter(set => !isCanonical(set)).find(
+    set => headings.has(set.Detail) && headings.has(set["Current Summary"])
+  );
+}
 function noteHeadingSet(content: string): NoteHeadings | undefined {
   const start = content.indexOf(DETAIL_START);
-  if (start < 0) return undefined;
+  if (start < 0) return markerlessHeadingSet(content);
   const before = content.slice(0, start);
   const heading = [...before.matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)?.[1];
   const localized = NOTE_HEADING_SETS.filter(set => !isCanonical(set));

@@ -2159,6 +2159,8 @@ export class MapChatPanel {
     this.sendEl.toggleClass("is-hidden", this.working);
     // While the usage notice is open, its own Cancel is the way out: no Stop beside it.
     const stoppable = this.working && !this.awaitingConsent;
+    // Hiding the focused Stop drops the keyboard to the page; once the run is over the message field takes it (C-#14).
+    const stopHadFocus = !stoppable && !this.stopEl.hidden && this.host.activeElement() === this.stopEl;
     this.stopEl.hidden = !stoppable;
     this.stopEl.toggleClass("is-hidden", !stoppable);
     if (this.stopWanted && !this.working) this.stopWanted = false;
@@ -2166,6 +2168,7 @@ export class MapChatPanel {
       this.stopWanted = false;
       if (this.focusFree()) this.stopEl.focus();
     }
+    if (stopHadFocus && !this.working && this.focusFree()) this.inputEl.focus();
     this.renderHint();
     this.host.stateChanged?.();
   }

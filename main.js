@@ -31328,6 +31328,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
     const stoppable = this.working && !this.awaitingConsent;
+    const stopHadFocus = !stoppable && !this.stopEl.hidden && this.host.activeElement() === this.stopEl;
     this.stopEl.hidden = !stoppable;
     this.stopEl.toggleClass("is-hidden", !stoppable);
     if (this.stopWanted && !this.working) this.stopWanted = false;
@@ -31335,6 +31336,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       this.stopWanted = false;
       if (this.focusFree()) this.stopEl.focus();
     }
+    if (stopHadFocus && !this.working && this.focusFree()) this.inputEl.focus();
     this.renderHint();
     (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
   }

@@ -3258,6 +3258,22 @@ test('C-#14: after the usage notice closes, Stop takes the keyboard that fell to
   f.panel.setStage('waiting'); assert.ok(f.page.doc.activeElement === elsewhere, 'focus elsewhere is not stolen');
 });
 
+test('C-#14: when the run ends and Stop is hidden while it holds the keyboard, the message field takes it (Chromium drops focus from a hidden element)', () => {
+  const run = end => {
+    const { f } = stageFixture(); const stop = f.parts.stop();
+    // Like Chromium: hiding the focused element moves focus to the page.
+    let hidden = stop.hidden;
+    Object.defineProperty(stop, 'hidden', { configurable: true, get: () => hidden, set: value => { hidden = value; if (value && f.page.doc.activeElement === stop) f.page.doc.activeElement = { tagName: 'BODY' }; } });
+    f.panel.begin('ask'); stop.focus(); assert.ok(f.page.doc.activeElement === stop);
+    end(f.panel); return f;
+  };
+  let f = run(p => p.finish('ok', [])); assert.ok(f.page.doc.activeElement === f.parts.input(), 'a finished reply leaves the keyboard in the message field');
+  f = run(p => p.fail('It broke')); assert.ok(f.page.doc.activeElement === f.parts.input(), 'a failed run does the same');
+  // Counterexample: the keyboard was elsewhere when the run ended; it stays there.
+  f = run(() => {}); const elsewhere = f.page.attach(f.page.root.createDiv('other-leaf')).createEl('input'); elsewhere.focus(); f.panel.finish('ok', []);
+  assert.ok(f.page.doc.activeElement === elsewhere, 'focus elsewhere is not taken');
+});
+
 integrationTest('UX B1: while the usage notice is open the empty canvas waits for the user (no skeleton, no Stop); agreeing builds, declining puts the draft back', async () => {
   for (const agree of [true, false]) {
     const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);

@@ -419,14 +419,18 @@ test('N1: a data.json that still carries sampleTourVersionSeen loads without err
 // ---- Settings page groups and pages (Obsidian 1.13 type: group / page) ----
 function groupedTab(overrides = {}) {
   const { VisualAgentMapSettingTab } = load('ui/settings-tab.ts', { obsidian: { ...obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: class {} } });
-  const blocks = { template: [{ ref: 'builtin:standard', name: 'Standard', kind: 'builtin', issues: [] }, { ref: 'file:mine', name: 'Mine', kind: 'file', issues: [] }], tone: [{ ref: 'builtin:academic', name: 'Academic', kind: 'builtin', issues: [] }] };
-  const keys = overrides.keys || { template: 'builtin:standard', tone: 'builtin:academic' };
+  const recipes = [
+    { ref: 'builtin:general', name: 'General research', kind: 'builtin', issues: [] },
+    { ref: 'builtin:hypothesis', name: 'Hypothesis test', kind: 'builtin', issues: [] },
+    { ref: 'builtin:aim', name: 'AIM report', kind: 'builtin', aimOnly: true, issues: [] },
+    { ref: 'file:mine', name: 'Mine', kind: 'file', issues: [] }
+  ];
   const plugin = {
-    settings: { cliModel: 'm', language: 'en', noteTemplateByKind: undefined, ...(overrides.settings || {}) },
+    settings: { cliModel: 'm', language: 'en', ...(overrides.settings || {}) },
     subscribeModelDiscovery: () => () => {}, subscribeCurrentModel: () => () => {},
     codexDiagnostic: () => ({ installed: overrides.codex ?? true, executable: 'codex' }),
     claudeDiagnostic: () => ({ installed: overrides.claude ?? true, executable: 'claude' }),
-    noteStyles: { listBlocks: category => overrides.blocks?.[category] || blocks[category], effectiveBlockKeys: () => keys }
+    noteStyles: { listRecipes: () => overrides.recipes || recipes }
   };
   return { tab: new VisualAgentMapSettingTab({}, plugin), plugin };
 }
@@ -436,7 +440,7 @@ const valueOf = page => typeof page.displayValue === 'function' ? page.displayVa
 const statusOf = page => typeof page.status === 'function' ? page.status() : page.status;
 const pageNamed = (tab, name) => allPages(tab.getSettingDefinitions()).find(p => p.name === name);
 
-test('settings page: five top-level groups in order, eleven rows, three top-level pages and one nested page', () => {
+test('settings page: five top-level groups in order, eleven rows, three top-level pages and no nested page', () => {
   const { tab } = groupedTab();
   const defs = tab.getSettingDefinitions();
   assert.ok(defs.every(d => d.type === 'group'), 'the top level holds only groups');
@@ -444,8 +448,8 @@ test('settings page: five top-level groups in order, eleven rows, three top-leve
   assert.equal(defs.reduce((n, d) => n + d.items.length, 0), 11);
   assert.deepEqual(plain(pagesOf(defs).map(p => p.name)), ['AI connection', 'Note style', 'Advanced and troubleshooting']);
   const note = pageNamed(tab, 'Note style');
-  assert.deepEqual(plain(pagesOf(note.items).map(p => p.name)), ['By topic type']);
-  assert.equal(allPages(defs).length, 4);
+  assert.deepEqual(plain(pagesOf(note.items).map(p => p.name)), [], 'the "By topic type" sub-page is gone (grilling Q11)');
+  assert.equal(allPages(defs).length, 3);
 });
 
 test('settings page: every control and saved key is still reachable after the regroup', () => {
@@ -455,12 +459,12 @@ test('settings page: every control and saved key is still reachable after the re
   assert.ok(rows.some(r => r.control && r.control.key === 'claudePath'));
   assert.equal(rows.filter(r => r.render && MODEL_ROW.test(r.name)).length, 1);
   const names = rows.map(r => r.name);
-  for (const name of ['Interface language', 'Hover preview size', 'Mind Maps folder', 'AIM folder', 'Record AI exchanges', 'Add diagrams after research', 'Reconnect existing Workspace', 'Structure', 'Voice', 'File location', 'Topic']) assert.ok(names.includes(name), `${name} is on the page`);
+  for (const name of ['Interface language', 'Hover preview size', 'Mind Maps folder', 'AIM folder', 'Record AI exchanges', 'Add diagrams after research', 'Reconnect existing Workspace', 'File location', 'Topic', 'AIM conclusion note']) assert.ok(names.includes(name), `${name} is on the page`);
 });
 
-test('settings page: the three sub-page intro rows render with an empty name and the sentence as the description, and stay out of search', () => {
+test('settings page: the two sub-page intro rows render with an empty name and the sentence as the description, and stay out of search', () => {
   const { tab, plugin } = groupedTab();
-  const intros = [["AI connection"], ["By topic type"], ["Note style"]];
+  const intros = [["AI connection"], ["Note style"]];
   for (const [pageName] of intros) {
     const item = pageNamed(tab, pageName).items[0];
     assert.equal(item.searchable, false, `${pageName} intro is not a search entry`);
@@ -495,27 +499,31 @@ test('AI connection entry: shows how many CLIs are connected and warns only when
   assert.equal(statusOf(page), null);
 });
 
-test('Note style entry: shows structure and voice names, falls back to the ref, warns when a saved block is gone', () => {
-  const ok = pageNamed(groupedTab().tab, 'Note style');
-  assert.equal(valueOf(ok), 'Standard · Academic');
-  assert.equal(statusOf(ok), null);
-  const unnamed = pageNamed(groupedTab({ blocks: { template: [], tone: [] } }).tab, 'Note style');
-  assert.doesNotThrow(() => valueOf(unnamed));
-  assert.equal(valueOf(unnamed), 'builtin:standard · builtin:academic', 'no name found: the ref is shown');
-  const gone = pageNamed(groupedTab({ keys: { template: 'file:deleted', tone: 'builtin:academic' } }).tab, 'Note style');
-  assert.equal(statusOf(gone), 'warning');
-  assert.doesNotThrow(() => valueOf(gone));
+test('Note style page: a "Topic types" group of seven rows in kind order (the AIM row last), then "Custom" with four manage rows, then "More" with only File location; no Structure, Voice or By topic type row', () => {
+  const note = pageNamed(groupedTab().tab, 'Note style');
+  const groups = note.items.filter(item => item.type === 'group');
+  assert.deepEqual(plain(groups.map(group => group.heading)), ['Topic types', 'Custom', 'More']);
+  assert.deepEqual(plain(groups[0].items.map(row => row.name)), ['Topic', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion', 'Action', 'AIM conclusion note']);
+  assert.deepEqual(plain(groups[1].items.map(row => row.name)), ['Note styles', 'Structures', 'Voices', 'Format rules']);
+  assert.deepEqual(plain(groups[2].items.map(row => row.name)), ['File location']);
+  const names = flattenDefinitions(note.items).map(row => row.name);
+  for (const gone of ['Structure', 'Voice', 'By topic type']) assert.ok(!names.includes(gone), `${gone} row is gone`);
 });
 
-test('By topic type entry: "Not set" with nothing saved, "N set" otherwise, warning for a structure that is gone', () => {
-  const none = pageNamed(groupedTab().tab, 'By topic type');
-  assert.equal(valueOf(none), 'Not set');
-  assert.equal(statusOf(none), null);
-  const two = pageNamed(groupedTab({ settings: { noteTemplateByKind: { hypothesis: 'builtin:standard', evidence: 'file:mine' } } }).tab, 'By topic type');
-  assert.equal(valueOf(two), '2 set');
-  assert.equal(statusOf(two), null);
-  const lost = pageNamed(groupedTab({ settings: { noteTemplateByKind: { action: 'file:deleted' } } }).tab, 'By topic type');
-  assert.equal(valueOf(lost), '1 set');
-  assert.equal(statusOf(lost), 'warning');
-  assert.equal(pageNamed(groupedTab().tab, 'By topic type').items.filter(i => i.render && i.searchable !== false).length, 6, 'six topic types, in KIND_ROWS order');
+test('Note style entry: shows the general topic row style by name, falls back to the ref, warns when a saved style is gone', () => {
+  const ok = pageNamed(groupedTab().tab, 'Note style');
+  assert.equal(valueOf(ok), 'General research');
+  assert.equal(statusOf(ok), null);
+  const chosen = pageNamed(groupedTab({ settings: { noteStyleByKind: { topic: 'file:mine' } } }).tab, 'Note style');
+  assert.equal(valueOf(chosen), 'Mine');
+  const unnamed = pageNamed(groupedTab({ recipes: [] }).tab, 'Note style');
+  assert.doesNotThrow(() => valueOf(unnamed));
+  assert.equal(valueOf(unnamed), 'builtin:general', 'no name found: the ref is shown');
+  const gone = pageNamed(groupedTab({ settings: { noteStyleByKind: { action: 'file:deleted' } } }).tab, 'Note style');
+  assert.equal(statusOf(gone), 'warning', 'any row whose saved style is gone');
+  assert.doesNotThrow(() => valueOf(gone));
+  const aimOnTopic = pageNamed(groupedTab({ settings: { noteStyleByKind: { topic: 'builtin:aim' } } }).tab, 'Note style');
+  assert.equal(statusOf(aimOnTopic), 'warning', 'the AIM report is not a style a topic type can use');
+  const aimOnAim = pageNamed(groupedTab({ settings: { noteStyleByKind: { aim: 'file:mine' } } }).tab, 'Note style');
+  assert.equal(statusOf(aimOnAim), null);
 });

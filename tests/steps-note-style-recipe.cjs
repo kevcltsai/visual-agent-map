@@ -576,13 +576,15 @@ const Main = S.load('main.ts', { obsidian: S.obsidian });
 
 test('P2b settings (T3 P2b, decisions #32): the other unpublished and old keys round-trip byte for byte through settingsFromSaved; noteStyleAliases and noteStyleUpgrade are not read and are gone after a save', () => {
   const saved = {
-    noteTemplateBlock: 'builtin:textbook', noteToneBlock: 'file:Mine', noteTemplateByKind: { hypothesis: 'builtin:action', evidence: 'file:Mine' },
+    noteTemplateBlock: 'builtin:textbook', noteToneBlock: 'file:Mine', noteTemplateByKind: { hypothesis: 'builtin:action', evidence: 'file:Mine' }, // noteTemplateByKind: removed in T5 P2b, read no more
     noteStyleAliases: { standard: { template: 'builtin:textbook', tone: 'builtin:plain' } }, noteStyleUpgrade: { version: 1 }, defaultNoteStyleId: 'textbook', defaultDetailTemplateId: 'u1',
     detailTemplates: [{ id: 'u1', name: 'U', sections: [{ id: 's', name: 'S', description: 'd', role: 'none', aliases: [] }] }],
     promptPresets: [{ id: 'p1', kind: 'tone', name: 'P', text: 'x' }]
   };
   const once = Main.settingsFromSaved(saved);
-  for (const key of ['noteTemplateBlock', 'noteToneBlock', 'noteTemplateByKind', 'defaultNoteStyleId', 'defaultDetailTemplateId'])
+  assert.equal('noteTemplateByKind' in once, false, 'noteTemplateByKind is not read; it is gone after a save (T5 P2b, #31)');
+  assert.equal('noteTemplateByKind' in Main.settingsFromSaved(JSON.parse(JSON.stringify(once))), false);
+  for (const key of ['noteTemplateBlock', 'noteToneBlock', 'defaultNoteStyleId', 'defaultDetailTemplateId'])
     assert.deepEqual(plain(once[key]), plain(saved[key]), key);
   assert.equal('noteStyleAliases' in once, false);
   assert.equal('noteStyleUpgrade' in once, false);

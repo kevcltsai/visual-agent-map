@@ -9791,8 +9791,8 @@ export class VisualAgentMapView extends ItemView {
     restoreChatFocus();
     keepMapFocus();
     this.applyPresentationMarks();
-    restoreSearch();
     this.syncStatusBarClearance();
+    restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   private emptyCanvasState(): "idle" | "building" | "plan" {

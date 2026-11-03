@@ -3970,3 +3970,54 @@ integrationTest('N6: the map switcher lists exactly the topics and no "Sample:" 
   assert.deepEqual(plain(labels), ['Alpha', 'Beta']);
   assert.ok(!labels.some(label => label.startsWith('Sample:')));
 });
+// ---- bug bash A #01: dragging a card's own cover image must never be taken for a dropped file ----
+function coverDragHarness() {
+  const { VisualAgentMapView } = require('../support-replay.cjs').load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, {
+    window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o), IntersectionObserver: class { observe() {} unobserve() {} disconnect() {} }
+  });
+  const view = Object.create(VisualAgentMapView.prototype);
+  const viewport = dom.element('div');
+  viewport.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600 }); viewport.clientWidth = 800; viewport.clientHeight = 600;
+  Object.assign(view, { viewportEl: viewport, selection: { state: { multiSelectMode: false } }, map: { viewport: { x: 0, y: 0, zoom: 1 } }, calls: [] });
+  view.relationsEnabled = () => true;
+  view.attachCardImages = (n, files) => { view.calls.push(['card', files.length]); return Promise.resolve(); };
+  view.queueCanvasImages = (files) => { view.calls.push(['canvas', files.length]); };
+  view.enqueue = work => work();
+  const file = { name: 'a.png', type: 'image/png', size: 1 };
+  const drop = () => ({ clientX: 1, clientY: 1, preventDefault() {}, stopPropagation() {}, dataTransfer: { files: [file], types: ['Files'] } });
+  return { VisualAgentMapView, view, viewport, drop, fire: (name, event = {}) => (viewport.listeners[name] ?? []).forEach(fn => fn(event)) };
+}
+test('bug bash #01: a card cover image is not natively draggable', () => {
+  const { VisualAgentMapView } = coverDragHarness();
+  const note = new obsidian.TFile('Topics/n.md'), image = new obsidian.TFile('img/a.png');
+  const view = Object.assign(Object.create(VisualAgentMapView.prototype), {
+    app: { vault: { getAbstractFileByPath: p => (p === note.path ? note : p === image.path ? image : null), getResourcePath: f => `app://res/${f.path}` },
+      metadataCache: { getFileCache: () => ({ embeds: [{ link: 'img/a.png' }] }), getFirstLinkpathDest: () => image } },
+    coverObserver: null
+  });
+  const card = dom.element('div'); card.createEl('h3', { cls: 'vam-card-title' });
+  view.paintCover(card, note.path);
+  const [img] = dom.findAll(card, i => i.tag === 'img');
+  assert.ok(img, 'the cover image exists');
+  assert.equal(img.attrs.draggable, 'false');
+  assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.vam-card-cover img\s*\{[^}]*-webkit-user-drag:\s*none/);
+});
+test('bug bash #01: a drag that started inside the view is ignored by the card and canvas drop handlers; an external file drop still works', () => {
+  const h = coverDragHarness();
+  h.view.setupCanvasImageInput();
+  const card = dom.element('div'), topic = node('t');
+  h.fire('dragstart', { target: card });
+  h.view.onCardDrop(h.drop(), card, topic);
+  h.fire('dragstart', { target: card });
+  h.fire('drop', h.drop());
+  assert.deepEqual(h.view.calls, [], 'an internal drag writes nothing');
+  h.fire('dragend', {});
+  h.view.onCardDrop(h.drop(), card, topic);
+  assert.deepEqual(h.view.calls, [['card', 1]], 'an external file drop still attaches the picture');
+  h.view.onCanvasDrop(h.drop());
+  assert.deepEqual(h.view.calls, [['card', 1], ['canvas', 1]], 'and the canvas still takes an external picture');
+  h.fire('dragstart', { target: card });
+  h.view.onCanvasDrop(h.drop());
+  h.view.onCardDrop(h.drop(), card, topic);
+  assert.equal(h.view.calls.length, 3, 'a drop ends the internal drag, so the next external drop is not blocked even when dragend is lost');
+});

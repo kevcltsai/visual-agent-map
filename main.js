@@ -47686,6 +47686,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "aimProgressRenderTimer", null);
     __publicField(this, "aimFailedReports", /* @__PURE__ */ new Map());
     __publicField(this, "aimAnswerRequestIds", /* @__PURE__ */ new Map());
+    /** True while a drag that started inside this view (for example a card's own cover image) is under way. */
+    __publicField(this, "internalDrag", false);
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
     /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
     __publicField(this, "unbindClipboard", null);
@@ -53437,6 +53439,12 @@ ${request.requirements}` : preset.text,
     viewport.addEventListener("dragover", (event) => this.onCanvasDragOver(event));
     viewport.addEventListener("dragleave", (event) => this.onCanvasDragLeave(event));
     viewport.addEventListener("drop", (event) => this.onCanvasDrop(event));
+    viewport.addEventListener("dragstart", () => {
+      this.internalDrag = true;
+    });
+    viewport.addEventListener("dragend", () => {
+      this.internalDrag = false;
+    });
     viewport.addEventListener("contextmenu", (event) => this.onCanvasContextMenu(event));
     viewport.addEventListener("pointermove", (event) => this.onCanvasPointerMove(event));
   }
@@ -53454,6 +53462,7 @@ ${request.requirements}` : preset.text,
   }
   hasFiles(event) {
     var _a2, _b2, _c;
+    if (this.internalDrag) return false;
     const transfer = event.dataTransfer;
     return !!transfer && (((_b2 = (_a2 = transfer.files) == null ? void 0 : _a2.length) != null ? _b2 : 0) > 0 || Array.from((_c = transfer.types) != null ? _c : []).includes("Files"));
   }
@@ -53474,7 +53483,9 @@ ${request.requirements}` : preset.text,
   onCanvasDrop(event) {
     var _a2, _b2, _c;
     (_a2 = this.viewportEl) == null ? void 0 : _a2.removeClass("is-image-drop");
-    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    const internal = this.internalDrag;
+    this.internalDrag = false;
+    if (internal || !this.canEditCanvasItems() || !this.hasFiles(event)) return;
     event.preventDefault();
     event.stopPropagation();
     const all = Array.from((_c = (_b2 = event.dataTransfer) == null ? void 0 : _b2.files) != null ? _c : []), images = imageFilesFrom({ files: all });
@@ -53505,7 +53516,9 @@ ${request.requirements}` : preset.text,
   onCardDrop(event, card, node) {
     var _a2, _b2;
     card.removeClass("is-drop-target");
-    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    const internal = this.internalDrag;
+    this.internalDrag = false;
+    if (internal || !this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
     event.preventDefault();
     event.stopPropagation();
     const all = Array.from((_b2 = (_a2 = event.dataTransfer) == null ? void 0 : _a2.files) != null ? _b2 : []), images = imageFilesFrom({ files: all });
@@ -56633,7 +56646,7 @@ ${request.requirements}` : preset.text,
     if (!source) return;
     const frame = createDiv({ cls: "vam-card-cover" });
     const img = frame.createEl("img", {
-      attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async" }
+      attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
     img.addEventListener("error", () => {
       var _a3;
@@ -67729,7 +67742,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-status-error::before { background: var(--color-red); }
 .vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
-.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

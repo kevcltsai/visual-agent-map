@@ -1160,8 +1160,12 @@ export class VisualAgentMapView extends ItemView {
   getState(): Record<string, unknown> {
     return { file: this.path };
   }
-  async setState(state: Record<string, unknown>, result: { history: boolean }): Promise<void> {
-    if (typeof state.file === "string" && state.file !== this.path) await this.openMap(state.file);
+  async setState(state: Record<string, unknown>, result: { history: boolean; layout?: boolean }): Promise<void> {
+    if (typeof state.file === "string" && state.file !== this.path) {
+      await this.openMap(state.file);
+      // Another map in the same tab: ask the workspace to redraw the tab and the window title, which names the map.
+      result.layout = true;
+    }
     await super.setState(state, result);
   }
   /** Keeps the chat's current-note chip and the source-note guess in step with which notes are open and shown. */

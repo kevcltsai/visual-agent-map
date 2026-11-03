@@ -183,6 +183,22 @@ test('Bug bash E #13: in a narrow pane the toolbar actions wrap inside the pane 
   assert.match(css, /\.vam-workspace\.has-inspector \.vam-zoom-controls \{ right: auto; left: 12px; \}/, 'the inspector shift rule stays');
 });
 
+test('Bug bash E #35: opening another map in the same tab asks the workspace to refresh the window title; the same map or no file does not', async () => {
+  const { view } = makeView();
+  const opened = [];
+  view.openMap = async file => { opened.push(file); view.path = file; };
+  const swap = { history: true };
+  await view.setState({ file: 'Other/Map.md' }, swap);
+  assert.deepEqual(opened, ['Other/Map.md']);
+  assert.equal(swap.layout, true, 'result.layout makes Obsidian redraw the tab and the OS window title');
+  const same = { history: true };
+  await view.setState({ file: 'Other/Map.md' }, same);
+  assert.equal(same.layout, undefined, 'the title refresh itself sets the same state again: no layout loop');
+  const none = { history: true };
+  await view.setState({}, none);
+  assert.equal(none.layout, undefined);
+});
+
 test('the empty-map hint ignores pointer events but its Topic button receives them', () => {
   assert.match(rule('.vam-empty'), /pointer-events: none/);
   assert.match(rule('.vam-empty button'), /pointer-events: auto/);

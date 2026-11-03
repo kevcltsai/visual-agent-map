@@ -37,6 +37,7 @@ __export(main_exports, {
   markdownImages: () => markdownImages,
   normalizeNoteStyleByKind: () => normalizeNoteStyleByKind,
   normalizeNoteStyleRecipeMarker: () => normalizeNoteStyleRecipeMarker,
+  obsidianAppLanguage: () => obsidianAppLanguage,
   settingsFromSaved: () => settingsFromSaved,
   visualReferencesMarkdown: () => visualReferencesMarkdown
 });
@@ -196,8 +197,8 @@ var en = {
   "ui.claude_code_status": "Claude Code status",
   "ui.claude_cli_found_0": "Claude Code CLI found: {0}",
   "ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it": "Claude Code CLI was not found. Install it and check the configured path.",
-  "ui.claude_usage_notice": "Claude account usage notice",
-  "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses": "VAM runs Claude tasks through your local Claude Code sign-in. Usage and limits depend on your Claude account or plan.",
+  "ui.claude_usage_notice": "Before sending to Claude",
+  "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses": "To answer, VAM sends your message and what the task needs from the current map (and any notes you include) to Claude, through the Claude Code sign-in on this computer. It uses your Claude account's usage; how much you can use depends on your Claude plan.",
   "ui.install_and_connect_claude_code": "Install and connect Claude Code",
   "ui.claude_code_is_only_needed_for_ai_tasks": "Claude Code is only needed for AI tasks. You can create and edit mind maps without it.",
   "ui.install_claude_code_and_sign_in_with_your_claude_account": "Install Claude Code and sign in with your Claude account: ",
@@ -452,9 +453,9 @@ var en = {
   "ui.aim_retry_subtopics": "Retry subtopic planning",
   "ui.card_resize_label": "Card width",
   "ui.card_height_label": "Card height",
-  "ui.codex_allowance_notice": "Codex allowance notice",
-  "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
-  "ui.understand_and_run": "Understand and run",
+  "ui.codex_allowance_notice": "Before sending to Codex",
+  "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "To answer, VAM sends your message and what the task needs from the current map (and any notes you include) to Codex, through your signed-in Codex account. It uses that account's Codex allowance; how much you can use depends on your ChatGPT plan.",
+  "ui.understand_and_run": "Agree and send",
   "ui.install_and_connect_codex": "Install and connect Codex",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "Open the official Codex CLI installation guide and complete installation: ",
   "ui.official_codex_cli_installation_guide": "Official Codex CLI installation guide",
@@ -585,6 +586,7 @@ var en = {
   "ui.source_topics": "Source topics",
   "ui.expand": "Expand",
   "ui.expansion_suggestions": "Expansion suggestions",
+  "ui.expansion_suggestions_none": "There are no expansion suggestions for this topic yet. Choose \u201CAI explore\u201D to have the AI suggest subtopics; you review them here before anything is created.",
   "ui.expansion_suggestions_changed_open_them_again": "Expansion suggestions changed. Open them again.",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di": "Suggest the most useful expansion direction, or follow the direction I specify.",
   "ui.no_mind_map_is_available": "No mind map is available.",
@@ -1227,7 +1229,7 @@ var en = {
   "ui.structure_review_not_started": "The structure review did not start.",
   "ui.map_chat_open": "Open AI chat",
   "ui.map_chat_close": "Close AI chat",
-  "ui.map_chat_title": "Ask AI about this map",
+  "ui.map_chat_title": "Ask AI",
   "ui.map_chat_references": "References for the AI",
   "ui.map_chat_input_label": "Message to the AI",
   "ui.map_chat_input_placeholder": "Ask a question, or ask the AI to change the map. Drag a topic card or a note here to add it as a reference.",
@@ -1236,6 +1238,9 @@ var en = {
   "ui.map_chat_style_label": "Answer length",
   "ui.map_chat_style_concise": "Concise",
   "ui.map_chat_style_detailed": "Detailed",
+  "ui.map_chat_style_concise_hint": "Short answers that get to the point",
+  "ui.map_chat_style_detailed_hint": "Longer answers with more explanation",
+  "ui.map_chat_model_short": "Model",
   "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
   "ui.map_chat_more_detail": "Say it in more detail",
   "ui.map_chat_more_detail_asked": "Say it in more detail.",
@@ -1373,8 +1378,9 @@ var en = {
   "ui.map_chat_plan_group_research_0": "Research and AI work ({0})",
   "ui.map_chat_plan_group_view_0": "Map and view ({0})",
   "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
-  "ui.map_chat_empty_log": "No messages yet. Type below, or pick a suggestion.",
+  "ui.map_chat_empty_log": "No messages yet. The AI can build or extend this map, research its topics, or rearrange it. Try one of these, or type your own:",
   "ui.map_chat_canvas_building": "Building the map\u2026",
+  "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
   "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",
   "ui.map_chat_plan_replace_hint": "Sending a new message cancels this plan.",
   "ui.map_chat_plan_irreversible": "Cannot be undone once applied.",
@@ -1385,6 +1391,7 @@ var en = {
   "ui.map_chat_stage_preparing": "Preparing",
   "ui.map_chat_not_sent_draft": "Not sent. Your message is back in the box.",
   "ui.map_chat_not_sent_kept": "Not sent. The conversation is unchanged.",
+  "ui.map_chat_stage_consent": "Waiting for you to confirm AI usage",
   "ui.map_chat_stage_waiting": "Waiting for the model",
   "ui.map_chat_stage_writing": "Writing",
   "ui.map_chat_stage_applying": "Applying",
@@ -1516,6 +1523,10 @@ var en = {
   "ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett": "Codex CLI was not found: {0}. Set the Codex CLI path in VAM Settings.",
   "ui.codex_app_server_is_ready_0": "Codex App Server is ready: {0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server check failed: {0}",
+  "ui.ai_not_ready_model_0_1": "{0} is not available in {1} right now. Pick another model, or check the connection.",
+  "ui.ai_not_ready_error_0_1": "{0} is not ready ({1}). It may not be running or signed in.",
+  "ui.ai_not_ready_unknown_0": "{0} is not ready. It may not be signed in, or it did not list its models.",
+  "ui.ai_not_ready_where": "Settings \u2192 Visual Agent Map \u2192 AI connection shows its status.",
   "ui.current_model_is_unavailable": "Current model is unavailable",
   "ui.auto": "Auto",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "Auto uses Low for simple tasks and Medium for complex synthesis; manual choices are preserved.",
@@ -2617,8 +2628,8 @@ var zhCN = {
   "ui.claude_code_status": "Claude Code \u72B6\u6001",
   "ui.claude_cli_found_0": "\u627E\u5230 Claude Code CLI\uFF1A{0}",
   "ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it": "\u627E\u4E0D\u5230 Claude Code CLI\u3002\u8BF7\u5B89\u88C5\u5E76\u68C0\u67E5\u8BBE\u7F6E\u7684\u8DEF\u5F84\u3002",
-  "ui.claude_usage_notice": "Claude \u8D26\u53F7\u4F7F\u7528\u63D0\u9192",
-  "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses": "VAM \u4F1A\u901A\u8FC7\u672C\u673A Claude Code \u767B\u5F55\u72B6\u6001\u8FD0\u884C\u4EFB\u52A1\u3002\u53EF\u7528\u91CF\u4E0E\u9650\u5236\u4F9D\u4F60\u7684 Claude \u8D26\u53F7\u6216\u65B9\u6848\u800C\u5B9A\u3002",
+  "ui.claude_usage_notice": "\u53D1\u9001\u5230 Claude \u4E4B\u524D",
+  "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses": "\u4E3A\u4E86\u56DE\u7B54\uFF0CVAM \u4F1A\u628A\u4F60\u7684\u6D88\u606F\u3001\u5F53\u524D\u5730\u56FE\u4E2D\u8FD9\u9879\u5DE5\u4F5C\u9700\u8981\u7684\u5185\u5BB9\uFF08\u4EE5\u53CA\u4F60\u9644\u4E0A\u7684\u7B14\u8BB0\uFF09\u901A\u8FC7\u8FD9\u53F0\u7535\u8111\u4E0A\u767B\u5F55\u7684 Claude Code \u53D1\u9001\u5230 Claude\uFF0C\u5E76\u4F7F\u7528\u4F60\u7684 Claude \u8D26\u53F7\u989D\u5EA6\uFF1B\u53EF\u7528\u591A\u5C11\u4F9D\u4F60\u7684 Claude \u65B9\u6848\u800C\u5B9A\u3002",
   "ui.install_and_connect_claude_code": "\u5B89\u88C5\u5E76\u8FDE\u63A5 Claude Code",
   "ui.claude_code_is_only_needed_for_ai_tasks": "\u53EA\u6709 AI \u4EFB\u52A1\u9700\u8981 Claude Code\uFF1B\u4F60\u4ECD\u53EF\u521B\u5EFA\u53CA\u7F16\u8F91\u5FC3\u667A\u56FE\u3002",
   "ui.install_claude_code_and_sign_in_with_your_claude_account": "\u5B89\u88C5 Claude Code\uFF0C\u5E76\u4F7F\u7528 Claude \u8D26\u53F7\u767B\u5F55\uFF1A",
@@ -2873,9 +2884,9 @@ var zhCN = {
   "ui.aim_retry_subtopics": "\u91CD\u65B0\u4EA7\u751F\u5B50\u8BAE\u9898",
   "ui.card_resize_label": "\u5361\u7247\u5BBD\u5EA6",
   "ui.card_height_label": "\u5361\u7247\u9AD8\u5EA6",
-  "ui.codex_allowance_notice": "Codex \u989D\u5EA6\u63D0\u9192",
-  "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM \u4F1A\u901A\u8FC7\u4F60\u5F53\u524D\u767B\u5F55\u7684 Codex \u8D26\u53F7\u8FD0\u884C AI \u4EFB\u52A1\uFF0C\u5E76\u4F7F\u7528\u8BE5\u8D26\u53F7\u7684 Codex \u4F7F\u7528\u989D\u5EA6\u3002\u53EF\u7528\u989D\u5EA6\u4E0E\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
-  "ui.understand_and_run": "\u4E86\u89E3\u5E76\u8FD0\u884C",
+  "ui.codex_allowance_notice": "\u53D1\u9001\u5230 Codex \u4E4B\u524D",
+  "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "\u4E3A\u4E86\u56DE\u7B54\uFF0CVAM \u4F1A\u628A\u4F60\u7684\u6D88\u606F\u3001\u5F53\u524D\u5730\u56FE\u4E2D\u8FD9\u9879\u5DE5\u4F5C\u9700\u8981\u7684\u5185\u5BB9\uFF08\u4EE5\u53CA\u4F60\u9644\u4E0A\u7684\u7B14\u8BB0\uFF09\u901A\u8FC7\u4F60\u767B\u5F55\u7684 Codex \u8D26\u53F7\u53D1\u9001\u5230 Codex\uFF0C\u5E76\u4F7F\u7528\u8BE5\u8D26\u53F7\u7684 Codex \u989D\u5EA6\uFF1B\u53EF\u7528\u591A\u5C11\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
+  "ui.understand_and_run": "\u540C\u610F\u5E76\u53D1\u9001",
   "ui.install_and_connect_codex": "\u5B89\u88C5\u5E76\u8FDE\u63A5 Codex",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "\u6253\u5F00\u5B98\u65B9 Codex CLI \u5B89\u88C5\u6307\u5357\u5E76\u5B8C\u6210\u5B89\u88C5\uFF1A",
   "ui.official_codex_cli_installation_guide": "Codex CLI \u5B98\u65B9\u5B89\u88C5\u6307\u5357",
@@ -3006,6 +3017,7 @@ var zhCN = {
   "ui.source_topics": "\u6765\u6E90\u8BAE\u9898",
   "ui.expand": "\u5C55\u5F00",
   "ui.expansion_suggestions": "\u5C55\u5F00\u5EFA\u8BAE",
+  "ui.expansion_suggestions_none": "\u8FD9\u4E2A\u8BAE\u9898\u8FD8\u6CA1\u6709\u5C55\u5F00\u5EFA\u8BAE\u3002\u70B9\u201CAI \u63A2\u7D22\u201D\u8BA9 AI \u5EFA\u8BAE\u5B50\u8BAE\u9898\uFF1B\u521B\u5EFA\u4E4B\u524D\u4F1A\u5148\u5728\u8FD9\u91CC\u8BA9\u4F60\u68C0\u67E5\u3002",
   "ui.expansion_suggestions_changed_open_them_again": "\u5C55\u5F00\u5EFA\u8BAE\u5DF2\u53D8\u66F4\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u3002",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di": "\u8BF7\u5EFA\u8BAE\u6700\u6709\u5E2E\u52A9\u7684\u5C55\u5F00\u65B9\u5411\uFF1B\u82E5\u6211\u6307\u5B9A\u65B9\u5411\u5C31\u4F9D\u6307\u5B9A\u65B9\u5411\u62C6\u89E3\u3002",
   "ui.no_mind_map_is_available": "\u5F53\u524D\u6CA1\u6709\u53EF\u7528\u7684\u5FC3\u667A\u56FE\u3002",
@@ -3648,7 +3660,7 @@ var zhCN = {
   "ui.structure_review_not_started": "\u7ED3\u6784\u67E5\u770B\u6CA1\u6709\u5F00\u59CB\u3002",
   "ui.map_chat_open": "\u6253\u5F00 AI \u5BF9\u8BDD",
   "ui.map_chat_close": "\u5173\u95ED AI \u5BF9\u8BDD",
-  "ui.map_chat_title": "\u8BE2\u95EE AI \u5173\u4E8E\u8FD9\u5F20\u56FE",
+  "ui.map_chat_title": "\u95EE AI",
   "ui.map_chat_references": "\u7ED9 AI \u7684\u5F15\u7528",
   "ui.map_chat_input_label": "\u53D1\u7ED9 AI \u7684\u6D88\u606F",
   "ui.map_chat_input_placeholder": "\u63D0\u95EE\uFF0C\u6216\u8BF7 AI \u4FEE\u6539\u8FD9\u5F20\u56FE\u3002\u628A\u8BAE\u9898\u5361\u6216\u7B14\u8BB0\u62D6\u5230\u8FD9\u91CC\u5C31\u80FD\u5F15\u7528\u3002",
@@ -3657,6 +3669,9 @@ var zhCN = {
   "ui.map_chat_style_label": "\u56DE\u7B54\u957F\u5EA6",
   "ui.map_chat_style_concise": "\u7CBE\u7B80",
   "ui.map_chat_style_detailed": "\u8BE6\u7EC6",
+  "ui.map_chat_style_concise_hint": "\u7B80\u77ED\u3001\u76F4\u63A5\u7684\u56DE\u590D",
+  "ui.map_chat_style_detailed_hint": "\u8F83\u957F\u3001\u8BF4\u660E\u8F83\u591A\u7684\u56DE\u590D",
+  "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u5F53\u524D\u6A21\u578B\uFF1A\u804A\u5929\u4E0E\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A",
   "ui.map_chat_more_detail": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9",
   "ui.map_chat_more_detail_asked": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9\u3002",
@@ -3794,8 +3809,9 @@ var zhCN = {
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u4E0E AI \u4F5C\u4E1A\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5730\u56FE\u4E0E\u753B\u9762\uFF08{0}\uFF09",
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8BDD\u8BF4\u8BF4\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48",
-  "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002\u5728\u4E0B\u9762\u8F93\u5165\uFF0C\u6216\u70B9\u4E00\u6761\u5EFA\u8BAE\u3002",
+  "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u6269\u5145\u8FD9\u5F20\u5730\u56FE\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8BAE\u9898\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u5E03\u5C40\u3002\u8BD5\u8BD5\u4E0B\u9762\u7684\u4F8B\u5B50\uFF0C\u6216\u81EA\u5DF1\u8F93\u5165\uFF1A",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5730\u56FE\u2026",
+  "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u786E\u8BA4\u4F7F\u7528\u989D\u5EA6\u3002\u540C\u610F\u540E\u624D\u4F1A\u5F00\u59CB\u5EFA\u7ACB\u5730\u56FE\u3002",
   "ui.map_chat_canvas_plan": "\u786E\u8BA4\u8BA1\u5212\u540E\uFF0C\u5730\u56FE\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC",
   "ui.map_chat_plan_replace_hint": "\u53D1\u9001\u65B0\u6D88\u606F\u4F1A\u53D6\u6D88\u8FD9\u4EFD\u8BA1\u5212",
   "ui.map_chat_plan_irreversible": "\u5E94\u7528\u540E\u4E0D\u53EF\u64A4\u9500",
@@ -3806,6 +3822,7 @@ var zhCN = {
   "ui.map_chat_stage_preparing": "\u51C6\u5907\u4E2D",
   "ui.map_chat_not_sent_draft": "\u6CA1\u6709\u53D1\u9001\uFF0C\u6D88\u606F\u5DF2\u653E\u56DE\u8F93\u5165\u6846\u3002",
   "ui.map_chat_not_sent_kept": "\u6CA1\u6709\u53D1\u9001\uFF0C\u539F\u6765\u7684\u5BF9\u8BDD\u6CA1\u6709\u6539\u53D8\u3002",
+  "ui.map_chat_stage_consent": "\u7B49\u5F85\u4F60\u786E\u8BA4\u4F7F\u7528\u989D\u5EA6",
   "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
   "ui.map_chat_stage_writing": "\u64B0\u5199\u4E2D",
   "ui.map_chat_stage_applying": "\u5E94\u7528\u4E2D",
@@ -3937,6 +3954,10 @@ var zhCN = {
   "ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett": "\u672A\u627E\u5230 Codex CLI\uFF1A{0}\u3002\u8BF7\u5728 VAM Settings \u8BBE\u7F6E\u201CCodex CLI \u8DEF\u5F84\u201D\u3002",
   "ui.codex_app_server_is_ready_0": "Codex App Server \u5DF2\u5C31\u7EEA\uFF1A{0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server \u68C0\u67E5\u5931\u8D25\uFF1A{0}",
+  "ui.ai_not_ready_model_0_1": "{1} \u76EE\u524D\u65E0\u6CD5\u4F7F\u7528 {0}\u3002\u8BF7\u6362\u4E00\u4E2A\u6A21\u578B\uFF0C\u6216\u68C0\u67E5\u8FDE\u63A5\u3002",
+  "ui.ai_not_ready_error_0_1": "{0} \u8FD8\u6CA1\u51C6\u5907\u597D\uFF08{1}\uFF09\u3002\u53EF\u80FD\u6CA1\u6709\u8FD0\u884C\u6216\u5C1A\u672A\u767B\u5F55\u3002",
+  "ui.ai_not_ready_unknown_0": "{0} \u8FD8\u6CA1\u51C6\u5907\u597D\u3002\u53EF\u80FD\u5C1A\u672A\u767B\u5F55\uFF0C\u6216\u6CA1\u6709\u62A5\u544A\u53EF\u7528\u7684\u6A21\u578B\u3002",
+  "ui.ai_not_ready_where": "\u53EF\u5728\u201C\u8BBE\u7F6E \u2192 Visual Agent Map \u2192 AI \u8FDE\u63A5\u201D\u67E5\u770B\u72B6\u6001\u3002",
   "ui.current_model_is_unavailable": "\u5F53\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528",
   "ui.auto": "\u81EA\u52A8 (Auto)",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52A8\u6A21\u5F0F\u4F1A\u5BF9\u7B80\u5355\u4EFB\u52A1\u4F7F\u7528 Low\u3001\u5BF9\u590D\u6742\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52A8\u9009\u62E9\u4E0D\u4F1A\u88AB\u8986\u76D6\u3002",
@@ -5038,8 +5059,8 @@ var zhTW = {
   "ui.claude_code_status": "Claude Code \u72C0\u614B",
   "ui.claude_cli_found_0": "\u627E\u5230 Claude Code CLI\uFF1A{0}",
   "ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it": "\u627E\u4E0D\u5230 Claude Code CLI\u3002\u8ACB\u5B89\u88DD\u4E26\u6AA2\u67E5\u8A2D\u5B9A\u7684\u8DEF\u5F91\u3002",
-  "ui.claude_usage_notice": "Claude \u5E33\u865F\u4F7F\u7528\u63D0\u9192",
-  "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses": "VAM \u6703\u900F\u904E\u672C\u6A5F Claude Code \u767B\u5165\u72C0\u614B\u57F7\u884C\u4EFB\u52D9\u3002\u53EF\u7528\u91CF\u8207\u9650\u5236\u4F9D\u4F60\u7684 Claude \u5E33\u865F\u6216\u65B9\u6848\u800C\u5B9A\u3002",
+  "ui.claude_usage_notice": "\u9001\u5230 Claude \u4E4B\u524D",
+  "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses": "\u70BA\u4E86\u56DE\u7B54\uFF0CVAM \u6703\u628A\u4F60\u7684\u8A0A\u606F\u3001\u76EE\u524D\u5730\u5716\u4E2D\u9019\u9805\u5DE5\u4F5C\u9700\u8981\u7684\u5167\u5BB9\uFF08\u4EE5\u53CA\u4F60\u9644\u4E0A\u7684\u7B46\u8A18\uFF09\u900F\u904E\u9019\u53F0\u96FB\u8166\u4E0A\u767B\u5165\u7684 Claude Code \u9001\u5230 Claude\uFF0C\u4E26\u4F7F\u7528\u4F60\u7684 Claude \u5E33\u865F\u984D\u5EA6\uFF1B\u53EF\u7528\u591A\u5C11\u4F9D\u4F60\u7684 Claude \u65B9\u6848\u800C\u5B9A\u3002",
   "ui.install_and_connect_claude_code": "\u5B89\u88DD\u4E26\u9023\u63A5 Claude Code",
   "ui.claude_code_is_only_needed_for_ai_tasks": "\u53EA\u6709 AI \u4EFB\u52D9\u9700\u8981 Claude Code\uFF1B\u4F60\u4ECD\u53EF\u5EFA\u7ACB\u53CA\u7DE8\u8F2F\u5FC3\u667A\u5716\u3002",
   "ui.install_claude_code_and_sign_in_with_your_claude_account": "\u5B89\u88DD Claude Code\uFF0C\u4E26\u4F7F\u7528 Claude \u5E33\u865F\u767B\u5165\uFF1A",
@@ -5294,9 +5315,9 @@ var zhTW = {
   "ui.aim_retry_subtopics": "\u91CD\u65B0\u7522\u751F\u5B50\u8B70\u984C",
   "ui.card_resize_label": "\u5361\u7247\u5BEC\u5EA6",
   "ui.card_height_label": "\u5361\u7247\u9AD8\u5EA6",
-  "ui.codex_allowance_notice": "Codex \u984D\u5EA6\u63D0\u9192",
-  "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM \u6703\u900F\u904E\u4F60\u76EE\u524D\u767B\u5165\u7684 Codex \u5E33\u865F\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E26\u4F7F\u7528\u8A72\u5E33\u865F\u7684 Codex \u4F7F\u7528\u984D\u5EA6\u3002\u53EF\u7528\u984D\u5EA6\u8207\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
-  "ui.understand_and_run": "\u4E86\u89E3\u4E26\u57F7\u884C",
+  "ui.codex_allowance_notice": "\u9001\u5230 Codex \u4E4B\u524D",
+  "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "\u70BA\u4E86\u56DE\u7B54\uFF0CVAM \u6703\u628A\u4F60\u7684\u8A0A\u606F\u3001\u76EE\u524D\u5730\u5716\u4E2D\u9019\u9805\u5DE5\u4F5C\u9700\u8981\u7684\u5167\u5BB9\uFF08\u4EE5\u53CA\u4F60\u9644\u4E0A\u7684\u7B46\u8A18\uFF09\u900F\u904E\u4F60\u767B\u5165\u7684 Codex \u5E33\u865F\u9001\u5230 Codex\uFF0C\u4E26\u4F7F\u7528\u8A72\u5E33\u865F\u7684 Codex \u984D\u5EA6\uFF1B\u53EF\u7528\u591A\u5C11\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
+  "ui.understand_and_run": "\u540C\u610F\u4E26\u9001\u51FA",
   "ui.install_and_connect_codex": "\u5B89\u88DD\u4E26\u9023\u63A5 Codex",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "\u958B\u555F\u5B98\u65B9 Codex CLI \u5B89\u88DD\u6307\u5357\u4E26\u5B8C\u6210\u5B89\u88DD\uFF1A",
   "ui.official_codex_cli_installation_guide": "Codex CLI \u5B98\u65B9\u5B89\u88DD\u6307\u5357",
@@ -5427,6 +5448,7 @@ var zhTW = {
   "ui.source_topics": "\u4F86\u6E90\u8B70\u984C",
   "ui.expand": "\u5C55\u958B",
   "ui.expansion_suggestions": "\u5C55\u958B\u5EFA\u8B70",
+  "ui.expansion_suggestions_none": "\u9019\u500B\u8B70\u984C\u9084\u6C92\u6709\u5C55\u958B\u5EFA\u8B70\u3002\u6309\u300CAI \u63A2\u7D22\u300D\u8B93 AI \u5EFA\u8B70\u5B50\u8B70\u984C\uFF1B\u5EFA\u7ACB\u4E4B\u524D\u6703\u5148\u5728\u9019\u88E1\u8B93\u4F60\u6AA2\u67E5\u3002",
   "ui.expansion_suggestions_changed_open_them_again": "\u5C55\u958B\u5EFA\u8B70\u5DF2\u8B8A\u66F4\uFF0C\u8ACB\u91CD\u65B0\u958B\u555F\u3002",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di": "\u8ACB\u5EFA\u8B70\u6700\u6709\u5E6B\u52A9\u7684\u5C55\u958B\u65B9\u5411\uFF1B\u82E5\u6211\u6307\u5B9A\u65B9\u5411\u5C31\u4F9D\u6307\u5B9A\u65B9\u5411\u62C6\u89E3\u3002",
   "ui.no_mind_map_is_available": "\u76EE\u524D\u6C92\u6709\u53EF\u7528\u7684\u5FC3\u667A\u5716\u3002",
@@ -6069,7 +6091,7 @@ var zhTW = {
   "ui.structure_review_not_started": "\u7D50\u69CB\u6AA2\u8996\u6C92\u6709\u958B\u59CB\u3002",
   "ui.map_chat_open": "\u958B\u555F AI \u5C0D\u8A71",
   "ui.map_chat_close": "\u95DC\u9589 AI \u5C0D\u8A71",
-  "ui.map_chat_title": "\u8A62\u554F AI \u95DC\u65BC\u9019\u5F35\u5716",
+  "ui.map_chat_title": "\u554F AI",
   "ui.map_chat_references": "\u7D66 AI \u7684\u5F15\u7528",
   "ui.map_chat_input_label": "\u50B3\u7D66 AI \u7684\u8A0A\u606F",
   "ui.map_chat_input_placeholder": "\u63D0\u554F\uFF0C\u6216\u8ACB AI \u4FEE\u6539\u9019\u5F35\u5716\u3002\u628A\u8B70\u984C\u5361\u6216\u7B46\u8A18\u62D6\u5230\u9019\u88E1\u5C31\u80FD\u5F15\u7528\u3002",
@@ -6078,6 +6100,9 @@ var zhTW = {
   "ui.map_chat_style_label": "\u56DE\u7B54\u9577\u5EA6",
   "ui.map_chat_style_concise": "\u7CBE\u7C21",
   "ui.map_chat_style_detailed": "\u8A73\u7D30",
+  "ui.map_chat_style_concise_hint": "\u7C21\u77ED\u3001\u76F4\u63A5\u7684\u56DE\u8986",
+  "ui.map_chat_style_detailed_hint": "\u8F03\u9577\u3001\u8AAA\u660E\u8F03\u591A\u7684\u56DE\u8986",
+  "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u76EE\u524D\u6A21\u578B\uFF1A\u804A\u5929\u8207\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B",
   "ui.map_chat_more_detail": "\u8AAA\u8A73\u7D30\u4E00\u9EDE",
   "ui.map_chat_more_detail_asked": "\u8AAA\u8A73\u7D30\u4E00\u9EDE\u3002",
@@ -6215,8 +6240,9 @@ var zhTW = {
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u8207 AI \u4F5C\u696D\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5FC3\u667A\u5716\u8207\u756B\u9762\uFF08{0}\uFF09",
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8A71\u8AAA\u8AAA\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC",
-  "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002\u5728\u4E0B\u9762\u8F38\u5165\uFF0C\u6216\u9EDE\u4E00\u5247\u5EFA\u8B70\u3002",
+  "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u64F4\u5145\u9019\u5F35\u5FC3\u667A\u5716\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8B70\u984C\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u7248\u9762\u3002\u8A66\u8A66\u4E0B\u9762\u7684\u4F8B\u5B50\uFF0C\u6216\u81EA\u5DF1\u8F38\u5165\uFF1A",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5FC3\u667A\u5716\u2026",
+  "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u78BA\u8A8D\u4F7F\u7528\u984D\u5EA6\u3002\u540C\u610F\u5F8C\u624D\u6703\u958B\u59CB\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002",
   "ui.map_chat_canvas_plan": "\u78BA\u8A8D\u8A08\u756B\u5F8C\uFF0C\u5FC3\u667A\u5716\u6703\u51FA\u73FE\u5728\u9019\u88E1",
   "ui.map_chat_plan_replace_hint": "\u9001\u51FA\u65B0\u8A0A\u606F\u6703\u53D6\u6D88\u9019\u4EFD\u8A08\u756B",
   "ui.map_chat_plan_irreversible": "\u5957\u7528\u5F8C\u4E0D\u53EF\u5FA9\u539F",
@@ -6227,6 +6253,7 @@ var zhTW = {
   "ui.map_chat_stage_preparing": "\u6E96\u5099\u4E2D",
   "ui.map_chat_not_sent_draft": "\u6C92\u6709\u9001\u51FA\uFF0C\u8A0A\u606F\u5DF2\u653E\u56DE\u8F38\u5165\u6846\u3002",
   "ui.map_chat_not_sent_kept": "\u6C92\u6709\u9001\u51FA\uFF0C\u539F\u672C\u7684\u5C0D\u8A71\u6C92\u6709\u6539\u8B8A\u3002",
+  "ui.map_chat_stage_consent": "\u7B49\u5F85\u4F60\u78BA\u8A8D\u4F7F\u7528\u984D\u5EA6",
   "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
   "ui.map_chat_stage_writing": "\u64B0\u5BEB\u4E2D",
   "ui.map_chat_stage_applying": "\u5957\u7528\u4E2D",
@@ -6358,6 +6385,10 @@ var zhTW = {
   "ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett": "\u672A\u627E\u5230 Codex CLI\uFF1A{0}\u3002\u8ACB\u5728 VAM Settings \u8A2D\u5B9A\u300CCodex CLI \u8DEF\u5F91\u300D\u3002",
   "ui.codex_app_server_is_ready_0": "Codex App Server \u5DF2\u5C31\u7DD2\uFF1A{0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server \u6AA2\u67E5\u5931\u6557\uFF1A{0}",
+  "ui.ai_not_ready_model_0_1": "{1} \u76EE\u524D\u7121\u6CD5\u4F7F\u7528 {0}\u3002\u8ACB\u63DB\u4E00\u500B\u6A21\u578B\uFF0C\u6216\u6AA2\u67E5\u9023\u7DDA\u3002",
+  "ui.ai_not_ready_error_0_1": "{0} \u9084\u6C92\u6E96\u5099\u597D\uFF08{1}\uFF09\u3002\u53EF\u80FD\u6C92\u6709\u57F7\u884C\u6216\u5C1A\u672A\u767B\u5165\u3002",
+  "ui.ai_not_ready_unknown_0": "{0} \u9084\u6C92\u6E96\u5099\u597D\u3002\u53EF\u80FD\u5C1A\u672A\u767B\u5165\uFF0C\u6216\u6C92\u6709\u56DE\u5831\u53EF\u7528\u7684\u6A21\u578B\u3002",
+  "ui.ai_not_ready_where": "\u53EF\u5728\u300C\u8A2D\u5B9A \u2192 Visual Agent Map \u2192 AI \u9023\u7DDA\u300D\u67E5\u770B\u72C0\u614B\u3002",
   "ui.current_model_is_unavailable": "\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528",
   "ui.auto": "\u81EA\u52D5 (Auto)",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52D5\u6A21\u5F0F\u6703\u5C0D\u7C21\u55AE\u4EFB\u52D9\u4F7F\u7528 Low\u3001\u5C0D\u8907\u96DC\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52D5\u9078\u64C7\u4E0D\u6703\u88AB\u8986\u84CB\u3002",
@@ -7665,8 +7696,28 @@ function intlLocaleOf(locale) {
   return entryOf(locale).intl;
 }
 var language = FALLBACK_LANGUAGE;
-function initialUiLanguage(saved) {
-  return isUiLanguage(saved) ? saved : FALLBACK_LANGUAGE;
+function uiLanguageFromAppLocale(locale) {
+  if (typeof locale !== "string" || !locale.trim()) return null;
+  const tag = locale.trim().toLowerCase().replace(/_/g, "-");
+  const byId = (id) => {
+    var _a2;
+    const found = (_a2 = registry.find((item) => item.id.toLowerCase() === id)) == null ? void 0 : _a2.id;
+    return isUiLanguage(found) ? found : null;
+  };
+  const exact = byId(tag);
+  if (exact) return exact;
+  if (/^zh(-|$)/.test(tag)) {
+    const traditional = /(^|-)(hant|tw|hk|mo)(-|$)/.test(tag.slice(2));
+    const id = traditional ? "zh-TW" : "zh-CN";
+    return isUiLanguage(id) ? id : null;
+  }
+  return byId(tag.split("-")[0]);
+}
+function initialUiLanguage(saved, appLocale) {
+  var _a2;
+  if (isUiLanguage(saved)) return saved;
+  if (saved === void 0 || saved === null) return (_a2 = uiLanguageFromAppLocale(appLocale)) != null ? _a2 : FALLBACK_LANGUAGE;
+  return FALLBACK_LANGUAGE;
 }
 function uiLocale(value) {
   return isUiLanguage(value) ? value : FALLBACK_LANGUAGE;
@@ -21396,10 +21447,17 @@ function chatOverlayWidth(paneWidth, setWidth) {
   return Math.max(MAP_CHAT_WIDTH_MIN, Math.min(setWidth, paneWidth - MAP_CHAT_OVERLAY_MARGIN));
 }
 function chatSuggestionKeys(context) {
-  const keys = !context.hasTopics ? ["ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"] : context.selected > 1 ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"] : context.selected === 1 ? ["ui.map_chat_suggest_one_expand", "ui.map_chat_suggest_one_research", "ui.map_chat_suggest_one_summary"] : ["ui.map_chat_suggest_all_missing", "ui.map_chat_suggest_all_layout", "ui.map_chat_suggest_all_collapse"];
+  const keys = !context.hasTopics ? ["ui.map_chat_example_research", "ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"] : context.selected > 1 ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"] : context.selected === 1 ? ["ui.map_chat_suggest_one_expand", "ui.map_chat_suggest_one_research", "ui.map_chat_suggest_one_summary"] : ["ui.map_chat_suggest_all_missing", "ui.map_chat_suggest_all_layout", "ui.map_chat_suggest_all_collapse"];
   if (context.hasNote)
     keys.push(context.hasTopics ? "ui.map_chat_suggest_note_add" : "ui.map_chat_suggest_empty_from_note");
   return keys;
+}
+var MAP_CHAT_OPEN_ENDED_KEYS = [
+  "ui.map_chat_suggest_empty_build",
+  "ui.map_chat_suggest_empty_new_map"
+];
+function chatSuggestionFill(text11, openEnded) {
+  return openEnded && /[A-Za-z]$/.test(text11) ? `${text11} ` : text11;
 }
 var MAP_CHAT_EXAMPLE_KEYS = [
   "ui.map_chat_example_research",
@@ -23810,7 +23868,8 @@ ${body}`);
     if (!marker2(fm["agent-map-node"])) return null;
     const language2 = this.scaffoldLanguage(content, fm);
     ensureNoteCssClass(fm);
-    fm.title = noteTitle(content, fm, file.basename);
+    const title = noteTitle(content, fm, file.basename);
+    if (fm.title !== void 0) fm.title = title;
     const owner = ownership2.get(file.path);
     let state = file.path.includes("/Archive/") ? "archived" : file.path.includes("/Unassigned/") ? "unassigned" : owner ? "active" : text5(fm["topic-state"], "unassigned");
     if (owner) {
@@ -23859,13 +23918,7 @@ ${body}`);
       delete fm["agent-map-references"];
       body = withoutReference(body);
     }
-    body = normalizeBodyOrder(
-      body,
-      text5(fm.title, file.basename),
-      text5(fm.summary, placeholder(textLanguage)),
-      language2,
-      textLanguage
-    );
+    body = normalizeBodyOrder(body, title, text5(fm.summary, placeholder(textLanguage)), language2, textLanguage);
     return `---
 ${(0, import_obsidian11.stringifyYaml)(fm)}---
 ${localizeHeadings(withReferenceLinks(body, fm, language2), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
@@ -29425,7 +29478,8 @@ function settledLine(line) {
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
   }
 }
-var STAGE_ORDER = { preparing: 0, waiting: 1, writing: 2, applying: 3 };
+var styleHintKey = (style) => style === "concise" ? "ui.map_chat_style_concise_hint" : "ui.map_chat_style_detailed_hint";
+var STAGE_ORDER = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 var LABEL_LIMIT2 = 40;
 var clip2 = (value, limit = LABEL_LIMIT2) => {
   const text11 = value.replace(/\s+/g, " ").trim();
@@ -29489,6 +29543,7 @@ var MapChatPanel = class {
     __publicField(this, "titleEl");
     __publicField(this, "closeEl");
     __publicField(this, "styleGroupEl");
+    __publicField(this, "styleTagEl");
     __publicField(this, "logLabelEl");
     __publicField(this, "guideEl");
     __publicField(this, "hintEl");
@@ -29505,6 +29560,8 @@ var MapChatPanel = class {
     __publicField(this, "inputEl");
     __publicField(this, "sendEl");
     __publicField(this, "modelEl");
+    /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
+    __publicField(this, "modelTagEl");
     __publicField(this, "styleEls", null);
     __publicField(this, "stopEl");
     __publicField(this, "saveEl");
@@ -29573,6 +29630,16 @@ var MapChatPanel = class {
   get isBusy() {
     return this.busy;
   }
+  /** The progress stage of the running turn, or null when nothing runs. */
+  get stageKind() {
+    var _a2, _b2;
+    return (_b2 = (_a2 = this.stage) == null ? void 0 : _a2.kind) != null ? _b2 : null;
+  }
+  /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
+  get awaitingConsent() {
+    var _a2;
+    return this.busy && ((_a2 = this.stage) == null ? void 0 : _a2.kind) === "consent";
+  }
   /** The window is laid over the canvas of a narrow pane. */
   get isOverlay() {
     return this.floating;
@@ -29590,6 +29657,10 @@ var MapChatPanel = class {
   }
   get draft() {
     return this.built ? this.inputEl.value : "";
+  }
+  /** Empties the message field (the user left the opening screen to start the map by hand). */
+  clearDraft() {
+    if (this.built) this.inputEl.value = "";
   }
   /** True when `element` is the message field. */
   isInput(element) {
@@ -29860,9 +29931,11 @@ ${typed}` : draft;
     const current = this.stage;
     if (!current || STAGE_ORDER[kind] <= STAGE_ORDER[current.kind]) return;
     this.slow = null;
-    this.stage = { kind, since: kind === "applying" ? this.clockNow() : current.since };
+    const fresh = kind === "applying" || current.kind === "consent";
+    this.stage = { kind, since: fresh ? this.clockNow() : current.since };
     this.paintStage();
     this.speakStage();
+    if (kind === "consent" || current.kind === "consent") this.renderBusy();
   }
   currentModelLabel() {
     var _a2, _b2;
@@ -29872,7 +29945,7 @@ ${typed}` : draft;
   /** The stage name, with the model that does the work after it; applying a plan is local work and names none. */
   stageLabel(kind) {
     const name = t(`ui.map_chat_stage_${kind}`);
-    return kind === "applying" || !this.stageModel ? name : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
+    return kind === "applying" || kind === "consent" || !this.stageModel ? name : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
   }
   elapsedText() {
     const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1e3)) : 0;
@@ -30218,6 +30291,11 @@ ${typed}` : draft;
     });
     this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
     this.titleEl = this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
+    this.modelTagEl = this.headEl.createSpan({
+      cls: "vam-map-chat-model-tag",
+      text: t("ui.map_chat_model_short"),
+      attr: { "aria-hidden": "true" }
+    });
     this.modelEl = this.headEl.createEl("select", {
       cls: "vam-map-chat-model dropdown",
       attr: { "aria-label": t("ui.map_chat_model_label") }
@@ -30292,7 +30370,13 @@ ${typed}` : draft;
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
     const side = form.createDiv("vam-map-chat-side");
-    const styleGroup = this.styleGroupEl = side.createDiv({
+    const length = side.createDiv("vam-map-chat-length");
+    this.styleTagEl = length.createSpan({
+      cls: "vam-map-chat-style-tag",
+      text: t("ui.map_chat_style_label"),
+      attr: { "aria-hidden": "true" }
+    });
+    const styleGroup = this.styleGroupEl = length.createDiv({
       cls: "vam-map-chat-style",
       attr: { role: "group", "aria-label": t("ui.map_chat_style_label") }
     });
@@ -30301,7 +30385,7 @@ ${typed}` : draft;
       const button = styleGroup.createEl("button", {
         cls: "vam-map-chat-style-option",
         text: label,
-        attr: { type: "button", "aria-pressed": "false" }
+        attr: { type: "button", "aria-pressed": "false", title: t(styleHintKey(style)) }
       });
       button.addEventListener("click", () => {
         this.host.setStyle(style);
@@ -30389,11 +30473,12 @@ ${typed}` : draft;
    * new language. Nothing is built again and the draft and the words of the messages stay as they are.
    */
   relabel() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     if (!this.built) return;
     this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
     this.titleEl.setText(t("ui.map_chat_title"));
     this.modelEl.setAttr("aria-label", t("ui.map_chat_model_label"));
+    this.modelTagEl.setText(t("ui.map_chat_model_short"));
     this.closeEl.setAttr("aria-label", t("ui.map_chat_close"));
     this.heroTitleEl.setText(t("ui.map_chat_hero_title"));
     this.guideEl.setText(t("ui.map_chat_empty_log"));
@@ -30405,6 +30490,9 @@ ${typed}` : draft;
     this.styleGroupEl.setAttr("aria-label", t("ui.map_chat_style_label"));
     (_a2 = this.styleEls) == null ? void 0 : _a2.concise.setText(t("ui.map_chat_style_concise"));
     (_b2 = this.styleEls) == null ? void 0 : _b2.detailed.setText(t("ui.map_chat_style_detailed"));
+    this.styleTagEl.setText(t("ui.map_chat_style_label"));
+    (_c = this.styleEls) == null ? void 0 : _c.concise.setAttr("title", t(styleHintKey("concise")));
+    (_d = this.styleEls) == null ? void 0 : _d.detailed.setAttr("title", t(styleHintKey("detailed")));
     this.sendEl.setText(t("ui.map_chat_send"));
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
     this.stopEl.setText(t("ui.map_chat_stop"));
@@ -30569,20 +30657,40 @@ ${typed}` : draft;
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
   /** A reply came in while the window is folded to its edge: the edge shows a dot. */
+  /**
+   * On the opening screen the message field and the examples come first: the model menu is a quiet last line, after the "empty
+   * map" button (so reading and Tab order match what is seen). In the window the head row (title, model, save, close) is on top.
+   * Elements are moved only when they are out of place, so a control that has the keyboard is not moved for nothing.
+   */
+  placeHeadAndEmptyMap(hero, showEmptyMap) {
+    const children = () => Array.from(this.bodyEl.children);
+    if (!hero) {
+      if (children()[0] !== this.headEl) this.bodyEl.insertBefore(this.headEl, this.bodyEl.firstChild);
+      return;
+    }
+    const tail = showEmptyMap ? [this.emptyMapEl, this.headEl] : [this.headEl];
+    const now = children().slice(-tail.length);
+    if (tail.every((el, index) => now[index] === el)) return;
+    for (const el of tail) {
+      el.remove();
+      this.bodyEl.insertBefore(el, null);
+    }
+  }
   markUnread() {
     if (this.shown || !this.built) return;
     this.unread = true;
     this.applyOpen();
   }
   // ---- suggested messages -----------------------------------------------------------------------------------------
-  /** Puts `text` into the message field and gives it the keyboard. Sending is always the user's own act. */
-  fill(text11) {
-    const draft = this.inputEl.value;
-    this.inputEl.value = draft.trim() ? `${draft.replace(/\s+$/, "")}
-${text11}` : text11;
+  /**
+   * Puts `text` into the message field in place of what was there and gives it the keyboard, with the cursor at the end (where an
+   * open-ended suggestion is finished). Sending is always the user's own act.
+   */
+  fill(text11, openEnded = false) {
+    const value = chatSuggestionFill(text11, openEnded);
+    this.inputEl.value = value;
     this.inputEl.focus();
-    const end = this.inputEl.value.length;
-    this.inputEl.setSelectionRange(end, end);
+    this.inputEl.setSelectionRange(value.length, value.length);
   }
   renderSuggestions() {
     if (!this.built) return;
@@ -30602,12 +30710,14 @@ ${text11}` : text11;
     this.suggestEl.hidden = keys.length === 0;
     for (const key2 of keys) {
       const text11 = t(key2);
+      const openEnded = MAP_CHAT_OPEN_ENDED_KEYS.includes(key2);
       const button = this.suggestEl.createEl("button", {
         cls: hero ? "vam-map-chat-example" : "vam-map-chat-suggestion",
-        text: text11,
+        // An open-ended suggestion is visibly unfinished: the user completes it in the field.
+        text: openEnded ? `${text11}\u2026` : text11,
         attr: { type: "button" }
       });
-      button.addEventListener("click", () => this.fill(text11));
+      button.addEventListener("click", () => this.fill(text11, openEnded));
     }
   }
   onDragOver(event) {
@@ -30675,10 +30785,7 @@ ${text11}` : text11;
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
-    if (showEmptyMap && this.bodyEl.children[this.bodyEl.children.length - 1] !== this.emptyMapEl) {
-      this.emptyMapEl.remove();
-      this.bodyEl.insertBefore(this.emptyMapEl, null);
-    }
+    this.placeHeadAndEmptyMap(hero, showEmptyMap);
     this.renderGuide();
     this.refreshSave();
     if (shown && hadUnread) this.scrollToEnd();
@@ -31185,8 +31292,9 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.el.toggleClass("is-busy", this.working);
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
-    this.stopEl.hidden = !this.working;
-    this.stopEl.toggleClass("is-hidden", !this.working);
+    const stoppable = this.working && !this.awaitingConsent;
+    this.stopEl.hidden = !stoppable;
+    this.stopEl.toggleClass("is-hidden", !stoppable);
     this.renderHint();
     (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
   }
@@ -33341,7 +33449,9 @@ function claudeCodeAiRuntime(get, checks) {
     readiness: async (model) => {
       const state = await checksOf(checks).refresh("claude");
       if (state.status === "missing") return { status: "missing" };
-      return state.status === "ready" && state.models.includes(model) ? { status: "ready" } : { status: "error" };
+      if (state.status === "ready")
+        return state.models.includes(model) ? { status: "ready" } : { status: "model-unavailable" };
+      return state.error ? { status: "error", error: state.error } : { status: "error" };
     },
     prewarm: (model, { effort, schema, webSearch }) => {
       get().prewarm(providerModelId(model), effort, schema, webSearch);
@@ -48107,6 +48217,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian33.Ite
     __publicField(this, "renderingCard", false);
     /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
     __publicField(this, "restoringFocus", false);
+    /** A focus restore was skipped because another window was active; done when this window is focused again. */
+    __publicField(this, "focusRestorePending", false);
     /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
     __publicField(this, "lastMapFocus", null);
     /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
@@ -48232,6 +48344,19 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian33.Ite
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
   }
+  onMapWindowFocus() {
+    var _a2, _b2, _c;
+    if (!this.focusRestorePending) return;
+    this.focusRestorePending = false;
+    const editor = this.editingTextId ? (_a2 = this.textEls.get(this.editingTextId)) == null ? void 0 : _a2.querySelector(".vam-text-node-input") : null;
+    const doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
+    if (editor && doc && focusIsLost(doc, this.contentEl)) {
+      editor.focus({ preventScroll: true });
+      (_c = editor.select) == null ? void 0 : _c.call(editor);
+      return;
+    }
+    this.restoreMapFocus(this.lastMapFocus);
+  }
   getViewType() {
     return VIEW_TYPE;
   }
@@ -48291,7 +48416,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian33.Ite
       );
   }
   async onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     this.closed = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = (_c = (_b2 = this.containerEl) == null ? void 0 : _b2.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
@@ -48316,8 +48441,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian33.Ite
     this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "blur", () => {
       this.spaceHeld = false;
     });
+    this.registerDomEvent((_n = (_m = this.contentEl.ownerDocument) == null ? void 0 : _m.defaultView) != null ? _n : window, "focus", () => this.onMapWindowFocus());
     this.bindClipboard();
-    (_n = (_m = this.contentEl).onWindowMigrated) == null ? void 0 : _n.call(_m, () => this.bindClipboard());
+    (_p = (_o = this.contentEl).onWindowMigrated) == null ? void 0 : _p.call(_o, () => this.bindClipboard());
     this.registerDomEvent(this.contentEl, "keydown", (event) => this.presentationKey(event), { capture: true });
     this.registerDomEvent(this.contentEl, "keydown", (event) => this.onMapKeydown(event));
     this.registerDomEvent(this.contentEl, "focusin", (event) => this.trackMapFocus(event.target));
@@ -48493,7 +48619,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian33.Ite
       this.mountMapSearch();
       this.applySearchMarks();
       const input2 = (_a3 = this.mapSearchBar) == null ? void 0 : _a3.input;
-      if (!focused || !input2) return;
+      if (!focused || !input2 || !this.mapWindowIsActive()) return;
       input2.focus({ preventScroll: true });
       if (start !== null && end !== null) input2.setSelectionRange(start, end);
     };
@@ -48881,12 +49007,26 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian33.Ite
     const active = current;
     const selection = active.tagName === "INPUT" || active.tagName === "TEXTAREA" ? [active.selectionStart, active.selectionEnd] : null;
     this.render();
+    if (!this.mapWindowIsActive()) return;
     const target = anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null;
     if (focusedContainer) this.contentEl.focus();
     else if (target) target.focus();
     else this.restoreMapFocus(anchor);
     if (selection && ((target == null ? void 0 : target.tagName) === "INPUT" || (target == null ? void 0 : target.tagName) === "TEXTAREA") && selection[0] !== null && selection[1] !== null)
       target.setSelectionRange(selection[0], selection[1]);
+  }
+  /**
+   * The one gate for every focus the map gives itself during a repaint. False while another Obsidian window (for example Settings
+   * in a pop-out) is the active one: the map must not take focus then. It remembers the skipped restore and does it when the
+   * map's own window gets focus again (see onOpen).
+   */
+  mapWindowIsActive() {
+    var _a2, _b2;
+    const active = typeof activeWindow === "undefined" ? void 0 : activeWindow;
+    const own2 = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.defaultView;
+    if (!active || !own2 || active === own2) return true;
+    this.focusRestorePending = true;
+    return false;
   }
   firstCardId() {
     return this.cardEls.keys().next().value;
@@ -48941,7 +49081,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian33.Ite
   restoreMapFocus(anchor, fallbackNodeId) {
     var _a2;
     const doc = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument;
-    if (!doc || this.closed || !focusIsLost(doc, this.contentEl)) return;
+    if (!doc || this.closed || !this.mapWindowIsActive() || !focusIsLost(doc, this.contentEl)) return;
     const selected = this.selection.state.selected;
     const candidates = [
       anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null,
@@ -50038,6 +50178,7 @@ ${request.requirements}` : preset.text,
     };
     return () => {
       var _a3, _b3, _c2, _d2, _e2, _f2, _g;
+      if (!this.mapWindowIsActive()) return;
       const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.contentEl) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-relevance-goal");
       target == null ? void 0 : target.focus();
     };
@@ -52930,7 +53071,7 @@ ${request.requirements}` : preset.text,
       this.startTextEdit(pending2);
     } else if (wanted && this.textEls.has(wanted)) {
       this.focusItemId = null;
-      (_b2 = this.textEls.get(wanted)) == null ? void 0 : _b2.focus({ preventScroll: true });
+      if (this.mapWindowIsActive()) (_b2 = this.textEls.get(wanted)) == null ? void 0 : _b2.focus({ preventScroll: true });
     }
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
@@ -53203,6 +53344,7 @@ ${request.requirements}` : preset.text,
       }
     });
     input2.addEventListener("blur", commit);
+    if (!this.mapWindowIsActive()) return;
     input2.focus({ preventScroll: true });
     (_c = input2.select) == null ? void 0 : _c.call(input2);
   }
@@ -56253,27 +56395,7 @@ ${request.requirements}` : preset.text,
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    const aimMode = !!this.map.aim;
-    if (!aimMode) {
-      this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
-        "mod-cta"
-      );
-      this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
-        "vam-topic-more"
-      );
-    }
-    if (!aimMode) {
-      const integrate = this.button(
-        tools,
-        this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
-        () => {
-          this.applySelectionChange(this.selection.toggleMultiSelect());
-        }
-      );
-      integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
-      if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
-      this.renderRelevanceGoalControl(tools);
-    }
+    this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
     this.viewportEl = canvas.createDiv("vam-viewport");
@@ -56284,7 +56406,7 @@ ${request.requirements}` : preset.text,
     else tools.remove();
     this.mountMapChat(workspace, overlay);
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
-    this.hintEl = !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
+    this.hintEl = this.map.nodes.length > 0 && !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
       cls: "vam-hint vam-canvas-hint",
       text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
     }) : null;
@@ -56390,9 +56512,11 @@ ${request.requirements}` : preset.text,
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   emptyCanvasState() {
-    var _a2;
+    var _a2, _b2, _c;
     const chat = this.chat;
     if (!chat || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return "idle";
+    if (chat.awaitingConsent || chat.isBusy && chat.stageKind === "preparing" && ((_c = (_b2 = this.plugin).usageNoticePending) == null ? void 0 : _c.call(_b2, this.plugin.settings.cliModel)))
+      return "consent";
     if (chat.isBusy || this.chatApplying) return "building";
     return chat.pendingPlan() ? "plan" : "idle";
   }
@@ -56400,7 +56524,7 @@ ${request.requirements}` : preset.text,
     if (!this.map) return;
     const state = this.emptyCanvasState();
     box.toggleClass("is-building", state === "building");
-    box.toggleClass("is-waiting", state === "plan");
+    box.toggleClass("is-waiting", state === "plan" || state === "consent");
     if (state === "building") {
       box.createSpan({ text: t("ui.map_chat_canvas_building") });
       const skeleton = box.createDiv({ cls: "vam-chat-skeleton", attr: { "aria-hidden": "true" } });
@@ -56411,11 +56535,38 @@ ${request.requirements}` : preset.text,
       box.createSpan({ text: t("ui.map_chat_canvas_plan") });
       return;
     }
+    if (state === "consent") {
+      box.createSpan({ text: t("ui.map_chat_canvas_consent") });
+      return;
+    }
     box.createSpan({
       text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
     });
-    if (!this.map.aim)
-      this.button(box, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null))));
+  }
+  /**
+   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics" and the
+   * goal control. An empty map has nothing to select or prioritise, so those two are left out rather than disabled: Tab never
+   * reaches a control that cannot do anything yet. An AIM map has none of them.
+   */
+  renderMapTools(tools) {
+    if (!this.map || this.map.aim) return;
+    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
+      "mod-cta"
+    );
+    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
+      "vam-topic-more"
+    );
+    if (!this.map.nodes.length) return;
+    const integrate = this.button(
+      tools,
+      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
+      () => {
+        this.applySelectionChange(this.selection.toggleMultiSelect());
+      }
+    );
+    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
+    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    this.renderRelevanceGoalControl(tools);
   }
   /** The chat started or ended something: an empty canvas follows it. */
   refreshEmptyMap() {
@@ -58045,7 +58196,17 @@ ${request.requirements}` : preset.text,
   renderPendingProposals(panel, node, note, close, host) {
     var _a2;
     const suggestions = this.plugin.topicRuns.pending(node.path);
-    if (!(suggestions == null ? void 0 : suggestions.length)) return;
+    if (!(suggestions == null ? void 0 : suggestions.length)) {
+      const empty = panel.createDiv("vam-inspector-proposals is-empty");
+      empty.createEl("p", { cls: "vam-hint", text: t("ui.expansion_suggestions_none") });
+      const actions2 = (host != null ? host : empty).createDiv("vam-next-actions");
+      actions2.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
+      actions2.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" }).addEventListener("click", () => {
+        close == null ? void 0 : close();
+        this.whenEditing(() => this.openNextStep(node));
+      });
+      return;
+    }
     const section3 = panel.createDiv("vam-inspector-proposals");
     section3.createEl("p", { text: t("ui.select_and_edit_suggestions_subtopics_are_created_only_after") });
     let showCount = (_count) => {
@@ -61242,11 +61403,16 @@ ${note.detail.trim()}` : "",
   // ---- AI chat window -------------------------------------------------------------------------------------------
   /** Before a repaint: takes the chat window out of the page and returns what gives its text field focus back after it. */
   detachMapChat() {
-    var _a2, _b2, _c;
-    const restore = (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.captureFocus()) != null ? _b2 : () => {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const active = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.activeElement) != null ? _c : null;
+    const held = !!active && !!((_d = this.chat) == null ? void 0 : _d.isInput(active));
+    const restore = (_f = (_e = this.chat) == null ? void 0 : _e.captureFocus()) != null ? _f : () => {
     };
-    (_c = this.chat) == null ? void 0 : _c.detach();
-    return restore;
+    (_g = this.chat) == null ? void 0 : _g.detach();
+    if (!held) return restore;
+    return () => {
+      if (this.mapWindowIsActive()) restore();
+    };
   }
   /**
    * Puts the chat window into this repaint. Normally it is the first child of `workspace`, the window left of the canvas. On an
@@ -61418,8 +61584,9 @@ ${note.detail.trim()}` : "",
     var _a2, _b2;
     if (!this.map) return;
     this.blankMapPaths.add(this.path);
+    (_a2 = this.chat) == null ? void 0 : _a2.clearDraft();
     this.render();
-    (_b2 = (_a2 = this.emptyMapEl) == null ? void 0 : _a2.querySelector("button")) == null ? void 0 : _b2.focus();
+    (_b2 = this.contentEl.querySelector(".vam-map-tools .mod-cta")) == null ? void 0 : _b2.focus();
   }
   chatHost() {
     return {
@@ -61790,134 +61957,143 @@ ${note.detail.trim()}` : "",
     }
     let went = false;
     try {
-      went = await this.plugin.confirmAiUsage(request.model, async () => {
-        var _a2, _b2;
-        if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
-          abandon();
-          return;
-        }
-        sent = true;
-        if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-        const openAttempt = () => {
-          var _a3;
-          const controller = new AbortController();
-          const key2 = `map-chat-view:${++mapChatTaskSequence}`;
-          this.chatController = controller;
-          this.chatTaskKey = key2;
-          (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.set(key2, controller);
-          return {
-            controller,
-            alive: () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path
+      went = await this.plugin.confirmAiUsage(
+        request.model,
+        async () => {
+          var _a2, _b2;
+          if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
+            abandon();
+            return;
+          }
+          sent = true;
+          if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+          const openAttempt = () => {
+            var _a3;
+            const controller = new AbortController();
+            const key2 = `map-chat-view:${++mapChatTaskSequence}`;
+            this.chatController = controller;
+            this.chatTaskKey = key2;
+            (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.set(key2, controller);
+            return {
+              controller,
+              alive: () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path
+            };
           };
-        };
-        let attempt = openAttempt();
-        this.supersedeChatPlan();
-        this.relocateMapChat();
-        chat.setStage("waiting");
-        const modelName = this.plugin.modelLabel(request.model);
-        for (; ; ) {
-          const { controller, alive } = attempt;
-          if (!alive()) return;
-          let replaced = false;
-          let wake = () => void 0;
-          const swapped = new Promise((resolve) => {
-            wake = resolve;
-          });
-          let watching = true;
-          let timer = null;
-          const stopWatching = () => {
-            watching = false;
-            if (timer !== null) window.clearTimeout(timer);
-            timer = null;
-          };
-          const modelEvent = () => {
-            stopWatching();
-            if (alive()) chat.clearSlow();
-          };
-          const resend = () => {
-            if (!alive() || replaced || !watching) return;
-            replaced = true;
-            stopWatching();
-            this.releaseChatTask();
-            controller.abort();
-            attempt = openAttempt();
-            chat.restartWaiting();
-            wake();
-          };
-          timer = window.setTimeout(() => {
-            timer = null;
-            if (watching && alive() && !replaced) chat.showSlow(t("ui.map_chat_slow_0", modelName), resend);
-          }, FIRST_EVENT_WAIT_MS);
-          try {
-            const outcome = await Promise.race([
-              this.plugin.mapChat.chat(
-                request,
-                controller.signal,
-                (text11) => {
-                  if (!alive()) return;
-                  modelEvent();
-                  chat.streamReply(text11);
-                },
-                (event) => {
-                  if (!alive()) return;
-                  if (event.kind === "stream-mode") {
-                    if (event.mode !== "stream-json") stopWatching();
-                    return;
-                  }
-                  if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
-                  if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
-                }
-              ),
-              swapped.then(() => null)
-            ]);
-            stopWatching();
-            if (outcome === null) continue;
+          let attempt = openAttempt();
+          this.supersedeChatPlan();
+          this.relocateMapChat();
+          chat.setStage("waiting");
+          const modelName = this.plugin.modelLabel(request.model);
+          for (; ; ) {
+            const { controller, alive } = attempt;
             if (!alive()) return;
-            const result = outcome;
-            if (redo) {
-              const lines2 = result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [];
-              if (alive() && chat.isBusy) chat.finish(result.reply, lines2);
+            let replaced = false;
+            let wake = () => void 0;
+            const swapped = new Promise((resolve) => {
+              wake = resolve;
+            });
+            let watching = true;
+            let timer = null;
+            const stopWatching = () => {
+              watching = false;
+              if (timer !== null) window.clearTimeout(timer);
+              timer = null;
+            };
+            const modelEvent = () => {
+              stopWatching();
+              if (alive()) chat.clearSlow();
+            };
+            const resend = () => {
+              if (!alive() || replaced || !watching) return;
+              replaced = true;
+              stopWatching();
+              this.releaseChatTask();
+              controller.abort();
+              attempt = openAttempt();
+              chat.restartWaiting();
+              wake();
+            };
+            timer = window.setTimeout(() => {
+              timer = null;
+              if (watching && alive() && !replaced) chat.showSlow(t("ui.map_chat_slow_0", modelName), resend);
+            }, FIRST_EVENT_WAIT_MS);
+            try {
+              const outcome = await Promise.race([
+                this.plugin.mapChat.chat(
+                  request,
+                  controller.signal,
+                  (text11) => {
+                    if (!alive()) return;
+                    modelEvent();
+                    chat.streamReply(text11);
+                  },
+                  (event) => {
+                    if (!alive()) return;
+                    if (event.kind === "stream-mode") {
+                      if (event.mode !== "stream-json") stopWatching();
+                      return;
+                    }
+                    if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
+                    if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                  }
+                ),
+                swapped.then(() => null)
+              ]);
+              stopWatching();
+              if (outcome === null) continue;
+              if (!alive()) return;
+              const result = outcome;
+              if (redo) {
+                const lines2 = result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [];
+                if (alive() && chat.isBusy) chat.finish(result.reply, lines2);
+                return;
+              }
+              const plan = result.actions.length ? planFor(result.actions, request.context, {
+                diagrams: this.plugin.settings.addDiagramsAfterResearch,
+                mapAiMode: (_b2 = this.map) == null ? void 0 : _b2.aiMode
+              }) : null;
+              if (plan) {
+                if (chat.isBusy) {
+                  chat.finish(result.reply, []);
+                  this.offerChatPlan(
+                    result,
+                    plan,
+                    request.context,
+                    { path: anchor.path, id: anchor.id },
+                    request.message
+                  );
+                }
+                return;
+              }
+              if (result.actions.length) chat.setStage("applying");
+              const lines = await this.applyMapChatActions(
+                { ...result, message: request.message },
+                request.context,
+                alive,
+                anchor
+              );
+              if (alive() && chat.isBusy) chat.finish(result.reply, lines);
               return;
-            }
-            const plan = result.actions.length ? planFor(result.actions, request.context, {
-              diagrams: this.plugin.settings.addDiagramsAfterResearch,
-              mapAiMode: (_b2 = this.map) == null ? void 0 : _b2.aiMode
-            }) : null;
-            if (plan) {
-              if (chat.isBusy) {
-                chat.finish(result.reply, []);
-                this.offerChatPlan(
-                  result,
-                  plan,
-                  request.context,
-                  { path: anchor.path, id: anchor.id },
-                  request.message
-                );
+            } catch (error) {
+              stopWatching();
+              if (replaced) continue;
+              if (alive()) {
+                const failure = this.chatErrorText(error);
+                chat.fail(failure.text, failure.wrapped ? failure.text : void 0);
               }
               return;
+            } finally {
+              if (!replaced && this.chatController === controller) this.releaseChatTask();
             }
-            if (result.actions.length) chat.setStage("applying");
-            const lines = await this.applyMapChatActions(
-              { ...result, message: request.message },
-              request.context,
-              alive,
-              anchor
-            );
-            if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-            return;
-          } catch (error) {
-            stopWatching();
-            if (replaced) continue;
-            if (alive()) {
-              const failure = this.chatErrorText(error);
-              chat.fail(failure.text, failure.wrapped ? failure.text : void 0);
-            }
-            return;
-          } finally {
-            if (!replaced && this.chatController === controller) this.releaseChatTask();
+          }
+        },
+        // The usage notice opens: the bubble and an empty canvas say the send waits for the user, not that a map is being built.
+        {
+          noticeOpening: () => {
+            if (chat.hasTurn(turn)) chat.setStage("consent");
           }
         }
-      });
+      );
     } catch (error) {
       if (sent) throw error;
       abandon(this.closed ? void 0 : errorMessage(error));
@@ -73626,7 +73802,14 @@ function normalizeNoteStyleRecipeMarker(value) {
     } : {}
   };
 }
-function settingsFromSaved(saved) {
+function obsidianAppLanguage() {
+  try {
+    return typeof import_obsidian44.getLanguage === "function" ? (0, import_obsidian44.getLanguage)() : "en";
+  } catch (e) {
+    return "en";
+  }
+}
+function settingsFromSaved(saved, appLocale) {
   var _a2;
   const legacy = saved;
   const savedWorkspace = (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder;
@@ -73648,7 +73831,7 @@ function settingsFromSaved(saved) {
       (item) => !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.prompt === "string"
     ) : [],
     defaultCoffeeStyleId: typeof (saved == null ? void 0 : saved.defaultCoffeeStyleId) === "string" ? saved.defaultCoffeeStyleId : void 0,
-    language: initialUiLanguage(saved == null ? void 0 : saved.language),
+    language: initialUiLanguage(saved == null ? void 0 : saved.language, appLocale),
     workspaceFolder: savedWorkspace,
     topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder,
     ...resolveMapFolders(saved),
@@ -73990,7 +74173,7 @@ var VisualAgentMapPlugin = class extends import_obsidian44.Plugin {
   async onload() {
     announceTestOverrides((message) => new import_obsidian44.Notice(message, 0));
     const saved = await this.loadData();
-    this.settings = settingsFromSaved(saved);
+    this.settings = settingsFromSaved(saved, obsidianAppLanguage());
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
@@ -74946,8 +75129,16 @@ ${t("ui.organize_link_wait_hint")}`;
     if (readiness.status === "missing") {
       if (runtime.capabilities.id === "claude") this.openClaudeSetupGuide();
       else this.openCodexSetupGuide();
-    } else if (readiness.status === "model-unavailable") new import_obsidian44.Notice(t("ui.current_model_is_unavailable"));
-    else if (readiness.error !== void 0) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
+      return false;
+    }
+    const service = runtime.capabilities.id === "claude" ? "Claude Code" : "Codex";
+    if (readiness.error !== void 0) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
+    const message = readiness.status === "model-unavailable" ? t("ui.ai_not_ready_model_0_1", this.modelLabel(model), service) : readiness.error ? t("ui.ai_not_ready_error_0_1", service, readiness.error) : t("ui.ai_not_ready_unknown_0", service);
+    actionNotice(
+      `${message} ${t("ui.ai_not_ready_where")}`,
+      t("ui.connection_repair"),
+      () => this.repairConnection(model)
+    );
     return false;
   }
   async codexReadyForAi() {
@@ -74979,10 +75170,13 @@ ${t("ui.organize_link_wait_hint")}`;
     new import_obsidian44.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
-  async confirmAiUsage(model, run) {
+  /** `noticeOpening` is called just before the usage notice opens (only when it really does), so a caller can say it waits for it. */
+  async confirmAiUsage(model, run, hooks) {
+    var _a2;
     if (!await this.aiReadyForModel(model)) return false;
     if (!this.usageNoticeSeen(model)) {
       const provider = this.runtimeIdFor(model);
+      (_a2 = hooks == null ? void 0 : hooks.noticeOpening) == null ? void 0 : _a2.call(hooks);
       const confirmed = await new Promise((resolve) => new AiUsageModal(this.app, provider, resolve).open());
       if (!confirmed) return false;
       await this.setUsageNoticeSeen(model);

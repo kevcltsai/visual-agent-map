@@ -660,3 +660,18 @@ test('Bug bash E #19 (follow-up): when the redraw adds a control (an invalid pat
   await tab.setControlValue('codexPath', '/ok/codex');
   assert.equal(doc.activeElement.id, 'Model/model');
 });
+test('UX B2: the AI usage notice says in plain words what is sent where and whose allowance it uses, and its button is a verb', () => {
+  const dom = require('../support-dom.cjs');
+  const buttons = [];
+  class Setting { constructor() {} addButton(build) { const b = { text: '', cta: false, setButtonText(text) { this.text = text; return this; }, setCta() { this.cta = true; return this; }, onClick(fn) { this.click = fn; return this; } }; build(b); buttons.push(b); return this; } }
+  const { AiUsageModal } = load('ui/settings-tab.ts', { obsidian: { ...obsidian, PluginSettingTab: class { hide() {} }, Setting, Modal: dom.makeModal() } });
+  for (const [provider, title, service, allowance] of [['codex', 'Before sending to Codex', /to Codex/, /Codex allowance/], ['claude', 'Before sending to Claude', /to Claude/, /Claude account's usage/]]) {
+    buttons.length = 0; const answers = [];
+    const modal = new AiUsageModal({}, provider, ok => answers.push(ok)); modal.open();
+    assert.equal(modal.titleEl.text, title);
+    const intro = dom.find(modal.contentEl, i => i.tag === 'p').text;
+    assert.match(intro, /your message/); assert.match(intro, /current map/); assert.match(intro, service); assert.match(intro, allowance);
+    assert.deepEqual(buttons.map(b => [b.text, b.cta]), [['Cancel', false], ['Agree and send', true]]);
+    buttons[1].click(); assert.deepEqual(answers, [true], 'agreeing still answers yes, once');
+  }
+});

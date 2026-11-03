@@ -97,9 +97,9 @@ export const en = {
   "ui.claude_cli_found_0": "Claude Code CLI found: {0}",
   "ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it":
     "Claude Code CLI was not found. Install it and check the configured path.",
-  "ui.claude_usage_notice": "Claude account usage notice",
+  "ui.claude_usage_notice": "Before sending to Claude",
   "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses":
-    "VAM runs Claude tasks through your local Claude Code sign-in. Usage and limits depend on your Claude account or plan.",
+    "To answer, VAM sends your message and what the task needs from the current map (and any notes you include) to Claude, through the Claude Code sign-in on this computer. It uses your Claude account's usage; how much you can use depends on your Claude plan.",
   "ui.install_and_connect_claude_code": "Install and connect Claude Code",
   "ui.claude_code_is_only_needed_for_ai_tasks":
     "Claude Code is only needed for AI tasks. You can create and edit mind maps without it.",
@@ -384,10 +384,10 @@ export const en = {
   "ui.aim_retry_subtopics": "Retry subtopic planning",
   "ui.card_resize_label": "Card width",
   "ui.card_height_label": "Card height",
-  "ui.codex_allowance_notice": "Codex allowance notice",
+  "ui.codex_allowance_notice": "Before sending to Codex",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u":
-    "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
-  "ui.understand_and_run": "Understand and run",
+    "To answer, VAM sends your message and what the task needs from the current map (and any notes you include) to Codex, through your signed-in Codex account. It uses that account's Codex allowance; how much you can use depends on your ChatGPT plan.",
+  "ui.understand_and_run": "Agree and send",
   "ui.install_and_connect_codex": "Install and connect Codex",
   "ui.open_the_official_codex_cli_installation_guide_and_complete":
     "Open the official Codex CLI installation guide and complete installation: ",
@@ -546,6 +546,8 @@ export const en = {
   "ui.source_topics": "Source topics",
   "ui.expand": "Expand",
   "ui.expansion_suggestions": "Expansion suggestions",
+  "ui.expansion_suggestions_none":
+    "There are no expansion suggestions for this topic yet. Choose “AI explore” to have the AI suggest subtopics; you review them here before anything is created.",
   "ui.expansion_suggestions_changed_open_them_again": "Expansion suggestions changed. Open them again.",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di":
     "Suggest the most useful expansion direction, or follow the direction I specify.",
@@ -1243,7 +1245,7 @@ export const en = {
   "ui.structure_review_not_started": "The structure review did not start.",
   "ui.map_chat_open": "Open AI chat",
   "ui.map_chat_close": "Close AI chat",
-  "ui.map_chat_title": "Ask AI about this map",
+  "ui.map_chat_title": "Ask AI",
   "ui.map_chat_references": "References for the AI",
   "ui.map_chat_input_label": "Message to the AI",
   "ui.map_chat_input_placeholder":
@@ -1253,6 +1255,9 @@ export const en = {
   "ui.map_chat_style_label": "Answer length",
   "ui.map_chat_style_concise": "Concise",
   "ui.map_chat_style_detailed": "Detailed",
+  "ui.map_chat_style_concise_hint": "Short answers that get to the point",
+  "ui.map_chat_style_detailed_hint": "Longer answers with more explanation",
+  "ui.map_chat_model_short": "Model",
   "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
   "ui.map_chat_more_detail": "Say it in more detail",
   "ui.map_chat_more_detail_asked": "Say it in more detail.",
@@ -1391,8 +1396,10 @@ export const en = {
   "ui.map_chat_plan_group_research_0": "Research and AI work ({0})",
   "ui.map_chat_plan_group_view_0": "Map and view ({0})",
   "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
-  "ui.map_chat_empty_log": "No messages yet. Type below, or pick a suggestion.",
+  "ui.map_chat_empty_log":
+    "No messages yet. The AI can build or extend this map, research its topics, or rearrange it. Try one of these, or type your own:",
   "ui.map_chat_canvas_building": "Building the map…",
+  "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
   "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",
   "ui.map_chat_plan_replace_hint": "Sending a new message cancels this plan.",
   "ui.map_chat_plan_irreversible": "Cannot be undone once applied.",
@@ -1403,6 +1410,7 @@ export const en = {
   "ui.map_chat_stage_preparing": "Preparing",
   "ui.map_chat_not_sent_draft": "Not sent. Your message is back in the box.",
   "ui.map_chat_not_sent_kept": "Not sent. The conversation is unchanged.",
+  "ui.map_chat_stage_consent": "Waiting for you to confirm AI usage",
   "ui.map_chat_stage_waiting": "Waiting for the model",
   "ui.map_chat_stage_writing": "Writing",
   "ui.map_chat_stage_applying": "Applying",
@@ -1547,6 +1555,10 @@ export const en = {
     "Codex CLI was not found: {0}. Set the Codex CLI path in VAM Settings.",
   "ui.codex_app_server_is_ready_0": "Codex App Server is ready: {0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server check failed: {0}",
+  "ui.ai_not_ready_model_0_1": "{0} is not available in {1} right now. Pick another model, or check the connection.",
+  "ui.ai_not_ready_error_0_1": "{0} is not ready ({1}). It may not be running or signed in.",
+  "ui.ai_not_ready_unknown_0": "{0} is not ready. It may not be signed in, or it did not list its models.",
+  "ui.ai_not_ready_where": "Settings → Visual Agent Map → AI connection shows its status.",
   "ui.current_model_is_unavailable": "Current model is unavailable",
   "ui.auto": "Auto",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":

@@ -6,7 +6,7 @@ import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/t
 import { CoffeeManager } from "./experiences/coffee-tables/engine";
 import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
-import { errorNotice } from "./experiences/visual-map/note-style-picker";
+import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
 import { selectionOutputLanguage } from "./experiences/aim/content-language";
@@ -22,6 +22,7 @@ import {
 } from "./i18n";
 import {
   FileSystemAdapter,
+  getLanguage,
   loadMermaid,
   MarkdownView,
   normalizePath,
@@ -189,8 +190,19 @@ export function normalizeNoteStyleRecipeMarker(value: unknown): Settings["noteSt
       : {})
   };
 }
-/** The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. */
-export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
+/** Obsidian's interface language code ("en" when it cannot be read). */
+export function obsidianAppLanguage(): string {
+  try {
+    return typeof getLanguage === "function" ? getLanguage() : "en";
+  } catch {
+    return "en";
+  }
+}
+/**
+ * The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. A new
+ * install (no language saved) starts in `appLocale`, Obsidian's own language, when VAM has an interface in it.
+ */
+export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: string): Settings {
   const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
   const savedWorkspace = saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder;
   return {
@@ -229,7 +241,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
         )
       : [],
     defaultCoffeeStyleId: typeof saved?.defaultCoffeeStyleId === "string" ? saved.defaultCoffeeStyleId : undefined,
-    language: initialUiLanguage(saved?.language),
+    language: initialUiLanguage(saved?.language, appLocale),
     workspaceFolder: savedWorkspace,
     topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder,
     ...resolveMapFolders(saved),
@@ -568,7 +580,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     announceTestOverrides(message => new Notice(message, 0));
     const saved = (await this.loadData()) as Partial<Settings> | null;
-    this.settings = settingsFromSaved(saved);
+    this.settings = settingsFromSaved(saved, obsidianAppLanguage());
     // The removed chat-model key is migrated into cliModel above; write the data back at once so it runs only once.
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
@@ -1583,8 +1595,20 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (readiness.status === "missing") {
       if (runtime.capabilities.id === "claude") this.openClaudeSetupGuide();
       else this.openCodexSetupGuide();
-    } else if (readiness.status === "model-unavailable") new Notice(t("ui.current_model_is_unavailable"));
-    else if (readiness.error !== undefined) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
+      return false;
+    }
+    // The reason is said to the user, not only written to the log, with a way to fix it and where to look in the settings.
+    const service = runtime.capabilities.id === "claude" ? "Claude Code" : "Codex";
+    if (readiness.error !== undefined) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
+    const message =
+      readiness.status === "model-unavailable"
+        ? t("ui.ai_not_ready_model_0_1", this.modelLabel(model), service)
+        : readiness.error
+          ? t("ui.ai_not_ready_error_0_1", service, readiness.error)
+          : t("ui.ai_not_ready_unknown_0", service);
+    actionNotice(`${message} ${t("ui.ai_not_ready_where")}`, t("ui.connection_repair"), () =>
+      this.repairConnection(model)
+    );
     return false;
   }
   async codexReadyForAi(): Promise<boolean> {
@@ -1617,10 +1641,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     new Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
-  async confirmAiUsage(model: string, run: () => Promise<void>): Promise<boolean> {
+  /** `noticeOpening` is called just before the usage notice opens (only when it really does), so a caller can say it waits for it. */
+  async confirmAiUsage(
+    model: string,
+    run: () => Promise<void>,
+    hooks?: { noticeOpening?: () => void }
+  ): Promise<boolean> {
     if (!(await this.aiReadyForModel(model))) return false;
     if (!this.usageNoticeSeen(model)) {
       const provider = this.runtimeIdFor(model);
+      hooks?.noticeOpening?.();
       const confirmed = await new Promise<boolean>(resolve => new AiUsageModal(this.app, provider, resolve).open());
       if (!confirmed) return false;
       await this.setUsageNoticeSeen(model);

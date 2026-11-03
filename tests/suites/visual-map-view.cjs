@@ -108,7 +108,7 @@ integrationTest('AIM cards hide generic map actions while ordinary map cards ret
   ordinaryResultView.stageEl = makeElement('stage', ordinaryButtonsForResult); ordinaryResultView.map = map([ordinaryResult]); ordinaryResultView.notes = new Map([[ordinaryResult.id, { title: 'Ordinary note', summary: '', status: 'completed' }]]);
   ordinaryResultView.renderNode(ordinaryResult);
   assert.equal(ordinaryButtonsForResult.some(button => button['aria-label'] === 'Generate another question from this research, keeping existing branches'), false, 'ordinary maps do not expose the AIM action');
-  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /if \(!aimMode\) \{\s*const integrate = this\.button\(\s*tools/);
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;[\s\S]{0,700}const integrate = this\.button\(\s*tools/);
 });
 integrationTest('AIM question cards show branch progress instead of note lifecycle status', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -518,7 +518,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { if (!firstUseConfirmed) { firstUseConfirmed = true; return false; } acknowledged++; await run(); return true; }, saveSettings: async () => { acknowledged++; } };
   const firstUse = new NextStepModal({}, 'Parent', 1, 0, firstUsePlugin, async (_options, _focus, _done, _failed, accepted) => { began++; accepted(); }, async () => {}, async () => {});
   firstUse.onOpen(); button(firstUse.modalEl, 'Confirm research task').click(); await tick();
-  assert.equal(began, 0); assert.equal(button(firstUse.contentEl, 'Understand and run'), undefined); assert.equal(closed, 3);
+  assert.equal(began, 0); assert.equal(button(firstUse.contentEl, 'Agree and send'), undefined); assert.equal(closed, 3);
   button(firstUse.modalEl, 'Confirm research task').click(); await tick();
   assert.equal(began, 1); assert.equal(acknowledged, 1); assert.equal(closed, 4);
   let pendingCalls = 0;
@@ -527,10 +527,10 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const pendingModal = new NextStepModal({}, 'Parent', 1, 1, pendingPlugin, async () => {}, async (_options, _direction, found) => { pendingCalls++; found([{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }], async () => {}); }, async () => {});
   pendingModal.onOpen(); find(pendingModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   button(pendingModal.modalEl, 'Review AI subtopic suggestions (1)').click(); await tick();
-  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Understand and run'), undefined);
+  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Agree and send'), undefined);
   button(pendingModal.contentEl, 'Create subtopics (1)').click(); await tick();
   assert.equal(pendingModal.closed, true, 'creating the reviewed subtopics ends the guided expansion'); closed -= 1;
-  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Understand and run'), undefined);
+  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Agree and send'), undefined);
   // C2 (owner decision 2026-10-19): a slow outline runs with the dialog hidden; the outline waits for review and a
   // reopened dialog carries the shallow-research choice to the create step.
   let finishQuick, delayedOptions, delayedNodes, delayedReady, delayedStops = 0;
@@ -1039,6 +1039,14 @@ integrationTest('expansion suggestions panel uses the shared list, treats the to
   const discard2 = find(host2, item => item.tag === 'button' && item.cls.includes('vam-discard'));
   discard2.click(); discard2.click(); await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(pendingSuggestions.has('P.md'), false); assert.equal(closed, 2);
+  // UX B11: with no suggestions the panel is not blank: one line says why, and "AI explore" (the step that makes them) is offered.
+  const explored = []; Object.assign(view, { whenEditing: run => run(), openNextStep: target => explored.push(target.id) });
+  const none = element('panel'), host3 = element('modal');
+  VisualAgentMapView.prototype.renderPendingProposals.call(view, none, node, { title: 'Parent' }, () => { closed++; }, host3);
+  assert.match(find(none, item => item.tag === 'p').text, /no expansion suggestions for this topic yet\. Choose “AI explore”/);
+  const [closeNone, explore] = find(host3, item => item.cls === 'vam-next-actions').children.filter(item => item.tag === 'button');
+  assert.equal(closeNone.text, 'Close'); assert.equal(explore.text, 'AI explore'); assert.ok(explore.cls.includes('mod-cta'));
+  explore.click(); assert.equal(closed, 3, 'the panel closes'); assert.deepEqual(explored, ['p'], 'and AI explore opens for this topic');
 });
 integrationTest('name dialog ignores Enter while composing, explains an empty name, and keeps buttons in the action bar', () => {
   const element = (tag, options = {}) => ({

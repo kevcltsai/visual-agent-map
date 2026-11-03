@@ -91,7 +91,7 @@ export const shellExecutableProbe: ExecutableProbe = {
 /** What the runtimes' readiness checks read from the plugin. */
 export interface AiRuntimeChecks {
   /** Must be the plugin's `refreshModelDiscovery`: it also saves the Codex model list to settings. */
-  refresh(id: AiRuntimeId): Promise<Pick<ModelDiscoveryState, "status" | "models">>;
+  refresh(id: AiRuntimeId): Promise<Pick<ModelDiscoveryState, "status" | "models" | "error">>;
   codexInstalled(): boolean;
 }
 
@@ -112,8 +112,10 @@ export function claudeCodeAiRuntime(
     readiness: async model => {
       const state = await checksOf(checks).refresh("claude");
       if (state.status === "missing") return { status: "missing" };
-      // Not on the list, or any other state: it cannot run, and there is nothing to report.
-      return state.status === "ready" && state.models.includes(model) ? { status: "ready" } : { status: "error" };
+      if (state.status === "ready")
+        return state.models.includes(model) ? { status: "ready" } : { status: "model-unavailable" };
+      // The check failed (often: not signed in) or has not finished; its own message, when it has one, is the reason.
+      return state.error ? { status: "error", error: state.error } : { status: "error" };
     },
     prewarm: (model, { effort, schema, webSearch }) => {
       get().prewarm(providerModelId(model), effort, schema, webSearch);

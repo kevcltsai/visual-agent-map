@@ -129,9 +129,35 @@ function quoteAnchor(text: string): string {
 export function intlLocaleOf(locale: ContentLanguage): string { return entryOf(locale).intl; }
 
 let language: UiLanguage = FALLBACK_LANGUAGE;
-/** The saved interface language, or English when absent, invalid, or written by a newer version. */
-export function initialUiLanguage(saved: unknown): UiLanguage {
-  return isUiLanguage(saved) ? saved : FALLBACK_LANGUAGE;
+/**
+ * The interface language that matches an app language code (Obsidian's `getLanguage()`, such as "zh-TW", "zh" or "en", or a
+ * BCP 47 tag such as "zh-Hant-HK"), or null when VAM has no interface in that language.
+ */
+export function uiLanguageFromAppLocale(locale: unknown): UiLanguage | null {
+  if (typeof locale !== "string" || !locale.trim()) return null;
+  const tag = locale.trim().toLowerCase().replace(/_/g, "-");
+  const byId = (id: string): UiLanguage | null => {
+    const found = registry.find(item => item.id.toLowerCase() === id)?.id;
+    return isUiLanguage(found) ? found : null;
+  };
+  const exact = byId(tag);
+  if (exact) return exact;
+  // Traditional Chinese is named by script (Hant) or by region (Taiwan, Hong Kong, Macau); any other Chinese is Simplified.
+  if (/^zh(-|$)/.test(tag)) {
+    const traditional = /(^|-)(hant|tw|hk|mo)(-|$)/.test(tag.slice(2));
+    const id = traditional ? "zh-TW" : "zh-CN";
+    return isUiLanguage(id) ? id : null;
+  }
+  return byId(tag.split("-")[0]);
+}
+/**
+ * The saved interface language. When none was ever saved (a new install), the app's own language when VAM has an interface
+ * in it; English otherwise, and also for a saved value that is invalid or was written by a newer version.
+ */
+export function initialUiLanguage(saved: unknown, appLocale?: unknown): UiLanguage {
+  if (isUiLanguage(saved)) return saved;
+  if (saved === undefined || saved === null) return uiLanguageFromAppLocale(appLocale) ?? FALLBACK_LANGUAGE;
+  return FALLBACK_LANGUAGE;
 }
 /** Normalizes a stored or session language; anything that is not a registered language is English. */
 export function uiLocale(value: unknown): UiLanguage { return isUiLanguage(value) ? value : FALLBACK_LANGUAGE; }

@@ -8,6 +8,8 @@ import {
   clampMapChatWidth,
   countChatLines,
   MAP_CHAT_EXAMPLE_KEYS,
+  MAP_CHAT_OPEN_ENDED_KEYS,
+  chatSuggestionFill,
   MAP_CHAT_LINES_FOLD_ABOVE,
   MAP_CHAT_WIDTH_DEFAULT,
   MAP_CHAT_WIDTH_MAX,
@@ -140,10 +142,17 @@ export interface MapChatSavedTurn {
 
 /**
  * The progress stage shown inside the AI bubble while a turn runs. "Preparing" is the time before the request reaches the
- * model (checking the AI, building the request, the usage notice); there is no "thinking": the model's thinking cannot be seen.
+ * model (checking the AI, building the request); "consent" is the time the AI usage notice is open and waits for the user's
+ * answer (nothing is being built, and Stop is not offered: the notice itself has Cancel). There is no "thinking": the model's
+ * thinking cannot be seen.
  */
-export type MapChatStage = "preparing" | "waiting" | "writing" | "applying";
-const STAGE_ORDER: Record<MapChatStage, number> = { preparing: 0, waiting: 1, writing: 2, applying: 3 };
+export type MapChatStage = "preparing" | "consent" | "waiting" | "writing" | "applying";
+/** The tooltip of an answer-length button: what that length means. */
+const styleHintKey = (
+  style: MapChatStyleChoice
+): "ui.map_chat_style_concise_hint" | "ui.map_chat_style_detailed_hint" =>
+  style === "concise" ? "ui.map_chat_style_concise_hint" : "ui.map_chat_style_detailed_hint";
+const STAGE_ORDER: Record<MapChatStage, number> = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 
 /** What {@link MapChatPanel.begin} returns: the two messages it added, so {@link MapChatPanel.retract} can take exactly them back. */
 export interface MapChatTurnHandle {
@@ -299,6 +308,7 @@ export class MapChatPanel {
   private titleEl!: HTMLElement;
   private closeEl!: HTMLButtonElement;
   private styleGroupEl!: HTMLElement;
+  private styleTagEl!: HTMLElement;
   private logLabelEl!: HTMLElement;
   private guideEl!: HTMLElement;
   private hintEl!: HTMLElement;
@@ -315,6 +325,8 @@ export class MapChatPanel {
   private inputEl!: HTMLTextAreaElement;
   private sendEl!: HTMLButtonElement;
   private modelEl!: HTMLSelectElement;
+  /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
+  private modelTagEl!: HTMLElement;
   private styleEls: Record<MapChatStyleChoice, HTMLButtonElement> | null = null;
   private stopEl!: HTMLButtonElement;
   private saveEl!: HTMLButtonElement;
@@ -389,6 +401,14 @@ export class MapChatPanel {
   get isBusy(): boolean {
     return this.busy;
   }
+  /** The progress stage of the running turn, or null when nothing runs. */
+  get stageKind(): MapChatStage | null {
+    return this.stage?.kind ?? null;
+  }
+  /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
+  get awaitingConsent(): boolean {
+    return this.busy && this.stage?.kind === "consent";
+  }
   /** The window is laid over the canvas of a narrow pane. */
   get isOverlay(): boolean {
     return this.floating;
@@ -406,6 +426,10 @@ export class MapChatPanel {
   }
   get draft(): string {
     return this.built ? this.inputEl.value : "";
+  }
+  /** Empties the message field (the user left the opening screen to start the map by hand). */
+  clearDraft(): void {
+    if (this.built) this.inputEl.value = "";
   }
   /** True when `element` is the message field. */
   isInput(element: unknown): boolean {
@@ -691,10 +715,14 @@ export class MapChatPanel {
     if (!current || STAGE_ORDER[kind] <= STAGE_ORDER[current.kind]) return;
     // A later stage is a model event (or the actions): the slow notice has nothing left to say.
     this.slow = null;
-    // The seconds of waiting and writing run together from the question; applying counts its own.
-    this.stage = { kind, since: kind === "applying" ? this.clockNow() : current.since };
+    // The seconds of waiting and writing run together from the question; applying counts its own, and so does the model's work
+    // after the usage notice (the time the user took to answer it is not the model's).
+    const fresh = kind === "applying" || current.kind === "consent";
+    this.stage = { kind, since: fresh ? this.clockNow() : current.since };
     this.paintStage();
     this.speakStage();
+    // Entering or leaving "consent" changes whether Stop is offered and what an empty canvas says.
+    if (kind === "consent" || current.kind === "consent") this.renderBusy();
   }
   private currentModelLabel(): string {
     const model = this.host.model();
@@ -703,7 +731,7 @@ export class MapChatPanel {
   /** The stage name, with the model that does the work after it; applying a plan is local work and names none. */
   private stageLabel(kind: MapChatStage): string {
     const name = t(`ui.map_chat_stage_${kind}`);
-    return kind === "applying" || !this.stageModel
+    return kind === "applying" || kind === "consent" || !this.stageModel
       ? name
       : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
   }
@@ -1040,6 +1068,12 @@ export class MapChatPanel {
     // Top row: the title, the model for this chat, and the button that folds the window.
     this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
     this.titleEl = this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
+    // Hidden from screen readers: the menu's own label says the same, in full.
+    this.modelTagEl = this.headEl.createSpan({
+      cls: "vam-map-chat-model-tag",
+      text: t("ui.map_chat_model_short"),
+      attr: { "aria-hidden": "true" }
+    });
     this.modelEl = this.headEl.createEl("select", {
       cls: "vam-map-chat-model dropdown",
       attr: { "aria-label": t("ui.map_chat_model_label") }
@@ -1117,7 +1151,15 @@ export class MapChatPanel {
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
     const side = form.createDiv("vam-map-chat-side");
-    const styleGroup = (this.styleGroupEl = side.createDiv({
+    // "Answer length" is written next to the toggle: "Concise" and "Detailed" alone do not say what they change. The group's
+    // own label says the same to a screen reader, so the visible word is hidden from it.
+    const length = side.createDiv("vam-map-chat-length");
+    this.styleTagEl = length.createSpan({
+      cls: "vam-map-chat-style-tag",
+      text: t("ui.map_chat_style_label"),
+      attr: { "aria-hidden": "true" }
+    });
+    const styleGroup = (this.styleGroupEl = length.createDiv({
       cls: "vam-map-chat-style",
       attr: { role: "group", "aria-label": t("ui.map_chat_style_label") }
     }));
@@ -1126,7 +1168,7 @@ export class MapChatPanel {
       const button = styleGroup.createEl("button", {
         cls: "vam-map-chat-style-option",
         text: label,
-        attr: { type: "button", "aria-pressed": "false" }
+        attr: { type: "button", "aria-pressed": "false", title: t(styleHintKey(style)) }
       });
       button.addEventListener("click", () => {
         this.host.setStyle(style);
@@ -1221,6 +1263,7 @@ export class MapChatPanel {
     this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
     this.titleEl.setText(t("ui.map_chat_title"));
     this.modelEl.setAttr("aria-label", t("ui.map_chat_model_label"));
+    this.modelTagEl.setText(t("ui.map_chat_model_short"));
     this.closeEl.setAttr("aria-label", t("ui.map_chat_close"));
     this.heroTitleEl.setText(t("ui.map_chat_hero_title"));
     this.guideEl.setText(t("ui.map_chat_empty_log"));
@@ -1232,6 +1275,9 @@ export class MapChatPanel {
     this.styleGroupEl.setAttr("aria-label", t("ui.map_chat_style_label"));
     this.styleEls?.concise.setText(t("ui.map_chat_style_concise"));
     this.styleEls?.detailed.setText(t("ui.map_chat_style_detailed"));
+    this.styleTagEl.setText(t("ui.map_chat_style_label"));
+    this.styleEls?.concise.setAttr("title", t(styleHintKey("concise")));
+    this.styleEls?.detailed.setAttr("title", t(styleHintKey("detailed")));
     this.sendEl.setText(t("ui.map_chat_send"));
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
     this.stopEl.setText(t("ui.map_chat_stop"));
@@ -1417,6 +1463,25 @@ export class MapChatPanel {
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
   /** A reply came in while the window is folded to its edge: the edge shows a dot. */
+  /**
+   * On the opening screen the message field and the examples come first: the model menu is a quiet last line, after the "empty
+   * map" button (so reading and Tab order match what is seen). In the window the head row (title, model, save, close) is on top.
+   * Elements are moved only when they are out of place, so a control that has the keyboard is not moved for nothing.
+   */
+  private placeHeadAndEmptyMap(hero: boolean, showEmptyMap: boolean): void {
+    const children = (): Element[] => Array.from(this.bodyEl.children);
+    if (!hero) {
+      if (children()[0] !== this.headEl) this.bodyEl.insertBefore(this.headEl, this.bodyEl.firstChild);
+      return;
+    }
+    const tail = showEmptyMap ? [this.emptyMapEl, this.headEl] : [this.headEl];
+    const now = children().slice(-tail.length);
+    if (tail.every((el, index) => now[index] === el)) return;
+    for (const el of tail) {
+      el.remove();
+      this.bodyEl.insertBefore(el, null);
+    }
+  }
   private markUnread(): void {
     if (this.shown || !this.built) return;
     this.unread = true;
@@ -1425,13 +1490,15 @@ export class MapChatPanel {
 
   // ---- suggested messages -----------------------------------------------------------------------------------------
 
-  /** Puts `text` into the message field and gives it the keyboard. Sending is always the user's own act. */
-  private fill(text: string): void {
-    const draft = this.inputEl.value;
-    this.inputEl.value = draft.trim() ? `${draft.replace(/\s+$/, "")}\n${text}` : text;
+  /**
+   * Puts `text` into the message field in place of what was there and gives it the keyboard, with the cursor at the end (where an
+   * open-ended suggestion is finished). Sending is always the user's own act.
+   */
+  private fill(text: string, openEnded = false): void {
+    const value = chatSuggestionFill(text, openEnded);
+    this.inputEl.value = value;
     this.inputEl.focus();
-    const end = this.inputEl.value.length;
-    this.inputEl.setSelectionRange(end, end);
+    this.inputEl.setSelectionRange(value.length, value.length);
   }
   private renderSuggestions(): void {
     if (!this.built) return;
@@ -1457,12 +1524,14 @@ export class MapChatPanel {
     this.suggestEl.hidden = keys.length === 0;
     for (const key of keys) {
       const text = t(key);
+      const openEnded = MAP_CHAT_OPEN_ENDED_KEYS.includes(key);
       const button = this.suggestEl.createEl("button", {
         cls: hero ? "vam-map-chat-example" : "vam-map-chat-suggestion",
-        text,
+        // An open-ended suggestion is visibly unfinished: the user completes it in the field.
+        text: openEnded ? `${text}…` : text,
         attr: { type: "button" }
       });
-      button.addEventListener("click", () => this.fill(text));
+      button.addEventListener("click", () => this.fill(text, openEnded));
     }
   }
 
@@ -1534,10 +1603,7 @@ export class MapChatPanel {
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
-    if (showEmptyMap && this.bodyEl.children[this.bodyEl.children.length - 1] !== this.emptyMapEl) {
-      this.emptyMapEl.remove();
-      this.bodyEl.insertBefore(this.emptyMapEl, null);
-    }
+    this.placeHeadAndEmptyMap(hero, showEmptyMap);
     this.renderGuide();
     this.refreshSave();
     // Someone opens the window because a reply came in while it was folded: they land on the newest message.
@@ -2070,8 +2136,10 @@ export class MapChatPanel {
     this.el.toggleClass("is-busy", this.working);
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
-    this.stopEl.hidden = !this.working;
-    this.stopEl.toggleClass("is-hidden", !this.working);
+    // While the usage notice is open, its own Cancel is the way out: no Stop beside it.
+    const stoppable = this.working && !this.awaitingConsent;
+    this.stopEl.hidden = !stoppable;
+    this.stopEl.toggleClass("is-hidden", !stoppable);
     this.renderHint();
     this.host.stateChanged?.();
   }

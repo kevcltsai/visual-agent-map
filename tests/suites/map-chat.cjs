@@ -2728,6 +2728,21 @@ integrationTest('B1 ui: an empty map shows the opening screen: the question, the
   const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'examples'), ['title', 'input', 'examples']);
 });
 
+integrationTest('UX B6: on the opening screen the model menu is a quiet last line (after the examples and the empty-map button); in the window it is back in the head row', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
+  const body = () => chat.bodyEl.children; const visible = body().filter(c => !c.hidden);
+  assert.equal(visible.at(-1), chat.headEl, 'the head row (only the model menu shows there) is last'); assert.ok(chat.headEl.hasClass('is-hero'));
+  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl || i === chat.modelEl).map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : i === chat.suggestEl ? 'examples' : 'model');
+  eq(order, ['title', 'input', 'examples', 'model'], 'reading and Tab order: the question, the field, the examples, then the model');
+  if (chat.emptyMapEl.hidden === false) assert.equal(body().at(-2), chat.emptyMapEl, 'the empty-map button stays right after the examples');
+  const tag = find(chat.headEl, i => hasClass(i, 'vam-map-chat-model-tag')); assert.equal(tag.text, 'Model'); assert.equal(tag.attrs['aria-hidden'], 'true');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = sel => css.split('\n').find(line => line.startsWith(`${sel} {`)) ?? '';
+  assert.match(rule('.vam-map-chat-head.is-hero .vam-map-chat-model'), /border: 0; background-color: transparent;.*color: var\(--text-muted\); font-size: var\(--font-ui-smaller\)/, 'a small, borderless, muted menu');
+  assert.match(rule('.vam-map-chat-model-tag'), /display: none/, 'the tag is only shown on the opening screen');
+  h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); h.type('Coffee'); await h.view.sendMapChat();
+  assert.equal(chat.isHero, false); assert.equal(body()[0], chat.headEl, 'in the window the head row is on top again'); assert.equal(chat.headEl.hasClass('is-hero'), false);
+});
+
 integrationTest('B1 ui: clicking an example fills the message field and sends nothing', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
   const sends = h.control.requests.length; findAll(chat.suggestEl, i => i.tag === 'button')[1].click();
@@ -2790,6 +2805,16 @@ integrationTest('45 ui: the button turns the opening screen into this map\'s emp
   h.repaint(); assert.equal(chat.isHero, false);
 });
 
+integrationTest('UX B10: "Create an empty mind map" clears the draft typed on the opening screen, and the empty canvas has no second "+ Topic"', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  h.type('half a question for the AI'); chat.emptyMapEl.click(); await tick();
+  assert.equal(chat.isHero, false); assert.equal(chat.draft, '', 'no stale draft waits in the side window');
+  const box = element('div'); h.view.fillEmptyMap(box);
+  assert.match(visibleText(box), /This mind map has no topics\. Click “＋ Topic” to create the first node\./); assert.equal(findAll(box, i => i.tag === 'button').length, 0);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.contentEl\.querySelector<HTMLElement>\("\.vam-map-tools \.mod-cta"\)\?\.focus\(\)/, 'the keyboard goes to the toolbar "+ Topic"');
+});
+
 integrationTest('B1 ui: many chips scroll inside their own box, so the message field stays in the window', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = css.match(/\.vam-map-chat-chips \{([^}]*)\}/)[1];
@@ -2821,18 +2846,71 @@ test('B1 ui: every suggestion and example exists in all three languages and is a
   for (const dictionary of dictionaries) for (const k of keys) assert.ok(typeof dictionary[k] === 'string' && dictionary[k].trim().length > 4, `${k}`);
 });
 
-integrationTest('B1 ui: a suggestion only fills the message field (nothing is sent, nothing else changes), keeps what was typed, and the row follows the selection and the open note', async () => {
+integrationTest('B1 ui: a suggestion only fills the message field (nothing is sent, nothing else changes), replaces an old draft (UX B3), and the row follows the selection and the open note', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   eq(suggestionTexts(chat), ['What is missing from this map?', 'Arrange the whole map', 'Collapse every branch below the first level']);
   const requests = h.control.requests.length, mutates = h.control.mutates;
   findAll(chat.suggestEl, i => i.tag === 'button')[0].click();
   assert.equal(chat.inputEl.value, 'What is missing from this map?'); assert.equal(h.page.doc.activeElement, chat.inputEl);
   await tick(); assert.equal(h.control.requests.length, requests, 'nothing sent'); assert.equal(h.control.mutates, mutates, 'nothing written'); assert.equal(chat.hasMessages, false);
-  chat.inputEl.value = 'first line'; findAll(chat.suggestEl, i => i.tag === 'button')[1].click(); assert.equal(chat.inputEl.value, 'first line\nArrange the whole map', 'an existing draft is kept');
+  chat.inputEl.value = 'first line'; findAll(chat.suggestEl, i => i.tag === 'button')[1].click(); assert.equal(chat.inputEl.value, 'Arrange the whole map', 'UX B3: the suggestion replaces the old draft instead of being added under it');
   h.view.selection.setSelected(h.ids.a); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /subtopics under the selected topic/);
   h.view.selection.replaceMulti([h.ids.a, h.ids.b]); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /Compare the selected topics/);
   h.view.selection.setSelected(null); h.view.selection.replaceMulti([]); h.setActive('Notes/Research.md', ''); chat.refreshNote(); assert.ok(suggestionTexts(chat).includes('Add what the open note says to the map'));
   assert.ok(suggestionTexts(chat).length <= 4);
+});
+
+test('UX B3: an open-ended suggestion shows an ellipsis, replaces the draft, and leaves the cursor after the words for the topic', () => {
+  const f = panelFixture({ suggestions: () => ({ selected: 0, hasTopics: false }) }); f.panel.setOpen(true);
+  const buttons = () => findAll(f.panel.suggestEl, i => i.tag === 'button');
+  eq(buttons().map(b => b.text), ['Research the coffee industry: players, supply chain, trends', 'Build a three-level topic tree about…', 'Create a new map about…'], 'UX B9: one whole example first');
+  f.parts.input().value = 'an old half-written draft'; const ranges = []; f.parts.input().setSelectionRange = (start, end) => ranges.push([start, end]);
+  buttons()[1].click();
+  assert.equal(f.parts.input().value, 'Build a three-level topic tree about ', 'replaced, with a space to type the topic after');
+  eq(ranges, [[37, 37]], 'the cursor is at the end, where the topic goes');
+  assert.equal(f.page.doc.activeElement, f.parts.input());
+  buttons()[2].click(); assert.equal(f.parts.input().value, 'Create a new map about ', 'a second pick replaces the first');
+});
+
+test('UX B7: the Concise/Detailed toggle has a visible "Answer length" label and a tooltip on each button that says what it means', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const group = find(f.panel.el, i => hasClass(i, 'vam-map-chat-style')); const box = find(f.panel.el, i => hasClass(i, 'vam-map-chat-length'));
+  const tag = find(box, i => hasClass(i, 'vam-map-chat-style-tag'));
+  assert.equal(tag.text, 'Answer length'); assert.equal(tag.attrs['aria-hidden'], 'true', 'the group label says it to screen readers already');
+  assert.ok(box.children.includes(group), 'the label sits right next to the toggle'); assert.equal(group.attrs['aria-label'], 'Answer length');
+  const [concise, detailed] = findAll(group, i => i.tag === 'button');
+  assert.equal(concise.attrs.title, 'Short answers that get to the point'); assert.equal(detailed.attrs.title, 'Longer answers with more explanation');
+  f.setLanguage('zh-TW'); f.panel.relabel();
+  assert.equal(tag.text, '回答長度'); assert.equal(concise.attrs.title, '簡短、直接的回覆');
+  f.setLanguage('en');
+});
+
+integrationTest('UX B9: an empty map leaves out "Select several topics", the goal control and the gesture hint; a map with topics has them', async () => {
+  // The goal control has its own suite (relevance-grade); here it only marks where it is drawn.
+  const tools = h => { const box = element('div'); h.view.renderRelevanceGoalControl = parent => { parent.createEl('button', { text: 'Prioritize by goal' }); }; h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
+  const empty = await harness({ empty: true }); await empty.view.hydrate();
+  const shown = tools(empty);
+  assert.ok(shown.some(l => /Topic$/.test(l)), '+ Topic stays'); assert.equal(shown.some(l => /Select several topics/.test(l)), false, 'nothing to select: not in the toolbar, so not in the Tab order');
+  assert.equal(shown.some(l => /Prioritize by goal/.test(l)), false, 'nothing to prioritise');
+  const full = await harness(); await full.view.hydrate(); const all = tools(full);
+  assert.ok(all.includes('Select several topics')); assert.ok(all.some(l => /Prioritize by goal/.test(l)));
+  const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
+});
+
+test('UX B9: an empty map\'s suggestions start with a whole example; a map with topics suggests three whole messages', () => {
+  const { chatSuggestionKeys } = load('core/map-chat-layout.ts');
+  eq(chatSuggestionKeys({ selected: 0, hasNote: false, hasTopics: false }), ['ui.map_chat_example_research', 'ui.map_chat_suggest_empty_build', 'ui.map_chat_suggest_empty_new_map']);
+  for (const selected of [0, 1, 2]) { const keys = chatSuggestionKeys({ selected, hasNote: true, hasTopics: true }); assert.ok(keys.length >= 3 && keys.length <= 4); }
+});
+
+test('UX B3: chatSuggestionFill adds a space only after a final Latin letter of an open-ended suggestion', () => {
+  const { chatSuggestionFill, MAP_CHAT_OPEN_ENDED_KEYS } = load('core/map-chat-layout.ts');
+  assert.equal(chatSuggestionFill('Create a new map about', true), 'Create a new map about ');
+  assert.equal(chatSuggestionFill('新建一張心智圖，主題是', true), '新建一張心智圖，主題是');
+  assert.equal(chatSuggestionFill('Arrange the whole map', false), 'Arrange the whole map');
+  eq([...MAP_CHAT_OPEN_ENDED_KEYS], ['ui.map_chat_suggest_empty_build', 'ui.map_chat_suggest_empty_new_map']);
 });
 
 integrationTest('B1 ui: a suggestion button that has the keyboard is not rebuilt by a refresh that changes nothing', async () => {
@@ -2964,7 +3042,7 @@ integrationTest('B1 ui: Retry is disabled while a request runs, and an answer th
 
 integrationTest('B1 ui: the window is a labelled region; the log has no aria-live and no role=log; one live region says the summary once, when the turn ends', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  assert.equal(chat.bodyEl.attrs.role, 'region'); assert.equal(chat.bodyEl.attrs['aria-label'], 'Ask AI about this map');
+  assert.equal(chat.bodyEl.attrs.role, 'region'); assert.equal(chat.bodyEl.attrs['aria-label'], 'Ask AI');
   assert.equal(chat.logEl.attrs['aria-live'], undefined); assert.notEqual(chat.logEl.attrs.role, 'log'); assert.equal(findAll(chat.bodyEl, i => i.attrs['aria-live'] !== undefined).length, 0, 'nothing in the body is live');
   const writes = []; const live = chat.liveEl; const setText = live.setText.bind(live); live.setText = value => { writes.push(value); setText(value); };
   assert.equal(live.attrs['aria-live'], 'polite'); assert.equal(live.attrs['aria-atomic'], 'true');
@@ -3140,7 +3218,7 @@ integrationTest('B1 fix 12: a blank map outside the managed folders, from the op
 
 integrationTest('B1 fix 15: the empty canvas follows the chat: building while it works, a line while a plan waits, the usual hint again when it ends or is cancelled', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
-  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.ok(findAll(box, i => i.tag === 'button').length === 1, 'the topic button of the usual hint');
+  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'UX B10: text only; the toolbar has the one "+ Topic"');
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'plan', actions: planActions(h, 16).map(a => ({ ...a, parentId: '' })), rejected: [] }; };
   h.type('Coffee'); const sent = h.view.sendMapChat(); await requestOut(chat);
   assert.match(shown(), /Building the map…/); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 3); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'no manual-create button meanwhile');
@@ -3149,6 +3227,42 @@ integrationTest('B1 fix 15: the empty canvas follows the chat: building while it
   planButton(h, 'cancel').click(); await tick(); assert.match(shown(), /no topics/, 'cancelled: the usual hint is back');
   h.control.reply = async () => ({ reply: 'just text', actions: [], rejected: [] }); h.type('hello'); await h.view.sendMapChat(); assert.match(shown(), /no topics/, 'a reply that builds nothing leaves the usual hint');
   h.control.reply = async () => { throw new Error('boom'); }; h.type('again'); await h.view.sendMapChat(); assert.match(shown(), /no topics/, 'failed: the usual hint');
+});
+
+test('UX B1: the "consent" stage names no model, offers no Stop, and the model\'s seconds start when the user agrees', () => {
+  const s = stageFixture(); const { f } = s;
+  f.panel.begin('ask', undefined, false, 'preparing'); assert.equal(f.panel.awaitingConsent, false); assert.equal(f.parts.stop().hidden, false, 'preparing: Stop is offered');
+  s.tickSeconds(3); f.panel.setStage('consent');
+  assert.equal(f.panel.awaitingConsent, true); assert.equal(f.panel.stageKind, 'consent');
+  assert.equal(s.label(), 'Waiting for you to confirm AI usage'); assert.equal(f.panel.liveEl.text, 'Waiting for you to confirm AI usage');
+  assert.equal(f.parts.stop().hidden, true, 'the notice has its own Cancel: no Stop beside it'); assert.equal(f.parts.send().hidden, true, 'and no Send either');
+  s.tickSeconds(20); f.panel.setStage('waiting');
+  assert.equal(f.panel.awaitingConsent, false); assert.equal(f.parts.stop().hidden, false, 'agreed: Stop is back');
+  assert.equal(s.label(), 'Waiting for the model (Haiku)'); assert.equal(s.elapsed().text, ' · 0:00', 'the time spent reading the notice is not the model\'s');
+  f.panel.setStage('consent'); assert.equal(f.panel.awaitingConsent, false, 'a stage never goes back to consent');
+});
+
+integrationTest('UX B1: while the usage notice is open the empty canvas waits for the user (no skeleton, no Stop); agreeing builds, declining puts the draft back', async () => {
+  for (const agree of [true, false]) {
+    const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
+    const shown = () => visibleText(box); const skeleton = () => findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length;
+    let seen = false; h.plugin.usageNoticePending = () => !seen;
+    const answer = deferred(); const opened = deferred(); const gate = deferred();
+    h.plugin.confirmAiUsage = async (model, run, hooks) => { h.control.usageAsks++; hooks?.noticeOpening?.(); opened.resolve(); if (!(await answer.promise)) return false; seen = true; await run(); return true; };
+    h.control.reply = async () => { await gate.promise; return { reply: 'just text', actions: [], rejected: [] }; };
+    h.type('Coffee'); const sent = h.view.sendMapChat();
+    assert.match(shown(), /Waiting for you to confirm AI usage/, 'preparing with the notice still to come: no "building" yet'); assert.equal(skeleton(), 0);
+    await opened.promise;
+    assert.equal(chat.awaitingConsent, true); assert.match(shown(), /Waiting for you to confirm AI usage\. The map is built after you agree\./); assert.equal(skeleton(), 0, 'no skeleton while the notice is open');
+    assert.doesNotMatch(shown(), /Building the map/); assert.equal(chat.stopEl.hidden, true, 'no Stop while the notice is open');
+    answer.resolve(agree);
+    if (agree) {
+      await requestOut(chat); assert.match(shown(), /Building the map…/, 'agreed: now the map is being built'); assert.equal(skeleton(), 3); assert.equal(chat.stopEl.hidden, false);
+      gate.resolve(); await sent; assert.match(shown(), /no topics/);
+    } else {
+      await sent; assert.equal(chat.isBusy, false); assert.equal(chat.draft, 'Coffee', 'declined: the draft is back in the box'); assert.match(shown(), /no topics/); assert.equal(h.control.requests.length, 0);
+    }
+  }
 });
 
 integrationTest('B1 fix 16: the plan card says before Apply that it cannot be undone, marks the group that removes cards in words, and its title follows what became of it', async () => {
@@ -3190,7 +3304,7 @@ integrationTest('B1 fix 20 and 24: the opening screen asks for a topic and hides
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); assert.match(css, /\.has-chat-hero \.vam-empty \{ display: none; \}/);
   hero.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); hero.type('Coffee'); await hero.view.sendMapChat(); assert.match(chat.inputEl.attrs.placeholder, /^Ask a question, or ask the AI to change the map/);
   const h = await harness(); await h.view.hydrate(); const side = h.open();
-  assert.equal(side.guideEl.hidden, false); assert.equal(side.guideEl.text, 'No messages yet. Type below, or pick a suggestion.'); assert.equal(side.logEl.hidden, true);
+  assert.equal(side.guideEl.hidden, false); assert.equal(side.guideEl.text, 'No messages yet. The AI can build or extend this map, research its topics, or rearrange it. Try one of these, or type your own:'); assert.equal(side.logEl.hidden, true);
   side.begin('q'); assert.equal(side.guideEl.hidden, true); assert.equal(side.logEl.hidden, false);
 });
 
@@ -3243,11 +3357,19 @@ integrationTest('B1 fix 21 and 27: a window laid over a narrow pane leaves 160px
 
 test('B1 fix 17: the suggestions, examples, retry, "more detail" and "show all" each get their own look, with enough weight to beat the base button style', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
-  for (const name of ['suggestion', 'example']) assert.match(rule(`.vam-map-chat button.vam-map-chat-${name}`), /background: transparent/, `${name}: ghost text`);
+  // UX B3: suggestions and examples are recognisable buttons (outlined, filled, at least 24px high), not faint text links.
+  for (const name of ['suggestion', 'example']) { const r = rule(`.vam-map-chat button.vam-map-chat-${name}`); assert.match(r, /border: 1px solid/, `${name}: outlined`); assert.match(r, /background: var\(--background-secondary\)/, `${name}: filled`); assert.match(r, /min-height: (2[4-9]|[3-9]\d)px/, `${name}: at least 24px high`); }
+  assert.match(rule('.vam-map-chat-style-option'), /min-height: 24px; min-width: 24px/, 'the answer-length toggle is a 24px target');
   assert.match(rule('.vam-map-chat button.vam-map-chat-retry'), /border: 1px solid/, 'retry: a clear secondary button'); assert.match(rule('.vam-map-chat button.vam-map-chat-retry'), /background: var\(--background-primary\)/);
   assert.match(css, /\.vam-map-chat button\.vam-map-chat-lines-toggle, \.vam-map-chat button\.vam-map-chat-more \{[^}]*background: transparent/);
   assert.match(rule('.vam-map-chat-chip'), /border: 1px solid[^;]*; border-radius: 999px/, 'chips: an outlined pill');
   for (const bare of ['.vam-map-chat-suggestion', '.vam-map-chat-example', '.vam-map-chat-retry', '.vam-map-chat-more']) assert.equal(css.split('\n').some(line => line.startsWith(`${bare} {`)), false, `${bare} is no longer a bare class that the base style beats`);
+});
+
+test('UX B4: the chat title is short in every language and is never cut with an ellipsis (it may wrap instead)', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')) ?? '';
+  assert.doesNotMatch(rule, /text-overflow: ellipsis|white-space: nowrap/); assert.match(rule, /flex: 0 0 auto/, 'the title does not shrink; the model menu gives way');
+  for (const id of ['en', 'zh-TW', 'zh-CN']) { const text = load(`i18n/${id}.ts`)[id.replace('-', '')]['ui.map_chat_title']; assert.ok(text.length <= 8, `${id}: "${text}" is short`); }
 });
 
 test('B1 fix 9 and 10: no dead overlay rule; the Escape selector is a plain literal that the literal scan allows with a reason', () => {
@@ -3310,9 +3432,9 @@ test('B2-0 F1: the deferred scroll is dropped when the window is folded again be
 integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and every entry shows its full label (MS-02: no follow-default entry, no shortened default label)', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-model {')); assert.ok(rule);
-  // B3-fix rule change: with the save button in the header the model asks for 146px (basis) and the title gives way first (flex-shrink 100, min 64px).
+  // UX B4 rule change: the title is short and keeps its width (no ellipsis); the model menu (basis 146px, min-width 0) gives way instead.
   assert.match(rule, /flex: 1 1 146px;/); assert.match(rule, /min-width: 0;/);
-  const title = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')); assert.match(title, /flex: 0 100 auto;/); assert.match(title, /min-width: 64px;/); assert.doesNotMatch(rule, /min-width: 120px/);
+  const title = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')); assert.match(title, /flex: 0 0 auto;/); assert.doesNotMatch(rule, /min-width: 120px/);
   const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliModel = 'gpt-6-luna'; h.plugin.modelLabel = id => id.startsWith('claude:') ? 'Claude Sonnet' : `OpenAI Codex · ${id}`;
   const choices = h.view.chatModelChoices(); const current = choices.find(c => c.value === 'gpt-6-luna');
   assert.equal(current.label, 'OpenAI Codex · gpt-6-luna', 'the full name is the label'); assert.equal(current.short, undefined); assert.equal(choices.some(c => c.value === ''), false);
@@ -3893,7 +4015,7 @@ const saveButton = h => find(h.view.chat.headEl, i => i.tag === 'button' && hasC
 const today = () => localDate(new Date());
 integrationTest('B3 save: a button between the model list and Close; hidden on the opening screen; disabled with a reason until a turn is finished', async () => {
   const { h, chat } = await imageHarness();
-  const order = chat.headEl.children.map(c => c.cls.split(' ')[0]); eq(order, ['vam-map-chat-title', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close']);
+  const order = chat.headEl.children.map(c => c.cls.split(' ')[0]); eq(order, ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close'], 'the model tag (UX B6) is only shown on the opening screen');
   const button = saveButton(h); assert.equal(button.attrs['aria-label'], 'There is no finished chat to save yet.', 'bug bash #28: the reason is the accessible name while disabled'); assert.ok(button.attrs.title);
   assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.attrs.title, 'There is no finished chat to save yet.', 'a turn that is still streaming does not count');
   button.click(); await tick(); eq(savedPaths(h), []);
@@ -4651,10 +4773,10 @@ test('bug bash #10: a language change sets the chat window\'s fixed words again,
   assert.equal(chat.sendEl.text, 'Send');
   await plugin.changeLanguage('zh-TW');
   assert.ok(chat.el === el, 'not rebuilt');
-  assert.equal(visibleText(chat.headEl.children[0]), '詢問 AI 關於這張圖');
+  assert.equal(visibleText(chat.headEl.children[0]), '問 AI');
   assert.equal(chat.sendEl.text, '送出'); assert.equal(chat.sendEl.attrs['aria-label'], '送出');
   assert.equal(chat.stopEl.text, '停止'); assert.equal(chat.inputEl.attrs['aria-label'], '傳給 AI 的訊息');
-  assert.equal(chat.bodyEl.attrs['aria-label'], '詢問 AI 關於這張圖');
+  assert.equal(chat.bodyEl.attrs['aria-label'], '問 AI');
   assert.equal(chat.toggleEl.attrs['aria-label'], '關閉 AI 對話');
   eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['你', 'AI']);
   assert.ok(find(chat.bodyEl, i => hasClass(i, 'vam-map-chat-log-label') && i.text === '對話紀錄'), 'the log label follows');

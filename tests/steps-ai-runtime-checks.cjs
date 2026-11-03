@@ -25,12 +25,14 @@ function fakeChecks(answers = {}) {
   };
 }
 
-test('claude readiness: ready only when the model is listed; missing is missing; everything else is an error without text', async () => {
+// UX B8: a listed-elsewhere model is "model-unavailable", and the discovery's own error text is passed on, so the user can be told why.
+test('claude readiness: ready only when the model is listed; missing is missing; a model not on the list is unavailable; a failed check is an error with its own text', async () => {
   const cases = [
     [{ status: 'ready', models: ['claude:sonnet'] }, { status: 'ready' }],
     [{ status: 'missing', models: [] }, { status: 'missing' }],
-    [{ status: 'ready', models: ['claude:haiku'] }, { status: 'error' }],
+    [{ status: 'ready', models: ['claude:haiku'] }, { status: 'model-unavailable' }],
     [{ status: 'error', models: [] }, { status: 'error' }],
+    [{ status: 'error', models: [], error: 'not logged in' }, { status: 'error', error: 'not logged in' }],
     [{ status: 'loading', models: [] }, { status: 'error' }],
     [{ status: 'idle', models: [] }, { status: 'error' }]
   ];
@@ -38,7 +40,7 @@ test('claude readiness: ready only when the model is listed; missing is missing;
     const checks = fakeChecks({ claude: state });
     const result = await mod.claudeCodeAiRuntime(() => ({}), checks).readiness('claude:sonnet');
     assert.deepEqual(plain(result), expected, JSON.stringify(state));
-    assert.equal('error' in result, false);
+    assert.equal('error' in result, 'error' in expected);
     assert.deepEqual(checks.calls, ['refresh:claude'], 'one refresh, no installed check');
   }
 });

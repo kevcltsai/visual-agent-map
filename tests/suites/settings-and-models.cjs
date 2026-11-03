@@ -527,3 +527,55 @@ test('Note style entry: shows the general topic row style by name, falls back to
   const aimOnAim = pageNamed(groupedTab({ settings: { noteStyleByKind: { aim: 'file:mine' } } }).tab, 'Note style');
   assert.equal(statusOf(aimOnAim), null);
 });
+
+// ---- Bug bash E: #18 language refocus in a popout window, #19 CLI path commit refreshes the status ----
+function tabWithDoc(extra = {}) {
+  const { VisualAgentMapSettingTab } = load('ui/settings-tab.ts', { obsidian: { ...obsidian, PluginSettingTab: class { hide() {} update() { this.updates = (this.updates || 0) + 1; this.onUpdate?.(); } }, Setting: class {}, Modal: class {} } });
+  const saved = [];
+  const plugin = {
+    settings: { cliModel: 'm', language: 'en', codexPath: 'codex', claudePath: 'claude' },
+    subscribeModelDiscovery: () => () => {}, subscribeCurrentModel: () => () => {},
+    codexDiagnostic() { return { installed: this.settings.codexPath === '/ok/codex', executable: this.settings.codexPath }; },
+    claudeDiagnostic() { return { installed: false, executable: 'claude' }; },
+    resetCodexRuntime() {}, modelDiscovery: { invalidate() {} }, refreshModelDiscovery: async () => {},
+    saveSettings: async () => { saved.push({ ...plugin.settings }); },
+    ...extra
+  };
+  return { tab: new VisualAgentMapSettingTab({}, plugin), plugin, saved };
+}
+const languageSelect = (id, log) => {
+  const select = { tag: 'select', id, options: ['en', 'zh-TW', 'zh-CN'].map(value => ({ value })), instanceOf: () => true, focus() { log.push(id); } };
+  return select;
+};
+test('Bug bash E #18: after a language change the language select of a popout Settings window is focused again (the window own document, not the global one)', () => {
+  const log = [];
+  const { tab } = tabWithDoc();
+  const oldSelect = languageSelect('old', log), newSelect = languageSelect('new', log);
+  const popoutDoc = { activeElement: oldSelect };
+  let selects = [oldSelect];
+  tab.containerEl = { doc: popoutDoc, contains: el => el === oldSelect || el === newSelect, querySelectorAll: () => selects };
+  tab.onUpdate = () => { selects = [newSelect]; popoutDoc.activeElement = null; };
+  tab.refreshAfterLanguageChange();
+  assert.deepEqual(log, ['new'], 'the new language select got the focus back');
+  // not focused in the language select: nothing is moved
+  log.length = 0;
+  popoutDoc.activeElement = { tag: 'button', instanceOf: () => false };
+  tab.containerEl.contains = () => true;
+  tab.refreshAfterLanguageChange();
+  assert.deepEqual(log, []);
+});
+test('Bug bash E #19: committing a Codex or Claude CLI path redraws the page after saving, and picking a reasoning level or typing does not', async () => {
+  const { tab, plugin, saved } = tabWithDoc();
+  const seen = [];
+  tab.onUpdate = () => seen.push({ saved: saved.length, value: tab.aiConnectionValue() });
+  assert.equal(tab.aiConnectionValue(), 'Not connected');
+  await tab.setControlValue('codexPath', ' /ok/codex ');
+  assert.equal(plugin.settings.codexPath, '/ok/codex');
+  assert.equal(seen.length, 1, 'redrawn once, after the save');
+  assert.equal(seen[0].saved, 1);
+  assert.notEqual(seen[0].value, 'Not connected', 'the status follows the diagnostic of the new path');
+  await tab.setControlValue('claudePath', '/x/claude');
+  assert.equal(seen.length, 2);
+  await tab.setControlValue('cliReasoning', 'high');
+  assert.equal(seen.length, 2, 'other values do not redraw the page');
+});

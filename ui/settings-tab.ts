@@ -500,12 +500,13 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     super.hide();
   }
   refreshAfterLanguageChange(): void {
+    // The Settings window can be a popout: its focus lives in its own document, not in the global `document`.
+    const active = this.containerEl.doc?.activeElement ?? null;
     const focused =
-      typeof document !== "undefined" &&
-      document.activeElement &&
-      this.containerEl.contains(document.activeElement) &&
-      document.activeElement.instanceOf(HTMLSelectElement) &&
-      offersEveryLanguage(Array.from(document.activeElement.options).map(option => option.value));
+      !!active &&
+      this.containerEl.contains(active) &&
+      active.instanceOf(HTMLSelectElement) &&
+      offersEveryLanguage(Array.from(active.options).map(option => option.value));
     this.update();
     if (!focused) return;
     const selector = Array.from(this.containerEl.querySelectorAll<HTMLSelectElement>("select")).find(select => {
@@ -913,5 +914,7 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     await this.plugin.saveSettings();
     if (key === "codexPath") void this.plugin.refreshModelDiscovery("codex");
     if (key === "claudePath") void this.plugin.refreshModelDiscovery("claude");
+    // Committed (change or blur), not while typing: the status rows and the entry value follow the new path.
+    if (key === "codexPath" || key === "claudePath") this.update();
   }
 }

@@ -9790,8 +9790,8 @@ export class VisualAgentMapView extends ItemView {
     restoreRelevanceFocus();
     restoreChatFocus();
     keepMapFocus();
-    this.applyPresentationMarks();
     this.syncStatusBarClearance();
+    this.applyPresentationMarks();
     restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */

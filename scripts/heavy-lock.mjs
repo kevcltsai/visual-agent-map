@@ -77,8 +77,17 @@ export function descendantsOf(pid, procs) {
   return found;
 }
 
-// pids (a Set; null when ps cannot run) whose environment carries VAM_HEAVY_LOCK_HELD=<token> (own-user processes only; ps prints the environment after the arguments).
+// pids (a Set; null when ps cannot run) whose environment carries VAM_HEAVY_LOCK_HELD=<token> (own-user processes only; macOS: ps eww prints the environment after the arguments, Linux: /proc/<pid>/environ).
 export function tokenCarriers(token, selfPid = process.pid) {
+  const needle = `VAM_HEAVY_LOCK_HELD=${token}\0`;
+  if (existsSync("/proc/self/environ")) { // Linux: ps does not print the environment with -o, /proc does
+    const found = new Set();
+    for (const name of readdirSync("/proc")) {
+      if (!/^\d+$/.test(name) || Number(name) === selfPid) continue;
+      try { if (readFileSync(`/proc/${name}/environ`, "latin1").includes(needle)) found.add(Number(name)); } catch { /* not ours to read, or gone */ }
+    }
+    return found;
+  }
   let text;
   try { text = execFileSync("ps", ["eww", "-axo", "pid=,command="], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; }
   const marker = new RegExp(`(?:^|\\s)VAM_HEAVY_LOCK_HELD=${token.replace(/[^\w-]/g, "")}(?:\\s|$)`);

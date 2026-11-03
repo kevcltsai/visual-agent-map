@@ -296,6 +296,10 @@ export class MapChatPanel {
   private bodyEl!: HTMLElement;
   private headEl!: HTMLElement;
   private heroTitleEl!: HTMLElement;
+  private titleEl!: HTMLElement;
+  private closeEl!: HTMLButtonElement;
+  private styleGroupEl!: HTMLElement;
+  private logLabelEl!: HTMLElement;
   private guideEl!: HTMLElement;
   private hintEl!: HTMLElement;
   private logEl!: HTMLElement;
@@ -1035,7 +1039,7 @@ export class MapChatPanel {
     });
     // Top row: the title, the model for this chat, and the button that folds the window.
     this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
-    this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
+    this.titleEl = this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
     this.modelEl = this.headEl.createEl("select", {
       cls: "vam-map-chat-model dropdown",
       attr: { "aria-label": t("ui.map_chat_model_label") }
@@ -1050,10 +1054,10 @@ export class MapChatPanel {
     });
     setIcon(this.saveEl, "file-down");
     this.saveEl.addEventListener("click", () => void this.saveNote());
-    const close = this.headEl.createEl("button", {
+    const close = (this.closeEl = this.headEl.createEl("button", {
       cls: "vam-map-chat-close clickable-icon",
       attr: { "aria-label": t("ui.map_chat_close") }
-    });
+    }));
     setIcon(close, "x");
     close.addEventListener("click", () => this.setOpen(false, true));
     this.heroTitleEl = this.bodyEl.createDiv({
@@ -1064,9 +1068,16 @@ export class MapChatPanel {
     // A map that has content opens the window onto an empty log: one line says what it is for.
     this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
     // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says each progress stage name once as it changes, then the whole turn once when it ends.
+    // Not `aria-label`: Obsidian shows an aria-label as a hover tooltip, and this one would cover the suggestions below the log.
+    const logLabelId = `${this.id}-log-label`;
+    this.logLabelEl = this.bodyEl.createSpan({
+      cls: "vam-map-chat-log-label",
+      text: t("ui.map_chat_log_label"),
+      attr: { id: logLabelId }
+    });
     this.logEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-log",
-      attr: { role: "group", "aria-label": t("ui.map_chat_log_label"), tabindex: "0" }
+      attr: { role: "group", "aria-labelledby": logLabelId, tabindex: "0" }
     });
     // A [[link]] in a reply is an internal link anchor; Obsidian's own handler is not attached to this panel, so open it here.
     const openInternal = (event: MouseEvent | KeyboardEvent, from: unknown): void => {
@@ -1106,10 +1117,10 @@ export class MapChatPanel {
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
     const side = form.createDiv("vam-map-chat-side");
-    const styleGroup = side.createDiv({
+    const styleGroup = (this.styleGroupEl = side.createDiv({
       cls: "vam-map-chat-style",
       attr: { role: "group", "aria-label": t("ui.map_chat_style_label") }
-    });
+    }));
     const styleButton = (style: MapChatStyleChoice): HTMLButtonElement => {
       const label = t(style === "concise" ? "ui.map_chat_style_concise" : "ui.map_chat_style_detailed");
       const button = styleGroup.createEl("button", {
@@ -1134,7 +1145,7 @@ export class MapChatPanel {
       text: t("ui.map_chat_stop"),
       attr: { "aria-label": t("ui.map_chat_stop") }
     });
-    this.sendEl.addEventListener("click", () => this.host.send());
+    this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
       this.composing = true;
@@ -1197,7 +1208,56 @@ export class MapChatPanel {
     this.saveDisabled = disabled;
     this.saveEl.setAttr("aria-disabled", String(disabled));
     this.saveEl.toggleClass("is-disabled", disabled);
+    // Obsidian's hover tooltip reads aria-label, so the reason a disabled button is disabled goes there too.
+    this.saveEl.setAttr("aria-label", why || t("ui.map_chat_save"));
     this.saveEl.setAttr("title", why || t("ui.map_chat_save"));
+  }
+  /**
+   * The interface language changed: the fixed words of the window (title, buttons, labels, row labels) are set again in the
+   * new language. Nothing is built again and the draft and the words of the messages stay as they are.
+   */
+  relabel(): void {
+    if (!this.built) return;
+    this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
+    this.titleEl.setText(t("ui.map_chat_title"));
+    this.modelEl.setAttr("aria-label", t("ui.map_chat_model_label"));
+    this.closeEl.setAttr("aria-label", t("ui.map_chat_close"));
+    this.heroTitleEl.setText(t("ui.map_chat_hero_title"));
+    this.guideEl.setText(t("ui.map_chat_empty_log"));
+    this.logLabelEl.setText(t("ui.map_chat_log_label"));
+    this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
+    this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
+    this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
+    this.inputEl.setAttr("placeholder", t("ui.map_chat_input_placeholder"));
+    this.styleGroupEl.setAttr("aria-label", t("ui.map_chat_style_label"));
+    this.styleEls?.concise.setText(t("ui.map_chat_style_concise"));
+    this.styleEls?.detailed.setText(t("ui.map_chat_style_detailed"));
+    this.sendEl.setText(t("ui.map_chat_send"));
+    this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
+    this.stopEl.setText(t("ui.map_chat_stop"));
+    this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
+    this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
+    this.applyOpen();
+    this.refreshControls();
+    this.refreshSave();
+    this.renderChips();
+    this.renderBusy();
+    // Rows are kept unless their key changed; the key holds the fixed words, so only rows with words to change are built again.
+    this.renderLog();
+  }
+  /** Send was pressed: a hidden Send button, or a row that is rebuilt, must not leave the keyboard on the page. */
+  private sendPressed(): void {
+    this.handOffFocus(() => this.host.send());
+  }
+  /** Runs `start` (which begins a turn); if the keyboard was in the window and fell out of it, Stop (the one control of a waiting turn) takes it. */
+  private handOffFocus(start: () => void): void {
+    const inside = this.hasFocus();
+    start();
+    if (!inside || !this.working) return;
+    const active = this.host.activeElement();
+    // Gone, hidden (Send) or inert (the button of a row that waits for the turn) all mean the keyboard has nowhere to act.
+    if (!active || !this.el.contains(active) || active === this.sendEl || (active as HTMLButtonElement).disabled)
+      this.stopEl.focus();
   }
   private async saveNote(): Promise<void> {
     if (!this.built || this.saving || this.saveDisabled) return;
@@ -1708,7 +1768,7 @@ export class MapChatPanel {
       });
       more.disabled = this.working;
       more.addEventListener("click", () => {
-        if (!this.working) this.host.moreDetail(origin);
+        if (!this.working) this.handOffFocus(() => this.host.moreDetail(origin));
       });
     }
     if (this.canRetry(message, asked) && asked?.origin) {
@@ -1720,7 +1780,7 @@ export class MapChatPanel {
       });
       more.disabled = this.working;
       more.addEventListener("click", () => {
-        if (!this.working) this.host.retry?.(origin);
+        if (!this.working) this.handOffFocus(() => this.host.retry?.(origin));
       });
     }
     return { row, body, more };

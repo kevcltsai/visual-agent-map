@@ -3888,7 +3888,7 @@ const today = () => localDate(new Date());
 integrationTest('B3 save: a button between the model list and Close; hidden on the opening screen; disabled with a reason until a turn is finished', async () => {
   const { h, chat } = await imageHarness();
   const order = chat.headEl.children.map(c => c.cls.split(' ')[0]); eq(order, ['vam-map-chat-title', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close']);
-  const button = saveButton(h); assert.equal(button.attrs['aria-label'], 'Save the chat as a note'); assert.ok(button.attrs.title);
+  const button = saveButton(h); assert.equal(button.attrs['aria-label'], 'There is no finished chat to save yet.', 'bug bash #28: the reason is the accessible name while disabled'); assert.ok(button.attrs.title);
   assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.attrs.title, 'There is no finished chat to save yet.', 'a turn that is still streaming does not count');
   button.click(); await tick(); eq(savedPaths(h), []);
   chat.finish('Done answer.', []);
@@ -4617,4 +4617,85 @@ test('MS-09: buildMapChatContext keeps retryWith next to a failure and drops it 
   const build = outline => JSON.parse(buildMapChatContext({ mapTitle: 'M', outline, selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] }).json);
   assert.equal(build([out({ status: 'error', error: 'x', retryWith: 'L' })]).outline[0].retryWith, 'L');
   assert.equal(build([out({ retryWith: 'L' })]).outline[0].retryWith, undefined, 'only a failed card carries it');
+});
+
+// ---- bug bash C, packet 1 (#10 #14 #28 #29 #31) ---------------------------------------------------------------
+
+test('bug bash #10: a language change sets the chat window\'s fixed words again, keeps the draft and the messages, and builds nothing new', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('question one', { text: 'question one', chips: [], selectedIds: [] }); f.panel.finish('answer one', []);
+  f.parts.input().value = 'half-typed';
+  const el = f.panel.el; const row = f.parts.log().children[0];
+  f.setLanguage('zh-TW'); f.panel.relabel();
+  assert.equal(f.panel.el, el, 'not rebuilt');
+  assert.equal(visibleText(f.panel.headEl.children[0]), '詢問 AI 關於這張圖');
+  assert.equal(f.panel.sendEl.text, '送出'); assert.equal(f.panel.sendEl.attrs['aria-label'], '送出');
+  assert.equal(f.panel.stopEl.text, '停止'); assert.equal(f.panel.inputEl.attrs['aria-label'], '傳給 AI 的訊息');
+  assert.equal(f.panel.styleEls.concise.text, '精簡'); assert.equal(f.panel.bodyEl.attrs['aria-label'], '詢問 AI 關於這張圖');
+  assert.equal(f.panel.toggleEl.attrs['aria-label'], '關閉 AI 對話');
+  const roles = findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-role')).map(i => i.text); eq(roles, ['你', 'AI']);
+  assert.ok(find(f.panel.bodyEl, i => hasClass(i, 'vam-map-chat-log-label') && i.text === '對話紀錄'), 'the log label follows');
+  assert.equal(f.panel.draft, 'half-typed'); eq(f.panel.transcript().map(m => m.text), ['question one', 'answer one']);
+  assert.ok(f.parts.log().children[0], 'rows are still there'); void row;
+  f.setLanguage('en'); f.panel.relabel(); assert.equal(f.panel.sendEl.text, 'Send');
+  eq(findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['You', 'AI']);
+});
+
+test('bug bash #10: the "say it in more detail" and Retry buttons of an existing row change language too', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('q', { text: 'q', chips: [], selectedIds: [] }); f.panel.finish('a', []);
+  const more = () => find(f.parts.log(), i => hasClass(i, 'vam-map-chat-more'));
+  assert.equal(more().text, 'Say it in more detail');
+  f.setLanguage('zh-TW'); f.panel.relabel();
+  assert.equal(more().text, '說詳細一點');
+});
+
+test('bug bash #14: pressing Send leaves the keyboard on Stop, not on the page', () => {
+  const ref = {};
+  const f = panelFixture({ send: () => { ref.f.panel.begin('hello', { text: 'hello', chips: [], selectedIds: [] }); } }); ref.f = f; f.panel.setOpen(true);
+  f.parts.send().focus(); assert.equal(f.page.doc.activeElement, f.parts.send());
+  f.parts.send().click();
+  assert.equal(f.panel.isBusy, true);
+  assert.ok(f.page.doc.activeElement === f.parts.stop(), 'Stop holds the keyboard');
+});
+
+test('bug bash #14: pressing Retry of a failed turn leaves the keyboard on Stop, not on the removed button', () => {
+  const ref = {};
+  const f = panelFixture({ retry: origin => { ref.f.panel.begin(origin.text, origin, false); } }); ref.f = f; f.panel.setOpen(true);
+  f.panel.begin('q', { text: 'q', chips: [], selectedIds: [] }); f.panel.fail('network is down');
+  const retry = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-retry')); assert.ok(retry);
+  retry.focus(); retry.click();
+  assert.equal(f.panel.isBusy, true);
+  assert.ok(f.page.doc.activeElement === f.parts.stop(), 'Stop holds the keyboard');
+});
+
+test('bug bash #14: a press whose keyboard was elsewhere does not take the keyboard', () => {
+  const ref = {};
+  const f = panelFixture({ send: () => { ref.f.panel.begin('hello', { text: 'hello', chips: [], selectedIds: [] }); } }); ref.f = f; f.panel.setOpen(true);
+  f.page.doc.activeElement = null; f.parts.send().click();
+  assert.ok(f.page.doc.activeElement === null);
+});
+
+test('bug bash #28: the Save button\'s aria-label gives the reason while it is disabled and goes back to its name once a chat can be saved', () => {
+  const f = panelFixture({ saveTranscript: async () => ({ ok: true, path: 'x.md' }) }); f.panel.setOpen(true);
+  const save = find(f.panel.headEl, i => hasClass(i, 'vam-map-chat-save'));
+  assert.equal(save.attrs['aria-label'], 'There is no finished chat to save yet.');
+  f.panel.begin('q', { text: 'q', chips: [], selectedIds: [] }); f.panel.finish('a', []);
+  assert.equal(save.attrs['aria-label'], 'Save the chat as a note');
+  assert.equal(save.attrs.title, 'Save the chat as a note');
+});
+
+test('bug bash #29: the log is named by a hidden label (aria-labelledby), not an aria-label that Obsidian shows as a tooltip', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const log = f.parts.log();
+  assert.equal(log.attrs['aria-label'], undefined, 'no aria-label, so no hover tooltip');
+  const label = find(f.panel.bodyEl, i => i.attrs.id === log.attrs['aria-labelledby']);
+  assert.ok(label, 'the labelledby target exists'); assert.equal(label.text, 'Conversation'); assert.ok(hasClass(label, 'vam-map-chat-log-label'));
+});
+
+integrationTest('bug bash #31: a chat add_child without a parent is labelled as a root topic; with a parent it stays a subtopic', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const add = parentId => ({ kind: 'add_child', title: 'T', summary: '', ...(parentId === undefined ? {} : { parentId }) });
+  for (const empty of [undefined, null, '']) assert.equal(h.view.chatActionLabel(add(empty)), 'Add root topic “T”', `parentId=${String(empty)}`);
+  assert.equal(h.view.chatActionLabel(add(h.ids.a)), 'Add subtopic “T”');
 });

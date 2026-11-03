@@ -1176,6 +1176,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_line_skipped_0_1": "略过：{0}（{1}）",
   "ui.map_chat_line_failed_0_1": "失败：{0}（{1}）",
   "ui.map_chat_do_add_child_0": "新增子议题“{0}”",
+  "ui.map_chat_do_add_root_0": "新增根议题“{0}”",
   "ui.map_chat_do_rename_0": "把议题改名为“{0}”",
   "ui.map_chat_do_summary_0": "更新“{0}”的摘要",
   "ui.map_chat_do_note_0": "改写“{0}”的笔记",

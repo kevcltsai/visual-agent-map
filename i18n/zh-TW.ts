@@ -1178,6 +1178,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_line_skipped_0_1": "略過：{0}（{1}）",
   "ui.map_chat_line_failed_0_1": "失敗：{0}（{1}）",
   "ui.map_chat_do_add_child_0": "新增子議題「{0}」",
+  "ui.map_chat_do_add_root_0": "新增根議題「{0}」",
   "ui.map_chat_do_rename_0": "把議題改名為「{0}」",
   "ui.map_chat_do_summary_0": "更新「{0}」的摘要",
   "ui.map_chat_do_note_0": "改寫「{0}」的筆記",

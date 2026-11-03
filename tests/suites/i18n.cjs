@@ -283,3 +283,10 @@ test('check:i18n fails on bad placeholder and extra-key fixtures and passes on a
     for (const fixture of fixtures) fs.rmSync(fixture, { recursive: true, force: true });
   }
 });
+
+test('bug bash #31: the root-topic action label exists in all three languages and keeps its placeholder', () => {
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('en', 'ui.map_chat_do_add_root_0'), 'Add root topic “{0}”');
+  assert.equal(translate('zh-TW', 'ui.map_chat_do_add_root_0'), '新增根議題「{0}」');
+  assert.equal(translate('zh-CN', 'ui.map_chat_do_add_root_0'), '新增根议题“{0}”');
+});

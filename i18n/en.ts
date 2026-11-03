@@ -1246,6 +1246,7 @@ export const en = {
   "ui.map_chat_line_skipped_0_1": "Skipped: {0} ({1})",
   "ui.map_chat_line_failed_0_1": "Failed: {0} ({1})",
   "ui.map_chat_do_add_child_0": "Add subtopic “{0}”",
+  "ui.map_chat_do_add_root_0": "Add root topic “{0}”",
   "ui.map_chat_do_rename_0": "Rename topic to “{0}”",
   "ui.map_chat_do_summary_0": "Update the summary of “{0}”",
   "ui.map_chat_do_note_0": "Rewrite the note of “{0}”",

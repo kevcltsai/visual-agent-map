@@ -1228,6 +1228,7 @@ var en = {
   "ui.map_chat_line_skipped_0_1": "Skipped: {0} ({1})",
   "ui.map_chat_line_failed_0_1": "Failed: {0} ({1})",
   "ui.map_chat_do_add_child_0": "Add subtopic \u201C{0}\u201D",
+  "ui.map_chat_do_add_root_0": "Add root topic \u201C{0}\u201D",
   "ui.map_chat_do_rename_0": "Rename topic to \u201C{0}\u201D",
   "ui.map_chat_do_summary_0": "Update the summary of \u201C{0}\u201D",
   "ui.map_chat_do_note_0": "Rewrite the note of \u201C{0}\u201D",
@@ -3599,6 +3600,7 @@ var zhCN = {
   "ui.map_chat_line_skipped_0_1": "\u7565\u8FC7\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_line_failed_0_1": "\u5931\u8D25\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_do_add_child_0": "\u65B0\u589E\u5B50\u8BAE\u9898\u201C{0}\u201D",
+  "ui.map_chat_do_add_root_0": "\u65B0\u589E\u6839\u8BAE\u9898\u201C{0}\u201D",
   "ui.map_chat_do_rename_0": "\u628A\u8BAE\u9898\u6539\u540D\u4E3A\u201C{0}\u201D",
   "ui.map_chat_do_summary_0": "\u66F4\u65B0\u201C{0}\u201D\u7684\u6458\u8981",
   "ui.map_chat_do_note_0": "\u6539\u5199\u201C{0}\u201D\u7684\u7B14\u8BB0",
@@ -5970,6 +5972,7 @@ var zhTW = {
   "ui.map_chat_line_skipped_0_1": "\u7565\u904E\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_line_failed_0_1": "\u5931\u6557\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_do_add_child_0": "\u65B0\u589E\u5B50\u8B70\u984C\u300C{0}\u300D",
+  "ui.map_chat_do_add_root_0": "\u65B0\u589E\u6839\u8B70\u984C\u300C{0}\u300D",
   "ui.map_chat_do_rename_0": "\u628A\u8B70\u984C\u6539\u540D\u70BA\u300C{0}\u300D",
   "ui.map_chat_do_summary_0": "\u66F4\u65B0\u300C{0}\u300D\u7684\u6458\u8981",
   "ui.map_chat_do_note_0": "\u6539\u5BEB\u300C{0}\u300D\u7684\u7B46\u8A18",
@@ -29027,6 +29030,10 @@ var MapChatPanel = class {
     __publicField(this, "bodyEl");
     __publicField(this, "headEl");
     __publicField(this, "heroTitleEl");
+    __publicField(this, "titleEl");
+    __publicField(this, "closeEl");
+    __publicField(this, "styleGroupEl");
+    __publicField(this, "logLabelEl");
     __publicField(this, "guideEl");
     __publicField(this, "hintEl");
     __publicField(this, "logEl");
@@ -29754,7 +29761,7 @@ ${typed}` : draft;
       attr: { id: this.id, role: "region", "aria-label": t("ui.map_chat_title") }
     });
     this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
-    this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
+    this.titleEl = this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
     this.modelEl = this.headEl.createEl("select", {
       cls: "vam-map-chat-model dropdown",
       attr: { "aria-label": t("ui.map_chat_model_label") }
@@ -29769,7 +29776,7 @@ ${typed}` : draft;
     });
     (0, import_obsidian17.setIcon)(this.saveEl, "file-down");
     this.saveEl.addEventListener("click", () => void this.saveNote());
-    const close = this.headEl.createEl("button", {
+    const close = this.closeEl = this.headEl.createEl("button", {
       cls: "vam-map-chat-close clickable-icon",
       attr: { "aria-label": t("ui.map_chat_close") }
     });
@@ -29781,9 +29788,15 @@ ${typed}` : draft;
       attr: { role: "heading", "aria-level": "2" }
     });
     this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
+    const logLabelId = `${this.id}-log-label`;
+    this.logLabelEl = this.bodyEl.createSpan({
+      cls: "vam-map-chat-log-label",
+      text: t("ui.map_chat_log_label"),
+      attr: { id: logLabelId }
+    });
     this.logEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-log",
-      attr: { role: "group", "aria-label": t("ui.map_chat_log_label"), tabindex: "0" }
+      attr: { role: "group", "aria-labelledby": logLabelId, tabindex: "0" }
     });
     const openInternal = (event, from) => {
       var _a2;
@@ -29823,7 +29836,7 @@ ${typed}` : draft;
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
     const side = form.createDiv("vam-map-chat-side");
-    const styleGroup = side.createDiv({
+    const styleGroup = this.styleGroupEl = side.createDiv({
       cls: "vam-map-chat-style",
       attr: { role: "group", "aria-label": t("ui.map_chat_style_label") }
     });
@@ -29851,7 +29864,7 @@ ${typed}` : draft;
       text: t("ui.map_chat_stop"),
       attr: { "aria-label": t("ui.map_chat_stop") }
     });
-    this.sendEl.addEventListener("click", () => this.host.send());
+    this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
       this.composing = true;
@@ -29912,7 +29925,54 @@ ${typed}` : draft;
     this.saveDisabled = disabled;
     this.saveEl.setAttr("aria-disabled", String(disabled));
     this.saveEl.toggleClass("is-disabled", disabled);
+    this.saveEl.setAttr("aria-label", why || t("ui.map_chat_save"));
     this.saveEl.setAttr("title", why || t("ui.map_chat_save"));
+  }
+  /**
+   * The interface language changed: the fixed words of the window (title, buttons, labels, row labels) are set again in the
+   * new language. Nothing is built again and the draft and the words of the messages stay as they are.
+   */
+  relabel() {
+    var _a2, _b2;
+    if (!this.built) return;
+    this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
+    this.titleEl.setText(t("ui.map_chat_title"));
+    this.modelEl.setAttr("aria-label", t("ui.map_chat_model_label"));
+    this.closeEl.setAttr("aria-label", t("ui.map_chat_close"));
+    this.heroTitleEl.setText(t("ui.map_chat_hero_title"));
+    this.guideEl.setText(t("ui.map_chat_empty_log"));
+    this.logLabelEl.setText(t("ui.map_chat_log_label"));
+    this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
+    this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
+    this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
+    this.inputEl.setAttr("placeholder", t("ui.map_chat_input_placeholder"));
+    this.styleGroupEl.setAttr("aria-label", t("ui.map_chat_style_label"));
+    (_a2 = this.styleEls) == null ? void 0 : _a2.concise.setText(t("ui.map_chat_style_concise"));
+    (_b2 = this.styleEls) == null ? void 0 : _b2.detailed.setText(t("ui.map_chat_style_detailed"));
+    this.sendEl.setText(t("ui.map_chat_send"));
+    this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
+    this.stopEl.setText(t("ui.map_chat_stop"));
+    this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
+    this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
+    this.applyOpen();
+    this.refreshControls();
+    this.refreshSave();
+    this.renderChips();
+    this.renderBusy();
+    this.renderLog();
+  }
+  /** Send was pressed: a hidden Send button, or a row that is rebuilt, must not leave the keyboard on the page. */
+  sendPressed() {
+    this.handOffFocus(() => this.host.send());
+  }
+  /** Runs `start` (which begins a turn); if the keyboard was in the window and fell out of it, Stop (the one control of a waiting turn) takes it. */
+  handOffFocus(start) {
+    const inside2 = this.hasFocus();
+    start();
+    if (!inside2 || !this.working) return;
+    const active = this.host.activeElement();
+    if (!active || !this.el.contains(active) || active === this.sendEl || active.disabled)
+      this.stopEl.focus();
   }
   async saveNote() {
     if (!this.built || this.saving || this.saveDisabled) return;
@@ -30375,7 +30435,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
       more.disabled = this.working;
       more.addEventListener("click", () => {
-        if (!this.working) this.host.moreDetail(origin);
+        if (!this.working) this.handOffFocus(() => this.host.moreDetail(origin));
       });
     }
     if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
@@ -30387,8 +30447,10 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
       more.disabled = this.working;
       more.addEventListener("click", () => {
-        var _a3, _b2;
-        if (!this.working) (_b2 = (_a3 = this.host).retry) == null ? void 0 : _b2.call(_a3, origin);
+        if (!this.working) this.handOffFocus(() => {
+          var _a3, _b2;
+          return (_b2 = (_a3 = this.host).retry) == null ? void 0 : _b2.call(_a3, origin);
+        });
       });
     }
     return { row, body, more };
@@ -48322,7 +48384,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     return !this.closed && this.aimViewEpoch === epoch && this.path === mapPath;
   }
   async refreshFromPlugin() {
+    var _a2;
     await this.hydrate();
+    (_a2 = this.chat) == null ? void 0 : _a2.relabel();
     this.renderPreservingFocus();
   }
   renderPreservingFocus() {
@@ -61169,7 +61233,7 @@ ${note.detail.trim()}` : "",
     const targets = (ids) => ids.length ? ids.length : this.chatSelectionIds().length;
     switch (action.kind) {
       case "add_child":
-        return t("ui.map_chat_do_add_child_0", action.title);
+        return action.parentId ? t("ui.map_chat_do_add_child_0", action.title) : t("ui.map_chat_do_add_root_0", action.title);
       case "rename_topic":
         return t("ui.map_chat_do_rename_0", action.title);
       case "update_summary":

@@ -1784,6 +1784,8 @@ export class VisualAgentMapView extends ItemView {
   }
   async refreshFromPlugin(): Promise<void> {
     await this.hydrate();
+    // A language change: the chat window's fixed words are set again (the panel itself is kept, with its draft and messages).
+    this.chat?.relabel();
     this.renderPreservingFocus();
   }
   private renderPreservingFocus(): void {
@@ -15675,7 +15677,10 @@ export class VisualAgentMapView extends ItemView {
     const targets = (ids: string[]): number => (ids.length ? ids.length : this.chatSelectionIds().length);
     switch (action.kind) {
       case "add_child":
-        return t("ui.map_chat_do_add_child_0", action.title);
+        // No parent (the same test as the apply step): the card becomes a root topic.
+        return action.parentId
+          ? t("ui.map_chat_do_add_child_0", action.title)
+          : t("ui.map_chat_do_add_root_0", action.title);
       case "rename_topic":
         return t("ui.map_chat_do_rename_0", action.title);
       case "update_summary":

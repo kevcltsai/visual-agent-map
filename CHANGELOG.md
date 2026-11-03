@@ -25,6 +25,7 @@
 - **Drag selected topics together.** In selection mode, drag any checked topic and all checked topics move by the same distance, as one undo step. In a timeline, first-level topics cannot move as a group; uncheck them first. Dropping them on the chat still adds every checked topic as a reference.
 - **Previews follow the latest summary.** The hover preview now updates when a new summary is written, instead of staying on the first one. A preview you edited or cleared yourself is kept, and anything you added after it stays. Older notes whose preview is a single paragraph take the new summary the next time one is written (undo covers research and similar steps, not AIM writes).
 - **No more stuck "AI running" cards.** If the plugin reloaded or Obsidian closed while an AI task was running, the card now shows a task error when you open the map, with a note that the task was interrupted, so you can run it again.
+- **Map chat window fixes.** Changing the interface language now also changes the chat window's own words (title, buttons, labels, "You", "Say it in more detail"); your draft and the messages already sent stay as they were. After pressing Send or Retry with the mouse, the keyboard moves to Stop instead of dropping to the page. The disabled "Save the chat as a note" button now says why it is disabled to screen readers and the hover text, the conversation log no longer shows a hover tooltip over the suggestions, and a root topic added by the chat is listed as "Add root topic" instead of "Add subtopic".
 
 ## [0.28.0] - 2026-11-01
 

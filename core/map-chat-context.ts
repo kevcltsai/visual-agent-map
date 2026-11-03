@@ -139,6 +139,8 @@ export interface MapChatContext {
   selectedCount: number;
   /** The reply must start with `create_map` (see {@link MapChatContextInput.noEditableMap}). */
   noEditableMap: boolean;
+  /** An AIM map: a reply's topic types are skipped (see {@link MapChatContextInput.aim}). */
+  aim: boolean;
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;
   /** Normalised path -> content hash of every Markdown file sent whole in this turn. */
@@ -337,6 +339,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     nodeIds: [...ids],
     selectedCount: input.selected.length,
     noEditableMap: !!input.noEditableMap,
+    aim: !!input.aim,
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
     mdHashes: hashes,
     topicHashes

@@ -331,3 +331,176 @@ test('bar children keep the same order and fixed labels at counts 0-3 (names spa
   assert.equal(new Set(shapes).size, 1, shapes.join(' / '));
 });
 
+
+// ---- UX review A theme 2: floating controls over cards ----
+test('clearToolbar: a saved viewport that puts a card under the toolbar moves down by the overlap, at most the inset; otherwise it is untouched', () => {
+  const v = { x: 0, y: 0, zoom: 1 };
+  assert.equal(inset.clearToolbar(v, 58, []), v, 'no card under the toolbar: the very same viewport');
+  assert.equal(inset.clearToolbar(v, 0, [10]), v, 'no inset measured: untouched');
+  assert.deepEqual({ ...inset.clearToolbar(v, 58, [20]) }, { x: 0, y: 38, zoom: 1 }, 'the highest card ends at the inset');
+  assert.deepEqual({ ...inset.clearToolbar(v, 58, [30, 20, 40]) }, { x: 0, y: 38, zoom: 1 });
+  assert.equal(inset.clearToolbar(v, 58, [-5000]).y, 58, 'a card far above moves the map by at most the inset');
+  assert.equal(inset.clearToolbar(v, 58, [80]), v, 'a card already below the inset needs no move');
+  assert.equal(inset.clearToolbar({ x: 5, y: 12, zoom: 0.5 }, 58, [12]).zoom, 0.5);
+});
+
+test('isObscured: outside the canvas or under any floating control counts, a clear card does not, touching edges do not', () => {
+  const view = { left: 0, top: 0, right: 1000, bottom: 600 };
+  const covers = [{ left: 12, top: 12, right: 400, bottom: 50 }, { left: 700, top: 540, right: 988, bottom: 588 }];
+  assert.equal(inset.isObscured({ left: 100, top: 100, right: 380, bottom: 280 }, view, covers), false);
+  assert.equal(inset.isObscured({ left: 100, top: 30, right: 380, bottom: 210 }, view, covers), true, 'under the toolbar');
+  assert.equal(inset.isObscured({ left: 100, top: 30, right: 380, bottom: 210 }, view, []), false, 'no covers');
+  assert.equal(inset.isObscured({ left: 750, top: 400, right: 900, bottom: 560 }, view, covers), true, 'under the zoom controls');
+  assert.equal(inset.isObscured({ left: 100, top: 50, right: 380, bottom: 230 }, view, covers), false, 'touching the toolbar edge');
+  assert.equal(inset.isObscured({ left: 900, top: 100, right: 1180, bottom: 280 }, view, covers), true, 'past the canvas edge');
+});
+
+test('moveKeyboardFocus brings a card hidden under the toolbar into view, and leaves a clear card alone', () => {
+  for (const [top, follows] of [[20, true], [200, false]]) {
+    const { view, nodes } = makeView();
+    view.contentEl = { querySelector: selector => (selector === '.vam-map-tools' ? { getBoundingClientRect: () => ({ left: 12, top: 12, right: 400, bottom: 50 }) } : null) };
+    view.cardEls.set('b', { getBoundingClientRect: () => ({ left: 100, right: 380, top, bottom: top + 180 }), focus() {} });
+    const before = view.map.viewport.y;
+    view.moveKeyboardFocus(nodes[1]);
+    assert.equal(view.map.viewport.y !== before, follows, `top ${top}`);
+  }
+});
+
+test('applyInitialViewport moves a saved viewport that draws a card under the toolbar, in memory only; a clear one stays', () => {
+  for (const [saved, moves] of [[{ x: 0, y: 0, zoom: 1 }, true], [{ x: 0, y: 300, zoom: 1 }, false]]) {
+    const { view, writes } = makeView();
+    view.map.viewport = { ...saved };
+    view.canvasNodes = () => view.map.nodes;
+    view.map.nodes[0].x = 684; view.map.nodes[0].y = 0;
+    view.map.nodes[1].x = 5000; view.map.nodes[1].y = 5000;
+    view.viewportEl.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1440, bottom: 700 });
+    view.contentEl = { querySelector: () => ({ getBoundingClientRect: () => ({ left: 12, top: 12, right: 720, bottom: 50 }) }) };
+    view.applyInitialViewport();
+    assert.equal(view.map.viewport.y, moves ? 58 : 300, `saved y ${saved.y}`);
+    assert.equal(view.viewportTimer, null);
+    assert.equal(writes.length, 0, 'nothing written');
+  }
+});
+
+test('applyInitialViewport lifts a saved viewport only on the first paint of a map; a later render leaves a view the user panned to', () => {
+  const { view } = makeView();
+  view.path = 'Maps/A/Map.md';
+  view.map.viewport = { x: 0, y: 0, zoom: 1 };
+  view.canvasNodes = () => view.map.nodes;
+  view.map.nodes[0].x = 684; view.map.nodes[0].y = 0;
+  view.map.nodes[1].x = 5000; view.map.nodes[1].y = 5000;
+  view.viewportEl.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1440, bottom: 700 });
+  view.contentEl = { querySelector: () => ({ getBoundingClientRect: () => ({ left: 12, top: 12, right: 720, bottom: 50 }) }) };
+  view.applyInitialViewport();
+  assert.equal(view.map.viewport.y, 58, 'first paint lifts the card clear');
+  view.map.viewport = { x: 0, y: 0, zoom: 1 }; // the user pans the card back under the toolbar
+  view.applyInitialViewport();
+  assert.equal(view.map.viewport.y, 0, 'a re-render keeps the panned view');
+  view.path = 'Maps/B/Map.md';
+  view.applyInitialViewport();
+  assert.equal(view.map.viewport.y, 58, 'another map is cleared on its first paint');
+});
+
+test('render order: toolbar overlay before the viewport, zoom controls in a second overlay after it', () => {
+  const source = read('experiences/visual-map/view.ts');
+  const render = source.slice(source.indexOf('  private render(): void {'));
+  const at = text => render.indexOf(text);
+  assert.ok(at('const overlay = canvas.createDiv("vam-canvas-overlay");') > at('this.viewportEl = canvas.createDiv("vam-viewport");'));
+  assert.ok(at('canvas.insertBefore(overlay, this.viewportEl);') > at('const overlay = canvas.createDiv("vam-canvas-overlay");'));
+  const controls = at('const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");');
+  assert.ok(controls > at('canvas.insertBefore(overlay, this.viewportEl);'), 'the controls overlay is appended after the viewport');
+  assert.ok(at('const zoom = controls.createDiv("vam-zoom-controls");') > controls);
+  assert.equal(render.includes('overlay.createDiv("vam-zoom-controls")'), false);
+});
+
+// ---- UX review A theme 3: zoom keeps the selected card ----
+function zoomFixture({ selected = 'a', viewport = { x: 100, y: 200, zoom: 0.4 }, tools = { left: 12, top: 12, right: 700, bottom: 50 } } = {}) {
+  const { view, nodes } = makeView();
+  Object.assign(view.map, { viewport: { ...viewport } });
+  nodes[0].x = 300; nodes[0].y = 150; nodes[1].x = 5000; nodes[1].y = 5000;
+  view.selection.setSelected(selected);
+  // Cards are drawn where the current viewport puts them (280 x 180 card units).
+  const rectOf = node => { const v = view.map.viewport; const left = 0 + node.x * v.zoom + v.x, top = node.y * v.zoom + v.y; return { left, top, right: left + 280 * v.zoom, bottom: top + 180 * v.zoom }; };
+  for (const node of nodes) view.cardEls.set(node.id, { getBoundingClientRect: () => rectOf(node), focus() {} });
+  view.contentEl = { querySelector: selector => (selector === '.vam-map-tools' ? { getBoundingClientRect: () => tools } : null) };
+  return { view, nodes, rectOf };
+}
+const centre = rect => ({ x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 });
+
+test('zoom −/+ keeps the selected card centre where it is on screen; without a selection it zooms around the canvas centre', () => {
+  const { view, nodes, rectOf } = zoomFixture();
+  const before = centre(rectOf(nodes[0]));
+  view.zoomBy(1.2, view.selectionAnchor() ?? undefined);
+  const after = centre(rectOf(nodes[0]));
+  assert.ok(Math.abs(before.x - after.x) < 1e-6 && Math.abs(before.y - after.y) < 1e-6, 'card centre did not move');
+  assert.ok(view.map.viewport.zoom > 0.4);
+  const none = zoomFixture({ selected: null });
+  assert.equal(none.view.selectionAnchor(), null, 'no selection: no anchor');
+  const v = { ...none.view.map.viewport };
+  none.view.zoomBy(2, none.view.selectionAnchor() ?? undefined);
+  assert.ok(Math.abs((500 - (500 - v.x) * (none.view.map.viewport.zoom / v.zoom)) - none.view.map.viewport.x) < 1e-6, 'centred on the 1000px canvas middle');
+});
+
+test('a selected card outside the canvas is not used as the zoom anchor', () => {
+  const { view } = zoomFixture({ viewport: { x: 5000, y: 5000, zoom: 1 } });
+  assert.equal(view.selectionAnchor(), null);
+});
+
+test('the percentage reset keeps the selected card and brings it into view when it ends up hidden', () => {
+  // Zoomed out 0.4: the card sits at the top (under the toolbar) after the reset around its centre would push it out.
+  const hidden = zoomFixture({ viewport: { x: 100, y: 20, zoom: 0.4 }, tools: { left: 12, top: 12, right: 700, bottom: 50 } });
+  hidden.nodes[0].y = 0;
+  hidden.view.resetZoom();
+  assert.equal(hidden.view.map.viewport.zoom, 1);
+  const rect = hidden.rectOf(hidden.nodes[0]);
+  assert.ok(!inset.isObscured(rect, { left: 0, top: 0, right: 1000, bottom: 600 }, [{ left: 12, top: 12, right: 700, bottom: 50 }]), `card is visible after the reset (top ${rect.top})`);
+  // A card that stays in view is left where the anchor put it (no extra camera move).
+  const fine = zoomFixture({ viewport: { x: 100, y: 200, zoom: 0.5 } });
+  const c0 = centre(fine.rectOf(fine.nodes[0]));
+  fine.view.resetZoom();
+  const c1 = centre(fine.rectOf(fine.nodes[0]));
+  assert.ok(Math.abs(c0.x - c1.x) < 1e-6 && Math.abs(c0.y - c1.y) < 1e-6);
+});
+
+test('the zoom buttons anchor on the selection and the reset is wired to resetZoom', () => {
+  const render = read('experiences/visual-map/view.ts');
+  assert.match(render, /this\.zoomBy\(1 \/ 1\.2, this\.selectionAnchor\(\) \?\? undefined\)/);
+  assert.match(render, /this\.zoomBy\(1\.2, this\.selectionAnchor\(\) \?\? undefined\)/);
+  assert.match(render, /if \(this\.map\) this\.resetZoom\(\);/);
+});
+
+// ---- UX review A theme 4: status bar clearance ----
+test('statusBarClearance: how far the floating status bar reaches into a target, 0 when it does not', () => {
+  const target = { left: 0, right: 1000, bottom: 760 };
+  assert.equal(inset.statusBarClearance(target, { left: 604, right: 1000, top: 733, bottom: 760 }), 27);
+  assert.equal(inset.statusBarClearance(target, { left: 604, right: 1000, top: 732.4, bottom: 760 }), 28, 'rounds up');
+  assert.equal(inset.statusBarClearance(target, null), 0, 'no status bar');
+  assert.equal(inset.statusBarClearance(target, { left: 604, right: 604, top: 733, bottom: 760 }), 0, 'zero width');
+  assert.equal(inset.statusBarClearance(target, { left: 604, right: 1000, top: 760, bottom: 760 }), 0, 'zero height');
+  assert.equal(inset.statusBarClearance({ left: 0, right: 500, bottom: 760 }, { left: 604, right: 1000, top: 733, bottom: 760 }), 0, 'no horizontal overlap');
+  assert.equal(inset.statusBarClearance({ left: 0, right: 604, bottom: 760 }, { left: 604, right: 1000, top: 733, bottom: 760 }), 0, 'touching edges');
+  assert.equal(inset.statusBarClearance({ left: 0, right: 1000, bottom: 700 }, { left: 604, right: 1000, top: 733, bottom: 760 }), 0, 'status bar starts below the target');
+});
+
+test('the zoom controls, canvas hint, selection bar add the status bar clearance; the viewer defines the variable', () => {
+  // The base rules keep their plain pixels (map-chat.cjs and the selection bar test read them); a following rule adds the clearance.
+  assert.match(css, /^\.vam-zoom-controls \{ bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.match(css, /^\.vam-canvas-overlay > \.vam-canvas-hint \{ bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.match(css, /^\.vam-selection-bar \{ bottom: calc\(64px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.match(read('experiences/sharing/viewer/viewer.css'), /--vam-status-clearance: 0px;/);
+  const view = read('experiences/visual-map/view.ts');
+  assert.match(view, /private syncStatusBarClearance\(\): void/);
+  assert.match(view, /onResize\(\): void \{[^}]*this\.syncStatusBarClearance\(\);/);
+  assert.match(view, /this\.statusBarObserver\?\.disconnect\(\);/);
+});
+
+test('theme 5: the chat body adds the status bar clearance to its bottom padding, after the base rule', () => {
+  assert.match(css, /^\.vam-map-chat > \.vam-map-chat-body \{ padding-bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.ok(css.indexOf('.vam-map-chat > .vam-map-chat-body {') > css.indexOf('.vam-map-chat-body { display: flex'), 'after the base rule');
+});
+
+test('theme 7: the outline row buttons keep a transparent background under Obsidian\'s button rule, hover and active still tint', () => {
+  assert.match(css, /^\.vam-outline-tree \.vam-outline-toggle, \.vam-outline-tree \.vam-outline-note \{ border: 0; box-shadow: none; background: transparent;/m);
+  assert.match(css, /^\.vam-outline-tree \.vam-outline-note:hover, \.vam-outline-tree \.vam-outline-note\.is-active \{ background: var\(--background-modifier-hover\); \}$/m);
+  assert.doesNotMatch(css, /^\.vam-outline-(toggle|note)(, |:hover|\.is-active)[^{]*\{[^}]*background/m, 'no unscoped (0,1,0) outline background rule is left');
+});

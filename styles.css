@@ -7,10 +7,11 @@
 .vam-outline-search { margin: 4px 10px 8px; width: calc(100% - 20px); }
 .vam-outline-tree { overflow-y: auto; flex: 1; padding: 4px 6px 12px; }
 .vam-outline-row { display: flex; align-items: center; min-width: 0; min-height: 30px; }
-.vam-outline-toggle, .vam-outline-note { border: 0; box-shadow: none; background: transparent; color: var(--text-normal); }
+/* Scoped under the tree so these beat Obsidian's `button:not(.clickable-icon)` background. */
+.vam-outline-tree .vam-outline-toggle, .vam-outline-tree .vam-outline-note { border: 0; box-shadow: none; background: transparent; color: var(--text-normal); }
 .vam-outline-toggle, .vam-outline-spacer { flex: 0 0 22px; width: 22px; padding: 0; text-align: center; }
 .vam-outline-note { display: block; flex: 1; min-width: 0; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
-.vam-outline-note:hover, .vam-outline-note.is-active { background: var(--background-modifier-hover); }
+.vam-outline-tree .vam-outline-note:hover, .vam-outline-tree .vam-outline-note.is-active { background: var(--background-modifier-hover); }
 .vam-outline .vam-outline-links { margin-inline-start: 4px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-tree-heading { display: block; margin-bottom: 6px; font-size: var(--font-ui-small); }
 .vam-topic-tree { display: flex; flex-direction: column; max-height: min(360px, 50vh); overflow-y: auto; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); }
@@ -51,6 +52,8 @@
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }
 .vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-zoom-controls { right: 12px; bottom: 12px; }
+/* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
+.vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
 .vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-layout-button::after { content: "▾" / ""; margin-left: 4px; color: var(--text-muted); }
@@ -60,6 +63,7 @@
 .vam-note-style-custom:not([hidden]) { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--interactive-accent); }
 /* A solid chip like the zoom cluster, so the hint stays readable when it sits over a card. */
 .vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }
+.vam-canvas-overlay > .vam-canvas-hint { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }
 .vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }
 .vam-viewport.is-panning { cursor: grabbing; }
@@ -162,6 +166,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-topic-modal .vam-inspector-section { margin: 0; }
 .vam-topic-modal .vam-inspector-section > .vam-hint, .vam-topic-modal .vam-relation-empty { margin: 8px 0 0; }
 .vam-topic-modal .vam-choice-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+/* Many-of marker groups (status, flag, face) fit as many columns as the panel allows; four flags share a row. */
+.vam-topic-modal .vam-choice-group.is-multi { grid-template-columns: repeat(auto-fill, minmax(8.5em, 1fr)); }
+/* Priority and progress are one-of groups: a row of symbol-only segments (the name is in aria-label and title). */
+.vam-topic-modal .vam-choice-group.is-segmented { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.vam-topic-modal .vam-choice-group.is-segmented button { justify-content: center; padding: 4px; }
+.vam-topic-modal .vam-choice-group.is-segmented button[data-marker^="progress-"] > .vam-marker { font-size: 16px; }
 .vam-topic-modal .vam-choice-group button { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; min-height: 32px; padding: 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); box-shadow: none; background: transparent; color: var(--text-normal); font-weight: 400; text-align: start; }
 .vam-topic-modal .vam-choice-group button:hover { background: var(--background-modifier-hover); }
 .vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
@@ -221,8 +231,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
 /* Secondary tools wait for intent (hover, keyboard focus or selection) in a toolbar over the card's top edge: they take
    no space in the card, so showing or hiding them never moves its content. */
-.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }
-.vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; }
+.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
+.vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; transform-origin: left bottom; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
 /* In select mode every picked card is selected, so only hover and focus show a card's tools there. */
 .vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; pointer-events: auto; transform: none; }
@@ -547,6 +557,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-aim-answer-option:focus-within { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 /* Left-anchored and clear of the bottom-right zoom cluster; the names sit on their own line so the buttons never move. */
 .vam-selection-bar { position: absolute; z-index: 6; bottom: 64px; left: 16px; width: max-content; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; max-width: calc(100% - 32px); padding: 8px 12px; border: 1px solid var(--interactive-accent); border-radius: 10px; background: var(--background-primary); box-shadow: var(--shadow-s); }
+.vam-selection-bar { bottom: calc(64px + var(--vam-status-clearance, 0px)); }
 .vam-selection-bar > span { flex: 0 0 100%; width: 0; min-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* AI chat window: the first child of the workspace, left of the canvas. It folds to a narrow edge (one button) and, on a narrow
    pane, lays over the canvas when opened. On an empty map the same elements are the opening screen, in the middle of the canvas. */
@@ -563,6 +574,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-note-remove:focus-visible, .vam-map-chat-log:focus-visible, .vam-map-chat-suggestion:focus-visible, .vam-map-chat-example:focus-visible, .vam-map-chat-retry:focus-visible, .vam-map-chat-plan-apply:focus-visible, .vam-map-chat-plan-cancel:focus-visible, .vam-map-chat-lines-toggle:focus-visible, .vam-map-chat-plan-group-title:focus-visible, .vam-map-chat-choice:focus-visible, .vam-map-chat-resizer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-toggle.is-hidden, .vam-map-chat-body.is-hidden, .vam-map-chat-send.is-hidden, .vam-map-chat-stop.is-hidden, .vam-map-chat-hero-title.is-hidden, .vam-map-chat-resizer.is-hidden { display: none; }
 .vam-map-chat-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 8px; box-sizing: border-box; min-height: 0; padding: 10px 12px 12px; }
+/* The docked chat reaches the window's bottom edge, where Obsidian's status bar floats over its send button. */
+.vam-map-chat > .vam-map-chat-body { padding-bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-map-chat.is-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -2px; background: var(--background-modifier-hover); }
 .vam-map-chat-head { display: flex; align-items: center; gap: 8px; }
 .vam-map-chat-title { flex: 0 0 auto; max-width: 50%; white-space: normal; overflow-wrap: anywhere; line-height: var(--line-height-tight); font-weight: var(--font-semibold); }

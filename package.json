@@ -28,7 +28,7 @@
     "format": "prettier --write \"**/*.ts\"",
     "format:check": "prettier --check \"**/*.ts\"",
     "verify": "npm run lint && npm run format:check && npm run check:i18n && npm test && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts",
-    "verify:push": "npm run lint && npm run format:check && npm run check:i18n && npm run build && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts",
+    "verify:push": "npm run lint && node scripts/check-workflows.mjs && npm run format:check && npm run check:i18n && npm run build && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts",
     "verify:fast": "npm run lint && npm run format:check && npm run check:i18n && npm run test:unit && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts"
   },
   "devDependencies": {
@@ -44,6 +44,7 @@
     "postcss": "8.5.31",
     "prettier": "3.9.9",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.70.0"
+    "typescript-eslint": "8.70.0",
+    "yaml": "2.9.1"
   }
 }

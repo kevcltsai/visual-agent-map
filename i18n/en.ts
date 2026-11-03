@@ -1723,6 +1723,10 @@ export const en = {
   "ui.style_folder_tone": "Voices",
   "ui.style_folder_format": "Formats",
   "ui.style_folder_backup": "Backups",
+  "ui.style_folder_backup_notes": "Notes",
+  "ui.writeback_top_failed":
+    "Could not add the new findings without touching your existing text, so the note was left as it is.",
+  "ui.writeback_backup_failed": "Could not save a backup of the note, so the note was left as it is.",
   "ui.recipe_key_structure": "structure",
   "ui.recipe_key_voice": "voice",
   "ui.recipe_key_format": "format",
@@ -2354,6 +2358,7 @@ export const en = {
   "note.external_source_0": "External source: {0}",
   "note.earlier_research_sources": "Sources from earlier research",
   "note.no_new_information": "No new information in this task.",
+  "note.writeback_fresh_replaced_0": "Replaced with new research; the earlier version is backed up at {0}",
   "note.visual_reference": "Visual reference",
   "ui.aim_preparing_clarification": "Preparing initial clarification…",
   "ui.aim_answered_not_started": "Answered · research not started",

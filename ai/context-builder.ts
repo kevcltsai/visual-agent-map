@@ -29,6 +29,8 @@ export function buildPreparedTaskContext(
     context.detail = "";
     context.workingFindings = "";
   }
+  // A fresh write-back never shows the old Detail to the model.
+  if (input.updateMode === "fresh") context.detail = "";
   const optional: ("sourceContext" | "workingFindings" | "detail" | "ancestors")[] = [
     "detail",
     "workingFindings",

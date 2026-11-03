@@ -254,7 +254,7 @@ const ENTRY_END_ALLOWED = [
 ];
 const EXCHANGE_WRITE_ALLOWED = [
   { file: 'core/ai-task-service.ts', count: 5, reason: 'AttemptSetup failed marking and the observed main call' },
-  { file: 'experiences/visual-map/topic-run.ts', count: 3, reason: 'research run: failed, failed and completed marks of its own exchange' }
+  { file: 'experiences/visual-map/topic-run.ts', count: 4, reason: 'research run: failed, failed, failed (write-back refused) and completed marks of its own exchange' }
 ];
 const ACTIVE_TASKS_SET_ALLOWED = [
   { file: 'core/ai-calls.ts', count: 1, reason: 'the per-call registration' },

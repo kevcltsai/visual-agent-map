@@ -3,6 +3,7 @@ import type { StyleSelection } from "../core/steps/task/assemble";
 import type { AimContract } from "./aim-contracts";
 import type { ContentLanguage } from "../i18n";
 import type { ReferenceGroup } from "./reference-materials";
+import type { UpdateMode } from "./note-style-recipe";
 
 export type ReasoningLevel = "auto" | "low" | "medium" | "high";
 export type ResearchMode = "local" | "research";
@@ -52,6 +53,8 @@ export interface TaskContext {
   /** The output content language (a `ContentLanguage`): names the language in prompts; the note language is `noteLanguageOf(...)` of it. */
   outputLanguage?: ContentLanguage;
   mode?: AiTaskKind;
+  /** How a write-back treats the existing Detail (trusted, never serialized); absent means merge. */
+  updateMode?: UpdateMode;
   /** Let a task choose its Markdown structure while retaining the structured result contract. */
   detailFormat?: "adaptive";
   /** The detail is intermediate evidence for a later call, never shown to the reader: no Obsidian syntax rules. */

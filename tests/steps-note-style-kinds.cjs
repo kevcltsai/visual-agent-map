@@ -406,9 +406,9 @@ test('kind level (view): topicStyle passes the topic\'s type, a topic without on
   assert.equal(view.topicStyle({ topicKind: 'hypothesis' }, undefined, undefined, 'en').template.id, 'hypothesis');
   assert.equal(view.topicStyle({}, undefined, undefined, 'en').template.id, 'atomic');
   assert.equal(view.topicStyle({ topicKind: 'action' }, undefined, undefined, 'en').template.id, 'action');
-  assert.equal(view.mapStyle('en', { kind: 'hypothesis' }).template.id, 'hypothesis');
-  assert.equal(view.mapStyle('en', { kind: 'topic' }).template.id, 'atomic');
-  assert.equal(view.mapStyle('en').template.id, 'atomic', 'a call site that gives no kind is the general topic kind');
+  assert.equal((await view.mapStyle('en', { kind: 'hypothesis' })).template.id, 'hypothesis');
+  assert.equal((await view.mapStyle('en', { kind: 'topic' })).template.id, 'atomic');
+  assert.equal((await view.mapStyle('en')).template.id, 'atomic', 'a call site that gives no kind is the general topic kind');
 });
 
 test('kind level (view): a missing kind structure raises the kind Notice once per gate and never rewrites the topic', async () => {
@@ -436,9 +436,9 @@ test('kind level (view): when the topic\'s own missing structure is the one name
 
 test('kind level (view): mapStyle with notify and a kind shows the kind Notice for a missing structure; without notify it is silent', async () => {
   const { view } = await viewWorld({ noteStyleByKind: { topic: 'file:Nope' } }, {});
-  view.mapStyle('en', { kind: 'topic' });
+  await view.mapStyle('en', { kind: 'topic' });
   assert.equal(notices.length, 0);
-  view.mapStyle('en', { kind: 'topic', notify: true });
+  await view.mapStyle('en', { kind: 'topic', notify: true });
   assert.equal(notices.length, 1);
   assert.match(notices[0], /Nope/);
 });
@@ -468,9 +468,9 @@ test('counterexample 1 (view half): the map\'s detailTemplateId / toneId change 
     const plain = await viewWorld({}, note);
     const mapped = await viewWorld({}, note);
     mapped.view.map = { detailTemplateId: 'textbook', toneId: 'plain' };
-    const summary = (view, style) => JSON.stringify({ ref: style.recipe.ref, format: style.formatText, tone: style.toneText, tpl: style.template.id, ctx: style.contextFields, proposal: view.proposalTone(note, { outputLanguage: 'en' }) });
-    assert.equal(summary(mapped.view, mapped.view.topicStyle(note, undefined, undefined, 'en')), summary(plain.view, plain.view.topicStyle(note, undefined, undefined, 'en')), `${kind}: topicStyle`);
-    assert.equal(summary(mapped.view, mapped.view.mapStyle('en', { kind })), summary(plain.view, plain.view.mapStyle('en', { kind })), `${kind}: mapStyle`);
+    const summary = async (view, style) => JSON.stringify({ ref: style.recipe.ref, format: style.formatText, tone: style.toneText, tpl: style.template.id, ctx: style.contextFields, proposal: await view.proposalTone(note, { outputLanguage: 'en' }) });
+    assert.equal(await summary(mapped.view, mapped.view.topicStyle(note, undefined, undefined, 'en')), await summary(plain.view, plain.view.topicStyle(note, undefined, undefined, 'en')), `${kind}: topicStyle`);
+    assert.equal(await summary(mapped.view, await mapped.view.mapStyle('en', { kind })), await summary(plain.view, await plain.view.mapStyle('en', { kind })), `${kind}: mapStyle`);
   }
 });
 

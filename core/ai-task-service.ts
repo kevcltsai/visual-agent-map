@@ -296,7 +296,9 @@ export class AiTaskService {
         template &&
         template.sections.some(section => section.count) &&
         input.mode !== "decompose" &&
-        input.detailFormat !== "adaptive"
+        input.detailFormat !== "adaptive" &&
+        // A top reply holds only the new findings, so a count over the whole page means nothing.
+        input.updateMode !== "top"
       ) {
         let issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
         if (issues.length && !input.countRepair) {
@@ -305,6 +307,9 @@ export class AiTaskService {
             const repaired = await this.execute(
               {
                 ...input,
+                // A fresh write-back hides the old Detail from the model; the repair is told to adjust the first reply,
+                // so it has to see that reply.
+                updateMode: input.updateMode === "fresh" ? undefined : input.updateMode,
                 detail: result.detail,
                 summary: result.summary,
                 task: repairCounts(
@@ -734,7 +739,9 @@ export class AiTaskService {
             researchMode: "local",
             researchDepth: "fast",
             visualMode: "off",
-            intermediateDetail: true
+            intermediateDetail: true,
+            // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
+            ...(context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {})
           },
           model,
           reasoning,

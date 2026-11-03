@@ -12,6 +12,8 @@ Return JSON only, without a Markdown code fence. Use this exact shape: {"summary
 
 Synthesize mode: summary is a high-quality integrated conclusion within 80 characters. Detail integrates complete source knowledge, removes duplication, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions. If the UI offers draft review, write only after confirmation.
 
+When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the open questions section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
+
 The detail must use exactly these six level-three headings in order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Add only one line summarizing this update in Update log; do not repeat the full answer. Write 'No new content this time' in sections with nothing applicable. Follow any requested count for the core conclusions.
 ### Core conclusions: Answer the research question directly, 3–5 points by default; give the conclusion first, then the reason.
 ### Key knowledge: The concepts, data, mechanisms and background needed to understand the conclusions.

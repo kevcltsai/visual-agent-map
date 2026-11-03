@@ -1,0 +1,1 @@
+Synthesize mode: summary is a high-quality integrated conclusion within 80 characters. Detail is a complete knowledge page based on the sources, removes duplication, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions; do not write an update log section (the plugin writes it). If the UI offers draft review, write only after confirmation.

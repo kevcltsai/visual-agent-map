@@ -684,7 +684,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.text_node_promote_label": "把这个文字节点转成议题卡",
   "ui.text_node_promoted": "已把文字节点转成议题卡。",
   "ui.text_node_select_topic": "请先选中一个议题。",
-  "ui.text_node_add_multiselect": "请先结束多选模式，再新增文字节点。",
+  "ui.text_node_add_multiselect": "请先结束多选模式，再添加文字节点。",
   "ui.text_node_placeholder": "文字",
   "ui.text_link_full": "一个文字节点最多连到 {0} 张卡片。",
   "ui.text_link_exists": "已连线。",

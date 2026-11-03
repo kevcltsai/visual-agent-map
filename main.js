@@ -47147,7 +47147,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "unbindClipboard", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
-    /** Maps made with "Create an empty mind map": they open onto the empty canvas, not the opening screen again. */
+    /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
     __publicField(this, "blankMapPaths", /* @__PURE__ */ new Set());
     __publicField(this, "noStyleFiles");
     this.installUndoScope();
@@ -60023,22 +60023,17 @@ ${note.detail.trim()}` : "",
     if (!this.chat) return;
     this.chat.toggleFromCommand();
   }
-  /** Asks for a name, then makes and opens an empty map. No AI. */
-  promptEmptyMap() {
-    new NameModal(
-      this.app,
-      t("ui.new_mind_map"),
-      t("ui.new_mind_map_from_sample"),
-      (title) => this.enqueue(async () => {
-        const path = await this.plugin.repo.createMap(title);
-        this.blankMapPaths.add(path);
-        await this.openMapInMutation(path);
-      })
-    ).open();
+  /** The opening screen is already on an empty map: drop it and show that map's empty canvas. No new file, no name box, no AI. */
+  startBlankMap() {
+    var _a2, _b2;
+    if (!this.map) return;
+    this.blankMapPaths.add(this.path);
+    this.render();
+    (_b2 = (_a2 = this.emptyMapEl) == null ? void 0 : _a2.querySelector("button")) == null ? void 0 : _b2.focus();
   }
   chatHost() {
     return {
-      createEmptyMap: () => this.promptEmptyMap(),
+      createEmptyMap: () => this.startBlankMap(),
       topicTitle: (id) => {
         var _a2, _b2, _c;
         const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);

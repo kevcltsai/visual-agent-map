@@ -14896,21 +14896,19 @@ export class VisualAgentMapView extends ItemView {
     if (!this.chat) return;
     this.chat.toggleFromCommand();
   }
-  /** Maps made with "Create an empty mind map": they open onto the empty canvas, not the opening screen again. */
+  /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
   private blankMapPaths = new Set<string>();
-  /** Asks for a name, then makes and opens an empty map. No AI. */
-  private promptEmptyMap(): void {
-    new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
-      this.enqueue(async () => {
-        const path = await this.plugin.repo.createMap(title);
-        this.blankMapPaths.add(path);
-        await this.openMapInMutation(path);
-      })
-    ).open();
+  /** The opening screen is already on an empty map: drop it and show that map's empty canvas. No new file, no name box, no AI. */
+  private startBlankMap(): void {
+    if (!this.map) return;
+    this.blankMapPaths.add(this.path);
+    this.render();
+    // The pressed button is gone; the keyboard goes to the canvas's own "Topic" button.
+    this.emptyMapEl?.querySelector<HTMLElement>("button")?.focus();
   }
   private chatHost(): MapChatHost {
     return {
-      createEmptyMap: () => this.promptEmptyMap(),
+      createEmptyMap: () => this.startBlankMap(),
       topicTitle: id => {
         const node = this.map?.nodes.find(item => item.id === id);
         return node ? (this.notes.get(id)?.title ?? node.path) : null;

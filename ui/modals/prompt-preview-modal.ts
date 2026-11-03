@@ -1,6 +1,6 @@
 import { App, Modal } from "obsidian";
 import type { AiProviderId } from "../../ai/providers/provider";
-import type { NoteStyleStore } from "../../ai/note-style-store";
+import type { NoteStyleStore, RunStyle } from "../../ai/note-style-store";
 import {
   PREVIEW_STEPS,
   previewPrompt,
@@ -34,7 +34,9 @@ export class PromptPreviewModal extends Modal {
     private readonly store: NoteStyleStore,
     private readonly language: ContentLanguage,
     private readonly provider: AiProviderId,
-    private readonly trigger?: HTMLElement
+    private readonly trigger?: HTMLElement,
+    /** The style to show instead of the workspace default (the style editor's draft). Read each time the body is drawn. */
+    private readonly styleOf?: () => RunStyle
   ) {
     super(app);
   }
@@ -95,15 +97,8 @@ export class PromptPreviewModal extends Modal {
     const body = this.bodyEl;
     if (!body) return;
     body.empty();
-    // A run with no choice of its own: the workspace default style.
-    const style = this.store.runStyle({ outputLanguage: this.language });
-    const { invalid } = style.issues;
-    if (invalid) {
-      const first = invalid.issues[0];
-      const reason = first ? styleIssueText(first) : "";
-      this.showProblems([t("ui.preview_style_invalid_0_1_2", invalid.fileName, first?.line ?? 1, reason)]);
-      return;
-    }
+    // A run with no choice of its own: the workspace default style (or the editor's draft when one is given).
+    const style = this.styleOf?.() ?? this.store.runStyle({ kind: "topic", outputLanguage: this.language });
     const fields: PreviewStyleFields = {
       detailTemplate: style.template,
       ...(style.toneText ? { toneText: style.toneText } : {}),

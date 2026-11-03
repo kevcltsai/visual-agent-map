@@ -12,6 +12,8 @@ Return JSON only, without a Markdown code fence. Use this exact shape: {"summary
 
 General task: summary is one new insight for the mind map, within 80 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.
 
+When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the open questions section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
+
 The detail must use exactly these 1 level-three headings in order: ### 核心結論. Write 'No new content this time' in sections with nothing applicable. Follow any count the user requests for a section.
 ### 核心結論: 講結論。
 

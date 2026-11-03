@@ -12,13 +12,13 @@ export { assembledTaskPrompt } from "./core/steps/task/render";
 export { lookupBuiltinBlock, builtinTemplateText } from "./core/blocks/builtin";
 export { textbookTemplate } from "./ai/detail-templates";
 export { NoteStyleStore } from "./ai/note-style-store";
-export { NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { translate, noteLanguageOf } from "./i18n";
 export { AiTaskService } from "./core/ai-task-service";
 `);
 const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
 const PROVIDERS = ['codex', 'claude'];
-const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+// A count line that is not a number: the sections parser reports it (line 2). A second format rules heading is no problem any more (Q1).
+const BROKEN = '## A\nCount: x\nbody\n';
 const plain = value => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
 
 const styleCases = language => ({
@@ -88,7 +88,7 @@ test('counter 1 (preview): a broken body shows the built-in text and the reporte
     const good = M.previewPrompt('research', language, 'codex', {});
     assert.equal(bad.text, good.text);
     assert.equal(bad.issues.length, 1);
-    assert.equal(bad.issues[0].line, 5);
+    assert.equal(bad.issues[0].line, 2);
     assert.equal(bad.issues[0].fileName, 'Mine.md');
     assert.equal(good.issues.length, 0);
   }
@@ -108,8 +108,8 @@ function makeStore(settingsPatch = {}, files = {}) {
   return new M.NoteStyleStore({ settings: () => settings, port, save: async () => undefined });
 }
 
-test('counter 11: runStyle with no choice gives the workspace fields: template, tone text and context fields (5 presets, a style file, unset)', async () => {
-  const cases = [...M.NOTE_STYLE_BUILTIN_IDS.map(id => ({ defaultNoteStyleId: id })), { defaultNoteStyleId: 'style:Own' }, {}, { defaultDetailTemplateId: 'textbook' }];
+test('counter 11 (was: the workspace fields, 5 presets, a style file, unset; grilling Q5/Q10): runStyle with no choice gives the general research fields whatever old workspace keys exist, in all three languages', async () => {
+  const cases = [...["standard", "textbook", "summary", "plain", "guide"].map(id => ({ defaultNoteStyleId: id })), { defaultNoteStyleId: 'style:Own' }, {}, { defaultDetailTemplateId: 'textbook' }];
   assert.equal(cases.length, 8);
   for (const patch of cases) for (const language of LANGUAGES) {
     const store = makeStore({ ...patch, language }, { 'WS/S/Own.md': OWN });
@@ -119,47 +119,42 @@ test('counter 11: runStyle with no choice gives the workspace fields: template, 
     const label = JSON.stringify(patch) + language;
     assert.equal(resolved.issues.invalid, undefined, label);
     assert.deepEqual(plain(got.detailTemplate), plain(resolved.template), label);
-    // D7 (ticket 04): the workspace tone is the end of the chain, so summary, plain and guide now reach the run
-    const workspaceTone = { summary: 'summary', plain: 'plain', guide: 'guide' }[patch.defaultNoteStyleId];
-    const tone = workspaceTone ? M.lookupBuiltinBlock('tone', workspaceTone, language) : (patch.defaultNoteStyleId === 'style:Own' ? '簡明' : undefined);
-    assert.equal(got.toneText, tone, label);
+    assert.equal(resolved.template.id, 'standard', label);
+    assert.equal(got.toneText, undefined, label);
     assert.equal(got.noteStyle, undefined, label);
     assert.equal(got.styleDiagrams, undefined, label);
-    if (patch.defaultNoteStyleId === 'style:Own') assert.equal(resolved.label.fileName, 'Own.md', label);
+    assert.equal(resolved.label.fileName, undefined, label);
     // the preview of these fields is the prompt a run with the same fields renders
     const preview = M.previewPrompt('research', language, 'codex', got);
     assert.equal(preview.text, renderOf(M.sampleTaskContext('research', language, got), language, 'codex'), label);
     assert.equal(preview.issues.length, 0);
   }
-  const store = makeStore({ defaultNoteStyleId: 'style:Own' }, { 'WS/S/Own.md': OWN });
-  await store.refresh();
-  assert.equal(store.runStyle({ outputLanguage: 'en' }).toneText, '簡明');
 });
 
-test('counter 9: a default style file that does not parse is returned as invalid, not thrown', async () => {
+test('counter 9 (was: a default style file that does not parse is returned as invalid; grilling Q12): an old default style file that does not parse is not read: nothing is invalid, nothing throws', async () => {
   const store = makeStore({ defaultNoteStyleId: 'style:Bad' }, { 'WS/S/Bad.md': '---\n語氣: x\n' });
   await store.refresh();
   let got;
   assert.doesNotThrow(() => { got = store.runStyle({ outputLanguage: 'en' }); });
-  assert.equal(got.issues.invalid.fileName, 'Bad.md');
-  assert.ok(got.issues.invalid.issues[0].line >= 1);
+  assert.equal(got.issues.invalid, undefined);
+  assert.equal(got.issues.blockIssues.length, 0);
   assert.equal(got.contextFields.styleSelection, undefined);
 });
 
-test('runStyle tone text: an old style file decides its own tone (or none) over a less specific tone, else the first tone preset id; academic is nothing', async () => {
+test('runStyle tone text (was: an old style file decides its own tone; grilling Q12): the tone is the topic\'s tone preset, else academic; an old style file is not read; academic is nothing', async () => {
   const withFile = async (content) => {
     const store = makeStore({}, { 'WS/S/F.md': content });
     await store.refresh();
     return store;
   };
   const text = await withFile('---\n語氣: from file\n---\n## A\ntext\n');
-  assert.equal(text.runStyle({ topic: { template: 'style:F' }, map: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'from file');
-  const none = await withFile('---\n---\n## A\ntext\n');
-  assert.equal(none.runStyle({ topic: { template: 'style:F' }, map: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, undefined);
+  assert.equal(text.runStyle({ topic: { template: 'style:F' }, map: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, undefined, 'neither the file nor the map tone is read');
+  assert.equal(text.runStyle({ topic: { template: 'style:F', tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
   const store = makeStore({}, {});
   await store.refresh();
   assert.equal(store.runStyle({ topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
-  assert.equal(store.runStyle({ choice: { tone: 'academic' }, topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, undefined);
+  // #18: a run's own tone is gone, so { choice: { tone: 'academic' } } no longer beats the topic's tone (replacement: steps-run-style.cjs slice 12)
+  assert.equal(store.runStyle({ choice: { tone: 'academic' }, topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
   assert.equal(store.runStyle({ outputLanguage: 'en' }).toneText, undefined);
 });
 
@@ -222,4 +217,21 @@ test('F1: the unreadable-block and invalid-style notices never end a reason with
       }
     }
   } finally { i18n.setUiLanguage('en'); }
+});
+
+// Note style recipe T5 P4 (decision #42 D7): the preview can show a style that is not saved (the style editor's draft).
+test('P4: the preview modal shows the style `styleOf` gives, read each time the body is drawn; without it the workspace default style is shown as before', () => {
+  const dom = require('./support-dom.cjs');
+  const S = require('./support.cjs');
+  const { PromptPreviewModal } = S.load('ui/modals/prompt-preview-modal.ts', { obsidian: { ...S.obsidian, Modal: dom.makeModal() } });
+  const textbook = M.textbookTemplate('en');
+  const store = { refresh: async () => {}, runStyle: () => ({ template: M.textbookTemplate('en'), formatText: '', contextFields: {}, issues: {} }) };
+  const draft = { template: { ...textbook, sections: [{ ...textbook.sections[0], name: 'Draft section name' }, ...textbook.sections.slice(1)] }, formatText: '', contextFields: {}, issues: {} };
+  const bodyText = modal => dom.texts(modal.contentEl).join('\n');
+  const withDraft = new PromptPreviewModal({}, store, 'en', 'codex', undefined, () => draft);
+  withDraft.open();
+  assert.match(bodyText(withDraft), /Draft section name/);
+  const plainModal = new PromptPreviewModal({}, store, 'en', 'codex');
+  plainModal.open();
+  assert.equal(/Draft section name/.test(bodyText(plainModal)), false);
 });

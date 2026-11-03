@@ -196,6 +196,8 @@ integrationTest('AIM outline keeps only note titles and hierarchy', () => {
   assert.ok(!rendered.some(item => item.text === '私有答案資料'));
   assert.deepEqual(rendered.filter(item => item.cls === 'vam-outline-row').map(item => item.style.paddingLeft), ['8px', '24px']);
 });
+// T6 P2: the dialogs list styles from the store's listRecipes(); a user's style file for these tests.
+const alphaStyle = { ref: 'file:Alpha style', kind: 'file', name: 'Alpha style', fileName: 'Alpha style.md', structure: { name: 'Standard' }, voice: { name: 'Academic rigor' }, format: { name: 'Standard' }, update: 'merge', issues: [] };
 integrationTest('Next Step reviews first expansion proposals in place and keeps existing proposal review', async () => {
   let closed = 0, expandCalls = 0, synthCalls = 0, created, saved, quickOptions, expandOptions, researchOptions, synthOptions; const notices = [];
   const { element, find, findAll: all, button } = dom;
@@ -206,7 +208,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
   const checkedModels = [];
   const modelState = provider => ({ provider, status: 'ready', models: provider === 'codex' ? ['gpt-test'] : [] });
-  const plugin = { noteStyles: { refresh: async () => {}, listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', synthesisTopics: ['Child A', 'Child B'], topics: async () => [], readTopic: async () => [] } };
+  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', synthesisTopics: ['Child A', 'Child B'], topics: async () => [], readTopic: async () => [] } };
   const modelSettings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources };
   const modal = new NextStepModal({}, 'Parent', 1, 1, plugin,
     async (options, _focus, _done, _failed, accepted) => { researchOptions = options; accepted(); },
@@ -623,7 +625,7 @@ test('preview renderer receives Markdown in original order with no extra Preview
   view.showHoverCard({...element(),dataset:{nodeId:'a'}},{title:'Topic',preview:markdown});
   assert.equal(rendered.markdown,markdown);assert.equal(rendered.path,'a.md');assert.deepEqual(created,[['strong','Topic']]);
 });
-test('multi research modal: no mode, network, image or depth fields; each row shows its mode; the request carries no mode; immediate close on start', () => {
+test('multi research modal: no mode, network, image or depth fields; each row shows its mode; the request carries no mode and no style key until one is chosen (was: detailTemplateId; D2); immediate close on start', () => {
   const element = (tag, options = {}) => ({
     tag, text: options.text ?? '', cls: options.cls ?? '', type: options.type, value: options.value ?? '', checked: false, disabled: false, children: [], listeners: {},
     createDiv(value) { const c = element('div', typeof value === 'string' ? { cls: value } : value); this.children.push(c); return c; },
@@ -635,12 +637,11 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   // As in Obsidian, the content sits inside modalEl; the action bar is modalEl's last child.
   class Modal { constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); this.closed = 0; } open() { this.onOpen(); } close() { this.closed++; } }
   const mod = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
-  const requests = []; const templates = [{ id: 'standard', name: 'Standard' }, { id: 'A', name: 'Alpha template' }];
-  // 06 P3: the user's own templates are template blocks (file:<name>); the old "template without a file" group is gone.
-  const styles = { refresh: async () => {}, list: () => [{ kind: 'file', id: 'file:Alpha template', name: 'Alpha template', fileName: 'Alpha template.md', issues: [] }], edit: async () => {} };
+  const requests = [];
+  const styles = { refresh: async () => {}, recipes: () => [alphaStyle], openRecipe: async () => {} };
   let models = [], changed = null, unwatched = 0;
   const live = { list: () => models, watch: fn => { changed = fn; return () => { unwatched++; }; } };
-  const modal = new mod.MultiResearchModal({}, ['Alpha', 'Beta'], live, templates, request => requests.push(request), [], undefined, { styles }, ['quick', 'standard']); modal.open();
+  const modal = new mod.MultiResearchModal({}, ['Alpha', 'Beta'], live, request => requests.push(request), { styles }, ['quick', 'standard']); modal.open();
   assert.ok(find(modal.contentEl, i => i.text === 'Alpha')); assert.ok(find(modal.contentEl, i => i.text === 'Beta'));
   // D-2026-10-233 / D-2026-10-247: no web, image or depth choice; the list says which mode each topic runs in.
   assert.equal(find(modal.contentEl, i => i.tag === 'input' && i.type === 'checkbox'), undefined);
@@ -653,21 +654,25 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   assert.deepEqual(plain(model().children.map(c => c.value)), ['']);
   models = [{ id: 'm1', label: 'Model One' }, { id: 'm2', label: 'Model Two' }]; changed();
   assert.deepEqual(plain(model().children.map(c => [c.value, c.text])), [['', 'Current model (overridden topics keep their own)'], ['m1', 'Model One'], ['m2', 'Model Two']]);
-  // The Note style select lists the built-ins, then the user's template blocks.
-  const templateSelect = find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style');
-  assert.deepEqual(plain(templateSelect.children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
-  assert.deepEqual(plain(find(templateSelect, c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['file:Alpha template', 'Alpha template']]);
+  // One line "Note style: Each topic's own setting"; opened, its select lists Keep (X), then the user's style files (was: the Note style select with five presets and template blocks).
+  assert.equal(find(modal.contentEl, i => /vam-style-choice-text/.test(i.cls)).children.map(c => c.text).join(''), "Note style: Each topic's own setting");
+  find(modal.contentEl, i => i.tag === 'button' && i.text === 'Use another style this time').listeners.click({ preventDefault() {} });
+  const templateSelect = find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style for this run');
+  assert.deepEqual(plain(templateSelect.children.filter(c => c.tag === 'option').map(c => c.value)), ['']);
+  assert.deepEqual(plain(find(templateSelect, c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['file:Alpha style', 'Alpha style']]);
+  templateSelect.value = ''; templateSelect.listeners.change();
   const start = find(modal.modalEl, i => i.tag === 'button' && i.text === 'Start research (2)');
   start.listeners.click(); start.listeners.click();
   assert.equal(modal.closed, 1); assert.equal(requests.length, 1); modal.onClose(); assert.equal(unwatched, 1);
   assert.deepEqual(plain(requests[0]), { requirements: '' }, 'the request carries no mode: each topic runs in its own note\'s mode');
-  const second = []; const m2 = new mod.MultiResearchModal({}, ['A'], { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, templates, r => second.push(r), [], undefined, { styles }); m2.open();
+  const second = []; const m2 = new mod.MultiResearchModal({}, ['A'], { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, r => second.push(r), { styles }); m2.open();
   find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model').value = 'm1';
-  // A template block is picked in the Note style select itself.
-  const style2 = find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style'); style2.value = 'file:Alpha template'; style2.listeners.change();
+  // A style file is picked in the one-line choice itself.
+  find(m2.contentEl, i => i.tag === 'button' && i.text === 'Use another style this time').listeners.click({ preventDefault() {} });
+  const style2 = find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style for this run'); style2.value = 'file:Alpha style'; style2.listeners.change();
   find(m2.contentEl, i => i.tag === 'textarea').value = '  only 2025  ';
   find(m2.modalEl, i => i.tag === 'button' && i.text === 'Start research (1)').listeners.click();
-  assert.deepEqual(plain(second[0]), { requirements: 'only 2025', model: 'm1', detailTemplateId: 'file:Alpha template' });
+  assert.deepEqual(plain(second[0]), { requirements: 'only 2025', model: 'm1', noteStyle: 'file:Alpha style' });
 });
 test('card shows a Format not met badge with the issues as tooltip', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -694,15 +699,15 @@ test('card shows a Format not met badge with the issues as tooltip', () => {
   assert.equal(render([]), undefined);
 });
 
-integrationTest('Next Step modal: the content template choice goes into research, expansion and synthesis options only when picked', async () => {
+integrationTest('Next Step modal: the style choice goes into research, expansion and synthesis options as noteStyle only when picked (was: detailTemplateId from the content template select; Q18, D2)', async () => {
   const { element, find, findAll: all, button } = dom;
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl.children.push(this.contentEl); } close() { this.onClose?.(); } }
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class {} } });
   const modelState = provider => ({ provider, status: 'ready', models: [] });
-  const plugin = { noteStyles: { refresh: async () => {}, listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async () => true, confirmAiUsage: async (_m, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current', synthesisLabel: 'Current and children', synthesisTopics: ['Child'], topics: async () => [], readTopic: async () => [] } };
+  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async () => true, confirmAiUsage: async (_m, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current', synthesisLabel: 'Current and children', synthesisTopics: ['Child'], topics: async () => [], readTopic: async () => [] } };
   const templates = [{ id: 'standard', name: 'Standard' }, { id: 'A', name: 'Alpha template' }];
-  const settings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources, templates, currentTemplate: 'Standard' };
+  const settings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources, currentStyle: 'Standard' };
   const seen = {};
   const open = (name, withSettings) => {
     const modal = new NextStepModal({}, 'Parent', 1, 0, plugin,
@@ -712,39 +717,44 @@ integrationTest('Next Step modal: the content template choice goes into research
     modal.onOpen();
     return modal;
   };
-  const templateSelect = modal => find(modal.contentEl, item => item.tag === 'select' && item['aria-label'] === 'Note style');
-  // A template block is picked in the Note style select itself.
+  const templateSelect = modal => {
+    find(modal.contentEl, item => item.tag === 'button' && item.text === 'Use another style this time').click();
+    return find(modal.contentEl, item => item.tag === 'select' && item['aria-label'] === 'Note style for this run');
+  };
+  // A style file is picked in the one-line choice itself (it opens first).
   const cardsOf = modal => find(modal.contentEl, item => item.cls === 'vam-next-cards');
   // Owner decision 2026-10-19: a research press hides the dialog, so each choice runs on its own fresh dialog.
   const modal = open('keep', settings);
-  assert.deepEqual(plain(templateSelect(modal).children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
-  assert.deepEqual(plain(find(templateSelect(modal), c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['file:Alpha template', 'Alpha template']]);
+  assert.equal(find(modal.contentEl, i => /vam-style-choice-text/.test(i.cls)).children.map(c => c.text).join(''), 'Note style: Standard');
+  const listed = templateSelect(modal);
+  assert.deepEqual(plain(listed.children.filter(c => c.tag === 'option').map(c => c.value)), ['']);
+  assert.deepEqual(plain(find(listed, c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['file:Alpha style', 'Alpha style']]);
   button(modal.modalEl, 'Confirm research task').click(); await tick();
-  assert.equal('detailTemplateId' in seen.research, false, 'keep-current sends no choice');
+  assert.equal('noteStyle' in seen.research, false, 'keep-current sends no choice'); assert.equal('detailTemplateId' in seen.research, false);
   const picked = open('picked', settings);
-  templateSelect(picked).value = 'file:Alpha template';
+  templateSelect(picked).value = 'file:Alpha style';
   button(picked.modalEl, 'Confirm research task').click(); await tick();
-  assert.equal(seen.research.detailTemplateId, 'file:Alpha template');
+  assert.equal(seen.research.noteStyle, 'file:Alpha style'); assert.equal('detailTemplateId' in seen.research, false);
   // C2: quick explore is an AI outline reviewed in the dialog; the template choice reaches its create step.
   // Owner decision 2026-10-19: Generate hides the dialog; the template choice rides along to the reopened review's create step.
   let ready;
   const quickOutline = { presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }], generate: async () => plain(load('experiences/visual-map/outline-import.ts', { obsidian }).parseOutline('# Parent\n## A').nodes), create: async (_nodes, options) => { seen.expand = options; } };
   const quickModal = open('quick', { ...settings, quickOutline, background: { begin() {}, end() {}, outlineReady: outline => { ready = outline; } } });
-  templateSelect(quickModal).value = 'file:Alpha template';
+  templateSelect(quickModal).value = 'file:Alpha style';
   cardsOf(quickModal).children[1].click();
  
   button(quickModal.modalEl, 'Expand').click(); await tick(); await tick();
   const reviewModal = open('review', { ...settings, quickOutline, pendingOutline: { ...ready, discard() {} } });
   button(reviewModal.contentEl, 'Create subtopics (1)').click(); await tick(); await tick();
-  assert.equal(seen.expand.detailTemplateId, 'file:Alpha template');
+  assert.equal(seen.expand.noteStyle, 'file:Alpha style');
   const synthModal = open('synth', settings);
-  templateSelect(synthModal).value = 'file:Alpha template';
+  templateSelect(synthModal).value = 'file:Alpha style';
   cardsOf(synthModal).children[2].click();
   const synthPanel = all(synthModal.contentEl, item => item.cls.includes('vam-next-research'))[2];
   button(synthModal.modalEl, 'Get synthesis suggestions first').click(); await tick();
-  assert.equal(seen.synth.detailTemplateId, 'file:Alpha template');
+  assert.equal(seen.synth.noteStyle, 'file:Alpha style');
   const bare = open('bare', undefined);
-  assert.deepEqual(plain(templateSelect(bare).children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
+  assert.deepEqual(plain(templateSelect(bare).children.filter(c => c.tag === 'option').map(c => c.value)).slice(0, 1), [''], 'a dialog with no settings still shows the choice');
 });
 integrationTest('draft review renders the draft, edits on demand and keeps the dialog open when saving fails', async () => {
   const element = (tag, options = {}) => ({

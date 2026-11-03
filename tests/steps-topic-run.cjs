@@ -227,7 +227,7 @@ function researchRuns({ reply, ask, notes = {}, extra = {} } = {}) {
     exchanges: () => ({ failed: (id, reason) => log.exchanges.push(['failed', id, reason]), completed: id => log.exchanges.push(['completed', id]), getEntries: () => [] }),
     recordFailure: (_label, error) => String(error?.message ?? error),
     progress: () => ({ begin: (...a) => log.progress.push(['begin', a[3]]), newAttempt() {}, stage() {}, preview() {}, markSlow() {}, end: () => log.progress.push(['end']) }),
-    runStyle: () => ({ template: undefined, label: { fileName: 'std' }, contextFields: {}, issues: {} }),
+    runStyle: () => ({ template: undefined, recipe: { ref: 'builtin:general', source: 'topic' }, label: { fileName: 'std' }, contextFields: {}, issues: {} }),
     clearOtherHistory: origin => log.cleared.push(origin),
     refreshViews: () => { log.refreshed++; },
     ...extra
@@ -376,7 +376,7 @@ test('research: a run-once model reaches the ask and the progress line, the topi
 });
 
 test('research: the style comes from the given runStyle, else the options resolver, else the runStyle port', async () => {
-  const style = tag => ({ template: undefined, label: { fileName: tag }, contextFields: { toneText: tag }, toneText: tag, issues: {} });
+  const style = tag => ({ template: undefined, recipe: { ref: 'builtin:general', source: 'topic' }, label: { fileName: tag }, contextFields: { toneText: tag }, toneText: tag, issues: {} });
   const a = researchRuns(); let resolved = 0;
   await (await a.runs.start('A.md', 'research', a.options({ request: { task: 'go', runStyle: style('given') } }))).finished;
   assert.equal(a.log.asks[0].context.toneText, 'given');

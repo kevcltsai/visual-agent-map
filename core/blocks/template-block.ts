@@ -4,9 +4,10 @@ import { CANONICAL_LANGUAGES, parseNoteStyleFile, type NoteStyleIssue } from "..
 import type { DetailTemplate } from "../../ai/detail-templates";
 
 /**
- * A template block is one markdown text with two zones: the sections zone (the `##` sections, the same shape as a note
- * style file body) and, after a level-one heading line, the format rules zone. The heading's name is a translation
- * entry; every canonical language's spelling is accepted, whatever language the block is used in.
+ * A template block is a markdown text of `##` sections (the same shape as a note style file body). Older texts may carry a
+ * format rules zone after a level-one heading line; it is not read any more (the format rules are a part of their own),
+ * but the heading is still recognised to cut it off. The heading's name is a translation entry; every canonical
+ * language's spelling is accepted, whatever language the block is used in.
  */
 const FORMAT_HEADING_KEY = "ui.block_template_format_heading";
 
@@ -23,6 +24,11 @@ const trimBlankLines = (lines: string[]): string => {
   while (end > start && !lines[end - 1].trim()) end--;
   return lines.slice(start, end).join("\n");
 };
+
+/** A format rules text without leading and trailing blank lines (and with line breaks and the BOM unified). */
+export function trimFormatBody(text: string): string {
+  return trimBlankLines(unify(text).split("\n"));
+}
 
 export interface TemplateZones {
   /** The text before the separator line (all of it when there is none); line numbers stay those of the original text. */
@@ -53,6 +59,13 @@ export function splitTemplateZones(text: string): TemplateZones {
   };
 }
 
+/** A non-fatal remark about a template text: the text is used, with this part left out. */
+export interface TemplateNotice {
+  /** 1-based line of the original text. */
+  line: number;
+  code: "format_zone_moved";
+}
+
 export type TemplateBlockParse =
   | {
       ok: true;
@@ -63,28 +76,17 @@ export type TemplateBlockParse =
        * there is none. The template itself stays the sections layout.
        */
       lead: string;
-      /** The format rules zone; empty when the text has no separator line. */
-      format: string;
+      /** A format rules zone found in the text is not read (the format rules are a part of their own); each is noted here. */
+      notices: TemplateNotice[];
     }
   | { ok: false; issues: NoteStyleIssue[] };
 
-/** Parses a template block text; a second separator line, or a sections zone the style file parser rejects, is an issue. */
+/**
+ * Parses a template block text: the sections are the text before the format rules heading line (when there is one), and
+ * what follows that line is not read, only noted. A sections zone the style file parser rejects is an issue.
+ */
 export function parseTemplateBlock(text: string, options: { id: string; name: string }): TemplateBlockParse {
   const zones = splitTemplateZones(text);
-  if (zones.separatorLines.length > 1) {
-    const line = zones.separatorLines[1];
-    return {
-      ok: false,
-      issues: [
-        {
-          line,
-          code: "format_heading_repeated",
-          values: [line],
-          message: `Line ${line}: the format rules heading appears a second time.`
-        }
-      ]
-    };
-  }
   const parsed = parseNoteStyleFile(zones.sections, options);
   if (!parsed.ok) return parsed;
   const { template, intro } = parsed.style;
@@ -92,6 +94,6 @@ export function parseTemplateBlock(text: string, options: { id: string; name: st
     ok: true,
     template: { ...template, layout: "sections", intro: "" },
     lead: intro,
-    format: zones.format ?? ""
+    notices: zones.separatorLines.length ? [{ line: zones.separatorLines[0], code: "format_zone_moved" }] : []
   };
 }

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { translateNote } from "../../i18n";
 import type { AiResult, TaskContext } from "../../ai/types";
 import type { AimContract } from "../../ai/aim-contracts";
+import { renderAimStructure, type AimNoteStyle } from "./aim-note-style";
 import { renderOutlineTask } from "./steps/delivery-outline/step";
 import { renderResearchTask, REUSED_RESEARCH_DETAIL } from "./steps/delivery-research/step";
 import { renderWritingTask, NO_MAPPED_SOURCE } from "./steps/delivery-writing/step";
@@ -101,6 +102,8 @@ export interface FinalDeliveryOptions {
   openItems?: string;
   /** Must finish saving the snapshot before the next model phase starts. */
   onCheckpoint?: (checkpoint: FinalDeliveryCheckpoint) => void | Promise<void>;
+  /** A note style other than the AIM report: its sections shape the outline and document, its format the document. */
+  noteStyle?: AimNoteStyle;
 }
 
 function validateContent(result: AiResult): void {
@@ -151,8 +154,10 @@ export async function buildFinalDelivery(
     title: base.title,
     rules: base.rules,
     conditions: options.knownConditions ?? base.detail,
-    language: base.outputLanguage
+    language: base.outputLanguage,
+    ...(options.noteStyle ? { noteStyle: options.noteStyle.ref } : {})
   });
+  const structure = options.noteStyle ? renderAimStructure(options.noteStyle.sections) : undefined;
   const savedBaseValid =
     options.checkpoint?.baseFingerprint === baseFingerprint ||
     (!options.checkpoint?.baseFingerprint && options.evidence === undefined);
@@ -211,6 +216,7 @@ export async function buildFinalDelivery(
       ...base,
       ...writingScope,
       ...(phase === "delivery-acceptance" ? { responseContract: "aim-delivery-acceptance" as const } : {}),
+      ...(phase === "delivery-writing" && options.noteStyle ? { aimNoteFormat: options.noteStyle.formatText } : {}),
       ...(contract ? { aimContract: contract } : {}),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
       task: `<!-- aim-phase: ${phase} -->\n${task}`,
@@ -228,7 +234,7 @@ export async function buildFinalDelivery(
     .join("\n\n");
   const outlineResult = await stage(
     "outline",
-    () => run("delivery-outline", renderOutlineTask(sourceCatalog)),
+    () => run("delivery-outline", renderOutlineTask(sourceCatalog, structure)),
     result => {
       parseDeliveryOutline(result.detail);
     }
@@ -352,6 +358,7 @@ export async function buildFinalDelivery(
           outline,
           knownConditions: options.knownConditions ?? base.detail,
           evidence: documentEvidence,
+          ...(structure === undefined ? {} : { structure }),
           ...(documentResearch === undefined ? {} : { research: documentResearch })
         })
       );

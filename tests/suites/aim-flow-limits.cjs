@@ -521,23 +521,31 @@ integrationTest('AIM flow limits: with smoke limits a rejected final delivery at
   assert.equal(results.filter(result => result.kind === 'conclusion').length, 1);
 });
 
-integrationTest('AIM tone: research calls carry the map tone, structured Planner calls never do, and no tone leaves every context untouched', async () => {
-  const run = async toneId => {
+integrationTest('AIM tone: the map tone is no longer read, only the final written document carries the AIM note style tone, and no style leaves every context untouched', async () => {
+  // Rewritten from "AIM tone: research calls carry the map tone, structured Planner calls never do, and no tone leaves
+  // every context untouched" (grilling Q15/Q16, decisions #8 OQ11): the map tone stops applying to AIM (Q15, C5); the tone
+  // of the user's AIM note style applies to the final conclusion Detail only (Q16, OQ11).
+  const style = { recipe: { ref: 'file:Plain', name: 'Plain', source: 'kind' }, template: { id: 'p', name: 'Plain', sections: [{ id: 'a', name: 'Answer', description: 'The answer.', role: 'none', aliases: [] }] }, formatText: '', toneText: 'Write in plain words.', contextFields: { styleSelection: { template: { id: 'p' }, tone: {}, format: { id: 'lean' } } } };
+  const run = async (toneId, noteStyle) => {
     const seen = [];
-    const subject = await coverageSetup(`Tone ${toneId ?? 'none'}`);
+    const subject = await coverageSetup(`Tone ${toneId ?? 'none'} ${noteStyle ? 'styled' : 'plain'}`);
     if (toneId) { const doc = await subject.repo.readMap(subject.created.mapPath); doc.toneId = toneId; await subject.repo.saveMap(subject.created.mapPath, doc); }
     const base = subject.model.ask;
     subject.flow = new AimManualFlow(subject.repo, new AimRunStore(subject.repo), async (context, ...rest) => {
-      seen.push({ phase: aimPhase(context, 'subtopic-research') ? 'research' : 'other', structured: !!context.aimContract, hasTone: 'toneText' in context, toneText: context.toneText });
+      seen.push({ phase: aimPhase(context, 'subtopic-research') ? 'research' : aimPhase(context, 'delivery-writing') ? 'writing' : 'other', structured: !!context.aimContract, hasTone: 'toneText' in context, toneText: context.toneText });
       return base(context, ...rest);
     });
-    const question = (await subject.flow.planNextQuestion(subject.created.mapPath, subject.created.root.id, 'gpt-6-luna', 'low', 'tone-question')).node;
-    await subject.flow.answerAndResearch(subject.created.mapPath, question.id, { requestId: 'tone-answer', selections: [question.aimQuestion.options[0].id], freeText: 'Condition' }, 'gpt-6-luna', 'low');
+    if (noteStyle) subject.flow.noteStyle = () => noteStyle;
+    await coverageThreeAnswers(subject);
     return seen;
   };
-  const withTone = await run('plain');
-  const research = withTone.filter(item => item.phase === 'research');
-  assert.ok(research.length > 0 && research.every(item => item.hasTone && /\S/.test(item.toneText)), 'subtopic research gets the tone');
-  assert.ok(withTone.filter(item => item.structured).every(item => !item.hasTone), 'contract calls never carry the tone');
-  assert.ok(!(await run(undefined)).some(item => item.hasTone), 'no tone: no context has the key');
+  const mapTone = await run('plain');
+  assert.ok(mapTone.some(item => item.phase === 'research'), 'the scenario ran research');
+  assert.ok(!mapTone.some(item => item.hasTone), 'the map tone is not read: no context has the key (Q15)');
+  const styled = await run('plain', style);
+  const writing = styled.filter(item => item.phase === 'writing');
+  assert.ok(writing.length > 0 && writing.every(item => item.hasTone && item.toneText === 'Write in plain words.'), 'only the final written document gets the style tone (Q16)');
+  assert.ok(styled.filter(item => item.phase === 'research').every(item => !item.hasTone), 'research calls carry no tone (OQ11)');
+  assert.ok(styled.filter(item => item.structured).every(item => !item.hasTone), 'contract calls never carry the tone');
+  assert.ok(!(await run(undefined)).some(item => item.hasTone), 'no port: no context has the key');
 });

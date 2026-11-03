@@ -37,17 +37,21 @@ import {
 } from "obsidian";
 import {
   NoteStyleStore,
-  normalizeNoteTemplateByKind,
-  type NoteStyleUpgradeEvent,
+  type RunStyle,
+  type SaveRecipeInput,
+  type SaveRecipeResult,
   type StyleFilePort
 } from "./ai/note-style-store";
-import { normalizeNoteStyleAliases, normalizeNoteStyleUpgradeMarker } from "./ai/note-style-upgrade";
-import type { BlockCategory } from "./core/blocks/builtin";
+import {
+  KIND_DEFAULT_RECIPE,
+  parseRecipeRef,
+  STYLE_KINDS,
+  type PartCategory,
+  type StyleKind
+} from "./ai/note-style-recipe";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
-import { backgroundResultNotice } from "./ui/background-run";
-import { parseBlockRef } from "./core/blocks/block-files";
 import {
   AiUsageModal,
   ClaudeSetupModal,
@@ -145,6 +149,46 @@ function migratedChatModel(saved: Partial<Settings> | null): string {
 export function hasLegacyChatModel(saved: unknown): boolean {
   return !!saved && typeof saved === "object" && "mapChatModel" in saved;
 }
+/** The kind -> style table: only the seven known kinds, each a ref `parseRecipeRef` reads; nothing left = no key. */
+export function normalizeNoteStyleByKind(value: unknown): Settings["noteStyleByKind"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const saved = value as Record<string, unknown>;
+  const kept: Record<string, string> = {};
+  for (const kind of STYLE_KINDS) {
+    const ref = Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : undefined;
+    if (typeof ref === "string" && parseRecipeRef(ref)) kept[kind] = ref;
+  }
+  return Object.keys(kept).length ? kept : undefined;
+}
+function isStringMap(value: unknown): value is Record<string, string> {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.values(value).every(item => typeof item === "string")
+  );
+}
+/** The conversion marker is kept only when its shape is valid. */
+export function normalizeNoteStyleRecipeMarker(value: unknown): Settings["noteStyleRecipe"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const saved = value as { migrated?: unknown; mapsNotified?: unknown; legacy?: unknown };
+  if (saved.migrated !== 1) return undefined;
+  const legacy = saved.legacy as { templates?: unknown; tones?: unknown } | undefined;
+  const legacyOk = legacy === undefined || (!!legacy && isStringMap(legacy.templates) && isStringMap(legacy.tones));
+  if (!legacyOk) return undefined;
+  return {
+    migrated: 1,
+    ...(saved.mapsNotified === true ? { mapsNotified: true as const } : {}),
+    ...(legacy
+      ? {
+          legacy: {
+            templates: legacy.templates as Record<string, string>,
+            tones: legacy.tones as Record<string, string>
+          }
+        }
+      : {})
+  };
+}
 /** The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. */
 export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
   const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
@@ -158,12 +202,11 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     ...(typeof saved?.defaultNoteStyleId === "string" && saved.defaultNoteStyleId
       ? { defaultNoteStyleId: saved.defaultNoteStyleId }
       : {}),
-    ...(typeof saved?.noteTemplateBlock === "string" && saved.noteTemplateBlock
-      ? { noteTemplateBlock: saved.noteTemplateBlock }
+    ...(normalizeNoteStyleByKind(saved?.noteStyleByKind)
+      ? { noteStyleByKind: normalizeNoteStyleByKind(saved?.noteStyleByKind) }
       : {}),
-    ...(typeof saved?.noteToneBlock === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {}),
-    ...(normalizeNoteTemplateByKind(saved?.noteTemplateByKind)
-      ? { noteTemplateByKind: normalizeNoteTemplateByKind(saved?.noteTemplateByKind) }
+    ...(normalizeNoteStyleRecipeMarker(saved?.noteStyleRecipe)
+      ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved?.noteStyleRecipe) }
       : {}),
     ...(typeof saved?.noteStylesFolder === "string" && saved.noteStylesFolder
       ? { noteStylesFolder: saved.noteStylesFolder }
@@ -174,12 +217,6 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
             Object.entries(saved.noteStyleFiles).filter(([, name]) => typeof name === "string" && name)
           )
         }
-      : {}),
-    ...(normalizeNoteStyleAliases(saved?.noteStyleAliases)
-      ? { noteStyleAliases: normalizeNoteStyleAliases(saved?.noteStyleAliases) }
-      : {}),
-    ...(normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade)
-      ? { noteStyleUpgrade: normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade) }
       : {}),
     coffeeStyles: Array.isArray(saved?.coffeeStyles)
       ? saved.coffeeStyles.filter(
@@ -233,8 +270,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly noteStyles = new NoteStyleStore({
     settings: () => this.settings,
     port: this.noteStylePort(),
-    save: () => this.saveSettings(),
-    report: event => this.reportNoteStyleUpgrade(event)
+    save: () => this.saveSettings()
   });
   ready: Promise<void> = Promise.resolve();
   /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
@@ -269,7 +305,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     recordFailure: (context, error) => this.recordFailure(context, error),
     runStyle: ({ note, outputLanguage }) =>
       this.noteStyles.runStyle({
-        topic: { template: note.detailTemplateId, tone: note.toneId },
+        topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
+        kind: note.topicKind ?? "topic",
         outputLanguage
       }),
     resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
@@ -791,9 +828,12 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     this.app.workspace.onLayoutReady(() => {
-      // The one-time upgrade of the old note style data starts here, after the settings are loaded and the workspace is ready.
-      void this.noteStyles.startUpgrade(this.ready);
       void this.finishStartup();
+    });
+    // Its own callback, not part of finishStartup: the conversion writes files and must stay apart from the start-up
+    // checks that call finishStartup on a bare plugin.
+    this.app.workspace.onLayoutReady(() => {
+      void this.migrateNoteStyles().then(() => this.refreshNoteStyles());
     });
     this.registerVaultEvents();
   }
@@ -837,6 +877,59 @@ export default class VisualAgentMapPlugin extends Plugin {
         t("log.initialization_incomplete_0", error instanceof Error ? error.message : String(error))
       );
       console.warn("Visual Agent Map initialization", error);
+    }
+  }
+  /** Reads the style files into the store once at start (read only), so a `file:` style resolves on its first use. */
+  private async refreshNoteStyles(): Promise<void> {
+    try {
+      await this.noteStyles.refresh();
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note styles were not read at start: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  /**
+   * Converts the 0.28.0 custom templates and tones once (the one write VAM makes on load), then says once which maps
+   * carried a style that is no longer used. After the first load that has done both, nothing is scanned or written.
+   * Never throws.
+   */
+  async migrateNoteStyles(): Promise<void> {
+    try {
+      await this.ready;
+      const marker = this.settings.noteStyleRecipe;
+      if (marker?.migrated && marker.mapsNotified) return;
+      // Read only: maps with a style of their own, by title (the file name when the title is empty), in path order.
+      const found = new Map<string, string>();
+      for (const { file, map } of await this.repo.readableMaps()) {
+        const styled = [map.detailTemplateId, map.toneId].some(id => typeof id === "string" && id !== "");
+        if (styled) found.set(file.path, map.title.trim() || file.name.replace(/\.md$/i, ""));
+      }
+      const mapsWithStyle = [
+        ...new Set([...found].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, name]) => name))
+      ];
+      const result = await this.noteStyles.migrateLegacy({ mapsWithStyle });
+      if (result.status === "already" && result.error) {
+        this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
+      } else if (result.status === "failed") {
+        this.logs.appendLog("warn", `Note style conversion failed: ${result.error ?? "unknown error"}`);
+        new Notice(t("ui.note_style_migrate_failed"));
+      } else if (result.notify) {
+        const maps = result.notify.maps.join(t("ui.list_separator"));
+        const text = [
+          t("ui.note_style_maps_notice_0", maps),
+          result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
+        new Notice(text, 0);
+      }
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note style conversion did not run: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   registerVaultEvents(): void {
@@ -1130,9 +1223,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
-  openPromptPreview(trigger?: HTMLElement): void {
+  openPromptPreview(trigger?: HTMLElement, styleOf?: () => RunStyle): void {
     const provider = this.runtimeIdFor(this.currentModelChoice().model);
-    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger).open();
+    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger, styleOf).open();
   }
   /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   currentModelChoice(): ModelChoice {
@@ -1277,12 +1370,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.unloaded = true;
     this.aiRuntime.dispose();
   }
-  /** Says once what the note style upgrade could not do (it never stops the plugin). */
-  private reportNoteStyleUpgrade(event: NoteStyleUpgradeEvent): void {
-    if (event.kind === "failed") new Notice(t("ui.note_style_upgrade_failed"));
-    else if (event.kind === "skipped") new Notice(t("ui.note_style_upgrade_skipped_0", event.names.join(", ")));
-    else new Notice(t("ui.note_style_upgrade_trash_failed_0", event.names.join(", ")));
-  }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   private noteStylePort(): StyleFilePort {
     const folderAt = (path: string) => {
@@ -1309,6 +1396,11 @@ export default class VisualAgentMapPlugin extends Plugin {
       },
       create: async (path, content) => {
         await this.app.vault.create(normalizePath(path), content);
+      },
+      modify: async (path, content) => {
+        const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+        if (!(file instanceof TFile)) throw new Error(path);
+        await this.app.vault.modify(file, content);
       },
       trash: async path => {
         const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
@@ -1346,65 +1438,53 @@ export default class VisualAgentMapPlugin extends Plugin {
       return null;
     }
   }
-  /** Opens the file behind a block of the note style pickers in a tab (a built-in with no file gets one first). */
-  async openBlock(category: BlockCategory, ref: string): Promise<boolean> {
+  /**
+   * "Edit" a part of the custom note styles: a built-in is first saved as "My <name>" (a new file, no setting changes), a
+   * file is opened as it is. Opens the file in a tab and returns the ref now behind it, or null (with a Notice) when it
+   * could not be done.
+   */
+  async editNotePart(category: PartCategory, ref: string): Promise<string | null> {
     try {
-      const { path, base, created } = await this.noteStyles.ensureBlockFile(category, ref);
-      const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+      let target = ref;
+      if (parseRecipeRef(ref, category)?.kind !== "file") {
+        target = await this.noteStyles.createPart(category, ref);
+        new Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
+      }
+      await this.noteStyles.refresh();
+      const path = this.noteStyles.partFilePath(category, target);
+      const file = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : null;
       if (!(file instanceof TFile)) throw new Error("not a file");
       await this.app.workspace.getLeaf("tab").openFile(file);
-      new Notice(created ? t("ui.block_notice_created_0_1", base, path) : t("ui.block_notice_opened_0", path));
-      return true;
+      return target;
     } catch {
       new Notice(t("ui.block_notice_open_failed"));
-      return false;
-    }
-  }
-  /**
-   * "Save as my own": copies a block into a new file (named `name`, else "<name> (my version)"), which becomes the
-   * workspace's choice; it is not opened here. Returns the new ref, or null (nothing written) when it cannot be saved.
-   */
-  async copyBlock(category: BlockCategory, ref: string, name?: string): Promise<string | null> {
-    try {
-      const created = await this.noteStyles.copyBlock(category, ref, name);
-      const parsed = parseBlockRef(created);
-      new Notice(t("ui.block_notice_saved_as_0", parsed?.kind === "file" ? parsed.base : created));
-      return created;
-    } catch {
-      new Notice(t("ui.block_notice_copy_failed"));
       return null;
     }
   }
-  /** Restores a built-in block after saving a backup of its file; every refusal says why in a Notice. */
-  async restoreBlock(category: BlockCategory, ref: string): Promise<boolean> {
-    try {
-      const result = await this.noteStyles.restoreBlock(category, ref);
-      if (result.ok) {
-        const backup = result.backup;
-        backgroundResultNotice(t("ui.block_notice_restored_0", backup), {
-          label: t("ui.block_notice_open_backup"),
-          open: () => {
-            const file = this.app.vault.getAbstractFileByPath(normalizePath(backup));
-            if (file instanceof TFile) void this.app.workspace.getLeaf("tab").openFile(file);
-            else new Notice(t("ui.block_notice_open_failed"));
-          }
-        });
-        return true;
-      }
-      const reason = result.reason;
+  /** Sets the style a kind uses. Choosing the kind's own built-in style removes the entry (a kind with no entry uses it). */
+  async setKindStyle(kind: StyleKind, ref: string): Promise<void> {
+    const next = { ...this.settings.noteStyleByKind };
+    if (ref === KIND_DEFAULT_RECIPE[kind]) delete next[kind];
+    else next[kind] = ref;
+    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
+    else delete this.settings.noteStyleByKind;
+    await this.saveSettings();
+  }
+  /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
+  async saveNoteRecipe(input: SaveRecipeInput): Promise<SaveRecipeResult> {
+    const result = await this.noteStyles.saveRecipe(input);
+    if (result.ok) new Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
+    else
       new Notice(
         t(
-          reason === "backup-failed"
-            ? "ui.block_notice_restore_backup_failed"
-            : reason === "not-builtin" || reason === "no-override"
-              ? "ui.block_notice_restore_not_available"
-              : "ui.block_notice_restore_failed"
+          result.reason === "name"
+            ? "ui.recipe_notice_name_unavailable"
+            : result.reason === "changed"
+              ? "ui.recipe_notice_changed"
+              : "ui.recipe_notice_failed"
         )
       );
-    } catch {
-      new Notice(t("ui.block_notice_restore_failed"));
-    }
-    return false;
+    return result;
   }
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);

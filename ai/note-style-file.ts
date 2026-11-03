@@ -1,40 +1,9 @@
-import { NOTE_LANGUAGES, translate, type TranslationKey, type UiLanguage } from "../i18n";
+import { NOTE_LANGUAGES, translate, type UiLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
 import { STANDARD, validateTemplate, type DetailSection, type DetailTemplate } from "./detail-templates";
-import StandardzhTW from "../core/note-styles/canonical/v1/standard.zh-TW.md";
-import StandardzhCN from "../core/note-styles/canonical/v1/standard.zh-CN.md";
-import Standarden from "../core/note-styles/canonical/v1/standard.en.md";
-import TextbookzhTW from "../core/note-styles/canonical/v1/textbook.zh-TW.md";
-import TextbookzhCN from "../core/note-styles/canonical/v1/textbook.zh-CN.md";
-import Textbooken from "../core/note-styles/canonical/v1/textbook.en.md";
-import SummaryzhTW from "../core/note-styles/canonical/v1/summary.zh-TW.md";
-import SummaryzhCN from "../core/note-styles/canonical/v1/summary.zh-CN.md";
-import Summaryen from "../core/note-styles/canonical/v1/summary.en.md";
-import PlainzhTW from "../core/note-styles/canonical/v1/plain.zh-TW.md";
-import PlainzhCN from "../core/note-styles/canonical/v1/plain.zh-CN.md";
-import Plainen from "../core/note-styles/canonical/v1/plain.en.md";
-import GuidezhTW from "../core/note-styles/canonical/v1/guide.zh-TW.md";
-import GuidezhCN from "../core/note-styles/canonical/v1/guide.zh-CN.md";
-import Guideen from "../core/note-styles/canonical/v1/guide.en.md";
-import StandardzhTWV2 from "../core/note-styles/canonical/v2/standard.zh-TW.md";
-import StandardzhCNV2 from "../core/note-styles/canonical/v2/standard.zh-CN.md";
-import StandardenV2 from "../core/note-styles/canonical/v2/standard.en.md";
-import TextbookzhTWV2 from "../core/note-styles/canonical/v2/textbook.zh-TW.md";
-import TextbookzhCNV2 from "../core/note-styles/canonical/v2/textbook.zh-CN.md";
-import TextbookenV2 from "../core/note-styles/canonical/v2/textbook.en.md";
-import SummaryzhTWV2 from "../core/note-styles/canonical/v2/summary.zh-TW.md";
-import SummaryzhCNV2 from "../core/note-styles/canonical/v2/summary.zh-CN.md";
-import SummaryenV2 from "../core/note-styles/canonical/v2/summary.en.md";
-import PlainzhTWV2 from "../core/note-styles/canonical/v2/plain.zh-TW.md";
-import PlainzhCNV2 from "../core/note-styles/canonical/v2/plain.zh-CN.md";
-import PlainenV2 from "../core/note-styles/canonical/v2/plain.en.md";
-import GuidezhTWV2 from "../core/note-styles/canonical/v2/guide.zh-TW.md";
-import GuidezhCNV2 from "../core/note-styles/canonical/v2/guide.zh-CN.md";
-import GuideenV2 from "../core/note-styles/canonical/v2/guide.en.md";
 
 /**
- * A note style is one Markdown file the user edits. This module is pure: it parses a file's text, finds out whether the
- * text is still a frozen canonical one, and writes the frozen legacy export. It reads and writes no file.
+ * A note style is one Markdown file the user edits. This module is pure: it parses a file's text and writes the frozen legacy export. It reads and writes no file.
  */
 
 export type NoteStyleLanguage = UiLanguage;
@@ -76,8 +45,6 @@ export interface NoteStyle {
 }
 export type NoteStyleParse = { ok: true; style: NoteStyle } | { ok: false; issues: NoteStyleIssue[] };
 
-export const NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"] as const;
-export type NoteStyleBuiltinId = (typeof NOTE_STYLE_BUILTIN_IDS)[number];
 export const CANONICAL_LANGUAGES: readonly NoteStyleLanguage[] = ["zh-TW", "zh-CN", "en"];
 
 /** A per-language record built from entries, so no source line branches on a language id (language gate). */
@@ -89,43 +56,7 @@ function byLanguage<T>(zhTW: T, zhCN: T, en: T): Record<NoteStyleLanguage, T> {
   ]) as Record<NoteStyleLanguage, T>;
 }
 
-/** Frozen canonical contents. A new version adds an entry here; v1 and v2 files never change (the test pins their hashes). */
-export const CANONICAL_VERSIONS: readonly Record<NoteStyleBuiltinId, Record<NoteStyleLanguage, string>>[] = [
-  {
-    standard: byLanguage(StandardzhTW, StandardzhCN, Standarden),
-    textbook: byLanguage(TextbookzhTW, TextbookzhCN, Textbooken),
-    summary: byLanguage(SummaryzhTW, SummaryzhCN, Summaryen),
-    plain: byLanguage(PlainzhTW, PlainzhCN, Plainen),
-    guide: byLanguage(GuidezhTW, GuidezhCN, Guideen)
-  },
-  // v2: v1 plus the four callout-rule keys at their defaults and one explanatory sentence; same prompt as v1.
-  {
-    standard: byLanguage(StandardzhTWV2, StandardzhCNV2, StandardenV2),
-    textbook: byLanguage(TextbookzhTWV2, TextbookzhCNV2, TextbookenV2),
-    summary: byLanguage(SummaryzhTWV2, SummaryzhCNV2, SummaryenV2),
-    plain: byLanguage(PlainzhTWV2, PlainzhCNV2, PlainenV2),
-    guide: byLanguage(GuidezhTWV2, GuidezhCNV2, GuideenV2)
-  }
-];
-
-/** The base file name (no ".md") a built-in is written under, in the interface language. */
-export function builtinStyleFileName(id: NoteStyleBuiltinId, language: NoteStyleLanguage): string {
-  const key: Record<NoteStyleBuiltinId, TranslationKey> = {
-    standard: "ui.note_style_standard_short",
-    textbook: "ui.note_style_textbook_short",
-    summary: "ui.note_style_summary",
-    plain: "ui.note_style_plain",
-    guide: "ui.note_style_guide"
-  };
-  return translate(language, key[id]);
-}
-
-/** The current standard content of a built-in, for writing the file and for "restore default". */
-export function canonicalContent(id: NoteStyleBuiltinId, language: NoteStyleLanguage): string {
-  return CANONICAL_VERSIONS[CANONICAL_VERSIONS.length - 1][id][language];
-}
-
-/** Line endings unified, trailing whitespace removed, one final newline: the form compared against canonical content. */
+/** Line endings unified, trailing whitespace removed, one final newline: the form two style texts are compared in. */
 export function normalizeStyleContent(text: string): string {
   return (
     text
@@ -136,19 +67,6 @@ export function normalizeStyleContent(text: string): string {
       .join("\n")
       .replace(/\n+$/, "") + "\n"
   );
-}
-
-/** Which frozen canonical content `text` equals after normalization, across every version and language. */
-export function matchCanonical(
-  text: string
-): { id: NoteStyleBuiltinId; language: NoteStyleLanguage; version: number } | undefined {
-  const normalized = normalizeStyleContent(text);
-  for (let version = 0; version < CANONICAL_VERSIONS.length; version++)
-    for (const id of NOTE_STYLE_BUILTIN_IDS)
-      for (const language of CANONICAL_LANGUAGES)
-        if (normalizeStyleContent(CANONICAL_VERSIONS[version][id][language]) === normalized)
-          return { id, language, version: version + 1 };
-  return undefined;
 }
 
 // ---- frozen legacy export (v1): never edit; a different layout needs a serializeLegacyV2 and both stay recognised ----

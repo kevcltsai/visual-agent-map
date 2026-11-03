@@ -736,6 +736,36 @@
       "language": "zh-CN",
       "schema": true
     },
+    "aim-flow.style-delivery-outline.en": {
+      "builder": "AimManualFlow/final-delivery phase delivery-outline with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "en",
+      "schema": true
+    },
+    "aim-flow.style-delivery-outline.zh": {
+      "builder": "AimManualFlow/final-delivery phase delivery-outline with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.style-delivery-outline.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase delivery-outline with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "aim-flow.style-delivery-writing.en": {
+      "builder": "AimManualFlow/final-delivery phase delivery-writing with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "en",
+      "schema": true
+    },
+    "aim-flow.style-delivery-writing.zh": {
+      "builder": "AimManualFlow/final-delivery phase delivery-writing with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.style-delivery-writing.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase delivery-writing with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.subtopic-research-reuse-rejected.en": {
       "builder": "AimManualFlow/planner-review phase task variant subtopic-research-reuse-rejected through AiTaskService",
       "language": "en",
@@ -1876,6 +1906,66 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.reference-groups-fresh.en.1": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "en",
+      "schema": true
+    },
+    "service.reference-groups-fresh.en.2": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "en",
+      "schema": true
+    },
+    "service.reference-groups-fresh.zh-CN.1": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups-fresh.zh-CN.2": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups-fresh.zh.1": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.reference-groups-fresh.zh.2": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.reference-groups-top.en.1": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "en",
+      "schema": true
+    },
+    "service.reference-groups-top.en.2": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "en",
+      "schema": true
+    },
+    "service.reference-groups-top.zh-CN.1": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups-top.zh-CN.2": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups-top.zh.1": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.reference-groups-top.zh.2": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "zh-TW",
+      "schema": true
+    },
     "service.reference-groups.en.1": {
       "builder": "AiTaskService reference extraction then task",
       "language": "en",
@@ -1904,6 +1994,21 @@
     "service.reference-groups.zh.2": {
       "builder": "AiTaskService reference extraction then task",
       "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-fresh.en": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, update mode fresh",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-fresh.zh": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, update mode fresh",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-fresh.zh-CN": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, update mode fresh",
+      "language": "zh-CN",
       "schema": true
     },
     "service.synthesize-local.en": {
@@ -2116,6 +2221,36 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.synthesize-top.en": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, update mode top",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-top.zh": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, update mode top",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-top.zh-CN": {
+      "builder": "AiTaskService instructions: mode synthesize, local, visual off, update mode top",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-fresh.en": {
+      "builder": "AiTaskService instructions: mode task, web research, update mode fresh",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-fresh.zh": {
+      "builder": "AiTaskService instructions: mode task, web research, update mode fresh",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-fresh.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, web research, update mode fresh",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-intermediate.en": {
       "builder": "AiTaskService instructions: mode task with intermediate detail",
       "language": "en",
@@ -2128,6 +2263,81 @@
     },
     "service.task-intermediate.zh-CN": {
       "builder": "AiTaskService instructions: mode task with intermediate detail",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-action.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in action style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-action.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in action style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-action.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in action style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-atomic.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in atomic style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-atomic.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in atomic style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-atomic.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in atomic style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-conclusion.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in conclusion style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-conclusion.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in conclusion style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-conclusion.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in conclusion style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-evidence.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in evidence style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-evidence.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in evidence style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-evidence.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in evidence style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-hypothesis.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in hypothesis style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-hypothesis.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in hypothesis style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-hypothesis.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in hypothesis style resolved by runStyle (its structure, academic voice, standard format)",
       "language": "zh-CN",
       "schema": true
     },
@@ -2473,6 +2683,21 @@
     },
     "service.task-tone.zh-CN": {
       "builder": "AiTaskService instructions: mode task with a resolved tone text (B1)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-top.en": {
+      "builder": "AiTaskService instructions: mode task, web research, update mode top",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-top.zh": {
+      "builder": "AiTaskService instructions: mode task, web research, update mode top",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-top.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, web research, update mode top",
       "language": "zh-CN",
       "schema": true
     },

@@ -123,7 +123,7 @@ const modalFor = (over = {}) => {
   const requests = [], created = [], labels = [];
   const generator = { presets: { settings: { language: 'en', promptPresets: [] }, async saveSettings() {} }, initialTopic: 'Sleep', generate: async (request, _signal, started) => { requests.push(request); started(); return '# Sleep\n## A\n'; } };
   const modal = new mod.OutlineImportModal({}, async request => { created.push(request); },
-    { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, [], { map: 'editable', selected: { id: 'n1', title: 'Sleep' } }, 'tree', generator, {}, [], '',
+    { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, { map: 'editable', selected: { id: 'n1', title: 'Sleep' } }, 'tree', generator, {},
     over.defaultModelLabel ?? (async parentId => { labels.push(parentId); return parentId ? 'Follow upper topic (gpt-x)' : 'Follow current model (cur)'; }));
   modal.open();
   const model = () => dom.find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model');

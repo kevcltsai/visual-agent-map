@@ -112,13 +112,13 @@ for (const kind of ['tree', 'under']) {
     assert.deepEqual(h.notices, [], 'no Notice');
   });
 
-  test(`I3 (${kind}): the second updateNote fails (template and tone chosen); same rollback`, async () => {
+  test(`I3 (${kind}): a chosen style adds no updateNote call, so the import has no second update to fail (was: the second updateNote failed with template and tone chosen and rolled back; Q18, C5, #44)`, async () => {
     const h = await harness();
-    const before = h.snapshot(), entries = h.view.history.past.length;
-    failOnce(h.spy, 'updateNote', new Error('update failed'), 2);
-    const error = await h.rejected(h.view.importOutlineIntoMap(request(tree4, { shallowResearch: true, detailTemplateId: 'standard', toneId: 'neutral' }), placementOf(h, kind)));
-    assert.match(error.message, /update failed/);
-    assertRolledBack(h, before, entries, kind);
+    let updates = 0;
+    const update = h.spy.updateNote.bind(h.spy);
+    h.spy.updateNote = async (...args) => { updates++; return update(...args); };
+    await h.view.importOutlineIntoMap(request(tree4, { shallowResearch: true, noteStyle: 'builtin:textbook' }), placementOf(h, kind));
+    assert.equal(updates, 0, 'the style is not recorded on any created topic');
     assert.deepEqual(h.notices, []);
   });
 }

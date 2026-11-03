@@ -18,9 +18,10 @@ import {
   builtinTemplateText,
   findBuiltinBlock,
   lookupBuiltinBlock,
+  lookupBuiltinFormat,
   type BlockCategory
 } from "../../blocks/builtin";
-import { parseTemplateBlock } from "../../blocks/template-block";
+import { parseTemplateBlock, trimFormatBody, type TemplateNotice } from "../../blocks/template-block";
 import type { NoteStyleIssue } from "../../../ai/note-style-file";
 import {
   headingsVerbatim,
@@ -52,13 +53,19 @@ import {
   DECOMPOSE,
   DEFAULT_TASK,
   detailStructure,
+  CONFLICT_RULE,
   GENERAL_TASK,
+  GENERAL_TASK_FRESH,
+  GENERAL_TASK_TOP,
   JSON_CONTRACT,
   LABEL_DETAIL,
+  LABEL_DETAIL_TOP,
   LABEL_FINDINGS,
   MERGE,
   outputLanguage,
   SYNTHESIZE,
+  SYNTHESIZE_FRESH,
+  SYNTHESIZE_TOP,
   textbookDetailStructure
 } from "./fragments";
 import { isQuickTask, quickGuidance, readerFacingDetail } from "./render";
@@ -83,10 +90,12 @@ export interface PromptSegment {
 export interface AssembledPrompt {
   readonly text: string;
   readonly segments: readonly PromptSegment[];
-  /** Whether the template asks for charts: its sections or format rules hold a mermaid code block. */
+  /** Whether the style asks for charts: its sections or format rules hold a mermaid code block (never with the lean format). */
   readonly charts: boolean;
   /** Template blocks that could not be read and were replaced by the built-in one for this prompt; empty normally. */
   readonly issues: readonly BlockIssue[];
+  /** Remarks that change nothing in the prompt's use of the template, for example an old format rules zone that is not read. */
+  readonly notices: readonly TemplateNotice[];
 }
 
 /** A block the assembler could not read: which one (and the file it came from, when known) and what is wrong, with its line. */
@@ -101,8 +110,7 @@ export interface BlockChoice {
 }
 export interface StyleSelection {
   /**
-   * `body` is the whole template text (sections zone, then the format rules zone) when the choice is not the unchanged
-   * built-in. `adaptive`: the detail has no fixed sections, the plugin's adaptive structure text stands in for the
+   * `body` is the sections text when the choice is not the unchanged built-in (a format rules zone in it is not read). `adaptive`: the detail has no fixed sections, the plugin's adaptive structure text stands in for the
    * sections.
    */
   readonly template: BlockChoice & {
@@ -110,6 +118,11 @@ export interface StyleSelection {
   };
   /** Academic rigor (the empty tone) is the default. */
   readonly tone: BlockChoice;
+  /**
+   * The format rules: a built-in id (standard, lean, rich), or a `body` (a format rules file, blank lines at both ends
+   * removed; an empty body adds no format text). Absent is the standard format.
+   */
+  readonly format?: BlockChoice;
 }
 export interface AssembleOptions {
   /** Test injection: block bodies by `category/id` (a template's body is its whole text); the real path uses the built-in registry only. */
@@ -166,14 +179,14 @@ interface OwnedText {
   readonly rule?: string;
 }
 
-/** What the template choice contributes: its sections text, and its format rules text (empty when the template has none). */
+/** What the template choice contributes: its sections text. */
 interface TemplateParts {
   readonly sections: string;
   /** The parts of `sections`, in order, that are the block's own words; the rest is the plugin's wrapper sentences. */
   readonly owned: readonly OwnedText[];
-  readonly format: string;
   /** Why the block was not used and the built-in one stands in; empty when the choice was used as written. */
   readonly issues: readonly BlockIssue[];
+  readonly notices: readonly TemplateNotice[];
 }
 
 const headingOf = (name: string): string => `### ${name}`;
@@ -230,8 +243,9 @@ function leadStructure(
 
 /**
  * Resolves the template choice. A built-in template that is not modified (no body, or a body equal to the built-in
- * text) takes today's path: today's template object and format fragment. A modified body goes through the parser and is
- * put together from what the text holds: a lead, the sections, the format rules; the Textbook id has no part in it.
+ * text) takes today's path: today's template object. A modified body goes through the parser and is
+ * put together from what the text holds: a lead and the sections; the Textbook id has no part in it. The format rules are
+ * a part of their own (`formatTextOf`).
  */
 function templateParts(
   selection: StyleSelection,
@@ -267,7 +281,7 @@ function templateParts(
         })
       });
     }
-    return { sections: structure(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language), issues: [] };
+    return { sections: structure(today), owned, issues: [], notices: [] };
   }
   const parsed = parseTemplateBlock(body, { id, name: id });
   if (!parsed.ok) {
@@ -291,10 +305,10 @@ function templateParts(
       topicAnchor,
       {}
     );
-    return { ...fallback, issues };
+    return { ...fallback, issues, notices: [] };
   }
   // The request's own old template object in the intro layout (its lead-in is a sentence of the intro structure text) keeps
-  // that structure text, with the format rules the block holds (decision 18 of ticket 06: the snapshots pin it).
+  // that structure text (decision 18 of ticket 06: the snapshots pin it).
   // This is a reference output of the old path: production never sends it (no code builds such a request; the upgrade
   // turns a lead-in into a block with a lead), and only tests/prompt-snapshots.cjs reaches it. Whether to keep the hook
   // and re-record those snapshots is the owner's decision at wrap-up.
@@ -302,8 +316,8 @@ function templateParts(
   if (parsed.lead && !introTemplate)
     return {
       ...leadStructure(parsed.template, parsed.lead, language, topicAnchor),
-      format: parsed.format,
-      issues: []
+      issues: [],
+      notices: parsed.notices
     };
   // No lead: the standard wrapper sentence for the standard id, else the generic one. The generic one must not take the
   // Textbook id's fixed structure text, so a Textbook-named block is put together under a neutral id.
@@ -313,14 +327,25 @@ function templateParts(
   return {
     sections: structure(template),
     owned: describedSections(template, language),
-    format: parsed.format,
-    issues: []
+    issues: [],
+    notices: parsed.notices
   };
+}
+
+/**
+ * The format rules text of the selection. Without a format choice it is the Obsidian format fragment as it is (not
+ * trimmed); a built-in id is looked up; a body loses its blank lines at both ends, and an empty result adds no text.
+ */
+function formatTextOf(selection: StyleSelection, language: ContentLanguage, options: AssembleOptions): string {
+  const choice = selection.format;
+  if (!choice) return inLanguage(OBSIDIAN_FORMAT, language);
+  const body = choice.body ?? options.blocks?.[`format/${choice.id}`]?.(language);
+  return body !== undefined ? trimFormatBody(body) : lookupBuiltinFormat(choice.id, language);
 }
 
 const CHART_BLOCK = "```mermaid";
 
-/** Whether the template (sections and format rules) asks for a mermaid diagram. */
+/** Whether the style (sections and format rules) asks for a mermaid diagram; the lean format never does. */
 export function chartsWanted(
   selection: StyleSelection,
   context: TaskContext,
@@ -328,13 +353,15 @@ export function chartsWanted(
   options: AssembleOptions = {}
 ): boolean {
   const parts = templateParts(selection, context, language, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection);
+  return partsAskForCharts(parts, selection, formatTextOf(selection, language, options));
 }
 
-function partsAskForCharts(parts: TemplateParts, selection: StyleSelection): boolean {
+function partsAskForCharts(parts: TemplateParts, selection: StyleSelection, format: string): boolean {
+  // The lean format draws no diagram, whatever the sections say.
+  if (selection.format?.id === "lean" && selection.format.body === undefined) return false;
   // An adaptive detail has no fixed sections: only the format rules can ask for a chart.
   const sections = selection.template.adaptive ? "" : parts.sections;
-  return sections.includes(CHART_BLOCK) || parts.format.includes(CHART_BLOCK);
+  return sections.includes(CHART_BLOCK) || format.includes(CHART_BLOCK);
 }
 
 type Piece = readonly [string, SegmentSource];
@@ -357,21 +384,31 @@ export function assembleTaskPrompt(
     findBuiltinBlock(category, id);
     return options.blocks?.[`${category}/${id}`]?.(language) ?? lookupBuiltinBlock(category, id, language);
   };
-  const modeFragment =
-    step === "research" || (step === "quick" && context.mode === "task")
-      ? GENERAL_TASK
-      : step === "decompose"
-        ? DECOMPOSE
-        : step === "synthesize"
-          ? SYNTHESIZE
-          : step === "merge"
-            ? MERGE
-            : DEFAULT_TASK;
+  const updateMode = context.updateMode ?? "merge";
+  const isGeneral = step === "research" || (step === "quick" && context.mode === "task");
+  const modeFragment = isGeneral
+    ? updateMode === "top"
+      ? GENERAL_TASK_TOP
+      : updateMode === "fresh"
+        ? GENERAL_TASK_FRESH
+        : GENERAL_TASK
+    : step === "decompose"
+      ? DECOMPOSE
+      : step === "synthesize"
+        ? updateMode === "top"
+          ? SYNTHESIZE_TOP
+          : updateMode === "fresh"
+            ? SYNTHESIZE_FRESH
+            : SYNTHESIZE
+        : step === "merge"
+          ? MERGE
+          : DEFAULT_TASK;
   const quick = step === "quick";
   const none = inLanguage(NONE, language);
   const topicAnchor: FollowAnchor = { kind: "topic", text: context.title };
   // The template choice is read once: its charts answer and issues come from the same (possibly fallback) parts.
   const parts = templateParts(selection, context, language, topicAnchor, options);
+  const format = formatTextOf(selection, language, options);
   // Each element is a list of pieces; elements are joined by a blank line, and an empty element still takes its place.
   const elements: Piece[][] = [];
   const add = (...pieces: Piece[]) => elements.push(pieces);
@@ -395,7 +432,13 @@ export function assembleTaskPrompt(
       add(fixed(before ?? "", "tone-rule"), [body, block], fixed(after ?? "", "tone-rule"));
     }
   }
-  add(fixed(inLanguage(modeFragment, language), "step"));
+  // Only a merge update adds the conflict rule; top and fresh have their own mode text (the rest is unchanged).
+  if ((isGeneral || step === "synthesize") && updateMode === "merge")
+    add(
+      fixed(inLanguage(modeFragment, language), "step"),
+      fixed(`\n\n${inLanguage(CONFLICT_RULE, language)}`, "conflict-rule")
+    );
+  else add(fixed(inLanguage(modeFragment, language), "step"));
   if (step === "decompose") add(fixed("", "template"));
   else {
     const pieces: Piece[][] = [];
@@ -404,7 +447,7 @@ export function assembleTaskPrompt(
     else pieces.push(sectionPieces(parts, selection.template.id));
     // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
     if (readerFacingDetail(context) && step !== "merge") {
-      const text = parts.format;
+      const text = format;
       if (text)
         pieces.push([[text, { kind: "block", category: "template", id: selection.template.id, part: "format" }]]);
     }
@@ -414,7 +457,9 @@ export function assembleTaskPrompt(
   for (const guidance of visualGuidance(context, language)) add(fixed(guidance, "visual-guidance"));
   add(input(`${inLanguage(LABEL_TOPIC, language)}:\n${context.title}`, "topic"));
   add(input(`${inLanguage(LABEL_SUMMARY, language)}:\n${context.summary}`, "summary"));
-  add(input(step !== "decompose" ? `${inLanguage(LABEL_DETAIL, language)}:\n${context.detail || none}` : "", "detail"));
+  const detailLabel = updateMode === "top" && (isGeneral || step === "synthesize") ? LABEL_DETAIL_TOP : LABEL_DETAIL;
+  const hideDetail = step === "decompose" || (updateMode === "fresh" && (isGeneral || step === "synthesize"));
+  add(input(!hideDetail ? `${inLanguage(detailLabel, language)}:\n${context.detail || none}` : "", "detail"));
   add(input(`${inLanguage(LABEL_RULES, language)}:\n${context.rules || none}`, "rules"));
   add(
     input(
@@ -439,9 +484,10 @@ export function assembleTaskPrompt(
   return {
     text: segments.map(segment => segment.text).join(""),
     segments,
-    charts: partsAskForCharts(parts, selection),
+    charts: partsAskForCharts(parts, selection, format),
     // The decompose step carries no template, so a template that could not be read changes nothing there.
-    issues: step === "decompose" ? [] : parts.issues
+    issues: step === "decompose" ? [] : parts.issues,
+    notices: step === "decompose" ? [] : parts.notices
   };
 }
 

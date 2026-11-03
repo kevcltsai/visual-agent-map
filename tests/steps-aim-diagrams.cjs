@@ -178,3 +178,33 @@ test('progress: the add-diagrams stage is emitted when the step runs and not whe
   }
   assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /"add-diagrams": "ui\.aim_stage_add-diagrams"/);
 });
+
+/** A user AIM note style (not the AIM report): one section, the format text given, the format id given. */
+function aimStyle(formatId, formatText) {
+  return {
+    recipe: { ref: `file:Style ${formatId}`, name: 'Style', source: 'kind' },
+    template: { id: 's', name: 'Style', sections: [{ id: 'a', name: 'Answer', description: 'The answer.', role: 'none', aliases: [] }] },
+    formatText,
+    contextFields: { styleSelection: { template: { id: 's' }, tone: {}, format: { id: formatId } } }
+  };
+}
+
+test('AIM note style: a lean format skips the chart step and its progress stage; a standard format and the AIM report still run it once', async () => {
+  const run = async style => {
+    const calls = [];
+    const stages = [];
+    await conclude(flow => {
+      if (style) flow.noteStyle = () => style;
+      flow.onProgress = event => event.kind === 'stage' && stages.push(event.stage);
+      flow.addDiagrams = async request => {
+        calls.push(request);
+        request.onStart?.();
+        return request.detail;
+      };
+    });
+    return { calls: calls.length, charted: stages.filter(stage => stage === 'add-diagrams').length };
+  };
+  assert.deepEqual(await run(aimStyle('lean', 'Plain text only.')), { calls: 0, charted: 0 });
+  assert.deepEqual(await run(aimStyle('standard', `Use one diagram:\n${CHART}`)), { calls: 1, charted: 1 });
+  assert.deepEqual(await run(undefined), { calls: 1, charted: 1 });
+});

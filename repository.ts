@@ -29,6 +29,7 @@ import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
 import { FALLBACK_MODEL, resolveTaskModel } from "./ai/model-resolution";
 import type { PromptPreset } from "./ai/prompt-presets";
+import type { StyleKind } from "./ai/note-style-recipe";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { fencedLines } from "./ai/markdown-blocks";
 import { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } from "./core/map-chat-layout";
@@ -99,6 +100,8 @@ export interface Note {
   detailTemplateId?: string;
   /** Per-topic tone preset id (frontmatter `tone`); absent = use the map default. */
   toneId?: string;
+  /** From `note-style` frontmatter (a style ref, `builtin:<id>` or `file:<name>`); absent = none or empty. */
+  noteStyle?: string;
   detailFormatIssues: string[];
   /** Why the last AI task on this note failed (frontmatter `last-error`); empty when none. */
   lastError: string;
@@ -129,20 +132,18 @@ export interface Settings {
   defaultDetailTemplateId?: string;
   /** Workspace default note style: `style:<file name>`, an old template id, or a built-in style id. Absent = defaultDetailTemplateId. */
   defaultNoteStyleId?: string;
-  /** Workspace default template block: `builtin:<id>` or `file:<name>` (a file in the Templates block folder). Absent = the old default above. */
-  noteTemplateBlock?: string;
-  /** Workspace default tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the tone of the old default. */
-  noteToneBlock?: string;
-  /** The template block each topic type uses (`builtin:<id>` or `file:<name>`); a type with no entry follows the map and the workspace. */
-  noteTemplateByKind?: Partial<Record<TopicKind, string>>;
+  /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. Read only until the settings page writes it. */
+  noteStyleByKind?: Partial<Record<StyleKind, string>>;
+  /** The marker of the conversion to the recipe model, and the old id -> new ref table that implicit styles read. */
+  noteStyleRecipe?: {
+    migrated: 1;
+    mapsNotified?: true;
+    legacy?: { templates: Record<string, string>; tones: Record<string, string> };
+  };
   /** The note style folder; written when the user first creates it. Absent = `<workspace>/<localized name>`. */
   noteStylesFolder?: string;
   /** Old custom template id -> the style file it was exported to (with ".md"). */
   noteStyleFiles?: Record<string, string>;
-  /** Old ids (style file, old template, built-in style whose file was changed, custom tone preset) -> the blocks that replaced them; written by the upgrade. */
-  noteStyleAliases?: Record<string, { template?: string; tone?: string }>;
-  /** Set when the one-time upgrade of the old note style data has finished; the old sources are not read after it. */
-  noteStyleUpgrade?: { version: number };
   coffeeStyles?: CoffeeStyle[];
   /** Custom tone/outline presets; built-ins live in ai/prompt-presets.ts. Absent = none. */
   promptPresets?: PromptPreset[];
@@ -1295,6 +1296,7 @@ export class Repository {
         ? { detailTemplateId: fm["detail-template"] }
         : {}),
       ...(typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {}),
+      ...(typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {}),
       ...(noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {}),
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
@@ -1368,6 +1370,7 @@ export class Repository {
     if (patch.detailTemplateId !== undefined)
       patch.detailTemplateId ? (fm["detail-template"] = patch.detailTemplateId) : delete fm["detail-template"];
     if (patch.toneId !== undefined) patch.toneId ? (fm.tone = patch.toneId) : delete fm.tone;
+    if (patch.noteStyle !== undefined) patch.noteStyle ? (fm["note-style"] = patch.noteStyle) : delete fm["note-style"];
     if (patch.detailFormatIssues !== undefined)
       patch.detailFormatIssues.length
         ? (fm["detail-format-issues"] = patch.detailFormatIssues)
@@ -1652,6 +1655,20 @@ export class Repository {
   async writeTopicKind(path: string, kind: TopicKind): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
       setFrontmatterKeys(content, { "topic-kind": kind === "topic" ? null : kind })
+    );
+  }
+
+  /**
+   * Sets a note's own note style. A ref writes `note-style` only (the 0.28.0 `detail-template` and `tone` stay as they are);
+   * null is "follow the topic type" and removes all three keys. Other lines and the body keep their bytes, `updated` is not
+   * bumped, nothing rebuilds.
+   */
+  async writeNoteStyle(path: string, ref: string | null): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      setFrontmatterKeys(
+        content,
+        ref === null ? { "note-style": null, "detail-template": null, tone: null } : { "note-style": ref }
+      )
     );
   }
 

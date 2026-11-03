@@ -1,4 +1,4 @@
-// UI findings F2/F4: the map-default chooser offers "Edit this style" even when unset and names every row; opening the folder shows its path.
+// T6 P3: the topic note-style chooser (openTopicStyleChooser) replaced the map-default chooser (openStyleChooser; grilling Q15/Q17, C5, #15, #45).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
@@ -11,51 +11,85 @@ class FakeModal {
   open() { opened.push(this); }
 }
 const obsidian = { ...S.obsidian, Notice, Modal: FakeModal };
-const { openStyleChooser } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
+const { openTopicStyleChooser } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
+const { NoteStyleStore } = S.load('ai/note-style-store.ts');
 const { default: Plugin } = S.load('main.ts', { obsidian });
+const plain = value => JSON.parse(JSON.stringify(value));
 
-const picker = (edits, items = []) => ({ refresh: async () => {}, list: () => items, edit: async ref => { edits.push(ref); } });
+async function world(files = {}, settingsPatch = {}) {
+  const settings = { language: 'en', workspaceFolder: 'WS', noteStylesFolder: 'WS/S', detailTemplates: [], promptPresets: [], ...settingsPatch };
+  const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => {}, trash: async () => {} };
+  const plugin = { settings, noteStyles: new NoteStyleStore({ settings: () => settings, port, save: async () => {} }) };
+  await plugin.noteStyles.refresh();
+  return { plugin, files };
+}
+const open = async (w, options) => { const writes = []; await openTopicStyleChooser({}, w.plugin, { write: ref => { writes.push(ref); }, ...options }); return { modal: opened.at(-1), writes }; };
 
-test('map default chooser: unset map still offers Edit this style (opens editRef) and every row has a name', async () => {
-  opened.length = 0;
-  const edits = [];
-  await openStyleChooser({}, picker(edits), {
-    title: 't', description: 'd',
-    leading: [{ label: 'Use the default', action() {} }],
-    editRef: { kind: 'builtin', id: 'textbook' },
-    pick() {}
-  });
-  const choices = opened[0].choices;
-  assert.ok(choices.every(choice => choice.named === true), 'all rows show a name');
-  const edit = choices.find(choice => choice.label === S.load('i18n.ts').t('ui.note_style_edit'));
-  assert.ok(edit, 'Edit this style row exists');
-  edit.action();
-  assert.deepEqual(edits, [{ kind: 'builtin', id: 'textbook' }]);
+test('chooser rows: Follow the topic type (X) first, then the built-ins without the AIM report, then the user\'s styles; every row is named and has one line of labels; the AIM report never appears (counterexample 8)', async () => {
+  const w = await world({ 'WS/S/Styles/Mine.md': '---\nstructure: Standard\n---\n' });
+  const { modal } = await open(w, { note: {}, kind: 'topic' });
+  const labels = plain(modal.choices.map(choice => choice.label));
+  assert.equal(labels[0], 'Follow the topic type (General research)');
+  assert.deepEqual(labels.slice(1, 8), ['General research', 'Atomic note', 'Hypothesis test', 'Evidence record', 'Conclusion', 'Action plan', 'Textbook']);
+  assert.equal(labels.at(-1), 'Mine', 'a style file with a problem is listed too');
+  assert.ok(!labels.some(label => /AIM/i.test(label)));
+  const usable = modal.choices.filter(choice => !choice.buttonLabel);
+  assert.ok(modal.choices.every(choice => choice.named === true) && usable.length === modal.choices.length - 1);
+  assert.ok(usable.every(choice => /^(Current setting · )?[^·]+ · [^·]+ · [^·]+ · [^·]+$/.test(choice.description)), plain(usable.map(c => c.description)).join('|'));
+  assert.match(modal.choices.at(-1).description, /Mine\.md.*line \d+.*was not found; the built-in one is used/, 'a style file with a problem says why in words, not in a code');
+  const hypothesis = await open(w, { note: {}, kind: 'hypothesis' });
+  assert.equal(hypothesis.modal.choices[0].label, 'Follow the topic type (Hypothesis test)', 'X follows the topic type');
 });
 
-test('chooser without current or editRef has no edit row', async () => {
-  opened.length = 0;
-  await openStyleChooser({}, picker([]), { title: 't', description: 'd', pick() {} });
-  assert.equal(opened[0].choices.some(choice => choice.buttonLabel), false);
+test('chooser: the row in force is marked and writes nothing; any other row writes its ref; Follow the topic type writes null (counterexamples 1, 2, 3)', async () => {
+  const w = await world();
+  const none = await open(w, { note: {}, kind: 'topic' });
+  assert.match(none.modal.choices[0].description, /^Current setting/);
+  await none.modal.choices[0].action();
+  assert.deepEqual(none.writes, [], 'no style set: Follow the topic type is already in force');
+  await none.modal.choices.find(c => c.label === 'Textbook').action();
+  assert.deepEqual(none.writes, ['builtin:textbook']);
+  const own = await open(w, { note: { noteStyle: 'builtin:textbook' }, kind: 'topic' });
+  assert.match(own.modal.choices.find(c => c.label === 'Textbook').description, /^Current setting/);
+  assert.doesNotMatch(own.modal.choices[0].description, /^Current setting/);
+  await own.modal.choices.find(c => c.label === 'Textbook').action();
+  assert.deepEqual(own.writes, [], 'the row in force writes nothing');
+  await own.modal.choices[0].action();
+  assert.deepEqual(own.writes, [null]);
 });
 
-test('chooser rows (D8): leading rows, the five built-ins, then the user\'s template blocks; a block that does not parse shows its reason and opens instead of being picked', async () => {
-  opened.length = 0;
-  const edits = [], picks = [];
-  const bad = { kind: 'file', id: 'file:Broken', name: 'Broken', fileName: 'Broken.md', issues: [{ line: 3, code: 'no_sections', values: [], message: 'x' }] };
-  const good = { kind: 'file', id: 'file:Mine', name: 'Mine', fileName: 'Mine.md', issues: [] };
-  await openStyleChooser({}, picker(edits, [good, bad]), { title: 't', description: 'd', leading: [{ label: 'Use the default', action() {} }], current: { kind: 'file', id: 'file:Mine' }, pick: (template, tone) => picks.push([template, tone]) });
-  const labels = opened[0].choices.map(choice => choice.label);
-  assert.deepEqual(JSON.parse(JSON.stringify(labels.slice(0, 1).concat(labels.slice(6, 8)))), ['Use the default', 'Mine', 'Broken']);
-  assert.equal(labels.length, 1 + 5 + 2 + 1, 'leading, five built-ins, two blocks, Edit this style');
-  const rowOf = label => opened[0].choices.find(choice => choice.label === label);
-  assert.equal(rowOf('Mine').description, S.load('i18n.ts').t('ui.detail_template_current'));
-  rowOf('Mine').action(); opened[0].choices[3].action();
-  assert.deepEqual(picks.map(([template, tone]) => `${template}/${tone}`), ['file:Mine/undefined', 'standard/summary']);
-  assert.ok(rowOf('Broken').buttonLabel, 'a broken block opens instead of being picked');
-  rowOf('Broken').action();
-  assert.deepEqual(JSON.parse(JSON.stringify(edits)), [{ kind: 'file', id: 'file:Broken' }]);
-  assert.equal(opened[0].choices.some(choice => choice.label.includes('old style')), false, 'no old style file item');
+test('chooser: a topic with only the 0.28.0 template and tone gets the Old setting row as the one in force; picking it writes nothing, Follow the topic type clears (counterexample 1)', async () => {
+  const w = await world();
+  const old = await open(w, { note: { detailTemplateId: 'textbook', toneId: 'plain' }, kind: 'topic' });
+  assert.equal(old.modal.choices[1].label, 'Old setting (Intro + six · Plain explanation)');
+  assert.match(old.modal.choices[1].description, /^Current setting/);
+  assert.doesNotMatch(old.modal.choices[0].description, /^Current setting/);
+  await old.modal.choices[1].action();
+  assert.deepEqual(old.writes, []);
+  await old.modal.choices[0].action();
+  assert.deepEqual(old.writes, [null]);
+  const gone = await open(w, { note: { toneId: 'gone' }, kind: 'topic' });
+  assert.match(gone.modal.choices[1].label, /^Old setting/, 'an unreadable tone alone is still an old setting');
+});
+
+test('chooser: a style file with a problem shows its reason and opens instead of being chosen; Cancel is passed through as dismissed', async () => {
+  const w = await world({ 'WS/S/Styles/Broken.md': '---\nupdate: bogus\nvoice: x\nstructure: y\n---\n' });
+  let dismissed = 0;
+  const { modal, writes } = await open(w, { note: {}, kind: 'topic', dismissed: () => dismissed++ });
+  const row = modal.choices.at(-1);
+  assert.equal(row.label, 'Broken');
+  assert.equal(row.buttonLabel, 'Open this file');
+  assert.match(row.description, /Broken\.md/);
+  assert.deepEqual(writes, []);
+  assert.equal(typeof modal.dismissed, 'function');
+  modal.dismissed(); assert.equal(dismissed, 1);
+});
+
+test('chooser without a style store (a plugin test double) still lists the built-ins and opens', async () => {
+  const w = { plugin: { settings: { language: 'en', detailTemplates: [], promptPresets: [] } } };
+  const { modal } = await open(w, { note: {}, kind: 'topic' });
+  assert.equal(modal.choices[0].label, 'Follow the topic type (General research)');
+  assert.ok(modal.choices.length >= 8);
 });
 
 test('openNoteStylesFolder (D15) creates the block folders, shows their path and reveals the folder', async () => {

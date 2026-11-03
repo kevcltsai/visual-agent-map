@@ -9803,11 +9803,10 @@ export class VisualAgentMapView extends ItemView {
       box.createSpan({ text: t("ui.map_chat_canvas_consent") });
       return;
     }
+    // Text only: the toolbar's "+ Topic" is the one button for it (a second one here broke the sentence and doubled the control).
     box.createSpan({
       text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
     });
-    if (!this.map.aim)
-      this.button(box, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null))));
   }
   /** The chat started or ended something: an empty canvas follows it. */
   private refreshEmptyMap(): void {
@@ -15096,9 +15095,11 @@ export class VisualAgentMapView extends ItemView {
   private startBlankMap(): void {
     if (!this.map) return;
     this.blankMapPaths.add(this.path);
+    // A message typed on the opening screen was meant for the AI; starting by hand leaves no stale draft in the chat.
+    this.chat?.clearDraft();
     this.render();
-    // The pressed button is gone; the keyboard goes to the canvas's own "Topic" button.
-    this.emptyMapEl?.querySelector<HTMLElement>("button")?.focus();
+    // The pressed button is gone; the keyboard goes to the toolbar's "+ Topic" (the one way to add a topic by hand).
+    this.contentEl.querySelector<HTMLElement>(".vam-map-tools .mod-cta")?.focus();
   }
   private chatHost(): MapChatHost {
     return {

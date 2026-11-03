@@ -427,6 +427,10 @@ export class MapChatPanel {
   get draft(): string {
     return this.built ? this.inputEl.value : "";
   }
+  /** Empties the message field (the user left the opening screen to start the map by hand). */
+  clearDraft(): void {
+    if (this.built) this.inputEl.value = "";
+  }
   /** True when `element` is the message field. */
   isInput(element: unknown): boolean {
     return this.built && element === this.inputEl;

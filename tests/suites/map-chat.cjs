@@ -2805,6 +2805,16 @@ integrationTest('45 ui: the button turns the opening screen into this map\'s emp
   h.repaint(); assert.equal(chat.isHero, false);
 });
 
+integrationTest('UX B10: "Create an empty mind map" clears the draft typed on the opening screen, and the empty canvas has no second "+ Topic"', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  h.type('half a question for the AI'); chat.emptyMapEl.click(); await tick();
+  assert.equal(chat.isHero, false); assert.equal(chat.draft, '', 'no stale draft waits in the side window');
+  const box = element('div'); h.view.fillEmptyMap(box);
+  assert.match(visibleText(box), /This mind map has no topics\. Click “＋ Topic” to create the first node\./); assert.equal(findAll(box, i => i.tag === 'button').length, 0);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.contentEl\.querySelector<HTMLElement>\("\.vam-map-tools \.mod-cta"\)\?\.focus\(\)/, 'the keyboard goes to the toolbar "+ Topic"');
+});
+
 integrationTest('B1 ui: many chips scroll inside their own box, so the message field stays in the window', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = css.match(/\.vam-map-chat-chips \{([^}]*)\}/)[1];
@@ -3208,7 +3218,7 @@ integrationTest('B1 fix 12: a blank map outside the managed folders, from the op
 
 integrationTest('B1 fix 15: the empty canvas follows the chat: building while it works, a line while a plan waits, the usual hint again when it ends or is cancelled', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
-  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.ok(findAll(box, i => i.tag === 'button').length === 1, 'the topic button of the usual hint');
+  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'UX B10: text only; the toolbar has the one "+ Topic"');
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'plan', actions: planActions(h, 16).map(a => ({ ...a, parentId: '' })), rejected: [] }; };
   h.type('Coffee'); const sent = h.view.sendMapChat(); await requestOut(chat);
   assert.match(shown(), /Building the map…/); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 3); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'no manual-create button meanwhile');

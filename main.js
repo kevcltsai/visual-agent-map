@@ -29268,6 +29268,10 @@ var MapChatPanel = class {
   get draft() {
     return this.built ? this.inputEl.value : "";
   }
+  /** Empties the message field (the user left the opening screen to start the map by hand). */
+  clearDraft() {
+    if (this.built) this.inputEl.value = "";
+  }
   /** True when `element` is the message field. */
   isInput(element) {
     return this.built && element === this.inputEl;
@@ -55975,8 +55979,6 @@ ${request.requirements}` : preset.text,
     box.createSpan({
       text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
     });
-    if (!this.map.aim)
-      this.button(box, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null))));
   }
   /** The chat started or ended something: an empty canvas follows it. */
   refreshEmptyMap() {
@@ -60878,8 +60880,9 @@ ${note.detail.trim()}` : "",
     var _a2, _b2;
     if (!this.map) return;
     this.blankMapPaths.add(this.path);
+    (_a2 = this.chat) == null ? void 0 : _a2.clearDraft();
     this.render();
-    (_b2 = (_a2 = this.emptyMapEl) == null ? void 0 : _a2.querySelector("button")) == null ? void 0 : _b2.focus();
+    (_b2 = this.contentEl.querySelector(".vam-map-tools .mod-cta")) == null ? void 0 : _b2.focus();
   }
   chatHost() {
     return {

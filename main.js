@@ -28244,22 +28244,30 @@ function previewMetrics(scaleValue) {
     padding: `${Math.round(14 * scale)}px ${Math.round(16 * scale)}px`
   };
 }
-function placeHoverPreview(host, card, preview, margin = 12) {
+function placeHoverPreview(host, card, preview, margin = 12, options = {}) {
+  var _a2, _b2, _c, _d;
+  const keepClear = [card, ...(_a2 = options.keepClear) != null ? _a2 : []];
+  const avoid = (_b2 = options.avoid) != null ? _b2 : [];
   const clamp = (value, low, high) => Math.max(low, Math.min(value, Math.max(low, high)));
   const topAligned = clamp(card.top, margin, host.height - preview.height - margin);
   const leftAligned = clamp(card.left, margin, host.width - preview.width - margin);
+  const bottom = Math.max(...keepClear.map((box) => box.bottom));
+  const top = Math.min(...keepClear.map((box) => box.top));
+  const sharesRows = keepClear.filter((box) => topAligned < box.bottom && box.top < topAligned + preview.height);
+  const rightEdge = Math.max(card.right, ...sharesRows.map((box) => box.right));
+  const leftEdge = Math.min(card.left, ...sharesRows.map((box) => box.left));
   const candidates = [
-    { left: card.right + margin, top: topAligned },
-    { left: card.left - margin - preview.width, top: topAligned },
-    { left: leftAligned, top: card.bottom + margin },
-    { left: leftAligned, top: card.top - margin - preview.height }
+    { left: rightEdge + margin, top: topAligned },
+    { left: leftEdge - margin - preview.width, top: topAligned },
+    { left: leftAligned, top: bottom + margin },
+    { left: leftAligned, top: top - margin - preview.height }
   ];
-  for (const spot of candidates) {
+  const overlaps2 = (spot, box) => spot.left < box.right && box.left < spot.left + preview.width && spot.top < box.bottom && box.top < spot.top + preview.height;
+  const clear = candidates.filter((spot) => {
     const inside2 = spot.left >= margin && spot.top >= margin && spot.left + preview.width <= host.width - margin && spot.top + preview.height <= host.height - margin;
-    const overlaps2 = spot.left < card.right && card.left < spot.left + preview.width && spot.top < card.bottom && card.top < spot.top + preview.height;
-    if (inside2 && !overlaps2) return spot;
-  }
-  return null;
+    return inside2 && !keepClear.some((box) => overlaps2(spot, box));
+  });
+  return (_d = (_c = clear.find((spot) => !avoid.some((box) => overlaps2(spot, box)))) != null ? _c : clear[0]) != null ? _d : null;
 }
 function markdownImages(markdown, limit = 4) {
   const images = [];
@@ -47976,8 +47984,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   onMapKeydown(event) {
     const target = event.target;
     if (target == null ? void 0 : target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
-    if (event.key === "Escape" && (event.defaultPrevented || this.menuClosedByKey || this.contentEl.ownerDocument.querySelector(".menu")))
+    if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
       return;
+    if (event.key === "Escape" && this.menuClosedByKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
       this.applySelectionChange(this.selection.escape());
@@ -48369,10 +48382,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     const active = (_j = (_i = this.contentEl.ownerDocument) == null ? void 0 : _i.activeElement) != null ? _j : null;
     const lost = !active || active === this.contentEl || !this.contentEl.contains(active);
     if (card && (announce || lost) && active !== card) card.focus({ preventScroll: true });
-    if (announce)
-      (_m = this.announcer) == null ? void 0 : _m.setText(
-        t("ui.presentation_position_0_1_2", index + 1, order.length, (_l = (_k = this.notes.get(currentId)) == null ? void 0 : _k.title) != null ? _l : "")
-      );
+    const title = (_l = (_k = this.notes.get(currentId)) == null ? void 0 : _k.title) != null ? _l : "";
+    if (session.spokenTitle !== void 0 && session.spokenTitle !== title) announce = true;
+    session.spokenTitle = title;
+    if (announce) (_m = this.announcer) == null ? void 0 : _m.setText(t("ui.presentation_position_0_1_2", index + 1, order.length, title));
   }
   /**
    * Leaves the presentation. `restore` puts back the viewport (in memory, never saved), the selection and the focus;
@@ -57089,7 +57102,7 @@ ${request.requirements}` : preset.text,
     }, 220);
   }
   showHoverCard(card, note) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     if (this.presentation) return;
     const workspace = this.contentEl.querySelector(".vam-canvas");
     if (!workspace) return;
@@ -57127,16 +57140,18 @@ ${request.requirements}` : preset.text,
     const availableWidth = Math.max(180, host.width - 24);
     const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
     const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
-    const spot = placeHoverPreview(
-      host,
-      {
-        left: rect2.left - host.left,
-        top: rect2.top - host.top,
-        right: rect2.right - host.left,
-        bottom: rect2.bottom - host.top
-      },
-      { width, height: visibleHeight }
-    );
+    const local = (box) => ({
+      left: box.left - host.left,
+      top: box.top - host.top,
+      right: box.right - host.left,
+      bottom: box.bottom - host.top
+    });
+    const tools = (_f = card.querySelector(".vam-node-tools")) == null ? void 0 : _f.getBoundingClientRect();
+    const selected = [...this.cardEls.values()].filter((other) => other !== card && other.classList.contains("is-selected")).flatMap((other) => [other, other.querySelector(".vam-node-tools")]).flatMap((el) => el ? [local(el.getBoundingClientRect())] : []);
+    const spot = placeHoverPreview(host, local(rect2), { width, height: visibleHeight }, 12, {
+      keepClear: tools && tools.width > 0 ? [local(tools)] : [],
+      avoid: selected
+    });
     if (!spot) {
       preview.remove();
       this.hoverCard = null;
@@ -65264,7 +65279,7 @@ function bindMapFolderInput(plugin, key2, input2) {
   };
   input2.inputEl.addEventListener("blur", apply);
   input2.inputEl.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") input2.inputEl.blur();
+    if (event.key === "Enter" && !event.isComposing) input2.inputEl.blur();
   });
 }
 var offersEveryLanguage = (values) => SUPPORTED_LANGUAGES.every((item) => values.includes(item.id));
@@ -65789,7 +65804,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
     if (key2 === "claudePath") void this.plugin.refreshModelDiscovery("claude");
     if (key2 === "codexPath" || key2 === "claudePath") this.updateKeepingFocus();
   }
-  /** Redraws the page; the control that had the keyboard (Tab just moved it) is focused again by its position. */
+  /**
+   * Redraws the page; the control that had the keyboard (Tab just moved it) is focused again. The control is found by what
+   * it is (its setting's name, which of the same-named settings, its label), not by its position: an invalid path adds an
+   * "Installation guide" button, so the number of controls before it changes with the redraw.
+   */
   updateKeepingFocus() {
     var _a2, _b2, _c;
     const root = this.containerEl;
@@ -65797,10 +65816,28 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
       var _a3;
       return Array.from((_a3 = root == null ? void 0 : root.querySelectorAll("input, select, textarea, button, [tabindex]")) != null ? _a3 : []);
     };
+    const identity = (control) => {
+      var _a3, _b3, _c2, _d;
+      const item = control.closest(".setting-item");
+      const items = Array.from((_a3 = root == null ? void 0 : root.querySelectorAll(".setting-item")) != null ? _a3 : []);
+      const name = (_d = (_c2 = (_b3 = item == null ? void 0 : item.querySelector(".setting-item-name")) == null ? void 0 : _b3.textContent) == null ? void 0 : _c2.trim()) != null ? _d : "";
+      const sameName = items.filter((other) => {
+        var _a4, _b4;
+        return ((_b4 = (_a4 = other.querySelector(".setting-item-name")) == null ? void 0 : _a4.textContent) == null ? void 0 : _b4.trim()) === name;
+      });
+      const label = (element) => {
+        var _a4, _b4;
+        return (_b4 = element.getAttribute("aria-label")) != null ? _b4 : ((_a4 = element.textContent) == null ? void 0 : _a4.trim()) || element.tagName.toLowerCase();
+      };
+      const own2 = controls().filter(
+        (other) => other.closest(".setting-item") === item && label(other) === label(control)
+      );
+      return JSON.stringify([name, sameName.indexOf(item), label(control), own2.indexOf(control)]);
+    };
     const active = (_b2 = (_a2 = root == null ? void 0 : root.doc) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
-    const index = active && (root == null ? void 0 : root.contains(active)) ? controls().indexOf(active) : -1;
+    const wanted = active && (root == null ? void 0 : root.contains(active)) ? identity(active) : null;
     this.update();
-    if (index >= 0) (_c = controls()[index]) == null ? void 0 : _c.focus();
+    if (wanted !== null) (_c = controls().find((control) => identity(control) === wanted)) == null ? void 0 : _c.focus();
   }
 };
 

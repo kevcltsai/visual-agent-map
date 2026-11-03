@@ -459,7 +459,7 @@ const topicBaseline = (h, { full = true } = {}) => {
   const selected = full ? h.view.map.nodes.map(n => ({ id: n.id, ...state(n.id), path: n.path })) : [];
   return buildMapChatContext({ mapTitle: 'm', outline, selected, references: [], snippets: [], files: [], history: [] }).topicHashes;
 };
-const NOT_UNDOABLE = 'These changes cannot be undone; the undo history was cleared.';
+const NOT_UNDOABLE = 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.';
 // Resolves with the action lines; the closing "cannot be undone" line is left out and reported as `.notice` (true when it was there).
 const apply = async (h, actions, hashes = {}, alive, topicHashes) => {
   const all = await withTimeout(h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: hashes, topicHashes: topicHashes ?? topicBaseline(h) }, alive));
@@ -467,7 +467,7 @@ const apply = async (h, actions, hashes = {}, alive, topicHashes) => {
   return lines;
 };
 
-integrationTest('map chat: one reply applies add_child, rename_topic, move_topic and edit_md_file in order, each in its own mutate, and clears the undo history', async () => {
+integrationTest('map chat: one reply applies add_child, rename_topic, move_topic and edit_md_file in order, each in its own mutate, and leaves one undo step on top of the earlier ones', async () => {
   const h = await harness(); await h.view.hydrate();
   h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
   h.control.mutates = 0;
@@ -483,7 +483,8 @@ integrationTest('map chat: one reply applies add_child, rename_topic, move_topic
   assert.ok(dreams, 'the new subtopic is under Mind'); assert.equal((await h.repo.readNote(dreams.path)).title, 'Dreams'); assert.equal((await h.repo.readNote(dreams.path)).summary, 'What we dream');
   assert.equal((await h.note('a')).title, 'Body clock'); assert.equal(nodes.find(n => n.id === h.ids.c).parentId, h.ids.b);
   assert.equal(h.contents.get('Notes/Research.md'), '# Research\n\nSleep needs total darkness.\nSleep needs quiet.\n');
-  assert.equal(h.view.history.undoEntry, undefined, 'a chat write leaves nothing to undo'); assert.equal(lines.notice, true, 'the reply says so');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply', 'the reply is one undo step, named as the chat\'s'); assert.equal(lines.notice, false, 'no AI work: no closing note');
+  h.view.history.undo(); assert.equal(h.view.history.undoEntry.label, 'earlier', 'the earlier entry is kept under it'); h.view.history.redo();
   eq(lines.map(l => l.text.split(':')[0]), ['Done', 'Done', 'Done', 'Done']);
 });
 
@@ -507,22 +508,22 @@ integrationTest('map chat: ticket 09 - a tree reply where one subtopic has no su
 
 // F1 (reviewer R1): an undo entry holds the map as it was before the chat wrote, so undoing it after the chat renamed files and moved cards
 // puts the map out of step with the notes (an orphan file, a parent that no longer exists, "File not found"). The history is cleared instead.
-integrationTest('map chat: F1 - a card drag, then a chat write, then Undo: nothing is left to undo, and the map and the files stay in step', async () => {
+integrationTest('map chat: F1 / chat 04 - an earlier entry, then a chat write, then Undo: only the reply is taken back, the earlier entry is not run, and the map and the files stay in step', async () => {
   const h = await harness(); await h.view.hydrate();
-  const dragged = { snapshot: true, undo: async () => { throw new Error('File not found (a stale snapshot was restored)'); }, redo: async () => {}, label: 'drag card' };
+  let earlierRan = 0;
+  const dragged = { undo: async () => { earlierRan++; }, redo: async () => {}, label: 'drag card' };
   h.view.history.push(dragged);
-  assert.equal(h.view.history.undoEntry, dragged);
   const lines = await apply(h, [{ kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: '' }, { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }]);
   eq(lines.map(l => l.status), ['done', 'done']);
-  assert.equal(h.view.history.undoEntry, undefined, 'the earlier snapshot entry is gone');
-  assert.equal(h.view.history.undo(), undefined, 'Undo has nothing to run');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.equal(earlierRan, 0, 'the reply\'s undo runs only its own writes'); assert.equal(h.view.history.undoEntry, dragged, 'the earlier entry is next');
   const nodes = await h.saved();
   for (const n of nodes) assert.ok(h.files.has(n.path), `${n.path} exists`);
-  assert.ok(nodes.some(n => n.parentId === h.ids.b && n.id !== h.ids.c), 'the new card is on the saved map');
-  assert.equal(nodes.find(n => n.id === h.ids.c).parentId, h.ids.b);
+  assert.equal(nodes.length, 4, 'the new card is off the map'); assert.equal(nodes.find(n => n.id === h.ids.c).parentId, h.ids.a, 'the moved card is back');
 });
 
-integrationTest('map chat: F1 - other views of the same map lose their undo history too; a view of another map keeps it; skipped writes clear nothing', async () => {
+integrationTest('map chat: F1 / chat 04 - other views of the same map lose their undo history; this view keeps its own and gets the reply on top; a view of another map keeps it; skipped writes change nothing', async () => {
   const h = await harness(); await h.view.hydrate();
   const other = { path: MAP, history: new (load('map-model.ts').History)() }; const elsewhere = { path: 'Other/Map.md', history: new (load('map-model.ts').History)() };
   const entry = { undo: async () => {}, redo: async () => {}, label: 'x' };
@@ -532,10 +533,11 @@ integrationTest('map chat: F1 - other views of the same map lose their undo hist
   eq(none.map(l => l.status), ['skipped']); assert.equal(none.notice, false);
   assert.equal(h.view.history.undoEntry, entry, 'nothing was written, so nothing was cleared');
   await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }]);
-  assert.equal(h.view.history.undoEntry, undefined); assert.equal(other.history.undoEntry, undefined); assert.equal(elsewhere.history.undoEntry, entry);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply'); assert.equal(other.history.undoEntry, undefined); assert.equal(elsewhere.history.undoEntry, entry);
+  h.view.history.undo(); assert.equal(h.view.history.undoEntry, entry, 'this view\'s own earlier entry stays');
 });
 
-integrationTest('map chat: F1 (reviewer probe) - a card moved by the user, then a chat reply that adds, moves and deletes cards: Undo cannot restore a map that points at missing files', async () => {
+integrationTest('map chat: F1 (reviewer probe) / chat 04 - a card moved by the user, then a chat reply that adds, moves and deletes cards: Undo takes the reply back as one step, then the drag, and every card points at an existing file; Redo puts the reply back', async () => {
   const h = await harness(); await h.view.hydrate();
   await h.plugin.mutate(() => h.view.mapChange(map => { map.nodes.find(n => n.id === h.ids.b).x += 50; }));
   assert.ok(h.view.history.undoEntry, 'the user\'s drag made a snapshot entry');
@@ -544,10 +546,19 @@ integrationTest('map chat: F1 (reviewer probe) - a card moved by the user, then 
     { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b },
     { kind: 'delete_topic', nodeId: h.ids.a, branch: false }
   ]);
-  assert.equal(h.view.history.undoEntry, undefined, 'there is no entry left to restore the pre-chat snapshot');
   const after = await h.saved();
   for (const n of after) assert.ok(h.app.vault.getAbstractFileByPath(n.path), `${n.path} exists`);
-  assert.ok(!after.some(n => n.id === h.ids.a), 'the deleted card stays off the map');
+  assert.ok(!after.some(n => n.id === h.ids.a), 'the deleted card is off the map');
+  const exists = nodes => { for (const n of nodes) assert.ok(h.app.vault.getAbstractFileByPath(n.path), `${n.path} exists`); };
+  await h.view.travel(false);
+  const undone = await h.saved(); exists(undone);
+  assert.equal(undone.length, 4); assert.ok(undone.some(n => n.id === h.ids.a), 'the deleted card is back');
+  assert.equal(undone.find(n => n.id === h.ids.c).parentId, h.ids.a, 'the moved card is back under its parent');
+  assert.equal(undone.find(n => n.id === h.ids.b).x, after.find(n => n.id === h.ids.b).x, 'the user\'s drag is still there');
+  await h.view.travel(false); exists(await h.saved());
+  await h.view.travel(true); await h.view.travel(true);
+  const redone = await h.saved(); exists(redone);
+  assert.ok(!redone.some(n => n.id === h.ids.a)); assert.equal(redone.find(n => n.id === h.ids.c).parentId, h.ids.b); assert.equal(redone.length, 4);
 });
 
 integrationTest('map chat: F2 - edit_topic_note needs the card\'s Detail baseline: a card seen only in the outline is never overwritten', async () => {
@@ -868,7 +879,7 @@ integrationTest('map chat: sending asks for usage consent first, builds the cont
   assert.equal(context.activeFile.path, 'Notes/Other.md'); assert.equal(context.outline.length, 4);
   eq(seen, ['Thinking', 'Thinking harder'], 'the answer streams into the last message');
   const turn = chat.transcript(); assert.equal(turn.at(-1).text, 'Renamed it.');
-  eq(turn.at(-1).lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(turn.at(-1).lines)); assert.equal(turn.at(-1).lines.at(-1).text, NOT_UNDOABLE);
+  eq(turn.at(-1).lines.map(l => l.status), ['done', 'done'], JSON.stringify(turn.at(-1).lines)); assert.equal(turn.at(-1).lines.some(l => l.text === NOT_UNDOABLE), false, 'no AI work in the reply: no closing note');
   assert.equal((await h.note('b')).title, 'Mind work'); assert.match(h.contents.get('Notes/Research.md'), /needs calm/);
   assert.equal(chat.isBusy, false); assert.equal(h.plugin.activeTasks.size, 0, 'the task key is released');
   assert.equal(chat.draft, '');
@@ -2470,6 +2481,7 @@ integrationTest('hypothesis-evidence: delete_topic from the map chat removes the
       { kind: 'supports', from: h.ids.c, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.a, to: h.ids.c }, { kind: 'supports', from: h.ids.a, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.b, to: h.ids.a }, keep
     ];
     await h.repo.saveMap(MAP, h.view.map); h.view.map = await h.repo.readMap(MAP);
+    const stored = plain(h.view.map.topicRelations);
     const lines = await apply(h, [{ kind: 'delete_topic', nodeId: h.ids.a, branch }]);
     eq(lines.map(l => l.status), ['done'], `branch ${branch}: ${JSON.stringify(lines)}`);
     const saved = await h.repo.readMap(MAP);
@@ -2477,7 +2489,9 @@ integrationTest('hypothesis-evidence: delete_topic from the map chat removes the
     assert.equal(saved.nodes.some(n => n.id === h.ids.c), !branch, `branch ${branch}: the subtopic goes only with the branch`);
     const expected = branch ? [keep] : [{ kind: 'supports', from: h.ids.c, to: h.ids.b }, keep];
     eq(saved.topicRelations, expected, `branch ${branch}: links touching a removed card are gone, the others stay`);
-    assert.equal(h.view.history.undoEntry, undefined, `branch ${branch}: a chat write leaves no undo entry (nothing to undo)`);
+    assert.equal(h.view.history.undoEntry.label, 'AI chat reply', `branch ${branch}: the reply is one undo step (chat 04)`);
+    await h.view.travel(false);
+    eq((await h.repo.readMap(MAP)).topicRelations, stored, `branch ${branch}: undo brings the removed links back with the cards`);
   }
 });
 integrationTest('B1 plan: exactly 15 actions are applied at once, with no plan card', async () => {
@@ -2486,16 +2500,15 @@ integrationTest('B1 plan: exactly 15 actions are applied at once, with no plan c
   h.type('add 15'); await h.view.sendMapChat();
   assert.equal(planCard(h).length, 0); assert.equal(chat.pendingPlan(), null); assert.equal(children(h, h.ids.root).length, 17);
 });
-integrationTest('B1 plan: delete with branch:true needs a plan when the card has subtopics, and not when it is a leaf', async () => {
-  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const before = vaultState(h);
+integrationTest('chat 04: delete with branch:true is applied at once (no plan): the reply is one undo step, and undo brings the branch back', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'removing', actions: [{ kind: 'delete_topic', nodeId: h.ids.a, branch: true }], rejected: [] });
   h.type('remove Body'); await h.view.sendMapChat();
-  assert.equal(planCard(h).length, 1); assert.match(visibleText(planCard(h)[0]), /whole branch/); assert.equal(vaultState(h), before);
-  planButton(h, 'cancel').click();
-  h.control.reply = async () => ({ reply: 'removing', actions: [{ kind: 'delete_topic', nodeId: h.ids.c, branch: true }], rejected: [] });
-  h.type('remove REM'); await h.view.sendMapChat();
-  assert.equal(chat.pendingPlan(), null, 'a leaf has no branch to take with it');
-  assert.equal(h.view.map.nodes.some(n => n.id === h.ids.c), false, 'REM was moved out at once');
+  assert.equal(chat.pendingPlan(), null, 'no plan for a branch any more');
+  assert.equal(h.view.map.nodes.some(n => n.id === h.ids.a || n.id === h.ids.c), false, 'the branch was moved out at once');
+  await h.view.travel(false);
+  const back = await h.saved(); assert.equal(back.some(n => n.id === h.ids.a) && back.some(n => n.id === h.ids.c), true, 'undo brings the branch back');
+  for (const n of back) assert.ok(h.app.vault.getAbstractFileByPath(n.path), `${n.path} exists`);
 });
 integrationTest('B1 plan: a plan that waited while the card changed skips that action as stale, like any other', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
@@ -2570,7 +2583,7 @@ integrationTest('B1 view operations: collapse, expand, auto layout and focus eac
   eq(lines.map(l => l.status), ['done', 'done', 'done', 'done', 'skipped'], JSON.stringify(lines));
   assert.match(lines[0].text, /Collapse “Body”/); assert.match(lines[1].text, /Arrange the whole map/); assert.match(lines[2].text, /Move the view to “Mind”/); assert.match(lines[3].text, /Expand “Body”/); assert.match(lines[4].text, /no subtopics/);
   eq(h.focused, [h.ids.b]);
-  assert.equal(h.control.nested, 0); assert.equal(h.view.history.undoEntry, undefined, 'the undo history was cleared');
+  assert.equal(h.control.nested, 0); assert.equal(h.view.history.undoEntry.label, 'AI chat reply', 'the reply is one undo step (chat 04)');
   await apply(h, [{ kind: 'collapse_topic', nodeId: h.ids.a }]);
   assert.equal((await h.saved()).find(n => n.id === h.ids.a).collapsed, true, 'saved'); assert.equal(chat.isBusy, false);
   await apply(h, [{ kind: 'expand_topic', nodeId: h.ids.a }]); assert.equal(!!(await h.saved()).find(n => n.id === h.ids.a).collapsed, false);
@@ -3001,17 +3014,17 @@ integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the ca
 
 integrationTest('B1 ui: result lines name their status in words; five or fewer are all shown; the closing "cannot be undone" line is always last', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
-  chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B (the topic is no longer on the map)' }, { status: 'failed', text: 'Failed: C (boom)' }, { status: 'done', text: 'These changes cannot be undone; the undo history was cleared.' }]);
-  const lines = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')); eq(lines.map(l => l.text.split(':')[0].split(' ')[0]), ['Done:', 'Skipped:', 'Failed:', 'These'].map(s => s.replace(':', ''))); assert.ok(hasClass(lines.at(-1), 'is-note'));
+  chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B (the topic is no longer on the map)' }, { status: 'failed', text: 'Failed: C (boom)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.' }]);
+  const lines = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')); eq(lines.map(l => l.text.split(':')[0].split(' ')[0]), ['Done:', 'Skipped:', 'Failed:', 'Undo'].map(s => s.replace(':', ''))); assert.ok(hasClass(lines.at(-1), 'is-note'));
   assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')).length, 0);
 });
 
 integrationTest('B1 ui: more than five result lines fold into a count; the toggle shows them all and back; the closing line stays last; focus stays on the toggle', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
-  const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'These changes cannot be undone; the undo history was cleared.' }];
+  const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.' }];
   chat.finish('r', lines);
   const text = () => visibleText(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines'))); const shown = () => findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line'));
-  assert.match(text(), /18 done, 2 skipped, 1 failed/); eq(shown().map(l => l.text), ['These changes cannot be undone; the undo history was cleared.'], 'folded: only the closing line');
+  assert.match(text(), /18 done, 2 skipped, 1 failed/); eq(shown().map(l => l.text), ['Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.'], 'folded: only the closing line');
   let toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.text, 'Show all 21 results'); assert.equal(toggle.attrs['aria-expanded'], 'false'); toggle.click();
   assert.equal(shown().length, 22); assert.ok(hasClass(shown().at(-1), 'is-note'), 'still last'); toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.attrs['aria-expanded'], 'true'); assert.equal(h.page.doc.activeElement, toggle);
   toggle.click(); assert.equal(shown().length, 1);
@@ -3136,7 +3149,7 @@ integrationTest('B1 fix 3: while a plan is applied the window says so and offers
   assert.equal(chat.stopEl.hidden, false, 'Stop is offered'); assert.equal(chat.sendEl.hidden, true); assert.equal(chat.statusEl.text, 'Applying the plan…'); assert.ok(chat.el.hasClass('is-busy'));
   const requests = h.control.requests.length; h.type('another'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, requests, 'no second request while the plan is applied');
   chat.stopEl.click(); gate.resolve(); await until(() => !h.view.chatApplying);
-  const lines = chat.transcript().at(-1).lines; assert.equal(lines.filter(l => l.status === 'done').length >= 3, true, JSON.stringify(lines.slice(0, 4)));
+  const lines = chat.transcript().at(-1).lines; assert.equal(lines.filter(l => l.status === 'done').length, 2, JSON.stringify(lines.slice(0, 4)));
   assert.ok(lines.some(l => l.status === 'skipped' && /you stopped it/.test(l.text)), JSON.stringify(lines.slice(-3)));
   assert.equal(chat.stopEl.hidden, true); assert.equal(chat.sendEl.hidden, false); assert.equal(chat.statusEl.text, '');
   assert.equal(h.view.map.nodes.length, 4 + lines.filter(l => l.status === 'done' && /Add subtopic/.test(l.text)).length, 'what was done is kept');
@@ -3300,12 +3313,12 @@ integrationTest('UX B1: while the usage notice is open the empty canvas waits fo
   }
 });
 
-integrationTest('B1 fix 16: the plan card says before Apply that it cannot be undone, marks the group that removes cards in words, and its title follows what became of it', async () => {
+integrationTest('B1 fix 16 / chat 04: a plan card without AI work has no undo warning; it marks the group that removes cards in words, and its title follows what became of it', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: [...planActions(h, 15), { kind: 'delete_topic', nodeId: h.ids.a, branch: true }], rejected: [] });
   h.type('many'); await h.view.sendMapChat(); const title = () => find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-title')).text;
   assert.equal(title(), 'Plan to review'); const buttons = find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-buttons'));
-  assert.ok(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning') && i.text === 'Cannot be undone once applied.').length === 1, 'next to the buttons, before they are pressed');
+  assert.equal(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning')).length, 0, 'everything in it is undone by Undo: no warning');
   const danger = findAll(planCard(h)[0], i => i.tag === 'details' && hasClass(i, 'is-danger')); assert.equal(danger.length, 1, 'only the delete group');
   assert.match(visibleText(danger[0]), /Delete \(1\)/); assert.equal(findAll(danger[0], i => hasClass(i, 'vam-map-chat-plan-mark'))[0].text, 'Removes');
   assert.equal(findAll(planCard(h)[0], i => i.tag === 'details' && !hasClass(i, 'is-danger')).length >= 1, true);
@@ -5024,4 +5037,94 @@ integrationTest('chat 03: the two other choices send a new chat message that say
   assert.equal(sent[0].origin.text, 'Split “Body”, “Mind” into topics that each hold one single concept, and give each of them the type Atomic knowledge.');
   assert.equal(sent[1].origin.text, 'Change the type of “Body”, “Mind” to Atomic knowledge, and rewrite each note to fit that type.');
   assert.equal(sent[0].retry, true, 'sent as a fresh turn, not a detail re-send');
+});
+
+integrationTest('chat 04: a plan card that starts AI work says, next to the buttons, that undo does not take the AI work back', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.view.startMultiResearch = async () => {};
+  h.control.reply = async () => ({ reply: 'plan', actions: [...planActions(h, 15), { kind: 'run_map_action', action: 'research_standard', nodeIds: [h.ids.a], title: '', goal: '', direction: '', mode: '', images: false }], rejected: [] });
+  h.type('many'); await h.view.sendMapChat();
+  const buttons = find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-buttons'));
+  eq(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning')).map(i => i.text), ['Undo takes back the changes, but not the AI work this plan starts.']);
+});
+
+// ---- chat 04: one reply is one undo step -------------------------------------------------------------------------------
+const chat04Reply = h => [
+  { kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 'What we dream' },
+  { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' },
+  { kind: 'update_summary', nodeId: h.ids.c, summary: 'A new summary' },
+  { kind: 'set_topic_kind', nodeIds: [h.ids.root], topicKind: 'hypothesis', strength: 'strong' },
+  { kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b },
+  { kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs total darkness' },
+  { kind: 'create_md_file', path: 'Notes/New/Plan.md', content: '# Plan\n' }
+];
+const chat04State = async h => JSON.stringify({
+  nodes: (await h.saved()).map(n => [n.id, n.parentId]).sort(),
+  titles: await Promise.all(h.view.map.nodes.map(async n => (await h.repo.readNote(n.path)).title)),
+  c: (await h.note('c')).summary, kind: (await h.note('root')).topicKind ?? 'topic',
+  research: h.contents.get('Notes/Research.md'), plan: h.app.vault.getAbstractFileByPath('Notes/New/Plan.md') ? h.contents.get('Notes/New/Plan.md') : null
+});
+integrationTest('chat 04: Undo takes a whole reply back (map, card notes, the edited and the created Markdown file) in one step, and Redo puts it all back', async () => {
+  const h = await harness(); await h.view.hydrate();
+  // The fixture's trash keeps the file; here it takes it away, like Obsidian's.
+  const trashed = []; h.app.fileManager.trashFile = async file => { trashed.push(file.path); h.files.delete(file.path); h.contents.delete(file.path); };
+  const before = await chat04State(h);
+  const lines = await apply(h, chat04Reply(h), h.hashes('Notes/Research.md'));
+  eq(lines.map(l => l.status), Array(7).fill('done'), JSON.stringify(lines));
+  const after = await chat04State(h); assert.notEqual(after, before);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.equal(await chat04State(h), before, 'everything the reply did is taken back'); eq(trashed, ['Notes/New/Plan.md'], 'the created file goes to the trash');
+  assert.equal(h.view.history.canUndo, false, 'one step: nothing else to undo'); assert.equal(h.view.history.redoEntry.label, 'AI chat reply');
+  for (const n of await h.saved()) assert.ok(h.app.vault.getAbstractFileByPath(n.path), `${n.path} exists`);
+  await h.view.travel(true);
+  assert.equal(await chat04State(h), after, 'redo puts the reply back');
+  await h.view.travel(false); assert.equal(await chat04State(h), before, 'and it can be undone again');
+});
+for (const [what, change] of [
+  ['a card note the reply wrote', async h => h.repo.updateNote(h.node('a').path, { title: 'Edited by hand' })],
+  ['the edited Markdown file', async h => h.app.vault.process(h.app.vault.getAbstractFileByPath('Notes/Research.md'), () => 'changed by hand\n')],
+  ['the created Markdown file', async h => h.app.vault.process(h.app.vault.getAbstractFileByPath('Notes/New/Plan.md'), () => '# Plan\nmore\n')],
+  ['the map structure', async h => h.plugin.mutate(() => h.view.mapChange(map => { map.nodes.find(n => n.id === h.ids.b).collapsed = true; }))]
+])
+  integrationTest(`chat 04: when ${what} changed after the reply, Undo refuses the whole step and touches nothing`, async () => {
+    const h = await harness(); await h.view.hydrate();
+    await apply(h, chat04Reply(h), h.hashes('Notes/Research.md'));
+    // A map change is its own newer step: undo it first would be the user's own; here the reply's step must be on top.
+    const entry = h.view.history.undoEntry;
+    await change(h); await h.view.hydrate();
+    while (h.view.history.undoEntry !== entry) h.view.history.past.pop();
+    const changed = await chat04State(h); const files = JSON.stringify([...h.contents.entries()].sort());
+    await assert.rejects(() => h.view.travel(false), /Files have changed since; this cannot be undone\./);
+    assert.equal(await chat04State(h), changed, 'nothing was undone, not even part of it');
+    assert.equal(JSON.stringify([...h.contents.entries()].sort()), files);
+    assert.equal(h.view.history.undoEntry, entry, 'the step stays where it was');
+  });
+integrationTest('chat 04: a reply that starts AI work keeps its writes undoable, says only the AI work is not undone, and its undo leaves the AI work alone', async () => {
+  const h = await harness(); await h.view.hydrate(); const started = [];
+  h.view.startMultiResearch = async request => { started.push(request); };
+  const all = await withTimeout(h.view.applyMapChatActions({ actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }, researchAct({ nodeIds: [h.ids.b] })], rejected: [] }, { mdHashes: {}, topicHashes: topicBaseline(h) }));
+  assert.equal(all.at(-1).text, NOT_UNDOABLE, 'the closing note is there only because of the research');
+  assert.equal(started.length, 1);
+  await h.view.travel(false);
+  assert.equal((await h.note('a')).title, 'Body', 'the rename is undone'); assert.equal(started.length, 1, 'the research is not run or cancelled again');
+});
+integrationTest('chat 04: a reply of more writes than the history keeps (80) is still one step, and undo takes all of them back', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  await apply(h, Array.from({ length: 90 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })));
+  assert.equal(h.view.map.nodes.length, 94);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.equal((await h.saved()).length, 4, 'every card of the reply is taken back'); assert.equal(h.view.history.undoEntry.label, 'earlier');
+});
+integrationTest('chat 04: after create_map the reply\'s step belongs to the new map: undo takes back the cards built there, the new map and the old one stay', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const oldPath = h.view.path; const oldNodes = JSON.stringify(await h.saved());
+  h.control.reply = async () => ({ reply: 'I will create a map.', actions: [{ kind: 'create_map', title: 'Quantum computing' }, addRoot('r', 'Quantum'), addRoot('q', 'Qubits', 'new:r')], rejected: [] });
+  h.type('new map on quantum'); await h.view.sendMapChat();
+  planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null && chat.transcript().at(-1).lines.length > 0);
+  const newPath = h.view.path; assert.notEqual(newPath, oldPath); assert.equal(h.view.map.nodes.length, 2);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.equal((await h.repo.readMap(newPath)).nodes.length, 0, 'the cards built in the new map are taken back'); assert.equal(h.view.path, newPath, 'the new map stays open');
+  assert.equal(JSON.stringify((await h.repo.readMap(oldPath)).nodes), oldNodes, 'the old map is unchanged');
 });

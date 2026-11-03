@@ -2775,6 +2775,16 @@ integrationTest('45 ui: the button opens the name box, makes no request, and can
   assert.deepEqual(created, ['My map']); assert.equal(h.control.requests.length, requests, 'still no AI request');
 });
 
+integrationTest('45 ui: the empty map the button makes opens onto the empty canvas, not another opening screen', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  h.plugin.repo.createMap = async () => 'Maps/blank.vam';
+  h.view.openMapInMutation = async path => { h.view.path = path; h.repaint(); };
+  assert.equal(chat.isHero, true);
+  chat.emptyMapEl.click(); await tick(); h.control.modals.at(-1).submit('Blank'); await tick(); await tick();
+  assert.equal(h.view.path, 'Maps/blank.vam'); assert.equal(chat.isHero, false, 'no opening screen on the new empty map');
+  assert.equal(find(h.rootEl, i => hasClass(i, 'vam-chat-hero-slot')), undefined);
+});
+
 integrationTest('45 ui: after the first message the button is hidden, and a map with cards never shows it', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
   assert.equal(chat.emptyMapEl.hidden, false);

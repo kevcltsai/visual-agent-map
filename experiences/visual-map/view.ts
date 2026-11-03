@@ -14792,9 +14792,9 @@ export class VisualAgentMapView extends ItemView {
     workspace.toggleClass("has-map-chat-open", this.chat.isOpen);
     this.focusChatHeroOnce();
   }
-  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one). */
+  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) the user did not ask to start blank. */
   private chatHero(): boolean {
-    if (!this.chat || this.chat.hasMessages || !this.map) return false;
+    if (!this.chat || this.chat.hasMessages || !this.map || this.blankMapPaths.has(this.path)) return false;
     return !this.map.aim && this.map.nodes.length === 0;
   }
   /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
@@ -14896,10 +14896,16 @@ export class VisualAgentMapView extends ItemView {
     if (!this.chat) return;
     this.chat.toggleFromCommand();
   }
+  /** Maps made with "Create an empty mind map": they open onto the empty canvas, not the opening screen again. */
+  private blankMapPaths = new Set<string>();
   /** Asks for a name, then makes and opens an empty map. No AI. */
   private promptEmptyMap(): void {
     new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
-      this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
+      this.enqueue(async () => {
+        const path = await this.plugin.repo.createMap(title);
+        this.blankMapPaths.add(path);
+        await this.openMapInMutation(path);
+      })
     ).open();
   }
   private chatHost(): MapChatHost {

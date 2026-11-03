@@ -458,3 +458,23 @@ test('card-height: the scene marks clipped:true only for a fixed-height card the
   assert.equal(cards.root.clipped, true, 'fixed height and clipped');
   assert.ok(!('clipped' in cards.child));
 });
+
+test('Bug bash E #22 (follow-up): a not-yet-researched (idea) card keeps its darker dashed saved border in the export, the same as on screen, and a selected idea card too', async () => {
+  const h = await harness();
+  const IDEA = 'rgb(63, 63, 63)', PLAIN = 'rgb(115, 115, 115)', SELECTED = 'rgb(152, 115, 247)';
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  // the screen rules this follows: the idea status is a saved, designed look (dashed, the hover token), not a transient state
+  assert.match(css, /^\.vam-node:not\(\[data-aim-kind\]\)\[data-status="idea"\] \{ border-style: dashed; border-color: var\(--background-modifier-border-hover\);/m);
+  assert.match(css, /^:where\(\[data-node-id\]\)\.vam-node:where\(:not\(\[data-aim-kind\]\)\) \{ border-color: color-mix\(in srgb, var\(--text-muted\) 45%, var\(--background-modifier-border-hover\)\); \}/m);
+  const follow = el => Object.defineProperty(el, 'computed', { configurable: true, get: () => style({ backgroundColor: 'rgb(255, 255, 255)', borderTopColor: el.hasClass('is-selected') ? SELECTED : el.dataset?.status === 'idea' ? IDEA : PLAIN }) });
+  const card = h.view.cardEls.get(h.root.id);
+  card.dataset = { ...(card.dataset || {}), status: 'idea' };
+  follow(card);
+  const plain = h.view.cardEls.get(h.child.id);
+  follow(plain);
+  card.addClass('is-selected');
+  const got = await h.view.collectExportScene(() => true);
+  const strokes = got.scene.cards.map(c => c.stroke).sort();
+  assert.equal(strokes.join('|'), [IDEA, PLAIN].sort().join('|'), 'the idea card exports its own saved stroke, the plain card the ordinary one');
+  assert.equal(card.hasClass('is-selected'), true);
+});

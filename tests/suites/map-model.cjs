@@ -389,10 +389,6 @@ test('hypothesis-evidence: parse removes the key when nothing valid remains and 
   const clean = parseWith(relMap([ev('a', 'h')]));
   assert.deepEqual(clean.logs, []);
 });
-test('hypothesis-evidence: parse keeps a hand-written prerequisite cycle (A->B->A)', () => {
-  const { parsed, logs } = parseWith(relMap([pre('a', 'b'), pre('b', 'c'), pre('c', 'a')]));
-  assert.equal(parsed.topicRelations.length, 3, 'a cycle needs three topics now: one pair holds at most one relation (decision #37)'); assert.deepEqual(logs, []);
-});
 test('hypothesis-evidence: a map without relations serializes byte for byte as before, and the key never appears', () => {
   const source = relMap(undefined);
   const text = core.serializeMap(source);
@@ -445,11 +441,6 @@ test('hypothesis-evidence: retargetTopicRelations merges ends, keeps one relatio
   assert.deepEqual(plain(cyc.topicRelations), [pre('a', 'c'), pre('c', 'h')], 'h->a would close a cycle through c and h');
   assert.deepEqual(plain(merged), { droppedCycles: 1, droppedSamePair: 0 });
   const none = relMap(undefined); assert.deepEqual(plain(core.retargetTopicRelations(none, ['a'], 'b')), { droppedCycles: 0, droppedSamePair: 0 }); assert.equal('topicRelations' in none, false);
-});
-test('hypothesis-evidence: retargetTopicRelations leaves a pre-existing cycle alone', () => {
-  const m = relMap([pre('a', 'b'), pre('b', 'h2'), pre('h2', 'a'), ev('c', 'h')]);
-  assert.deepEqual(plain(core.retargetTopicRelations(m, ['c'], 'c2')), { droppedCycles: 0, droppedSamePair: 0 });
-  assert.deepEqual(plain(m.topicRelations), [pre('a', 'b'), pre('b', 'h2'), pre('h2', 'a'), ev('c2', 'h')]);
 });
 // ---- hypothesis-evidence (P7): six relation kinds, description, relationAllowed ----
 const rel = (kind, from, to, description) => (description === undefined ? { kind, from, to } : { kind, from, to, description });
@@ -585,10 +576,13 @@ test('hypothesis-evidence: retargetTopicRelations drops a newly closed derivatio
   assert.deepEqual(plain(m.topicRelations), [rel('derives_from', 'a', 'c'), rel('derives_from', 'c', 'x'), rel('prerequisite', 'a', 'h'), rel('prerequisite', 'h', 'y'), rel('supports', 'h2', 'a', 'kept')]);
   assert.deepEqual(plain(result), { droppedCycles: 2, droppedSamePair: 0 });
 });
-test('hypothesis-evidence: retargetTopicRelations leaves an existing derivation cycle alone and keeps descriptions', () => {
-  const m = relMap([rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'h'), rel('derives_from', 'h', 'a'), rel('verifies', 'c', 'h2', 'note')]);
-  assert.deepEqual(plain(core.retargetTopicRelations(m, ['c'], 'c2')), { droppedCycles: 0, droppedSamePair: 0 });
-  assert.deepEqual(plain(m.topicRelations), [rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'h'), rel('derives_from', 'h', 'a'), rel('verifies', 'c2', 'h2', 'note')]);
+test('hypothesis-evidence: retargetTopicRelations leaves an existing prerequisite or derivation cycle alone and keeps descriptions', () => {
+  for (const kind of ['prerequisite', 'derives_from']) {
+    const cycle = [rel(kind, 'a', 'b'), rel(kind, 'b', 'h'), rel(kind, 'h', 'a')];
+    const m = relMap([...cycle, rel('supports', 'c', 'h'), rel('verifies', 'c', 'h2', 'note')]);
+    assert.deepEqual(plain(core.retargetTopicRelations(m, ['c'], 'c2')), { droppedCycles: 0, droppedSamePair: 0 }, kind);
+    assert.deepEqual(plain(m.topicRelations), [...cycle, rel('supports', 'c2', 'h'), rel('verifies', 'c2', 'h2', 'note')], kind);
+  }
 });
 test('hypothesis-evidence: retargetTopicRelations keeps the first relation when merged topics land on one pair, of any kind or direction, and reports the count (decision #37)', () => {
   const m = relMap([rel('related', 'a', 'b', 'first'), rel('related', 'b', 'c'), rel('related', 'h', 'c')]);

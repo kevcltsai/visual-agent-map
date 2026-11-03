@@ -3440,15 +3440,20 @@ integrationTest('topic-markers: refreshCard keeps the marker row where it was (a
   f.view.refreshCard(node, false);
   assert.ok(order().indexOf('vam-card-markers') > order().indexOf('vam-kind-tag'), 'a row added later goes after the type tag');
 });
-integrationTest('topic-markers: an AIM map and select mode have no marker menu and refuse a toggle', async () => {
-  for (const options of [{ aim: true }, { integration: true }]) {
+integrationTest('topic-markers, topic-color and topic-style: an AIM map and select mode have no marker, colour or style menu and refuse a change', async () => {
+  const sections = [
+    ['markers', (view, panel, n) => view.renderMarkerSection(panel, n), (view, n) => view.changeTopicMarker(n, 'done')],
+    ['color', (view, panel, n) => view.renderColorSection(panel, n), (view, n) => view.changeTopicColor(n, 'red', true)],
+    ['style', (view, panel, n) => view.renderStyleSection(panel, n), (view, n) => view.changeTopicStyle(n, ['bold'], true)],
+  ];
+  for (const [name, render, change] of sections) for (const options of [{ aim: true }, { integration: true }]) {
     const { view, writes } = heFixture(options);
     if (options.integration) view.selection.toggleMultiSelect();
-    const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[2]);
-    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
+    const panel = dom.element('panel'); render(view, panel, view.map.nodes[2]);
+    assert.deepEqual(dom.buttons(panel), [], `${name} panel ${JSON.stringify(options)}`);
     view.beginMapTransaction = () => assert.fail('no transaction');
-    await view.changeTopicMarker(view.map.nodes[2], 'done');
-    assert.deepEqual(writes, []);
+    await change(view, view.map.nodes[2]);
+    assert.deepEqual(writes, [], `${name} ${JSON.stringify(options)}`);
   }
 });
 integrationTest('topic-markers: the panel has one aria-pressed toggle per marker and priority is one of three', async () => {
@@ -3559,17 +3564,6 @@ integrationTest('topic-color: the colour name sits with the marker and model par
   note.color = 'purple'; f.view.refreshCard(node, false); check({ markers: 1, color: 1, model: 0, attr: 'purple' }, 'colour added later');
   const spans = dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
   assert.equal(spans.length, 1, 'one label element, replaced in place');
-});
-integrationTest('topic-color: an AIM map and select mode have no colour menu and refuse a change', async () => {
-  for (const options of [{ aim: true }, { integration: true }]) {
-    const { view, writes } = heFixture(options);
-    if (options.integration) view.selection.toggleMultiSelect();
-    const panel = dom.element('panel'); view.renderColorSection(panel, view.map.nodes[2]);
-    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
-    view.beginMapTransaction = () => assert.fail('no transaction');
-    await view.changeTopicColor(view.map.nodes[2], 'red', true);
-    assert.deepEqual(writes, []);
-  }
 });
 integrationTest('topic-color: the menu is a radiogroup of None and six named colours with aria-checked, and a branch button; choosing writes that colour for this topic only', async () => {
   const { view } = heFixture({ topics: [node('fact'), { ...node('kid'), parentId: 'fact' }], notes: heNotes([['fact', {}], ['kid', {}]]) });
@@ -3702,17 +3696,6 @@ integrationTest('topic-style: a card carries only whitelisted data-topic-style-*
   assert.equal(count(/Style:/g), 1); assert.match(tcLabel(card).text, /Style: Small/); assert.doesNotMatch(tcLabel(card).text, /Bold/); assert.equal('topicStyleBold' in card.dataset, false); assert.equal(card.dataset.topicStyleSize, 'small'); assert.equal(count(/Color:/g), 1);
   note.style = undefined; g.view.refreshCard(node0, false);
   assert.equal(count(/Style:/g), 0); assert.equal('styleText' in card.dataset, false); assert.equal(count(/Color:/g), 1);
-});
-integrationTest('topic-style: an AIM map and select mode have no style menu and refuse a change', async () => {
-  for (const options of [{ aim: true }, { integration: true }]) {
-    const { view, writes } = heFixture(options);
-    if (options.integration) view.selection.toggleMultiSelect();
-    const panel = dom.element('panel'); view.renderStyleSection(panel, view.map.nodes[2]);
-    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
-    view.beginMapTransaction = () => assert.fail('no transaction');
-    await view.changeTopicStyle(view.map.nodes[2], ['bold'], true);
-    assert.deepEqual(writes, []);
-  }
 });
 integrationTest('topic-style: bold, thick border and thick line are aria-pressed switches; text size is a radiogroup that arrow keys move; the branch button applies what is shown', async () => {
   const { view } = heFixture({ topics: [node('fact'), { ...node('kid'), parentId: 'fact' }], notes: heNotes([['fact', {}], ['kid', {}]]) });

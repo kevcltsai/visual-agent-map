@@ -386,3 +386,20 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   click(byClass('root', 'vam-add-child')); await h.settle();
   assert.equal(h.modals.length, 1, 'after leaving, the "+" opens its dialog again');
 });
+
+test('bug bash #05: during a presentation double-clicking a card title does not open the rename dialog or write anything', async () => {
+  const h = await harness();
+  h.recordModalsOnly();
+  const find = (root, pred) => { const out = []; const walk = n => { if (pred(n)) out.push(n); (n.children ?? []).forEach(walk); }; walk(root); return out; };
+  const title = find(h.card('root'), n => n.classes?.has('vam-card-title'))[0];
+  const dbl = () => h.card('root').handlers.get('dblclick')({ target: title, clientX: 0, clientY: 0, preventDefault() {} });
+  const before = h.contents.get(MAP), note = h.contents.get(h.view.map.nodes[0].path);
+  h.view.selection.setSelected(h.ids.root);
+  h.view.startPresentation();
+  dbl(); h.view.renameNode(h.view.map.nodes[0], 'Root'); await h.settle();
+  assert.deepEqual(h.modals, [], 'no rename dialog');
+  assert.equal(h.contents.get(MAP), before); assert.equal(h.contents.get(h.view.map.nodes[0].path), note);
+  h.view.exitPresentation();
+  dbl(); await h.settle();
+  assert.equal(h.modals.length, 1, 'after leaving, the double-click renames again');
+});

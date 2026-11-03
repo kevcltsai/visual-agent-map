@@ -48363,6 +48363,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   renameNode(node, current) {
+    if (this.presentation) return;
     new NameModal(
       this.app,
       t("ui.rename_topic"),
@@ -53499,6 +53500,10 @@ ${request.requirements}` : preset.text,
     viewport.addEventListener("dragend", () => {
       this.internalDrag = false;
     });
+    for (const name of ["pointerdown", "pointermove"])
+      viewport.addEventListener(name, () => {
+        this.internalDrag = false;
+      });
     viewport.addEventListener("contextmenu", (event) => this.onCanvasContextMenu(event));
     viewport.addEventListener("pointermove", (event) => this.onCanvasPointerMove(event));
   }
@@ -53570,9 +53575,7 @@ ${request.requirements}` : preset.text,
   onCardDrop(event, card, node) {
     var _a2, _b2;
     card.removeClass("is-drop-target");
-    const internal = this.internalDrag;
-    this.internalDrag = false;
-    if (internal || !this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
     event.preventDefault();
     event.stopPropagation();
     const all = Array.from((_b2 = (_a2 = event.dataTransfer) == null ? void 0 : _a2.files) != null ? _b2 : []), images = imageFilesFrom({ files: all });

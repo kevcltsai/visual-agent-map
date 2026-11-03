@@ -1717,6 +1717,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   private renameNode(node: MapNode, current: string): void {
+    if (this.presentation) return;
     new NameModal(this.app, t("ui.rename_topic"), current, name =>
       this.enqueue(() => this.noteChange(node, { title: name }))
     ).open();
@@ -7200,6 +7201,12 @@ export class VisualAgentMapView extends ItemView {
     viewport.addEventListener("dragend", () => {
       this.internalDrag = false;
     });
+    // A drag whose dragend never arrived (its source was redrawn mid-drag) must not block files dragged in later: the
+    // browser sends no pointer events during a drag, so the next one proves it is over.
+    for (const name of ["pointerdown", "pointermove"] as const)
+      viewport.addEventListener(name, () => {
+        this.internalDrag = false;
+      });
     viewport.addEventListener("contextmenu", event => this.onCanvasContextMenu(event));
     viewport.addEventListener("pointermove", event => this.onCanvasPointerMove(event));
   }
@@ -7275,9 +7282,8 @@ export class VisualAgentMapView extends ItemView {
   }
   private onCardDrop(event: DragEvent, card: HTMLElement, node: MapNode): void {
     card.removeClass("is-drop-target");
-    const internal = this.internalDrag;
-    this.internalDrag = false;
-    if (internal || !this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    // An internal drag's flag stays up here so the drop bubbles on to the canvas handler, which ignores it and ends it.
+    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
     event.preventDefault();
     event.stopPropagation();
     const all = Array.from(event.dataTransfer?.files ?? []),

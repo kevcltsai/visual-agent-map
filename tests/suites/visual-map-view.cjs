@@ -3984,7 +3984,7 @@ function coverDragHarness() {
   view.queueCanvasImages = (files) => { view.calls.push(['canvas', files.length]); };
   view.enqueue = work => work();
   const file = { name: 'a.png', type: 'image/png', size: 1 };
-  const drop = () => ({ clientX: 1, clientY: 1, preventDefault() {}, stopPropagation() {}, dataTransfer: { files: [file], types: ['Files'] } });
+  const drop = () => ({ clientX: 1, clientY: 1, defaultPrevented: false, stopped: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; }, dataTransfer: { files: [file], types: ['Files'] } });
   return { VisualAgentMapView, view, viewport, drop, fire: (name, event = {}) => (viewport.listeners[name] ?? []).forEach(fn => fn(event)) };
 }
 test('bug bash #01: a card cover image is not natively draggable', () => {
@@ -4002,24 +4002,41 @@ test('bug bash #01: a card cover image is not natively draggable', () => {
   assert.equal(img.attrs.draggable, 'false');
   assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.vam-card-cover img\s*\{[^}]*-webkit-user-drag:\s*none/);
 });
-test('bug bash #01: a drag that started inside the view is ignored by the card and canvas drop handlers; an external file drop still works', () => {
+test('bug bash #01: an internal drag dropped on a card and bubbling to the canvas writes nothing; the flag ends with the canvas drop or dragend', () => {
   const h = coverDragHarness();
   h.view.setupCanvasImageInput();
   const card = dom.element('div'), topic = node('t');
+  // Real order: dragstart on the cover, the drop lands on a card, then bubbles from the card to the canvas.
+  const dropOnCard = () => { const ev = h.drop(); h.view.onCardDrop(ev, card, topic); if (!ev.stopped) h.fire('drop', ev); };
   h.fire('dragstart', { target: card });
-  h.view.onCardDrop(h.drop(), card, topic);
-  h.fire('dragstart', { target: card });
-  h.fire('drop', h.drop());
-  assert.deepEqual(h.view.calls, [], 'an internal drag writes nothing');
+  dropOnCard();
+  assert.deepEqual(h.view.calls, [], 'neither the card nor the canvas takes an internal drag');
   h.fire('dragend', {});
-  h.view.onCardDrop(h.drop(), card, topic);
-  assert.deepEqual(h.view.calls, [['card', 1]], 'an external file drop still attaches the picture');
+  dropOnCard();
+  assert.deepEqual(h.view.calls, [['card', 1]], 'an external file drop on a card still attaches the picture (and the card stops it reaching the canvas)');
   h.view.onCanvasDrop(h.drop());
   assert.deepEqual(h.view.calls, [['card', 1], ['canvas', 1]], 'and the canvas still takes an external picture');
   h.fire('dragstart', { target: card });
-  h.view.onCanvasDrop(h.drop());
+  h.fire('drop', h.drop());
   h.view.onCardDrop(h.drop(), card, topic);
-  assert.equal(h.view.calls.length, 3, 'a drop ends the internal drag, so the next external drop is not blocked even when dragend is lost');
+  assert.equal(h.view.calls.length, 3, 'the canvas drop ended the internal drag, so the next external drop is not blocked');
+});
+test('bug bash #01: when dragend is lost, the next pointer event ends the internal drag and an external drag is accepted again', () => {
+  const h = coverDragHarness();
+  h.view.setupCanvasImageInput();
+  const card = dom.element('div');
+  h.fire('dragstart', { target: card });
+  const refused = h.drop(); h.fire('dragover', refused);
+  assert.equal(refused.defaultPrevented, false, 'while the internal drag lasts, dragover is not taken');
+  h.fire('pointermove', { clientX: 1, clientY: 1 });
+  const over = h.drop(); h.fire('dragover', over);
+  assert.equal(over.defaultPrevented, true, 'after a pointer event the external dragover is accepted');
+  h.fire('drop', h.drop());
+  assert.deepEqual(h.view.calls, [['canvas', 1]]);
+  h.fire('dragstart', { target: card });
+  h.fire('pointerdown', { button: 0 });
+  h.fire('drop', h.drop());
+  assert.deepEqual(h.view.calls, [['canvas', 1], ['canvas', 1]], 'pointerdown ends it too');
 });
 // ---- bug bash A #03: the "+" button must win the hit test over the width resize handle while it is visible ----
 // A unit environment has no layout, so elementsFromPoint cannot run here; the hit order is asserted through the CSS that decides it (the UI layer checks the real click).

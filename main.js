@@ -65662,7 +65662,9 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
         var _a4, _b4;
         return (_b4 = element.getAttribute("aria-label")) != null ? _b4 : ((_a4 = element.textContent) == null ? void 0 : _a4.trim()) || element.tagName.toLowerCase();
       };
-      const own2 = controls().filter((other) => other.closest(".setting-item") === item && label(other) === label(control));
+      const own2 = controls().filter(
+        (other) => other.closest(".setting-item") === item && label(other) === label(control)
+      );
       return JSON.stringify([name, sameName.indexOf(item), label(control), own2.indexOf(control)]);
     };
     const active = (_b2 = (_a2 = root == null ? void 0 : root.doc) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;

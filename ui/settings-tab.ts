@@ -944,7 +944,9 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       const sameName = items.filter(other => other.querySelector(".setting-item-name")?.textContent?.trim() === name);
       const label = (element: Element): string =>
         element.getAttribute("aria-label") ?? (element.textContent?.trim() || element.tagName.toLowerCase());
-      const own = controls().filter(other => other.closest(".setting-item") === item && label(other) === label(control));
+      const own = controls().filter(
+        other => other.closest(".setting-item") === item && label(other) === label(control)
+      );
       return JSON.stringify([name, sameName.indexOf(item as Element), label(control), own.indexOf(control)]);
     };
     const active = root?.doc?.activeElement ?? null;

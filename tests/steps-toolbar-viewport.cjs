@@ -297,3 +297,65 @@ test('bar children keep the same order and fixed labels at counts 0-3 (names spa
   assert.equal(new Set(shapes).size, 1, shapes.join(' / '));
 });
 
+
+// ---- UX review A theme 2: floating controls over cards ----
+test('clearToolbar: a saved viewport that puts a card under the toolbar moves down by the overlap, at most the inset; otherwise it is untouched', () => {
+  const v = { x: 0, y: 0, zoom: 1 };
+  assert.equal(inset.clearToolbar(v, 58, []), v, 'no card under the toolbar: the very same viewport');
+  assert.equal(inset.clearToolbar(v, 0, [10]), v, 'no inset measured: untouched');
+  assert.deepEqual({ ...inset.clearToolbar(v, 58, [20]) }, { x: 0, y: 38, zoom: 1 }, 'the highest card ends at the inset');
+  assert.deepEqual({ ...inset.clearToolbar(v, 58, [30, 20, 40]) }, { x: 0, y: 38, zoom: 1 });
+  assert.equal(inset.clearToolbar(v, 58, [-5000]).y, 58, 'a card far above moves the map by at most the inset');
+  assert.equal(inset.clearToolbar(v, 58, [80]), v, 'a card already below the inset needs no move');
+  assert.equal(inset.clearToolbar({ x: 5, y: 12, zoom: 0.5 }, 58, [12]).zoom, 0.5);
+});
+
+test('isObscured: outside the canvas or under any floating control counts, a clear card does not, touching edges do not', () => {
+  const view = { left: 0, top: 0, right: 1000, bottom: 600 };
+  const covers = [{ left: 12, top: 12, right: 400, bottom: 50 }, { left: 700, top: 540, right: 988, bottom: 588 }];
+  assert.equal(inset.isObscured({ left: 100, top: 100, right: 380, bottom: 280 }, view, covers), false);
+  assert.equal(inset.isObscured({ left: 100, top: 30, right: 380, bottom: 210 }, view, covers), true, 'under the toolbar');
+  assert.equal(inset.isObscured({ left: 100, top: 30, right: 380, bottom: 210 }, view, []), false, 'no covers');
+  assert.equal(inset.isObscured({ left: 750, top: 400, right: 900, bottom: 560 }, view, covers), true, 'under the zoom controls');
+  assert.equal(inset.isObscured({ left: 100, top: 50, right: 380, bottom: 230 }, view, covers), false, 'touching the toolbar edge');
+  assert.equal(inset.isObscured({ left: 900, top: 100, right: 1180, bottom: 280 }, view, covers), true, 'past the canvas edge');
+});
+
+test('moveKeyboardFocus brings a card hidden under the toolbar into view, and leaves a clear card alone', () => {
+  for (const [top, follows] of [[20, true], [200, false]]) {
+    const { view, nodes } = makeView();
+    view.contentEl = { querySelector: selector => (selector === '.vam-map-tools' ? { getBoundingClientRect: () => ({ left: 12, top: 12, right: 400, bottom: 50 }) } : null) };
+    view.cardEls.set('b', { getBoundingClientRect: () => ({ left: 100, right: 380, top, bottom: top + 180 }), focus() {} });
+    const before = view.map.viewport.y;
+    view.moveKeyboardFocus(nodes[1]);
+    assert.equal(view.map.viewport.y !== before, follows, `top ${top}`);
+  }
+});
+
+test('applyInitialViewport moves a saved viewport that draws a card under the toolbar, in memory only; a clear one stays', () => {
+  for (const [saved, moves] of [[{ x: 0, y: 0, zoom: 1 }, true], [{ x: 0, y: 300, zoom: 1 }, false]]) {
+    const { view, writes } = makeView();
+    view.map.viewport = { ...saved };
+    view.canvasNodes = () => view.map.nodes;
+    view.map.nodes[0].x = 684; view.map.nodes[0].y = 0;
+    view.map.nodes[1].x = 5000; view.map.nodes[1].y = 5000;
+    view.viewportEl.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1440, bottom: 700 });
+    view.contentEl = { querySelector: () => ({ getBoundingClientRect: () => ({ left: 12, top: 12, right: 720, bottom: 50 }) }) };
+    view.applyInitialViewport();
+    assert.equal(view.map.viewport.y, moves ? 58 : 300, `saved y ${saved.y}`);
+    assert.equal(view.viewportTimer, null);
+    assert.equal(writes.length, 0, 'nothing written');
+  }
+});
+
+test('render order: toolbar overlay before the viewport, zoom controls in a second overlay after it', () => {
+  const source = read('experiences/visual-map/view.ts');
+  const render = source.slice(source.indexOf('  private render(): void {'));
+  const at = text => render.indexOf(text);
+  assert.ok(at('const overlay = canvas.createDiv("vam-canvas-overlay");') > at('this.viewportEl = canvas.createDiv("vam-viewport");'));
+  assert.ok(at('canvas.insertBefore(overlay, this.viewportEl);') > at('const overlay = canvas.createDiv("vam-canvas-overlay");'));
+  const controls = at('const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");');
+  assert.ok(controls > at('canvas.insertBefore(overlay, this.viewportEl);'), 'the controls overlay is appended after the viewport');
+  assert.ok(at('const zoom = controls.createDiv("vam-zoom-controls");') > controls);
+  assert.equal(render.includes('overlay.createDiv("vam-zoom-controls")'), false);
+});

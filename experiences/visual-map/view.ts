@@ -274,11 +274,14 @@ import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
 import {
   cardToolsPlacement,
+  clearToolbar,
   fitIsClamped,
   fitViewport,
   focusViewport,
   initialViewport,
-  insetFromRects
+  insetFromRects,
+  isObscured,
+  rectsIntersect
 } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
 import {
@@ -9664,6 +9667,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.selection.state.multiSelectMode) this.viewportEl.addClass("is-selecting");
     // Canvas controls float over the map instead of stacking a second toolbar above it; the overlay covers the canvas only.
     const overlay = canvas.createDiv("vam-canvas-overlay");
+    // Keyboard order is toolbar, then the cards, then the zoom controls (second overlay below): the toolbar comes first in the DOM.
+    canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     this.mountMapChat(workspace, overlay);
@@ -9677,7 +9682,8 @@ export class VisualAgentMapView extends ItemView {
             text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
           })
         : null;
-    const zoom = overlay.createDiv("vam-zoom-controls");
+    const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
+    const zoom = controls.createDiv("vam-zoom-controls");
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => this.zoomBy(1 / 1.2));
     const zoomReset = zoom.createEl("button", {
       text: `${Math.round(this.map.viewport.zoom * 100)}%`,
@@ -10614,12 +10620,8 @@ export class VisualAgentMapView extends ItemView {
       this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(target.id)}"]`);
     const view = this.viewportEl?.getBoundingClientRect(),
       rect = card?.getBoundingClientRect();
-    if (
-      view &&
-      rect &&
-      (rect.left < view.left || rect.right > view.right || rect.top < view.top || rect.bottom > view.bottom)
-    )
-      this.focusNode(target, false);
+    // Off the canvas, or under the toolbar / zoom controls / hint, counts as not seen: the camera follows.
+    if (view && rect && isObscured(rect, view, this.floatingControlRects())) this.focusNode(target, false);
     if (this.selection.state.multiSelectMode) {
       // Topic selection mode: moving focus must not clear the topics already ticked.
       this.paintCards(this.selection.moveTabStop(target.id).touched);
@@ -10633,6 +10635,15 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     (this.cardEls.get(target.id) ?? card)?.focus({ preventScroll: true });
+  }
+  /** Screen rectangles of the floating controls that cover part of the canvas (toolbar, zoom controls, hint). */
+  private floatingControlRects(): { left: number; top: number; right: number; bottom: number }[] {
+    const rects = [];
+    for (const selector of [".vam-map-tools", ".vam-zoom-controls", ".vam-canvas-hint"]) {
+      const rect = this.contentEl?.querySelector?.<HTMLElement>(selector)?.getBoundingClientRect?.();
+      if (rect && rect.right > rect.left && rect.bottom > rect.top) rects.push(rect);
+    }
+    return rects;
   }
   /** The tab stop when nothing moved it: the selected card, else the first root, else the first card. */
   defaultTabStop(shown: MapNode[]): string | null {
@@ -14807,7 +14818,38 @@ export class VisualAgentMapView extends ItemView {
   /** Lifts a never-moved default viewport below the toolbar. In memory only; it is saved with the next real pan or zoom. */
   private applyInitialViewport(): void {
     if (!this.map) return;
-    this.map.viewport = initialViewport(this.map.viewport, this.canvasInset());
+    const inset = this.canvasInset();
+    this.map.viewport = clearToolbar(
+      initialViewport(this.map.viewport, inset),
+      inset,
+      this.topsUnderToolbar(this.map.viewport.zoom)
+    );
+  }
+  /**
+   * Screen tops (canvas coordinates) of the cards the saved viewport would draw under the toolbar. Computed from the
+   * saved positions, as the stage is not transformed yet when this runs; a card's height is its laid-out height.
+   */
+  private topsUnderToolbar(zoomHint: number): number[] {
+    const canvas = this.viewportEl?.getBoundingClientRect?.();
+    const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools")?.getBoundingClientRect?.();
+    if (!this.map || !canvas || !tools || !(tools.bottom > tools.top)) return [];
+    const bar = {
+      left: tools.left - canvas.left,
+      right: tools.right - canvas.left,
+      top: tools.top - canvas.top,
+      bottom: tools.bottom - canvas.top
+    };
+    const v = initialViewport(this.map.viewport, this.canvasInset());
+    const zoom = v.zoom || zoomHint;
+    const tops: number[] = [];
+    for (const node of this.canvasNodes()) {
+      const left = node.x * zoom + v.x,
+        top = node.y * zoom + v.y;
+      const height = this.cardEls.get(node.id)?.offsetHeight || 180;
+      const rect = { left, top, right: left + (node.width ?? CARD_WIDTH) * zoom, bottom: top + height * zoom };
+      if (rectsIntersect(rect, bar)) tops.push(top);
+    }
+    return tops;
   }
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
   private focusNode(target: MapNode, persist = true): void {

@@ -114,3 +114,32 @@ export function cardToolsPlacement(
     shift: start >= visible.left + margin && start + width <= visible.right - margin ? 0 : placed - start
   };
 }
+
+/**
+ * A saved viewport can put cards under the floating toolbar. `overlappingTops` are the screen tops (canvas coordinates)
+ * of the cards that intersect the toolbar rectangle; the viewport moves down so the highest of them clears the inset,
+ * by at most `inset` (a card far above the canvas must not throw the map away). No overlap returns the same viewport.
+ */
+export function clearToolbar(viewport: MapViewport, inset: number, overlappingTops: number[]): MapViewport {
+  if (!overlappingTops.length || !(inset > 0)) return viewport;
+  const shift = Math.min(inset, inset - Math.min(...overlappingTops));
+  return shift > 0 ? { ...viewport, y: viewport.y + shift } : viewport;
+}
+
+export interface ScreenRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** True when the rectangles share area (touching edges do not count). */
+export function rectsIntersect(a: ScreenRect, b: ScreenRect): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+/** A card the user cannot fully see: outside the canvas, or under one of the floating controls (`covers`). */
+export function isObscured(rect: ScreenRect, view: ScreenRect, covers: ScreenRect[]): boolean {
+  if (rect.left < view.left || rect.right > view.right || rect.top < view.top || rect.bottom > view.bottom) return true;
+  return covers.some(cover => rectsIntersect(rect, cover));
+}

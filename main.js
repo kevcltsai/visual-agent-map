@@ -2421,6 +2421,33 @@ var en = {
   "ui.manage_name_taken": "A file with this name already exists.",
   "ui.manage_create_failed": "Cannot create this file. Nothing was overwritten.",
   "ui.recipe_new_name": "New style",
+  "ui.editor_title_edit": "Edit note style",
+  "ui.editor_title_new": "New note style",
+  "ui.editor_name": "Name",
+  "ui.editor_name_fixed": "The name of an existing style stays as it is.",
+  "ui.editor_part_structure": "Structure",
+  "ui.editor_part_voice": "Voice",
+  "ui.editor_part_format": "Format rules",
+  "ui.editor_update_legend": "When a note already has this kind of content",
+  "ui.editor_update_desc_merge": "Rewrite the whole note so old and new findings read as one. Findings that disagree are both kept and marked.",
+  "ui.editor_update_desc_top": "Keep the old text as it is and put the new findings at the top of each section, under a dated heading.",
+  "ui.editor_update_desc_fresh": "Replace the note with the new findings only. The old note is copied to the backups folder first.",
+  "ui.editor_example_caption": "Sample note. It shows the section names of the chosen structure and the shape the format rules give; no AI is used.",
+  "ui.editor_example_label": "Sample note",
+  "ui.editor_example_voice_0": "Voice: {0}",
+  "ui.editor_example_format_0": "Format: {0}",
+  "ui.editor_example_callout": "A key point is set apart here.",
+  "ui.editor_example_col_a": "Item",
+  "ui.editor_example_col_b": "Finding",
+  "ui.editor_example_cell_a": "Example",
+  "ui.editor_example_cell_b": "A short result",
+  "ui.editor_example_bullet_a": "A first short point.",
+  "ui.editor_example_bullet_b": "A second short point.",
+  "ui.editor_example_body": "Sample text that stands for what the AI writes in this section.",
+  "ui.editor_discard_title": "Discard changes?",
+  "ui.editor_discard_desc": "This note style has changes that are not saved.",
+  "ui.editor_discard": "Discard changes",
+  "ui.recipe_notice_switched_0_1": 'Topic types now using "{0}": {1}.',
   "ui.settings_group_debug": "Debugging",
   "ui.settings_group_workspace": "Workspace",
   "ui.settings_language_desc": "Only changes VAM, not Obsidian's language.",
@@ -4774,6 +4801,33 @@ var zhCN = {
   "ui.manage_name_taken": "\u5DF2\u7ECF\u6709\u540C\u540D\u7684\u6587\u4EF6\u3002",
   "ui.manage_create_failed": "\u65E0\u6CD5\u521B\u5EFA\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u6CA1\u6709\u8986\u76D6\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.recipe_new_name": "\u65B0\u98CE\u683C",
+  "ui.editor_title_edit": "\u7F16\u8F91\u7B14\u8BB0\u98CE\u683C",
+  "ui.editor_title_new": "\u65B0\u589E\u7B14\u8BB0\u98CE\u683C",
+  "ui.editor_name": "\u540D\u79F0",
+  "ui.editor_name_fixed": "\u5DF2\u5B58\u5728\u7684\u98CE\u683C\u4E0D\u80FD\u5728\u8FD9\u91CC\u6539\u540D\u3002",
+  "ui.editor_part_structure": "\u6BB5\u843D\u7ED3\u6784",
+  "ui.editor_part_voice": "\u5199\u4F5C\u53E3\u543B",
+  "ui.editor_part_format": "\u683C\u5F0F\u89C4\u5219",
+  "ui.editor_update_legend": "\u7B14\u8BB0\u5DF2\u7ECF\u6709\u5185\u5BB9\u65F6",
+  "ui.editor_update_desc_merge": "\u6574\u4EFD\u91CD\u5199\uFF0C\u8BA9\u65B0\u65E7\u53D1\u73B0\u8BFB\u8D77\u6765\u662F\u4E00\u4EFD\u3002\u4E92\u76F8\u77DB\u76FE\u7684\u8BF4\u6CD5\u4E24\u79CD\u90FD\u4FDD\u7559\u5E76\u6807\u6CE8\u3002",
+  "ui.editor_update_desc_top": "\u65E7\u5185\u5BB9\u539F\u6837\u4FDD\u7559\uFF0C\u65B0\u53D1\u73B0\u653E\u5728\u6BCF\u6BB5\u6700\u4E0A\u9762\uFF0C\u52A0\u4E0A\u65E5\u671F\u5C0F\u6807\u3002",
+  "ui.editor_update_desc_fresh": "\u6574\u4EFD\u6362\u6210\u65B0\u53D1\u73B0\u3002\u65E7\u7B14\u8BB0\u4F1A\u5148\u590D\u5236\u5230\u5907\u4EFD\u6587\u4EF6\u5939\u3002",
+  "ui.editor_example_caption": "\u793A\u4F8B\u7B14\u8BB0\uFF1A\u663E\u793A\u6240\u9009\u6BB5\u843D\u7ED3\u6784\u7684\u6BB5\u540D\uFF0C\u4EE5\u53CA\u683C\u5F0F\u89C4\u5219\u7ED9\u51FA\u7684\u5916\u89C2\uFF0C\u4E0D\u4F7F\u7528 AI\u3002",
+  "ui.editor_example_label": "\u793A\u4F8B\u7B14\u8BB0",
+  "ui.editor_example_voice_0": "\u53E3\u543B\uFF1A{0}",
+  "ui.editor_example_format_0": "\u683C\u5F0F\uFF1A{0}",
+  "ui.editor_example_callout": "\u91CD\u70B9\u4F1A\u5355\u72EC\u6807\u51FA\u3002",
+  "ui.editor_example_col_a": "\u9879\u76EE",
+  "ui.editor_example_col_b": "\u53D1\u73B0",
+  "ui.editor_example_cell_a": "\u793A\u4F8B",
+  "ui.editor_example_cell_b": "\u4E00\u53E5\u7B80\u77ED\u7ED3\u679C",
+  "ui.editor_example_bullet_a": "\u7B2C\u4E00\u4E2A\u7B80\u77ED\u91CD\u70B9\u3002",
+  "ui.editor_example_bullet_b": "\u7B2C\u4E8C\u4E2A\u7B80\u77ED\u91CD\u70B9\u3002",
+  "ui.editor_example_body": "\u8FD9\u662F\u793A\u4F8B\u6587\u5B57\uFF0C\u4EE3\u8868 AI \u5728\u8FD9\u4E00\u6BB5\u4F1A\u5199\u7684\u5185\u5BB9\u3002",
+  "ui.editor_discard_title": "\u653E\u5F03\u4FEE\u6539\uFF1F",
+  "ui.editor_discard_desc": "\u8FD9\u4E2A\u7B14\u8BB0\u98CE\u683C\u6709\u5C1A\u672A\u4FDD\u5B58\u7684\u4FEE\u6539\u3002",
+  "ui.editor_discard": "\u653E\u5F03\u4FEE\u6539",
+  "ui.recipe_notice_switched_0_1": "\u8FD9\u4E9B\u8BAE\u9898\u7C7B\u578B\u6539\u7528\u201C{0}\u201D\uFF1A{1}\u3002",
   "ui.settings_group_debug": "\u8C03\u8BD5",
   "ui.settings_group_workspace": "\u5DE5\u4F5C\u533A",
   "ui.settings_language_desc": "\u53EA\u5F71\u54CD VAM\uFF0C\u4E0D\u6539 Obsidian \u7684\u8BED\u8A00\u3002",
@@ -7127,6 +7181,33 @@ var zhTW = {
   "ui.manage_name_taken": "\u5DF2\u7D93\u6709\u540C\u540D\u7684\u6A94\u6848\u3002",
   "ui.manage_create_failed": "\u7121\u6CD5\u5EFA\u7ACB\u9019\u500B\u6A94\u6848\uFF0C\u6C92\u6709\u8986\u5BEB\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.recipe_new_name": "\u65B0\u98A8\u683C",
+  "ui.editor_title_edit": "\u7DE8\u8F2F\u7B46\u8A18\u98A8\u683C",
+  "ui.editor_title_new": "\u65B0\u589E\u7B46\u8A18\u98A8\u683C",
+  "ui.editor_name": "\u540D\u7A31",
+  "ui.editor_name_fixed": "\u5DF2\u5B58\u5728\u7684\u98A8\u683C\u4E0D\u80FD\u5728\u9019\u88E1\u6539\u540D\u3002",
+  "ui.editor_part_structure": "\u6BB5\u843D\u7D50\u69CB",
+  "ui.editor_part_voice": "\u5BEB\u4F5C\u53E3\u543B",
+  "ui.editor_part_format": "\u683C\u5F0F\u898F\u5247",
+  "ui.editor_update_legend": "\u7B46\u8A18\u5DF2\u7D93\u6709\u5167\u5BB9\u6642",
+  "ui.editor_update_desc_merge": "\u6574\u4EFD\u91CD\u5BEB\uFF0C\u8B93\u65B0\u820A\u767C\u73FE\u8B80\u8D77\u4F86\u662F\u4E00\u4EFD\u3002\u4E92\u76F8\u77DB\u76FE\u7684\u8AAA\u6CD5\u5169\u7A2E\u90FD\u7559\u4E0B\u4E26\u6A19\u8A3B\u3002",
+  "ui.editor_update_desc_top": "\u820A\u5167\u5BB9\u539F\u6A23\u4FDD\u7559\uFF0C\u65B0\u767C\u73FE\u653E\u5728\u6BCF\u6BB5\u6700\u4E0A\u9762\uFF0C\u52A0\u4E0A\u65E5\u671F\u5C0F\u6A19\u3002",
+  "ui.editor_update_desc_fresh": "\u6574\u4EFD\u63DB\u6210\u65B0\u767C\u73FE\u3002\u820A\u7B46\u8A18\u6703\u5148\u8907\u88FD\u5230\u5099\u4EFD\u8CC7\u6599\u593E\u3002",
+  "ui.editor_example_caption": "\u7BC4\u4F8B\u7B46\u8A18\uFF1A\u986F\u793A\u6240\u9078\u6BB5\u843D\u7D50\u69CB\u7684\u6BB5\u540D\uFF0C\u4EE5\u53CA\u683C\u5F0F\u898F\u5247\u7D66\u7684\u5916\u89C0\uFF0C\u4E0D\u4F7F\u7528 AI\u3002",
+  "ui.editor_example_label": "\u7BC4\u4F8B\u7B46\u8A18",
+  "ui.editor_example_voice_0": "\u53E3\u543B\uFF1A{0}",
+  "ui.editor_example_format_0": "\u683C\u5F0F\uFF1A{0}",
+  "ui.editor_example_callout": "\u91CD\u9EDE\u6703\u7368\u7ACB\u6A19\u51FA\u3002",
+  "ui.editor_example_col_a": "\u9805\u76EE",
+  "ui.editor_example_col_b": "\u767C\u73FE",
+  "ui.editor_example_cell_a": "\u7BC4\u4F8B",
+  "ui.editor_example_cell_b": "\u4E00\u53E5\u7C21\u77ED\u7D50\u679C",
+  "ui.editor_example_bullet_a": "\u7B2C\u4E00\u500B\u7C21\u77ED\u91CD\u9EDE\u3002",
+  "ui.editor_example_bullet_b": "\u7B2C\u4E8C\u500B\u7C21\u77ED\u91CD\u9EDE\u3002",
+  "ui.editor_example_body": "\u9019\u662F\u7BC4\u4F8B\u6587\u5B57\uFF0C\u4EE3\u8868 AI \u5728\u9019\u4E00\u6BB5\u6703\u5BEB\u7684\u5167\u5BB9\u3002",
+  "ui.editor_discard_title": "\u653E\u68C4\u4FEE\u6539\uFF1F",
+  "ui.editor_discard_desc": "\u9019\u500B\u7B46\u8A18\u98A8\u683C\u6709\u5C1A\u672A\u5B58\u6A94\u7684\u4FEE\u6539\u3002",
+  "ui.editor_discard": "\u653E\u68C4\u4FEE\u6539",
+  "ui.recipe_notice_switched_0_1": "\u9019\u4E9B\u8B70\u984C\u985E\u578B\u6539\u7528\u300C{0}\u300D\uFF1A{1}\u3002",
   "ui.settings_group_debug": "\u5075\u932F",
   "ui.settings_group_workspace": "\u5DE5\u4F5C\u5340",
   "ui.settings_language_desc": "\u53EA\u5F71\u97FF VAM\uFF0C\u4E0D\u6539 Obsidian \u7684\u8A9E\u8A00\u3002",
@@ -7514,11 +7595,11 @@ function cleanStyle(value) {
 function cleanAttributes(node) {
   var _a2;
   for (const { name, value } of Array.from(node.attributes)) {
-    const lower5 = name.toLowerCase();
-    if (lower5.startsWith("on")) node.removeAttribute(name);
-    else if ((lower5 === "href" || lower5 === "xlink:href" || lower5 === "src") && unsafeUrl(value))
+    const lower6 = name.toLowerCase();
+    if (lower6.startsWith("on")) node.removeAttribute(name);
+    else if ((lower6 === "href" || lower6 === "xlink:href" || lower6 === "src") && unsafeUrl(value))
       node.removeAttribute(name);
-    else if (lower5 === "style") {
+    else if (lower6 === "style") {
       if (HARD_TO_VET.test(value)) node.removeAttribute(name);
       else if (cleanStyle(value) !== value) (_a2 = node.setAttribute) == null ? void 0 : _a2.call(node, name, cleanStyle(value));
     } else if (EXTERNAL_URL.test(value) || HARD_TO_VET.test(value)) node.removeAttribute(name);
@@ -21366,8 +21447,8 @@ function guardMapChatWrite(check) {
   const path = normalizeVaultPath(check.path);
   if (path === null) return { ok: false, code: "outside_vault" };
   const configDir = normalizeVaultPath(check.configDir);
-  const lower5 = path.toLowerCase();
-  const inside2 = (dir) => !!dir && (lower5 === dir.toLowerCase() || lower5.startsWith(`${dir.toLowerCase()}/`));
+  const lower6 = path.toLowerCase();
+  const inside2 = (dir) => !!dir && (lower6 === dir.toLowerCase() || lower6.startsWith(`${dir.toLowerCase()}/`));
   if (configDir === null || inside2(configDir)) return { ok: false, code: "config_dir" };
   if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
   if (check.kind === "create") {
@@ -63599,7 +63680,7 @@ async function applyMathRepair(vault, plan) {
 }
 
 // main.ts
-var import_obsidian41 = require("obsidian");
+var import_obsidian42 = require("obsidian");
 
 // ui/modals/prompt-preview-modal.ts
 var import_obsidian32 = require("obsidian");
@@ -63674,12 +63755,13 @@ var GROUP_KEYS = {
   input: "ui.preview_group_input"
 };
 var PromptPreviewModal = class extends import_obsidian32.Modal {
-  constructor(app, store, language2, provider, trigger) {
+  constructor(app, store, language2, provider, trigger, styleOf) {
     super(app);
     this.store = store;
     this.language = language2;
     this.provider = provider;
     this.trigger = trigger;
+    this.styleOf = styleOf;
     __publicField(this, "step", PREVIEW_STEPS[0].id);
     __publicField(this, "bodyEl");
     __publicField(this, "problemsEl");
@@ -63728,10 +63810,11 @@ var PromptPreviewModal = class extends import_obsidian32.Modal {
     for (const line of lines) region.createEl("p", { text: line, cls: "vam-prompt-preview-problem" });
   }
   renderBody() {
+    var _a2, _b2;
     const body = this.bodyEl;
     if (!body) return;
     body.empty();
-    const style = this.store.runStyle({ kind: "topic", outputLanguage: this.language });
+    const style = (_b2 = (_a2 = this.styleOf) == null ? void 0 : _a2.call(this)) != null ? _b2 : this.store.runStyle({ kind: "topic", outputLanguage: this.language });
     const fields = {
       detailTemplate: style.template,
       ...style.toneText ? { toneText: style.toneText } : {},
@@ -63741,8 +63824,8 @@ var PromptPreviewModal = class extends import_obsidian32.Modal {
     this.showProblems(
       preview.issues.map(
         (issue2) => {
-          var _a2;
-          return t("ui.preview_issue_0_1_2", (_a2 = issue2.fileName) != null ? _a2 : issue2.id, issue2.line, styleIssueText(issue2));
+          var _a3;
+          return t("ui.preview_issue_0_1_2", (_a3 = issue2.fileName) != null ? _a3 : issue2.id, issue2.line, styleIssueText(issue2));
         }
       )
     );
@@ -63771,10 +63854,449 @@ var PromptPreviewModal = class extends import_obsidian32.Modal {
 };
 
 // ui/settings-tab.ts
-var import_obsidian34 = require("obsidian");
+var import_obsidian35 = require("obsidian");
 
 // ui/modals/note-style-manage-modal.ts
+var import_obsidian34 = require("obsidian");
+
+// ui/modals/note-style-editor-modal.ts
 var import_obsidian33 = require("obsidian");
+var lower4 = (value) => value.toLocaleLowerCase();
+function namePartProblem(value, category, taken) {
+  var _a2;
+  if (!value) return t("ui.name_required");
+  const check = validatePartName(value, category);
+  if (!check.ok) {
+    const keys = {
+      empty: "ui.name_required",
+      padded: "ui.manage_name_padded",
+      separator: "ui.manage_name_separator",
+      dots: "ui.manage_name_dots",
+      builtin: "ui.manage_name_builtin"
+    };
+    return t((_a2 = keys[check.reason]) != null ? _a2 : "ui.manage_name_unsafe");
+  }
+  if (cleanBlockName(value) !== value) return t("ui.manage_name_unsafe");
+  if (taken.has(lower4(value))) return t("ui.manage_name_taken");
+  return "";
+}
+function suggestRecipeName(plugin, from) {
+  const base = cleanBlockName(
+    from === null ? t("ui.recipe_new_name") : t("ui.block_copy_name_0", cleanBlockName(from))
+  );
+  const taken = takenRecipeNames(plugin);
+  let name = base || "copy";
+  for (let n = 2; taken.has(lower4(name)) || !validatePartName(name, "recipe").ok; n++) {
+    if (n > 999) break;
+    name = `${base || "copy"} (${n})`;
+  }
+  return name;
+}
+function takenRecipeNames(plugin) {
+  return new Set(
+    plugin.noteStyles.listRecipes().filter((item) => item.kind === "file").map((item) => lower4(item.name))
+  );
+}
+var PART_CATEGORIES = ["structure", "voice", "format"];
+var PART_LABEL_KEYS = {
+  structure: "ui.editor_part_structure",
+  voice: "ui.editor_part_voice",
+  format: "ui.editor_part_format"
+};
+var UPDATE_DESC_KEYS = {
+  merge: "ui.editor_update_desc_merge",
+  top: "ui.editor_update_desc_top",
+  fresh: "ui.editor_update_desc_fresh"
+};
+var plainMd = (value) => value.replace(/\s+/g, " ").trim().replace(/[\\`*_{}[\]<>()#+\-.!|~$%&=^]/g, "\\$&");
+var EXAMPLE_DELAY_MS = 200;
+var NoteStyleEditorModal = class extends import_obsidian33.Modal {
+  constructor(app, plugin, options) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    super(app);
+    this.plugin = plugin;
+    this.options = options;
+    __publicField(this, "draft");
+    __publicField(this, "initial");
+    __publicField(this, "existing");
+    /** The built-in style this window was opened on: the topic types that use it switch to the saved file (decision #41). */
+    __publicField(this, "builtinSource");
+    __publicField(this, "component", new import_obsidian33.Component());
+    __publicField(this, "closed", false);
+    __publicField(this, "forceClose", false);
+    __publicField(this, "asking", false);
+    __publicField(this, "busy", false);
+    __publicField(this, "saving", false);
+    __publicField(this, "timer");
+    __publicField(this, "renderToken", 0);
+    __publicField(this, "selects", /* @__PURE__ */ new Map());
+    __publicField(this, "nameInput");
+    __publicField(this, "errorEl");
+    __publicField(this, "exampleEl");
+    __publicField(this, "saveButton");
+    __publicField(this, "updateRadios", /* @__PURE__ */ new Map());
+    __publicField(this, "focusWindow");
+    __publicField(this, "onFocus", () => void this.reload());
+    const store = plugin.noteStyles;
+    const source = options.source;
+    const recipes = store.listRecipes();
+    const byRef = (ref) => recipes.find((item) => item.ref === ref);
+    const base = (_c = (_b2 = byRef((_a2 = source != null ? source : options.from) != null ? _a2 : void 0)) != null ? _b2 : byRef(KIND_DEFAULT_RECIPE.topic)) != null ? _c : recipes[0];
+    const parts = {
+      structure: (_d = base == null ? void 0 : base.structure.ref) != null ? _d : "builtin:standard",
+      voice: (_e = base == null ? void 0 : base.voice.ref) != null ? _e : "builtin:academic",
+      format: (_f = base == null ? void 0 : base.format.ref) != null ? _f : "builtin:standard",
+      update: (_g = base == null ? void 0 : base.update) != null ? _g : "merge"
+    };
+    const sourceItem = byRef(source);
+    const isFile = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
+    this.existing = isFile ? { ref: sourceItem.ref, text: (_h = store.recipeText(sourceItem.ref)) != null ? _h : "" } : void 0;
+    this.builtinSource = (sourceItem == null ? void 0 : sourceItem.kind) === "builtin" ? sourceItem.ref : void 0;
+    const name = isFile ? sourceItem.name : (_i = options.name) != null ? _i : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
+    this.draft = { name, ...parts };
+    this.initial = { ...this.draft };
+  }
+  onOpen() {
+    var _a2, _b2, _c, _d;
+    this.component.load();
+    const { contentEl } = this;
+    this.modalEl.addClass("vam-editor-modal");
+    this.titleEl.setText(t(this.options.source ? "ui.editor_title_edit" : "ui.editor_title_new"));
+    const nameRow = new import_obsidian33.Setting(contentEl).setName(t("ui.editor_name"));
+    nameRow.settingEl.addClass("vam-editor-row");
+    nameRow.addText((text11) => {
+      const input2 = text11.inputEl;
+      this.nameInput = input2;
+      input2.value = this.draft.name;
+      input2.setAttr("aria-label", t("ui.editor_name"));
+      input2.setAttr("aria-describedby", "vam-editor-error");
+      if (this.existing) {
+        input2.readOnly = true;
+        input2.setAttr("readonly", "readonly");
+        nameRow.setDesc(t("ui.editor_name_fixed"));
+      }
+      text11.onChange((value) => {
+        this.draft.name = value;
+        this.changed();
+      });
+    });
+    this.errorEl = contentEl.createDiv({
+      cls: "vam-block-status-error vam-editor-error",
+      attr: { id: "vam-editor-error", "aria-live": "polite" }
+    });
+    for (const category of PART_CATEGORIES) {
+      const label = t(PART_LABEL_KEYS[category]);
+      const row = new import_obsidian33.Setting(contentEl).setName(label);
+      row.settingEl.addClass("vam-editor-row");
+      row.addDropdown((dropdown) => {
+        this.selects.set(category, dropdown.selectEl);
+        dropdown.selectEl.setAttr("aria-label", label);
+        dropdown.onChange((value) => {
+          this.draft[category] = value;
+          this.changed();
+        });
+      });
+      row.addButton((button) => {
+        button.setButtonText(t("ui.manage_edit")).onClick(() => void this.editPart(category, button.buttonEl));
+        button.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", label));
+      });
+    }
+    this.fillSelects();
+    const fieldset = contentEl.createEl("fieldset", { cls: "vam-editor-update" });
+    fieldset.createEl("legend", { text: t("ui.editor_update_legend") });
+    for (const mode of UPDATE_MODES) {
+      const id = `vam-editor-update-${mode}`;
+      const line = fieldset.createDiv({ cls: "vam-editor-mode" });
+      const radio = line.createEl("input", {
+        type: "radio",
+        attr: { name: "vam-editor-update", id, "aria-describedby": `${id}-desc` }
+      });
+      radio.checked = this.draft.update === mode;
+      radio.addEventListener("change", () => {
+        if (!radio.checked) return;
+        this.draft.update = mode;
+        this.changed();
+      });
+      this.updateRadios.set(mode, radio);
+      const text11 = line.createDiv({ cls: "vam-editor-mode-text" });
+      text11.createEl("label", { text: t(UPDATE_MODE_KEYS[mode]), attr: { for: id } });
+      text11.createDiv({ text: t(UPDATE_DESC_KEYS[mode]), cls: "setting-item-description", attr: { id: `${id}-desc` } });
+    }
+    contentEl.createEl("p", { text: t("ui.editor_example_caption"), cls: "setting-item-description" });
+    this.exampleEl = contentEl.createDiv({
+      cls: "vam-editor-example markdown-rendered",
+      attr: { role: "region", "aria-label": t("ui.editor_example_label") }
+    });
+    const actions = modalActions(this);
+    const preview = actions.createEl("button", { text: t("ui.preview_prompt_open") });
+    preview.addEventListener("click", () => void this.previewPrompt(preview));
+    const cancel = actions.createEl("button", { text: t("ui.cancel") });
+    cancel.addEventListener("click", () => this.close());
+    this.saveButton = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
+    this.saveButton.addEventListener("click", () => void this.save());
+    this.syncState();
+    void this.drawExample();
+    const win = (_c = (_b2 = contentEl.win) != null ? _b2 : (_a2 = contentEl.ownerDocument) == null ? void 0 : _a2.defaultView) != null ? _c : void 0;
+    if (win && typeof win.addEventListener === "function") {
+      this.focusWindow = win;
+      win.addEventListener("focus", this.onFocus);
+    }
+    (_d = this.existing ? this.selects.get("structure") : this.nameInput) == null ? void 0 : _d.focus();
+  }
+  onClose() {
+    var _a2, _b2, _c;
+    this.closed = true;
+    if (this.timer !== void 0) window.clearTimeout(this.timer);
+    this.timer = void 0;
+    (_a2 = this.focusWindow) == null ? void 0 : _a2.removeEventListener("focus", this.onFocus);
+    this.component.unload();
+    this.contentEl.empty();
+    const trigger = this.options.trigger;
+    if ((trigger == null ? void 0 : trigger.isConnected) !== false) trigger == null ? void 0 : trigger.focus();
+    (_c = (_b2 = this.options).onClosed) == null ? void 0 : _c.call(_b2);
+  }
+  /** A window with unsaved changes asks before it closes (Escape and the close button come here too). */
+  close() {
+    if (this.forceClose || this.closed || !this.isDirty()) {
+      super.close();
+      return;
+    }
+    if (this.asking) return;
+    this.asking = true;
+    new ChoiceModal(
+      this.app,
+      t("ui.editor_discard_title"),
+      t("ui.editor_discard_desc"),
+      [
+        {
+          label: t("ui.editor_discard"),
+          warning: true,
+          action: () => {
+            this.asking = false;
+            this.forceClose = true;
+            super.close();
+          }
+        }
+      ],
+      () => {
+        this.asking = false;
+      }
+    ).open();
+  }
+  isDirty() {
+    const a = this.draft;
+    const b = this.initial;
+    return a.name !== b.name || a.structure !== b.structure || a.voice !== b.voice || a.format !== b.format || a.update !== b.update;
+  }
+  // ---- the choices ----
+  /** Fills the three lists from the parts that exist now, keeping each choice (one that is gone stays as "Not found"). */
+  fillSelects() {
+    const store = this.plugin.noteStyles;
+    for (const category of PART_CATEGORIES) {
+      const select = this.selects.get(category);
+      if (!select) continue;
+      const items = store.listParts(category).filter((item) => !item.issues.some((issue2) => issue2.code === "builtin_name"));
+      select.replaceChildren();
+      const current = this.draft[category];
+      if (!items.some((item) => item.ref === current)) {
+        const bare = current.replace(/^(?:file|builtin):/, "");
+        select.createEl("option", { value: current, text: t("ui.block_missing_option_0", bare) });
+      }
+      const optionText = (item) => item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.name;
+      const addGroup = (title, group) => {
+        if (!group.length) return;
+        const parent = select.createEl("optgroup", { attr: { label: title } });
+        for (const item of group) parent.createEl("option", { value: item.ref, text: optionText(item) });
+      };
+      addGroup(
+        t("ui.block_group_builtin"),
+        items.filter((item) => item.kind === "builtin")
+      );
+      addGroup(
+        t("ui.note_style_group_folder"),
+        items.filter((item) => item.kind === "file")
+      );
+      select.value = current;
+    }
+  }
+  partName(category) {
+    var _a2, _b2;
+    const select = this.selects.get(category);
+    const ref = this.draft[category];
+    const item = this.plugin.noteStyles.listParts(category).find((part) => part.ref === ref);
+    return (_b2 = (_a2 = item == null ? void 0 : item.name) != null ? _a2 : select == null ? void 0 : select.value) != null ? _b2 : ref;
+  }
+  takenNames() {
+    return takenRecipeNames(this.plugin);
+  }
+  nameProblem() {
+    return this.existing ? "" : namePartProblem(this.draft.name, "recipe", this.takenNames());
+  }
+  /** Writes the name error (only when its text changes) and enables or disables Save. */
+  syncState() {
+    const problem = this.nameProblem();
+    const error = this.errorEl;
+    if (error && error.textContent !== problem) error.setText(problem);
+    if (this.saveButton) this.saveButton.disabled = !!problem || this.saving;
+  }
+  changed() {
+    this.syncState();
+    this.scheduleExample();
+  }
+  /** The parts the draft holds, with a name the store can use for a style that is not saved. */
+  draftParts() {
+    return { ...this.draft, name: this.draft.name || t("ui.recipe_new_name") };
+  }
+  // ---- Edit on a part ----
+  async editPart(category, button) {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      const target = await this.plugin.editNotePart(category, this.draft[category]);
+      if (!target || this.closed) return;
+      this.draft[category] = target;
+      await this.plugin.noteStyles.refresh().catch(() => void 0);
+      if (this.closed) return;
+      this.fillSelects();
+      this.syncState();
+      this.scheduleExample();
+      button.focus();
+    } finally {
+      this.busy = false;
+    }
+  }
+  /** The window is in front again: read the files again and redraw what depends on them. */
+  async reload() {
+    await this.plugin.noteStyles.refresh().catch(() => void 0);
+    if (this.closed) return;
+    this.fillSelects();
+    this.syncState();
+    this.scheduleExample();
+  }
+  // ---- the sample note ----
+  scheduleExample() {
+    if (this.closed) return;
+    if (this.timer !== void 0) window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => {
+      this.timer = void 0;
+      void this.drawExample();
+    }, EXAMPLE_DELAY_MS);
+  }
+  /** The sample as Markdown: the structure's section names and descriptions with fixed sample text, shaped by the format rules. */
+  exampleMarkdown() {
+    const language2 = this.plugin.settings.language;
+    const style = this.plugin.noteStyles.draftStyle(this.draftParts(), "topic", language2);
+    const formatId = this.draft.format.startsWith("builtin:") ? this.draft.format.slice("builtin:".length) : void 0;
+    const lines = [
+      `*${plainMd(t("ui.editor_example_voice_0", this.partName("voice")))}* \xB7 *${plainMd(t("ui.editor_example_format_0", this.partName("format")))}*`,
+      ""
+    ];
+    const callout = (title) => [
+      `> [!note] ${plainMd(title)}`,
+      `> ${plainMd(t("ui.editor_example_callout"))}`,
+      ""
+    ];
+    const table = [
+      `| ${plainMd(t("ui.editor_example_col_a"))} | ${plainMd(t("ui.editor_example_col_b"))} |`,
+      "| --- | --- |",
+      `| ${plainMd(t("ui.editor_example_cell_a"))} | ${plainMd(t("ui.editor_example_cell_b"))} |`,
+      ""
+    ];
+    for (const [index, section3] of style.template.sections.entries()) {
+      const heading = plainMd(section3.name);
+      lines.push(`## ${heading}`, "");
+      const hint = plainMd(section3.description);
+      if (formatId === "lean") {
+        if (hint) lines.push(`- ${hint}`);
+        lines.push(
+          `- ${plainMd(t("ui.editor_example_bullet_a"))}`,
+          `- ${plainMd(t("ui.editor_example_bullet_b"))}`,
+          ""
+        );
+        continue;
+      }
+      if (hint) lines.push(hint, "");
+      lines.push(plainMd(t("ui.editor_example_body")), "");
+      if (formatId === "rich") lines.push(...index % 2 === 0 ? callout(section3.name) : table);
+      else if (index === 0) lines.push(...callout(section3.name));
+    }
+    return lines.join("\n");
+  }
+  async drawExample() {
+    const host = this.exampleEl;
+    if (!host || this.closed) return;
+    const token = ++this.renderToken;
+    const markdown = this.exampleMarkdown();
+    const next = host.createDiv({ cls: "vam-editor-example-body" });
+    try {
+      await import_obsidian33.MarkdownRenderer.render(this.app, markdown, next, "", this.component);
+    } catch (e) {
+      next.remove();
+      return;
+    }
+    if (this.closed || token !== this.renderToken) {
+      next.remove();
+      return;
+    }
+    for (const child of Array.from(host.children)) if (child !== next) child.remove();
+  }
+  // ---- preview and save ----
+  async previewPrompt(button) {
+    await this.plugin.noteStyles.refresh().catch(() => void 0);
+    if (this.closed) return;
+    this.plugin.openPromptPreview(
+      button,
+      () => this.plugin.noteStyles.draftStyle(this.draftParts(), "topic", this.plugin.settings.language)
+    );
+  }
+  async save() {
+    var _a2, _b2, _c, _d, _e;
+    if (this.saving || this.closed) return;
+    const problem = this.nameProblem();
+    if (problem) {
+      this.syncState();
+      return;
+    }
+    this.saving = true;
+    this.syncState();
+    try {
+      const switched = this.builtinSource ? [
+        ...(_b2 = (_a2 = this.plugin.noteStyles.listRecipes().find((item) => item.ref === this.builtinSource)) == null ? void 0 : _a2.usedByKinds) != null ? _b2 : []
+      ].filter((kind) => kind !== "aim") : [];
+      const result = await this.plugin.saveNoteRecipe({
+        name: this.draft.name,
+        structure: this.draft.structure,
+        voice: this.draft.voice,
+        format: this.draft.format,
+        update: this.draft.update,
+        ...this.existing ? { original: this.existing } : {}
+      });
+      if (this.closed) return;
+      if (!result.ok) {
+        if (result.reason === "name") (_c = this.errorEl) == null ? void 0 : _c.setText(t("ui.recipe_notice_name_unavailable"));
+        return;
+      }
+      if (switched.length) {
+        for (const kind of switched) await this.plugin.setKindStyle(kind, result.ref);
+        new import_obsidian33.Notice(
+          t(
+            "ui.recipe_notice_switched_0_1",
+            result.ref.slice("file:".length),
+            switched.map((kind) => t(kind === "aim" ? "ui.note_style_kind_aim" : `ui.topic_kind_${kind}`)).join(t("ui.manage_list_separator"))
+          )
+        );
+      }
+      this.forceClose = true;
+      super.close();
+      (_e = (_d = this.options).onSaved) == null ? void 0 : _e.call(_d, result.ref);
+    } finally {
+      this.saving = false;
+      if (!this.closed) this.syncState();
+    }
+  }
+};
+
+// ui/modals/note-style-manage-modal.ts
 var MANAGE_TABS = ["recipe", "structure", "voice", "format"];
 var TAB_NAME_KEYS = {
   recipe: "ui.manage_tab_recipe",
@@ -63801,8 +64323,8 @@ function styleTags(item) {
 function styleKindName(kind) {
   return kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`);
 }
-var lower4 = (value) => value.toLocaleLowerCase();
-var NoteStyleManageModal = class extends import_obsidian33.Modal {
+var lower5 = (value) => value.toLocaleLowerCase();
+var NoteStyleManageModal = class extends import_obsidian34.Modal {
   constructor(app, plugin, initialTab = "recipe", trigger, onClosed) {
     super(app);
     this.plugin = plugin;
@@ -63817,6 +64339,8 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
     __publicField(this, "editButtons", /* @__PURE__ */ new Map());
     /** Rebuilds the source choices of the open "New..." form after the list changed. */
     __publicField(this, "refreshForm");
+    /** The style editor while it is open (one at a time). */
+    __publicField(this, "editor");
     this.tab = initialTab;
   }
   onOpen() {
@@ -63920,7 +64444,7 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
     list.empty();
     this.editButtons.clear();
     for (const entry of this.entries()) {
-      const setting = new import_obsidian33.Setting(list);
+      const setting = new import_obsidian34.Setting(list);
       setting.settingEl.addClass("vam-manage-row");
       setting.setName(entry.name);
       if (entry.builtin) setting.nameEl.createSpan({ text: t("ui.block_group_builtin"), cls: "vam-manage-badge" });
@@ -63944,25 +64468,21 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
     var _a2;
     if (ref) (_a2 = this.editButtons.get(ref)) == null ? void 0 : _a2.focus();
   }
-  /** Opens the vault file of a user's style in a tab. */
-  async openStyleFile(ref) {
-    const path = this.plugin.noteStyles.recipeFilePath(ref);
-    const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian33.normalizePath)(path)) : null;
-    if (!(file instanceof import_obsidian33.TFile)) {
-      new import_obsidian33.Notice(t("ui.block_notice_open_failed"));
-      return false;
-    }
-    await this.app.workspace.getLeaf("tab").openFile(file);
-    return true;
-  }
   async edit(entry) {
     var _a2;
     if (this.busy || entry.aimOnly) return;
+    if (this.tab === "recipe") {
+      this.openEditor({
+        source: entry.ref,
+        ...entry.builtin ? { name: this.suggestRecipeName(entry.name) } : {},
+        trigger: this.editButtons.get(entry.ref),
+        onSaved: (ref) => this.afterSaved(ref)
+      });
+      return;
+    }
     this.busy = true;
     try {
-      let target;
-      if (this.tab === "recipe") target = await this.editRecipe(entry);
-      else target = await this.plugin.editNotePart(this.tab, entry.ref);
+      const target = await this.plugin.editNotePart(this.tab, entry.ref);
       await this.plugin.noteStyles.refresh();
       if (this.closed) return;
       this.renderList();
@@ -63972,44 +64492,36 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
       this.busy = false;
     }
   }
-  /** A user's style opens as it is. A built-in one is saved as "My <name>" (the same four parts) and that file opens. */
-  async editRecipe(entry) {
-    let target = entry.ref;
-    if (entry.builtin) {
-      const item = this.plugin.noteStyles.listRecipes().find((recipe) => recipe.ref === entry.ref);
-      if (!item) return null;
-      const result = await this.plugin.saveNoteRecipe({
-        name: this.suggestRecipeName(entry.name),
-        structure: item.structure.ref,
-        voice: item.voice.ref,
-        format: item.format.ref,
-        update: item.update
-      });
-      if (!result.ok) return null;
-      target = result.ref;
-      await this.plugin.noteStyles.refresh();
-    }
-    return await this.openStyleFile(target) ? target : null;
+  /** Opens the style editor on top of this window; a second one is not opened while it is there. */
+  openEditor(options) {
+    if (this.editor || this.closed) return;
+    const editor = new NoteStyleEditorModal(this.app, this.plugin, {
+      ...options,
+      onClosed: () => {
+        this.editor = void 0;
+      }
+    });
+    this.editor = editor;
+    editor.open();
+  }
+  /** The editor saved a style: draw the list again and put the focus on its row. */
+  afterSaved(ref) {
+    var _a2;
+    if (this.closed) return;
+    this.renderList();
+    (_a2 = this.refreshForm) == null ? void 0 : _a2.call(this);
+    this.focusRow(ref);
   }
   // ---- "New..." ----
   /** The names taken in this tab, lower case (the vault is case-insensitive on some systems). */
   takenNames() {
     const store = this.plugin.noteStyles;
     const items = this.tab === "recipe" ? store.listRecipes() : store.listParts(this.tab);
-    return new Set(items.filter((item) => item.kind === "file").map((item) => lower4(item.name)));
+    return new Set(items.filter((item) => item.kind === "file").map((item) => lower5(item.name)));
   }
   /** "My <name>" for a copy of a style, "New style" for a blank one; " (2)", " (3)" ... until it is free and allowed. */
   suggestRecipeName(from) {
-    const base = cleanBlockName(
-      from === null ? t("ui.recipe_new_name") : t("ui.block_copy_name_0", cleanBlockName(from))
-    );
-    const taken = this.takenNames();
-    let name = base || "copy";
-    for (let n = 2; taken.has(lower4(name)) || !validatePartName(name, "recipe").ok; n++) {
-      if (n > 999) break;
-      name = `${base || "copy"} (${n})`;
-    }
-    return name;
+    return suggestRecipeName(this.plugin, from);
   }
   suggestName(from) {
     var _a2;
@@ -64019,21 +64531,7 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
   }
   /** Why `value` cannot be the name of a new file in this tab; "" when it can. */
   nameProblem(value) {
-    if (!value) return t("ui.name_required");
-    const check = validatePartName(value, this.tab);
-    if (!check.ok) {
-      const keys = {
-        empty: "ui.name_required",
-        padded: "ui.manage_name_padded",
-        separator: "ui.manage_name_separator",
-        dots: "ui.manage_name_dots",
-        builtin: "ui.manage_name_builtin"
-      };
-      return t(keys[check.reason]);
-    }
-    if (cleanBlockName(value) !== value) return t("ui.manage_name_unsafe");
-    if (this.takenNames().has(lower4(value))) return t("ui.manage_name_taken");
-    return "";
+    return namePartProblem(value, this.tab, this.takenNames());
   }
   buildAddForm(panel) {
     const tab = this.tab;
@@ -64061,7 +64559,7 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
     const fromRadio = radio("from", t("ui.manage_add_from"));
     const blankRadio = radio("blank", t("ui.manage_add_blank"));
     let sourceSelect;
-    new import_obsidian33.Setting(form).setName(t("ui.manage_add_source")).addDropdown((dropdown) => {
+    new import_obsidian34.Setting(form).setName(t("ui.manage_add_source")).addDropdown((dropdown) => {
       sourceSelect = dropdown.selectEl;
       dropdown.selectEl.setAttr("aria-label", t("ui.manage_add_source"));
       dropdown.onChange((value) => {
@@ -64072,7 +64570,7 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
     });
     let nameInput;
     const errorId = `vam-manage-error-${tab}`;
-    new import_obsidian33.Setting(form).setName(t("ui.manage_add_name")).addText((text11) => {
+    new import_obsidian34.Setting(form).setName(t("ui.manage_add_name")).addText((text11) => {
       nameInput = text11.inputEl;
       text11.inputEl.setAttr("aria-label", t("ui.manage_add_name"));
       text11.inputEl.setAttr("aria-describedby", errorId);
@@ -64093,7 +64591,7 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
       attr: { id: errorId, "aria-live": "polite" }
     });
     let createButton;
-    new import_obsidian33.Setting(form).addButton((button) => {
+    new import_obsidian34.Setting(form).addButton((button) => {
       createButton = button;
       button.setButtonText(t("ui.manage_add_create")).setCta().onClick(() => void create());
     });
@@ -64140,30 +64638,40 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
       if (!touched) setName(this.suggestName(mode === "from" ? source : null));
       check();
     };
+    const finish = (target) => {
+      if (this.closed) return;
+      form.hidden = true;
+      toggle.setAttr("aria-expanded", "false");
+      this.renderList();
+      reset();
+      this.focusRow(target);
+    };
     const create = async () => {
       var _a2;
-      if (this.busy || this.nameProblem(name)) return;
+      if (this.busy || this.editor || this.nameProblem(name)) return;
+      if (tab === "recipe") {
+        this.openEditor({
+          source: null,
+          from: mode === "from" ? source : null,
+          name,
+          trigger: createButton == null ? void 0 : createButton.buttonEl,
+          onSaved: (ref) => finish(ref)
+        });
+        return;
+      }
       this.busy = true;
       try {
         const from = mode === "from" ? source : null;
         let target = null;
-        if (tab === "recipe") target = await this.createRecipe(name, from);
-        else {
-          try {
-            target = await this.plugin.noteStyles.createPart(tab, from, name);
-          } catch (e) {
-            new import_obsidian33.Notice(t("ui.manage_create_failed"));
-          }
-          if (target) target = (_a2 = await this.plugin.editNotePart(tab, target)) != null ? _a2 : target;
+        try {
+          target = await this.plugin.noteStyles.createPart(tab, from, name);
+        } catch (e) {
+          new import_obsidian34.Notice(t("ui.manage_create_failed"));
         }
+        if (target) target = (_a2 = await this.plugin.editNotePart(tab, target)) != null ? _a2 : target;
         if (!target) return;
         await this.plugin.noteStyles.refresh();
-        if (this.closed) return;
-        form.hidden = true;
-        toggle.setAttr("aria-expanded", "false");
-        this.renderList();
-        reset();
-        this.focusRow(target);
+        finish(target);
       } finally {
         this.busy = false;
       }
@@ -64180,20 +64688,6 @@ var NoteStyleManageModal = class extends import_obsidian33.Modal {
     fillSources();
     setName(this.suggestName(source || null));
     check();
-  }
-  /** Writes a new style file: the four parts of the chosen style, or the general research style for a blank one. */
-  async createRecipe(name, from) {
-    const items = this.plugin.noteStyles.listRecipes();
-    const base = items.find((item) => item.ref === (from != null ? from : KIND_DEFAULT_RECIPE.topic));
-    if (!base) return null;
-    const result = await this.plugin.saveNoteRecipe({
-      name,
-      structure: base.structure.ref,
-      voice: base.voice.ref,
-      format: base.format.ref,
-      update: base.update
-    });
-    return result.ok ? result.ref : null;
   }
 };
 
@@ -64234,7 +64728,7 @@ function renderNoteLocationSetting(setting, plugin, refresh) {
     });
     setting.addButton(
       (button) => button.setButtonText(t("ui.note_style_folder_choose")).onClick(async () => {
-        const value = (0, import_obsidian34.normalizePath)(input2.trim());
+        const value = (0, import_obsidian35.normalizePath)(input2.trim());
         if (!input2.trim() || value === ".") return;
         settings.noteStylesFolder = value;
         await plugin.saveSettings();
@@ -64403,7 +64897,7 @@ function bindMapFolderInput(plugin, key2, input2) {
   });
 }
 var offersEveryLanguage = (values) => SUPPORTED_LANGUAGES.every((item) => values.includes(item.id));
-var CodexSetupModal = class extends import_obsidian34.Modal {
+var CodexSetupModal = class extends import_obsidian35.Modal {
   constructor(app, executable, recheck) {
     super(app);
     this.executable = executable;
@@ -64427,7 +64921,7 @@ var CodexSetupModal = class extends import_obsidian34.Modal {
       cls: "vam-setup-note"
     });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian34.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+    new import_obsidian35.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
       (button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
@@ -64435,7 +64929,7 @@ var CodexSetupModal = class extends import_obsidian34.Modal {
     );
   }
 };
-var AiUsageModal = class extends import_obsidian34.Modal {
+var AiUsageModal = class extends import_obsidian35.Modal {
   constructor(app, provider, resolve) {
     super(app);
     this.provider = provider;
@@ -64456,7 +64950,7 @@ var AiUsageModal = class extends import_obsidian34.Modal {
       this.close();
       this.resolve(confirmed);
     };
-    new import_obsidian34.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
+    new import_obsidian35.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
       (button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true))
     );
   }
@@ -64464,7 +64958,7 @@ var AiUsageModal = class extends import_obsidian34.Modal {
     if (!this.settled) this.resolve(false);
   }
 };
-var ClaudeSetupModal = class extends import_obsidian34.Modal {
+var ClaudeSetupModal = class extends import_obsidian35.Modal {
   constructor(app, executable, url, recheck) {
     super(app);
     this.executable = executable;
@@ -64484,7 +64978,7 @@ var ClaudeSetupModal = class extends import_obsidian34.Modal {
     });
     steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian34.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+    new import_obsidian35.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
       (button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
@@ -64492,7 +64986,7 @@ var ClaudeSetupModal = class extends import_obsidian34.Modal {
     );
   }
 };
-var VisualAgentMapSettingTab = class extends import_obsidian34.PluginSettingTab {
+var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -65027,10 +65521,10 @@ var PendingSuggestions = class extends Map {
 };
 
 // ui/outline-view.ts
-var import_obsidian35 = require("obsidian");
+var import_obsidian36 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 var foldOutlineSearch = (text11) => toSimplifiedFold(text11.toLocaleLowerCase().replace(/\u0307/g, ""));
-var OutlineView = class extends import_obsidian35.ItemView {
+var OutlineView = class extends import_obsidian36.ItemView {
   constructor(leaf, openNote) {
     super(leaf);
     this.openNote = openNote;
@@ -65163,7 +65657,7 @@ var OutlineView = class extends import_obsidian35.ItemView {
       if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
       button.addEventListener("click", () => {
         var _a3;
-        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian35.Notice(t("ui.coffee_segment_no_content"));
+        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian36.Notice(t("ui.coffee_segment_no_content"));
       });
     });
   }
@@ -65253,7 +65747,7 @@ var OutlineView = class extends import_obsidian35.ItemView {
 };
 
 // experiences/sharing/share-modal.ts
-var import_obsidian37 = require("obsidian");
+var import_obsidian38 = require("obsidian");
 
 // experiences/sharing/share-format.ts
 var SHARE_FORMAT = "vam-share";
@@ -65781,23 +66275,23 @@ function allowedUrl(tag, name, value) {
   return false;
 }
 function cssIsInert(css) {
-  const lower5 = css.toLowerCase();
-  if (lower5.includes("@import") || lower5.includes("expression(") || lower5.includes("javascript:")) return false;
-  if (lower5.includes("behavior:") || lower5.includes("-moz-binding")) return false;
-  for (const match of lower5.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
+  const lower6 = css.toLowerCase();
+  if (lower6.includes("@import") || lower6.includes("expression(") || lower6.includes("javascript:")) return false;
+  if (lower6.includes("behavior:") || lower6.includes("-moz-binding")) return false;
+  for (const match of lower6.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
     if (!match[2].trim().startsWith("#")) return false;
-  return !FORBIDDEN_SCHEMES.test(lower5);
+  return !FORBIDDEN_SCHEMES.test(lower6);
 }
 function scrubAttributes(element, tag, report) {
   var _a2;
   for (const name of element.getAttributeNames()) {
-    const lower5 = name.toLowerCase();
+    const lower6 = name.toLowerCase();
     const value = (_a2 = element.getAttribute(name)) != null ? _a2 : "";
     let drop = false;
-    if (lower5.startsWith("on") || lower5 === "srcdoc") drop = true;
-    else if (lower5.startsWith("data-") && !lower5.startsWith("data-callout")) drop = true;
-    else if (URL_ATTRIBUTES.has(lower5)) drop = !allowedUrl(tag, lower5, value);
-    else if (lower5 === "style") drop = !cssIsInert(value);
+    if (lower6.startsWith("on") || lower6 === "srcdoc") drop = true;
+    else if (lower6.startsWith("data-") && !lower6.startsWith("data-callout")) drop = true;
+    else if (URL_ATTRIBUTES.has(lower6)) drop = !allowedUrl(tag, lower6, value);
+    else if (lower6 === "style") drop = !cssIsInert(value);
     else if (FORBIDDEN_SCHEMES.test(value)) drop = true;
     if (drop) {
       element.removeAttribute(name);
@@ -66681,7 +67175,7 @@ function attachTranslations(payload, options) {
 }
 
 // experiences/sharing/share-exporter.ts
-var import_obsidian36 = require("obsidian");
+var import_obsidian37 = require("obsidian");
 
 // experiences/sharing/share-viewer-dictionaries.ts
 var SHARE_VIEWER_UI_EXTRA = {
@@ -67482,7 +67976,7 @@ async function installWrapper() {
   if (installedWrapper) return;
   installing != null ? installing : installing = (async () => {
     try {
-      const mermaid = await (0, import_obsidian36.loadMermaid)();
+      const mermaid = await (0, import_obsidian37.loadMermaid)();
       const original = mermaid.render;
       if (typeof original === "function" && !installedWrapper) {
         const wrapped = function(id, text11, ...rest) {
@@ -67530,7 +68024,7 @@ var ShareExporter = class {
     __publicField(this, "images", /* @__PURE__ */ new Map());
     __publicField(this, "registry", createAssetRegistry());
     __publicField(this, "ownerPath", /* @__PURE__ */ new Map());
-    __publicField(this, "component", new import_obsidian36.Component());
+    __publicField(this, "component", new import_obsidian37.Component());
     __publicField(this, "container", null);
     __publicField(this, "disposed", false);
     __publicField(this, "forbidden", null);
@@ -67598,13 +68092,13 @@ var ShareExporter = class {
   async renderOne(detail, titles, ticket) {
     const cleaned = cleanShareMarkdown(detail, { titleOf: (target) => titles.get(target), assets: this.registry });
     const host = this.host().createDiv();
-    const child = new import_obsidian36.Component();
+    const child = new import_obsidian37.Component();
     this.component.addChild(child);
     const hasDiagram = /(`{3,}|~{3,})[ \t]*mermaid\b/i.test(cleaned.markdown);
     const capture = hasDiagram ? await captureMermaidSources() : { sources: /* @__PURE__ */ new Map(), restore() {
     } };
     try {
-      await import_obsidian36.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
+      await import_obsidian37.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
       const finished = this.finish(host, capture.sources);
@@ -67633,11 +68127,11 @@ var ShareExporter = class {
     if (this.disposed || signal.aborted) return null;
     const ticket = { generation: 0, signal, isCurrent: () => !signal.aborted && !this.disposed };
     const host = this.host().createDiv();
-    const child = new import_obsidian36.Component();
+    const child = new import_obsidian37.Component();
     this.component.addChild(child);
     try {
       const fence = source.includes("```") ? "~~~~" : "```";
-      await import_obsidian36.MarkdownRenderer.render(this.app, `${fence}mermaid
+      await import_obsidian37.MarkdownRenderer.render(this.app, `${fence}mermaid
 ${source}
 ${fence}`, host, "", child);
       await this.settleMermaid(host, ticket);
@@ -67712,7 +68206,7 @@ ${fence}`, host, "", child);
         pre.after(caption);
       }
     const clean4 = createDiv();
-    clean4.append((0, import_obsidian36.sanitizeHTMLToDom)(host.innerHTML));
+    clean4.append((0, import_obsidian37.sanitizeHTMLToDom)(host.innerHTML));
     unwrapLocalLinks(clean4, () => createSpan());
     scrubShareTree(clean4);
     const slots = Array.from(clean4.querySelectorAll(".vam-mermaid-slot"));
@@ -67738,8 +68232,8 @@ ${fence}`, host, "", child);
     const relative = resolveRelative(folder, entry.ref);
     const candidates = [
       (_c = this.app.metadataCache.getFirstLinkpathDest(entry.ref, fromPath)) == null ? void 0 : _c.path,
-      relative ? (0, import_obsidian36.normalizePath)(relative) : void 0,
-      (0, import_obsidian36.normalizePath)(entry.ref)
+      relative ? (0, import_obsidian37.normalizePath)(relative) : void 0,
+      (0, import_obsidian37.normalizePath)(entry.ref)
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getFileByPath(path) : null;
@@ -67775,7 +68269,7 @@ ${fence}`, host, "", child);
       const folder = this.source.mapPath.split("/").slice(0, -1).join("/");
       this.forbidden = forbiddenStringsFor(
         {
-          vaultPath: adapter instanceof import_obsidian36.FileSystemAdapter ? adapter.getBasePath() : void 0,
+          vaultPath: adapter instanceof import_obsidian37.FileSystemAdapter ? adapter.getBasePath() : void 0,
           vaultName: this.app.vault.getName(),
           mapFolder: folder
         },
@@ -67979,7 +68473,7 @@ function originalLanguage(source, uiLanguage) {
 }
 var UNVERIFIED_LANGUAGES = ["ja", "ko", "es"];
 var AUTO_LANGUAGE = "auto";
-var ShareModal = class extends import_obsidian37.Modal {
+var ShareModal = class extends import_obsidian38.Modal {
   constructor(app, options) {
     var _a2, _b2;
     super(app);
@@ -68035,14 +68529,14 @@ var ShareModal = class extends import_obsidian37.Modal {
   onOpen() {
     this.titleEl.setText(t("share.title"));
     this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
-    this.fullSetting = new import_obsidian37.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t("share.option_full_desc")).addToggle((toggle) => {
+    this.fullSetting = new import_obsidian38.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t("share.option_full_desc")).addToggle((toggle) => {
       this.fullToggle = toggle;
       toggle.setValue(this.includeDetail).onChange((value) => {
         this.includeDetail = value;
         this.restart();
       });
     });
-    this.imagesSetting = new import_obsidian37.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t("share.option_images_desc")).addToggle((toggle) => {
+    this.imagesSetting = new import_obsidian38.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t("share.option_images_desc")).addToggle((toggle) => {
       this.imagesToggle = toggle;
       toggle.setValue(this.includeImages).onChange((value) => {
         this.includeImages = value;
@@ -68110,11 +68604,11 @@ var ShareModal = class extends import_obsidian37.Modal {
   openTranslationSection() {
     const host = this.options.translation;
     if (!host) return;
-    new import_obsidian37.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
+    new import_obsidian38.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
     this.contentEl.createEl("p", { text: t("share.translate_intro"), cls: "vam-modal-intro" });
     for (const language2 of SHARE_TRANSLATION_LANGUAGES) {
       const original = language2 === this.sourceLanguage;
-      const setting = new import_obsidian37.Setting(this.contentEl).setName(
+      const setting = new import_obsidian38.Setting(this.contentEl).setName(
         original ? t("share.translate_original_0", this.languageLabel(language2)) : this.languageLabel(language2)
       );
       if (!original && UNVERIFIED_LANGUAGES.includes(language2))
@@ -68127,7 +68621,7 @@ var ShareModal = class extends import_obsidian37.Modal {
             else this.picked.delete(language2);
             if (!value && this.defaultChoice === language2) {
               this.defaultChoice = AUTO_LANGUAGE;
-              new import_obsidian37.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
+              new import_obsidian38.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
             }
             this.renderOpenLanguage();
             this.selectionChanged();
@@ -68137,7 +68631,7 @@ var ShareModal = class extends import_obsidian37.Modal {
     }
     this.openLangEl = this.contentEl.createDiv();
     this.renderOpenLanguage();
-    this.modelSetting = new import_obsidian37.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
+    this.modelSetting = new import_obsidian38.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
       this.modelDropdown = dropdown;
       dropdown.addOption(FOLLOW_DEFAULT_MODEL, t("ui.follow_default_model", host.modelLabel(host.defaultModel())));
       for (const id of host.models()) dropdown.addOption(id, host.modelLabel(id));
@@ -68158,7 +68652,7 @@ var ShareModal = class extends import_obsidian37.Modal {
     if (!container) return;
     container.empty();
     const ids = [String(this.sourceLanguage), ...this.selected()];
-    this.openLangSetting = new import_obsidian37.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
+    this.openLangSetting = new import_obsidian38.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
       this.openLangDropdown = dropdown;
       dropdown.addOption(AUTO_LANGUAGE, t("share.translate_default_auto"));
       for (const id of ids) dropdown.addOption(id, this.languageLabel(id));
@@ -68285,7 +68779,7 @@ var ShareModal = class extends import_obsidian37.Modal {
       this.phase = "done";
       this.estimateMemo = null;
       this.applyTranslation();
-      new import_obsidian37.Notice(t("share.translate_done"));
+      new import_obsidian38.Notice(t("share.translate_done"));
       this.render();
       this.saveButton.focus();
     } catch (error) {
@@ -68328,7 +68822,7 @@ var ShareModal = class extends import_obsidian37.Modal {
     if (choice2 === AUTO_LANGUAGE || choice2 === String(this.sourceLanguage)) return;
     const carried = ((_b2 = (_a2 = this.translationArg()) == null ? void 0 : _a2.pieces) != null ? _b2 : []).map((item) => item.language);
     if (carried.includes(choice2)) return;
-    new import_obsidian37.Notice(
+    new import_obsidian38.Notice(
       t("share.translate_open_dropped_0_1", this.languageLabel(choice2), this.languageLabel(String(this.sourceLanguage)))
     );
   }
@@ -68414,7 +68908,7 @@ var ShareModal = class extends import_obsidian37.Modal {
         row.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
     }
     if (item.status === "incomplete")
-      new import_obsidian37.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
+      new import_obsidian38.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
         (toggle) => toggle.setValue(this.includeIncomplete.has(item.language)).onChange((value) => {
           if (value) this.includeIncomplete.add(item.language);
           else this.includeIncomplete.delete(item.language);
@@ -68536,9 +69030,9 @@ var ShareModal = class extends import_obsidian37.Modal {
     try {
       const write = (_a2 = this.options.writeClipboard) != null ? _a2 : (text11) => navigator.clipboard.writeText(text11);
       await write(publishInstructions());
-      new import_obsidian37.Notice(t("share.publish_done"));
+      new import_obsidian38.Notice(t("share.publish_done"));
     } catch (e) {
-      new import_obsidian37.Notice(t("share.publish_fail"));
+      new import_obsidian38.Notice(t("share.publish_fail"));
       this.publishFallback = true;
       if (!this.closed) this.render();
     }
@@ -68589,12 +69083,12 @@ var ShareModal = class extends import_obsidian37.Modal {
       else {
         const size = formatBytes(result.bytes);
         this.savedText = t(outcome === "saved" ? "share.saved_0_1" : "share.downloaded_0_1", name, size);
-        new import_obsidian37.Notice(this.savedText);
+        new import_obsidian38.Notice(this.savedText);
       }
     } catch (e) {
       if (!this.closed) {
         this.savedText = "";
-        new import_obsidian37.Notice(t("share.save_failed"));
+        new import_obsidian38.Notice(t("share.save_failed"));
       }
     }
     this.saving = false;
@@ -68603,13 +69097,13 @@ var ShareModal = class extends import_obsidian37.Modal {
 };
 
 // experiences/sharing/share-translate-dom.ts
-var import_obsidian38 = require("obsidian");
+var import_obsidian39 = require("obsidian");
 function obsidianTranslateDom() {
   return {
     parse: (html) => new DOMParser().parseFromString(html, "text/html").body,
     serialize: (root) => root.innerHTML,
     sanitize: (root) => {
-      const clean4 = (0, import_obsidian38.sanitizeHTMLToDom)(root.innerHTML);
+      const clean4 = (0, import_obsidian39.sanitizeHTMLToDom)(root.innerHTML);
       root.replaceChildren(clean4);
     },
     createSpan: () => createSpan(),
@@ -71043,10 +71537,10 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
 }
 
 // experiences/markdown-context/selection-ai.ts
-var import_obsidian40 = require("obsidian");
+var import_obsidian41 = require("obsidian");
 
 // experiences/markdown-context/image-translate-action.ts
-var import_obsidian39 = require("obsidian");
+var import_obsidian40 = require("obsidian");
 
 // experiences/markdown-context/steps/image-translate/prompt.md
 var prompt_default8 = "Edit the attached image: create the same image with every piece of visible text translated into {{target}}.\nKeep the layout, illustrations, colors, arrows, icons and style the same; only replace the text, in a matching size and weight that fits each original text area. Do not add, remove or redraw other content. Leave proper names, numbers and units as they are unless they are normally translated.\nGenerate the image with the image generation tool, then reply with one short sentence describing the result in {{target}}.\n";
@@ -71072,7 +71566,7 @@ var languageIdsPattern = () => [...SUPPORTED_LANGUAGES, ...OUTPUT_LANGUAGE_CHOIC
 function imageFileBase(alt) {
   return (alt || "image").replace(/\.(?:png|jpe?g|gif|webp)$/i, "").replace(new RegExp(`-(?:${languageIdsPattern()})(?:[ -]\\d+)?$`), "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
-var ImageTranslateAction = class extends import_obsidian39.Component {
+var ImageTranslateAction = class extends import_obsidian40.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -71153,7 +71647,7 @@ var ImageTranslateAction = class extends import_obsidian39.Component {
     this.target = { view, path: view.file.path, image, token };
     const rect2 = image.getBoundingClientRect();
     const pill = this.app.workspace.containerEl.createEl("button", { cls: "vam-image-action vam-image-action-pill" });
-    (0, import_obsidian39.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
+    (0, import_obsidian40.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
     pill.createSpan({ text: t("ui.image_translate_action") });
     pill.addEventListener("click", () => this.openPopover());
     this.pill = pill;
@@ -71191,7 +71685,7 @@ var ImageTranslateAction = class extends import_obsidian39.Component {
     header.createEl("strong", { text: t("ui.image_translate_action"), attr: { id: titleId } });
     const close = header.createEl("button", { cls: "clickable-icon" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian39.setIcon)(close, "x");
+    (0, import_obsidian40.setIcon)(close, "x");
     close.addEventListener("click", () => this.hide());
     const field = popover.createEl("label", { cls: "vam-image-action-field" });
     field.createSpan({ text: t("ui.image_translate_language") });
@@ -71271,10 +71765,10 @@ var ImageTranslateAction = class extends import_obsidian39.Component {
       const link = this.app.fileManager.generateMarkdownLink(saved, target.path);
       const embed = link.startsWith("!") ? link : `!${link}`;
       const outcome = await this.write(target, note, embed, placement);
-      new import_obsidian39.Notice(t(outcome, saved.path));
+      new import_obsidian40.Notice(t(outcome, saved.path));
       saved = null;
     } catch (error) {
-      if (!controller.signal.aborted) new import_obsidian39.Notice(error instanceof Error ? error.message : String(error));
+      if (!controller.signal.aborted) new import_obsidian40.Notice(error instanceof Error ? error.message : String(error));
       if (saved) await this.app.fileManager.trashFile(saved);
     } finally {
       if (this.running === controller) {
@@ -71325,7 +71819,7 @@ ${embed}
     };
     const open = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view) => {
       var _a2;
-      return view instanceof import_obsidian39.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
+      return view instanceof import_obsidian40.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
     });
     if (open) {
       const editor = open.editor;
@@ -71496,7 +71990,7 @@ function locateImageToken(view, image, markdown, matches) {
   return rendered.length === matches.length ? toToken(matches[rendered.indexOf(image)]) : null;
 }
 var panelSequence2 = 0;
-var MarkdownSelectionAi = class extends import_obsidian40.Component {
+var MarkdownSelectionAi = class extends import_obsidian41.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -71531,8 +72025,8 @@ var MarkdownSelectionAi = class extends import_obsidian40.Component {
       const image = event.target;
       if (!(image instanceof HTMLImageElement) || !this.options.autoOpen()) return;
       if (image.closest(".vam-context-ai-panel, .vam-image-action")) return;
-      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian40.MarkdownView && candidate.containerEl.contains(image));
-      if (!(view instanceof import_obsidian40.MarkdownView) || !view.file) return;
+      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian41.MarkdownView && candidate.containerEl.contains(image));
+      if (!(view instanceof import_obsidian41.MarkdownView) || !view.file) return;
       const markdown = view.editor.getValue();
       const embeddedPath = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src");
       const tokens2 = [...markdown.matchAll(/!\[\[[^\]\n]+\]\]|!\[[^\]\n]*\]\([^\n]+?\)/g)].filter((match) => {
@@ -71586,9 +72080,9 @@ var MarkdownSelectionAi = class extends import_obsidian40.Component {
     const selection = window.getSelection();
     const range = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null;
     const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find(
-      (candidate) => candidate instanceof import_obsidian40.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
+      (candidate) => candidate instanceof import_obsidian41.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
     );
-    if (!(view instanceof import_obsidian40.MarkdownView) || !view.file) {
+    if (!(view instanceof import_obsidian41.MarkdownView) || !view.file) {
       this.hideLauncher();
       return;
     }
@@ -71630,7 +72124,7 @@ var MarkdownSelectionAi = class extends import_obsidian40.Component {
     }
     this.updateLauncher(this.options.autoOpen());
     if (!this.snapshot) {
-      const view = this.app.workspace.getActiveViewOfType(import_obsidian40.MarkdownView);
+      const view = this.app.workspace.getActiveViewOfType(import_obsidian41.MarkdownView);
       if (!(view == null ? void 0 : view.file) || view.getMode() !== "source") return false;
       const markdown = view.editor.getValue();
       const matchAt = view.editor.posToOffset(view.editor.getCursor());
@@ -71664,7 +72158,7 @@ var MarkdownSelectionAi = class extends import_obsidian40.Component {
     this.panel.open();
   }
 };
-var SelectionAiPanel = class extends import_obsidian40.Component {
+var SelectionAiPanel = class extends import_obsidian41.Component {
   constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run) {
     super();
     this.app = app;
@@ -71709,7 +72203,7 @@ var SelectionAiPanel = class extends import_obsidian40.Component {
     this.titleEl.id = titleId;
     const close = header.createEl("button", { cls: "clickable-icon vam-context-ai-close" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian40.setIcon)(close, "x");
+    (0, import_obsidian41.setIcon)(close, "x");
     close.addEventListener("click", () => this.close());
     this.contentEl = this.modalEl.createDiv({ cls: "vam-context-ai-body" });
     this.load();
@@ -71783,7 +72277,7 @@ var SelectionAiPanel = class extends import_obsidian40.Component {
     const preset = (id, icon, label, prompt) => {
       const button = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
       button.dataset.preset = id;
-      (0, import_obsidian40.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
+      (0, import_obsidian41.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
       button.createSpan({ text: label });
       button.addEventListener(
         "click",
@@ -71852,7 +72346,7 @@ var SelectionAiPanel = class extends import_obsidian40.Component {
     const bar = footer.createDiv({ cls: "vam-context-ai-bar" });
     bar.createSpan({
       cls: "vam-context-ai-shortcut",
-      text: t("ui.context_ai_shortcut", import_obsidian40.Platform.isMacOS ? "\u2318" : "Ctrl")
+      text: t("ui.context_ai_shortcut", import_obsidian41.Platform.isMacOS ? "\u2318" : "Ctrl")
     });
     this.stopButton = bar.createEl("button", { text: t("ui.cancel") });
     this.stopButton.addEventListener("click", () => {
@@ -72031,9 +72525,9 @@ var SelectionAiPanel = class extends import_obsidian40.Component {
           result = result.replace(/\r\n?/g, "\n");
           if (!/^```mermaid[ \t]*\n(?:(?!```)[\s\S])+\n```$/.test(result.trim()) || unsafeMermaid(result.trim().split("\n").slice(1, -1)) || /(?:%%\{|@\{|\bimg\s*:|\bimage\s*:|\burl\s*\(|https?:|data:|file:|javascript:)/i.test(result))
             throw new Error(t("ui.context_ai_invalid_diagram"));
-          this.previewChild = new import_obsidian40.Component();
+          this.previewChild = new import_obsidian41.Component();
           this.previewChild.load();
-          await import_obsidian40.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
+          await import_obsidian41.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
         }
       }
       if (controller.signal.aborted || !this.modalEl.isConnected) return;
@@ -72134,7 +72628,7 @@ ${value}
       editor.replaceRange(addition, end, end);
     }
     this.close();
-    new import_obsidian40.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
+    new import_obsidian41.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
   }
 };
 
@@ -72229,7 +72723,7 @@ function settingsFromSaved(saved) {
     canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
   };
 }
-var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
+var VisualAgentMapPlugin = class extends import_obsidian42.Plugin {
   constructor() {
     super(...arguments);
     /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
@@ -72296,7 +72790,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
       claudePath: () => this.settings.claudePath,
       clientVersion: () => this.manifest.version || "0.0.0",
       pluginDirectory: () => this.pluginDirectory(),
-      readLocalFile: (path) => import_obsidian41.FileSystemAdapter.readLocalFile(path),
+      readLocalFile: (path) => import_obsidian42.FileSystemAdapter.readLocalFile(path),
       onLog: (level, message) => this.logs.appendLog(level, message),
       checks: {
         refresh: (id) => this.refreshModelDiscovery(id),
@@ -72314,7 +72808,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
       claudeRuntime: (directory) => this.claudeCli(directory),
       mermaidParses: async (code) => {
         try {
-          const mermaid = await (0, import_obsidian41.loadMermaid)();
+          const mermaid = await (0, import_obsidian42.loadMermaid)();
           await mermaid.parse(code);
           return true;
         } catch (e) {
@@ -72492,9 +72986,9 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
     var _a2;
     const view = (_a2 = source != null ? source : this.app.workspace.getActiveViewOfType(VisualAgentMapView)) != null ? _a2 : this.views()[0];
     const snapshot = view == null ? void 0 : view.shareSnapshot();
-    if (!snapshot || snapshot === "none") return void new import_obsidian41.Notice(t("share.unavailable_no_map"));
-    if (snapshot === "aim") return void new import_obsidian41.Notice(t("share.unavailable_aim"));
-    if (snapshot === "empty") return void new import_obsidian41.Notice(t("share.unavailable_empty"));
+    if (!snapshot || snapshot === "none") return void new import_obsidian42.Notice(t("share.unavailable_no_map"));
+    if (snapshot === "aim") return void new import_obsidian42.Notice(t("share.unavailable_aim"));
+    if (snapshot === "empty") return void new import_obsidian42.Notice(t("share.unavailable_empty"));
     new ShareModal(this.app, {
       source: snapshot,
       vamVersion: this.manifest.version || "0.0.0",
@@ -72536,12 +73030,12 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
       this.useOutlineSource(leaf.view);
       return;
     }
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian41.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian42.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
     const path = leaf.view.file.path;
-    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian41.Notice(error instanceof Error ? error.message : String(error)));
+    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian42.Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload() {
-    announceTestOverrides((message) => new import_obsidian41.Notice(message, 0));
+    announceTestOverrides((message) => new import_obsidian42.Notice(message, 0));
     const saved = await this.loadData();
     this.settings = settingsFromSaved(saved);
     if (hasLegacyChatModel(saved)) await this.saveSettings();
@@ -72578,11 +73072,11 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
     });
     this.addLocalizedCommand("preview-full-prompt", "ui.preview_prompt_command", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
-    if (this.app.vault.adapter instanceof import_obsidian41.FileSystemAdapter && this.manifest.dir) {
+    if (this.app.vault.adapter instanceof import_obsidian42.FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
       this.exchanges = new AiExchangeLog(
         adapter,
-        (0, import_obsidian41.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
+        (0, import_obsidian42.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.exchange_log_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -72591,7 +73085,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
       await this.exchanges.load();
       this.pendingSuggestions = new PendingSuggestions(
         adapter,
-        (0, import_obsidian41.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
+        (0, import_obsidian42.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -72610,7 +73104,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
         await this.saveSettings();
-        if (count) new import_obsidian41.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        if (count) new import_obsidian42.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
       }
     });
     this.ready = initialize;
@@ -72631,7 +73125,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
     this.registerView(COFFEE_TABLES_VIEW_TYPE, (leaf) => new CoffeeTablesView(leaf, this));
     this.buildCoffee();
     const openCoffee = () => {
-      void this.activateCoffeeTables().catch((error) => new import_obsidian41.Notice(String(error)));
+      void this.activateCoffeeTables().catch((error) => new import_obsidian42.Notice(String(error)));
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
     this.coffeeRibbonIcon = coffeeRibbonIcon;
@@ -72648,12 +73142,12 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
           }
           await this.openDetails(this.repo.file(path));
         } catch (error) {
-          new import_obsidian41.Notice(error instanceof Error ? error.message : String(error));
+          new import_obsidian42.Notice(error instanceof Error ? error.message : String(error));
         }
       })
     );
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
-      void this.activateView().catch((error) => new import_obsidian41.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian42.Notice(String(error)));
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
@@ -72671,25 +73165,25 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
       key: "ui.map_chat_toggle_command"
     });
     this.addLocalizedCommand("open-map", "ui.open_map", () => {
-      void this.activateView().catch((error) => new import_obsidian41.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian42.Notice(String(error)));
     });
     this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.aim_create_map", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
-      }).catch((error) => new import_obsidian41.Notice(String(error)));
+      }).catch((error) => new import_obsidian42.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline", "ui.outline_import", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openOutlineImport();
-      }).catch((error) => new import_obsidian41.Notice(String(error)));
+      }).catch((error) => new import_obsidian42.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline-exchange", "ui.exchange_import", () => {
       void this.activateView().then(() => {
         const view = this.views()[0];
         if (view) chooseAndImportExchange(view);
-      }).catch((error) => new import_obsidian41.Notice(String(error)));
+      }).catch((error) => new import_obsidian42.Notice(String(error)));
     });
     this.localizedCommands.push({
       command: this.addCommand({
@@ -72719,7 +73213,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
     });
     this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
-      void this.activateOutline().catch((error) => new import_obsidian41.Notice(String(error)));
+      void this.activateOutline().catch((error) => new import_obsidian42.Notice(String(error)));
     });
     this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => {
       this.runMutation(() => this.fullRebuild());
@@ -72727,23 +73221,23 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
     this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => {
       this.runMutation(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian41.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
+        new import_obsidian42.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => {
       this.runMutation(async () => {
         await this.repo.ensureNodePresentation();
-        new import_obsidian41.Notice(t("ui.topic_note_display_repaired"));
+        new import_obsidian42.Notice(t("ui.topic_note_display_repaired"));
       });
     });
     this.addLocalizedCommand("fix-math-formulas", "ui.fix_math_formulas", () => {
       void this.offerFixMathFormulas().catch(
-        (error) => new import_obsidian41.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian42.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("organize-workspace-folders", "ui.organize_workspace_folders", () => {
       void this.offerOrganizeWorkspaceFolders().catch(
-        (error) => new import_obsidian41.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian42.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("repair-workspace", "ui.repair_agent_workspace", () => {
@@ -72776,7 +73270,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
     this.registerNoteStyleEntrypoints();
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof import_obsidian41.TFile && this.isMap(file))
+        if (file instanceof import_obsidian42.TFile && this.isMap(file))
           menu.addItem(
             (item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => {
               void this.activateView(file.path);
@@ -72878,14 +73372,14 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
         this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
       } else if (result.status === "failed") {
         this.logs.appendLog("warn", `Note style conversion failed: ${(_a2 = result.error) != null ? _a2 : "unknown error"}`);
-        new import_obsidian41.Notice(t("ui.note_style_migrate_failed"));
+        new import_obsidian42.Notice(t("ui.note_style_migrate_failed"));
       } else if (result.notify) {
         const maps = result.notify.maps.join(t("ui.list_separator"));
         const text11 = [
           t("ui.note_style_maps_notice_0", maps),
           result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
         ].filter(Boolean).join(" ");
-        new import_obsidian41.Notice(text11, 0);
+        new import_obsidian42.Notice(text11, 0);
       }
     } catch (error) {
       this.logs.appendLog(
@@ -72897,13 +73391,13 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
   registerVaultEvents() {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (!this.writing && file instanceof import_obsidian41.TFile) for (const view of this.views()) view.changed(file);
+        if (!this.writing && file instanceof import_obsidian42.TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian41.TFile) this.scheduleExternalReconciliation(file.path);
-        if (!this.writing && file instanceof import_obsidian41.TFile) {
+        if (file instanceof import_obsidian42.TFile) this.scheduleExternalReconciliation(file.path);
+        if (!this.writing && file instanceof import_obsidian42.TFile) {
           for (const view of this.views()) view.deleted(file);
           if (file.path.startsWith(`${this.settings.mapsFolder}/`) || isManagedMapPath(this.settings, file.path) && file.name === "Map.md")
             this.runMutation(() => this.repo.rebuildDerivedData());
@@ -72912,7 +73406,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (!(file instanceof import_obsidian41.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
+        if (!(file instanceof import_obsidian42.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
         if (external) for (const view of this.views()) view.relocate(/* @__PURE__ */ new Map([[oldPath, file.path]]));
@@ -72947,7 +73441,7 @@ ${error}`;
       this.unreadableReported.set(key2, now);
       const message = t("ui.map_unreadable_skipped_0_1", path, error);
       this.logs.appendLog("warn", message);
-      new import_obsidian41.Notice(message);
+      new import_obsidian42.Notice(message);
     }
   }
   /**
@@ -72960,7 +73454,7 @@ ${error}`;
       report: (done, total2, title) => {
         const message = t("ui.organize_progress_0_1_2", done, total2, title);
         if (notice) notice.setMessage(message);
-        else notice = new import_obsidian41.Notice(message, 0);
+        else notice = new import_obsidian42.Notice(message, 0);
       },
       done: () => notice == null ? void 0 : notice.hide()
     };
@@ -72995,12 +73489,12 @@ ${error}`;
         cleaned = await this.repo.removeEmptyLegacyFolders();
       });
       const base = plan.skipped.length ? t("ui.organize_only_skipped_0", plan.skipped.length) : t("ui.organize_nothing_to_do");
-      new import_obsidian41.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
+      new import_obsidian42.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
       return;
     }
     const busyOpen = this.views().some((view) => plan.moves.some((move) => view.hasActiveAimWork(move.mapPath)));
     if (plan.busy.length || busyOpen) {
-      new import_obsidian41.Notice(t("error.organize_aim_busy"));
+      new import_obsidian42.Notice(t("error.organize_aim_busy"));
       return;
     }
     const mind = plan.moves.filter((move) => move.kind === "mind").length;
@@ -73034,7 +73528,7 @@ ${t("ui.organize_link_wait_hint")}`;
           for (const view of this.views()) view.relocate(mapping);
           this.app.workspace.requestSaveLayout();
           const cleaned = await this.repo.removeEmptyLegacyFolders();
-          new import_obsidian41.Notice(
+          new import_obsidian42.Notice(
             cleaned.length ? `${t("ui.organize_done_0", mapping.size)} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : t("ui.organize_done_0", mapping.size)
           );
         })
@@ -73047,7 +73541,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const files = (await this.repo.markedFiles("agent-map-node")).filter((file) => file.path.startsWith(prefix));
     const plan = await planMathRepair(this.app.vault, files);
     if (!plan.items.length) {
-      new import_obsidian41.Notice(t("ui.fix_math_none"));
+      new import_obsidian42.Notice(t("ui.fix_math_none"));
       return;
     }
     new ChoiceModal(
@@ -73058,10 +73552,10 @@ ${t("ui.organize_link_wait_hint")}`;
         {
           label: t("ui.fix_math_start"),
           action: () => void applyMathRepair(this.app.vault, plan).then(
-            (result) => new import_obsidian41.Notice(
+            (result) => new import_obsidian42.Notice(
               result.skipped ? t("ui.fix_math_done_0_1", result.changed, result.skipped) : t("ui.fix_math_done_0", result.changed)
             )
-          ).catch((error) => new import_obsidian41.Notice(error instanceof Error ? error.message : String(error)))
+          ).catch((error) => new import_obsidian42.Notice(error instanceof Error ? error.message : String(error)))
         }
       ]
     ).open();
@@ -73071,13 +73565,13 @@ ${t("ui.organize_link_wait_hint")}`;
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian41.Notice(t("ui.agent_workspace_is_ready"));
+    new import_obsidian42.Notice(t("ui.agent_workspace_is_ready"));
   }
   async fullRebuild() {
     await this.repo.reconcileMissingNodePaths();
     await this.repo.rebuildDerivedData();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian41.Notice(t("ui.vam_data_has_been_refreshed"));
+    new import_obsidian42.Notice(t("ui.vam_data_has_been_refreshed"));
   }
   /** Builds Coffee Tables storage and manager for the current workspace folder (CoffeeStorage fixes its folder at construction). */
   buildCoffee() {
@@ -73124,7 +73618,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const candidates = known != null ? known : await this.repo.workspaceCandidates();
     this.workspaceRecoveryCandidates = [];
     if (!candidates.length) {
-      new import_obsidian41.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
+      new import_obsidian42.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
       return;
     }
     new ChoiceModal(
@@ -73139,7 +73633,7 @@ ${t("ui.organize_link_wait_hint")}`;
           await this.rebuildCoffee();
           await this.repo.rebuildDerivedData();
           for (const view of this.views()) await view.refreshFromPlugin();
-          new import_obsidian41.Notice(t("ui.reconnected_workspace_0", root));
+          new import_obsidian42.Notice(t("ui.reconnected_workspace_0", root));
         })
       }))
     ).open();
@@ -73164,9 +73658,9 @@ ${t("ui.organize_link_wait_hint")}`;
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
-  openPromptPreview(trigger) {
+  openPromptPreview(trigger, styleOf) {
     const provider = this.runtimeIdFor(this.currentModelChoice().model);
-    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger).open();
+    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger, styleOf).open();
   }
   /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   currentModelChoice() {
@@ -73248,19 +73742,19 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
-      else new import_obsidian41.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+      else new import_obsidian42.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
     const state = await this.refreshModelDiscovery("codex");
-    if (state.status === "ready") new import_obsidian41.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+    if (state.status === "ready") new import_obsidian42.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
     else if (state.status === "error")
-      new import_obsidian41.Notice(
+      new import_obsidian42.Notice(
         t(
           "ui.codex_app_server_check_failed_0",
           this.recordFailure(t("log.codex_recheck_failed"), (_a2 = state.error) != null ? _a2 : "unknown error")
         )
       );
-    else new import_obsidian41.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+    else new import_obsidian42.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
   }
   isMap(file) {
     var _a2, _b2;
@@ -73273,7 +73767,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return marker5 === true || marker5 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || isManagedMapPath(this.settings, file.path));
   }
   styleNodeLeaf(leaf) {
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian41.MarkdownView)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian42.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
@@ -73294,38 +73788,38 @@ ${t("ui.organize_link_wait_hint")}`;
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   noteStylePort() {
     const folderAt = (path) => {
-      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian41.normalizePath)(path));
-      return found instanceof import_obsidian41.TFolder ? found : null;
+      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian42.normalizePath)(path));
+      return found instanceof import_obsidian42.TFolder ? found : null;
     };
     return {
       list: async (folder) => {
         var _a2, _b2;
-        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian41.TFile && child.extension === "md").map((child) => child.name);
+        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian42.TFile && child.extension === "md").map((child) => child.name);
       },
       read: (path) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian41.normalizePath)(path));
-        if (!(file instanceof import_obsidian41.TFile)) return Promise.reject(new Error(path));
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian42.normalizePath)(path));
+        if (!(file instanceof import_obsidian42.TFile)) return Promise.reject(new Error(path));
         return this.app.vault.read(file);
       },
       folderExists: (path) => folderAt(path) !== null,
       createFolder: async (path) => {
         let current = "";
-        for (const part of (0, import_obsidian41.normalizePath)(path).split("/")) {
+        for (const part of (0, import_obsidian42.normalizePath)(path).split("/")) {
           current = current ? `${current}/${part}` : part;
           if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
         }
       },
       create: async (path, content) => {
-        await this.app.vault.create((0, import_obsidian41.normalizePath)(path), content);
+        await this.app.vault.create((0, import_obsidian42.normalizePath)(path), content);
       },
       modify: async (path, content) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian41.normalizePath)(path));
-        if (!(file instanceof import_obsidian41.TFile)) throw new Error(path);
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian42.normalizePath)(path));
+        if (!(file instanceof import_obsidian42.TFile)) throw new Error(path);
         await this.app.vault.modify(file, content);
       },
       trash: async (path) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian41.normalizePath)(path));
-        if (file instanceof import_obsidian41.TFile) await this.app.fileManager.trashFile(file);
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian42.normalizePath)(path));
+        if (file instanceof import_obsidian42.TFile) await this.app.fileManager.trashFile(file);
       }
     };
   }
@@ -73333,8 +73827,8 @@ ${t("ui.organize_link_wait_hint")}`;
   registerNoteStyleEntrypoints() {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (file instanceof import_obsidian41.TFolder)
-          void this.noteStyles.followFolderRename((0, import_obsidian41.normalizePath)(oldPath), file.path).catch(() => void 0);
+        if (file instanceof import_obsidian42.TFolder)
+          void this.noteStyles.followFolderRename((0, import_obsidian42.normalizePath)(oldPath), file.path).catch(() => void 0);
       })
     );
     this.addLocalizedCommand("open-note-styles-folder", "ui.note_style_open_folder_command", () => {
@@ -73346,15 +73840,15 @@ ${t("ui.organize_link_wait_hint")}`;
     var _a2, _b2, _c, _d, _e;
     try {
       const folder = await this.noteStyles.ensureBlockFolder();
-      new import_obsidian41.Notice(t("ui.note_style_folder_opened_0", folder));
-      const target = this.app.vault.getAbstractFileByPath((0, import_obsidian41.normalizePath)(folder));
+      new import_obsidian42.Notice(t("ui.note_style_folder_opened_0", folder));
+      const target = this.app.vault.getAbstractFileByPath((0, import_obsidian42.normalizePath)(folder));
       if (target) {
         const explorer = (_d = (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "file-explorer")) == null ? void 0 : _c[0]) == null ? void 0 : _d.view;
         (_e = explorer == null ? void 0 : explorer.revealInFolder) == null ? void 0 : _e.call(explorer, target);
       }
       return folder;
     } catch (error) {
-      new import_obsidian41.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian42.Notice(error instanceof Error ? error.message : String(error));
       return null;
     }
   }
@@ -73369,16 +73863,16 @@ ${t("ui.organize_link_wait_hint")}`;
       let target = ref;
       if (((_a2 = parseRecipeRef(ref, category)) == null ? void 0 : _a2.kind) !== "file") {
         target = await this.noteStyles.createPart(category, ref);
-        new import_obsidian41.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
+        new import_obsidian42.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
       }
       await this.noteStyles.refresh();
       const path = this.noteStyles.partFilePath(category, target);
-      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian41.normalizePath)(path)) : null;
-      if (!(file instanceof import_obsidian41.TFile)) throw new Error("not a file");
+      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian42.normalizePath)(path)) : null;
+      if (!(file instanceof import_obsidian42.TFile)) throw new Error("not a file");
       await this.app.workspace.getLeaf("tab").openFile(file);
       return target;
     } catch (e) {
-      new import_obsidian41.Notice(t("ui.block_notice_open_failed"));
+      new import_obsidian42.Notice(t("ui.block_notice_open_failed"));
       return null;
     }
   }
@@ -73394,9 +73888,9 @@ ${t("ui.organize_link_wait_hint")}`;
   /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
   async saveNoteRecipe(input2) {
     const result = await this.noteStyles.saveRecipe(input2);
-    if (result.ok) new import_obsidian41.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
+    if (result.ok) new import_obsidian42.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
     else
-      new import_obsidian41.Notice(
+      new import_obsidian42.Notice(
         t(
           result.reason === "name" ? "ui.recipe_notice_name_unavailable" : result.reason === "changed" ? "ui.recipe_notice_changed" : "ui.recipe_notice_failed"
         )
@@ -73419,7 +73913,7 @@ ${t("ui.organize_link_wait_hint")}`;
         await this.saveData(nextSettings);
       } catch (error) {
         this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
-        new import_obsidian41.Notice(translate(previous, "ui.language_change_save_failed"));
+        new import_obsidian42.Notice(translate(previous, "ui.language_change_save_failed"));
         return false;
       }
       Object.assign(this.settings, nextSettings);
@@ -73446,7 +73940,7 @@ ${t("ui.organize_link_wait_hint")}`;
         failures.push(error);
       }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
-      new import_obsidian41.Notice(
+      new import_obsidian42.Notice(
         failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved")
       );
       return true;
@@ -73475,7 +73969,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (readiness.status === "missing") {
       if (runtime.capabilities.id === "claude") this.openClaudeSetupGuide();
       else this.openCodexSetupGuide();
-    } else if (readiness.status === "model-unavailable") new import_obsidian41.Notice(t("ui.current_model_is_unavailable"));
+    } else if (readiness.status === "model-unavailable") new import_obsidian42.Notice(t("ui.current_model_is_unavailable"));
     else if (readiness.error !== void 0) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
     return false;
   }
@@ -73502,10 +73996,10 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.claudeDiagnostic();
     const state = await this.refreshModelDiscovery("claude");
     if (!diagnostic.installed) {
-      new import_obsidian41.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+      new import_obsidian42.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
       return;
     }
-    new import_obsidian41.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    new import_obsidian42.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
   async confirmAiUsage(model, run) {
@@ -73527,7 +74021,7 @@ ${t("ui.organize_link_wait_hint")}`;
       await this.repo.rebuildDerivedData();
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
-      new import_obsidian41.Notice(
+      new import_obsidian42.Notice(
         t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error))
       );
     }
@@ -73559,7 +74053,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.app.workspace.getLeavesOfType("markdown").some(
       (leaf) => {
         var _a2, _b2;
-        return leaf.getRoot() === split && leaf.view instanceof import_obsidian41.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
+        return leaf.getRoot() === split && leaf.view instanceof import_obsidian42.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
       }
     );
   }
@@ -73572,7 +74066,7 @@ ${t("ui.organize_link_wait_hint")}`;
       this.detailsLeaf = (_b2 = (_a2 = markdownLeaves.filter(
         (leaf) => {
           var _a3, _b3;
-          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian41.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
+          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian42.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
         }
       ).sort(
         (a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top
@@ -73594,11 +74088,11 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   closeStaleDetails() {
     var _a2, _b2, _c, _d;
-    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian41.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
+    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian42.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian41.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
+      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian42.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
@@ -73614,7 +74108,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
   async runCoffeeRequest(request) {
-    if (!(this.app.vault.adapter instanceof import_obsidian41.FileSystemAdapter) || !this.manifest.dir)
+    if (!(this.app.vault.adapter instanceof import_obsidian42.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
     const effort = effectiveReasoningLevel(
@@ -73667,16 +74161,16 @@ ${t("ui.organize_link_wait_hint")}`;
     }
     let bytes;
     const embeddedPath = (_b2 = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src")) == null ? void 0 : _b2.split("#")[0];
-    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian41.MarkdownView && view2.containerEl.contains(image));
+    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian42.MarkdownView && view2.containerEl.contains(image));
     const file = embeddedPath ? this.app.metadataCache.getFirstLinkpathDest(
       embeddedPath,
-      view instanceof import_obsidian41.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
+      view instanceof import_obsidian42.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
     ) : null;
     const remote = image.currentSrc || image.src;
-    if (file instanceof import_obsidian41.TFile) bytes = await this.app.vault.readBinary(file);
+    if (file instanceof import_obsidian42.TFile) bytes = await this.app.vault.readBinary(file);
     else if (/^https?:\/\//i.test(remote)) {
       try {
-        bytes = (await (0, import_obsidian41.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
+        bytes = (await (0, import_obsidian42.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
       } catch (e) {
         throw new Error(t("ui.context_ai_image_download_failed"));
       }
@@ -73755,7 +74249,7 @@ ${t("ui.organize_link_wait_hint")}`;
       if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
       await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);
     } catch (error) {
-      new import_obsidian41.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian42.Notice(error instanceof Error ? error.message : String(error));
     }
   }
   async openResearchMap(path) {
@@ -73774,7 +74268,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   async loadCodexModels() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian41.FileSystemAdapter) || !this.manifest.dir)
+    if (!(adapter instanceof import_obsidian42.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Codex model discovery requires desktop Obsidian");
     const pluginDirectory = (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
@@ -73846,7 +74340,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   pluginDirectory() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian41.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
+    if (!(adapter instanceof import_obsidian42.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
     return (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
   }

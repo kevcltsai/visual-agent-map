@@ -1,9 +1,9 @@
-import { App, Modal, Notice, Setting, TFile, normalizePath } from "obsidian";
+import { App, Modal, Notice, Setting } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
 import { t, type TranslationKey } from "../../i18n";
 import type { RecipeListItem } from "../../ai/note-style-store";
-import { KIND_DEFAULT_RECIPE, UPDATE_MODE_KEYS, validatePartName, type StyleKind } from "../../ai/note-style-recipe";
-import { cleanBlockName } from "../../core/blocks/block-files";
+import { UPDATE_MODE_KEYS, type StyleKind } from "../../ai/note-style-recipe";
+import { NoteStyleEditorModal, namePartProblem, suggestRecipeName } from "./note-style-editor-modal";
 import { styleIssueText } from "../../experiences/visual-map/note-style-picker";
 
 /** The four pages of the manage window, in tab order. */
@@ -79,6 +79,8 @@ export class NoteStyleManageModal extends Modal {
   private editButtons = new Map<string, HTMLElement>();
   /** Rebuilds the source choices of the open "New..." form after the list changed. */
   private refreshForm?: () => void;
+  /** The style editor while it is open (one at a time). */
+  private editor?: NoteStyleEditorModal;
 
   constructor(
     app: App,
@@ -191,7 +193,7 @@ export class NoteStyleManageModal extends Modal {
     this.buildAddForm(panel);
   }
 
-  private renderList(): void {
+  renderList(): void {
     const list = this.listEl;
     if (!list) return;
     list.empty();
@@ -220,29 +222,25 @@ export class NoteStyleManageModal extends Modal {
     }
   }
 
-  private focusRow(ref: string | null): void {
+  focusRow(ref: string | null): void {
     if (ref) this.editButtons.get(ref)?.focus();
-  }
-
-  /** Opens the vault file of a user's style in a tab. */
-  private async openStyleFile(ref: string): Promise<boolean> {
-    const path = this.plugin.noteStyles.recipeFilePath(ref);
-    const file = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : null;
-    if (!(file instanceof TFile)) {
-      new Notice(t("ui.block_notice_open_failed"));
-      return false;
-    }
-    await this.app.workspace.getLeaf("tab").openFile(file);
-    return true;
   }
 
   private async edit(entry: Entry): Promise<void> {
     if (this.busy || entry.aimOnly) return;
+    if (this.tab === "recipe") {
+      // A built-in style opens as "My <name>" (saved only when the editor saves); a user's style opens as it is.
+      this.openEditor({
+        source: entry.ref,
+        ...(entry.builtin ? { name: this.suggestRecipeName(entry.name) } : {}),
+        trigger: this.editButtons.get(entry.ref),
+        onSaved: ref => this.afterSaved(ref)
+      });
+      return;
+    }
     this.busy = true;
     try {
-      let target: string | null;
-      if (this.tab === "recipe") target = await this.editRecipe(entry);
-      else target = await this.plugin.editNotePart(this.tab, entry.ref);
+      const target = await this.plugin.editNotePart(this.tab, entry.ref);
       await this.plugin.noteStyles.refresh();
       if (this.closed) return;
       this.renderList();
@@ -253,24 +251,25 @@ export class NoteStyleManageModal extends Modal {
     }
   }
 
-  /** A user's style opens as it is. A built-in one is saved as "My <name>" (the same four parts) and that file opens. */
-  private async editRecipe(entry: Entry): Promise<string | null> {
-    let target = entry.ref;
-    if (entry.builtin) {
-      const item = this.plugin.noteStyles.listRecipes().find(recipe => recipe.ref === entry.ref);
-      if (!item) return null;
-      const result = await this.plugin.saveNoteRecipe({
-        name: this.suggestRecipeName(entry.name),
-        structure: item.structure.ref,
-        voice: item.voice.ref,
-        format: item.format.ref,
-        update: item.update
-      });
-      if (!result.ok) return null;
-      target = result.ref;
-      await this.plugin.noteStyles.refresh();
-    }
-    return (await this.openStyleFile(target)) ? target : null;
+  /** Opens the style editor on top of this window; a second one is not opened while it is there. */
+  private openEditor(options: ConstructorParameters<typeof NoteStyleEditorModal>[2]): void {
+    if (this.editor || this.closed) return;
+    const editor = new NoteStyleEditorModal(this.app, this.plugin, {
+      ...options,
+      onClosed: () => {
+        this.editor = undefined;
+      }
+    });
+    this.editor = editor;
+    editor.open();
+  }
+
+  /** The editor saved a style: draw the list again and put the focus on its row. */
+  private afterSaved(ref: string): void {
+    if (this.closed) return;
+    this.renderList();
+    this.refreshForm?.();
+    this.focusRow(ref);
   }
 
   // ---- "New..." ----
@@ -284,16 +283,7 @@ export class NoteStyleManageModal extends Modal {
 
   /** "My <name>" for a copy of a style, "New style" for a blank one; " (2)", " (3)" ... until it is free and allowed. */
   private suggestRecipeName(from: string | null): string {
-    const base = cleanBlockName(
-      from === null ? t("ui.recipe_new_name") : t("ui.block_copy_name_0", cleanBlockName(from))
-    );
-    const taken = this.takenNames();
-    let name = base || "copy";
-    for (let n = 2; taken.has(lower(name)) || !validatePartName(name, "recipe").ok; n++) {
-      if (n > 999) break;
-      name = `${base || "copy"} (${n})`;
-    }
-    return name;
+    return suggestRecipeName(this.plugin, from);
   }
 
   private suggestName(from: string | null): string {
@@ -304,21 +294,7 @@ export class NoteStyleManageModal extends Modal {
 
   /** Why `value` cannot be the name of a new file in this tab; "" when it can. */
   private nameProblem(value: string): string {
-    if (!value) return t("ui.name_required");
-    const check = validatePartName(value, this.tab);
-    if (!check.ok) {
-      const keys: Record<typeof check.reason, TranslationKey> = {
-        empty: "ui.name_required",
-        padded: "ui.manage_name_padded",
-        separator: "ui.manage_name_separator",
-        dots: "ui.manage_name_dots",
-        builtin: "ui.manage_name_builtin"
-      };
-      return t(keys[check.reason]);
-    }
-    if (cleanBlockName(value) !== value) return t("ui.manage_name_unsafe");
-    if (this.takenNames().has(lower(value))) return t("ui.manage_name_taken");
-    return "";
+    return namePartProblem(value, this.tab, this.takenNames());
   }
 
   private buildAddForm(panel: HTMLElement): void {
@@ -380,7 +356,7 @@ export class NoteStyleManageModal extends Modal {
       cls: "vam-block-status-error vam-manage-error",
       attr: { id: errorId, "aria-live": "polite" }
     });
-    let createButton: { setDisabled(disabled: boolean): unknown } | undefined;
+    let createButton: { setDisabled(disabled: boolean): unknown; buttonEl: HTMLElement } | undefined;
     new Setting(form).addButton(button => {
       createButton = button;
       button
@@ -434,30 +410,42 @@ export class NoteStyleManageModal extends Modal {
       check();
     };
 
+    /** The new file is made: close the form, draw the list again and put the focus on its row. */
+    const finish = (target: string): void => {
+      if (this.closed) return;
+      form.hidden = true;
+      toggle.setAttr("aria-expanded", "false");
+      this.renderList();
+      reset();
+      this.focusRow(target);
+    };
     const create = async (): Promise<void> => {
-      if (this.busy || this.nameProblem(name)) return;
+      if (this.busy || this.editor || this.nameProblem(name)) return;
+      if (tab === "recipe") {
+        // A new style is not written here: the editor opens on it and the file appears when it saves.
+        this.openEditor({
+          source: null,
+          from: mode === "from" ? source : null,
+          name,
+          trigger: createButton?.buttonEl,
+          onSaved: ref => finish(ref)
+        });
+        return;
+      }
       this.busy = true;
       try {
         const from = mode === "from" ? source : null;
         let target: string | null = null;
-        if (tab === "recipe") target = await this.createRecipe(name, from);
-        else {
-          try {
-            target = await this.plugin.noteStyles.createPart(tab, from, name);
-          } catch {
-            new Notice(t("ui.manage_create_failed"));
-          }
-          // The new file opens for editing; "edit" of a file opens it as it is.
-          if (target) target = (await this.plugin.editNotePart(tab, target)) ?? target;
+        try {
+          target = await this.plugin.noteStyles.createPart(tab, from, name);
+        } catch {
+          new Notice(t("ui.manage_create_failed"));
         }
+        // The new file opens for editing; "edit" of a file opens it as it is.
+        if (target) target = (await this.plugin.editNotePart(tab, target)) ?? target;
         if (!target) return;
         await this.plugin.noteStyles.refresh();
-        if (this.closed) return;
-        form.hidden = true;
-        toggle.setAttr("aria-expanded", "false");
-        this.renderList();
-        reset();
-        this.focusRow(target);
+        finish(target);
       } finally {
         this.busy = false;
       }
@@ -475,20 +463,5 @@ export class NoteStyleManageModal extends Modal {
     fillSources();
     setName(this.suggestName(source || null));
     check();
-  }
-
-  /** Writes a new style file: the four parts of the chosen style, or the general research style for a blank one. */
-  private async createRecipe(name: string, from: string | null): Promise<string | null> {
-    const items = this.plugin.noteStyles.listRecipes();
-    const base = items.find(item => item.ref === (from ?? KIND_DEFAULT_RECIPE.topic));
-    if (!base) return null;
-    const result = await this.plugin.saveNoteRecipe({
-      name,
-      structure: base.structure.ref,
-      voice: base.voice.ref,
-      format: base.format.ref,
-      update: base.update
-    });
-    return result.ok ? result.ref : null;
   }
 }

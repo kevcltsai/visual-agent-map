@@ -35,7 +35,13 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import { NoteStyleStore, type SaveRecipeInput, type SaveRecipeResult, type StyleFilePort } from "./ai/note-style-store";
+import {
+  NoteStyleStore,
+  type RunStyle,
+  type SaveRecipeInput,
+  type SaveRecipeResult,
+  type StyleFilePort
+} from "./ai/note-style-store";
 import {
   KIND_DEFAULT_RECIPE,
   parseRecipeRef,
@@ -1221,9 +1227,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
-  openPromptPreview(trigger?: HTMLElement): void {
+  openPromptPreview(trigger?: HTMLElement, styleOf?: () => RunStyle): void {
     const provider = this.runtimeIdFor(this.currentModelChoice().model);
-    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger).open();
+    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger, styleOf).open();
   }
   /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   currentModelChoice(): ModelChoice {

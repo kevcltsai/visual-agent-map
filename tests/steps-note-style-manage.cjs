@@ -391,7 +391,11 @@ class FakeSetting {
     return this;
   }
 }
-const obsidian = { ...S.obsidian, Modal: dom.makeModal(), Setting: FakeSetting, Notice: dom.makeNotice(notices) };
+const windows = [];
+const BaseModal = dom.makeModal();
+class RecordingModal extends BaseModal { open() { windows.push(this); super.open(); } }
+class FakeComponent { load() {} unload() {} }
+const obsidian = { ...S.obsidian, Modal: RecordingModal, Setting: FakeSetting, Notice: dom.makeNotice(notices), Component: FakeComponent, MarkdownRenderer: { render: async () => {} } };
 const { NoteStyleManageModal, MANAGE_TABS } = S.load('ui/modals/note-style-manage-modal.ts', { obsidian });
 const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: dom.createFragment });
 
@@ -411,6 +415,9 @@ async function manageSetup(files = {}, settingsPatch = {}) {
   const plugin = { app, settings, noteStyles: store, saveSettings: async () => { made.settingSaves = (made.settingSaves ?? 0) + 1; } };
   plugin.editNotePart = (...args) => Plugin.prototype.editNotePart.apply(plugin, args);
   plugin.saveNoteRecipe = (...args) => Plugin.prototype.saveNoteRecipe.apply(plugin, args);
+  plugin.setKindStyle = (...args) => Plugin.prototype.setKindStyle.apply(plugin, args);
+  plugin.openPromptPreview = () => {};
+  windows.length = 0;
   return { ...made, plugin, app };
 }
 async function openManage(setup, tab = 'recipe') {
@@ -561,21 +568,34 @@ test('counter 5: Edit on a built-in part saves "My <name>" (a new file) and open
   assert.equal(opened.at(-1), `${dirOf('en', 'template')}/My Standard six.md`);
 });
 
-test('P3: Edit on a built-in style saves "My <name>" with the same four parts and opens the file; on a user\'s style it only opens the file', async () => {
+// Replaces the P3 test "Edit on a built-in style saves My <name> and opens the file" (decisions #41/#42 D3, D5: Edit opens the style editor; the file is written only by its Save).
+test('P4: Edit on a built-in style opens the style editor on "My <name>" with the style\'s four parts and writes nothing; its Save writes the file, the list shows it and the focus is on its row', async () => {
   const setup = await manageSetup();
   const { root } = await openManage(setup, 'recipe');
+  const edit = editOf(rowFor(root, 'Hypothesis test'));
+  edit.click();
+  await settle();
+  assert.equal(windows.length, 2, 'the manage window and the editor');
+  const editor = windows[1];
+  assert.equal(editor.titleEl.text, 'Edit note style');
+  assert.equal(writes(setup.v), 0, 'opening the editor writes nothing');
+  assert.equal(dom.byLabel(editor.contentEl, 'Name').value, 'My Hypothesis test');
   editOf(rowFor(root, 'Hypothesis test')).click();
+  await settle();
+  assert.equal(windows.length, 2, 'a second editor is not opened on top of the first');
+  dom.button(editor.modalEl, 'Save').click();
   await settle();
   const path = `${dirOf('en', 'recipe')}/My Hypothesis test.md`;
   assert.deepEqual(setup.v.creates, [path]);
   const read = M.parseRecipeFile(setup.v.files[path]);
   const hypothesis = setup.store.listRecipes().find(item => item.ref === 'builtin:hypothesis');
   assert.deepEqual(plain({ structure: read.structure, voice: read.voice, format: read.format, update: read.update }), plain({ structure: hypothesis.structure.ref, voice: hypothesis.voice.ref, format: hypothesis.format.ref, update: hypothesis.update }));
-  assert.deepEqual(opened, [path]);
+  assert.equal(opened.length, 0, 'saving opens no file tab');
   assert.equal(editOf(rowFor(root, 'My Hypothesis test')).focused, true);
-  assert.equal(JSON.stringify(setup.settings.noteStyleByKind ?? null), 'null', 'no topic type is switched in this packet');
   editOf(rowFor(root, 'My Hypothesis test')).click();
   await settle();
+  assert.equal(windows.length, 3, 'a user\'s style opens in the editor too, as it is');
+  assert.equal(dom.byLabel(windows[2].contentEl, 'Name').attrs.readonly, 'readonly');
   assert.equal(setup.v.creates.length, 1);
   assert.equal(setup.v.modifies.length, 0);
 });
@@ -676,7 +696,8 @@ test('P3: Create on a part writes the copy (or the blank text), opens it, closes
   assert.equal(editOf(rowFor(root, 'New voice')).focused, true);
 });
 
-test('P3: Create on a style writes a style file with the four parts of the chosen style (blank = the general research parts); it reads back and the new row has the focus', async () => {
+// Replaces the P3 test "Create on a style writes a style file" (decision #42 D5: New opens the style editor without writing the file; Save writes it).
+test('P4: Create on a style opens the style editor with the typed name and the chosen style\'s parts and writes nothing; Blank starts from the general research parts; Save writes the file, closes the form and puts the focus on the new row', async () => {
   const setup = await manageSetup();
   const { root } = await openManage(setup, 'recipe');
   newButton(root, 'recipe').click();
@@ -689,6 +710,13 @@ test('P3: Create on a style writes a style file with the four parts of the chose
   createOf(form).click();
   await settle();
   const path = `${dirOf('en', 'recipe')}/Lab log.md`;
+  assert.equal(windows.length, 2);
+  assert.equal(windows[1].titleEl.text, 'New note style');
+  assert.equal(writes(setup.v), 0, 'the file is not written before Save');
+  assert.equal(path in setup.v.files, false);
+  assert.equal(dom.byLabel(windows[1].contentEl, 'Name').value, 'Lab log');
+  dom.button(windows[1].modalEl, 'Save').click();
+  await settle();
   const read = M.parseRecipeFile(setup.v.files[path]);
   const evidence = setup.store.listRecipes().find(item => item.ref === 'builtin:evidence');
   assert.deepEqual(plain({ structure: read.structure, voice: read.voice, format: read.format, update: read.update }), plain({ structure: evidence.structure.ref, voice: evidence.voice.ref, format: evidence.format.ref, update: evidence.update }));
@@ -698,6 +726,10 @@ test('P3: Create on a style writes a style file with the four parts of the chose
   dom.findAll(form, node => node.type === 'radio')[1].fire('change');
   assert.equal(nameInputOf(form).value, 'New style');
   createOf(form).click();
+  await settle();
+  assert.equal(windows.length, 3);
+  assert.equal(`${dirOf('en', 'recipe')}/New style.md` in setup.v.files, false);
+  dom.button(windows[2].modalEl, 'Save').click();
   await settle();
   const blank = M.parseRecipeFile(setup.v.files[`${dirOf('en', 'recipe')}/New style.md`]);
   const general = setup.store.listRecipes().find(item => item.ref === 'builtin:general');

@@ -59,6 +59,8 @@ export function frameToWrite(frame: CoverFrame | null): CoverFrame | null {
   return !frame || isWholeFrame(frame) ? null : frame;
 }
 
+let labelSeq = 0;
+const EDGE_TOUCH = 0.0005;
 const WHOLE: CoverFrame = { x: 0, y: 0, w: 1, h: 1 };
 const HANDLE_KEY: Record<FrameDragMode, TranslationKey> = {
   move: "ui.topic_cover_frame_box",
@@ -113,7 +115,10 @@ export class CoverFrameModal extends Modal {
     const box = stage.createDiv({ cls: "vam-card-frame-box" });
     box.setAttr("tabindex", "0");
     box.setAttr("role", "group");
-    box.setAttr("aria-label", t(HANDLE_KEY.move));
+    // aria-labelledby, not aria-label: Obsidian shows an aria-label as a tooltip, which would cover the status line.
+    const labelId = `vam-card-frame-label-${++labelSeq}`;
+    stage.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
+    box.setAttr("aria-labelledby", labelId);
     this.boxEl = box;
     this.bindDrag(box, "move", stage);
     for (const mode of FRAME_HANDLES) {
@@ -160,6 +165,11 @@ export class CoverFrameModal extends Modal {
     const box = this.boxEl;
     if (!box) return;
     const percent = (value: number): string => `${round(value * 100)}%`;
+    // A handle sits on its edge; where the edge is the picture's edge the handles move inward so none is clipped.
+    box.toggleClass("is-at-w", frame.x < EDGE_TOUCH);
+    box.toggleClass("is-at-n", frame.y < EDGE_TOUCH);
+    box.toggleClass("is-at-e", frame.x + frame.w > 1 - EDGE_TOUCH);
+    box.toggleClass("is-at-s", frame.y + frame.h > 1 - EDGE_TOUCH);
     box.style.left = percent(frame.x);
     box.style.top = percent(frame.y);
     box.style.width = percent(frame.w);

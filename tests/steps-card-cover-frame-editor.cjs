@@ -118,7 +118,10 @@ test('dialog: shows the whole picture, a frame box and eight handles that are re
   assert.ok(names.every(Boolean), 'every handle has a name');
   assert.equal(new Set(names).size, 8, 'the names differ');
   assert.equal(ui.box.attrs.tabindex, '0', 'the frame can take focus');
-  assert.ok(ui.box.attrs['aria-label'], 'and has a name');
+  assert.equal(ui.box.attrs['aria-label'], undefined, 'no aria-label on the frame: Obsidian would show it as a tooltip over the status line');
+  const labelId = ui.box.attrs['aria-labelledby'];
+  const label = dom.find(ui.el, i => i.attrs.id === labelId);
+  assert.ok(label && label.text, 'the frame is named through aria-labelledby');
   assert.deepEqual(shown(ui), { x: 20, y: 30, w: 40, h: 40 });
   assert.match(ui.status.text, /20/);
   assert.equal(ui.status.attrs['aria-live'], 'polite');
@@ -337,4 +340,16 @@ test('i18n: every language has the new strings; the stylesheet uses no CSS varia
   assert.ok(lines.length >= 5);
   assert.doesNotMatch(lines.join('\n'), /var\(--/);
   assert.match(lines.join('\n'), /touch-action: none/);
+});
+
+test('decision 10: at a whole-picture frame every handle moves inward; away from the edges none does', () => {
+  const whole = openEditor();
+  for (const side of ['w', 'e', 'n', 's']) assert.ok(whole.box.classes.includes(`is-at-${side}`), side);
+  const inner = openEditor({ initial: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } });
+  assert.ok(!inner.box.classes.some(c => c.startsWith('is-at-')));
+  const css = read('styles.css');
+  assert.match(css, /\.vam-card-frame-box\.is-at-w[^{]*\{[^}]*margin-left: 9px/);
+  assert.match(css, /\.vam-card-frame-box\.is-at-e[^{]*\{[^}]*margin-left: -9px/);
+  assert.match(css, /\.vam-card-frame-box\.is-at-n[^{]*\{[^}]*margin-top: 9px/);
+  assert.match(css, /\.vam-card-frame-box\.is-at-s[^{]*\{[^}]*margin-top: -9px/);
 });

@@ -283,6 +283,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-frame-handle.is-s { left: 50%; top: 100%; cursor: ns-resize; }
 .vam-card-frame-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .vam-card-frame-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
+.vam-card-frame-label { display: none; }
+/* A handle on the picture's own edge moves inward by its radius so the stage (overflow hidden) does not clip it. */
+.vam-card-frame-box.is-at-w .vam-card-frame-handle.is-nw, .vam-card-frame-box.is-at-w .vam-card-frame-handle.is-w, .vam-card-frame-box.is-at-w .vam-card-frame-handle.is-sw { margin-left: 9px; }
+.vam-card-frame-box.is-at-e .vam-card-frame-handle.is-ne, .vam-card-frame-box.is-at-e .vam-card-frame-handle.is-e, .vam-card-frame-box.is-at-e .vam-card-frame-handle.is-se { margin-left: -9px; }
+.vam-card-frame-box.is-at-n .vam-card-frame-handle.is-nw, .vam-card-frame-box.is-at-n .vam-card-frame-handle.is-n, .vam-card-frame-box.is-at-n .vam-card-frame-handle.is-ne { margin-top: 9px; }
+.vam-card-frame-box.is-at-s .vam-card-frame-handle.is-sw, .vam-card-frame-box.is-at-s .vam-card-frame-handle.is-s, .vam-card-frame-box.is-at-s .vam-card-frame-handle.is-se { margin-top: -9px; }
 .vam-card-frame-status { margin: 12px 0 0; text-align: center; }
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }

@@ -10645,8 +10645,9 @@ export class VisualAgentMapView extends ItemView {
    * or past the canvas edge (a row wider than a card on the left edge). Measured, so it follows panning and zooming.
    */
   private alignCardTools(card: HTMLElement): void {
+    if (!this.viewportEl) return;
     const tools = card.querySelector<HTMLElement>(":scope > .vam-node-tools");
-    if (!tools || !this.viewportEl) return;
+    if (!tools) return;
     const cardRect = card.getBoundingClientRect(),
       zoom = this.map?.viewport.zoom || 1;
     const chat = this.contentEl.querySelector<HTMLElement>(".vam-map-chat.is-overlay");

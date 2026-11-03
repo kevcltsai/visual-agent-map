@@ -56563,8 +56563,9 @@ ${request.requirements}` : preset.text,
    */
   alignCardTools(card) {
     var _a2;
+    if (!this.viewportEl) return;
     const tools = card.querySelector(":scope > .vam-node-tools");
-    if (!tools || !this.viewportEl) return;
+    if (!tools) return;
     const cardRect = card.getBoundingClientRect(), zoom = ((_a2 = this.map) == null ? void 0 : _a2.viewport.zoom) || 1;
     const chat = this.contentEl.querySelector(".vam-map-chat.is-overlay");
     const visibleLeft = Math.max(

@@ -206,7 +206,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node[data-aim-kind="conclusion"] { isolation: isolate; border: 0; background: transparent; box-shadow: none; }
 .vam-conclusion-background { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08)); }
 .vam-conclusion-background polygon { fill: var(--vam-card-bg); stroke: var(--background-modifier-border); stroke-width: 1; }
-.vam-node .vam-add-child { position: absolute; right: -14px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 50%; background: var(--vam-card-bg); box-shadow: var(--shadow-s); color: var(--text-muted); font-size: var(--font-ui-medium); line-height: 1; opacity: 0; transition: opacity 120ms ease-out; }
+.vam-node .vam-add-child { position: absolute; right: -14px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 50%; background: var(--vam-card-bg); box-shadow: var(--shadow-s); color: var(--text-muted); font-size: var(--font-ui-medium); line-height: 1; opacity: 0; transition: opacity 120ms ease-out; z-index: 2; pointer-events: none; }
 .vam-node .vam-add-child:hover { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); border-color: var(--interactive-accent); }
 .vam-node:active { cursor: grabbing; }
 /* Export reads the saved border colour: no transition while the highlight class is taken off for that read. */
@@ -228,7 +228,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-node-tools > .vam-ai-explore { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-weight: 600; }
 .vam-node-tools > .vam-ai-explore::before { content: "✦" / ""; margin-right: 4px; }
-.vam-node:hover > .vam-add-child, .vam-node:focus-within > .vam-add-child, .vam-node.is-selected > .vam-add-child { opacity: 1; }
+.vam-node:hover > .vam-add-child, .vam-node:focus-within > .vam-add-child, .vam-node.is-selected > .vam-add-child { opacity: 1; pointer-events: auto; }
 /* One line per status: a long progress label ends in an ellipsis instead of running past the card. */
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
 .vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }

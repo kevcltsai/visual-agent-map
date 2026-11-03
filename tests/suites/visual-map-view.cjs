@@ -4021,3 +4021,21 @@ test('bug bash #01: a drag that started inside the view is ignored by the card a
   h.view.onCardDrop(h.drop(), card, topic);
   assert.equal(h.view.calls.length, 3, 'a drop ends the internal drag, so the next external drop is not blocked even when dragend is lost');
 });
+// ---- bug bash A #03: the "+" button must win the hit test over the width resize handle while it is visible ----
+// A unit environment has no layout, so elementsFromPoint cannot run here; the hit order is asserted through the CSS that decides it (the UI layer checks the real click).
+const cssRules = (css, selectorPattern) => [...css.matchAll(/(^|\n)([^{}\n/][^{}]*)\{([^}]*)\}/g)].filter(m => selectorPattern.test(m[2].trim())).map(m => ({ selector: m[2].trim(), body: m[3] }));
+test('bug bash #03: the add-child button sits above the width handle when visible and ignores the pointer when hidden', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const z = body => Number(/z-index:\s*(-?\d+)/.exec(body)?.[1] ?? 0);
+  const base = cssRules(css, /^\.vam-node \.vam-add-child$/)[0];
+  const handle = cssRules(css, /^\.vam-card-resize$/)[0];
+  assert.ok(base && handle, 'both rules exist');
+  assert.ok(z(base.body) > z(handle.body), 'the button paints above the width handle');
+  assert.match(base.body, /pointer-events:\s*none/, 'hidden: the button does not take the pointer, so the handle stays continuous');
+  const shown = cssRules(css, /\.vam-node\.is-selected > \.vam-add-child/)[0];
+  assert.ok(shown, 'a visible rule exists');
+  for (const state of [':hover', ':focus-within', '.is-selected']) assert.match(shown.selector, new RegExp(`\\.vam-node${state.replace('.', '\\.')}`));
+  assert.match(shown.body, /opacity:\s*1/);
+  assert.match(shown.body, /pointer-events:\s*auto/, 'visible: the button takes the pointer');
+  assert.doesNotMatch(cssRules(css, /^\.vam-card-resize-y$|^\.vam-card-resize-corner$/).map(r => r.body).join(''), /pointer-events:\s*none/, 'height and corner handles are untouched');
+});

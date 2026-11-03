@@ -4,7 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath } from '../scripts/test-harness.mjs';
+import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction } from '../scripts/test-harness.mjs';
 
 function environment(t) {
   const folder = mkdtempSync(join(tmpdir(), 'vam-harness-test-'));
@@ -248,4 +248,33 @@ test('owner vault is outside the temp session prefix, shared by worktrees, and o
   const main = execFileSync('git', ['-C', root, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
   assert.equal(canonicalVault, join(dirname(dirname(resolve(root, main))), 'vaults', 'vam-e2e-current'));
   assert.equal(ownerVaultPath(join(root, 'scripts'), {}), canonicalVault);
+});
+
+const focusOwner = { pid: 10, path: '/Applications/Terminal.app' };
+const focusBase = { instancePid: 99, ownerApp: focusOwner, allowFocus: false };
+const obsidianPath = '/Applications/Obsidian.app';
+
+test('focusAction reopens the recorded owner app when the test instance stole the foreground', () => {
+  assert.deepEqual(focusAction({ ...focusBase, frontPid: 99, frontPath: obsidianPath }), { ownerApp: focusOwner, reopen: true });
+});
+
+test('focusAction remembers a non-test foreground app as the owner app without reopening', () => {
+  assert.deepEqual(focusAction({ ...focusBase, ownerApp: null, frontPid: 11, frontPath: '/Applications/Safari.app' }), { ownerApp: { pid: 11, path: '/Applications/Safari.app' }, reopen: false });
+  assert.deepEqual(focusAction({ ...focusBase, frontPid: NaN, frontPath: undefined }), { ownerApp: focusOwner, reopen: false });
+});
+
+test('focusAction does not reopen when the owner\'s own Obsidian (same bundle, other pid) is in front', () => {
+  assert.equal(focusAction({ ...focusBase, frontPid: 50, frontPath: obsidianPath }).reopen, false);
+});
+
+test('focusAction does not reopen when another test instance is in front', () => {
+  assert.equal(focusAction({ ...focusBase, frontPid: 77, frontPath: obsidianPath }).reopen, false);
+});
+
+test('focusAction with allow-focus does not reopen and keeps the recorded owner app', () => {
+  assert.deepEqual(focusAction({ ...focusBase, allowFocus: true, frontPid: 99, frontPath: obsidianPath }), { ownerApp: focusOwner, reopen: false });
+});
+
+test('focusAction does not reopen when no owner app was recorded', () => {
+  assert.deepEqual(focusAction({ ...focusBase, ownerApp: null, frontPid: 99, frontPath: obsidianPath }), { ownerApp: null, reopen: false });
 });

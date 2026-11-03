@@ -839,7 +839,8 @@ export const en = {
   "ui.summary_refused_too_many": "A bracket can hold at most 50 topics.",
   "ui.summary_layout_unsupported": "This arrangement does not support summary brackets yet.",
   "ui.summary_cross_side": "Select topics on one side only; a bracket cannot span both halves of a balanced map.",
-  "ui.export_map": "Export map",
+  "ui.export_or_share_map": "Export or share map",
+  "ui.export_share_html": "Share as HTML page…",
   "ui.export_png_vault": "Save PNG image in the Vault",
   "ui.export_png_download": "Download PNG image",
   "ui.export_svg_vault": "Save SVG image in the Vault",
@@ -2469,7 +2470,6 @@ export const en = {
   "share.viewer_color_blue": "Blue",
   "share.viewer_color_purple": "Purple",
   // Share dialog
-  "share.button": "Share this map",
   "share.title": "Share this map",
   "share.intro":
     "Creates one HTML file that opens in any browser, even offline. You choose where it is saved. Nothing is uploaded.",

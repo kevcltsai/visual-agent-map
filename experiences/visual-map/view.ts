@@ -8840,9 +8840,9 @@ export class VisualAgentMapView extends ItemView {
       }
     }
   }
-  /** The header's export button (AIM and integration mode included, decision D11). */
+  /** The header's export and share button (AIM and integration mode included, decision D11; sharing is not offered for AIM). */
   private addExportButton(parent: HTMLElement): HTMLButtonElement {
-    return this.iconButton(parent, "download", t("ui.export_map"), event => this.openExportMenu(event));
+    return this.iconButton(parent, "share", t("ui.export_or_share_map"), event => this.openExportMenu(event));
   }
   private openExportMenu(event: MouseEvent): void {
     const menu = this.newMenu();
@@ -8860,7 +8860,17 @@ export class VisualAgentMapView extends ItemView {
     add(t("ui.export_svg_download"), "download", "svg", "download");
     add(t("ui.export_md_vault"), "file-down", "md", "vault");
     add(t("ui.export_md_download"), "download", "md", "download");
-    menu.showAtMouseEvent(event);
+    // The one place for export and sharing (the command palette's "Share map as HTML" opens the same dialog).
+    if (this.map && !this.map.aim) {
+      menu.addSeparator();
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.export_share_html"))
+          .setIcon("globe")
+          .onClick(() => this.plugin.openShare(this))
+      );
+    }
+    this.showMenuUnder(menu, event);
   }
   /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
   private exportCoverPath(notePath: string): string | null {
@@ -9564,8 +9574,6 @@ export class VisualAgentMapView extends ItemView {
       redo.disabled = !this.history.canRedo;
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
-      if (!this.map.aim)
-        this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
       this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
         this.openMapActions(event)

@@ -4,6 +4,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, fixture, DEFAULT_SETTINGS, obsidian, core, withExpansionCoordinator, deferred } = require('./support.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.join(__dirname, '..');
 const dom = require('./support-dom.cjs');
 const { element } = dom;
 const TOPICS = 'Agent Workspace/Topics';
@@ -59,7 +62,7 @@ async function harness({ aim = false } = {}) {
   const menuTitles = [];
   class Menu {
     addItem(cb) { const item = { setTitle(t) { menuTitles.push(t); this.title = t; return this; }, setIcon() { return this; }, onClick(fn) { this.fn = fn; return this; } }; cb(item); this.items = [...(this.items ?? []), item]; Menu.last = this; return this; }
-    addSeparator() { return this; } showAtMouseEvent() { return this; }
+    addSeparator() { return this; } showAtMouseEvent() { this.mouse = true; return this; } showAtPosition(at) { this.at = at; return this; }
   }
   const globals = {
     createFragment: dom.createFragment,
@@ -332,14 +335,25 @@ test('AIM and integration mode can all export', async () => {
   assert.equal(h.counts.createBinary, 1, 'integration');
 });
 
-test('the header button is a download icon with an accessible name and a six-item menu', async () => {
+test('C6: the header has one export and share button; its menu holds the six exports and, set apart, Share as HTML page (not for an AIM map), which opens the share dialog', async () => {
   const h = await harness();
   const bar = element('div');
   const button = h.view.addExportButton(bar);
-  assert.equal(button.dataset.icon, 'download');
-  assert.equal(button.attrs['aria-label'], 'Export map');
+  assert.equal(button.dataset.icon, 'share');
+  assert.equal(button.attrs['aria-label'], 'Export or share map');
   button.click();
-  assert.deepEqual(h.menuTitles, ['Save PNG image in the Vault', 'Download PNG image', 'Save SVG image in the Vault', 'Download SVG image', 'Save Markdown outline in the Vault', 'Download Markdown outline']);
+  const exports = ['Save PNG image in the Vault', 'Download PNG image', 'Save SVG image in the Vault', 'Download SVG image', 'Save Markdown outline in the Vault', 'Download Markdown outline'];
+  assert.deepEqual(h.menuTitles, [...exports, 'Share as HTML page…']);
+  const shared = [];
+  h.view.plugin.openShare = view => shared.push(view);
+  h.Menu.last.items.at(-1).fn();
+  assert.deepEqual(shared, [h.view], 'the same dialog as the share command');
+  h.menuTitles.length = 0;
+  h.view.map.aim = { branches: [] };
+  h.view.addExportButton(element('div')).click();
+  assert.deepEqual(h.menuTitles, exports, 'an AIM map cannot be shared, so the entry is not offered');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.doesNotMatch(source, /iconButton\(headerActions, "share-2"/, 'no second share button in the header');
 });
 
 test('helpers: colour normalising, data URI, file stem', () => {

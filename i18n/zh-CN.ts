@@ -786,7 +786,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.summary_refused_too_many": "一个括号最多框 50 个议题。",
   "ui.summary_layout_unsupported": "此排列方向尚不支持摘要括号。",
   "ui.summary_cross_side": "请只选同一侧的议题，括号不能跨过平衡图的左右两侧。",
-  "ui.export_map": "导出地图",
+  "ui.export_or_share_map": "导出或分享心智图",
+  "ui.export_share_html": "分享为 HTML 网页…",
   "ui.export_png_vault": "将 PNG 图片存入 Vault",
   "ui.export_png_download": "下载 PNG 图片",
   "ui.export_svg_vault": "将 SVG 图片存入 Vault",
@@ -2309,7 +2310,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_color_blue": "蓝色",
   "share.viewer_color_purple": "紫色",
   // Share dialog
-  "share.button": "分享这张地图",
   "share.title": "分享这张地图",
   "share.intro": "生成一个 HTML 文件，任何浏览器都能打开，离线也可以。存放位置由你决定，不会上传任何内容。",
   "share.option_full_name": "包含完整笔记",

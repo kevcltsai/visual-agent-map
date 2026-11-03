@@ -866,7 +866,8 @@ var en = {
   "ui.summary_refused_too_many": "A bracket can hold at most 50 topics.",
   "ui.summary_layout_unsupported": "This arrangement does not support summary brackets yet.",
   "ui.summary_cross_side": "Select topics on one side only; a bracket cannot span both halves of a balanced map.",
-  "ui.export_map": "Export map",
+  "ui.export_or_share_map": "Export or share map",
+  "ui.export_share_html": "Share as HTML page\u2026",
   "ui.export_png_vault": "Save PNG image in the Vault",
   "ui.export_png_download": "Download PNG image",
   "ui.export_svg_vault": "Save SVG image in the Vault",
@@ -2325,7 +2326,6 @@ var en = {
   "share.viewer_color_blue": "Blue",
   "share.viewer_color_purple": "Purple",
   // Share dialog
-  "share.button": "Share this map",
   "share.title": "Share this map",
   "share.intro": "Creates one HTML file that opens in any browser, even offline. You choose where it is saved. Nothing is uploaded.",
   "share.option_full_name": "Include full notes",
@@ -3287,7 +3287,8 @@ var zhCN = {
   "ui.summary_refused_too_many": "\u4E00\u4E2A\u62EC\u53F7\u6700\u591A\u6846 50 \u4E2A\u8BAE\u9898\u3002",
   "ui.summary_layout_unsupported": "\u6B64\u6392\u5217\u65B9\u5411\u5C1A\u4E0D\u652F\u6301\u6458\u8981\u62EC\u53F7\u3002",
   "ui.summary_cross_side": "\u8BF7\u53EA\u9009\u540C\u4E00\u4FA7\u7684\u8BAE\u9898\uFF0C\u62EC\u53F7\u4E0D\u80FD\u8DE8\u8FC7\u5E73\u8861\u56FE\u7684\u5DE6\u53F3\u4E24\u4FA7\u3002",
-  "ui.export_map": "\u5BFC\u51FA\u5730\u56FE",
+  "ui.export_or_share_map": "\u5BFC\u51FA\u6216\u5206\u4EAB\u5FC3\u667A\u56FE",
+  "ui.export_share_html": "\u5206\u4EAB\u4E3A HTML \u7F51\u9875\u2026",
   "ui.export_png_vault": "\u5C06 PNG \u56FE\u7247\u5B58\u5165 Vault",
   "ui.export_png_download": "\u4E0B\u8F7D PNG \u56FE\u7247",
   "ui.export_svg_vault": "\u5C06 SVG \u56FE\u7247\u5B58\u5165 Vault",
@@ -4746,7 +4747,6 @@ var zhCN = {
   "share.viewer_color_blue": "\u84DD\u8272",
   "share.viewer_color_purple": "\u7D2B\u8272",
   // Share dialog
-  "share.button": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
   "share.title": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
   "share.intro": "\u751F\u6210\u4E00\u4E2A HTML \u6587\u4EF6\uFF0C\u4EFB\u4F55\u6D4F\u89C8\u5668\u90FD\u80FD\u6253\u5F00\uFF0C\u79BB\u7EBF\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u51B3\u5B9A\uFF0C\u4E0D\u4F1A\u4E0A\u4F20\u4EFB\u4F55\u5185\u5BB9\u3002",
   "share.option_full_name": "\u5305\u542B\u5B8C\u6574\u7B14\u8BB0",
@@ -5708,7 +5708,8 @@ var zhTW = {
   "ui.summary_refused_too_many": "\u4E00\u500B\u62EC\u865F\u6700\u591A\u6846 50 \u500B\u8B70\u984C\u3002",
   "ui.summary_layout_unsupported": "\u6B64\u6392\u5217\u65B9\u5411\u5C1A\u4E0D\u652F\u63F4\u6458\u8981\u62EC\u865F\u3002",
   "ui.summary_cross_side": "\u8ACB\u53EA\u9078\u540C\u4E00\u5074\u7684\u8B70\u984C\uFF0C\u62EC\u865F\u4E0D\u80FD\u8DE8\u904E\u5E73\u8861\u5716\u7684\u5DE6\u53F3\u5169\u5074\u3002",
-  "ui.export_map": "\u532F\u51FA\u5FC3\u667A\u5716",
+  "ui.export_or_share_map": "\u532F\u51FA\u6216\u5206\u4EAB\u5FC3\u667A\u5716",
+  "ui.export_share_html": "\u5206\u4EAB\u70BA HTML \u7DB2\u9801\u2026",
   "ui.export_png_vault": "\u5C07 PNG \u5716\u7247\u5B58\u9032 Vault",
   "ui.export_png_download": "\u4E0B\u8F09 PNG \u5716\u7247",
   "ui.export_svg_vault": "\u5C07 SVG \u5716\u7247\u5B58\u9032 Vault",
@@ -7167,7 +7168,6 @@ var zhTW = {
   "share.viewer_color_blue": "\u85CD\u8272",
   "share.viewer_color_purple": "\u7D2B\u8272",
   // Share dialog
-  "share.button": "\u5206\u4EAB\u9019\u5F35\u5FC3\u667A\u5716",
   "share.title": "\u5206\u4EAB\u9019\u5F35\u5FC3\u667A\u5716",
   "share.intro": "\u7522\u751F\u4E00\u500B HTML \u6A94\uFF0C\u4EFB\u4F55\u700F\u89BD\u5668\u90FD\u80FD\u958B\u555F\uFF0C\u96E2\u7DDA\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u6C7A\u5B9A\uFF0C\u4E0D\u6703\u4E0A\u50B3\u4EFB\u4F55\u6771\u897F\u3002",
   "share.option_full_name": "\u5305\u542B\u5B8C\u6574\u7B46\u8A18",
@@ -55189,9 +55189,9 @@ ${request.requirements}` : preset.text,
       }
     }
   }
-  /** The header's export button (AIM and integration mode included, decision D11). */
+  /** The header's export and share button (AIM and integration mode included, decision D11; sharing is not offered for AIM). */
   addExportButton(parent) {
-    return this.iconButton(parent, "download", t("ui.export_map"), (event) => this.openExportMenu(event));
+    return this.iconButton(parent, "share", t("ui.export_or_share_map"), (event) => this.openExportMenu(event));
   }
   openExportMenu(event) {
     const menu = this.newMenu();
@@ -55206,7 +55206,13 @@ ${request.requirements}` : preset.text,
     add(t("ui.export_svg_download"), "download", "svg", "download");
     add(t("ui.export_md_vault"), "file-down", "md", "vault");
     add(t("ui.export_md_download"), "download", "md", "download");
-    menu.showAtMouseEvent(event);
+    if (this.map && !this.map.aim) {
+      menu.addSeparator();
+      menu.addItem(
+        (item) => item.setTitle(t("ui.export_share_html")).setIcon("globe").onClick(() => this.plugin.openShare(this))
+      );
+    }
+    this.showMenuUnder(menu, event);
   }
   /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
   exportCoverPath(notePath) {
@@ -55890,8 +55896,6 @@ ${request.requirements}` : preset.text,
       redo.disabled = !this.history.canRedo;
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
-      if (!this.map.aim)
-        this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
       this.addExportButton(headerActions);
       this.iconButton(
         headerActions,

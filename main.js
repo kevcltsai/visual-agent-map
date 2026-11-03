@@ -47611,6 +47611,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "unbindClipboard", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
+    /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
+    __publicField(this, "blankMapPaths", /* @__PURE__ */ new Set());
     __publicField(this, "aimStyleNoticed", /* @__PURE__ */ new Set());
     __publicField(this, "noStyleFiles");
     this.installUndoScope();
@@ -60246,9 +60248,9 @@ ${note.detail.trim()}` : "",
     workspace.toggleClass("has-map-chat-open", this.chat.isOpen);
     this.focusChatHeroOnce();
   }
-  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one). */
+  /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) the user did not ask to start blank. */
   chatHero() {
-    if (!this.chat || this.chat.hasMessages || !this.map) return false;
+    if (!this.chat || this.chat.hasMessages || !this.map || this.blankMapPaths.has(this.path)) return false;
     return !this.map.aim && this.map.nodes.length === 0;
   }
   /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
@@ -60349,18 +60351,17 @@ ${note.detail.trim()}` : "",
     if (!this.chat) return;
     this.chat.toggleFromCommand();
   }
-  /** Asks for a name, then makes and opens an empty map. No AI. */
-  promptEmptyMap() {
-    new NameModal(
-      this.app,
-      t("ui.new_mind_map"),
-      t("ui.new_mind_map_from_sample"),
-      (title) => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
-    ).open();
+  /** The opening screen is already on an empty map: drop it and show that map's empty canvas. No new file, no name box, no AI. */
+  startBlankMap() {
+    var _a2, _b2;
+    if (!this.map) return;
+    this.blankMapPaths.add(this.path);
+    this.render();
+    (_b2 = (_a2 = this.emptyMapEl) == null ? void 0 : _a2.querySelector("button")) == null ? void 0 : _b2.focus();
   }
   chatHost() {
     return {
-      createEmptyMap: () => this.promptEmptyMap(),
+      createEmptyMap: () => this.startBlankMap(),
       topicTitle: (id) => {
         var _a2, _b2, _c;
         const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);

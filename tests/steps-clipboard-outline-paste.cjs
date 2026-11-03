@@ -200,23 +200,6 @@ test('P5 text paste: a bad line refuses the whole text with its line number', as
   assert.equal(h.map().nodes.length, 5); assert.equal(h.history(), 0);
 });
 
-test('P5 text paste: a read-only map (AIM, topic selection mode) writes nothing and says so', async () => {
-  const cases = {
-    aim: h => { h.view.map.aim = { version: 1 }; },
-    integration: h => { h.view.selection.toggleMultiSelect(); }
-  };
-  for (const [name, arrange] of Object.entries(cases)) {
-    const h = await harness();
-    h.view.selection.setSelected(h.ids.root);
-    arrange(h);
-    const filesBefore = files(h);
-    pasteOf(h, { 'text/plain': 'Alpha\n\tBeta' });
-    await settled(h);
-    assert.equal(h.map().nodes.length, 5, name); assert.deepEqual(files(h), filesBefore, name); assert.equal(h.history(), 0, name);
-    assert.equal(h.notices.at(-1), 'This map is read-only here, so nothing was pasted.', name);
-  }
-});
-
 test('P5 text paste: text controls, the chat panel and anywhere outside the view keep their own paste', async () => {
   const h = await harness();
   h.view.selection.setSelected(h.ids.root);

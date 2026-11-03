@@ -238,24 +238,28 @@ test('P4 paste: an external payload makes new notes with kind, strength and body
   assert.equal(h.history(), 1);
 });
 
-test('P4 paste: read-only situations (AIM map, topic selection mode) write nothing and say so', async () => {
-  const valid = payloadText([{ id: 'a', parent: null, title: 'Claim', kind: 'topic', body: '' }]);
+test('P4 paste: read-only situations (AIM map, topic selection mode) write nothing and say so, for a private payload and for plain text', async () => {
+  const payloads = {
+    private: { [MIME]: payloadText([{ id: 'a', parent: null, title: 'Claim', kind: 'topic', body: '' }]) },
+    text: { 'text/plain': 'Alpha\n\tBeta' }
+  };
   const cases = {
     aim: h => { h.view.map.aim = { version: 1 }; },
     integration: h => { h.view.selection.toggleMultiSelect(); }
   };
-  for (const [name, arrange] of Object.entries(cases)) {
+  for (const [kind, data] of Object.entries(payloads)) for (const [name, arrange] of Object.entries(cases)) {
+    const label = `${kind} ${name}`;
     const h = await harness();
     h.view.selection.setSelected(h.ids.root);
     arrange(h);
     const filesBefore = files(h), nodes = h.map().nodes.length;
-    const event = pasteOf(h, { [MIME]: valid });
-    await tick(); await tick();
-    assert.equal(event.defaultPrevented, true, name);
-    assert.equal(h.map().nodes.length, nodes, `${name}: no node`);
-    assert.deepEqual(files(h), filesBefore, `${name}: no file`);
-    assert.equal(h.history(), 0, `${name}: history unchanged`);
-    assert.equal(h.notices.at(-1), 'This map is read-only here, so nothing was pasted.', name);
+    const event = pasteOf(h, data);
+    await tick(); await tick(); await tick();
+    assert.equal(event.defaultPrevented, true, label);
+    assert.equal(h.map().nodes.length, nodes, `${label}: no node`);
+    assert.deepEqual(files(h), filesBefore, `${label}: no file`);
+    assert.equal(h.history(), 0, `${label}: history unchanged`);
+    assert.equal(h.notices.at(-1), 'This map is read-only here, so nothing was pasted.', label);
   }
 });
 

@@ -139,7 +139,7 @@ test('note style: every preset has a full name and hint in both languages; the m
   }
   assert.equal(translate('zh-TW', 'ui.note_style'), '筆記風格'); assert.equal(translate('en', 'ui.note_style'), 'Note style');
   assert.equal(translate('en', 'ui.note_style_custom_0_1', 'A', 'B'), 'Custom: A · B'); assert.equal(translate('zh-TW', 'ui.note_style_custom_0_1', 'A', 'B'), '自訂：A · B');
-  assert.equal(translate('zh-TW', 'ui.note_style_keep_each'), '保持不變'); assert.equal(translate('en', 'ui.note_style_use_default_0', 'Standard'), 'Follow default (Standard)');
+  assert.equal(translate('zh-TW', 'ui.note_style_each_topic'), '各議題自己的設定'); /* was ui.note_style_keep_each (key removed, D3) */ assert.equal(translate('en', 'ui.note_style_use_default_0', 'Standard'), 'Follow default (Standard)');
   assert.equal(translate('zh-TW', 'ui.note_style_use_default_0', '教科書'), '跟隨預設（教科書）');
   const names = { template: id => id === 'mine' ? 'My notes' : id, tone: id => id };
   assert.equal(translate('zh-TW', 'ui.note_style_use_default_0', style.styleLabel('textbook', 'academic', names, 'zh-TW')), '跟隨預設（教科書）');

@@ -1395,6 +1395,7 @@ integrationTest('FB1 F1: opening the research or the synthesis dialog raises no 
   await until(() => opened.length === 1);
   view.selection.replaceMulti([h.topic.id, other.id]);
   view.openSelectionSynthesis(null);
+  await until(() => opened.length === 2); // the styles are read again first (#38), so the dialog opens a moment later
   assert.equal(opened.length, 2, 'both dialogs opened');
   assert.deepEqual(notices, [], 'a label or a dialog is not a run');
   assert.deepEqual(h.notices, []);
@@ -1480,18 +1481,20 @@ integrationTest('runAgent: a structure file that still has a format rules headin
   assert.equal(h.contexts[0].styleSelection.template.fileName, 'Bad.md');
   assert.deepEqual(h.notices, [], 'the format rules zone is only noted, not an error');
 });
-integrationTest('runAgent: choosing a template or a style file for a run is used by that run only, the topic template and tone stay (was: written to the topic, the style file deleted the tone; grilling Q18)', async () => {
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), workspaceFolder: 'WS', noteStylesFolder: 'WS/S' } });
-  await installStyleFiles(h.plugin, { 'WS/S/Structures/Mine.md': '## Mine\nx\n' });
+integrationTest('runAgent: choosing a style (a built-in or a style file) for a run is used by that run only and is the whole style, the topic tone stays on the note (was: choosing a template, the topic tone still applied; grilling Q18, D2)', async () => {
+  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' } });
+  await installStyleFiles(h.plugin, { 'WS/S/Styles/Mine.md': '---\nstructure: Mine\nvoice: Practical guide\n---\n', 'WS/S/Structures/Mine.md': '## Mine\nx\n' });
   await h.repo.updateNote(h.topic.path, { toneId: 'plain' });
-  const chosen = await h.view.detailTemplateFor({ path: h.topic.path }, 'A');
-  assert.equal(chosen.template.id, 'A');
+  const chosen = await h.view.detailTemplateFor({ path: h.topic.path }, 'builtin:textbook');
+  assert.equal(chosen.template.id, 'textbook');
   assert.deepEqual([(await h.repo.readNote(h.topic.path)).detailTemplateId, (await h.repo.readNote(h.topic.path)).toneId], [undefined, 'plain']);
   const file = await h.view.detailTemplateFor({ path: h.topic.path }, 'file:Mine');
   assert.equal(file.template.id, 'file:Mine');
-  assert.equal(typeof file.toneText, 'string', 'the topic tone still applies to a run that only picks a structure');
+  assert.equal(file.recipe.ref, 'file:Mine'); assert.equal(file.recipe.source, 'run');
+  assert.equal(file.toneText, h.plugin.noteStyles.runStyle({ choice: { style: 'file:Mine' }, kind: 'topic', outputLanguage: 'en' }).toneText, 'the voice is the chosen style\'s own, not the topic tone');
+  assert.notEqual(file.toneText, toneTexts('en').plain, 'the topic tone does not mix into a whole-style choice');
   const note = await h.repo.readNote(h.topic.path);
-  assert.equal(note.detailTemplateId, undefined); assert.equal(note.toneId, 'plain', 'nothing is written to the topic');
+  assert.equal(note.detailTemplateId, undefined); assert.equal(note.toneId, 'plain', 'nothing is written to the topic'); assert.equal(note.noteStyle, undefined);
 });
 integrationTest('runAgent saves detail with the template order and stores formatIssues text; clears it when met', async () => {
   const template = { id: 'T', name: 'Counted', sections: [templateSection('t0', '結論'), templateSection('t1', '範例', { count: { mode: 'exact', n: 3 } }), templateSection('t2', '來源', { role: 'sources' })] };
@@ -1535,13 +1538,14 @@ integrationTest('a deleted topic template notifies on each run, keeps the field 
   assert.equal(h.contexts[1].detailTemplate.id, 'standard');
   assert.equal(h.notices.length, 2, 'it is told again, nothing was cleared');
 });
-integrationTest('an explicit choice is used by that run only and its reply still saves (was: also recorded on the topic; grilling Q18)', async () => {
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C' }, reply: () => ({ summary: 'Chosen summary', detail: '### Alpha\n\nBody', visualReferences: [], suggestions: [] }) });
-  await h.view.researchChild(h.topic, new AbortController().signal, () => {}, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], detailTemplateId: 'A' });
+integrationTest('an explicit choice is used by that run only and its reply still saves (was: also recorded on the topic as detailTemplateId; grilling Q18, D2)', async () => {
+  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C', workspaceFolder: 'WS', noteStylesFolder: 'WS/S' }, reply: () => ({ summary: 'Chosen summary', detail: '### Alpha\n\nBody', visualReferences: [], suggestions: [] }) });
+  await installStyleFiles(h.plugin, { 'WS/S/Styles/Chosen.md': '---\nstructure: Chosen\n---\n', 'WS/S/Structures/Chosen.md': '## Alpha\nx\n\n## Beta\ny\n' });
+  await h.view.researchChild(h.topic, new AbortController().signal, () => {}, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], noteStyle: 'file:Chosen' });
   await until(() => !h.plugin.running.size);
-  assert.equal(h.contexts[0].detailTemplate.id, 'A');
+  assert.equal(h.contexts[0].detailTemplate.id, 'file:Chosen');
   const note = await h.repo.readNote(h.topic.path);
-  assert.equal(note.detailTemplateId, undefined, 'the topic is not changed');
+  assert.equal(note.detailTemplateId, undefined, 'the topic is not changed'); assert.equal(note.noteStyle, undefined);
   assert.equal(note.summary, 'Chosen summary');
   assert.ok(!h.notices.some(message => /outdated/.test(message)), h.notices.join('|'));
   assert.match(note.detail, /^### Alpha/);
@@ -1599,13 +1603,14 @@ integrationTest('tone: runAgent resolves run > topic override > topic type voice
   await h.repo.updateNote(h.topic.path, { toneId: 'gone' }); await h.run();
   assert.equal('toneText' in h.contexts.at(-1), false, 'a deleted topic tone is academic rigor in the topic\'s own implicit style (was: fell through to the map default)');
 });
-integrationTest('tone: a dialog choice is used by that run only and not recorded on the topic (single and batch research) (was: recorded on the topic; grilling Q18)', async () => {
+integrationTest('tone: a dialog style choice brings its own voice for that run only and is not recorded on the topic (single and batch research) (was: a toneId choice; grilling Q18, D2)', async () => {
   const tones = toneTexts('en');
-  const h = await templateHarness({ language: 'en' });
-  await h.view.researchChild(h.topic, new AbortController().signal, () => {}, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], toneId: 'magazine' });
+  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' } });
+  await installStyleFiles(h.plugin, { 'WS/S/Styles/Magazine.md': '---\nvoice: magazine\n---\n' });
+  await h.view.researchChild(h.topic, new AbortController().signal, () => {}, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], noteStyle: 'file:Magazine' });
   await until(() => !h.plugin.running.size);
   assert.equal(h.contexts.at(-1).toneText, tones.magazine);
-  assert.equal((await h.repo.readNote(h.topic.path)).toneId, undefined, 'the topic keeps no tone');
+  assert.equal((await h.repo.readNote(h.topic.path)).toneId, undefined, 'the topic keeps no tone'); assert.equal((await h.repo.readNote(h.topic.path)).noteStyle, undefined);
   await h.view.researchChild(h.topic, new AbortController().signal, () => {}, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [] });
   await until(() => !h.plugin.running.size);
   assert.equal('toneText' in h.contexts.at(-1), false, 'no choice: the next run is back on the topic type voice');
@@ -1692,17 +1697,18 @@ integrationTest('integrated topic stores the result format issues', async () => 
 });
 const partsTemplate = () => ({ id: 'X', name: 'Parts', sections: [templateSection('x0', 'First part'), templateSection('x1', 'Second part')] });
 const contributedSuggestion = title => ({ title, task: `Look at ${title}`, contribution: '### Second part\n\nB\n\n### First part\n\nA', parentTitle: '' });
-integrationTest('expand without shallow research: the chosen template shapes contributions and is recorded on the new children', async () => {
+integrationTest('expand without shallow research: the chosen style shapes contributions for this batch only and is recorded on no new child (was: recorded on the new children; Q18, C5, #44)', async () => {
   const reply = () => ({ summary: '', detail: '', visualReferences: [], suggestions: [contributedSuggestion('One'), contributedSuggestion('Two'), contributedSuggestion('Three')] });
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: [partsTemplate()] }, reply });
-  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], shallowResearch: false, detailTemplateId: 'X' };
+  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' }, reply });
+  await installStyleFiles(h.plugin, { 'WS/S/Styles/X.md': '---\nstructure: X\n---\n', 'WS/S/Structures/X.md': '## First part\nA\n\n## Second part\nB\n' });
+  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], shallowResearch: false, noteStyle: 'file:X' };
   let create;
   await h.view.proposeChildren(h.topic, options, '', (items, run) => { create = () => run(items.slice(0, 1)); }, message => assert.fail(message));
   assert.ok(create, 'suggestions were presented');
   await create();
   const saved = await h.repo.readMap(h.mapPath);
   const child = await h.repo.readNote(saved.nodes.find(node => node.parentId === h.topic.id).path);
-  assert.equal(child.detailTemplateId, 'X');
+  assert.equal(child.detailTemplateId, undefined, 'no child records the chosen style'); assert.equal(child.noteStyle, undefined); assert.equal(child.toneId, undefined);
   assert.match(child.detail, /^### First part\n\nA\n\n### Second part\n\nB$/);
   assert.equal(h.contexts.length, 1, 'no research ran');
 });
@@ -1715,11 +1721,37 @@ integrationTest('opening the AI dialog for a topic with a deleted template neith
   const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
   view.openNextStep(h.topic);
   await until(() => opened.length === 1);
-  assert.equal(opened[0].modelSettings.currentTemplate, 'Standard six', 'label shows the fallback template: the topic type\'s built-in structure, the map template B is not read');
+  assert.equal(opened[0].modelSettings.currentStyle, 'Old setting (Standard six · Academic rigor)', 'the line shows the topic\'s old setting with the fallback structure; the map template B is not read');
+  assert.equal('currentTemplate' in opened[0].modelSettings, false, 'the dialog gets one style name, not template and tone lists');
   opened[0].close();
   assert.deepEqual(notices, []);
   assert.equal(await h.app.vault.read(h.app.vault.getAbstractFileByPath(h.topic.path)), before, 'note file unchanged');
   assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, 'gone');
+});
+integrationTest('opening the research or the selection synthesis dialog reads the style files again first, so a style made since the last run is named on the line (#38, counter-example 10)', async () => {
+  const opened = [];
+  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'file:Fresh' } } });
+  const files = {};
+  const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => {}, trash: async () => {} };
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
+  await h.plugin.noteStyles.refresh(); // the cache knows no style file
+  files['WS/S/Styles/Fresh.md'] = '---\nvoice: plain\n---\n'; // made after the last refresh
+  await h.repo.updateNote(h.topic.path, { noteStyle: 'file:Fresh' });
+  const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
+  const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
+  view.openNextStep(h.topic);
+  await until(() => opened.length === 1);
+  assert.equal(opened[0].modelSettings.currentStyle, 'Fresh', 'the research dialog names the style file, not the topic type default');
+  // The selection synthesis shows the topic type\'s style (no topic): a second file made after the dialog above.
+  await h.plugin.noteStyles.refresh();
+  files['WS/S/Styles/Newer.md'] = '---\nvoice: plain\n---\n';
+  h.plugin.settings.noteStyleByKind = { topic: 'file:Newer' };
+  view.selection.replaceMulti([h.topic.id, other.id]);
+  view.openSelectionSynthesis(null);
+  await until(() => opened.length === 2);
+  assert.equal(opened[1].selectionFlow.fields.currentStyle, 'Newer');
 });
 integrationTest('no templates, zh-TW interface, English output: Standard follows the output language in the request and the saved note', async () => {
   const h = await templateHarness({ language: 'zh-TW', reply: () => ({ summary: 'English summary', detail: '### Core conclusions\n\nC\n\n### Key knowledge\n\nK', visualReferences: [], suggestions: [] }) });
@@ -1732,17 +1764,18 @@ integrationTest('no templates, zh-TW interface, English output: Standard follows
   assert.deepEqual(note.detail.split('\n').filter(line => line.startsWith('### ')), ['### Core conclusions', '### Key knowledge', '### Evidence and sources', '### Tradeoffs and limitations', '### Open questions', '### Update log']);
   assert.match(note.detail, /### Core conclusions\n\nC\n\n### Key knowledge\n\nK/);
 });
-integrationTest('multi research with a chosen template uses it for each started topic and records it on none (skipped topics untouched; was: recorded on each started topic; grilling Q18)', async () => {
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C' } });
+integrationTest('multi research with a chosen style uses it for each started topic and records it on none (skipped topics untouched; was: a chosen template, recorded on each started topic; grilling Q18, D2)', async () => {
+  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C', workspaceFolder: 'WS', noteStylesFolder: 'WS/S' } });
+  await installStyleFiles(h.plugin, { 'WS/S/Styles/A.md': '---\nstructure: A\n---\n', 'WS/S/Structures/A.md': '## A\nx\n' });
   const second = await h.repo.createNote('Second', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(second); await h.repo.saveMap(h.mapPath, h.doc);
   const third = await h.repo.createNote('Third', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(third); await h.repo.saveMap(h.mapPath, h.doc);
   await h.repo.updateNote(second.path, { prompt: 'Research second' }); await h.repo.updateNote(third.path, { prompt: 'Research third' });
   h.plugin.confirmAiUsage = async (_model, run) => { await run(); return true; };
   h.plugin.running.add(third.path); // busy: skipped before any write
   h.view.selection.replaceMulti([h.topic.id, second.id, third.id]);
-  await h.view.startMultiResearch({ researchMode: 'local', researchDepth: 'fast', requirements: '', detailTemplateId: 'A' });
+  await h.view.startMultiResearch({ researchMode: 'local', researchDepth: 'fast', requirements: '', noteStyle: 'file:A' });
   await until(() => h.contexts.length === 2 && !h.plugin.running.has(h.topic.path) && !h.plugin.running.has(second.path));
-  assert.deepEqual(h.contexts.map(context => context.detailTemplate.id), ['A', 'A']);
+  assert.deepEqual(h.contexts.map(context => context.detailTemplate.id), ['file:A', 'file:A']);
   assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, undefined);
   assert.equal((await h.repo.readNote(second.path)).detailTemplateId, undefined);
   assert.equal((await h.repo.readNote(third.path)).detailTemplateId, undefined);
@@ -1828,7 +1861,7 @@ integrationTest('map action: one default note style sets or clears the template 
   saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, undefined); assert.equal(saved.toneId, undefined);
 });
-integrationTest('run-style P3: "Keep as is (…)" in the research and synthesis dialogs names the style and tone the run really uses (topic type voice, topic override, topic style file; the map tone and the workspace tone block are not read; was: workspace tone block, map override; grilling Q5/Q10/Q15)', async () => {
+integrationTest('run-style P3: the style line of the research and synthesis dialogs names the style the run really uses (topic type voice, topic override, topic style file; the map tone and the workspace tone block are not read; was: "Keep as is (…)" naming style and tone; grilling Q5/Q10/Q15, D3)', async () => {
   const FILES = { 'WS/S/Voices/Pirate.md': 'Talk like a pirate.', 'WS/S/Styles/Pirated.md': '---\nvoice: Pirate\n---\n', 'WS/S/Styles/Own.md': '---\nvoice: plain\n---\n' };
   const { NoteStyleStore } = load('ai/note-style-store.ts');
   const cases = [
@@ -1848,12 +1881,13 @@ integrationTest('run-style P3: "Keep as is (…)" in the research and synthesis 
     const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
     view.openNextStep(h.topic);
     await until(() => opened.length === 1);
-    assert.equal(opened[0].modelSettings.currentTone, row.tone, `${row.name}: research dialog tone`);
-    assert.equal(opened[0].modelSettings.currentStyle, row.style, `${row.name}: research dialog style`);
+    assert.equal(opened[0].modelSettings.currentStyle, row.style, `${row.name}: research dialog style (one name; the tone is part of the style)`);
+    assert.equal('currentTone' in opened[0].modelSettings, false, `${row.name}: the dialog no longer gets a separate tone`);
+    assert.equal(h.view.topicStyle(await h.repo.readNote(h.topic.path), undefined, 'en').label.toneName, row.tone, `${row.name}: the voice the run really uses`);
     view.selection.replaceMulti([h.topic.id, other.id]);
     view.openSelectionSynthesis(null);
-    assert.equal(opened.length, 2);
-    assert.equal(opened[1].selectionFlow.fields.currentTone, 'Pirate', `${row.name}: synthesis dialog tone (no topic: the topic type voice)`);
+    await until(() => opened.length === 2); // the styles are read again first (#38)
+    assert.equal('currentTone' in opened[1].selectionFlow.fields, false);
     assert.equal(opened[1].selectionFlow.fields.currentStyle, 'Pirated', `${row.name}: synthesis dialog style (no topic: the topic type style)`);
   }
 });

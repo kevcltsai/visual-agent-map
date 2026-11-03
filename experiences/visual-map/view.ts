@@ -2100,11 +2100,11 @@ export class VisualAgentMapView extends ItemView {
    */
   private async proposalTone(
     note: Pick<Note, "toneId" | "noteStyle" | "topicKind"> | undefined,
-    options?: Pick<TaskOptions, "toneId" | "outputLanguage">
+    options?: Pick<TaskOptions, "noteStyle" | "outputLanguage">
   ): Promise<{ toneText: string } | Record<string, never>> {
     await this.refreshNoteStyles();
     const { toneText } = this.noteStyles.runStyle({
-      choice: { tone: options?.toneId },
+      choice: { style: options?.noteStyle },
       topic: { style: note?.noteStyle, tone: note?.toneId },
       kind: note?.topicKind ?? "topic",
       outputLanguage: options?.outputLanguage ?? this.plugin.settings.language
@@ -2127,8 +2127,7 @@ export class VisualAgentMapView extends ItemView {
   private fieldLinks(): FieldLinks {
     return {
       repair: model => this.plugin.repairConnection(model),
-      styles: this.stylePicker(),
-      ...(this.defaultStyleRef() ? { currentStyleRef: this.defaultStyleRef() } : {})
+      styles: this.stylePicker()
     };
   }
   /** Built-in Standard and Textbook plus the workspace's custom templates, for the template selects. */
@@ -2199,13 +2198,13 @@ export class VisualAgentMapView extends ItemView {
       this.app,
       request => this.importOutline(request),
       this.modelChoices(),
-      this.templateChoices(),
+      [],
       target,
       placement,
       this.outlineGenerator(prefill ? prefill.inputs.topic : target.selected?.title, prefill),
       this.fieldLinks(),
-      this.toneChoices(),
-      this.defaultStyleLabel(),
+      [],
+      "",
       parentId => this.outlineModelLabel(parentId)
     ).open();
   }
@@ -2432,12 +2431,12 @@ export class VisualAgentMapView extends ItemView {
                 researchOptions: {
                   referenceGroups: options.referenceGroups ?? [],
                   ...(options.outputLanguage ? { outputLanguage: options.outputLanguage } : {}),
-                  ...(options.toneId ? { toneId: options.toneId } : {}),
+                  ...(options.noteStyle ? { noteStyle: options.noteStyle } : {}),
                   ...(options.requirements ? { requirements: options.requirements } : {})
                 }
               }
             : {}),
-          ...(options.detailTemplateId ? { detailTemplateId: options.detailTemplateId } : {})
+          ...(options.noteStyle ? { noteStyle: options.noteStyle } : {})
         })
     };
   }
@@ -3704,7 +3703,7 @@ export class VisualAgentMapView extends ItemView {
     const model = (request.shallowResearch && request.model) || currentModel;
     await this.noteStyles.refresh();
     const importStyle = this.noteStyles.runStyle({
-      choice: { template: request.detailTemplateId },
+      choice: { style: request.noteStyle },
       kind: "topic",
       outputLanguage: this.plugin.settings.language
     });
@@ -3733,15 +3732,7 @@ export class VisualAgentMapView extends ItemView {
     let opened = true;
     try {
       await this.plugin.mutate(async () => {
-        // The template and tone chosen for the import become the new map's defaults, not per-topic fields.
-        const chosenTemplate = request.detailTemplateId;
-        const chosenTone = request.toneId;
-        if (chosenTemplate || chosenTone)
-          await this.plugin.repo.updateMap(result.mapPath, map => {
-            if (chosenTemplate) map.detailTemplateId = chosenTemplate;
-            if (chosenTone) map.toneId = chosenTone;
-            else if (chosenTemplate?.startsWith("style:")) delete map.toneId;
-          });
+        // A style chosen in the window shaped the root note and the research only: nothing is written to the map (#44).
         // Notes and Map.md were written directly; derive their Reference Links (map, parent, children) like any map change.
         await this.plugin.rebuildDerivedData();
         await this.openMapInMutation(result.mapPath);
@@ -3764,7 +3755,9 @@ export class VisualAgentMapView extends ItemView {
           children,
           {
             ...aiModeOptions(request.aiMode ?? "quick", "subtopic"),
-            referenceGroups: []
+            referenceGroups: [],
+            // The style no longer becomes the new map's default (#44), so the research carries it.
+            ...(request.noteStyle ? { noteStyle: request.noteStyle } : {})
           },
           noticeGate
         )
@@ -3817,11 +3810,12 @@ export class VisualAgentMapView extends ItemView {
           ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel)
           : currentModel;
         model = (request.shallowResearch && request.model) || baseModel;
-        // A template chosen here is recorded on each new topic: an import never changes this map's default.
+        // A style chosen here shapes the root note's sections and the research for this import only: it is not recorded on
+        // a new topic and an import never changes this map's default (#44).
         await this.noteStyles.refresh();
         const template = (
           await this.mapStyle(settings.language, {
-            template: request.detailTemplateId,
+            style: request.noteStyle,
             notify: true,
             gate: noticeGate
           })
@@ -3835,10 +3829,8 @@ export class VisualAgentMapView extends ItemView {
           request.source,
           parent?.id ?? null,
           template,
-          request.detailTemplateId,
           undefined,
-          Boolean(request.shallowResearch && request.model && request.model !== baseModel),
-          request.toneId
+          Boolean(request.shallowResearch && request.model && request.model !== baseModel)
         );
         state.result = result;
         const created = result.created;
@@ -3961,8 +3953,7 @@ export class VisualAgentMapView extends ItemView {
             ...aiModeOptions(request.aiMode ?? "quick", "subtopic"),
             referenceGroups: [],
             ...request.researchOptions,
-            ...(request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {}),
-            ...(request.toneId ? { toneId: request.toneId } : {})
+            ...(request.noteStyle ? { noteStyle: request.noteStyle } : {})
           },
           noticeGate
         )
@@ -11153,6 +11144,8 @@ export class VisualAgentMapView extends ItemView {
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
       const sources = this.taskSourceSettings(currentLabel, this.map?.id, synthesisLabel);
+      // Read the styles again first (#38): a style file made since the last run is what `note-style` may point at.
+      await this.refreshNoteStyles();
       const current = this.topicStyle(note);
       sources.synthesisTopics =
         this.map?.nodes
@@ -11171,8 +11164,7 @@ export class VisualAgentMapView extends ItemView {
           const task = researchTopicTask(taskLanguage, latest.title);
           const runStyle = await this.detailTemplateFor(
             node,
-            options.detailTemplateId,
-            options.toneId,
+            options.noteStyle,
             undefined,
             options.outputLanguage ?? this.plugin.settings.language
           );
@@ -11236,16 +11228,11 @@ export class VisualAgentMapView extends ItemView {
           })(),
           structureReview: this.nextStepStructureReview(node),
           sources,
-          templates: this.templateChoices(),
-          tones: this.toneChoices(),
-          currentTone: current.label.toneName,
-          currentStyle: current.label.styleName,
+          currentStyle: current.recipe.name,
           currentSummary: note.summary,
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
-          // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
-          currentTemplate: current.label.templateName,
           topicStatus: note.status,
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
@@ -12727,7 +12714,7 @@ export class VisualAgentMapView extends ItemView {
               selected,
               researchOptions,
               undefined,
-              options?.detailTemplateId ?? researchOptions?.detailTemplateId
+              options?.noteStyle ?? researchOptions?.noteStyle
             );
           } catch (error) {
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
@@ -12869,13 +12856,13 @@ export class VisualAgentMapView extends ItemView {
       });
     }).open();
   }
-  /** `detailTemplateId` is the dialog's template choice: it shapes contributions and is recorded on each new child. */
+  /** `noteStyle` is the dialog's style choice: it shapes the contributions for this batch only; no child records it (Q18, #44). */
   private async createChildBatch(
     parent: MapNode,
     items: Suggestion[],
     researchOptions?: TaskOptions,
     signal?: AbortSignal,
-    detailTemplateId = researchOptions?.detailTemplateId
+    noteStyle = researchOptions?.noteStyle
   ): Promise<MapNode[]> {
     if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
     if (!this.map?.nodes.some(node => node.id === parent.id && node.path === parent.path))
@@ -12899,7 +12886,7 @@ export class VisualAgentMapView extends ItemView {
     await this.noteStyles.refresh();
     const contributionTemplate = (
       await this.mapStyle(this.plugin.settings.language, {
-        template: detailTemplateId,
+        style: noteStyle,
         kind: "topic"
       })
     ).template;
@@ -12925,8 +12912,7 @@ export class VisualAgentMapView extends ItemView {
                 researchMode: "local" as const,
                 visualMode: researchOptions.visualMode
               }
-            : {}),
-          ...(detailTemplateId ? { detailTemplateId } : {})
+            : {})
         });
       }
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -13076,13 +13062,7 @@ export class VisualAgentMapView extends ItemView {
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
       choices.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
-    const runStyle = await this.detailTemplateFor(
-      child,
-      choices.detailTemplateId,
-      choices.toneId,
-      gate,
-      outputLanguage
-    );
+    const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage);
     let started = false;
     let failure: string | undefined;
     const handle = await this.runAgent(
@@ -13202,8 +13182,7 @@ export class VisualAgentMapView extends ItemView {
           requirements: request.requirements,
           // The picked model is for this batch only (D4): it never becomes a topic's own model.
           ...(request.model ? { runOnce: { model: request.model } } : {}),
-          ...(request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {}),
-          ...(request.toneId ? { toneId: request.toneId } : {})
+          ...(request.noteStyle ? { noteStyle: request.noteStyle } : {})
         };
         // The map chat may set the research choices for the whole batch (as before); the dialog never does, so each topic then
         // runs in the mode its own note stores: Quick without the web and without charts, Standard with both.
@@ -13648,8 +13627,7 @@ export class VisualAgentMapView extends ItemView {
         task = direction || synthesisGoalTask(language);
         const run = await this.detailTemplateFor(
           node,
-          options?.detailTemplateId,
-          options?.toneId,
+          options?.noteStyle,
           undefined,
           options?.outputLanguage ?? language
         );
@@ -13950,39 +13928,38 @@ export class VisualAgentMapView extends ItemView {
     const selectedLabel = t("ui.reference_selected_topics_included", names.join(", "));
     const sources = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
     const settings = this.plugin.settings;
-    const current = this.mapStyleCached(settings.language);
-    new NextStepModal(
-      this.app,
-      "",
-      0,
-      0,
-      this.plugin,
-      async () => {},
-      async () => {},
-      (options, direction, failed, accepted, observer) =>
-        this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
-      undefined,
-      {
-        names,
-        initialTitle:
-          pending?.title ??
-          synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names),
-        defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
-        background: this.backgroundHooks(this.selectionTaskKey()),
-        fields: {
-          sources,
-          templates: this.templateChoices(),
-          currentTemplate: current.label.templateName,
-          tones: this.toneChoices(),
-          currentTone: current.label.toneName,
-          currentStyle: current.label.styleName,
-          ...this.outputLanguageMemory()
-        },
-        ...(pending
-          ? { pending: { directions: pending.directions, discard: () => this.discardSelectionSynthesis() } }
-          : {})
-      }
-    ).open();
+    // The styles are read again first (#38), so the line shows a style file made since the last run.
+    this.enqueue(async () => {
+      const current = await this.mapStyle(settings.language, { kind: "topic" });
+      new NextStepModal(
+        this.app,
+        "",
+        0,
+        0,
+        this.plugin,
+        async () => {},
+        async () => {},
+        (options, direction, failed, accepted, observer) =>
+          this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
+        undefined,
+        {
+          names,
+          initialTitle:
+            pending?.title ??
+            synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names),
+          defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
+          background: this.backgroundHooks(this.selectionTaskKey()),
+          fields: {
+            sources,
+            currentStyle: current.recipe.name,
+            ...this.outputLanguageMemory()
+          },
+          ...(pending
+            ? { pending: { directions: pending.directions, discard: () => this.discardSelectionSynthesis() } }
+            : {})
+        }
+      ).open();
+    });
   }
   /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
   async createIntegratedNode(
@@ -14198,8 +14175,7 @@ export class VisualAgentMapView extends ItemView {
           } satisfies TaskContext;
         await this.noteStyles.refresh();
         const integrationStyle = await this.mapStyle(runOptions.outputLanguage ?? language, {
-          template: runOptions.detailTemplateId,
-          tone: runOptions.toneId,
+          style: runOptions.noteStyle,
           kind: "topic",
           notify: true
         });
@@ -14420,8 +14396,7 @@ export class VisualAgentMapView extends ItemView {
       this.path,
       "workspace"
     );
-    const detailTemplate = (await this.mapStyle(language, { template: task.options.detailTemplateId, kind: "topic" }))
-      .template;
+    const detailTemplate = (await this.mapStyle(language, { style: task.options.noteStyle, kind: "topic" })).template;
     try {
       await this.plugin.repo.updateNote(
         integrated.path,
@@ -17984,14 +17959,13 @@ export class VisualAgentMapView extends ItemView {
    */
   private async detailTemplateFor(
     node: MapNode,
-    chosenId?: string,
-    chosenToneId?: string,
+    chosenStyle?: string,
     gate?: { shown: boolean },
     outputLanguage: ContentLanguage = this.plugin.settings.language
   ): Promise<RunStyle> {
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     await this.noteStyles.refresh();
-    const resolved = this.topicStyle(note, chosenId, chosenToneId, outputLanguage);
+    const resolved = this.topicStyle(note, chosenStyle, outputLanguage);
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
     this.noticeKindMissing(resolved.issues, note.topicKind ?? "topic", note.detailTemplateId, gate);
@@ -18015,12 +17989,11 @@ export class VisualAgentMapView extends ItemView {
    */
   private topicStyle(
     note: Note,
-    chosenId?: string,
-    chosenToneId?: string,
+    chosenStyle?: string,
     outputLanguage: ContentLanguage = this.plugin.settings.language
   ): RunStyle {
     return this.noteStyles.runStyle({
-      choice: { template: chosenId, tone: chosenToneId },
+      choice: { style: chosenStyle },
       topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
       kind: note.topicKind ?? "topic",
       outputLanguage
@@ -18112,7 +18085,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async mapStyle(
     language: ContentLanguage,
-    options: { template?: string; tone?: string; notify?: boolean; gate?: { shown: boolean }; kind?: TopicKind } = {}
+    options: { style?: string; notify?: boolean; gate?: { shown: boolean }; kind?: TopicKind } = {}
   ): Promise<RunStyle> {
     await this.refreshNoteStyles();
     return this.mapStyleCached(language, options);
@@ -18120,10 +18093,10 @@ export class VisualAgentMapView extends ItemView {
   /** `mapStyle` without the refresh: a dialog's default value reads the cached styles (its own refresh is a later ticket). */
   private mapStyleCached(
     language: ContentLanguage,
-    options: { template?: string; tone?: string; notify?: boolean; gate?: { shown: boolean }; kind?: TopicKind } = {}
+    options: { style?: string; notify?: boolean; gate?: { shown: boolean }; kind?: TopicKind } = {}
   ): RunStyle {
     const result = this.noteStyles.runStyle({
-      choice: { template: options.template, tone: options.tone },
+      choice: { style: options.style },
       kind: options.kind ?? "topic",
       outputLanguage: language
     });
@@ -18215,7 +18188,7 @@ export class VisualAgentMapView extends ItemView {
       failed,
       notify: message => new Notice(message),
       accepted: onLaunchAccepted,
-      resolveStyle: language => this.detailTemplateFor(node, undefined, undefined, undefined, language),
+      resolveStyle: language => this.detailTemplateFor(node, undefined, undefined, language),
       ancestors: language => this.ancestorContext(node, language),
       userTexts: () => this.userTextContext(node.id),
       onStarted: async () => {

@@ -1531,8 +1531,6 @@ export const en = {
   "ui.detail_template_standard": "Standard",
   "ui.detail_template_textbook": "Textbook",
   "ui.note_style": "Note style",
-  "ui.note_style_keep_0": "Keep as is ({0})",
-  "ui.note_style_keep_each": "Keep as is",
   "ui.note_style_use_default_0": "Follow default ({0})",
   "ui.note_style_custom_0_1": "Custom: {0} · {1}",
   "ui.note_style_standard": "Standard (academic)",

@@ -1451,8 +1451,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.detail_template_standard": "标准",
   "ui.detail_template_textbook": "教科书",
   "ui.note_style": "笔记风格",
-  "ui.note_style_keep_0": "保持不变（{0}）",
-  "ui.note_style_keep_each": "保持不变",
   "ui.note_style_use_default_0": "跟随默认（{0}）",
   "ui.note_style_custom_0_1": "自订：{0} · {1}",
   "ui.note_style_standard": "标准（学术严谨）",

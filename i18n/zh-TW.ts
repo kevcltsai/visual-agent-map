@@ -1453,8 +1453,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.detail_template_standard": "標準",
   "ui.detail_template_textbook": "教科書",
   "ui.note_style": "筆記風格",
-  "ui.note_style_keep_0": "保持不變（{0}）",
-  "ui.note_style_keep_each": "保持不變",
   "ui.note_style_use_default_0": "跟隨預設（{0}）",
   "ui.note_style_custom_0_1": "自訂：{0} · {1}",
   "ui.note_style_standard": "標準（學術嚴謹）",

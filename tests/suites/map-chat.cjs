@@ -2862,6 +2862,19 @@ test('UX B3: an open-ended suggestion shows an ellipsis, replaces the draft, and
   buttons()[1].click(); assert.equal(f.parts.input().value, 'Create a new map about ', 'a second pick replaces the first');
 });
 
+test('UX B7: the Concise/Detailed toggle has a visible "Answer length" label and a tooltip on each button that says what it means', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const group = find(f.panel.el, i => hasClass(i, 'vam-map-chat-style')); const box = find(f.panel.el, i => hasClass(i, 'vam-map-chat-length'));
+  const tag = find(box, i => hasClass(i, 'vam-map-chat-style-tag'));
+  assert.equal(tag.text, 'Answer length'); assert.equal(tag.attrs['aria-hidden'], 'true', 'the group label says it to screen readers already');
+  assert.ok(box.children.includes(group), 'the label sits right next to the toggle'); assert.equal(group.attrs['aria-label'], 'Answer length');
+  const [concise, detailed] = findAll(group, i => i.tag === 'button');
+  assert.equal(concise.attrs.title, 'Short answers that get to the point'); assert.equal(detailed.attrs.title, 'Longer answers with more explanation');
+  f.setLanguage('zh-TW'); f.panel.relabel();
+  assert.equal(tag.text, '回答長度'); assert.equal(concise.attrs.title, '簡短、直接的回覆');
+  f.setLanguage('en');
+});
+
 test('UX B3: chatSuggestionFill adds a space only after a final Latin letter of an open-ended suggestion', () => {
   const { chatSuggestionFill, MAP_CHAT_OPEN_ENDED_KEYS } = load('core/map-chat-layout.ts');
   assert.equal(chatSuggestionFill('Create a new map about', true), 'Create a new map about ');

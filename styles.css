@@ -1469,6 +1469,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-share-note.vam-share-error { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-share-publish { margin-top: 10px; }
 .vam-share-publish-text { display: block; width: 100%; margin-top: 8px; font-size: var(--font-ui-smaller); }
+.vam-map-chat-length { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.vam-map-chat-style-tag { color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; }
 .vam-map-chat-style { display: flex; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; }
 .vam-map-chat-style-option { flex: 1 1 auto; min-height: 24px; min-width: 24px; height: auto; padding: 2px 8px; border: 0; border-radius: 0; box-shadow: none; background: transparent; font-size: var(--font-ui-smaller); }
 .vam-map-chat-style-option.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }

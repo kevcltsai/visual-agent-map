@@ -147,6 +147,11 @@ export interface MapChatSavedTurn {
  * thinking cannot be seen.
  */
 export type MapChatStage = "preparing" | "consent" | "waiting" | "writing" | "applying";
+/** The tooltip of an answer-length button: what that length means. */
+const styleHintKey = (
+  style: MapChatStyleChoice
+): "ui.map_chat_style_concise_hint" | "ui.map_chat_style_detailed_hint" =>
+  style === "concise" ? "ui.map_chat_style_concise_hint" : "ui.map_chat_style_detailed_hint";
 const STAGE_ORDER: Record<MapChatStage, number> = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 
 /** What {@link MapChatPanel.begin} returns: the two messages it added, so {@link MapChatPanel.retract} can take exactly them back. */
@@ -303,6 +308,7 @@ export class MapChatPanel {
   private titleEl!: HTMLElement;
   private closeEl!: HTMLButtonElement;
   private styleGroupEl!: HTMLElement;
+  private styleTagEl!: HTMLElement;
   private logLabelEl!: HTMLElement;
   private guideEl!: HTMLElement;
   private hintEl!: HTMLElement;
@@ -1141,7 +1147,15 @@ export class MapChatPanel {
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
     const side = form.createDiv("vam-map-chat-side");
-    const styleGroup = (this.styleGroupEl = side.createDiv({
+    // "Answer length" is written next to the toggle: "Concise" and "Detailed" alone do not say what they change. The group's
+    // own label says the same to a screen reader, so the visible word is hidden from it.
+    const length = side.createDiv("vam-map-chat-length");
+    this.styleTagEl = length.createSpan({
+      cls: "vam-map-chat-style-tag",
+      text: t("ui.map_chat_style_label"),
+      attr: { "aria-hidden": "true" }
+    });
+    const styleGroup = (this.styleGroupEl = length.createDiv({
       cls: "vam-map-chat-style",
       attr: { role: "group", "aria-label": t("ui.map_chat_style_label") }
     }));
@@ -1150,7 +1164,7 @@ export class MapChatPanel {
       const button = styleGroup.createEl("button", {
         cls: "vam-map-chat-style-option",
         text: label,
-        attr: { type: "button", "aria-pressed": "false" }
+        attr: { type: "button", "aria-pressed": "false", title: t(styleHintKey(style)) }
       });
       button.addEventListener("click", () => {
         this.host.setStyle(style);
@@ -1257,6 +1271,9 @@ export class MapChatPanel {
     this.styleGroupEl.setAttr("aria-label", t("ui.map_chat_style_label"));
     this.styleEls?.concise.setText(t("ui.map_chat_style_concise"));
     this.styleEls?.detailed.setText(t("ui.map_chat_style_detailed"));
+    this.styleTagEl.setText(t("ui.map_chat_style_label"));
+    this.styleEls?.concise.setAttr("title", t(styleHintKey("concise")));
+    this.styleEls?.detailed.setAttr("title", t(styleHintKey("detailed")));
     this.sendEl.setText(t("ui.map_chat_send"));
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
     this.stopEl.setText(t("ui.map_chat_stop"));

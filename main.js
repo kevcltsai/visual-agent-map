@@ -1184,6 +1184,8 @@ var en = {
   "ui.map_chat_style_label": "Answer length",
   "ui.map_chat_style_concise": "Concise",
   "ui.map_chat_style_detailed": "Detailed",
+  "ui.map_chat_style_concise_hint": "Short answers that get to the point",
+  "ui.map_chat_style_detailed_hint": "Longer answers with more explanation",
   "ui.map_chat_model_short": "Model",
   "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
   "ui.map_chat_more_detail": "Say it in more detail",
@@ -3562,6 +3564,8 @@ var zhCN = {
   "ui.map_chat_style_label": "\u56DE\u7B54\u957F\u5EA6",
   "ui.map_chat_style_concise": "\u7CBE\u7B80",
   "ui.map_chat_style_detailed": "\u8BE6\u7EC6",
+  "ui.map_chat_style_concise_hint": "\u7B80\u77ED\u3001\u76F4\u63A5\u7684\u56DE\u590D",
+  "ui.map_chat_style_detailed_hint": "\u8F83\u957F\u3001\u8BF4\u660E\u8F83\u591A\u7684\u56DE\u590D",
   "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u5F53\u524D\u6A21\u578B\uFF1A\u804A\u5929\u4E0E\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A",
   "ui.map_chat_more_detail": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9",
@@ -5940,6 +5944,8 @@ var zhTW = {
   "ui.map_chat_style_label": "\u56DE\u7B54\u9577\u5EA6",
   "ui.map_chat_style_concise": "\u7CBE\u7C21",
   "ui.map_chat_style_detailed": "\u8A73\u7D30",
+  "ui.map_chat_style_concise_hint": "\u7C21\u77ED\u3001\u76F4\u63A5\u7684\u56DE\u8986",
+  "ui.map_chat_style_detailed_hint": "\u8F03\u9577\u3001\u8AAA\u660E\u8F03\u591A\u7684\u56DE\u8986",
   "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u76EE\u524D\u6A21\u578B\uFF1A\u804A\u5929\u8207\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B",
   "ui.map_chat_more_detail": "\u8AAA\u8A73\u7D30\u4E00\u9EDE",
@@ -29070,6 +29076,7 @@ function settledLine(line) {
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
   }
 }
+var styleHintKey = (style) => style === "concise" ? "ui.map_chat_style_concise_hint" : "ui.map_chat_style_detailed_hint";
 var STAGE_ORDER = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 var LABEL_LIMIT2 = 40;
 var clip2 = (value, limit = LABEL_LIMIT2) => {
@@ -29134,6 +29141,7 @@ var MapChatPanel = class {
     __publicField(this, "titleEl");
     __publicField(this, "closeEl");
     __publicField(this, "styleGroupEl");
+    __publicField(this, "styleTagEl");
     __publicField(this, "logLabelEl");
     __publicField(this, "guideEl");
     __publicField(this, "hintEl");
@@ -29956,7 +29964,13 @@ ${typed}` : draft;
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
     const side = form.createDiv("vam-map-chat-side");
-    const styleGroup = this.styleGroupEl = side.createDiv({
+    const length = side.createDiv("vam-map-chat-length");
+    this.styleTagEl = length.createSpan({
+      cls: "vam-map-chat-style-tag",
+      text: t("ui.map_chat_style_label"),
+      attr: { "aria-hidden": "true" }
+    });
+    const styleGroup = this.styleGroupEl = length.createDiv({
       cls: "vam-map-chat-style",
       attr: { role: "group", "aria-label": t("ui.map_chat_style_label") }
     });
@@ -29965,7 +29979,7 @@ ${typed}` : draft;
       const button = styleGroup.createEl("button", {
         cls: "vam-map-chat-style-option",
         text: label,
-        attr: { type: "button", "aria-pressed": "false" }
+        attr: { type: "button", "aria-pressed": "false", title: t(styleHintKey(style)) }
       });
       button.addEventListener("click", () => {
         this.host.setStyle(style);
@@ -30053,7 +30067,7 @@ ${typed}` : draft;
    * new language. Nothing is built again and the draft and the words of the messages stay as they are.
    */
   relabel() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     if (!this.built) return;
     this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
     this.titleEl.setText(t("ui.map_chat_title"));
@@ -30070,6 +30084,9 @@ ${typed}` : draft;
     this.styleGroupEl.setAttr("aria-label", t("ui.map_chat_style_label"));
     (_a2 = this.styleEls) == null ? void 0 : _a2.concise.setText(t("ui.map_chat_style_concise"));
     (_b2 = this.styleEls) == null ? void 0 : _b2.detailed.setText(t("ui.map_chat_style_detailed"));
+    this.styleTagEl.setText(t("ui.map_chat_style_label"));
+    (_c = this.styleEls) == null ? void 0 : _c.concise.setAttr("title", t(styleHintKey("concise")));
+    (_d = this.styleEls) == null ? void 0 : _d.detailed.setAttr("title", t(styleHintKey("detailed")));
     this.sendEl.setText(t("ui.map_chat_send"));
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
     this.stopEl.setText(t("ui.map_chat_stop"));

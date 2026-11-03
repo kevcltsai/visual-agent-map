@@ -1200,6 +1200,8 @@ export const en = {
   "ui.map_chat_style_label": "Answer length",
   "ui.map_chat_style_concise": "Concise",
   "ui.map_chat_style_detailed": "Detailed",
+  "ui.map_chat_style_concise_hint": "Short answers that get to the point",
+  "ui.map_chat_style_detailed_hint": "Longer answers with more explanation",
   "ui.map_chat_model_short": "Model",
   "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
   "ui.map_chat_more_detail": "Say it in more detail",

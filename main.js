@@ -11749,14 +11749,14 @@ var CoffeeEngine = class {
   }
   recoverCompleteDraft() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
-    const savedDraft = (_d = (_c = this.session.draftMarkdown) != null ? _c : (_b2 = [...(_a2 = this.session.rounds) != null ? _a2 : []].reverse().find((round4) => round4.draftMarkdown)) == null ? void 0 : _b2.draftMarkdown) != null ? _d : "";
+    const savedDraft = (_d = (_c = this.session.draftMarkdown) != null ? _c : (_b2 = [...(_a2 = this.session.rounds) != null ? _a2 : []].reverse().find((round5) => round5.draftMarkdown)) == null ? void 0 : _b2.draftMarkdown) != null ? _d : "";
     if (!COMPLETION_MARKER.test(savedDraft)) return null;
     const recoveredSummary = extractSegmentSummary(stripCompletionMarker(savedDraft));
     const draft = recoveredSummary.markdown;
     const { dialogue: recoverableDialogue, notes } = splitObserverNotes(draft);
     const parts = recoverableDialogue.split(/(?=^### )/gm), introduction = ((_e = parts[0]) == null ? void 0 : _e.startsWith("### ")) ? "" : ((_f = parts.shift()) != null ? _f : "").trim();
     const draftRoundIds = new Set(
-      ((_g = this.session.rounds) != null ? _g : []).filter((round4) => round4.draftMarkdown).map((round4) => round4.id)
+      ((_g = this.session.rounds) != null ? _g : []).filter((round5) => round5.draftMarkdown).map((round5) => round5.id)
     );
     const hasDraftInterventions = ((_h = this.session.interventions) != null ? _h : []).some(
       (item) => item.roundId && draftRoundIds.has(item.roundId)
@@ -11770,7 +11770,7 @@ var CoffeeEngine = class {
     const dialogue = [introduction, ...speeches].filter(Boolean).join("\n\n");
     if (!dialogue || !noteSections(notes).length) return null;
     const mergedNotes = mergeObserverNotes(this.session, notes);
-    const draftRounds = ((_i = this.session.rounds) != null ? _i : []).filter((round4) => round4.draftMarkdown);
+    const draftRounds = ((_i = this.session.rounds) != null ? _i : []).filter((round5) => round5.draftMarkdown);
     const roundId = (_k = (_j = draftRounds.at(-1)) == null ? void 0 : _j.id) != null ? _k : crypto.randomUUID();
     const round3 = {
       ...draftRounds.at(-1),
@@ -24438,8 +24438,13 @@ function parseCoverFrame(raw) {
   if (x + w > 1 + FRAME_EPSILON || y + h > 1 + FRAME_EPSILON) return null;
   return { x, y, w, h };
 }
+var round4 = (value) => Math.round(value * 1e4) / 1e4;
 function serialiseCoverFrame(frame) {
-  return [frame.x, frame.y, frame.w, frame.h].map((value) => String(Math.round(value * 1e4) / 1e4)).join(" ");
+  const x = round4(frame.x);
+  const y = round4(frame.y);
+  const w = round4(round4(frame.x + frame.w) - x);
+  const h = round4(round4(frame.y + frame.h) - y);
+  return [x, y, w, h].map(String).join(" ");
 }
 function withCoverFrame(content, frame) {
   return setFrontmatterKeys(content, { [COVER_FRAME_KEY]: frame ? serialiseCoverFrame(frame) : null });
@@ -24457,8 +24462,15 @@ function withCover(content, link) {
   const safe = safeLink(link);
   return safe ? setFrontmatterKeys(content, { [COVER_KEY]: `[[${safe}]]`, [COVER_FRAME_KEY]: null }) : content;
 }
+function declaredCover(content) {
+  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
+  const line = block ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(block[1]) : null;
+  return line ? line[1].replace(/^["']|["']$/g, "") : null;
+}
 function withCoverOff(content) {
-  return setFrontmatterKeys(content, { [COVER_KEY]: "none" });
+  const declared = declaredCover(content);
+  const explicit = declared !== null && declared !== "" && declared.toLowerCase() !== "none";
+  return setFrontmatterKeys(content, explicit ? { [COVER_KEY]: "none", [COVER_FRAME_KEY]: null } : { [COVER_KEY]: "none" });
 }
 function withCoverOn(content) {
   return setFrontmatterKeys(content, { [COVER_KEY]: null });
@@ -24525,6 +24537,8 @@ function isWholeFrame(frame) {
 function frameToWrite(frame) {
   return !frame || isWholeFrame(frame) ? null : frame;
 }
+var labelSeq = 0;
+var EDGE_TOUCH = 5e-4;
 var WHOLE = { x: 0, y: 0, w: 1, h: 1 };
 var HANDLE_KEY = {
   move: "ui.topic_cover_frame_box",
@@ -24565,7 +24579,9 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     const box = stage.createDiv({ cls: "vam-card-frame-box" });
     box.setAttr("tabindex", "0");
     box.setAttr("role", "group");
-    box.setAttr("aria-label", t(HANDLE_KEY.move));
+    const labelId = `vam-card-frame-label-${++labelSeq}`;
+    stage.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
+    box.setAttr("aria-labelledby", labelId);
     this.boxEl = box;
     this.bindDrag(box, "move", stage);
     for (const mode of FRAME_HANDLES) {
@@ -24613,6 +24629,10 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     const box = this.boxEl;
     if (!box) return;
     const percent = (value) => `${round2(value * 100)}%`;
+    box.toggleClass("is-at-w", frame.x < EDGE_TOUCH);
+    box.toggleClass("is-at-n", frame.y < EDGE_TOUCH);
+    box.toggleClass("is-at-e", frame.x + frame.w > 1 - EDGE_TOUCH);
+    box.toggleClass("is-at-s", frame.y + frame.h > 1 - EDGE_TOUCH);
     box.style.left = percent(frame.x);
     box.style.top = percent(frame.y);
     box.style.width = percent(frame.w);
@@ -48092,9 +48112,7 @@ function placeCoverFrame(parts, shape2, mask) {
   parts.frame.addClass("is-sized");
   if (!mask || !parts.window) return;
   const region = shape2 * mask.w / mask.h;
-  const share = region / ratio * 100;
-  parts.window.style.setProperty("width", `${share}%`);
-  parts.window.style.setProperty("left", `${(100 - share) / 2}%`);
+  parts.window.style.setProperty("aspect-ratio", String(region));
   const img = parts.img.style;
   img.setProperty("width", `${100 / mask.w}%`);
   img.setProperty("height", `${100 / mask.h}%`);
@@ -55915,10 +55933,10 @@ ${request.requirements}` : preset.text,
         const href = await imageHref(coverInfo.path);
         if (!isCurrent()) return null;
         if (href === false) return { refuse: "embedded" };
-        const win2 = coverInfo.frame ? frame.querySelector(".vam-card-cover-window") : null;
+        const win2 = coverInfo.frame && frame.classList.contains("is-sized") ? frame.querySelector(".vam-card-cover-window") : null;
         if (href && coverInfo.frame && win2 && win2.offsetWidth > 0 && win2.offsetHeight > 0) {
           const mask = coverInfo.frame;
-          const winX = box.x + frame.offsetLeft + win2.offsetLeft;
+          const winX = box.x + frame.offsetLeft + (frame.offsetWidth - win2.offsetWidth) / 2;
           const winY = box.y + frame.offsetTop + win2.offsetTop;
           const w = win2.offsetWidth / mask.w;
           const h = win2.offsetHeight / mask.h;
@@ -69075,10 +69093,10 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
 .vam-card-cover.is-framed { position: relative; }
-.vam-card-cover-window { position: absolute; top: 0; height: 100%; left: 0; width: 100%; overflow: hidden; }
+.vam-card-cover-window { position: absolute; top: 0; height: 100%; width: auto; left: 50%; transform: translateX(-50%); overflow: hidden; }
 .vam-card-cover.is-framed:not(.is-sized) img { visibility: hidden; }
 .vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; }
-.vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
+.vam-node .vam-card-cover .vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
 .vam-card-frame-modal { max-width: 640px; }
 .vam-card-frame-stage { position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto; overflow: hidden; touch-action: none; user-select: none; }
 .vam-card-frame-image { display: block; max-width: 100%; max-height: 60vh; -webkit-user-drag: none; }
@@ -69093,6 +69111,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-frame-handle.is-s { left: 50%; top: 100%; cursor: ns-resize; }
 .vam-card-frame-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .vam-card-frame-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
+.vam-card-frame-label { display: none; }
+.vam-card-frame-box.is-at-w .vam-card-frame-handle.is-nw, .vam-card-frame-box.is-at-w .vam-card-frame-handle.is-w, .vam-card-frame-box.is-at-w .vam-card-frame-handle.is-sw { margin-left: 9px; }
+.vam-card-frame-box.is-at-e .vam-card-frame-handle.is-ne, .vam-card-frame-box.is-at-e .vam-card-frame-handle.is-e, .vam-card-frame-box.is-at-e .vam-card-frame-handle.is-se { margin-left: -9px; }
+.vam-card-frame-box.is-at-n .vam-card-frame-handle.is-nw, .vam-card-frame-box.is-at-n .vam-card-frame-handle.is-n, .vam-card-frame-box.is-at-n .vam-card-frame-handle.is-ne { margin-top: 9px; }
+.vam-card-frame-box.is-at-s .vam-card-frame-handle.is-sw, .vam-card-frame-box.is-at-s .vam-card-frame-handle.is-s, .vam-card-frame-box.is-at-s .vam-card-frame-handle.is-se { margin-top: -9px; }
 .vam-card-frame-status { margin: 12px 0 0; text-align: center; }
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }

@@ -403,3 +403,23 @@ test('Custom rows: the count is written again when the window closes (after file
   assert.equal(row.view.desc, '1 built-in, 1 mine');
   assert.equal(row.plugin.settings.noteStyleByKind, undefined);
 });
+
+test('F1 R6 (was failing first): when the manage window closes, the seven topic-type rows of the open page are drawn again from the store, so a style made or deleted in the window shows in their pickers', async () => {
+  openedModals.length = 0;
+  const recipes = RECIPES();
+  const settings = { language: 'en' };
+  const plugin = { app: {}, settings, saveSettings: async () => {}, noteStyles: { refresh: async () => {}, listRecipes: () => recipes, listParts: () => [] } };
+  plugin.setKindStyle = (...args) => Plugin.prototype.setKindStyle.apply(plugin, args);
+  const rows = KIND_ORDER.map(kind => { const { setting, view } = fakeSetting(); renderNoteKindSetting(setting, plugin, kind); return { kind, view }; });
+  const manage = fakeSetting();
+  renderNoteCustomSetting(manage.setting, plugin, 'recipe');
+  await flush();
+  for (const row of rows) assert.equal(optionsOf(row.view).some(option => option[0] === 'file:Fresh'), false);
+  manage.view.buttons[0].click();
+  recipes.push(rec('file:Fresh', 'Fresh'));
+  for (const row of rows) assert.equal(optionsOf(row.view).some(option => option[0] === 'file:Fresh'), false, 'not before the window closes');
+  openedModals.at(-1).onClosed();
+  await flush();
+  for (const row of rows) assert.ok(optionsOf(row.view).some(option => option[0] === 'file:Fresh'), `${row.kind} shows the new style`);
+  assert.equal('noteStyleByKind' in settings, false, 'drawing again saves nothing');
+});

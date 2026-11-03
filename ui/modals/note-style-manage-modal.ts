@@ -81,6 +81,8 @@ export class NoteStyleManageModal extends Modal {
   private refreshForm?: () => void;
   /** The style editor while it is open (one at a time). */
   private editor?: NoteStyleEditorModal;
+  /** The files are being read before the editor opens. */
+  private opening = false;
 
   constructor(
     app: App,
@@ -230,12 +232,12 @@ export class NoteStyleManageModal extends Modal {
     if (this.busy || entry.aimOnly) return;
     if (this.tab === "recipe") {
       // A built-in style opens as "My <name>" (saved only when the editor saves); a user's style opens as it is.
-      this.openEditor({
+      void this.openEditor(() => ({
         source: entry.ref,
         ...(entry.builtin ? { name: this.suggestRecipeName(entry.name) } : {}),
         trigger: this.editButtons.get(entry.ref),
         onSaved: ref => this.afterSaved(ref)
-      });
+      }));
       return;
     }
     this.busy = true;
@@ -251,17 +253,27 @@ export class NoteStyleManageModal extends Modal {
     }
   }
 
-  /** Opens the style editor on top of this window; a second one is not opened while it is there. */
-  private openEditor(options: ConstructorParameters<typeof NoteStyleEditorModal>[2]): void {
-    if (this.editor || this.closed) return;
-    const editor = new NoteStyleEditorModal(this.app, this.plugin, {
-      ...options,
-      onClosed: () => {
-        this.editor = undefined;
-      }
-    });
-    this.editor = editor;
-    editor.open();
+  /**
+   * Opens the style editor on top of this window; a second one is not opened while it is there. The files are read
+   * first, so the editor compares against the file as it is now and not against a copy from before an outside edit.
+   */
+  private async openEditor(make: () => ConstructorParameters<typeof NoteStyleEditorModal>[2]): Promise<void> {
+    if (this.editor || this.opening || this.closed) return;
+    this.opening = true;
+    try {
+      await this.plugin.noteStyles.refresh().catch(() => undefined);
+      if (this.closed) return;
+      const editor = new NoteStyleEditorModal(this.app, this.plugin, {
+        ...make(),
+        onClosed: () => {
+          this.editor = undefined;
+        }
+      });
+      this.editor = editor;
+      editor.open();
+    } finally {
+      this.opening = false;
+    }
   }
 
   /** The editor saved a style: draw the list again and put the focus on its row. */
@@ -420,16 +432,16 @@ export class NoteStyleManageModal extends Modal {
       this.focusRow(target);
     };
     const create = async (): Promise<void> => {
-      if (this.busy || this.editor || this.nameProblem(name)) return;
+      if (this.busy || this.editor || this.opening || this.nameProblem(name)) return;
       if (tab === "recipe") {
         // A new style is not written here: the editor opens on it and the file appears when it saves.
-        this.openEditor({
+        void this.openEditor(() => ({
           source: null,
           from: mode === "from" ? source : null,
           name,
           trigger: createButton?.buttonEl,
           onSaved: ref => finish(ref)
-        });
+        }));
         return;
       }
       this.busy = true;

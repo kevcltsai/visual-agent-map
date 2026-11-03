@@ -394,7 +394,7 @@ class FakeSetting {
 const windows = [];
 const BaseModal = dom.makeModal();
 class RecordingModal extends BaseModal { open() { windows.push(this); super.open(); } }
-class FakeComponent { load() {} unload() {} }
+class FakeComponent { load() {} unload() {} addChild(child) { return child; } removeChild(child) { return child; } }
 const obsidian = { ...S.obsidian, Modal: RecordingModal, Setting: FakeSetting, Notice: dom.makeNotice(notices), Component: FakeComponent, MarkdownRenderer: { render: async () => {} } };
 const { NoteStyleManageModal, MANAGE_TABS } = S.load('ui/modals/note-style-manage-modal.ts', { obsidian });
 const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: dom.createFragment });
@@ -759,4 +759,23 @@ test('P3: a window closed while the files are still being read draws nothing aft
   await settle();
   assert.equal(closedCalls, 1);
   assert.equal(modal.contentEl.children.length, 0);
+});
+
+test('F1 R3 (was failing first): Edit on a style file reads the files again before the editor opens, so a file another program changed after the window opened is compared as it is now and the first Save writes', async () => {
+  const path = `${dirOf('en', 'recipe')}/Weekly.md`;
+  const text = M.recipeFileText({ ...STD, update: 'top' }, 'en');
+  const setup = await manageSetup({ [path]: text });
+  const { root } = await openManage(setup, 'recipe');
+  const outside = `${text}Notes added in a tab.\n`;
+  setup.v.files[path] = outside;
+  editOf(rowFor(root, 'Weekly')).click();
+  await settle();
+  assert.equal(windows.length, 2);
+  dom.findAll(windows[1].contentEl, node => node.type === 'radio')[2].checked = true;
+  dom.findAll(windows[1].contentEl, node => node.type === 'radio')[2].fire('change');
+  dom.button(windows[1].modalEl, 'Save').click();
+  await settle();
+  assert.deepEqual(setup.v.modifies, [path], 'the save wrote');
+  assert.ok(setup.v.files[path].includes('Notes added in a tab.'), 'the other program\'s text is kept');
+  assert.equal(notices.includes(M.translate('en', 'ui.recipe_notice_changed')), false, 'no "changed" notice');
 });

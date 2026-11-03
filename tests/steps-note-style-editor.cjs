@@ -41,12 +41,20 @@ const notices = [];
 const windows = [];
 const events = [];
 const renders = [];
+const renderOwners = [];
 const timers = [];
 let timerId = 0;
 const fakeSetTimeout = (fn, ms) => { const id = ++timerId; timers.push({ id, fn, ms }); return id; };
 const fakeClearTimeout = id => { const at = timers.findIndex(timer => timer.id === id); if (at >= 0) timers.splice(at, 1); };
-const counts = { loads: 0, unloads: 0 };
-class FakeComponent { load() { counts.loads++; } unload() { counts.unloads++; } }
+const counts = { loads: 0, unloads: 0, added: 0, removed: 0 };
+/** A component with children: addChild / removeChild are counted apart from the window's own load / unload. */
+class FakeComponent {
+  constructor() { this.children = new Set(); }
+  load() { counts.loads++; }
+  unload() { counts.unloads++; }
+  addChild(child) { this.children.add(child); counts.added++; return child; }
+  removeChild(child) { if (this.children.delete(child)) counts.removed++; return child; }
+}
 const BaseModal = dom.makeModal();
 class RecordingModal extends BaseModal { open() { windows.push(this); events.push(`open:${this.constructor.name}`); super.open(); } }
 class FakeSetting {
@@ -79,7 +87,7 @@ class FakeSetting {
 }
 const obsidian = {
   ...S.obsidian, Modal: RecordingModal, Setting: FakeSetting, Notice: dom.makeNotice(notices), Component: FakeComponent,
-  MarkdownRenderer: { render: async (app, markdown, host) => { renders.push(markdown); host.createDiv({ text: markdown }); } }
+  MarkdownRenderer: { render: async (app, markdown, host, path, component) => { renders.push(markdown); renderOwners.push(component); host.createDiv({ text: markdown }); } }
 };
 const windowValues = { setTimeout: fakeSetTimeout, clearTimeout: fakeClearTimeout };
 const { NoteStyleEditorModal } = S.load('ui/modals/note-style-editor-modal.ts', { obsidian }, windowValues);
@@ -100,7 +108,7 @@ async function editorSetup(files = {}, settingsPatch = {}) {
   const realRefresh = store.refresh.bind(store);
   store.refresh = async () => { events.push('refresh'); await realRefresh(); events.push('refreshed'); };
   await realRefresh();
-  notices.length = 0; windows.length = 0; events.length = 0; renders.length = 0; timers.length = 0; counts.loads = 0; counts.unloads = 0;
+  notices.length = 0; windows.length = 0; events.length = 0; renders.length = 0; renderOwners.length = 0; timers.length = 0; counts.loads = 0; counts.unloads = 0; counts.added = 0; counts.removed = 0;
   const opened = [];
   const app = {
     vault: { getAbstractFileByPath: path => (path in v.files ? new S.TFile(path) : null) },
@@ -118,9 +126,54 @@ async function editorSetup(files = {}, settingsPatch = {}) {
 }
 const RECIPE_DIR = dirOf('en', 'recipe');
 const STRUCTURE_DIR = dirOf('en', 'template');
+const VOICE_DIR = dirOf('en', 'tone');
+const FORMAT_DIR = dirOf('en', 'format');
 const WEEKLY = `${RECIPE_DIR}/Weekly.md`;
 const WEEKLY_TEXT = '---\nstructure: Mine\nvoice: plain\nformat: Standard format\nupdate: top\ntags: [a]\n---\nWeekly notes\n';
 const SEED = { [`${STRUCTURE_DIR}/Mine.md`]: '## A\nx\n', [WEEKLY]: WEEKLY_TEXT };
+
+test('F1 R1 (security, was failing first): a part file\'s section names and descriptions, and the names of the voice and format, reach the renderer with every ASCII punctuation character escaped - no link, tag, wiki link, HTML or highlight can be made', async () => {
+  const hostile = ['https://x.test/a', 'a@b.co', '[[x]]', '<b>y</b>', '==z==', '+ plus', '![i](u)', '1. n', '~~s~~', '$m$', '|p|', '> q'];
+  const part = words => words.map((word, n) => `## S${n} ${word}\n${word} desc\n`).join('\n');
+  const setup = await editorSetup({ ...SEED, [`${STRUCTURE_DIR}/Hostile.md`]: part(hostile.slice(0, 6)), [`${STRUCTURE_DIR}/Hostile2.md`]: part(hostile.slice(6)), [`${VOICE_DIR}/Odd _v_ @a.md`]: 'x\n', [`${FORMAT_DIR}/Odd _f_ @g.md`]: 'x\n' });
+  const ed = openEditor(setup, { source: null, from: 'builtin:general', name: 'Sample' });
+  await settle();
+  choose(ed, 'Voice', 'file:Odd _v_ @a');
+  choose(ed, 'Format rules', 'file:Odd _f_ @g');
+  const plain = value => value.replace(/\s+/g, ' ').trim().replace(/[!-\/:-@[-`{-~]/g, '\\$&');
+  for (const [structure, words] of [['file:Hostile', hostile.slice(0, 6)], ['file:Hostile2', hostile.slice(6)]]) {
+    choose(ed, 'Structure', structure);
+    await runTimers();
+    const markdown = renders.at(-1);
+    const headings = markdown.split('\n').filter(line => line.startsWith('## '));
+    assert.equal(headings.length, words.length);
+    words.forEach((word, n) => assert.equal(headings[n], `## ${plain(`S${n} ${word}`)}`, word));
+    // no ASCII punctuation survives unescaped in the text a part file supplied
+    for (const line of markdown.split('\n')) {
+      if (/^(> \[!note\]|>|\| )/.test(line) && !/S\d/.test(line)) continue;
+      if (line === '' || line === '| --- | --- |' || line.startsWith('- ') || line.startsWith('*')) continue;
+      assert.equal(/[!-\/:-@[-`{-~]/.test(line.replace(/\\[!-\/:-@[-`{-~]/g, '').replace(/^(## |> \[!note\] |> |\*|\| )/, '')), false, line);
+    }
+    assert.ok(markdown.includes('Odd \\_v\\_ \\@a'), 'the voice name is escaped too');
+    assert.ok(markdown.includes('Odd \\_f\\_ \\@g'), 'the format name is escaped too');
+  }
+});
+
+test('F1 R4: every redraw of the sample uses its own child component and the one it replaces is removed, so the children do not pile up; closing unloads the window\'s component', async () => {
+  const setup = await editorSetup(SEED);
+  const ed = openEditor(setup, { source: null, name: 'Sample' });
+  await settle();
+  const live = () => counts.added - counts.removed;
+  assert.equal(live(), 1);
+  for (let n = 0; n < 6; n++) {
+    choose(ed, 'Format rules', n % 2 ? 'builtin:lean' : 'builtin:rich');
+    await runTimers();
+  }
+  assert.equal(renders.length, 7);
+  assert.equal(live(), 1, 'one child holds the sample on screen');
+  assert.equal(new Set(renderOwners).size, 7, 'each picture had its own child');
+  assert.ok(renderOwners.every(owner => owner.load !== undefined));
+});
 
 function openEditor(setup, options = {}) {
   const trigger = dom.element('button');
@@ -327,7 +380,8 @@ test('P4 (D6): the sample lists the section names of the chosen structure; Lean 
   const bullets = markdown => markdown.split('\n').filter(line => line.startsWith('- ')).length;
   const last = () => renders.at(-1);
   assert.equal(headings(last()).length, sections.length);
-  for (const section of sections) assert.ok(last().includes(`## ${section.name.replace(/[\\`*_{}[\]<>()#+\-.!|~$%&=^]/g, '\\$&')}`) || last().includes(section.name), section.name);
+  const plain = value => value.replace(/\s+/g, ' ').trim().replace(/[!-\/:-@[-`{-~]/g, '\\$&');
+  for (const section of sections) assert.ok(last().split('\n').includes(`## ${plain(section.name)}`), section.name);
   assert.equal(callouts(last()), 1);
   choose(ed, 'Format rules', 'builtin:lean');
   await runTimers();
@@ -343,7 +397,7 @@ test('P4 (D6): the sample lists the section names of the chosen structure; Lean 
   assert.equal(headings(odd).length, 2);
   assert.equal(/<b>|\*\*bold\*\*|\[\[link\]\]/.test(odd), false, 'a part file\'s words carry no markup into the sample');
   assert.match(odd, /Bold/);
-  assert.match(odd, /Voice: /);
+  assert.match(odd, /Voice\\: /);
 });
 
 test('counter 12 (#38, was failing first): Preview AI instructions reads the files again before it opens, so a part edited in a tab shows in the preview; the preview shows the draft\'s parts, and the default preview of the settings page is unchanged', async () => {
@@ -472,4 +526,12 @@ test('P4: closing (Escape and the close button call close) asks before it drops 
   pickUpdate(back, 'merge');
   back.editor.close();
   assert.equal(back.editor.closeCount, 1);
+});
+
+test('F1 R7: the sample has no scroll of its own, so the window is the only scroll axis and the button row never covers the end of the sample; the rule sits above the map-search marker', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  const rule = css.split('\n').find(line => line.startsWith('.vam-editor-example {'));
+  assert.ok(rule && !/max-height|overflow-y/.test(rule), rule);
+  assert.ok(css.indexOf('.vam-editor-example {') < css.indexOf('/* Map search'));
+  assert.match(css, /^\.vam-editor-modal \.modal-content \{ padding-bottom: var\(--size-4-3\); \}/m);
 });

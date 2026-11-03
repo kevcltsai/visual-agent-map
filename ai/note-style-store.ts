@@ -77,10 +77,6 @@ export interface NoteStyleSettings {
   defaultNoteStyleId?: string;
   noteStylesFolder?: string;
   noteStyleFiles?: Record<string, string>;
-  /** The workspace template block: `builtin:<id>` or `file:<name>` (a file in the Templates block folder). Absent = the old default. */
-  noteTemplateBlock?: string;
-  /** The workspace tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the old default. */
-  noteToneBlock?: string;
   /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. */
   noteStyleByKind?: Partial<Record<StyleKind, string>>;
   /** The marker of the conversion to this model, and the old id -> new ref table that implicit styles read. */

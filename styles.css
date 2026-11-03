@@ -1554,7 +1554,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-editor-mode { display: flex; align-items: flex-start; gap: var(--size-4-2); padding: var(--size-4-1) 0; }
 .vam-editor-mode input { margin-top: var(--size-4-1); }
 .vam-editor-mode-text { min-width: 0; }
-.vam-editor-example { max-height: 16rem; overflow-y: auto; overflow-x: auto; padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); color: var(--text-normal); }
+.vam-editor-modal .modal-content { padding-bottom: var(--size-4-3); }
+/* The sample has no scroll of its own (one scroll axis, the window's), so the button row never covers its end. */
+.vam-editor-example { overflow-x: auto; padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); color: var(--text-normal); }
 .vam-editor-example h2 { font-size: var(--font-ui-medium); }
 
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */

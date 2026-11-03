@@ -63908,7 +63908,7 @@ var UPDATE_DESC_KEYS = {
   top: "ui.editor_update_desc_top",
   fresh: "ui.editor_update_desc_fresh"
 };
-var plainMd = (value) => value.replace(/\s+/g, " ").trim().replace(/[\\`*_{}[\]<>()#+\-.!|~$%&=^]/g, "\\$&");
+var plainMd = (value) => value.replace(/\s+/g, " ").trim().replace(/[!-/:-@[-`{-~]/g, "\\$&");
 var EXAMPLE_DELAY_MS = 200;
 var NoteStyleEditorModal = class extends import_obsidian33.Modal {
   constructor(app, plugin, options) {
@@ -63922,6 +63922,8 @@ var NoteStyleEditorModal = class extends import_obsidian33.Modal {
     /** The built-in style this window was opened on: the topic types that use it switch to the saved file (decision #41). */
     __publicField(this, "builtinSource");
     __publicField(this, "component", new import_obsidian33.Component());
+    /** The child that owns the sample on screen now; the next picture replaces it, so the children do not pile up. */
+    __publicField(this, "exampleChild");
     __publicField(this, "closed", false);
     __publicField(this, "forceClose", false);
     __publicField(this, "asking", false);
@@ -64228,17 +64230,23 @@ var NoteStyleEditorModal = class extends import_obsidian33.Modal {
     const token = ++this.renderToken;
     const markdown = this.exampleMarkdown();
     const next = host.createDiv({ cls: "vam-editor-example-body" });
+    const child = new import_obsidian33.Component();
+    this.component.addChild(child);
     try {
-      await import_obsidian33.MarkdownRenderer.render(this.app, markdown, next, "", this.component);
+      await import_obsidian33.MarkdownRenderer.render(this.app, markdown, next, "", child);
     } catch (e) {
       next.remove();
+      this.component.removeChild(child);
       return;
     }
     if (this.closed || token !== this.renderToken) {
       next.remove();
+      this.component.removeChild(child);
       return;
     }
-    for (const child of Array.from(host.children)) if (child !== next) child.remove();
+    for (const old of Array.from(host.children)) if (old !== next) old.remove();
+    if (this.exampleChild) this.component.removeChild(this.exampleChild);
+    this.exampleChild = child;
   }
   // ---- preview and save ----
   async previewPrompt(button) {
@@ -64341,6 +64349,8 @@ var NoteStyleManageModal = class extends import_obsidian34.Modal {
     __publicField(this, "refreshForm");
     /** The style editor while it is open (one at a time). */
     __publicField(this, "editor");
+    /** The files are being read before the editor opens. */
+    __publicField(this, "opening", false);
     this.tab = initialTab;
   }
   onOpen() {
@@ -64472,12 +64482,12 @@ var NoteStyleManageModal = class extends import_obsidian34.Modal {
     var _a2;
     if (this.busy || entry.aimOnly) return;
     if (this.tab === "recipe") {
-      this.openEditor({
+      void this.openEditor(() => ({
         source: entry.ref,
         ...entry.builtin ? { name: this.suggestRecipeName(entry.name) } : {},
         trigger: this.editButtons.get(entry.ref),
         onSaved: (ref) => this.afterSaved(ref)
-      });
+      }));
       return;
     }
     this.busy = true;
@@ -64492,17 +64502,27 @@ var NoteStyleManageModal = class extends import_obsidian34.Modal {
       this.busy = false;
     }
   }
-  /** Opens the style editor on top of this window; a second one is not opened while it is there. */
-  openEditor(options) {
-    if (this.editor || this.closed) return;
-    const editor = new NoteStyleEditorModal(this.app, this.plugin, {
-      ...options,
-      onClosed: () => {
-        this.editor = void 0;
-      }
-    });
-    this.editor = editor;
-    editor.open();
+  /**
+   * Opens the style editor on top of this window; a second one is not opened while it is there. The files are read
+   * first, so the editor compares against the file as it is now and not against a copy from before an outside edit.
+   */
+  async openEditor(make) {
+    if (this.editor || this.opening || this.closed) return;
+    this.opening = true;
+    try {
+      await this.plugin.noteStyles.refresh().catch(() => void 0);
+      if (this.closed) return;
+      const editor = new NoteStyleEditorModal(this.app, this.plugin, {
+        ...make(),
+        onClosed: () => {
+          this.editor = void 0;
+        }
+      });
+      this.editor = editor;
+      editor.open();
+    } finally {
+      this.opening = false;
+    }
   }
   /** The editor saved a style: draw the list again and put the focus on its row. */
   afterSaved(ref) {
@@ -64648,15 +64668,15 @@ var NoteStyleManageModal = class extends import_obsidian34.Modal {
     };
     const create = async () => {
       var _a2;
-      if (this.busy || this.editor || this.nameProblem(name)) return;
+      if (this.busy || this.editor || this.opening || this.nameProblem(name)) return;
       if (tab === "recipe") {
-        this.openEditor({
+        void this.openEditor(() => ({
           source: null,
           from: mode === "from" ? source : null,
           name,
           trigger: createButton == null ? void 0 : createButton.buttonEl,
           onSaved: (ref) => finish(ref)
-        });
+        }));
         return;
       }
       this.busy = true;
@@ -64775,7 +64795,17 @@ function missingStyleRef(plugin, kind) {
   if (typeof saved !== "string" || !saved) return void 0;
   return offeredStyles(plugin, kind).some((item) => item.ref === saved) ? void 0 : saved;
 }
+var kindRows = /* @__PURE__ */ new WeakMap();
+function redrawKindRows(plugin) {
+  const rows = kindRows.get(plugin);
+  if (!rows) return;
+  for (const row of [...rows]) {
+    if (row.el.isConnected === false) rows.delete(row);
+    else row.redraw();
+  }
+}
 function renderNoteKindSetting(setting, plugin, kind) {
+  var _a2;
   const { noteStyles: store } = plugin;
   const kindName = styleKindName(kind);
   setting.setName(kindName);
@@ -64839,13 +64869,17 @@ function renderNoteKindSetting(setting, plugin, kind) {
     });
   });
   render();
-  void store.refresh().then(
+  const readAgain = () => void store.refresh().then(
     () => {
       loaded = true;
       render();
     },
     () => void 0
   );
+  readAgain();
+  const rows = (_a2 = kindRows.get(plugin)) != null ? _a2 : /* @__PURE__ */ new Set();
+  rows.add({ el: setting.settingEl, redraw: readAgain });
+  kindRows.set(plugin, rows);
 }
 function renderNoteCustomSetting(setting, plugin, tab) {
   const { noteStyles: store } = plugin;
@@ -64859,7 +64893,10 @@ function renderNoteCustomSetting(setting, plugin, tab) {
   describe();
   setting.addButton((button) => {
     button.setButtonText(t("ui.manage_button")).onClick(() => {
-      new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, describe).open();
+      new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, () => {
+        describe();
+        redrawKindRows(plugin);
+      }).open();
     });
     button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name));
   });

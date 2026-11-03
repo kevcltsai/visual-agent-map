@@ -129,6 +129,19 @@ export function missingStyleRef(plugin: VisualAgentMapPlugin, kind: StyleKind): 
   return offeredStyles(plugin, kind).some(item => item.ref === saved) ? undefined : saved;
 }
 
+/** The topic-type rows that are on screen, by plugin; each draws itself again from the store. */
+const kindRows = new WeakMap<VisualAgentMapPlugin, Set<{ el: HTMLElement; redraw: () => void }>>();
+
+/** Draws every topic-type row that is still on screen again (after the manage window saved or deleted a style). */
+export function redrawKindRows(plugin: VisualAgentMapPlugin): void {
+  const rows = kindRows.get(plugin);
+  if (!rows) return;
+  for (const row of [...rows]) {
+    if (row.el.isConnected === false) rows.delete(row);
+    else row.redraw();
+  }
+}
+
 /**
  * One topic-type row: a single picker over the built-in and the user's own styles (two groups; the AIM row also offers
  * the AIM report, first). There is no "not set": a kind with no saved choice shows its own built-in style, and choosing
@@ -204,13 +217,18 @@ export function renderNoteKindSetting(setting: Setting, plugin: VisualAgentMapPl
     });
   });
   render();
-  void store.refresh().then(
-    () => {
-      loaded = true;
-      render();
-    },
-    () => undefined
-  );
+  const readAgain = (): void =>
+    void store.refresh().then(
+      () => {
+        loaded = true;
+        render();
+      },
+      () => undefined
+    );
+  readAgain();
+  const rows = kindRows.get(plugin) ?? new Set();
+  rows.add({ el: setting.settingEl, redraw: readAgain });
+  kindRows.set(plugin, rows);
 }
 
 /**
@@ -229,7 +247,11 @@ export function renderNoteCustomSetting(setting: Setting, plugin: VisualAgentMap
   describe();
   setting.addButton(button => {
     button.setButtonText(t("ui.manage_button")).onClick(() => {
-      new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, describe).open();
+      new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, () => {
+        describe();
+        // The styles may have changed in the window: the topic-type rows of this page are drawn again.
+        redrawKindRows(plugin);
+      }).open();
     });
     button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name));
   });

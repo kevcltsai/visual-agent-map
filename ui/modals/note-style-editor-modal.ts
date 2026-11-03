@@ -95,12 +95,15 @@ interface Draft {
   update: UpdateMode;
 }
 
-/** Markdown special characters made plain text, so a part file's own words cannot add markup to the sample. */
+/**
+ * Text made plain in Markdown: every ASCII punctuation character is escaped, so the words of a part file (section
+ * names, descriptions) or a style cannot become a link, a tag, a wiki link, a highlight or any other markup in the sample.
+ */
 const plainMd = (value: string): string =>
   value
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/[\\`*_{}[\]<>()#+\-.!|~$%&=^]/g, "\\$&");
+    .replace(/[!-/:-@[-`{-~]/g, "\\$&");
 
 const EXAMPLE_DELAY_MS = 200;
 
@@ -116,6 +119,8 @@ export class NoteStyleEditorModal extends Modal {
   /** The built-in style this window was opened on: the topic types that use it switch to the saved file (decision #41). */
   private readonly builtinSource: string | undefined;
   private readonly component = new Component();
+  /** The child that owns the sample on screen now; the next picture replaces it, so the children do not pile up. */
+  private exampleChild?: Component;
   private closed = false;
   private forceClose = false;
   private asking = false;
@@ -465,17 +470,23 @@ export class NoteStyleEditorModal extends Modal {
     const markdown = this.exampleMarkdown();
     // The new picture is drawn beside the old one and replaces it when it is ready, so the sample never flashes empty.
     const next = host.createDiv({ cls: "vam-editor-example-body" });
+    const child = new Component();
+    this.component.addChild(child);
     try {
-      await MarkdownRenderer.render(this.app, markdown, next, "", this.component);
+      await MarkdownRenderer.render(this.app, markdown, next, "", child);
     } catch {
       next.remove();
+      this.component.removeChild(child);
       return;
     }
     if (this.closed || token !== this.renderToken) {
       next.remove();
+      this.component.removeChild(child);
       return;
     }
-    for (const child of Array.from(host.children)) if (child !== next) child.remove();
+    for (const old of Array.from(host.children)) if (old !== next) old.remove();
+    if (this.exampleChild) this.component.removeChild(this.exampleChild);
+    this.exampleChild = child;
   }
 
   // ---- preview and save ----

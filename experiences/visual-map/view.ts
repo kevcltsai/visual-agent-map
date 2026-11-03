@@ -3593,7 +3593,7 @@ export class VisualAgentMapView extends ItemView {
           item
             .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
             .setIcon(TOPIC_KIND_ICON[kind])
-            .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind)))
+            .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind))))
         );
     menu.showAtMouseEvent(event);
   }
@@ -9625,7 +9625,9 @@ export class VisualAgentMapView extends ItemView {
     const tools = createDiv("vam-map-tools");
     const aimMode = !!this.map.aim;
     if (!aimMode) {
-      this.button(tools, t("ui.topic"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
+      this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
+        "mod-cta"
+      );
       this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
         "vam-topic-more"
       );
@@ -9775,7 +9777,8 @@ export class VisualAgentMapView extends ItemView {
     box.createSpan({
       text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
     });
-    if (!this.map.aim) this.button(box, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+    if (!this.map.aim)
+      this.button(box, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null))));
   }
   /** The chat started or ended something: an empty canvas follows it. */
   private refreshEmptyMap(): void {
@@ -10398,14 +10401,14 @@ export class VisualAgentMapView extends ItemView {
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
           if (event.defaultPrevented) return; // the view scope already added the subtopic
           event.preventDefault();
-          this.enqueue(() => this.addNode(node));
+          this.whenEditing(() => this.enqueue(() => this.addNode(node)));
           return;
         }
         if (event.key === "Enter" && event.shiftKey && plain) {
           if (event.defaultPrevented) return; // the view scope already added the sibling
           event.preventDefault();
           const parent = this.map?.nodes.find(item => item.id === node.parentId) ?? null;
-          this.enqueue(() => this.addNode(parent));
+          this.whenEditing(() => this.enqueue(() => this.addNode(parent)));
           return;
         }
       }
@@ -12014,7 +12017,7 @@ export class VisualAgentMapView extends ItemView {
       event.stopPropagation();
       this.openKindMenu(event, kind => {
         close?.();
-        this.enqueue(() => this.addNode(node, undefined, true, true, kind));
+        this.whenEditing(() => this.enqueue(() => this.addNode(node, undefined, true, true, kind)));
       });
     });
   }
@@ -12742,7 +12745,7 @@ export class VisualAgentMapView extends ItemView {
     kind: TopicKind = "topic",
     keyboardFocus = false
   ): Promise<void> {
-    if (!this.map || this.presentation) return;
+    if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
@@ -12753,7 +12756,7 @@ export class VisualAgentMapView extends ItemView {
           ? t("ui.new_subtopic")
           : t("ui.my_core_topic");
       new NameModal(this.app, dialogTitle, "", title =>
-        this.enqueue(() => this.addNode(parent, title, true, true, kind, true))
+        this.whenEditing(() => this.enqueue(() => this.addNode(parent, title, true, true, kind, true)))
       ).open();
       return;
     }

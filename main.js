@@ -50132,7 +50132,7 @@ ${request.requirements}` : preset.text,
     if (this.relationsEnabled())
       for (const kind of TOPIC_KINDS)
         menu.addItem(
-          (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind)))
+          (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind))))
         );
     menu.showAtMouseEvent(event);
   }
@@ -55690,7 +55690,9 @@ ${request.requirements}` : preset.text,
     const tools = createDiv("vam-map-tools");
     const aimMode = !!this.map.aim;
     if (!aimMode) {
-      this.button(tools, t("ui.topic"), () => this.enqueue(() => this.addNode(null))).addClass("mod-cta");
+      this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
+        "mod-cta"
+      );
       this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
         "vam-topic-more"
       );
@@ -55832,7 +55834,8 @@ ${request.requirements}` : preset.text,
     box.createSpan({
       text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
     });
-    if (!this.map.aim) this.button(box, t("ui.topic"), () => this.enqueue(() => this.addNode(null)));
+    if (!this.map.aim)
+      this.button(box, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null))));
   }
   /** The chat started or ended something: an empty canvas follows it. */
   refreshEmptyMap() {
@@ -56335,14 +56338,14 @@ ${request.requirements}` : preset.text,
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
           if (event.defaultPrevented) return;
           event.preventDefault();
-          this.enqueue(() => this.addNode(node));
+          this.whenEditing(() => this.enqueue(() => this.addNode(node)));
           return;
         }
         if (event.key === "Enter" && event.shiftKey && plain) {
           if (event.defaultPrevented) return;
           event.preventDefault();
           const parent = (_c2 = (_b3 = this.map) == null ? void 0 : _b3.nodes.find((item) => item.id === node.parentId)) != null ? _c2 : null;
-          this.enqueue(() => this.addNode(parent));
+          this.whenEditing(() => this.enqueue(() => this.addNode(parent)));
           return;
         }
       }
@@ -57872,7 +57875,7 @@ ${request.requirements}` : preset.text,
       event.stopPropagation();
       this.openKindMenu(event, (kind) => {
         close == null ? void 0 : close();
-        this.enqueue(() => this.addNode(node, void 0, true, true, kind));
+        this.whenEditing(() => this.enqueue(() => this.addNode(node, void 0, true, true, kind)));
       });
     });
   }
@@ -58587,7 +58590,7 @@ ${request.requirements}` : preset.text,
         this.app,
         dialogTitle,
         "",
-        (title) => this.enqueue(() => this.addNode(parent, title, true, true, kind, true))
+        (title) => this.whenEditing(() => this.enqueue(() => this.addNode(parent, title, true, true, kind, true)))
       ).open();
       return;
     }

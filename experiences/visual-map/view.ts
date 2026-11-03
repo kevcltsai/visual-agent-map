@@ -1910,6 +1910,12 @@ export class VisualAgentMapView extends ItemView {
     modal.open();
     return modal;
   }
+  /** Every menu this view opens: Esc that closes it must not also clear the selection, and focus returns to the map. */
+  private newMenu(nodeId?: string): Menu {
+    const menu = new Menu();
+    this.restoreFocusOnMenuHide(menu, nodeId);
+    return menu;
+  }
   private restoreFocusOnMenuHide(menu: Menu, nodeId?: string): void {
     (menu as unknown as { onHide?: (callback: () => void) => void }).onHide?.(() => {
       this.menuClosedByKey = true;
@@ -3303,7 +3309,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private openRelevanceMenu(node: MapNode, current: RelevanceTier, anchor: HTMLElement): void {
     if (this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
-    const menu = new Menu();
+    const menu = this.newMenu();
     for (const tier of ["core", "support", "side"] as const)
       menu.addItem(item =>
         item
@@ -3566,7 +3572,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   private openTopicMenu(event: MouseEvent): void {
-    const menu = new Menu();
+    const menu = this.newMenu();
     menu.addItem(item =>
       item
         .setTitle(t("ui.paste_outline_add_many"))
@@ -3614,7 +3620,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
-    const menu = new Menu();
+    const menu = this.newMenu();
     for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
@@ -3674,7 +3680,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The zoom cluster's Layout menu: collapse or expand levels, then re-arrange the whole map. */
   private openLayoutMenu(event: MouseEvent): void {
-    const menu = new Menu();
+    const menu = this.newMenu();
     const choices: { title: string; icon: string; levels: number | null }[] = [
       { title: t("ui.collapse_all"), icon: "chevrons-down-up", levels: 0 },
       { title: t("ui.expand_all"), icon: "chevrons-up-down", levels: null },
@@ -3730,7 +3736,6 @@ export class VisualAgentMapView extends ItemView {
         .setIcon("workflow")
         .onClick(() => this.autoLayout())
     );
-    this.restoreFocusOnMenuHide(menu);
     menu.showAtMouseEvent(event);
   }
   /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
@@ -4727,7 +4732,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   private openNewMapMenu(event: MouseEvent): void {
-    const menu = new Menu();
+    const menu = this.newMenu();
     menu.addItem(item =>
       item
         .setTitle(t("ui.new_mind_map"))
@@ -6354,7 +6359,7 @@ export class VisualAgentMapView extends ItemView {
   private openUnlinkMenu(id: string, anchor: HTMLElement): void {
     const text = (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === id);
     if (!text || !this.canEditText()) return;
-    const menu = new Menu();
+    const menu = this.newMenu();
     for (const cardId of this.liveLinks(text)) {
       const title = this.notes.get(cardId)?.title ?? cardId;
       menu.addItem(item =>
@@ -6632,7 +6637,7 @@ export class VisualAgentMapView extends ItemView {
       chip.addEventListener("contextmenu", event => {
         event.preventDefault();
         event.stopPropagation();
-        const menu = new Menu();
+        const menu = this.newMenu();
         menu.addItem(item =>
           item
             .setTitle(t("ui.canvas_boundary_edit"))
@@ -6828,7 +6833,7 @@ export class VisualAgentMapView extends ItemView {
       label.addEventListener("contextmenu", event => {
         event.preventDefault();
         event.stopPropagation();
-        const menu = new Menu();
+        const menu = this.newMenu();
         menu.addItem(item =>
           item
             .setTitle(t("ui.summary_edit"))
@@ -7309,7 +7314,7 @@ export class VisualAgentMapView extends ItemView {
       if (cardId) {
         event.preventDefault();
         const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
-        const menu = new Menu();
+        const menu = this.newMenu(cardId);
         menu.addItem(item =>
           item
             .setTitle(t("ui.summary_add"))
@@ -7325,7 +7330,6 @@ export class VisualAgentMapView extends ItemView {
               .setIcon("palette")
               .onClick(() => void this.chooseTopicStyle(topic))
           );
-        this.restoreFocusOnMenuHide(menu, cardId);
         // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the card, where a keyboard user is.
         if (event.clientX === 0 && event.clientY === 0) {
           const box = card.getBoundingClientRect();
@@ -7349,7 +7353,7 @@ export class VisualAgentMapView extends ItemView {
     const point = this.stagePoint({ x: event.clientX, y: event.clientY });
     if (!point) return;
     event.preventDefault();
-    const menu = new Menu();
+    const menu = this.newMenu();
     menu.addItem(item =>
       item
         .setTitle(t("ui.canvas_image_insert"))
@@ -8690,7 +8694,7 @@ export class VisualAgentMapView extends ItemView {
     return this.iconButton(parent, "download", t("ui.export_map"), event => this.openExportMenu(event));
   }
   private openExportMenu(event: MouseEvent): void {
-    const menu = new Menu();
+    const menu = this.newMenu();
     const add = (title: string, icon: string, format: "png" | "svg" | "md", target: "vault" | "download"): void => {
       menu.addItem(item =>
         item
@@ -11625,7 +11629,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The six relation kinds as a menu; `pick` gets the chosen one. */
   private openRelationKindMenu(event: MouseEvent, pick: (kind: TopicRelationKind) => void): void {
-    const menu = new Menu();
+    const menu = this.newMenu();
     for (const kind of RELATION_KINDS)
       menu.addItem(item =>
         item

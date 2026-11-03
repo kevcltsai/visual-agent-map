@@ -300,3 +300,21 @@ test('#11 real order: the menu is already closed (onHide fired, .menu gone) when
     assert.equal(h.view.selection.state.selected, null, `${open}: a later Escape clears it`);
   }
 });
+
+test('#11 real order for other menus: the new-map menu counts as closed by the Escape that hid it; every menu goes through newMenu', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.equal((source.match(/new Menu\(\)/g) ?? []).length, 1, 'only newMenu itself builds a Menu');
+  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 12, 'the other twelve menus use it');
+  const card = source.slice(source.indexOf('private onCanvasContextMenu'), source.indexOf('private openCanvasImagePicker'));
+  assert.match(card, /this\.newMenu\(cardId\)/, 'the card right-click menu keeps its card as the focus fallback');
+});
+
+test('#11 real order for other menus (behavior): the new-map menu hides before the Escape reaches the map', async () => {
+  const h = await harness();
+  h.view.selection.setSelected(h.ids.leaf);
+  h.view.openNewMapMenu({ stopPropagation() {} });
+  h.menus.at(-1).hide();
+  h.view.onMapKeydown(keydown(h, h.card('leaf')));
+  assert.equal(h.view.selection.state.selected, h.ids.leaf);
+});

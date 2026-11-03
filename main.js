@@ -48434,6 +48434,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     modal.open();
     return modal;
   }
+  /** Every menu this view opens: Esc that closes it must not also clear the selection, and focus returns to the map. */
+  newMenu(nodeId) {
+    const menu = new import_obsidian31.Menu();
+    this.restoreFocusOnMenuHide(menu, nodeId);
+    return menu;
+  }
   restoreFocusOnMenuHide(menu, nodeId) {
     var _a2;
     (_a2 = menu.onHide) == null ? void 0 : _a2.call(menu, () => {
@@ -49755,7 +49761,7 @@ ${request.requirements}` : preset.text,
   openRelevanceMenu(node, current, anchor) {
     var _a2;
     if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") return;
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     for (const tier of ["core", "support", "side"])
       menu.addItem(
         (item) => item.setTitle(t(RELEVANCE_LABEL[tier])).setChecked(tier === current).onClick(() => this.setManualRelevance(node, tier))
@@ -50001,7 +50007,7 @@ ${request.requirements}` : preset.text,
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   openTopicMenu(event) {
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     menu.addItem(
       (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
     );
@@ -50040,7 +50046,7 @@ ${request.requirements}` : preset.text,
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   openKindMenu(event, pick) {
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     for (const kind of TOPIC_KINDS)
       menu.addItem(
         (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => pick(kind))
@@ -50098,7 +50104,7 @@ ${request.requirements}` : preset.text,
   }
   /** The zoom cluster's Layout menu: collapse or expand levels, then re-arrange the whole map. */
   openLayoutMenu(event) {
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     const choices = [
       { title: t("ui.collapse_all"), icon: "chevrons-down-up", levels: 0 },
       { title: t("ui.expand_all"), icon: "chevrons-up-down", levels: null },
@@ -50142,7 +50148,6 @@ ${request.requirements}` : preset.text,
     menu.addItem(
       (item) => item.setTitle(t("ui.auto_layout")).setIcon("workflow").onClick(() => this.autoLayout())
     );
-    this.restoreFocusOnMenuHide(menu);
     menu.showAtMouseEvent(event);
   }
   /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
@@ -51054,7 +51059,7 @@ ${request.requirements}` : preset.text,
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   openNewMapMenu(event) {
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     menu.addItem(
       (item) => item.setTitle(t("ui.new_mind_map")).setIcon("file-plus").onClick(
         () => new NameModal(
@@ -52566,7 +52571,7 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d;
     const text11 = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find((item) => item.kind === "text" && item.id === id);
     if (!text11 || !this.canEditText()) return;
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     for (const cardId of this.liveLinks(text11)) {
       const title = (_d = (_c = this.notes.get(cardId)) == null ? void 0 : _c.title) != null ? _d : cardId;
       menu.addItem(
@@ -52849,7 +52854,7 @@ ${request.requirements}` : preset.text,
       chip.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        const menu = new import_obsidian31.Menu();
+        const menu = this.newMenu();
         menu.addItem(
           (item) => item.setTitle(t("ui.canvas_boundary_edit")).setIcon("pencil").onClick(() => this.editBoundaryLabel(boundary.id))
         );
@@ -53028,7 +53033,7 @@ ${request.requirements}` : preset.text,
       label.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        const menu = new import_obsidian31.Menu();
+        const menu = this.newMenu();
         menu.addItem(
           (item) => item.setTitle(t("ui.summary_edit")).setIcon("pencil").onClick(() => this.startSummaryEdit(summary.id))
         );
@@ -53496,7 +53501,7 @@ ${request.requirements}` : preset.text,
       if (cardId) {
         event.preventDefault();
         const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
-        const menu2 = new import_obsidian31.Menu();
+        const menu2 = this.newMenu(cardId);
         menu2.addItem(
           (item) => item.setTitle(t("ui.summary_add")).setIcon("brackets").onClick(() => this.addSummaryOver(ids))
         );
@@ -53505,7 +53510,6 @@ ${request.requirements}` : preset.text,
           menu2.addItem(
             (item) => item.setTitle(t("ui.note_style_menu")).setIcon("palette").onClick(() => void this.chooseTopicStyle(topic))
           );
-        this.restoreFocusOnMenuHide(menu2, cardId);
         if (event.clientX === 0 && event.clientY === 0) {
           const box = card.getBoundingClientRect();
           menu2.showAtPosition({ x: box.left, y: box.bottom });
@@ -53520,7 +53524,7 @@ ${request.requirements}` : preset.text,
     const point = this.stagePoint({ x: event.clientX, y: event.clientY });
     if (!point) return;
     event.preventDefault();
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     menu.addItem(
       (item) => item.setTitle(t("ui.canvas_image_insert")).setIcon("image-plus").onClick(() => this.openCanvasImagePicker(point))
     );
@@ -54702,7 +54706,7 @@ ${request.requirements}` : preset.text,
     return this.iconButton(parent, "download", t("ui.export_map"), (event) => this.openExportMenu(event));
   }
   openExportMenu(event) {
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     const add = (title, icon, format, target) => {
       menu.addItem(
         (item) => item.setTitle(title).setIcon(icon).onClick(() => void this.exportMap(format, target))
@@ -57425,7 +57429,7 @@ ${request.requirements}` : preset.text,
   }
   /** The six relation kinds as a menu; `pick` gets the chosen one. */
   openRelationKindMenu(event, pick) {
-    const menu = new import_obsidian31.Menu();
+    const menu = this.newMenu();
     for (const kind of RELATION_KINDS2)
       menu.addItem(
         (item) => item.setTitle(t(RELATION_NAME_KEY[kind])).setIcon("link").onClick(() => pick(kind))

@@ -2774,6 +2774,12 @@ integrationTest('45 ui: the button turns the opening screen into this map\'s emp
   h.repaint(); assert.equal(chat.isHero, false);
 });
 
+integrationTest('B1 ui: many chips scroll inside their own box, so the message field stays in the window', async () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = css.match(/\.vam-map-chat-chips \{([^}]*)\}/)[1];
+  assert.match(rule, /max-height: 9em/); assert.match(rule, /overflow-y: auto/); assert.match(rule, /flex: 0 0 auto/);
+});
+
 integrationTest('45 ui: after the first message the button is hidden, and a map with cards never shows it', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
   assert.equal(chat.emptyMapEl.hidden, false);

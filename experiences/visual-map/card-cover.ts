@@ -133,7 +133,10 @@ function declaredCover(content: string): string | null {
 export function withCoverOff(content: string): string {
   const declared = declaredCover(content);
   const explicit = declared !== null && declared !== "" && declared.toLowerCase() !== "none";
-  return setFrontmatterKeys(content, explicit ? { [COVER_KEY]: "none", [COVER_FRAME_KEY]: null } : { [COVER_KEY]: "none" });
+  return setFrontmatterKeys(
+    content,
+    explicit ? { [COVER_KEY]: "none", [COVER_FRAME_KEY]: null } : { [COVER_KEY]: "none" }
+  );
 }
 
 /** Removes the `topic-cover` key and the frame so the first embedded image is used again, whole. */

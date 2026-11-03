@@ -24470,7 +24470,10 @@ function declaredCover(content) {
 function withCoverOff(content) {
   const declared = declaredCover(content);
   const explicit = declared !== null && declared !== "" && declared.toLowerCase() !== "none";
-  return setFrontmatterKeys(content, explicit ? { [COVER_KEY]: "none", [COVER_FRAME_KEY]: null } : { [COVER_KEY]: "none" });
+  return setFrontmatterKeys(
+    content,
+    explicit ? { [COVER_KEY]: "none", [COVER_FRAME_KEY]: null } : { [COVER_KEY]: "none" }
+  );
 }
 function withCoverOn(content) {
   return setFrontmatterKeys(content, { [COVER_KEY]: null });

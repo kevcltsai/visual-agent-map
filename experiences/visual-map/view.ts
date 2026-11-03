@@ -9184,34 +9184,34 @@ export class VisualAgentMapView extends ItemView {
       if (isCurrent()) new Notice(t("ui.export_failed", errorMessage(error)));
     }
   }
-  private openMapActions(): void {
-    const choices: { label: string; description?: string; buttonLabel?: string; action: () => void }[] = [];
+  /** The header's "More mind map actions": an Obsidian menu under the button, each entry a verb. */
+  private openMapActions(event?: MouseEvent): void {
+    const menu = this.newMenu();
+    const add = (title: string, icon: string, action: () => void, warning = false): void => {
+      menu.addItem(item => {
+        item.setTitle(title).setIcon(icon).onClick(action);
+        if (warning) item.setWarning(true);
+      });
+    };
+    if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
+    if (this.map && !this.map.aim) add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
+    add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
     if (this.map) {
-      choices.push({
-        label: t("ui.rename_current_mind_map"),
-        description: t("ui.update_the_topic_folder_and_mind_map_name_together"),
-        action: () => this.renameCurrentMap()
-      });
+      menu.addSeparator();
+      add(t("ui.delete_current_mind_map"), "trash-2", () => this.deleteCurrentMap(), true);
     }
-    if (this.map && !this.map.aim)
-      choices.push({
-        label: t("ui.organize"),
-        description: t("ui.manage_notes_that_are_currently_outside_the_mind_map"),
-        action: () => this.enqueue(() => this.openOrganizer())
-      });
-    choices.push({
-      label: t("ui.repair_missing_mind_map"),
-      description: t("ui.rebuild_a_missing_map_from_existing_topic_notes"),
-      action: () => this.enqueue(() => this.repairMissingTopic())
-    });
-    if (this.map)
-      choices.push({
-        label: t("ui.delete_current_mind_map"),
-        description: t("ui.remove_only_the_map_file_keep_all_topic_notes_undo_is_availa"),
-        buttonLabel: t("ui.review"),
-        action: () => this.deleteCurrentMap()
-      });
-    new ChoiceModal(this.app, t("ui.more_mind_map_actions"), t("ui.additional_map_management_actions"), choices).open();
+    this.showMenuUnder(menu, event);
+  }
+  /** A header button's menu opens under the button (also from the keyboard, whose click has no pointer position). */
+  private showMenuUnder(menu: Menu, event?: MouseEvent): void {
+    const anchor = (event?.currentTarget ?? null) as HTMLElement | null;
+    const box = typeof anchor?.getBoundingClientRect === "function" ? anchor.getBoundingClientRect() : null;
+    if (box) menu.showAtPosition({ x: box.left, y: box.bottom });
+    else if (event) menu.showAtMouseEvent(event);
+    else {
+      const rect = this.contentEl?.getBoundingClientRect?.();
+      menu.showAtPosition({ x: rect?.right ?? 0, y: rect?.top ?? 0 });
+    }
   }
   private aimActiveForPath(path: string): boolean {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).some(leaf => {
@@ -9509,7 +9509,9 @@ export class VisualAgentMapView extends ItemView {
       if (!this.map.aim)
         this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
       this.addExportButton(headerActions);
-      this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
+      this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), event =>
+        this.openMapActions(event)
+      );
     }
     const selectedNode = this.map?.nodes.find(node => node.id === this.selection.state.selected);
     if (this.map?.aim) {

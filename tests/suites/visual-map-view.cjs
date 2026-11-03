@@ -1527,13 +1527,12 @@ integrationTest('status pill: researched topics show none, other states keep the
   assert.ok(labelled.cards().a.attrs['aria-labelledby'], 'the card is still named');
 });
 integrationTest('the more-actions menu holds Organize notes and folders; toolbar keeps Select several topics; the zoom cluster Layout menu holds Auto layout', () => {
-  const opened = [];
-  class Modal { open() { opened.push(this); } close() {} }
-  const { view } = selectionView(load, {}, { ...obsidian, Modal });
+  const menus = [];
+  const { view } = selectionView(load, {}, { ...obsidian, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } } });
   view.openMapActions();
-  const labels = opened[0].choices.map(choice => choice.label);
+  const labels = menus[0].items.map(item => item.title);
   assert.ok(labels.includes('Organize notes and folders'));
-  const organize = opened[0].choices.find(choice => choice.label === 'Organize notes and folders'); assert.equal(typeof organize.action, 'function');
+  const organize = menus[0].items.find(item => item.title === 'Organize notes and folders'); assert.equal(typeof organize.click, 'function');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   const toolsBlock = source.slice(source.indexOf('const tools = createDiv("vam-map-tools")'), source.indexOf('const workspace = this.contentEl.createDiv("vam-workspace")'));
   assert.ok(!/ui\.organize|ui\.auto_layout/.test(toolsBlock), 'neither control stays in the floating tools');
@@ -1544,6 +1543,29 @@ integrationTest('the more-actions menu holds Organize notes and folders; toolbar
   assert.equal(translate('en', 'ui.finish_topic_selection'), 'Done selecting'); assert.equal(translate('zh-TW', 'ui.finish_topic_selection'), '完成選取');
   assert.equal(translate('zh-TW', 'ui.organize'), '整理筆記與資料夾'); assert.equal(translate('zh-TW', 'ui.rename_topic'), '重新命名'); assert.equal(translate('zh-TW', 'ui.ai_explore'), 'AI 探索');
   assert.equal(translate('zh-TW', 'ui.new_map'), '＋ 新增心智圖');
+});
+integrationTest('C2: More mind map actions is an Obsidian menu under its button (no dialog), every entry a verb, Delete set apart as a warning; each entry runs its action', () => {
+  const menus = [], dialogs = [];
+  class Modal { open() { dialogs.push(this); } close() {} }
+  const { view } = selectionView(load, {}, { ...obsidian, Modal, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } } });
+  const ran = [];
+  view.renameCurrentMap = () => ran.push('rename');
+  view.deleteCurrentMap = () => ran.push('delete');
+  view.enqueue = work => { ran.push('queued'); };
+  const button = { getBoundingClientRect: () => ({ left: 40, bottom: 30, top: 10, right: 60 }) };
+  view.openMapActions({ currentTarget: button, clientX: 0, clientY: 0 });
+  assert.equal(dialogs.length, 0, 'no dialog opens');
+  const menu = menus.at(-1);
+  assert.deepEqual(plain(menu.at), { x: 40, y: 30 }, 'the menu sits under the button, also for a keyboard click');
+  assert.deepEqual(menu.items.map(item => item.title), ['Rename current mind map', 'Organize notes and folders', 'Repair missing mind map', 'Delete current mind map']);
+  assert.deepEqual(menu.separators, [3]);
+  assert.equal(menu.items.at(-1).warning, true);
+  for (const item of menu.items) item.click();
+  assert.deepEqual(ran, ['rename', 'queued', 'queued', 'delete']);
+  const { translate } = load('i18n.ts');
+  for (const language of ['zh-TW', 'zh-CN'])
+    for (const key of ['ui.rename_current_mind_map', 'ui.organize', 'ui.repair_missing_mind_map', 'ui.delete_current_mind_map'])
+      assert.match(translate(language, key), /^(重新命名|重命名|整理|修復|修复|刪除|删除)/, `${language} ${key} starts with a verb`);
 });
 integrationTest('UI wording: short research (subtopic research), not shallow research; the synthesis draft is reviewed (檢閱) everywhere', () => {
   const { translate } = load('i18n.ts');

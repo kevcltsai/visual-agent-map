@@ -76,15 +76,15 @@ test('outline library: delete asks twice (armed for five seconds) and New preset
 
 // ---- tone pickers -----------------------------------------------------------------------------------------------
 integrationTest('map actions (counterexample 9, Q15/Q17, C5; was: the map default note style and map default tone pickers): a regular map and an AIM map list neither "Note style for this map" nor "Voice for this map", and the old map values stay byte for byte', async () => {
-  const opened = [];
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
+  const menus = [];
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Menu: class Menu { constructor() { this.items = []; this.separators = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, setWarning(v) { this.warning = v; return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } addSeparator() { this.separators.push(this.items.length); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } }, Notice: class {} } });
   const plugin = { settings: { language: 'en', detailTemplates: [], promptPresets: [] } };
   for (const aim of [false, true]) {
     const view = new VisualAgentMapView({ app: {} }, plugin);
     view.map = { ...map([node('a')]), detailTemplateId: 'textbook', toneId: 'plain', ...(aim ? { aim: { branches: [] } } : {}) };
     const before = JSON.stringify(view.map);
     view.openMapActions();
-    const labels = plain(opened.at(-1).choices.map(choice => choice.label));
+    const labels = plain(menus.at(-1).items.map(item => item.title));
     assert.ok(labels.length >= 2 && labels.includes('Rename current mind map'), labels.join('|'));
     for (const label of labels) assert.ok(!/note style|voice|tone/i.test(label), `${aim ? 'AIM' : 'regular'} map: ${label}`);
     assert.equal(JSON.stringify(view.map), before, 'opening the actions leaves the old map values alone');

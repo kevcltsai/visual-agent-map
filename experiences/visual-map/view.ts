@@ -11055,25 +11055,7 @@ export class VisualAgentMapView extends ItemView {
     const workspace = this.contentEl.querySelector<HTMLElement>(".vam-canvas");
     if (!workspace) return;
     this.hoverCard?.remove();
-    this.hoverCard = null;
     const size = previewMetrics(this.plugin.settings.previewScale);
-    // Placed before anything is built: with no side of the card that clears it, the preview is not shown at all.
-    const host = workspace.getBoundingClientRect(),
-      rect = card.getBoundingClientRect();
-    const availableWidth = Math.max(180, host.width - 24);
-    const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
-    const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
-    const spot = placeHoverPreview(
-      host,
-      {
-        left: rect.left - host.left,
-        top: rect.top - host.top,
-        right: rect.right - host.left,
-        bottom: rect.bottom - host.top
-      },
-      { width, height: visibleHeight }
-    );
-    if (!spot) return;
     const preview = workspace.createDiv("vam-hover-card");
     this.hoverCard = preview;
     preview.style.maxHeight = `${size.height}px`;
@@ -11103,6 +11085,28 @@ export class VisualAgentMapView extends ItemView {
     }
     const content = preview.createDiv("vam-hover-markdown");
     void MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
+    const host = workspace.getBoundingClientRect(),
+      rect = card.getBoundingClientRect();
+    const availableWidth = Math.max(180, host.width - 24);
+    const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
+    const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
+    // The first side of the card that clears it (right, left, below, above); with none, the preview is not shown at all.
+    const spot = placeHoverPreview(
+      host,
+      {
+        left: rect.left - host.left,
+        top: rect.top - host.top,
+        right: rect.right - host.left,
+        bottom: rect.bottom - host.top
+      },
+      { width, height: visibleHeight }
+    );
+    if (!spot) {
+      preview.remove();
+      this.hoverCard = null;
+      this.hoverResearch = null;
+      return;
+    }
     preview.style.width = `${width}px`;
     preview.style.left = `${spot.left}px`;
     preview.style.top = `${spot.top}px`;

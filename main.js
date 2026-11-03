@@ -56986,23 +56986,7 @@ ${request.requirements}` : preset.text,
     const workspace = this.contentEl.querySelector(".vam-canvas");
     if (!workspace) return;
     (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
-    this.hoverCard = null;
     const size = previewMetrics(this.plugin.settings.previewScale);
-    const host = workspace.getBoundingClientRect(), rect2 = card.getBoundingClientRect();
-    const availableWidth = Math.max(180, host.width - 24);
-    const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
-    const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
-    const spot = placeHoverPreview(
-      host,
-      {
-        left: rect2.left - host.left,
-        top: rect2.top - host.top,
-        right: rect2.right - host.left,
-        bottom: rect2.bottom - host.top
-      },
-      { width, height: visibleHeight }
-    );
-    if (!spot) return;
     const preview = workspace.createDiv("vam-hover-card");
     this.hoverCard = preview;
     preview.style.maxHeight = `${size.height}px`;
@@ -57031,6 +57015,26 @@ ${request.requirements}` : preset.text,
     }
     const content = preview.createDiv("vam-hover-markdown");
     void import_obsidian31.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
+    const host = workspace.getBoundingClientRect(), rect2 = card.getBoundingClientRect();
+    const availableWidth = Math.max(180, host.width - 24);
+    const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
+    const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
+    const spot = placeHoverPreview(
+      host,
+      {
+        left: rect2.left - host.left,
+        top: rect2.top - host.top,
+        right: rect2.right - host.left,
+        bottom: rect2.bottom - host.top
+      },
+      { width, height: visibleHeight }
+    );
+    if (!spot) {
+      preview.remove();
+      this.hoverCard = null;
+      this.hoverResearch = null;
+      return;
+    }
     preview.style.width = `${width}px`;
     preview.style.left = `${spot.left}px`;
     preview.style.top = `${spot.top}px`;

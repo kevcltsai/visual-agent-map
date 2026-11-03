@@ -37,7 +37,7 @@ test('test wiring: a file mentioned only in a comment is not wired, in test-unit
 // The expected names are the fixture tests/snapshots/aim-suite-tests.json. Regenerate it after adding or renaming an AIM suite test: UPDATE_AIM_SUITE_TESTS=1 node --test --test-name-pattern='test:aim runs' tests/run.cjs
 const { spawnSync } = require('node:child_process');
 const aimFixture = path.join(root, 'tests', 'snapshots', 'aim-suite-tests.json');
-const aimCommands = () => JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts['test:aim'].split('&&').map(part => part.trim());
+const aimCommands = () => JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts['test:aim:run'].split('&&').map(part => part.trim());
 // Registers the suites named by the test:aim command in a child process with node:test replaced by a recorder, so nothing runs and only the registered names come back.
 const recorder = "const Module = require('node:module'); const names = []; const load = Module._load; Module._load = function (request, ...rest) { if (request === 'node:test') return { test: name => { names.push(name); } }; return load.call(this, request, ...rest); }; require('./tests/run.cjs'); process.stdout.write(JSON.stringify(names));";
 function aimSuiteTests(command) {

@@ -40,6 +40,8 @@ const expand = word => {
 const runnable = list => list.map(part => (part.args[0] === "--test" ? { ...part, args: ["--test", ...part.args.slice(1).flatMap(expand)] } : part));
 
 async function main() {
+  const { enterHeavy } = await import("./heavy-lock.mjs");
+  await enterHeavy("npm run test:unit");
   // Imported here so that importing this file (the wiring check does) does not load the runner.
   const { runParts } = await import("./test-integration.mjs");
   const failed = await runParts(runnable(parts));

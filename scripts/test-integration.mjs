@@ -52,6 +52,8 @@ export async function runParts(list) {
 }
 
 async function main() {
+  const { enterHeavy } = await import("./heavy-lock.mjs");
+  await enterHeavy("npm run test:integration");
   process.exitCode = (await runParts(parts)).length ? 1 : 0; // not process.exit: it can cut off piped output
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

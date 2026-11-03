@@ -6,6 +6,9 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { connectCdp, devToolsPortFile, trustExpression, waitForInstance } from "./obsidian-cdp.mjs";
 import { canonicalVault, sourceFingerprint } from "./test-harness.mjs";
+import { enterHeavy } from "./heavy-lock.mjs";
+
+await enterHeavy("npm run test:runtime");
 
 const vault = resolve(process.argv[2] || canonicalVault);
 const environmentPath = `${vault}/.vam-test-environment.json`;

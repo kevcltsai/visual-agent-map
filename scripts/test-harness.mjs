@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { focusAction, frontApp, instancePattern } from "./keep-background.mjs";
+import { enterHeavy, keepProfile } from "./heavy-lock.mjs";
 export { focusAction };
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
 
@@ -157,6 +158,7 @@ function launchObsidian(appProfile) {
   if (!existsSync(obsidianApp)) throw new Error(`Obsidian app bundle not found at ${obsidianApp}.`);
   if (instanceRunning(appProfile)) return;
   rmSync(join(appProfile, "DevToolsActivePort"), { force: true });
+  keepProfile(appProfile); // left running on purpose for the owner; the end-of-run check must not stop it
   const previous = frontApp();
   execFileSync("open", ["-g", "-n", "-a", obsidianApp, "--args", `--user-data-dir=${appProfile}`, "--remote-debugging-port=0", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows"]);
   startFocusWatcher(appProfile, previous);
@@ -341,4 +343,9 @@ export function main(args = process.argv.slice(2)) {
   } finally { if (prepare) rmSync(lock, { recursive: true }); }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const argv = process.argv.slice(2);
+  // --smoke and --session= are the Obsidian-only setup paths; every other form builds and runs the test layers.
+  if (!argv.includes("--smoke") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim());
+  main();
+}

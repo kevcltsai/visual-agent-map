@@ -53,7 +53,7 @@ function setup(initial, options = {}) {
   const selected = 'Selected words here.';
   const view = Object.assign(new MarkdownView(), {
     file: { path: 'Note.md' }, containerEl: new FakeElement(), getMode: () => options.mode ?? 'source',
-    editor: { getValue: () => markdown, getSelection: () => options.cursorOnly ? '' : selected, getCursor: () => ({ line: 0, ch: 0 }), posToOffset: () => markdown.indexOf(selected), replaceRange() {} }
+    editor: { getValue: () => markdown, getSelection: () => options.cursorOnly ? '' : selected, getCursor: which => ({ line: 0, ch: options.cursorOnly ? 3 : which === 'from' ? markdown.indexOf(selected) : markdown.indexOf(selected) + selected.length }), posToOffset: pos => pos.ch, replaceRange() {} }
   });
   const app = {
     workspace: { containerEl: new FakeElement(), getLeavesOfType: () => options.commandPalette ? [] : [{ view }], getActiveViewOfType: () => view, on: () => ({}) },
@@ -138,5 +138,6 @@ test('command palette: a bare cursor keeps the no-selection snapshot, and readin
   const cursor = setup(false, { commandPalette: true, cursorOnly: true });
   assert.equal(cursor.ai.openForSelection(false), true);
   assert.equal(cursor.ai.panel.snapshot.text, '');
+  assert.equal(cursor.ai.panel.snapshot.matchAt, 3, 'the result goes at the cursor');
   assert.equal(setup(false, { commandPalette: true, mode: 'preview' }).ai.openForSelection(true), false);
 });

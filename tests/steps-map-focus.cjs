@@ -38,11 +38,27 @@ class El {
     this.doc.activeElement = this;
     for (let e = this; e; e = e.parent) for (const fn of e.listeners.focusin ?? []) fn({ target: this });
   }
+  // Enough of Obsidian's element helpers for the render functions that build right-click targets.
+  createEl(tag, init = {}) { const o = typeof init === 'string' ? { cls: init } : init; return this.add(tag, o); }
+  createDiv(init) { return this.createEl('div', init); }
+  createSpan(init) { return this.createEl('span', init); }
+  addClass(name) { this.classes.add(name); }
+  removeClass(name) { this.classes.delete(name); }
+  setText(text) { this.textContent = text; }
+  setAttribute(name, value) { this.attrs[name] = String(value); }
+  appendChild(child) { child.parent = this; this.children.push(child); return child; }
+  fire(name, event) { for (const fn of this.listeners[name] ?? []) fn(event); }
+  get style() { return (this._style ??= {}); }
+  getBoundingClientRect() { return { left: 0, top: 0, right: 100, bottom: 50, width: 100, height: 50 }; }
+  get offsetLeft() { return 0; } get offsetTop() { return 0; } get offsetWidth() { return 100; } get offsetHeight() { return 50; }
   detach() { if (this.contains(this.doc.activeElement)) this.doc.activeElement = this.doc.body; if (this.parent) this.parent.children = this.parent.children.filter(c => c !== this); this.parent = null; }
   empty() { for (const c of [...this.children]) c.detach(); }
   remove() { this.detach(); }
 }
 
+// Settings rows are built by the organizer windows; a chainable stand-in that runs the callbacks is enough here.
+const chain = () => new Proxy(function () {}, { get: (_t, key) => (key === 'then' ? undefined : chain()), apply: (_t, _self, args) => { for (const a of args) if (typeof a === 'function') a(chain()); return chain(); } });
+class Setting { constructor() { return chain(); } }
 const MAP = 'Agent Workspace/Topics/map-f/Map.md';
 const timers = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -64,8 +80,9 @@ async function harness() {
   const Base = dom.makeModal();
   class Modal extends Base { open() { modals.push(this); super.open(); } }
   class Menu { constructor() { menus.push(this); } addItem(cb) { cb({ setTitle() { return this; }, setIcon() { return this; }, onClick() { return this; }, setChecked() { return this; } }); return this; } addSeparator() { return this; } onHide(fn) { this.hide = fn; return this; } showAtMouseEvent() {} showAtPosition() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Menu, Notice: dom.makeNotice(notices), setTooltip() {} } }, { createFragment: dom.createFragment, CSS: { escape: v => v } });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Menu, Notice: dom.makeNotice(notices), Setting, setTooltip() {} } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: tag => new El(new Doc(), tag) });
   const plugin = withExpansionCoordinator({
+    availableModels: () => ['gpt-6-luna'], modelLabel: model => model, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async () => {},
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
   });
@@ -318,3 +335,116 @@ test('#11 real order for other menus (behavior): the new-map menu hides before t
   h.view.onMapKeydown(keydown(h, h.card('leaf')));
   assert.equal(h.view.selection.state.selected, h.ids.leaf);
 });
+
+// ---- Behavioral coverage for the dialog and menu paths (the regex wiring checks above stay) ----
+
+test('08c: the paste-outline window imports, closes onto its removed opener, and focus lands in the map; cancel keeps the opener', async () => {
+  const opener = h => h.card('root').querySelector('.vam-structure-tool');
+  let h = await harness();
+  h.view.selection.setSelected(h.ids.root);
+  opener(h).focus();
+  h.view.openOutlineImport();
+  const modal = h.modals.at(-1);
+  assert.ok(modal, 'the outline window opened through the view');
+  modal.textarea.value = '# Pasted A\n## Pasted B';
+  modal.refresh();
+  const before = h.view.map.nodes.length;
+  const old = opener(h);
+  // The import window holds focus while the map repaints behind it, then closes; Obsidian puts focus back on the opener that the repaint removed.
+  h.doc.body.add('div', { cls: 'modal' }).add('button', { text: 'Create' }).focus();
+  await modal.submit();
+  assert.ok(h.view.map.nodes.length > before, 'importOutline committed new topics');
+  assert.equal(modal.closeCount, 1, 'the window closed after the import');
+  assert.notEqual(opener(h), old, 'the repaint replaced the opener');
+  h.doc.activeElement = h.doc.body;
+  await timers(180);
+  assert.equal(h.inMap(), true, 'focus is inside the map, not on the body');
+  // Cancel: the opener survives and keeps focus.
+  h = await harness();
+  h.view.selection.setSelected(h.ids.root);
+  const kept = opener(h); kept.focus();
+  h.view.openOutlineImport();
+  h.modals.at(-1).close(); kept.focus();
+  await timers(180);
+  assert.equal(h.active(), kept, 'cancel: focus stays on the opener');
+});
+
+test('08d: the Organizer, Unassigned and Archive windows (openMapModal) hand focus back to the map after a map change', async () => {
+  const stubs = h => { h.view.plugin.repo.collectionFiles = async () => []; };
+  for (const open of ['organizer', 'unassigned', 'archive']) {
+    const h = await harness(); stubs(h);
+    const old = h.card('leaf').querySelector('.vam-structure-tool'); old.focus();
+    if (open === 'organizer') await h.view.openOrganizer();
+    else if (open === 'unassigned') h.view.openUnassigned([]);
+    else h.view.openArchive([]);
+    const modal = h.modals.at(-1);
+    assert.ok(modal, `${open}: the window opened through the view`);
+    h.doc.body.add('div', { cls: 'modal' }).add('button', { text: 'Add to mind map' }).focus();
+    h.view.render(); // the action changed the map and repainted behind the window
+    assert.equal(old.isConnected, false, `${open}: the opener is gone`);
+    modal.close(); h.doc.activeElement = h.doc.body;
+    await timers(180);
+    assert.equal(h.inMap(), true, `${open}: focus is in the map`);
+    assert.notEqual(h.active(), h.doc.body);
+  }
+  // Cancel and another leaf, once through the organizer.
+  const h = await harness(); stubs(h);
+  const sidebar = new El(h.doc, 'div', { tabindex: 0 }); sidebar.parent = h.doc.body; h.doc.body.children.push(sidebar);
+  await h.view.openOrganizer(); h.modals.at(-1).close(); sidebar.focus();
+  await timers(180);
+  assert.equal(h.active(), sidebar, 'a focus in another leaf is not stolen');
+});
+
+// Every menu opener, driven for real: the menu hides before the same Escape reaches the map, the selection stays, and a later Escape clears it.
+const MENU_OPENERS = {
+  openTopicMenu: h => h.view.openTopicMenu({}),
+  openKindMenu: h => h.view.openKindMenu({}, () => {}),
+  openRelevanceMenu: h => h.view.openRelevanceMenu(h.view.map.nodes[1], 'core', h.card('leaf')),
+  openUnlinkMenu: h => {
+    h.view.map.canvasItems = [{ id: 't1', kind: 'text', text: 'Hi', x: 0, y: 0, links: [h.ids.leaf] }];
+    h.view.openUnlinkMenu('t1', h.card('leaf'));
+  },
+  openExportMenu: h => h.view.openExportMenu({}),
+  openRelationKindMenu: h => h.view.openRelationKindMenu({}, () => {}),
+  openNewMapMenu: h => h.view.openNewMapMenu({ stopPropagation() {} }),
+  openLayoutMenu: h => h.view.openLayoutMenu({}),
+  onCanvasContextMenu_card: h => h.view.onCanvasContextMenu({ target: h.card('leaf'), clientX: 5, clientY: 5, preventDefault() {} }),
+  onCanvasContextMenu_canvas: h => {
+    h.view.stagePoint = () => ({ x: 1, y: 1 });
+    h.view.onCanvasContextMenu({ target: h.contentEl.querySelector('.vam-stage'), clientX: 5, clientY: 5, preventDefault() {} });
+  },
+  boundary_label_contextmenu: h => {
+    h.view.map.canvasItems = [{ id: 'b1', kind: 'boundary', members: [h.ids.leaf], label: 'Group' }];
+    const stage = h.contentEl.querySelector('.vam-stage');
+    h.view.renderBoundaries(stage, h.view.map.canvasItems, true);
+    const chip = stage.querySelector('.vam-boundary-label');
+    chip.fire('contextmenu', { preventDefault() {}, stopPropagation() {}, ...{} });
+  },
+  summary_label_contextmenu: h => {
+    h.view.map.canvasItems = [{ id: 's1', kind: 'summary', parentId: h.ids.root, members: [h.ids.leaf], text: 'Sum' }];
+    const stage = h.contentEl.querySelector('.vam-stage');
+    h.view.renderSummaries(stage, h.view.map.canvasItems);
+    stage.querySelector('.vam-summary-text').fire('contextmenu', { preventDefault() {}, stopPropagation() {} });
+  }
+};
+for (const [name, open] of Object.entries(MENU_OPENERS)) {
+  test(`#11 behavior: ${name} - hidden before the Escape reaches the map: selection stays, the next Escape clears it`, async () => {
+    const h = await harness();
+    h.view.selection.setSelected(h.ids.leaf);
+    h.card('leaf').focus();
+    const count = h.menus.length;
+    open(h);
+    assert.equal(h.menus.length, count + 1, 'the opener built one menu');
+    h.doc.body.add('div', { cls: 'menu' }).detach(); // Obsidian removes the menu on keydown, before the event bubbles to the view
+    h.menus.at(-1).hide?.(); // a menu with no onHide hook is the bug: nothing tells the view this Escape closed it
+    let stopped = false;
+    const closing = keydown(h, h.card('leaf'), 'Escape', { stopPropagation() { stopped = true; } });
+    h.view.onMapKeydown(closing);
+    assert.equal(h.view.selection.state.selected, h.ids.leaf, 'the Escape that closed the menu keeps the selection');
+    // Unclaimed, Obsidian answers the same Esc by activating the sidebar note, and focus lands in its editor (parent UI smoke on aaefff0).
+    assert.equal(closing.defaultPrevented && stopped, true, 'the Escape that closed the menu is claimed by the map');
+    await timers(20);
+    h.view.onMapKeydown(keydown(h, h.card('leaf')));
+    assert.equal(h.view.selection.state.selected, null, 'a later Escape clears it');
+  });
+}

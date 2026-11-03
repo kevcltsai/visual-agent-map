@@ -622,7 +622,7 @@ test('preview renderer receives Markdown in original order with no extra Preview
   const {VisualAgentMapView} = load('main.ts', {obsidian:{...obsidian,MarkdownRenderer:{render(app, markdown, el, path){rendered={markdown,path};return Promise.resolve()}}}});
   const view = new VisualAgentMapView({app:{}},{settings:{...DEFAULT_SETTINGS}}); view.contentEl=contentEl;view.map=map([node('a')]);
   const markdown='Text first\n\n![Image](https://example.com/a.png)\n\nText after\n\n|A|B|\n|---|---|\n|1|2|';
-  view.showHoverCard({...element(),dataset:{nodeId:'a'}},{title:'Topic',preview:markdown});
+  view.showHoverCard({...element(),dataset:{nodeId:'a'},querySelector(){return null}},{title:'Topic',preview:markdown});
   assert.equal(rendered.markdown,markdown);assert.equal(rendered.path,'a.md');assert.deepEqual(created,[['strong','Topic']]);
 });
 test('multi research modal: no mode, network, image or depth fields; each row shows its mode; the request carries no mode and no style key until one is chosen (was: detailTemplateId; D2); immediate close on start', () => {
@@ -4110,7 +4110,7 @@ test('bug bash #03: the add-child button sits above the width handle when visibl
   assert.doesNotMatch(cssRules(css, /^\.vam-card-resize-y$|^\.vam-card-resize-corner$/).map(r => r.body).join(''), /pointer-events:\s*none/, 'height and corner handles are untouched');
 });
 // ---- bug bash A #04: the hover preview never covers the card it describes ----
-function hoverHarness(hostWidth, hostHeight, cardRect) {
+function hoverHarness(hostWidth, hostHeight, cardRect, { tools = null, selectedNeighbours = [] } = {}) {
   const { VisualAgentMapView } = require('../support-replay.cjs').load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, MarkdownRenderer: { render() { return Promise.resolve(); } } } }, {
     window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o)
   });
@@ -4119,7 +4119,10 @@ function hoverHarness(hostWidth, hostHeight, cardRect) {
   host.createDiv = cls => { const el = dom.element('div', { cls }); el.style = { setProperty() {} }; host.children.push(el); return el; };
   const view = Object.create(VisualAgentMapView.prototype);
   Object.assign(view, { contentEl: { querySelector: () => host }, plugin: { settings: { previewScale: 120 }, researchProgress: null }, map: { nodes: [{ id: 'a', path: 'a.md' }] }, presentation: null, hoverCard: null });
-  const card = { dataset: { nodeId: 'a' }, getBoundingClientRect: () => cardRect };
+  const box = rect => ({ ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top });
+  const card = { dataset: { nodeId: 'a' }, getBoundingClientRect: () => cardRect, querySelector: selector => (selector === '.vam-node-tools' && tools ? { getBoundingClientRect: () => box(tools) } : null) };
+  const neighbour = (rect, selected) => ({ classList: { contains: name => name === 'is-selected' && selected }, getBoundingClientRect: () => box(rect), querySelector: () => null });
+  view.cardEls = new Map([['a', card], ...selectedNeighbours.map((rect, i) => [`n${i}`, neighbour(rect, true)]), ['unselected', neighbour({ left: 0, top: 0, right: hostWidth, bottom: hostHeight }, false)]]);
   view.showHoverCard(card, { title: 'T', preview: 'body' });
   const preview = host.children.at(-1);
   const px = key => (view.hoverCard ? parseFloat(view.hoverCard.style[key]) : NaN);
@@ -4139,6 +4142,48 @@ test('bug bash #04: a narrow canvas puts the preview beside, above or below the 
   assert.ok(box.left >= 12 && box.right <= 400 - 12 && box.top >= 12 && box.bottom <= 900 - 12, 'and it lies inside the canvas');
   const cramped = hoverHarness(300, 300, { left: 20, top: 20, right: 280, bottom: 280 });
   assert.equal(cramped.shown, false, 'no place that clears the card: no preview');
+});
+const boxOf = spot => ({ left: spot.left, top: spot.top, right: spot.left + spot.width, bottom: spot.top + Math.min(spot.maxHeight, 900 - 24) });
+// A card's tool row hangs above the card (bottom: calc(100% - 6px)); a preview above the card used to start 12px over the card and cover it.
+test('bug bash #04: the hover preview never covers the hovered card\'s tool row, neither above the card nor beside it', () => {
+  const card = { left: 100, top: 700, right: 300, bottom: 760 };
+  const tools = { left: 40, top: 670, right: 300, bottom: 706 };
+  const above = hoverHarness(400, 900, card, { tools });
+  assert.equal(above.shown, true, 'the only free side is above');
+  assert.equal(intersects(boxOf(above), card), false);
+  assert.equal(intersects(boxOf(above), tools), false, 'and the preview stops short of the tool row');
+  // A left-aligned tool row wider than the card runs out over the right side of the card.
+  const wideRow = { left: 20, top: 170, right: 400, bottom: 206 };
+  const beside = hoverHarness(1200, 900, { left: 20, top: 200, right: 300, bottom: 260 }, { tools: wideRow });
+  assert.equal(beside.shown, true);
+  assert.equal(intersects(boxOf(beside), wideRow), false, 'beside the card the preview clears the wider tool row too');
+  assert.equal(hoverHarness(1200, 900, { left: 150, top: 200, right: 250, bottom: 260 }, { tools: { left: 40, top: 170, right: 240, bottom: 206 } }).left, 262, 'an ordinary tool row inside the card keeps the preview on the right');
+});
+// Regression (UI acceptance of f516ade): a left-aligned tool row wider than its card sticks out past the card's right edge; on a wide canvas the preview still goes to the right, starting beyond the row.
+test('bug bash #04: on a wide canvas a tool row sticking out past the card\'s right edge moves the right-hand preview\'s start beyond the row; the left side mirrors it', () => {
+  const card = { left: 100, top: 372, right: 274, bottom: 430 };
+  const tools = { left: 100, top: 355, right: 336, bottom: 376 };
+  const spot = hoverHarness(1200, 900, card, { tools });
+  assert.equal(spot.shown, true, 'the preview is shown');
+  assert.equal(spot.left, 336 + 12, 'on the right, beyond the tool row');
+  assert.equal(intersects(boxOf(spot), card), false);
+  assert.equal(intersects(boxOf(spot), tools), false);
+  const mirrored = hoverHarness(1200, 900, { left: 900, top: 372, right: 1074, bottom: 430 }, { tools: { left: 838, top: 355, right: 1074, bottom: 376 } });
+  assert.equal(mirrored.shown, true);
+  assert.equal(mirrored.left + mirrored.width, 838 - 12, 'on the left (right side has no room), beyond the row\'s left end');
+});
+// The pointer rests on a neighbour after dragging a handle of the selected card: the neighbour's preview must not cover the selected card's handles.
+test('bug bash #04: when another side is free, the hover preview does not cover the selected neighbour card (its resize handles); with no free side it still clears the hovered card', () => {
+  const card = { left: 150, top: 200, right: 250, bottom: 260 };
+  const selected = { left: 270, top: 190, right: 420, bottom: 250 };
+  const spot = hoverHarness(1200, 800, card, { selectedNeighbours: [selected] });
+  assert.equal(spot.shown, true);
+  assert.equal(intersects(boxOf(spot), selected), false, 'the selected card stays uncovered');
+  assert.equal(intersects(boxOf(spot), card), false);
+  assert.equal(hoverHarness(1200, 800, card).left, 262, 'without a selected neighbour the preview stays on the right');
+  const boxed = hoverHarness(1200, 800, card, { selectedNeighbours: [{ left: 0, top: 0, right: 1200, bottom: 800 }] });
+  assert.equal(boxed.shown, true, 'a selected card that every side would cover does not suppress the preview');
+  assert.equal(intersects(boxOf(boxed), card), false);
 });
 // ---- bug bash A #12: a card's tool row wider than the card never runs off the visible left edge ----
 function toolsHarness({ cardLeft, cardWidth = 280, toolsWidth = 345, canvasLeft = 0, canvasRight = 100000, zoom = 1, chatRight = null }) {

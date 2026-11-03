@@ -262,10 +262,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
 .vam-card-cover.is-framed { position: relative; }
-.vam-card-cover-window { position: absolute; top: 0; height: 100%; left: 0; width: 100%; overflow: hidden; }
+/* The window is the framed region at its own aspect-ratio (set by the view): full height of the cover, width from the ratio, centred, so a card clipped short scales it down whole like contain and never stretches it. */
+.vam-card-cover-window { position: absolute; top: 0; height: 100%; width: auto; left: 50%; transform: translateX(-50%); overflow: hidden; }
 .vam-card-cover.is-framed:not(.is-sized) img { visibility: hidden; }
 .vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; }
-.vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
+/* Out-specifies Obsidian's core `.workspace-leaf-content img:not([width])` (0,2,1), which would otherwise cap the width and squash a sideways crop. */
+.vam-node .vam-card-cover .vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
 /* "Adjust area" dialog of the card cover frame: the whole picture, a white frame, the outside dimmed. No CSS variables. */
 .vam-card-frame-modal { max-width: 640px; }
 .vam-card-frame-stage { position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto; overflow: hidden; touch-action: none; user-select: none; }

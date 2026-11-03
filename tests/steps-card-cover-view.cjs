@@ -251,8 +251,7 @@ test('a valid frame: the frame takes the region shape and the picture is placed 
   const ratio = (400 * 0.8) / (300 * 0.2);
   assert.equal(frame.style['aspect-ratio'], String(ratio));
   assert.ok(frame.classes.includes('is-sized') && frame.classes.includes('is-framed'));
-  assert.equal(win.style.width, '100%');
-  assert.equal(win.style.left, '0%');
+  assert.equal(win.style['aspect-ratio'], String((400 * 0.8) / (300 * 0.2)), 'the window keeps the region shape');
   assert.equal(img.style.width, `${100 / 0.8}%`);
   assert.equal(img.style.height, `${100 / 0.2}%`);
   assert.equal(img.style.left, `${(-0.1 / 0.8) * 100}%`);
@@ -270,9 +269,8 @@ test('a tall region is scaled down whole inside the capped frame (masked, not cr
   img.fire('load');
   assert.equal(frame.style['aspect-ratio'], String(2 / 3));
   const regionRatio = 0.1;
-  const share = (regionRatio / (2 / 3)) * 100;
-  assert.equal(win.style.width, `${share}%`);
-  assert.equal(win.style.left, `${(100 - share) / 2}%`);
+  assert.equal(win.style['aspect-ratio'], String(regionRatio), 'the window keeps the region shape; CSS scales it whole and centres it');
+  assert.equal(win.style.width, undefined, 'no inline width: a clipped card must not stretch the region');
 });
 
 test('counter-example: an invalid frame shows the whole picture with no window and no error', () => {
@@ -328,6 +326,12 @@ test('the stylesheet gives the framed cover a positioned window and uses no CSS 
   const text = lines.join('\n');
   assert.match(text, /\.vam-card-cover\.is-framed[^{]*\{[^}]*position: relative/);
   assert.match(text, /\.vam-card-cover-window[^{]*\{[^}]*position: absolute[^}]*overflow: hidden/);
+  // Decision 9: the window is full height, width from its own aspect-ratio, centred (never stretched on a clipped card).
+  const windowRule = lines.find(l => /^\.vam-card-cover-window \{/.test(l));
+  assert.match(windowRule, /height: 100%/);
+  assert.match(windowRule, /width: auto/);
+  assert.match(windowRule, /left: 50%[^}]*translateX\(-50%\)/);
+  assert.doesNotMatch(windowRule, /width: 100%/);
   assert.match(text, /is-framed:not\(\.is-sized\)[^{]*\{[^}]*visibility: hidden/);
 });
 
@@ -416,4 +420,23 @@ test('P4b: changeTopicCover refuses a topic that is not editable', async () => {
   h.view.selection.toggleMultiSelect();
   assert.equal(await h.view.changeTopicCover({ id: 'm', path: NOTE }), null);
   assert.equal(h.contents.get(NOTE), TEXT);
+});
+
+// Obsidian core `.workspace-leaf-content img:not([width])` is (0,2,1) and would cap the width of the oversized picture inside the window.
+function specificity(selector) {
+  const sel = selector.replace(/:not\(([^)]*)\)/g, ' $1 ');
+  const ids = (sel.match(/#[\w-]+/g) || []).length;
+  const classes = (sel.match(/\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+/g) || []).length;
+  const tags = (sel.replace(/\[[^\]]*\]/g, '').match(/(^|[\s>+~])[a-z][\w-]*/gi) || []).length;
+  return [ids, classes, tags];
+}
+const beats = (a, b) => { for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
+
+test('counter-example: the window picture rule out-specifies Obsidian core img:not([width]) (0,2,1)', () => {
+  assert.deepEqual(specificity('.workspace-leaf-content img:not([width])'), [0, 2, 1], 'the helper reads the core rule');
+  const rule = read('styles.css').split('\n').find(l => /vam-card-cover-window img \{/.test(l));
+  assert.ok(rule, 'rule exists');
+  assert.match(rule, /max-width: none/);
+  const selector = rule.slice(0, rule.indexOf('{')).trim();
+  assert.ok(beats(specificity(selector), [0, 2, 1]), `${selector} -> ${specificity(selector)}`);
 });

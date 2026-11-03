@@ -625,9 +625,9 @@ function placeCoverFrame(
   parts.frame.addClass("is-sized");
   if (!mask || !parts.window) return;
   const region = (shape * mask.w) / mask.h;
-  const share = (region / ratio) * 100;
-  parts.window.style.setProperty("width", `${share}%`);
-  parts.window.style.setProperty("left", `${(100 - share) / 2}%`);
+  // The window keeps the region's own shape (CSS: full height, width from this ratio, centred), so a card clipped
+  // short scales the region down whole instead of stretching it.
+  parts.window.style.setProperty("aspect-ratio", String(region));
   const img = parts.img.style;
   img.setProperty("width", `${100 / mask.w}%`);
   img.setProperty("height", `${100 / mask.h}%`);
@@ -9152,11 +9152,17 @@ export class VisualAgentMapView extends ItemView {
         const href = await imageHref(coverInfo.path);
         if (!isCurrent()) return null;
         if (href === false) return { refuse: "embedded" };
-        const win = coverInfo.frame ? frame.querySelector<HTMLElement>(".vam-card-cover-window") : null;
+        // Only a sized cover has the region's own shape; the lazy 96 px placeholder would stretch the region, so it
+        // exports the whole picture proportionally (meet) instead.
+        const win =
+          coverInfo.frame && frame.classList.contains("is-sized")
+            ? frame.querySelector<HTMLElement>(".vam-card-cover-window")
+            : null;
         if (href && coverInfo.frame && win && win.offsetWidth > 0 && win.offsetHeight > 0) {
           // A masked cover: the whole picture is placed so the framed region fills the window; the export clips to the window.
           const mask = coverInfo.frame;
-          const winX = box.x + frame.offsetLeft + win.offsetLeft;
+          // The window is centred in the frame by CSS (a transform), which offsetLeft does not see.
+          const winX = box.x + frame.offsetLeft + (frame.offsetWidth - win.offsetWidth) / 2;
           const winY = box.y + frame.offsetTop + win.offsetTop;
           const w = win.offsetWidth / mask.w;
           const h = win.offsetHeight / mask.h;

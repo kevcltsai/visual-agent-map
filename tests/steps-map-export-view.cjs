@@ -171,6 +171,13 @@ test('a framed cover exports the same region: the whole picture placed so the wi
   // The window as the stylesheet lays it out: the region fills the frame (x 0, 8 from the card top, 280 x 96).
   const win = frameEl.createDiv('vam-card-cover-window');
   Object.assign(win, { offsetLeft: 0, offsetTop: 0, offsetWidth: 280, offsetHeight: 96 });
+  // F3 counter-example: a framed cover that is not yet sized (lazy 96 px placeholder) is never stretched to the window: whole picture, meet.
+  const frameCache = f => (f.path === h.root.path ? { frontmatter: { 'topic-cover': '[[Media/c.png]]', 'topic-cover-frame': '0.25 0.5 0.5 0.25' } } : { frontmatter: {} });
+  cacheOf.getFileCache = frameCache;
+  const unsized = (await h.view.collectExportScene(() => true)).scene.cards.find(c => c.cover).cover;
+  assert.equal(unsized.fit, 'contain', 'not sized: proportional, not fill');
+  assert.ok(!('window' in unsized));
+  frameEl.addClass('is-sized');
   cacheOf.getFileCache = f => (f.path === h.root.path ? { frontmatter: { 'topic-cover': '[[Media/c.png]]', 'topic-cover-frame': '0.25 0.5 0.5 0.25' } } : { frontmatter: {} });
   const { scene } = await h.view.collectExportScene(() => true);
   const cover = scene.cards.find(c => c.cover).cover;

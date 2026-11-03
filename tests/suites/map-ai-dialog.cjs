@@ -137,7 +137,7 @@ integrationTest('style and model pickers: a style file with a problem offers Ope
   const part = name => ({ name });
   const recipes = [{ ref: 'file:Mine', kind: 'file', name: 'Mine', fileName: 'Mine.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [] },
     { ref: 'file:Broken', kind: 'file', name: 'Broken', fileName: 'Broken.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [{ line: 3, code: 'ui.detail_template_error_section_name_taken', values: [2], message: 'x' }] }];
-  const styles = { refresh: async () => {}, list: () => [], recipes: () => recipes, edit: async ref => { opened.push(ref); } };
+  const styles = { refresh: async () => {}, recipes: () => recipes, openRecipe: async ref => { opened.push(ref); } };
   const modal = new MultiResearchModal({}, ['A', 'B'], models, () => {}, { repair: model => repaired.push(model), styles });
   modal.open();
   // The template and tone selects are gone, and so is "Edit this style": a problem row opens its file instead.
@@ -146,7 +146,7 @@ integrationTest('style and model pickers: a style file with a problem offers Ope
   assert.equal(button(modal.contentEl, 'Edit this style'), undefined);
   assert.equal(openStyle(modal.contentEl).children.length > 0, true);
   button(modal.contentEl, 'Open this file').click();
-  assert.deepEqual(plain(opened), [{ kind: 'file', id: 'file:Broken' }], 'the style file with the problem opens');
+  assert.deepEqual(plain(opened), ['file:Broken'], 'the style file with the problem opens');
   byLabel(modal.contentEl, 'Model').value = 'gpt-a';
   button(modal.contentEl, 'Fix connection…').click();
   assert.deepEqual(repaired, ['gpt-a'], 'the fix link checks the chosen model');

@@ -638,7 +638,7 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   class Modal { constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); this.closed = 0; } open() { this.onOpen(); } close() { this.closed++; } }
   const mod = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
   const requests = [];
-  const styles = { refresh: async () => {}, list: () => [], recipes: () => [alphaStyle], edit: async () => {} };
+  const styles = { refresh: async () => {}, recipes: () => [alphaStyle], openRecipe: async () => {} };
   let models = [], changed = null, unwatched = 0;
   const live = { list: () => models, watch: fn => { changed = fn; return () => { unwatched++; }; } };
   const modal = new mod.MultiResearchModal({}, ['Alpha', 'Beta'], live, request => requests.push(request), { styles }, ['quick', 'standard']); modal.open();

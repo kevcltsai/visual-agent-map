@@ -282,11 +282,11 @@ test('D8 (was: tones, an upgraded custom preset keeps its name through its alias
   assert.equal((await store.migrateLegacy({ mapsWithStyle: [] })).status, 'done');
   assert.equal(settings.noteStyleAliases, undefined);
   await store.refresh();
-  const choices = store.toneChoices();
-  assert.ok(['academic', 'summary', 'plain'].every(id => choices.some(choice => choice.id === id)), 'the built-in tones come by tone id');
-  assert.ok(choices.some(choice => choice.id === 'file:Calm' && choice.name === 'Calm'));
-  assert.ok(choices.some(choice => choice.id === 'file:Pirate' && choice.name === 'Pirate'), 'the custom preset is a tone block now');
-  assert.ok(!choices.some(choice => choice.id === 'custom-tone-1'));
+  assert.equal(store.toneChoices, undefined, 'the tone list of the old pickers is gone (D9, decision #45)');
+  const tones = store.listBlocks('tone');
+  assert.ok(tones.some(item => item.ref === 'file:Calm' && item.name === 'Calm'));
+  assert.ok(tones.some(item => item.ref === 'file:Pirate' && item.name === 'Pirate'), 'the custom preset is a tone block now');
+  assert.ok(!tones.some(item => item.ref === 'custom-tone-1'));
   assert.equal(store.runStyle({ topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.', 'the saved preset is read, not its alias');
   assert.ok(Object.keys(v.files).some(path => path.includes('/Voices/Pirate')));
 });

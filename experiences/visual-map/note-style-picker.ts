@@ -10,32 +10,6 @@ import { ChoiceModal, type Choice } from "../../ui/modals/choice-modal";
 import { BUILTIN_BLOCKS, BUILTIN_FORMATS } from "../../core/blocks/builtin";
 import { AIM_DELIVERY_STRUCTURE, BUILTIN_RECIPES, UPDATE_MODE_KEYS, type UpdateMode } from "../../ai/note-style-recipe";
 
-/** Which style a picker row stands for: a built-in style id, or `file:<name>` of a template block the user wrote. */
-export interface StyleRef {
-  kind: "builtin" | "file";
-  id: string;
-}
-
-/** The structure block a built-in style id opens (the five 0.28.0 menu styles share the Standard and Textbook structures). */
-const BUILTIN_STRUCTURE_BLOCK: Readonly<Record<string, string>> = {
-  standard: "standard",
-  textbook: "textbook",
-  summary: "standard",
-  plain: "standard",
-  guide: "standard"
-};
-
-/** One template block of the user in a picker, with the reasons it cannot be read (empty when it can). */
-export interface StyleListItem {
-  kind: "file";
-  /** `file:<name>`, as the map, topic or run stores it. */
-  id: string;
-  name: string;
-  /** The file (with ".md") in the Templates block folder. */
-  fileName: string;
-  issues: NoteStyleIssue[];
-}
-
 /**
  * One style (recipe) in a one-line choice. A structural subset of the store's `RecipeListItem`,
  * so that list can be handed over as it is.
@@ -89,14 +63,12 @@ export function recipeTags(item: PickerRecipe): string {
 
 /** What the four note-style entries need from the block folders (absent in a test double: only the built-ins are listed). */
 export interface StylePicker {
-  /** Re-reads the block folders; call `list()` afterwards. */
+  /** Re-reads the block folders; call `recipes()` afterwards. */
   refresh(): Promise<void>;
-  /** The user's own template blocks. */
-  list(): StyleListItem[];
   /** Every style, built-ins (the AIM report marked `aimOnly`) first, then the user's style files. */
   recipes(): PickerRecipe[];
-  /** Opens the template block behind a style in a new tab (a built-in with no file gets one first). */
-  edit(ref: StyleRef): Promise<void>;
+  /** Opens the style file `file:<name>` in a new tab (a Notice when it is not there). */
+  openRecipe(ref: string): Promise<void>;
 }
 
 /** A style file that does not parse stops the run; the Notice offers to open the file. */
@@ -127,16 +99,8 @@ export function stylePickerFor(app: App, plugin: VisualAgentMapPlugin): StylePic
   if (!store) return undefined;
   return {
     refresh: () => store.refresh(),
-    list: () =>
-      store
-        .listBlocks("template")
-        .flatMap((item): StyleListItem[] =>
-          item.kind === "file" && item.fileName !== undefined
-            ? [{ kind: "file", id: item.ref, name: item.name, fileName: item.fileName, issues: item.issues }]
-            : []
-        ),
     recipes: () => store.listRecipes(),
-    edit: ref => openStyleFile(app, store, ref)
+    openRecipe: ref => openRecipeFile(app, store, ref)
   };
 }
 
@@ -148,15 +112,11 @@ export async function openVaultFile(app: App, path: string): Promise<boolean> {
   return true;
 }
 
-/** Opens the template block behind a style in a new tab (a built-in with no file gets one first, as "Open" in the settings does). */
-export async function openStyleFile(app: App, store: NoteStyleStore, ref: StyleRef): Promise<void> {
-  const name = ref.kind === "file" ? `${ref.id.slice("file:".length)}.md` : ref.id;
-  try {
-    const blockRef = ref.kind === "file" ? ref.id : builtinRef(BUILTIN_STRUCTURE_BLOCK[ref.id] ?? ref.id);
-    const { path } = await store.ensureBlockFile("template", blockRef);
-    if (!(await openVaultFile(app, path))) new Notice(t("ui.note_style_edit_missing_0", name));
-  } catch {
-    new Notice(t("ui.note_style_edit_missing_0", name));
+/** Opens a user's style file (`<style folder>/<Styles>/<name>.md`) in a new tab; a Notice when it is not there. */
+export async function openRecipeFile(app: App, store: NoteStyleStore, ref: string): Promise<void> {
+  const path = store.recipeFilePath(ref);
+  if (path === undefined || !(await openVaultFile(app, path))) {
+    new Notice(t("ui.note_style_edit_missing_0", ref.startsWith("file:") ? `${ref.slice("file:".length)}.md` : ref));
   }
 }
 
@@ -181,13 +141,6 @@ const ISSUE_KEYS = new Set([
 export function styleIssueText(issue: NoteStyleIssue): string {
   if (ISSUE_KEYS.has(issue.code)) return t(`ui.note_style_issue_${issue.code}` as TranslationKey, ...issue.values);
   return t(issue.code as TranslationKey, ...issue.values);
-}
-
-/** The first problem of an unusable file, as one line for the picker. */
-export function styleProblem(item: StyleListItem): string | undefined {
-  const first = item.issues[0];
-  if (!first) return undefined;
-  return t("ui.note_style_unusable_0_1_2", item.fileName, first.line, styleIssueText(first));
 }
 
 export interface TopicStyleChooserOptions {
@@ -257,7 +210,7 @@ export async function openTopicStyleChooser(
         label: item.name,
         description: t("ui.note_style_unusable_0_1_2", item.fileName ?? item.name, first.line, styleIssueText(first)),
         buttonLabel: t("ui.note_style_open_file"),
-        action: () => void picker?.edit({ kind: "file", id: item.ref })
+        action: () => void picker?.openRecipe(item.ref)
       });
       continue;
     }

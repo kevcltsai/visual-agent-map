@@ -17991,7 +17991,7 @@ export class VisualAgentMapView extends ItemView {
     await this.refreshNoteStyles();
     return this.mapStyleCached(language, options);
   }
-  /** `mapStyle` without the refresh: a dialog's default value reads the cached styles (its own refresh is a later ticket). */
+  /** `mapStyle` without the refresh, for the two merge call sites that resolve the style after the notes were read (`detailTemplate` and `logHeadings`). */
   private mapStyleCached(
     language: ContentLanguage,
     options: { style?: string; notify?: boolean; gate?: { shown: boolean }; kind?: TopicKind } = {}

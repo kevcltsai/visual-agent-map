@@ -782,16 +782,6 @@ export class NoteStyleStore {
     };
   }
 
-  // ---- the tone choices of the map pickers ----
-
-  /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
-  toneChoices(): { id: string; name: string }[] {
-    return this.listBlocks("tone").map(item => {
-      const parsed = parseBlockRef(item.ref);
-      return { id: parsed?.kind === "builtin" ? parsed.id : item.ref, name: item.name };
-    });
-  }
-
   // ---- writing block files (only on a user action; a file is never overwritten) ----
 
   private serial<T>(task: () => Promise<T>): Promise<T> {

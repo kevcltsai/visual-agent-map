@@ -90,7 +90,7 @@ function importHarness({ generate, presets = [], initialTopic = 'Sleep', languag
   const generator = { presets: host, initialTopic, ...(prefill ? { prefill } : {}), generate: generate ?? (async (request, _signal, started) => { requests.push(request); startedInputs.push(started()); return '# Sleep\n## Stages\n### REM\n'; }) };
   // T6 P2: the user's own styles are style files (file:<name>) in the one-line style choice.
   const part = name => ({ name });
-  const styles = { refresh: async () => {}, list: () => [], recipes: () => [{ ref: 'file:Template one', kind: 'file', name: 'Template one', fileName: 'Template one.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [] }], edit: async () => {} };
+  const styles = { refresh: async () => {}, recipes: () => [{ ref: 'file:Template one', kind: 'file', name: 'Template one', fileName: 'Template one.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [] }], openRecipe: async () => {} };
   const modal = new mod.OutlineImportModal({}, async request => { created.push(request); }, undefined, { map: 'editable', selected: { id: 'n1', title: 'Sleep' } }, 'under', generator, { styles });
   modal.open();
   const ai = find(modal.contentEl, i => i.tag === 'details' && hasCls(i, 'vam-outline-ai'));

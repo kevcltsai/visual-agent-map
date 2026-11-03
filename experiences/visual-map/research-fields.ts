@@ -253,7 +253,7 @@ export function styleChoiceField(parent: HTMLElement, options: StyleChoiceFieldO
       if (picker) {
         const open = row.createEl("button", { text: t("ui.note_style_open_file"), cls: "vam-field-link" });
         open.type = "button";
-        open.addEventListener("click", () => void picker.edit({ kind: "file", id: item.ref }));
+        open.addEventListener("click", () => void picker.openRecipe(item.ref));
       }
     }
   };

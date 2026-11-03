@@ -1491,11 +1491,6 @@ var en = {
   "ui.detail_template_standard": "Standard",
   "ui.detail_template_textbook": "Textbook",
   "ui.note_style": "Note style",
-  "ui.note_style_custom_0_1": "Custom: {0} \xB7 {1}",
-  "ui.note_style_standard": "Standard (academic)",
-  "ui.note_style_standard_short": "Standard",
-  "ui.note_style_textbook": "Textbook (intro, then sections)",
-  "ui.note_style_textbook_short": "Textbook",
   "ui.note_style_hypothesis_short": "Hypothesis structure",
   "ui.note_style_evidence_short": "Evidence structure",
   "ui.note_style_action_short": "Action structure",
@@ -1536,14 +1531,6 @@ var en = {
   "ui.preview_group_input": "Task input (sample)",
   "ui.preview_issue_0_1_2": 'The structure "{0}" has a problem (line {1}): {2} The built-in structure is used instead.',
   "ui.preview_style_invalid_0_1_2": 'The default note style file "{0}" has a problem (line {1}): {2} Research will not start until it is fixed.',
-  "ui.note_style_summary": "Key points",
-  "ui.note_style_plain": "Plain language",
-  "ui.note_style_guide": "Practical guide",
-  "ui.note_style_standard_hint": "Six fixed sections in a neutral, evidence-first voice.",
-  "ui.note_style_textbook_hint": "Opens with 2\u20134 intro paragraphs, then the six sections; empty sections are left out.",
-  "ui.note_style_summary_hint": "Six sections in short sentences and lists: conclusions, facts and numbers only.",
-  "ui.note_style_plain_hint": "Six sections in everyday words; jargon is explained the first time it appears.",
-  "ui.note_style_guide_hint": "Six sections focused on steps, checkpoints and common mistakes.",
   "ui.adjust": "Adjust",
   "ui.next_summary_synth_full": "Full content",
   "ui.next_summary_synth_summary": "Summary only",
@@ -3873,11 +3860,6 @@ var zhCN = {
   "ui.detail_template_standard": "\u6807\u51C6",
   "ui.detail_template_textbook": "\u6559\u79D1\u4E66",
   "ui.note_style": "\u7B14\u8BB0\u98CE\u683C",
-  "ui.note_style_custom_0_1": "\u81EA\u8BA2\uFF1A{0} \xB7 {1}",
-  "ui.note_style_standard": "\u6807\u51C6\uFF08\u5B66\u672F\u4E25\u8C28\uFF09",
-  "ui.note_style_standard_short": "\u6807\u51C6",
-  "ui.note_style_textbook": "\u6559\u79D1\u4E66\uFF08\u5148\u5BFC\u8BFB\uFF0C\u518D\u5206\u7C7B\uFF09",
-  "ui.note_style_textbook_short": "\u6559\u79D1\u4E66",
   "ui.note_style_hypothesis_short": "\u5047\u8BBE\u7ED3\u6784",
   "ui.note_style_evidence_short": "\u8BC1\u636E\u7ED3\u6784",
   "ui.note_style_action_short": "\u884C\u52A8\u7ED3\u6784",
@@ -3918,14 +3900,6 @@ var zhCN = {
   "ui.preview_group_input": "\u4EFB\u52A1\u8F93\u5165\uFF08\u793A\u4F8B\uFF09",
   "ui.preview_issue_0_1_2": "\u7B14\u8BB0\u7ED3\u6784\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u8FD9\u6B21\u6539\u7528\u5185\u7F6E\u7ED3\u6784\u3002",
   "ui.preview_style_invalid_0_1_2": "\u9ED8\u8BA4\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u4FEE\u597D\u4E4B\u524D\u7814\u7A76\u4E0D\u4F1A\u5F00\u59CB\u3002",
-  "ui.note_style_summary": "\u7CBE\u7B80\u91CD\u70B9",
-  "ui.note_style_plain": "\u767D\u8BDD\u8BF4\u660E",
-  "ui.note_style_guide": "\u5B9E\u7528\u6307\u5357",
-  "ui.note_style_standard_hint": "\u516D\u4E2A\u56FA\u5B9A\u5206\u7C7B\uFF0C\u4E2D\u6027\u3001\u4EE5\u8BC1\u636E\u4E3A\u672C\u3002",
-  "ui.note_style_textbook_hint": "\u5148\u7528 2\u20134 \u6BB5\u5BFC\u8BFB\u5E26\u4F60\u8FDB\u5165\u4E3B\u9898\uFF0C\u518D\u63A5\u516D\u4E2A\u5206\u7C7B\uFF1B\u6CA1\u6709\u5185\u5BB9\u7684\u5206\u7C7B\u4F1A\u7701\u7565\u3002",
-  "ui.note_style_summary_hint": "\u516D\u4E2A\u5206\u7C7B\uFF0C\u7528\u77ED\u53E5\u548C\u6761\u5217\u53EA\u7559\u7ED3\u8BBA\u3001\u4E8B\u5B9E\u4E0E\u6570\u5B57\u3002",
-  "ui.note_style_plain_hint": "\u516D\u4E2A\u5206\u7C7B\uFF0C\u7528\u65E5\u5E38\u7528\u8BED\u89E3\u91CA\uFF0C\u672F\u8BED\u7B2C\u4E00\u6B21\u51FA\u73B0\u5C31\u8BF4\u660E\u3002",
-  "ui.note_style_guide_hint": "\u516D\u4E2A\u5206\u7C7B\uFF0C\u7740\u91CD\u6B65\u9AA4\u3001\u68C0\u67E5\u70B9\u548C\u5E38\u89C1\u9519\u8BEF\u3002",
   "ui.adjust": "\u8C03\u6574",
   "ui.next_summary_synth_full": "\u5B8C\u6574\u5185\u5BB9",
   "ui.next_summary_synth_summary": "\u4EC5\u6458\u8981",
@@ -6255,11 +6229,6 @@ var zhTW = {
   "ui.detail_template_standard": "\u6A19\u6E96",
   "ui.detail_template_textbook": "\u6559\u79D1\u66F8",
   "ui.note_style": "\u7B46\u8A18\u98A8\u683C",
-  "ui.note_style_custom_0_1": "\u81EA\u8A02\uFF1A{0} \xB7 {1}",
-  "ui.note_style_standard": "\u6A19\u6E96\uFF08\u5B78\u8853\u56B4\u8B39\uFF09",
-  "ui.note_style_standard_short": "\u6A19\u6E96",
-  "ui.note_style_textbook": "\u6559\u79D1\u66F8\uFF08\u5148\u5C0E\u8B80\uFF0C\u518D\u5206\u985E\uFF09",
-  "ui.note_style_textbook_short": "\u6559\u79D1\u66F8",
   "ui.note_style_hypothesis_short": "\u5047\u8A2D\u7D50\u69CB",
   "ui.note_style_evidence_short": "\u8B49\u64DA\u7D50\u69CB",
   "ui.note_style_action_short": "\u884C\u52D5\u7D50\u69CB",
@@ -6300,14 +6269,6 @@ var zhTW = {
   "ui.preview_group_input": "\u4EFB\u52D9\u8F38\u5165\uFF08\u7BC4\u4F8B\uFF09",
   "ui.preview_issue_0_1_2": "\u7B46\u8A18\u7D50\u69CB\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u9019\u6B21\u6539\u7528\u5167\u5EFA\u7D50\u69CB\u3002",
   "ui.preview_style_invalid_0_1_2": "\u9810\u8A2D\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u4FEE\u597D\u4E4B\u524D\u7814\u7A76\u4E0D\u6703\u958B\u59CB\u3002",
-  "ui.note_style_summary": "\u7CBE\u7C21\u91CD\u9EDE",
-  "ui.note_style_plain": "\u767D\u8A71\u8AAA\u660E",
-  "ui.note_style_guide": "\u5BE6\u7528\u6307\u5357",
-  "ui.note_style_standard_hint": "\u516D\u500B\u56FA\u5B9A\u5206\u985E\uFF0C\u4E2D\u6027\u3001\u4EE5\u8B49\u64DA\u70BA\u672C\u3002",
-  "ui.note_style_textbook_hint": "\u5148\u7528 2\u20134 \u6BB5\u5C0E\u8B80\u5E36\u4F60\u9032\u5165\u4E3B\u984C\uFF0C\u518D\u63A5\u516D\u500B\u5206\u985E\uFF1B\u6C92\u6709\u5167\u5BB9\u7684\u5206\u985E\u6703\u7701\u7565\u3002",
-  "ui.note_style_summary_hint": "\u516D\u500B\u5206\u985E\uFF0C\u7528\u77ED\u53E5\u548C\u689D\u5217\u53EA\u7559\u7D50\u8AD6\u3001\u4E8B\u5BE6\u8207\u6578\u5B57\u3002",
-  "ui.note_style_plain_hint": "\u516D\u500B\u5206\u985E\uFF0C\u7528\u65E5\u5E38\u7528\u8A9E\u89E3\u91CB\uFF0C\u8853\u8A9E\u7B2C\u4E00\u6B21\u51FA\u73FE\u5C31\u8AAA\u660E\u3002",
-  "ui.note_style_guide_hint": "\u516D\u500B\u5206\u985E\uFF0C\u8457\u91CD\u6B65\u9A5F\u3001\u6AA2\u67E5\u9EDE\u548C\u5E38\u898B\u932F\u8AA4\u3002",
   "ui.adjust": "\u8ABF\u6574",
   "ui.next_summary_synth_full": "\u5B8C\u6574\u5167\u5BB9",
   "ui.next_summary_synth_summary": "\u50C5\u6458\u8981",
@@ -27149,14 +27110,6 @@ var NoteStyleStore = class {
       issues: []
     };
   }
-  // ---- the tone choices of the map pickers ----
-  /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
-  toneChoices() {
-    return this.listBlocks("tone").map((item) => {
-      const parsed = parseBlockRef(item.ref);
-      return { id: (parsed == null ? void 0 : parsed.kind) === "builtin" ? parsed.id : item.ref, name: item.name };
-    });
-  }
   // ---- writing block files (only on a user action; a file is never overwritten) ----
   serial(task) {
     const run = this.writeQueue.then(task, task);
@@ -28027,13 +27980,6 @@ async function backupNote(port, input2) {
 
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian14 = require("obsidian");
-var BUILTIN_STRUCTURE_BLOCK = {
-  standard: "standard",
-  textbook: "textbook",
-  summary: "standard",
-  plain: "standard",
-  guide: "standard"
-};
 function builtinRecipeItems() {
   const nameOf = (list, id) => {
     const found = list.find((item) => item.id === id);
@@ -28081,11 +28027,8 @@ function stylePickerFor(app, plugin) {
   if (!store) return void 0;
   return {
     refresh: () => store.refresh(),
-    list: () => store.listBlocks("template").flatMap(
-      (item) => item.kind === "file" && item.fileName !== void 0 ? [{ kind: "file", id: item.ref, name: item.name, fileName: item.fileName, issues: item.issues }] : []
-    ),
     recipes: () => store.listRecipes(),
-    edit: (ref) => openStyleFile(app, store, ref)
+    openRecipe: (ref) => openRecipeFile(app, store, ref)
   };
 }
 async function openVaultFile(app, path) {
@@ -28094,15 +28037,10 @@ async function openVaultFile(app, path) {
   await app.workspace.getLeaf("tab").openFile(file);
   return true;
 }
-async function openStyleFile(app, store, ref) {
-  var _a2;
-  const name = ref.kind === "file" ? `${ref.id.slice("file:".length)}.md` : ref.id;
-  try {
-    const blockRef = ref.kind === "file" ? ref.id : builtinRef((_a2 = BUILTIN_STRUCTURE_BLOCK[ref.id]) != null ? _a2 : ref.id);
-    const { path } = await store.ensureBlockFile("template", blockRef);
-    if (!await openVaultFile(app, path)) new import_obsidian14.Notice(t("ui.note_style_edit_missing_0", name));
-  } catch (e) {
-    new import_obsidian14.Notice(t("ui.note_style_edit_missing_0", name));
+async function openRecipeFile(app, store, ref) {
+  const path = store.recipeFilePath(ref);
+  if (path === void 0 || !await openVaultFile(app, path)) {
+    new import_obsidian14.Notice(t("ui.note_style_edit_missing_0", ref.startsWith("file:") ? `${ref.slice("file:".length)}.md` : ref));
   }
 }
 var ISSUE_KEYS = /* @__PURE__ */ new Set([
@@ -28172,7 +28110,7 @@ async function openTopicStyleChooser(app, plugin, options) {
         label: item.name,
         description: t("ui.note_style_unusable_0_1_2", (_d = item.fileName) != null ? _d : item.name, first.line, styleIssueText(first)),
         buttonLabel: t("ui.note_style_open_file"),
-        action: () => void (picker == null ? void 0 : picker.edit({ kind: "file", id: item.ref }))
+        action: () => void (picker == null ? void 0 : picker.openRecipe(item.ref))
       });
       continue;
     }
@@ -35950,7 +35888,7 @@ function styleChoiceField(parent, options) {
       if (picker) {
         const open = row.createEl("button", { text: t("ui.note_style_open_file"), cls: "vam-field-link" });
         open.type = "button";
-        open.addEventListener("click", () => void picker.edit({ kind: "file", id: item.ref }));
+        open.addEventListener("click", () => void picker.openRecipe(item.ref));
       }
     }
   };
@@ -63298,7 +63236,7 @@ ${addition}` : addition });
     await this.refreshNoteStyles();
     return this.mapStyleCached(language2, options);
   }
-  /** `mapStyle` without the refresh: a dialog's default value reads the cached styles (its own refresh is a later ticket). */
+  /** `mapStyle` without the refresh, for the two merge call sites that resolve the style after the notes were read (`detailTemplate` and `logHeadings`). */
   mapStyleCached(language2, options = {}) {
     var _a2;
     const result = this.noteStyles.runStyle({

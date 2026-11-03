@@ -252,7 +252,7 @@ test('outline modal: the one-line style choice sits in the research options and 
   const h = modalHarness(); const requests = [];
   const part = name => ({ name });
   const mine = { ref: 'file:Template one', kind: 'file', name: 'Template one', fileName: 'Template one.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [] };
-  const styles = { refresh: async () => {}, list: () => [], recipes: () => [mine], edit: async () => {} };
+  const styles = { refresh: async () => {}, recipes: () => [mine], openRecipe: async () => {} };
   const submit = async (shallowOn, picked) => {
     const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, undefined, undefined, undefined, { styles });
     modal.open();

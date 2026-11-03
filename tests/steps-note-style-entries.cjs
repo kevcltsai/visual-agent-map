@@ -6,6 +6,7 @@ const support = require('./support.cjs');
 const dom = require('./support-dom.cjs');
 
 const { load, obsidian, plain } = support;
+const { loadSource } = require('./support-replay.cjs');
 const eq = (actual, expected) => assert.deepEqual(plain(actual), plain(expected));
 const fields = load('experiences/visual-map/research-fields.ts', { obsidian });
 const noticeLog = [];
@@ -23,7 +24,7 @@ test('error Notice: a style file error offers Open this file; other errors are p
   assert.equal(plainNotice.message, 'boom');
 });
 
-test('D9 (replaces styleRefOf names the style behind a stored pair): the picker no longer maps a stored template and tone pair to a style; StyleRef is only a row of the picker', () => {
+test('D9 (replaces styleRefOf names the style behind a stored pair): the picker no longer maps a stored template and tone pair to a style', () => {
   assert.equal(picker.styleRefOf, undefined);
 });
 
@@ -48,25 +49,54 @@ test('plugin.mutate: a style file error from a queued write shows Open this file
   } finally { console.error = origError; }
 });
 
-test('stylePickerFor: the picker lists only the user\'s template blocks (built-in rows and tone blocks stay out) and edit opens the block\'s file', async () => {
-  const opened = [], ensured = [];
-  const file = new (class TFile {})();
-  const app = { vault: { getAbstractFileByPath: path => (path === 'WS/Blocks/Templates/Mine.md' ? file : null) }, workspace: { getLeaf: () => ({ openFile: async f => { opened.push(f); } }) } };
-  const store = {
-    refresh: async () => {},
-    listBlocks: category => (category === 'template'
-      ? [{ ref: 'builtin:standard', kind: 'builtin', name: 'Standard', fileName: 'Standard.md', modified: true, issues: [] }, { ref: 'file:Mine', kind: 'file', name: 'Mine', fileName: 'Mine.md', modified: false, issues: [] }]
-      : [{ ref: 'file:Calm', kind: 'file', name: 'Calm', fileName: 'Calm.md', modified: false, issues: [] }]),
-    ensureBlockFile: async (category, ref) => { ensured.push([category, ref]); return { path: 'WS/Blocks/Templates/Mine.md', base: 'Mine' }; }
+test('stylePickerFor: a plugin without a store has no picker; the picker has no template-block list and no edit any more (R1-1)', () => {
+  const store = { refresh: async () => {}, listRecipes: () => [], recipeFilePath: () => undefined };
+  const styles = picker.stylePickerFor({}, { noteStyles: store });
+  assert.equal(styles.list, undefined);
+  assert.equal(styles.edit, undefined);
+  assert.equal(typeof styles.openRecipe, 'function');
+  assert.equal(picker.stylePickerFor({}, {}), undefined);
+  assert.equal(picker.openStyleFile, undefined);
+  assert.equal(picker.styleProblem, undefined);
+});
+
+// R1-1 (T6 F1): "Open this file" of a style opens the style file, never a structure file of the same name (real store, in-memory vault).
+test('R1-1: "Open this file" of a style file with a problem opens <Styles folder>/Broken.md, and not the structure file with the same name', async () => {
+  const S = loadSource('export { NoteStyleStore } from "./ai/note-style-store";');
+  const root = 'WS/S';
+  const files = {
+    [`${root}/Styles/Broken.md`]: '---\nstructure: Mine\nupdate: nonsense\n---\n',
+    [`${root}/Structures/Broken.md`]: '## A\nx\n',
+    [`${root}/Structures/Mine.md`]: '## A\nx\n'
   };
-  const loaded = load('experiences/visual-map/note-style-picker.ts', { obsidian: { ...obsidian, TFile: file.constructor } });
+  const under = folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes('/'));
+  const port = {
+    list: async folder => under(folder).map(f => f.slice(folder.length + 1)),
+    read: async f => files[f],
+    folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)),
+    createFolder: async () => {},
+    create: async (f, c) => { files[f] = c; },
+    trash: async () => {}
+  };
+  const settings = { detailTemplates: [], promptPresets: [], workspaceFolder: 'WS', noteStylesFolder: root, language: 'en' };
+  const store = new S.NoteStyleStore({ settings: () => settings, port, save: async () => {} });
+  await store.refresh();
+  const opened = [];
+  class TFile { constructor(path) { this.path = path; } }
+  const app = { vault: { getAbstractFileByPath: path => (path in files ? new TFile(path) : null) }, workspace: { getLeaf: () => ({ openFile: async f => { opened.push(f.path); } }) } };
+  const loaded = load('experiences/visual-map/note-style-picker.ts', { obsidian: { ...obsidian, TFile } });
   const styles = loaded.stylePickerFor(app, { noteStyles: store });
-  eq(styles.list(), [{ kind: 'file', id: 'file:Mine', name: 'Mine', fileName: 'Mine.md', issues: [] }]);
-  await styles.edit({ kind: 'file', id: 'file:Mine' });
-  await styles.edit({ kind: 'builtin', id: 'summary' });
-  eq(ensured, [['template', 'file:Mine'], ['template', 'builtin:standard']]);
-  assert.equal(opened.length, 2);
-  assert.equal(loaded.stylePickerFor(app, {}), undefined, 'a plugin without a store has no picker');
+  await styles.refresh();
+  const parent = dom.element('div');
+  fields.styleChoiceField(parent, { styles, current: 'x', changed: () => {} });
+  const toggle = dom.find(parent, i => i.tag === 'button' && dom.hasCls(i, 'vam-field-link') && !dom.hasCls(i, 'vam-note-style-problem'));
+  toggle.click();
+  const row = dom.find(parent, i => dom.hasCls(i, 'vam-note-style-problem'));
+  const open = dom.find(row, i => i.tag === 'button');
+  assert.ok(open, 'the problem row has the open button');
+  open.click();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  eq(opened, [`${root}/Styles/Broken.md`]);
 });
 
 // T6 P1: the one-line style choice (`styleChoiceField`), added beside the old field; the dialogs switch to it in P2.
@@ -78,7 +108,7 @@ const recipes = [recipe('builtin:general', 'General research'), recipe('builtin:
 function choice(list = recipes, extra = {}) {
   const edited = [], changes = [];
   let current = list;
-  const styles = { refresh: async () => {}, list: () => [], recipes: () => current, edit: async ref => { edited.push(plain(ref)); } };
+  const styles = { refresh: async () => {}, recipes: () => current, openRecipe: async ref => { edited.push(ref); } };
   const parent = dom.element('div');
   const field = fields.styleChoiceField(parent, { styles, current: 'Hypothesis test', changed: () => changes.push(1), ...extra });
   const toggle = dom.find(parent, i => i.tag === 'button' && dom.hasCls(i, 'vam-field-link') && !dom.hasCls(i, 'vam-note-style-problem'));
@@ -138,7 +168,7 @@ test('styleChoiceField: a style file with a problem is disabled with its reason 
   assert.match(dom.texts(rows[0]).join(' '), /"Broken\.md" has a problem and cannot be chosen \(line 4\): Section 2: another section already uses this name\./);
   const open = dom.findAll(h.parent, i => i.tag === 'button' && i.text === 'Open this file');
   assert.equal(open.length, 1); open[0].click();
-  assert.deepEqual(h.edited, [{ kind: 'file', id: 'file:Broken' }]);
+  assert.deepEqual(h.edited, ['file:Broken']);
   h.toggle.click(); h.select.value = 'file:Broken'; h.select.fire('change');
   assert.equal(h.field.style(), undefined, 'a bad file is never sent');
   assert.equal(h.field.name(), 'Hypothesis test');
@@ -177,12 +207,12 @@ test('styleChoiceField: set restores a choice, an unknown or unusable ref leaves
 
 test('styleChoiceField: building, expanding and choosing write nothing to the vault', () => {
   const writes = [];
-  const h = choice(recipes, { styles: { refresh: async () => { writes.push('refresh'); }, list: () => [], recipes: () => recipes, edit: async () => { writes.push('edit'); } } });
+  const h = choice(recipes, { styles: { refresh: async () => { writes.push('refresh'); }, recipes: () => recipes, openRecipe: async () => { writes.push('edit'); } } });
   h.toggle.click(); h.select.value = 'builtin:textbook'; h.select.fire('change'); h.toggle.click();
   assert.deepEqual(writes, []);
 });
 
-test('stylePickerFor: recipes() is the store\'s listRecipes() as it is; builtinRecipeItems() names the built-in styles for a picker-less test double; list() stays the template blocks', () => {
+test('stylePickerFor: recipes() is the store\'s listRecipes() as it is; builtinRecipeItems() names the built-in styles for a picker-less test double; list() is gone (R1-1)', () => {
   const file = new (class TFile {})();
   const loaded = load('experiences/visual-map/note-style-picker.ts', { obsidian: { ...obsidian, TFile: file.constructor } });
   const base = { refresh: async () => {}, listBlocks: () => [] };
@@ -194,5 +224,5 @@ test('stylePickerFor: recipes() is the store\'s listRecipes() as it is; builtinR
   const listed = [recipe('builtin:general', 'General research'), mineRecipe];
   const withList = loaded.stylePickerFor({}, { noteStyles: { ...base, listRecipes() { return listed; } } });
   assert.equal(withList.recipes(), listed);
-  eq(withList.list(), []);
+  assert.equal(withList.list, undefined);
 });

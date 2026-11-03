@@ -1646,7 +1646,10 @@ export const en = {
   "ui.note_style_by_kind_desc":
     "Each type of topic can use its own note structure. A structure chosen on the topic or for a run still wins.",
   "ui.note_style_kind_none": "Not set (use the map or default structure)",
-  "ui.note_style_kind_row_aria_0": "Note structure for {0}",
+  "ui.note_style_kind_row_aria_0": "Note style for {0}",
+  "ui.note_style_recipe_issue_0_1": "⚠ Line {0}: {1}",
+  "ui.note_style_row_missing_0_1":
+    'The style set for {0}, "{1}", was not found; this type uses its built-in style instead.',
   "ui.note_style_kind_issue_0_1_2": '⚠ Line {0}: {1} Until it is fixed, topics of this type use the built-in "{2}".',
   "ui.note_style_hypothesis_hint": "Claim, prediction, test, support, counterevidence, judgment.",
   "ui.note_style_evidence_hint": "Content, credibility, and what it supports or refutes.",
@@ -2595,6 +2598,7 @@ export const en = {
   "ui.settings_group_map": "Map",
   "ui.settings_group_advanced": "Advanced",
   "ui.settings_group_default": "Default",
+  "ui.settings_group_kinds": "Topic types",
   "ui.settings_group_more": "More",
   "ui.settings_group_debug": "Debugging",
   "ui.settings_group_workspace": "Workspace",
@@ -2613,8 +2617,9 @@ export const en = {
   "ui.settings_cli_path": "CLI path",
   "ui.settings_codex_path_desc": "VAM uses it to start Codex.",
   "ui.settings_claude_path_desc": "VAM uses it to start Claude Code.",
-  "ui.settings_note_style_page_desc": "The structure and voice AI uses for notes.",
-  "ui.settings_note_style_intro": "Default structure and voice for AI notes. A map or topic that sets its own wins.",
+  "ui.settings_note_style_page_desc": "The style AI uses for notes, by topic type.",
+  "ui.settings_note_style_intro":
+    "Pick the note style AI uses for each topic type. A style picked on a topic or for one run still wins.",
   "ui.settings_structure": "Structure",
   "ui.settings_voice": "Voice",
   "ui.settings_by_kind_desc": "Let types like hypothesis or evidence each use their own structure.",

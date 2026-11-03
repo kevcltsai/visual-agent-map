@@ -56,7 +56,8 @@ Copies, previews and AI runs now behave the way you expect. Copy a topic into an
 ### Changed
 
 - **Upgrading from 0.28.0.** Your custom note structures and writing tones become files and styles with the same names, and your old settings stay in place, so going back to an older version still works.
-- **Note style defaults.** General topics gain one rule for conflicts between old and new content, other topic types use their own built-in style, and hypothesis topics put new findings on top. A style or tone chosen for a whole map is no longer used; you see one notice listing those maps.
+- **Note style defaults.** General topics gain one rule for conflicts between old and new content, other topic types use their own built-in style, and hypothesis topics put new findings on top.
+- **No more map-wide styles.** A style or tone chosen for a whole map is no longer used, and the map menu no longer has style or voice items; you see one notice listing those maps. AIM conclusion notes follow the AIM row in Settings › Note style, and read as before with the default AIM report.
 - **Renamed.** "Writing tone" is now "voice", and "content template" is now "note structure".
 - **The built-in Taiwan travel sample and the five-step tour are gone.** A fresh install opens a blank mind map; maps you already copied out of the sample work as before. AIM research maps cannot be shared yet.
 
@@ -67,6 +68,7 @@ Copies, previews and AI runs now behave the way you expect. Copy a topic into an
 ### Known issues
 
 - Radial, fishbone and timeline layouts do not draw summary brackets yet, and text nodes wait for the next Auto layout in a few cases.
+- Only the right and left layouts make room for a resized card; other layouts may overlap it, and AI Next Step maps keep the standard size.
 
 ## [0.28.0] - 2026-11-01
 

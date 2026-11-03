@@ -29613,7 +29613,6 @@ var MapChatPanel = class {
     /** The visible note the user took off the chip; it stays off until another note is visible. */
     __publicField(this, "dismissedNote", null);
     __publicField(this, "noteChip", null);
-    /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
     /** Set when the usage notice closed before Stop was shown: the keyboard waits in the message field and moves to Stop when it appears. */
     __publicField(this, "stopWanted", false);
   }
@@ -29652,6 +29651,7 @@ var MapChatPanel = class {
     var _a2, _b2;
     return (_b2 = (_a2 = this.stage) == null ? void 0 : _a2.kind) != null ? _b2 : null;
   }
+  /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
   get awaitingConsent() {
     var _a2;
     return this.busy && ((_a2 = this.stage) == null ? void 0 : _a2.kind) === "consent";

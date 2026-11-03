@@ -405,9 +405,9 @@ export class MapChatPanel {
   get stageKind(): MapChatStage | null {
     return this.stage?.kind ?? null;
   }
-  /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
   /** Set when the usage notice closed before Stop was shown: the keyboard waits in the message field and moves to Stop when it appears. */
   private stopWanted = false;
+  /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
   get awaitingConsent(): boolean {
     return this.busy && this.stage?.kind === "consent";
   }

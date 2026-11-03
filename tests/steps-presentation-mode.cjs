@@ -44,7 +44,9 @@ async function harness() {
   const BaseModal = dom.makeModal();
   let recordOnly = false;
   class Modal extends BaseModal { open() { modals.push(this); if (!recordOnly) super.open(); } }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: dom.makeNotice(notices), setTooltip() {} } }, { createFragment: dom.createFragment });
+  // The hover delay (700 ms) can be captured and fired by hand; every other timer is the real one.
+  const hoverTimers = { capture: false, fns: [] };
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: dom.makeNotice(notices), setTooltip() {}, MarkdownRenderer: { render() { return Promise.resolve(); } } } }, { createFragment: dom.createFragment, setTimeout: (fn, ms) => (hoverTimers.capture && ms === 700 ? (hoverTimers.fns.push(fn), 0) : setTimeout(fn, ms)) });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, closeStaleDetails() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
@@ -87,7 +89,7 @@ async function harness() {
   const current = () => view.presentation?.currentId ?? null;
   const spoken = () => view.announcer.text;
   const barText = () => { const bar = view.contentEl.children.flatMap(c => c.children).find(c => c.hasClass('vam-presentation-bar')); return bar; };
-  return { modals, recordModalsOnly: () => { recordOnly = true; }, repo, app, contents, view, plugin, ids, doc, stage, card, press, settle, centred, build, notices, current, spoken, barText, spied, spyKeys, renders: () => renders, saved: () => repo.readMap(MAP) };
+  return { hoverTimers, modals, recordModalsOnly: () => { recordOnly = true; }, repo, app, contents, view, plugin, ids, doc, stage, card, press, settle, centred, build, notices, current, spoken, barText, spied, spyKeys, renders: () => renders, saved: () => repo.readMap(MAP) };
 }
 
 test('42: pure helpers: key table, start position, no-wrap stepping and the neighbour that takes a vanished current', () => {
@@ -379,12 +381,74 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   assert.deepEqual(h.modals, [], 'no dialog opens');
   assert.equal(bytes(), before, 'Map.md is unchanged');
   assert.deepEqual((await h.saved()).nodes.map(n => ({ id: n.id, collapsed: n.collapsed })), mapBefore, 'nothing was folded');
+  assert.equal(h.view.history.canUndo, false, 'undo stays disabled: no tool left an undo step');
+  assert.equal(h.view.history.canRedo, false);
   const count = h.view.map.nodes.length;
   await h.view.addNode(h.view.map.nodes[0], 'from AI', false, false); await h.settle();
   assert.equal(h.view.map.nodes.length, count + 1, 'the internal path (AI write-back) still creates a node during a presentation');
   h.view.exitPresentation();
   click(byClass('root', 'vam-add-child')); await h.settle();
   assert.equal(h.modals.length, 1, 'after leaving, the "+" opens its dialog again');
+});
+
+test('bug bash #05: during a presentation a collapse click leaves no undo step and folds nothing', async () => {
+  const h = await harness();
+  h.recordModalsOnly();
+  const find = (root, pred) => { const out = []; const walk = n => { if (pred(n)) out.push(n); (n.children ?? []).forEach(walk); }; walk(root); return out; };
+  const collapse = find(h.card('root'), n => n.classes?.has('vam-collapse-button'))[0];
+  assert.ok(collapse, 'the root card has a collapse button');
+  assert.equal(h.view.history.canUndo, false, 'nothing to undo before');
+  h.view.selection.setSelected(h.ids.root);
+  h.view.startPresentation();
+  collapse.handlers.get('click')({ stopPropagation() {}, preventDefault() {} }); await h.settle();
+  assert.equal(h.view.history.canUndo, false, 'a presentation is read-only: undo stays disabled');
+  assert.equal(h.view.map.nodes.find(n => n.id === h.ids.root).collapsed, false, 'nothing was folded');
+});
+
+test('bug bash #05: when the current card\'s title changes during a presentation (an AI write-back), the live region reads the new title; a repaint with the same title stays silent', async () => {
+  const h = await harness();
+  h.view.selection.setSelected(h.ids.root);
+  h.view.startPresentation();
+  assert.match(h.spoken(), /Root/, 'starting speaks the current title');
+  h.view.announcer.setText('sentinel');
+  h.view.render();
+  assert.equal(h.spoken(), 'sentinel', 'a repaint with the same title speaks nothing');
+  h.view.notes.get(h.ids.root).title = 'Renamed by AI';
+  h.view.render();
+  assert.match(h.spoken(), /Renamed by AI/, 'the new title is read');
+  assert.match(h.spoken(), /1\/4/, 'with the position');
+  h.view.announcer.setText('sentinel');
+  h.view.render();
+  assert.equal(h.spoken(), 'sentinel', 'and only once');
+  h.view.notes.get(h.ids.alpha).title = 'Other card renamed';
+  h.view.render();
+  assert.equal(h.spoken(), 'sentinel', 'a title change on another card is not read');
+});
+
+// bug bash A #04 (keyboard variant): a preview opened by focusing a card takes the same placement as the hover one.
+test('bug bash #04: the preview a keyboard focus opens clears the card and its tool row, and sits where the hover preview does', async () => {
+  const h = await harness();
+  const canvas = h.view.contentEl.createDiv('vam-canvas');
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, right: 400, bottom: 900, width: 400, height: 900 });
+  canvas.createDiv = cls => { const el = dom.element('div', { cls }); el.style = { setProperty() {} }; canvas.children.push(el); return el; };
+  for (const el of h.view.cardEls.values()) el.classList = { contains: name => el.classes.has(name) };
+  const card = h.card('root'), rect = { left: 100, top: 700, right: 300, bottom: 760 }, tools = { left: 40, top: 670, right: 300, bottom: 706 };
+  card.getBoundingClientRect = () => rect;
+  card.querySelector = selector => (selector === '.vam-node-tools' ? { getBoundingClientRect: () => ({ ...tools, width: 260, height: 36 }) } : null);
+  card.matches = () => true;
+  h.hoverTimers.capture = true;
+  const preview = () => { const el = h.view.hoverCard; return el ? { left: parseFloat(el.style.left), top: parseFloat(el.style.top), right: parseFloat(el.style.left) + parseFloat(el.style.width), bottom: parseFloat(el.style.top) + Math.min(parseFloat(el.style.maxHeight), 900 - 24) } : null; };
+  const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  card.handlers.get('focusin')({ target: card });
+  assert.equal(h.hoverTimers.fns.length, 1, 'focusing the card arms the preview timer');
+  h.hoverTimers.fns.shift()();
+  const byFocus = preview();
+  assert.ok(byFocus, 'the keyboard preview opens');
+  assert.equal(overlap(byFocus, rect), false, 'it does not cover the focused card');
+  assert.equal(overlap(byFocus, tools), false, 'nor its tool row');
+  card.handlers.get('mouseenter')({});
+  h.hoverTimers.fns.shift()();
+  assert.deepEqual(preview(), byFocus, 'the pointer opens it in the same place');
 });
 
 test('bug bash #05: during a presentation double-clicking a card title does not open the rename dialog or write anything', async () => {

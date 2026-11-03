@@ -1688,10 +1688,11 @@ export class VisualAgentMapView extends ItemView {
     const active = this.contentEl.ownerDocument?.activeElement ?? null;
     const lost = !active || active === this.contentEl || !this.contentEl.contains(active);
     if (card && (announce || lost) && active !== card) card.focus({ preventScroll: true });
-    if (announce)
-      this.announcer?.setText(
-        t("ui.presentation_position_0_1_2", index + 1, order.length, this.notes.get(currentId)?.title ?? "")
-      );
+    const title = this.notes.get(currentId)?.title ?? "";
+    // A write-back can rename the current card under the presentation: read the new title, once.
+    if (session.spokenTitle !== undefined && session.spokenTitle !== title) announce = true;
+    session.spokenTitle = title;
+    if (announce) this.announcer?.setText(t("ui.presentation_position_0_1_2", index + 1, order.length, title));
   }
   /**
    * Leaves the presentation. `restore` puts back the viewport (in memory, never saved), the selection and the focus;
@@ -11117,16 +11118,22 @@ export class VisualAgentMapView extends ItemView {
     const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
     const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
     // The first side of the card that clears it (right, left, below, above); with none, the preview is not shown at all.
-    const spot = placeHoverPreview(
-      host,
-      {
-        left: rect.left - host.left,
-        top: rect.top - host.top,
-        right: rect.right - host.left,
-        bottom: rect.bottom - host.top
-      },
-      { width, height: visibleHeight }
-    );
+    const local = (box: DOMRect): { left: number; top: number; right: number; bottom: number } => ({
+      left: box.left - host.left,
+      top: box.top - host.top,
+      right: box.right - host.left,
+      bottom: box.bottom - host.top
+    });
+    // The hovered card's own tool row stays uncovered; so do the tools and resize handles of a selected card beside it.
+    const tools = card.querySelector<HTMLElement>(".vam-node-tools")?.getBoundingClientRect();
+    const selected = [...this.cardEls.values()]
+      .filter(other => other !== card && other.classList.contains("is-selected"))
+      .flatMap(other => [other, other.querySelector<HTMLElement>(".vam-node-tools")])
+      .flatMap(el => (el ? [local(el.getBoundingClientRect())] : []));
+    const spot = placeHoverPreview(host, local(rect), { width, height: visibleHeight }, 12, {
+      keepClear: tools && tools.width > 0 ? [local(tools)] : [],
+      avoid: selected
+    });
     if (!spot) {
       preview.remove();
       this.hoverCard = null;

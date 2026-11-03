@@ -25,6 +25,8 @@ export interface PresentationState {
   multiSelected: string[];
   returnNodeId: string | null;
   returnEl: HTMLElement | null;
+  /** The title the live region last read for the current card; a different one (an AI write-back) is read again. */
+  spokenTitle?: string;
 }
 
 export type PresentationMove =

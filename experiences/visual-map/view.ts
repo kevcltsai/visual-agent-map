@@ -8595,6 +8595,25 @@ export class VisualAgentMapView extends ItemView {
     const win = window;
     const computed = (el: Element, pseudo?: string): CSSStyleDeclaration => win.getComputedStyle(el, pseudo);
     const colorOf = (value: unknown): string | undefined => normalizeCssColor(value) || undefined;
+    // The export shows the saved style: a selection or drag highlight (it switches the border colour) is taken off while
+    // the box is measured and put back at once, so the card on screen keeps showing it.
+    const transient = ["is-selected", "is-cut", "is-drop-target", "is-marquee-hit", "is-marquee-remove"];
+    const savedLook = (
+      el: HTMLElement
+    ): { backgroundColor: string; borderTopColor: string; borderTopWidth: string } => {
+      const on = transient.filter(name => el.hasClass(name));
+      if (on.length) el.removeClass(...on);
+      try {
+        const look = computed(el);
+        return {
+          backgroundColor: look.backgroundColor,
+          borderTopColor: look.borderTopColor,
+          borderTopWidth: look.borderTopWidth
+        };
+      } finally {
+        if (on.length) el.addClass(...on);
+      }
+    };
     let embedded = 0;
     const loaded = new Map<string, string | null>();
     const imageHref = async (path: string): Promise<string | null | false> => {
@@ -8623,7 +8642,7 @@ export class VisualAgentMapView extends ItemView {
       if (!node) continue;
       const box = boxOf(card);
       grow(box.x, box.y, box.width, box.height);
-      const style = computed(card);
+      const style = savedLook(card);
       const titleEl = card.querySelector<HTMLElement>(".vam-card-title");
       const title = (titleEl?.textContent ?? this.notes.get(id)?.title ?? "").trim();
       const item: SceneCard = {
@@ -8672,7 +8691,7 @@ export class VisualAgentMapView extends ItemView {
     for (const el of this.textEls.values()) {
       const box = boxOf(el);
       grow(box.x, box.y, box.width, box.height);
-      const style = computed(el);
+      const style = savedLook(el);
       const body = el.querySelector<HTMLElement>(".vam-text-node-body");
       cards.push({
         x: box.x,

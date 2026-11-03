@@ -385,6 +385,27 @@ test('tree-text-node: a text node is exported as a card with its text escaped, a
   assert.ok(got.scene.cards.some(c => c.x === 600 && c.y === 40), 'the text node box is in the scene');
 });
 
+test('Bug bash E #22: a selected card and a selected text block export the stroke of their saved style, and stay selected on screen afterwards', async () => {
+  const h = await harness();
+  const SELECTED = 'rgb(152, 115, 247)', SAVED = 'rgb(204, 204, 204)';
+  // the computed border follows the class like styles.css: .is-selected switches border-color to the accent
+  const follow = (el, fill) => Object.defineProperty(el, 'computed', { configurable: true, get: () => style({ backgroundColor: fill, borderTopColor: el.hasClass('is-selected') ? SELECTED : SAVED }) });
+  const rootCard = h.view.cardEls.get(h.root.id);
+  follow(rootCard, 'rgb(255, 255, 255)');
+  rootCard.addClass('is-selected');
+  const el = element('div', 'vam-text-node is-selected');
+  Object.assign(el, { offsetLeft: 600, offsetTop: 40, offsetWidth: 300, offsetHeight: 50 });
+  follow(el, 'rgb(255, 255, 255)');
+  const body = el.createDiv('vam-text-node-body');
+  body.text = 'note'; body.computed = style({ color: 'rgb(34, 34, 34)' });
+  h.view.textEls = new Map([['t1', el]]);
+  const got = await h.view.collectExportScene(() => true);
+  assert.equal(got.scene.cards.map(c => c.stroke).join('|'), [SAVED, SAVED, SAVED].join('|'), 'selected cards, plain card and text block all carry the saved stroke');
+  assert.equal(rootCard.hasClass('is-selected'), true, 'the selection is still shown on screen');
+  assert.equal(el.hasClass('is-selected'), true);
+  assert.doesNotMatch(ex.buildMapSvg(got.scene), /152, 115, 247/);
+});
+
 test('canvas-text-node: a free text link path is exported as a dashed edge, other edges stay solid', async () => {
   const h = await harness();
   h.view.edgesEl.children.push(h.path('M 10 10 L 90 90', { stroke: 'rgb(100, 100, 100)', display: 'inline' }, { class: 'vam-text-link' }));

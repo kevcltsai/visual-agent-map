@@ -107,6 +107,24 @@ interface TurnState {
 
 const CONTROL_TIMEOUT_MS = 30_000;
 const TURN_TIMEOUT_MS = 3 * 60 * 1000;
+/**
+ * The message for a turn that ended without completing. A real error message wins; otherwise the status is shown in the
+ * interface language (failed, interrupted) and any other status is passed through unchanged.
+ */
+export function codexTurnFailureMessage(
+  turn: { status?: unknown; error?: { message?: unknown } | null } | undefined,
+  translate: typeof t = t
+): string {
+  if (typeof turn?.error?.message === "string") return turn.error.message;
+  const status = turn?.status;
+  const shown =
+    status === "interrupted"
+      ? translate("ui.codex_status_interrupted")
+      : typeof status === "string" && status !== "failed"
+        ? status
+        : translate("ui.failed");
+  return translate("ui.codex_turn_0", shown);
+}
 function describeFailure(failure: unknown): string {
   if (typeof failure === "string") return failure;
   const message = (failure as { message?: unknown } | null)?.message;
@@ -585,14 +603,7 @@ export class CodexAppServerRuntime {
             ? [...state.visibleMessages.values()].join("\n\n").trim() || state.messages.at(-1)?.trim() || ""
             : state.messages.at(-1)?.trim() || ""
         );
-      else
-        state.reject(
-          new Error(
-            typeof turn?.error?.message === "string"
-              ? turn.error.message
-              : t("ui.codex_turn_0", typeof turn?.status === "string" ? turn.status : t("ui.failed"))
-          )
-        );
+      else state.reject(new Error(codexTurnFailureMessage(turn)));
     }
   }
 

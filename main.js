@@ -561,6 +561,7 @@ var en = {
   "ui.codex_app_server_returned_an_error": "Codex App Server returned an error",
   "ui.codex_turn_0": "Codex turn {0}",
   "ui.failed": "failed",
+  "ui.codex_status_interrupted": "interrupted",
   "ui.codex_app_server_0_did_not_respond_within_1_seconds": "Codex App Server {0} did not respond within {1} seconds",
   "ui.codex_app_server_has_not_started": "Codex App Server has not started",
   "ui.new_topic_name": "New topic name",
@@ -733,6 +734,8 @@ var en = {
   "ui.new_mind_map_from_sample": "New mind map",
   "ui.undo": "Undo",
   "ui.redo": "Redo",
+  "ui.undo_0": "Undo: {0}",
+  "ui.redo_0": "Redo: {0}",
   "ui.topic": "\uFF0B Topic",
   "ui.organize": "Organize notes and folders",
   "ui.zoom_out": "Zoom out",
@@ -2931,8 +2934,9 @@ var zhCN = {
   "ui.unknown": "\u672A\u77E5",
   "ui.could_not_parse_codex_app_server_response_0": "Codex App Server \u54CD\u5E94\u65E0\u6CD5\u89E3\u6790\uFF1A{0}",
   "ui.codex_app_server_returned_an_error": "Codex App Server \u8FD4\u56DE\u9519\u8BEF",
-  "ui.codex_turn_0": "Codex turn {0}",
+  "ui.codex_turn_0": "Codex \u56DE\u5408\u672A\u5B8C\u6210\uFF1A{0}",
   "ui.failed": "\u5931\u8D25",
+  "ui.codex_status_interrupted": "\u5DF2\u4E2D\u65AD",
   "ui.codex_app_server_0_did_not_respond_within_1_seconds": "Codex App Server {0} \u5728 {1} \u79D2\u5185\u6CA1\u6709\u54CD\u5E94",
   "ui.codex_app_server_has_not_started": "Codex App Server \u5C1A\u672A\u542F\u52A8",
   "ui.new_topic_name": "\u65B0\u8BAE\u9898\u540D\u79F0",
@@ -3035,8 +3039,8 @@ var zhCN = {
   "ui.merge_dropped_same_pair_0": "\u5DF2\u79FB\u9664 {0} \u6761\u91CD\u590D\u7684\u5173\u7CFB\uFF08\u540C\u4E00\u5BF9\u8BAE\u9898\u53EA\u4FDD\u7559\u4E00\u6761\uFF09",
   "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
   "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
-  "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
-  "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
+  "ui.collapse_levels": "\u6298\u53E0\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
+  "ui.collapse_all": "\u5168\u90E8\u6298\u53E0",
   "ui.expand_all": "\u5168\u90E8\u5C55\u5F00",
   "ui.expand_to_level_0": "\u5C55\u5F00\u5230\u7B2C {0} \u5C42",
   "ui.ai_explore": "AI \u63A2\u7D22",
@@ -3105,6 +3109,8 @@ var zhCN = {
   "ui.new_mind_map_from_sample": "\u65B0\u7684\u5FC3\u667A\u56FE",
   "ui.undo": "\u590D\u539F",
   "ui.redo": "\u91CD\u505A",
+  "ui.undo_0": "\u590D\u539F\uFF1A{0}",
+  "ui.redo_0": "\u91CD\u505A\uFF1A{0}",
   "ui.topic": "\uFF0B \u8BAE\u9898",
   "ui.organize": "\u6574\u7406\u7B14\u8BB0\u4E0E\u6587\u4EF6\u5939",
   "ui.zoom_out": "\u7F29\u5C0F",
@@ -3123,12 +3129,12 @@ var zhCN = {
   "ui.presentation_first": "\u5DF2\u662F\u7B2C\u4E00\u4E2A\u8BAE\u9898",
   "ui.presentation_last": "\u5DF2\u662F\u6700\u540E\u4E00\u4E2A\u8BAE\u9898",
   "ui.presentation_exited": "\u5DF2\u9000\u51FA\u6F14\u793A",
-  "ui.text_node_add": "\u65B0\u589E\u6587\u5B57",
-  "ui.text_node_add_command": "\u65B0\u589E\u6587\u5B57\u8282\u70B9\uFF08\u9009\u4E86\u8BAE\u9898\u5C31\u6302\u5728\u8BAE\u9898\u4E0B\uFF0C\u6CA1\u9009\u5C31\u653E\u5728\u753B\u5E03\u4E0A\uFF09",
+  "ui.text_node_add": "\u6DFB\u52A0\u6587\u5B57",
+  "ui.text_node_add_command": "\u6DFB\u52A0\u6587\u5B57\u8282\u70B9\uFF08\u9009\u4E86\u8BAE\u9898\u5C31\u6302\u5728\u8BAE\u9898\u4E0B\uFF0C\u6CA1\u9009\u5C31\u653E\u5728\u753B\u5E03\u4E0A\uFF09",
   "ui.text_node_label": "\u6587\u5B57\u8282\u70B9\uFF1A{0}",
   "ui.text_nodes_group": "\u6587\u5B57\u8282\u70B9",
   "ui.text_node_edit_label": "\u7F16\u8F91\u6587\u5B57\u8282\u70B9",
-  "ui.text_node_added": "\u5DF2\u65B0\u589E\u6587\u5B57\u8282\u70B9\u3002",
+  "ui.text_node_added": "\u5DF2\u6DFB\u52A0\u6587\u5B57\u8282\u70B9\u3002",
   "ui.text_node_removed": "\u5DF2\u5220\u9664\u6587\u5B57\u8282\u70B9\u3002",
   "ui.text_node_promote": "\u8F6C\u6210\u8BAE\u9898\u5361",
   "ui.text_node_promote_label": "\u628A\u8FD9\u4E2A\u6587\u5B57\u8282\u70B9\u8F6C\u6210\u8BAE\u9898\u5361",
@@ -3148,7 +3154,7 @@ var zhCN = {
   "ui.text_link_start_label": "\u628A\u8FD9\u4E2A\u6587\u5B57\u8282\u70B9\u8FDE\u5230\u4E00\u5F20\u5361\u7247",
   "ui.text_link_start": "\u8FDE\u5230\u5361\u7247",
   "ui.text_node_label_linked": "\u6587\u5B57\u8282\u70B9\uFF1A{0}\uFF0C\u8FDE\u5230 {1} \u5F20\u5361\u7247",
-  "ui.text_node_add_here": "\u5728\u6B64\u65B0\u589E\u6587\u5B57\u8282\u70B9",
+  "ui.text_node_add_here": "\u5728\u6B64\u6DFB\u52A0\u6587\u5B57\u8282\u70B9",
   "ui.canvas_images_group": "\u753B\u5E03\u56FE\u7247",
   "ui.canvas_image_label": "\u56FE\u7247\uFF1A{0}",
   "ui.canvas_image_insert": "\u63D2\u5165\u56FE\u7247\u2026",
@@ -3197,7 +3203,7 @@ var zhCN = {
   "ui.export_refused_embedded": "\u5730\u56FE\u4E0A\u7684\u56FE\u7247\u5408\u8BA1\u8D85\u8FC7 50 MB\uFF0C\u65E0\u6CD5\u5BFC\u51FA\u3002",
   "ui.export_empty": "\u6CA1\u6709\u53EF\u5BFC\u51FA\u7684\u5185\u5BB9\u3002",
   "ui.export_failed": "\u5BFC\u51FA\u5931\u8D25\uFF1A{0}",
-  "ui.zoom_level_0_reset": "\u5F53\u524D\u7F29\u653E {0}\uFF0C\u6309\u4E00\u4E0B\u91CD\u8BBE\u4E3A 100%",
+  "ui.zoom_level_0_reset": "\u5F53\u524D\u7F29\u653E {0}\uFF0C\u70B9\u51FB\u91CD\u7F6E\u4E3A 100%",
   "ui.new_map": "\uFF0B \u6DFB\u52A0\u5FC3\u667A\u56FE",
   "ui.researched": "\u5DF2\u7814\u7A76",
   "ui.relevance_core": "\u5FC5\u5B66",
@@ -3366,7 +3372,7 @@ var zhCN = {
   "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709\u8BAE\u9898\u3002\u70B9\u201C\uFF0B \u8BAE\u9898\u201D\u521B\u5EFA\u7B2C\u4E00\u4E2A\u8BAE\u9898\u3002",
   "ui.note_missing": "\u7B14\u8BB0\u4E0D\u5B58\u5728",
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u4FA7\u680F\u6253\u5F00\u8BE6\u60C5",
-  "ui.collapse": "\u6536\u5408",
+  "ui.collapse": "\u6298\u53E0",
   "ui.node_tool_links": "\u7ED3\u6784",
   "ui.node_tool_rename": "\u6539\u540D",
   "ui.node_tool_details": "\u8BE6\u60C5",
@@ -3605,7 +3611,7 @@ var zhCN = {
   "ui.map_chat_do_summary_0": "\u66F4\u65B0\u201C{0}\u201D\u7684\u6458\u8981",
   "ui.map_chat_do_note_0": "\u6539\u5199\u201C{0}\u201D\u7684\u7B14\u8BB0",
   "ui.map_chat_do_move_0_1": "\u628A\u201C{0}\u201D\u79FB\u5230\u201C{1}\u201D\u5E95\u4E0B",
-  "ui.map_chat_do_delete_0": "\u628A\u201C{0}\u201D\u79FB\u5230\u672A\u5206\u914D",
+  "ui.map_chat_do_delete_0": "\u628A\u201C{0}\u201D\u79FB\u5230\u672A\u5F52\u7C7B",
   "ui.map_chat_do_edit_md_0": "\u4FEE\u6539 {0}",
   "ui.map_chat_do_create_md_0": "\u521B\u5EFA {0}",
   "ui.map_chat_do_select_0": "\u9009\u53D6 {0} \u4E2A\u8BAE\u9898",
@@ -3619,7 +3625,7 @@ var zhCN = {
   "ui.map_chat_do_merge_0": "\u628A\u9009\u53D6\u7684\u8BAE\u9898\u5408\u5E76\u6210\u201C{0}\u201D",
   "ui.map_chat_do_create_map_0": "\u5EFA\u7ACB\u65B0\u5730\u56FE\u201C{0}\u201D",
   "ui.map_chat_do_open_map_0": "\u5207\u6362\u5230\u5730\u56FE\u201C{0}\u201D",
-  "ui.map_chat_do_collapse_0": "\u6536\u5408\u201C{0}\u201D",
+  "ui.map_chat_do_collapse_0": "\u6298\u53E0\u201C{0}\u201D",
   "ui.map_chat_do_expand_topic_0": "\u5C55\u5F00\u201C{0}\u201D",
   "ui.map_chat_do_auto_layout": "\u81EA\u52A8\u6392\u7248\u6574\u5F20\u5730\u56FE",
   "ui.map_chat_do_focus_0": "\u628A\u753B\u9762\u79FB\u5230\u201C{0}\u201D",
@@ -5303,8 +5309,9 @@ var zhTW = {
   "ui.unknown": "\u672A\u77E5",
   "ui.could_not_parse_codex_app_server_response_0": "Codex App Server \u56DE\u61C9\u7121\u6CD5\u89E3\u6790\uFF1A{0}",
   "ui.codex_app_server_returned_an_error": "Codex App Server \u56DE\u50B3\u932F\u8AA4",
-  "ui.codex_turn_0": "Codex turn {0}",
+  "ui.codex_turn_0": "Codex \u56DE\u5408\u672A\u5B8C\u6210\uFF1A{0}",
   "ui.failed": "\u5931\u6557",
+  "ui.codex_status_interrupted": "\u5DF2\u4E2D\u65B7",
   "ui.codex_app_server_0_did_not_respond_within_1_seconds": "Codex App Server {0} \u5728 {1} \u79D2\u5167\u6C92\u6709\u56DE\u61C9",
   "ui.codex_app_server_has_not_started": "Codex App Server \u5C1A\u672A\u555F\u52D5",
   "ui.new_topic_name": "\u65B0\u8B70\u984C\u540D\u7A31",
@@ -5477,6 +5484,8 @@ var zhTW = {
   "ui.new_mind_map_from_sample": "\u65B0\u7684\u5FC3\u667A\u5716",
   "ui.undo": "\u5FA9\u539F",
   "ui.redo": "\u91CD\u505A",
+  "ui.undo_0": "\u5FA9\u539F\uFF1A{0}",
+  "ui.redo_0": "\u91CD\u505A\uFF1A{0}",
   "ui.topic": "\uFF0B \u8B70\u984C",
   "ui.organize": "\u6574\u7406\u7B46\u8A18\u8207\u8CC7\u6599\u593E",
   "ui.zoom_out": "\u7E2E\u5C0F",
@@ -5977,7 +5986,7 @@ var zhTW = {
   "ui.map_chat_do_summary_0": "\u66F4\u65B0\u300C{0}\u300D\u7684\u6458\u8981",
   "ui.map_chat_do_note_0": "\u6539\u5BEB\u300C{0}\u300D\u7684\u7B46\u8A18",
   "ui.map_chat_do_move_0_1": "\u628A\u300C{0}\u300D\u79FB\u5230\u300C{1}\u300D\u5E95\u4E0B",
-  "ui.map_chat_do_delete_0": "\u628A\u300C{0}\u300D\u79FB\u5230\u672A\u5206\u914D",
+  "ui.map_chat_do_delete_0": "\u628A\u300C{0}\u300D\u79FB\u5230\u672A\u6B78\u985E",
   "ui.map_chat_do_edit_md_0": "\u4FEE\u6539 {0}",
   "ui.map_chat_do_create_md_0": "\u5EFA\u7ACB {0}",
   "ui.map_chat_do_select_0": "\u9078\u53D6 {0} \u500B\u8B70\u984C",
@@ -31295,6 +31304,13 @@ function searchBudgetExhaustedMessage(language2 = getUiLanguage()) {
 var spawnProcess = import_node_child_process.spawn;
 var CONTROL_TIMEOUT_MS = 3e4;
 var TURN_TIMEOUT_MS = 3 * 60 * 1e3;
+function codexTurnFailureMessage(turn, translate2 = t) {
+  var _a2;
+  if (typeof ((_a2 = turn == null ? void 0 : turn.error) == null ? void 0 : _a2.message) === "string") return turn.error.message;
+  const status = turn == null ? void 0 : turn.status;
+  const shown = status === "interrupted" ? translate2("ui.codex_status_interrupted") : typeof status === "string" && status !== "failed" ? status : translate2("ui.failed");
+  return translate2("ui.codex_turn_0", shown);
+}
 function describeFailure(failure) {
   if (typeof failure === "string") return failure;
   const message = failure == null ? void 0 : failure.message;
@@ -31628,7 +31644,7 @@ var CodexAppServerRuntime = class {
     }
   }
   handle(message) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     if ("id" in message && "method" in message) {
       this.respondToServerRequest(message);
       return;
@@ -31721,12 +31737,7 @@ var CodexAppServerRuntime = class {
         state.resolve(
           state.onText && !state.resolveLast ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "" : ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || ""
         );
-      else
-        state.reject(
-          new Error(
-            typeof ((_h = turn == null ? void 0 : turn.error) == null ? void 0 : _h.message) === "string" ? turn.error.message : t("ui.codex_turn_0", typeof (turn == null ? void 0 : turn.status) === "string" ? turn.status : t("ui.failed"))
-          )
-        );
+      else state.reject(new Error(codexTurnFailureMessage(turn)));
     }
   }
   reportActivity(state, activity) {
@@ -48311,7 +48322,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   renameNode(node, current) {
     new NameModal(
       this.app,
-      t("ui.new_topic_name"),
+      t("ui.rename_topic"),
       current,
       (name) => this.enqueue(() => this.noteChange(node, { title: name }))
     ).open();
@@ -54726,11 +54737,11 @@ ${request.requirements}` : preset.text,
     };
     if (undo) {
       undo.disabled = !this.history.canUndo;
-      label(undo, ((_c = this.history.undoEntry) == null ? void 0 : _c.label) ? `${t("ui.undo")}: ${this.history.undoEntry.label}` : t("ui.undo"));
+      label(undo, ((_c = this.history.undoEntry) == null ? void 0 : _c.label) ? t("ui.undo_0", this.history.undoEntry.label) : t("ui.undo"));
     }
     if (redo) {
       redo.disabled = !this.history.canRedo;
-      label(redo, ((_d = this.history.redoEntry) == null ? void 0 : _d.label) ? `${t("ui.redo")}: ${this.history.redoEntry.label}` : t("ui.redo"));
+      label(redo, ((_d = this.history.redoEntry) == null ? void 0 : _d.label) ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
     }
   }
   async synchronize() {
@@ -56019,7 +56030,7 @@ ${request.requirements}` : preset.text,
             t("ui.node_tool_rename"),
             () => new NameModal(
               this.app,
-              t("ui.new_topic_name"),
+              t("ui.rename_topic"),
               note.title,
               (title2) => this.enqueue(() => this.noteChange(node, { title: title2 }))
             ).open()

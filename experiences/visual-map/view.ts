@@ -1711,7 +1711,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   private renameNode(node: MapNode, current: string): void {
-    new NameModal(this.app, t("ui.new_topic_name"), current, name =>
+    new NameModal(this.app, t("ui.rename_topic"), current, name =>
       this.enqueue(() => this.noteChange(node, { title: name }))
     ).open();
   }
@@ -8647,11 +8647,11 @@ export class VisualAgentMapView extends ItemView {
     };
     if (undo) {
       undo.disabled = !this.history.canUndo;
-      label(undo, this.history.undoEntry?.label ? `${t("ui.undo")}: ${this.history.undoEntry.label}` : t("ui.undo"));
+      label(undo, this.history.undoEntry?.label ? t("ui.undo_0", this.history.undoEntry.label) : t("ui.undo"));
     }
     if (redo) {
       redo.disabled = !this.history.canRedo;
-      label(redo, this.history.redoEntry?.label ? `${t("ui.redo")}: ${this.history.redoEntry.label}` : t("ui.redo"));
+      label(redo, this.history.redoEntry?.label ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
     }
   }
   async synchronize(): Promise<void> {
@@ -10074,7 +10074,7 @@ export class VisualAgentMapView extends ItemView {
         structure.setAttr("aria-label", t("ui.structure_and_links"));
         if (note)
           this.button(tools, t("ui.node_tool_rename"), () =>
-            new NameModal(this.app, t("ui.new_topic_name"), note.title, title =>
+            new NameModal(this.app, t("ui.rename_topic"), note.title, title =>
               this.enqueue(() => this.noteChange(node, { title }))
             ).open()
           ).addClass("vam-node-tool", "vam-rename-tool");

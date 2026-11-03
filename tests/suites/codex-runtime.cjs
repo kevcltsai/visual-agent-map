@@ -612,3 +612,14 @@ integrationTest('Codex App Server with onText resolves to every message joined, 
   assert.equal(last.texts.at(-1), `I will answer now.\n\n${final}`, 'the stream still carries every visible message');
   assert.equal((await run({})).raw, `I will answer now.\n\n${final}`, 'without the control the result is unchanged: every message joined');
 });
+
+test('bug bash #32: a Codex turn that ends without an error message reports a translated status, and unknown statuses pass through', () => {
+  const { codexTurnFailureMessage } = load('ai/runtime/codex-app-server.ts');
+  const { translate } = load('i18n.ts');
+  const zh = (key, ...values) => translate('zh-TW', key, ...values);
+  assert.equal(codexTurnFailureMessage({ status: 'failed' }, zh), 'Codex 回合未完成：失敗');
+  assert.equal(codexTurnFailureMessage({ status: 'interrupted' }, zh), 'Codex 回合未完成：已中斷');
+  assert.equal(codexTurnFailureMessage({ status: 'weird_new_status' }, zh), 'Codex 回合未完成：weird_new_status', 'an unknown status is kept as is');
+  assert.equal(codexTurnFailureMessage(undefined, zh), 'Codex 回合未完成：失敗');
+  assert.equal(codexTurnFailureMessage({ status: 'failed', error: { message: 'boom' } }, zh), 'boom', 'a real error message still wins');
+});

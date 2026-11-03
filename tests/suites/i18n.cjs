@@ -290,3 +290,35 @@ test('bug bash #31: the root-topic action label exists in all three languages an
   assert.equal(translate('zh-TW', 'ui.map_chat_do_add_root_0'), '新增根議題「{0}」');
   assert.equal(translate('zh-CN', 'ui.map_chat_do_add_root_0'), '新增根议题“{0}”');
 });
+
+test('bug bash #30: the delete-to-Unassigned label says 未歸類 / 未归类, never 未分配', () => {
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-TW', 'ui.map_chat_do_delete_0', 'X'), '把「X」移到未歸類');
+  assert.equal(translate('zh-CN', 'ui.map_chat_do_delete_0', 'X'), '把“X”移到未归类');
+  assert.equal(translate('en', 'ui.map_chat_do_delete_0', 'X'), 'Move “X” to Unassigned');
+});
+test('bug bash #32: the Codex turn labels are translated and keep the status', () => {
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-TW', 'ui.codex_turn_0', 'S'), 'Codex 回合未完成：S');
+  assert.equal(translate('zh-CN', 'ui.codex_turn_0', 'S'), 'Codex 回合未完成：S');
+  assert.equal(translate('en', 'ui.codex_turn_0', 'S'), 'Codex turn S');
+  assert.equal(translate('en', 'ui.codex_status_interrupted'), 'interrupted');
+  assert.equal(translate('zh-TW', 'ui.codex_status_interrupted'), '已中斷');
+  assert.equal(translate('zh-CN', 'ui.codex_status_interrupted'), '已中断');
+});
+test('bug bash #33: ui.undo_0 and ui.redo_0 use a full-width colon in Chinese', () => {
+  const { translate } = load('i18n.ts');
+  assert.deepEqual([translate('en', 'ui.undo_0', 'A'), translate('en', 'ui.redo_0', 'A')], ['Undo: A', 'Redo: A']);
+  assert.deepEqual([translate('zh-TW', 'ui.undo_0', 'A'), translate('zh-TW', 'ui.redo_0', 'A')], ['復原：A', '重做：A']);
+  assert.deepEqual([translate('zh-CN', 'ui.undo_0', 'A'), translate('zh-CN', 'ui.redo_0', 'A')], ['复原：A', '重做：A']);
+});
+test('bug bash #34: zh-CN uses mainland wording (折叠, 点击, 添加文字), not 收合 or 按一下 or 新增文字', () => {
+  const source = fs.readFileSync(path.join(root, 'i18n/zh-CN.ts'), 'utf8');
+  for (const word of ['收合', '按一下', '新增文字']) assert.ok(!source.includes(word), `zh-CN contains ${word}`);
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-CN', 'ui.text_node_add'), '添加文字');
+  assert.equal(translate('zh-CN', 'ui.zoom_level_0_reset', '80%'), '当前缩放 80%，点击重置为 100%');
+  assert.equal(translate('zh-CN', 'ui.collapse'), '折叠');
+  assert.equal(translate('zh-CN', 'ui.collapse_all'), '全部折叠');
+  assert.equal(translate('zh-CN', 'ui.map_chat_do_collapse_0', 'A'), '折叠“A”');
+});

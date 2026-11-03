@@ -4699,3 +4699,38 @@ integrationTest('bug bash #31: a chat add_child without a parent is labelled as 
   for (const empty of [undefined, null, '']) assert.equal(h.view.chatActionLabel(add(empty)), 'Add root topic “T”', `parentId=${String(empty)}`);
   assert.equal(h.view.chatActionLabel(add(h.ids.a)), 'Add subtopic “T”');
 });
+
+// Bug bash C Packet 2 (#27, #33): the real view in a real language switch (a fresh main.ts bundle, so the language is its own).
+async function languageView(language) {
+  const modals = [];
+  class Modal { constructor(app) { this.app = app; } open() { modals.push(this); } close() {} }
+  const { default: Plugin, VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal } });
+  const plugin = new Plugin();
+  plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' };
+  plugin.saveData = async () => {};
+  plugin.repo = { settings: plugin.settings };
+  plugin.views = () => []; plugin.coffeeViews = () => []; plugin.refreshLocalizedEntrypoints = () => {}; plugin.settingTab = { update() {}, refreshAfterLanguageChange() {} };
+  await plugin.changeLanguage(language);
+  const view = new VisualAgentMapView({ app: {} }, plugin);
+  view.app = {};
+  return { view, modals };
+}
+test('bug bash #27: Rename opens a dialog titled "Rename", not the new-topic title', async () => {
+  const { view, modals } = await languageView('zh-TW');
+  view.renameNode({ id: 'n1', title: 'Old' }, 'Old');
+  assert.ok(modals.length === 1, 'one dialog opened');
+  assert.equal(modals[0].titleText, '重新命名');
+});
+for (const [language, mark, undo, redo] of [['zh-TW', '標記', '復原：標記', '重做：標記'], ['zh-CN', '标记', '复原：标记', '重做：标记'], ['en', 'Mark', 'Undo: Mark', 'Redo: Mark']]) test(`bug bash #33: the undo and redo labels use the ${language} colon template and keep the bare word without a label`, async () => {
+  const { view } = await languageView(language);
+  const buttons = { undo: { dataset: { icon: 'x' }, attrs: {}, setAttr(name, value) { this.attrs[name] = value; } }, redo: { dataset: { icon: 'x' }, attrs: {}, setAttr(name, value) { this.attrs[name] = value; } } };
+  view.contentEl = { querySelector: selector => buttons[selector.match(/history=(\w+)/)[1]] };
+  const labelOf = base => ({ label: base ? mark : undefined, snapshot: true, undo: async () => {}, redo: async () => {} });
+  const word = { 'zh-TW': ['復原', '重做'], 'zh-CN': ['复原', '重做'], en: ['Undo', 'Redo'] }[language];
+  view.history.push(labelOf(false)); view.updateHistoryButtons();
+  assert.equal(buttons.undo.attrs['aria-label'], word[0], 'no label: the bare word');
+  view.history.push(labelOf(true)); view.updateHistoryButtons();
+  assert.equal(buttons.undo.attrs['aria-label'], undo);
+  view.history.undo(); view.updateHistoryButtons();
+  assert.equal(buttons.redo.attrs['aria-label'], redo);
+});

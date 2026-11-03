@@ -16,6 +16,8 @@ export class OutlineView extends ItemView {
   private markers = new Map<string, TopicMarker[]>();
   private links = new Map<string, string[]>();
   private collapsed = new Set<string>();
+  /** The fold button of each row in the tree as last drawn, so focus can follow a rebuild. */
+  private toggleEls = new Map<string, HTMLElement>();
   private query = "";
   private activePath = "";
   private coffee: CoffeeNavigationSnapshot | null = null;
@@ -168,6 +170,7 @@ export class OutlineView extends ItemView {
   }
   private renderTree(): void {
     this.contentEl.querySelector(".vam-outline-tree")?.remove();
+    this.toggleEls.clear();
     if (!this.map) return;
     const tree = this.contentEl.createDiv("vam-outline-tree");
     const children = new Map<string | null, MapNode[]>();
@@ -191,10 +194,14 @@ export class OutlineView extends ItemView {
         toggle.disabled = !!query;
         toggle.setAttr("aria-label", !query && this.collapsed.has(node.id) ? t("ui.expand") : t("ui.collapse"));
         toggle.setAttr("aria-expanded", String(!!query || !this.collapsed.has(node.id)));
+        this.toggleEls.set(node.id, toggle);
         toggle.addEventListener("click", () => {
+          // The tree is rebuilt: a toggle that had focus (Space on the keyboard) keeps it on the new button of the same row.
+          const hadFocus = (this.contentEl.ownerDocument as Document | undefined)?.activeElement === toggle;
           if (this.collapsed.has(node.id)) this.collapsed.delete(node.id);
           else this.collapsed.add(node.id);
           this.renderTree();
+          if (hadFocus) this.toggleEls.get(node.id)?.focus();
         });
       } else row.createSpan("vam-outline-spacer");
       const title = this.titles.get(node.id) ?? node.path.split("/").pop() ?? node.path;

@@ -762,6 +762,7 @@ var en = {
   "ui.text_node_promote_label": "Turn this text node into a topic card",
   "ui.text_node_promoted": "Text node turned into a topic card.",
   "ui.text_node_select_topic": "Select a topic first.",
+  "ui.text_node_add_multiselect": "Finish selecting topics first, then add a text node.",
   "ui.text_node_placeholder": "Text",
   "ui.text_link_full": "A text node can connect to at most {0} cards.",
   "ui.text_link_exists": "Already connected.",
@@ -3132,6 +3133,7 @@ var zhCN = {
   "ui.text_node_promote_label": "\u628A\u8FD9\u4E2A\u6587\u5B57\u8282\u70B9\u8F6C\u6210\u8BAE\u9898\u5361",
   "ui.text_node_promoted": "\u5DF2\u628A\u6587\u5B57\u8282\u70B9\u8F6C\u6210\u8BAE\u9898\u5361\u3002",
   "ui.text_node_select_topic": "\u8BF7\u5148\u9009\u4E2D\u4E00\u4E2A\u8BAE\u9898\u3002",
+  "ui.text_node_add_multiselect": "\u8BF7\u5148\u7ED3\u675F\u591A\u9009\u6A21\u5F0F\uFF0C\u518D\u65B0\u589E\u6587\u5B57\u8282\u70B9\u3002",
   "ui.text_node_placeholder": "\u6587\u5B57",
   "ui.text_link_full": "\u4E00\u4E2A\u6587\u5B57\u8282\u70B9\u6700\u591A\u8FDE\u5230 {0} \u5F20\u5361\u7247\u3002",
   "ui.text_link_exists": "\u5DF2\u8FDE\u7EBF\u3002",
@@ -5502,6 +5504,7 @@ var zhTW = {
   "ui.text_node_promote_label": "\u628A\u9019\u500B\u6587\u5B57\u5340\u584A\u8F49\u6210\u8B70\u984C\u5361",
   "ui.text_node_promoted": "\u5DF2\u628A\u6587\u5B57\u5340\u584A\u8F49\u6210\u8B70\u984C\u5361\u3002",
   "ui.text_node_select_topic": "\u8ACB\u5148\u9078\u53D6\u4E00\u500B\u8B70\u984C\u3002",
+  "ui.text_node_add_multiselect": "\u8ACB\u5148\u7D50\u675F\u591A\u9078\u6A21\u5F0F\uFF0C\u518D\u65B0\u589E\u6587\u5B57\u5340\u584A\u3002",
   "ui.text_node_placeholder": "\u6587\u5B57",
   "ui.text_link_full": "\u4E00\u500B\u6587\u5B57\u5340\u584A\u6700\u591A\u9023\u5230 {0} \u5F35\u5361\u7247\u3002",
   "ui.text_link_exists": "\u5DF2\u9023\u7DDA\u3002",
@@ -17455,6 +17458,45 @@ function mapOutline(nodes, titleOf) {
   };
   for (const root of roots) walk(root, 0);
   return lines.join("\n");
+}
+
+// experiences/visual-map/map-focus.ts
+var KEYED = ["button", "input", "textarea", "select", "[tabindex]"].join(",");
+var keyOf = (el) => {
+  var _a2;
+  return `${el.tagName.toLowerCase()}|${el.getAttribute("aria-label") || el.classList.item(0) || ((_a2 = el.textContent) != null ? _a2 : "").trim()}`;
+};
+function describeFocus(el, root, parentOf) {
+  var _a2;
+  if (!el || el === root || !root.contains(el)) return null;
+  const target = el;
+  const text11 = target.closest(".vam-text-node");
+  if ((text11 == null ? void 0 : text11.dataset.itemId) && root.contains(text11))
+    return { itemId: text11.dataset.itemId, parentId: (_a2 = parentOf(text11.dataset.itemId)) != null ? _a2 : null };
+  const card = target.closest(".vam-node");
+  const scope = card && root.contains(card) && card.dataset.nodeId ? card : root;
+  const nodeId = scope === card ? card.dataset.nodeId : void 0;
+  if (nodeId && target === card) return { nodeId };
+  const key2 = keyOf(target);
+  const same = Array.from(scope.querySelectorAll(KEYED)).filter((peer) => keyOf(peer) === key2);
+  const nth = Math.max(0, same.indexOf(target));
+  return nodeId ? { nodeId, key: key2, nth } : { key: key2, nth };
+}
+function resolveFocus(anchor, root, lookup) {
+  var _a2, _b2, _c, _d, _e;
+  if (anchor.itemId) return (_a2 = lookup.text(anchor.itemId)) != null ? _a2 : null;
+  const card = anchor.nodeId ? lookup.card(anchor.nodeId) : void 0;
+  if (anchor.nodeId && !card) return null;
+  if (!anchor.key) return card != null ? card : null;
+  const scope = card != null ? card : root;
+  const same = Array.from(scope.querySelectorAll(KEYED)).filter((peer) => keyOf(peer) === anchor.key);
+  return (_e = (_d = (_c = same[(_b2 = anchor.nth) != null ? _b2 : 0]) != null ? _c : same[0]) != null ? _d : card) != null ? _e : null;
+}
+function focusIsLost(doc, root) {
+  const active = doc.activeElement;
+  if (!active || active === doc.body || active.tagName === "BODY") return true;
+  if (root.contains(active)) return false;
+  return !active.isConnected;
 }
 
 // experiences/visual-map/map-search.ts
@@ -36070,6 +36112,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     const prefill = (_a2 = this.generator) == null ? void 0 : _a2.prefill;
     if (prefill) this.restoreChoices(prefill.inputs);
     this.restoreResult();
+    this.textarea.focus();
   }
   /** The research choices of a run that started from this window, put back on a reopened one. */
   restoreChoices(inputs) {
@@ -38923,7 +38966,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
   suggestions = suggestions.map(
     (item) => options.rootTitle && item.parentTitle === options.rootTitle ? { ...item, parentTitle: "" } : item
   );
-  const keyOf = (item) => {
+  const keyOf2 = (item) => {
     var _a3;
     return (_a3 = item.key) != null ? _a3 : item.title;
   };
@@ -38942,13 +38985,13 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
   const keyed = suggestions.some((item) => item.key !== void 0);
   const depthFirst = (item) => [
     item,
-    ...suggestions.filter((other) => parentOf(other) === keyOf(item)).flatMap(depthFirst)
+    ...suggestions.filter((other) => parentOf(other) === keyOf2(item)).flatMap(depthFirst)
   ];
   const ordered = [
     ...new Set(
       keyed ? [...roots.flatMap(depthFirst), ...suggestions] : [
-        ...roots.flatMap((root) => [root, ...suggestions.filter((item) => parentOf(item) === keyOf(root))]),
-        ...suggestions.filter((item) => parentOf(item) && !roots.some((root) => keyOf(root) === parentOf(item)))
+        ...roots.flatMap((root) => [root, ...suggestions.filter((item) => parentOf(item) === keyOf2(root))]),
+        ...suggestions.filter((item) => parentOf(item) && !roots.some((root) => keyOf2(root) === parentOf(item)))
       ]
     )
   ];
@@ -38956,7 +38999,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     var _a3;
     let depth = 0;
     for (let up = parentOf(item); up && depth < 6; depth++)
-      up = parentOf((_a3 = suggestions.find((other) => keyOf(other) === up)) != null ? _a3 : { title: "", task: "", contribution: "" });
+      up = parentOf((_a3 = suggestions.find((other) => keyOf2(other) === up)) != null ? _a3 : { title: "", task: "", contribution: "" });
     return depth;
   };
   const count = () => rows.filter((row) => row.check.checked).length;
@@ -39006,19 +39049,19 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       const uncheckChildren = (key2) => rows.forEach((other) => {
         if (parentOf(other.item) === key2 && other.check.checked) {
           other.check.checked = false;
-          uncheckChildren(keyOf(other.item));
+          uncheckChildren(keyOf2(other.item));
         }
       });
       if (check.checked && parentOf(item)) {
         let parentKey = parentOf(item);
         while (parentKey) {
-          const parent2 = rows.find((other) => keyOf(other.item) === parentKey);
+          const parent2 = rows.find((other) => keyOf2(other.item) === parentKey);
           if (!parent2) break;
           parent2.check.checked = true;
           parentKey = parentOf(parent2.item);
         }
       }
-      if (!check.checked) uncheckChildren(keyOf(item));
+      if (!check.checked) uncheckChildren(keyOf2(item));
       update();
     });
   }
@@ -39033,7 +39076,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     selected: () => {
       const selected = rows.filter((row) => row.check.checked && row.title.value.trim());
       if (!selected.length) return t("ui.select_at_least_one_subtopic");
-      const renamed = new Map(selected.map((row) => [keyOf(row.item), row.title.value.trim()]));
+      const renamed = new Map(selected.map((row) => [keyOf2(row.item), row.title.value.trim()]));
       const names3 = selected.filter((row) => !parentOf(row.item)).map((row) => row.title.value.trim());
       if (new Set(names3).size !== names3.length) return t("ui.first_level_topic_names_must_be_unique");
       if (selected.some((row) => parentOf(row.item) && !renamed.has(parentOf(row.item))))
@@ -47542,6 +47585,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "renderingCard", false);
     /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
     __publicField(this, "restoringFocus", false);
+    /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
+    __publicField(this, "lastMapFocus", null);
     __publicField(this, "closed", false);
     __publicField(this, "aimViewEpoch", 0);
     __publicField(this, "mapOpenEpoch", 0);
@@ -47740,13 +47785,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.bindClipboard();
     (_n = (_m = this.contentEl).onWindowMigrated) == null ? void 0 : _n.call(_m, () => this.bindClipboard());
     this.registerDomEvent(this.contentEl, "keydown", (event) => this.presentationKey(event), { capture: true });
-    this.registerDomEvent(this.contentEl, "keydown", (event) => {
-      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
-        return;
-      if (event.key === "Escape") {
-        this.applySelectionChange(this.selection.escape());
-      }
-    });
+    this.registerDomEvent(this.contentEl, "keydown", (event) => this.onMapKeydown(event));
+    this.registerDomEvent(this.contentEl, "focusin", (event) => this.trackMapFocus(event.target));
     await this.plugin.ready;
     if (this.closed || this.aimViewEpoch !== epoch) return;
     if (!this.path) {
@@ -47772,6 +47812,19 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
           await this.openMap(defaultPath);
         } else this.render();
       }
+    }
+  }
+  onMapKeydown(event) {
+    const target = event.target;
+    if (target == null ? void 0 : target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
+    if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
+      return;
+    if (event.key === "Escape") {
+      const anchor = this.describeMapFocus(target);
+      this.applySelectionChange(this.selection.escape());
+      event.preventDefault();
+      event.stopPropagation();
+      this.restoreMapFocus(anchor);
     }
   }
   /**
@@ -48274,23 +48327,114 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     var _a2, _b2, _c;
     const doc = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument;
     const current = (_b2 = doc == null ? void 0 : doc.activeElement) != null ? _b2 : null;
-    if (!doc || !current || !this.contentEl.contains(current) || ((_c = this.chat) == null ? void 0 : _c.isInput(current))) {
+    if (!doc || !current || !this.contentEl.contains(current) || ((_c = this.chat) == null ? void 0 : _c.isInput(current)) || current.closest(".vam-text-node")) {
       this.render();
       return;
     }
     const focusedContainer = current === this.contentEl;
-    const focusables = "button, input, select, textarea, [tabindex]:not([tabindex='-1'])";
-    const before = Array.from(this.contentEl.querySelectorAll(focusables));
-    const activeIndex = before.indexOf(current);
+    const anchor = this.describeMapFocus(current);
     const active = current;
     const selection = active.tagName === "INPUT" || active.tagName === "TEXTAREA" ? [active.selectionStart, active.selectionEnd] : null;
     this.render();
-    const after = Array.from(this.contentEl.querySelectorAll(focusables));
-    const target = after[activeIndex];
+    const target = anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null;
     if (focusedContainer) this.contentEl.focus();
-    else target == null ? void 0 : target.focus();
+    else if (target) target.focus();
+    else this.restoreMapFocus(anchor);
     if (selection && ((target == null ? void 0 : target.tagName) === "INPUT" || (target == null ? void 0 : target.tagName) === "TEXTAREA") && selection[0] !== null && selection[1] !== null)
       target.setSelectionRange(selection[0], selection[1]);
+  }
+  firstCardId() {
+    return this.cardEls.keys().next().value;
+  }
+  mapFocusLookup() {
+    return { card: (id) => this.cardEls.get(id), text: (id) => this.textEls.get(id) };
+  }
+  describeMapFocus(el) {
+    return describeFocus(el, this.contentEl, (id) => {
+      var _a2, _b2, _c;
+      const text11 = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+        (item) => item.kind === "text" && item.id === id
+      );
+      return text11 ? text11.parentId : ((_c = this.lastMapFocus) == null ? void 0 : _c.itemId) === id ? this.lastMapFocus.parentId : null;
+    });
+  }
+  /** Focus moved inside the map: remember the control, so a dialog or menu that closes onto a removed opener can send it back. */
+  trackMapFocus(target) {
+    const anchor = this.describeMapFocus(target);
+    if (anchor) this.lastMapFocus = anchor;
+  }
+  /**
+   * Before a repaint: remembers a focused control that paint does not give back by itself (not a card, a field, the chat or the
+   * search bar) and returns the function that puts focus back on it once the view is rebuilt.
+   */
+  holdMapFocus() {
+    var _a2, _b2, _c;
+    const current = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.activeElement) != null ? _c : null;
+    const ownRestore = [
+      ".vam-node",
+      "input",
+      "textarea",
+      "select",
+      "[contenteditable=true]",
+      ".vam-map-chat",
+      ".vam-map-search"
+    ];
+    if (!current || current.closest(ownRestore.join(","))) return () => {
+    };
+    const anchor = this.describeMapFocus(current);
+    if (!anchor) return () => {
+    };
+    return () => {
+      if (!this.editingTextId) this.restoreMapFocus(anchor);
+    };
+  }
+  /**
+   * Gives focus back to the map when it has been lost (on the page body, or on an element that left the document). Order: the
+   * same control (new element), the card a removed text block hung from, `fallbackNodeId`, the selected card, the canvas.
+   * Focus that is in a dialog, the chat, the search bar or another leaf is not lost, so it is never taken.
+   */
+  restoreMapFocus(anchor, fallbackNodeId) {
+    var _a2;
+    const doc = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument;
+    if (!doc || this.closed || !focusIsLost(doc, this.contentEl)) return;
+    const selected = this.selection.state.selected;
+    const candidates = [
+      anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null,
+      (anchor == null ? void 0 : anchor.parentId) ? this.cardEls.get(anchor.parentId) : void 0,
+      fallbackNodeId ? this.cardEls.get(fallbackNodeId) : void 0,
+      selected ? this.cardEls.get(selected) : void 0
+    ];
+    this.restoringFocus = true;
+    try {
+      for (const el of candidates) {
+        el == null ? void 0 : el.focus({ preventScroll: true });
+        if (el && doc.activeElement === el) return;
+      }
+      if (this.contentEl.getAttribute("tabindex") === null) this.contentEl.tabIndex = -1;
+      this.contentEl.focus({ preventScroll: true });
+    } finally {
+      this.restoringFocus = false;
+    }
+  }
+  /** After a dialog or menu closed: Obsidian puts focus back on the opener, which a repaint may have removed. Checked twice, as the host restores late. */
+  restoreMapFocusSoon(fallbackNodeId) {
+    const run = () => this.restoreMapFocus(this.lastMapFocus, fallbackNodeId);
+    window.setTimeout(run, 0);
+    window.setTimeout(run, 120);
+  }
+  /** Opens a dialog from the map; when it closes, focus returns to the map if the repaint it caused removed its opener. */
+  openMapModal(modal) {
+    const hostOnClose = modal.onClose;
+    modal.onClose = () => {
+      hostOnClose == null ? void 0 : hostOnClose.call(modal);
+      this.restoreMapFocusSoon();
+    };
+    modal.open();
+    return modal;
+  }
+  restoreFocusOnMenuHide(menu, nodeId) {
+    var _a2;
+    (_a2 = menu.onHide) == null ? void 0 : _a2.call(menu, () => this.restoreMapFocusSoon(nodeId));
   }
   syncOutline() {
     this.plugin.syncOutline(this.map, this.notes, this);
@@ -48629,16 +48773,18 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       return;
     }
     const placement = prefill ? prefill.inputs.placement : target.selected ? "under" : "tree";
-    new OutlineImportModal(
-      this.app,
-      (request) => this.importOutline(request),
-      this.modelChoices(),
-      target,
-      placement,
-      this.outlineGenerator(prefill ? prefill.inputs.topic : (_a2 = target.selected) == null ? void 0 : _a2.title, prefill),
-      this.fieldLinks(),
-      (parentId) => this.outlineModelLabel(parentId)
-    ).open();
+    this.openMapModal(
+      new OutlineImportModal(
+        this.app,
+        (request) => this.importOutline(request),
+        this.modelChoices(),
+        target,
+        placement,
+        this.outlineGenerator(prefill ? prefill.inputs.topic : (_a2 = target.selected) == null ? void 0 : _a2.title, prefill),
+        this.fieldLinks(),
+        (parentId) => this.outlineModelLabel(parentId)
+      )
+    );
   }
   /**
    * What the outline window's default model entry means at a position: new topics under a topic with a manual upper
@@ -49990,6 +50136,7 @@ ${request.requirements}` : preset.text,
     menu.addItem(
       (item) => item.setTitle(t("ui.auto_layout")).setIcon("workflow").onClick(() => this.autoLayout())
     );
+    this.restoreFocusOnMenuHide(menu);
     menu.showAtMouseEvent(event);
   }
   /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
@@ -52615,7 +52762,11 @@ ${request.requirements}` : preset.text,
   addTextNodeUnder(parent) {
     this.enqueue(async () => {
       var _a2;
-      if (!this.map || !this.canEditText()) return;
+      if (!this.map) return;
+      if (!this.canEditText()) {
+        if (this.selection.state.multiSelectMode) new import_obsidian31.Notice(t("ui.text_node_add_multiselect"));
+        return;
+      }
       const target = parent != null ? parent : this.map.nodes.find((node) => node.id === this.selection.state.selected);
       const owner = target && this.map.nodes.find((node) => node.id === target.id);
       if (!owner) {
@@ -53348,6 +53499,7 @@ ${request.requirements}` : preset.text,
           menu2.addItem(
             (item) => item.setTitle(t("ui.note_style_menu")).setIcon("palette").onClick(() => void this.chooseTopicStyle(topic))
           );
+        this.restoreFocusOnMenuHide(menu2, cardId);
         if (event.clientX === 0 && event.clientY === 0) {
           const box = card.getBoundingClientRect();
           menu2.showAtPosition({ x: box.left, y: box.bottom });
@@ -55003,6 +55155,7 @@ ${request.requirements}` : preset.text,
     await this.plugin.rebuildDerivedData();
     await this.hydrate();
     this.render();
+    this.restoreMapFocus(this.lastMapFocus, this.firstCardId());
   }
   async deleteRestoredMap() {
     const deleted = this.deletedMap;
@@ -55016,6 +55169,7 @@ ${request.requirements}` : preset.text,
     this.map = null;
     await this.plugin.rebuildDerivedData();
     this.render();
+    this.restoreMapFocus(this.lastMapFocus);
   }
   async restoreDeletedMapFromUi() {
     var _a2;
@@ -55024,8 +55178,10 @@ ${request.requirements}` : preset.text,
       this.viewportTimer = null;
       await this.persistViewport();
     }
-    if (this.history.undoEntry === ((_a2 = this.deletedMap) == null ? void 0 : _a2.deleteAction)) await this.travel(false);
-    else {
+    if (this.history.undoEntry === ((_a2 = this.deletedMap) == null ? void 0 : _a2.deleteAction)) {
+      await this.travel(false);
+      this.restoreMapFocus(this.lastMapFocus, this.firstCardId());
+    } else {
       await this.restoreDeletedMap();
       this.history.clear();
       this.history.push({
@@ -55042,59 +55198,65 @@ ${request.requirements}` : preset.text,
       this.plugin.repo.collectionFiles(this.path, "Unassigned"),
       this.plugin.repo.collectionFiles(this.path, "Archive")
     ]);
-    new ChoiceModal(this.app, t("ui.organize_notes"), t("ui.manage_notes_that_are_currently_outside_the_mind_map"), [
-      {
-        label: t("ui.unassigned_0", unassigned.length),
-        description: t("ui.add_to_the_current_map_archive_or_move_to_another_topic"),
-        action: () => this.openUnassigned(unassigned)
-      },
-      {
-        label: t("ui.archived_0", archived.length),
-        description: t("ui.view_archived_notes_or_move_them_back_to_unassigned"),
-        action: () => this.openArchive(archived)
-      }
-    ]).open();
+    this.openMapModal(
+      new ChoiceModal(this.app, t("ui.organize_notes"), t("ui.manage_notes_that_are_currently_outside_the_mind_map"), [
+        {
+          label: t("ui.unassigned_0", unassigned.length),
+          description: t("ui.add_to_the_current_map_archive_or_move_to_another_topic"),
+          action: () => this.openUnassigned(unassigned)
+        },
+        {
+          label: t("ui.archived_0", archived.length),
+          description: t("ui.view_archived_notes_or_move_them_back_to_unassigned"),
+          action: () => this.openArchive(archived)
+        }
+      ])
+    );
   }
   openUnassigned(files) {
-    new NoteCollectionModal(this.app, t("ui.unassigned_notes"), files, [
-      { label: t("ui.add_to_mind_map"), run: (file) => this.enqueue(() => this.claimToCurrent(file)) },
-      { label: t("ui.archive"), run: (file) => this.enqueue(() => this.parkFile(file, "Archive", "archived")) },
-      {
-        label: t("ui.move_to_another_topic"),
-        run: (file) => this.enqueue(async () => {
-          const topics = (await this.plugin.repo.topics()).filter((topic) => {
-            var _a2;
-            return topic.id !== ((_a2 = this.map) == null ? void 0 : _a2.id);
-          });
-          new TopicPickerModal(
-            this.app,
-            t("ui.move_to_another_topic"),
-            topics,
-            (topic) => this.enqueue(() => this.transferToTopic(file, topic))
-          ).open();
-        })
-      },
-      {
-        label: t("ui.move_and_add_to_another_topic"),
-        run: (file) => this.enqueue(async () => {
-          const topics = (await this.plugin.repo.topics()).filter((topic) => {
-            var _a2;
-            return topic.id !== ((_a2 = this.map) == null ? void 0 : _a2.id);
-          });
-          new TopicPickerModal(
-            this.app,
-            t("ui.move_and_add_to_another_mind_map"),
-            topics,
-            (topic) => this.enqueue(() => this.transferAndAdd(file, topic))
-          ).open();
-        })
-      }
-    ]).open();
+    this.openMapModal(
+      new NoteCollectionModal(this.app, t("ui.unassigned_notes"), files, [
+        { label: t("ui.add_to_mind_map"), run: (file) => this.enqueue(() => this.claimToCurrent(file)) },
+        { label: t("ui.archive"), run: (file) => this.enqueue(() => this.parkFile(file, "Archive", "archived")) },
+        {
+          label: t("ui.move_to_another_topic"),
+          run: (file) => this.enqueue(async () => {
+            const topics = (await this.plugin.repo.topics()).filter((topic) => {
+              var _a2;
+              return topic.id !== ((_a2 = this.map) == null ? void 0 : _a2.id);
+            });
+            new TopicPickerModal(
+              this.app,
+              t("ui.move_to_another_topic"),
+              topics,
+              (topic) => this.enqueue(() => this.transferToTopic(file, topic))
+            ).open();
+          })
+        },
+        {
+          label: t("ui.move_and_add_to_another_topic"),
+          run: (file) => this.enqueue(async () => {
+            const topics = (await this.plugin.repo.topics()).filter((topic) => {
+              var _a2;
+              return topic.id !== ((_a2 = this.map) == null ? void 0 : _a2.id);
+            });
+            new TopicPickerModal(
+              this.app,
+              t("ui.move_and_add_to_another_mind_map"),
+              topics,
+              (topic) => this.enqueue(() => this.transferAndAdd(file, topic))
+            ).open();
+          })
+        }
+      ])
+    );
   }
   openArchive(files) {
-    new NoteCollectionModal(this.app, t("ui.archived_notes"), files, [
-      { label: t("ui.unarchive"), run: (file) => this.enqueue(() => this.parkFile(file, "Unassigned", "unassigned")) }
-    ]).open();
+    this.openMapModal(
+      new NoteCollectionModal(this.app, t("ui.archived_notes"), files, [
+        { label: t("ui.unarchive"), run: (file) => this.enqueue(() => this.parkFile(file, "Unassigned", "unassigned")) }
+      ])
+    );
   }
   render() {
     if (this.renderHold > 0 && !this.closed) {
@@ -55145,6 +55307,7 @@ ${request.requirements}` : preset.text,
         }
       } else (_g = this.focusNodeId) != null ? _g : this.focusNodeId = (_f = focusedCard.dataset.nodeId) != null ? _f : null;
     }
+    const keepMapFocus = this.holdMapFocus();
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const restoreSearch = this.holdMapSearch();
@@ -55487,6 +55650,7 @@ ${request.requirements}` : preset.text,
     this.drawEdges();
     restoreRelevanceFocus();
     restoreChatFocus();
+    keepMapFocus();
     this.applyPresentationMarks();
     restoreSearch();
   }
@@ -56948,12 +57112,14 @@ ${request.requirements}` : preset.text,
   }
   openNodePanel(node, mode) {
     const render = (content, close, host) => this.renderInspector(content, node, mode, close, host);
-    new class extends import_obsidian31.Modal {
-      onOpen() {
-        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
-        render(this.contentEl, () => this.close(), this.modalEl);
-      }
-    }(this.app).open();
+    this.openMapModal(
+      new class extends import_obsidian31.Modal {
+        onOpen() {
+          this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
+          render(this.contentEl, () => this.close(), this.modalEl);
+        }
+      }(this.app)
+    );
   }
   renderInspector(parent, node, mode = "structure", close, host) {
     var _a2, _b2, _c, _d;
@@ -65368,6 +65534,8 @@ var OutlineView = class extends import_obsidian36.ItemView {
     __publicField(this, "markers", /* @__PURE__ */ new Map());
     __publicField(this, "links", /* @__PURE__ */ new Map());
     __publicField(this, "collapsed", /* @__PURE__ */ new Set());
+    /** The fold button of each row in the tree as last drawn, so focus can follow a rebuild. */
+    __publicField(this, "toggleEls", /* @__PURE__ */ new Map());
     __publicField(this, "query", "");
     __publicField(this, "activePath", "");
     __publicField(this, "coffee", null);
@@ -65499,6 +65667,7 @@ var OutlineView = class extends import_obsidian36.ItemView {
   renderTree() {
     var _a2, _b2, _c;
     (_a2 = this.contentEl.querySelector(".vam-outline-tree")) == null ? void 0 : _a2.remove();
+    this.toggleEls.clear();
     if (!this.map) return;
     const tree = this.contentEl.createDiv("vam-outline-tree");
     const children = /* @__PURE__ */ new Map();
@@ -65524,10 +65693,14 @@ var OutlineView = class extends import_obsidian36.ItemView {
         toggle.disabled = !!query;
         toggle.setAttr("aria-label", !query && this.collapsed.has(node.id) ? t("ui.expand") : t("ui.collapse"));
         toggle.setAttr("aria-expanded", String(!!query || !this.collapsed.has(node.id)));
+        this.toggleEls.set(node.id, toggle);
         toggle.addEventListener("click", () => {
+          var _a4, _b4;
+          const hadFocus = ((_a4 = this.contentEl.ownerDocument) == null ? void 0 : _a4.activeElement) === toggle;
           if (this.collapsed.has(node.id)) this.collapsed.delete(node.id);
           else this.collapsed.add(node.id);
           this.renderTree();
+          if (hadFocus) (_b4 = this.toggleEls.get(node.id)) == null ? void 0 : _b4.focus();
         });
       } else row.createSpan("vam-outline-spacer");
       const title = (_c2 = (_b3 = this.titles.get(node.id)) != null ? _b3 : node.path.split("/").pop()) != null ? _c2 : node.path;

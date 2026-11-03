@@ -64,6 +64,7 @@ import {
   type SceneEdge,
   type SceneImage
 } from "./map-export";
+import { describeFocus, focusIsLost, resolveFocus, type MapFocusAnchor } from "./map-focus";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
 import {
@@ -1085,6 +1086,8 @@ export class VisualAgentMapView extends ItemView {
   private renderingCard = false;
   /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
   private restoringFocus = false;
+  /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
+  private lastMapFocus: MapFocusAnchor | null = null;
   private closed = false;
   private aimViewEpoch = 0;
   private mapOpenEpoch = 0;
@@ -1238,17 +1241,8 @@ export class VisualAgentMapView extends ItemView {
     this.contentEl.onWindowMigrated?.(() => this.bindClipboard());
     // Presentation keys are taken in the capture phase, before any card or tree key handler can see them.
     this.registerDomEvent(this.contentEl, "keydown", event => this.presentationKey(event), { capture: true });
-    this.registerDomEvent(this.contentEl, "keydown", event => {
-      // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
-      if (
-        event.target instanceof HTMLElement &&
-        event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")
-      )
-        return;
-      if (event.key === "Escape") {
-        this.applySelectionChange(this.selection.escape());
-      }
-    });
+    this.registerDomEvent(this.contentEl, "keydown", event => this.onMapKeydown(event));
+    this.registerDomEvent(this.contentEl, "focusin", event => this.trackMapFocus(event.target));
     await this.plugin.ready;
     if (this.closed || this.aimViewEpoch !== epoch) return;
     if (!this.path) {
@@ -1274,6 +1268,22 @@ export class VisualAgentMapView extends ItemView {
           await this.openMap(defaultPath);
         } else this.render();
       }
+    }
+  }
+  private onMapKeydown(event: KeyboardEvent): void {
+    // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
+    // Something that already took this Esc (a menu, a dialog), or a menu still open, closes alone; only a bare Esc clears the selection.
+    if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
+      return;
+    if (event.key === "Escape") {
+      const anchor = this.describeMapFocus(target);
+      this.applySelectionChange(this.selection.escape());
+      // Claimed here: unhandled, Obsidian answers Esc by activating another leaf and the next key edits that note.
+      event.preventDefault();
+      event.stopPropagation();
+      this.restoreMapFocus(anchor);
     }
   }
   /**
@@ -1773,25 +1783,30 @@ export class VisualAgentMapView extends ItemView {
   private renderPreservingFocus(): void {
     const doc = this.contentEl?.ownerDocument;
     const current = doc?.activeElement ?? null;
-    // The chat field is restored by render() itself (captureFocus / restoreChatFocus); an index lookup would land on another control.
-    if (!doc || !current || !this.contentEl.contains(current) || this.chat?.isInput(current)) {
+    // The chat field is restored by render() itself (captureFocus / restoreChatFocus); an open text editor is reopened by paint.
+    if (
+      !doc ||
+      !current ||
+      !this.contentEl.contains(current) ||
+      this.chat?.isInput(current) ||
+      current.closest(".vam-text-node")
+    ) {
       this.render();
       return;
     }
     const focusedContainer = current === this.contentEl;
-    const focusables = "button, input, select, textarea, [tabindex]:not([tabindex='-1'])";
-    const before = Array.from(this.contentEl.querySelectorAll<HTMLElement>(focusables));
-    const activeIndex = before.indexOf(current as HTMLElement);
+    // The control is found again by what it is (card id, label, class, text), never by its position in the view.
+    const anchor = this.describeMapFocus(current);
     const active = current as HTMLInputElement;
     const selection =
       active.tagName === "INPUT" || active.tagName === "TEXTAREA"
         ? ([active.selectionStart, active.selectionEnd] as const)
         : null;
     this.render();
-    const after = Array.from(this.contentEl.querySelectorAll<HTMLElement>(focusables));
-    const target = after[activeIndex];
+    const target = anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null;
     if (focusedContainer) this.contentEl.focus();
-    else target?.focus();
+    else if (target) target.focus();
+    else this.restoreMapFocus(anchor);
     if (
       selection &&
       (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") &&
@@ -1799,6 +1814,98 @@ export class VisualAgentMapView extends ItemView {
       selection[1] !== null
     )
       (target as HTMLInputElement).setSelectionRange(selection[0], selection[1]);
+  }
+  private firstCardId(): string | undefined {
+    return this.cardEls.keys().next().value as string | undefined;
+  }
+  private mapFocusLookup(): {
+    card: (id: string) => HTMLElement | undefined;
+    text: (id: string) => HTMLElement | undefined;
+  } {
+    return { card: id => this.cardEls.get(id), text: id => this.textEls.get(id) };
+  }
+  private describeMapFocus(el: Element | null): MapFocusAnchor | null {
+    return describeFocus(el, this.contentEl, id => {
+      const text = (this.map?.canvasItems ?? []).find(
+        (item): item is TextItem => item.kind === "text" && item.id === id
+      );
+      // A block that is already gone (undo removed it) is remembered from when it still had focus.
+      return text ? text.parentId : this.lastMapFocus?.itemId === id ? this.lastMapFocus.parentId : null;
+    });
+  }
+  /** Focus moved inside the map: remember the control, so a dialog or menu that closes onto a removed opener can send it back. */
+  private trackMapFocus(target: EventTarget | null): void {
+    const anchor = this.describeMapFocus(target as Element | null);
+    if (anchor) this.lastMapFocus = anchor;
+  }
+  /**
+   * Before a repaint: remembers a focused control that paint does not give back by itself (not a card, a field, the chat or the
+   * search bar) and returns the function that puts focus back on it once the view is rebuilt.
+   */
+  private holdMapFocus(): () => void {
+    const current = this.contentEl?.ownerDocument?.activeElement ?? null;
+    // A card is handed back by paint's own card path; fields, the chat and the search bar restore themselves.
+    const ownRestore = [
+      ".vam-node",
+      "input",
+      "textarea",
+      "select",
+      "[contenteditable=true]",
+      ".vam-map-chat",
+      ".vam-map-search"
+    ];
+    if (!current || current.closest(ownRestore.join(","))) return () => {};
+    const anchor = this.describeMapFocus(current);
+    if (!anchor) return () => {};
+    return () => {
+      if (!this.editingTextId) this.restoreMapFocus(anchor);
+    };
+  }
+  /**
+   * Gives focus back to the map when it has been lost (on the page body, or on an element that left the document). Order: the
+   * same control (new element), the card a removed text block hung from, `fallbackNodeId`, the selected card, the canvas.
+   * Focus that is in a dialog, the chat, the search bar or another leaf is not lost, so it is never taken.
+   */
+  private restoreMapFocus(anchor: MapFocusAnchor | null, fallbackNodeId?: string): void {
+    const doc = this.contentEl?.ownerDocument;
+    if (!doc || this.closed || !focusIsLost(doc, this.contentEl)) return;
+    const selected = this.selection.state.selected;
+    const candidates = [
+      anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null,
+      anchor?.parentId ? this.cardEls.get(anchor.parentId) : undefined,
+      fallbackNodeId ? this.cardEls.get(fallbackNodeId) : undefined,
+      selected ? this.cardEls.get(selected) : undefined
+    ];
+    this.restoringFocus = true;
+    try {
+      for (const el of candidates) {
+        el?.focus({ preventScroll: true });
+        if (el && doc.activeElement === el) return;
+      }
+      if (this.contentEl.getAttribute("tabindex") === null) this.contentEl.tabIndex = -1;
+      this.contentEl.focus({ preventScroll: true });
+    } finally {
+      this.restoringFocus = false;
+    }
+  }
+  /** After a dialog or menu closed: Obsidian puts focus back on the opener, which a repaint may have removed. Checked twice, as the host restores late. */
+  private restoreMapFocusSoon(fallbackNodeId?: string): void {
+    const run = (): void => this.restoreMapFocus(this.lastMapFocus, fallbackNodeId);
+    window.setTimeout(run, 0);
+    window.setTimeout(run, 120);
+  }
+  /** Opens a dialog from the map; when it closes, focus returns to the map if the repaint it caused removed its opener. */
+  private openMapModal<M extends Modal>(modal: M): M {
+    const hostOnClose = (modal as { onClose?: () => void }).onClose;
+    modal.onClose = (): void => {
+      hostOnClose?.call(modal);
+      this.restoreMapFocusSoon();
+    };
+    modal.open();
+    return modal;
+  }
+  private restoreFocusOnMenuHide(menu: Menu, nodeId?: string): void {
+    (menu as unknown as { onHide?: (callback: () => void) => void }).onHide?.(() => this.restoreMapFocusSoon(nodeId));
   }
   syncOutline(): void {
     this.plugin.syncOutline(this.map, this.notes, this);
@@ -2145,16 +2252,18 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const placement = prefill ? prefill.inputs.placement : target.selected ? "under" : "tree";
-    new OutlineImportModal(
-      this.app,
-      request => this.importOutline(request),
-      this.modelChoices(),
-      target,
-      placement,
-      this.outlineGenerator(prefill ? prefill.inputs.topic : target.selected?.title, prefill),
-      this.fieldLinks(),
-      parentId => this.outlineModelLabel(parentId)
-    ).open();
+    this.openMapModal(
+      new OutlineImportModal(
+        this.app,
+        request => this.importOutline(request),
+        this.modelChoices(),
+        target,
+        placement,
+        this.outlineGenerator(prefill ? prefill.inputs.topic : target.selected?.title, prefill),
+        this.fieldLinks(),
+        parentId => this.outlineModelLabel(parentId)
+      )
+    );
   }
   /**
    * What the outline window's default model entry means at a position: new topics under a topic with a manual upper
@@ -3611,6 +3720,7 @@ export class VisualAgentMapView extends ItemView {
         .setIcon("workflow")
         .onClick(() => this.autoLayout())
     );
+    this.restoreFocusOnMenuHide(menu);
     menu.showAtMouseEvent(event);
   }
   /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
@@ -6430,7 +6540,12 @@ export class VisualAgentMapView extends ItemView {
   /** Adds a text node under `parent` (or the selected topic) and opens its editor; one undo step. */
   addTextNodeUnder(parent?: MapNode | null): void {
     this.enqueue(async () => {
-      if (!this.map || !this.canEditText()) return;
+      if (!this.map) return;
+      if (!this.canEditText()) {
+        // Selection mode blocks canvas edits; say so instead of doing nothing (other reasons stay silent).
+        if (this.selection.state.multiSelectMode) new Notice(t("ui.text_node_add_multiselect"));
+        return;
+      }
       const target = parent ?? this.map.nodes.find(node => node.id === this.selection.state.selected);
       const owner = target && this.map.nodes.find(node => node.id === target.id);
       if (!owner) {
@@ -7200,6 +7315,7 @@ export class VisualAgentMapView extends ItemView {
               .setIcon("palette")
               .onClick(() => void this.chooseTopicStyle(topic))
           );
+        this.restoreFocusOnMenuHide(menu, cardId);
         // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the card, where a keyboard user is.
         if (event.clientX === 0 && event.clientY === 0) {
           const box = card.getBoundingClientRect();
@@ -9056,6 +9172,8 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.rebuildDerivedData();
     await this.hydrate();
     this.render();
+    // The restore button that had focus is gone: the selected or first card (else the canvas) takes it.
+    this.restoreMapFocus(this.lastMapFocus, this.firstCardId());
   }
   private async deleteRestoredMap(): Promise<void> {
     const deleted = this.deletedMap;
@@ -9069,6 +9187,7 @@ export class VisualAgentMapView extends ItemView {
     this.map = null;
     await this.plugin.rebuildDerivedData();
     this.render();
+    this.restoreMapFocus(this.lastMapFocus);
   }
   private async restoreDeletedMapFromUi(): Promise<void> {
     if (this.viewportTimer !== null) {
@@ -9076,8 +9195,10 @@ export class VisualAgentMapView extends ItemView {
       this.viewportTimer = null;
       await this.persistViewport();
     }
-    if (this.history.undoEntry === this.deletedMap?.deleteAction) await this.travel(false);
-    else {
+    if (this.history.undoEntry === this.deletedMap?.deleteAction) {
+      await this.travel(false);
+      this.restoreMapFocus(this.lastMapFocus, this.firstCardId());
+    } else {
       await this.restoreDeletedMap();
       this.history.clear();
       this.history.push({
@@ -9094,49 +9215,55 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.repo.collectionFiles(this.path, "Unassigned"),
       this.plugin.repo.collectionFiles(this.path, "Archive")
     ]);
-    new ChoiceModal(this.app, t("ui.organize_notes"), t("ui.manage_notes_that_are_currently_outside_the_mind_map"), [
-      {
-        label: t("ui.unassigned_0", unassigned.length),
-        description: t("ui.add_to_the_current_map_archive_or_move_to_another_topic"),
-        action: () => this.openUnassigned(unassigned)
-      },
-      {
-        label: t("ui.archived_0", archived.length),
-        description: t("ui.view_archived_notes_or_move_them_back_to_unassigned"),
-        action: () => this.openArchive(archived)
-      }
-    ]).open();
+    this.openMapModal(
+      new ChoiceModal(this.app, t("ui.organize_notes"), t("ui.manage_notes_that_are_currently_outside_the_mind_map"), [
+        {
+          label: t("ui.unassigned_0", unassigned.length),
+          description: t("ui.add_to_the_current_map_archive_or_move_to_another_topic"),
+          action: () => this.openUnassigned(unassigned)
+        },
+        {
+          label: t("ui.archived_0", archived.length),
+          description: t("ui.view_archived_notes_or_move_them_back_to_unassigned"),
+          action: () => this.openArchive(archived)
+        }
+      ])
+    );
   }
   private openUnassigned(files: TFile[]): void {
-    new NoteCollectionModal(this.app, t("ui.unassigned_notes"), files, [
-      { label: t("ui.add_to_mind_map"), run: file => this.enqueue(() => this.claimToCurrent(file)) },
-      { label: t("ui.archive"), run: file => this.enqueue(() => this.parkFile(file, "Archive", "archived")) },
-      {
-        label: t("ui.move_to_another_topic"),
-        run: file =>
-          this.enqueue(async () => {
-            const topics = (await this.plugin.repo.topics()).filter(topic => topic.id !== this.map?.id);
-            new TopicPickerModal(this.app, t("ui.move_to_another_topic"), topics, topic =>
-              this.enqueue(() => this.transferToTopic(file, topic))
-            ).open();
-          })
-      },
-      {
-        label: t("ui.move_and_add_to_another_topic"),
-        run: file =>
-          this.enqueue(async () => {
-            const topics = (await this.plugin.repo.topics()).filter(topic => topic.id !== this.map?.id);
-            new TopicPickerModal(this.app, t("ui.move_and_add_to_another_mind_map"), topics, topic =>
-              this.enqueue(() => this.transferAndAdd(file, topic))
-            ).open();
-          })
-      }
-    ]).open();
+    this.openMapModal(
+      new NoteCollectionModal(this.app, t("ui.unassigned_notes"), files, [
+        { label: t("ui.add_to_mind_map"), run: file => this.enqueue(() => this.claimToCurrent(file)) },
+        { label: t("ui.archive"), run: file => this.enqueue(() => this.parkFile(file, "Archive", "archived")) },
+        {
+          label: t("ui.move_to_another_topic"),
+          run: file =>
+            this.enqueue(async () => {
+              const topics = (await this.plugin.repo.topics()).filter(topic => topic.id !== this.map?.id);
+              new TopicPickerModal(this.app, t("ui.move_to_another_topic"), topics, topic =>
+                this.enqueue(() => this.transferToTopic(file, topic))
+              ).open();
+            })
+        },
+        {
+          label: t("ui.move_and_add_to_another_topic"),
+          run: file =>
+            this.enqueue(async () => {
+              const topics = (await this.plugin.repo.topics()).filter(topic => topic.id !== this.map?.id);
+              new TopicPickerModal(this.app, t("ui.move_and_add_to_another_mind_map"), topics, topic =>
+                this.enqueue(() => this.transferAndAdd(file, topic))
+              ).open();
+            })
+        }
+      ])
+    );
   }
   private openArchive(files: TFile[]): void {
-    new NoteCollectionModal(this.app, t("ui.archived_notes"), files, [
-      { label: t("ui.unarchive"), run: file => this.enqueue(() => this.parkFile(file, "Unassigned", "unassigned")) }
-    ]).open();
+    this.openMapModal(
+      new NoteCollectionModal(this.app, t("ui.archived_notes"), files, [
+        { label: t("ui.unarchive"), run: file => this.enqueue(() => this.parkFile(file, "Unassigned", "unassigned")) }
+      ])
+    );
   }
   private render(): void {
     // A batch of chat writes repaints once, when it is done.
@@ -9191,6 +9318,7 @@ export class VisualAgentMapView extends ItemView {
         }
       } else this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
     }
+    const keepMapFocus = this.holdMapFocus();
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const restoreSearch = this.holdMapSearch();
@@ -9562,6 +9690,7 @@ export class VisualAgentMapView extends ItemView {
     this.drawEdges();
     restoreRelevanceFocus();
     restoreChatFocus();
+    keepMapFocus();
     this.applyPresentationMarks();
     restoreSearch();
   }
@@ -11162,12 +11291,14 @@ export class VisualAgentMapView extends ItemView {
   private openNodePanel(node: MapNode, mode: "structure" | "proposals"): void {
     const render = (content: HTMLElement, close: () => void, host: HTMLElement): void =>
       this.renderInspector(content, node, mode, close, host);
-    new (class extends Modal {
-      onOpen(): void {
-        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
-        render(this.contentEl, () => this.close(), this.modalEl);
-      }
-    })(this.app).open();
+    this.openMapModal(
+      new (class extends Modal {
+        onOpen(): void {
+          this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
+          render(this.contentEl, () => this.close(), this.modalEl);
+        }
+      })(this.app)
+    );
   }
   private renderInspector(
     parent: HTMLElement,

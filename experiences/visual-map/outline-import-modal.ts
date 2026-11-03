@@ -231,6 +231,8 @@ export class OutlineImportModal extends Modal {
     const prefill = this.generator?.prefill;
     if (prefill) this.restoreChoices(prefill.inputs);
     this.restoreResult();
+    // After the restored text, so the cursor is in the box either way and the user can type or paste at once.
+    this.textarea.focus();
   }
 
   /** The research choices of a run that started from this window, put back on a reopened one. */

@@ -187,7 +187,7 @@ function modalHarness(clipboardFails = false) {
     createDiv(value) { const child = element('div', { cls: typeof value === 'string' ? value : value?.cls }); this.children.push(child); return child; },
     createEl(name, value = {}) { const child = element(name, value); this.children.push(child); return child; },
     createSpan(value = {}) { const child = element('span', value); this.children.push(child); return child; },
-    setText(value) { this.text = value; }, empty() { this.children = []; }, replaceChildren() { this.children = []; }, toggleClass(name, on) { this.toggled = { ...(this.toggled ?? {}), [name]: on }; }, setAttr(name, value) { this[name] = value; },
+    focus() { this.focused = true; }, setText(value) { this.text = value; }, empty() { this.children = []; }, replaceChildren() { this.children = []; }, toggleClass(name, on) { this.toggled = { ...(this.toggled ?? {}), [name]: on }; }, setAttr(name, value) { this[name] = value; },
     addEventListener(name, handler) { this.listeners[name] = handler; }, addClass(name) { this.cls = `${this.cls} ${name}`.trim(); }, removeClass() {}
   });
   const find = (root, predicate) => predicate(root) ? root : root.children.map(child => find(child, predicate)).find(Boolean);

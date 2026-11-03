@@ -734,6 +734,7 @@ export const en = {
   "ui.text_node_promote_label": "Turn this text node into a topic card",
   "ui.text_node_promoted": "Text node turned into a topic card.",
   "ui.text_node_select_topic": "Select a topic first.",
+  "ui.text_node_add_multiselect": "Finish selecting topics first, then add a text node.",
   "ui.text_node_placeholder": "Text",
   "ui.text_link_full": "A text node can connect to at most {0} cards.",
   "ui.text_link_exists": "Already connected.",

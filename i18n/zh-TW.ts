@@ -681,6 +681,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.text_node_promote_label": "把這個文字區塊轉成議題卡",
   "ui.text_node_promoted": "已把文字區塊轉成議題卡。",
   "ui.text_node_select_topic": "請先選取一個議題。",
+  "ui.text_node_add_multiselect": "請先結束多選模式，再新增文字區塊。",
   "ui.text_node_placeholder": "文字",
   "ui.text_link_full": "一個文字區塊最多連到 {0} 張卡片。",
   "ui.text_link_exists": "已連線。",

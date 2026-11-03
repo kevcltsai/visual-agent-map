@@ -410,16 +410,17 @@ test('Bug bash E #22 (round 2): the border is read with transitions off, so a ca
   const h = await harness();
   const SAVED = 'rgb(204, 204, 204)';
   // like the live card: the border colour transitions, so right after a class change it is a colour the export cannot parse
-  const animated = (el, inline) => {
-    el.style = { transition: inline };
-    Object.defineProperty(el, 'computed', { configurable: true, get: () => style({ backgroundColor: 'rgb(255, 255, 255)', borderTopColor: el.style.transition === 'none' ? SAVED : 'oklab(0.6 0.05 -0.1)' }) });
+  const animated = el => {
+    Object.defineProperty(el, 'computed', { configurable: true, get: () => style({ backgroundColor: 'rgb(255, 255, 255)', borderTopColor: el.hasClass('vam-export-measure') ? SAVED : 'oklab(0.6 0.05 -0.1)' }) });
   };
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(css, /^\.vam-view \.vam-node\.vam-export-measure, \.vam-view \.vam-text-node\.vam-export-measure \{ transition: none; \}/m, 'the measuring class switches the transition off');
   const card = h.view.cardEls.get(h.root.id);
-  animated(card, 'border-color 0.16s');
+  animated(card);
   card.addClass('is-selected');
   const el = element('div', 'vam-text-node is-selected');
   Object.assign(el, { offsetLeft: 600, offsetTop: 40, offsetWidth: 300, offsetHeight: 50 });
-  animated(el, '');
+  animated(el);
   const body = el.createDiv('vam-text-node-body');
   body.text = 'note'; body.computed = style({ color: 'rgb(34, 34, 34)' });
   h.view.textEls = new Map([['t1', el]]);
@@ -427,8 +428,7 @@ test('Bug bash E #22 (round 2): the border is read with transitions off, so a ca
   const strokes = got.scene.cards.map(c => c.stroke);
   assert.equal(strokes[0], SAVED, 'selected card');
   assert.equal(strokes[2], SAVED, 'selected text block');
-  assert.equal(card.style.transition, 'border-color 0.16s', 'the inline transition is put back');
-  assert.equal(el.style.transition, '');
+  assert.equal(card.hasClass('vam-export-measure') || el.hasClass('vam-export-measure'), false, 'the measuring class is taken off again');
   assert.equal(card.hasClass('is-selected'), true);
 });
 

@@ -54585,9 +54585,8 @@ ${request.requirements}` : preset.text,
     const transient = ["is-selected", "is-cut", "is-drop-target", "is-marquee-hit", "is-marquee-remove"];
     const savedLook = (el) => {
       const on = transient.filter((name) => el.hasClass(name));
-      const transition = el.style.transition;
       if (on.length) {
-        el.style.transition = "none";
+        el.addClass("vam-export-measure");
         el.removeClass(...on);
       }
       try {
@@ -54600,7 +54599,7 @@ ${request.requirements}` : preset.text,
       } finally {
         if (on.length) {
           el.addClass(...on);
-          el.style.transition = transition;
+          el.removeClass("vam-export-measure");
         }
       }
     };

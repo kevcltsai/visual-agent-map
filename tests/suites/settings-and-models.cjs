@@ -605,3 +605,22 @@ test('Bug bash E #18 (round 2): the language select is focused again after the r
   tab.refreshAfterLanguageChange();
   assert.deepEqual(log, [], 'the request is used once');
 });
+
+test('Bug bash E #19 (round 3): committing a CLI path with Tab keeps the keyboard on the control Tab moved to, and the redrawn page has it focused again', async () => {
+  const { tab } = tabWithDoc();
+  const doc = { activeElement: null };
+  const make = id => ({ id, focus() { doc.activeElement = this; }, instanceOf: () => false });
+  let controls = ['path', 'next', 'other'].map(make);
+  tab.containerEl = { doc, contains: el => controls.includes(el), querySelectorAll: () => controls };
+  tab.onUpdate = () => { controls = ['path', 'next', 'other'].map(make); doc.activeElement = { id: 'container' }; }; // a redraw drops the focus to the container
+  controls[1].focus(); // Tab moved the focus to the next control before the change was committed
+  const before = controls[1];
+  await tab.setControlValue('codexPath', '/ok/codex');
+  assert.equal(doc.activeElement.id, 'next', 'activeElement is the redrawn equivalent of the control that had focus');
+  assert.notEqual(doc.activeElement, before, 'it is the new element, not the destroyed one');
+  // no focus inside the page: nothing is moved
+  tab.onUpdate = () => { controls = ['path'].map(make); doc.activeElement = null; };
+  doc.activeElement = { id: 'elsewhere' };
+  await tab.setControlValue('claudePath', '/c');
+  assert.equal(doc.activeElement, null);
+});

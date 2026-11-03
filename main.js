@@ -65228,7 +65228,20 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
     await this.plugin.saveSettings();
     if (key2 === "codexPath") void this.plugin.refreshModelDiscovery("codex");
     if (key2 === "claudePath") void this.plugin.refreshModelDiscovery("claude");
-    if (key2 === "codexPath" || key2 === "claudePath") this.update();
+    if (key2 === "codexPath" || key2 === "claudePath") this.updateKeepingFocus();
+  }
+  /** Redraws the page; the control that had the keyboard (Tab just moved it) is focused again by its position. */
+  updateKeepingFocus() {
+    var _a2, _b2, _c;
+    const root = this.containerEl;
+    const controls = () => {
+      var _a3;
+      return Array.from((_a3 = root == null ? void 0 : root.querySelectorAll("input, select, textarea, button, [tabindex]")) != null ? _a3 : []);
+    };
+    const active = (_b2 = (_a2 = root == null ? void 0 : root.doc) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
+    const index = active && (root == null ? void 0 : root.contains(active)) ? controls().indexOf(active) : -1;
+    this.update();
+    if (index >= 0) (_c = controls()[index]) == null ? void 0 : _c.focus();
   }
 };
 

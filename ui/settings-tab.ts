@@ -925,6 +925,16 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     if (key === "codexPath") void this.plugin.refreshModelDiscovery("codex");
     if (key === "claudePath") void this.plugin.refreshModelDiscovery("claude");
     // Committed (change or blur), not while typing: the status rows and the entry value follow the new path.
-    if (key === "codexPath" || key === "claudePath") this.update();
+    if (key === "codexPath" || key === "claudePath") this.updateKeepingFocus();
+  }
+  /** Redraws the page; the control that had the keyboard (Tab just moved it) is focused again by its position. */
+  private updateKeepingFocus(): void {
+    const root = this.containerEl as HTMLElement | undefined;
+    const controls = (): Element[] =>
+      Array.from(root?.querySelectorAll("input, select, textarea, button, [tabindex]") ?? []);
+    const active = root?.doc?.activeElement ?? null;
+    const index = active && root?.contains(active) ? controls().indexOf(active) : -1;
+    this.update();
+    if (index >= 0) (controls()[index] as HTMLElement | undefined)?.focus();
   }
 }

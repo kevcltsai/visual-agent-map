@@ -1130,6 +1130,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_style_label": "回答长度",
   "ui.map_chat_style_concise": "精简",
   "ui.map_chat_style_detailed": "详细",
+  "ui.map_chat_model_short": "模型",
   "ui.map_chat_model_label": "当前模型：聊天与新的 AI 任务都用这个",
   "ui.map_chat_more_detail": "说详细一点",
   "ui.map_chat_more_detail_asked": "说详细一点。",

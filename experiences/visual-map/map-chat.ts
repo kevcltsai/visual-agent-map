@@ -319,6 +319,8 @@ export class MapChatPanel {
   private inputEl!: HTMLTextAreaElement;
   private sendEl!: HTMLButtonElement;
   private modelEl!: HTMLSelectElement;
+  /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
+  private modelTagEl!: HTMLElement;
   private styleEls: Record<MapChatStyleChoice, HTMLButtonElement> | null = null;
   private stopEl!: HTMLButtonElement;
   private saveEl!: HTMLButtonElement;
@@ -1056,6 +1058,12 @@ export class MapChatPanel {
     // Top row: the title, the model for this chat, and the button that folds the window.
     this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
     this.titleEl = this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
+    // Hidden from screen readers: the menu's own label says the same, in full.
+    this.modelTagEl = this.headEl.createSpan({
+      cls: "vam-map-chat-model-tag",
+      text: t("ui.map_chat_model_short"),
+      attr: { "aria-hidden": "true" }
+    });
     this.modelEl = this.headEl.createEl("select", {
       cls: "vam-map-chat-model dropdown",
       attr: { "aria-label": t("ui.map_chat_model_label") }
@@ -1237,6 +1245,7 @@ export class MapChatPanel {
     this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
     this.titleEl.setText(t("ui.map_chat_title"));
     this.modelEl.setAttr("aria-label", t("ui.map_chat_model_label"));
+    this.modelTagEl.setText(t("ui.map_chat_model_short"));
     this.closeEl.setAttr("aria-label", t("ui.map_chat_close"));
     this.heroTitleEl.setText(t("ui.map_chat_hero_title"));
     this.guideEl.setText(t("ui.map_chat_empty_log"));
@@ -1433,6 +1442,25 @@ export class MapChatPanel {
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
   /** A reply came in while the window is folded to its edge: the edge shows a dot. */
+  /**
+   * On the opening screen the message field and the examples come first: the model menu is a quiet last line, after the "empty
+   * map" button (so reading and Tab order match what is seen). In the window the head row (title, model, save, close) is on top.
+   * Elements are moved only when they are out of place, so a control that has the keyboard is not moved for nothing.
+   */
+  private placeHeadAndEmptyMap(hero: boolean, showEmptyMap: boolean): void {
+    const children = (): Element[] => Array.from(this.bodyEl.children);
+    if (!hero) {
+      if (children()[0] !== this.headEl) this.bodyEl.insertBefore(this.headEl, this.bodyEl.firstChild);
+      return;
+    }
+    const tail = showEmptyMap ? [this.emptyMapEl, this.headEl] : [this.headEl];
+    const now = children().slice(-tail.length);
+    if (tail.every((el, index) => now[index] === el)) return;
+    for (const el of tail) {
+      el.remove();
+      this.bodyEl.insertBefore(el, null);
+    }
+  }
   private markUnread(): void {
     if (this.shown || !this.built) return;
     this.unread = true;
@@ -1554,10 +1582,7 @@ export class MapChatPanel {
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
-    if (showEmptyMap && this.bodyEl.children[this.bodyEl.children.length - 1] !== this.emptyMapEl) {
-      this.emptyMapEl.remove();
-      this.bodyEl.insertBefore(this.emptyMapEl, null);
-    }
+    this.placeHeadAndEmptyMap(hero, showEmptyMap);
     this.renderGuide();
     this.refreshSave();
     // Someone opens the window because a reply came in while it was folded: they land on the newest message.

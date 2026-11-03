@@ -1184,6 +1184,7 @@ var en = {
   "ui.map_chat_style_label": "Answer length",
   "ui.map_chat_style_concise": "Concise",
   "ui.map_chat_style_detailed": "Detailed",
+  "ui.map_chat_model_short": "Model",
   "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
   "ui.map_chat_more_detail": "Say it in more detail",
   "ui.map_chat_more_detail_asked": "Say it in more detail.",
@@ -3561,6 +3562,7 @@ var zhCN = {
   "ui.map_chat_style_label": "\u56DE\u7B54\u957F\u5EA6",
   "ui.map_chat_style_concise": "\u7CBE\u7B80",
   "ui.map_chat_style_detailed": "\u8BE6\u7EC6",
+  "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u5F53\u524D\u6A21\u578B\uFF1A\u804A\u5929\u4E0E\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A",
   "ui.map_chat_more_detail": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9",
   "ui.map_chat_more_detail_asked": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9\u3002",
@@ -5938,6 +5940,7 @@ var zhTW = {
   "ui.map_chat_style_label": "\u56DE\u7B54\u9577\u5EA6",
   "ui.map_chat_style_concise": "\u7CBE\u7C21",
   "ui.map_chat_style_detailed": "\u8A73\u7D30",
+  "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u76EE\u524D\u6A21\u578B\uFF1A\u804A\u5929\u8207\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B",
   "ui.map_chat_more_detail": "\u8AAA\u8A73\u7D30\u4E00\u9EDE",
   "ui.map_chat_more_detail_asked": "\u8AAA\u8A73\u7D30\u4E00\u9EDE\u3002",
@@ -29147,6 +29150,8 @@ var MapChatPanel = class {
     __publicField(this, "inputEl");
     __publicField(this, "sendEl");
     __publicField(this, "modelEl");
+    /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
+    __publicField(this, "modelTagEl");
     __publicField(this, "styleEls", null);
     __publicField(this, "stopEl");
     __publicField(this, "saveEl");
@@ -29872,6 +29877,11 @@ ${typed}` : draft;
     });
     this.headEl = this.bodyEl.createDiv("vam-map-chat-head");
     this.titleEl = this.headEl.createSpan({ cls: "vam-map-chat-title", text: t("ui.map_chat_title") });
+    this.modelTagEl = this.headEl.createSpan({
+      cls: "vam-map-chat-model-tag",
+      text: t("ui.map_chat_model_short"),
+      attr: { "aria-hidden": "true" }
+    });
     this.modelEl = this.headEl.createEl("select", {
       cls: "vam-map-chat-model dropdown",
       attr: { "aria-label": t("ui.map_chat_model_label") }
@@ -30048,6 +30058,7 @@ ${typed}` : draft;
     this.bodyEl.setAttr("aria-label", t("ui.map_chat_title"));
     this.titleEl.setText(t("ui.map_chat_title"));
     this.modelEl.setAttr("aria-label", t("ui.map_chat_model_label"));
+    this.modelTagEl.setText(t("ui.map_chat_model_short"));
     this.closeEl.setAttr("aria-label", t("ui.map_chat_close"));
     this.heroTitleEl.setText(t("ui.map_chat_hero_title"));
     this.guideEl.setText(t("ui.map_chat_empty_log"));
@@ -30223,6 +30234,25 @@ ${typed}` : draft;
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
   /** A reply came in while the window is folded to its edge: the edge shows a dot. */
+  /**
+   * On the opening screen the message field and the examples come first: the model menu is a quiet last line, after the "empty
+   * map" button (so reading and Tab order match what is seen). In the window the head row (title, model, save, close) is on top.
+   * Elements are moved only when they are out of place, so a control that has the keyboard is not moved for nothing.
+   */
+  placeHeadAndEmptyMap(hero, showEmptyMap) {
+    const children = () => Array.from(this.bodyEl.children);
+    if (!hero) {
+      if (children()[0] !== this.headEl) this.bodyEl.insertBefore(this.headEl, this.bodyEl.firstChild);
+      return;
+    }
+    const tail = showEmptyMap ? [this.emptyMapEl, this.headEl] : [this.headEl];
+    const now = children().slice(-tail.length);
+    if (tail.every((el, index) => now[index] === el)) return;
+    for (const el of tail) {
+      el.remove();
+      this.bodyEl.insertBefore(el, null);
+    }
+  }
   markUnread() {
     if (this.shown || !this.built) return;
     this.unread = true;
@@ -30332,10 +30362,7 @@ ${typed}` : draft;
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
-    if (showEmptyMap && this.bodyEl.children[this.bodyEl.children.length - 1] !== this.emptyMapEl) {
-      this.emptyMapEl.remove();
-      this.bodyEl.insertBefore(this.emptyMapEl, null);
-    }
+    this.placeHeadAndEmptyMap(hero, showEmptyMap);
     this.renderGuide();
     this.refreshSave();
     if (shown && hadUnread) this.scrollToEnd();

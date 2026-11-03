@@ -1132,6 +1132,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_style_label": "回答長度",
   "ui.map_chat_style_concise": "精簡",
   "ui.map_chat_style_detailed": "詳細",
+  "ui.map_chat_model_short": "模型",
   "ui.map_chat_model_label": "目前模型：聊天與新的 AI 任務都用這個",
   "ui.map_chat_more_detail": "說詳細一點",
   "ui.map_chat_more_detail_asked": "說詳細一點。",

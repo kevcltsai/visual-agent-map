@@ -2728,6 +2728,21 @@ integrationTest('B1 ui: an empty map shows the opening screen: the question, the
   const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : 'examples'), ['title', 'input', 'examples']);
 });
 
+integrationTest('UX B6: on the opening screen the model menu is a quiet last line (after the examples and the empty-map button); in the window it is back in the head row', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
+  const body = () => chat.bodyEl.children; const visible = body().filter(c => !c.hidden);
+  assert.equal(visible.at(-1), chat.headEl, 'the head row (only the model menu shows there) is last'); assert.ok(chat.headEl.hasClass('is-hero'));
+  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl || i === chat.modelEl).map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : i === chat.suggestEl ? 'examples' : 'model');
+  eq(order, ['title', 'input', 'examples', 'model'], 'reading and Tab order: the question, the field, the examples, then the model');
+  if (chat.emptyMapEl.hidden === false) assert.equal(body().at(-2), chat.emptyMapEl, 'the empty-map button stays right after the examples');
+  const tag = find(chat.headEl, i => hasClass(i, 'vam-map-chat-model-tag')); assert.equal(tag.text, 'Model'); assert.equal(tag.attrs['aria-hidden'], 'true');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = sel => css.split('\n').find(line => line.startsWith(`${sel} {`)) ?? '';
+  assert.match(rule('.vam-map-chat-head.is-hero .vam-map-chat-model'), /border: 0; background-color: transparent;.*color: var\(--text-muted\); font-size: var\(--font-ui-smaller\)/, 'a small, borderless, muted menu');
+  assert.match(rule('.vam-map-chat-model-tag'), /display: none/, 'the tag is only shown on the opening screen');
+  h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); h.type('Coffee'); await h.view.sendMapChat();
+  assert.equal(chat.isHero, false); assert.equal(body()[0], chat.headEl, 'in the window the head row is on top again'); assert.equal(chat.headEl.hasClass('is-hero'), false);
+});
+
 integrationTest('B1 ui: clicking an example fills the message field and sends nothing', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
   const sends = h.control.requests.length; findAll(chat.suggestEl, i => i.tag === 'button')[1].click();
@@ -3957,7 +3972,7 @@ const saveButton = h => find(h.view.chat.headEl, i => i.tag === 'button' && hasC
 const today = () => localDate(new Date());
 integrationTest('B3 save: a button between the model list and Close; hidden on the opening screen; disabled with a reason until a turn is finished', async () => {
   const { h, chat } = await imageHarness();
-  const order = chat.headEl.children.map(c => c.cls.split(' ')[0]); eq(order, ['vam-map-chat-title', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close']);
+  const order = chat.headEl.children.map(c => c.cls.split(' ')[0]); eq(order, ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close'], 'the model tag (UX B6) is only shown on the opening screen');
   const button = saveButton(h); assert.equal(button.attrs['aria-label'], 'There is no finished chat to save yet.', 'bug bash #28: the reason is the accessible name while disabled'); assert.ok(button.attrs.title);
   assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.attrs.title, 'There is no finished chat to save yet.', 'a turn that is still streaming does not count');
   button.click(); await tick(); eq(savedPaths(h), []);

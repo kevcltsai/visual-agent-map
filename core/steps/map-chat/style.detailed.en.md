@@ -1,1 +1,0 @@
-Answer style: detailed. Explain fully; you may use several paragraphs, examples and the reasons behind your points.

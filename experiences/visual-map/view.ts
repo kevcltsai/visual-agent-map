@@ -229,7 +229,6 @@ import {
   isManagedMapPath,
   moveNotePath,
   normalizeReasoningLevel,
-  normalizeMapChatStyle,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
   type Note,
@@ -15467,11 +15466,6 @@ export class VisualAgentMapView extends ItemView {
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
-      style: () => normalizeMapChatStyle(this.plugin.settings.mapChatStyle),
-      setStyle: style => {
-        this.plugin.settings.mapChatStyle = style;
-        void this.plugin.saveSettings();
-      },
       modelChoices: () => this.chatModelChoices(),
       model: () => this.plugin.settings.cliModel,
       setModel: model => {
@@ -15487,12 +15481,10 @@ export class VisualAgentMapView extends ItemView {
           stopCurrent();
         };
       },
-      moreDetail: origin => {
+      retry: origin => {
         void this.sendMapChat(origin);
       },
-      retry: origin => {
-        void this.sendMapChat(origin, true);
-      },
+      modelName: id => this.plugin.modelLabel(id),
       resolveLink: link => {
         const file = this.app.metadataCache.getFirstLinkpathDest(link, this.sourceMarkdownFile()?.path ?? "");
         return file && file.extension === "md" ? file.path : null;
@@ -15675,12 +15667,7 @@ export class VisualAgentMapView extends ItemView {
       ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {})
     };
   }
-  private async buildChatRequest(
-    message: string,
-    chat: MapChatPanel,
-    origin: MapChatOrigin,
-    redo = false
-  ): Promise<MapChatRequest> {
+  private async buildChatRequest(message: string, chat: MapChatPanel, origin: MapChatOrigin): Promise<MapChatRequest> {
     const map = this.map!;
     const settings = this.plugin.settings;
     const byId = new Map(map.nodes.map(node => [node.id, node]));
@@ -15778,8 +15765,6 @@ export class VisualAgentMapView extends ItemView {
       context,
       language: settings.language,
       contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
-      style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
-      ...(redo ? { redo: true } : {}),
       model: settings.cliModel,
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
@@ -15796,12 +15781,10 @@ export class VisualAgentMapView extends ItemView {
     return { text: t("ui.map_chat_error_failed_0", errorMessage(error)), wrapped: true };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  private async sendMapChat(again?: MapChatOrigin, retry = false): Promise<void> {
+  private async sendMapChat(again?: MapChatOrigin): Promise<void> {
     const chat = this.chat;
     if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
-    // "Say it in more detail" sends the same question with the same references again; a normal send reads the draft. A retry
-    // sends the same question as it was (concise, with its actions applied), after a failure.
-    const redo = Boolean(again) && !retry;
+    // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
     const origin: MapChatOrigin = again ?? {
@@ -15814,9 +15797,9 @@ export class VisualAgentMapView extends ItemView {
     // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
     // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
     const draft = chat.draft;
-    const turn = chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again), "preparing");
+    const turn = chat.begin(message, origin, Boolean(again), "preparing");
     let sent = false;
-    // Takes the turn back and puts the draft into the field again (a "more detail" or retry has no draft to put back). `reason`
+    // Takes the turn back and puts the draft into the field again (a retry has no draft to put back). `reason`
     // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
     const abandon = (reason?: string): void => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
@@ -15829,7 +15812,7 @@ export class VisualAgentMapView extends ItemView {
     const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request: MapChatRequest;
     try {
-      request = await this.buildChatRequest(message, chat, origin, redo);
+      request = await this.buildChatRequest(message, chat, origin);
     } catch (error) {
       abandon(this.closed ? undefined : errorMessage(error));
       return;
@@ -15951,14 +15934,6 @@ export class VisualAgentMapView extends ItemView {
               if (outcome === null) continue;
               if (!alive()) return;
               const result: MapChatResult = outcome;
-              // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
-              if (redo) {
-                const lines = result.actions.length
-                  ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
-                  : [];
-                if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-                return;
-              }
               const plan = result.actions.length
                 ? planFor(result.actions, request.context, {
                     diagrams: this.plugin.settings.addDiagramsAfterResearch,

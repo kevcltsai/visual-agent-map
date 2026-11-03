@@ -86,3 +86,31 @@ export function cardToolsSide(
 ): "left" | "right" {
   return cardRight - gap - toolsWidth < visibleLeft ? "left" : "right";
 }
+
+/**
+ * Where a card's floating tool row goes. Normally `cardToolsSide` decides left or right. A row wider than the visible
+ * canvas (minus `margin` each side) cannot fit either way, so it wraps: `maxWidth` is the width it may take, and
+ * `shift` moves its left-aligned start so the whole row lies inside the visible canvas. A row that fits keeps its place
+ * (a left-aligned one is also kept off the right edge). All numbers are screen pixels; `shift` is 0 for a right-aligned row.
+ */
+export function cardToolsPlacement(
+  card: { left: number; right: number },
+  toolsWidth: number,
+  visible: { left: number; right: number },
+  gap: number,
+  margin = 10
+): { side: "left" | "right"; maxWidth: number | null; shift: number } {
+  const available = visible.right - visible.left - 2 * margin;
+  const wraps = toolsWidth > available;
+  const side = wraps ? "left" : cardToolsSide(card.right, toolsWidth, visible.left, gap);
+  if (side === "right") return { side, maxWidth: null, shift: 0 };
+  const width = wraps ? available : toolsWidth;
+  const start = card.left + gap;
+  const placed = Math.max(visible.left + margin, Math.min(start, visible.right - margin - width));
+  // Only a row that wraps or runs off the right edge is moved; one that already fits stays on the card.
+  return {
+    side,
+    maxWidth: wraps ? available : null,
+    shift: start >= visible.left + margin && start + width <= visible.right - margin ? 0 : placed - start
+  };
+}

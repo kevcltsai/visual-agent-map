@@ -272,7 +272,7 @@ import {
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
-import { cardToolsSide, fitIsClamped, fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
+import { cardToolsPlacement, cardToolsSide, fitIsClamped, fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
 import {
   MapChatPanel,
@@ -10651,7 +10651,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
-   * or past the canvas edge (a row wider than a card on the left edge). Measured, so it follows panning and zooming.
+   * or past the canvas edge (a row wider than a card on the left edge); a row wider than the visible canvas wraps. Measured,
+   * so it follows panning and zooming.
    */
   private alignCardTools(card: HTMLElement): void {
     if (!this.viewportEl) return;
@@ -10664,10 +10665,18 @@ export class VisualAgentMapView extends ItemView {
       this.viewportEl.getBoundingClientRect().left,
       chat ? chat.getBoundingClientRect().right : 0
     );
-    tools.toggleClass(
-      "is-align-left",
-      cardToolsSide(cardRect.right, tools.getBoundingClientRect().width, visibleLeft, 10 * zoom) === "left"
-    );
+    // Measured in its natural single row: forget what an earlier fit did first.
+    tools.toggleClass("is-wrapped", false);
+    tools.style.removeProperty("--vam-tools-max");
+    tools.style.removeProperty("--vam-tools-shift");
+    const visible = { left: visibleLeft, right: this.viewportEl.getBoundingClientRect().right };
+    const place = cardToolsPlacement(cardRect, tools.getBoundingClientRect().width, visible, 10 * zoom);
+    tools.toggleClass("is-align-left", place.side === "left");
+    if (place.maxWidth !== null) {
+      tools.toggleClass("is-wrapped", true);
+      tools.style.setProperty("--vam-tools-max", `${place.maxWidth / zoom}px`);
+    }
+    if (place.shift) tools.style.setProperty("--vam-tools-shift", `${place.shift / zoom}px`);
   }
   /** Repaints only the named cards from the current selection state (class, aria-selected, roving tabindex, checkbox). */
   private paintCards(ids: Iterable<string | null>): void {

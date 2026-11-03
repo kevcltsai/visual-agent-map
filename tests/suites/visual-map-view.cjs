@@ -4088,21 +4088,24 @@ test('bug bash #04: a narrow canvas puts the preview beside, above or below the 
   assert.equal(cramped.shown, false, 'no place that clears the card: no preview');
 });
 // ---- bug bash A #12: a card's tool row wider than the card never runs off the visible left edge ----
-function toolsHarness({ cardLeft, cardWidth = 280, toolsWidth = 345, canvasLeft = 0, chatRight = null, selected = true }) {
+function toolsHarness({ cardLeft, cardWidth = 280, toolsWidth = 345, canvasLeft = 0, canvasRight = 100000, zoom = 1, chatRight = null }) {
   const { VisualAgentMapView } = require('../support-replay.cjs').load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, {
     window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o)
   });
   const classes = new Set();
-  const tools = { getBoundingClientRect: () => ({ width: toolsWidth, left: 0, right: toolsWidth }), toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
+  const vars = {};
+  const tools = { style: { setProperty: (key, value) => { vars[key] = value; }, removeProperty: key => { delete vars[key]; } }, getBoundingClientRect() { const max = parseFloat(vars['--vam-tools-max']) * zoom; return { width: Number.isFinite(max) ? Math.min(toolsWidth, max) : toolsWidth }; }, toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
   const card = { offsetWidth: cardWidth, getBoundingClientRect: () => ({ left: cardLeft, right: cardLeft + cardWidth, width: cardWidth }), querySelector: () => tools };
   const chat = chatRight === null ? null : { getBoundingClientRect: () => ({ left: 0, right: chatRight }) };
   const view = Object.create(VisualAgentMapView.prototype);
-  Object.assign(view, { map: { viewport: { x: 0, y: 0, zoom: 1 } }, viewportEl: { getBoundingClientRect: () => ({ left: canvasLeft }) }, contentEl: { querySelector: () => chat } });
+  Object.assign(view, { map: { viewport: { x: 0, y: 0, zoom } }, viewportEl: { getBoundingClientRect: () => ({ left: canvasLeft, right: canvasRight }) }, contentEl: { querySelector: () => chat } });
   view.alignCardTools(card);
   // The rendered row: right edge of the tools = card right - 10; so its left = cardLeft + cardWidth - 10 - toolsWidth.
   const align = classes.has('is-align-left') ? 'left' : 'right';
-  const toolsLeft = align === 'left' ? cardLeft + 10 : cardLeft + cardWidth - 10 - toolsWidth;
-  return { align, toolsLeft };
+  const shift = (parseFloat(vars['--vam-tools-shift']) || 0) * zoom;
+  const width = tools.getBoundingClientRect().width;
+  const toolsLeft = align === 'left' ? cardLeft + 10 * zoom + shift : cardLeft + cardWidth - 10 * zoom - width;
+  return { align, toolsLeft, toolsRight: toolsLeft + width, wrapped: classes.has('is-wrapped') };
 }
 test('bug bash #12: a tool row wider than a card on the left edge is aligned to the card\'s left edge; an ordinary card stays right-aligned', () => {
   const edge = toolsHarness({ cardLeft: 20, canvasLeft: 0 });
@@ -4114,4 +4117,17 @@ test('bug bash #12: a tool row wider than a card on the left edge is aligned to 
   const ordinary = toolsHarness({ cardLeft: 500 });
   assert.equal(ordinary.align, 'right');
   assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.vam-node > \.vam-node-tools\.is-align-left\s*\{[^}]*right:\s*auto;[^}]*left:\s*10px/);
+});
+
+test('bug bash #12: a tool row wider than the whole visible canvas wraps and every button stays inside it; a wide canvas keeps the single row', () => {
+  // Chat docked on the left, canvas 664-1024 (360px); the 379.7px row is wider than what is visible.
+  const narrow = toolsHarness({ cardLeft: 670.8, toolsWidth: 379.7, canvasLeft: 664, canvasRight: 1024 });
+  assert.equal(narrow.wrapped, true, 'the row wraps');
+  assert.ok(narrow.toolsLeft >= 664 + 10 && narrow.toolsRight <= 1024 - 10, `every button lies inside the canvas (${narrow.toolsLeft}..${narrow.toolsRight})`);
+  const zoomed = toolsHarness({ cardLeft: 700, toolsWidth: 480, zoom: 1.5, canvasLeft: 664, canvasRight: 1024 });
+  assert.ok(zoomed.wrapped && zoomed.toolsLeft >= 674 && zoomed.toolsRight <= 1014, 'also when zoomed');
+  const wide = toolsHarness({ cardLeft: 500, toolsWidth: 379.7, canvasLeft: 0, canvasRight: 1600 });
+  assert.equal(wide.wrapped, false); assert.equal(wide.align, 'right', 'a wide canvas keeps the single right-aligned row');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-node > \.vam-node-tools\.is-wrapped\s*\{[^}]*flex-wrap:\s*wrap/);
 });

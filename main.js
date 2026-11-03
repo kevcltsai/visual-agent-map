@@ -28408,6 +28408,20 @@ function fitViewport(bounds, size, inset, maxZoom = 1.2) {
 function cardToolsSide(cardRight, toolsWidth, visibleLeft, gap) {
   return cardRight - gap - toolsWidth < visibleLeft ? "left" : "right";
 }
+function cardToolsPlacement(card, toolsWidth, visible, gap, margin = 10) {
+  const available = visible.right - visible.left - 2 * margin;
+  const wraps = toolsWidth > available;
+  const side = wraps ? "left" : cardToolsSide(card.right, toolsWidth, visible.left, gap);
+  if (side === "right") return { side, maxWidth: null, shift: 0 };
+  const width = wraps ? available : toolsWidth;
+  const start = card.left + gap;
+  const placed = Math.max(visible.left + margin, Math.min(start, visible.right - margin - width));
+  return {
+    side,
+    maxWidth: wraps ? available : null,
+    shift: start >= visible.left + margin && start + width <= visible.right - margin ? 0 : placed - start
+  };
+}
 
 // experiences/visual-map/relevance-summary-modal.ts
 var import_obsidian16 = require("obsidian");
@@ -56565,7 +56579,8 @@ ${request.requirements}` : preset.text,
   }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
-   * or past the canvas edge (a row wider than a card on the left edge). Measured, so it follows panning and zooming.
+   * or past the canvas edge (a row wider than a card on the left edge); a row wider than the visible canvas wraps. Measured,
+   * so it follows panning and zooming.
    */
   alignCardTools(card) {
     var _a2;
@@ -56578,10 +56593,17 @@ ${request.requirements}` : preset.text,
       this.viewportEl.getBoundingClientRect().left,
       chat ? chat.getBoundingClientRect().right : 0
     );
-    tools.toggleClass(
-      "is-align-left",
-      cardToolsSide(cardRect.right, tools.getBoundingClientRect().width, visibleLeft, 10 * zoom) === "left"
-    );
+    tools.toggleClass("is-wrapped", false);
+    tools.style.removeProperty("--vam-tools-max");
+    tools.style.removeProperty("--vam-tools-shift");
+    const visible = { left: visibleLeft, right: this.viewportEl.getBoundingClientRect().right };
+    const place = cardToolsPlacement(cardRect, tools.getBoundingClientRect().width, visible, 10 * zoom);
+    tools.toggleClass("is-align-left", place.side === "left");
+    if (place.maxWidth !== null) {
+      tools.toggleClass("is-wrapped", true);
+      tools.style.setProperty("--vam-tools-max", `${place.maxWidth / zoom}px`);
+    }
+    if (place.shift) tools.style.setProperty("--vam-tools-shift", `${place.shift / zoom}px`);
   }
   /** Repaints only the named cards from the current selection state (class, aria-selected, roving tabindex, checkbox). */
   paintCards(ids) {
@@ -67825,6 +67847,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
 .vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }
 .vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; }
+.vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; max-width: var(--vam-tools-max); margin-left: var(--vam-tools-shift, 0); }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }

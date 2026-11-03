@@ -8606,7 +8606,12 @@ export class VisualAgentMapView extends ItemView {
       el: HTMLElement
     ): { backgroundColor: string; borderTopColor: string; borderTopWidth: string } => {
       const on = transient.filter(name => el.hasClass(name));
-      if (on.length) el.removeClass(...on);
+      // A card animates its border colour (0.16s): without this the read below would return a colour mid-way.
+      const transition = el.style.transition;
+      if (on.length) {
+        el.style.transition = "none";
+        el.removeClass(...on);
+      }
       try {
         const look = computed(el);
         return {
@@ -8615,7 +8620,10 @@ export class VisualAgentMapView extends ItemView {
           borderTopWidth: look.borderTopWidth
         };
       } finally {
-        if (on.length) el.addClass(...on);
+        if (on.length) {
+          el.addClass(...on);
+          el.style.transition = transition;
+        }
       }
     };
     let embedded = 0;

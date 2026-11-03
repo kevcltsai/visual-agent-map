@@ -87,12 +87,44 @@ test('counter-example: the plugin changing the cover removes the old frame in th
   assert.equal(cover.withCover(note, 'img/b.jpg'), '---\ntitle: "T"\ntopic-cover: "[[img/b.jpg]]"\n---\n# Body\n');
   assert.equal(cover.withoutCover(note), '---\ntitle: "T"\n---\n# Body\n');
   assert.equal(cover.withCover('---\ntitle: "T"\n---\n', 'img/b.jpg'), '---\ntitle: "T"\ntopic-cover: "[[img/b.jpg]]"\n---\n');
-  // Turning the cover off and on again is not a change of picture: the frame stays.
+  // Decision 8: turning an explicit link off drops its frame in the same write (on would show another picture); a first-embed cover keeps it (next test).
   const off = cover.withCoverOff(note);
-  assert.ok(off.includes('topic-cover-frame: "0.1 0.2 0.5 0.5"') && off.includes('topic-cover: "none"'));
-  assert.equal(cover.withCoverOn(off), note.replace('topic-cover: "[[img/a.png]]"\n', '').replace('topic-cover-frame', 'topic-cover-frame'));
-  assert.ok(cover.withCoverOn(off).includes('topic-cover-frame: "0.1 0.2 0.5 0.5"'));
+  assert.ok(!off.includes('topic-cover-frame') && off.includes('topic-cover: "none"'));
   assert.ok(!cover.withCoverOn(off).includes('topic-cover:'));
   // appendImageEmbed (the body) never touches the frame key.
   assert.ok(cover.appendImageEmbed(note, 'img/c.png').startsWith(note.slice(0, note.indexOf('# Body'))));
+});
+
+// ---- Packet 4 fixes -----------------------------------------------------------------------------------------------
+test('F1 counter-example: a frame touching the right or bottom edge survives write then read (edges are rounded, not sizes)', () => {
+  const edge = { x: 0.80025, y: 0.60004, w: 0.19975, h: 0.39996 };
+  const parsed = frameOf(cover.serialiseCoverFrame(edge));
+  assert.notEqual(parsed, null, cover.serialiseCoverFrame(edge));
+  assert.ok(parsed.x + parsed.w <= 1 + 1e-9 && parsed.y + parsed.h <= 1 + 1e-9);
+  // Sweep: every frame that ends exactly at 1 stays valid after the round trip.
+  for (let i = 0; i < 2000; i++) {
+    const x = Math.random() * 0.99;
+    const y = Math.random() * 0.99;
+    const frame = { x, y, w: 1 - x, h: 1 - y };
+    assert.notEqual(frameOf(cover.serialiseCoverFrame(frame)), null, JSON.stringify(frame));
+  }
+  for (let i = 0; i < 2000; i++) {
+    const x = Math.random() * 0.9;
+    const y = Math.random() * 0.9;
+    const frame = { x, y, w: Math.random() * (1 - x) * 0.99 + 0.001, h: Math.random() * (1 - y) * 0.99 + 0.001 };
+    const back = frameOf(cover.serialiseCoverFrame(frame));
+    if (back) assert.ok(back.x + back.w <= 1 + 1e-9);
+  }
+});
+
+test('F4 decision 8: turning the cover off removes the frame only when topic-cover was an explicit link', () => {
+  const explicit = '---\ntitle: "T"\ntopic-cover: "[[img/a.png]]"\ntopic-cover-frame: "0.1 0.2 0.5 0.5"\n---\n# Body\n';
+  const off = cover.withCoverOff(explicit);
+  assert.ok(off.includes('topic-cover: "none"') && !off.includes('topic-cover-frame'), off);
+  const embedOnly = '---\ntitle: "T"\ntopic-cover-frame: "0.1 0.2 0.5 0.5"\n---\n# Body\n![[img/a.png]]\n';
+  const off2 = cover.withCoverOff(embedOnly);
+  assert.ok(off2.includes('topic-cover: "none"') && off2.includes('topic-cover-frame: "0.1 0.2 0.5 0.5"'), off2);
+  assert.ok(cover.withCoverOn(off2).includes('topic-cover-frame: "0.1 0.2 0.5 0.5"'));
+  // already none: off again keeps the frame
+  assert.ok(cover.withCoverOff(off2).includes('topic-cover-frame'));
 });

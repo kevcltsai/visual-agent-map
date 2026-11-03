@@ -79,9 +79,17 @@ export function parseCoverFrame(raw: unknown): CoverFrame | null {
   return { x, y, w, h };
 }
 
-/** The frame as the four-number string written to the note (at most 4 decimals). */
+const round4 = (value: number): number => Math.round(value * 10000) / 10000;
+/**
+ * The frame as the four-number string written to the note (at most 4 decimals). Edges are rounded, then the sizes are
+ * the difference of rounded edges, so a frame that ends at 1 still ends at exactly 1 after rounding.
+ */
 export function serialiseCoverFrame(frame: CoverFrame): string {
-  return [frame.x, frame.y, frame.w, frame.h].map(value => String(Math.round(value * 10000) / 10000)).join(" ");
+  const x = round4(frame.x);
+  const y = round4(frame.y);
+  const w = round4(round4(frame.x + frame.w) - x);
+  const h = round4(round4(frame.y + frame.h) - y);
+  return [x, y, w, h].map(String).join(" ");
 }
 
 /** Sets (or, with null, removes) `topic-cover-frame`; every other line and the body stay as written. */
@@ -110,9 +118,22 @@ export function withCover(content: string, link: string): string {
   return safe ? setFrontmatterKeys(content, { [COVER_KEY]: `[[${safe}]]`, [COVER_FRAME_KEY]: null }) : content;
 }
 
-/** Writes `topic-cover: "none"` (the topic menu's "turn cover off"). */
+/** The raw `topic-cover` value written in the note's frontmatter, or null when the key is absent. */
+function declaredCover(content: string): string | null {
+  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
+  const line = block ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(block[1]) : null;
+  return line ? line[1].replace(/^["']|["']$/g, "") : null;
+}
+
+/**
+ * Writes `topic-cover: "none"` (the topic menu's "turn cover off"). When `topic-cover` was an explicit link, turning
+ * the cover on again would show the first embedded image instead, so the frame (made for the linked picture) goes in
+ * the same write; when the cover came from the first embed, the frame stays.
+ */
 export function withCoverOff(content: string): string {
-  return setFrontmatterKeys(content, { [COVER_KEY]: "none" });
+  const declared = declaredCover(content);
+  const explicit = declared !== null && declared !== "" && declared.toLowerCase() !== "none";
+  return setFrontmatterKeys(content, explicit ? { [COVER_KEY]: "none", [COVER_FRAME_KEY]: null } : { [COVER_KEY]: "none" });
 }
 
 /** Removes the `topic-cover` key and the frame so the first embedded image is used again, whole. */

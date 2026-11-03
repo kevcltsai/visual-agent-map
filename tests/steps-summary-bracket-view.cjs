@@ -54,7 +54,7 @@ async function harness({ direction, build, boxes } = {}) {
   const layout = boxes ?? { [ids.root]: [100, 200], [ids.a]: [500, 0], [ids.b]: [500, 150], [ids.c]: [500, 300], [ids.d]: [500, 450], [ids.b1]: [900, 150] };
   let pending = Promise.resolve();
   const notices = [], menus = [];
-  const Menu = class { constructor() { this.items = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } showAtPosition() { return this; } showAtMouseEvent() { return this; } };
+  const Menu = class { constructor() { this.items = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -311,6 +311,39 @@ test('A3 clean-up: a member moved to another parent or removed shrinks or remove
   assert.equal((await h.repo.readMap(MAP)).canvasItems, undefined);
 });
 
+test('T6 P3 entries (counterexample 15, D4/D10): Note style… only for one regular topic; a multi-selection, an AIM conclusion card, an AIM map and presentation get none; Menu key / Shift+F10 (client 0,0) opens the menu beside the card', async () => {
+  const h = await harness();
+  const card = h.view.cardEls.get(h.ids.b);
+  card.getBoundingClientRect = () => ({ left: 500, bottom: 190, top: 150, right: 700 });
+  const event = (x = 1, y = 1) => ({ clientX: x, clientY: y, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
+  const titles = () => h.menus.at(-1).items.map(i => i.title);
+  const opened = [];
+  h.view.chooseTopicStyle = node => opened.push(node.id);
+  h.view.onCanvasContextMenu(event());
+  h.menus.at(-1).items[1].click();
+  assert.deepEqual(opened, [h.ids.b], 'the entry opens the chooser for the right-clicked topic');
+  h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
+  h.view.onCanvasContextMenu(event());
+  assert.deepEqual(titles(), ['Add summary bracket'], 'two or more selected topics: no per-topic style');
+  h.view.selection.replaceMulti([]);
+  h.view.map.nodes.find(n => n.id === h.ids.b).aimKind = 'conclusion';
+  h.view.onCanvasContextMenu(event());
+  assert.deepEqual(titles(), ['Add summary bracket'], 'an AIM conclusion card has its own style row in the settings');
+  delete h.view.map.nodes.find(n => n.id === h.ids.b).aimKind;
+  h.view.onCanvasContextMenu(event(0, 0));
+  assert.deepEqual(plain(h.menus.at(-1).at), { x: 500, y: 190 }, 'keyboard: the menu sits at the bottom-left of the card');
+  assert.equal(h.menus.at(-1).mouse, undefined);
+  for (const mode of ['aim', 'presentation']) {
+    const g = await harness();
+    if (mode === 'aim') g.view.map.aim = { branches: [] };
+    if (mode === 'presentation') g.view.presentation = { order: [], currentId: 'x' };
+    const gcard = g.view.cardEls.get(g.ids.b);
+    const before = g.menus.length;
+    g.view.onCanvasContextMenu({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? gcard : null) } });
+    assert.equal(g.menus.length, before, `${mode}: no menu, so no Note style…`);
+  }
+});
+
 test('A5 wiring: the integration context gets the brackets of that parent only; the chat gets every bracket as the effective range', async () => {
   const h = await harness({ build: ids => [{ id: 's1', kind: 'summary', parentId: ids.root, members: [ids.a, ids.c], text: 'Conclude: postpone' }] });
   assert.deepEqual(plain(h.view.summaryDirections(h.ids.root)), { summaryDirections: '- Alpha; Beta; Gamma\n  Conclude: postpone' });
@@ -326,7 +359,8 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
   h.view.onCanvasContextMenu(event());
-  assert.deepEqual(h.menus.at(-1).items.map(i => i.title), ['Add summary bracket']);
+  assert.deepEqual(h.menus.at(-1).items.map(i => i.title), ['Add summary bracket', 'Note style…'], 'T6 P3 added the topic note style entry after the bracket (D4)');
+  assert.equal(h.menus.at(-1).mouse, true, 'a mouse right-click opens the menu at the pointer');
   h.menus.at(-1).items[0].click();
   assert.ok(h.area(), 'one card is enough; the editor opens');
   assert.deepEqual(plain(h.view.pendingSummary.members), [h.ids.b]);

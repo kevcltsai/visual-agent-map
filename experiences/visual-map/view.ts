@@ -229,23 +229,20 @@ import {
   isPlaceholder
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import { builtinTemplates, STANDARD_TEMPLATE_ID, type DetailTemplate } from "../../ai/detail-templates";
+import type { DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
-import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
-import { parseBlockRef, resolveBlockFolder } from "../../core/blocks/block-files";
+import { DEFAULT_OUTLINE_PRESET_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
+import { resolveBlockFolder } from "../../core/blocks/block-files";
 import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
 import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNote } from "../../ai/note-writeback";
 import type { WritebackHooks } from "./topic-run";
-import { NOTE_STYLE_PRESETS, fileStyleName, styleLabel } from "./note-style";
 import {
   errorNotice,
   actionNotice,
-  openStyleChooser,
+  openTopicStyleChooser,
   stylePickerFor,
-  styleRefOf,
   type StylePicker,
-  type StyleRef,
   styleIssueText
 } from "./note-style-picker";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
@@ -2119,10 +2116,6 @@ export class VisualAgentMapView extends ItemView {
       console.warn("Visual Agent Map note styles refresh", error);
     }
   }
-  /** Built-in tones plus the tone blocks the user wrote, for the tone selects (call `noteStyles.refresh()` first for the blocks). */
-  private toneChoices(): { id: string; name: string }[] {
-    return this.noteStyles.toneChoices();
-  }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
   private fieldLinks(): FieldLinks {
     return {
@@ -2130,61 +2123,9 @@ export class VisualAgentMapView extends ItemView {
       styles: this.stylePicker()
     };
   }
-  /** Built-in Standard and Textbook plus the workspace's custom templates, for the template selects. */
-  private templateChoices(): { id: string; name: string }[] {
-    const settings = this.plugin.settings;
-    return [...builtinTemplates(noteLanguageOf(settings.language), settings.language), ...settings.detailTemplates].map(
-      ({ id, name }) => ({ id, name })
-    );
-  }
-  /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
-  private currentStyleLabel(templateId: string, toneId: string): string {
-    const fileName = fileStyleName(templateId);
-    if (fileName !== undefined) return fileName;
-    const names = (list: { id: string; name: string }[]) => (id: string) =>
-      list.find(item => item.id === id)?.name ?? id;
-    return styleLabel(
-      templateId,
-      toneId,
-      { template: names(this.templateChoices()), tone: names(this.toneChoices()) },
-      this.plugin.settings.language
-    );
-  }
-  /** Name of the workspace default note style (default template, academic tone) for "Use the default (…)". */
-  private defaultStyleLabel(): string {
-    // The workspace template block decides once it is set (the upgrade sets it from the old default).
-    const block = this.plugin.settings.noteTemplateBlock;
-    const named = block ? this.noteStyles.listBlocks("template").find(item => item.ref === block)?.name : undefined;
-    if (named) return named;
-    const chosen = this.plugin.settings.defaultNoteStyleId;
-    const preset = NOTE_STYLE_PRESETS.find(item => item.id === chosen);
-    if (preset) return t(preset.short);
-    return this.currentStyleLabel(
-      chosen ?? this.plugin.settings.defaultDetailTemplateId ?? STANDARD_TEMPLATE_ID,
-      DEFAULT_TONE_ID
-    );
-  }
   /** The style folder for the pickers; a plugin without a style store (a test double) has none. */
   private stylePicker(): StylePicker | undefined {
     return stylePickerFor(this.app, this.plugin);
-  }
-  /** The style behind a stored pair, for "Edit this style" on the first option of a picker. */
-  private styleRefFor(templateId: string | undefined, toneId: string | undefined): StyleRef | undefined {
-    return styleRefOf(templateId, toneId);
-  }
-  private defaultStyleRef(): StyleRef | undefined {
-    const block = parseBlockRef(this.plugin.settings.noteTemplateBlock);
-    if (block?.kind === "file") return { kind: "file", id: this.plugin.settings.noteTemplateBlock! };
-    if (block?.kind === "builtin") {
-      const preset = NOTE_STYLE_PRESETS.find(item => item.templateId === block.id && item.toneId === DEFAULT_TONE_ID);
-      if (preset) return { kind: "builtin", id: preset.id };
-    }
-    const chosen = this.plugin.settings.defaultNoteStyleId;
-    if (chosen) {
-      const preset = NOTE_STYLE_PRESETS.find(item => item.id === chosen);
-      return preset ? { kind: "builtin", id: preset.id } : this.styleRefFor(chosen, undefined);
-    }
-    return this.styleRefFor(this.plugin.settings.defaultDetailTemplateId ?? STANDARD_TEMPLATE_ID, DEFAULT_TONE_ID);
   }
   /** Adds an outline to the open map: under the selected topic, else as a new tree. A new map starts from + New mind map. */
   openOutlineImport(prefill?: OutlineDraftPrefill): void {
@@ -7243,7 +7184,20 @@ export class VisualAgentMapView extends ItemView {
             .setIcon("brackets")
             .onClick(() => this.addSummaryOver(ids))
         );
-        menu.showAtMouseEvent(event);
+        // One topic only; the AIM conclusion cards have their own style row in the settings.
+        const topic = ids.length === 1 ? this.map?.nodes.find(item => item.id === cardId) : undefined;
+        if (topic && !topic.aimKind)
+          menu.addItem(item =>
+            item
+              .setTitle(t("ui.note_style_menu"))
+              .setIcon("palette")
+              .onClick(() => void this.chooseTopicStyle(topic))
+          );
+        // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the card, where a keyboard user is.
+        if (event.clientX === 0 && event.clientY === 0) {
+          const box = card.getBoundingClientRect();
+          menu.showAtPosition({ x: box.left, y: box.bottom });
+        } else menu.showAtMouseEvent(event);
       }
       return;
     }
@@ -8944,20 +8898,6 @@ export class VisualAgentMapView extends ItemView {
         description: t("ui.manage_notes_that_are_currently_outside_the_mind_map"),
         action: () => this.enqueue(() => this.openOrganizer())
       });
-    // One note style (content template + writing tone) for regular maps; templates do not apply to AIM maps.
-    if (this.map && !this.map.aim)
-      choices.push({
-        label: t("ui.note_style_map_default"),
-        description: t("ui.note_style_map_default_desc"),
-        action: () => this.chooseMapStyle()
-      });
-    // Writing tone applies to the notes AI writes; AIM maps use it for their research and final report.
-    if (this.map && this.map.aim)
-      choices.push({
-        label: t("ui.tone_map_default"),
-        description: t("ui.tone_map_default_desc"),
-        action: () => this.chooseMapTone()
-      });
     choices.push({
       label: t("ui.repair_missing_mind_map"),
       description: t("ui.rebuild_a_missing_map_from_existing_topic_notes"),
@@ -8971,69 +8911,6 @@ export class VisualAgentMapView extends ItemView {
         action: () => this.deleteCurrentMap()
       });
     new ChoiceModal(this.app, t("ui.more_mind_map_actions"), t("ui.additional_map_management_actions"), choices).open();
-  }
-  /** The map's default note style: both stored values (template and tone) are set or cleared together. */
-  private chooseMapStyle(): void {
-    const apply = (templateId: string | undefined, toneId: string | undefined): void =>
-      this.enqueue(() =>
-        this.mapChange(map => {
-          if (templateId) map.detailTemplateId = templateId;
-          else delete map.detailTemplateId;
-          // A style file decides its own tone: choosing one deletes this layer's tone.
-          if (toneId) map.toneId = toneId;
-          else delete map.toneId;
-        }, false)
-      );
-    const templateId = this.map?.detailTemplateId;
-    const toneId = this.map?.toneId;
-    const unset = !templateId && !toneId;
-    const known = unset ? undefined : this.styleRefFor(templateId, toneId);
-    void openStyleChooser(this.app, this.stylePicker(), {
-      title: t("ui.note_style_map_default"),
-      description: t("ui.note_style_map_default_desc"),
-      leading: [
-        {
-          label: t("ui.note_style_use_default_0", this.defaultStyleLabel()),
-          ...(unset ? { description: t("ui.detail_template_current") } : {}),
-          action: () => apply(undefined, undefined)
-        },
-        // An older template-and-tone pair that is none of the listed styles stays as it is and can be kept.
-        ...(!unset && !known
-          ? [
-              {
-                label: this.currentStyleLabel(templateId ?? STANDARD_TEMPLATE_ID, toneId ?? DEFAULT_TONE_ID),
-                description: t("ui.detail_template_current"),
-                action: () => apply(templateId, toneId)
-              }
-            ]
-          : [])
-      ],
-      ...(known ? { current: known } : {}),
-      ...(unset ? { editRef: this.defaultStyleRef() } : {}),
-      // Only a style file deletes the layer's tone; an old template keeps the tone the map already has.
-      pick: (template, tone) => apply(template, tone ?? (template.startsWith("style:") ? undefined : toneId))
-    });
-  }
-  private chooseMapTone(): void {
-    const apply = (id: string | undefined): void =>
-      this.enqueue(() =>
-        this.mapChange(map => {
-          if (id) map.toneId = id;
-          else delete map.toneId;
-        }, false)
-      );
-    const current = this.map?.toneId;
-    const mark = (id: string | undefined) => (id === current ? { description: t("ui.detail_template_current") } : {});
-    // The tone blocks are read when the list opens, so a block written a moment ago is in it.
-    void this.noteStyles
-      .refresh()
-      .catch(() => undefined)
-      .then(() =>
-        new ChoiceModal(this.app, t("ui.tone_map_default"), t("ui.tone_map_default_desc"), [
-          { label: t("ui.tone_use_default"), ...mark(undefined), action: () => apply(undefined) },
-          ...this.toneChoices().map(({ id, name }) => ({ label: name, ...mark(id), action: () => apply(id) }))
-        ]).open()
-      );
   }
   private aimActiveForPath(path: string): boolean {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).some(leaf => {
@@ -13110,9 +12987,9 @@ export class VisualAgentMapView extends ItemView {
       this.app,
       names,
       this.modelChoices(),
-      this.templateChoices(),
+      [],
       request => void this.startMultiResearch(request, retryBatchKey),
-      this.toneChoices(),
+      [],
       undefined,
       this.fieldLinks(),
       shown.map(item => item.mode)
@@ -17969,17 +17846,7 @@ export class VisualAgentMapView extends ItemView {
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
     this.noticeKindMissing(resolved.issues, note.topicKind ?? "topic", note.detailTemplateId, gate);
-    if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
-      if (note.detailTemplateId.startsWith("style:") || note.detailTemplateId.startsWith("file:")) {
-        // The file may come back (moved back, restored): the note is not rewritten. The Notice offers another style.
-        const missingId = note.detailTemplateId;
-        actionNotice(this.missingTemplateMessage(missingId), t("ui.note_style_switch"), () =>
-          this.switchNoteStyle(node)
-        );
-      } else {
-        new Notice(this.missingTemplateMessage(note.detailTemplateId));
-      }
-    }
+    this.noticeTopicStyleMissing(node, note, missing);
     return resolved;
   }
   /**
@@ -18060,24 +17927,60 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   private noStyleFiles?: NoteStyleStore;
-  /** From the "style not found" Notice: pick another style for this topic (a file style also deletes the topic's tone). */
-  private switchNoteStyle(node: MapNode): void {
-    void openStyleChooser(this.app, this.stylePicker(), {
-      title: t("ui.note_style"),
-      description: t("ui.note_style_switch"),
-      pick: (templateId, toneId) =>
+  /**
+   * The topic's own `note-style`, `detail-template` or `tone` could not be read: one Notice with a button that opens the
+   * topic's style chooser. Only the entry of a run calls this, and the topic file is never rewritten.
+   */
+  private noticeTopicStyleMissing(node: MapNode, note: Note, missing: readonly string[]): void {
+    const messages: string[] = [];
+    const named = (ref: string): string => `${ref.replace(/^(?:builtin|file|style):/, "")}.md`;
+    const isFile = (ref: string): boolean => ref.startsWith("style:") || ref.startsWith("file:");
+    if (note.noteStyle && missing.includes(note.noteStyle))
+      messages.push(
+        isFile(note.noteStyle)
+          ? t("ui.note_style_file_missing_0", named(note.noteStyle))
+          : t("ui.detail_template_missing_0", note.noteStyle)
+      );
+    // An old template or tone is only read when the topic has no readable `note-style` of its own.
+    if (note.detailTemplateId && missing.includes(note.detailTemplateId))
+      messages.push(
+        isFile(note.detailTemplateId)
+          ? t("ui.note_style_file_missing_0", named(note.detailTemplateId))
+          : t("ui.detail_template_missing_0", note.detailTemplateId)
+      );
+    if (note.toneId && missing.includes(note.toneId)) messages.push(t("ui.note_style_tone_missing_0", note.toneId));
+    if (messages.length)
+      actionNotice(messages.join(" "), t("ui.note_style_switch"), () => void this.chooseTopicStyle(node));
+  }
+  /**
+   * The topic's note style chooser (right-click "Note style…", or the Notice above). Choosing writes `note-style` only; "Follow
+   * the topic type" removes it with the old `detail-template` and `tone`. One undoable step for the topic file; the current
+   * row writes nothing.
+   */
+  private async chooseTopicStyle(node: MapNode): Promise<void> {
+    if (!this.map || this.map.aim || this.presentation || node.aimKind) return;
+    const path = node.path;
+    const note = await this.plugin.repo.readNote(path, this.map);
+    const refocus = (): void => this.cardEls.get(node.id)?.focus?.();
+    await openTopicStyleChooser(this.app, this.plugin, {
+      note,
+      kind: note.topicKind ?? "topic",
+      dismissed: refocus,
+      write: ref =>
         this.enqueue(async () => {
-          await this.plugin.repo.updateNote(node.path, {
-            detailTemplateId: templateId,
-            ...(toneId !== undefined ? { toneId } : templateId.startsWith("style:") ? { toneId: "" } : {})
-          });
+          if (!this.map) return;
+          const viewport = clone(this.map.viewport);
+          const entry = await this.beginMapTransaction()
+            .rewriteNote(path, target => this.plugin.repo.writeNoteStyle(target, ref))
+            .editMap(this.path, map => {
+              map.viewport = clone(viewport);
+            })
+            .commit({ deferRebuild: true, label: t("ui.note_style") });
+          this.history.push(entry);
+          await this.refreshAfterSavedChange();
+          refocus();
         })
     });
-  }
-  private missingTemplateMessage(id: string): string {
-    return id.startsWith("style:") || id.startsWith("file:")
-      ? t("ui.note_style_file_missing_0", `${id.replace(/^(?:style|file):/, "")}.md`)
-      : t("ui.detail_template_missing_0", id);
   }
   /**
    * The note style for content that has no topic choice of its own (new integrated topics, child contributions); a dialog

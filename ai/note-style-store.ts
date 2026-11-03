@@ -627,8 +627,10 @@ export class NoteStyleStore {
       const own = BUILTIN_RECIPES.find(item => `builtin:${item.id}` === KIND_DEFAULT_RECIPE[kind])?.structure;
       structure = this.structurePart(`builtin:${own && own !== AIM_DELIVERY_STRUCTURE ? own : "standard"}`, language);
     }
-    const voice =
-      (toneId ? this.legacyVoice(toneId, language) : undefined) ?? this.voicePart("builtin:academic", language)!;
+    let voice = toneId ? this.legacyVoice(toneId, language) : undefined;
+    // A tone id that names nothing is academic rigor, and the entry tells the user (never silently).
+    if (toneId && !voice) miss(toneId);
+    voice ??= this.voicePart("builtin:academic", language)!;
     const resolvedStructure = structure ?? this.structurePart("builtin:standard", language)!;
     return {
       ref: "legacy",

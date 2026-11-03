@@ -65,7 +65,8 @@ test('no folder, no new keys (was: topic x map x workspace matrix; grilling Q10/
     const got = store.runStyle(request([{ template: topic, tone: noteTone }, { template: map, tone: mapTone }]));
     const want = todayTemplate(settings, [topic]);
     eq(got.template, want.template);
-    eq(got.issues.missing, want.missing);
+    // R1-L1 (T6 P3): a topic tone that names nothing is reported after the structure (academic rigor still stands in).
+    eq(got.issues.missing, [...want.missing, ...(noteTone === 'nope' ? ['nope'] : [])]);
     assert.equal(got.toneText, M.resolveToneText(PRESETS, [noteTone], 'en'));
     assert.equal(got.label.fileName, undefined);
     assert.equal(got.issues.invalid, undefined);

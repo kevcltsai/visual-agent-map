@@ -1663,6 +1663,20 @@ export class Repository {
   }
 
   /**
+   * Sets a note's own note style. A ref writes `note-style` only (the 0.28.0 `detail-template` and `tone` stay as they are);
+   * null is "follow the topic type" and removes all three keys. Other lines and the body keep their bytes, `updated` is not
+   * bumped, nothing rebuilds.
+   */
+  async writeNoteStyle(path: string, ref: string | null): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      setFrontmatterKeys(
+        content,
+        ref === null ? { "note-style": null, "detail-template": null, tone: null } : { "note-style": ref }
+      )
+    );
+  }
+
+  /**
    * Toggles one marker in `topic-markers`, reading the current list inside the same `vault.process` call. Values this
    * version does not know are kept, an emptied list removes the key, and `updated` is not bumped.
    */

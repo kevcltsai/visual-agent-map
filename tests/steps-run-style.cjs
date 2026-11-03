@@ -297,3 +297,18 @@ test('P3 (was: the style name of a template and tone pair is the preset name or 
   assert.equal(store.runStyle({ outputLanguage: 'en', topic: { template: 'A' } }).recipe.implicit, true);
   assert.equal(store.runStyle({ outputLanguage: 'en' }).label.styleName, 'General research');
 });
+
+test('R1-L1 (T6 P3): a topic tone that cannot be read is reported missing and the voice is academic rigor; nothing is written; a readable tone or a topic without tone reports nothing', async () => {
+  const { store, v, counter } = await world();
+  const gone = store.runStyle({ topic: { tone: 'gone' }, kind: 'topic', outputLanguage: 'en' });
+  assert.deepEqual(plain(gone.issues.missing), ['gone']);
+  assert.equal(gone.toneText, undefined, 'academic rigor adds no tone text');
+  assert.equal(gone.label.toneName, store.runStyle({ outputLanguage: 'en' }).label.toneName);
+  const both = store.runStyle({ topic: { template: 'gone-id', tone: 'gone' }, kind: 'topic', outputLanguage: 'en' });
+  assert.deepEqual(plain(both.issues.missing), ['gone-id', 'gone'], 'structure first, then voice, each once');
+  assert.deepEqual(plain(store.runStyle({ topic: { tone: 'plain' }, kind: 'topic', outputLanguage: 'en' }).issues.missing), []);
+  assert.deepEqual(plain(store.runStyle({ topic: {}, kind: 'topic', outputLanguage: 'en' }).issues.missing), []);
+  // A topic style that reads makes the implicit tone moot: it is not asked, so it is not reported.
+  assert.deepEqual(plain(store.runStyle({ topic: { style: 'builtin:textbook', tone: 'gone' }, kind: 'topic', outputLanguage: 'en' }).issues.missing), []);
+  assert.deepEqual(v.writes, []); assert.equal(counter.saves, 0);
+});

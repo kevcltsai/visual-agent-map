@@ -75,31 +75,22 @@ test('outline library: delete asks twice (armed for five seconds) and New preset
 });
 
 // ---- tone pickers -----------------------------------------------------------------------------------------------
-integrationTest('map default tone picker: lists built-in tones and tone blocks, marks the current one, sets and clears map.toneId', async () => {
+integrationTest('map actions (counterexample 9, Q15/Q17, C5; was: the map default note style and map default tone pickers): a regular map and an AIM map list neither "Note style for this map" nor "Voice for this map", and the old map values stay byte for byte', async () => {
   const opened = [];
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
-  // 06 P3: the custom tone presets are tone blocks now (the upgrade moved them); the picker's data source is the block folder.
-  const { NoteStyleStore } = load('ai/note-style-store.ts');
-  const settings = { language: 'en', workspaceFolder: 'WS', noteStylesFolder: 'WS/S', detailTemplates: [], promptPresets: [] };
-  const port = { list: async folder => (folder === 'WS/S/Voices' ? ['Mine.md'] : []), read: async () => 'x', folderExists: () => false, createFolder: async () => {}, create: async () => {}, trash: async () => {} };
-  const plugin = { settings, noteStyles: new NoteStyleStore({ settings: () => settings, port, save: async () => {} }) };
-  const view = new VisualAgentMapView({ app: {} }, plugin);
-  view.map = map([node('a')]); view.enqueue = work => work();
-  view.mapChange = async change => { change(view.map); };
-  view.chooseMapTone(); await tick();
-  const choices = opened.at(-1).choices;
-  assert.deepEqual(plain(choices.map(c => c.label)).slice(0, 1).concat(plain(choices.map(c => c.label)).slice(-1)), ['Follow default (Academic rigor)', 'Mine']);
-  assert.equal(choices.length, 1 + 6 + 1, 'use-the-default, the six built-in tones, the tone block');
-  assert.equal(choices[0].description, 'Current setting');
-  const magazine = choices.find(c => c.label === 'Magazine column');
-  await magazine.action(); await tick();
-  assert.equal(view.map.toneId, 'magazine');
-  view.chooseMapTone(); await tick();
-  assert.equal(opened.at(-1).choices.find(c => c.label === 'Magazine column').description, 'Current setting');
-  await choices.find(c => c.label === 'Mine').action(); await tick();
-  assert.equal(view.map.toneId, 'file:Mine', 'a tone block is stored as file:<name>');
-  await choices[0].action(); await tick();
-  assert.equal('toneId' in view.map, false);
+  const plugin = { settings: { language: 'en', detailTemplates: [], promptPresets: [] } };
+  for (const aim of [false, true]) {
+    const view = new VisualAgentMapView({ app: {} }, plugin);
+    view.map = { ...map([node('a')]), detailTemplateId: 'textbook', toneId: 'plain', ...(aim ? { aim: { branches: [] } } : {}) };
+    const before = JSON.stringify(view.map);
+    view.openMapActions();
+    const labels = plain(opened.at(-1).choices.map(choice => choice.label));
+    assert.ok(labels.length >= 2 && labels.includes('Rename current mind map'), labels.join('|'));
+    for (const label of labels) assert.ok(!/note style|voice|tone/i.test(label), `${aim ? 'AIM' : 'regular'} map: ${label}`);
+    assert.equal(JSON.stringify(view.map), before, 'opening the actions leaves the old map values alone');
+  }
+  assert.equal(typeof load('main.ts', { obsidian }).VisualAgentMapView.prototype.chooseMapStyle, 'undefined');
+  assert.equal(typeof load('main.ts', { obsidian }).VisualAgentMapView.prototype.chooseMapTone, 'undefined');
 });
 // The one-line note-style choice (T6 P2): "Note style: X", a button "Use another style this time", and a select that exists once opened.
 const styleLine = root => findAll(find(root, i => hasCls(i, 'vam-style-choice-text')), i => i.text).map(i => i.text).join('');

@@ -1,7 +1,12 @@
 import { t } from "../../i18n";
 import { DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
-import { UPDATE_MODE_KEYS } from "../../ai/note-style-recipe";
-import { builtinRecipeItems, styleIssueText, type PickerRecipe, type StylePicker } from "./note-style-picker";
+import {
+  builtinRecipeItems,
+  recipeTags,
+  styleIssueText,
+  type PickerRecipe,
+  type StylePicker
+} from "./note-style-picker";
 
 /** Live model choices: the list fills in as model discovery finishes. */
 export interface ModelChoices {
@@ -161,13 +166,6 @@ export interface StyleChoiceField {
 }
 
 let choiceCount = 0;
-
-/** The four small labels of a style: structure, voice, format and (not for the AIM report) the update mode. */
-function recipeTags(item: PickerRecipe): string {
-  const tags = [item.structure.name, item.voice.name, item.format.name];
-  if (!item.aimOnly) tags.push(t(UPDATE_MODE_KEYS[item.update]));
-  return tags.join(" · ");
-}
 
 /**
  * The one-line note-style choice of a research dialog: "Note style: X" and a button "Use another style this time". The

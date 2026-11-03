@@ -22154,22 +22154,35 @@ var CANONICAL_HEADINGS = Object.freeze(
 );
 var isCanonical = (set) => set.Detail === CANONICAL_HEADINGS.Detail;
 function noteHeadingSet(content) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const start = content.indexOf(DETAIL_START);
   if (start < 0) return void 0;
-  const heading = (_a2 = [...content.slice(0, start).matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)) == null ? void 0 : _a2[1];
-  return (_b2 = NOTE_HEADING_SETS.find((set) => !isCanonical(set) && set.Detail === heading)) != null ? _b2 : CANONICAL_HEADINGS;
+  const before = content.slice(0, start);
+  const heading = (_a2 = [...before.matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)) == null ? void 0 : _a2[1];
+  const localized = NOTE_HEADING_SETS.filter((set) => !isCanonical(set));
+  const summary = (set) => new RegExp(`^## ${set["Current Summary"]}[ \\t]*\\r?$`, "m").test(before) && !/^## Current Summary[ \t]*\r?$/m.test(before);
+  return (_c = (_b2 = localized.find((set) => set.Detail === heading)) != null ? _b2 : heading === CANONICAL_HEADINGS.Detail ? void 0 : localized.find(summary)) != null ? _c : CANONICAL_HEADINGS;
+}
+function fencedOutsideDetail(lines) {
+  let inDetail = false;
+  const masked = lines.map((line) => {
+    if (line.trim() === DETAIL_START) inDetail = true;
+    const value = inDetail ? "" : line;
+    if (line.trim() === DETAIL_END) inDetail = false;
+    return value;
+  });
+  return fencedLines(masked);
 }
 function writtenHeadingSet(content, fallback) {
   const set = noteHeadingSet(content);
   if (set) return set;
-  return /^## (?:Current Summary|Detail|Prompt)[ \t]*\r?$/m.test(content) ? CANONICAL_HEADINGS : fallback;
+  return /^## (?:Current Summary|Detail|Prompt|Rules|Working Findings|Thinking Origin)[ \t]*\r?$/m.test(content) ? CANONICAL_HEADINGS : fallback;
 }
 var CALLOUT_TITLE = /^(> \[!info\][+-]? )(.+?)([ \t]*\r?)$/;
 function renameManagedHeadings(content, rename) {
   var _a2;
   const lines = content.split("\n");
-  const code = fencedLines(lines);
+  const code = fencedOutsideDetail(lines);
   let inDetail = false;
   let origin = "none";
   for (let index = 0; index < lines.length; index++) {
@@ -22211,7 +22224,7 @@ var CALLOUT_SECTION = /^> \[!info\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
 function decodeCalloutSections(content) {
   var _a2;
   const lines = canonicalHeadings(content, (_a2 = noteHeadingSet(content)) != null ? _a2 : CANONICAL_HEADINGS).split("\n");
-  const code = fencedLines(lines);
+  const code = fencedOutsideDetail(lines);
   const out = [];
   let inDetail = false;
   let origin = "none";

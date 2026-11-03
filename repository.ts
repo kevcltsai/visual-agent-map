@@ -580,8 +580,32 @@ const isCanonical = (set: NoteHeadings): boolean => set.Detail === CANONICAL_HEA
 function noteHeadingSet(content: string): NoteHeadings | undefined {
   const start = content.indexOf(DETAIL_START);
   if (start < 0) return undefined;
-  const heading = [...content.slice(0, start).matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)?.[1];
-  return NOTE_HEADING_SETS.find(set => !isCanonical(set) && set.Detail === heading) ?? CANONICAL_HEADINGS;
+  const before = content.slice(0, start);
+  const heading = [...before.matchAll(/^## (.+?)[ \t]*\r?$/gm)].at(-1)?.[1];
+  const localized = NOTE_HEADING_SETS.filter(set => !isCanonical(set));
+  // A Detail heading the user renamed: the summary heading (written right under the title) still names the set.
+  const summary = (set: NoteHeadings): boolean =>
+    new RegExp(`^## ${set["Current Summary"]}[ \\t]*\\r?$`, "m").test(before) &&
+    !/^## Current Summary[ \t]*\r?$/m.test(before);
+  return (
+    localized.find(set => set.Detail === heading) ??
+    (heading === CANONICAL_HEADINGS.Detail ? undefined : localized.find(summary)) ??
+    CANONICAL_HEADINGS
+  );
+}
+/**
+ * Fenced-code lines of a note body, the Detail block left out: a fence the Detail text opens and never closes must not
+ * turn every section after the block into code (it would hide their headings from decoding and encoding).
+ */
+function fencedOutsideDetail(lines: string[]): boolean[] {
+  let inDetail = false;
+  const masked = lines.map(line => {
+    if (line.trim() === DETAIL_START) inDetail = true;
+    const value = inDetail ? "" : line;
+    if (line.trim() === DETAIL_END) inDetail = false;
+    return value;
+  });
+  return fencedLines(masked);
 }
 /** The interface language whose headings a note is written with (for tests and diagnostics); English without a marker. */
 export function noteHeadingLanguage(content: string): UiLanguage {
@@ -594,7 +618,9 @@ export function noteHeadingLanguage(content: string): UiLanguage {
 function writtenHeadingSet(content: string, fallback: NoteHeadings): NoteHeadings {
   const set = noteHeadingSet(content);
   if (set) return set;
-  return /^## (?:Current Summary|Detail|Prompt)[ \t]*\r?$/m.test(content) ? CANONICAL_HEADINGS : fallback;
+  return /^## (?:Current Summary|Detail|Prompt|Rules|Working Findings|Thinking Origin)[ \t]*\r?$/m.test(content)
+    ? CANONICAL_HEADINGS
+    : fallback;
 }
 const CALLOUT_TITLE = /^(> \[!info\][+-]? )(.+?)([ \t]*\r?)$/;
 /**
@@ -606,7 +632,7 @@ function renameManagedHeadings(
   rename: (text: string, kind: "heading" | "callout") => string | undefined
 ): string {
   const lines = content.split("\n");
-  const code = fencedLines(lines);
+  const code = fencedOutsideDetail(lines);
   let inDetail = false;
   let origin: "none" | "heading" | "quote" = "none";
   for (let index = 0; index < lines.length; index++) {
@@ -656,7 +682,7 @@ export function localizeHeadings(content: string, set: NoteHeadings): string {
 const CALLOUT_SECTION = /^> \[!info\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
 function decodeCalloutSections(content: string): string {
   const lines = canonicalHeadings(content, noteHeadingSet(content) ?? CANONICAL_HEADINGS).split("\n");
-  const code = fencedLines(lines);
+  const code = fencedOutsideDetail(lines);
   const out: string[] = [];
   let inDetail = false;
   // Thinking Origin is quoted source text: a line there that looks like a callout title is still source text.

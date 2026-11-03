@@ -2305,3 +2305,24 @@ test('C8 heading language: only the managed Detail heading decides; the marker l
   for (const line of ['<!-- visual-agent-map:detail:start -->', '<!-- visual-agent-map:references:end -->', '<!-- aim-open-items ["a","b"] -->']) assert.ok(INTERNAL_MARKER_LINE.test(line), line);
   assert.equal(INTERNAL_MARKER_LINE.test('<!-- a user comment -->'), false, 'a user comment is left alone');
 });
+integrationTest('C8 review: an unclosed code fence in Detail does not hide the localized sections after it; a renamed Detail heading keeps the note on its heading set', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo, '圍欄');
+  await repo.updateNote(n.path, { summary: 'S', prompt: 'P1', rules: 'R1', newFindings: 'F1', thinkingOrigin: 'O1' });
+  await repo.updateNote(n.path, { detail: '```\ncode without a closing fence' });
+  let note = await repo.readNote(n.path);
+  assert.equal(note.rules, 'R1'); assert.equal(note.newFindings, 'F1'); assert.equal(note.prompt, 'P1'); assert.equal(note.thinkingOrigin, 'O1');
+  await repo.updateNote(n.path, { rules: 'R2', newFindings: 'F2' });
+  let text = contents.get(n.path);
+  assert.equal((text.match(/^## 規則$/gm) || []).length, 1, text);
+  assert.doesNotMatch(text, /^## (Rules|Working Findings|Current Summary)$/m, 'no second, English copy of a section');
+  assert.match(text, /## 規則\n\nR2/); assert.doesNotMatch(text, /R1|F1/);
+  // The user renames the Detail heading: the summary heading still says the note is zh-TW.
+  contents.set(n.path, contents.get(n.path).replace('## 詳細內容\n', '## 詳細內容（AI）\n'));
+  note = await repo.readNote(n.path);
+  assert.equal(note.rules, 'R2'); assert.equal(note.newFindings, 'F2');
+  await repo.updateNote(n.path, { summary: 'S2' });
+  text = contents.get(n.path);
+  assert.doesNotMatch(text, /^## (Current Summary|Detail|Rules|Working Findings)$/m, text);
+  assert.equal((text.match(/^## 目前摘要$/gm) || []).length, 1);
+  assert.equal((await repo.readNote(n.path)).summary, 'S2');
+});

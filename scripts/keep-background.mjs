@@ -13,15 +13,24 @@ export const instancePattern = appProfile => `MacOS/Obsidian --user-data-dir=${a
 
 // Pure decision: remember whatever is in front when it is not this instance; hand focus back only when this instance
 // itself is in front, an owner app is known, and the allow-focus switch is off.
-export function focusAction({ frontPid, frontPath, instancePid, ownerApp = null, allowFocus = false }) {
+export function focusAction({ frontPid, frontPath, instancePid, ownerApp = null, allowFocus = false, testPids = [], ownerAlive = true, obsidianPath }) {
   if (!Number.isFinite(frontPid) || !frontPath) return { ownerApp, reopen: false };
+  // Another harness instance in front is not the owner's app: keep what was recorded.
+  if (frontPid !== instancePid && testPids.includes(frontPid)) return { ownerApp, reopen: false };
   if (frontPid !== instancePid) return { ownerApp: { pid: frontPid, path: frontPath }, reopen: false };
-  return { ownerApp, reopen: Boolean(ownerApp?.path) && !allowFocus };
+  // The owner quit their app: reopening it would relaunch what they just closed.
+  if (ownerApp && !ownerAlive) return { ownerApp: null, reopen: false };
+  // The owner's own Obsidian shares the bundle path: `open -a` could pick a test instance, so never target it.
+  return { ownerApp, reopen: Boolean(ownerApp?.path) && !allowFocus && ownerApp.path !== obsidianPath };
 }
 
 export function frontApp() {
   const info = spawnSync("sh", ["-c", "lsappinfo info -only pid -only bundlepath \"$(lsappinfo front)\""], { encoding: "utf8" }).stdout ?? "";
   return { pid: Number(/"pid"=(\d+)/.exec(info)?.[1]), path: /"LSBundlePath"="([^"]+)"/.exec(info)?.[1] };
+}
+
+function processAlive(pid) {
+  try { process.kill(pid, 0); return true; } catch (error) { return error.code === "EPERM"; }
 }
 
 export function watch(appProfile, obsidianApp, previous = frontApp(), intervalSeconds = 0.2) {
@@ -39,10 +48,10 @@ export function watch(appProfile, obsidianApp, previous = frontApp(), intervalSe
     }
     started = true;
     const front = frontApp();
-    const action = focusAction({ frontPid: front.pid, frontPath: front.path, instancePid, ownerApp, allowFocus: existsSync(join(appProfile, "allow-focus")) });
+    const testPids = spawnSync("pgrep", ["-f", "--", "MacOS/Obsidian --user-data-dir="], { encoding: "utf8" }).stdout.split("\n").filter(Boolean).map(Number);
+    const action = focusAction({ frontPid: front.pid, frontPath: front.path, instancePid, ownerApp, allowFocus: existsSync(join(appProfile, "allow-focus")), testPids, ownerAlive: ownerApp ? processAlive(ownerApp.pid) : true, obsidianPath: obsidianApp });
     ownerApp = action.ownerApp;
-    // The owner's own Obsidian shares the bundle path: `open -a` could pick a test instance, so never target it.
-    if (action.reopen && ownerApp.path !== obsidianApp) spawnSync("open", ["-a", ownerApp.path]);
+    if (action.reopen) spawnSync("open", ["-a", ownerApp.path]);
     spawnSync("sleep", [String(intervalSeconds)]);
   }
 }

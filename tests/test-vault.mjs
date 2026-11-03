@@ -267,8 +267,17 @@ test('focusAction does not reopen when the owner\'s own Obsidian (same bundle, o
   assert.equal(focusAction({ ...focusBase, frontPid: 50, frontPath: obsidianPath }).reopen, false);
 });
 
-test('focusAction does not reopen when another test instance is in front', () => {
-  assert.equal(focusAction({ ...focusBase, frontPid: 77, frontPath: obsidianPath }).reopen, false);
+test('focusAction does not reopen and keeps the owner app when another test instance is in front', () => {
+  assert.deepEqual(focusAction({ ...focusBase, testPids: [99, 77], frontPid: 77, frontPath: obsidianPath }), { ownerApp: focusOwner, reopen: false });
+});
+
+test('focusAction clears the owner app instead of reopening when the owner app has quit', () => {
+  assert.deepEqual(focusAction({ ...focusBase, ownerAlive: false, frontPid: 99, frontPath: obsidianPath }), { ownerApp: null, reopen: false });
+});
+
+test('focusAction never reopens when the recorded owner app is the Obsidian bundle', () => {
+  const ownObsidian = { pid: 50, path: obsidianPath };
+  assert.deepEqual(focusAction({ ...focusBase, ownerApp: ownObsidian, obsidianPath, frontPid: 99, frontPath: obsidianPath }), { ownerApp: ownObsidian, reopen: false });
 });
 
 test('focusAction with allow-focus does not reopen and keeps the recorded owner app', () => {

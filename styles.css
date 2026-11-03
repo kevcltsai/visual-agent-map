@@ -35,7 +35,7 @@
 .vam-research-progress { display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vam-research-progress-track { width: 88px; height: 4px; overflow: hidden; border-radius: 2px; background: var(--background-modifier-border); }
 .vam-research-progress-fill { height: 100%; border-radius: inherit; background: var(--interactive-accent); }
-.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.vam-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 2px; max-width: 100%; margin-left: auto; }
 .vam-toolbar-actions .vam-new-map { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; }
 .vam-new-map-icon { display: inline-flex; color: var(--text-muted); }
 .vam-new-map-icon svg { width: 14px; height: 14px; }
@@ -50,7 +50,7 @@
 .vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }
 .vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
-.vam-zoom-controls { right: 12px; bottom: 12px; }
+.vam-zoom-controls { right: 12px; bottom: 12px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
 .vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-layout-button::after { content: "▾" / ""; margin-left: 4px; color: var(--text-muted); }
 .vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }

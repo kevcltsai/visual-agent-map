@@ -171,6 +171,18 @@ test('Bug bash E #24: Show all says so when the 25% floor keeps cards off screen
   assert.equal(inset.fitViewport({ minX: 0, minY: 0, maxX: 9000, maxY: 9000 }, { width: 1000, height: 600 }, 0).zoom, 0.25);
 });
 
+test('Bug bash E #13: in a narrow pane the toolbar actions wrap inside the pane and the zoom controls stay inside its left edge', () => {
+  const actions = rule('.vam-toolbar-actions');
+  assert.match(actions, /flex-wrap: wrap/, 'actions wrap instead of running past the pane');
+  assert.match(actions, /max-width: 100%/, 'actions never grow wider than the toolbar');
+  assert.match(actions, /margin-left: auto/, 'still pushed to the end when there is room');
+  const zoom = rule('.vam-zoom-controls');
+  assert.match(zoom, /max-width: calc\(100% - 24px\)/, 'zoom controls leave the 12px gap on both sides');
+  assert.match(zoom, /flex-wrap: wrap/);
+  assert.match(zoom, /right: 12px/);
+  assert.match(css, /\.vam-workspace\.has-inspector \.vam-zoom-controls \{ right: auto; left: 12px; \}/, 'the inspector shift rule stays');
+});
+
 test('the empty-map hint ignores pointer events but its Topic button receives them', () => {
   assert.match(rule('.vam-empty'), /pointer-events: none/);
   assert.match(rule('.vam-empty button'), /pointer-events: auto/);

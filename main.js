@@ -51596,6 +51596,11 @@ ${request.requirements}` : preset.text,
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
   }
+  /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
+  whenEditing(action) {
+    if (this.presentation) return;
+    action();
+  }
   button(parent, text11, action, disabled = false) {
     const button = parent.createEl("button", { text: text11 });
     if (this.renderingCard) button.tabIndex = -1;
@@ -56095,12 +56100,14 @@ ${request.requirements}` : preset.text,
       const collapse = this.button(
         node.collapsed ? header : tools,
         node.collapsed ? t("ui.expand_0", count) : t("ui.collapse"),
-        () => this.enqueue(
-          () => this.mapChange((map) => {
-            const n = map.nodes.find((n2) => n2.id === node.id);
-            n.collapsed = !n.collapsed;
-            this.arrangeAll(map);
-          })
+        () => this.whenEditing(
+          () => this.enqueue(
+            () => this.mapChange((map) => {
+              const n = map.nodes.find((n2) => n2.id === node.id);
+              n.collapsed = !n.collapsed;
+              this.arrangeAll(map);
+            })
+          )
         )
       );
       collapse.addClass("vam-collapse-button", ...node.collapsed ? ["is-collapsed"] : []);
@@ -56108,33 +56115,47 @@ ${request.requirements}` : preset.text,
     }
     if (!this.selection.state.multiSelectMode) {
       if (!((_z = this.map) == null ? void 0 : _z.aim)) {
-        const structure2 = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
+        const structure2 = this.button(
+          tools,
+          t("ui.node_tool_links"),
+          () => this.whenEditing(() => this.openNodePanel(node, "structure"))
+        );
         structure2.addClass("vam-node-tool", "vam-structure-tool");
         structure2.setAttr("aria-label", t("ui.structure_and_links"));
         if (note)
           this.button(
             tools,
             t("ui.node_tool_rename"),
-            () => new NameModal(
-              this.app,
-              t("ui.rename_topic"),
-              note.title,
-              (title2) => this.enqueue(() => this.noteChange(node, { title: title2 }))
-            ).open()
+            () => this.whenEditing(
+              () => new NameModal(
+                this.app,
+                t("ui.rename_topic"),
+                note.title,
+                (title2) => this.enqueue(() => this.noteChange(node, { title: title2 }))
+              ).open()
+            )
           ).addClass("vam-node-tool", "vam-rename-tool");
         if (!node.collapsed && this.map.nodes.some((item) => item.parentId === node.id)) {
-          const select = this.button(tools, t("ui.select_subtopics"), () => this.selectSubtopics(node));
+          const select = this.button(
+            tools,
+            t("ui.select_subtopics"),
+            () => this.whenEditing(() => this.selectSubtopics(node))
+          );
           select.addClass("vam-node-tool", "vam-select-subtopics-tool");
           select.setAttr("aria-label", t("ui.select_subtopics_hint"));
         }
         if (this.canEditText() && !node.aimKind)
-          this.button(tools, t("ui.text_node_add"), () => this.addTextNodeUnder(node)).addClass(
+          this.button(tools, t("ui.text_node_add"), () => this.whenEditing(() => this.addTextNodeUnder(node))).addClass(
             "vam-node-tool",
             "vam-add-text-tool"
           );
       }
       if (node.aimKind === "question") {
-        const remove = this.button(tools, t("ui.node_tool_remove"), () => this.confirmRemoveNode(node));
+        const remove = this.button(
+          tools,
+          t("ui.node_tool_remove"),
+          () => this.whenEditing(() => this.confirmRemoveNode(node))
+        );
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
@@ -56177,9 +56198,12 @@ ${request.requirements}` : preset.text,
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
     if (!this.selection.state.multiSelectMode && !((_D = this.map) == null ? void 0 : _D.aim))
-      this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
+      this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openNextStep(node))).addClass(
+        "vam-node-tool",
+        "vam-ai-explore"
+      );
     if (!this.selection.state.multiSelectMode && !((_E = this.map) == null ? void 0 : _E.aim)) {
-      const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
+      const add = this.button(card, "+", () => this.whenEditing(() => this.enqueue(() => this.addNode(node))));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
@@ -57224,6 +57248,7 @@ ${request.requirements}` : preset.text,
     return `selection:${this.path}`;
   }
   openNextStep(node) {
+    if (this.presentation) return;
     this.enqueue(async () => {
       var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);

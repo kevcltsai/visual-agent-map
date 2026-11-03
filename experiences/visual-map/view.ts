@@ -272,7 +272,14 @@ import {
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
-import { cardToolsPlacement, cardToolsSide, fitIsClamped, fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
+import {
+  cardToolsPlacement,
+  fitIsClamped,
+  fitViewport,
+  focusViewport,
+  initialViewport,
+  insetFromRects
+} from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
 import {
   MapChatPanel,

@@ -2821,18 +2821,38 @@ test('B1 ui: every suggestion and example exists in all three languages and is a
   for (const dictionary of dictionaries) for (const k of keys) assert.ok(typeof dictionary[k] === 'string' && dictionary[k].trim().length > 4, `${k}`);
 });
 
-integrationTest('B1 ui: a suggestion only fills the message field (nothing is sent, nothing else changes), keeps what was typed, and the row follows the selection and the open note', async () => {
+integrationTest('B1 ui: a suggestion only fills the message field (nothing is sent, nothing else changes), replaces an old draft (UX B3), and the row follows the selection and the open note', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   eq(suggestionTexts(chat), ['What is missing from this map?', 'Arrange the whole map', 'Collapse every branch below the first level']);
   const requests = h.control.requests.length, mutates = h.control.mutates;
   findAll(chat.suggestEl, i => i.tag === 'button')[0].click();
   assert.equal(chat.inputEl.value, 'What is missing from this map?'); assert.equal(h.page.doc.activeElement, chat.inputEl);
   await tick(); assert.equal(h.control.requests.length, requests, 'nothing sent'); assert.equal(h.control.mutates, mutates, 'nothing written'); assert.equal(chat.hasMessages, false);
-  chat.inputEl.value = 'first line'; findAll(chat.suggestEl, i => i.tag === 'button')[1].click(); assert.equal(chat.inputEl.value, 'first line\nArrange the whole map', 'an existing draft is kept');
+  chat.inputEl.value = 'first line'; findAll(chat.suggestEl, i => i.tag === 'button')[1].click(); assert.equal(chat.inputEl.value, 'Arrange the whole map', 'UX B3: the suggestion replaces the old draft instead of being added under it');
   h.view.selection.setSelected(h.ids.a); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /subtopics under the selected topic/);
   h.view.selection.replaceMulti([h.ids.a, h.ids.b]); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /Compare the selected topics/);
   h.view.selection.setSelected(null); h.view.selection.replaceMulti([]); h.setActive('Notes/Research.md', ''); chat.refreshNote(); assert.ok(suggestionTexts(chat).includes('Add what the open note says to the map'));
   assert.ok(suggestionTexts(chat).length <= 4);
+});
+
+test('UX B3: an open-ended suggestion shows an ellipsis, replaces the draft, and leaves the cursor after the words for the topic', () => {
+  const f = panelFixture({ suggestions: () => ({ selected: 0, hasTopics: false }) }); f.panel.setOpen(true);
+  const buttons = () => findAll(f.panel.suggestEl, i => i.tag === 'button');
+  eq(buttons().map(b => b.text), ['Build a three-level topic tree about…', 'Create a new map about…']);
+  f.parts.input().value = 'an old half-written draft'; const ranges = []; f.parts.input().setSelectionRange = (start, end) => ranges.push([start, end]);
+  buttons()[0].click();
+  assert.equal(f.parts.input().value, 'Build a three-level topic tree about ', 'replaced, with a space to type the topic after');
+  eq(ranges, [[37, 37]], 'the cursor is at the end, where the topic goes');
+  assert.equal(f.page.doc.activeElement, f.parts.input());
+  buttons()[1].click(); assert.equal(f.parts.input().value, 'Create a new map about ', 'a second pick replaces the first');
+});
+
+test('UX B3: chatSuggestionFill adds a space only after a final Latin letter of an open-ended suggestion', () => {
+  const { chatSuggestionFill, MAP_CHAT_OPEN_ENDED_KEYS } = load('core/map-chat-layout.ts');
+  assert.equal(chatSuggestionFill('Create a new map about', true), 'Create a new map about ');
+  assert.equal(chatSuggestionFill('新建一張心智圖，主題是', true), '新建一張心智圖，主題是');
+  assert.equal(chatSuggestionFill('Arrange the whole map', false), 'Arrange the whole map');
+  eq([...MAP_CHAT_OPEN_ENDED_KEYS], ['ui.map_chat_suggest_empty_build', 'ui.map_chat_suggest_empty_new_map']);
 });
 
 integrationTest('B1 ui: a suggestion button that has the keyboard is not rebuilt by a refresh that changes nothing', async () => {
@@ -3279,7 +3299,9 @@ integrationTest('B1 fix 21 and 27: a window laid over a narrow pane leaves 160px
 
 test('B1 fix 17: the suggestions, examples, retry, "more detail" and "show all" each get their own look, with enough weight to beat the base button style', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
-  for (const name of ['suggestion', 'example']) assert.match(rule(`.vam-map-chat button.vam-map-chat-${name}`), /background: transparent/, `${name}: ghost text`);
+  // UX B3: suggestions and examples are recognisable buttons (outlined, filled, at least 24px high), not faint text links.
+  for (const name of ['suggestion', 'example']) { const r = rule(`.vam-map-chat button.vam-map-chat-${name}`); assert.match(r, /border: 1px solid/, `${name}: outlined`); assert.match(r, /background: var\(--background-secondary\)/, `${name}: filled`); assert.match(r, /min-height: (2[4-9]|[3-9]\d)px/, `${name}: at least 24px high`); }
+  assert.match(rule('.vam-map-chat-style-option'), /min-height: 24px; min-width: 24px/, 'the answer-length toggle is a 24px target');
   assert.match(rule('.vam-map-chat button.vam-map-chat-retry'), /border: 1px solid/, 'retry: a clear secondary button'); assert.match(rule('.vam-map-chat button.vam-map-chat-retry'), /background: var\(--background-primary\)/);
   assert.match(css, /\.vam-map-chat button\.vam-map-chat-lines-toggle, \.vam-map-chat button\.vam-map-chat-more \{[^}]*background: transparent/);
   assert.match(rule('.vam-map-chat-chip'), /border: 1px solid[^;]*; border-radius: 999px/, 'chips: an outlined pill');

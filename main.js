@@ -21232,6 +21232,13 @@ function chatSuggestionKeys(context) {
     keys.push(context.hasTopics ? "ui.map_chat_suggest_note_add" : "ui.map_chat_suggest_empty_from_note");
   return keys;
 }
+var MAP_CHAT_OPEN_ENDED_KEYS = [
+  "ui.map_chat_suggest_empty_build",
+  "ui.map_chat_suggest_empty_new_map"
+];
+function chatSuggestionFill(text11, openEnded) {
+  return openEnded && /[A-Za-z]$/.test(text11) ? `${text11} ` : text11;
+}
 var MAP_CHAT_EXAMPLE_KEYS = [
   "ui.map_chat_example_research",
   "ui.map_chat_example_learn",
@@ -30201,14 +30208,15 @@ ${typed}` : draft;
     this.applyOpen();
   }
   // ---- suggested messages -----------------------------------------------------------------------------------------
-  /** Puts `text` into the message field and gives it the keyboard. Sending is always the user's own act. */
-  fill(text11) {
-    const draft = this.inputEl.value;
-    this.inputEl.value = draft.trim() ? `${draft.replace(/\s+$/, "")}
-${text11}` : text11;
+  /**
+   * Puts `text` into the message field in place of what was there and gives it the keyboard, with the cursor at the end (where an
+   * open-ended suggestion is finished). Sending is always the user's own act.
+   */
+  fill(text11, openEnded = false) {
+    const value = chatSuggestionFill(text11, openEnded);
+    this.inputEl.value = value;
     this.inputEl.focus();
-    const end = this.inputEl.value.length;
-    this.inputEl.setSelectionRange(end, end);
+    this.inputEl.setSelectionRange(value.length, value.length);
   }
   renderSuggestions() {
     if (!this.built) return;
@@ -30228,12 +30236,14 @@ ${text11}` : text11;
     this.suggestEl.hidden = keys.length === 0;
     for (const key2 of keys) {
       const text11 = t(key2);
+      const openEnded = MAP_CHAT_OPEN_ENDED_KEYS.includes(key2);
       const button = this.suggestEl.createEl("button", {
         cls: hero ? "vam-map-chat-example" : "vam-map-chat-suggestion",
-        text: text11,
+        // An open-ended suggestion is visibly unfinished: the user completes it in the field.
+        text: openEnded ? `${text11}\u2026` : text11,
         attr: { type: "button" }
       });
-      button.addEventListener("click", () => this.fill(text11));
+      button.addEventListener("click", () => this.fill(text11, openEnded));
     }
   }
   onDragOver(event) {

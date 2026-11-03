@@ -70,6 +70,24 @@ export function chatSuggestionKeys(context: ChatSuggestionContext): TranslationK
   return keys;
 }
 
+/**
+ * Suggestions that are the start of a sentence for the user to finish ("Build a three-level topic tree about"): the button shows
+ * them ending in an ellipsis, and choosing one leaves the cursor at the end of the words for the topic to be typed.
+ */
+export const MAP_CHAT_OPEN_ENDED_KEYS: readonly TranslationKey[] = [
+  "ui.map_chat_suggest_empty_build",
+  "ui.map_chat_suggest_empty_new_map"
+];
+
+/**
+ * What choosing a suggestion puts in the message field: the suggestion replaces whatever was there (a suggestion is a whole
+ * message; added under an old draft it would make a confusing one). An open-ended one gets a space after a final Latin letter
+ * so the topic can be typed at once; CJK text needs none.
+ */
+export function chatSuggestionFill(text: string, openEnded: boolean): string {
+  return openEnded && /[A-Za-z]$/.test(text) ? `${text} ` : text;
+}
+
 /** The three starting sentences on the opening screen. */
 export const MAP_CHAT_EXAMPLE_KEYS: readonly TranslationKey[] = [
   "ui.map_chat_example_research",

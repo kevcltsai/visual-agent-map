@@ -8,6 +8,8 @@ import {
   clampMapChatWidth,
   countChatLines,
   MAP_CHAT_EXAMPLE_KEYS,
+  MAP_CHAT_OPEN_ENDED_KEYS,
+  chatSuggestionFill,
   MAP_CHAT_LINES_FOLD_ABOVE,
   MAP_CHAT_WIDTH_DEFAULT,
   MAP_CHAT_WIDTH_MAX,
@@ -1439,13 +1441,15 @@ export class MapChatPanel {
 
   // ---- suggested messages -----------------------------------------------------------------------------------------
 
-  /** Puts `text` into the message field and gives it the keyboard. Sending is always the user's own act. */
-  private fill(text: string): void {
-    const draft = this.inputEl.value;
-    this.inputEl.value = draft.trim() ? `${draft.replace(/\s+$/, "")}\n${text}` : text;
+  /**
+   * Puts `text` into the message field in place of what was there and gives it the keyboard, with the cursor at the end (where an
+   * open-ended suggestion is finished). Sending is always the user's own act.
+   */
+  private fill(text: string, openEnded = false): void {
+    const value = chatSuggestionFill(text, openEnded);
+    this.inputEl.value = value;
     this.inputEl.focus();
-    const end = this.inputEl.value.length;
-    this.inputEl.setSelectionRange(end, end);
+    this.inputEl.setSelectionRange(value.length, value.length);
   }
   private renderSuggestions(): void {
     if (!this.built) return;
@@ -1471,12 +1475,14 @@ export class MapChatPanel {
     this.suggestEl.hidden = keys.length === 0;
     for (const key of keys) {
       const text = t(key);
+      const openEnded = MAP_CHAT_OPEN_ENDED_KEYS.includes(key);
       const button = this.suggestEl.createEl("button", {
         cls: hero ? "vam-map-chat-example" : "vam-map-chat-suggestion",
-        text,
+        // An open-ended suggestion is visibly unfinished: the user completes it in the field.
+        text: openEnded ? `${text}…` : text,
         attr: { type: "button" }
       });
-      button.addEventListener("click", () => this.fill(text));
+      button.addEventListener("click", () => this.fill(text, openEnded));
     }
   }
 

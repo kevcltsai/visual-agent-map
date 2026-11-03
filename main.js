@@ -540,6 +540,7 @@ var en = {
   "ui.source_topics": "Source topics",
   "ui.expand": "Expand",
   "ui.expansion_suggestions": "Expansion suggestions",
+  "ui.expansion_suggestions_none": "There are no expansion suggestions for this topic yet. Choose \u201CAI explore\u201D to have the AI suggest subtopics; you review them here before anything is created.",
   "ui.expansion_suggestions_changed_open_them_again": "Expansion suggestions changed. Open them again.",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di": "Suggest the most useful expansion direction, or follow the direction I specify.",
   "ui.no_mind_map_is_available": "No mind map is available.",
@@ -2924,6 +2925,7 @@ var zhCN = {
   "ui.source_topics": "\u6765\u6E90\u8BAE\u9898",
   "ui.expand": "\u5C55\u5F00",
   "ui.expansion_suggestions": "\u5C55\u5F00\u5EFA\u8BAE",
+  "ui.expansion_suggestions_none": "\u8FD9\u4E2A\u8BAE\u9898\u8FD8\u6CA1\u6709\u5C55\u5F00\u5EFA\u8BAE\u3002\u70B9\u201CAI \u63A2\u7D22\u201D\u8BA9 AI \u5EFA\u8BAE\u5B50\u8BAE\u9898\uFF1B\u521B\u5EFA\u4E4B\u524D\u4F1A\u5148\u5728\u8FD9\u91CC\u8BA9\u4F60\u68C0\u67E5\u3002",
   "ui.expansion_suggestions_changed_open_them_again": "\u5C55\u5F00\u5EFA\u8BAE\u5DF2\u53D8\u66F4\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u3002",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di": "\u8BF7\u5EFA\u8BAE\u6700\u6709\u5E2E\u52A9\u7684\u5C55\u5F00\u65B9\u5411\uFF1B\u82E5\u6211\u6307\u5B9A\u65B9\u5411\u5C31\u4F9D\u6307\u5B9A\u65B9\u5411\u62C6\u89E3\u3002",
   "ui.no_mind_map_is_available": "\u5F53\u524D\u6CA1\u6709\u53EF\u7528\u7684\u5FC3\u667A\u56FE\u3002",
@@ -5308,6 +5310,7 @@ var zhTW = {
   "ui.source_topics": "\u4F86\u6E90\u8B70\u984C",
   "ui.expand": "\u5C55\u958B",
   "ui.expansion_suggestions": "\u5C55\u958B\u5EFA\u8B70",
+  "ui.expansion_suggestions_none": "\u9019\u500B\u8B70\u984C\u9084\u6C92\u6709\u5C55\u958B\u5EFA\u8B70\u3002\u6309\u300CAI \u63A2\u7D22\u300D\u8B93 AI \u5EFA\u8B70\u5B50\u8B70\u984C\uFF1B\u5EFA\u7ACB\u4E4B\u524D\u6703\u5148\u5728\u9019\u88E1\u8B93\u4F60\u6AA2\u67E5\u3002",
   "ui.expansion_suggestions_changed_open_them_again": "\u5C55\u958B\u5EFA\u8B70\u5DF2\u8B8A\u66F4\uFF0C\u8ACB\u91CD\u65B0\u958B\u555F\u3002",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di": "\u8ACB\u5EFA\u8B70\u6700\u6709\u5E6B\u52A9\u7684\u5C55\u958B\u65B9\u5411\uFF1B\u82E5\u6211\u6307\u5B9A\u65B9\u5411\u5C31\u4F9D\u6307\u5B9A\u65B9\u5411\u62C6\u89E3\u3002",
   "ui.no_mind_map_is_available": "\u76EE\u524D\u6C92\u6709\u53EF\u7528\u7684\u5FC3\u667A\u5716\u3002",
@@ -57604,7 +57607,17 @@ ${request.requirements}` : preset.text,
   renderPendingProposals(panel, node, note, close, host) {
     var _a2;
     const suggestions = this.plugin.topicRuns.pending(node.path);
-    if (!(suggestions == null ? void 0 : suggestions.length)) return;
+    if (!(suggestions == null ? void 0 : suggestions.length)) {
+      const empty = panel.createDiv("vam-inspector-proposals is-empty");
+      empty.createEl("p", { cls: "vam-hint", text: t("ui.expansion_suggestions_none") });
+      const actions2 = (host != null ? host : empty).createDiv("vam-next-actions");
+      actions2.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
+      actions2.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" }).addEventListener("click", () => {
+        close == null ? void 0 : close();
+        this.whenEditing(() => this.openNextStep(node));
+      });
+      return;
+    }
     const section3 = panel.createDiv("vam-inspector-proposals");
     section3.createEl("p", { text: t("ui.select_and_edit_suggestions_subtopics_are_created_only_after") });
     let showCount = (_count) => {

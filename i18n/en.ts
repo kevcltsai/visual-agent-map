@@ -500,6 +500,7 @@ export const en = {
   "ui.source_topics": "Source topics",
   "ui.expand": "Expand",
   "ui.expansion_suggestions": "Expansion suggestions",
+  "ui.expansion_suggestions_none": "There are no expansion suggestions for this topic yet. Choose “AI explore” to have the AI suggest subtopics; you review them here before anything is created.",
   "ui.expansion_suggestions_changed_open_them_again": "Expansion suggestions changed. Open them again.",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di":
     "Suggest the most useful expansion direction, or follow the direction I specify.",

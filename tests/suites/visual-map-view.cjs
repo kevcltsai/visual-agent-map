@@ -1039,6 +1039,14 @@ integrationTest('expansion suggestions panel uses the shared list, treats the to
   const discard2 = find(host2, item => item.tag === 'button' && item.cls.includes('vam-discard'));
   discard2.click(); discard2.click(); await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(pendingSuggestions.has('P.md'), false); assert.equal(closed, 2);
+  // UX B11: with no suggestions the panel is not blank: one line says why, and "AI explore" (the step that makes them) is offered.
+  const explored = []; Object.assign(view, { whenEditing: run => run(), openNextStep: target => explored.push(target.id) });
+  const none = element('panel'), host3 = element('modal');
+  VisualAgentMapView.prototype.renderPendingProposals.call(view, none, node, { title: 'Parent' }, () => { closed++; }, host3);
+  assert.match(find(none, item => item.tag === 'p').text, /no expansion suggestions for this topic yet\. Choose “AI explore”/);
+  const [closeNone, explore] = find(host3, item => item.cls === 'vam-next-actions').children.filter(item => item.tag === 'button');
+  assert.equal(closeNone.text, 'Close'); assert.equal(explore.text, 'AI explore'); assert.ok(explore.cls.includes('mod-cta'));
+  explore.click(); assert.equal(closed, 3, 'the panel closes'); assert.deepEqual(explored, ['p'], 'and AI explore opens for this topic');
 });
 integrationTest('name dialog ignores Enter while composing, explains an empty name, and keeps buttons in the action bar', () => {
   const element = (tag, options = {}) => ({

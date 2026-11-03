@@ -451,6 +451,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.source_topics": "来源议题",
   "ui.expand": "展开",
   "ui.expansion_suggestions": "展开建议",
+  "ui.expansion_suggestions_none": "这个议题还没有展开建议。点“AI 探索”让 AI 建议子议题；创建之前会先在这里让你检查。",
   "ui.expansion_suggestions_changed_open_them_again": "展开建议已变更，请重新打开。",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di":
     "请建议最有帮助的展开方向；若我指定方向就依指定方向拆解。",

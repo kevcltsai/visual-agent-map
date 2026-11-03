@@ -11576,7 +11576,18 @@ export class VisualAgentMapView extends ItemView {
     host?: HTMLElement
   ): void {
     const suggestions = this.plugin.topicRuns.pending(node.path);
-    if (!suggestions?.length) return;
+    if (!suggestions?.length) {
+      // Nothing to review (yet, or any more): say so, and offer the step that makes suggestions instead of an empty panel.
+      const empty = panel.createDiv("vam-inspector-proposals is-empty");
+      empty.createEl("p", { cls: "vam-hint", text: t("ui.expansion_suggestions_none") });
+      const actions = (host ?? empty).createDiv("vam-next-actions");
+      actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
+      actions.createEl("button", { text: t("ui.ai_explore"), cls: "mod-cta" }).addEventListener("click", () => {
+        close?.();
+        this.whenEditing(() => this.openNextStep(node));
+      });
+      return;
+    }
     const section = panel.createDiv("vam-inspector-proposals");
     section.createEl("p", { text: t("ui.select_and_edit_suggestions_subtopics_are_created_only_after") });
     let showCount = (_count: number): void => {};

@@ -2,7 +2,16 @@ import { t } from "../../i18n";
 import { DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
 import { DEFAULT_TONE_ID } from "../../ai/prompt-presets";
 import { matchPreset, NOTE_STYLE_PRESETS } from "./note-style";
-import { styleProblem, type StyleListItem, type StylePicker, type StyleRef } from "./note-style-picker";
+import { UPDATE_MODE_KEYS } from "../../ai/note-style-recipe";
+import {
+  builtinRecipeItems,
+  styleIssueText,
+  styleProblem,
+  type PickerRecipe,
+  type StyleListItem,
+  type StylePicker,
+  type StyleRef
+} from "./note-style-picker";
 
 /** Live model choices: the list fills in as model discovery finishes. */
 export interface ModelChoices {
@@ -333,6 +342,162 @@ export function noteStyleField(parent: HTMLElement, options: NoteStyleFieldOptio
       await picker.refresh();
       load();
       refresh(false);
+      options.changed?.();
+    }
+  };
+}
+
+export interface StyleChoiceFieldOptions {
+  /** The styles to choose from; without it only the built-in ones are listed (no file is read). */
+  styles?: StylePicker;
+  /** X: the style that applies when nothing is chosen, as the line and the first option show it. */
+  current: string;
+  /** Runs after a toggle, a choice or a refreshed list, so a summary that names the style stays current. */
+  changed?: () => void;
+}
+
+export interface StyleChoiceField {
+  /** The `builtin:<id>` or `file:<name>` to send, or undefined while collapsed, on the first option, or on an unusable one. */
+  style: () => string | undefined;
+  /** What the field now means, as a collapsed summary shows it: the chosen style, else X. */
+  label: () => string;
+  name: () => string;
+  /** Restores an earlier choice; a ref that is not on the list (or none) leaves the field collapsed and empty. */
+  set: (ref: string | undefined) => void;
+  /** Re-reads the style files and redraws the list, keeping a choice that is still usable. */
+  reload: () => Promise<void>;
+}
+
+let choiceCount = 0;
+
+/** The four small labels of a style: structure, voice, format and (not for the AIM report) the update mode. */
+function recipeTags(item: PickerRecipe): string {
+  const tags = [item.structure.name, item.voice.name, item.format.name];
+  if (!item.aimOnly) tags.push(t(UPDATE_MODE_KEYS[item.update]));
+  return tags.join(" · ");
+}
+
+/**
+ * The one-line note-style choice of a research dialog: "Note style: X" and a button "Use another style this time". The
+ * button opens a select (first option "Keep (X)" with an empty value, then the built-ins and the user's styles; one
+ * with a problem is listed but disabled, with its reason and an "Open this file" button beneath) and a line of the
+ * chosen style's four small labels. Collapsing it again goes back to the empty value. It never writes anything.
+ */
+export function styleChoiceField(parent: HTMLElement, options: StyleChoiceFieldOptions): StyleChoiceField {
+  const id = `vam-style-choice-${++choiceCount}`;
+  const root = parent.createDiv("vam-style-choice");
+  const line = root.createDiv("vam-style-choice-line");
+  const text = line.createSpan({ cls: "vam-style-choice-text" });
+  const toggle = line.createEl("button", { text: t("ui.note_style_change_once"), cls: "vam-field-link" });
+  toggle.type = "button";
+  toggle.setAttr("aria-expanded", "false");
+  toggle.setAttr("aria-controls", id);
+  const panel = root.createDiv({ cls: "vam-style-choice-panel", attr: { id } });
+  panel.hidden = true;
+  const select = panel.createEl("select");
+  select.setAttr("aria-label", t("ui.note_style_this_run"));
+  const tags = panel.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
+  tags.hidden = true;
+  const problems = panel.createDiv("vam-note-style-problems");
+  const picker = options.styles;
+  let recipes: PickerRecipe[] = [];
+  let expanded = false;
+  let shownTags = "";
+
+  const offered = (): PickerRecipe[] => recipes.filter(item => !item.aimOnly);
+  const usable = (ref: string): PickerRecipe | undefined =>
+    offered().find(item => item.ref === ref && item.issues.length === 0);
+  const chosen = (): PickerRecipe | undefined => (expanded && select.value ? usable(select.value) : undefined);
+  const nameNow = (): string => chosen()?.name ?? options.current;
+
+  const paintLine = (): void => {
+    text.replaceChildren();
+    const mark = "\u0001";
+    const [before, after = ""] = t("ui.note_style_line_0", mark).split(mark);
+    if (before) text.createSpan({ text: before });
+    text.createEl("strong", { text: nameNow() });
+    if (after) text.createSpan({ text: after });
+  };
+  const paintTags = (): void => {
+    const next = chosen() ? recipeTags(chosen() as PickerRecipe) : "";
+    if (next !== shownTags) {
+      shownTags = next;
+      tags.setText(next);
+    }
+    tags.hidden = !next;
+  };
+  const paint = (): void => {
+    toggle.setText(t(expanded ? "ui.note_style_change_back" : "ui.note_style_change_once"));
+    toggle.setAttr("aria-expanded", String(expanded));
+    panel.hidden = !expanded;
+    paintLine();
+    paintTags();
+  };
+  const build = (): void => {
+    const kept = select.value;
+    select.replaceChildren();
+    select.createEl("option", { value: "", text: t("ui.note_style_no_change_0", options.current) });
+    const own = offered().filter(item => item.kind === "file");
+    const addAll = (parentEl: HTMLElement, list: PickerRecipe[]): void => {
+      for (const item of list) {
+        const option = parentEl.createEl("option", {
+          value: item.ref,
+          text: item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.name
+        });
+        option.disabled = item.issues.length > 0;
+      }
+    };
+    const builtins = offered().filter(item => item.kind === "builtin");
+    if (builtins.length)
+      addAll(select.createEl("optgroup", { attr: { label: t("ui.note_style_group_builtin") } }), builtins);
+    if (own.length) addAll(select.createEl("optgroup", { attr: { label: t("ui.note_style_group_folder") } }), own);
+    select.value = usable(kept) ? kept : "";
+    problems.replaceChildren();
+    for (const item of own) {
+      const first = item.issues[0];
+      if (!first) continue;
+      const row = problems.createDiv({ cls: "vam-note-style-problem", attr: { role: "status" } });
+      row.createSpan({
+        text: t("ui.note_style_unusable_0_1_2", item.fileName ?? item.name, first.line, styleIssueText(first))
+      });
+      if (picker) {
+        const open = row.createEl("button", { text: t("ui.note_style_open_file"), cls: "vam-field-link" });
+        open.type = "button";
+        open.addEventListener("click", () => void picker.edit({ kind: "file", id: item.ref }));
+      }
+    }
+  };
+  const load = (): void => {
+    recipes = picker ? picker.recipes() : builtinRecipeItems();
+    build();
+  };
+  load();
+  paint();
+  toggle.addEventListener("click", event => {
+    event.preventDefault();
+    expanded = !expanded;
+    if (!expanded) select.value = "";
+    paint();
+    options.changed?.();
+  });
+  select.addEventListener("change", () => {
+    paint();
+    options.changed?.();
+  });
+  return {
+    style: () => chosen()?.ref,
+    label: nameNow,
+    name: nameNow,
+    set: ref => {
+      const found = ref ? usable(ref) : undefined;
+      expanded = found !== undefined;
+      select.value = found ? found.ref : "";
+      paint();
+    },
+    reload: async () => {
+      if (picker) await picker.refresh();
+      load();
+      paint();
       options.changed?.();
     }
   };

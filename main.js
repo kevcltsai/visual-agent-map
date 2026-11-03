@@ -1633,6 +1633,14 @@ var en = {
   "ui.note_style_open_file": "Open this file",
   "ui.note_style_switch": "Use another style",
   "ui.note_style_group_folder": "Mine",
+  "ui.note_style_line_0": "Note style: {0}",
+  "ui.note_style_change_once": "Use another style this time",
+  "ui.note_style_change_back": "Go back to the original style",
+  "ui.note_style_this_run": "Note style for this run",
+  "ui.note_style_no_change_0": "Keep ({0})",
+  "ui.note_style_each_topic": "Each topic's own setting",
+  "ui.note_style_follow_kind": "Follow the topic type",
+  "ui.note_style_group_builtin": "Built-in",
   "ui.note_style_unusable_0_1_2": '"{0}" has a problem and cannot be chosen (line {1}): {2}',
   "ui.note_style_unusable_option_0": "{0} (has a problem)",
   "ui.note_style_issue_file_long": "The file is over {0} characters.",
@@ -3994,6 +4002,14 @@ var zhCN = {
   "ui.note_style_open_file": "\u6253\u5F00\u8FD9\u4E2A\u6587\u4EF6",
   "ui.note_style_switch": "\u6539\u7528\u5176\u4ED6\u98CE\u683C",
   "ui.note_style_group_folder": "\u6211\u7684",
+  "ui.note_style_line_0": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0}",
+  "ui.note_style_change_once": "\u8FD9\u6B21\u6539\u7528\u5176\u4ED6\u98CE\u683C",
+  "ui.note_style_change_back": "\u6062\u590D\u539F\u672C\u7684\u98CE\u683C",
+  "ui.note_style_this_run": "\u8FD9\u6B21\u7684\u7B14\u8BB0\u98CE\u683C",
+  "ui.note_style_no_change_0": "\u4E0D\u6539\uFF08{0}\uFF09",
+  "ui.note_style_each_topic": "\u5404\u8BAE\u9898\u81EA\u5DF1\u7684\u8BBE\u5B9A",
+  "ui.note_style_follow_kind": "\u8DDF\u7740\u8BAE\u9898\u7C7B\u578B",
+  "ui.note_style_group_builtin": "\u5185\u7F6E",
   "ui.note_style_unusable_0_1_2": "\u201C{0}\u201D\u6709\u95EE\u9898\uFF0C\u65E0\u6CD5\u9009\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u6709\u95EE\u9898\uFF09",
   "ui.note_style_issue_file_long": "\u6587\u4EF6\u8D85\u8FC7 {0} \u5B57\u3002",
@@ -6355,6 +6371,14 @@ var zhTW = {
   "ui.note_style_open_file": "\u958B\u555F\u9019\u500B\u6A94",
   "ui.note_style_switch": "\u6539\u7528\u5176\u4ED6\u98A8\u683C",
   "ui.note_style_group_folder": "\u6211\u7684",
+  "ui.note_style_line_0": "\u7B46\u8A18\u98A8\u683C\uFF1A{0}",
+  "ui.note_style_change_once": "\u9019\u6B21\u6539\u7528\u5176\u4ED6\u98A8\u683C",
+  "ui.note_style_change_back": "\u6062\u5FA9\u539F\u672C\u7684\u98A8\u683C",
+  "ui.note_style_this_run": "\u9019\u6B21\u7684\u7B46\u8A18\u98A8\u683C",
+  "ui.note_style_no_change_0": "\u4E0D\u6539\uFF08{0}\uFF09",
+  "ui.note_style_each_topic": "\u5404\u8B70\u984C\u81EA\u5DF1\u7684\u8A2D\u5B9A",
+  "ui.note_style_follow_kind": "\u8DDF\u8457\u8B70\u984C\u985E\u578B",
+  "ui.note_style_group_builtin": "\u5167\u5EFA",
   "ui.note_style_unusable_0_1_2": "\u300C{0}\u300D\u6709\u554F\u984C\uFF0C\u7121\u6CD5\u9078\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u6709\u554F\u984C\uFF09",
   "ui.note_style_issue_file_long": "\u6A94\u6848\u8D85\u904E {0} \u5B57\u3002",
@@ -27813,6 +27837,28 @@ function runStyleLabelText(label, language2) {
 
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian14 = require("obsidian");
+function builtinRecipeItems() {
+  const nameOf = (list, id) => {
+    const found = list.find((item) => item.id === id);
+    return found ? t(found.nameKey) : id;
+  };
+  const templates = BUILTIN_BLOCKS.filter((block) => block.category === "template");
+  const tones = BUILTIN_BLOCKS.filter((block) => block.category === "tone");
+  return BUILTIN_RECIPES.map((recipe) => {
+    const aim = recipe.structure === AIM_DELIVERY_STRUCTURE;
+    return {
+      ref: builtinRef(recipe.id),
+      kind: "builtin",
+      name: t(recipe.nameKey),
+      ...aim ? { aimOnly: true } : {},
+      structure: { name: aim ? t(recipe.nameKey) : nameOf(templates, recipe.structure) },
+      voice: { name: nameOf(tones, recipe.voice) },
+      format: { name: nameOf(BUILTIN_FORMATS, recipe.format) },
+      update: recipe.update,
+      issues: []
+    };
+  });
+}
 var NoteStyleFileError = class extends Error {
   constructor(message, open) {
     super(message);
@@ -27836,6 +27882,11 @@ function stylePickerFor(app, plugin) {
     list: () => store.listBlocks("template").flatMap(
       (item) => item.kind === "file" && item.fileName !== void 0 ? [{ kind: "file", id: item.ref, name: item.name, fileName: item.fileName, issues: item.issues }] : []
     ),
+    // T5 adds `listRecipes()` to the store; until it is merged here the built-in styles are what is offered.
+    recipes: () => {
+      const source = store;
+      return source.listRecipes ? source.listRecipes() : builtinRecipeItems();
+    },
     edit: (ref) => openStyleFile(app, store, ref)
   };
 }

@@ -8,6 +8,8 @@ import { backgroundResultNotice } from "../../ui/background-run";
 import { ChoiceModal, type Choice } from "../../ui/modals/choice-modal";
 import { NOTE_STYLE_PRESETS } from "./note-style";
 import { styleRefOf, type StyleRef } from "../../ai/note-style-label";
+import { BUILTIN_BLOCKS, BUILTIN_FORMATS } from "../../core/blocks/builtin";
+import { AIM_DELIVERY_STRUCTURE, BUILTIN_RECIPES, type UpdateMode } from "../../ai/note-style-recipe";
 
 export { styleRefOf };
 export type { StyleRef };
@@ -23,12 +25,58 @@ export interface StyleListItem {
   issues: NoteStyleIssue[];
 }
 
+/**
+ * One style (recipe) in a one-line choice. A structural subset of the store's `RecipeListItem` (T5 adds `listRecipes()`),
+ * so that list can be handed over as it is.
+ */
+export interface PickerRecipe {
+  /** `builtin:<id>` or `file:<name>`. */
+  ref: string;
+  kind: "builtin" | "file";
+  name: string;
+  /** The file (with ".md") of a user's style. */
+  fileName?: string;
+  /** The AIM report: only for the AIM kind, never offered for a topic. */
+  aimOnly?: true;
+  structure: { name: string };
+  voice: { name: string };
+  format: { name: string };
+  update: UpdateMode;
+  issues: NoteStyleIssue[];
+}
+
+/** The built-in styles by name, without reading any file (a test double, or a store with no style list yet). */
+export function builtinRecipeItems(): PickerRecipe[] {
+  const nameOf = (list: readonly { id: string; nameKey: TranslationKey }[], id: string): string => {
+    const found = list.find(item => item.id === id);
+    return found ? t(found.nameKey) : id;
+  };
+  const templates = BUILTIN_BLOCKS.filter(block => block.category === "template");
+  const tones = BUILTIN_BLOCKS.filter(block => block.category === "tone");
+  return BUILTIN_RECIPES.map(recipe => {
+    const aim = recipe.structure === AIM_DELIVERY_STRUCTURE;
+    return {
+      ref: builtinRef(recipe.id),
+      kind: "builtin" as const,
+      name: t(recipe.nameKey),
+      ...(aim ? { aimOnly: true as const } : {}),
+      structure: { name: aim ? t(recipe.nameKey) : nameOf(templates, recipe.structure) },
+      voice: { name: nameOf(tones, recipe.voice) },
+      format: { name: nameOf(BUILTIN_FORMATS, recipe.format) },
+      update: recipe.update,
+      issues: []
+    };
+  });
+}
+
 /** What the four note-style entries need from the block folders (absent in a test double: only the built-ins are listed). */
 export interface StylePicker {
   /** Re-reads the block folders; call `list()` afterwards. */
   refresh(): Promise<void>;
   /** The user's own template blocks. */
   list(): StyleListItem[];
+  /** Every style, built-ins (the AIM report marked `aimOnly`) first, then the user's style files. */
+  recipes(): PickerRecipe[];
   /** Opens the template block behind a style in a new tab (a built-in with no file gets one first). */
   edit(ref: StyleRef): Promise<void>;
 }
@@ -69,6 +117,11 @@ export function stylePickerFor(app: App, plugin: VisualAgentMapPlugin): StylePic
             ? [{ kind: "file", id: item.ref, name: item.name, fileName: item.fileName, issues: item.issues }]
             : []
         ),
+    // T5 adds `listRecipes()` to the store; until it is merged here the built-in styles are what is offered.
+    recipes: () => {
+      const source = store as { listRecipes?: () => PickerRecipe[] };
+      return source.listRecipes ? source.listRecipes() : builtinRecipeItems();
+    },
     edit: ref => openStyleFile(app, store, ref)
   };
 }

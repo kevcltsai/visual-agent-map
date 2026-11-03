@@ -1851,8 +1851,16 @@ export class VisualAgentMapView extends ItemView {
     await this.hydrate();
     // A language change: the chat window's fixed words are set again (the panel itself is kept, with its draft and messages).
     this.chat?.relabel();
-    this.renderPreservingFocus();
+    // Only this repaint (a change made in another window) is held back from taking focus; the map's own repaints are not.
+    this.externalRefresh = true;
+    try {
+      this.renderPreservingFocus();
+    } finally {
+      this.externalRefresh = false;
+    }
   }
+  /** True only while refreshFromPlugin repaints (synchronously: every restorer it triggers runs inside that call). */
+  private externalRefresh = false;
   private renderPreservingFocus(): void {
     const doc = this.contentEl?.ownerDocument;
     const current = doc?.activeElement ?? null;
@@ -1891,11 +1899,13 @@ export class VisualAgentMapView extends ItemView {
       (target as HTMLInputElement).setSelectionRange(selection[0], selection[1]);
   }
   /**
-   * The one gate for every focus the map gives itself during a repaint. False while another Obsidian window (for example Settings
-   * in a pop-out) is the active one: the map must not take focus then. It remembers the skipped restore and does it when the
+   * The one gate for the focus the map gives itself during an external refresh (refreshFromPlugin: a setting changed in another
+   * window). False then while another Obsidian window (for example Settings in a pop-out) is the active one: the map must not take
+   * focus. Repaints from the map's own work are never gated (activeWindow stays the pop-out even after clicks in the main window). It remembers the skipped restore and does it when the
    * map's own window gets focus again (see onOpen).
    */
   private mapWindowIsActive(): boolean {
+    if (!this.externalRefresh) return true;
     const active = typeof activeWindow === "undefined" ? undefined : activeWindow;
     const own = this.contentEl?.ownerDocument?.defaultView;
     if (!active || !own || active === own) return true;

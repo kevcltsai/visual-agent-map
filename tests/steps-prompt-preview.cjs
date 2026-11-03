@@ -12,7 +12,6 @@ export { assembledTaskPrompt } from "./core/steps/task/render";
 export { lookupBuiltinBlock, builtinTemplateText } from "./core/blocks/builtin";
 export { textbookTemplate } from "./ai/detail-templates";
 export { NoteStyleStore } from "./ai/note-style-store";
-export { NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { translate, noteLanguageOf } from "./i18n";
 export { AiTaskService } from "./core/ai-task-service";
 `);
@@ -110,7 +109,7 @@ function makeStore(settingsPatch = {}, files = {}) {
 }
 
 test('counter 11 (was: the workspace fields, 5 presets, a style file, unset; grilling Q5/Q10): runStyle with no choice gives the general research fields whatever old workspace keys exist, in all three languages', async () => {
-  const cases = [...M.NOTE_STYLE_BUILTIN_IDS.map(id => ({ defaultNoteStyleId: id })), { defaultNoteStyleId: 'style:Own' }, {}, { defaultDetailTemplateId: 'textbook' }];
+  const cases = [...["standard", "textbook", "summary", "plain", "guide"].map(id => ({ defaultNoteStyleId: id })), { defaultNoteStyleId: 'style:Own' }, {}, { defaultDetailTemplateId: 'textbook' }];
   assert.equal(cases.length, 8);
   for (const patch of cases) for (const language of LANGUAGES) {
     const store = makeStore({ ...patch, language }, { 'WS/S/Own.md': OWN });
@@ -142,7 +141,7 @@ test('counter 9 (was: a default style file that does not parse is returned as in
   assert.equal(got.contextFields.styleSelection, undefined);
 });
 
-test('runStyle tone text (was: an old style file decides its own tone; grilling Q12): the tone is the run\'s, else the topic\'s tone preset, else academic; an old style file is not read; academic is nothing', async () => {
+test('runStyle tone text (was: an old style file decides its own tone; grilling Q12): the tone is the topic\'s tone preset, else academic; an old style file is not read; academic is nothing', async () => {
   const withFile = async (content) => {
     const store = makeStore({}, { 'WS/S/F.md': content });
     await store.refresh();
@@ -154,7 +153,8 @@ test('runStyle tone text (was: an old style file decides its own tone; grilling 
   const store = makeStore({}, {});
   await store.refresh();
   assert.equal(store.runStyle({ topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
-  assert.equal(store.runStyle({ choice: { tone: 'academic' }, topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, undefined);
+  // #18: a run's own tone is gone, so { choice: { tone: 'academic' } } no longer beats the topic's tone (replacement: steps-run-style.cjs slice 12)
+  assert.equal(store.runStyle({ choice: { tone: 'academic' }, topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
   assert.equal(store.runStyle({ outputLanguage: 'en' }).toneText, undefined);
 });
 

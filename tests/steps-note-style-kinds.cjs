@@ -280,9 +280,11 @@ test('kind level (was: the kind structure wins over the map and the workspace; g
   const topic = store.runStyle(request({ topic: { template: 'textbook' } }));
   assert.equal(topic.template.id, 'textbook');
   assert.equal(topic.label.templateSource, 'topic');
-  const run = store.runStyle(request({ topic: { template: 'textbook' }, choice: { template: 'file:Mine2' } }));
-  assert.equal(run.template.id, 'file:Mine2');
+  const run = store.runStyle(request({ topic: { template: 'textbook' }, choice: { style: 'builtin:evidence' } }));
+  assert.equal(run.template.id, 'evidence');
   assert.equal(run.label.templateSource, 'run');
+  // #18: the old structure id on a run is ignored
+  assert.equal(store.runStyle(request({ topic: { template: 'textbook' }, choice: { template: 'file:Mine2' } })).label.templateSource, 'topic');
   const evidence = store.runStyle({ outputLanguage: 'en', kind: 'evidence', map: { template: 'standard' } });
   assert.equal(evidence.template.id, 'evidence', 'a kind with no entry has its built-in style, whatever the map holds');
   assert.equal(evidence.label.templateSource, 'kind');
@@ -396,9 +398,9 @@ async function viewWorld(settingsPatch, note) {
 
 test('kind level (view): topicStyle passes the topic\'s type, a topic without one counts as the general topic; mapStyle passes the kind it is given (none counts as topic)', async () => {
   const { view } = await viewWorld({ noteStyleByKind: { hypothesis: 'builtin:hypothesis', topic: 'builtin:atomic' } }, {});
-  assert.equal(view.topicStyle({ topicKind: 'hypothesis' }, undefined, undefined, 'en').template.id, 'hypothesis');
-  assert.equal(view.topicStyle({}, undefined, undefined, 'en').template.id, 'atomic');
-  assert.equal(view.topicStyle({ topicKind: 'action' }, undefined, undefined, 'en').template.id, 'action');
+  assert.equal(view.topicStyle({ topicKind: 'hypothesis' }, undefined, 'en').template.id, 'hypothesis');
+  assert.equal(view.topicStyle({}, undefined, 'en').template.id, 'atomic');
+  assert.equal(view.topicStyle({ topicKind: 'action' }, undefined, 'en').template.id, 'action');
   assert.equal((await view.mapStyle('en', { kind: 'hypothesis' })).template.id, 'hypothesis');
   assert.equal((await view.mapStyle('en', { kind: 'topic' })).template.id, 'atomic');
   assert.equal((await view.mapStyle('en')).template.id, 'atomic', 'a call site that gives no kind is the general topic kind');
@@ -408,12 +410,12 @@ test('kind level (view): a missing kind structure raises the kind Notice once pe
   const note = { path: 'T.md', topicKind: 'hypothesis' };
   const { view, updates } = await viewWorld({ noteStyleByKind: { hypothesis: 'file:Nope' } }, note);
   const gate = { shown: false };
-  const style = await view.detailTemplateFor({ path: 'T.md' }, undefined, undefined, gate);
+  const style = await view.detailTemplateFor({ path: 'T.md' }, undefined, gate);
   assert.deepEqual(plainOf(style.issues.missing), ['file:Nope']);
   assert.equal(notices.length, 1);
   assert.match(notices[0], /Nope/);
   assert.match(notices[0], /Hypothesis|假設/);
-  await view.detailTemplateFor({ path: 'T.md' }, undefined, undefined, gate);
+  await view.detailTemplateFor({ path: 'T.md' }, undefined, gate);
   assert.equal(notices.length, 1, 'the same gate tells once');
   assert.deepEqual(updates, [], 'the topic frontmatter is not written');
 });
@@ -444,14 +446,14 @@ test('decision 18: keep current (no explicit choice) writes no detail-template t
   assert.deepEqual(updates, []);
 });
 
-test('counterexample 14: a topic detail-template that no longer exists shows its Notice, is not cleared, and a dialog choice of template and tone writes nothing', async () => {
+test('counterexample 14: a topic detail-template that no longer exists shows its Notice, is not cleared, and a dialog choice of a style writes nothing', async () => {
   const note = { path: 'T.md', detailTemplateId: 'gone-id', toneId: 'gone-tone' };
   const { view, updates } = await viewWorld({}, note);
   await view.detailTemplateFor({ path: 'T.md' });
   assert.equal(notices.length, 1, 'the missing template is told');
   assert.deepEqual(updates, [], 'detail-template is not cleared');
-  await view.detailTemplateFor({ path: 'T.md' }, 'builtin:textbook', 'plain');
-  await view.detailTemplateFor({ path: 'T.md' }, 'file:Mine', 'plain');
+  await view.detailTemplateFor({ path: 'T.md' }, 'builtin:textbook');
+  await view.detailTemplateFor({ path: 'T.md' }, 'file:Mine');
   assert.deepEqual(updates, [], 'a choice in the dialog holds for this run only');
 });
 
@@ -462,7 +464,7 @@ test('counterexample 1 (view half): the map\'s detailTemplateId / toneId change 
     const mapped = await viewWorld({}, note);
     mapped.view.map = { detailTemplateId: 'textbook', toneId: 'plain' };
     const summary = async (view, style) => JSON.stringify({ ref: style.recipe.ref, format: style.formatText, tone: style.toneText, tpl: style.template.id, ctx: style.contextFields, proposal: await view.proposalTone(note, { outputLanguage: 'en' }) });
-    assert.equal(await summary(mapped.view, mapped.view.topicStyle(note, undefined, undefined, 'en')), await summary(plain.view, plain.view.topicStyle(note, undefined, undefined, 'en')), `${kind}: topicStyle`);
+    assert.equal(await summary(mapped.view, mapped.view.topicStyle(note, undefined, 'en')), await summary(plain.view, plain.view.topicStyle(note, undefined, 'en')), `${kind}: topicStyle`);
     assert.equal(await summary(mapped.view, await mapped.view.mapStyle('en', { kind })), await summary(plain.view, await plain.view.mapStyle('en', { kind })), `${kind}: mapStyle`);
   }
 });

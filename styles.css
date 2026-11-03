@@ -666,7 +666,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-text.is-markdown .vam-map-chat-plain { white-space: pre-wrap; }
 .vam-map-chat-text.is-markdown .vam-map-chat-overflow-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-chip.is-note { border-style: solid; }
-.vam-map-chat-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Many selected cards would push the message field out of the window: the chips get about five rows, then scroll. */
+.vam-map-chat-chips { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 4px; max-height: 9em; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--background-modifier-border-hover) transparent; }
 .vam-map-chat-chips:empty { display: none; }
 .vam-map-chat-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 1px 4px 1px 8px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-secondary); font-size: var(--font-ui-smaller); }
 .vam-map-chat-chip.is-auto { padding-right: 8px; border-style: dashed; }
@@ -1516,6 +1517,18 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-note-style-problem { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: var(--font-ui-smaller); color: var(--text-error); overflow-wrap: anywhere; }
 .vam-note-style-problem > .vam-field-link { padding: 0; height: auto; border: 0; background: none; box-shadow: none; color: var(--text-accent); cursor: pointer; }
 .vam-note-style-problem > .vam-field-link:hover { text-decoration: underline; }
+/* One-line note style choice of the research dialogs: "Note style: X" and a link-style button; narrow widths put the button on its own line. */
+.vam-style-choice { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.vam-style-choice-line { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.vam-style-choice-text { min-width: 0; overflow-wrap: anywhere; }
+.vam-style-choice-line > .vam-field-link { padding: 0; height: auto; border: 0; background: none; box-shadow: none; color: var(--text-accent); cursor: pointer; }
+.vam-style-choice-line > .vam-field-link:hover { text-decoration: underline; }
+.vam-style-choice-line > .vam-field-link:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; border-radius: var(--radius-s); }
+.vam-style-choice-panel { display: flex; flex-direction: column; gap: 6px; }
+.vam-style-choice-panel[hidden] { display: none; }
+.vam-style-choice-panel > select { width: 100%; }
+.vam-style-choice-panel > .vam-hint { margin: 0; }
+@media (max-width: 480px) { .vam-style-choice-line > .vam-field-link { flex-basis: 100%; text-align: left; } }
 .vam-field-head > .vam-field-link:disabled { color: var(--text-faint); cursor: default; text-decoration: none; }
 .vam-field-head > .vam-field-link:focus-visible, .vam-note-style-problem > .vam-field-link:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; border-radius: var(--radius-s); }
 .vam-field > select { max-width: 100%; }

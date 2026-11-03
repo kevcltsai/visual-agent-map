@@ -413,12 +413,13 @@ test('counter 4: a file named like a built-in part is never the built-in; file:<
     assert.equal(promptOf(general, language), baseText(language), language);
     assert.equal(general.recipe.ref, 'builtin:general');
     // a run that names the file as a structure, a voice, or a style cannot read it
-    for (const [request, ref] of [[{ choice: { template: 'file:標準六段' } }, 'file:標準六段'], [{ choice: { template: 'file:Standard six' } }, 'file:Standard six'], [{ choice: { style: 'file:General research' } }, 'file:General research']]) {
+    for (const [request, ref] of [[{ choice: { style: 'file:標準六段' } }, 'file:標準六段'], [{ choice: { style: 'file:Standard six' } }, 'file:Standard six'], [{ choice: { style: 'file:General research' } }, 'file:General research']]) {
       const got = store.runStyle({ kind: 'topic', outputLanguage: language, ...request });
       assert.deepEqual(plain(got.issues.missing), [ref], ref);
       assert.equal(got.template.id, 'standard');
       assert.equal(got.recipe.ref, 'builtin:general');
     }
+    // #18: a run tone is ignored (replacement: steps-run-style.cjs slice 12)
     assert.equal(store.runStyle({ kind: 'topic', outputLanguage: language, choice: { tone: 'file:Plain explanation' } }).toneText, undefined);
   }
   // the conversion table cannot reach a built-in name through a file either
@@ -478,7 +479,7 @@ test('counter 7: a kind that is not one of the seven reads as the general topic 
   assert.equal(store.runStyle({ kind: '亂寫', outputLanguage: 'en' }).recipe.ref, 'builtin:general', 'the store itself does not throw on an unknown kind');
 });
 
-test('counter 8: priority: the topic\'s note-style beats its old keys; the run\'s style beats the topic; the run\'s tone changes only the voice and the source is run', async () => {
+test('counter 8: priority: the topic\'s note-style beats its old keys; the run\'s style beats the topic; a run tone is ignored (#18)', async () => {
   const { store } = await world({ detailTemplates: M.normalizeTemplates([{ id: 'u1', name: 'U', sections: [{ id: 's', name: 'S', description: 'd', role: 'none', aliases: [] }] }]) });
   const ask = request => store.runStyle({ kind: 'topic', outputLanguage: 'en', ...request });
   const both = ask({ topic: { style: 'builtin:atomic', template: 'u1', tone: 'plain' } });
@@ -488,10 +489,11 @@ test('counter 8: priority: the topic\'s note-style beats its old keys; the run\'
   assert.equal(both.recipe.source, 'topic');
   const run = ask({ choice: { style: 'builtin:evidence' }, topic: { style: 'builtin:atomic' } });
   assert.deepEqual([run.recipe.ref, run.recipe.source, run.template.id], ['builtin:evidence', 'run', 'evidence']);
+  // #18: a run tone no longer changes the voice or the source (replacement: steps-run-style.cjs slice 12)
   const tone = ask({ choice: { tone: 'plain' }, topic: { style: 'builtin:atomic' } });
-  assert.deepEqual([tone.recipe.ref, tone.recipe.source, tone.template.id], ['builtin:atomic', 'run', 'atomic']);
-  assert.ok(tone.toneText && tone.toneText.length > 0);
-  assert.equal(tone.label.toneName, 'Plain explanation');
+  assert.deepEqual([tone.recipe.ref, tone.recipe.source, tone.template.id], ['builtin:atomic', 'topic', 'atomic']);
+  assert.equal(tone.toneText, undefined);
+  assert.notEqual(tone.label.toneName, 'Plain explanation');
   const old = ask({ topic: { template: 'u1', tone: 'plain' } });
   assert.deepEqual([old.recipe.source, old.recipe.implicit, old.template.id], ['topic', true, 'u1']);
 });
@@ -584,8 +586,11 @@ test('P2b settings (T3 P2b, decisions #32): the other unpublished and old keys r
   const once = Main.settingsFromSaved(saved);
   assert.equal('noteTemplateByKind' in once, false, 'noteTemplateByKind is not read; it is gone after a save (T5 P2b, #31)');
   assert.equal('noteTemplateByKind' in Main.settingsFromSaved(JSON.parse(JSON.stringify(once))), false);
-  for (const key of ['noteTemplateBlock', 'noteToneBlock', 'defaultNoteStyleId', 'defaultDetailTemplateId'])
+  for (const key of ['defaultNoteStyleId', 'defaultDetailTemplateId'])
     assert.deepEqual(plain(once[key]), plain(saved[key]), key);
+  // #40: the two unpublished workspace keys are not read any more
+  assert.equal('noteTemplateBlock' in once, false);
+  assert.equal('noteToneBlock' in once, false);
   assert.equal('noteStyleAliases' in once, false);
   assert.equal('noteStyleUpgrade' in once, false);
   assert.equal('noteStyleAliases' in Main.settingsFromSaved(JSON.parse(JSON.stringify(once))), false);

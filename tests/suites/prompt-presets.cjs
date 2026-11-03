@@ -105,45 +105,17 @@ test('promptPresets default is empty and settings without the field normalize to
   assert.deepEqual(plain(presets.normalizePresets(plain({}).promptPresets)), []);
 });
 
-// ---- Note style presets (pure) --------------------------------------------------------------------------------------
-test('note style: five presets pair a content template with a writing tone; unset template/tone equal Standard/academic', () => {
-  const style = load('experiences/visual-map/note-style.ts');
-  assert.deepEqual(plain(style.NOTE_STYLE_PRESETS.map(p => [p.id, p.templateId, p.toneId])), [
-    ['standard', 'standard', 'academic'], ['textbook', 'textbook', 'academic'], ['summary', 'standard', 'summary'], ['plain', 'standard', 'plain'], ['guide', 'standard', 'guide']]);
-  assert.equal(style.matchPreset(undefined, undefined).id, 'standard');
-  assert.equal(style.matchPreset('standard', undefined).id, 'standard');
-  assert.equal(style.matchPreset(undefined, 'academic').id, 'standard');
-  assert.equal(style.matchPreset('textbook', undefined).id, 'textbook');
-  assert.equal(style.matchPreset(undefined, 'plain').id, 'plain');
-  assert.equal(style.matchPreset('textbook', 'plain'), undefined, 'a pair that is not a preset is custom');
-  assert.equal(style.matchPreset('mine', undefined), undefined);
-  assert.equal(style.matchPreset(undefined, 'magazine'), undefined);
+// ---- Note style presets (D9): the five-preset menu is gone ------------------------------------------------------------
+test('note style (D9, replaces the five-preset and styleLabel tests): the old preset table and its helpers have no module; ai/note-style-label keeps only runStyleLabelText', () => {
+  const { existsSync } = require('node:fs'), { join } = require('node:path');
+  assert.equal(existsSync(join(__dirname, '..', '..', 'experiences', 'visual-map', 'note-style.ts')), false);
+  const label = load('ai/note-style-label.ts');
+  assert.deepEqual(Object.keys(label).sort(), ['runStyleLabelText']);
 });
-test('note style: styleLabel names a preset, else "Custom: template · tone", in both languages', () => {
-  const style = load('experiences/visual-map/note-style.ts');
-  const names = { template: id => ({ standard: 'Standard', mine: 'My notes' })[id] ?? id, tone: id => ({ academic: 'Academic rigor', magazine: 'Magazine column' })[id] ?? id };
-  assert.equal(style.styleLabel(undefined, undefined, names, 'en'), 'Standard');
-  assert.equal(style.styleLabel('textbook', 'academic', names, 'en'), 'Textbook');
-  assert.equal(style.styleLabel('textbook', undefined, names, 'zh-TW'), '教科書');
-  assert.equal(style.styleLabel('standard', 'summary', names, 'zh-TW'), '精簡重點');
-  assert.equal(style.styleLabel('mine', 'magazine', names, 'en'), 'Custom: My notes · Magazine column');
-  assert.equal(style.styleLabel('mine', undefined, names, 'zh-TW'), '自訂：My notes · Academic rigor');
-  assert.equal(style.styleLabel('standard', 'magazine', names, 'zh-TW'), '自訂：Standard · Magazine column');
-});
-test('note style: every preset has a full name and hint in both languages; the menu names match the design', () => {
-  const style = load('experiences/visual-map/note-style.ts'), { translate } = load('i18n.ts');
-  const full = { en: ['Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide'], 'zh-TW': ['標準（學術嚴謹）', '教科書（先導讀，再分類）', '精簡重點', '白話說明', '實用指南'] };
-  for (const language of ['en', 'zh-TW']) {
-    assert.deepEqual(plain(style.NOTE_STYLE_PRESETS.map(p => translate(language, p.name))), full[language]);
-    for (const p of style.NOTE_STYLE_PRESETS) assert.ok(translate(language, p.hint).length > 10 && translate(language, p.hint) !== p.hint);
-  }
+test('note style: the settings and dialog strings that remain read in both languages', () => {
+  const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.note_style'), '筆記風格'); assert.equal(translate('en', 'ui.note_style'), 'Note style');
-  assert.equal(translate('en', 'ui.note_style_custom_0_1', 'A', 'B'), 'Custom: A · B'); assert.equal(translate('zh-TW', 'ui.note_style_custom_0_1', 'A', 'B'), '自訂：A · B');
-  assert.equal(translate('zh-TW', 'ui.note_style_keep_each'), '保持不變'); assert.equal(translate('en', 'ui.note_style_use_default_0', 'Standard'), 'Follow default (Standard)');
-  assert.equal(translate('zh-TW', 'ui.note_style_use_default_0', '教科書'), '跟隨預設（教科書）');
-  const names = { template: id => id === 'mine' ? 'My notes' : id, tone: id => id };
-  assert.equal(translate('zh-TW', 'ui.note_style_use_default_0', style.styleLabel('textbook', 'academic', names, 'zh-TW')), '跟隨預設（教科書）');
-  assert.equal(translate('zh-TW', 'ui.note_style_use_default_0', style.styleLabel('mine', 'academic', names, 'zh-TW')), '跟隨預設（自訂：My notes · academic）');
+  assert.equal(translate('zh-TW', 'ui.note_style_each_topic'), '各議題自己的設定'); /* was ui.note_style_keep_each (key removed, D3) */
 });
 test('06 P4: the settings tone-presets row is gone (replaces "tone settings row: the description points at the tone line of a note style file")', () => {
   const { obsidian } = require('../support.cjs');

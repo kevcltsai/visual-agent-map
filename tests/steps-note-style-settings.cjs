@@ -174,10 +174,11 @@ test('the old template library is gone from the code and the dictionaries', () =
   for (const language of ['en', 'zh-TW', 'zh-CN']) assert.ok(!fs.readFileSync(path.join(root, `i18n/${language}.ts`), 'utf8').includes('"ui.note_style_custom"'));
 });
 
-test('Low 2: the standard structure hint states the effect only, in three languages (no "same as today\'s default")', () => {
-  assert.equal(t('ui.note_style_standard_hint'), 'Six fixed sections in a neutral, evidence-first voice.');
-  assert.equal(i18n.translate('zh-TW', 'ui.note_style_standard_hint'), '六個固定分類，中性、以證據為本。');
-  assert.equal(i18n.translate('zh-CN', 'ui.note_style_standard_hint'), '六个固定分类，中性、以证据为本。');
+test('R1-4 (replaces Low 2, the standard structure hint; D9): the strings of the five-preset menu are gone from the three dictionaries', () => {
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const text = fs.readFileSync(path.join(root, `i18n/${language}.ts`), 'utf8');
+    assert.ok(!/"ui\.note_style_(custom_0_1|standard|textbook|summary|plain|guide)(_short|_hint)?"/.test(text), language);
+  }
 });
 
 // ---- the seven topic-type rows ----

@@ -10,7 +10,6 @@ const { loadSource } = require('./support-replay.cjs');
 
 const M = loadSource(`
 export { NoteStyleStore } from "./ai/note-style-store";
-export { NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { previewPrompt, PREVIEW_STEPS } from "./core/blocks/prompt-preview";
 export { lookupBuiltinBlock, builtinTemplateText, academicToneNote, stripToneComments } from "./core/blocks/builtin";
 export { parseTemplateBlock } from "./core/blocks/template-block";
@@ -95,7 +94,7 @@ const fieldsOf = async (store, language = 'en') => { await store.refresh(); retu
 
 // ---- counter 1 and D7: nothing new set, no block folder ----
 test('counter 1 (was: workspace presets, style file, old template; grilling Q5/Q10): with no style folder every old workspace key is ignored and a run gets no fields and the default prompt, in all three languages', async () => {
-  const cases = [...M.NOTE_STYLE_BUILTIN_IDS.map(id => ({ defaultNoteStyleId: id })), { defaultNoteStyleId: 'style:Own' }, {}, { defaultDetailTemplateId: 'textbook' }, { noteToneBlock: 'builtin:guide', noteTemplateBlock: 'builtin:textbook' }];
+  const cases = [...["standard", "textbook", "summary", "plain", "guide"].map(id => ({ defaultNoteStyleId: id })), { defaultNoteStyleId: 'style:Own' }, {}, { defaultDetailTemplateId: 'textbook' }, { noteToneBlock: 'builtin:guide', noteTemplateBlock: 'builtin:textbook' }];
   for (const patch of cases) for (const language of LANGUAGES) {
     const { store } = makeStore({ ...patch, language }, { [`${STYLES}/Own.md`]: OWN });
     await store.refresh();
@@ -112,17 +111,16 @@ test('counter 1 (was: workspace presets, style file, old template; grilling Q5/Q
   }
 });
 
-test('voice chain (was D7 chain with the workspace tone; grilling Q5/Q10): the run\'s tone beats the topic\'s; academic is no text; an unknown id is skipped; no workspace tone exists', async () => {
+test('voice chain (was D7 chain with the workspace tone; grilling Q5/Q10): academic is no text; an unknown id is skipped; no workspace tone exists', async () => {
   const { store } = makeStore({ defaultNoteStyleId: 'summary', noteToneBlock: 'builtin:summary' });
   await store.refresh();
   const plainText = M.lookupBuiltinBlock('tone', 'plain', 'en');
   assert.equal(store.runStyle({ outputLanguage: 'en' }).toneText, undefined, 'the old workspace tone keys are not read');
   assert.equal(store.runStyle({ topic: { tone: 'plain' }, outputLanguage: 'en' }).toneText, plainText);
-  assert.equal(store.runStyle({ topic: { tone: 'guide' }, choice: { tone: 'plain' }, outputLanguage: 'en' }).toneText, plainText);
-  assert.equal(store.runStyle({ topic: { tone: 'plain' }, choice: { tone: 'academic' }, outputLanguage: 'en' }).toneText, undefined);
-  assert.equal(store.runStyle({ topic: { tone: 'plain' }, choice: { tone: 'gone-tone' }, outputLanguage: 'en' }).toneText, plainText, 'an unknown run tone leaves the lower level');
-  assert.equal(store.runStyle({ choice: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
-  assert.equal(store.runStyle({ choice: { tone: 'gone-tone' }, outputLanguage: 'en' }).toneText, undefined);
+  // #18: the run's own tone is gone (replacement: the run-choice test in steps-run-style.cjs, slice 12); the topic's voice chain stays
+  assert.equal(store.runStyle({ topic: { tone: 'academic' }, outputLanguage: 'en' }).toneText, undefined);
+  assert.equal(store.runStyle({ topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
+  assert.equal(store.runStyle({ topic: { tone: 'gone-tone' }, outputLanguage: 'en' }).toneText, undefined);
 });
 
 test('Later item: a built-in tone cannot be overridden through the promptPresets setting, so its effective text is the built-in text', () => {
@@ -234,7 +232,6 @@ test('counter 6 (was: map/topic template over the workspace block, workspace ton
   await file.store.refresh();
   assert.equal(file.store.runStyle({ outputLanguage: 'en' }).toneText, 'Arr.');
   assert.equal(file.store.runStyle({ topic: { tone: 'academic' }, outputLanguage: 'en' }).toneText, undefined);
-  assert.equal(file.store.runStyle({ choice: { tone: 'plain' }, outputLanguage: 'en' }).toneText, M.lookupBuiltinBlock('tone', 'plain', 'en'));
 });
 
 // ---- counter 7: change of tone ----
@@ -273,15 +270,16 @@ test('counter 7 (was: noteToneBlock; grilling Q5/Q10): changing the style\'s voi
 });
 
 // ---- counter 8 ----
-test('counter 8 (was: a style file that decides the tone; grilling Q10/Q12): a style\'s voice is its own; only the run\'s tone replaces it, an old run structure does not', async () => {
+test('counter 8 (was: a style file that decides the tone; grilling Q10/Q12): a style\'s voice is its own; an old run tone or structure does not replace it', async () => {
   const { store } = makeMix({ voice: 'builtin:summary' });
   await store.refresh();
   const summary = M.lookupBuiltinBlock('tone', 'summary', 'en');
   assert.equal(store.runStyle({ outputLanguage: 'en' }).toneText, summary);
   assert.equal(store.runStyle({ outputLanguage: 'en' }).label.fileName, 'Mix.md');
-  assert.equal(store.runStyle({ choice: { tone: 'plain' }, outputLanguage: 'en' }).toneText, M.lookupBuiltinBlock('tone', 'plain', 'en'));
-  assert.equal(store.runStyle({ choice: { tone: 'plain' }, outputLanguage: 'en' }).recipe.source, 'run');
-  assert.equal(store.runStyle({ choice: { template: 'textbook' }, outputLanguage: 'en' }).toneText, summary, 'a run structure leaves the voice of the style');
+  // #18: an old run tone or structure id is ignored (replacement: steps-run-style.cjs slice 12)
+  assert.equal(store.runStyle({ choice: { tone: 'plain' }, outputLanguage: 'en' }).toneText, summary);
+  assert.equal(store.runStyle({ choice: { tone: 'plain' }, outputLanguage: 'en' }).recipe.source, 'kind');
+  assert.equal(store.runStyle({ choice: { template: 'textbook' }, outputLanguage: 'en' }).toneText, summary);
 });
 
 // ---- counter 9: copy ----
@@ -493,7 +491,12 @@ test('FB1 B1: opening the preview reads the block files again, so a block edited
 });
 
 // ---- note style flow redesign, P2: tone files are read without HTML comments; academic rigor "Edit" writes only a note ----
-const toneTextOf = (store, ref) => store.runStyle({ choice: { tone: ref }, outputLanguage: 'en' }).toneText;
+// The tone text a style gets when its voice is `ref` (#18: a run no longer names a tone, a style does).
+const toneTextOf = async (files, ref) => {
+  const { store } = makeMix({ voice: ref }, {}, files);
+  await store.refresh();
+  return store.runStyle({ outputLanguage: 'en' }).toneText;
+};
 
 test('P2 comments: a tone file with a comment and text sends only the text; a lone "<" or an unclosed "<!--" is kept as written (counter: not a comment)', async () => {
   assert.equal(M.stripToneComments('<!-- note -->\nSpeak calmly.'), 'Speak calmly.');
@@ -506,13 +509,11 @@ test('P2 comments: a tone file with a comment and text sends only the text; a lo
     [`${TONE}/Plain text.md`]: 'Speak calmly.\n',
     [`${TONE}/Angle.md`]: 'Prefer a < b over <b>bold</b>.\n'
   };
-  const { store } = makeStore({}, files);
-  await store.refresh();
-  assert.equal(toneTextOf(store, 'file:Calm'), 'Speak calmly.');
-  assert.equal(toneTextOf(store, 'file:Calm'), toneTextOf(store, 'file:Plain text'));
-  assert.equal(toneTextOf(store, 'file:Angle').trim(), 'Prefer a < b over <b>bold</b>.');
-  const calm = M.previewPrompt('research', 'en', 'codex', { toneText: toneTextOf(store, 'file:Calm') }).text;
-  const plainText = M.previewPrompt('research', 'en', 'codex', { toneText: toneTextOf(store, 'file:Plain text') }).text;
+  assert.equal(await toneTextOf(files, 'file:Calm'), 'Speak calmly.');
+  assert.equal(await toneTextOf(files, 'file:Calm'), await toneTextOf(files, 'file:Plain text'));
+  assert.equal((await toneTextOf(files, 'file:Angle')).trim(), 'Prefer a < b over <b>bold</b>.');
+  const calm = M.previewPrompt('research', 'en', 'codex', { toneText: await toneTextOf(files, 'file:Calm') }).text;
+  const plainText = M.previewPrompt('research', 'en', 'codex', { toneText: await toneTextOf(files, 'file:Plain text') }).text;
   assert.equal(calm, plainText, 'the prompt only loses the comment');
   assert.ok(!calm.includes('my note'));
 });
@@ -539,7 +540,7 @@ test('P2 comments: a comment-only file is no change (academic: unmodified, promp
   await edited.store.refresh();
   assert.equal(edited.store.listBlocks('tone').find(item => item.ref === 'builtin:academic').modified, true);
   // decision #22: the menu still marks the edited file, but a run reads the built-in text (academic rigor: nothing)
-  assert.equal(toneTextOf(edited.store, 'builtin:academic'), undefined);
+  assert.equal(await toneTextOf({ [`${TONE}/Academic rigor.md`]: `${academicFile}\nUse short sentences.\n` }, 'builtin:academic'), undefined);
 });
 
 test('P2 academic Edit: ensureBlockFile writes only the design note (three languages), the file then reads as unmodified; other tones still get their own text', async () => {

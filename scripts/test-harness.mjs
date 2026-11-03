@@ -3,7 +3,9 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSy
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { focusAction, frontApp, instancePattern } from "./keep-background.mjs";
+export { focusAction };
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
@@ -157,27 +159,16 @@ function launchObsidian(appProfile) {
   rmSync(join(appProfile, "DevToolsActivePort"), { force: true });
   const previous = frontApp();
   execFileSync("open", ["-g", "-n", "-a", obsidianApp, "--args", `--user-data-dir=${appProfile}`, "--remote-debugging-port=0", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows"]);
-  returnFocus(appProfile, previous);
+  startFocusWatcher(appProfile, previous);
 }
 
-function frontApp() {
-  const info = spawnSync("sh", ["-c", "lsappinfo info -only pid -only bundlepath \"$(lsappinfo front)\""], { encoding: "utf8" }).stdout ?? "";
-  return { pid: Number(/"pid"=(\d+)/.exec(info)?.[1]), path: /"LSBundlePath"="([^"]+)"/.exec(info)?.[1] };
+// Obsidian activates itself whenever a window opens (Settings etc. since 1.14), even under `open -g`. A detached watcher
+// hands focus back to the owner's app for the instance's whole life; it exits on its own when the instance is gone.
+function startFocusWatcher(appProfile, previous) {
+  if (process.platform !== "darwin") return;
+  spawn(process.execPath, [fileURLToPath(new URL("./keep-background.mjs", import.meta.url)), appProfile, obsidianApp, String(previous.pid), previous.path ?? ""], { detached: true, stdio: "ignore" }).unref();
 }
 
-// Obsidian activates itself when its first window opens, even under `open -g`, and nothing outside the app prevents
-// that. Hand focus straight back to whatever the owner had in front for the launch window, so the flash stays short.
-function returnFocus(appProfile, previous) {
-  if (!previous.path || previous.path === obsidianApp) return;
-  for (let tick = 0; tick < 150; tick++) {
-    const main = Number(spawnSync("pgrep", ["-f", "--", instancePattern(appProfile)], { encoding: "utf8" }).stdout.trim().split("\n")[0]);
-    if (main && frontApp().pid === main) spawnSync("open", ["-a", previous.path]);
-    spawnSync("sleep", ["0.1"]);
-  }
-}
-
-// `--` keeps pgrep/pkill from reading the pattern as an option; matching the main executable leaves helpers to it.
-const instancePattern = appProfile => `MacOS/Obsidian --user-data-dir=${appProfile}`;
 const instanceRunning = appProfile => spawnSync("pgrep", ["-f", "--", instancePattern(appProfile)], { encoding: "utf8" }).status === 0;
 
 // Per-session vaults let parallel sessions run UI acceptance without sharing the owner's testing vault.
@@ -222,7 +213,7 @@ function sessionMain(args) {
   if (!existsSync(join(appProfile, "obsidian.json"))) prepareObsidianProfile(vault, runtime, { cli: false });
   launchObsidian(appProfile);
   const cdp = `node scripts/obsidian-cdp.mjs --vault=${vault}`;
-  process.stdout.write(`${JSON.stringify({ vault, created: !exists, version: record.version, hashes: record.hashes, next: [`${cdp} wait`, `${cdp} trust`, `${cdp} eval "<expression>"`, `${cdp} screenshot <file.png>`, `node scripts/test-harness.mjs --session=${vault.slice(sessionVaultPrefix.length)} --stop`] }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ vault, created: !exists, version: record.version, hashes: record.hashes, next: [`${cdp} wait`, `${cdp} trust`, `${cdp} eval "<expression>"`, `${cdp} screenshot <file.png>`, `node scripts/test-harness.mjs --session=${vault.slice(sessionVaultPrefix.length)} --stop`, `Test Obsidian stays in the background for its whole life; to watch it, create ${join(appProfile, "allow-focus")} (delete it to hide again)`] }, null, 2)}\n`);
 }
 
 export function sourceFingerprint(directory = root) {

@@ -132,10 +132,6 @@ export interface Settings {
   defaultDetailTemplateId?: string;
   /** Workspace default note style: `style:<file name>`, an old template id, or a built-in style id. Absent = defaultDetailTemplateId. */
   defaultNoteStyleId?: string;
-  /** Workspace default template block: `builtin:<id>` or `file:<name>` (a file in the Templates block folder). Absent = the old default above. */
-  noteTemplateBlock?: string;
-  /** Workspace default tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the tone of the old default. */
-  noteToneBlock?: string;
   /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. Read only until the settings page writes it. */
   noteStyleByKind?: Partial<Record<StyleKind, string>>;
   /** The marker of the conversion to the recipe model, and the old id -> new ref table that implicit styles read. */
@@ -1659,6 +1655,20 @@ export class Repository {
   async writeTopicKind(path: string, kind: TopicKind): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
       setFrontmatterKeys(content, { "topic-kind": kind === "topic" ? null : kind })
+    );
+  }
+
+  /**
+   * Sets a note's own note style. A ref writes `note-style` only (the 0.28.0 `detail-template` and `tone` stay as they are);
+   * null is "follow the topic type" and removes all three keys. Other lines and the body keep their bytes, `updated` is not
+   * bumped, nothing rebuilds.
+   */
+  async writeNoteStyle(path: string, ref: string | null): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      setFrontmatterKeys(
+        content,
+        ref === null ? { "note-style": null, "detail-template": null, tone: null } : { "note-style": ref }
+      )
     );
   }
 

@@ -17493,7 +17493,10 @@ function imageElement(image) {
   if (!image || typeof image.href !== "string" || !DATA_IMAGE.test(image.href)) return "";
   const box = rect(image.x, image.y, image.w, image.h);
   const fit = image.fit === "contain" ? "xMidYMid meet" : image.fit === "cover" ? "xMidYMid slice" : "none";
-  return box ? `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>` : "";
+  if (!box) return "";
+  const tag = `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>`;
+  const win = image.window ? rect(image.window.x, image.window.y, image.window.w, image.window.h) : null;
+  return win ? `<svg x="${win[0]}" y="${win[1]}" width="${win[2]}" height="${win[3]}" viewBox="${win.join(" ")}">${tag}</svg>` : tag;
 }
 function numberIn(value, min, max) {
   return typeof value === "number" && Number.isFinite(value) ? Math.round(Math.min(max, Math.max(min, value)) * 100) / 100 : void 0;
@@ -24374,6 +24377,7 @@ function fishboneEdgePathData(parent, child, depth) {
 
 // experiences/visual-map/card-cover.ts
 var COVER_KEY = "topic-cover";
+var COVER_FRAME_KEY = "topic-cover-frame";
 var IMAGE_EXTENSION2 = /\.(?:png|jpe?g|gif|webp)$/i;
 var SCHEME2 = /^[a-z][a-z0-9+.-]*:/i;
 function linkpathOf(raw) {
@@ -24406,17 +24410,34 @@ function resolveCover(cache, resolve) {
   }
   return null;
 }
+var FRAME_NUMBER = /^(?:\d+(?:\.\d*)?|\.\d+)$/;
+var FRAME_EPSILON = 1e-9;
+function parseCoverFrame(raw) {
+  if (typeof raw !== "string") return null;
+  const parts = raw.trim().split(/\s+/);
+  if (parts.length !== 4 || !parts.every((part) => FRAME_NUMBER.test(part))) return null;
+  const [x, y, w, h] = parts.map(Number);
+  if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0 || x > 1 || y > 1 || w > 1 || h > 1) return null;
+  if (x + w > 1 + FRAME_EPSILON || y + h > 1 + FRAME_EPSILON) return null;
+  return { x, y, w, h };
+}
+function resolveCoverWithFrame(cache, resolve) {
+  var _a2;
+  const cover = resolveCover(cache, resolve);
+  if (!cover || !("path" in cover)) return cover;
+  return { path: cover.path, frame: parseCoverFrame((_a2 = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _a2[COVER_FRAME_KEY]) };
+}
 function safeLink(link) {
   return link.replace(/[[\]|\r\n]/g, " ").trim();
 }
 function withCover(content, link) {
   const safe = safeLink(link);
-  return safe ? setFrontmatterKeys(content, { [COVER_KEY]: `[[${safe}]]` }) : content;
+  return safe ? setFrontmatterKeys(content, { [COVER_KEY]: `[[${safe}]]`, [COVER_FRAME_KEY]: null }) : content;
 }
 function withCoverOff(content) {
   return setFrontmatterKeys(content, { [COVER_KEY]: "none" });
 }
-function withoutCover(content) {
+function withCoverOn(content) {
   return setFrontmatterKeys(content, { [COVER_KEY]: null });
 }
 function appendImageEmbed(content, link) {
@@ -47916,10 +47937,28 @@ var cardLabels = /* @__PURE__ */ new WeakMap();
 var cardCutLabels = /* @__PURE__ */ new WeakMap();
 var cardCovers = /* @__PURE__ */ new WeakMap();
 var COVER_MAX_HEIGHT_RATIO = 1.5;
-function coverFrameRatio(width, height) {
-  return width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height) ? Math.max(width / height, 1 / COVER_MAX_HEIGHT_RATIO) : null;
+function coverFrameRatio(width, height, frame) {
+  var _a2, _b2;
+  if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) return null;
+  return Math.max(width * ((_a2 = frame == null ? void 0 : frame.w) != null ? _a2 : 1) / (height * ((_b2 = frame == null ? void 0 : frame.h) != null ? _b2 : 1)), 1 / COVER_MAX_HEIGHT_RATIO);
 }
-var coverRatios = /* @__PURE__ */ new Map();
+var coverShapes = /* @__PURE__ */ new Map();
+function placeCoverFrame(parts, shape2, mask) {
+  const ratio = coverFrameRatio(shape2, 1, mask);
+  if (!ratio) return;
+  parts.frame.style.setProperty("aspect-ratio", String(ratio));
+  parts.frame.addClass("is-sized");
+  if (!mask || !parts.window) return;
+  const region = shape2 * mask.w / mask.h;
+  const share = region / ratio * 100;
+  parts.window.style.setProperty("width", `${share}%`);
+  parts.window.style.setProperty("left", `${(100 - share) / 2}%`);
+  const img = parts.img.style;
+  img.setProperty("width", `${100 / mask.w}%`);
+  img.setProperty("height", `${100 / mask.h}%`);
+  img.setProperty("left", `${-mask.x / mask.w * 100}%`);
+  img.setProperty("top", `${-mask.y / mask.h * 100}%`);
+}
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var cardLinkButtons = /* @__PURE__ */ new WeakMap();
@@ -50776,7 +50815,7 @@ ${request.requirements}` : preset.text,
     const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof import_obsidian33.TFile)) throw new Error(path);
-      await this.app.vault.process(file, (content) => off ? withoutCover(content) : withCoverOff(content));
+      await this.app.vault.process(file, (content) => off ? withCoverOn(content) : withCoverOff(content));
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
     }).commit({ deferRebuild: true, label: t("ui.topic_cover") });
@@ -55576,11 +55615,11 @@ ${request.requirements}` : preset.text,
   exportCoverPath(notePath) {
     const file = this.app.vault.getAbstractFileByPath(notePath);
     if (!(file instanceof import_obsidian33.TFile)) return null;
-    const cover = resolveCover(
+    const cover = resolveCoverWithFrame(
       this.app.metadataCache.getFileCache(file),
       (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
     );
-    return cover && "path" in cover ? cover.path : null;
+    return cover && "path" in cover ? cover : null;
   }
   /**
    * The map as the screen shows it (decision D9): card rectangles and edge paths (the fishbone spine included) are
@@ -55671,12 +55710,28 @@ ${request.requirements}` : preset.text,
         if (Number.isFinite(width) && width > 0) item.strokeWidth = width;
       }
       const frame = card.querySelector(".vam-card-cover");
-      const coverPath = frame ? this.exportCoverPath(node.path) : null;
-      if (frame && coverPath) {
-        const href = await imageHref(coverPath);
+      const coverInfo = frame ? this.exportCoverPath(node.path) : null;
+      if (frame && coverInfo) {
+        const href = await imageHref(coverInfo.path);
         if (!isCurrent()) return null;
         if (href === false) return { refuse: "embedded" };
-        if (href)
+        const win2 = coverInfo.frame ? frame.querySelector(".vam-card-cover-window") : null;
+        if (href && coverInfo.frame && win2 && win2.offsetWidth > 0 && win2.offsetHeight > 0) {
+          const mask = coverInfo.frame;
+          const winX = box.x + frame.offsetLeft + win2.offsetLeft;
+          const winY = box.y + frame.offsetTop + win2.offsetTop;
+          const w = win2.offsetWidth / mask.w;
+          const h = win2.offsetHeight / mask.h;
+          item.cover = {
+            x: winX - mask.x * w,
+            y: winY - mask.y * h,
+            w,
+            h,
+            href,
+            fit: "fill",
+            window: { x: winX, y: winY, w: win2.offsetWidth, h: win2.offsetHeight }
+          };
+        } else if (href)
           item.cover = {
             x: box.x + frame.offsetLeft,
             y: box.y + frame.offsetTop,
@@ -57534,10 +57589,11 @@ ${request.requirements}` : preset.text,
     }
     let source;
     let imagePath = "";
+    let mask = null;
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof import_obsidian33.TFile)) return;
-      const cover = resolveCover(
+      const cover = resolveCoverWithFrame(
         this.app.metadataCache.getFileCache(file),
         (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
       );
@@ -57545,19 +57601,20 @@ ${request.requirements}` : preset.text,
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof import_obsidian33.TFile ? (_c = (_b2 = this.app.vault).getResourcePath) == null ? void 0 : _c.call(_b2, image) : void 0;
       imagePath = cover.path;
+      mask = cover.frame;
     } catch (e) {
       return;
     }
     if (!source) return;
     const frame = createDiv({ cls: "vam-card-cover" });
-    const known = coverRatios.get(imagePath);
-    if (known) {
-      frame.style.setProperty("aspect-ratio", String(known));
-      frame.addClass("is-sized");
-    }
-    const img = frame.createEl("img", {
+    const windowEl = mask ? frame.createDiv({ cls: "vam-card-cover-window" }) : null;
+    if (mask) frame.addClass("is-framed");
+    const img = (windowEl != null ? windowEl : frame).createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
+    const parts = { frame, window: windowEl, img };
+    const known = coverShapes.get(imagePath);
+    if (known) placeCoverFrame(parts, known, mask);
     img.addEventListener("error", () => {
       var _a3;
       (_a3 = this.coverObserver) == null ? void 0 : _a3.unobserve(img);
@@ -57565,11 +57622,10 @@ ${request.requirements}` : preset.text,
       cardCovers.delete(card);
     });
     img.addEventListener("load", () => {
-      const ratio = coverFrameRatio(img.naturalWidth, img.naturalHeight);
-      if (!ratio || frame.hasClass("is-sized")) return;
-      coverRatios.set(imagePath, ratio);
-      frame.style.setProperty("aspect-ratio", String(ratio));
-      frame.addClass("is-sized");
+      const shape2 = coverFrameRatio(img.naturalWidth, img.naturalHeight) && img.naturalWidth / img.naturalHeight;
+      if (!shape2 || frame.hasClass("is-sized")) return;
+      coverShapes.set(imagePath, shape2);
+      placeCoverFrame(parts, shape2, mask);
       this.afterCoverSized(card);
     });
     cardCovers.set(card, { frame, img });
@@ -68831,7 +68887,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
+.vam-card-cover.is-framed { position: relative; }
+.vam-card-cover-window { position: absolute; top: 0; height: 100%; left: 0; width: 100%; overflow: hidden; }
+.vam-card-cover.is-framed:not(.is-sized) img { visibility: hidden; }
 .vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; }
+.vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

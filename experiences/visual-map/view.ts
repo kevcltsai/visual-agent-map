@@ -122,7 +122,14 @@ import {
   type TopicColor,
   type TopicStyle
 } from "../../topic-colors";
-import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
+import {
+  appendImageEmbed,
+  resolveCoverWithFrame,
+  withCover,
+  withCoverOff,
+  withCoverOn,
+  type CoverFrame
+} from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -590,14 +597,41 @@ const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement }>();
 /** A card cover is as wide as the card's content and at most this many times as tall; a taller picture is scaled down whole (letterboxed), never cropped. */
 export const COVER_MAX_HEIGHT_RATIO = 1.5;
-/** Width over height of the frame for a picture of this size (a very tall picture is held at 1 / COVER_MAX_HEIGHT_RATIO). */
-export function coverFrameRatio(width: number, height: number): number | null {
-  return width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height)
-    ? Math.max(width / height, 1 / COVER_MAX_HEIGHT_RATIO)
-    : null;
+/**
+ * Width over height of the card's cover frame for a picture of this size, or of the part of it a cover frame (mask) shows
+ * (a very tall picture or region is held at 1 / COVER_MAX_HEIGHT_RATIO).
+ */
+export function coverFrameRatio(width: number, height: number, frame?: CoverFrame | null): number | null {
+  if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) return null;
+  return Math.max((width * (frame?.w ?? 1)) / (height * (frame?.h ?? 1)), 1 / COVER_MAX_HEIGHT_RATIO);
 }
-/** Picture shapes already seen, by image path, so a redraw sizes the frame at once and nothing jumps. */
-const coverRatios = new Map<string, number>();
+/** Picture shapes (width over height) already seen, by image path, so a redraw sizes the frame at once and nothing jumps. */
+const coverShapes = new Map<string, number>();
+/**
+ * Lays a picture into its (already sized) cover frame. Whole picture: nothing to place (CSS contains it). With a mask:
+ * the window is the framed region, as wide as the frame or, when the frame is capped, scaled down whole and centred;
+ * the picture is sized and shifted inside the window so only the region shows. Inline percentages, no CSS variables.
+ */
+function placeCoverFrame(
+  parts: { frame: HTMLElement; window: HTMLElement | null; img: HTMLImageElement },
+  shape: number,
+  mask: CoverFrame | null
+): void {
+  const ratio = coverFrameRatio(shape, 1, mask);
+  if (!ratio) return;
+  parts.frame.style.setProperty("aspect-ratio", String(ratio));
+  parts.frame.addClass("is-sized");
+  if (!mask || !parts.window) return;
+  const region = (shape * mask.w) / mask.h;
+  const share = (region / ratio) * 100;
+  parts.window.style.setProperty("width", `${share}%`);
+  parts.window.style.setProperty("left", `${(100 - share) / 2}%`);
+  const img = parts.img.style;
+  img.setProperty("width", `${100 / mask.w}%`);
+  img.setProperty("height", `${100 / mask.h}%`);
+  img.setProperty("left", `${(-mask.x / mask.w) * 100}%`);
+  img.setProperty("top", `${(-mask.y / mask.h) * 100}%`);
+}
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -3710,7 +3744,7 @@ export class VisualAgentMapView extends ItemView {
       .rewriteNote(node.path, async path => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await this.app.vault.process(file, content => (off ? withoutCover(content) : withCoverOff(content)));
+        await this.app.vault.process(file, content => (off ? withCoverOn(content) : withCoverOff(content)));
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -8946,13 +8980,13 @@ export class VisualAgentMapView extends ItemView {
     this.showMenuUnder(menu, event);
   }
   /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
-  private exportCoverPath(notePath: string): string | null {
+  private exportCoverPath(notePath: string): { path: string; frame: CoverFrame | null } | null {
     const file = this.app.vault.getAbstractFileByPath(notePath);
     if (!(file instanceof TFile)) return null;
-    const cover = resolveCover(this.app.metadataCache.getFileCache(file), link =>
+    const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
       this.app.metadataCache.getFirstLinkpathDest(link, notePath)
     );
-    return cover && "path" in cover ? cover.path : null;
+    return cover && "path" in cover ? cover : null;
   }
   /**
    * The map as the screen shows it (decision D9): card rectangles and edge paths (the fishbone spine included) are
@@ -9051,12 +9085,29 @@ export class VisualAgentMapView extends ItemView {
         if (Number.isFinite(width) && width > 0) item.strokeWidth = width;
       }
       const frame = card.querySelector<HTMLElement>(".vam-card-cover");
-      const coverPath = frame ? this.exportCoverPath(node.path) : null;
-      if (frame && coverPath) {
-        const href = await imageHref(coverPath);
+      const coverInfo = frame ? this.exportCoverPath(node.path) : null;
+      if (frame && coverInfo) {
+        const href = await imageHref(coverInfo.path);
         if (!isCurrent()) return null;
         if (href === false) return { refuse: "embedded" };
-        if (href)
+        const win = coverInfo.frame ? frame.querySelector<HTMLElement>(".vam-card-cover-window") : null;
+        if (href && coverInfo.frame && win && win.offsetWidth > 0 && win.offsetHeight > 0) {
+          // A masked cover: the whole picture is placed so the framed region fills the window; the export clips to the window.
+          const mask = coverInfo.frame;
+          const winX = box.x + frame.offsetLeft + win.offsetLeft;
+          const winY = box.y + frame.offsetTop + win.offsetTop;
+          const w = win.offsetWidth / mask.w;
+          const h = win.offsetHeight / mask.h;
+          item.cover = {
+            x: winX - mask.x * w,
+            y: winY - mask.y * h,
+            w,
+            h,
+            href,
+            fit: "fill",
+            window: { x: winX, y: winY, w: win.offsetWidth, h: win.offsetHeight }
+          };
+        } else if (href)
           item.cover = {
             x: box.x + frame.offsetLeft,
             y: box.y + frame.offsetTop,
@@ -11064,30 +11115,33 @@ export class VisualAgentMapView extends ItemView {
     }
     let source: string | undefined;
     let imagePath = "";
+    let mask: CoverFrame | null = null;
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof TFile)) return;
-      const cover = resolveCover(this.app.metadataCache.getFileCache(file), link =>
+      const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
         this.app.metadataCache.getFirstLinkpathDest(link, notePath)
       );
       if (!cover || !("path" in cover)) return;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
       imagePath = cover.path;
+      mask = cover.frame;
     } catch {
       return;
     }
     if (!source) return;
     const frame = createDiv({ cls: "vam-card-cover" });
-    // Until the picture's shape is known the frame keeps its 96 px placeholder (CSS); a known shape sizes it at once.
-    const known = coverRatios.get(imagePath);
-    if (known) {
-      frame.style.setProperty("aspect-ratio", String(known));
-      frame.addClass("is-sized");
-    }
-    const img = frame.createEl("img", {
+    // A frame (mask) puts the picture inside a window that shows only the framed region; the file itself is never changed.
+    const windowEl = mask ? frame.createDiv({ cls: "vam-card-cover-window" }) : null;
+    if (mask) frame.addClass("is-framed");
+    const img = (windowEl ?? frame).createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
+    const parts = { frame, window: windowEl, img };
+    // Until the picture's shape is known the frame keeps its 96 px placeholder (CSS); a known shape sizes it at once.
+    const known = coverShapes.get(imagePath);
+    if (known) placeCoverFrame(parts, known, mask);
     // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
     img.addEventListener("error", () => {
       this.coverObserver?.unobserve(img);
@@ -11096,11 +11150,10 @@ export class VisualAgentMapView extends ItemView {
     });
     // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
     img.addEventListener("load", () => {
-      const ratio = coverFrameRatio(img.naturalWidth, img.naturalHeight);
-      if (!ratio || frame.hasClass("is-sized")) return;
-      coverRatios.set(imagePath, ratio);
-      frame.style.setProperty("aspect-ratio", String(ratio));
-      frame.addClass("is-sized");
+      const shape = coverFrameRatio(img.naturalWidth, img.naturalHeight) && img.naturalWidth / img.naturalHeight;
+      if (!shape || frame.hasClass("is-sized")) return;
+      coverShapes.set(imagePath, shape);
+      placeCoverFrame(parts, shape, mask);
       this.afterCoverSized(card);
     });
     cardCovers.set(card, { frame, img });

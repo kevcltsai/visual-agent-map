@@ -7,6 +7,7 @@
 A card's cover picture now shows the whole picture instead of a 96 px strip cut from the middle. For example, a book cover that used to lose its top and bottom now appears complete.
 
 - **Whole picture.** The cover is as wide as the card and as tall as the picture needs, up to 1.5 times the card width. A taller picture is scaled down to fit, with space at the sides, and is never cropped. Exported images match the canvas.
+- **Show only part of the picture.** Add `topic-cover-frame: "x y w h"` to a topic note to show just that part of its cover, as fractions of the picture. For example, `0 0.4 1 0.33` shows a full-width band starting 40% down. The card takes the shape of the part (up to 1.5 times the card width), the picture file is never cut or changed, and exported images show the same part. A wrong or out-of-range value is ignored and the whole picture shows; `topic-cover: none` still hides the cover. When VAM itself changes the cover picture (a new picture dropped on the card, or the cover reset), the old frame is removed. Older VAM versions ignore the property and show the whole picture.
 
 ## [0.29.0] - 2026-11-04
 

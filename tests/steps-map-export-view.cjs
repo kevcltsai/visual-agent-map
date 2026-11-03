@@ -163,6 +163,33 @@ test('a cover and a free canvas image become data URIs read with readBinary; a f
   assert.equal(h.counts.readBinary, 3, 'cover, free image, fake image; the missing file is never read');
 });
 
+test('a framed cover exports the same region: the whole picture placed so the window shows only the frame, still the original file', async () => {
+  const h = await harness();
+  const cacheOf = h.view.app.metadataCache;
+  const rootEl = h.view.cardEls.get(h.root.id);
+  const frameEl = rootEl.children.find(c => c.classes.includes('vam-card-cover'));
+  // The window as the stylesheet lays it out: the region fills the frame (x 0, 8 from the card top, 280 x 96).
+  const win = frameEl.createDiv('vam-card-cover-window');
+  Object.assign(win, { offsetLeft: 0, offsetTop: 0, offsetWidth: 280, offsetHeight: 96 });
+  cacheOf.getFileCache = f => (f.path === h.root.path ? { frontmatter: { 'topic-cover': '[[Media/c.png]]', 'topic-cover-frame': '0.25 0.5 0.5 0.25' } } : { frontmatter: {} });
+  const { scene } = await h.view.collectExportScene(() => true);
+  const cover = scene.cards.find(c => c.cover).cover;
+  // Image rectangle: the window is 0.5 x 0.25 of the picture -> picture 560 x 384; its top-left sits 0.25 / 0.5 of that left and above the window.
+  assert.equal(cover.w, 560);
+  assert.equal(cover.h, 384);
+  assert.equal(cover.x, 100 + 0 - 0.25 * 560);
+  assert.equal(cover.y, 50 + 8 + 0 - 0.5 * 384);
+  assert.deepEqual(JSON.parse(JSON.stringify(cover.window)), { x: 100, y: 58, w: 280, h: 96 });
+  assert.equal(cover.fit, 'fill');
+  const svg = ex.buildMapSvg(scene);
+  assert.ok(svg.includes('viewBox="100 58 280 96"'));
+  // Counter-example: an invalid frame exports the whole picture exactly as before.
+  cacheOf.getFileCache = f => (f.path === h.root.path ? { frontmatter: { 'topic-cover': '[[Media/c.png]]', 'topic-cover-frame': '0.9 0 0.5 1' } } : { frontmatter: {} });
+  const whole = (await h.view.collectExportScene(() => true)).scene.cards.find(c => c.cover).cover;
+  assert.equal(whole.fit, 'contain');
+  assert.ok(!('window' in whole));
+});
+
 test('card-style: a styled card and a thick line carry size, weight, border and edge width into the scene; an unstyled card has none', async () => {
   const h = await harness();
   const rootEl = h.view.cardEls.get(h.root.id);

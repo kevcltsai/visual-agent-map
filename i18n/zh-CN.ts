@@ -1018,6 +1018,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.ai_unlock_card": "解除锁定：允许 AI 修改此议题",
   "ui.ai_locked_state": "已锁定 AI",
   "ui.ai_locked_skipped_0": "已跳过 {0} 个锁定的议题",
+  "ui.ai_unlock_selected": "解除 AI 锁定",
+  "ui.ai_locked_some_0_1": "{1} 个中有 {0} 个已锁定",
   "ui.model_and_advanced_settings": "模型与高级设置",
   "ui.model": "使用模型",
   "ui.codex_provider_label": "Codex",

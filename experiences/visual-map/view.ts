@@ -8927,6 +8927,8 @@ export class VisualAgentMapView extends ItemView {
     preserve?: (charted: string) => boolean;
   }): void {
     const path = job.path;
+    // AI lock: no diagrams are asked for a locked topic, and a result that lands after a lock is not written.
+    if (job.saved.aiLocked) return;
     const snapshot = this.chartSnapshot(job.saved);
     const map = this.map ?? undefined;
     this.plugin.addChartsAfterWrite({
@@ -8938,7 +8940,7 @@ export class VisualAgentMapView extends ItemView {
       apply: async charted => {
         if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
-        if (this.chartSnapshot(latest) !== snapshot) return false;
+        if (latest.aiLocked || this.chartSnapshot(latest) !== snapshot) return false;
         // "Add new findings on top": the diagrams may only touch the new text. The whole Detail is not normalized (that
         // would move the old text); the diagrammed text must still hold every old piece, or the diagrams are dropped.
         const top = job.updateMode === "top";
@@ -12903,6 +12905,9 @@ export class VisualAgentMapView extends ItemView {
     this.startingTasks.get(path)?.abort();
     this.plugin.topicRuns.taskController(path)?.abort();
     this.plugin.topicRuns.stop(path);
+    this.plugin.abortChartJobs(path);
+    const synthesis = this.synthesisTasks.get(path);
+    if (synthesis?.state === "running") synthesis.controller.abort();
   }
   /**
    * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).
@@ -12926,6 +12931,31 @@ export class VisualAgentMapView extends ItemView {
       .commit({ deferRebuild: true, label: t("ui.ai_lock") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
+  }
+  /**
+   * The selection bar's AI lock: one button whose `aria-pressed` is true when every selected topic is locked, false when
+   * none is and "mixed" otherwise (the title and name say how many). A click unlocks all when all are locked and locks
+   * the rest otherwise, in one undo step. Not on AIM maps.
+   */
+  private renderAiLockSelectionButton(selection: HTMLElement): void {
+    if (!this.map || this.map.aim) return;
+    const nodes = [...this.selection.state.multiSelected]
+      .map(id => this.map?.nodes.find(node => node.id === id))
+      .filter((node): node is MapNode => !!node && !node.aimKind && !!this.notes.get(node.id));
+    const locked = nodes.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
+    const all = nodes.length > 0 && locked === nodes.length;
+    const button = this.button(
+      selection,
+      t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"),
+      () => this.enqueue(() => this.setAiLock(nodes, !all)),
+      !nodes.length
+    );
+    button.setAttr("aria-pressed", all ? "true" : locked ? "mixed" : "false");
+    if (locked && !all) {
+      const state = t("ui.ai_locked_some_0_1", locked, nodes.length);
+      button.setAttr("title", state);
+      button.setAttr("aria-label", `${t("ui.ai_lock_toggle")} (${state})`);
+    }
   }
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
   private renderAiLockSection(panel: HTMLElement, node: MapNode): void {
@@ -14147,6 +14177,7 @@ export class VisualAgentMapView extends ItemView {
         bracket.setAttr("title", t(check.reason));
       }
     }
+    this.renderAiLockSelectionButton(selection);
     this.button(
       selection,
       t("ui.move_to"),

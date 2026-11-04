@@ -1083,6 +1083,8 @@ export const en = {
   "ui.ai_unlock_card": "Unlock: let AI change this topic",
   "ui.ai_locked_state": "Locked from AI",
   "ui.ai_locked_skipped_0": "{0} locked topics skipped",
+  "ui.ai_unlock_selected": "Unlock for AI",
+  "ui.ai_locked_some_0_1": "{0} of {1} locked",
   "ui.model_and_advanced_settings": "Model and advanced settings",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",

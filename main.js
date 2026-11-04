@@ -1090,6 +1090,8 @@ var en = {
   "ui.ai_unlock_card": "Unlock: let AI change this topic",
   "ui.ai_locked_state": "Locked from AI",
   "ui.ai_locked_skipped_0": "{0} locked topics skipped",
+  "ui.ai_unlock_selected": "Unlock for AI",
+  "ui.ai_locked_some_0_1": "{0} of {1} locked",
   "ui.model_and_advanced_settings": "Model and advanced settings",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
@@ -3547,6 +3549,8 @@ var zhCN = {
   "ui.ai_unlock_card": "\u89E3\u9664\u9501\u5B9A\uFF1A\u5141\u8BB8 AI \u4FEE\u6539\u6B64\u8BAE\u9898",
   "ui.ai_locked_state": "\u5DF2\u9501\u5B9A AI",
   "ui.ai_locked_skipped_0": "\u5DF2\u8DF3\u8FC7 {0} \u4E2A\u9501\u5B9A\u7684\u8BAE\u9898",
+  "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9501\u5B9A",
+  "ui.ai_locked_some_0_1": "{1} \u4E2A\u4E2D\u6709 {0} \u4E2A\u5DF2\u9501\u5B9A",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u4E0E\u9AD8\u7EA7\u8BBE\u7F6E",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
@@ -6004,6 +6008,8 @@ var zhTW = {
   "ui.ai_unlock_card": "\u89E3\u9664\u9396\u5B9A\uFF1A\u5141\u8A31 AI \u4FEE\u6539\u6B64\u8B70\u984C",
   "ui.ai_locked_state": "\u5DF2\u9396\u5B9A AI",
   "ui.ai_locked_skipped_0": "\u5DF2\u7565\u904E {0} \u500B\u9396\u5B9A\u7684\u8B70\u984C",
+  "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9396\u5B9A",
+  "ui.ai_locked_some_0_1": "{1} \u500B\u4E2D\u6709 {0} \u500B\u5DF2\u9396\u5B9A",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u8207\u9032\u968E\u8A2D\u5B9A",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
@@ -55906,6 +55912,7 @@ ${request.requirements}` : preset.text,
   queueCharts(job) {
     var _a2;
     const path = job.path;
+    if (job.saved.aiLocked) return;
     const snapshot = this.chartSnapshot(job.saved);
     const map = (_a2 = this.map) != null ? _a2 : void 0;
     this.plugin.addChartsAfterWrite({
@@ -55918,7 +55925,7 @@ ${request.requirements}` : preset.text,
         var _a3;
         if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
-        if (this.chartSnapshot(latest) !== snapshot) return false;
+        if (latest.aiLocked || this.chartSnapshot(latest) !== snapshot) return false;
         const top = job.updateMode === "top";
         if (top && !((_a3 = job.preserve) == null ? void 0 : _a3.call(job, charted))) return false;
         await this.plugin.repo.updateNote(
@@ -59607,6 +59614,9 @@ ${request.requirements}` : preset.text,
     (_a2 = this.startingTasks.get(path)) == null ? void 0 : _a2.abort();
     (_b2 = this.plugin.topicRuns.taskController(path)) == null ? void 0 : _b2.abort();
     this.plugin.topicRuns.stop(path);
+    this.plugin.abortChartJobs(path);
+    const synthesis = this.synthesisTasks.get(path);
+    if ((synthesis == null ? void 0 : synthesis.state) === "running") synthesis.controller.abort();
   }
   /**
    * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).
@@ -59631,6 +59641,35 @@ ${request.requirements}` : preset.text,
     }).commit({ deferRebuild: true, label: t("ui.ai_lock") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
+  }
+  /**
+   * The selection bar's AI lock: one button whose `aria-pressed` is true when every selected topic is locked, false when
+   * none is and "mixed" otherwise (the title and name say how many). A click unlocks all when all are locked and locks
+   * the rest otherwise, in one undo step. Not on AIM maps.
+   */
+  renderAiLockSelectionButton(selection) {
+    if (!this.map || this.map.aim) return;
+    const nodes = [...this.selection.state.multiSelected].map((id) => {
+      var _a2;
+      return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === id);
+    }).filter((node) => !!node && !node.aimKind && !!this.notes.get(node.id));
+    const locked = nodes.filter((node) => {
+      var _a2;
+      return ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
+    }).length;
+    const all = nodes.length > 0 && locked === nodes.length;
+    const button = this.button(
+      selection,
+      t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"),
+      () => this.enqueue(() => this.setAiLock(nodes, !all)),
+      !nodes.length
+    );
+    button.setAttr("aria-pressed", all ? "true" : locked ? "mixed" : "false");
+    if (locked && !all) {
+      const state = t("ui.ai_locked_some_0_1", locked, nodes.length);
+      button.setAttr("title", state);
+      button.setAttr("aria-label", `${t("ui.ai_lock_toggle")} (${state})`);
+    }
   }
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
   renderAiLockSection(panel, node) {
@@ -60769,6 +60808,7 @@ ${request.requirements}` : preset.text,
         bracket.setAttr("title", t(check.reason));
       }
     }
+    this.renderAiLockSelectionButton(selection);
     this.button(
       selection,
       t("ui.move_to"),
@@ -72134,6 +72174,14 @@ function runStyleLabelText(label, language2) {
 
 // experiences/visual-map/topic-run.ts
 var CHART_JOB_LIMIT = 3;
+function aiLockedError() {
+  const error = new Error(t("ui.ai_locked_notice"));
+  error.name = "AiLockedError";
+  return error;
+}
+function isAiLockedError(error) {
+  return error instanceof Error && error.name === "AiLockedError";
+}
 var TopicRuns = class {
   constructor(ports) {
     this.ports = ports;
@@ -72324,6 +72372,10 @@ var TopicRuns = class {
       }
       const repo = this.ports.repository();
       const note = await repo.readNote(path, options.map());
+      if (note.aiLocked) {
+        options.failed(t("ui.ai_locked_notice"));
+        return;
+      }
       const used = await this.modelOf(path, note, options.map(), options.runOnce);
       (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
       const progress = this.startProgress(path, used.model);
@@ -72396,6 +72448,10 @@ var TopicRuns = class {
     };
     const repo = this.ports.repository();
     const note = await repo.readNote(path, options.map());
+    if (note.aiLocked) {
+      fail2(t("ui.ai_locked_notice"));
+      return;
+    }
     const used = await this.modelOf(path, note, options.map(), options.runOnce);
     const noteSnapshot = (item) => JSON.stringify([
       item.title,
@@ -72460,6 +72516,7 @@ var TopicRuns = class {
         if (signal.aborted || prepared.viewChanged()) throw changed();
         if (await prepared.sourcesChanged()) throw changed();
         const latest = await repo.readNote(path, options.map());
+        if (latest.aiLocked) throw aiLockedError();
         if (noteSnapshot(latest) !== snapshot) throw changed();
         const mode = (_a3 = prepared.updateMode) != null ? _a3 : "merge";
         const noteLanguage = noteLanguageOf(outputLanguage2);
@@ -72540,7 +72597,8 @@ var TopicRuns = class {
       try {
         await options.drafted(result, save, result.summary, result.detail, note);
       } catch (error) {
-        if (signal.aborted || error instanceof Error && error.name === "AbortError") {
+        if (isAiLockedError(error)) fail2(t("ui.ai_locked_notice"));
+        else if (signal.aborted || error instanceof Error && error.name === "AbortError") {
           fail2(t("ui.research_stopped_existing_content_was_preserved"));
         } else {
           console.error("VAM synthesis write", error);

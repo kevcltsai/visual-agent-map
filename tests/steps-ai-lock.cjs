@@ -250,3 +250,145 @@ test('i18n: the locked notice and the toggle names exist in every language', () 
   assert.match(read('i18n/zh-TW.ts'), /"ui\.ai_locked_notice": "議題已鎖定，AI 不會修改"/);
   assert.match(t('ui.ai_locked_notice'), LOCKED_NOTICE);
 });
+
+// ---- ticket 03: bulk lock from the selection bar ---------------------------------------------------------------------
+const selectionButton = (h) => {
+  const bar = dom.element('div');
+  h.view.renderAiLockSelectionButton(bar);
+  return dom.findAll(bar, i => i.tag === 'button')[0];
+};
+
+test('03 bulk: the selection bar locks every selected topic in one undo step, then unlocks them in one', async () => {
+  const h = await harness(['A', 'B', 'C']);
+  const [a, b, c] = h.nodes;
+  h.view.selection.replaceMulti([a.id, b.id, c.id]);
+  let pending;
+  h.view.enqueue = fn => { pending = fn(); };
+  const button = selectionButton(h);
+  assert.equal(button.attrs['aria-pressed'], 'false');
+  button.click(); await pending;
+  for (const node of h.nodes) assert.equal((await h.repo.readNote(node.path)).aiLocked, true);
+  await h.view.history.undo().undo();
+  for (const node of h.nodes) assert.equal((await h.repo.readNote(node.path)).aiLocked, undefined, 'one undo unlocks all three');
+  assert.equal(h.view.history.canUndo, false);
+  await h.view.history.redo().redo();
+  await h.view.hydrate();
+  const again = selectionButton(h);
+  assert.equal(again.attrs['aria-pressed'], 'true', 'all locked: pressed');
+  assert.match(again.text, /解除|Unlock/);
+  again.click(); await pending;
+  for (const node of h.nodes) assert.equal((await h.repo.readNote(node.path)).aiLocked, undefined);
+  void c;
+});
+
+test('03 bulk: a mixed selection says how many are locked and the click locks the rest', async () => {
+  const h = await harness(['A', 'B', 'C']);
+  const [a, b, c] = h.nodes;
+  await h.view.setAiLock([a], true);
+  h.view.selection.replaceMulti([a.id, b.id, c.id]);
+  let pending;
+  h.view.enqueue = fn => { pending = fn(); };
+  const button = selectionButton(h);
+  assert.equal(button.attrs['aria-pressed'], 'mixed');
+  assert.match(button.attrs.title, /1.*3/, 'the title names 1 of 3');
+  assert.match(button.attrs['aria-label'], /1.*3/);
+  const before = h.raw(a);
+  button.click(); await pending;
+  for (const node of [a, b, c]) assert.equal((await h.repo.readNote(node.path)).aiLocked, true);
+  assert.equal(h.raw(a), before, 'the already locked note is not rewritten');
+  await h.view.history.undo().undo();
+  assert.equal((await h.repo.readNote(a.path)).aiLocked, true, 'undo leaves the topic that was locked before');
+  assert.equal((await h.repo.readNote(b.path)).aiLocked, undefined);
+});
+
+test('03 bulk: no selection disables it; AIM maps get no button; the bar wires it in', async () => {
+  const h = await harness(['A']);
+  assert.equal(selectionButton(h).disabled, true);
+  h.view.map.aim = { version: 1, branches: [] };
+  assert.equal(selectionButton(h), undefined);
+  assert.match(read('experiences/visual-map/view.ts'), /this\.renderAiLockSelectionButton\(selection\);/);
+});
+
+// ---- ticket 04: integrate, charts, integrate selection -------------------------------------------------------------
+async function parentHarness() {
+  const h = await harness(['P', 'C1', 'C2']);
+  const [p, c1, c2] = h.nodes;
+  c1.parentId = p.id; c2.parentId = p.id;
+  await h.repo.saveMap(MAP, h.view.map);
+  for (const child of [c1, c2]) await h.repo.updateNote(child.path, { summary: `${child.path} summary`, detail: 'Child detail', status: 'completed' });
+  await h.view.hydrate();
+  return { ...h, p, c1, c2 };
+}
+const synthesis = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
+
+test('04 integrate: integrating into a locked parent is refused before the AI and writes nothing', async () => {
+  const h = await parentHarness();
+  await h.view.setAiLock([h.p], true);
+  const before = h.raw(h.p), failures = [];
+  await h.view.integrateChildren(h.p, synthesis, '', undefined, message => failures.push(message));
+  assert.equal(h.calls.length, 0, 'provider calls: 0');
+  assert.equal(h.raw(h.p), before);
+  assert.match(failures.join('\n'), LOCKED_NOTICE);
+  failures.length = 0;
+  await h.view.proposeIntegrationDirections(h.p, synthesis, () => assert.fail('no directions'), message => failures.push(message));
+  assert.equal(h.calls.length, 0, 'the synthesis directions are refused too');
+  assert.match(failures.join('\n'), LOCKED_NOTICE);
+});
+
+test('04 integrate: locked children are read as sources; the unlocked parent is written', async () => {
+  const h = await parentHarness();
+  await h.view.setAiLock([h.c1], true);
+  const child = h.raw(h.c1);
+  await h.view.integrateChildren(h.p, synthesis, '', undefined, message => assert.fail(message));
+  assert.equal(h.calls.length, 1);
+  assert.equal((await h.repo.readNote(h.p.path)).summary, 'AI summary');
+  assert.equal(h.raw(h.c1), child, 'the locked child is not touched');
+});
+
+test('04 integrate: late fence: a parent locked while the AI runs gets no write and does not stay running', async () => {
+  const h = await parentHarness();
+  const gate = h.hold(), failures = [];
+  const run = h.view.integrateChildren(h.p, synthesis, '', undefined, message => failures.push(message));
+  await until(() => gate.length === 1);
+  await h.repo.writeAiLocked(h.p.path, true);
+  gate[0]();
+  await run;
+  const note = await h.repo.readNote(h.p.path);
+  assert.notEqual(note.summary, 'AI summary');
+  assert.notEqual(note.status, 'running');
+  assert.match(failures.join('\n'), LOCKED_NOTICE);
+});
+
+test('04 charts: a chart result for a topic locked meanwhile is not written; locking stops its chart job', async () => {
+  const h = await harness(['A']);
+  const [a] = h.nodes;
+  const jobs = [], aborted = [];
+  h.host.addChartsAfterWrite = job => jobs.push(job);
+  h.host.abortChartJobs = path => aborted.push(path);
+  delete h.view.queueCharts; // the harness stubs it out; this test drives the real one
+  const saved = await h.repo.readNote(a.path);
+  h.view.queueCharts({ path: a.path, saved, context: { title: 'A' }, detail: saved.detail, model: 'gpt-6-luna', language: 'zh-TW' });
+  assert.equal(jobs.length, 1);
+  await h.view.setAiLock([a], true);
+  assert.ok(aborted.includes(a.path), 'locking stops the chart job of the topic');
+  const before = h.raw(a);
+  assert.equal(await jobs[0].apply('Detail with a chart'), false);
+  assert.equal(h.raw(a), before, 'no chart is written to a locked topic');
+  jobs.length = 0;
+  h.view.queueCharts({ path: a.path, saved: await h.repo.readNote(a.path), context: { title: 'A' }, detail: saved.detail, model: 'gpt-6-luna', language: 'zh-TW' });
+  assert.equal(jobs.length, 0, 'a locked topic gets no chart job at all');
+});
+
+test('04 integrate selection: locked sources may be read; the new topic is written and the sources stay as they were', async () => {
+  const h = await harness(['A', 'B']);
+  const [a, b] = h.nodes;
+  for (const node of h.nodes) await h.repo.updateNote(node.path, { summary: 'S', detail: 'Source detail', status: 'completed' });
+  await h.view.setAiLock([a, b], true);
+  const sources = [h.raw(a), h.raw(b)];
+  const failures = [];
+  await h.view.startSelectionSynthesis([a, b], { ...synthesis, synthesisTitle: 'Synth' }, 'Compare them', message => failures.push(message), () => {});
+  await until(() => h.view.map.nodes.length === 3 || failures.length);
+  assert.deepEqual(failures, []);
+  assert.equal(h.calls.length >= 1, true);
+  assert.deepEqual([h.raw(a), h.raw(b)], sources, 'locked sources are read, never written');
+});

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **AI lock.** Lock a topic (topic panel, card button or selection bar; `ai-locked: true`) and no AI action changes it, its children or its relations; your own edits still work.
+
 ### Cards, links and marks
 
 A card's cover picture now shows the whole picture instead of a 96 px strip cut from the middle. For example, a book cover that used to lose its top and bottom now appears complete.

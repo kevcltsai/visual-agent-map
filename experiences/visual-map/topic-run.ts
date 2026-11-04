@@ -1069,6 +1069,13 @@ export class TopicRuns {
       return null;
     }
     const { note, used, context, styleLabel } = prelude;
+    // AI lock: a locked topic is refused before anything is written or any AI call is made.
+    if (note.aiLocked) {
+      handle.release();
+      if (options.failed) options.failed(t("ui.ai_locked_notice"));
+      else options.notify?.(t("ui.ai_locked_notice"));
+      return null;
+    }
     const language = settings().language;
     this.pendingSuggestions.delete(path);
     // A diagram job still running for the previous result of this note must not land on the new run.
@@ -1183,14 +1190,17 @@ export class TopicRuns {
             latest.visualMode !== note.visualMode ||
             latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") ||
             JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-          if (controller.signal.aborted || stale) {
+          // The late-result fence: a topic locked while the AI ran gets nothing but its status back.
+          const locked = latest.aiLocked === true;
+          if (controller.signal.aborted || stale || locked) {
             await repo.updateNote(path, { status: note.status });
             if (exchangeId)
               exchanges()?.failed(
                 exchangeId,
-                t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
+                t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
               );
-            if (stale) fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+            if (locked) fail(t("ui.ai_locked_notice"));
+            else if (stale) fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
             return;
           }
           // Write-back comes after the stale fence: the old Detail is `latest.detail`, which equals the one the run started with.

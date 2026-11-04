@@ -330,6 +330,7 @@ import {
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
+import { aiLockBlock, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
@@ -638,6 +639,8 @@ const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
 /** The link button drawn in each card header, so a refresh can replace it. */
 const cardLinkButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
+/** The AI lock button of each locked card, so a repaint replaces it instead of adding a second. */
+const cardAiLockButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
@@ -2117,6 +2120,10 @@ export class VisualAgentMapView extends ItemView {
       const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
       if (this.plugin.topicRuns.isBusy(node.path)) {
         new Notice(t("ui.ai_running_ai"));
+        return;
+      }
+      if (this.aiLockReason("write", [node.id], new Map([[node.id, note]]))) {
+        new Notice(t("ui.ai_locked_notice"));
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
@@ -10396,6 +10403,7 @@ export class VisualAgentMapView extends ItemView {
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
     this.paintCardColor(card, note, !!node.aimKind);
     this.paintCardStyle(card, note, !!node.aimKind);
+    if (header) this.paintAiLock(card, header, node);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
     if (note?.detailFormatIssues?.length) {
@@ -11634,6 +11642,7 @@ export class VisualAgentMapView extends ItemView {
     }
     this.paintCardColor(card, note, !!node.aimKind);
     this.paintCardStyle(card, note, !!node.aimKind);
+    if (header) this.paintAiLock(card, header, node);
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
@@ -11746,6 +11755,10 @@ export class VisualAgentMapView extends ItemView {
     if (this.presentation) return;
     this.enqueue(async () => {
       const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+      if (this.aiLockReason("write", [node.id], new Map([[node.id, note]]))) {
+        new Notice(t("ui.ai_locked_notice"));
+        return;
+      }
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
       const sources = this.taskSourceSettings(currentLabel, this.map?.id, synthesisLabel);
@@ -11925,6 +11938,7 @@ export class VisualAgentMapView extends ItemView {
     if (note) this.renderColorSection(panel, node);
     if (note) this.renderStyleSection(panel, node);
     if (note) this.renderCoverSection(panel, node);
+    if (note) this.renderAiLockSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
@@ -12872,6 +12886,104 @@ export class VisualAgentMapView extends ItemView {
     await this.refreshAfterSavedChange();
     return result;
   }
+  /**
+   * Why the AI may not do `op` on the topics (AI lock), or null. The rule lives in core/ai-lock.ts; `fresh` notes (just
+   * read from disk) win over the view's.
+   */
+  private aiLockReason(
+    op: AiLockOp,
+    ids: readonly string[],
+    fresh?: ReadonlyMap<string, Note>,
+    options?: { to?: string | null }
+  ): AiLockReason | null {
+    return aiLockBlock(op, ids, this.map, id => (fresh?.get(id) ?? this.notes.get(id))?.aiLocked === true, options);
+  }
+  /** Stops every AI run on the topic through the same handles its Stop button uses. */
+  private stopAiOn(path: string): void {
+    this.startingTasks.get(path)?.abort();
+    this.plugin.topicRuns.taskController(path)?.abort();
+    this.plugin.topicRuns.stop(path);
+  }
+  /**
+   * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).
+   * Locking first stops the AI runs on them; their late results are fenced at write time. Not on AIM maps.
+   */
+  async setAiLock(nodes: readonly MapNode[], locked: boolean): Promise<void> {
+    if (!this.map || this.map.aim) return;
+    const targets = nodes.filter(
+      node => !node.aimKind && !!this.notes.get(node.id) && (this.notes.get(node.id)?.aiLocked === true) !== locked
+    );
+    if (!targets.length) return;
+    if (locked) for (const node of targets) this.stopAiOn(node.path);
+    const viewport = clone(this.map.viewport);
+    let transaction = this.beginMapTransaction();
+    for (const target of targets)
+      transaction = transaction.rewriteNote(target.path, path => this.plugin.repo.writeAiLocked(path, locked));
+    const entry = await transaction
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.ai_lock") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
+  private renderAiLockSection(panel: HTMLElement, node: MapNode): void {
+    if (!this.map || this.map.aim || node.aimKind || this.selection.state.multiSelectMode) return;
+    const section = panel.createDiv("vam-inspector-section vam-ai-lock-section");
+    section.createEl("strong", { text: t("ui.ai_lock"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.ai_lock"));
+    // The metadata cache may lag behind the write, so the state after a click is tracked here.
+    let locked = this.notes.get(node.id)?.aiLocked === true;
+    const paint = (focus = false): void => {
+      group.empty();
+      const choice = this.button(group, t("ui.ai_lock_toggle"), () => {
+        this.enqueue(async () => {
+          await this.setAiLock([node], !locked);
+          locked = !locked;
+          paint(true);
+        });
+      });
+      choice.setAttr("aria-pressed", String(locked));
+      if (locked) choice.addClass("is-pressed");
+      if (focus) choice.focus();
+    };
+    paint();
+    section.createEl("p", { cls: "vam-hint", text: t("ui.ai_lock_hint") });
+  }
+  /**
+   * A locked card shows a lock button in its header (a click unlocks) and says "locked" in its accessible name. Safe to
+   * call again on the same card: the old button goes first.
+   */
+  private paintAiLock(card: HTMLElement, header: HTMLElement, node: MapNode): void {
+    const old = cardAiLockButtons.get(card);
+    if (old) {
+      old.remove();
+      cardAiLockButtons.delete(card);
+      delete card.dataset.aiLocked;
+    }
+    if (!this.map || this.map.aim || node.aimKind || this.notes.get(node.id)?.aiLocked !== true) return;
+    card.dataset.aiLocked = "true";
+    const button = header.createEl("button", { cls: "vam-card-ai-lock" });
+    cardAiLockButtons.set(card, button);
+    button.type = "button";
+    setIcon(button, "lock");
+    button.tabIndex = -1;
+    button.setAttr("aria-label", t("ui.ai_unlock_card"));
+    button.setAttr("title", t("ui.ai_unlock_card"));
+    button.addEventListener("pointerdown", event => event.stopPropagation());
+    button.addEventListener("dblclick", event => event.stopPropagation());
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      event.preventDefault();
+      this.enqueue(() => this.setAiLock([node], false));
+    });
+    const named = cardLabels.get(card)?.textContent;
+    if (named && !named.includes(t("ui.ai_locked_state")))
+      this.labelCard(card, t("ui.topic_card_label_0_1", named, t("ui.ai_locked_state")));
+  }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   private async changeTopicMarker(node: MapNode, id: TopicMarker): Promise<void> {
     if (!this.map || !this.markersEditable(node)) return;
@@ -13792,12 +13904,16 @@ export class VisualAgentMapView extends ItemView {
           this.plugin.topicRuns.isBusy(node.path) ||
           this.plugin.quickExpandPending.has(node.path) ||
           this.plugin.topicRuns.hasTask(node.path);
-        const nodes = selected.filter(node => !busy(node));
+        // A locked topic is skipped before any AI call (AI lock), and counted apart from the busy ones.
+        const unlocked = selected.filter(node => !this.aiLockReason("write", [node.id]));
+        if (unlocked.length < selected.length)
+          new Notice(t("ui.ai_locked_skipped_0", selected.length - unlocked.length));
+        const nodes = unlocked.filter(node => !busy(node));
         if (!nodes.length) {
-          new Notice(t("ui.multi_research_all_skipped"));
+          if (unlocked.length) new Notice(t("ui.multi_research_all_skipped"));
           return;
         }
-        if (nodes.length < selected.length) new Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
+        if (nodes.length < unlocked.length) new Notice(t("ui.multi_research_skipped", unlocked.length - nodes.length));
         // The batch runs in the background: leave selection mode so the selection bar gets out of the way.
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();

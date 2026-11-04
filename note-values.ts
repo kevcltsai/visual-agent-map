@@ -20,6 +20,10 @@ export function readRelevance(fm: Record<string, unknown>): NoteRelevance | unde
   if (fm["relevance-manual"] === true) return { tier: tier as RelevanceTier, manual: true };
   return { tier: tier as RelevanceTier };
 }
+/** The AI lock (`ai-locked: true`): only the boolean true locks; a missing or any other value reads as unlocked. */
+export function readAiLocked(fm: Record<string, unknown>): boolean {
+  return fm["ai-locked"] === true;
+}
 /** The learning goal in the map file's frontmatter (`relevance-goal`); absent or blank reads as none. */
 export function readRelevanceGoal(fm: Record<string, unknown>): string | undefined {
   const goal = fm["relevance-goal"];

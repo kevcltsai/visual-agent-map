@@ -1083,6 +1083,13 @@ var en = {
   "ui.card_menu_add_sibling": "Add sibling topic",
   "ui.card_menu_open_note_tab": "Open note in new tab",
   "ui.ai_running_ai": "AI running\u2026",
+  "ui.ai_locked_notice": "Topic is locked; AI will not change it",
+  "ui.ai_lock": "AI lock",
+  "ui.ai_lock_toggle": "Lock from AI",
+  "ui.ai_lock_hint": "AI research, merge, expand and chat will not change this topic, its children or its relations. Your own edits still work.",
+  "ui.ai_unlock_card": "Unlock: let AI change this topic",
+  "ui.ai_locked_state": "Locked from AI",
+  "ui.ai_locked_skipped_0": "{0} locked topics skipped",
   "ui.model_and_advanced_settings": "Model and advanced settings",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
@@ -3533,6 +3540,13 @@ var zhCN = {
   "ui.card_menu_add_sibling": "\u6DFB\u52A0\u540C\u5C42\u8BAE\u9898",
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u6807\u7B7E\u9875\u6253\u5F00\u7B14\u8BB0",
   "ui.ai_running_ai": "AI \u8FD0\u884C\u4E2D\u2026",
+  "ui.ai_locked_notice": "\u8BAE\u9898\u5DF2\u9501\u5B9A\uFF0CAI \u4E0D\u4F1A\u4FEE\u6539",
+  "ui.ai_lock": "AI \u9501\u5B9A",
+  "ui.ai_lock_toggle": "\u9501\u5B9A\uFF0C\u4E0D\u8BA9 AI \u4FEE\u6539",
+  "ui.ai_lock_hint": "AI \u7814\u7A76\u3001\u5408\u5E76\u3001\u5C55\u5F00\u4E0E\u5BF9\u8BDD\u90FD\u4E0D\u4F1A\u4FEE\u6539\u6B64\u8BAE\u9898\u3001\u5B83\u7684\u5B50\u8BAE\u9898\u6216\u5173\u8054\uFF1B\u4F60\u81EA\u5DF1\u7684\u7F16\u8F91\u4E0D\u53D7\u5F71\u54CD\u3002",
+  "ui.ai_unlock_card": "\u89E3\u9664\u9501\u5B9A\uFF1A\u5141\u8BB8 AI \u4FEE\u6539\u6B64\u8BAE\u9898",
+  "ui.ai_locked_state": "\u5DF2\u9501\u5B9A AI",
+  "ui.ai_locked_skipped_0": "\u5DF2\u8DF3\u8FC7 {0} \u4E2A\u9501\u5B9A\u7684\u8BAE\u9898",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u4E0E\u9AD8\u7EA7\u8BBE\u7F6E",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
@@ -5983,6 +5997,13 @@ var zhTW = {
   "ui.card_menu_add_sibling": "\u65B0\u589E\u540C\u5C64\u8B70\u984C",
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u5206\u9801\u958B\u555F\u7B46\u8A18",
   "ui.ai_running_ai": "AI \u57F7\u884C\u4E2D\u2026",
+  "ui.ai_locked_notice": "\u8B70\u984C\u5DF2\u9396\u5B9A\uFF0CAI \u4E0D\u6703\u4FEE\u6539",
+  "ui.ai_lock": "AI \u9396\u5B9A",
+  "ui.ai_lock_toggle": "\u9396\u5B9A\uFF0C\u4E0D\u8B93 AI \u4FEE\u6539",
+  "ui.ai_lock_hint": "AI \u7814\u7A76\u3001\u5408\u4F75\u3001\u5C55\u958B\u8207\u5C0D\u8A71\u90FD\u4E0D\u6703\u4FEE\u6539\u6B64\u8B70\u984C\u3001\u5B83\u7684\u5B50\u8B70\u984C\u6216\u95DC\u806F\uFF1B\u4F60\u81EA\u5DF1\u7684\u7DE8\u8F2F\u4E0D\u53D7\u5F71\u97FF\u3002",
+  "ui.ai_unlock_card": "\u89E3\u9664\u9396\u5B9A\uFF1A\u5141\u8A31 AI \u4FEE\u6539\u6B64\u8B70\u984C",
+  "ui.ai_locked_state": "\u5DF2\u9396\u5B9A AI",
+  "ui.ai_locked_skipped_0": "\u5DF2\u7565\u904E {0} \u500B\u9396\u5B9A\u7684\u8B70\u984C",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u8207\u9032\u968E\u8A2D\u5B9A",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
@@ -22036,6 +22057,9 @@ function readRelevance(fm) {
   if (fm["relevance-manual"] === true) return { tier, manual: true };
   return { tier };
 }
+function readAiLocked(fm) {
+  return fm["ai-locked"] === true;
+}
 function readRelevanceGoal(fm) {
   const goal = fm["relevance-goal"];
   return typeof goal === "string" && goal.trim() ? goal.trim() : void 0;
@@ -23040,6 +23064,7 @@ var Repository = class {
       ...typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {},
       ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
+      ...readAiLocked(fm) ? { aiLocked: true } : {},
       ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
       ...readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {},
       ...readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {},
@@ -23360,6 +23385,16 @@ ${body}`);
     await this.app.vault.process(
       this.file(path),
       (content) => setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
+    );
+  }
+  /**
+   * Sets (`ai-locked: true`) or removes the AI lock. No other key changes and `updated` is not bumped; a note already in
+   * the asked state is returned as it is, byte for byte.
+   */
+  async writeAiLocked(path, locked) {
+    await this.app.vault.process(
+      this.file(path),
+      (content) => readAiLocked(frontmatter(content)) === locked ? content : setFrontmatterKeys(content, { "ai-locked": locked ? true : null })
     );
   }
   /**
@@ -35043,6 +35078,45 @@ ${value}`).join("\n\n");
     }
   }
 };
+
+// core/ai-lock.ts
+function isAiLocked(notes, id) {
+  var _a2;
+  if (!id) return false;
+  return typeof notes === "function" ? notes(id) : ((_a2 = notes.get(id)) == null ? void 0 : _a2.aiLocked) === true;
+}
+function aiLockBlock(op, targets, map, notes, options = {}) {
+  var _a2, _b2;
+  const nodes = (_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : [];
+  const parentOf = (id) => {
+    var _a3, _b3;
+    return (_b3 = (_a3 = nodes.find((node) => node.id === id)) == null ? void 0 : _a3.parentId) != null ? _b3 : null;
+  };
+  for (const id of targets) {
+    if (isAiLocked(notes, id)) return "locked";
+    if (op === "write" || op === "addChild") continue;
+    if (isAiLocked(notes, parentOf(id))) return "lockedParent";
+    if (op === "move") {
+      if (options.to !== void 0 && isAiLocked(notes, options.to)) return "lockedParent";
+      continue;
+    }
+    const subtree = /* @__PURE__ */ new Set([id]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const node of nodes)
+        if (node.parentId && subtree.has(node.parentId) && !subtree.has(node.id)) {
+          subtree.add(node.id);
+          grew = true;
+        }
+    }
+    for (const member of subtree) if (member !== id && isAiLocked(notes, member)) return "lockedDescendant";
+    for (const relation of (_b2 = map == null ? void 0 : map.topicRelations) != null ? _b2 : []) {
+      const other = subtree.has(relation.from) ? relation.to : subtree.has(relation.to) ? relation.from : null;
+      if (other && !subtree.has(other) && isAiLocked(notes, other)) return "lockedRelation";
+    }
+  }
+  return null;
+}
 
 // core/steps/map-chat/language.en.md
 var language_en_default2 = "Write the reply, and every title, summary, note text and new file text you produce, in {{language}}.\n";
@@ -48233,6 +48307,7 @@ function placeCoverFrame(parts, shape2, mask) {
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var cardLinkButtons = /* @__PURE__ */ new WeakMap();
+var cardAiLockButtons = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
 var relevancePanelSeq = 0;
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
@@ -49552,6 +49627,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
       if (this.plugin.topicRuns.isBusy(node.path)) {
         new import_obsidian34.Notice(t("ui.ai_running_ai"));
+        return;
+      }
+      if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
+        new import_obsidian34.Notice(t("ui.ai_locked_notice"));
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
@@ -57176,6 +57255,7 @@ ${request.requirements}` : preset.text,
     this.paintModelTag(card, header, note);
     this.paintCardColor(card, note, !!node.aimKind);
     this.paintCardStyle(card, note, !!node.aimKind);
+    if (header) this.paintAiLock(card, header, node);
     const errorDetails = [];
     if ((_n = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _n.length) {
       const issue2 = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
@@ -58339,6 +58419,7 @@ ${request.requirements}` : preset.text,
     }
     this.paintCardColor(card, note, !!node.aimKind);
     this.paintCardStyle(card, note, !!node.aimKind);
+    if (header) this.paintAiLock(card, header, node);
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
@@ -58445,6 +58526,10 @@ ${request.requirements}` : preset.text,
     this.enqueue(async () => {
       var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+      if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
+        new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+        return;
+      }
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
       const sources = this.taskSourceSettings(currentLabel, (_b2 = this.map) == null ? void 0 : _b2.id, synthesisLabel);
@@ -58609,6 +58694,7 @@ ${request.requirements}` : preset.text,
     if (note) this.renderColorSection(panel, node);
     if (note) this.renderStyleSection(panel, node);
     if (note) this.renderCoverSection(panel, node);
+    if (note) this.renderAiLockSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
@@ -59505,6 +59591,105 @@ ${request.requirements}` : preset.text,
     await this.refreshAfterSavedChange();
     return result;
   }
+  /**
+   * Why the AI may not do `op` on the topics (AI lock), or null. The rule lives in core/ai-lock.ts; `fresh` notes (just
+   * read from disk) win over the view's.
+   */
+  aiLockReason(op, ids, fresh, options) {
+    return aiLockBlock(op, ids, this.map, (id) => {
+      var _a2, _b2;
+      return ((_b2 = (_a2 = fresh == null ? void 0 : fresh.get(id)) != null ? _a2 : this.notes.get(id)) == null ? void 0 : _b2.aiLocked) === true;
+    }, options);
+  }
+  /** Stops every AI run on the topic through the same handles its Stop button uses. */
+  stopAiOn(path) {
+    var _a2, _b2;
+    (_a2 = this.startingTasks.get(path)) == null ? void 0 : _a2.abort();
+    (_b2 = this.plugin.topicRuns.taskController(path)) == null ? void 0 : _b2.abort();
+    this.plugin.topicRuns.stop(path);
+  }
+  /**
+   * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).
+   * Locking first stops the AI runs on them; their late results are fenced at write time. Not on AIM maps.
+   */
+  async setAiLock(nodes, locked) {
+    if (!this.map || this.map.aim) return;
+    const targets = nodes.filter(
+      (node) => {
+        var _a2;
+        return !node.aimKind && !!this.notes.get(node.id) && ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true !== locked;
+      }
+    );
+    if (!targets.length) return;
+    if (locked) for (const node of targets) this.stopAiOn(node.path);
+    const viewport = clone(this.map.viewport);
+    let transaction = this.beginMapTransaction();
+    for (const target of targets)
+      transaction = transaction.rewriteNote(target.path, (path) => this.plugin.repo.writeAiLocked(path, locked));
+    const entry = await transaction.editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.ai_lock") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
+  renderAiLockSection(panel, node) {
+    var _a2;
+    if (!this.map || this.map.aim || node.aimKind || this.selection.state.multiSelectMode) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-ai-lock-section");
+    section3.createEl("strong", { text: t("ui.ai_lock"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section3.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.ai_lock"));
+    let locked = ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
+    const paint = (focus = false) => {
+      group.empty();
+      const choice2 = this.button(group, t("ui.ai_lock_toggle"), () => {
+        this.enqueue(async () => {
+          await this.setAiLock([node], !locked);
+          locked = !locked;
+          paint(true);
+        });
+      });
+      choice2.setAttr("aria-pressed", String(locked));
+      if (locked) choice2.addClass("is-pressed");
+      if (focus) choice2.focus();
+    };
+    paint();
+    section3.createEl("p", { cls: "vam-hint", text: t("ui.ai_lock_hint") });
+  }
+  /**
+   * A locked card shows a lock button in its header (a click unlocks) and says "locked" in its accessible name. Safe to
+   * call again on the same card: the old button goes first.
+   */
+  paintAiLock(card, header, node) {
+    var _a2, _b2;
+    const old = cardAiLockButtons.get(card);
+    if (old) {
+      old.remove();
+      cardAiLockButtons.delete(card);
+      delete card.dataset.aiLocked;
+    }
+    if (!this.map || this.map.aim || node.aimKind || ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) !== true) return;
+    card.dataset.aiLocked = "true";
+    const button = header.createEl("button", { cls: "vam-card-ai-lock" });
+    cardAiLockButtons.set(card, button);
+    button.type = "button";
+    (0, import_obsidian34.setIcon)(button, "lock");
+    button.tabIndex = -1;
+    button.setAttr("aria-label", t("ui.ai_unlock_card"));
+    button.setAttr("title", t("ui.ai_unlock_card"));
+    button.addEventListener("pointerdown", (event) => event.stopPropagation());
+    button.addEventListener("dblclick", (event) => event.stopPropagation());
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      this.enqueue(() => this.setAiLock([node], false));
+    });
+    const named = (_b2 = cardLabels.get(card)) == null ? void 0 : _b2.textContent;
+    if (named && !named.includes(t("ui.ai_locked_state")))
+      this.labelCard(card, t("ui.topic_card_label_0_1", named, t("ui.ai_locked_state")));
+  }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   async changeTopicMarker(node, id) {
     if (!this.map || !this.markersEditable(node)) return;
@@ -60352,12 +60537,15 @@ ${request.requirements}` : preset.text,
           return;
         }
         const busy = (node) => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.topicRuns.hasTask(node.path);
-        const nodes = selected.filter((node) => !busy(node));
+        const unlocked = selected.filter((node) => !this.aiLockReason("write", [node.id]));
+        if (unlocked.length < selected.length)
+          new import_obsidian34.Notice(t("ui.ai_locked_skipped_0", selected.length - unlocked.length));
+        const nodes = unlocked.filter((node) => !busy(node));
         if (!nodes.length) {
-          new import_obsidian34.Notice(t("ui.multi_research_all_skipped"));
+          if (unlocked.length) new import_obsidian34.Notice(t("ui.multi_research_all_skipped"));
           return;
         }
-        if (nodes.length < selected.length) new import_obsidian34.Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
+        if (nodes.length < unlocked.length) new import_obsidian34.Notice(t("ui.multi_research_skipped", unlocked.length - nodes.length));
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const shared2 = {
@@ -72561,7 +72749,7 @@ var TopicRuns = class {
     return { note, used, context, styleLabel };
   }
   async startResearch(path, kind, options) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if (this.disposed) return null;
     const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};
     const settings = () => this.ports.settings();
@@ -72585,13 +72773,19 @@ var TopicRuns = class {
       return null;
     }
     const { note, used, context, styleLabel } = prelude;
+    if (note.aiLocked) {
+      handle.release();
+      if (options.failed) options.failed(t("ui.ai_locked_notice"));
+      else (_c = options.notify) == null ? void 0 : _c.call(options, t("ui.ai_locked_notice"));
+      return null;
+    }
     const language2 = settings().language;
     this.pendingSuggestions.delete(path);
     this.abortCharts(path);
     const activeTasks = this.ports.activeTasks();
     const abortFromTaskModal = () => controller.abort();
-    if ((_c = overrides.signal) == null ? void 0 : _c.aborted) controller.abort();
-    else (_d = overrides.signal) == null ? void 0 : _d.addEventListener("abort", abortFromTaskModal, { once: true });
+    if ((_d = overrides.signal) == null ? void 0 : _d.aborted) controller.abort();
+    else (_e = overrides.signal) == null ? void 0 : _e.addEventListener("abort", abortFromTaskModal, { once: true });
     activeTasks.set(path, controller);
     const progress = this.ports.progress();
     let progressAttempt = "starting";
@@ -72624,14 +72818,14 @@ var TopicRuns = class {
     let raw = null;
     try {
       startupStatusAttempted = true;
-      const original = await this.readOriginal((_e = context.updateMode) != null ? _e : "merge", path, options);
-      if (((_f = context.updateMode) != null ? _f : "merge") === "fresh" && original === null) {
+      const original = await this.readOriginal((_f = context.updateMode) != null ? _f : "merge", path, options);
+      if (((_g = context.updateMode) != null ? _g : "merge") === "fresh" && original === null) {
         fail2(t("ui.writeback_backup_failed"));
         releaseStartup();
         return null;
       }
       await repo.updateNote(path, { status: "running" });
-      await ((_g = options.onStarted) == null ? void 0 : _g.call(options));
+      await ((_h = options.onStarted) == null ? void 0 : _h.call(options));
       raw = await this.snapshotRaw(original, path, options);
       if (controller.signal.aborted) {
         try {
@@ -72677,18 +72871,20 @@ var TopicRuns = class {
       observer
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h, _i, _j, _k, _l, _m;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-        if (controller.signal.aborted || stale) {
+        const locked = latest.aiLocked === true;
+        if (controller.signal.aborted || stale || locked) {
           await repo.updateNote(path, { status: note.status });
           if (exchangeId)
             (_a3 = exchanges()) == null ? void 0 : _a3.failed(
               exchangeId,
-              t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
+              t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
             );
-          if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          if (locked) fail2(t("ui.ai_locked_notice"));
+          else if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
           return;
         }
         const mode = (_b3 = context.updateMode) != null ? _b3 : "merge";
@@ -72737,7 +72933,7 @@ var TopicRuns = class {
           detail: saved.detail,
           formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_h = context.outputLanguage) != null ? _h : settings().language,
+          language: (_h2 = context.outputLanguage) != null ? _h2 : settings().language,
           template: context.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });

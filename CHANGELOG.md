@@ -15,6 +15,7 @@ A card's cover picture now shows the whole picture instead of a 96 px strip cut 
 - **Picture size.** "Edit card" has a Picture size slider (30–100% of the card width), saved as `topic-cover-size`; the masked part stays the same.
 - **Picture position.** "Edit card" can put the picture at the top, bottom, left or right of the card (`topic-cover-position`); beside the text, the picture's size sets its column width.
 - **Card width.** "Edit card" has a handle on the card's right edge (arrow keys work too) that sets the card width, within the same limits as on the map; Apply saves it with the other changes as one undo step.
+- **Relations in notes.** A topic note's Reference Links now list its relations to other topics (for example "Supports" and "Supported by"), so Obsidian backlinks and graph view see them.
 - **Title and summary.** In "Edit card" you can type the title and summary right on the card; Apply saves them like a rename and a summary edit, together with the other changes as one undo step.
 
 ## [0.29.0] - 2026-11-04

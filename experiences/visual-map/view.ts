@@ -415,7 +415,11 @@ import type {
   RelevanceGradeResult,
   RelevanceGradeRun
 } from "../../core/relevance-grade-service";
-import { RELEVANCE_GRADE_SCHEMA, RELEVANCE_RECALIBRATE_SCHEMA } from "../../core/relevance-grade-service";
+import {
+  RELEVANCE_GRADE_SCHEMA,
+  RELEVANCE_RECALIBRATE_SCHEMA,
+  relevanceFailureDetail
+} from "../../core/relevance-grade-service";
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
@@ -3356,7 +3360,12 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, graded, { mode, pins, repairs }));
       if (this.paintCount === paintedBefore) this.refreshRelevance();
     } catch (error) {
-      this.finishRelevance(run, mapPath, "failed", t("ui.relevance_failed_0", errorMessage(error)));
+      this.finishRelevance(
+        run,
+        mapPath,
+        "failed",
+        t("ui.relevance_failed_0", relevanceFailureDetail(error, this.plugin.settings.language))
+      );
     }
   }
   /**

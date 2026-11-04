@@ -2350,6 +2350,7 @@ var en = {
   "error.relevance_grade_over_budget": "The map is too large to grade at once. Nothing was changed.",
   "error.relevance_grade_stopped": "Grading stopped.",
   "error.relevance_grade_invalid": "The AI grading could not be used: {0}",
+  "error.relevance_grade_unavailable": "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
   "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map \xB7 read-only",
@@ -4847,6 +4848,7 @@ var zhCN = {
   "error.relevance_grade_over_budget": "\u5FC3\u667A\u56FE\u592A\u5927\uFF0C\u65E0\u6CD5\u4E00\u6B21\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u6539\u53D8\u3002",
   "error.relevance_grade_stopped": "\u5206\u7EA7\u5DF2\u505C\u6B62\u3002",
   "error.relevance_grade_invalid": "\u65E0\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7EA7\u7ED3\u679C\uFF1A{0}",
+  "error.relevance_grade_unavailable": "AI \u76EE\u524D\u65E0\u6CD5\u4E3A\u8FD9\u5F20\u5FC3\u667A\u56FE\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u5185\u5BB9\u88AB\u6539\u53D8\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
   "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u70B9\u201C\u76EE\u6807\u201D\u518D\u6309 Enter \u91CD\u8BD5",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5730\u56FE\u30FB\u53EA\u8BFB",
@@ -7344,6 +7346,7 @@ var zhTW = {
   "error.relevance_grade_over_budget": "\u5FC3\u667A\u5716\u592A\u5927\uFF0C\u7121\u6CD5\u4E00\u6B21\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u6539\u8B8A\u3002",
   "error.relevance_grade_stopped": "\u5206\u7D1A\u5DF2\u505C\u6B62\u3002",
   "error.relevance_grade_invalid": "\u7121\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7D1A\u7D50\u679C\uFF1A{0}",
+  "error.relevance_grade_unavailable": "AI \u76EE\u524D\u7121\u6CD5\u70BA\u9019\u5F35\u5FC3\u667A\u5716\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u5167\u5BB9\u88AB\u6539\u8B8A\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
   "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u9EDE\u300C\u76EE\u6A19\u300D\u518D\u6309 Enter \u91CD\u8A66",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5FC3\u667A\u5716\u30FB\u552F\u8B80",
@@ -42264,7 +42267,9 @@ var RELEVANCE_GRADE_SCHEMA = {
           tier: { type: "string", enum: [...RELEVANCE_TIERS2] },
           anchor: { type: ["string", "null"] }
         },
-        required: ["id", "tier"]
+        // Codex runs the schema in strict mode: every property must be listed here, so `anchor` is required and
+        // nullable. The parser below still accepts a reply that leaves it out (Claude does not enforce strictness).
+        required: ["id", "tier", "anchor"]
       }
     }
   },
@@ -42786,6 +42791,16 @@ var relevanceRecalibrateRepairStep = {
 };
 
 // core/relevance-grade-service.ts
+function relevanceFailureDetail(error, language2) {
+  if (error instanceof RelevanceGradeError || (error == null ? void 0 : error.name) === "RelevanceGradeError")
+    return error.message;
+  const message = error == null ? void 0 : error.message;
+  const text11 = (typeof message === "string" ? message : "").trim();
+  const technical = /[{}[\]]|schema|json|required|properties|invalid_request|\$\.|\bat \S+:\d+/i.test(text11);
+  if (!text11 || technical || text11.length > 140)
+    return translate(uiLocale(language2), "error.relevance_grade_unavailable");
+  return text11;
+}
 var TIER_FIELD = /"tier"\s*:\s*"(?:core|support|side)"/g;
 var PROGRESS_INTERVAL_MS = 200;
 function providerRelevanceGradeRunner(aiCalls) {
@@ -52003,7 +52018,12 @@ ${request.requirements}` : preset.text,
       await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, graded, { mode, pins, repairs }));
       if (this.paintCount === paintedBefore) this.refreshRelevance();
     } catch (error) {
-      this.finishRelevance(run, mapPath, "failed", t("ui.relevance_failed_0", errorMessage(error)));
+      this.finishRelevance(
+        run,
+        mapPath,
+        "failed",
+        t("ui.relevance_failed_0", relevanceFailureDetail(error, this.plugin.settings.language))
+      );
     }
   }
   /**

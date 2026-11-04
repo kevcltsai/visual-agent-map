@@ -1467,6 +1467,8 @@ export class VisualAgentMapView extends ItemView {
     }
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
+      // A pending cut ends with this Esc as well; the selection is cleared exactly as before.
+      if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
       this.applySelectionChange(this.selection.escape());
       // Claimed here: unhandled, Obsidian answers Esc by activating another leaf and the next key edits that note.
       event.preventDefault();

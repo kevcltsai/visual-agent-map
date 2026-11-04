@@ -15887,12 +15887,15 @@ export class VisualAgentMapView extends ItemView {
       sources.some(source => !this.map?.nodes.some(node => node.id === source.id && node.path === source.path))
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    const concluded = this.relationsEnabled();
     const integrated = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       this.map,
       this.path,
-      "workspace"
+      "workspace",
+      // A synthesis is a conclusion drawn from its sources (ordinary maps only; AIM has its own kinds).
+      concluded ? { topicKind: "conclusion" } : {}
     );
     const detailTemplate = (await this.mapStyle(language, { style: task.options.noteStyle, kind: "topic" })).template;
     try {
@@ -15917,6 +15920,13 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChangeSnapshots(
           map => {
             map.nodes.push(integrated);
+            // The new conclusion links back to every source it was drawn from ("derived from").
+            if (concluded)
+              for (const source of sources) {
+                const link = { kind: "derives_from" as const, from: integrated.id, to: source.id };
+                if (relationAllowed(map.topicRelations ?? [], link))
+                  setTopicRelations(map, [...(map.topicRelations ?? []), link]);
+              }
           },
           true,
           [integrated.path]

@@ -58279,6 +58279,7 @@ ${request.requirements}` : preset.text,
       String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
     );
     if (node.aimKind) card.setAttr("data-aim-kind", node.aimKind);
+    if (node.aimKind && !aimEnabled()) card.addClass("vam-aim-hidden");
     if (node.aimKind === "conclusion") {
       const background = createSvg("svg");
       background.addClass("vam-conclusion-background");

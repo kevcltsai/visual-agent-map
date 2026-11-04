@@ -509,3 +509,67 @@ test('aim-hidden: E3 display parity: the same map shows the same nodes with the 
   assert.ok(supersededOn.length > 0, 'the fixture does supersede a node');
   assert.deepEqual(canvas(loadHidden), canvas(load));
 });
+
+// ---- Fix batch R3: hidden-mode colour/border selectors, aim block after a delete ----------------------------------
+test('aim-hidden: R3 the hidden marker class is on an AIM card only while AIM is hidden', () => {
+  const classesOf = (loader, pick) => {
+    const { doc, ...nodes } = aimDoc(), view = viewOf(loader, doc), added = [];
+    view.stageEl = element('stage', []);
+    const make = parent => { const create = parent.createDiv.bind(parent); parent.createDiv = options => { const child = create(options); const addClass = child.addClass; child.addClass = name => { added.push([child['data-node-id'] ?? child, name]); addClass.call(child, name); }; make(child); return child; }; };
+    make(view.stageEl);
+    view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
+    view.renderNode(nodes[pick]);
+    return added.map(([, name]) => name);
+  };
+  assert.ok(classesOf(loadHidden, 'conclusion').includes('vam-aim-hidden'), 'hidden: an AIM card carries the marker');
+  assert.ok(classesOf(loadHidden, 'topic').includes('vam-aim-hidden'));
+  assert.equal(classesOf(load, 'conclusion').includes('vam-aim-hidden'), false, 'AIM on: no marker');
+  assert.equal(classesOf(load, 'topic').includes('vam-aim-hidden'), false);
+  const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(view, /if \(node\.aimKind && !aimEnabled\(\)\) card\.addClass\("vam-aim-hidden"\)/);
+});
+
+test('aim-hidden: R3 the colour, style and border selectors match a hidden AIM card; the AIM-on selectors still exclude it', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const lines = css.split('\n');
+  for (const colour of ['red', 'orange', 'yellow', 'green', 'blue', 'purple']) {
+    assert.ok(lines.some(line => line.startsWith(`.vam-node.vam-aim-hidden[data-topic-color="${colour}"] { --vam-topic-hue: var(--color-${colour});`)), `${colour}: fill rule for a hidden AIM card`);
+    assert.ok(lines.some(line => line.startsWith(`.vam-node[data-topic-color="${colour}"]:not([data-aim-kind]) {`)), `${colour}: the ordinary rule is as it was`);
+  }
+  assert.ok(lines.some(line => line.startsWith('.vam-node.vam-aim-hidden[data-topic-color]::before { content: ""; position: absolute;')), 'stripe');
+  assert.ok(lines.some(line => line.startsWith('.vam-node[data-topic-color]:not([data-aim-kind])::before')), 'ordinary stripe unchanged');
+  assert.ok(lines.some(line => /^:where\(\[data-node-id\]\)\.vam-node\.vam-aim-hidden:where\(\[data-aim-kind\]\) \{ border-color:/.test(line)), 'frame');
+  assert.ok(lines.some(line => /^\.vam-view \.vam-node\[data-topic-style-border="thick"\]\.vam-aim-hidden \{ border-width: 3px;/.test(line)), 'thick border');
+  assert.ok(lines.some(line => /^\.vam-view \.vam-node\[data-topic-style-bold\]\.vam-aim-hidden \.vam-card-title \{/.test(line)), 'bold');
+  // every new colour/style selector needs the marker, so an AIM-on card (no marker) never matches it
+  const added = lines.filter(line => /vam-aim-hidden/.test(line) && !line.startsWith('/*'));
+  assert.ok(added.length >= 15);
+  for (const line of added) for (const selector of line.slice(0, line.indexOf(' {')).split(/,\s*(?=[.\[:])/)) assert.match(selector, /\.vam-aim-hidden/, `selector needs the marker: ${selector.slice(0, 80)}`);
+});
+
+integrationTest('aim-hidden: R3 decision 5 deleting a node whose note moves to Unassigned changes the aim block only by the moved notePath values', async () => {
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const vault = hiddenVault();
+  const { repo, contents, mapPath, conclusion } = await aimMap(vault);
+  const doc = await repo.readMap(mapPath);
+  doc.aim.branches = [{ id: 'branch', questionNodeId: doc.nodes[0].id, parentBranchId: null, answerSnapshot: { selections: [], freeText: '' }, inputSnapshot: { topic: 'Old AIM map', conditions: {}, upstreamResults: [] }, createdAt: '2026-10-09T00:00:00.000Z', results: [] }];
+  doc.aim.branches[0].results = [{ nodeId: conclusion.id, notePath: conclusion.path, version: 1, kind: 'conclusion', runId: 'run' }];
+  await repo.saveMap(mapPath, doc);
+  const before = aimBlockOf(contents.get(mapPath));
+  assert.equal(before.branches[0].results[0].notePath, conclusion.path);
+  const deps = { repo, rebuildDerivedData: () => repo.rebuildDerivedData(), onApplied() {}, checkConflict: async () => {} };
+  await begin(deps).park(conclusion.path, repo.topicFolder(mapPath, 'Unassigned'), doc.id, 'unassigned')
+    .editMap(mapPath, map => { map.nodes = hiddenCore.removeNodes(map.nodes, conclusion.id, false); }).commit();
+  const newPath = [...contents.keys()].find(key => /\/Unassigned\/Conclusion/.test(key));
+  assert.ok(newPath, 'the note now lies in Unassigned');
+  // The vault rename handler in main.ts does this for every move (a rename event, not the transaction): same calls, hidden repository.
+  for (const { file, map } of await repo.readableMaps()) if (hiddenRepository.rebaseMapNotePaths(map, hiddenRepository.moveNotePath(conclusion.path, newPath))) await repo.saveMap(file.path, map);
+  const after = aimBlockOf(contents.get(mapPath));
+  assert.equal((await repo.readMap(mapPath)).nodes.some(n => n.id === conclusion.id), false, 'the node is gone from the map');
+  assert.equal(after.branches[0].results[0].notePath, newPath, 'the moved note’s notePath follows it');
+  assert.match(newPath, /\/Unassigned\//);
+  assert.equal(contents.has(newPath), true, 'the new path is the note’s real place');
+  assert.equal(contents.has(conclusion.path), false);
+  const moved = JSON.parse(JSON.stringify(before, (key, value) => (key === 'notePath' && value === conclusion.path ? newPath : value)));
+  assert.deepEqual(after, moved, 'only the moved note’s notePath values differ');
+});

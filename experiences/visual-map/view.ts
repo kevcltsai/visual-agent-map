@@ -10525,6 +10525,8 @@ export class VisualAgentMapView extends ItemView {
       String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
     );
     if (node.aimKind) card.setAttr("data-aim-kind", node.aimKind);
+    // AIM is hidden: the card keeps its AIM shape (data-aim-kind) but takes the ordinary card's colour and style (styles.css, .vam-aim-hidden).
+    if (node.aimKind && !aimEnabled()) card.addClass("vam-aim-hidden");
     if (node.aimKind === "conclusion") {
       const background = createSvg("svg");
       background.addClass("vam-conclusion-background");

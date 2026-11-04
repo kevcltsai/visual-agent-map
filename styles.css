@@ -124,6 +124,9 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 /* An ordinary card's frame was invisible on the dotted canvas: use the hover token, one step deeper on hover. The typed cards' own border rules are more specific and keep winning. :where keeps the specificity of the rules above and below (status, selected, relevance) so they still win. */
 :where([data-node-id]).vam-node:where(:not([data-aim-kind])) { border-color: color-mix(in srgb, var(--text-muted) 45%, var(--background-modifier-border-hover)); }
 :where([data-node-id]).vam-node:where(:not([data-aim-kind], .is-selected)):hover { border-color: color-mix(in srgb, var(--background-modifier-border-hover) 55%, var(--text-muted)); }
+/* AIM is hidden (experiences/aim/availability.ts): an old AIM map's cards carry .vam-aim-hidden and take the ordinary card's frame, topic colour and topic style. The AIM-on card does not carry it, so its rules above are unchanged; the share viewer leaves these rules out (the name says aim). */
+:where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind]) { border-color: color-mix(in srgb, var(--text-muted) 45%, var(--background-modifier-border-hover)); }
+:where([data-node-id]).vam-node.vam-aim-hidden:where([data-aim-kind]:not(.is-selected)):hover { border-color: color-mix(in srgb, var(--background-modifier-border-hover) 55%, var(--text-muted)); }
 .vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }
 .vam-node[data-aim-kind="topic"] { border-radius: 48% / 28%; padding: 22px 24px; }
 .vam-node[data-aim-kind="question"] { isolation: isolate; border-color: transparent; background: transparent; box-shadow: none; }
@@ -1568,6 +1571,14 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
 .vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }
 [data-topic-kind="atomic"].vam-node[data-topic-color]:not([data-aim-kind])::before, [data-topic-kind="hypothesis"].vam-node[data-topic-color]:not([data-aim-kind])::before, [data-topic-kind="evidence"].vam-node[data-topic-color]:not([data-aim-kind])::before, [data-topic-kind="conclusion"].vam-node[data-topic-color]:not([data-aim-kind])::before, [data-topic-kind="action"].vam-node[data-topic-color]:not([data-aim-kind])::before { left: 8px; top: 28%; bottom: 28%; }
+.vam-node.vam-aim-hidden[data-topic-color="red"] { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node.vam-aim-hidden[data-topic-color="orange"] { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node.vam-aim-hidden[data-topic-color="yellow"] { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node.vam-aim-hidden[data-topic-color="green"] { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node.vam-aim-hidden[data-topic-color="blue"] { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node.vam-aim-hidden[data-topic-color="purple"] { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node.vam-aim-hidden[data-topic-color]::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }
+[data-topic-kind="atomic"].vam-node[data-topic-color].vam-aim-hidden::before, [data-topic-kind="hypothesis"].vam-node[data-topic-color].vam-aim-hidden::before, [data-topic-kind="evidence"].vam-node[data-topic-color].vam-aim-hidden::before, [data-topic-kind="conclusion"].vam-node[data-topic-color].vam-aim-hidden::before, [data-topic-kind="action"].vam-node[data-topic-color].vam-aim-hidden::before { left: 8px; top: 28%; bottom: 28%; }
 .vam-topic-modal .vam-color-swatch[data-topic-color-swatch="red"] { background: color-mix(in srgb, var(--color-red) 60%, var(--text-normal)); }
 .vam-topic-modal .vam-color-swatch[data-topic-color-swatch="orange"] { background: color-mix(in srgb, var(--color-orange) 60%, var(--text-normal)); }
 .vam-topic-modal .vam-color-swatch[data-topic-color-swatch="yellow"] { background: color-mix(in srgb, var(--color-yellow) 60%, var(--text-normal)); }
@@ -1588,6 +1599,11 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-node[data-topic-style-size="large"]:not([data-aim-kind]) .vam-card-title, .vam-view .vam-node[data-topic-style-size="large"]:not([data-aim-kind]) .vam-card-summary { font-size: var(--font-ui-large); }
 .vam-view .vam-node[data-topic-style-border="thick"]:not([data-aim-kind]) { border-width: 3px; --vam-kind-width: 3px; }
 .vam-view .vam-node[data-topic-style-border="thick"].is-selected:not([data-aim-kind]), .vam-view .vam-node[data-topic-style-border="thick"].is-relation-end:not([data-aim-kind]) { outline-width: 3px; --vam-kind-width: 4px; }
+.vam-view .vam-node[data-topic-style-bold].vam-aim-hidden .vam-card-title { font-weight: 800; }
+.vam-view .vam-node[data-topic-style-size="small"].vam-aim-hidden .vam-card-title, .vam-view .vam-node[data-topic-style-size="small"].vam-aim-hidden .vam-card-summary { font-size: var(--font-ui-small); }
+.vam-view .vam-node[data-topic-style-size="large"].vam-aim-hidden .vam-card-title, .vam-view .vam-node[data-topic-style-size="large"].vam-aim-hidden .vam-card-summary { font-size: var(--font-ui-large); }
+.vam-view .vam-node[data-topic-style-border="thick"].vam-aim-hidden { border-width: 3px; --vam-kind-width: 3px; }
+.vam-view .vam-node[data-topic-style-border="thick"].is-selected.vam-aim-hidden, .vam-view .vam-node[data-topic-style-border="thick"].is-relation-end.vam-aim-hidden { outline-width: 3px; --vam-kind-width: 4px; }
 .vam-view .vam-edge[data-line-thick] { stroke-width: 4px; }
 /* Note style pickers */
 .vam-note-style-problems { display: flex; flex-direction: column; gap: 4px; }

@@ -1675,6 +1675,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.note_style_group_builtin": "内置",
   "ui.note_style_unusable_0_1_2": "“{0}”有问题，无法选用（第 {1} 行）：{2}",
   "ui.note_style_unusable_option_0": "{0}（有问题）",
+  "ui.note_style_retired_option_0": "{0}（已停用）",
   "ui.note_style_issue_file_long": "文件超过 {0} 字。",
   "ui.note_style_issue_tone_long": "口吻超过 {0} 字。",
   "ui.note_style_issue_frontmatter_unclosed": "第 1 行的 --- 开头没有对应的结尾 ---。",

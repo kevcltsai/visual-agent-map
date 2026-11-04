@@ -248,8 +248,10 @@ export function renderNoteCustomSetting(setting: Setting, plugin: VisualAgentMap
   setting.setName(name);
   const describe = (): void => {
     const items = tab === "recipe" ? store.listRecipes() : store.listParts(tab);
-    const builtin = items.filter(item => item.kind === "builtin").length;
-    setting.setDesc(t("ui.manage_count_0_1", builtin, items.length - builtin));
+    // A retired built-in counts only while a style still uses it (the manage window lists it the same way).
+    const shown = items.filter(item => !("retired" in item && item.retired === true && item.usedBy.length === 0));
+    const builtin = shown.filter(item => item.kind === "builtin").length;
+    setting.setDesc(t("ui.manage_count_0_1", builtin, shown.length - builtin));
   };
   describe();
   setting.addButton(button => {

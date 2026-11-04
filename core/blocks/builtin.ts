@@ -53,6 +53,8 @@ export interface BuiltinBlock {
   readonly legacyNameKeys?: readonly TranslationKey[];
   /** Template blocks only: a section with no reliable material is left out whole (`DetailTemplate.omitEmpty`). */
   readonly omitEmpty?: boolean;
+  /** Retired: still resolves and renders, but is not offered in new choices (a style that uses it keeps it, marked). */
+  readonly retired?: boolean;
   /** The block's prompt text in the language's instruction language. */
   body(language: ContentLanguage): string;
   /** Template blocks only: the sections zone (same text as `body`). */
@@ -62,10 +64,16 @@ export interface BuiltinBlock {
 const strip = (text: string): string => (text.endsWith("\n") ? text.slice(0, -1) : text);
 
 /** A tone block's body is the built-in tone preset text; academic rigor is the default tone and adds nothing. */
-const tone = (id: string, nameKey: TranslationKey, legacyNameKeys?: readonly TranslationKey[]): BuiltinBlock => ({
+const tone = (
+  id: string,
+  nameKey: TranslationKey,
+  legacyNameKeys?: readonly TranslationKey[],
+  retired = false
+): BuiltinBlock => ({
   category: "tone",
   id,
   nameKey,
+  ...(retired ? { retired: true as const } : {}),
   ...(legacyNameKeys ? { legacyNameKeys } : {}),
   body: language =>
     id === "academic" ? "" : (builtinPresets(language, "tone").find(preset => preset.id === id)?.text ?? "")
@@ -121,9 +129,9 @@ export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
   tone("academic", "ui.preset_name_academic", ["ui.preset_name_academic_old"]),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine", ["ui.preset_name_magazine_old"]),
-  tone("summary", "ui.preset_name_summary"),
-  tone("guide", "ui.preset_name_guide"),
-  tone("auto", "ui.preset_name_auto")
+  tone("summary", "ui.preset_name_summary", undefined, true),
+  tone("guide", "ui.preset_name_guide", undefined, true),
+  tone("auto", "ui.preset_name_auto", undefined, true)
 ];
 
 /** A built-in format rules part: its text in the language's instruction language (zh or en). */

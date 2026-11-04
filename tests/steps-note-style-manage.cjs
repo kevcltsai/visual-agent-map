@@ -779,3 +779,17 @@ test('F1 R3 (was failing first): Edit on a style file reads the files again befo
   assert.ok(setup.v.files[path].includes('Notes added in a tab.'), 'the other program\'s text is kept');
   assert.equal(notices.includes(M.translate('en', 'ui.recipe_notice_changed')), false, 'no "changed" notice');
 });
+
+test('K3 (P4): the voice tab lists no retired voice unless a style uses it (then marked "(retired)"); the copy source of a new voice never offers one', async () => {
+  const setup = await manageSetup({ [`${dirOf('en', 'recipe')}/Old.md`]: '---\nvoice: Practical guide\n---\n' });
+  const { root } = await openManage(setup, 'voice');
+  const names = rowsOf(root).map(rowName);
+  assert.ok(names.includes('Practical guide (retired)'));
+  assert.equal(names.includes('Key-point summary') || names.includes('Key-point summary (retired)'), false);
+  assert.equal(names.includes('AI choice') || names.includes('AI choice (retired)'), false);
+  assert.ok(names.includes('Professional'));
+  const edit = editOf(rowFor(root, 'Practical guide (retired)'));
+  assert.ok(edit.attrs['aria-label'].includes('retired'));
+  const sources = dom.findAll(formOf(root, 'voice'), node => node.tag === 'option').map(node => node.text);
+  assert.equal(sources.some(text => /Practical guide|Key-point summary|AI choice/.test(text)), false);
+});

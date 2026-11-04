@@ -1709,6 +1709,7 @@ var en = {
   "ui.note_style_group_builtin": "Built-in",
   "ui.note_style_unusable_0_1_2": '"{0}" has a problem and cannot be chosen (line {1}): {2}',
   "ui.note_style_unusable_option_0": "{0} (has a problem)",
+  "ui.note_style_retired_option_0": "{0} (retired)",
   "ui.note_style_issue_file_long": "The file is over {0} characters.",
   "ui.note_style_issue_tone_long": "The voice is over {0} characters.",
   "ui.note_style_issue_frontmatter_unclosed": "The frontmatter opened by --- on line 1 is never closed.",
@@ -4205,6 +4206,7 @@ var zhCN = {
   "ui.note_style_group_builtin": "\u5185\u7F6E",
   "ui.note_style_unusable_0_1_2": "\u201C{0}\u201D\u6709\u95EE\u9898\uFF0C\u65E0\u6CD5\u9009\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u6709\u95EE\u9898\uFF09",
+  "ui.note_style_retired_option_0": "{0}\uFF08\u5DF2\u505C\u7528\uFF09",
   "ui.note_style_issue_file_long": "\u6587\u4EF6\u8D85\u8FC7 {0} \u5B57\u3002",
   "ui.note_style_issue_tone_long": "\u53E3\u543B\u8D85\u8FC7 {0} \u5B57\u3002",
   "ui.note_style_issue_frontmatter_unclosed": "\u7B2C 1 \u884C\u7684 --- \u5F00\u5934\u6CA1\u6709\u5BF9\u5E94\u7684\u7ED3\u5C3E ---\u3002",
@@ -6701,6 +6703,7 @@ var zhTW = {
   "ui.note_style_group_builtin": "\u5167\u5EFA",
   "ui.note_style_unusable_0_1_2": "\u300C{0}\u300D\u6709\u554F\u984C\uFF0C\u7121\u6CD5\u9078\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u6709\u554F\u984C\uFF09",
+  "ui.note_style_retired_option_0": "{0}\uFF08\u5DF2\u505C\u7528\uFF09",
   "ui.note_style_issue_file_long": "\u6A94\u6848\u8D85\u904E {0} \u5B57\u3002",
   "ui.note_style_issue_tone_long": "\u53E3\u543B\u8D85\u904E {0} \u5B57\u3002",
   "ui.note_style_issue_frontmatter_unclosed": "\u7B2C 1 \u884C\u7684 --- \u958B\u982D\u6C92\u6709\u5C0D\u61C9\u7684\u7D50\u5C3E ---\u3002",
@@ -27485,10 +27488,11 @@ var skim_en_default = "Additional requirements of the skim list format (they fol
 
 // core/blocks/builtin.ts
 var strip2 = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
-var tone = (id, nameKey, legacyNameKeys) => ({
+var tone = (id, nameKey, legacyNameKeys, retired = false) => ({
   category: "tone",
   id,
   nameKey,
+  ...retired ? { retired: true } : {},
   ...legacyNameKeys ? { legacyNameKeys } : {},
   body: (language2) => {
     var _a2, _b2;
@@ -27528,9 +27532,9 @@ var BUILTIN_BLOCKS = [
   tone("academic", "ui.preset_name_academic", ["ui.preset_name_academic_old"]),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine", ["ui.preset_name_magazine_old"]),
-  tone("summary", "ui.preset_name_summary"),
-  tone("guide", "ui.preset_name_guide"),
-  tone("auto", "ui.preset_name_auto")
+  tone("summary", "ui.preset_name_summary", void 0, true),
+  tone("guide", "ui.preset_name_guide", void 0, true),
+  tone("auto", "ui.preset_name_auto", void 0, true)
 ];
 var byInstruction = (zh, en2) => (language2) => instructionLanguageOf(language2) === "zh" ? zh : en2;
 var BUILTIN_FORMATS = [
@@ -29138,15 +29142,16 @@ var NoteStyleStore = class {
   listParts(category) {
     const language2 = this.settings.language;
     const { files } = this.partStore(category);
-    const builtins = category === "format" ? BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey })) : BUILTIN_BLOCKS.filter((block) => block.category === (category === "structure" ? "template" : "tone")).map(
-      ({ id, nameKey }) => ({ id, nameKey })
+    const builtins = category === "format" ? BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey, retired: false })) : BUILTIN_BLOCKS.filter((block) => block.category === (category === "structure" ? "template" : "tone")).map(
+      ({ id, nameKey, retired }) => ({ id, nameKey, retired: retired === true })
     );
-    const items = builtins.map(({ id, nameKey }) => ({
+    const items = builtins.map(({ id, nameKey, retired }) => ({
       ref: builtinRef(id),
       kind: "builtin",
       name: translate(language2, nameKey),
       issues: [],
-      usedBy: this.stylesUsing(category, builtinRef(id))
+      usedBy: this.stylesUsing(category, builtinRef(id)),
+      ...retired ? { retired: true } : {}
     }));
     for (const [base, text11] of [...files].sort(([a], [b]) => a.localeCompare(b))) {
       const issues = [];
@@ -67783,14 +67788,14 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
     for (const category of PART_CATEGORIES) {
       const select = this.selects.get(category);
       if (!select) continue;
-      const items = store.listParts(category).filter((item) => !item.issues.some((issue2) => issue2.code === "builtin_name"));
-      select.replaceChildren();
       const current = this.draft[category];
+      const items = store.listParts(category).filter((item) => !item.issues.some((issue2) => issue2.code === "builtin_name")).filter((item) => !item.retired || item.ref === current);
+      select.replaceChildren();
       if (!items.some((item) => item.ref === current)) {
         const bare = current.replace(/^(?:file|builtin):/, "");
         select.createEl("option", { value: current, text: t("ui.block_missing_option_0", bare) });
       }
-      const optionText = (item) => item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.name;
+      const optionText = (item) => item.retired ? t("ui.note_style_retired_option_0", item.name) : item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.name;
       const addGroup = (title, group) => {
         if (!group.length) return;
         const parent = select.createEl("optgroup", { attr: { label: title } });
@@ -68118,13 +68123,14 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
         tags: styleTags(item),
         aimOnly: item.aimOnly === true
       }));
-    return store.listParts(this.tab).map((item) => ({
+    return store.listParts(this.tab).filter((item) => !item.retired || item.usedBy.length > 0).map((item) => ({
       ref: item.ref,
       builtin: item.kind === "builtin",
-      name: item.name,
+      name: item.retired ? t("ui.note_style_retired_option_0", item.name) : item.name,
       issues: item.issues,
       used: item.usedBy,
-      aimOnly: false
+      aimOnly: false,
+      ...item.retired ? { retired: true } : {}
     }));
   }
   buildPanel(panel) {
@@ -68313,7 +68319,7 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
     const fillSources = () => {
       var _a2, _b2;
       if (!sourceSelect) return;
-      const sources = this.entries().filter((entry) => !entry.aimOnly);
+      const sources = this.entries().filter((entry) => !entry.aimOnly && !entry.retired);
       sourceSelect.replaceChildren();
       for (const entry of sources) sourceSelect.createEl("option", { value: entry.ref, text: entry.name });
       if (!sources.some((entry) => entry.ref === source)) source = (_b2 = (_a2 = sources[0]) == null ? void 0 : _a2.ref) != null ? _b2 : "";
@@ -68575,8 +68581,9 @@ function renderNoteCustomSetting(setting, plugin, tab) {
   setting.setName(name2);
   const describe = () => {
     const items = tab === "recipe" ? store.listRecipes() : store.listParts(tab);
-    const builtin = items.filter((item) => item.kind === "builtin").length;
-    setting.setDesc(t("ui.manage_count_0_1", builtin, items.length - builtin));
+    const shown = items.filter((item) => !("retired" in item && item.retired === true && item.usedBy.length === 0));
+    const builtin = shown.filter((item) => item.kind === "builtin").length;
+    setting.setDesc(t("ui.manage_count_0_1", builtin, shown.length - builtin));
   };
   describe();
   setting.addButton((button) => {

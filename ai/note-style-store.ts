@@ -190,6 +190,8 @@ export interface PartListItem {
   issues: NoteStyleIssue[];
   /** The names of the styles that use this part. */
   usedBy: string[];
+  /** A retired built-in: still resolves, but is not offered in new choices. */
+  retired?: boolean;
 }
 
 /** One style in the manage list. */
@@ -890,18 +892,19 @@ export class NoteStyleStore {
   listParts(category: PartCategory): PartListItem[] {
     const language = this.settings.language;
     const { files } = this.partStore(category);
-    const builtins: { id: string; nameKey: TranslationKey }[] =
+    const builtins: { id: string; nameKey: TranslationKey; retired: boolean }[] =
       category === "format"
-        ? BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey }))
+        ? BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey, retired: false }))
         : BUILTIN_BLOCKS.filter(block => block.category === (category === "structure" ? "template" : "tone")).map(
-            ({ id, nameKey }) => ({ id, nameKey })
+            ({ id, nameKey, retired }) => ({ id, nameKey, retired: retired === true })
           );
-    const items: PartListItem[] = builtins.map(({ id, nameKey }) => ({
+    const items: PartListItem[] = builtins.map(({ id, nameKey, retired }) => ({
       ref: builtinRef(id),
       kind: "builtin",
       name: translate(language, nameKey),
       issues: [],
-      usedBy: this.stylesUsing(category, builtinRef(id))
+      usedBy: this.stylesUsing(category, builtinRef(id)),
+      ...(retired ? { retired: true as const } : {})
     }));
     for (const [base, text] of [...files].sort(([a], [b]) => a.localeCompare(b))) {
       const issues: NoteStyleIssue[] = [];

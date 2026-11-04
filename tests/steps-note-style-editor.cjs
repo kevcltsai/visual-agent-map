@@ -535,3 +535,23 @@ test('F1 R7: the sample has no scroll of its own, so the window is the only scro
   assert.ok(css.indexOf('.vam-editor-example {') < css.indexOf('/* Map search'));
   assert.match(css, /^\.vam-editor-modal \.modal-content \{ padding-bottom: var\(--size-4-3\); \}/m);
 });
+
+test('K3 (P4): the voice list offers no retired voice; a style that uses one shows it as "(retired)" in the list, its option name says so, and Save keeps the ref', async () => {
+  const setup = await editorSetup({ ...SEED, [`${RECIPE_DIR}/Old.md`]: '---\nvoice: Key-point summary\n---\n' });
+  const fresh = openEditor(setup, { source: null, name: 'Fresh' });
+  await settle();
+  const freshVoices = optionsOf(byLabel(fresh.content, 'Voice'));
+  for (const id of ['summary', 'guide', 'auto']) assert.equal(freshVoices.includes(`builtin:${id}`), false, id);
+  assert.ok(freshVoices.includes('builtin:plain'));
+  const ed = openEditor(setup, { source: 'file:Old' });
+  await settle();
+  const voice = byLabel(ed.content, 'Voice');
+  assert.equal(voice.value, 'builtin:summary');
+  const options = dom.findAll(voice, node => node.tag === 'option');
+  assert.deepEqual(options.filter(node => node.optionValue.startsWith('builtin:')).map(node => node.optionValue).filter(ref => ['summary', 'guide', 'auto'].some(id => ref === `builtin:${id}`)), ['builtin:summary']);
+  assert.equal(options.find(node => node.optionValue === 'builtin:summary').text, 'Key-point summary (retired)');
+  pickUpdate(ed, 'top');
+  saveOf(ed).click();
+  await settle();
+  assert.equal(M.parseRecipeFile(setup.v.files[`${RECIPE_DIR}/Old.md`]).voice, 'builtin:summary');
+});

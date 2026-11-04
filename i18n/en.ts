@@ -1769,6 +1769,7 @@ export const en = {
   "ui.note_style_group_builtin": "Built-in",
   "ui.note_style_unusable_0_1_2": '"{0}" has a problem and cannot be chosen (line {1}): {2}',
   "ui.note_style_unusable_option_0": "{0} (has a problem)",
+  "ui.note_style_retired_option_0": "{0} (retired)",
   "ui.note_style_issue_file_long": "The file is over {0} characters.",
   "ui.note_style_issue_tone_long": "The voice is over {0} characters.",
   "ui.note_style_issue_frontmatter_unclosed": "The frontmatter opened by --- on line 1 is never closed.",

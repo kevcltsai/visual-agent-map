@@ -1678,6 +1678,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.note_style_group_builtin": "內建",
   "ui.note_style_unusable_0_1_2": "「{0}」有問題，無法選用（第 {1} 行）：{2}",
   "ui.note_style_unusable_option_0": "{0}（有問題）",
+  "ui.note_style_retired_option_0": "{0}（已停用）",
   "ui.note_style_issue_file_long": "檔案超過 {0} 字。",
   "ui.note_style_issue_tone_long": "口吻超過 {0} 字。",
   "ui.note_style_issue_frontmatter_unclosed": "第 1 行的 --- 開頭沒有對應的結尾 ---。",

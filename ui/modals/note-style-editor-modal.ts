@@ -323,15 +323,23 @@ export class NoteStyleEditorModal extends Modal {
     for (const category of PART_CATEGORIES) {
       const select = this.selects.get(category);
       if (!select) continue;
-      const items = store.listParts(category).filter(item => !item.issues.some(issue => issue.code === "builtin_name"));
-      select.replaceChildren();
       const current = this.draft[category];
+      // A retired part is not offered, except the one this style uses now (marked, and kept as it is).
+      const items = store
+        .listParts(category)
+        .filter(item => !item.issues.some(issue => issue.code === "builtin_name"))
+        .filter(item => !item.retired || item.ref === current);
+      select.replaceChildren();
       if (!items.some(item => item.ref === current)) {
         const bare = current.replace(/^(?:file|builtin):/, "");
         select.createEl("option", { value: current, text: t("ui.block_missing_option_0", bare) });
       }
       const optionText = (item: PartListItem): string =>
-        item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.name;
+        item.retired
+          ? t("ui.note_style_retired_option_0", item.name)
+          : item.issues.length
+            ? t("ui.note_style_unusable_option_0", item.name)
+            : item.name;
       const addGroup = (title: string, group: PartListItem[]): void => {
         if (!group.length) return;
         const parent = select.createEl("optgroup", { attr: { label: title } });

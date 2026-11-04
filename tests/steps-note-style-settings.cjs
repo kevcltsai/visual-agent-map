@@ -449,3 +449,10 @@ test('F1 R6 (was failing first): when the manage window closes, the seven topic-
   for (const row of rows) assert.ok(optionsOf(row.view).some(option => option[0] === 'file:Fresh'), `${row.kind} shows the new style`);
   assert.equal('noteStyleByKind' in settings, false, 'drawing again saves nothing');
 });
+
+test('K3 (P4): the Custom row counts a retired built-in only while a style uses it', async () => {
+  const retired = (ref, name, usedBy) => ({ ...part(ref, name), retired: true, usedBy });
+  const parts = [part('builtin:a', 'A'), retired('builtin:r1', 'R1', []), retired('builtin:r2', 'R2', ['Old']), part('file:Mine', 'Mine')];
+  const row = customRow('voice', { parts });
+  assert.equal(row.view.desc, '2 built-in, 1 mine');
+});

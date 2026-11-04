@@ -61,6 +61,8 @@ interface Entry {
   tags?: string;
   /** The AIM report: listed, but neither editable nor a copy source. */
   aimOnly: boolean;
+  /** A retired built-in a style still uses: listed marked, but not a copy source. */
+  retired?: boolean;
 }
 
 const lower = (value: string): string => value.toLocaleLowerCase();
@@ -181,14 +183,18 @@ export class NoteStyleManageModal extends Modal {
           tags: styleTags(item),
           aimOnly: item.aimOnly === true
         }));
-    return store.listParts(this.tab).map(item => ({
-      ref: item.ref,
-      builtin: item.kind === "builtin",
-      name: item.name,
-      issues: item.issues,
-      used: item.usedBy,
-      aimOnly: false
-    }));
+    return store
+      .listParts(this.tab)
+      .filter(item => !item.retired || item.usedBy.length > 0)
+      .map(item => ({
+        ref: item.ref,
+        builtin: item.kind === "builtin",
+        name: item.retired ? t("ui.note_style_retired_option_0", item.name) : item.name,
+        issues: item.issues,
+        used: item.usedBy,
+        aimOnly: false,
+        ...(item.retired ? { retired: true } : {})
+      }));
   }
 
   private buildPanel(panel: HTMLElement): void {
@@ -393,7 +399,7 @@ export class NoteStyleManageModal extends Modal {
     /** Fills the source choices from the current list (the AIM report is no source) and keeps the choice when it is still there. */
     const fillSources = (): void => {
       if (!sourceSelect) return;
-      const sources = this.entries().filter(entry => !entry.aimOnly);
+      const sources = this.entries().filter(entry => !entry.aimOnly && !entry.retired);
       sourceSelect.replaceChildren();
       for (const entry of sources) sourceSelect.createEl("option", { value: entry.ref, text: entry.name });
       if (!sources.some(entry => entry.ref === source)) source = sources[0]?.ref ?? "";

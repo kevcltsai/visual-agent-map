@@ -28,6 +28,7 @@ Built-in note styles are rewritten so each kind of note has sections that each h
 - **New parts you can pick.** The "How-to guide" structure (When to use, How to do it, Common mistakes, Decision rules, Sources, Update log) and the "Skim list" format (the lean format with a stricter one-point-per-line rule).
 - **A same-named file may stop being used.** The new built-in names "Professional", "Narrative", "Skim list" and "How-to guide" are reserved. A file of yours with one of these names is listed but not used; rename it.
 - **Sections named Sources, Source or References hold the source list.** In your own structure files too, a section with one of these names now gets the footnote list, as "Evidence and sources" did.
+- **Three voices retired.** "Key points summary", "Practical guide" and "AI suggestion" no longer appear in the voice lists. A style that already uses one keeps working and shows it as "(retired)".
 
 ## [0.29.0] - 2026-11-04
 

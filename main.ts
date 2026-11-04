@@ -1659,9 +1659,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   async confirmCodexUsage(run: () => Promise<void>): Promise<void> {
     await this.confirmAiUsage(this.settings.cliModel, run);
   }
-  async rebuildDerivedData(): Promise<void> {
+  /** Rebuilds derived note data; `paths` limits the rewrite to those notes (the ends of a changed relation). */
+  async rebuildDerivedData(paths?: string[]): Promise<void> {
     try {
-      await this.repo.rebuildDerivedData();
+      await this.repo.rebuildDerivedData(paths ? { roots: [], paths } : undefined);
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
       new Notice(

@@ -8838,6 +8838,7 @@ export class VisualAgentMapView extends ItemView {
     return beginTransaction({
       repo: plugin.repo,
       rebuildDerivedData: () => plugin.rebuildDerivedData(),
+      refreshNotes: paths => plugin.rebuildDerivedData(paths),
       onApplied: () => {},
       checkConflict: async mapPath => {
         // The source map is judged first, so a cut that cannot go ahead never opens a conflict window in its view.
@@ -8920,6 +8921,7 @@ export class VisualAgentMapView extends ItemView {
     return beginTransaction({
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
+      refreshNotes: paths => this.plugin.rebuildDerivedData(paths),
       onApplied: (mapPath, map) => {
         if (mapPath === this.path) this.adoptSavedMap(map);
       },

@@ -19914,6 +19914,31 @@ var isTransactionError = (error, kind) => {
 var structure = (map) => JSON.stringify({ ...map, viewport: null, nodes: map.nodes.map((node) => ({ ...node, x: null, y: null })) });
 var written = (map) => JSON.stringify({ ...map, viewport: null });
 var ownership = (map) => JSON.stringify(map.nodes.map((node) => [node.id, node.path, node.parentId]));
+var relationEnds = (map) => {
+  var _a2;
+  const ends = /* @__PURE__ */ new Map();
+  const add = (id, end) => {
+    var _a3;
+    ends.set(id, [...(_a3 = ends.get(id)) != null ? _a3 : [], end]);
+  };
+  for (const r of (_a2 = map.topicRelations) != null ? _a2 : []) {
+    add(r.from, `${r.kind}>${r.to}`);
+    add(r.to, `${r.kind}<${r.from}`);
+  }
+  return ends;
+};
+function relationNotePaths(before, after) {
+  var _a2, _b2;
+  const was = relationEnds(before), now = relationEnds(after), paths = /* @__PURE__ */ new Set();
+  for (const id of /* @__PURE__ */ new Set([...was.keys(), ...now.keys()])) {
+    if (JSON.stringify((_a2 = was.get(id)) != null ? _a2 : []) === JSON.stringify((_b2 = now.get(id)) != null ? _b2 : [])) continue;
+    for (const map of [before, after]) {
+      const node = map.nodes.find((item) => item.id === id);
+      if (node) paths.add(node.path);
+    }
+  }
+  return [...paths];
+}
 var baseNameOf = (path) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 var tagged = (error, kind) => Object.assign(error, { kind });
 var GUARD_FIELDS = ["title", "summary", "detail", "status"];
@@ -19942,7 +19967,7 @@ function begin(deps) {
   };
   let committed = false;
   const exists = (path) => !!repo.app.vault.getAbstractFileByPath(path);
-  async function run(files, maps, rebuild2, notes = { before: [], after: [] }) {
+  async function run(files, maps, rebuild2, notes = { before: [], after: [] }, refresh = []) {
     const journal = { files: [], maps: [], notes: [] };
     const rewrite = async (step) => {
       journal.notes.push({ path: step.path, restore: step.restore, written: true });
@@ -19972,13 +19997,17 @@ function begin(deps) {
         entry.written = true;
         await repo.saveMap(item.mapPath, next);
       }
-      if (rebuild2) await deps.rebuildDerivedData();
+      await derive(rebuild2, refresh);
       for (const item of maps) await deps.onApplied(item.mapPath, clone(item.write));
     } catch (error) {
-      await revert(journal, rebuild2, error);
+      await revert(journal, rebuild2, error, refresh);
     }
   }
-  async function revert(journal, rebuild2, error) {
+  async function derive(rebuild2, refresh) {
+    if (rebuild2) await deps.rebuildDerivedData();
+    else if (refresh.length && deps.refreshNotes) await deps.refreshNotes(refresh);
+  }
+  async function revert(journal, rebuild2, error, refresh = []) {
     var _a2;
     const problems = [];
     for (const item of [...journal.maps].reverse()) {
@@ -20024,6 +20053,12 @@ function begin(deps) {
     if (rebuild2 && (journal.files.length > 0 || journal.maps.length > 0)) {
       try {
         await deps.rebuildDerivedData();
+      } catch (problem) {
+        problems.push(problem);
+      }
+    } else if (refresh.length && journal.maps.some((item) => item.written)) {
+      try {
+        await derive(false, refresh);
       } catch (problem) {
         problems.push(problem);
       }
@@ -20087,6 +20122,7 @@ function begin(deps) {
         for (const item of attachments) if (!exists(item.path)) fail2();
       }
     };
+    const refresh = [...new Set(records.flatMap((record) => relationNotePaths(record.before, record.after)))];
     const apply = async (direction) => {
       if (direction === "undo") choosePark();
       await guarded(direction);
@@ -20108,7 +20144,7 @@ function begin(deps) {
           notes.after.push({ path: note.path, restore, apply: () => writeText(repo, note.path, note.beforeText) });
         else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
       }
-      await run(files, maps, rebuild2, notes);
+      await run(files, maps, rebuild2, notes, refresh);
     };
     return {
       undo: () => apply("undo"),
@@ -20198,6 +20234,7 @@ function begin(deps) {
       const journal = { files: [], maps: [], notes: [], attachments: placed };
       let rebuildNeeded = ops.length > 0;
       const records = [];
+      const refresh = [];
       const owner = {};
       try {
         await place(owner);
@@ -20239,14 +20276,15 @@ function begin(deps) {
           const after = clone(before);
           for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
           records.push({ mapPath, before, after });
+          for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
           if (ownership(before) !== ownership(after)) rebuildNeeded = true;
           journal.maps.push({ mapPath, restore: before, written: true });
           await repo.saveMap(mapPath, after);
         }
-        if (rebuildRequested && rebuildNeeded) await deps.rebuildDerivedData();
+        await derive(rebuildRequested && rebuildNeeded, refresh);
         for (const record of records) await deps.onApplied(record.mapPath, clone(record.after));
       } catch (error) {
-        return revert(journal, rebuildRequested && rebuildNeeded, error).finally(() => release(owner));
+        return revert(journal, rebuildRequested && rebuildNeeded, error, refresh).finally(() => release(owner));
       }
       release(owner);
       return entryFor(ops, records, rebuildNeeded, options.label, noteRecords, placed);
@@ -56522,6 +56560,7 @@ ${request.requirements}` : preset.text,
     return begin({
       repo: plugin.repo,
       rebuildDerivedData: () => plugin.rebuildDerivedData(),
+      refreshNotes: (paths) => plugin.rebuildDerivedData(paths),
       onApplied: () => {
       },
       checkConflict: async (mapPath) => {
@@ -56601,6 +56640,7 @@ ${request.requirements}` : preset.text,
     return begin({
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
+      refreshNotes: (paths) => this.plugin.rebuildDerivedData(paths),
       onApplied: (mapPath, map) => {
         if (mapPath === this.path) this.adoptSavedMap(map);
       },
@@ -77297,9 +77337,10 @@ ${t("ui.organize_link_wait_hint")}`;
   async confirmCodexUsage(run) {
     await this.confirmAiUsage(this.settings.cliModel, run);
   }
-  async rebuildDerivedData() {
+  /** Rebuilds derived note data; `paths` limits the rewrite to those notes (the ends of a changed relation). */
+  async rebuildDerivedData(paths) {
     try {
-      await this.repo.rebuildDerivedData();
+      await this.repo.rebuildDerivedData(paths ? { roots: [], paths } : void 0);
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
       new import_obsidian45.Notice(

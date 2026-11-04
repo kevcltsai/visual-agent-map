@@ -399,8 +399,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 11 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 11);
+test('C1: the style is not part of the action schema, and the step version is 11 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 12);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -1153,4 +1153,67 @@ test('chat 06: the schema has fromId, toId, relationKind and description as requ
 test('chat 06: a reply of step version 10 (no relation keys) still parses', () => {
   const old = item('rename_topic', { nodeId: 'a', title: 'T' });
   assert.deepEqual(parse(reply(old)).actions, [{ kind: 'rename_topic', nodeId: 'a', title: 'T' }]);
+});
+
+// ---- AI chat reorders siblings (chat 07) ------------------------------------------------------------------------------
+test('chat 07: move_topic carries an optional beforeId (a child of the target parent); without it the action is as before', () => {
+  const got = parse(reply(
+    item('move_topic', { nodeId: 'b', newParentId: 'r', beforeId: 'a' }),
+    item('move_topic', { nodeId: 'a1', newParentId: 'r', beforeId: ' b ' }),
+    item('move_topic', { nodeId: 'a1', newParentId: 'b' }),
+    child('n1', 'r'),
+    item('move_topic', { nodeId: 'a', newParentId: 'r', beforeId: 'new:n1' })
+  ));
+  assert.deepEqual(got.actions, [
+    { kind: 'move_topic', nodeId: 'b', newParentId: 'r', beforeId: 'a' },
+    { kind: 'move_topic', nodeId: 'a1', newParentId: 'r', beforeId: 'b' },
+    { kind: 'move_topic', nodeId: 'a1', newParentId: 'b' },
+    { kind: 'add_child', parentId: 'r', title: 'n1', summary: '', ref: 'n1' },
+    { kind: 'move_topic', nodeId: 'a', newParentId: 'r', beforeId: 'new:n1' }
+  ]);
+  assert.deepEqual(got.rejected, []);
+});
+test('chat 07: a beforeId that is not under the target parent, is the card itself, or is unknown is dropped and counted', () => {
+  const got = parse(reply(
+    item('move_topic', { nodeId: 'b', newParentId: 'r', beforeId: 'a1' }),
+    item('move_topic', { nodeId: 'b', newParentId: 'r', beforeId: 'b' }),
+    item('move_topic', { nodeId: 'b', newParentId: 'a', beforeId: 'r' }),
+    item('move_topic', { nodeId: 'b', newParentId: 'r', beforeId: 'ghost' }),
+    item('move_topic', { nodeId: 'b', newParentId: 'r', beforeId: 'new:zz' })
+  ));
+  assert.deepEqual(got.actions, []);
+  assert.deepEqual(codes(got), ['0:not_sibling', '1:not_sibling', '2:not_sibling', '3:unknown_node', '4:bad_ref']);
+});
+test('chat 07: a kept move updates the parent links, so a later beforeId and the cycle check see where the card went', () => {
+  const got = parse(reply(
+    item('move_topic', { nodeId: 'a1', newParentId: 'b' }),
+    item('move_topic', { nodeId: 'a', newParentId: 'b', beforeId: 'a1' }),
+    item('move_topic', { nodeId: 'b', newParentId: 'a1' })
+  ));
+  assert.deepEqual(got.actions.map(a => a.beforeId ?? ''), ['', 'a1']);
+  assert.deepEqual(codes(got), ['2:cycle']);
+});
+test('chat 07: the outline is sent in tree order, the children of one parent in the order they were given', () => {
+  const shuffled = [
+    { id: 'b2', title: 'B2', summary: '', parentId: 'b', depth: 2 },
+    { id: 'r', title: 'Root', summary: '', parentId: null, depth: 0 },
+    { id: 'b', title: 'B', summary: '', parentId: 'r', depth: 1 },
+    { id: 'a', title: 'A', summary: '', parentId: 'r', depth: 1 },
+    { id: 'b1', title: 'B1', summary: '', parentId: 'b', depth: 2 },
+    { id: 'lost', title: 'Lost', summary: '', parentId: 'gone', depth: 1 }
+  ];
+  const data = JSON.parse(context({ outline: shuffled }).json);
+  assert.deepEqual(data.outline.map(node => node.id), ['r', 'b', 'b2', 'b1', 'a', 'lost']);
+});
+test('chat 07: the schema has beforeId as a required string, and both prompts explain reordering with move_topic', () => {
+  const items = MAP_CHAT_SCHEMA.properties.actions.items;
+  assert.deepEqual(plain(items.properties.beforeId), { type: 'string' });
+  assert.ok(items.required.includes('beforeId'));
+  const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
+  const en = render('en'), zh = render('zh-TW');
+  assert.match(en, /beforeId \(optional: a card that is already a child of newParentId/);
+  assert.match(en, /The outline lists the cards in tree order/);
+  assert.match(zh, /beforeId（選填：已經是 newParentId 子議題的一張議題/);
+  assert.match(zh, /大綱依樹狀順序列出議題/);
+  for (const text of [en, zh]) assert.ok(text.includes('"newParentId":"","beforeId":""'));
 });

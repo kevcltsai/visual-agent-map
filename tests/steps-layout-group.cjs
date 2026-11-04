@@ -1486,3 +1486,14 @@ test('R1-M2: emptying one side of a balanced map does not move the other topics 
   const dealt = layout.arrangeMap(right, undefined, H, B, { reset: true });
   assert.ok(['t0', 't1', 't2', 't3'].some(id => side(dealt, id) === 'left') && ['t0', 't1', 't2', 't3'].some(id => side(dealt, id) === 'right'));
 });
+
+test('chat 07: reorderSiblings puts a child in front of another child of the same parent and changes nothing else', () => {
+  const nodes = [{ id: 'r', parentId: null }, { id: 'a', parentId: 'r' }, { id: 'x', parentId: 'a' }, { id: 'b', parentId: 'r' }, { id: 'c', parentId: 'r' }, { id: 'd', parentId: 'r' }];
+  const ids = list => list.map(item => item.id);
+  assert.deepEqual(ids(layout.reorderSiblings(nodes, 'r', 'd', 'a')), ['r', 'd', 'x', 'a', 'b', 'c'], 'only the children of r change places, x keeps its index');
+  assert.deepEqual(ids(layout.reorderSiblings(nodes, 'r', 'a', 'c')), ['r', 'b', 'x', 'a', 'c', 'd']);
+  // Invalid requests return the list itself: the card itself, an unknown id, a card under another parent.
+  for (const args of [['r', 'a', 'a'], ['r', 'a', 'nope'], ['r', 'nope', 'a'], ['r', 'x', 'a'], ['r', 'a', 'x'], ['a', 'x', 'b']])
+    assert.equal(layout.reorderSiblings(nodes, ...args), nodes, args.join());
+  assert.deepEqual(ids(nodes), ['r', 'a', 'x', 'b', 'c', 'd'], 'the input is not modified');
+});

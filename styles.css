@@ -102,6 +102,8 @@
 .vam-node.is-clipped > p { flex: 0 10000 auto; }
 .vam-node.is-clipped > .vam-card-cover { flex: 0 100 auto; }
 .vam-node.is-clipped > h3 { flex: 0 1 auto; }
+/* Side layouts (topic-cover-position left / right): the picture column and the text column sit in one .vam-card-side row. A short card cuts that row at its own bottom, so each column is cut from its bottom: the picture from its bottom edge, and in the text column the summary (lower) before the title. The row shrinks like the cover (weight 100), after anything below it in the card. */
+.vam-node.is-clipped > .vam-card-side { flex: 0 100 auto; min-height: 0; overflow: hidden; }
 .vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
 .vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
 .vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }
@@ -264,6 +266,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-cover.is-framed { position: relative; }
 /* A picture size below 100% (topic-cover-size): the view sets the width; the box stays centred in the card. */
 .vam-card-cover.is-resized { margin-left: auto; margin-right: auto; }
+/* Picture beside the text (left / right): the cover is the picture column (its width set by the view from the picture size), the text takes the rest; the card is as tall as the taller column. Bottom: the cover follows the summary. */
+.vam-card-side { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 0; }
+.vam-node.has-cover-right .vam-card-side { flex-direction: row-reverse; }
+.vam-node .vam-card-side > .vam-card-cover { flex: 0 1 auto; margin: 0; }
+.vam-card-side-text { flex: 1 1 0; min-width: 0; }
+.vam-card-side-text > .vam-card-title { margin-top: 0; }
 /* A masked cover: the box is the card's content width and as tall as the window; the part a mask hides at the sides is empty card, not frame colour. */
 .vam-card-cover.is-framed.is-sized { background: transparent; border-radius: 0; }
 /* The window is the masked region at its own scale (cover-layout.ts): left and width are inline percentages of the content width, height follows from its inline aspect-ratio, top is the top of the cover. Never stretched; a card clipped short cuts it from its bottom. */
@@ -276,6 +284,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-frame-modal { width: auto; max-width: min(720px, 96vw); }
 .vam-card-frame-tools { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: center; margin: 0 0 4px; }
 .vam-card-frame-tool { display: inline-flex; gap: 8px; align-items: center; }
+.vam-card-frame-positions { display: inline-flex; gap: 4px; }
+.vam-card-frame-position.is-active { background: #4a90e2; color: #fff; }
 .vam-card-frame-stage { display: flex; justify-content: center; padding: 16px 12px 20px; overflow: auto; max-height: 70vh; }
 .vam-card-frame-stage > .vam-node { position: relative; left: auto; top: auto; flex: 0 0 auto; transform: none; cursor: default; }
 .vam-card-frame-stage .vam-card-cover.is-framed { overflow: visible; touch-action: none; user-select: none; }

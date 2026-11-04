@@ -528,3 +528,20 @@ test('Bug bash E #22 (follow-up): a not-yet-researched (idea) card keeps its dar
   assert.equal(strokes.join('|'), [IDEA, PLAIN].sort().join('|'), 'the idea card exports its own saved stroke, the plain card the ordinary one');
   assert.equal(card.hasClass('is-selected'), true);
 });
+
+test('card editor 03: a card with its picture at the bottom or beside the text exports the title where the card draws it; a top cover is unchanged', async () => {
+  const h = await harness();
+  const rootEl = h.view.cardEls.get(h.root.id);
+  const titleEl = rootEl.children.find(c => c.classes.includes('vam-card-title'));
+  Object.assign(titleEl, { offsetLeft: 140, offsetTop: 8, offsetWidth: 126 });
+  const top = (await h.view.collectExportScene(() => true)).scene.cards.find(c => c.cover);
+  assert.ok(!('titleAt' in top), 'top: the scene is as before');
+  rootEl.addClass('has-cover-left');
+  const side = (await h.view.collectExportScene(() => true)).scene.cards.find(c => c.cover);
+  assert.deepEqual(JSON.parse(JSON.stringify(side.titleAt)), { x: 100 + 140, y: 50 + 8 });
+  assert.ok(ex.buildMapSvg((await h.view.collectExportScene(() => true)).scene).includes('<text x="240" y="72"'), 'drawn in the text column');
+  rootEl.removeClass('has-cover-left');
+  rootEl.addClass('has-cover-bottom');
+  const bottom = (await h.view.collectExportScene(() => true)).scene.cards.find(c => c.cover);
+  assert.equal(bottom.titleAt.y, 58, 'bottom: the title above the picture');
+});

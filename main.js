@@ -624,6 +624,11 @@ var en = {
   "ui.topic_cover_frame_reset": "Show whole picture",
   "ui.topic_cover_frame_apply": "Apply",
   "ui.card_edit_picture_size": "Picture size",
+  "ui.card_edit_picture_position": "Picture position",
+  "ui.card_edit_position_top": "Top",
+  "ui.card_edit_position_bottom": "Bottom",
+  "ui.card_edit_position_left": "Left",
+  "ui.card_edit_position_right": "Right",
   "ui.topic_cover_frame_box": "Cover picture. Drag inside to move what the card shows; arrow keys move it, Shift and arrow keys resize it from the bottom right.",
   "ui.topic_cover_frame_status": "Left {0}%, top {1}%, width {2}%, height {3}%",
   "ui.topic_cover_frame_load_failed": "The picture could not be loaded.",
@@ -3075,6 +3080,11 @@ var zhCN = {
   "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5E94\u7528",
   "ui.card_edit_picture_size": "\u56FE\u7247\u5927\u5C0F",
+  "ui.card_edit_picture_position": "\u56FE\u7247\u4F4D\u7F6E",
+  "ui.card_edit_position_top": "\u4E0A",
+  "ui.card_edit_position_bottom": "\u4E0B",
+  "ui.card_edit_position_left": "\u5DE6",
+  "ui.card_edit_position_right": "\u53F3",
   "ui.topic_cover_frame_box": "\u5C01\u9762\u56FE\u7247\u3002\u5728\u91CC\u9762\u62D6\u52A8\u53EF\u79FB\u52A8\u5361\u7247\u663E\u793A\u7684\u90E8\u5206\uFF1B\u65B9\u5411\u952E\u79FB\u52A8\uFF0CShift \u52A0\u65B9\u5411\u952E\u4ECE\u53F3\u4E0B\u89D2\u7F29\u653E\u3002",
   "ui.topic_cover_frame_status": "\u5DE6 {0}%\u3001\u4E0A {1}%\u3001\u5BBD {2}%\u3001\u9AD8 {3}%",
   "ui.topic_cover_frame_load_failed": "\u65E0\u6CD5\u52A0\u8F7D\u56FE\u7247\u3002",
@@ -5526,6 +5536,11 @@ var zhTW = {
   "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5957\u7528",
   "ui.card_edit_picture_size": "\u5716\u7247\u5927\u5C0F",
+  "ui.card_edit_picture_position": "\u5716\u7247\u4F4D\u7F6E",
+  "ui.card_edit_position_top": "\u4E0A",
+  "ui.card_edit_position_bottom": "\u4E0B",
+  "ui.card_edit_position_left": "\u5DE6",
+  "ui.card_edit_position_right": "\u53F3",
   "ui.topic_cover_frame_box": "\u5C01\u9762\u5716\u7247\u3002\u5728\u88E1\u9762\u62D6\u66F3\u53EF\u79FB\u52D5\u5361\u7247\u986F\u793A\u7684\u90E8\u5206\uFF1B\u65B9\u5411\u9375\u79FB\u52D5\uFF0CShift \u52A0\u65B9\u5411\u9375\u5F9E\u53F3\u4E0B\u89D2\u7E2E\u653E\u3002",
   "ui.topic_cover_frame_status": "\u5DE6 {0}%\u3001\u4E0A {1}%\u3001\u5BEC {2}%\u3001\u9AD8 {3}%",
   "ui.topic_cover_frame_load_failed": "\u7121\u6CD5\u8F09\u5165\u5716\u7247\u3002",
@@ -17566,7 +17581,7 @@ function textLines(title) {
   return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT2));
 }
 function buildMapSvg(scene) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
   const width = num(scene == null ? void 0 : scene.width);
   const height = num(scene == null ? void 0 : scene.height);
   if (width === null || height === null || width <= 0 || height <= 0) return "";
@@ -17623,19 +17638,23 @@ function buildMapSvg(scene) {
     const fill2 = color(card.textColor, textColor);
     const shownCover = (_j = (_i = card.cover) == null ? void 0 : _i.window) != null ? _j : card.cover;
     const coverBox = shownCover ? rect(shownCover.x, shownCover.y, shownCover.w, shownCover.h) : null;
-    const top = (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
+    const titleX = num((_k = card.titleAt) == null ? void 0 : _k.x);
+    const titleY = num((_l = card.titleAt) == null ? void 0 : _l.y);
+    const placed = titleX !== null && titleY !== null;
+    const top = placed ? titleY + 14 : (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
+    const left = placed ? titleX : box[0] + 14;
     const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
     const shown = textLines(card.title).slice(0, fits);
     if (card.clipped === true && shown.length) shown[shown.length - 1] += "\u2026";
     shown.forEach((line, i) => {
       out.push(
-        `<text x="${box[0] + 14}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize != null ? titleSize : 13}"${titleWeight === void 0 ? "" : ` font-weight="${titleWeight}"`} fill="${fill2}">${escapeXml(line)}</text>`
+        `<text x="${left}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize != null ? titleSize : 13}"${titleWeight === void 0 ? "" : ` font-weight="${titleWeight}"`} fill="${fill2}">${escapeXml(line)}</text>`
       );
     });
     if (card.clipped === true) out.push("</svg>");
     out.push("</g>");
   }
-  for (const summary of (_k = scene.summaries) != null ? _k : []) {
+  for (const summary of (_m = scene.summaries) != null ? _m : []) {
     if (typeof (summary == null ? void 0 : summary.d) !== "string" || !PATH_DATA.test(summary.d) || summary.d.length > 4e3) continue;
     const [x, y] = [num(summary.x), num(summary.y)];
     if (x === null || y === null) continue;
@@ -24508,6 +24527,8 @@ var COVER_FRAME_KEY = "topic-cover-frame";
 var COVER_SIZE_KEY = "topic-cover-size";
 var COVER_SIZE_MIN = 0.3;
 var COVER_SIZE_DEFAULT = 1;
+var COVER_POSITION_KEY = "topic-cover-position";
+var COVER_POSITIONS = ["top", "bottom", "left", "right"];
 var IMAGE_EXTENSION2 = /\.(?:png|jpe?g|gif|webp)$/i;
 var SCHEME2 = /^[a-z][a-z0-9+.-]*:/i;
 function linkpathOf(raw) {
@@ -24569,6 +24590,15 @@ function serialiseCoverSize(size) {
   const value = Math.round(parseCoverSize(size) * 100) / 100;
   return value >= COVER_SIZE_DEFAULT ? null : value;
 }
+function parseCoverPosition(raw) {
+  var _a2;
+  const value = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  return (_a2 = COVER_POSITIONS.find((position) => position === value)) != null ? _a2 : "top";
+}
+function serialiseCoverPosition(position) {
+  const value = parseCoverPosition(position);
+  return value === "top" ? null : value;
+}
 function withCoverLook(content, look) {
   const values = {
     [COVER_FRAME_KEY]: look.frame ? serialiseCoverFrame(look.frame) : null
@@ -24577,6 +24607,7 @@ function withCoverLook(content, look) {
     const size = serialiseCoverSize(look.size);
     values[COVER_SIZE_KEY] = size === null ? null : String(size);
   }
+  if (look.position !== void 0) values[COVER_POSITION_KEY] = serialiseCoverPosition(look.position);
   return setFrontmatterKeys(content, values);
 }
 function resolveCoverWithFrame(cache, resolve) {
@@ -24586,7 +24617,8 @@ function resolveCoverWithFrame(cache, resolve) {
   return {
     path: cover.path,
     frame: parseCoverFrame(frontmatter2 == null ? void 0 : frontmatter2[COVER_FRAME_KEY]),
-    size: parseCoverSize(frontmatter2 == null ? void 0 : frontmatter2[COVER_SIZE_KEY])
+    size: parseCoverSize(frontmatter2 == null ? void 0 : frontmatter2[COVER_SIZE_KEY]),
+    position: parseCoverPosition(frontmatter2 == null ? void 0 : frontmatter2[COVER_POSITION_KEY])
   };
 }
 function safeLink(link) {
@@ -24667,11 +24699,63 @@ function coverDisplay(contentWidth, size) {
   const width = contentWidth * k;
   return { left: (contentWidth - width) / 2, width };
 }
-function sizeCoverBox(frame, size) {
+function sizeCoverBox(frame, size, side = false) {
   const { width } = coverDisplay(1, size);
-  frame.toggleClass("is-resized", width < 1);
-  if (width >= 1) frame.style.removeProperty("width");
+  frame.toggleClass("is-resized", width < 1 && !side);
+  if (width >= 1 && !side) frame.style.removeProperty("width");
   else frame.style.setProperty("width", `${width * 100}%`);
+}
+var SIDE_OUTSIDE = ["vam-add-child", "vam-card-resize", "vam-card-resize-y", "vam-card-fade", "vam-card-more"];
+var POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
+var hasCls = (el, cls) => {
+  var _a2, _b2, _c;
+  return (_c = (_b2 = (_a2 = el == null ? void 0 : el.classList) == null ? void 0 : _a2.contains) == null ? void 0 : _b2.call(_a2, cls)) != null ? _c : false;
+};
+var childWith = (parent, cls) => {
+  var _a2, _b2;
+  return (_b2 = Array.from((_a2 = parent.children) != null ? _a2 : []).find((child) => hasCls(child, cls))) != null ? _b2 : null;
+};
+function arrangeCover(card, frame, position) {
+  var _a2, _b2, _c;
+  const row = childWith(card, "vam-card-side");
+  if (row) {
+    const text12 = childWith(row, "vam-card-side-text");
+    for (const child of Array.from((_a2 = text12 == null ? void 0 : text12.children) != null ? _a2 : [])) {
+      child.remove();
+      card.insertBefore(child, row);
+    }
+    row.remove();
+  }
+  for (const cls of POSITION_CLASSES) if (hasCls(card, cls)) card.classList.remove(cls);
+  if (!frame) return;
+  frame.remove();
+  const title = childWith(card, "vam-card-title");
+  if (!title) {
+    card.appendChild(frame);
+    return;
+  }
+  if (position === "top") {
+    card.insertBefore(frame, title);
+    return;
+  }
+  card.addClass(`has-cover-${position}`);
+  if (position === "bottom") {
+    const after = (_b2 = childWith(card, "vam-card-summary")) != null ? _b2 : title;
+    const kids2 = Array.from(card.children);
+    card.insertBefore(frame, (_c = kids2[kids2.indexOf(after) + 1]) != null ? _c : null);
+    return;
+  }
+  const side = card.createDiv({ cls: "vam-card-side" });
+  side.remove();
+  card.insertBefore(side, title);
+  side.appendChild(frame);
+  const text11 = side.createDiv({ cls: "vam-card-side-text" });
+  const kids = Array.from(card.children);
+  for (const child of kids.slice(kids.indexOf(side) + 1)) {
+    if (SIDE_OUTSIDE.some((cls) => hasCls(child, cls))) continue;
+    child.remove();
+    text11.appendChild(child);
+  }
 }
 function placeCoverFrame(parts, shape2, mask) {
   const win = coverWindow(shape2, 1, mask, 1);
@@ -24751,6 +24835,15 @@ function nudgeCoverFrameEdge(mode, frame, key2) {
   if (!dx && !dy) return null;
   return dragCoverFrame(mode, frame, dx, dy);
 }
+var SIDE_SIZE_LIMIT = 0.5;
+var SIDE_SIZE = 0.45;
+var POSITION_KEY = {
+  top: "ui.card_edit_position_top",
+  bottom: "ui.card_edit_position_bottom",
+  left: "ui.card_edit_position_left",
+  right: "ui.card_edit_position_right"
+};
+var isSide = (position) => position === "left" || position === "right";
 var SIZE_STEP = 1;
 var CoverFrameModal = class extends import_obsidian12.Modal {
   constructor(app, options) {
@@ -24759,6 +24852,9 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.options = options;
     __publicField(this, "draft");
     __publicField(this, "size");
+    __publicField(this, "position");
+    __publicField(this, "cardEl", null);
+    __publicField(this, "sizeSlider", null);
     __publicField(this, "shape");
     __publicField(this, "drag", null);
     __publicField(this, "applying", false);
@@ -24771,6 +24867,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     __publicField(this, "applyButton", null);
     this.draft = { ...(_a2 = options.initial) != null ? _a2 : WHOLE2 };
     this.size = parseCoverSize((_b2 = options.size) != null ? _b2 : COVER_SIZE_DEFAULT);
+    this.position = parseCoverPosition(options.position);
     this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen() {
@@ -24781,8 +24878,11 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     const stage = this.contentEl.createDiv({ cls: "vam-card-frame-stage" });
     const given = (_b2 = (_a2 = this.options).card) == null ? void 0 : _b2.call(_a2);
     const card = given ? stage.appendChild(given) : stage.createDiv({ cls: "vam-node" });
+    this.cardEl = card;
+    arrangeCover(card, null, "top");
     const cover = this.buildCover(card);
     for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
+    arrangeCover(card, cover, this.position);
     const labelId = `vam-card-frame-label-${++labelSeq}`;
     this.contentEl.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
     cover.setAttr("aria-labelledby", labelId);
@@ -24824,6 +24924,61 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     slider.setAttr("aria-valuetext", `${Math.round(this.size * 100)}%`);
     slider.addEventListener("input", update);
     slider.addEventListener("change", update);
+    this.sizeSlider = slider;
+    const place = row.createDiv({ cls: "vam-card-frame-tool" });
+    const placeLabel = place.createSpan({ text: t("ui.card_edit_picture_position") });
+    const group = place.createDiv({ cls: "vam-card-frame-positions" });
+    group.setAttr("role", "radiogroup");
+    const groupLabel = `vam-card-frame-position-${labelSeq + 1}`;
+    placeLabel.setAttr("id", groupLabel);
+    group.setAttr("aria-labelledby", groupLabel);
+    const choices = [];
+    const paint = () => {
+      for (const [index, choice2] of choices.entries()) {
+        const on = COVER_POSITIONS[index] === this.position;
+        choice2.setAttr("aria-checked", String(on));
+        choice2.setAttr("tabindex", on ? "0" : "-1");
+        choice2.toggleClass("is-active", on);
+      }
+    };
+    for (const position of COVER_POSITIONS) {
+      const choice2 = group.createEl("button", {
+        cls: "vam-card-frame-position",
+        text: t(POSITION_KEY[position]),
+        attr: { type: "button", role: "radio" }
+      });
+      choice2.dataset.position = position;
+      choice2.addEventListener("click", () => {
+        this.setPosition(position);
+        paint();
+      });
+      choice2.addEventListener("keydown", (event) => {
+        const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+        if (!step) return;
+        event.preventDefault();
+        const index = (COVER_POSITIONS.indexOf(this.position) + step + COVER_POSITIONS.length) % COVER_POSITIONS.length;
+        this.setPosition(COVER_POSITIONS[index]);
+        paint();
+        choices[index].focus();
+      });
+      choices.push(choice2);
+    }
+    paint();
+  }
+  /** Moves the picture on the dialog card; moving it beside the text with a picture over half the width makes it 45%. */
+  setPosition(position) {
+    if (position === this.position) return;
+    const toSide = isSide(position) && !isSide(this.position);
+    this.position = position;
+    if (toSide && this.size > SIDE_SIZE_LIMIT) {
+      this.size = SIDE_SIZE;
+      if (this.sizeSlider) {
+        this.sizeSlider.value = String(Math.round(SIDE_SIZE * 100));
+        this.sizeSlider.setAttr("aria-valuetext", `${Math.round(SIDE_SIZE * 100)}%`);
+      }
+    }
+    if (this.cardEl && this.coverEl) arrangeCover(this.cardEl, this.coverEl, position);
+    this.setDraft(this.draft);
   }
   /** Replaces the card's cover (or adds one before the title) with the editable cover: picture, window, mask box, handles. */
   buildCover(card) {
@@ -24883,7 +25038,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size });
+      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size, position: this.position });
     } finally {
       this.close();
     }
@@ -24902,7 +25057,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     );
     const cover = this.coverEl;
     const box = this.boxEl;
-    if (cover) sizeCoverBox(cover, this.size);
+    if (cover) sizeCoverBox(cover, this.size, isSide(this.position));
     if (!cover || !box || !this.windowEl || !this.imgEl || !this.ghostEl || !this.shape) return;
     const win = placeCoverFrame({ frame: cover, window: this.windowEl, img: this.imgEl }, this.shape, frame);
     if (!win) return;
@@ -51331,7 +51486,7 @@ ${request.requirements}` : preset.text,
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       const src = image instanceof import_obsidian34.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
-      return src ? { src, path: cover.path, frame: cover.frame, size: cover.size } : null;
+      return src ? { src, path: cover.path, frame: cover.frame, size: cover.size, position: cover.position } : null;
     } catch (e) {
       return null;
     }
@@ -51368,6 +51523,7 @@ ${request.requirements}` : preset.text,
       src: picture.src,
       initial: picture.frame,
       size: picture.size,
+      position: picture.position,
       shape: (_a2 = coverShapes.get(picture.path)) != null ? _a2 : null,
       card: () => this.cardForEditor(node),
       onApply: ({ frame, ...look }) => new Promise(
@@ -52771,6 +52927,7 @@ ${request.requirements}` : preset.text,
       if (!summary && title) {
         summary = card.createEl("p", { cls: "vam-card-summary" });
         title.after(summary);
+        this.arrangeCardCover(card);
       }
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text11);
@@ -56292,6 +56449,13 @@ ${request.requirements}` : preset.text,
         accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : void 0
       };
       if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
+      const placedTitle = ["has-cover-bottom", "has-cover-left", "has-cover-right"].some(
+        (cls) => card.classList.contains(cls)
+      );
+      if (placedTitle && titleEl && titleEl.offsetWidth > 0) {
+        item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
+        item.title = wrapText(title, titleEl.offsetWidth);
+      }
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
         if (Number.isFinite(size) && size > 0) item.titleSize = Math.round(size * 13 / 15);
@@ -57827,6 +57991,7 @@ ${request.requirements}` : preset.text,
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    this.arrangeCardCover(card);
     if (shownNode.height) this.ensureClipParts(card);
     this.fitKindShape(card, kind);
   }
@@ -58164,38 +58329,45 @@ ${request.requirements}` : preset.text,
    * remote or unreadable cover adds nothing. The image gets its `src` when the frame scrolls into view. Safe to call again.
    */
   paintCover(card, notePath) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c;
     const old = cardCovers.get(card);
     if (old) {
       (_a2 = this.coverObserver) == null ? void 0 : _a2.unobserve(old.img);
       old.frame.remove();
       cardCovers.delete(card);
     }
+    const placed = this.paintCoverFrame(card, notePath);
+    arrangeCover(card, (_b2 = placed == null ? void 0 : placed.frame) != null ? _b2 : null, (_c = placed == null ? void 0 : placed.position) != null ? _c : "top");
+  }
+  paintCoverFrame(card, notePath) {
+    var _a2, _b2, _c;
     let source;
     let imagePath = "";
     let mask = null;
     let size = 1;
+    let position = "top";
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
-      if (!(file instanceof import_obsidian34.TFile)) return;
+      if (!(file instanceof import_obsidian34.TFile)) return null;
       const cover = resolveCoverWithFrame(
         this.app.metadataCache.getFileCache(file),
         (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
       );
-      if (!cover || !("path" in cover)) return;
+      if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
-      source = image instanceof import_obsidian34.TFile ? (_c = (_b2 = this.app.vault).getResourcePath) == null ? void 0 : _c.call(_b2, image) : void 0;
+      source = image instanceof import_obsidian34.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
       imagePath = cover.path;
       mask = cover.frame;
       size = cover.size;
+      position = cover.position;
     } catch (e) {
-      return;
+      return null;
     }
-    if (!source) return;
+    if (!source) return null;
     const frame = createDiv({ cls: "vam-card-cover" });
     const windowEl = mask ? frame.createDiv({ cls: "vam-card-cover-window" }) : null;
     if (mask) frame.addClass("is-framed");
-    sizeCoverBox(frame, size);
+    sizeCoverBox(frame, size, position === "left" || position === "right");
     const img = (windowEl != null ? windowEl : frame).createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
@@ -58207,6 +58379,7 @@ ${request.requirements}` : preset.text,
       (_a3 = this.coverObserver) == null ? void 0 : _a3.unobserve(img);
       frame.remove();
       cardCovers.delete(card);
+      arrangeCover(card, null, "top");
     });
     img.addEventListener("load", () => {
       const shape2 = coverFrameRatio(img.naturalWidth, img.naturalHeight) && img.naturalWidth / img.naturalHeight;
@@ -58215,14 +58388,12 @@ ${request.requirements}` : preset.text,
       placeCoverFrame(parts, shape2, mask);
       this.afterCoverSized(card);
     });
-    cardCovers.set(card, { frame, img });
-    const title = card.querySelector(".vam-card-title");
-    card.insertBefore(frame, title);
+    cardCovers.set(card, { frame, img, position });
     if (typeof IntersectionObserver !== "function") {
       img.setAttr("src", source);
-      return;
+      return { frame, position };
     }
-    (_d = this.coverObserver) != null ? _d : this.coverObserver = new IntersectionObserver((entries) => {
+    (_c = this.coverObserver) != null ? _c : this.coverObserver = new IntersectionObserver((entries) => {
       var _a3;
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
@@ -58233,6 +58404,13 @@ ${request.requirements}` : preset.text,
       }
     });
     this.coverObserver.observe(img);
+    return { frame, position };
+  }
+  /** Puts the card's cover where its position says (after the card is built, or after its text changed). */
+  arrangeCardCover(card) {
+    var _a2, _b2;
+    const cover = cardCovers.get(card);
+    arrangeCover(card, (_a2 = cover == null ? void 0 : cover.frame) != null ? _a2 : null, (_b2 = cover == null ? void 0 : cover.position) != null ? _b2 : "top");
   }
   /**
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
@@ -58540,6 +58718,7 @@ ${request.requirements}` : preset.text,
       if (!summary && title) {
         summary = createEl("p", { cls: "vam-card-summary" });
         title.after(summary);
+        this.arrangeCardCover(card);
       }
       summary == null ? void 0 : summary.setText(note.summary);
       summary == null ? void 0 : summary.setAttr("title", note.summary);
@@ -69675,6 +69854,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node.is-clipped > p { flex: 0 10000 auto; }
 .vam-node.is-clipped > .vam-card-cover { flex: 0 100 auto; }
 .vam-node.is-clipped > h3 { flex: 0 1 auto; }
+.vam-node.is-clipped > .vam-card-side { flex: 0 100 auto; min-height: 0; overflow: hidden; }
 .vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
 .vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
 .vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }
@@ -69715,6 +69895,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-cover.is-sized { height: auto; }
 .vam-card-cover.is-framed { position: relative; }
 .vam-card-cover.is-resized { margin-left: auto; margin-right: auto; }
+.vam-card-side { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 0; }
+.vam-node.has-cover-right .vam-card-side { flex-direction: row-reverse; }
+.vam-node .vam-card-side > .vam-card-cover { flex: 0 1 auto; margin: 0; }
+.vam-card-side-text { flex: 1 1 0; min-width: 0; }
+.vam-card-side-text > .vam-card-title { margin-top: 0; }
 .vam-card-cover.is-framed.is-sized { background: transparent; border-radius: 0; }
 .vam-card-cover-window { position: absolute; top: 0; height: auto; overflow: hidden; border-radius: var(--radius-s); }
 .vam-card-cover.is-framed:not(.is-sized) img { visibility: hidden; }
@@ -69723,6 +69908,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-frame-modal { width: auto; max-width: min(720px, 96vw); }
 .vam-card-frame-tools { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: center; margin: 0 0 4px; }
 .vam-card-frame-tool { display: inline-flex; gap: 8px; align-items: center; }
+.vam-card-frame-positions { display: inline-flex; gap: 4px; }
+.vam-card-frame-position.is-active { background: #4a90e2; color: #fff; }
 .vam-card-frame-stage { display: flex; justify-content: center; padding: 16px 12px 20px; overflow: auto; max-height: 70vh; }
 .vam-card-frame-stage > .vam-node { position: relative; left: auto; top: auto; flex: 0 0 auto; transform: none; cursor: default; }
 .vam-card-frame-stage .vam-card-cover.is-framed { overflow: visible; touch-action: none; user-select: none; }

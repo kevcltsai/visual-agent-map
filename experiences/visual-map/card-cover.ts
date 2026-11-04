@@ -26,6 +26,10 @@ export interface CoverFrame {
 export const COVER_SIZE_KEY = "topic-cover-size";
 export const COVER_SIZE_MIN = 0.3;
 export const COVER_SIZE_DEFAULT = 1;
+/** `topic-cover-position`: where the picture sits on the card (default top, today's layout). */
+export const COVER_POSITION_KEY = "topic-cover-position";
+export type CoverPosition = "top" | "bottom" | "left" | "right";
+export const COVER_POSITIONS: readonly CoverPosition[] = ["top", "bottom", "left", "right"];
 const IMAGE_EXTENSION = /\.(?:png|jpe?g|gif|webp)$/i;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -119,14 +123,28 @@ export function serialiseCoverSize(size: number): number | null {
   return value >= COVER_SIZE_DEFAULT ? null : value;
 }
 
-/** What "Edit card" writes in one go: the mask and, when given, the picture size. */
+/** Reads `topic-cover-position`; anything that is not top, bottom, left or right (any case) is top. */
+export function parseCoverPosition(raw: unknown): CoverPosition {
+  const value = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  return COVER_POSITIONS.find(position => position === value) ?? "top";
+}
+
+/** The position as written to the note, or null (no key) for the default top. */
+export function serialiseCoverPosition(position: unknown): CoverPosition | null {
+  const value = parseCoverPosition(position);
+  return value === "top" ? null : value;
+}
+
+/** What "Edit card" writes in one go: the mask and, when given, the picture size and position. */
 export interface CoverLook {
   frame: CoverFrame | null;
   size?: number;
+  position?: CoverPosition;
 }
 
 /**
- * Sets (or removes, at the defaults) `topic-cover-frame` and, when the look has one, `topic-cover-size`, in one write;
+ * Sets (or removes, at the defaults) `topic-cover-frame` and, when the look has them, `topic-cover-size` and
+ * `topic-cover-position`, in one write;
  * every other line and the body stay as written. The size is written as a quoted decimal, like the frame.
  */
 export function withCoverLook(content: string, look: CoverLook): string {
@@ -137,21 +155,23 @@ export function withCoverLook(content: string, look: CoverLook): string {
     const size = serialiseCoverSize(look.size);
     values[COVER_SIZE_KEY] = size === null ? null : String(size);
   }
+  if (look.position !== undefined) values[COVER_POSITION_KEY] = serialiseCoverPosition(look.position);
   return setFrontmatterKeys(content, values);
 }
 
-/** `resolveCover` plus the note's valid frame (null: whole picture) and picture size. Off or no picture stays as `resolveCover` says. */
+/** `resolveCover` plus the note's valid frame (null: whole picture), picture size and position. Off or no picture stays as `resolveCover` says. */
 export function resolveCoverWithFrame(
   cache: CoverCache | null | undefined,
   resolve: CoverResolve
-): { path: string; frame: CoverFrame | null; size: number } | { off: true } | null {
+): { path: string; frame: CoverFrame | null; size: number; position: CoverPosition } | { off: true } | null {
   const cover = resolveCover(cache, resolve);
   if (!cover || !("path" in cover)) return cover;
   const frontmatter = cache?.frontmatter;
   return {
     path: cover.path,
     frame: parseCoverFrame(frontmatter?.[COVER_FRAME_KEY]),
-    size: parseCoverSize(frontmatter?.[COVER_SIZE_KEY])
+    size: parseCoverSize(frontmatter?.[COVER_SIZE_KEY]),
+    position: parseCoverPosition(frontmatter?.[COVER_POSITION_KEY])
   };
 }
 

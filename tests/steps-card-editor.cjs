@@ -200,3 +200,121 @@ test('sizeCoverBox: a smaller picture narrows and centres the cover box; the def
   assert.ok(!box.classes.includes('is-resized'));
   assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname, '../styles.css'), 'utf8'), /\.vam-card-cover\.is-resized \{ margin-left: auto; margin-right: auto; \}/);
 });
+
+// ---- ticket 03: picture position (`topic-cover-position`: top, bottom, left, right)
+test('position: parse reads the four positions in any case; anything else is top; serialise drops top', () => {
+  assert.equal(cover.COVER_POSITION_KEY, 'topic-cover-position');
+  for (const [raw, p] of [['top', 'top'], ['bottom', 'bottom'], ['left', 'left'], ['right', 'right'], [' Left ', 'left'], ['RIGHT', 'right']]) assert.equal(cover.parseCoverPosition(raw), p, raw);
+  for (const raw of [undefined, null, '', 'middle', 'l', 3, ['left'], { left: true }, true]) assert.equal(cover.parseCoverPosition(raw), 'top', JSON.stringify(raw));
+  assert.equal(cover.serialiseCoverPosition('top'), null);
+  assert.equal(cover.serialiseCoverPosition('nonsense'), null);
+  assert.equal(cover.serialiseCoverPosition('left'), 'left');
+});
+
+test('position: written with frame and size in one write; top removes the key; it rides with the resolved cover', () => {
+  const note = '---\ntitle: "T"\n---\n# Body\n';
+  const looked = cover.withCoverLook(note, { frame: null, size: 0.45, position: 'left' });
+  assert.equal(looked, '---\ntitle: "T"\ntopic-cover-size: "0.45"\ntopic-cover-position: "left"\n---\n# Body\n');
+  assert.equal(cover.withCoverLook(looked, { frame: null, size: 1, position: 'top' }), note);
+  assert.equal(cover.withCoverLook(looked, { frame: null }), looked, 'without size and position both keys are left alone');
+  const resolve = l => ({ path: l });
+  assert.equal(cover.resolveCoverWithFrame({ frontmatter: { 'topic-cover-position': 'bottom' }, embeds: [{ link: 'a.png' }] }, resolve).position, 'bottom');
+  assert.equal(cover.resolveCoverWithFrame({ frontmatter: { 'topic-cover-position': 'up' }, embeds: [{ link: 'a.png' }] }, resolve).position, 'top');
+});
+
+// Content 250 wide, picture 2:1 (height = D / 2), text: 600 / width lines of 20 px (narrower text wraps taller).
+const pictureOf = D => D / 2;
+const textOf = width => Math.ceil(600 / width) * 20;
+test('layout math: top is today\'s layout — picture D wide and centred over full-width text', () => {
+  const at = layout.coverCardLayout('top', 250, 1, pictureOf, textOf);
+  nearBox(at.picture, { x: 0, y: 8, width: 250, height: 125 }, 'picture');
+  nearBox(at.text, { x: 0, y: 133, width: 250, height: 60 }, 'text');
+  near(at.height, 193, 'height');
+  nearBox(layout.coverCardLayout('top', 250, 0.4, pictureOf, textOf).picture, { x: 75, width: 100, height: 50 }, 'k 40% centred');
+});
+
+test('layout math: bottom puts the picture under the text', () => {
+  const at = layout.coverCardLayout('bottom', 250, 0.6, pictureOf, textOf);
+  nearBox(at.text, { x: 0, y: 0, width: 250, height: 60 }, 'text');
+  nearBox(at.picture, { x: 50, y: 68, width: 150, height: 75 }, 'picture');
+  near(at.height, 143, 'height');
+});
+
+test('layout math: left and right put a D-wide picture column beside text that takes the rest; height is the taller', () => {
+  const left = layout.coverCardLayout('left', 250, 0.45, pictureOf, textOf);
+  // D = 112.5, text width = 250 - 112.5 - 10 = 127.5 -> 5 lines = 100 px; picture 56.25 px.
+  nearBox(left.picture, { x: 0, y: 8, width: 112.5, height: 56.25 }, 'left picture');
+  nearBox(left.text, { x: 122.5, y: 8, width: 127.5, height: 100 }, 'left text');
+  near(left.height, 108, 'the text is taller');
+  const right = layout.coverCardLayout('right', 250, 0.45, pictureOf, textOf);
+  nearBox(right.picture, { x: 137.5, width: 112.5 }, 'right picture');
+  nearBox(right.text, { x: 0, width: 127.5 }, 'right text');
+  const tall = layout.coverCardLayout('left', 250, 0.45, D => D * 1.5, () => 20);
+  near(tall.height, 8 + 112.5 * 1.5, 'the picture is taller');
+  assert.equal(layout.COVER_SIDE_GAP, 10);
+  assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname, '../styles.css'), 'utf8'), /\.vam-card-side \{ display: flex; gap: 10px;/, 'the stylesheet uses the same gap');
+});
+
+// arrangeCover on a stand-in card: header, cover, title, summary, error, "+", fade.
+const builtCard = () => {
+  const c = dom.element('div', { cls: 'vam-node' });
+  c.createDiv('vam-node-header');
+  const frame = c.createDiv('vam-card-cover');
+  c.createEl('h3', { cls: 'vam-card-title' });
+  c.createEl('p', { cls: 'vam-card-summary' });
+  c.createEl('p', { cls: 'vam-card-error' });
+  c.createEl('button', { cls: 'vam-add-child' });
+  c.createSpan({ cls: 'vam-card-fade' });
+  return { c, frame };
+};
+const order = el => el.children.map(child => child.cls.split(' ')[0] + (child.children.length && child.cls.startsWith('vam-card-side') ? `[${order(child).join(',')}]` : ''));
+
+test('arrangeCover: top, bottom, left and right place the cover; calling again or switching back restores the card', () => {
+  const { c, frame } = builtCard();
+  const top = ['vam-node-header', 'vam-card-cover', 'vam-card-title', 'vam-card-summary', 'vam-card-error', 'vam-add-child', 'vam-card-fade'];
+  layout.arrangeCover(c, frame, 'top');
+  assert.deepEqual(order(c), top);
+  layout.arrangeCover(c, frame, 'bottom');
+  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-title', 'vam-card-summary', 'vam-card-cover', 'vam-card-error', 'vam-add-child', 'vam-card-fade']);
+  assert.ok(c.classes.includes('has-cover-bottom'));
+  layout.arrangeCover(c, frame, 'left');
+  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-side[vam-card-cover,vam-card-side-text[vam-card-title,vam-card-summary,vam-card-error]]', 'vam-add-child', 'vam-card-fade']);
+  assert.ok(c.classes.includes('has-cover-left') && !c.classes.includes('has-cover-bottom'));
+  layout.arrangeCover(c, frame, 'right');
+  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-side[vam-card-cover,vam-card-side-text[vam-card-title,vam-card-summary,vam-card-error]]', 'vam-add-child', 'vam-card-fade'], 'one row, not two');
+  assert.ok(c.classes.includes('has-cover-right') && !c.classes.includes('has-cover-left'));
+  layout.arrangeCover(c, frame, 'top');
+  assert.deepEqual(order(c), top);
+  assert.ok(!c.classes.some(cls => cls.startsWith('has-cover-')));
+});
+
+test('arrangeCover: without a summary bottom follows the title; without a cover a side row is taken apart; an unbuilt card just gets the cover', () => {
+  const { c, frame } = builtCard();
+  c.children = c.children.filter(child => !child.cls.includes('vam-card-summary'));
+  layout.arrangeCover(c, frame, 'bottom');
+  assert.deepEqual(order(c).slice(1, 3), ['vam-card-title', 'vam-card-cover']);
+  layout.arrangeCover(c, frame, 'left');
+  frame.remove();
+  layout.arrangeCover(c, null, 'left');
+  assert.deepEqual(order(c), ['vam-node-header', 'vam-card-title', 'vam-card-error', 'vam-add-child', 'vam-card-fade']);
+  const bare = dom.element('div');
+  bare.createDiv('vam-node-header');
+  const f = dom.element('div', { cls: 'vam-card-cover' });
+  layout.arrangeCover(bare, f, 'left');
+  assert.deepEqual(order(bare), ['vam-node-header', 'vam-card-cover']);
+});
+
+test('side layouts in the stylesheet: a row of picture and text, right reversed, and the clip rule for a short card', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '../styles.css'), 'utf8');
+  assert.match(css, /\.vam-node\.has-cover-right \.vam-card-side \{ flex-direction: row-reverse; \}/);
+  assert.match(css, /\.vam-card-side-text \{ flex: 1 1 0; min-width: 0; \}/);
+  assert.match(css, /\.vam-node\.is-clipped > \.vam-card-side \{ flex: 0 100 auto; min-height: 0; overflow: hidden; \}/, 'a short card cuts the row from its bottom');
+  assert.match(css, /\.vam-card-side \{[^}]*align-items: flex-start/, 'the card is as tall as the taller column');
+});
+
+test('export: a placed title is drawn where the card has it', () => {
+  const svg = ex.buildMapSvg({ width: 400, height: 400, cards: [{ x: 0, y: 0, w: 280, h: 200, title: 'Hello', titleAt: { x: 140, y: 30 }, cover: { x: 14, y: 22, w: 116, h: 80, href: 'data:image/png;base64,iVBORw0KGgo=', fit: 'contain' } }], edges: [] });
+  assert.match(svg, /<text x="140" y="44"/);
+  const old = ex.buildMapSvg({ width: 400, height: 400, cards: [{ x: 0, y: 0, w: 280, h: 200, title: 'Hello', titleAt: { x: 'bad', y: 30 } }], edges: [] });
+  assert.match(old, /<text x="14" y="22"/, 'an invalid place falls back to the old rule');
+});

@@ -75,9 +75,9 @@ test('withCoverFrame sets, replaces and removes only topic-cover-frame', () => {
 test('resolveCoverWithFrame: the frame rides with the cover; none beats a valid frame; an invalid frame shows the whole picture', () => {
   const pickFramed = cache => plain(cover.resolveCoverWithFrame(cache, resolve));
   const fm = frame => ({ frontmatter: { 'topic-cover-frame': frame }, embeds: [{ link: 'img/a.png' }] });
-  assert.deepEqual(pickFramed(fm('0.1 0.2 0.5 0.5')), { path: 'img/a.png', frame: { x: 0.1, y: 0.2, w: 0.5, h: 0.5 }, size: 1 });
-  assert.deepEqual(pickFramed({ embeds: [{ link: 'img/a.png' }] }), { path: 'img/a.png', frame: null, size: 1 });
-  assert.deepEqual(pickFramed(fm('0 0 2 1')), { path: 'img/a.png', frame: null, size: 1 }, 'invalid: whole picture');
+  assert.deepEqual(pickFramed(fm('0.1 0.2 0.5 0.5')), { path: 'img/a.png', frame: { x: 0.1, y: 0.2, w: 0.5, h: 0.5 }, size: 1, position: 'top' });
+  assert.deepEqual(pickFramed({ embeds: [{ link: 'img/a.png' }] }), { path: 'img/a.png', frame: null, size: 1, position: 'top' });
+  assert.deepEqual(pickFramed(fm('0 0 2 1')), { path: 'img/a.png', frame: null, size: 1, position: 'top' }, 'invalid: whole picture');
   assert.deepEqual(pickFramed({ frontmatter: { 'topic-cover': 'none', 'topic-cover-frame': '0.1 0.2 0.5 0.5' }, embeds: [{ link: 'img/a.png' }] }), { off: true }, 'none wins over a valid frame');
   assert.equal(pickFramed({ frontmatter: { 'topic-cover-frame': '0.1 0.2 0.5 0.5' }, embeds: [{ link: 'https://x/y.png' }] }), null, 'a frame without a picture shows nothing');
 });

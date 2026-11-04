@@ -595,3 +595,94 @@ test('open: the dialog gets the note size, and Apply sends frame and size to one
   assert.match(h.contents.get(NOTE), /topic-cover-size: "0\.6"/);
   assert.equal(h.view.history.entries.length, 1);
 });
+
+// ---- ticket 03: picture position (top, bottom, left, right)
+function openPlaced({ size = 1, position, initial = START } = {}) {
+  const applied = [];
+  const modal = new editor.CoverFrameModal({}, { src: 'x', initial, size, position, shape: 2, card: plainCard, onApply: async edit => { applied.push(edit); } });
+  modal.open();
+  const el = modal.contentEl;
+  const choices = dom.findAll(el, i => i.tag === 'button' && dom.hasCls(i, 'vam-card-frame-position'));
+  const choice = name => choices.find(b => b.text === name);
+  const slider = dom.find(el, i => i.tag === 'input');
+  const cardEl = dom.find(el, i => dom.hasCls(i, 'vam-node'));
+  const coverEl = dom.find(el, i => dom.hasCls(i, 'vam-card-cover'));
+  return { modal, el, choices, choice, slider, cardEl, coverEl, applied };
+}
+
+test('position: a radio group of Top, Bottom, Left, Right in the tool row, starting from the note', () => {
+  const ui = openPlaced({ position: 'bottom' });
+  const group = dom.find(ui.el, i => dom.hasCls(i, 'vam-card-frame-positions'));
+  assert.equal(group.attrs.role, 'radiogroup');
+  assert.ok(dom.find(ui.el, i => i.attrs.id === group.attrs['aria-labelledby'] && i.text === 'Picture position'));
+  assert.deepEqual(ui.choices.map(b => [b.text, b.attrs.role, b.attrs['aria-checked']]), [['Top', 'radio', 'false'], ['Bottom', 'radio', 'true'], ['Left', 'radio', 'false'], ['Right', 'radio', 'false']]);
+  assert.ok(ui.cardEl.classes.includes('has-cover-bottom'), 'the dialog card shows the note position');
+  assert.equal(openPlaced().choices[0].attrs['aria-checked'], 'true', 'no position: top');
+});
+
+test('position: switching to left or right with a picture over half the width sets it to 45 percent; at or under half it stays', () => {
+  const big = openPlaced({ size: 0.8 });
+  big.choice('Left').click();
+  assert.equal(big.slider.value, '45');
+  assert.equal(big.coverEl.style.width, '45%');
+  assert.ok(big.cardEl.classes.includes('has-cover-left'));
+  assert.ok(dom.find(big.cardEl, i => dom.hasCls(i, 'vam-card-side')).children.includes(big.coverEl), 'the cover is the picture column');
+  assert.equal(big.coverEl.attrs.inert, undefined, 'the cover still takes input');
+  const text = dom.find(big.cardEl, i => dom.hasCls(i, 'vam-card-side-text'));
+  assert.ok(text.children.every(child => child.attrs.inert === ''), 'the text column is shown, not edited');
+  big.slider.value = '90';
+  big.slider.input();
+  big.choice('Right').click();
+  assert.equal(big.slider.value, '90', 'left to right is not a switch to a side');
+  assert.ok(big.cardEl.classes.includes('has-cover-right'));
+  const small = openPlaced({ size: 0.5 });
+  small.choice('Right').click();
+  assert.equal(small.slider.value, '50');
+  assert.equal(small.coverEl.style.width, '50%');
+  const back = openPlaced({ size: 0.4, position: 'left' });
+  back.choice('Top').click();
+  assert.ok(!back.cardEl.classes.some(cls => cls.startsWith('has-cover-')), 'back to top restores the card');
+  assert.equal(back.cardEl.children[1], back.coverEl);
+  assert.equal(back.slider.value, '40', 'going back to top keeps the size');
+});
+
+test('position: arrow keys move between the choices; Apply hands over frame, size and position once; Cancel writes nothing', async () => {
+  const ui = openPlaced({ size: 0.8 });
+  let prevented = 0;
+  ui.choices[0].keydown({ key: 'ArrowRight', preventDefault() { prevented++; } });
+  assert.equal(ui.choices[1].attrs['aria-checked'], 'true');
+  assert.equal(ui.choices[1].focused, true);
+  ui.choices[1].keydown({ key: 'ArrowLeft', preventDefault() { prevented++; } });
+  ui.choices[0].keydown({ key: 'ArrowLeft', preventDefault() { prevented++; } });
+  assert.equal(ui.choices[3].attrs['aria-checked'], 'true', 'wraps around');
+  assert.equal(prevented, 3);
+  dom.find(ui.el, i => i.tag === 'button' && i.text === 'Apply').click();
+  await dom.tick();
+  assert.equal(ui.applied.length, 1);
+  assert.equal(ui.applied[0].position, 'right');
+  assert.equal(ui.applied[0].size, 0.45);
+  nearFrame(ui.applied[0].frame, START, 'the mask is unchanged by the position');
+  const cancel = openPlaced();
+  cancel.choice('Left').click();
+  cancel.modal.close();
+  await dom.tick();
+  assert.deepEqual(cancel.applied, []);
+});
+
+test('write: frame, size and position are one history entry; undo returns the note byte for byte', async () => {
+  const h = await harness(TEXT);
+  const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, { size: 0.45, position: 'left' });
+  assert.equal(h.view.history.entries.length, 1);
+  assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"\ntopic-cover-size: "0\.45"\ntopic-cover-position: "left"\n---/);
+  await entry.undo();
+  assert.equal(h.contents.get(NOTE), TEXT);
+});
+
+test('open: a copied side-layout card is taken apart and rebuilt around the editable cover', async () => {
+  const h = await harness(TEXT, { cache: { frontmatter: { 'topic-cover-position': 'right', 'topic-cover-size': '0.4' }, embeds: [{ link: 'img/a.png' }] } });
+  const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE });
+  const card = dom.find(modal.contentEl, i => dom.hasCls(i, 'vam-node'));
+  assert.ok(card.classes.includes('has-cover-right'));
+  assert.equal(dom.findAll(card, i => dom.hasCls(i, 'vam-card-cover')).length, 1);
+  assert.equal(dom.find(modal.contentEl, i => i.tag === 'input').value, '40');
+});

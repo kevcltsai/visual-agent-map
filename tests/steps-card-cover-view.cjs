@@ -461,3 +461,36 @@ test('picture size: the map card cover is k of the content width, centred, with 
     assert.equal(frame.classes.includes('is-resized'), Boolean(width));
   }
 });
+
+// Card editor 03: `topic-cover-position` places the map card's cover once the card is built.
+test('picture position: bottom follows the summary, left and right make a picture column with the text beside it; a repaint keeps one row', () => {
+  for (const [position, shape] of [['bottom', ['vam-card-title', 'vam-card-summary', 'vam-card-cover']], ['left', ['vam-card-side']], ['right', ['vam-card-side']], ['middle', ['vam-card-cover', 'vam-card-title', 'vam-card-summary']]]) {
+    before();
+    const view = relay(framed({ 'topic-cover-position': position, 'topic-cover-size': '0.4' }));
+    const c = card();
+    view.paintCover(c, 'Topics/n.md');
+    assert.deepEqual(c.children.map(x => x.cls.split(' ')[0]), shape, position);
+    const [frame] = frames(c);
+    assert.equal(frame.style.width, '40%', `${position}: the size still applies`);
+    assert.equal(frame.classes.includes('is-resized'), position === 'bottom' || position === 'middle', `${position}: centred only on top and bottom`);
+    if (position === 'left') {
+      view.paintCover(c, 'Topics/n.md');
+      assert.equal(dom.findAll(c, i => dom.hasCls(i, 'vam-card-side')).length, 1, 'a repaint does not nest rows');
+      const before = c.children.length;
+      view.app.metadataCache.getFileCache = () => ({ frontmatter: { 'topic-cover': 'none' } });
+      view.paintCover(c, 'Topics/n.md');
+      assert.deepEqual(c.children.map(x => x.cls.split(' ')[0]), ['vam-card-title', 'vam-card-summary'], 'cover off: the row is taken apart');
+      assert.ok(c.children.length > 0 && before > 0);
+    }
+  }
+  const source = read('experiences/visual-map/view.ts');
+  const render = source.match(/private renderNode\([\s\S]*?\n  }\n/)[0];
+  assert.ok(render.indexOf('this.arrangeCardCover(card)') > render.indexOf('cls: "vam-card-summary"'), 'renderNode places the cover after the text is built');
+});
+
+test('picture position: a side cover with the default size is the full column width (set, not left to the stylesheet)', () => {
+  before();
+  const c = card();
+  relay(framed({ 'topic-cover-position': 'left' })).paintCover(c, 'Topics/n.md');
+  assert.equal(frames(c)[0].style.width, '100%');
+});

@@ -590,6 +590,11 @@ export const en = {
   "ui.topic_cover_frame_reset": "Show whole picture",
   "ui.topic_cover_frame_apply": "Apply",
   "ui.card_edit_picture_size": "Picture size",
+  "ui.card_edit_picture_position": "Picture position",
+  "ui.card_edit_position_top": "Top",
+  "ui.card_edit_position_bottom": "Bottom",
+  "ui.card_edit_position_left": "Left",
+  "ui.card_edit_position_right": "Right",
   "ui.topic_cover_frame_box":
     "Cover picture. Drag inside to move what the card shows; arrow keys move it, Shift and arrow keys resize it from the bottom right.",
   "ui.topic_cover_frame_status": "Left {0}%, top {1}%, width {2}%, height {3}%",

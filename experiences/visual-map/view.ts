@@ -130,10 +130,11 @@ import {
   withCoverLook,
   withCoverOn,
   type CoverFrame,
-  type CoverLook
+  type CoverLook,
+  type CoverPosition
 } from "./card-cover";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
-import { coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
+import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
@@ -598,7 +599,7 @@ const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
 const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 /** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
-const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement }>();
+const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement; position: CoverPosition }>();
 /** What the "Edit card" dialog leaves out of its copy of a card: the tools, the "+", the size handles and the clip parts. */
 /** Map-only states a copied card must not carry into the dialog. */
 const CARD_EDITOR_STATES = [
@@ -3780,7 +3781,9 @@ export class VisualAgentMapView extends ItemView {
     return entry;
   }
   /** The topic's cover picture (resource path) and its valid frame; null when it has no picture or the cover is off. */
-  private coverPictureOf(node: MapNode): { src: string; path: string; frame: CoverFrame | null; size: number } | null {
+  private coverPictureOf(
+    node: MapNode
+  ): { src: string; path: string; frame: CoverFrame | null; size: number; position: CoverPosition } | null {
     try {
       const file = this.app.vault.getAbstractFileByPath(node.path);
       if (!(file instanceof TFile)) return null;
@@ -3790,7 +3793,7 @@ export class VisualAgentMapView extends ItemView {
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       const src = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
-      return src ? { src, path: cover.path, frame: cover.frame, size: cover.size } : null;
+      return src ? { src, path: cover.path, frame: cover.frame, size: cover.size, position: cover.position } : null;
     } catch {
       return null;
     }
@@ -3836,6 +3839,7 @@ export class VisualAgentMapView extends ItemView {
       src: picture.src,
       initial: picture.frame,
       size: picture.size,
+      position: picture.position,
       shape: coverShapes.get(picture.path) ?? null,
       card: () => this.cardForEditor(node),
       onApply: ({ frame, ...look }) =>
@@ -5346,6 +5350,7 @@ export class VisualAgentMapView extends ItemView {
       if (!summary && title) {
         summary = card.createEl("p", { cls: "vam-card-summary" });
         title.after(summary);
+        this.arrangeCardCover(card);
       }
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
@@ -9207,6 +9212,15 @@ export class VisualAgentMapView extends ItemView {
       };
       // card-height: only a fixed-height card that cuts its content says so, so a map without heights exports unchanged.
       if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
+      // topic-cover-position: under or beside the picture the title is not below the cover, so it goes where the card
+      // draws it (and wraps at its own width). A top cover leaves the scene as it was.
+      const placedTitle = ["has-cover-bottom", "has-cover-left", "has-cover-right"].some(cls =>
+        card.classList.contains(cls)
+      );
+      if (placedTitle && titleEl && titleEl.offsetWidth > 0) {
+        item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
+        item.title = wrapText(title, titleEl.offsetWidth);
+      }
       // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
@@ -10901,6 +10915,8 @@ export class VisualAgentMapView extends ItemView {
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    // Bottom, left and right need the whole card (the summary, the text column), so the cover is placed once it is built.
+    this.arrangeCardCover(card);
     if (shownNode.height) this.ensureClipParts(card);
     this.fitKindShape(card, kind);
   }
@@ -11243,32 +11259,39 @@ export class VisualAgentMapView extends ItemView {
       old.frame.remove();
       cardCovers.delete(card);
     }
+    const placed = this.paintCoverFrame(card, notePath);
+    // Every way out puts the card back in order: no cover undoes a side layout, a cover goes where its position says.
+    arrangeCover(card, placed?.frame ?? null, placed?.position ?? "top");
+  }
+  private paintCoverFrame(card: HTMLElement, notePath: string): { frame: HTMLElement; position: CoverPosition } | null {
     let source: string | undefined;
     let imagePath = "";
     let mask: CoverFrame | null = null;
     let size = 1;
+    let position: CoverPosition = "top";
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
-      if (!(file instanceof TFile)) return;
+      if (!(file instanceof TFile)) return null;
       const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
         this.app.metadataCache.getFirstLinkpathDest(link, notePath)
       );
-      if (!cover || !("path" in cover)) return;
+      if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
       imagePath = cover.path;
       mask = cover.frame;
       size = cover.size;
+      position = cover.position;
     } catch {
-      return;
+      return null;
     }
-    if (!source) return;
+    if (!source) return null;
     const frame = createDiv({ cls: "vam-card-cover" });
     // A frame (mask) puts the picture inside a window that shows only the framed region; the file itself is never changed.
     const windowEl = mask ? frame.createDiv({ cls: "vam-card-cover-window" }) : null;
     if (mask) frame.addClass("is-framed");
     // The picture size (k) makes the whole box narrower; the mask is the same region of the picture at any size.
-    sizeCoverBox(frame, size);
+    sizeCoverBox(frame, size, position === "left" || position === "right");
     const img = (windowEl ?? frame).createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
@@ -11281,6 +11304,7 @@ export class VisualAgentMapView extends ItemView {
       this.coverObserver?.unobserve(img);
       frame.remove();
       cardCovers.delete(card);
+      arrangeCover(card, null, "top");
     });
     // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
     img.addEventListener("load", () => {
@@ -11290,12 +11314,10 @@ export class VisualAgentMapView extends ItemView {
       placeCoverFrame(parts, shape, mask);
       this.afterCoverSized(card);
     });
-    cardCovers.set(card, { frame, img });
-    const title = card.querySelector<HTMLElement>(".vam-card-title");
-    card.insertBefore(frame, title);
+    cardCovers.set(card, { frame, img, position });
     if (typeof IntersectionObserver !== "function") {
       img.setAttr("src", source);
-      return;
+      return { frame, position };
     }
     this.coverObserver ??= new IntersectionObserver(entries => {
       for (const entry of entries) {
@@ -11307,6 +11329,12 @@ export class VisualAgentMapView extends ItemView {
       }
     });
     this.coverObserver.observe(img);
+    return { frame, position };
+  }
+  /** Puts the card's cover where its position says (after the card is built, or after its text changed). */
+  private arrangeCardCover(card: HTMLElement): void {
+    const cover = cardCovers.get(card);
+    arrangeCover(card, cover?.frame ?? null, cover?.position ?? "top");
   }
   /**
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
@@ -11622,6 +11650,7 @@ export class VisualAgentMapView extends ItemView {
       if (!summary && title) {
         summary = createEl("p", { cls: "vam-card-summary" });
         title.after(summary);
+        this.arrangeCardCover(card);
       }
       summary?.setText(note.summary);
       summary?.setAttr("title", note.summary);

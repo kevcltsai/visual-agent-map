@@ -1,7 +1,15 @@
 import { Modal, type App } from "obsidian";
 import { t, type TranslationKey } from "../../i18n";
-import { COVER_SIZE_DEFAULT, COVER_SIZE_MIN, parseCoverSize, type CoverFrame } from "./card-cover";
-import { coverWindow, placeCoverFrame, sizeCoverBox } from "./cover-layout";
+import {
+  COVER_POSITIONS,
+  COVER_SIZE_DEFAULT,
+  COVER_SIZE_MIN,
+  parseCoverPosition,
+  parseCoverSize,
+  type CoverFrame,
+  type CoverPosition
+} from "./card-cover";
+import { arrangeCover, coverWindow, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 
 /** The smallest a frame side can be, as a fraction of the picture. */
 export const MIN_FRAME_SIDE = 0.08;
@@ -84,11 +92,23 @@ export function nudgeCoverFrameEdge(mode: FrameDragMode, frame: CoverFrame, key:
   return dragCoverFrame(mode, frame, dx, dy);
 }
 
-/** What Apply hands over: the frame to write (null: whole picture, remove the key) and the picture size (k). */
+/** What Apply hands over: the frame to write (null: whole picture, remove the key), the picture size (k) and position. */
 export interface CardCoverEdit {
   frame: CoverFrame | null;
   size: number;
+  position: CoverPosition;
 }
+
+/** Switching to left or right with a picture wider than this sets it to SIDE_SIZE, so the text keeps room beside it. */
+export const SIDE_SIZE_LIMIT = 0.5;
+export const SIDE_SIZE = 0.45;
+const POSITION_KEY: Record<CoverPosition, TranslationKey> = {
+  top: "ui.card_edit_position_top",
+  bottom: "ui.card_edit_position_bottom",
+  left: "ui.card_edit_position_left",
+  right: "ui.card_edit_position_right"
+};
+const isSide = (position: CoverPosition): boolean => position === "left" || position === "right";
 
 /** The picture-size slider works in whole percents of the card's content width. */
 const SIZE_STEP = 1;
@@ -100,6 +120,8 @@ export interface CoverFrameModalOptions {
   initial: CoverFrame | null;
   /** The note's picture size (k, 0.3-1); the default 1 when absent. */
   size?: number;
+  /** The note's picture position; top when absent. */
+  position?: CoverPosition;
   /** The picture's width over height when the map already measured it, so the card has its size before the picture loads. */
   shape?: number | null;
   /**
@@ -124,13 +146,16 @@ interface CoverDrag {
 
 /**
  * The "Edit card" dialog: one card in the middle that looks like the card on the map, edited in place. On its cover,
- * dragging inside moves the mask over the still picture, the eight handles (shown on hover, focus or touch) hide a side,
+ * a tool row above it sets the picture size and position, dragging inside moves the mask over the still picture, the eight handles (shown on hover, focus or touch) hide a side,
  * and arrow keys move the mask 1% (Shift and arrow keys resize it from the bottom right). The picture keeps its scale
  * (cover-layout.ts). Pointer events with pointer capture, so touch works. Only Apply writes.
  */
 export class CoverFrameModal extends Modal {
   private draft: CoverFrame;
   private size: number;
+  private position: CoverPosition;
+  private cardEl: HTMLElement | null = null;
+  private sizeSlider: HTMLInputElement | null = null;
   private shape: number | null;
   private drag: CoverDrag | null = null;
   private applying = false;
@@ -148,6 +173,7 @@ export class CoverFrameModal extends Modal {
     super(app);
     this.draft = { ...(options.initial ?? WHOLE) };
     this.size = parseCoverSize(options.size ?? COVER_SIZE_DEFAULT);
+    this.position = parseCoverPosition(options.position);
     this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen(): void {
@@ -158,9 +184,13 @@ export class CoverFrameModal extends Modal {
     const given = this.options.card?.();
     // Without the map card, the stylesheet's default card (its width and padding), empty but for the cover.
     const card = given ? stage.appendChild(given) : stage.createDiv({ cls: "vam-node" });
+    this.cardEl = card;
+    // A copied side layout is taken apart first, so every text child is a direct child that can be made inert.
+    arrangeCover(card, null, "top");
     const cover = this.buildCover(card);
     // The rest of the card is shown, not edited (ticket 05 adds the text).
     for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
+    arrangeCover(card, cover, this.position);
     // aria-labelledby, not aria-label: Obsidian shows an aria-label as a tooltip, which would cover the picture.
     const labelId = `vam-card-frame-label-${++labelSeq}`;
     this.contentEl.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
@@ -205,6 +235,68 @@ export class CoverFrameModal extends Modal {
     slider.setAttr("aria-valuetext", `${Math.round(this.size * 100)}%`);
     slider.addEventListener("input", update);
     slider.addEventListener("change", update);
+    this.sizeSlider = slider;
+    const place = row.createDiv({ cls: "vam-card-frame-tool" });
+    const placeLabel = place.createSpan({ text: t("ui.card_edit_picture_position") });
+    const group = place.createDiv({ cls: "vam-card-frame-positions" });
+    group.setAttr("role", "radiogroup");
+    const groupLabel = `vam-card-frame-position-${labelSeq + 1}`;
+    placeLabel.setAttr("id", groupLabel);
+    group.setAttr("aria-labelledby", groupLabel);
+    const choices: HTMLButtonElement[] = [];
+    const paint = (): void => {
+      for (const [index, choice] of choices.entries()) {
+        const on = COVER_POSITIONS[index] === this.position;
+        choice.setAttr("aria-checked", String(on));
+        choice.setAttr("tabindex", on ? "0" : "-1");
+        choice.toggleClass("is-active", on);
+      }
+    };
+    for (const position of COVER_POSITIONS) {
+      const choice = group.createEl("button", {
+        cls: "vam-card-frame-position",
+        text: t(POSITION_KEY[position]),
+        attr: { type: "button", role: "radio" }
+      });
+      choice.dataset.position = position;
+      choice.addEventListener("click", () => {
+        this.setPosition(position);
+        paint();
+      });
+      // Arrow keys move between the four choices, as in any radio group.
+      choice.addEventListener("keydown", (event: KeyboardEvent) => {
+        const step =
+          event.key === "ArrowRight" || event.key === "ArrowDown"
+            ? 1
+            : event.key === "ArrowLeft" || event.key === "ArrowUp"
+              ? -1
+              : 0;
+        if (!step) return;
+        event.preventDefault();
+        const index = (COVER_POSITIONS.indexOf(this.position) + step + COVER_POSITIONS.length) % COVER_POSITIONS.length;
+        this.setPosition(COVER_POSITIONS[index]);
+        paint();
+        choices[index].focus();
+      });
+      choices.push(choice);
+    }
+    paint();
+  }
+  /** Moves the picture on the dialog card; moving it beside the text with a picture over half the width makes it 45%. */
+  private setPosition(position: CoverPosition): void {
+    if (position === this.position) return;
+    // Only a move from top or bottom to a side shrinks the picture; left to right keeps the size the user chose there.
+    const toSide = isSide(position) && !isSide(this.position);
+    this.position = position;
+    if (toSide && this.size > SIDE_SIZE_LIMIT) {
+      this.size = SIDE_SIZE;
+      if (this.sizeSlider) {
+        this.sizeSlider.value = String(Math.round(SIDE_SIZE * 100));
+        this.sizeSlider.setAttr("aria-valuetext", `${Math.round(SIDE_SIZE * 100)}%`);
+      }
+    }
+    if (this.cardEl && this.coverEl) arrangeCover(this.cardEl, this.coverEl, position);
+    this.setDraft(this.draft);
   }
   /** Replaces the card's cover (or adds one before the title) with the editable cover: picture, window, mask box, handles. */
   private buildCover(card: HTMLElement): HTMLElement {
@@ -264,7 +356,7 @@ export class CoverFrameModal extends Modal {
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size });
+      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size, position: this.position });
     } finally {
       this.close();
     }
@@ -282,7 +374,7 @@ export class CoverFrameModal extends Modal {
     );
     const cover = this.coverEl;
     const box = this.boxEl;
-    if (cover) sizeCoverBox(cover, this.size);
+    if (cover) sizeCoverBox(cover, this.size, isSide(this.position));
     if (!cover || !box || !this.windowEl || !this.imgEl || !this.ghostEl || !this.shape) return;
     // The map's own placement, so the dialog card is the map card.
     const win = placeCoverFrame({ frame: cover, window: this.windowEl, img: this.imgEl }, this.shape, frame);

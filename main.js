@@ -56702,12 +56702,6 @@ ${request.requirements}` : preset.text,
       (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.text_node_added"));
     });
   }
-  /**
-   * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
-   * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
-   * The layer comes after the image layer, so Tab reaches the frames last, and is painted behind the images (CSS z-index).
-   * The label is text only. Only the label chip takes the pointer; the frame area stays click-through.
-   */
   /** Rects of the drawn cards that are not in `members`: a frame keeps its padding off them (ticket 31). */
   otherCardRects(members) {
     const own2 = new Set(members);
@@ -56719,6 +56713,12 @@ ${request.requirements}` : preset.text,
     }
     return rects;
   }
+  /**
+   * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
+   * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
+   * The layer comes after the image layer, so Tab reaches the frames last, and is painted behind the images (CSS z-index).
+   * The label is text only. Only the label chip takes the pointer; the frame area stays click-through.
+   */
   renderBoundaries(stage, items, editable) {
     var _a2;
     const boundaries = items.filter((item) => item.kind === "boundary");

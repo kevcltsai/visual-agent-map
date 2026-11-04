@@ -297,6 +297,22 @@ integrationTest('hypothesis-evidence: merging two facts that are evidence for th
   await h.view.travel(true);
   assert.deepEqual(await h.relations(), [heRel('supports', merged, h.ids.hyp), heRel('supports', merged, h.ids.hyp2)], 'redo merges again');
 });
+integrationTest('relation references 02: a merge that moves relations onto the merged topic rewrites the other end notes; undo puts the old lines back', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('verifies', h.ids.x, h.ids.f2)]);
+  const linkOf = path => `[[${path.replace(/\.md$/, '')}]]`;
+  const hypLines = () => h.contents.get(h.notes.hyp.path).split('\n').filter(line => line.startsWith('- 被支持：') || line.startsWith('- Supported by: '));
+  const label = hypLines()[0].startsWith('- 被支持') ? '- 被支持：' : '- Supported by: ';
+  assert.deepEqual(hypLines(), [`${label}${linkOf(h.notes.f1.path)}`]);
+  await h.mergeKeys(['f1', 'f2']);
+  const mergedId = await h.mergedId();
+  const merged = (await h.saved()).nodes.find(n => n.id === mergedId);
+  assert.deepEqual(hypLines(), [`${label}${linkOf(merged.path)}`], 'the hypothesis now lists the merged topic');
+  assert.match(h.contents.get(merged.path), /^- (?:支持：|Supports: )\[\[/m, 'the merged topic lists both relations');
+  assert.match(h.contents.get(merged.path), /^- (?:被驗證：|Verified by: )\[\[/m);
+  await h.view.travel(false);
+  assert.deepEqual(hypLines(), [`${label}${linkOf(h.notes.f1.path)}`], 'undo');
+});
 integrationTest('hypothesis-evidence: merging two topics that each hold a relation to the same topic keeps the first whatever the kind or direction; undo restores both (decision #37)', async () => {
   const h = await heHarness();
   await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('contradicts', h.ids.hyp, h.ids.f2), heRel('related', h.ids.f1, h.ids.x), heRel('verifies', h.ids.x, h.ids.f2)]);

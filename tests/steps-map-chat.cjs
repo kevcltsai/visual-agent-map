@@ -110,7 +110,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 20);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 21);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -399,8 +399,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 11 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 12);
+test('C1: the style is not part of the action schema, and the step version is 13 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 13);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -473,7 +473,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-5)), ['focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-6)), ['focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -521,11 +521,11 @@ test('B1 view operations: collapse_topic, expand_topic and focus_topic need a ca
   const bad = parse(reply(item('collapse_topic'), item('focus_topic', { nodeId: 'ghost' })));
   assert.deepEqual(bad.rejected.map(entry => entry.code), ['missing_field', 'unknown_node']);
 });
-test('B1 schema: ref is a required string property and the kinds list ends with the view operations, then the topic type actions (chat 03), then the relation actions (chat 06)', () => {
+test('B1 schema: ref is a required string property and the kinds list ends with the view operations, then the topic type actions (chat 03), then the relation actions (chat 06), then the appearance action (chat 08)', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
@@ -1216,4 +1216,70 @@ test('chat 07: the schema has beforeId as a required string, and both prompts ex
   assert.match(zh, /beforeId（選填：已經是 newParentId 子議題的一張議題/);
   assert.match(zh, /大綱依樹狀順序列出議題/);
   for (const text of [en, zh]) assert.ok(text.includes('"newParentId":"","beforeId":""'));
+});
+
+// ---- AI chat sets the appearance (chat 08) ----------------------------------------------------------------------------
+const look = (nodeIds, fields = {}) => item('set_appearance', { nodeIds, color: '', markers: [], removeMarkers: [], formats: [], removeFormats: [], ...fields });
+test('chat 08: set_appearance keeps its cards and only the changes it names; a new card can be named by its ref', () => {
+  const got = parse(reply(
+    look(['a', 'b'], { color: 'red', markers: ['flag-red', 'priority-1'], formats: ['bold', 'text-large'] }),
+    look(['a1'], { color: 'none', removeMarkers: ['all'], removeFormats: ['border-thick'] }),
+    child('n1', 'a'),
+    look(['new:n1'], { markers: ['star'] })
+  ));
+  assert.deepEqual(got.actions, [
+    { kind: 'set_appearance', nodeIds: ['a', 'b'], color: 'red', markers: ['flag-red', 'priority-1'], formats: ['bold', 'text-large'] },
+    { kind: 'set_appearance', nodeIds: ['a1'], color: 'none', removeMarkers: ['all'], removeFormats: ['border-thick'] },
+    { kind: 'add_child', parentId: 'a', title: 'n1', summary: '', ref: 'n1' },
+    { kind: 'set_appearance', nodeIds: ['new:n1'], markers: ['star'] }
+  ]);
+  assert.deepEqual(got.rejected, []);
+});
+test('chat 08: an unknown colour, marker or format, two values of one single-choice group, both text sizes, a value both on and off, nothing to change or no cards drops it', () => {
+  const got = parse(reply(
+    look(['a'], { color: 'pink' }),
+    look(['a'], { markers: ['flag-purple'] }),
+    look(['a'], { formats: ['italic'] }),
+    look(['a'], { removeMarkers: ['everything'] }),
+    look(['a'], { markers: ['priority-1', 'priority-2'] }),
+    look(['a'], { markers: ['progress-0', 'progress-50'] }),
+    look(['a'], { formats: ['text-small', 'text-large'] }),
+    look(['a'], { markers: ['star'], removeMarkers: ['star'] }),
+    look(['a']),
+    look([], { color: 'red' }),
+    look(['ghost'], { color: 'red' }),
+    look(['a'], { markers: 'star' })
+  ));
+  assert.deepEqual(got.actions, []);
+  assert.deepEqual(codes(got), ['0:bad_value', '1:bad_value', '2:bad_value', '3:bad_value', '4:bad_value', '5:bad_value', '6:bad_value', '7:bad_value', '8:missing_field', '9:missing_field', '10:unknown_node', '11:bad_value']);
+  // Several values of a group that holds several (flags, status, faces) are fine.
+  assert.deepEqual(parse(reply(look(['a'], { markers: ['flag-red', 'flag-blue', 'done', 'star'] }))).rejected, []);
+});
+test('chat 08: on an AIM map set_appearance is dropped and counted', () => {
+  const got = parse(reply(look(['a'], { color: 'red' })), context({ aim: true }));
+  assert.deepEqual(got.actions, []); assert.deepEqual(codes(got), ['0:no_appearance']);
+});
+test('chat 08: the context sends each card\'s appearance and leaves out the default; nothing on AIM', () => {
+  const dressed = [
+    { ...outline[0] },
+    { ...outline[1], color: 'red', markers: ['flag-red', 'priority-2'], styles: ['bold'] },
+    { ...outline[2], color: undefined, markers: [], styles: [] },
+    { ...outline[3] }
+  ];
+  const data = JSON.parse(context({ outline: dressed }).json);
+  assert.deepEqual(data.outline[1], { id: 'a', title: 'A', summary: 'A summary', parentId: 'r', depth: 1, color: 'red', markers: ['flag-red', 'priority-2'], formats: ['bold'] });
+  for (const index of [0, 2, 3]) for (const key of ['color', 'markers', 'formats']) assert.equal(key in data.outline[index], false, `${index} ${key}`);
+  const aim = JSON.parse(context({ outline: dressed, aim: true }).json);
+  assert.equal(aim.outline.some(node => 'color' in node || 'markers' in node || 'formats' in node), false);
+});
+test('chat 08: the schema lists the colours, markers and formats as enums, and both prompts explain set_appearance', () => {
+  const items = MAP_CHAT_SCHEMA.properties.actions.items;
+  for (const key of ['color', 'markers', 'removeMarkers', 'formats', 'removeFormats']) assert.ok(items.required.includes(key), key);
+  assert.deepEqual(plain(items.properties.color.enum), ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'none', '']);
+  assert.ok(items.properties.removeMarkers.items.enum.includes('all'));
+  assert.deepEqual(plain(items.properties.formats.items.enum), ['bold', 'text-small', 'text-large', 'border-thick', 'line-thick']);
+  const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
+  const en = render('en'), zh = render('zh-TW');
+  assert.match(en, /- set_appearance: nodeIds/); assert.match(en, /Priority and progress hold one value each/); assert.match(en, /do not send set_appearance/);
+  assert.match(zh, /- set_appearance：nodeIds/); assert.match(zh, /優先度與進度各只能有一個值/); assert.match(zh, /不要送 set_appearance/);
 });

@@ -28,6 +28,11 @@ export interface TransactionDeps {
     | "file"
   >;
   rebuildDerivedData: () => Promise<void>;
+  /**
+   * Rewrites the derived references of just these notes (the ends of relations this step changed), when no full
+   * rebuild runs. A note whose derived text is already current is not written.
+   */
+  refreshNotes?: (paths: string[]) => Promise<void>;
   /** Called once per edited map after commit, undo and redo, with the map as now stored. */
   onApplied: (mapPath: string, map: MapDocument) => void | Promise<void>;
   /** Called for each edited map before anything is written; throwing cancels the whole transaction. */
@@ -141,6 +146,35 @@ const structure = (map: MapDocument): string =>
 const written = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
 const ownership = (map: MapDocument): string =>
   JSON.stringify(map.nodes.map(node => [node.id, node.path, node.parentId]));
+/** Per topic id, the relation ends its note lists, in map order (kind, direction, other end); descriptions do not count. */
+const relationEnds = (map: MapDocument): Map<string, string[]> => {
+  const ends = new Map<string, string[]>();
+  const add = (id: string, end: string): void => {
+    ends.set(id, [...(ends.get(id) ?? []), end]);
+  };
+  for (const r of map.topicRelations ?? []) {
+    add(r.from, `${r.kind}>${r.to}`);
+    add(r.to, `${r.kind}<${r.from}`);
+  }
+  return ends;
+};
+/**
+ * The notes whose relation lines differ between `before` and `after`: both ends of every relation added, removed,
+ * reversed or changed in kind. Only a description change gives none.
+ */
+export function relationNotePaths(before: MapDocument, after: MapDocument): string[] {
+  const was = relationEnds(before),
+    now = relationEnds(after),
+    paths = new Set<string>();
+  for (const id of new Set([...was.keys(), ...now.keys()])) {
+    if (JSON.stringify(was.get(id) ?? []) === JSON.stringify(now.get(id) ?? [])) continue;
+    for (const map of [before, after]) {
+      const node = map.nodes.find(item => item.id === id);
+      if (node) paths.add(node.path);
+    }
+  }
+  return [...paths];
+}
 const baseNameOf = (path: string): string => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 const tagged = (error: Error, kind: TransactionErrorKind): TransactionError => Object.assign(error, { kind });
 
@@ -199,7 +233,8 @@ export function begin(deps: TransactionDeps): Transaction {
     files: FileStep[],
     maps: Array<{ mapPath: string; write: MapDocument; restore: MapDocument; preserveViewport: boolean }>,
     rebuild: boolean,
-    notes: { before: NoteStep[]; after: NoteStep[] } = { before: [], after: [] }
+    notes: { before: NoteStep[]; after: NoteStep[] } = { before: [], after: [] },
+    refresh: string[] = []
   ): Promise<void> {
     const journal: Journal = { files: [], maps: [], notes: [] };
     const rewrite = async (step: NoteStep): Promise<void> => {
@@ -231,14 +266,20 @@ export function begin(deps: TransactionDeps): Transaction {
         entry.written = true;
         await repo.saveMap(item.mapPath, next);
       }
-      if (rebuild) await deps.rebuildDerivedData();
+      await derive(rebuild, refresh);
       for (const item of maps) await deps.onApplied(item.mapPath, clone(item.write));
     } catch (error) {
-      await revert(journal, rebuild, error);
+      await revert(journal, rebuild, error, refresh);
     }
   }
 
-  async function revert(journal: Journal, rebuild: boolean, error: unknown): Promise<never> {
+  /** The full rebuild when the step needs one, else a refresh of just the notes whose relation lines changed. */
+  async function derive(rebuild: boolean, refresh: string[]): Promise<void> {
+    if (rebuild) await deps.rebuildDerivedData();
+    else if (refresh.length && deps.refreshNotes) await deps.refreshNotes(refresh);
+  }
+
+  async function revert(journal: Journal, rebuild: boolean, error: unknown, refresh: string[] = []): Promise<never> {
     const problems: unknown[] = [];
     for (const item of [...journal.maps].reverse()) {
       if (!item.written) continue;
@@ -285,6 +326,12 @@ export function begin(deps: TransactionDeps): Transaction {
     if (rebuild && (journal.files.length > 0 || journal.maps.length > 0)) {
       try {
         await deps.rebuildDerivedData();
+      } catch (problem) {
+        problems.push(problem);
+      }
+    } else if (refresh.length && journal.maps.some(item => item.written)) {
+      try {
+        await derive(false, refresh);
       } catch (problem) {
         problems.push(problem);
       }
@@ -365,6 +412,8 @@ export function begin(deps: TransactionDeps): Transaction {
       // Redo links the same files again; it never recreates one.
       if (direction === "redo") for (const item of attachments) if (!exists(item.path)) fail();
     };
+    // The same notes both ways: undo and redo swap before and after.
+    const refresh = [...new Set(records.flatMap(record => relationNotePaths(record.before, record.after)))];
     const apply = async (direction: "undo" | "redo"): Promise<void> => {
       if (direction === "undo") choosePark();
       await guarded(direction);
@@ -389,7 +438,7 @@ export function begin(deps: TransactionDeps): Transaction {
           notes.after.push({ path: note.path, restore, apply: () => writeText(repo, note.path, note.beforeText) });
         else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
       }
-      await run(files, maps, rebuild, notes);
+      await run(files, maps, rebuild, notes, refresh);
     };
     return {
       undo: () => apply("undo"),
@@ -488,6 +537,8 @@ export function begin(deps: TransactionDeps): Transaction {
       const journal: Journal = { files: [], maps: [], notes: [], attachments: placed };
       let rebuildNeeded = ops.length > 0;
       const records: MapRecord[] = [];
+      // Ends of relations this step changed; refreshed even when the caller defers the full rebuild.
+      const refresh: string[] = [];
       // Marks the files this step creates until commit settles, so a parallel step does not reuse one it may trash.
       const owner = {};
       try {
@@ -531,14 +582,15 @@ export function begin(deps: TransactionDeps): Transaction {
           const after = clone(before);
           for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
           records.push({ mapPath, before, after });
+          for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
           if (ownership(before) !== ownership(after)) rebuildNeeded = true;
           journal.maps.push({ mapPath, restore: before, written: true });
           await repo.saveMap(mapPath, after);
         }
-        if (rebuildRequested && rebuildNeeded) await deps.rebuildDerivedData();
+        await derive(rebuildRequested && rebuildNeeded, refresh);
         for (const record of records) await deps.onApplied(record.mapPath, clone(record.after));
       } catch (error) {
-        return revert(journal, rebuildRequested && rebuildNeeded, error).finally(() => release(owner));
+        return revert(journal, rebuildRequested && rebuildNeeded, error, refresh).finally(() => release(owner));
       }
       release(owner);
       return entryFor(ops, records, rebuildNeeded, options.label, noteRecords, placed);

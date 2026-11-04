@@ -5108,6 +5108,24 @@ integrationTest('chat 06: remove_relation removes that one relation; reversing i
   assert.equal(lines[0].text, 'Done: Remove the relation between “Mind” and “REM”');
   eq(await diskRelations(h), [{ kind: 'related', from: h.ids.a, to: h.ids.b }, { kind: 'supports', from: h.ids.b, to: h.ids.c }]);
 });
+integrationTest('relation references 02: an AI chat add or remove rewrites both end notes at once (only those); undo of the reply puts the lines back', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const scopes = [];
+  h.plugin.rebuildDerivedData = scope => { scopes.push(scope); return h.repo.rebuildDerivedData(scope ? { roots: [], paths: scope } : undefined); };
+  const pathOf = key => h.view.map.nodes.find(n => n.id === h.ids[key]).path;
+  const link = key => `[[${pathOf(key).replace(/\.md$/, '')}]]`;
+  const lines = key => h.contents.get(pathOf(key)).split('\n').filter(line => /^- (Supports|Supported by|Related):/.test(line));
+  const untouched = h.contents.get(pathOf('root'));
+  eq((await apply(h, [addRel(h.ids.c, h.ids.b, 'supports', 'A reason')])).map(l => l.status), ['done']);
+  eq(lines('c'), [`- Supports: ${link('b')}`]); eq(lines('b'), [`- Supported by: ${link('c')}`]);
+  eq(scopes.map(scope => [...scope].sort()), [[pathOf('b'), pathOf('c')].sort()], 'one refresh, limited to the two ends');
+  assert.equal(h.contents.get(pathOf('root')), untouched, 'another note is not written');
+  assert.doesNotMatch(h.contents.get(pathOf('c')), /A reason/, 'the description is not written');
+  eq((await apply(h, [{ kind: 'remove_relation', fromId: h.ids.b, toId: h.ids.c }])).map(l => l.status), ['done']);
+  eq(lines('c'), []); eq(lines('b'), []);
+  await h.view.travel(false);
+  eq(lines('c'), [`- Supports: ${link('b')}`], 'undoing the removal brings the lines back');
+});
 integrationTest('chat 06: a relation the map no longer allows (duplicate pair, cycle, self) or a pair with none is skipped and writes nothing', async () => {
   const h = await harness(); await h.view.hydrate();
   await linkOnDisk(h, [{ kind: 'prerequisite', from: h.ids.a, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.b, to: h.ids.c }]);
@@ -5222,4 +5240,88 @@ integrationTest('chat 07: in a timeline map a first-level topic is reordered alo
   eq(xs, ['Body', 'Dusk', 'Mind', 'Dawn', 'Noon'], 'left to right on the axis');
   await h.view.travel(false);
   assert.equal(h.contents.get(MAP), before);
+});
+
+// ---- chat 08: the AI chat sets the appearance ------------------------------------------------------------------------------
+const lookAct = (nodeIds, fields = {}) => ({ kind: 'set_appearance', nodeIds, ...fields });
+const looksOf = async (h, key) => { const note = await h.note(key); return { color: note.color ?? null, markers: note.markers ?? [], style: note.style ?? [] }; };
+integrationTest('chat 08: set_appearance sets colour, markers and styles on every card it names, with the panel\'s writes; the note text stays', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const before = { a: h.contents.get(h.node('a').path), b: h.contents.get(h.node('b').path) };
+  const lines = await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red', markers: ['flag-red', 'priority-2'], formats: ['bold', 'text-large'] })]);
+  eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Done: Set the appearance of 2 topics');
+  for (const key of ['a', 'b']) {
+    eq(await looksOf(h, key), { color: 'red', markers: ['priority-2', 'flag-red'], style: ['bold', 'text-large'] });
+    assert.equal(body(h.contents.get(h.node(key).path)), body(before[key]), 'the note body is not rewritten');
+  }
+  eq(await looksOf(h, 'c'), { color: null, markers: [], style: [] }, 'other cards are untouched');
+});
+integrationTest('chat 08: a single-choice marker group keeps one value and the text size one choice, as in the panel', async () => {
+  const h = await harness();
+  const path = h.node('a').path;
+  await h.repo.writeTopicMarkers(path, 'priority-1'); await h.repo.writeTopicMarkers(path, 'progress-25'); await h.repo.writeTopicStyle(path, { set: ['text-small'] }); await h.view.hydrate();
+  await apply(h, [lookAct([h.ids.a], { markers: ['priority-4', 'progress-100'], formats: ['text-large'] })]);
+  eq(await looksOf(h, 'a'), { color: null, markers: ['priority-4', 'progress-100'], style: ['text-large'] });
+});
+integrationTest('chat 08: set_appearance clears a colour, every marker and every style; unknown frontmatter values stay', async () => {
+  const h = await harness(); const path = h.node('a').path;
+  await h.repo.writeTopicColor(path, 'blue'); await h.repo.writeTopicMarkers(path, 'star'); await h.repo.writeTopicStyle(path, { set: ['bold', 'border-thick'] });
+  await h.app.vault.process(h.app.vault.getAbstractFileByPath(path), text => text.replace('topic-style:\n', 'topic-style:\n  - "glow"\n'));
+  await h.view.hydrate();
+  await apply(h, [lookAct([h.ids.a], { color: 'none', removeMarkers: ['all'], removeFormats: ['all'] })]);
+  eq(await looksOf(h, 'a'), { color: null, markers: [], style: [] });
+  const text = h.contents.get(path);
+  assert.equal(/topic-color|topic-markers/.test(text), false, 'emptied keys are removed'); assert.match(text, /"glow"/, 'an unknown style value is kept');
+});
+integrationTest('chat 08: a card that already looks like that is not written, and the reply has nothing to undo', async () => {
+  const h = await harness(); await h.repo.writeTopicColor(h.node('a').path, 'red'); await h.view.hydrate(); const before = h.contents.get(h.node('a').path);
+  eq((await apply(h, [lookAct([h.ids.a], { color: 'red' })])).map(l => l.status), ['done']);
+  assert.equal(h.contents.get(h.node('a').path), before);
+  assert.equal(h.view.history.canUndo, false, 'nothing to undo');
+});
+integrationTest('chat 08: on an AIM map set_appearance writes nothing and is skipped', async () => {
+  const h = await harness({ aim: true }); const before = h.contents.get(h.node('a').path);
+  eq((await apply(h, [lookAct([h.ids.a], { color: 'red' })])).map(l => l.status), ['skipped']);
+  assert.equal(h.contents.get(h.node('a').path), before);
+});
+integrationTest('chat 08: a real send carries each card\'s appearance (default left out); an unknown value is counted as skipped and writes nothing', async () => {
+  const h = await harness(); const path = h.node('a').path;
+  await h.repo.writeTopicColor(path, 'green'); await h.repo.writeTopicMarkers(path, 'flag-blue'); await h.repo.writeTopicStyle(path, { set: ['bold'] }); await h.view.hydrate();
+  const before = h.contents.get(h.node('b').path);
+  h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'set_appearance', nodeIds: [h.ids.b], color: 'pink' }] }), request.context);
+  h.open(); h.type('make it pink'); await h.view.sendMapChat();
+  await until(() => !h.view.chat.isBusy);
+  const outline = JSON.parse(h.control.requests[0].context.json).outline;
+  const card = id => outline.find(n => n.id === id);
+  assert.equal(card(h.ids.a).color, 'green'); eq(card(h.ids.a).markers, ['flag-blue']); eq(card(h.ids.a).formats, ['bold']);
+  assert.equal(['color', 'markers', 'formats'].some(key => key in card(h.ids.b)), false);
+  assert.equal(h.contents.get(h.node('b').path), before);
+  assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
+});
+integrationTest('chat 08: an AIM send carries no appearance and counts set_appearance as skipped', async () => {
+  const h = await harness({ aim: true }); await h.repo.writeTopicColor(h.node('a').path, 'green'); await h.view.hydrate();
+  const before = h.contents.get(h.node('a').path);
+  h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'set_appearance', nodeIds: [h.ids.a], color: 'red' }] }), request.context);
+  h.open(); h.type('make it red'); await h.view.sendMapChat();
+  await until(() => !h.view.chat.isBusy);
+  assert.equal(JSON.parse(h.control.requests[0].context.json).outline.some(n => 'color' in n), false);
+  assert.equal(h.contents.get(h.node('a').path), before);
+  assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
+});
+integrationTest('chat 08: Undo takes back every appearance change of one reply in one step, with its other writes; Redo puts them back', async () => {
+  const h = await harness(); await h.repo.writeTopicMarkers(h.node('b').path, 'priority-1'); await h.view.hydrate();
+  const state = async () => JSON.stringify([await Promise.all(['a', 'b', 'c'].map(key => looksOf(h, key))), (await h.note('c')).title]);
+  const before = await state();
+  await apply(h, [
+    lookAct([h.ids.a, h.ids.c], { color: 'purple', markers: ['star'], formats: ['line-thick'] }),
+    lookAct([h.ids.b], { markers: ['priority-5'], removeFormats: ['all'] }),
+    { kind: 'rename_topic', nodeId: h.ids.c, title: 'Dream sleep' }
+  ]);
+  const after = await state(); assert.notEqual(after, before);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.equal(await state(), before, 'every change is taken back');
+  assert.equal(h.view.history.canUndo, false, 'one step');
+  await h.view.travel(true);
+  assert.equal(await state(), after);
 });

@@ -197,6 +197,24 @@ test('P4 paste: a copy keeps the relations between copied topics', async () => {
   assert.equal(h.map().topicRelations.length, 2);
 });
 
+test('relation references 02: a pasted branch that carries a relation writes the relation lines into both copied notes', async () => {
+  const h = await harness();
+  const doc = h.map();
+  doc.topicRelations = [{ kind: 'supports', from: h.ids.branch, to: h.ids.kid }];
+  await h.repo.saveMap(MAP, doc);
+  copyOf(h, ['branch', 'kid']);
+  const raw = h.lastRaw;
+  h.view.selection.setSelected(h.ids.other); h.view.selection.replaceMulti([]);
+  pasteOf(h, { [MIME]: raw });
+  await until(() => h.map().nodes.length === 7); await tick(); await tick();
+  const fresh = h.map().nodes.filter(n => !Object.values(h.ids).includes(n.id));
+  const link = h.map().topicRelations.find(r => fresh.some(n => n.id === r.from));
+  const pathOf = id => h.map().nodes.find(n => n.id === id).path;
+  await until(() => /Supports: /.test(h.contents.get(pathOf(link.from)) ?? ''));
+  assert.ok(h.contents.get(pathOf(link.from)).includes(`\n- Supports: [[${pathOf(link.to).replace(/\.md$/, '')}]]\n`), 'the copy that supports lists the other copy');
+  assert.match(h.contents.get(pathOf(link.to)), /^- Supported by: \[\[/m);
+});
+
 test('P4 paste: the source is copied only when the string is byte for byte what the plugin wrote (D2)', async () => {
   const h = await harness();
   const leafPath = h.map().nodes.find(n => n.id === h.ids.leaf).path;

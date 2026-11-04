@@ -11,6 +11,8 @@ import {
   type TopicRelation,
   type TopicRelationKind
 } from "../../../map-model";
+import { TOPIC_COLORS, TOPIC_STYLES, type TopicColor, type TopicStyle } from "../../../topic-colors";
+import { TOPIC_MARKERS, TOPIC_MARKER_GROUPS, type TopicMarker } from "../../../topic-markers";
 import { HYPOTHESIS_STRENGTHS, TOPIC_KINDS, type HypothesisStrength, type TopicKind } from "../../../note-values";
 import languageEn from "./language.en.md";
 import languageZh from "./language.zh.md";
@@ -39,7 +41,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "set_topic_kind",
   "ask_topic_kind",
   "add_relation",
-  "remove_relation"
+  "remove_relation",
+  "set_appearance"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -137,7 +140,21 @@ export type MapChatAction =
       description?: string;
     }
   /** Removes the one relation between two cards (a pair holds at most one, of any kind and in either direction). */
-  | { kind: "remove_relation"; fromId: string; toId: string };
+  | { kind: "remove_relation"; fromId: string; toId: string }
+  /**
+   * Sets or clears the appearance of one or more cards, with the same rules as the topic panel. `color` absent keeps the
+   * colour, "none" clears it. `markers` / `formats` (card styles) are turned on, `removeMarkers` / `removeFormats` off ("all" = every one).
+   * A single-choice marker group (priority, progress) and the text size keep one value. Absent lists change nothing.
+   */
+  | {
+      kind: "set_appearance";
+      nodeIds: string[];
+      color?: TopicColor | "none";
+      markers?: TopicMarker[];
+      removeMarkers?: (TopicMarker | "all")[];
+      formats?: TopicStyle[];
+      removeFormats?: (TopicStyle | "all")[];
+    };
 
 export type MapChatRejectCode =
   | "bad_item"
@@ -158,7 +175,9 @@ export type MapChatRejectCode =
   /** A remove_relation for two cards that hold no relation. */
   | "unknown_relation"
   /** A move_topic whose `beforeId` is not a child of the target parent (at that point of the reply). */
-  | "not_sibling";
+  | "not_sibling"
+  /** An appearance change on a map whose cards have none to edit (AIM). */
+  | "no_appearance";
 export interface MapChatRejection {
   index: number;
   code: MapChatRejectCode;
@@ -228,7 +247,12 @@ export const MAP_CHAT_SCHEMA = {
           fromId: STRING,
           toId: STRING,
           relationKind: { type: "string", enum: [...TOPIC_RELATION_KINDS, ""] },
-          description: STRING
+          description: STRING,
+          color: { type: "string", enum: [...TOPIC_COLORS, "none", ""] },
+          markers: { type: "array", items: { type: "string", enum: [...TOPIC_MARKERS] } },
+          removeMarkers: { type: "array", items: { type: "string", enum: [...TOPIC_MARKERS, "all"] } },
+          formats: { type: "array", items: { type: "string", enum: [...TOPIC_STYLES] } },
+          removeFormats: { type: "array", items: { type: "string", enum: [...TOPIC_STYLES, "all"] } }
         },
         required: [
           "kind",
@@ -258,7 +282,12 @@ export const MAP_CHAT_SCHEMA = {
           "fromId",
           "toId",
           "relationKind",
-          "description"
+          "description",
+          "color",
+          "markers",
+          "removeMarkers",
+          "formats",
+          "removeFormats"
         ]
       }
     }
@@ -531,6 +560,47 @@ export function parseMapChat(
           actions.push({ kind: "set_topic_kind", nodeIds, topicKind: typed, ...(power ? { strength: power } : {}) });
           break;
         }
+        case "set_appearance": {
+          const nodeIds = list("nodeIds");
+          if (!nodeIds.length) throw new Dropped("missing_field");
+          /** A list of known values; an unknown one drops the item. */
+          const values = <T extends string>(key: string, known: readonly string[]): T[] => {
+            const field = item[key];
+            if (field === undefined || field === null) return [];
+            if (!Array.isArray(field) || field.some(value => typeof value !== "string")) throw new Dropped("bad_value");
+            const given = [...new Set((field as string[]).map(value => value.trim()).filter(Boolean))];
+            if (given.some(value => !known.includes(value))) throw new Dropped("bad_value");
+            return given as T[];
+          };
+          const color = text("color", false);
+          if (color && color !== "none" && !(TOPIC_COLORS as readonly string[]).includes(color))
+            throw new Dropped("bad_value");
+          const markers = values<TopicMarker>("markers", TOPIC_MARKERS);
+          const removeMarkers = values<TopicMarker | "all">("removeMarkers", [...TOPIC_MARKERS, "all"]);
+          const formats = values<TopicStyle>("formats", TOPIC_STYLES);
+          const removeFormats = values<TopicStyle | "all">("removeFormats", [...TOPIC_STYLES, "all"]);
+          // One value per single-choice group and one text size, as the panel allows; a value both on and off is unclear.
+          if (
+            TOPIC_MARKER_GROUPS.some(group => group.single && markers.filter(id => group.ids.includes(id)).length > 1)
+          )
+            throw new Dropped("bad_value");
+          if (formats.includes("text-small") && formats.includes("text-large")) throw new Dropped("bad_value");
+          if (markers.some(id => removeMarkers.includes(id)) || formats.some(id => removeFormats.includes(id)))
+            throw new Dropped("bad_value");
+          if (!color && !markers.length && !removeMarkers.length && !formats.length && !removeFormats.length)
+            throw new Dropped("missing_field");
+          if (context.aim) throw new Dropped("no_appearance");
+          actions.push({
+            kind: "set_appearance",
+            nodeIds,
+            ...(color ? { color: color as TopicColor | "none" } : {}),
+            ...(markers.length ? { markers } : {}),
+            ...(removeMarkers.length ? { removeMarkers } : {}),
+            ...(formats.length ? { formats } : {}),
+            ...(removeFormats.length ? { removeFormats } : {})
+          });
+          break;
+        }
         case "add_relation": {
           const fromId = node("fromId", true),
             toId = node("toId", true);
@@ -568,7 +638,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 12,
+  version: 13,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

@@ -33,7 +33,8 @@
               "set_topic_kind",
               "ask_topic_kind",
               "add_relation",
-              "remove_relation"
+              "remove_relation",
+              "set_appearance"
             ]
           },
           "nodeId": {
@@ -157,6 +158,105 @@
           },
           "description": {
             "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "red",
+              "orange",
+              "yellow",
+              "green",
+              "blue",
+              "purple",
+              "none",
+              ""
+            ]
+          },
+          "markers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "done",
+                "warning",
+                "star",
+                "priority-1",
+                "priority-2",
+                "priority-3",
+                "priority-4",
+                "priority-5",
+                "progress-0",
+                "progress-25",
+                "progress-50",
+                "progress-75",
+                "progress-100",
+                "flag-red",
+                "flag-yellow",
+                "flag-green",
+                "flag-blue",
+                "smile",
+                "neutral",
+                "sad",
+                "question"
+              ]
+            }
+          },
+          "removeMarkers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "done",
+                "warning",
+                "star",
+                "priority-1",
+                "priority-2",
+                "priority-3",
+                "priority-4",
+                "priority-5",
+                "progress-0",
+                "progress-25",
+                "progress-50",
+                "progress-75",
+                "progress-100",
+                "flag-red",
+                "flag-yellow",
+                "flag-green",
+                "flag-blue",
+                "smile",
+                "neutral",
+                "sad",
+                "question",
+                "all"
+              ]
+            }
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bold",
+                "text-small",
+                "text-large",
+                "border-thick",
+                "line-thick"
+              ]
+            }
+          },
+          "removeFormats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bold",
+                "text-small",
+                "text-large",
+                "border-thick",
+                "line-thick",
+                "all"
+              ]
+            }
           }
         },
         "required": [
@@ -187,7 +287,12 @@
           "fromId",
           "toId",
           "relationKind",
-          "description"
+          "description",
+          "color",
+          "markers",
+          "removeMarkers",
+          "formats",
+          "removeFormats"
         ]
       }
     }

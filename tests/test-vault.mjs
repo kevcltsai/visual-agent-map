@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction } from '../scripts/test-harness.mjs';
+import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
 function environment(t) {
   const folder = mkdtempSync(join(tmpdir(), 'vam-harness-test-'));
@@ -286,4 +287,30 @@ test('focusAction with allow-focus does not reopen and keeps the recorded owner 
 
 test('focusAction does not reopen when no owner app was recorded', () => {
   assert.deepEqual(focusAction({ ...focusBase, ownerApp: null, frontPid: 99, frontPath: obsidianPath }), { ownerApp: null, reopen: false });
+});
+
+// Prevention (activation policy) decisions; the real macOS effect is checked by the UI sampling in the task handoff.
+const policyProfile = '/private/tmp/vam-e2e-x/.vam-app';
+
+test('policyAction prohibits activation for a harness profile and goes back to regular when allow-focus exists', () => {
+  assert.equal(policyAction({ appProfile: policyProfile, portFileExists: true, allowFocus: false }), 'prohibited');
+  assert.equal(policyAction({ appProfile: policyProfile, portFileExists: true, allowFocus: true }), 'regular');
+  assert.equal(policyAction({ appProfile: policyProfile, portFileExists: true, allowFocus: true, applied: 'regular' }), null);
+  assert.equal(policyAction({ appProfile: policyProfile, portFileExists: true, allowFocus: false, applied: 'regular' }), 'prohibited');
+});
+
+test('policyAction never targets a non-harness profile or an instance without a DevToolsActivePort', () => {
+  assert.equal(policyAction({ appProfile: policyProfile, portFileExists: false }), null);
+  assert.equal(policyAction({ appProfile: '/Users/someone/Library/Application Support/obsidian', portFileExists: true }), null);
+  assert.equal(policyAction({ appProfile: undefined, portFileExists: true }), null);
+});
+
+test('applyPolicy evaluates the requested policy and reports failure instead of throwing', async () => {
+  const calls = [];
+  const fake = { evaluate: async expression => { calls.push(expression); }, close: () => calls.push('close') };
+  assert.equal(await applyPolicy(policyProfile, 'prohibited', async vault => { calls.push(vault); return fake; }), true);
+  assert.deepEqual(calls, ['/private/tmp/vam-e2e-x', policyExpression('prohibited'), 'close']);
+  assert.equal(await applyPolicy(policyProfile, 'prohibited', async () => { throw new Error('no port'); }), false);
+  assert.equal(await applyPolicy(policyProfile, 'prohibited', async () => ({ evaluate: async () => { throw new Error('eval failed'); }, close() {} })), false);
+  assert.equal(await applyPolicy(policyProfile, 'prohibited', () => new Promise(() => {}), 50), false);
 });

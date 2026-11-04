@@ -29,7 +29,9 @@
               "collapse_topic",
               "expand_topic",
               "auto_layout",
-              "focus_topic"
+              "focus_topic",
+              "set_topic_kind",
+              "ask_topic_kind"
             ]
           },
           "nodeId": {
@@ -108,6 +110,27 @@
           },
           "otherProvider": {
             "type": "boolean"
+          },
+          "topicKind": {
+            "type": "string",
+            "enum": [
+              "topic",
+              "action",
+              "atomic",
+              "hypothesis",
+              "evidence",
+              "conclusion",
+              ""
+            ]
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "weak",
+              "medium",
+              "strong",
+              ""
+            ]
           }
         },
         "required": [
@@ -131,7 +154,9 @@
           "direction",
           "mode",
           "images",
-          "otherProvider"
+          "otherProvider",
+          "topicKind",
+          "strength"
         ]
       }
     }

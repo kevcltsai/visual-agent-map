@@ -16345,6 +16345,14 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_auto_layout");
       case "focus_topic":
         return t("ui.map_chat_do_focus_0", title(action.nodeId));
+      case "set_topic_kind": {
+        const kind = this.chatKindText(action.topicKind, action.strength);
+        return action.nodeIds.length === 1
+          ? t("ui.map_chat_do_set_kind_0_1", title(action.nodeIds[0]), kind)
+          : t("ui.map_chat_do_set_kind_many_0_1", action.nodeIds.length, kind);
+      }
+      case "ask_topic_kind":
+        return t("ui.map_chat_do_ask_kind_0", this.chatKindText(action.topicKind));
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
@@ -16385,6 +16393,62 @@ export class VisualAgentMapView extends ItemView {
   }
   private currentModelId(): string {
     return this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
+  }
+  /** "Hypothesis" or "Hypothesis (Strong)" in the language of the UI. */
+  private chatKindText(kind: TopicKind, strength?: HypothesisStrength): string {
+    const name = t(`ui.topic_kind_${kind}`);
+    return kind === "hypothesis" && strength
+      ? t("ui.map_chat_kind_with_strength_0_1", name, t(STRENGTH_LABEL[strength]))
+      : name;
+  }
+  /**
+   * An ask_topic_kind of a reply: the three ways to read it are offered under the answer and nothing happens until one is
+   * picked. "Only the type" applies a set_topic_kind; the other two send the user's choice to the chat as a new message, with
+   * the cards selected so their notes are in it.
+   */
+  private offerChatKindChoices(ids: string[], kind: TopicKind): void {
+    const chat = this.chat;
+    if (!chat || !ids.length) return;
+    const kindText = this.chatKindText(kind);
+    const titles = (): string =>
+      ids.map(id => `“${this.chatTopicState(id)?.title ?? id}”`).join(t("ui.map_chat_kind_choice_topics_separator"));
+    const follow = (key: TranslationKey): void => {
+      if (!this.chat || this.chat !== chat || chat.isBusy || this.chatApplying || this.closed) return;
+      const known = ids.filter(id => this.map?.nodes.some(node => node.id === id));
+      void this.sendMapChat({ text: t(key, titles(), kindText), chips: [], selectedIds: known });
+    };
+    chat.showChoices({
+      prompt: t("ui.map_chat_kind_choice_prompt_0", kindText),
+      options: [
+        { label: t("ui.map_chat_kind_choice_type_only"), pick: () => void this.chatPickKind(ids, kind) },
+        {
+          label: t("ui.map_chat_kind_choice_split"),
+          pick: () => follow("ui.map_chat_kind_choice_split_message_0_1")
+        },
+        {
+          label: t("ui.map_chat_kind_choice_rewrite"),
+          pick: () => follow("ui.map_chat_kind_choice_rewrite_message_0_1")
+        }
+      ],
+      picked: false
+    });
+  }
+  /** "Only the type" of an ask_topic_kind: one set_topic_kind, applied like any reply, its result lines added to the answer. */
+  private async chatPickKind(ids: string[], kind: TopicKind): Promise<void> {
+    const chat = this.chat;
+    if (!chat || this.closed || chat.isBusy || this.chatApplying || !this.map) return;
+    this.chatApplying = true;
+    try {
+      const lines = await this.applyMapChatActions(
+        { actions: [{ kind: "set_topic_kind", nodeIds: ids, topicKind: kind }], rejected: [] },
+        { mdHashes: {}, topicHashes: {} }
+      );
+      if (this.chat === chat) chat.appendLines(lines);
+    } catch (error) {
+      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage(error) }]);
+    } finally {
+      this.chatApplying = false;
+    }
   }
   /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
   private chatTargetModels(ids: string[]): string[] {
@@ -16522,7 +16586,12 @@ export class VisualAgentMapView extends ItemView {
       if (batched) this.holdChatBatch();
       run.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
-        if (action.kind === "select_topics" || action.kind === "run_map_action" || action.kind === "open_map") {
+        if (
+          action.kind === "select_topics" ||
+          action.kind === "run_map_action" ||
+          action.kind === "open_map" ||
+          action.kind === "ask_topic_kind"
+        ) {
           later.push(index);
           continue;
         }
@@ -16637,6 +16706,17 @@ export class VisualAgentMapView extends ItemView {
           if (action.kind === "open_map") {
             outcome = await this.chatOpenMap(action.title, anchor, same);
             if (outcome.status === "done") touched.add(anchor.path);
+          } else if (action.kind === "ask_topic_kind") {
+            // Cards this reply made are named by their real ids; one that was never made is left out.
+            const ids = action.nodeIds
+              .map(id => (id.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id))
+              .filter((id): id is string => !!id && !!this.map?.nodes.some(node => node.id === id));
+            if (!ids.length) outcome = skipped("ui.map_chat_skip_topic_gone");
+            else if (!this.relationsEnabled()) outcome = skipped("ui.map_chat_skip_unavailable");
+            else {
+              this.offerChatKindChoices(ids, action.topicKind);
+              outcome = { status: "done" };
+            }
           } else {
             const resolved = this.chatResolveTargets(
               action as Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
@@ -16807,7 +16887,10 @@ export class VisualAgentMapView extends ItemView {
   }
   /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
   private async applyChatWrite(
-    action: Exclude<MapChatAction, { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" }>,
+    action: Exclude<
+      MapChatAction,
+      { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" | "ask_topic_kind" }
+    >,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
     same: () => boolean,
     run: ChatRun = { refs: new Map(), created: [] }
@@ -16842,8 +16925,16 @@ export class VisualAgentMapView extends ItemView {
         run.created.push(created.id);
         if (action.ref) run.refs.set(action.ref, created.id);
         if (action.summary) await this.noteChange(created, { summary: action.summary });
+        // The type goes into the new note's frontmatter only (the parser already dropped it on an AIM map).
+        if (action.topicKind && action.topicKind !== "topic" && this.relationsEnabled()) {
+          await this.plugin.repo.writeTopicKind(created.path, action.topicKind);
+          if (action.topicKind === "hypothesis" && action.strength)
+            await this.plugin.repo.writeHypothesisStrength(created.path, action.strength);
+        }
         return done;
       }
+      case "set_topic_kind":
+        return this.chatSetTopicKind(action, real);
       case "collapse_topic":
       case "expand_topic": {
         this.flushChatRender();
@@ -16982,6 +17073,47 @@ export class VisualAgentMapView extends ItemView {
         return done;
       }
     }
+  }
+  /**
+   * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every
+   * target in one step. Only the note's frontmatter changes: never the title, the body, the id, the parent or a relation. A card
+   * of an AIM map (or an AIM card) has no type and is skipped; a card that already has the type and strength is left alone.
+   */
+  private async chatSetTopicKind(
+    action: Extract<MapChatAction, { kind: "set_topic_kind" }>,
+    real: (id: string) => string | null
+  ): Promise<ChatOutcome> {
+    if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const nodes = action.nodeIds
+      .map(id => real(id))
+      .map(id => (id ? this.map?.nodes.find(node => node.id === id) : undefined))
+      .filter((node): node is MapNode => !!node);
+    if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
+    const typed = nodes.filter(node => !node.aimKind);
+    if (!typed.length) return skipped("ui.map_chat_skip_unavailable");
+    if (typed.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    const kind = action.topicKind;
+    const transaction = this.beginMapTransaction();
+    let changes = 0;
+    for (const node of typed) {
+      const kindChanges = this.topicKindOf(node.id) !== kind;
+      const strength = kind === "hypothesis" ? action.strength : undefined;
+      const strengthChanges = !!strength && this.hypothesisStrengthOf(node.id) !== strength;
+      if (!kindChanges && !strengthChanges) continue;
+      changes++;
+      transaction.rewriteNote(node.path, async path => {
+        if (kindChanges) await this.plugin.repo.writeTopicKind(path, kind);
+        if (strength && strengthChanges) await this.plugin.repo.writeHypothesisStrength(path, strength);
+      });
+    }
+    if (!changes) return { status: "done" };
+    const viewport = clone(this.map.viewport);
+    await transaction
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_type") });
+    return { status: "done" };
   }
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);

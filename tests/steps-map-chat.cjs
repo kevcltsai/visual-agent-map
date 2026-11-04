@@ -110,7 +110,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 16);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 18);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -399,8 +399,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 8 (the prompt lost the detailed and redo texts, gained the no-count rule and the topic-type and relation text; D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 8);
+test('C1: the style is not part of the action schema, and the step version is 9 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text; D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 9);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -473,7 +473,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.equal(MAP_CHAT_ACTION_KINDS.at(-1), 'focus_topic');
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-3)), ['focus_topic', 'set_topic_kind', 'ask_topic_kind']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -521,11 +521,11 @@ test('B1 view operations: collapse_topic, expand_topic and focus_topic need a ca
   const bad = parse(reply(item('collapse_topic'), item('focus_topic', { nodeId: 'ghost' })));
   assert.deepEqual(bad.rejected.map(entry => entry.code), ['missing_field', 'unknown_node']);
 });
-test('B1 schema: ref is a required string property and the kinds list ends with the view operations', () => {
+test('B1 schema: ref is a required string property and the kinds list ends with the view operations, then the topic type actions (chat 03)', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
@@ -987,4 +987,75 @@ test('chat 02: both prompts explain the six types and six relations, the one-ste
   assert.match(en, /go one step only/); assert.match(en, /everything related/); assert.match(en, /say so in "reply" and leave it in place/);
   for (const word of ['一般議題', '原子知識', '假設', '證據', '結論', '行動', '支持', '反駁', '驗證', '衍生自', '相關', '先備']) assert.ok(zh.includes(word), word);
   assert.match(zh, /只走一層/); assert.match(zh, /全部相關的/); assert.match(zh, /只在 "reply" 提出/);
+});
+
+// ---- AI chat changes topic types (chat 03) ----------------------------------------------------------------------------
+test('chat 03: set_topic_kind keeps its cards, type and a hypothesis strength; a strength next to another type is dropped', () => {
+  const got = parse(reply(
+    item('set_topic_kind', { nodeIds: ['a', ' b '], topicKind: 'hypothesis', strength: 'strong' }),
+    item('set_topic_kind', { nodeIds: ['a1'], topicKind: 'evidence', strength: 'strong' }),
+    item('set_topic_kind', { nodeIds: ['r'], topicKind: 'topic' })
+  ));
+  assert.deepEqual(got.actions, [
+    { kind: 'set_topic_kind', nodeIds: ['a', 'b'], topicKind: 'hypothesis', strength: 'strong' },
+    { kind: 'set_topic_kind', nodeIds: ['a1'], topicKind: 'evidence' },
+    { kind: 'set_topic_kind', nodeIds: ['r'], topicKind: 'topic' }
+  ]);
+  assert.deepEqual(got.rejected, []);
+});
+test('chat 03: set_topic_kind without a type or cards, with an unknown type or strength, or with an unknown card is dropped', () => {
+  const got = parse(reply(
+    item('set_topic_kind', { nodeIds: ['a'] }),
+    item('set_topic_kind', { nodeIds: [], topicKind: 'evidence' }),
+    item('set_topic_kind', { nodeIds: ['a'], topicKind: 'Hypothesis' }),
+    item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'huge' }),
+    item('set_topic_kind', { nodeIds: ['zz'], topicKind: 'evidence' }),
+    item('ask_topic_kind', { nodeIds: ['a'] })
+  ));
+  assert.deepEqual(got.actions, []);
+  assert.deepEqual(codes(got), ['0:missing_field', '1:missing_field', '2:bad_value', '3:bad_value', '4:unknown_node', '5:missing_field']);
+});
+test('chat 03: add_child carries a type and strength; an ordinary topic carries none; a new card can be typed by its ref', () => {
+  const got = parse(reply(
+    item('add_child', { parentId: 'a', title: 'Claim', ref: 'h1', topicKind: 'hypothesis', strength: 'medium' }),
+    item('add_child', { parentId: 'a', title: 'Plain', topicKind: 'topic', strength: 'weak' }),
+    item('set_topic_kind', { nodeIds: ['new:h1'], topicKind: 'conclusion' }),
+    item('ask_topic_kind', { nodeIds: ['b', 'new:h1'], topicKind: 'atomic' })
+  ));
+  assert.deepEqual(got.actions, [
+    { kind: 'add_child', parentId: 'a', title: 'Claim', summary: '', ref: 'h1', topicKind: 'hypothesis', strength: 'medium' },
+    { kind: 'add_child', parentId: 'a', title: 'Plain', summary: '' },
+    { kind: 'set_topic_kind', nodeIds: ['new:h1'], topicKind: 'conclusion' },
+    { kind: 'ask_topic_kind', nodeIds: ['b', 'new:h1'], topicKind: 'atomic' }
+  ]);
+});
+test('chat 03: on an AIM map every type action is skipped and counted; a typed add_child is kept as an ordinary topic and counted', () => {
+  const ctx = context({ aim: true });
+  assert.equal(ctx.aim, true);
+  const got = parse(reply(
+    item('set_topic_kind', { nodeIds: ['a'], topicKind: 'evidence' }),
+    item('ask_topic_kind', { nodeIds: ['a'], topicKind: 'atomic' }),
+    item('add_child', { parentId: 'a', title: 'New', topicKind: 'hypothesis', strength: 'strong' }),
+    item('add_child', { parentId: 'a', title: 'Plain' })
+  ), ctx);
+  assert.deepEqual(got.actions, [
+    { kind: 'add_child', parentId: 'a', title: 'New', summary: '' },
+    { kind: 'add_child', parentId: 'a', title: 'Plain', summary: '' }
+  ]);
+  assert.deepEqual(codes(got), ['0:no_topic_kinds', '1:no_topic_kinds', '2:no_topic_kinds']);
+});
+test('chat 03: a reply of step version 6 (no topicKind or strength keys) still parses', () => {
+  const old = item('add_child', { parentId: 'a', title: 'Old' }); delete old.topicKind; delete old.strength;
+  assert.deepEqual(parse(reply(old)).actions, [{ kind: 'add_child', parentId: 'a', title: 'Old', summary: '' }]);
+});
+test('chat 03: the schema has topicKind and strength as required enums, and both prompts forbid a type in the title', () => {
+  const items = MAP_CHAT_SCHEMA.properties.actions.items;
+  assert.deepEqual(plain(items.properties.topicKind.enum), ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion', '']);
+  assert.deepEqual(plain(items.properties.strength.enum), ['weak', 'medium', 'strong', '']);
+  assert.ok(items.required.includes('topicKind') && items.required.includes('strength'));
+  const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
+  assert.match(render('en'), /Never express a topic type through the title/);
+  assert.match(render('en'), /- ask_topic_kind: nodeIds, topicKind/);
+  assert.match(render('zh-TW'), /絕不用標題表達議題類型/);
+  assert.match(render('zh-TW'), /只改類型、拆成單一概念、改類型並重寫筆記/);
 });

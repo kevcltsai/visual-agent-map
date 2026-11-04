@@ -4,6 +4,7 @@ import type { ReasoningLevel } from "../../../ai/types";
 import { languageVariables } from "../_shared/fragments";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import type { MapChatContext } from "../../map-chat-context";
+import { HYPOTHESIS_STRENGTHS, TOPIC_KINDS, type HypothesisStrength, type TopicKind } from "../../../note-values";
 import languageEn from "./language.en.md";
 import languageZh from "./language.zh.md";
 import templateEn from "./prompt.en.md";
@@ -27,7 +28,9 @@ export const MAP_CHAT_ACTION_KINDS = [
   "collapse_topic",
   "expand_topic",
   "auto_layout",
-  "focus_topic"
+  "focus_topic",
+  "set_topic_kind",
+  "ask_topic_kind"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -51,8 +54,19 @@ const REF_FORMAT = /^[A-Za-z0-9_-]{1,40}$/;
 export const MAP_CHAT_TOKEN_BUDGET = 150_000;
 
 export type MapChatAction =
-  /** `parentId` "" = a new root card; `new:<ref>` = a card created earlier in this reply. `ref` names this card for later actions (absent = none). */
-  | { kind: "add_child"; parentId: string; title: string; summary: string; ref?: string }
+  /**
+   * `parentId` "" = a new root card; `new:<ref>` = a card created earlier in this reply. `ref` names this card for later actions
+   * (absent = none). `topicKind` (absent = an ordinary topic) and `strength` (only with a hypothesis) are its type.
+   */
+  | {
+      kind: "add_child";
+      parentId: string;
+      title: string;
+      summary: string;
+      ref?: string;
+      topicKind?: TopicKind;
+      strength?: HypothesisStrength;
+    }
   | { kind: "rename_topic"; nodeId: string; title: string }
   | { kind: "update_summary"; nodeId: string; summary: string }
   | { kind: "edit_topic_note"; nodeId: string; detail: string }
@@ -87,7 +101,17 @@ export type MapChatAction =
   | { kind: "collapse_topic"; nodeId: string }
   | { kind: "expand_topic"; nodeId: string }
   | { kind: "auto_layout" }
-  | { kind: "focus_topic"; nodeId: string };
+  | { kind: "focus_topic"; nodeId: string }
+  /**
+   * Sets the topic type of one or more cards: only the note's frontmatter, never the title, the note body, the id, the parent or
+   * the relations. `strength` (only with a hypothesis; absent = keep it, or weak for a card that becomes one) is its strength.
+   */
+  | { kind: "set_topic_kind"; nodeIds: string[]; topicKind: TopicKind; strength?: HypothesisStrength }
+  /**
+   * The user's words could mean only the type, or also new content (for example "make it atomic knowledge": a new type, or one
+   * single concept). Nothing is applied: the view offers the choices under the answer and acts on the one the user picks.
+   */
+  | { kind: "ask_topic_kind"; nodeIds: string[]; topicKind: TopicKind };
 
 export type MapChatRejectCode =
   | "bad_item"
@@ -98,7 +122,9 @@ export type MapChatRejectCode =
   | "cycle"
   | "too_many"
   /** A `ref` that is malformed or repeated, or a `new:` id that no earlier kept action defines (or one used where it cannot be). */
-  | "bad_ref";
+  | "bad_ref"
+  /** A topic type on a map that has none (AIM). An `add_child` that carries one is kept as an ordinary topic and counted here too. */
+  | "no_topic_kinds";
 export interface MapChatRejection {
   index: number;
   code: MapChatRejectCode;
@@ -106,7 +132,7 @@ export interface MapChatRejection {
 export interface MapChatResult {
   reply: string;
   actions: MapChatAction[];
-  /** Items that were dropped; never applied, shown only as a count. */
+  /** Items that were dropped (never applied) or, for `no_topic_kinds`, applied without their type; shown only as a count. */
   rejected: MapChatRejection[];
 }
 export class MapChatError extends Error {
@@ -161,7 +187,9 @@ export const MAP_CHAT_SCHEMA = {
           direction: STRING,
           mode: { type: "string", enum: [...MAP_CHAT_RESEARCH_MODES, ""] },
           images: { type: "boolean" },
-          otherProvider: { type: "boolean" }
+          otherProvider: { type: "boolean" },
+          topicKind: { type: "string", enum: [...TOPIC_KINDS, ""] },
+          strength: { type: "string", enum: [...HYPOTHESIS_STRENGTHS, ""] }
         },
         required: [
           "kind",
@@ -184,7 +212,9 @@ export const MAP_CHAT_SCHEMA = {
           "direction",
           "mode",
           "images",
-          "otherProvider"
+          "otherProvider",
+          "topicKind",
+          "strength"
         ]
       }
     }
@@ -216,7 +246,7 @@ class Dropped extends Error {
  */
 export function parseMapChat(
   raw: string,
-  context: Pick<MapChatContext, "nodeIds" | "parents"> & { noEditableMap?: boolean }
+  context: Pick<MapChatContext, "nodeIds" | "parents"> & { noEditableMap?: boolean; aim?: boolean }
 ): MapChatResult {
   let value: unknown;
   try {
@@ -264,6 +294,18 @@ export function parseMapChat(
         return field;
       };
       const flag = (key: string): boolean => item[key] === true;
+      /** The topic type an item names; "" when none. An unknown one drops the item. */
+      const topicKind = (): TopicKind | "" => {
+        const given = text("topicKind", false);
+        if (given && !(TOPIC_KINDS as readonly string[]).includes(given)) throw new Dropped("bad_value");
+        return given as TopicKind | "";
+      };
+      /** A hypothesis strength; "" when none. An unknown one drops the item; one next to another type is ignored. */
+      const strength = (kind: TopicKind | ""): HypothesisStrength | "" => {
+        const given = text("strength", false);
+        if (given && !(HYPOTHESIS_STRENGTHS as readonly string[]).includes(given)) throw new Dropped("bad_value");
+        return kind === "hypothesis" ? (given as HypothesisStrength | "") : "";
+      };
       /** One card id: a supplied card, or (when `allowNew`) a `new:` ref an earlier kept item defined. */
       const resolve = (id: string, allowNew: boolean): string => {
         if (id.startsWith(MAP_CHAT_NEW_PREFIX)) {
@@ -293,12 +335,19 @@ export function parseMapChat(
           const title = text("title");
           const ref = text("ref", false);
           if (ref && (!REF_FORMAT.test(ref) || refs.has(ref))) throw new Dropped("bad_ref");
+          const typed = topicKind();
+          const power = strength(typed);
+          // An AIM map has no types: the card is still added, as an ordinary topic, and its type is counted as skipped.
+          const keepType = !context.aim && typed !== "" && typed !== "topic";
+          if (context.aim && typed !== "" && typed !== "topic") rejected.push({ index, code: "no_topic_kinds" });
           actions.push({
             kind: "add_child",
             parentId,
             title,
             summary: text("summary", false),
-            ...(ref ? { ref } : {})
+            ...(ref ? { ref } : {}),
+            ...(keepType ? { topicKind: typed as TopicKind } : {}),
+            ...(keepType && power ? { strength: power } : {})
           });
           if (ref) {
             refs.add(ref);
@@ -405,6 +454,21 @@ export function parseMapChat(
         case "focus_topic":
           actions.push({ kind: "focus_topic", nodeId: node("nodeId", true) });
           break;
+        case "set_topic_kind":
+        case "ask_topic_kind": {
+          const typed = topicKind();
+          if (!typed) throw new Dropped("missing_field");
+          const nodeIds = list("nodeIds");
+          if (!nodeIds.length) throw new Dropped("missing_field");
+          if (context.aim) throw new Dropped("no_topic_kinds");
+          if (kind === "ask_topic_kind") {
+            actions.push({ kind: "ask_topic_kind", nodeIds, topicKind: typed });
+            break;
+          }
+          const power = strength(typed);
+          actions.push({ kind: "set_topic_kind", nodeIds, topicKind: typed, ...(power ? { strength: power } : {}) });
+          break;
+        }
       }
     } catch (error) {
       if (!(error instanceof Dropped)) throw error;
@@ -417,7 +481,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 8,
+  version: 9,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

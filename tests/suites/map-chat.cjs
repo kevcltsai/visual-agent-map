@@ -4842,3 +4842,67 @@ integrationTest('chat 02: a send on an AIM map carries no type, strength or rela
   const h = await harness(); const context = await chat02Type(h, true);
   assert.equal(context.outline.some(n => 'kind' in n || 'strength' in n), false); assert.equal('relations' in context, false);
 });
+
+// ---- chat 03: the AI chat changes topic types ---------------------------------------------------------------------------
+const body = text => text.replace(/^---\n[\s\S]*?\n---\n/, '');
+integrationTest('chat 03: set_topic_kind changes only the type (and a strength) of every card it names; title, note, parent and relations stay', async () => {
+  const h = await harness(); h.view.map.topicRelations = [{ kind: 'supports', from: h.ids.b, to: h.ids.a }];
+  const before = { a: h.contents.get(h.node('a').path), b: h.contents.get(h.node('b').path) };
+  const nodes = JSON.stringify((await h.saved()).map(n => ({ id: n.id, parentId: n.parentId, path: n.path })));
+  const lines = await apply(h, [{ kind: 'set_topic_kind', nodeIds: [h.ids.a, h.ids.b], topicKind: 'hypothesis', strength: 'strong' }, { kind: 'set_topic_kind', nodeIds: [h.ids.c], topicKind: 'evidence' }]);
+  eq(lines.map(l => l.status), ['done', 'done']);
+  assert.equal(lines[0].text, 'Done: Set the type of 2 topics to Hypothesis (Strong)');
+  assert.equal(lines[1].text, 'Done: Set the type of “REM” to Evidence');
+  for (const key of ['a', 'b']) {
+    const note = await h.note(key); assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'strong');
+    assert.equal(body(h.contents.get(h.node(key).path)), body(before[key]), 'the note body is not rewritten');
+  }
+  assert.equal((await h.note('a')).title, 'Body'); assert.equal((await h.note('c')).topicKind, 'evidence');
+  assert.equal(JSON.stringify((await h.saved()).map(n => ({ id: n.id, parentId: n.parentId, path: n.path }))), nodes, 'ids, parents and paths unchanged');
+  eq(h.view.map.topicRelations, [{ kind: 'supports', from: h.ids.b, to: h.ids.a }]);
+});
+integrationTest('chat 03: set_topic_kind with only a strength keeps a hypothesis and changes its strength', async () => {
+  const h = await harness(); await h.repo.writeTopicKind(h.node('a').path, 'hypothesis'); await h.view.hydrate();
+  await apply(h, [{ kind: 'set_topic_kind', nodeIds: [h.ids.a], topicKind: 'hypothesis', strength: 'medium' }]);
+  const note = await h.note('a'); assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'medium');
+});
+integrationTest('chat 03: add_child with a type creates the card with that type and strength', async () => {
+  const h = await harness();
+  await apply(h, [{ kind: 'add_child', parentId: h.ids.a, title: 'A claim', summary: 's', topicKind: 'hypothesis', strength: 'medium' }]);
+  const made = h.view.map.nodes.find(n => h.view.notes.get(n.id)?.title === 'A claim');
+  const note = await h.repo.readNote(made.path); assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'medium');
+});
+integrationTest('chat 03: on an AIM map set_topic_kind writes nothing and is skipped', async () => {
+  const h = await harness({ aim: true }); const before = h.contents.get(h.node('a').path);
+  const lines = await apply(h, [{ kind: 'set_topic_kind', nodeIds: [h.ids.a], topicKind: 'evidence' }]);
+  eq(lines.map(l => l.status), ['skipped']); assert.equal(h.contents.get(h.node('a').path), before);
+});
+integrationTest('chat 03: an AIM send tells the parser, so a reply that changes a type is counted as skipped and writes nothing', async () => {
+  const h = await harness({ aim: true }); const before = h.contents.get(h.node('a').path);
+  h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'set_topic_kind', nodeIds: [h.ids.a], topicKind: 'evidence' }] }), request.context);
+  h.open(); h.type('make it evidence'); await h.view.sendMapChat();
+  await until(() => !h.view.chat.isBusy);
+  assert.equal(h.contents.get(h.node('a').path), before);
+  assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
+});
+integrationTest('chat 03: ask_topic_kind changes nothing and offers three choices; "type only" then applies the type', async () => {
+  const h = await harness(); h.open(); const before = h.contents.get(h.node('a').path);
+  const shown = []; const original = h.view.chat.showChoices.bind(h.view.chat); h.view.chat.showChoices = choices => { shown.push(choices); original(choices); };
+  const lines = await apply(h, [{ kind: 'ask_topic_kind', nodeIds: [h.ids.a], topicKind: 'atomic' }]);
+  eq(lines.map(l => l.status), ['done']); assert.equal(h.contents.get(h.node('a').path), before, 'nothing written before a pick');
+  assert.equal(shown.length, 1); eq(shown[0].options.map(o => o.label), ['Change the type only', 'Split into single concepts', 'Change the type and rewrite the note']);
+  shown[0].options[0].pick();
+  await until(async () => (await h.note('a')).topicKind === 'atomic');
+  assert.equal(body(h.contents.get(h.node('a').path)), body(before));
+});
+integrationTest('chat 03: the two other choices send a new chat message that says what to do, with the cards selected', async () => {
+  const h = await harness(); h.open();
+  const shown = []; h.view.chat.showChoices = choices => { shown.push(choices); };
+  await apply(h, [{ kind: 'ask_topic_kind', nodeIds: [h.ids.a, h.ids.b], topicKind: 'atomic' }]);
+  const sent = []; h.view.sendMapChat = async (origin, retry) => { sent.push({ origin, retry }); };
+  shown[0].options[1].pick(); shown[0].options[2].pick();
+  eq(sent.map(s => s.origin.selectedIds), [[h.ids.a, h.ids.b], [h.ids.a, h.ids.b]]);
+  assert.equal(sent[0].origin.text, 'Split “Body”, “Mind” into topics that each hold one single concept, and give each of them the type Atomic knowledge.');
+  assert.equal(sent[1].origin.text, 'Change the type of “Body”, “Mind” to Atomic knowledge, and rewrite each note to fit that type.');
+  assert.equal(sent[0].retry, undefined, 'a plain new turn: sendMapChat has no re-send flag any more');
+});

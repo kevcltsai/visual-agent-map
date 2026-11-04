@@ -31409,9 +31409,7 @@ ${typed}` : draft;
     this.renderHint();
     (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
     if (lines == null ? void 0 : lines.length)
-      this.announce(
-        t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, chatNoteTexts())))
-      );
+      this.announce(t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, chatNoteTexts()))));
   }
   /** Offers a short list to pick from under the last answer. */
   showChoices(choices) {

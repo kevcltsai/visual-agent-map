@@ -51225,9 +51225,9 @@ ${request.requirements}` : preset.text,
     this.structureHighlight = next;
   }
   // ---- Relevance grading: goal chip, status bar and change summary ----------------------------------------------
-  /** Mind maps only: not an AIM map. */
+  /** Mind maps only: not an AIM map. An old AIM map stays off while AIM is hidden too (goal grading has no visible UI there). */
   relevanceGradeable() {
-    return !!this.map && !this.aimLive() && !!this.path;
+    return !!this.map && !this.map.aim && !!this.path;
   }
   /**
    * One toolbar button, the same level as "Select topics": it shows the goal and opens a panel under it with the goal,
@@ -58325,7 +58325,7 @@ ${request.requirements}` : preset.text,
     else this.researchSigs.delete(node.path);
     const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_h = this.plugin.quickExpandPending) == null ? void 0 : _h.has(node.path)) || this.startingTasks.has(node.path);
     const doc = this.map, aimData = doc == null ? void 0 : doc.aim;
-    const aimProgress = !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
+    const aimProgress = aimEnabled() && !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
       const status = aimQuestionStatus(doc, node.id, this.aimActiveQuestionNodeId);
       const key2 = {
@@ -58395,8 +58395,8 @@ ${request.requirements}` : preset.text,
     this.paintCardMarkers(card, header, node.id);
     this.paintCardLinks(card, header, node.id);
     this.paintModelTag(card, header, note);
-    this.paintCardColor(card, note, !!node.aimKind);
-    this.paintCardStyle(card, note, !!node.aimKind);
+    this.paintCardColor(card, note, isAimNode(node));
+    this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     const errorDetails = [];
     if ((_n = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _n.length) {
@@ -59583,8 +59583,8 @@ ${request.requirements}` : preset.text,
       this.paintCardLinks(card, header, node.id);
       this.paintModelTag(card, header, note);
     }
-    this.paintCardColor(card, note, !!node.aimKind);
-    this.paintCardStyle(card, note, !!node.aimKind);
+    this.paintCardColor(card, note, isAimNode(node));
+    this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();

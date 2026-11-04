@@ -2854,9 +2854,9 @@ export class VisualAgentMapView extends ItemView {
     this.structureHighlight = next;
   }
   // ---- Relevance grading: goal chip, status bar and change summary ----------------------------------------------
-  /** Mind maps only: not an AIM map. */
+  /** Mind maps only: not an AIM map. An old AIM map stays off while AIM is hidden too (goal grading has no visible UI there). */
   private relevanceGradeable(): boolean {
-    return !!this.map && !this.aimLive() && !!this.path;
+    return !!this.map && !this.map.aim && !!this.path;
   }
   /**
    * One toolbar button, the same level as "Select topics": it shows the goal and opens a panel under it with the goal,
@@ -10589,6 +10589,7 @@ export class VisualAgentMapView extends ItemView {
       aimData = doc?.aim;
     // An AIM question, and the AIM root topic that owns the first branch, show the branch progress instead of note state.
     const aimProgress =
+      aimEnabled() &&
       !!aimData &&
       (node.aimKind === "question" ||
         (node.aimKind === "topic" &&
@@ -10687,8 +10688,8 @@ export class VisualAgentMapView extends ItemView {
     // The model tag follows the marker row (see paintModelTag).
     this.paintModelTag(card, header, note);
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
-    this.paintCardColor(card, note, !!node.aimKind);
-    this.paintCardStyle(card, note, !!node.aimKind);
+    this.paintCardColor(card, note, isAimNode(node));
+    this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
@@ -11959,8 +11960,8 @@ export class VisualAgentMapView extends ItemView {
       this.paintCardLinks(card, header, node.id);
       this.paintModelTag(card, header, note);
     }
-    this.paintCardColor(card, note, !!node.aimKind);
-    this.paintCardStyle(card, note, !!node.aimKind);
+    this.paintCardColor(card, note, isAimNode(node));
+    this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);

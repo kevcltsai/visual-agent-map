@@ -177,7 +177,7 @@ integrationTest('aim-hidden: D11 an old AIM map shares like any map and the payl
 const element = (tag, buttons = []) => ({ tag, children: [], dataset: {}, style: {},
   createDiv(options) { const child = element('div', buttons); child.cls = options?.cls ?? options; this.children.push(child); return child; },
   createEl(name, options) { const child = element(name, buttons); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
-  createSpan(options) { const child = element('span', buttons); child.text = options?.text; this.children.push(child); return child; },
+  createSpan(options) { const child = element('span', buttons); child.text = options?.text; child.cls = options?.cls; this.children.push(child); return child; },
   setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, toggleClass() {}, setPointerCapture() {}, addEventListener() {}, removeEventListener() {}, appendChild(child) { this.children.push(child); return child; }
 });
 const aimDoc = () => {
@@ -439,4 +439,73 @@ test('aim-hidden: N1 the text a new user can reach names no AIM: the hidden-vari
   assert.match(main, /aimEnabled\(\)\s*\? t\(\s*"ui\.organize_preview_0_1_2_3_4"[\s\S]*?: t\("ui\.organize_preview_hidden_0_1_2"/);
   const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(view, /aimEnabled\(\) \? "ui\.map_chat_line_cards_skipped_0" : "ui\.map_chat_line_cards_skipped_hidden_0"/);
+});
+
+// ---- Fix batch R1: goal grading, colour/style, status chip, display parity ------------------------------------------
+const spans = el => [el, ...el.children.flatMap(spans)];
+
+integrationTest('aim-hidden: B1 map chat rate_by_goal on a hidden AIM map is skipped: no AI call, no goal, no write', async () => {
+  const { doc } = aimDoc();
+  let asked = 0, writes = 0;
+  const grades = new Map();
+  const make = loader => {
+    const view = viewOf(loader, doc, { relevanceGrades: grades, askModel: async () => { asked++; throw new Error('no AI call'); }, mutate: async work => { writes++; return work(); } });
+    view.refreshRelevance = () => {};
+    return view;
+  };
+  const action = { kind: 'run_map_action', action: 'rate_by_goal', goal: 'Find the best option', nodeIds: [], title: '', direction: '', mode: '', images: false };
+  for (const loader of [loadHidden, load]) {
+    const view = make(loader);
+    const outcome = await view.runChatSelection(action);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(outcome.status, 'skipped', 'goal grading is off for a map with an aim block');
+    assert.equal(view.relevanceGradeable(), false);
+  }
+  assert.equal(asked, 0, 'no AI call');
+  assert.equal(writes, 0, 'no frontmatter or map write');
+  assert.equal(grades.size, 0, 'no grading run started');
+});
+
+test('aim-hidden: M1 a hidden-mode AIM card paints its colour and style choices (the AIM-on card still does not)', () => {
+  const { doc, conclusion } = aimDoc();
+  const render = loader => {
+    const calls = [], view = viewOf(loader, doc);
+    view.stageEl = element('stage', []);
+    view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
+    for (const name of ['paintCardColor', 'paintCardStyle']) { const original = view[name].bind(view); view[name] = (card, note, aim) => { calls.push([name, aim]); return original(card, note, aim); }; }
+    view.renderNode(conclusion);
+    return calls;
+  };
+  assert.deepEqual(render(loadHidden), [['paintCardColor', false], ['paintCardStyle', false]], 'hidden: colour and style are painted');
+  assert.deepEqual(render(load), [['paintCardColor', true], ['paintCardStyle', true]], 'AIM on: unchanged');
+});
+
+test('aim-hidden: M2 a question card shows no AIM status chip while AIM is hidden, whatever its run state', () => {
+  const chips = (loader, state) => {
+    const { doc, topic } = aimDoc();
+    const question = node('question', 'topic'); question.aimKind = 'question'; doc.nodes.push(question);
+    if (state === 'completed') doc.aim.branches.push({ ...doc.aim.branches[0], id: 'q', questionNodeId: question.id, parentBranchId: 'branch' });
+    const view = viewOf(loader, doc);
+    if (state === 'running') view.aimActiveQuestionNodeId = question.id;
+    view.stageEl = element('stage', []);
+    view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
+    const found = [];
+    for (const target of [question, topic]) { view.stageEl.children.length = 0; view.renderNode(target); found.push(...spans(view.stageEl).filter(item => /vam-aim-question-status/.test(item.cls ?? ''))); }
+    return found;
+  };
+  for (const state of ['running', 'awaiting', 'completed']) {
+    assert.equal(chips(loadHidden, state).length, 0, `hidden, ${state}: no chip`);
+    assert.ok(chips(load, state).length > 0, `AIM on, ${state}: the chip is still there`);
+  }
+});
+
+test('aim-hidden: E3 display parity: the same map shows the same nodes with the flag on and off', () => {
+  const { doc, conclusion } = aimDoc();
+  const interim = node('interim', 'topic'); interim.aimKind = 'result'; doc.nodes.push(interim); // an interim result its run's conclusion has replaced
+  doc.aim.branches[0].results = [{ nodeId: interim.id, notePath: interim.path, version: 1, kind: 'synthesis', runId: 'run' }, { nodeId: conclusion.id, notePath: conclusion.path, version: 1, kind: 'conclusion', runId: 'run' }];
+  const canvas = loader => viewOf(loader, doc).canvasNodes().map(item => item.id).sort();
+  const supersededOn = [...load('map-model.ts').supersededAimNodeIds(doc)].sort(), supersededOff = [...hiddenCore.supersededAimNodeIds(doc)].sort();
+  assert.deepEqual(supersededOff, supersededOn, 'supersededAimNodeIds is flag-independent');
+  assert.ok(supersededOn.length > 0, 'the fixture does supersede a node');
+  assert.deepEqual(canvas(loadHidden), canvas(load));
 });

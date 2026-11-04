@@ -73,7 +73,7 @@ The CLI inherits Obsidian's OS permissions; read-only or tool restrictions are n
 
 ## Known limitations
 
-Desktop only; macOS with Obsidian 1.14.4 is the verified environment. Windows and Linux remain unverified.
+Desktop only. Windows and Linux remain unverified.
 
 Standard research searches the web and provides source links, but finding a source does not prove its claims are true. AI judgments, unavailable sources, and account limits can leave research incomplete. Check important claims against the original sources.
 
@@ -166,7 +166,7 @@ CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sa
 
 ## 已知限制
 
-僅支援桌面版；已驗證環境為 macOS 與 Obsidian 1.14.4。Windows 與 Linux 尚未驗證。
+僅支援桌面版。Windows 與 Linux 尚未驗證。
 
 標準研究會搜尋網路並提供來源連結，但找到來源不代表內容已證實。AI 判斷、無法存取的來源與帳號額度，都可能讓研究未能完成。重要主張請回到原始來源核對。
 

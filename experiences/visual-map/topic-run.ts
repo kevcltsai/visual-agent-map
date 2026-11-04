@@ -3,6 +3,7 @@
  * It imports neither obsidian nor the view; everything it needs from the plugin comes through lazy ports, because the
  * plugin replaces some of those objects after construction.
  */
+import { aiLockedError, isAiLockedError } from "../../core/ai-lock";
 import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
@@ -440,6 +441,11 @@ export class TopicRuns {
     try {
       const repo = this.ports.repository()!;
       const note = await repo.readNote(path, options.map);
+      // AI lock: no subtopics are proposed for a locked topic (no AI call).
+      if (note.aiLocked) {
+        fail(t("ui.ai_locked_notice"), false);
+        return;
+      }
       const used = options.runOnce?.model.trim()
         ? await this.ports.resolveModel(path, options.map, options.runOnce)
         : { model: note.model, reasoning: note.reasoning };
@@ -462,6 +468,11 @@ export class TopicRuns {
       }
       const latest = await repo.readNote(path, options.map);
       if (controller.signal.aborted) throw aborted();
+      // The late-result fence: suggestions for a topic locked meanwhile are not kept.
+      if (latest.aiLocked) {
+        fail(t("ui.ai_locked_notice"), false);
+        return;
+      }
       if (latest.thinkingOrigin !== note.thinkingOrigin)
         throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
       const pendingItems = suggestions.map(item => ({
@@ -561,6 +572,11 @@ export class TopicRuns {
       }
       const repo = this.ports.repository()!;
       const note = await repo.readNote(path, options.map());
+      // AI lock: the directions lead to a rewrite of this topic, so a locked topic is refused before any AI call.
+      if (note.aiLocked) {
+        options.failed(t("ui.ai_locked_notice"));
+        return;
+      }
       const used = await this.modelOf(path, note, options.map(), options.runOnce);
       options.onStarted?.();
       const progress = this.startProgress(path, used.model);
@@ -637,6 +653,11 @@ export class TopicRuns {
     };
     const repo = this.ports.repository()!;
     const note = await repo.readNote(path, options.map());
+    // AI lock: a locked topic is refused before anything is written or any AI call is made.
+    if (note.aiLocked) {
+      fail(t("ui.ai_locked_notice"));
+      return;
+    }
     const used = await this.modelOf(path, note, options.map(), options.runOnce);
     const noteSnapshot = (item: Note): string =>
       JSON.stringify([
@@ -706,6 +727,8 @@ export class TopicRuns {
           if (signal.aborted || prepared.viewChanged()) throw changed();
           if (await prepared.sourcesChanged()) throw changed();
           const latest = await repo.readNote(path, options.map());
+          // The late-result fence: a topic locked while the AI ran gets nothing (its status is already back).
+          if (latest.aiLocked) throw aiLockedError();
           if (noteSnapshot(latest) !== snapshot) throw changed();
           const mode: WritebackMode = prepared.updateMode ?? "merge";
           const noteLanguage = noteLanguageOf(outputLanguage);
@@ -798,7 +821,8 @@ export class TopicRuns {
       try {
         await options.drafted(result, save, result.summary, result.detail, note);
       } catch (error) {
-        if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+        if (isAiLockedError(error)) fail(t("ui.ai_locked_notice"));
+        else if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {
           fail(t("ui.research_stopped_existing_content_was_preserved"));
         } else {
           console.error("VAM synthesis write", error);
@@ -1069,6 +1093,13 @@ export class TopicRuns {
       return null;
     }
     const { note, used, context, styleLabel } = prelude;
+    // AI lock: a locked topic is refused before anything is written or any AI call is made.
+    if (note.aiLocked) {
+      handle.release();
+      if (options.failed) options.failed(t("ui.ai_locked_notice"));
+      else options.notify?.(t("ui.ai_locked_notice"));
+      return null;
+    }
     const language = settings().language;
     this.pendingSuggestions.delete(path);
     // A diagram job still running for the previous result of this note must not land on the new run.
@@ -1183,14 +1214,17 @@ export class TopicRuns {
             latest.visualMode !== note.visualMode ||
             latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") ||
             JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-          if (controller.signal.aborted || stale) {
+          // The late-result fence: a topic locked while the AI ran gets nothing but its status back.
+          const locked = latest.aiLocked === true;
+          if (controller.signal.aborted || stale || locked) {
             await repo.updateNote(path, { status: note.status });
             if (exchangeId)
               exchanges()?.failed(
                 exchangeId,
-                t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
+                t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
               );
-            if (stale) fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+            if (locked) fail(t("ui.ai_locked_notice"));
+            else if (stale) fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
             return;
           }
           // Write-back comes after the stale fence: the old Detail is `latest.detail`, which equals the one the run started with.

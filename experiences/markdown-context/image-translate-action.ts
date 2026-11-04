@@ -1,4 +1,5 @@
-import { Component, MarkdownView, Notice, setIcon, type App, type TFile } from "obsidian";
+import { Component, MarkdownView, Notice, parseYaml, setIcon, type App, type TFile } from "obsidian";
+import { noteTextAiLocked } from "../../note-values";
 import { getUiLanguage, OUTPUT_LANGUAGE_CHOICES, SUPPORTED_LANGUAGES, t, type ContentLanguage } from "../../i18n";
 import { prepareStep, type PreparedStep } from "../../core/step-runner";
 import { imageTranslateStep } from "./steps/image-translate/step";
@@ -260,6 +261,17 @@ export class ImageTranslateAction extends Component {
     actions: HTMLElement
   ): Promise<void> {
     if (this.running) return;
+    // AI lock: no translated image is made for a locked note.
+    let text = "";
+    try {
+      text = target.view.editor.getValue();
+    } catch {
+      /* No editor text: the write checks the note again. */
+    }
+    if (noteTextAiLocked(text, parseYaml)) {
+      new Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const controller = new AbortController();
     this.running = controller;
     this.showRunning(status, actions);
@@ -319,6 +331,8 @@ export class ImageTranslateAction extends Component {
     let outcome: "ui.image_translate_replaced" | "ui.image_translate_added" | "ui.image_translate_appended" =
       "ui.image_translate_appended";
     const edit = (text: string): string => {
+      // AI lock, at write time: a note locked meanwhile is not changed (the caller removes the saved image).
+      if (noteTextAiLocked(text, parseYaml)) throw new Error(t("ui.ai_locked_notice"));
       // Find the clicked copy again: same copy number while the note has the same number of copies.
       const copies = target.token ? occurrences(text, target.token.text) : [];
       const at =

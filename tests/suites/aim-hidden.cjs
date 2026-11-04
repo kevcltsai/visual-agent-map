@@ -499,6 +499,22 @@ test('aim-hidden: M2 a question card shows no AIM status chip while AIM is hidde
   }
 });
 
+test('aim-hidden: P1 the topic status pill rule from main (idea shows none, researched shows one) applies to a hidden AIM card too', () => {
+  const pills = (loader, status) => {
+    const { doc } = aimDoc();
+    const research = node('research', 'topic'); research.aimKind = 'research'; doc.nodes.push(research);
+    const view = viewOf(loader, doc);
+    view.stageEl = element('stage', []);
+    view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: item.id === research.id ? status : 'completed', detail: '' }]));
+    view.renderNode(research);
+    return spans(view.stageEl).filter(item => /vam-status\b/.test(item.cls ?? '')).length;
+  };
+  assert.equal(pills(loadHidden, 'idea'), 0, 'hidden, idea: no pill, like any plain topic');
+  assert.equal(pills(loadHidden, 'completed'), 1, 'hidden, researched: a pill, like any plain topic');
+  assert.equal(pills(load, 'idea'), 1, 'AIM on, idea: AIM keeps its own rule');
+  assert.equal(pills(load, 'completed'), 0, 'AIM on, researched: AIM keeps its own rule');
+});
+
 test('aim-hidden: E3 display parity: the same map shows the same nodes with the flag on and off', () => {
   const { doc, conclusion } = aimDoc();
   const interim = node('interim', 'topic'); interim.aimKind = 'result'; doc.nodes.push(interim); // an interim result its run's conclusion has replaced

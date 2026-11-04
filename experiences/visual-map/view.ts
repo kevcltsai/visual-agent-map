@@ -10616,7 +10616,7 @@ export class VisualAgentMapView extends ItemView {
             ? t("ui.aim_answered_not_started")
             : t(key[status])
       });
-    } else if (!node.aimKind || active || queued || !note || note.status !== "completed" || research) {
+    } else if (!isAimNode(node) || active || queued || !note || note.status !== "completed" || research) {
       const statusText = research
         ? this.researchStageText(research)
         : merging
@@ -10645,7 +10645,7 @@ export class VisualAgentMapView extends ItemView {
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
-      } else if (!note || note.status !== (node.aimKind ? "completed" : "idea") || active || queued) {
+      } else if (!note || note.status !== (isAimNode(node) ? "completed" : "idea") || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (note?.status ?? "error")}`,
           text: statusText

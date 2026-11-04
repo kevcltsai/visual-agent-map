@@ -143,6 +143,8 @@ export interface MapChatContext {
   aim: boolean;
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;
+  /** The relations sent (none on an AIM map), for the parser's checks of a relation the reply adds or removes. */
+  relations?: MapChatRelation[];
   /** Normalised path -> content hash of every Markdown file sent whole in this turn. */
   mdHashes: Record<string, string>;
   /** Card id -> what the model saw of that card this turn; the baseline every card action is checked against. */
@@ -341,6 +343,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     noEditableMap: !!input.noEditableMap,
     aim: !!input.aim,
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
+    relations: relations.map(link => ({ kind: link.kind, from: link.from, to: link.to })),
     mdHashes: hashes,
     topicHashes
   };

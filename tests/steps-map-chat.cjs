@@ -110,7 +110,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 18);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 20);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -399,8 +399,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 10 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text; D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 10);
+test('C1: the style is not part of the action schema, and the step version is 11 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 11);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -473,7 +473,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-3)), ['focus_topic', 'set_topic_kind', 'ask_topic_kind']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-5)), ['focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -521,11 +521,11 @@ test('B1 view operations: collapse_topic, expand_topic and focus_topic need a ca
   const bad = parse(reply(item('collapse_topic'), item('focus_topic', { nodeId: 'ghost' })));
   assert.deepEqual(bad.rejected.map(entry => entry.code), ['missing_field', 'unknown_node']);
 });
-test('B1 schema: ref is a required string property and the kinds list ends with the view operations, then the topic type actions (chat 03)', () => {
+test('B1 schema: ref is a required string property and the kinds list ends with the view operations, then the topic type actions (chat 03), then the relation actions (chat 06)', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
@@ -1058,4 +1058,99 @@ test('chat 03: the schema has topicKind and strength as required enums, and both
   assert.match(render('en'), /- ask_topic_kind: nodeIds, topicKind/);
   assert.match(render('zh-TW'), /絕不用標題表達議題類型/);
   assert.match(render('zh-TW'), /只改類型、拆成單一概念、改類型並重寫筆記/);
+});
+
+// ---- AI chat adds and removes relations (chat 06) ---------------------------------------------------------------------
+const rel = (fromId, toId, relationKind, extra = {}) => item('add_relation', { fromId, toId, relationKind, description: '', ...extra });
+const unrel = (fromId, toId) => item('remove_relation', { fromId, toId });
+const linked = (relations, extra = {}) => context({ relations, ...extra });
+test('chat 06: add_relation keeps both ends, the kind and a one-line description; either end may be a card of this reply', () => {
+  const got = parse(reply(
+    rel('a', 'b', 'supports', { description: '  A short\n reason  ' }),
+    child('n1', 'a'),
+    rel('new:n1', 'a1', 'related'),
+    rel('r', 'new:n1', 'prerequisite')
+  ));
+  assert.deepEqual(got.actions, [
+    { kind: 'add_relation', fromId: 'a', toId: 'b', relationKind: 'supports', description: 'A short reason' },
+    { kind: 'add_child', parentId: 'a', title: 'n1', summary: '', ref: 'n1' },
+    { kind: 'add_relation', fromId: 'new:n1', toId: 'a1', relationKind: 'related' },
+    { kind: 'add_relation', fromId: 'r', toId: 'new:n1', relationKind: 'prerequisite' }
+  ]);
+  assert.deepEqual(got.rejected, []);
+});
+test('chat 06: a relation that the manual rule refuses is dropped and counted: itself, a second link on a pair (either direction, any kind), a cycle', () => {
+  const ctx = linked([{ kind: 'derives_from', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'b', to: 'a1' }]);
+  const got = parse(reply(
+    rel('a', 'a', 'related'),
+    rel('b', 'a', 'supports'),
+    rel('a1', 'a', 'derives_from'),
+    rel('a1', 'a', 'supports'),
+    rel('r', 'b', 'verifies'),
+    rel('b', 'r', 'contradicts')
+  ), ctx);
+  assert.deepEqual(got.actions, [
+    { kind: 'add_relation', fromId: 'a1', toId: 'a', relationKind: 'supports' },
+    { kind: 'add_relation', fromId: 'r', toId: 'b', relationKind: 'verifies' }
+  ]);
+  assert.deepEqual(codes(got), ['0:relation_not_allowed', '1:relation_not_allowed', '2:relation_not_allowed', '5:relation_not_allowed']);
+});
+test('chat 06: an unknown kind, a missing end, an unknown card, an undefined ref or a description over 200 characters drops the add', () => {
+  const got = parse(reply(
+    rel('a', 'b', 'evidence'),
+    rel('a', 'b', ''),
+    rel('a', '', 'supports'),
+    rel('a', 'ghost', 'supports'),
+    rel('a', 'new:zz', 'supports'),
+    rel('a', 'b', 'supports', { description: 'x'.repeat(201) }),
+    rel('a', 'b', 'supports', { description: 'y'.repeat(200) })
+  ));
+  assert.deepEqual(got.actions, [{ kind: 'add_relation', fromId: 'a', toId: 'b', relationKind: 'supports', description: 'y'.repeat(200) }]);
+  assert.deepEqual(codes(got), ['0:bad_value', '1:missing_field', '2:missing_field', '3:unknown_node', '4:bad_ref', '5:bad_value']);
+});
+test('chat 06: remove_relation names the pair in either order; a pair with no relation is dropped; reversing is remove then add', () => {
+  const ctx = linked([{ kind: 'supports', from: 'a', to: 'b' }]);
+  const got = parse(reply(
+    unrel('b', 'a'),
+    rel('b', 'a', 'contradicts'),
+    unrel('a', 'a1'),
+    unrel('a', 'ghost')
+  ), ctx);
+  assert.deepEqual(got.actions, [
+    { kind: 'remove_relation', fromId: 'b', toId: 'a' },
+    { kind: 'add_relation', fromId: 'b', toId: 'a', relationKind: 'contradicts' }
+  ]);
+  assert.deepEqual(codes(got), ['2:unknown_relation', '3:unknown_node']);
+  // Without the remove first, the same add is a second link on the pair and is refused.
+  assert.deepEqual(codes(parse(reply(rel('b', 'a', 'contradicts')), ctx)), ['0:relation_not_allowed']);
+});
+test('chat 06: on an AIM map every relation action is dropped and counted', () => {
+  const ctx = linked([{ kind: 'supports', from: 'a', to: 'b' }], { aim: true });
+  assert.deepEqual(plain(ctx.relations), [], 'an AIM context carries no relations');
+  const got = parse(reply(rel('a', 'a1', 'supports'), unrel('a', 'b')), ctx);
+  assert.deepEqual(got.actions, []);
+  assert.deepEqual(codes(got), ['0:no_relations', '1:no_relations']);
+});
+test('chat 06: the context hands the parser the relations it sent (both ends in the outline)', () => {
+  const ctx = linked([{ kind: 'supports', from: 'a', to: 'b', description: 'd' }, { kind: 'related', from: 'a', to: 'gone' }]);
+  assert.deepEqual(plain(ctx.relations), [{ kind: 'supports', from: 'a', to: 'b' }]);
+});
+test('chat 06: the schema has fromId, toId, relationKind and description as required fields, and both prompts explain add, remove and reverse', () => {
+  const items = MAP_CHAT_SCHEMA.properties.actions.items;
+  for (const key of ['fromId', 'toId', 'relationKind', 'description']) assert.ok(items.required.includes(key), key);
+  assert.deepEqual(plain(items.properties.relationKind.enum), ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite', '']);
+  const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
+  const en = render('en'), zh = render('zh-TW');
+  assert.match(en, /- add_relation: fromId \(card A\), toId \(card B\), relationKind/);
+  assert.match(en, /- remove_relation: fromId, toId/);
+  assert.match(en, /To reverse a relation or to change its kind, send remove_relation and then add_relation/);
+  assert.match(en, /do not send add_relation or remove_relation/);
+  assert.match(zh, /- add_relation：fromId（議題 A）/);
+  assert.match(zh, /要反轉方向或改種類時，對同兩張議題先送 remove_relation 再送 add_relation/);
+  assert.match(zh, /不要送 add_relation 或 remove_relation/);
+  for (const text of [en, zh]) assert.ok(text.includes('"fromId":"","toId":"","relationKind":"","description":""'));
+});
+test('chat 06: a reply of step version 10 (no relation keys) still parses', () => {
+  const old = item('rename_topic', { nodeId: 'a', title: 'T' });
+  assert.deepEqual(parse(reply(old)).actions, [{ kind: 'rename_topic', nodeId: 'a', title: 'T' }]);
 });

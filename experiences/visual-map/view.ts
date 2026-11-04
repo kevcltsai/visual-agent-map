@@ -16496,6 +16496,15 @@ export class VisualAgentMapView extends ItemView {
       }
       case "ask_topic_kind":
         return t("ui.map_chat_do_ask_kind_0", this.chatKindText(action.topicKind));
+      case "add_relation":
+        return t(
+          "ui.map_chat_do_add_relation_0_1_2",
+          title(action.fromId),
+          title(action.toId),
+          t(RELATION_NAME_KEY[action.relationKind])
+        );
+      case "remove_relation":
+        return t("ui.map_chat_do_remove_relation_0_1", title(action.fromId), title(action.toId));
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
@@ -17106,6 +17115,9 @@ export class VisualAgentMapView extends ItemView {
       }
       case "set_topic_kind":
         return this.chatSetTopicKind(action, real, run);
+      case "add_relation":
+      case "remove_relation":
+        return this.chatChangeRelation(action, real);
       case "collapse_topic":
       case "expand_topic": {
         this.flushChatRender();
@@ -17250,6 +17262,58 @@ export class VisualAgentMapView extends ItemView {
         return done;
       }
     }
+  }
+  /**
+   * add_relation / remove_relation: the same Map.md write as a relation added or removed by hand (`addRelation`,
+   * `removeRelation`), checked again on the map being edited with the same rule (`relationAllowed`): a self link, a second
+   * relation on a pair and a derivation or prerequisite cycle are refused. Never on an AIM map or an AIM card.
+   */
+  private async chatChangeRelation(
+    action: Extract<MapChatAction, { kind: "add_relation" | "remove_relation" }>,
+    real: (id: string) => string | null
+  ): Promise<ChatOutcome> {
+    if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const fromId = real(action.fromId),
+      toId = real(action.toId);
+    if (fromId === null || toId === null) return skipped("ui.map_chat_skip_parent_missing");
+    const ends = [fromId, toId].map(id => this.map?.nodes.find(node => node.id === id));
+    if (ends.some(node => !node)) return skipped("ui.map_chat_skip_topic_gone");
+    if (ends.some(node => node?.aimKind)) return skipped("ui.map_chat_skip_unavailable");
+    const pair = (link: TopicRelation): boolean =>
+      (link.from === fromId && link.to === toId) || (link.from === toId && link.to === fromId);
+    const link: TopicRelation = {
+      kind: action.kind === "add_relation" ? action.relationKind : "related",
+      from: fromId,
+      to: toId
+    };
+    /** Why the change cannot be made on `list`; null when it can. */
+    const refusal = (list: readonly TopicRelation[]): TranslationKey | null =>
+      action.kind === "remove_relation"
+        ? list.some(pair)
+          ? null
+          : "ui.map_chat_skip_relation_missing"
+        : relationAllowed(list, link)
+          ? null
+          : "ui.map_chat_skip_relation_not_allowed";
+    // Checked on the map on screen first (nothing is written for a refused one), then again inside the write.
+    const early = refusal(this.map.topicRelations ?? []);
+    if (early) return skipped(early);
+    const box: { refused: TranslationKey | null } = { refused: null };
+    await this.mapChange(map => {
+      const list = map.topicRelations ?? [];
+      box.refused = refusal(list);
+      if (box.refused) return;
+      if (action.kind === "remove_relation") {
+        setTopicRelations(
+          map,
+          list.filter(item => !pair(item))
+        );
+        return;
+      }
+      const description = action.description ? normalizeRelationDescription(action.description) : undefined;
+      setTopicRelations(map, [...list, description ? { ...link, description } : link]);
+    }, false);
+    return box.refused ? skipped(box.refused) : { status: "done" };
   }
   /**
    * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every

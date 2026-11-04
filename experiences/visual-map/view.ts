@@ -10587,7 +10587,7 @@ export class VisualAgentMapView extends ItemView {
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
-      } else if (!note || note.status !== "idea" || active || queued) {
+      } else if (!note || note.status !== (node.aimKind ? "completed" : "idea") || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (note?.status ?? "error")}`,
           text: statusText
@@ -17293,6 +17293,9 @@ export class VisualAgentMapView extends ItemView {
         this.updateHistoryButtons();
       }
     }
+    // addNode selects each card it makes, which leaves the last one selected; the reply's new branch root is the better start. Done before the later actions so a select_topics or run_map_action of the same reply keeps its selection.
+    const branchRoot = this.chatBranchRoot(run);
+    if (branchRoot && same() && !this.closed) this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     for (const index of later) {
       const action = result.actions[index];
       const label = this.chatActionLabel(action, refTitles);
@@ -17330,9 +17333,6 @@ export class VisualAgentMapView extends ItemView {
       }
       lines[index] = this.chatLine(label, outcome);
     }
-    // addNode selects each card it makes, which leaves the last one selected; the reply's new branch root is the better start.
-    const branchRoot = this.chatBranchRoot(run);
-    if (branchRoot && same() && !this.closed) this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     const all = [...lines];
     if (result.rejected.length)
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });

@@ -438,6 +438,17 @@ test('V7: a reply with focus_topic still selects the branch root and does not mo
   const kids = Array.from({ length: 6 }, (_, i) => ({ kind: 'add_child', ref: `k${i}`, parentId: i ? 'new:k0' : h.named('Root').id, title: `Kid${i}` }));
   await chatApply(h, [...kids, { kind: 'focus_topic', nodeId: h.named('A').id }]);
   assert.equal(h.fits(), 0, 'focus_topic keeps the view where the reply put it');
+  h.view.notes = new Map(await Promise.all(h.view.map.nodes.map(async n => [n.id, await h.repo.readNote(n.path)])));
+  assert.equal(h.view.selection.state.selected, h.named('Kid0').id, 'the reply made cards, so its branch root (first card made) is selected');
+});
+
+test('V7: a reply that makes cards and also selects existing cards ends with those cards selected, not the branch root', async () => {
+  const h = await harness(tree4);
+  const picked = [h.named('A').id, h.named('B').id];
+  await chatApply(h, [{ kind: 'add_child', ref: 'r', parentId: '', title: 'Branch' }, { kind: 'add_child', ref: 'k', parentId: 'new:r', title: 'Kid' }, { kind: 'select_topics', nodeIds: picked }]);
+  assert.equal(h.view.map.nodes.some(n => n.path && /Branch/.test(n.path)), true, 'the cards were made');
+  assert.equal(h.view.selection.state.selected, null, 'the requested selection wins over the branch root');
+  assert.deepEqual([...h.view.selection.state.multiSelected].sort(), [...picked].sort());
 });
 
 test('V7: a manual add still selects the new card', async () => {

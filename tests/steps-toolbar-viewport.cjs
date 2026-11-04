@@ -424,6 +424,7 @@ test('four-sided inset: a number is the top only; Show all keeps the lowest card
   assert.ok(old.y + 1200 * old.zoom > 600 - 68, 'without the bottom inset the card would sit under the bar');
   const left = inset.fitViewport({ minX: 0, minY: 0, maxX: 900, maxY: 300 }, size, { top: 58, right: 0, bottom: 0, left: 300 });
   assert.ok(left.x >= 300 - 1e-6, `leftmost card ${left.x} is right of the panel edge 300`);
+  assert.ok(inset.fitViewport({ minX: 0, minY: 0, maxX: 900, maxY: 300 }, size, 58).x < 300, 'contrast: the old number inset puts the leftmost card under a 300px left panel');
   assert.ok(left.x + 900 * left.zoom <= 1000 + 1e-6, 'the right edge stays in the canvas');
   const focus = inset.focusViewport({ x: 0, y: 0, zoom: 1 }, { x: 140, y: 80 }, size, { top: 58, right: 0, bottom: 68, left: 300 });
   assert.equal(focus.x, 300 + (1000 - 300) / 2 - 140);
@@ -456,9 +457,9 @@ test('Show all measures the zoom bar and the overlay chat panel; a docked panel 
   const overlay = fixture({ tools: rects.tools, zoom: rects.zoom, chat: rects.chat });
   overlay.nodes[0].y = 400; overlay.nodes[1].x = 400; overlay.nodes[1].y = 400;
   overlay.view.fit();
-  assert.equal(overlay.view.canvasInsets().left, 300);
   const o = overlay.view.map.viewport;
   assert.ok(overlay.nodes[0].x * o.zoom + o.x >= 300 - 1e-6, `leftmost card ${overlay.nodes[0].x * o.zoom + o.x} is right of the panel edge`);
+  assert.equal(overlay.view.canvasInsets().left, 300);
 });
 
 // ---- UX review A theme 3: zoom keeps the selected card ----

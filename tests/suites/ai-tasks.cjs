@@ -340,10 +340,14 @@ integrationTest('AIM task timeout text follows the interface language while the 
 });
 test('summary truncation never leaves trailing whitespace and prefers a sentence boundary', () => {
   const { truncateSummary } = load('ai/result-utils.ts');
-  const spaced = truncateSummary(`${'a'.repeat(79)} tail that continues past the limit`);
-  assert.equal(spaced, spaced.trimEnd()); assert.ok(Array.from(spaced).length <= 160);
+  const width = text => Array.from(text).reduce((sum, ch) => sum + (/[\u1100-\u115f\u2e80-\u303e\u3040-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{20000}-\u{3fffd}]/u.test(ch) ? 1 : 0.5), 0);
+  const spacedInput = `${'a'.repeat(159)} tail that continues past the limit`;
+  assert.ok(width(spacedInput) > 80, 'the sample really exceeds the width limit');
+  const spaced = truncateSummary(spacedInput);
+  assert.notEqual(spaced, spacedInput, 'it is truncated');
+  assert.equal(spaced, spaced.trimEnd()); assert.ok(Array.from(spaced).length <= 160); assert.ok(width(spaced) <= 80, `display width ${width(spaced)} <= 80`);
   const observed = truncateSummary('三個來源大致一致，公開版為 1.14.4（2026-10-05）；但 changelog 公開條目標為「1.14」，需注意 Catalyst 1.14.4 於 10/1 先行，且尚有標示差異，另外還有許多補充說明與後續追蹤事項需要再確認');
-  assert.equal(observed, observed.trimEnd()); assert.ok(Array.from(observed).length <= 160); assert.match(observed, /…$/);
+  assert.equal(observed, observed.trimEnd()); assert.ok(Array.from(observed).length <= 160); assert.ok(width(observed) <= 80, `display width ${width(observed)} <= 80`); assert.match(observed, /…$/);
   assert.equal(truncateSummary(`${'第一句完整結論'.repeat(7)}。${'後續補充說明'.repeat(15)}`), `${'第一句完整結論'.repeat(7)}。`);
   assert.equal(truncateSummary('  Short.  '), 'Short.');
   assert.equal(Array.from(truncateSummary('字'.repeat(200))).length, 80);

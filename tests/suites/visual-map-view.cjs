@@ -3502,6 +3502,23 @@ integrationTest('topic-markers: refreshing a card replaces its symbols and its n
   f.view.refreshCard(node, false);
   assert.doesNotMatch(label.text, /Markers/);
 });
+integrationTest('status pill: an AIM idea card has the same pill after a full render and after refreshCard; a plain idea card has none after either', () => {
+  for (const [aimKind, expected] of [['research', ['Not started']], [undefined, []]]) {
+    const f = heFixture({ notes: heNotes([['fact', { status: 'idea' }], ['hyp', {}], ['other', {}]]), aim: !!aimKind });
+    if (aimKind) f.view.map.nodes[0].aimKind = aimKind;
+    f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
+    const node = f.view.map.nodes[0], card = f.view.stageEl.children[0];
+    f.view.stageEl.querySelector = () => card; f.view.drawEdges = () => {};
+    const header = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-node-header'));
+    const pills = () => header.children.filter(c => (c.cls ?? '').split(/\s+/).includes('vam-status')).map(c => c.text);
+    const plainQuery = card.querySelector.bind(card);
+    card.querySelector = sel => (sel.includes('> .vam-status') ? header.children.find(c => (c.cls ?? '').split(/\s+/).includes('vam-status') && !(c.cls ?? '').includes('vam-aim-question-status')) ?? null : plainQuery(sel));
+    const rendered = pills();
+    f.view.refreshCard(node, false);
+    assert.deepEqual(pills(), rendered, `${aimKind ?? 'plain'}: refreshCard agrees with the full render`);
+    assert.equal(rendered.length, expected.length, `${aimKind ?? 'plain'} idea card pill count`);
+  }
+});
 integrationTest('topic-markers: refreshCard keeps the marker row where it was (after the type tag), and the row carries the tag style', () => {
   const f = heFixture({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) });
   f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);

@@ -2919,6 +2919,13 @@ integrationTest('B1 ui: result lines name their status in words; five or fewer a
   assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')).length, 0);
 });
 
+integrationTest('B1 ui: the auto-layout line is a note: it is neither spoken in the counts nor counted toward folding', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
+  const note = 'Arranged the map automatically after adding many topics';
+  chat.begin('q'); chat.finish('r', [...Array.from({ length: 5 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'done', text: note }]);
+  assert.match(writes.at(-1), /Results: 5 done$/, 'spoken count leaves the auto-layout line out');
+  assert.equal(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')), undefined, 'five results plus the note do not fold');
+});
 integrationTest('B1 ui: more than five result lines fold into a count; the toggle shows them all and back; the closing line stays last; focus stays on the toggle', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
   const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.' }];

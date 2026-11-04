@@ -58320,7 +58320,7 @@ ${request.requirements}` : preset.text,
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
-      } else if (!note || note.status !== "idea" || active || queued) {
+      } else if (!note || note.status !== (node.aimKind ? "completed" : "idea") || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_i = note == null ? void 0 : note.status) != null ? _i : "error"}`,
           text: statusText
@@ -64537,6 +64537,8 @@ ${note.detail.trim()}` : "",
         this.updateHistoryButtons();
       }
     }
+    const branchRoot = this.chatBranchRoot(run);
+    if (branchRoot && same() && !this.closed) this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     for (const index of later) {
       const action = result.actions[index];
       const label = this.chatActionLabel(action, refTitles);
@@ -64572,8 +64574,6 @@ ${note.detail.trim()}` : "",
       }
       lines[index] = this.chatLine(label, outcome);
     }
-    const branchRoot = this.chatBranchRoot(run);
-    if (branchRoot && same() && !this.closed) this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     const all = [...lines];
     if (result.rejected.length)
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });

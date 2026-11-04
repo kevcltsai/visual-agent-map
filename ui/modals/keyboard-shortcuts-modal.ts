@@ -15,6 +15,9 @@ export const MAP_KEYBOARD_SHORTCUTS: readonly { keys: readonly string[]; action:
   { keys: ["Mod+F"], action: "ui.shortcut_search_map" },
   { keys: ["Mod+Z"], action: "ui.shortcut_undo" },
   { keys: ["Mod+Shift+Z"], action: "ui.shortcut_redo" },
+  { keys: ["Mod+C"], action: "ui.shortcut_copy" },
+  { keys: ["Mod+X"], action: "ui.shortcut_cut" },
+  { keys: ["Mod+V"], action: "ui.shortcut_paste" },
   { keys: ["Esc"], action: "ui.shortcut_clear_selection" }
 ];
 

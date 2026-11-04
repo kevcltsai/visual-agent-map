@@ -12179,7 +12179,7 @@ export class VisualAgentMapView extends ItemView {
         this.map?.nodes
           .filter(item => item.parentId === node.id)
           .map(item => this.notes.get(item.id)?.title ?? item.path) ?? [];
-      new NextStepModal(
+      const dialog = new NextStepModal(
         this.app,
         note.title,
         this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0,
@@ -12273,7 +12273,8 @@ export class VisualAgentMapView extends ItemView {
               : undefined;
           })()
         }
-      ).open();
+      );
+      this.openMapModal(dialog);
     });
   }
   private openNodePanel(node: MapNode, mode: "structure" | "proposals"): void {
@@ -14386,14 +14387,15 @@ export class VisualAgentMapView extends ItemView {
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
     });
     const names = shown.map(item => item.name);
-    new MultiResearchModal(
+    const dialog = new MultiResearchModal(
       this.app,
       names,
       this.modelChoices(),
       request => void this.startMultiResearch(request, retryBatchKey),
       this.fieldLinks(),
       shown.map(item => item.mode)
-    ).open();
+    );
+    this.openMapModal(dialog);
   }
   stopMultiResearch(): void {
     this.plugin.expansionCoordinator.stop(this.multiResearchKey());
@@ -15218,7 +15220,7 @@ export class VisualAgentMapView extends ItemView {
     // The styles are read again first (#38), so the line shows a style file made since the last run.
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
-      new NextStepModal(
+      const dialog = new NextStepModal(
         this.app,
         "",
         0,
@@ -15245,7 +15247,8 @@ export class VisualAgentMapView extends ItemView {
             ? { pending: { directions: pending.directions, discard: () => this.discardSelectionSynthesis() } }
             : {})
         }
-      ).open();
+      );
+      this.openMapModal(dialog);
     });
   }
   /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */

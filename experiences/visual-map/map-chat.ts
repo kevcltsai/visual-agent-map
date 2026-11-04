@@ -1007,9 +1007,7 @@ export class MapChatPanel {
     this.host.stateChanged?.();
     // The results of an applied plan arrive well after the reply: say them once, like the results of a reply.
     if (lines?.length)
-      this.announce(
-        t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, chatNoteTexts())))
-      );
+      this.announce(t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, chatNoteTexts()))));
   }
   /** Offers a short list to pick from under the last answer. */
   showChoices(choices: MapChatChoices): void {

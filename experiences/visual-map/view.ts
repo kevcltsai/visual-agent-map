@@ -15788,7 +15788,8 @@ export class VisualAgentMapView extends ItemView {
   private canvasInsets(): CanvasInsets {
     const canvas = this.viewportEl?.getBoundingClientRect?.();
     if (!canvas) return { top: 0, right: 0, bottom: 0, left: 0 };
-    const rectOf = (selector: string) => this.contentEl?.querySelector<HTMLElement>(selector)?.getBoundingClientRect?.();
+    const rectOf = (selector: string) =>
+      this.contentEl?.querySelector<HTMLElement>(selector)?.getBoundingClientRect?.();
     return {
       top: insetFromRects(canvas.top, rectOf(".vam-map-tools")),
       right: 0,

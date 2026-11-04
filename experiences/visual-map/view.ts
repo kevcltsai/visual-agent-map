@@ -8927,6 +8927,8 @@ export class VisualAgentMapView extends ItemView {
     preserve?: (charted: string) => boolean;
   }): void {
     const path = job.path;
+    // AI lock: no diagrams are asked for a locked topic, and a result that lands after a lock is not written.
+    if (job.saved.aiLocked) return;
     const snapshot = this.chartSnapshot(job.saved);
     const map = this.map ?? undefined;
     this.plugin.addChartsAfterWrite({
@@ -8938,7 +8940,7 @@ export class VisualAgentMapView extends ItemView {
       apply: async charted => {
         if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
-        if (this.chartSnapshot(latest) !== snapshot) return false;
+        if (latest.aiLocked || this.chartSnapshot(latest) !== snapshot) return false;
         // "Add new findings on top": the diagrams may only touch the new text. The whole Detail is not normalized (that
         // would move the old text); the diagrammed text must still hold every old piece, or the diagrams are dropped.
         const top = job.updateMode === "top";
@@ -12903,6 +12905,9 @@ export class VisualAgentMapView extends ItemView {
     this.startingTasks.get(path)?.abort();
     this.plugin.topicRuns.taskController(path)?.abort();
     this.plugin.topicRuns.stop(path);
+    this.plugin.abortChartJobs(path);
+    const synthesis = this.synthesisTasks.get(path);
+    if (synthesis?.state === "running") synthesis.controller.abort();
   }
   /**
    * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).

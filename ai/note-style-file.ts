@@ -303,7 +303,8 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
     const { callouts, rest } = parseCallouts(content, sectionCode);
     const standard = standardKeyOf(heading.name);
     // The current "Sources" name starts as none: it takes the sources role below only when no older name has it.
-    const role = standard >= 0 && STANDARD_ROWS[standard][1] !== "detail.sources_heading" ? STANDARD_ROWS[standard][3] : "none";
+    const role =
+      standard >= 0 && STANDARD_ROWS[standard][1] !== "detail.sources_heading" ? STANDARD_ROWS[standard][3] : "none";
     const standardAliases =
       standard >= 0
         ? NOTE_LANGUAGES.map(locale => translate(locale, STANDARD_ROWS[standard][1])).filter(

@@ -6465,17 +6465,25 @@ export class VisualAgentMapView extends ItemView {
           sourcePaths: sources.map(source => source.path),
           status: mergedStatus(detail)
         });
-      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id);
+      // The sources may hold the title's file name until they are parked: the merged note takes it once they are.
+      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id, sanitizeGeneratedTitle(title));
       for (const source of sources) tx.park(source.path, parkFolder, before.id, "unassigned");
       entry = await tx
-        .editMap(mapPath, map => {
+        .editMap(mapPath, (map, resolve) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen.
           map.viewport = clone(viewport);
           const ids = new Set(sources.map(source => source.id)),
             first = map.nodes.find(item => item.id === sources[0].id);
           if (!first || sources.some(source => !map.nodes.some(item => item.id === source.id)))
             throw new Error(t("ui.merge_missing_note"));
-          const merged: MapNode = { ...created, parentId: check.parentId, x: first.x, y: first.y, collapsed: false },
+          const merged: MapNode = {
+              ...created,
+              path: resolve(created.path),
+              parentId: check.parentId,
+              x: first.x,
+              y: first.y,
+              collapsed: false
+            },
             adopted = new Set<string>();
           for (const item of map.nodes)
             if (item.parentId !== null && ids.has(item.parentId)) {

@@ -399,8 +399,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 7 (the prompt lost the detailed and redo texts and gained the no-count rule; D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 7);
+test('C1: the style is not part of the action schema, and the step version is 8 (the prompt lost the detailed and redo texts, gained the no-count rule and the topic-type and relation text; D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 8);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -934,4 +934,57 @@ test('map chat context adds no status or error field to a card that did not fail
   assert.equal(noReason.outline.find(node => node.id === 'a').status, 'error');
   assert.equal('error' in noReason.outline.find(node => node.id === 'a'), false, 'no reason stored, none invented');
   assert.equal(JSON.parse(context({ outline: outline.map(node => (node.id === 'a' ? { ...node, error: 'stray' } : node)) }).json).outline[1].error, undefined, 'error without status error is not sent');
+});
+
+// ---- AI chat reads topic types and relations (chat 02) ----------------------------------------------------------------
+test('chat 02: the outline carries a topic type other than an ordinary topic, and a strength only next to a hypothesis', () => {
+  const typed = [
+    { id: 'r', title: 'Root', summary: '', parentId: null, depth: 0, kind: 'topic' },
+    { id: 'h', title: 'H', summary: '', parentId: 'r', depth: 1, kind: 'hypothesis', strength: 'strong' },
+    { id: 'e', title: 'E', summary: '', parentId: 'r', depth: 1, kind: 'evidence', strength: 'weak' },
+    { id: 'x', title: 'X', summary: '', parentId: 'r', depth: 1 }
+  ];
+  const sent = JSON.parse(buildMapChatContext(input({ outline: typed })).json).outline;
+  const of = id => sent.find(n => n.id === id);
+  assert.equal('kind' in of('r'), false, 'an ordinary topic sends no kind');
+  assert.equal('kind' in of('x'), false);
+  assert.equal(of('h').kind, 'hypothesis'); assert.equal(of('h').strength, 'strong');
+  assert.equal(of('e').kind, 'evidence'); assert.equal('strength' in of('e'), false, 'only a hypothesis has a strength');
+});
+
+test('chat 02: relations are sent with both ends, kind and the whole description; one with an end outside the outline is left out', () => {
+  const relations = [
+    { kind: 'supports', from: 'a', to: 'b', description: 'A note on why a backs b' },
+    { kind: 'related', from: 'a1', to: 'b' },
+    { kind: 'prerequisite', from: 'a', to: 'gone' }
+  ];
+  const sent = JSON.parse(context({ relations }).json);
+  assert.deepEqual(sent.relations, [
+    { kind: 'supports', from: 'a', to: 'b', description: 'A note on why a backs b' },
+    { kind: 'related', from: 'a1', to: 'b' }
+  ]);
+  assert.equal('relations' in JSON.parse(context().json), false, 'no relations, no key');
+});
+
+test('chat 02: an AIM map sends no topic type, strength or relation, even when they are given', () => {
+  const typed = outline.map(node => ({ ...node, kind: 'hypothesis', strength: 'medium' }));
+  const sent = JSON.parse(context({ outline: typed, relations: [{ kind: 'supports', from: 'a', to: 'b' }], aim: true }).json);
+  assert.equal(sent.outline.some(n => 'kind' in n || 'strength' in n), false);
+  assert.equal('relations' in sent, false);
+});
+
+test('chat 02: types and relations count toward the token budget of the whole prompt', () => {
+  const many = Array.from({ length: 4000 }, (_, i) => ({ id: `n${i}`, title: `T${i}`, summary: '', parentId: null, depth: 0, kind: 'evidence' }));
+  const relations = many.slice(1).map((n, i) => ({ kind: 'supports', from: n.id, to: many[i].id, description: 'd'.repeat(200) }));
+  const ctx = buildMapChatContext(input({ outline: many, relations }));
+  assert.throws(() => mapChatStep.policy(mapChatStep.render({ message: 'hi', context: ctx, language: 'en', model: 'm', reasoning: 'low' }), { message: 'hi', context: ctx }), error => error.code === 'over_budget');
+});
+
+test('chat 02: both prompts explain the six types and six relations, the one-step rule and that a wrong relation is only pointed out', () => {
+  const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
+  const en = render('en'), zh = render('zh-TW');
+  for (const word of ['atomic', 'hypothesis', 'evidence', 'conclusion', 'action', 'supports', 'contradicts', 'verifies', 'derives from', 'prerequisite', 'related']) assert.ok(en.includes(word), word);
+  assert.match(en, /go one step only/); assert.match(en, /everything related/); assert.match(en, /say so in "reply" and leave it in place/);
+  for (const word of ['一般議題', '原子知識', '假設', '證據', '結論', '行動', '支持', '反駁', '驗證', '衍生自', '相關', '先備']) assert.ok(zh.includes(word), word);
+  assert.match(zh, /只走一層/); assert.match(zh, /全部相關的/); assert.match(zh, /只在 "reply" 提出/);
 });

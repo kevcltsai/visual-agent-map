@@ -24971,7 +24971,7 @@ var centreOf = (box) => ({
 });
 function nearestSides(a, b, axis = void 0) {
   const horizontal = axisGap(a.x, a.width, b.x, b.width), vertical = axisGap(a.y, a.height, b.y, b.height);
-  if (horizontal < 0 && vertical < 0) {
+  if (horizontal <= 0 && vertical <= 0) {
     const from = centreOf(a), to = centreOf(b);
     return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
   }

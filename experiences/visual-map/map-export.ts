@@ -416,10 +416,19 @@ export interface OutlineNode {
 }
 
 /**
- * Markdown outline of the whole map in node order, two spaces per level. Collapsed branches are written out in full:
- * collapsing is a view state, not content.
+ * Markdown outline of the whole map in the given node order, written as headings (`#` to `######`), which is the form
+ * the outline import reads, so the file can be imported back with the same structure. Collapsed branches are written out
+ * in full: collapsing is a view state, not content. A card's summary follows its heading as one `>` quote line (the import
+ * ignores it, and no summary text can turn into a heading or a fence). Research text is not written: it holds its own
+ * headings and would break the round trip; OPML carries it. Several roots are put under one heading with the map title
+ * (the import takes one root); a level deeper than six is written as level six, the most Markdown has.
  */
-export function mapOutline(nodes: OutlineNode[], titleOf: (id: string) => string): string {
+export function mapOutline(
+  nodes: OutlineNode[],
+  titleOf: (id: string) => string,
+  summaryOf: (id: string) => string = () => "",
+  mapTitle = ""
+): string {
   const ids = new Set(nodes.map(n => n.id));
   const children = new Map<string, OutlineNode[]>();
   const roots: OutlineNode[] = [];
@@ -430,18 +439,23 @@ export function mapOutline(nodes: OutlineNode[], titleOf: (id: string) => string
       children.set(node.parentId, list);
     } else roots.push(node);
   }
+  const oneLine = (value: string | undefined): string => (value ?? "").replace(/\s+/g, " ").trim();
   const lines: string[] = [];
   const seen = new Set<string>();
+  const wrap = roots.length > 1;
+  if (wrap) lines.push(`# ${oneLine(mapTitle) || "Map"}`);
   const walk = (node: OutlineNode, depth: number): void => {
     if (seen.has(node.id)) return;
     seen.add(node.id);
-    const title =
-      String(titleOf(node.id) ?? "")
-        .replace(/\s+/g, " ")
-        .trim() || node.id;
-    lines.push(`${"  ".repeat(depth)}- ${title}`);
+    const title = oneLine(titleOf(node.id)) || node.id;
+    lines.push(`${"#".repeat(Math.min(6, depth + 1 + (wrap ? 1 : 0)))} ${title}`);
+    const summary = oneLine(summaryOf(node.id));
+    if (summary) lines.push("", `> ${summary}`, "");
     for (const child of children.get(node.id) ?? []) walk(child, depth + 1);
   };
   for (const root of roots) walk(root, 0);
-  return lines.join("\n");
+  return lines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\n+$/, "");
 }

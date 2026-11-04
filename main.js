@@ -17915,7 +17915,7 @@ function exportLimits(scene) {
   const longest = Math.max(width, height);
   return longest > EXPORT_MAX_EDGE ? { action: "scaleDown", scale: EXPORT_MAX_EDGE / longest } : { action: "ok", scale: 1 };
 }
-function mapOutline(nodes, titleOf) {
+function mapOutline(nodes, titleOf, summaryOf = () => "", mapTitle = "") {
   var _a2;
   const ids = new Set(nodes.map((n) => n.id));
   const children = /* @__PURE__ */ new Map();
@@ -17927,18 +17927,23 @@ function mapOutline(nodes, titleOf) {
       children.set(node.parentId, list);
     } else roots.push(node);
   }
+  const oneLine2 = (value) => (value != null ? value : "").replace(/\s+/g, " ").trim();
   const lines = [];
   const seen = /* @__PURE__ */ new Set();
+  const wrap = roots.length > 1;
+  if (wrap) lines.push(`# ${oneLine2(mapTitle) || "Map"}`);
   const walk = (node, depth) => {
-    var _a3, _b2;
+    var _a3;
     if (seen.has(node.id)) return;
     seen.add(node.id);
-    const title = String((_a3 = titleOf(node.id)) != null ? _a3 : "").replace(/\s+/g, " ").trim() || node.id;
-    lines.push(`${"  ".repeat(depth)}- ${title}`);
-    for (const child of (_b2 = children.get(node.id)) != null ? _b2 : []) walk(child, depth + 1);
+    const title = oneLine2(titleOf(node.id)) || node.id;
+    lines.push(`${"#".repeat(Math.min(6, depth + 1 + (wrap ? 1 : 0)))} ${title}`);
+    const summary = oneLine2(summaryOf(node.id));
+    if (summary) lines.push("", `> ${summary}`, "");
+    for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk(child, depth + 1);
   };
   for (const root of roots) walk(root, 0);
-  return lines.join("\n");
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "");
 }
 
 // experiences/visual-map/map-focus.ts
@@ -57834,10 +57839,19 @@ ${request.requirements}` : preset.text,
     try {
       let blob;
       if (format === "md") {
-        const outline = mapOutline(map.nodes, (id) => {
-          var _a2, _b2;
-          return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : "";
-        });
+        const outline = mapOutline(
+          this.onScreenSiblingOrder(map),
+          (id) => {
+            var _a2, _b2;
+            return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : "";
+          },
+          (id) => {
+            var _a2, _b2;
+            const summary = (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.summary) != null ? _b2 : "";
+            return isPlaceholder(summary) ? "" : summary;
+          },
+          map.title
+        );
         blob = new Blob([`${outline}
 `], { type: "text/markdown;charset=utf-8" });
       } else {

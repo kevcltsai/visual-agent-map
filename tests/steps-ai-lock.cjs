@@ -91,13 +91,14 @@ async function harness(titles = ['A', 'B'], plugin = {}) {
     ...plugin
   });
   repo.settings = host.settings;
-  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } } } });
+  const modals = [];
+  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } }, Modal: class { constructor(app) { this.app = app; } open() { modals.push(this); } close() {} } } });
   const view = new VisualAgentMapView({ app }, attachTopicRuns(host));
   const hydrate = async () => { view.notes = new Map(await Promise.all(mapDoc.nodes.map(async n => [n.id, await repo.readNote(n.path, mapDoc)]))); };
   Object.assign(view, { path: MAP, map: mapDoc, contentEl: { querySelector: () => null }, render() {}, hydrate, ancestorContext: async () => '', queueCharts() {} });
   await hydrate();
   const raw = node => contents.get(node.path);
-  return { repo, app, contents, view, host, nodes, calls, notices, raw, hold: () => { gate = []; return gate; } };
+  return { repo, app, contents, view, host, nodes, calls, notices, raw, modals, hold: () => { gate = []; return gate; } };
 }
 const research = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
 
@@ -391,4 +392,185 @@ test('04 integrate selection: locked sources may be read; the new topic is writt
   assert.deepEqual(failures, []);
   assert.equal(h.calls.length >= 1, true);
   assert.deepEqual([h.raw(a), h.raw(b)], sources, 'locked sources are read, never written');
+});
+
+// ---- ticket 05: merge -----------------------------------------------------------------------------------------------
+async function mergeHarness(titles = ['A', 'B', 'C']) {
+  const h = await harness(titles);
+  for (const node of h.nodes) await h.repo.updateNote(node.path, { summary: `${node.path} summary`, detail: 'Source detail', status: 'completed' });
+  await h.view.hydrate();
+  h.view.mergeOpen = false;
+  return h;
+}
+const snapshotOf = (h, nodes, targetId = null) => ({ path: MAP, mapId: h.view.map.id, parentId: null, targetId, sources: nodes.map(n => ({ id: n.id, path: n.path })) });
+const signal = () => new AbortController().signal;
+
+test('05 merge: an AI merge with one locked source is refused before the AI and writes nothing', async () => {
+  const h = await mergeHarness();
+  const [a, b] = h.nodes;
+  await h.view.setAiLock([a], true);
+  const before = [h.raw(a), h.raw(b)], mapBefore = h.contents.get(MAP);
+  const began = await h.view.startMergeDraft('M', snapshotOf(h, [a, b]), () => assert.fail('not started'), signal());
+  assert.equal(began, false);
+  assert.equal(h.calls.length, 0, 'provider calls: 0');
+  assert.match(h.notices.join('\n'), LOCKED_NOTICE);
+  assert.deepEqual([h.raw(a), h.raw(b)], before);
+  assert.equal(h.contents.get(MAP), mapBefore);
+});
+
+test('05 merge: opening Merge on a selection with a locked topic shows the notice and offers no AI merge', async () => {
+  const h = await mergeHarness();
+  const [a, b] = h.nodes;
+  await h.view.setAiLock([b], true);
+  h.view.selection.replaceMulti([a.id, b.id]);
+  h.view.openMerge();
+  assert.match(h.notices.join('\n'), LOCKED_NOTICE);
+  const modal = h.modals.at(-1);
+  assert.ok(modal, 'the dialog still opens for a merge by hand');
+  assert.equal(modal.ai, undefined, 'no AI merge is offered');
+  h.view.mergeOpen = false;
+  h.view.selection.replaceMulti([a.id, h.nodes[2].id]);
+  h.view.openMerge();
+  assert.ok(h.modals.at(-1).ai, 'nothing locked: the AI merge is offered as before');
+});
+
+test('05 merge: an AI merge of a topic related to a locked topic, or under a locked parent, is refused', async () => {
+  const h = await mergeHarness(['A', 'B', 'C', 'P', 'X', 'Y']);
+  const [a, b, c, p, x, y] = h.nodes;
+  h.view.map.topicRelations = [{ kind: 'related', from: a.id, to: c.id }];
+  x.parentId = p.id; y.parentId = p.id;
+  await h.repo.saveMap(MAP, h.view.map);
+  await h.view.setAiLock([c, p], true);
+  assert.equal(await h.view.startMergeDraft('M', snapshotOf(h, [a, b]), () => assert.fail('related'), signal()), false);
+  assert.equal(await h.view.startMergeDraft('M', { ...snapshotOf(h, [x, y]), parentId: p.id }, () => assert.fail('locked parent'), signal()), false);
+  assert.equal(h.calls.length, 0);
+});
+
+test('05 merge: merging into a locked parent topic is refused', async () => {
+  const h = await mergeHarness(['P', 'C1', 'C2']);
+  const [p, c1, c2] = h.nodes;
+  c1.parentId = p.id; c2.parentId = p.id;
+  await h.repo.saveMap(MAP, h.view.map);
+  await h.view.setAiLock([p], true);
+  assert.equal(await h.view.startMergeDraft('M', snapshotOf(h, [p, c1, c2], p.id), () => assert.fail('started'), signal()), false);
+  assert.equal(h.calls.length, 0);
+});
+
+test('05 merge: late fence: a source locked while the AI merges gets no merge written', async () => {
+  const h = await mergeHarness();
+  const [a, b] = h.nodes;
+  const gate = h.hold();
+  const before = h.raw(b), nodes = h.view.map.nodes.length;
+  assert.equal(await h.view.startMergeDraft('M', snapshotOf(h, [a, b]), () => {}, signal()), true);
+  await until(() => gate.length === 1);
+  await h.repo.writeAiLocked(a.path, true);
+  gate[0]();
+  await h.view.mergeTasks.get(MAP)?.run;
+  assert.equal(h.view.map.nodes.length, nodes, 'no merged topic');
+  assert.equal(h.raw(b), before, 'the other source is untouched');
+  assert.match((await h.repo.readNote(a.path)).aiLocked ? 'locked' : '', /locked/);
+  assert.ok(h.app.vault.getAbstractFileByPath(a.path), 'the locked source note stays where it was');
+  assert.match(h.notices.join('\n'), LOCKED_NOTICE);
+});
+
+test('05 merge: a merge by hand (no AI) of locked topics still works', async () => {
+  const h = await mergeHarness();
+  const [a, b] = h.nodes;
+  await h.view.setAiLock([a], true);
+  await h.view.mergeSelected('Merged by hand', snapshotOf(h, [a, b]));
+  assert.equal(h.view.map.nodes.some(node => node.id === a.id), false, 'the user merge went through');
+});
+
+test('05 merge: the map chat merge of a locked topic is skipped and writes nothing', async () => {
+  const h = await mergeHarness();
+  const [a, b] = h.nodes;
+  await h.view.setAiLock([a], true);
+  h.view.canSelectTopics = () => true;
+  const before = h.contents.get(MAP);
+  const outcome = await h.view.runChatSelection({ kind: 'run_map_action', action: 'merge', title: 'Merged', nodeIds: [a.id, b.id] });
+  assert.equal(outcome.status, 'skipped');
+  assert.match(outcome.reason, LOCKED_NOTICE);
+  assert.equal(h.contents.get(MAP), before);
+  assert.ok(h.view.map.nodes.some(node => node.id === a.id));
+});
+
+// ---- ticket 06: expand, grade by goal, structure suggestions, AI outline import -------------------------------------
+test('06 expand: proposing subtopics for a locked topic is refused before the AI', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  await h.view.setAiLock([p], true);
+  const failures = [];
+  await h.view.proposeChildren(p, { ...synthesis, shallowResearch: false }, '', () => assert.fail('no suggestions'), message => failures.push(message));
+  assert.equal(h.calls.length, 0, 'provider calls: 0');
+  assert.match(failures.join('\n'), LOCKED_NOTICE);
+});
+
+test('06 expand: creating suggested subtopics under a parent locked meanwhile writes nothing', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  await h.repo.writeAiLocked(p.path, true); // locked after the proposal, before the batch write (the view has not seen it)
+  const mapBefore = h.contents.get(MAP), count = h.view.map.nodes.length;
+  await assert.rejects(h.view.createChildBatch(p, [{ title: 'Child', task: 't', contribution: '' }]), LOCKED_NOTICE);
+  assert.equal(h.view.map.nodes.length, count);
+  assert.equal(h.contents.get(MAP), mapBefore);
+});
+
+test('06 expand: quick explore and the chat expand refuse a locked topic before the AI', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  await h.view.setAiLock([p], true);
+  let outlineCalls = 0;
+  h.host.outlineGeneration = { generate: async () => { outlineCalls++; return { nodes: [], markdown: '' }; } };
+  await assert.rejects(h.view.quickOutline(p).generate({ presetId: 'default', requirements: '', language: 'en', limits: { levels: 2, maxTopics: 5 } }, signal()), LOCKED_NOTICE);
+  await h.view.chatExpand(p, '');
+  assert.equal(outlineCalls, 0, 'provider calls: 0');
+  assert.match(h.notices.join('\n'), LOCKED_NOTICE);
+  assert.equal(h.host.running.has(p.path), false, 'the chat expand does not stay running');
+});
+
+test('06 outline: an AI outline under a locked topic is refused and says how many topics were skipped; a pasted outline still goes in', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  await h.view.setAiLock([p], true);
+  const count = h.view.map.nodes.length;
+  const outline = [{ index: 0, title: 'One', level: 1, parent: null, line: 1 }, { index: 1, title: 'Two', level: 1, parent: null, line: 2 }];
+  await assert.rejects(h.view.importOutline({ nodes: outline, source: null, shallowResearch: false, aiGenerated: true, placement: { kind: 'under', parentId: p.id } }), /2/);
+  assert.equal(h.view.map.nodes.length, count, 'nothing added under the locked topic');
+  await h.view.importOutline({ nodes: outline, source: null, shallowResearch: false, placement: { kind: 'under', parentId: p.id } });
+  assert.equal(h.view.map.nodes.length, count + 2, 'a user outline is the user\'s own edit');
+});
+
+test('06 grade by goal: a locked card keeps its tier and is counted as skipped', async () => {
+  const h = await harness(['A', 'B']);
+  const [a, b] = h.nodes;
+  await h.repo.writeRelevance(a.path, { tier: 'side' });
+  await h.view.setAiLock([a], true);
+  const run = { token: 1, owner: h.view, controller: new AbortController(), goal: 'g', status: 'running' };
+  h.host.relevanceGrades = new Map([[MAP, run]]);
+  h.host.logs = { appendLog() {} };
+  const basis = h.nodes.map(n => ({ id: n.id, title: h.view.notes.get(n.id).title, parentId: null }));
+  const before = h.raw(a);
+  await h.view.applyRelevanceGrade(run, MAP, basis, { items: [{ id: a.id, tier: 'core' }, { id: b.id, tier: 'core' }] }, { mode: 'full', pins: [], repairs: [] });
+  assert.equal(h.raw(a), before, 'the locked tier is unchanged');
+  assert.equal((await h.repo.readNote(b.path)).relevance.tier, 'core');
+  assert.equal(run.outcome.skipped, 1);
+  assert.equal(run.outcome.graded, 1);
+});
+
+test('06 structure: suggestions touching a locked topic are dropped and counted; applying one refuses at write time', async () => {
+  const h = await harness(['A', 'B', 'C']);
+  const [a, b, c] = h.nodes;
+  await h.view.setAiLock([a], true);
+  const basis = { targetTitle: '', targetParentId: null };
+  const result = { suggestions: [
+    { kind: 'strengthen', targetId: a.id, basis }, { kind: 'move', targetId: b.id, newParentId: a.id, basis },
+    { kind: 'reduce', targetId: c.id, basis }, { kind: 'merge', targetId: b.id, mergeIntoId: c.id, basis }
+  ], rejected: [] };
+  const { kept, skipped } = h.view.dropAiLockedSuggestions(result);
+  assert.equal(skipped, 2);
+  assert.deepEqual(kept.suggestions.map(s => s.kind), ['reduce', 'merge']);
+  await h.repo.writeAiLocked(c.path, true); // locked after the review
+  const count = h.view.map.nodes.length;
+  await assert.rejects(h.view.applyStructureSuggestion({ kind: 'strengthen', targetId: c.id, basis }, 'New', () => null), LOCKED_NOTICE);
+  assert.equal(h.view.map.nodes.length, count);
 });

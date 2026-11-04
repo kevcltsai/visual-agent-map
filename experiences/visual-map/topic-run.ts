@@ -3,6 +3,7 @@
  * It imports neither obsidian nor the view; everything it needs from the plugin comes through lazy ports, because the
  * plugin replaces some of those objects after construction.
  */
+import { aiLockedError, isAiLockedError } from "../../core/ai-lock";
 import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
@@ -341,16 +342,6 @@ export interface TopicRunHandle {
   release(): void;
 }
 
-/** The error a write-time AI lock check throws; entries report it with the locked notice, not as a failure. */
-export function aiLockedError(): Error {
-  const error = new Error(t("ui.ai_locked_notice"));
-  error.name = "AiLockedError";
-  return error;
-}
-export function isAiLockedError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AiLockedError";
-}
-
 export class TopicRuns {
   /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
   get running(): Set<string> {
@@ -450,6 +441,11 @@ export class TopicRuns {
     try {
       const repo = this.ports.repository()!;
       const note = await repo.readNote(path, options.map);
+      // AI lock: no subtopics are proposed for a locked topic (no AI call).
+      if (note.aiLocked) {
+        fail(t("ui.ai_locked_notice"), false);
+        return;
+      }
       const used = options.runOnce?.model.trim()
         ? await this.ports.resolveModel(path, options.map, options.runOnce)
         : { model: note.model, reasoning: note.reasoning };
@@ -472,6 +468,11 @@ export class TopicRuns {
       }
       const latest = await repo.readNote(path, options.map);
       if (controller.signal.aborted) throw aborted();
+      // The late-result fence: suggestions for a topic locked meanwhile are not kept.
+      if (latest.aiLocked) {
+        fail(t("ui.ai_locked_notice"), false);
+        return;
+      }
       if (latest.thinkingOrigin !== note.thinkingOrigin)
         throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
       const pendingItems = suggestions.map(item => ({

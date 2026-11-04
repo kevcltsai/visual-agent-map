@@ -330,7 +330,7 @@ import {
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
-import { aiLockBlock, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
+import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
 import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
@@ -2623,6 +2623,7 @@ export class VisualAgentMapView extends ItemView {
       presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name }) => ({ id, name })),
       generate: async (request, signal): Promise<OutlineNode[]> => {
         const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+        if (note.aiLocked) throw new Error(t("ui.ai_locked_notice"));
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
@@ -2643,6 +2644,7 @@ export class VisualAgentMapView extends ItemView {
           nodes,
           placement: { kind: "under", parentId: node.id },
           source: null,
+          aiGenerated: true,
           shallowResearch: !!options.shallowResearch,
           researchEveryTopic: true,
           // The research of the new topics is the short overview in the dialog's AI mode (Quick when it has none).
@@ -2776,10 +2778,13 @@ export class VisualAgentMapView extends ItemView {
             );
             // Stopped, replaced or the view closed meanwhile: the late result is dropped.
             if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
+            // AI lock: suggestions that touch a locked topic are dropped, and the count is reported.
+            const { kept, skipped: lockedCount } = this.dropAiLockedSuggestions(review);
+            if (lockedCount) new Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
             own.state = "done";
-            own.result = review;
-            backgroundResultNotice(t("ui.structure_review_ready_0", review.suggestions.length), {
-              label: t("ui.structure_review_view_0", review.suggestions.length),
+            own.result = kept;
+            backgroundResultNotice(t("ui.structure_review_ready_0", kept.suggestions.length), {
+              label: t("ui.structure_review_view_0", kept.suggestions.length),
               open: () => this.reopenStructureReview(own)
             });
           } catch (error) {
@@ -3380,6 +3385,11 @@ export class VisualAgentMapView extends ItemView {
           outcome.skipped++;
           continue;
         }
+        if (note.aiLocked) {
+          // AI lock: a locked card keeps its tier, like a hand-set one, and is counted as skipped.
+          outcome.skipped++;
+          continue;
+        }
         if (note.relevance?.manual) {
           // A hand-set (pinned) card is never written by the AI, whatever the AI said.
           pinned.add(base.id);
@@ -3661,6 +3671,7 @@ export class VisualAgentMapView extends ItemView {
         new Notice(t("ui.merge_locked"));
         throw new Error(t("ui.merge_locked"));
       }
+      if (this.structureLockReason(suggestion)) throw new Error(t("ui.ai_locked_notice"));
     };
     const nodeOf = (id: string): MapNode => {
       const node = this.map?.nodes.find(item => item.id === id);
@@ -3675,6 +3686,8 @@ export class VisualAgentMapView extends ItemView {
     const write = (work: () => Promise<void>): Promise<void> =>
       this.plugin.mutate(async () => {
         guard();
+        // AI lock, at write time: the notes are read again, so a lock set after the review still counts.
+        if (this.structureLockReason(suggestion, await this.freshNotes())) throw new Error(t("ui.ai_locked_notice"));
         await work();
       });
     if (suggestion.kind === "strengthen")
@@ -3708,6 +3721,27 @@ export class VisualAgentMapView extends ItemView {
         () => resolve(false)
       ).open();
     });
+  }
+  /** Why a structure suggestion may not be applied (AI lock), or null: what it adds, moves or removes, and where. */
+  private structureLockReason(suggestion: StructureSuggestion, fresh?: ReadonlyMap<string, Note>): AiLockReason | null {
+    switch (suggestion.kind) {
+      case "strengthen":
+        return this.aiLockReason("addChild", [suggestion.targetId], fresh);
+      case "move":
+        return this.aiLockReason("move", [suggestion.targetId], fresh, { to: suggestion.newParentId ?? null });
+      case "reduce":
+        return this.aiLockReason("remove", [suggestion.targetId], fresh);
+      default:
+        return (
+          this.aiLockReason("remove", [suggestion.targetId], fresh) ??
+          (suggestion.mergeIntoId ? this.aiLockReason("addChild", [suggestion.mergeIntoId], fresh) : null)
+        );
+    }
+  }
+  /** The review without the suggestions that touch a locked topic, and how many were dropped. */
+  private dropAiLockedSuggestions(result: StructureReviewResult): { kept: StructureReviewResult; skipped: number } {
+    const suggestions = result.suggestions.filter(suggestion => !this.structureLockReason(suggestion));
+    return { kept: { ...result, suggestions }, skipped: result.suggestions.length - suggestions.length };
   }
   /** Moves one topic and its branch under a new parent, in one undo step. */
   private async moveTopic(node: MapNode, parent: MapNode): Promise<void> {
@@ -4119,6 +4153,17 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         const { map, path, parent } = current;
+        // AI lock: an outline from the AI may not add children under a locked topic; a user outline is the user's edit.
+        if (
+          request.aiGenerated &&
+          parent &&
+          this.aiLockReason("addChild", [parent.id], new Map([[parent.id, await repo.readNote(parent.path, map)]]))
+        ) {
+          const skippedCount = request.nodes.length;
+          new Notice(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          state.rejection = new Error(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          return;
+        }
         // A model chosen for the shallow research becomes the new topics' model; otherwise they inherit like new children.
         const baseModel = parent
           ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel)
@@ -5572,7 +5617,13 @@ export class VisualAgentMapView extends ItemView {
       targetId: check.targetId,
       sources: check.sources.map(source => ({ id: source.id, path: source.path }))
     };
-    const withContent = hasMergeContent(check.sources.map(source => this.notes.get(source.id)));
+    // AI lock: a merge by hand stays possible, but the dialog offers no AI merge.
+    const locked = !!this.mergeLockReason(
+      check.sources.map(source => source.id),
+      check.targetId
+    );
+    if (locked) new Notice(t("ui.ai_locked_notice"));
+    const withContent = !locked && hasMergeContent(check.sources.map(source => this.notes.get(source.id)));
     this.mergeOpen = true;
     new MergeTopicsModal(
       this.app,
@@ -5638,6 +5689,16 @@ export class VisualAgentMapView extends ItemView {
         check.sources.every(node => snapshot.sources.find(source => source.id === node.id)?.path === node.path)
       );
     };
+    if (
+      this.mergeLockReason(
+        snapshot.sources.map(source => source.id),
+        snapshot.targetId,
+        await this.freshNotes()
+      )
+    ) {
+      new Notice(t("ui.ai_locked_notice"));
+      return false;
+    }
     // The run below and its content check read the styles from this one refresh (no await inside the run, so its timing stays).
     await this.refreshNoteStyles();
     if (!stillValid()) {
@@ -5796,7 +5857,8 @@ export class VisualAgentMapView extends ItemView {
       if (!this.closed) this.render();
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
-      new Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
+      if (isAiLockedError(error)) new Notice(t("ui.ai_locked_notice"));
+      else new Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
     } finally {
       progress.end();
     }
@@ -5901,6 +5963,17 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.merge_missing_note"));
       return;
     }
+    // The late-result fence of the AI merge: a topic locked while the AI ran stops the write (a merge by hand is the
+    // user's own edit and is not asked).
+    if (
+      content &&
+      this.mergeLockReason(
+        check.sources.map(source => source.id),
+        check.targetId,
+        await this.freshNotes()
+      )
+    )
+      throw aiLockedError();
     const sources = check.sources,
       mapPath = this.path,
       repo = this.plugin.repo,
@@ -12900,6 +12973,32 @@ export class VisualAgentMapView extends ItemView {
   ): AiLockReason | null {
     return aiLockBlock(op, ids, this.map, id => (fresh?.get(id) ?? this.notes.get(id))?.aiLocked === true, options);
   }
+  /**
+   * Why the AI may not merge these topics (AI lock), or null: the sources leave the map (their subtree, their parent's
+   * child list and their semantic relations count), and in parent mode the parent topic is rewritten.
+   */
+  private mergeLockReason(
+    ids: readonly string[],
+    targetId: string | null | undefined,
+    fresh?: ReadonlyMap<string, Note>
+  ): AiLockReason | null {
+    const removed = ids.filter(id => id !== targetId);
+    return (
+      (targetId ? this.aiLockReason("write", [targetId], fresh) : null) ?? this.aiLockReason("remove", removed, fresh)
+    );
+  }
+  /** Every topic note of the map read again from disk: the write-time fence must not trust the view's copy. */
+  private async freshNotes(): Promise<Map<string, Note>> {
+    const fresh = new Map<string, Note>();
+    for (const node of this.map?.nodes ?? []) {
+      try {
+        fresh.set(node.id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
+      } catch {
+        /* A missing note has no lock; the write's own checks deal with it. */
+      }
+    }
+    return fresh;
+  }
   /** Stops every AI run on the topic through the same handles its Stop button uses. */
   private stopAiOn(path: string): void {
     this.startingTasks.get(path)?.abort();
@@ -13659,11 +13758,15 @@ export class VisualAgentMapView extends ItemView {
         kind: "topic"
       })
     ).template;
+    // AI lock: the parent is read again from disk before each child is added under it.
+    const parentLocked = async (): Promise<boolean> =>
+      (await this.plugin.repo.readNote(parent.path, this.map ?? undefined)).aiLocked === true;
     try {
       for (const item of items) {
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
+        if (owner === parent && (await parentLocked())) throw new Error(t("ui.ai_locked_notice"));
         await this.addNode(owner, item.title, false, false);
         created++;
         const child = this.map.nodes.at(-1)!;
@@ -17511,6 +17614,15 @@ export class VisualAgentMapView extends ItemView {
         if (this.mergeTasks.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
         const check = this.mergeCheck();
         if (!check.ok) return skipped("ui.map_chat_skip_unavailable");
+        // AI lock: the chat's merge is AI-initiated, so locked topics, their parents and relations refuse it.
+        if (
+          this.mergeLockReason(
+            check.sources.map(source => source.id),
+            check.targetId,
+            await this.freshNotes()
+          )
+        )
+          return skipped("ui.ai_locked_notice");
         const snapshot = {
           path: this.path,
           mapId: map.id,
@@ -17791,6 +17903,10 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
+      if (note.aiLocked) {
+        new Notice(t("ui.ai_locked_notice"));
+        return;
+      }
       const outline = this.quickOutline(parent);
       const limits = { levels: CHAT_EXPAND_LEVELS, maxTopics: CHAT_EXPAND_MAX_TOPICS };
       const generated = await outline.generate(

@@ -172,6 +172,7 @@ import {
   setTooltip
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
+import { cardFailure } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
@@ -10974,7 +10975,12 @@ export class VisualAgentMapView extends ItemView {
       issue.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
-    if (note?.status === "error" && note.lastError) errorDetails.push(note.lastError);
+    const technicalDetails: string[] = [];
+    if (note?.status === "error" && note.lastError) {
+      const failure = cardFailure(note.lastError);
+      errorDetails.push(failure.text);
+      if (failure.technical) technicalDetails.push(failure.technical);
+    }
     if (batch) {
       const currentNode = batch.currentPath ? this.map?.nodes.find(item => item.path === batch.currentPath) : undefined;
       const currentTitle = currentNode ? this.notes.get(currentNode.id)?.title : undefined;
@@ -10995,7 +11001,11 @@ export class VisualAgentMapView extends ItemView {
           text: `${batch.failures.length} ${t("ui.failed")}`
         });
         failure.setAttr("title", batch.failures.join("\n"));
-        errorDetails.push(...batch.failures);
+        for (const raw of batch.failures) {
+          const failure = cardFailure(raw);
+          errorDetails.push(failure.text);
+          if (failure.technical) technicalDetails.push(failure.technical);
+        }
       }
       this.renderRetryFailedButton(header, node.path, batch);
     }
@@ -11220,6 +11230,14 @@ export class VisualAgentMapView extends ItemView {
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
+      if (technicalDetails.length) {
+        const more = card.createEl("details", { cls: "vam-card-error-details" });
+        more.createEl("summary", { text: t("ui.technical_details") });
+        more.createEl("pre", { text: technicalDetails.join("\n\n") });
+        this.button(more, t("ui.copy_technical_details"), () => {
+          void navigator.clipboard?.writeText(technicalDetails.join("\n\n"));
+        });
+      }
     }
     if (node.aimKind === "conclusion" && aimEnabled() && this.map?.aim) {
       const branch = this.map.aim.branches.find(item => item.results.some(result => result.nodeId === node.id));

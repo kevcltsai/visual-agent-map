@@ -1594,7 +1594,7 @@ var en = {
   "ui.stop_research": "Stop research",
   "ui.stop_expand": "Stop expanding",
   "ui.research_stopped_existing_content_was_preserved": "Research stopped. Existing content was preserved.",
-  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "The topic changed, so the outdated AI result was not saved.",
+  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "The AI result was not saved: this card was edited while AI was working, and saving would overwrite that edit. Your map was not changed. Run it again; it uses 1 more AI call.",
   "ui.shallow_research_for_expanded_subtopics_0": "Subtopic research: {0}",
   "ui.select_the_parent_topic_before_its_child": "Select the parent topic before its child.",
   "ui.first_level_topic_names_must_be_unique": "First-level topic names must be unique.",
@@ -1605,7 +1605,7 @@ var en = {
   "ui.choose_synthesis_direction": "Choose synthesis direction",
   "ui.discard_synthesis": "Discard",
   "ui.synthesis_pending_review_first": "Choose or discard the pending synthesis on this topic first.",
-  "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "The topic changed; the synthesis draft was not saved.",
+  "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "Integration was not saved: something else, such as research on a subtopic, wrote to this card while AI was working, and saving would overwrite it. Your map was not changed. Run integration again; it uses 1 more AI call.",
   "detail.core_conclusions": "Core conclusions",
   "detail.key_knowledge": "Key knowledge",
   "detail.evidence_and_sources": "Evidence and sources",
@@ -2361,6 +2361,19 @@ var en = {
   "error.relevance_grade_over_budget": "The map is too large to grade at once. Nothing was changed.",
   "error.relevance_grade_stopped": "Grading stopped.",
   "error.relevance_grade_invalid": "The AI grading could not be used: {0}",
+  "error.plain_failed_0": "{0}.",
+  "error.plain_failed_reason_0_1": "{0}: {1}.",
+  "error.plain_reason_quota": "the AI provider's usage limit was reached",
+  "error.plain_reason_auth": "the AI provider is not signed in",
+  "error.plain_reason_model": "the chosen model is not available",
+  "error.plain_reason_network": "the connection to the AI dropped or timed out",
+  "error.plain_map_unchanged": "Your map was not changed.",
+  "error.plain_next_retry": "Try again to run it once more; this uses 1 more AI call.",
+  "error.plain_next_signin": "Sign in again in Settings, then try again; a try uses 1 AI call.",
+  "error.plain_next_quota": "Wait for the limit to reset or switch provider; a new try uses 1 AI call.",
+  "error.plain_card_context": "This card's AI step did not finish",
+  "ui.technical_details": "Technical details",
+  "ui.copy_technical_details": "Copy technical details",
   "error.relevance_grade_unavailable": "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
   "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
   // Share viewer (shipped inside the exported HTML file)
@@ -4103,7 +4116,7 @@ var zhCN = {
   "ui.stop_research": "\u505C\u6B62\u7814\u7A76",
   "ui.stop_expand": "\u505C\u6B62\u5C55\u5F00",
   "ui.research_stopped_existing_content_was_preserved": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u539F\u6709\u5185\u5BB9\u4FDD\u7559\u3002",
-  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "\u8BAE\u9898\u5185\u5BB9\u5DF2\u53D8\u66F4\uFF0C\u8FC7\u65F6\u7684 AI \u7ED3\u679C\u672A\u5199\u5165\u3002",
+  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "AI \u7ED3\u679C\u6CA1\u6709\u4FDD\u5B58\uFF1AAI \u4F5C\u4E1A\u671F\u95F4\u8FD9\u5F20\u5361\u88AB\u4FEE\u6539\u8FC7\uFF0C\u4FDD\u5B58\u4F1A\u76D6\u6389\u4FEE\u6539\u3002\u5FC3\u667A\u56FE\u6CA1\u6709\u88AB\u6539\u52A8\u3002\u53EF\u4EE5\u91CD\u65B0\u6267\u884C\uFF1B\u4F1A\u518D\u7528 1 \u6B21 AI\u3002",
   "ui.shallow_research_for_expanded_subtopics_0": "\u5B50\u9898\u7814\u7A76\uFF1A{0}",
   "ui.select_the_parent_topic_before_its_child": "\u8BF7\u5148\u52FE\u9009\u5B50\u8BAE\u9898\u7684\u7236\u8BAE\u9898\u3002",
   "ui.first_level_topic_names_must_be_unique": "\u7B2C\u4E00\u5C42\u5B50\u8BAE\u9898\u540D\u79F0\u4E0D\u80FD\u91CD\u590D\u3002",
@@ -4114,7 +4127,7 @@ var zhCN = {
   "ui.choose_synthesis_direction": "\u9009\u62E9\u6574\u5408\u65B9\u5411",
   "ui.discard_synthesis": "\u653E\u5F03",
   "ui.synthesis_pending_review_first": "\u8BF7\u5148\u5904\u7406\u6216\u653E\u5F03\u8FD9\u4E2A\u4E3B\u9898\u5F85\u5904\u7406\u7684\u6574\u5408\u7ED3\u679C\u3002",
-  "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "\u8BAE\u9898\u5DF2\u53D8\u66F4\uFF0C\u6574\u5408\u8349\u7A3F\u672A\u5199\u5165\u3002",
+  "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "\u6574\u5408\u7ED3\u679C\u6CA1\u6709\u4FDD\u5B58\uFF1AAI \u4F5C\u4E1A\u671F\u95F4\uFF0C\u522B\u7684\u52A8\u4F5C\uFF08\u4F8B\u5982\u5B50\u9898\u7814\u7A76\uFF09\u521A\u597D\u5199\u56DE\u8FD9\u5F20\u5361\uFF0C\u4FDD\u5B58\u4F1A\u76D6\u6389\u5B83\u3002\u5FC3\u667A\u56FE\u6CA1\u6709\u88AB\u6539\u52A8\u3002\u53EF\u4EE5\u91CD\u65B0\u6574\u5408\uFF1B\u4F1A\u518D\u7528 1 \u6B21 AI\u3002",
   "detail.core_conclusions": "\u6838\u5FC3\u7ED3\u8BBA",
   "detail.key_knowledge": "\u5173\u952E\u77E5\u8BC6",
   "detail.evidence_and_sources": "\u8BC1\u636E\u4E0E\u6765\u6E90",
@@ -4870,6 +4883,19 @@ var zhCN = {
   "error.relevance_grade_over_budget": "\u5FC3\u667A\u56FE\u592A\u5927\uFF0C\u65E0\u6CD5\u4E00\u6B21\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u6539\u53D8\u3002",
   "error.relevance_grade_stopped": "\u5206\u7EA7\u5DF2\u505C\u6B62\u3002",
   "error.relevance_grade_invalid": "\u65E0\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7EA7\u7ED3\u679C\uFF1A{0}",
+  "error.plain_failed_0": "{0}\u3002",
+  "error.plain_failed_reason_0_1": "{0}\uFF1A{1}\u3002",
+  "error.plain_reason_quota": "AI \u670D\u52A1\u7684\u7528\u91CF\u4E0A\u9650\u5DF2\u5230",
+  "error.plain_reason_auth": "AI \u670D\u52A1\u5C1A\u672A\u767B\u5F55",
+  "error.plain_reason_model": "\u6240\u9009\u6A21\u578B\u76EE\u524D\u65E0\u6CD5\u4F7F\u7528",
+  "error.plain_reason_network": "\u4E0E AI \u7684\u8FDE\u63A5\u4E2D\u65AD\u6216\u8D85\u65F6",
+  "error.plain_map_unchanged": "\u5FC3\u667A\u56FE\u6CA1\u6709\u88AB\u6539\u52A8\u3002",
+  "error.plain_next_retry": "\u53EF\u4EE5\u518D\u8BD5\u4E00\u6B21\uFF1B\u518D\u8BD5\u4E00\u6B21\u4F1A\u518D\u7528 1 \u6B21 AI\u3002",
+  "error.plain_next_signin": "\u8BF7\u5230\u8BBE\u7F6E\u91CD\u65B0\u767B\u5F55\u518D\u8BD5\uFF1B\u8BD5\u4E00\u6B21\u4F1A\u7528 1 \u6B21 AI\u3002",
+  "error.plain_next_quota": "\u7B49\u989D\u5EA6\u91CD\u7F6E\u6216\u6539\u7528\u53E6\u4E00\u4E2A\u670D\u52A1\uFF1B\u65B0\u7684\u5C1D\u8BD5\u4F1A\u7528 1 \u6B21 AI\u3002",
+  "error.plain_card_context": "\u8FD9\u5F20\u5361\u7684 AI \u6B65\u9AA4\u6CA1\u6709\u5B8C\u6210",
+  "ui.technical_details": "\u6280\u672F\u7EC6\u8282",
+  "ui.copy_technical_details": "\u590D\u5236\u6280\u672F\u7EC6\u8282",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u65E0\u6CD5\u4E3A\u8FD9\u5F20\u5FC3\u667A\u56FE\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u5185\u5BB9\u88AB\u6539\u53D8\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
   "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u70B9\u201C\u76EE\u6807\u201D\u518D\u6309 Enter \u91CD\u8BD5",
   // Share viewer (shipped inside the exported HTML file)
@@ -6612,7 +6638,7 @@ var zhTW = {
   "ui.stop_research": "\u505C\u6B62\u7814\u7A76",
   "ui.stop_expand": "\u505C\u6B62\u5C55\u958B",
   "ui.research_stopped_existing_content_was_preserved": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u539F\u6709\u5167\u5BB9\u4FDD\u7559\u3002",
-  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002",
+  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "AI \u7D50\u679C\u6C92\u6709\u5132\u5B58\uFF1AAI \u4F5C\u696D\u671F\u9593\u9019\u5F35\u5361\u88AB\u4FEE\u6539\u904E\uFF0C\u5B58\u6A94\u6703\u84CB\u6389\u4FEE\u6539\u3002\u5FC3\u667A\u5716\u6C92\u6709\u88AB\u6539\u52D5\u3002\u53EF\u4EE5\u91CD\u65B0\u57F7\u884C\uFF1B\u6703\u518D\u7528 1 \u6B21 AI\u3002",
   "ui.shallow_research_for_expanded_subtopics_0": "\u5B50\u984C\u7814\u7A76\uFF1A{0}",
   "ui.select_the_parent_topic_before_its_child": "\u8ACB\u5148\u52FE\u9078\u5B50\u8B70\u984C\u7684\u6BCD\u8B70\u984C\u3002",
   "ui.first_level_topic_names_must_be_unique": "\u7B2C\u4E00\u5C64\u5B50\u8B70\u984C\u540D\u7A31\u4E0D\u80FD\u91CD\u8907\u3002",
@@ -6623,7 +6649,7 @@ var zhTW = {
   "ui.choose_synthesis_direction": "\u9078\u64C7\u6574\u5408\u65B9\u5411",
   "ui.discard_synthesis": "\u6368\u68C4",
   "ui.synthesis_pending_review_first": "\u8ACB\u5148\u8655\u7406\u6216\u6368\u68C4\u9019\u500B\u4E3B\u984C\u5F85\u8655\u7406\u7684\u6574\u5408\u7D50\u679C\u3002",
-  "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "\u8B70\u984C\u5DF2\u8B8A\u66F4\uFF0C\u6574\u5408\u8349\u7A3F\u672A\u5BEB\u5165\u3002",
+  "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "\u6574\u5408\u7D50\u679C\u6C92\u6709\u5132\u5B58\uFF1AAI \u4F5C\u696D\u671F\u9593\uFF0C\u5225\u7684\u52D5\u4F5C\uFF08\u4F8B\u5982\u5B50\u984C\u7814\u7A76\uFF09\u525B\u597D\u5BEB\u56DE\u9019\u5F35\u5361\uFF0C\u5B58\u6A94\u6703\u84CB\u6389\u5B83\u3002\u5FC3\u667A\u5716\u6C92\u6709\u88AB\u6539\u52D5\u3002\u53EF\u4EE5\u91CD\u65B0\u6574\u5408\uFF1B\u6703\u518D\u7528 1 \u6B21 AI\u3002",
   "detail.core_conclusions": "\u6838\u5FC3\u7D50\u8AD6",
   "detail.key_knowledge": "\u95DC\u9375\u77E5\u8B58",
   "detail.evidence_and_sources": "\u8B49\u64DA\u8207\u4F86\u6E90",
@@ -7379,6 +7405,19 @@ var zhTW = {
   "error.relevance_grade_over_budget": "\u5FC3\u667A\u5716\u592A\u5927\uFF0C\u7121\u6CD5\u4E00\u6B21\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u6539\u8B8A\u3002",
   "error.relevance_grade_stopped": "\u5206\u7D1A\u5DF2\u505C\u6B62\u3002",
   "error.relevance_grade_invalid": "\u7121\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7D1A\u7D50\u679C\uFF1A{0}",
+  "error.plain_failed_0": "{0}\u3002",
+  "error.plain_failed_reason_0_1": "{0}\uFF1A{1}\u3002",
+  "error.plain_reason_quota": "AI \u670D\u52D9\u7684\u7528\u91CF\u4E0A\u9650\u5DF2\u5230",
+  "error.plain_reason_auth": "AI \u670D\u52D9\u5C1A\u672A\u767B\u5165",
+  "error.plain_reason_model": "\u6240\u9078\u6A21\u578B\u76EE\u524D\u7121\u6CD5\u4F7F\u7528",
+  "error.plain_reason_network": "\u8207 AI \u7684\u9023\u7DDA\u4E2D\u65B7\u6216\u903E\u6642",
+  "error.plain_map_unchanged": "\u5FC3\u667A\u5716\u6C92\u6709\u88AB\u6539\u52D5\u3002",
+  "error.plain_next_retry": "\u53EF\u4EE5\u518D\u8A66\u4E00\u6B21\uFF1B\u518D\u8A66\u4E00\u6B21\u6703\u518D\u7528 1 \u6B21 AI\u3002",
+  "error.plain_next_signin": "\u8ACB\u5230\u8A2D\u5B9A\u91CD\u65B0\u767B\u5165\u518D\u8A66\uFF1B\u8A66\u4E00\u6B21\u6703\u7528 1 \u6B21 AI\u3002",
+  "error.plain_next_quota": "\u7B49\u984D\u5EA6\u91CD\u7F6E\u6216\u6539\u7528\u53E6\u4E00\u500B\u670D\u52D9\uFF1B\u65B0\u7684\u5617\u8A66\u6703\u7528 1 \u6B21 AI\u3002",
+  "error.plain_card_context": "\u9019\u5F35\u5361\u7684 AI \u6B65\u9A5F\u6C92\u6709\u5B8C\u6210",
+  "ui.technical_details": "\u6280\u8853\u7D30\u7BC0",
+  "ui.copy_technical_details": "\u8907\u88FD\u6280\u8853\u7D30\u7BC0",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u7121\u6CD5\u70BA\u9019\u5F35\u5FC3\u667A\u5716\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u5167\u5BB9\u88AB\u6539\u8B8A\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
   "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u9EDE\u300C\u76EE\u6A19\u300D\u518D\u6309 Enter \u91CD\u8A66",
   // Share viewer (shipped inside the exported HTML file)
@@ -26389,6 +26428,36 @@ function otherProviderModel(failed, available, current) {
   if (providerOf(current) === "codex" && available.includes(current)) return current;
   if (available.includes(FALLBACK_MODEL)) return FALLBACK_MODEL;
   return (_a2 = codex[0]) != null ? _a2 : null;
+}
+
+// ai/plain-error.ts
+var TECHNICAL = /[{}[\]]|schema|json|required|properties|invalid_request|\$\.|\bat \S+:\d+|\b[45]\d\d\b|<\/?\w+>/i;
+var NETWORK = /timed? ?out|timeout|etimedout|econn|enotfound|network|socket|fetch failed|offline|aborted by/i;
+function rawErrorText(error) {
+  const message = error == null ? void 0 : error.message;
+  if (typeof message === "string") return message.trim();
+  return typeof error === "string" ? error.trim() : "";
+}
+function isTechnicalErrorText(raw) {
+  return !raw || raw.length > 400 || TECHNICAL.test(raw);
+}
+function plainFailure(context, error, locale) {
+  const say = (key2, ...values) => locale ? translate(locale, key2, ...values) : t(key2, ...values);
+  const raw = rawErrorText(error);
+  const kind = classifyProviderError(raw);
+  if (!kind && !NETWORK.test(raw) && !isTechnicalErrorText(raw) && raw.length > 60) return raw;
+  const reason = kind === "quota" ? say("error.plain_reason_quota") : kind === "auth" ? say("error.plain_reason_auth") : kind === "model-unavailable" ? say("error.plain_reason_model") : NETWORK.test(raw) ? say("error.plain_reason_network") : !isTechnicalErrorText(raw) ? raw.replace(/[.。]+$/, "") : "";
+  const first = reason ? say("error.plain_failed_reason_0_1", context, reason) : say("error.plain_failed_0", context);
+  const next = kind === "auth" ? say("error.plain_next_signin") : kind === "quota" ? say("error.plain_next_quota") : say("error.plain_next_retry");
+  return `${first} ${say("error.plain_map_unchanged")} ${next}`;
+}
+function cardFailure(raw, locale) {
+  const text11 = plainFailure(
+    locale ? translate(locale, "error.plain_card_context") : t("error.plain_card_context"),
+    raw,
+    locale
+  );
+  return { text: text11, technical: isTechnicalErrorText(raw) || classifyProviderError(raw) || NETWORK.test(raw) ? raw : null };
 }
 
 // ui/modals/name-modal.ts
@@ -60230,7 +60299,12 @@ ${request.requirements}` : preset.text,
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
-    if ((note == null ? void 0 : note.status) === "error" && note.lastError) errorDetails.push(note.lastError);
+    const technicalDetails = [];
+    if ((note == null ? void 0 : note.status) === "error" && note.lastError) {
+      const failure = cardFailure(note.lastError);
+      errorDetails.push(failure.text);
+      if (failure.technical) technicalDetails.push(failure.technical);
+    }
     if (batch) {
       const currentNode = batch.currentPath ? (_o = this.map) == null ? void 0 : _o.nodes.find((item) => item.path === batch.currentPath) : void 0;
       const currentTitle = currentNode ? (_p = this.notes.get(currentNode.id)) == null ? void 0 : _p.title : void 0;
@@ -60251,7 +60325,11 @@ ${request.requirements}` : preset.text,
           text: `${batch.failures.length} ${t("ui.failed")}`
         });
         failure.setAttr("title", batch.failures.join("\n"));
-        errorDetails.push(...batch.failures);
+        for (const raw of batch.failures) {
+          const failure2 = cardFailure(raw);
+          errorDetails.push(failure2.text);
+          if (failure2.technical) technicalDetails.push(failure2.technical);
+        }
       }
       this.renderRetryFailedButton(header, node.path, batch);
     }
@@ -60444,6 +60522,15 @@ ${request.requirements}` : preset.text,
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
+      if (technicalDetails.length) {
+        const more = card.createEl("details", { cls: "vam-card-error-details" });
+        more.createEl("summary", { text: t("ui.technical_details") });
+        more.createEl("pre", { text: technicalDetails.join("\n\n") });
+        this.button(more, t("ui.copy_technical_details"), () => {
+          var _a3;
+          void ((_a3 = navigator.clipboard) == null ? void 0 : _a3.writeText(technicalDetails.join("\n\n")));
+        });
+      }
     }
     if (node.aimKind === "conclusion" && aimEnabled() && ((_G = this.map) == null ? void 0 : _G.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
@@ -73101,6 +73188,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.vam-card-error-details { margin: 4px 0 0; font-size: var(--font-ui-smaller); }
+.vam-card-error-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8em; overflow: auto; user-select: text; }
 .vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }
 .vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }
@@ -77315,7 +77404,7 @@ var VisualAgentMapPlugin = class extends import_obsidian45.Plugin {
   recordFailure(context, error) {
     const message = error instanceof Error ? error.message : String(error);
     this.logs.appendLog("error", `${context}\uFF1A${message}`);
-    return message;
+    return plainFailure(context, error);
   }
   /**
    * Runs a write after every earlier one. Views re-read the map and its notes afterwards unless the caller states the

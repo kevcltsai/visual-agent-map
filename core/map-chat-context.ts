@@ -153,6 +153,8 @@ export interface MapChatContext {
   noEditableMap: boolean;
   /** An AIM map: a reply's topic types are skipped (see {@link MapChatContextInput.aim}). */
   aim: boolean;
+  /** Vault paths of the notes the user showed the chat (open note, attached files): a new card's plain-text mention of one becomes a wikilink. */
+  sourcePaths?: string[];
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;
   /** The relations sent (none on an AIM map), for the parser's checks of a relation the reply adds or removes. */
@@ -406,6 +408,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     selectedCount: input.selected.length,
     noEditableMap: !!input.noEditableMap,
     aim: !!input.aim,
+    sourcePaths: [...input.files.map(file => file.path), ...(input.activeFile ? [input.activeFile.path] : [])],
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
     relations: relations.map(link => ({ kind: link.kind, from: link.from, to: link.to })),
     mdHashes: hashes,

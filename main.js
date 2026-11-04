@@ -22559,6 +22559,7 @@ function buildMapChatContext(input2) {
     selectedCount: input2.selected.length,
     noEditableMap: !!input2.noEditableMap,
     aim: !!input2.aim,
+    sourcePaths: [...input2.files.map((file) => file.path), ...input2.activeFile ? [input2.activeFile.path] : []],
     parents: Object.fromEntries(input2.outline.map((node) => [node.id, node.parentId])),
     relations: relations.map((link) => ({ kind: link.kind, from: link.from, to: link.to })),
     mdHashes: hashes,
@@ -36546,6 +36547,18 @@ var Dropped = class extends Error {
     this.code = code;
   }
 };
+function linkSources(summary, paths) {
+  if (!summary || !(paths == null ? void 0 : paths.length)) return summary;
+  let out = summary;
+  for (const path of paths) {
+    if (!/\.md$/i.test(path)) continue;
+    const target = path.replace(/\.md$/i, "");
+    const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp("`?" + escaped + "`?", "g");
+    out = out.split(/(\[\[[^\]]*\]\])/).map((part) => part.startsWith("[[") ? part : part.replace(pattern, `[[${target}]]`)).join("");
+  }
+  return out;
+}
 function parseMapChat(raw, context) {
   var _a2;
   let value;
@@ -36645,7 +36658,7 @@ function parseMapChat(raw, context) {
             kind: "add_child",
             parentId,
             title,
-            summary: text11("summary", false),
+            summary: linkSources(text11("summary", false), context.sourcePaths),
             ...ref ? { ref } : {},
             ...keepType ? { topicKind: typed } : {},
             ...keepType && power ? { strength: power } : {}

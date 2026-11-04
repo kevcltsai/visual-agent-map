@@ -22109,6 +22109,17 @@ function readRelevance(fm) {
 function readAiLocked(fm) {
   return fm["ai-locked"] === true;
 }
+function noteTextAiLocked(text11, parse) {
+  var _a2;
+  const block = (_a2 = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text11)) == null ? void 0 : _a2[1];
+  if (block === void 0 || !/ai-locked/.test(block)) return false;
+  try {
+    const fm = parse(block);
+    return !!fm && typeof fm === "object" && readAiLocked(fm);
+  } catch (e) {
+    return false;
+  }
+}
 function readRelevanceGoal(fm) {
   const goal = fm["relevance-goal"];
   return typeof goal === "string" && goal.trim() ? goal.trim() : void 0;
@@ -74084,6 +74095,15 @@ var ImageTranslateAction = class extends import_obsidian43.Component {
   async translate(target, language2, placement, status, actions) {
     var _a2, _b2, _c;
     if (this.running) return;
+    let text11 = "";
+    try {
+      text11 = target.view.editor.getValue();
+    } catch (e) {
+    }
+    if (noteTextAiLocked(text11, import_obsidian43.parseYaml)) {
+      new import_obsidian43.Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const controller = new AbortController();
     this.running = controller;
     this.showRunning(status, actions);
@@ -74133,6 +74153,7 @@ var ImageTranslateAction = class extends import_obsidian43.Component {
     let outcome = "ui.image_translate_appended";
     const edit = (text11) => {
       var _a2, _b2, _c, _d;
+      if (noteTextAiLocked(text11, import_obsidian43.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
       const copies = target.token ? occurrences(text11, target.token.text) : [];
       const at = target.token && copies.length === target.token.count ? copies[target.token.occurrence] : copies.length === 1 ? copies[0] : -1;
       const token = (_b2 = (_a2 = target.token) == null ? void 0 : _a2.text) != null ? _b2 : "";
@@ -74769,6 +74790,11 @@ var SelectionAiPanel = class extends import_obsidian44.Component {
   async generate(prompt, label, requestedAction, trigger) {
     var _a2;
     if (this.controller) return;
+    if (this.noteLocked()) {
+      this.status.setText(t("ui.ai_locked_notice"));
+      new import_obsidian44.Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const controller = new AbortController();
     this.controller = controller;
     const output = this.output, status = this.status;
@@ -74940,8 +74966,23 @@ ${caption.trim()}`;
   applyDraft(action) {
     this.applyResult(this.output.value, action, this.status);
   }
+  /** True when the note the panel works on is locked for AI (`ai-locked: true`), read from the editor as it is now. */
+  noteLocked() {
+    const { view, markdown } = this.snapshot;
+    let current = markdown;
+    try {
+      current = view.editor.getValue();
+    } catch (e) {
+    }
+    return noteTextAiLocked(current, import_obsidian44.parseYaml);
+  }
   applyResult(result, action, status) {
     var _a2;
+    if (this.noteLocked()) {
+      status.setText(t("ui.ai_locked_notice"));
+      new import_obsidian44.Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const { view, path, markdown, text: text11, matchAt } = this.snapshot;
     const viewStillOpen = this.app.workspace.getLeavesOfType("markdown").some((leaf) => leaf.view === view);
     if (!viewStillOpen || ((_a2 = view.file) == null ? void 0 : _a2.path) !== path || view.editor.getValue() !== markdown) {

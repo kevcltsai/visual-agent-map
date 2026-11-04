@@ -10,18 +10,20 @@ Use the selected local Markdown sources first. Use web research only to fill gap
 
 Return JSON only, without a Markdown code fence. Use this exact shape: {"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}. Return an empty visualReferences array when there are no visual references.
 
+Writing baseline (applies to every voice): do not use filler transitions or wrap-ups such as "First", "Second", "In conclusion" or "To sum up"; do not exaggerate or use hype words such as "revolutionary" or "unprecedented"; state numbers concretely, with the value, unit, year and range, and never write "many", "significantly" or "recently".
+
 General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.
 
-When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the open questions section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
+When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the "Open questions to check" section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
 
-The detail must use exactly these 8 level-three headings in order: ### Claim, ### Prediction, ### How to test, ### Support, ### Counterevidence, ### Current judgment, ### Evidence and sources, ### Update log. Write 'No new content this time' in sections with nothing applicable. Follow any count the user requests for a section.
-### Claim: State in one sentence what this hypothesis claims, so that it can be tested or refuted.
-### Prediction: What should be observed if the claim holds; write concrete results that can be checked.
-### How to test: How to confirm or refute it: what data to look for, what comparison or experiment to run.
-### Support: Evidence that supports the claim; give the source and strength of each point.
-### Counterevidence: Evidence or counterexamples that conflict with the claim; give the source and strength of each point; if there is none, say none has been found yet.
-### Current judgment: Weigh the support against the counterevidence; state the current strength (weak, medium or strong) and what evidence is still missing.
-### Evidence and sources: The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.
+The detail must use exactly these 8 level-three headings in order: ### Claim, ### Current judgment, ### If true we would see, ### What would refute it, ### How to test, ### Evidence table, ### Sources, ### Update log. Write 'No new content this time' in sections with nothing applicable. Follow any count the user requests for a section.
+### Claim: One statement that can be refuted, with the subject, the conditions and the direction stated. No reasons or evidence here.
+### Current judgment: Keep only one: untested, leaning support, leaning against or refuted, plus a one-sentence reason and what is missing. This takes precedence over the earlier rule for inconsistencies: never list old and new ones; when it changes, rewrite this one and write "from X to Y: reason" in the update log.
+### If true we would see: Concrete predictions that can be checked, one per line.
+### What would refute it: Counter-conditions written in advance: which result would mean the claim fails.
+### How to test: What data to look for, and what comparison or experiment to run.
+### Evidence table: One table with the columns "Evidence | Supports / refutes | Strength | Linked topic", one row per piece of evidence, each with its source. Write linked topics only here, as topic links; do not restate the supporting and refuting content elsewhere.
+### Sources: Only the source list, which is added to the end of this section automatically; do not restate the body.
 ### Update log gets only one new line summarizing this update; do not repeat the full answer.
 ### Update log: Add only one line saying what this update changed.
 

@@ -175,7 +175,7 @@ test('counter 10: with a broken body in styleSelection the fake provider still w
   assert.equal(prompts.length, 2);
   assert.equal(prompts[0], prompts[1], 'the prompt is the built-in one');
   assert.equal(prompts[0].includes('### A\n'), false, 'the unreadable block text is not in it');
-  assert.ok(prompts[0].includes('### Key knowledge: The concepts, data, mechanisms and background needed to understand the conclusions.\n'), 'the built-in standard template section is in it');
+  assert.ok(prompts[0].includes('### Background and mechanism: The concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.\n'), 'the built-in standard template section is in it');
 });
 
 // P2: group headings are UI only (never inside the prompt text), exist in every language, and the modal shows text as plain text.

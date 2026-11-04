@@ -10,16 +10,20 @@ Use the selected local Markdown sources first. Use web research only to fill gap
 
 Return JSON only, without a Markdown code fence. Use this exact shape: {"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}. Return an empty visualReferences array when there are no visual references.
 
+Writing baseline (applies to every voice): do not use filler transitions or wrap-ups such as "First", "Second", "In conclusion" or "To sum up"; do not exaggerate or use hype words such as "revolutionary" or "unprecedented"; state numbers concretely, with the value, unit, year and range, and never write "many", "significantly" or "recently".
+
 General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.
 
-When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the open questions section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
+When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the "Open questions to check" section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
 
-The detail must use exactly these 6 level-three headings in order: ### Goal, ### Steps, ### Checkpoints, ### Done when, ### Evidence and sources, ### Update log. Write 'No new content this time' in sections with nothing applicable. Follow any count the user requests for a section.
-### Goal: What this action should achieve, stated in a measurable way.
-### Steps: List what to do in order, one step per line, as a numbered list.
-### Checkpoints: The times or indicators used along the way to confirm the direction is right.
-### Done when: What counts as finished; write conditions that can be checked.
-### Evidence and sources: The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.
+The detail must use exactly these 8 level-three headings in order: ### Status, ### Goal and done-when, ### Next step, ### Steps, ### Blockers and risks, ### Expected output, ### References, ### Update log. Write 'No new content this time' in sections with nothing applicable. Follow any count the user requests for a section.
+### Status: Not started, in progress, blocked or done, plus the date and one sentence of progress. Keep only one; this takes precedence over the earlier rule for inconsistencies: never list old and new status; when it changes, rewrite this one and write "from X to Y: reason" in the update log.
+### Goal and done-when: What is to be achieved, plus a done-when condition that can be checked.
+### Next step: Only the nearest step, one line, starting with a verb.
+### Steps: List all steps as a checkbox to-do list, tick the finished ones, and show progress by the ticks.
+### Blockers and risks: Why it is stuck and where it may go wrong, one line each; write "None for now" if there are none.
+### Expected output: What you get when it is done, and which topic it links back to.
+### References: Only the source list, which is added to the end of this section automatically; do not restate the body.
 ### Update log gets only one new line summarizing this update; do not repeat the full answer.
 ### Update log: Add only one line saying what this update changed.
 

@@ -10,16 +10,18 @@ For every important factual claim based on local material, keep its [S#] marker 
 
 Return JSON only, without a Markdown code fence. Use this exact shape: {"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}. Return an empty visualReferences array when there are no visual references.
 
+Writing baseline (applies to every voice): do not use filler transitions or wrap-ups such as "First", "Second", "In conclusion" or "To sum up"; do not exaggerate or use hype words such as "revolutionary" or "unprecedented"; state numbers concretely, with the value, unit, year and range, and never write "many", "significantly" or "recently".
+
 General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.
 
-When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the open questions section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
+When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the "Open questions to check" section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
 
-The detail must use exactly these six level-three headings in order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Add only one line summarizing this update in Update log; do not repeat the full answer. Write 'No new content this time' in sections with nothing applicable. Follow any requested count for the core conclusions.
-### Core conclusions: Answer the research question directly, 3–5 points by default; give the conclusion first, then the reason.
-### Key knowledge: The concepts, data, mechanisms and background needed to understand the conclusions.
-### Evidence and sources: The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.
-### Tradeoffs and limitations: Pros and cons of the options, when each applies, the risks, and the limits of this research.
-### Open questions: Questions not yet verified or lacking data that are worth researching next.
+The detail must use exactly these six level-three headings in order: ### Core conclusions, ### Background and mechanism, ### Disagreements and limits, ### Open questions to check, ### Sources, ### Update log. Add only one line summarizing this update in Update log; do not repeat the full answer. Write 'No new content this time' in sections with nothing applicable. Follow any requested count for the core conclusions.
+### Core conclusions: The first sentence answers the topic's question directly, then 2–4 reasons, each one sentence of conclusion plus one sentence of reason. No background here.
+### Background and mechanism: The concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.
+### Disagreements and limits: Where the evidence is contested, counterexamples, when the conclusions apply, and what this research did not cover; write only limits if nothing is contested.
+### Open questions to check: Questions not yet verified that are worth opening as subtopics; write each as a question that can be researched.
+### Sources: Mark sources with footnotes in the body; this section holds only the source list, which is added to the end of this section automatically, without restating the body.
 ### Update log: Add only one line saying what this update changed.
 
 The detail is rendered in Obsidian. Choose the syntax below by the shape of the content; do not write the whole page as paragraphs or bullet lists:

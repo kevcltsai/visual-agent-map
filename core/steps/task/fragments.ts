@@ -1,7 +1,12 @@
 import { renderTemplate } from "../../step-runner";
 import type { ContentLanguage } from "../../../i18n";
 import { inLanguage, languageVariables, type FragmentPair } from "../_shared/fragments";
-import { isFollowInputLanguage, verbatimHeadingLanguage, type FollowAnchor } from "../../../i18n";
+import {
+  instructionLanguageOf,
+  isFollowInputLanguage,
+  verbatimHeadingLanguage,
+  type FollowAnchor
+} from "../../../i18n";
 import SourceRegistryTemplate from "./source-registry.md";
 import AdaptiveDetailStructureZH from "./adaptive-detail-structure.zh.md";
 import AdaptiveDetailStructureEN from "./adaptive-detail-structure.en.md";
@@ -21,6 +26,10 @@ import IntroDetailStructureZH from "./intro-detail-structure.zh.md";
 import IntroDetailStructureEN from "./intro-detail-structure.en.md";
 import CustomRuleCalloutZH from "./custom-detail-rule-callout.zh.md";
 import CustomRuleCalloutEN from "./custom-detail-rule-callout.en.md";
+import VoiceBaselineZH from "./voice-baseline.zh.md";
+import VoiceBaselineEN from "./voice-baseline.en.md";
+import VoiceBaselineTaiwanZH from "./voice-baseline-taiwan.zh.md";
+import VoiceBaselineTaiwanEN from "./voice-baseline-taiwan.en.md";
 import TextbookDetailStructureZH from "./textbook-detail-structure.zh.md";
 import TextbookDetailStructureEN from "./textbook-detail-structure.en.md";
 import RepairCountsZH from "./repair-counts.zh.md";
@@ -88,6 +97,21 @@ const DETAIL_STRUCTURE_TEMPLATE: FragmentPair = { zh: DetailStructureZH, en: Det
 export const GENERAL_TASK: FragmentPair = pair(GeneralTaskZH, GeneralTaskEN);
 /** Update-mode fragments (note style recipe): merge keeps GENERAL_TASK/SYNTHESIZE plus the conflict rule; top and fresh replace them. */
 export const CONFLICT_RULE: FragmentPair = pair(ConflictRuleZH, ConflictRuleEN);
+/** A template, not text: {@link voiceBaseline} fills its `{{terms}}` placeholder (the zh file only). */
+const VOICE_BASELINE_TEMPLATE: FragmentPair = { zh: VoiceBaselineZH, en: VoiceBaselineEN };
+const VOICE_BASELINE_TAIWAN: FragmentPair = pair(VoiceBaselineTaiwanZH, VoiceBaselineTaiwanEN);
+/**
+ * The writing baseline every voice shares (no filler transitions, no hype, concrete numbers), added after the voice text of a
+ * topic prompt. The Taiwan wording sentence is added only when the output is Traditional Chinese: a Chinese prompt whose
+ * output language is its own note language (Simplified Chinese is not).
+ */
+export function voiceBaseline(language: ContentLanguage): string {
+  const template = inLanguage(VOICE_BASELINE_TEMPLATE, language);
+  if (instructionLanguageOf(language) !== "zh") return renderTemplate(template, {});
+  return renderTemplate(template, {
+    terms: verbatimHeadingLanguage(language) === null ? inLanguage(VOICE_BASELINE_TAIWAN, language) : ""
+  });
+}
 export const GENERAL_TASK_TOP: FragmentPair = pair(GeneralTaskTopZH, GeneralTaskTopEN);
 export const GENERAL_TASK_FRESH: FragmentPair = pair(GeneralTaskFreshZH, GeneralTaskFreshEN);
 export const SYNTHESIZE_TOP: FragmentPair = pair(SynthesizeTopZH, SynthesizeTopEN);

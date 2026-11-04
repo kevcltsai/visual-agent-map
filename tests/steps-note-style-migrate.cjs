@@ -77,7 +77,7 @@ test('counter 1 (design §9): the 0.28.0 fixture becomes structure, voice and st
   assert.equal(v.files[`${DIRS.template}/Conclusion.md`], '## Answer\nState the answer first.\n\n## Why\nThe reasons.\n');
   assert.equal(v.files[`${DIRS.template}/Field notes draft.md`], '## Findings\nCount: at least 3\nWhat we saw.\n\n## Refs\nWhere it came from.\n\n## Open items\nWhat is still unclear.\n\n## History\nOne dated line.\n');
   assert.equal(v.files[`${DIRS.tone}/Pirate.md`], 'Talk like a pirate.\nKeep the facts straight.');
-  assert.equal(v.files[`${DIRS.recipe}/Weekly review.md`], '---\nstructure: Weekly review\nvoice: Academic rigor\nformat: Standard format\nupdate: merge\n---\n');
+  assert.equal(v.files[`${DIRS.recipe}/Weekly review.md`], '---\nstructure: Weekly review\nvoice: Professional\nformat: Standard format\nupdate: merge\n---\n');
   for (const file of names(v, DIRS.recipe)) {
     const parsed = M.parseRecipeFile(v.files[`${DIRS.recipe}/${file}`]);
     eq([parsed.voice, parsed.format, parsed.update, parsed.issues], ['builtin:academic', 'builtin:standard', 'merge', []], file);

@@ -103,7 +103,7 @@ test('counter 3: updateRecipeFileText changes only the values of the four known 
 });
 
 // ---- listParts (decision #22) ----
-test('listParts: built-ins first (7 structures, 6 voices, 3 formats), then the user\'s files; a file named like a built-in in any language or case is the user\'s file with a builtin_name issue and does not mark the built-in as changed (counter 6, decision #22)', async () => {
+test('listParts: built-ins first (8 structures, 6 voices, 4 formats), then the user\'s files; a file named like a built-in in any language or case is the user\'s file with a builtin_name issue and does not mark the built-in as changed (counter 6, decision #22)', async () => {
   const files = {
     [`${dirOf('en', 'template')}/Standard six.md`]: '## A\nx\n',
     [`${dirOf('en', 'template')}/標準六段.md`]: '## A\nx\n',
@@ -115,9 +115,9 @@ test('listParts: built-ins first (7 structures, 6 voices, 3 formats), then the u
   };
   const { store, v, saves } = await makeStore(files);
   const structures = store.listParts('structure');
-  assert.equal(structures.filter(item => item.kind === 'builtin').length, 7);
-  assert.equal(structures.filter(item => item.kind === 'builtin').map(item => item.ref).join(), 'builtin:standard,builtin:textbook,builtin:hypothesis,builtin:evidence,builtin:action,builtin:atomic,builtin:conclusion');
-  assert.deepEqual(plain(structures.slice(0, 7).map(item => item.kind)), Array(7).fill('builtin'));
+  assert.equal(structures.filter(item => item.kind === 'builtin').length, 8);
+  assert.equal(structures.filter(item => item.kind === 'builtin').map(item => item.ref).join(), 'builtin:standard,builtin:textbook,builtin:hypothesis,builtin:evidence,builtin:action,builtin:atomic,builtin:conclusion,builtin:guide');
+  assert.deepEqual(plain(structures.slice(0, 8).map(item => item.kind)), Array(8).fill('builtin'));
   for (const item of structures.filter(entry => entry.kind === 'builtin')) {
     assert.equal(item.fileName, undefined, item.ref);
     assert.deepEqual(plain(item.issues), [], item.ref);
@@ -135,7 +135,7 @@ test('listParts: built-ins first (7 structures, 6 voices, 3 formats), then the u
   assert.equal(voices.filter(item => item.kind === 'builtin').length, 6);
   assert.ok(voices.find(item => item.ref === 'file:Practical guide').issues.some(issue => issue.code === 'builtin_name'));
   const formats = store.listParts('format');
-  assert.equal(formats.filter(item => item.kind === 'builtin').length, 3);
+  assert.equal(formats.filter(item => item.kind === 'builtin').length, 4);
   assert.ok(formats.find(item => item.ref === 'file:Lean format').issues.some(issue => issue.code === 'builtin_name'));
   assert.equal(writes(v), 0);
   assert.equal(saves(), 0);
@@ -183,7 +183,7 @@ test('listRecipes: eight built-ins (the AIM report is aimOnly and the only one),
   assert.equal(byRef['file:Mine'].issues.find(issue => issue.code === 'part_missing').line, 2);
   assert.ok(byRef['file:General research'].issues.some(issue => issue.code === 'builtin_name'));
   assert.deepEqual(plain(byRef['builtin:hypothesis'].structure), { ref: 'builtin:hypothesis', name: 'Claim to verdict' });
-  assert.equal(byRef['builtin:hypothesis'].update, 'top');
+  assert.equal(byRef['builtin:hypothesis'].update, 'merge');
 });
 
 // ---- createPart ----
@@ -474,7 +474,7 @@ test('P3: the window is a tablist of four tabs with a tabpanel each; aria-select
   tabs[0].keydown({ key: 'End' });
   assert.deepEqual(state(), ['false', 'false', 'false', 'true']);
   assert.equal(panelOf(root, 'format').hidden, false);
-  assert.ok(rowsOf(panelOf(root, 'format')).length === 3 && rowsOf(panelOf(root, 'voice')).length === 0, 'only the selected panel is filled');
+  assert.ok(rowsOf(panelOf(root, 'format')).length === 4 && rowsOf(panelOf(root, 'voice')).length === 0, 'only the selected panel is filled');
   tabs[3].keydown({ key: 'a' });
   assert.deepEqual(state(), ['false', 'false', 'false', 'true']);
   modal.close();

@@ -34,9 +34,9 @@ test('merge research and synthesize prompts carry the conflict rule exactly once
 
 test('the conflict rule names the five elements in zh and en: keep both, date and source, current judgment, open questions, one log line', () => {
   const zh = text(M.CONFLICT_RULE, 'zh-TW');
-  for (const word of ['兩種說法都保留', '日期與來源', '目前判斷', '待確認事項', '並列', '更新紀錄寫一行', '與先前結論不一致']) assert.ok(zh.includes(word), word);
+  for (const word of ['兩種說法都保留', '日期與來源', '目前判斷', '待確認問題', '並列', '更新紀錄寫一行', '與先前結論不一致']) assert.ok(zh.includes(word), word);
   const en = text(M.CONFLICT_RULE, 'en');
-  for (const word of ['keep both', 'date and source', 'current judgment', 'open questions', 'side by side', 'one line in the update log', 'Disagrees with an earlier conclusion']) assert.ok(en.includes(word), word);
+  for (const word of ['keep both', 'date and source', 'current judgment', 'Open questions to check', 'side by side', 'one line in the update log', 'Disagrees with an earlier conclusion']) assert.ok(en.includes(word), word);
 });
 
 test('the other steps have no conflict rule and no update-mode text: decompose, merge, default', () => {
@@ -485,6 +485,20 @@ const BACKUP_FILE = /(?:備份|Backups|备份)\/(?:筆記|Notes|笔记)\/主題 
 const backupKeys = files => [...files.keys()].filter(key => BACKUP_FILE.test(key));
 const anyBackupFolder = files => [...files.keys()].some(key => /(?:備份|Backups|备份)/.test(key));
 
+// Since note-style-editorial K2 the built-in hypothesis style rewrites (merge), so a topic that is to be written back "on top"
+// takes the hypothesis structure from a style file that says `update: top` (the way 0.29.0's hypothesis worked).
+function topHypothesisStyles(host) {
+  const files = { 'WS/S/Styles/TopHyp.md': '---\nstructure: hypothesis\nupdate: top\n---\n' };
+  const under = folder => Object.keys(files).filter(file => file.startsWith(`${folder}/`) && !file.slice(folder.length + 1).includes('/'));
+  const port = {
+    list: async folder => under(folder).map(file => file.slice(folder.length + 1)).filter(name => name.endsWith('.md')),
+    read: async file => { if (!(file in files)) throw new Error(file); return files[file]; },
+    folderExists: folder => Object.keys(files).some(file => file.startsWith(`${folder}/`)),
+    createFolder: async () => {}, create: async () => {}, trash: async () => {}
+  };
+  Object.assign(host.settings, { noteStylesFolder: 'WS/S', noteStyleByKind: { hypothesis: 'file:TopHyp' } });
+  host.noteStyles = new (loadSource('export { NoteStyleStore } from "./ai/note-style-store";').NoteStyleStore)({ settings: () => host.settings, port, save: async () => {} });
+}
 async function wiring({ kind = 'hypothesis', detail = OLD, reply, language = 'zh-TW' } = {}) {
   const { repo, app, contents, files } = S.fixture(language);
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -508,6 +522,7 @@ async function wiring({ kind = 'hypothesis', detail = OLD, reply, language = 'zh
     addChartsAfterWrite: job => calls.jobs.push(job)
   });
   repo.settings = host.settings;
+  if (kind === 'hypothesis') topHypothesisStyles(host);
   const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: class {} } });
   const view = new VisualAgentMapView({ app }, S.attachTopicRuns(host));
   Object.assign(view, { path: MAP_PATH, map: mapDoc, contentEl: { querySelector: () => null }, render() {}, hydrate: async () => {}, ancestorContext: async () => '', updateHistoryButtons() {} });

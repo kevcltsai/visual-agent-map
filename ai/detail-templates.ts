@@ -7,6 +7,7 @@ import {
   type FollowAnchor
 } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
+import { sectionAliasesFor } from "./section-aliases";
 import { headingsVerbatim } from "../core/steps/_shared/fragments";
 import {
   customDetailCallout,
@@ -68,6 +69,19 @@ export const STANDARD_TEMPLATE_ID = "standard";
 /** Built-in template: the Standard sections, written as an intro followed by the sections; empty sections are omitted. */
 export const TEXTBOOK_TEMPLATE_ID = "textbook";
 export const STANDARD: readonly [string, TranslationKey, TranslationKey, DetailSectionRole][] = [
+  ["core", "detail.core_conclusions", "detail.description_core_conclusions_answer_first", "none"],
+  ["knowledge", "detail.background_and_mechanism", "detail.description_background_and_mechanism", "none"],
+  ["tradeoffs", "detail.disagreements_and_limits", "detail.description_disagreements_and_limits", "none"],
+  ["questions", "detail.open_questions_to_check", "detail.description_open_questions_to_check", "none"],
+  ["sources", "detail.sources_heading", "detail.description_sources_heading", "sources"],
+  ["log", "detail.update_log", "detail.description_update_log", "log"]
+];
+
+/**
+ * The Standard sections of 0.29.0 and earlier (their old names). No built-in structure uses them any more; a note style
+ * file that spells them keeps their roles and aliases, and the output-script repair still knows their Simplified spelling.
+ */
+export const LEGACY_STANDARD: readonly [string, TranslationKey, TranslationKey, DetailSectionRole][] = [
   ["core", "detail.core_conclusions", "detail.description_core_conclusions", "none"],
   ["knowledge", "detail.key_knowledge", "detail.description_key_knowledge", "none"],
   ["sources", "detail.evidence_and_sources", "detail.description_evidence_and_sources", "sources"],
@@ -87,12 +101,17 @@ export function standardTemplate(language: NoteLanguage, display: ContentLanguag
     name: translate(display, "ui.detail_template_standard"),
     sections: STANDARD.map(([id, key, descriptionKey, role]) => {
       const name = translate(language, key);
+      const spellings = NOTE_LANGUAGES.map(locale => translate(locale, key)).filter(alias => alias !== name);
+      // The earlier names (section-aliases.ts) so a note written with them still lines up with the current section.
+      const earlier = sectionAliasesFor(name).filter(
+        alias => alias !== name && !spellings.some(known => known.toLocaleLowerCase() === alias.toLocaleLowerCase())
+      );
       return {
         id,
         name,
         description: translate(language, descriptionKey),
         role,
-        aliases: NOTE_LANGUAGES.map(locale => translate(locale, key)).filter(alias => alias !== name)
+        aliases: [...spellings, ...earlier]
       };
     })
   };

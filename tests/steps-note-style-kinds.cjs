@@ -20,33 +20,40 @@ export { runStyleLabelText } from "./ai/note-style-label";
 const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
 const HEADINGS = {
   hypothesis: {
-    'zh-TW': ['主張', '預測', '驗證方式', '支持', '反駁', '目前判斷', '證據與來源', '更新紀錄'],
-    en: ['Claim', 'Prediction', 'How to test', 'Support', 'Counterevidence', 'Current judgment', 'Evidence and sources', 'Update log']
+    'zh-TW': ['主張', '目前判斷', '如果成立會看到', '什麼會推翻它', '驗證方式', '證據對照', '來源', '更新紀錄'],
+    en: ['Claim', 'Current judgment', 'If true we would see', 'What would refute it', 'How to test', 'Evidence table', 'Sources', 'Update log']
   },
   evidence: {
-    'zh-TW': ['內容', '證據與來源', '可信度', '支持或反駁', '更新紀錄'],
-    en: ['Content', 'Evidence and sources', 'Credibility', 'Supports or refutes', 'Update log']
+    'zh-TW': ['摘要', '原文或數據', '怎麼得到的', '可信度', '和哪些議題有關', '出處', '更新紀錄'],
+    en: ['Summary', 'Source text or data', 'How it was obtained', 'Credibility', 'Related topics', 'Source', 'Update log']
   },
   action: {
-    'zh-TW': ['目標', '步驟', '檢查點', '完成條件', '證據與來源', '更新紀錄'],
-    en: ['Goal', 'Steps', 'Checkpoints', 'Done when', 'Evidence and sources', 'Update log']
+    'zh-TW': ['狀態', '目標與完成條件', '下一步', '步驟', '阻礙與風險', '預期產出', '參考資料', '更新紀錄'],
+    en: ['Status', 'Goal and done-when', 'Next step', 'Steps', 'Blockers and risks', 'Expected output', 'References', 'Update log']
   },
   atomic: {
-    'zh-TW': ['定義', '解釋', '例子', '證據與來源', '更新紀錄'],
-    en: ['Definition', 'Explanation', 'Example', 'Evidence and sources', 'Update log']
+    'zh-TW': ['一句話', '為什麼', '例子', '和誰不同', '出處', '更新紀錄'],
+    en: ['In one sentence', 'Why', 'Example', 'How it differs', 'Source', 'Update log']
+  },
+  conclusion: {
+    'zh-TW': ['結論', '信心', '依據', '什麼會改變這個結論', '適用範圍', '影響與下一步', '來源', '更新紀錄'],
+    en: ['Conclusion', 'Confidence', 'Basis', 'What would change it', 'Scope', 'Impact and next steps', 'Sources', 'Update log']
+  },
+  guide: {
+    'zh-TW': ['適用情境', '做法', '常見錯誤', '判斷準則', '來源', '更新紀錄'],
+    en: ['When to use', 'How to do it', 'Common mistakes', 'Decision rules', 'Sources', 'Update log']
   }
 };
-HEADINGS.hypothesis['zh-CN'] = HEADINGS.hypothesis['zh-TW'];
-HEADINGS.evidence['zh-CN'] = HEADINGS.evidence['zh-TW'];
-HEADINGS.action['zh-CN'] = HEADINGS.action['zh-TW'];
-HEADINGS.atomic['zh-CN'] = HEADINGS.atomic['zh-TW'];
+for (const id of Object.keys(HEADINGS)) HEADINGS[id]['zh-CN'] = HEADINGS[id]['zh-TW'];
 // The names are the design's part names (decisions: a part is named for what it holds, not "... structure").
 const NAMES = {
-  'zh-TW': { hypothesis: '主張到判斷', evidence: '內容與可信度', action: '目標到完成', atomic: '定義解釋例子' },
-  'zh-CN': { hypothesis: '主张到判断', evidence: '内容与可信度', action: '目标到完成', atomic: '定义解释例子' },
-  en: { hypothesis: 'Claim to verdict', evidence: 'Content & credibility', action: 'Goal to done', atomic: 'Definition & example' }
+  'zh-TW': { hypothesis: '主張到判斷', evidence: '內容與可信度', action: '目標到完成', atomic: '定義解釋例子', conclusion: '結論與依據', guide: '操作指南' },
+  'zh-CN': { hypothesis: '主张到判断', evidence: '内容与可信度', action: '目标到完成', atomic: '定义解释例子', conclusion: '结论与依据', guide: '操作指南' },
+  en: { hypothesis: 'Claim to verdict', evidence: 'Content & credibility', action: 'Goal to done', atomic: 'Definition & example', conclusion: 'Conclusion & basis', guide: 'How-to guide' }
 };
 const IDS = Object.keys(HEADINGS);
+// The guide is a structure only (no style of its own): a style picks it by name.
+const KIND_IDS = IDS.filter(id => id !== 'guide');
 
 const STYLES = 'WS/S';
 const TPL = `${STYLES}/Structures`;
@@ -88,9 +95,9 @@ function promptOf(style, language) {
   return M.assembleTaskPrompt(selection, M.promptStepOf(context), context, language);
 }
 
-test('kinds: the four kind templates are registered after Textbook, with names in three languages', () => {
+test('kinds: the kind templates and the guide are registered after Textbook, with names in three languages', () => {
   const templates = M.BUILTIN_BLOCKS.filter(block => block.category === 'template');
-  assert.equal(templates.map(block => block.id).join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion');
+  assert.equal(templates.map(block => block.id).join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion,guide');
   for (const id of IDS) for (const language of LANGUAGES) {
     const block = templates.find(item => item.id === id);
     assert.equal(M.translate(language, block.nameKey), NAMES[language][id], `${id} ${language}`);
@@ -104,24 +111,28 @@ test('kinds: each kind template parses without an issue in every language, with 
     assert.equal(parsed.ok, true, `${id} ${language}`);
     assert.deepEqual(JSON.parse(JSON.stringify(names(parsed.template))), HEADINGS[id][language], `${id} ${language}`);
     const roles = Object.fromEntries(parsed.template.sections.map(section => [section.name, section.role]));
-    const [source, log] = language === 'en' ? ['Evidence and sources', 'Update log'] : ['證據與來源', '更新紀錄'];
-    assert.equal(roles[source], 'sources', `${id} ${language}`);
+    const log = language === 'en' ? 'Update log' : '更新紀錄';
+    assert.equal(Object.values(roles).filter(role => role === 'sources').length, 1, `${id} ${language}: exactly one sources section`);
+    assert.equal(Object.values(roles).filter(role => role === 'log').length, 1, `${id} ${language}: exactly one log section`);
     assert.equal(roles[log], 'log', `${id} ${language}`);
     for (const section of parsed.template.sections) assert.ok(section.description.trim().length > 0, `${id} ${language} ${section.name}`);
+    for (const section of parsed.template.sections) assert.ok(section.description.length <= 300, `${id} ${language} ${section.name}: within the 300-character description limit of a copied structure`);
     assert.ok(parsed.template.sections.every(section => !section.count), `${id} ${language}: no count line`);
   }
 });
 
-test('kinds: the source and log sentences are the Standard ones word for word; zh-CN files hold the same text as zh-TW', () => {
+test('kinds: the log sentence is the Standard one word for word, the source sentence names its role; zh-CN files hold the same text as zh-TW', () => {
   for (const id of IDS) for (const language of LANGUAGES) {
     const standard = M.parseTemplateBlock(M.builtinTemplateText('standard', language), { id: 'standard', name: 's' }).template;
     const kind = M.parseTemplateBlock(M.builtinTemplateText(id, language), { id, name: id }).template;
-    for (const role of ['sources', 'log']) {
-      const a = standard.sections.find(section => section.role === role);
-      const b = kind.sections.find(section => section.role === role);
-      assert.equal(b.name, a.name, `${id} ${language} ${role}`);
-      assert.equal(b.description, a.description, `${id} ${language} ${role}`);
-    }
+    const a = standard.sections.find(section => section.role === 'log');
+    const b = kind.sections.find(section => section.role === 'log');
+    assert.equal(b.name, a.name, `${id} ${language} log`);
+    assert.equal(b.description, a.description, `${id} ${language} log`);
+    // the source section is one of the three source names and holds the list only (the footnotes stay in the body)
+    const source = kind.sections.find(section => section.role === 'sources');
+    assert.ok(['來源', '出處', '參考資料', 'Sources', 'Source', 'References'].includes(source.name), `${id} ${language} ${source.name}`);
+    assert.match(source.description, language === 'en' ? /source list/i : /來源清單/, `${id} ${language}`);
   }
   for (const id of IDS) assert.equal(M.builtinTemplateText(id, 'zh-CN').split('\n# ')[0], M.builtinTemplateText(id, 'zh-TW').split('\n# ')[0], id);
 });
@@ -143,7 +154,7 @@ test('kinds: the atomic note keeps itself short in its section descriptions, not
 });
 
 test('kinds: a store whose kind style is a kind template gives that template, named, in the output language; the interface language stays out of the headings', async () => {
-  for (const id of IDS) {
+  for (const id of KIND_IDS) {
     const { store, v } = await world({ language: 'zh-TW', noteStyleByKind: { topic: `builtin:${id}` } });
     const got = store.runStyle({ outputLanguage: 'en' });
     assert.equal(got.template.id, id);
@@ -190,7 +201,7 @@ test('kinds (was: an override file of a built-in; grilling Q5/decision #22): a f
 test('kinds (was: a broken override of a kind template; grilling Q5/decision #22): a broken file named like a kind structure is not read, so the built-in has no issue; nothing throws or is written', async () => {
   // A count line that is not a number: still a problem the sections parser reports (a second format heading is not one any more, Q1).
   const BROKEN = '## A\nCount: x\nbody\n';
-  for (const id of IDS) {
+  for (const id of KIND_IDS) {
     const file = NAMES.en[id];
     const { store, v } = await world({ noteStyleByKind: { topic: `builtin:${id}` } }, { [`${TPL}/${file}.md`]: BROKEN });
     let got;
@@ -211,6 +222,51 @@ test('kinds (was: a broken override of a kind template; grilling Q5/decision #22
   }
 });
 
+test('kinds: a style that names the guide structure gets the guide, with its six headings in each output language', async () => {
+  for (const language of LANGUAGES) {
+    const { store } = await mixWorld({ structure: 'builtin:guide' });
+    const got = store.runStyle({ outputLanguage: language });
+    assert.equal(got.template.id, 'guide');
+    assert.deepEqual(JSON.parse(JSON.stringify(names(got.template))), HEADINGS.guide[language], language);
+    assert.deepEqual(JSON.parse(JSON.stringify(got.issues.blockIssues)), [], language);
+    assert.equal(got.template.omitEmpty, undefined, 'the guide keeps the placeholder sentence');
+  }
+});
+
+test('kinds: atomic and evidence leave an empty section out whole; the other structures do not', async () => {
+  for (const id of KIND_IDS) {
+    const { store } = await world({ noteStyleByKind: { topic: `builtin:${id}` } });
+    const style = store.runStyle({ outputLanguage: 'en' });
+    assert.equal(style.template.omitEmpty === true, id === 'atomic' || id === 'evidence', id);
+    const { text } = promptOf(style, 'en');
+    assert.equal(/leave out the whole section|Leave out/i.test(text) && /overrides the later formatting rule/.test(text), id === 'atomic' || id === 'evidence', id);
+  }
+});
+
+test('kinds: judgments that change are kept as one (hypothesis, conclusion, action), and the evidence text is protected by its description', () => {
+  const sectionOf = (id, language, name) => M.parseTemplateBlock(M.builtinTemplateText(id, language), { id, name: id }).template.sections.find(section => section.name === name).description;
+  const ONLY_ONE = {
+    'zh-TW': [/只留一份/, /優先於前面的不一致處理規則/, /從 X 改為 Y：理由/],
+    en: [/Keep (only )?one/, /takes precedence over the earlier rule for inconsistencies/, /from X to Y: reason/]
+  };
+  for (const [id, zh, en] of [['hypothesis', '目前判斷', 'Current judgment'], ['conclusion', '信心', 'Confidence'], ['action', '狀態', 'Status']])
+    for (const language of LANGUAGES) {
+      const description = sectionOf(id, language, language === 'en' ? en : zh);
+      for (const pattern of ONLY_ONE[language === 'en' ? 'en' : 'zh-TW']) assert.match(description, pattern, `${id} ${language}`);
+    }
+  assert.match(sectionOf('evidence', 'zh-TW', '原文或數據'), /不得改寫或刪掉.*只能補充/);
+  assert.match(sectionOf('evidence', 'en', 'Source text or data'), /must not rewrite or delete.*only add/);
+  // each section says what it holds; no description is copied between two structures
+  const seen = new Map();
+  for (const id of IDS) for (const language of ['zh-TW', 'en']) {
+    const sections = M.parseTemplateBlock(M.builtinTemplateText(id, language), { id, name: id }).template.sections;
+    for (const section of sections.filter(item => item.role === 'none')) {
+      assert.ok(!seen.has(`${language}:${section.description}`) || seen.get(`${language}:${section.description}`) === id, `${language} ${id} ${section.name} repeats the description of ${seen.get(`${language}:${section.description}`)}`);
+      seen.set(`${language}:${section.description}`, id);
+    }
+  }
+});
+
 test('kinds: the built-in names are not mistaken for the legacy ids, and Standard and Textbook still resolve as before', async () => {
   for (const [id, recipe] of [['standard', 'general'], ['textbook', 'textbook']]) {
     const { store } = await world({ noteStyleByKind: { topic: `builtin:${recipe}` } });
@@ -220,7 +276,7 @@ test('kinds: the built-in names are not mistaken for the legacy ids, and Standar
   }
   const { store } = await world({});
   assert.equal(store.runStyle({ outputLanguage: 'en' }).template.id, 'standard');
-  assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic', 'builtin:conclusion']);
+  assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic', 'builtin:conclusion', 'builtin:guide']);
 });
 
 test('kinds: a user file named Evidence / Action / Hypothesis / Atomic note stays a file ("mine"), is not claimed by a built-in, and a style naming it resolves to it', async () => {

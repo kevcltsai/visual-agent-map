@@ -47,6 +47,14 @@ async function run(options = {}, names = ['A', 'B'], baseContext = base) {
 const phaseOf = context => M.aimPhase(context.task);
 const promptOf = (context, language = 'en') => M.buildAimPrompt({ ...context, promptProfile: 'aim' }, language);
 
+test('K2 counter: the AIM prompt never carries the shared writing baseline, with or without a voice', () => {
+  for (const [language, toneText] of [['en', 'Tone: plain.'], ['zh-TW', '寫作語氣：白話。']]) {
+    const prompt = promptOf({ ...base, outputLanguage: language, toneText, task: '<!-- aim-phase: delivery-writing -->\nWrite.' }, language);
+    const text = typeof prompt === 'string' ? prompt : prompt.prompt ?? prompt.text ?? JSON.stringify(prompt);
+    assert.ok(!/In conclusion|Do not use filler|台灣用語|首先/.test(text), language);
+  }
+});
+
 test('counter 1: no style, the AIM report style, or an unusable section count read as the AIM report', () => {
   assert.equal(M.aimNoteStyleOf(undefined), undefined);
   assert.equal(M.aimNoteStyleOf(runStyle(HYPOTHESIS, { recipe: { ref: 'builtin:aim', name: 'AIM', source: 'kind', aimDelivery: true } })), undefined);
@@ -285,7 +293,7 @@ test('F1: an AIM entry before any store refresh still resolves the style file an
   await concludeSeen({ port: language => view.aimNoteStyle(language), tasks });
   const outline = tasks.find(item => item.phase === 'delivery-outline');
   assert.ok(outline, 'the run reached the outline');
-  assert.match(outline.task, /Prediction/);
+  assert.match(outline.task, /If true we would see/);
 });
 
 test('F1: a refresh that fails reads as the style not found, the AIM report', async () => {

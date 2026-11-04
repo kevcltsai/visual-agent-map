@@ -10,6 +10,8 @@
 
 只回傳 JSON，不要使用 Markdown code fence。格式必須符合：{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}。若沒有視覺參考，visualReferences 回傳空陣列。
 
+共同寫作底線（不論口吻都適用）：不要用「首先」「其次」「總之」「綜上所述」這類套話串場或收尾；不誇飾，不用「驚人」「顛覆」「史無前例」這類形容；數字要具體，寫出數值、單位、年份與範圍，不寫「很多」「大幅」「近年」。
+
 summary 必須是一句適合心智圖顯示的新目前理解，detail 必須是完整 Markdown 分析。
 
 detail 使用 Markdown，依使用者最初問題與期望成果決定內容結構。按需要選擇標題、段落、步驟、表格或其他合適形式，不套固定段落模板。整合已知使用者條件與相關證據，寫成連貫、可獨立閱讀的完整回答；在相關內容交代來源及重要不確定性。不要貼上中間研究報告，不加空段落或更新紀錄。保留任務要求的機器可讀決策標記與外層 JSON 回應格式。

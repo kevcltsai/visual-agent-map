@@ -756,16 +756,17 @@ integrationTest('visual reference without a related paragraph goes before the so
   {
     const { repo } = fixture('en'); const n = await topicNote(repo, 'English picture');
     await repo.updateNote(n.path, { detail: canonicalDetail('### Key knowledge\n\nK', 'en'), visualReferences: reference });
+    assert.match((await repo.readNote(n.path)).detail, /### Background and mechanism\n\nK/, '0.29.0 heading rewritten to the new name');
     const detail = (await repo.readNote(n.path)).detail;
     assert.ok(detail.indexOf('**Pic**') > detail.indexOf('\nK\n'), 'after the knowledge text');
-    assert.ok(detail.indexOf('**Pic**') < detail.indexOf('### Evidence and sources'), 'before the sources section');
+    assert.ok(detail.indexOf('**Pic**') < detail.indexOf('### Sources'), 'before the sources section');
   }
   {
     const { repo } = fixture(); const n = await topicNote(repo, '中文圖片');
     await repo.updateNote(n.path, { detail: canonicalDetail('### 關鍵知識\n\nK', 'zh-TW'), visualReferences: reference });
     const detail = (await repo.readNote(n.path)).detail;
     assert.ok(detail.indexOf('**Pic**') > detail.indexOf('\nK\n'));
-    assert.ok(detail.indexOf('**Pic**') < detail.indexOf('### 證據與來源'));
+    assert.ok(detail.indexOf('**Pic**') < detail.indexOf('### 來源'));
   }
   {
     const { repo } = fixture('en'); const n = await topicNote(repo, 'No sources picture');
@@ -792,7 +793,7 @@ integrationTest('visual reference placement: a sources alias equal to another se
 integrationTest('legacy Visual References section moves into Detail before the Standard sources heading on rebuild (zh and en)', async () => {
   const { canonicalDetail } = load('ai/result-utils.ts');
   const legacy = '\n\n## Visual References\n\n**Pic**\n\n![Pic](https://x/y.png)\n\nSource: https://x\n';
-  for (const [language, knowledge, sources] of [['zh-TW', '關鍵知識', '證據與來源'], ['en', 'Key knowledge', 'Evidence and sources']]) {
+  for (const [language, knowledge, sources] of [['zh-TW', '背景與機制', '來源'], ['en', 'Background and mechanism', 'Sources']]) {
     const { repo, contents } = fixture(language); const n = await topicNote(repo, `Legacy ${language}`);
     await repo.updateNote(n.path, { detail: canonicalDetail(`### ${knowledge}\n\nK`, language) });
     contents.set(n.path, `${contents.get(n.path).trimEnd()}${legacy}`);
@@ -803,7 +804,17 @@ integrationTest('legacy Visual References section moves into Detail before the S
     const image = detail.indexOf('![Pic](https://x/y.png)');
     assert.ok(image > detail.indexOf(`### ${knowledge}\n\nK`), `${language}: after the key knowledge text\n${detail}`);
     assert.ok(image < detail.indexOf(`### ${sources}`), `${language}: before the sources heading\n${detail}`);
-    assert.match(detail, new RegExp(`### ${knowledge}\\n\\nK\\n\\n\\*\\*Pic\\*\\*\\n\\n!\\[Pic\\]\\(https://x/y\\.png\\)\\n\\nSource: https://x\\n\\n### ${sources}`), language);
+    assert.match(detail, new RegExp(`\\*\\*Pic\\*\\*\\n\\n!\\[Pic\\]\\(https://x/y\\.png\\)\\n\\nSource: https://x\\n\\n### ${sources}`), language);
+  }
+});
+integrationTest('note-style-editorial: a note that still carries the 0.29.0 headings gets the picture before its "Evidence and sources" heading (zh and en)', async () => {
+  const reference = '**Pic**\n\n![Pic](https://x/y.png)\n\nSource: https://x';
+  for (const [language, knowledge, sources] of [['zh-TW', '關鍵知識', '證據與來源'], ['en', 'Key knowledge', 'Evidence and sources']]) {
+    const { repo } = fixture(language); const n = await topicNote(repo, `Old headings ${language}`);
+    await repo.updateNote(n.path, { detail: `### ${knowledge}\n\nK\n\n### ${sources}\n\nE`, visualReferences: reference });
+    const detail = (await repo.readNote(n.path)).detail;
+    assert.ok(detail.indexOf('**Pic**') > detail.indexOf('\nK\n'), `${language}: after the knowledge text`);
+    assert.ok(detail.indexOf('**Pic**') < detail.indexOf(`### ${sources}`), `${language}: before the old sources heading\n${detail}`);
   }
 });
 

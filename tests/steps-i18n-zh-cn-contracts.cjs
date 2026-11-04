@@ -207,7 +207,7 @@ test('N1: zh-CN standard Simplified heading becomes the canonical heading and ke
 test('N1: zh-CN textbook Simplified heading is mapped too', () => {
   const out = normalize('导言\n\n### 关键知识\n\n内容', 'zh-CN', textbookZh);
   assert.equal(out, '导言\n\n### 關鍵知識\n\n内容');
-  assert.ok(resultUtils.canonicalDetail(out, 'zh-TW', textbookZh).includes('### 關鍵知識\n\n内容'));
+  assert.ok(resultUtils.canonicalDetail(out, 'zh-TW', textbookZh).includes('### 背景與機制\n\n内容'), 'the 0.29.0 heading is rewritten to the new name');
 });
 
 test('N1: mixed Traditional and Simplified duplicates merge into one section without losing text', () => {

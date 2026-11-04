@@ -4,10 +4,10 @@ const { test, integrationTest, load, core, map, plain, obsidian, DEFAULT_SETTING
 test('AI result formatting always produces the canonical knowledge structure', async () => {
   const { canonicalDetail } = load('main.ts', { obsidian });
   const result = canonicalDetail('New analysis');
-  for (const heading of ['核心結論', '關鍵知識', '證據與來源', '取捨與限制', '待確認事項', '更新紀錄']) assert.match(result, new RegExp(`### ${heading}`));
+  for (const heading of ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', '來源', '更新紀錄']) assert.match(result, new RegExp(`### ${heading}`));
   assert.equal((result.match(/New analysis/g) || []).length, 1);
   const english = canonicalDetail('New analysis', 'en');
-  for (const heading of ['Core conclusions', 'Key knowledge', 'Evidence and sources', 'Tradeoffs and limitations', 'Open questions', 'Update log']) assert.match(english, new RegExp(`### ${heading}`));
+  for (const heading of ['Core conclusions', 'Background and mechanism', 'Disagreements and limits', 'Open questions to check', 'Sources', 'Update log']) assert.match(english, new RegExp(`### ${heading}`));
   assert.doesNotMatch(english, /核心結論|尚待補充|整理為結構化知識/);
   const bilingual = canonicalDetail('### 核心結論\n\n中文結論\n\n### 證據與來源\n\n[[來源.md]]', 'en');
   assert.equal((bilingual.match(/中文結論/g) || []).length, 1);
@@ -430,7 +430,7 @@ integrationTest('task prompt uses the context template; no template keeps the St
   const base = { title: 'Goal', summary: '', rules: '', detail: '', task: 'Write', ancestors: '', mode: 'task', researchMode: 'local', outputLanguage: 'zh-TW' };
   await service.askModel(base, 'gpt-6-luna', 'low');
   await service.askModel({ ...base, detailTemplate: teach() }, 'gpt-6-luna', 'low');
-  assert.match(prompts[0], /### 核心結論, ### 關鍵知識/);
+  assert.match(prompts[0], /### 核心結論, ### 背景與機制/);
   assert.match(prompts[0], /依序使用以下六個三級標題/);
   assert.match(prompts[1], /### 範例 必須剛好有 3 個項目/);
   assert.match(prompts[1], /6 個三級標題/);

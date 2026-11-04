@@ -15,7 +15,7 @@ test('built-in presets: six tones plus the knowledge-tree outline, localized, ac
     assert.equal(outline.id, 'knowledge-tree');
     assert.ok(outline.text.includes(presets.OUTLINE_TOPIC_PLACEHOLDER[language]));
   }
-  assert.deepEqual(plain(presets.builtinPresets('zh-TW', 'tone').map(item => item.name)), ['白話說明', '雜誌專欄', '重點摘要', '實用指南', '學術嚴謹', 'AI 建議']);
+  assert.deepEqual(plain(presets.builtinPresets('zh-TW', 'tone').map(item => item.name)), ['白話說明', '敘事', '重點摘要', '實用指南', '專業', 'AI 建議']);
   assert.ok(presets.builtinPresets('zh-TW', 'outline')[0].text.startsWith('# VAM Knowledge Tree Generator'));
   assert.equal(presets.DEFAULT_TONE_ID, 'academic');
 });
@@ -60,7 +60,7 @@ test('preset CRUD helpers are pure; built-ins are immutable', () => {
   assert.equal(presets.createPreset(custom, { kind: 'tone', name: '  ', text: 'T' }).presets.length, 2);
   assert.equal(presets.createPreset(created.presets, { kind: 'tone', name: 'Again', text: '' }).created.id, 'custom-tone-2');
   const copy = presets.duplicatePreset(custom, 'academic', 'en');
-  assert.equal(copy.created.kind, 'tone'); assert.equal(copy.created.name, 'Academic rigor copy');
+  assert.equal(copy.created.kind, 'tone'); assert.equal(copy.created.name, 'Professional copy');
   assert.equal(copy.created.text, presets.builtinPresets('en', 'tone').find(item => item.id === 'academic').text);
   assert.equal(presets.duplicatePreset(custom, 'mine', 'zh-TW').created.name, 'Mine 副本');
   assert.equal(presets.duplicatePreset(custom, 'nope', 'en').created, undefined);

@@ -1,7 +1,13 @@
 import { NOTE_LANGUAGES, translate, type UiLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
 import { isNewSourcesHeading, sectionAliasesFor } from "./section-aliases";
-import { STANDARD, validateTemplate, type DetailSection, type DetailTemplate } from "./detail-templates";
+import {
+  LEGACY_STANDARD,
+  STANDARD,
+  validateTemplate,
+  type DetailSection,
+  type DetailTemplate
+} from "./detail-templates";
 
 /**
  * A note style is one Markdown file the user edits. This module is pure: it parses a file's text and writes the frozen legacy export. It reads and writes no file.
@@ -176,9 +182,13 @@ export function stripNoteStyleComments(text: string): { text: string; unclosed?:
 const NAME_LANGUAGES = ["zh-TW", "zh-CN", "en"] as const;
 const lowered = (value: string) => value.trim().toLocaleLowerCase();
 
+/** The Standard rows a heading can be: the current ones, then the 0.29.0 ones (a file that spells the old names keeps them). */
+const STANDARD_ROWS = [...STANDARD, ...LEGACY_STANDARD];
 function standardKeyOf(heading: string): number {
   const key = lowered(heading);
-  return STANDARD.findIndex(([, name]) => NAME_LANGUAGES.some(language => lowered(translate(language, name)) === key));
+  return STANDARD_ROWS.findIndex(([, name]) =>
+    NAME_LANGUAGES.some(language => lowered(translate(language, name)) === key)
+  );
 }
 
 function parseCount(line: string): { mode: "exact" | "min"; n: number } | "invalid" | undefined {
@@ -292,10 +302,12 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
     }
     const { callouts, rest } = parseCallouts(content, sectionCode);
     const standard = standardKeyOf(heading.name);
-    const role = standard === 2 ? "sources" : standard === 5 ? "log" : "none";
+    const role = standard >= 0 ? STANDARD_ROWS[standard][3] : "none";
     const standardAliases =
       standard >= 0
-        ? NOTE_LANGUAGES.map(locale => translate(locale, STANDARD[standard][1])).filter(alias => alias !== heading.name)
+        ? NOTE_LANGUAGES.map(locale => translate(locale, STANDARD_ROWS[standard][1])).filter(
+            alias => alias !== heading.name
+          )
         : [];
     // Old names of the editorial redesign (section-aliases.ts) join the aliases of the standard spellings.
     const aliases = [
@@ -305,7 +317,7 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
       )
     ];
     return {
-      id: standard >= 0 ? STANDARD[standard][0] : `s${position + 1}`,
+      id: standard >= 0 ? STANDARD_ROWS[standard][0] : `s${position + 1}`,
       name: heading.name,
       description: rest.join("\n").trim(),
       role,

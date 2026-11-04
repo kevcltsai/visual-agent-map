@@ -1457,7 +1457,7 @@ integrationTest('FB1 F2: an unreadable block with the output language different 
   assert.match(prompts[0], /Core conclusions/, 'the prompt carries the English built-in headings');
   assert.doesNotMatch(prompts[0], /核心結論/, 'no interface-language headings');
   const note = await h.repo.readNote(h.topic.path);
-  assert.deepEqual(note.detail.split('\n').filter(line => line.startsWith('### ')).slice(0, 2), ['### Core conclusions', '### Key knowledge']);
+  assert.deepEqual(note.detail.split('\n').filter(line => line.startsWith('### ')).slice(0, 2), ['### Core conclusions', '### Background and mechanism']);
   assert.equal(blockNotices(h.notices).length, 1);
   assert.match(String(blockNotices(h.notices)[0]), /line 3/);
 });
@@ -1722,7 +1722,7 @@ integrationTest('opening the AI dialog for a topic with a deleted template neith
   const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
   view.openNextStep(h.topic);
   await until(() => opened.length === 1);
-  assert.equal(opened[0].modelSettings.currentStyle, 'Old setting (Standard six · Academic rigor)', 'the line shows the topic\'s old setting with the fallback structure; the map template B is not read');
+  assert.equal(opened[0].modelSettings.currentStyle, 'Old setting (Standard six · Professional)', 'the line shows the topic\'s old setting with the fallback structure; the map template B is not read');
   assert.equal('currentTemplate' in opened[0].modelSettings, false, 'the dialog gets one style name, not template and tone lists');
   opened[0].close();
   assert.deepEqual(notices, []);
@@ -1762,8 +1762,8 @@ integrationTest('no templates, zh-TW interface, English output: Standard follows
   assert.equal(h.contexts[0].detailTemplate.sections[0].name, 'Core conclusions');
   const note = await h.repo.readNote(h.topic.path);
   assert.equal(note.summary, 'English summary');
-  assert.deepEqual(note.detail.split('\n').filter(line => line.startsWith('### ')), ['### Core conclusions', '### Key knowledge', '### Evidence and sources', '### Tradeoffs and limitations', '### Open questions', '### Update log']);
-  assert.match(note.detail, /### Core conclusions\n\nC\n\n### Key knowledge\n\nK/);
+  assert.deepEqual(note.detail.split('\n').filter(line => line.startsWith('### ')), ['### Core conclusions', '### Background and mechanism', '### Disagreements and limits', '### Open questions to check', '### Sources', '### Update log']);
+  assert.match(note.detail, /### Core conclusions\n\nC\n\n### Background and mechanism\n\nK/);
 });
 integrationTest('multi research with a chosen style uses it for each started topic and records it on none (skipped topics untouched; was: a chosen template, recorded on each started topic; grilling Q18, D2)', async () => {
   const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C', workspaceFolder: 'WS', noteStylesFolder: 'WS/S' } });
@@ -1874,7 +1874,7 @@ integrationTest('R1-L1 / counterexample 11: a topic tone that is gone is told on
   await h.run();
   assert.equal('toneText' in h.contexts.at(-1), false, 'academic rigor adds no tone text');
   assert.equal(h.notices.length, 1, h.notices.map(String).join('|'));
-  assert.match(String(h.notices[0]), /The writing voice "gone" was not found; this topic now uses Academic rigor\./);
+  assert.match(String(h.notices[0]), /The writing voice "gone" was not found; this topic now uses Professional\./);
   assert.deepEqual(require('../support-dom.cjs').findAll(h.notices[0], i => i.tag === 'button').map(b => b.text), ['Use another style']);
   const after = await h.app.vault.read(h.app.vault.getAbstractFileByPath(h.topic.path));
   assert.equal(after.includes('tone: "gone"') || after.includes('tone: gone'), true, 'the note keeps the tone');

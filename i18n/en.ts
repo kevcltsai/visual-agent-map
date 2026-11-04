@@ -1661,6 +1661,16 @@ export const en = {
     "Pros and cons of the options, when each applies, the risks, and the limits of this research.",
   "detail.description_open_questions": "Questions not yet verified or lacking data that are worth researching next.",
   "detail.description_update_log": "Add only one line saying what this update changed.",
+  "detail.description_core_conclusions_answer_first":
+    "The first sentence answers the topic's question directly, then 2–4 reasons, each one sentence of conclusion plus one sentence of reason. No background here.",
+  "detail.description_background_and_mechanism":
+    "The concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.",
+  "detail.description_disagreements_and_limits":
+    "Where the evidence is contested, counterexamples, when the conclusions apply, and what this research did not cover; write only limits if nothing is contested.",
+  "detail.description_open_questions_to_check":
+    "Questions not yet verified that are worth opening as subtopics; write each as a question that can be researched.",
+  "detail.description_sources_heading":
+    "Mark sources with footnotes in the body; this section holds only the source list, which is added to the end of this section automatically, without restating the body.",
   "ui.detail_template_standard": "Standard",
   "ui.detail_template_textbook": "Textbook",
   "ui.note_style": "Note style",
@@ -1678,7 +1688,7 @@ export const en = {
   "ui.note_style_location_empty": "No files yet. The first edit or save creates them.",
   "ui.preview_tone_empty": "(Default voice; no extra instruction)",
   "ui.block_academic_note":
-    "<!-- Academic rigor is the default voice: the AI follows the plugin's fixed neutral, evidence-first rules and gets no extra voice instruction.\n     To change the voice, write it below this comment, for example 'use more metaphors and shorter sentences'. -->",
+    "<!-- Professional is the default voice: the AI follows the plugin's fixed neutral, evidence-first rules and gets no extra voice instruction.\n     To change the voice, write it below this comment, for example 'use more metaphors and shorter sentences'. -->",
   "ui.preview_step_research": "Research a topic",
   "ui.preview_step_quick": "Quick research",
   "ui.preview_step_decompose": "Break into subtopics",
@@ -1755,7 +1765,7 @@ export const en = {
   "ui.note_style_topic_title": "Note style of this topic",
   "ui.note_style_topic_desc": "Only later research is affected; content already written does not change.",
   "ui.note_style_follow_kind_0": "Follow the topic type ({0})",
-  "ui.note_style_tone_missing_0": 'The writing voice "{0}" was not found; this topic now uses Academic rigor.',
+  "ui.note_style_tone_missing_0": 'The writing voice "{0}" was not found; this topic now uses Professional.',
   "ui.note_style_group_builtin": "Built-in",
   "ui.note_style_unusable_0_1_2": '"{0}" has a problem and cannot be chosen (line {1}): {2}',
   "ui.note_style_unusable_option_0": "{0} (has a problem)",
@@ -1785,9 +1795,11 @@ export const en = {
   "ui.structure_name_evidence": "Content & credibility",
   "ui.structure_name_action": "Goal to done",
   "ui.structure_name_conclusion": "Conclusion & basis",
+  "ui.structure_name_guide": "How-to guide",
   "ui.format_name_standard": "Standard format",
   "ui.format_name_lean": "Lean format",
   "ui.format_name_rich": "Rich format",
+  "ui.format_name_skim": "Skim list",
   "ui.note_style_issue_format_zone_moved": "Put the format rules in a format rules file instead.",
   "ui.note_style_issue_update_invalid": "The update mode is not merge, top or fresh; merge is used.",
   "ui.note_style_issue_part_name_invalid": "The part name cannot be used as a file name.",
@@ -1876,12 +1888,14 @@ export const en = {
   "ui.map_file_description":
     "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu.",
   "ui.preset_name_plain": "Plain explanation",
-  "ui.preset_name_magazine": "Magazine column",
+  "ui.preset_name_magazine": "Narrative",
   "ui.preset_name_summary": "Key-point summary",
   "ui.preset_name_guide": "Practical guide",
-  "ui.preset_name_academic": "Academic rigor",
+  "ui.preset_name_academic": "Professional",
   "ui.preset_name_auto": "AI choice",
   "ui.preset_name_knowledge_tree": "Knowledge tree generator",
+  "ui.preset_name_academic_old": "Academic rigor",
+  "ui.preset_name_magazine_old": "Magazine column",
   "ui.outline_topic_placeholder": "{research topic}",
   "ui.preset_copy_suffix": " copy",
   // coffee:begin (keep every coffee.* key in this one contiguous block)

@@ -13,6 +13,7 @@ import { NEW_STANDARD_HEADING_KEYS } from "./section-aliases";
 import {
   isBuiltinTemplateId,
   sectionLookup,
+  LEGACY_STANDARD,
   STANDARD,
   standardTemplate,
   TEXTBOOK_TEMPLATE_ID,
@@ -135,7 +136,10 @@ export function normalizeOutputScriptHeadings(
   if (!verbatimHeadingLanguage(output) || (template && !isBuiltinTemplateId(template.id))) return detail;
   const note = noteLanguageOf(output);
   const forms = new Map<string, string>();
-  for (const key of [...STANDARD.map(([, standardKey]) => standardKey), ...NEW_STANDARD_HEADING_KEYS]) {
+  for (const key of [
+    ...[...STANDARD, ...LEGACY_STANDARD].map(([, standardKey]) => standardKey),
+    ...NEW_STANDARD_HEADING_KEYS
+  ]) {
     const canonical = translate(note, key);
     const written = translate(output, key);
     if (written !== canonical) forms.set(written, canonical);

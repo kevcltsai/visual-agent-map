@@ -26,6 +26,9 @@ import ActionEn from "./template/action.en.md";
 import AtomicZhTW from "./template/atomic.zh-TW.md";
 import AtomicZhCN from "./template/atomic.zh-CN.md";
 import AtomicEn from "./template/atomic.en.md";
+import GuideZhTW from "./template/guide.zh-TW.md";
+import GuideZhCN from "./template/guide.zh-CN.md";
+import GuideEn from "./template/guide.en.md";
 import ConclusionZhTW from "./template/conclusion.zh-TW.md";
 import ConclusionZhCN from "./template/conclusion.zh-CN.md";
 import ConclusionEn from "./template/conclusion.en.md";
@@ -33,6 +36,8 @@ import LeanZh from "./format/lean.zh.md";
 import LeanEn from "./format/lean.en.md";
 import RichZh from "./format/rich.zh.md";
 import RichEn from "./format/rich.en.md";
+import SkimZh from "./format/skim.zh.md";
+import SkimEn from "./format/skim.en.md";
 
 /**
  * Built-in note-style blocks: one registry of the text a block contributes to the task prompt, per category. Bodies
@@ -44,6 +49,10 @@ export interface BuiltinBlock {
   readonly category: BlockCategory;
   readonly id: string;
   readonly nameKey: TranslationKey;
+  /** Earlier names (any language) that still resolve to this block and stay reserved, after a rename. */
+  readonly legacyNameKeys?: readonly TranslationKey[];
+  /** Template blocks only: a section with no reliable material is left out whole (`DetailTemplate.omitEmpty`). */
+  readonly omitEmpty?: boolean;
   /** The block's prompt text in the language's instruction language. */
   body(language: ContentLanguage): string;
   /** Template blocks only: the sections zone (same text as `body`). */
@@ -53,10 +62,11 @@ export interface BuiltinBlock {
 const strip = (text: string): string => (text.endsWith("\n") ? text.slice(0, -1) : text);
 
 /** A tone block's body is the built-in tone preset text; academic rigor is the default tone and adds nothing. */
-const tone = (id: string, nameKey: TranslationKey): BuiltinBlock => ({
+const tone = (id: string, nameKey: TranslationKey, legacyNameKeys?: readonly TranslationKey[]): BuiltinBlock => ({
   category: "tone",
   id,
   nameKey,
+  ...(legacyNameKeys ? { legacyNameKeys } : {}),
   body: language =>
     id === "academic" ? "" : (builtinPresets(language, "tone").find(preset => preset.id === id)?.text ?? "")
 });
@@ -76,7 +86,7 @@ function fileFor(files: Readonly<Record<NoteStyleLanguage, string>>, language: C
  * A template block's body is its section file text (canonical v2 without the tone and format switches). The format rules
  * are a separate part (BUILTIN_FORMATS). `files` follow the order of CANONICAL_LANGUAGES.
  */
-const template = (id: string, nameKey: TranslationKey, files: readonly string[]): BuiltinBlock => {
+const template = (id: string, nameKey: TranslationKey, files: readonly string[], omitEmpty = false): BuiltinBlock => {
   const table = Object.fromEntries(CANONICAL_LANGUAGES.map((language, index) => [language, files[index]])) as Record<
     NoteStyleLanguage,
     string
@@ -85,6 +95,7 @@ const template = (id: string, nameKey: TranslationKey, files: readonly string[])
     category: "template",
     id,
     nameKey,
+    ...(omitEmpty ? { omitEmpty: true as const } : {}),
     body: language => strip(fileFor(table, language)),
     sections: language => strip(fileFor(table, language))
   };
@@ -102,13 +113,14 @@ export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
   template("standard", "ui.structure_name_standard", [StandardZhTW, StandardZhCN, StandardEn]),
   template("textbook", "ui.structure_name_textbook", [TextbookZhTW, TextbookZhCN, TextbookEn]),
   template("hypothesis", "ui.structure_name_hypothesis", [HypothesisZhTW, HypothesisZhCN, HypothesisEn]),
-  template("evidence", "ui.structure_name_evidence", [EvidenceZhTW, EvidenceZhCN, EvidenceEn]),
+  template("evidence", "ui.structure_name_evidence", [EvidenceZhTW, EvidenceZhCN, EvidenceEn], true),
   template("action", "ui.structure_name_action", [ActionZhTW, ActionZhCN, ActionEn]),
-  template("atomic", "ui.structure_name_atomic", [AtomicZhTW, AtomicZhCN, AtomicEn]),
+  template("atomic", "ui.structure_name_atomic", [AtomicZhTW, AtomicZhCN, AtomicEn], true),
   template("conclusion", "ui.structure_name_conclusion", [ConclusionZhTW, ConclusionZhCN, ConclusionEn]),
-  tone("academic", "ui.preset_name_academic"),
+  template("guide", "ui.structure_name_guide", [GuideZhTW, GuideZhCN, GuideEn]),
+  tone("academic", "ui.preset_name_academic", ["ui.preset_name_academic_old"]),
   tone("plain", "ui.preset_name_plain"),
-  tone("magazine", "ui.preset_name_magazine"),
+  tone("magazine", "ui.preset_name_magazine", ["ui.preset_name_magazine_old"]),
   tone("summary", "ui.preset_name_summary"),
   tone("guide", "ui.preset_name_guide"),
   tone("auto", "ui.preset_name_auto")
@@ -128,7 +140,7 @@ const byInstruction = (zh: string, en: string) => (language: ContentLanguage) =>
 /**
  * The built-in format rules, apart from the structures. Standard is the Obsidian format fragment itself (no copy), so it
  * is byte-equal to what the prompt carried before; rich is the standard text plus an additional part, so its diagram and
- * HTML safety rules are the standard ones; lean is a file of its own.
+ * HTML safety rules are the standard ones; lean is a file of its own; skim is the lean text plus its skim rules.
  */
 export const BUILTIN_FORMATS: readonly BuiltinFormat[] = [
   { id: "standard", nameKey: "ui.format_name_standard", text: language => inLanguage(OBSIDIAN_FORMAT, language) },
@@ -137,6 +149,11 @@ export const BUILTIN_FORMATS: readonly BuiltinFormat[] = [
     id: "rich",
     nameKey: "ui.format_name_rich",
     text: language => `${inLanguage(OBSIDIAN_FORMAT, language)}\n\n${byInstruction(RichZh, RichEn)(language)}`
+  },
+  {
+    id: "skim",
+    nameKey: "ui.format_name_skim",
+    text: language => `${byInstruction(LeanZh, LeanEn)(language)}\n\n${byInstruction(SkimZh, SkimEn)(language)}`
   }
 ];
 

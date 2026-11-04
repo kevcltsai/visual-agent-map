@@ -1612,6 +1612,11 @@ var en = {
   "detail.description_tradeoffs_and_limitations": "Pros and cons of the options, when each applies, the risks, and the limits of this research.",
   "detail.description_open_questions": "Questions not yet verified or lacking data that are worth researching next.",
   "detail.description_update_log": "Add only one line saying what this update changed.",
+  "detail.description_core_conclusions_answer_first": "The first sentence answers the topic's question directly, then 2\u20134 reasons, each one sentence of conclusion plus one sentence of reason. No background here.",
+  "detail.description_background_and_mechanism": "The concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.",
+  "detail.description_disagreements_and_limits": "Where the evidence is contested, counterexamples, when the conclusions apply, and what this research did not cover; write only limits if nothing is contested.",
+  "detail.description_open_questions_to_check": "Questions not yet verified that are worth opening as subtopics; write each as a question that can be researched.",
+  "detail.description_sources_heading": "Mark sources with footnotes in the body; this section holds only the source list, which is added to the end of this section automatically, without restating the body.",
   "ui.detail_template_standard": "Standard",
   "ui.detail_template_textbook": "Textbook",
   "ui.note_style": "Note style",
@@ -1628,7 +1633,7 @@ var en = {
   "ui.note_style_location_desc": "Structures and voices you edited or created are stored here.",
   "ui.note_style_location_empty": "No files yet. The first edit or save creates them.",
   "ui.preview_tone_empty": "(Default voice; no extra instruction)",
-  "ui.block_academic_note": "<!-- Academic rigor is the default voice: the AI follows the plugin's fixed neutral, evidence-first rules and gets no extra voice instruction.\n     To change the voice, write it below this comment, for example 'use more metaphors and shorter sentences'. -->",
+  "ui.block_academic_note": "<!-- Professional is the default voice: the AI follows the plugin's fixed neutral, evidence-first rules and gets no extra voice instruction.\n     To change the voice, write it below this comment, for example 'use more metaphors and shorter sentences'. -->",
   "ui.preview_step_research": "Research a topic",
   "ui.preview_step_quick": "Quick research",
   "ui.preview_step_decompose": "Break into subtopics",
@@ -1700,7 +1705,7 @@ var en = {
   "ui.note_style_topic_title": "Note style of this topic",
   "ui.note_style_topic_desc": "Only later research is affected; content already written does not change.",
   "ui.note_style_follow_kind_0": "Follow the topic type ({0})",
-  "ui.note_style_tone_missing_0": 'The writing voice "{0}" was not found; this topic now uses Academic rigor.',
+  "ui.note_style_tone_missing_0": 'The writing voice "{0}" was not found; this topic now uses Professional.',
   "ui.note_style_group_builtin": "Built-in",
   "ui.note_style_unusable_0_1_2": '"{0}" has a problem and cannot be chosen (line {1}): {2}',
   "ui.note_style_unusable_option_0": "{0} (has a problem)",
@@ -1730,9 +1735,11 @@ var en = {
   "ui.structure_name_evidence": "Content & credibility",
   "ui.structure_name_action": "Goal to done",
   "ui.structure_name_conclusion": "Conclusion & basis",
+  "ui.structure_name_guide": "How-to guide",
   "ui.format_name_standard": "Standard format",
   "ui.format_name_lean": "Lean format",
   "ui.format_name_rich": "Rich format",
+  "ui.format_name_skim": "Skim list",
   "ui.note_style_issue_format_zone_moved": "Put the format rules in a format rules file instead.",
   "ui.note_style_issue_update_invalid": "The update mode is not merge, top or fresh; merge is used.",
   "ui.note_style_issue_part_name_invalid": "The part name cannot be used as a file name.",
@@ -1805,12 +1812,14 @@ var en = {
   "detail.preview": "Preview",
   "ui.map_file_description": "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu.",
   "ui.preset_name_plain": "Plain explanation",
-  "ui.preset_name_magazine": "Magazine column",
+  "ui.preset_name_magazine": "Narrative",
   "ui.preset_name_summary": "Key-point summary",
   "ui.preset_name_guide": "Practical guide",
-  "ui.preset_name_academic": "Academic rigor",
+  "ui.preset_name_academic": "Professional",
   "ui.preset_name_auto": "AI choice",
   "ui.preset_name_knowledge_tree": "Knowledge tree generator",
+  "ui.preset_name_academic_old": "Academic rigor",
+  "ui.preset_name_magazine_old": "Magazine column",
   "ui.outline_topic_placeholder": "{research topic}",
   "ui.preset_copy_suffix": " copy",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
@@ -4099,6 +4108,11 @@ var zhCN = {
   "detail.description_tradeoffs_and_limitations": "\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002",
   "detail.description_open_questions": "\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002",
   "detail.description_update_log": "\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002",
+  "detail.description_core_conclusions_answer_first": "\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u8BAE\u9898\u7684\u95EE\u9898\uFF0C\u518D\u7528 2\u20134 \u70B9\u7406\u7531\u652F\u6301\uFF1B\u6BCF\u70B9\u4E00\u53E5\u7ED3\u8BBA\u52A0\u4E00\u53E5\u7406\u7531\u3002\u4E0D\u653E\u80CC\u666F\u4ECB\u7ECD\u3002",
+  "detail.description_background_and_mechanism": "\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u548C\u8FD0\u4F5C\u65B9\u5F0F\uFF1B\u4E0D\u91CD\u590D\u6838\u5FC3\u7ED3\u8BBA\uFF0C\u4E5F\u4E0D\u653E\u4E0D\u540C\u770B\u6CD5\u3002",
+  "detail.description_disagreements_and_limits": "\u6709\u4E89\u8BAE\u7684\u5730\u65B9\u3001\u53CD\u4F8B\u3001\u9002\u7528\u6761\u4EF6\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u6CA1\u6DB5\u76D6\u7684\u8303\u56F4\uFF1B\u6CA1\u6709\u4E89\u8BAE\u5C31\u53EA\u5199\u9650\u5236\u3002",
+  "detail.description_open_questions_to_check": "\u8FD8\u6CA1\u67E5\u8BC1\u3001\u503C\u5F97\u5F00\u6210\u5B50\u8BAE\u9898\u7684\u95EE\u9898\uFF1B\u6BCF\u70B9\u5199\u6210\u4E00\u4E2A\u53EF\u4EE5\u7814\u7A76\u7684\u95EE\u53E5\u3002",
+  "detail.description_sources_heading": "\u6B63\u6587\u7528\u811A\u6CE8\u6807\u51FA\u5904\uFF1B\u8FD9\u6BB5\u53EA\u653E\u6765\u6E90\u5217\u8868\uFF0C\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002",
   "ui.detail_template_standard": "\u6807\u51C6",
   "ui.detail_template_textbook": "\u6559\u79D1\u4E66",
   "ui.note_style": "\u7B14\u8BB0\u98CE\u683C",
@@ -4115,7 +4129,7 @@ var zhCN = {
   "ui.note_style_location_desc": "\u4F60\u6539\u8FC7\u6216\u65B0\u5EFA\u7684\u7ED3\u6784\u4E0E\u53E3\u543B\u5B58\u5728\u8FD9\u91CC\u3002",
   "ui.note_style_location_empty": "\u8FD8\u6CA1\u6709\u6587\u4EF6\u3002\u7B2C\u4E00\u6B21\u7F16\u8F91\u6216\u53E6\u5B58\u65F6\u4F1A\u521B\u5EFA\u3002",
   "ui.preview_tone_empty": "\uFF08\u9ED8\u8BA4\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\uFF09",
-  "ui.block_academic_note": "<!-- \u5B66\u672F\u4E25\u8C28\u662F\u9ED8\u8BA4\u53E3\u543B\uFF1AAI \u53EA\u7167\u63D2\u4EF6\u56FA\u5B9A\u7684\u4E2D\u6027\u3001\u91CD\u8BC1\u636E\u89C4\u5219\u5199\uFF0C\u4E0D\u53E6\u52A0\u53E3\u543B\u6307\u793A\u3002\n     \u60F3\u6362\u4E00\u79CD\u5199\u6CD5\uFF0C\u5C31\u5728\u8FD9\u6BB5\u6CE8\u91CA\u4E0B\u9762\u76F4\u63A5\u5199\u4F60\u8981\u7684\u53E3\u543B\uFF0C\u4F8B\u5982\u201C\u591A\u7528\u6BD4\u55BB\uFF0C\u53E5\u5B50\u77ED\u4E00\u70B9\u201D\u3002 -->",
+  "ui.block_academic_note": "<!-- \u4E13\u4E1A\u662F\u9ED8\u8BA4\u53E3\u543B\uFF1AAI \u53EA\u7167\u63D2\u4EF6\u56FA\u5B9A\u7684\u4E2D\u6027\u3001\u91CD\u8BC1\u636E\u89C4\u5219\u5199\uFF0C\u4E0D\u53E6\u52A0\u53E3\u543B\u6307\u793A\u3002\n     \u60F3\u6362\u4E00\u79CD\u5199\u6CD5\uFF0C\u5C31\u5728\u8FD9\u6BB5\u6CE8\u91CA\u4E0B\u9762\u76F4\u63A5\u5199\u4F60\u8981\u7684\u53E3\u543B\uFF0C\u4F8B\u5982\u201C\u591A\u7528\u6BD4\u55BB\uFF0C\u53E5\u5B50\u77ED\u4E00\u70B9\u201D\u3002 -->",
   "ui.preview_step_research": "\u7814\u7A76\u4E3B\u9898",
   "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
   "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u9898",
@@ -4187,7 +4201,7 @@ var zhCN = {
   "ui.note_style_topic_title": "\u8FD9\u4E2A\u8BAE\u9898\u7684\u7B14\u8BB0\u98CE\u683C",
   "ui.note_style_topic_desc": "\u53EA\u5F71\u54CD\u4E4B\u540E\u7684\u7814\u7A76\uFF0C\u5DF2\u5199\u597D\u7684\u5185\u5BB9\u4E0D\u4F1A\u6539\u3002",
   "ui.note_style_follow_kind_0": "\u8DDF\u7740\u8BAE\u9898\u7C7B\u578B\uFF08{0}\uFF09",
-  "ui.note_style_tone_missing_0": "\u627E\u4E0D\u5230\u5199\u4F5C\u53E3\u543B\u201C{0}\u201D\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u5B66\u672F\u4E25\u8C28\u3002",
+  "ui.note_style_tone_missing_0": "\u627E\u4E0D\u5230\u5199\u4F5C\u53E3\u543B\u201C{0}\u201D\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E13\u4E1A\u3002",
   "ui.note_style_group_builtin": "\u5185\u7F6E",
   "ui.note_style_unusable_0_1_2": "\u201C{0}\u201D\u6709\u95EE\u9898\uFF0C\u65E0\u6CD5\u9009\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u6709\u95EE\u9898\uFF09",
@@ -4217,9 +4231,11 @@ var zhCN = {
   "ui.structure_name_evidence": "\u5185\u5BB9\u4E0E\u53EF\u4FE1\u5EA6",
   "ui.structure_name_action": "\u76EE\u6807\u5230\u5B8C\u6210",
   "ui.structure_name_conclusion": "\u7ED3\u8BBA\u4E0E\u4F9D\u636E",
+  "ui.structure_name_guide": "\u64CD\u4F5C\u6307\u5357",
   "ui.format_name_standard": "\u6807\u51C6\u683C\u5F0F",
   "ui.format_name_lean": "\u7CBE\u7B80\u683C\u5F0F",
   "ui.format_name_rich": "\u4E30\u5BCC\u683C\u5F0F",
+  "ui.format_name_skim": "\u6761\u5217\u901F\u8BFB",
   "ui.note_style_issue_format_zone_moved": "\u683C\u5F0F\u89C4\u5219\u8BF7\u6539\u653E\u5230\u683C\u5F0F\u89C4\u5219\u6587\u4EF6",
   "ui.note_style_issue_update_invalid": "\u66F4\u65B0\u65B9\u5F0F\u4E0D\u662F merge\u3001top \u6216 fresh\uFF0C\u5DF2\u6539\u7528\u6574\u5408\u6539\u5199\u3002",
   "ui.note_style_issue_part_name_invalid": "\u8FD9\u4E2A\u90E8\u5206\u540D\u79F0\u4E0D\u80FD\u7528\u4F5C\u6587\u4EF6\u540D\u3002",
@@ -4292,12 +4308,14 @@ var zhCN = {
   "detail.preview": "\u9884\u89C8",
   "ui.map_file_description": "\u6B64\u6587\u4EF6\u4FDD\u5B58\u5FC3\u667A\u56FE\u7ED3\u6784\uFF1B\u5B8C\u6574\u5185\u5BB9\u4FDD\u5B58\u5728\u5404\u8BAE\u9898\u7B14\u8BB0\u3002\u4ECE\u6587\u4EF6\u83DC\u5355\u9009\u62E9\u201C\u4EE5\u5FC3\u667A\u56FE\u6253\u5F00\u201D\u3002",
   "ui.preset_name_plain": "\u767D\u8BDD\u8BF4\u660E",
-  "ui.preset_name_magazine": "\u6742\u5FD7\u4E13\u680F",
+  "ui.preset_name_magazine": "\u53D9\u4E8B",
   "ui.preset_name_summary": "\u91CD\u70B9\u6458\u8981",
   "ui.preset_name_guide": "\u5B9E\u7528\u6307\u5357",
-  "ui.preset_name_academic": "\u5B66\u672F\u4E25\u8C28",
+  "ui.preset_name_academic": "\u4E13\u4E1A",
   "ui.preset_name_auto": "AI \u5EFA\u8BAE",
   "ui.preset_name_knowledge_tree": "\u77E5\u8BC6\u6811\u751F\u6210\u5668",
+  "ui.preset_name_academic_old": "\u5B66\u672F\u4E25\u8C28",
+  "ui.preset_name_magazine_old": "\u6742\u5FD7\u4E13\u680F",
   "ui.outline_topic_placeholder": "{\u586B\u5165\u7814\u7A76\u4E3B\u9898}",
   "ui.preset_copy_suffix": " \u526F\u672C",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
@@ -6586,6 +6604,11 @@ var zhTW = {
   "detail.description_tradeoffs_and_limitations": "\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002",
   "detail.description_open_questions": "\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002",
   "detail.description_update_log": "\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002",
+  "detail.description_core_conclusions_answer_first": "\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u8B70\u984C\u7684\u554F\u984C\uFF0C\u518D\u7528 2\u20134 \u9EDE\u7406\u7531\u652F\u6301\uFF1B\u6BCF\u9EDE\u4E00\u53E5\u7D50\u8AD6\u52A0\u4E00\u53E5\u7406\u7531\u3002\u4E0D\u653E\u80CC\u666F\u4ECB\u7D39\u3002",
+  "detail.description_background_and_mechanism": "\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u548C\u904B\u4F5C\u65B9\u5F0F\uFF1B\u4E0D\u91CD\u8907\u6838\u5FC3\u7D50\u8AD6\uFF0C\u4E5F\u4E0D\u653E\u4E0D\u540C\u770B\u6CD5\u3002",
+  "detail.description_disagreements_and_limits": "\u6709\u722D\u8B70\u7684\u5730\u65B9\u3001\u53CD\u4F8B\u3001\u9069\u7528\u689D\u4EF6\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u6C92\u6DB5\u84CB\u7684\u7BC4\u570D\uFF1B\u6C92\u6709\u722D\u8B70\u5C31\u53EA\u5BEB\u9650\u5236\u3002",
+  "detail.description_open_questions_to_check": "\u9084\u6C92\u67E5\u8B49\u3001\u503C\u5F97\u958B\u6210\u5B50\u8B70\u984C\u7684\u554F\u984C\uFF1B\u6BCF\u9EDE\u5BEB\u6210\u4E00\u500B\u53EF\u4EE5\u7814\u7A76\u7684\u554F\u53E5\u3002",
+  "detail.description_sources_heading": "\u6B63\u6587\u7528\u8A3B\u8173\u6A19\u51FA\u8655\uFF1B\u9019\u6BB5\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002",
   "ui.detail_template_standard": "\u6A19\u6E96",
   "ui.detail_template_textbook": "\u6559\u79D1\u66F8",
   "ui.note_style": "\u7B46\u8A18\u98A8\u683C",
@@ -6602,7 +6625,7 @@ var zhTW = {
   "ui.note_style_location_desc": "\u4F60\u6539\u904E\u6216\u65B0\u5EFA\u7684\u7D50\u69CB\u8207\u53E3\u543B\u5B58\u5728\u9019\u88E1\u3002",
   "ui.note_style_location_empty": "\u9084\u6C92\u6709\u6A94\u6848\u3002\u7B2C\u4E00\u6B21\u7DE8\u8F2F\u6216\u53E6\u5B58\u6642\u6703\u5EFA\u7ACB\u3002",
   "ui.preview_tone_empty": "\uFF08\u9810\u8A2D\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\uFF09",
-  "ui.block_academic_note": "<!-- \u5B78\u8853\u56B4\u8B39\u662F\u9810\u8A2D\u53E3\u543B\uFF1AAI \u53EA\u7167\u5916\u639B\u56FA\u5B9A\u7684\u4E2D\u6027\u3001\u91CD\u8B49\u64DA\u898F\u5247\u5BEB\uFF0C\u4E0D\u53E6\u52A0\u53E3\u543B\u6307\u793A\u3002\n     \u60F3\u63DB\u4E00\u7A2E\u5BEB\u6CD5\uFF0C\u5C31\u5728\u9019\u6BB5\u8A3B\u89E3\u4E0B\u9762\u76F4\u63A5\u5BEB\u4F60\u8981\u7684\u53E3\u543B\uFF0C\u4F8B\u5982\u300C\u591A\u7528\u6BD4\u55BB\uFF0C\u53E5\u5B50\u77ED\u4E00\u9EDE\u300D\u3002 -->",
+  "ui.block_academic_note": "<!-- \u5C08\u696D\u662F\u9810\u8A2D\u53E3\u543B\uFF1AAI \u53EA\u7167\u5916\u639B\u56FA\u5B9A\u7684\u4E2D\u6027\u3001\u91CD\u8B49\u64DA\u898F\u5247\u5BEB\uFF0C\u4E0D\u53E6\u52A0\u53E3\u543B\u6307\u793A\u3002\n     \u60F3\u63DB\u4E00\u7A2E\u5BEB\u6CD5\uFF0C\u5C31\u5728\u9019\u6BB5\u8A3B\u89E3\u4E0B\u9762\u76F4\u63A5\u5BEB\u4F60\u8981\u7684\u53E3\u543B\uFF0C\u4F8B\u5982\u300C\u591A\u7528\u6BD4\u55BB\uFF0C\u53E5\u5B50\u77ED\u4E00\u9EDE\u300D\u3002 -->",
   "ui.preview_step_research": "\u7814\u7A76\u4E3B\u984C",
   "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
   "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u984C",
@@ -6674,7 +6697,7 @@ var zhTW = {
   "ui.note_style_topic_title": "\u9019\u500B\u8B70\u984C\u7684\u7B46\u8A18\u98A8\u683C",
   "ui.note_style_topic_desc": "\u53EA\u5F71\u97FF\u4E4B\u5F8C\u7684\u7814\u7A76\uFF0C\u5DF2\u5BEB\u597D\u7684\u5167\u5BB9\u4E0D\u6703\u6539\u3002",
   "ui.note_style_follow_kind_0": "\u8DDF\u8457\u8B70\u984C\u985E\u578B\uFF08{0}\uFF09",
-  "ui.note_style_tone_missing_0": "\u627E\u4E0D\u5230\u5BEB\u4F5C\u53E3\u543B\u300C{0}\u300D\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u5B78\u8853\u56B4\u8B39\u3002",
+  "ui.note_style_tone_missing_0": "\u627E\u4E0D\u5230\u5BEB\u4F5C\u53E3\u543B\u300C{0}\u300D\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u5C08\u696D\u3002",
   "ui.note_style_group_builtin": "\u5167\u5EFA",
   "ui.note_style_unusable_0_1_2": "\u300C{0}\u300D\u6709\u554F\u984C\uFF0C\u7121\u6CD5\u9078\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u6709\u554F\u984C\uFF09",
@@ -6704,9 +6727,11 @@ var zhTW = {
   "ui.structure_name_evidence": "\u5167\u5BB9\u8207\u53EF\u4FE1\u5EA6",
   "ui.structure_name_action": "\u76EE\u6A19\u5230\u5B8C\u6210",
   "ui.structure_name_conclusion": "\u7D50\u8AD6\u8207\u4F9D\u64DA",
+  "ui.structure_name_guide": "\u64CD\u4F5C\u6307\u5357",
   "ui.format_name_standard": "\u6A19\u6E96\u683C\u5F0F",
   "ui.format_name_lean": "\u7CBE\u7C21\u683C\u5F0F",
   "ui.format_name_rich": "\u8C50\u5BCC\u683C\u5F0F",
+  "ui.format_name_skim": "\u689D\u5217\u901F\u8B80",
   "ui.note_style_issue_format_zone_moved": "\u683C\u5F0F\u898F\u5247\u8ACB\u6539\u653E\u5230\u683C\u5F0F\u898F\u5247\u6A94",
   "ui.note_style_issue_update_invalid": "\u66F4\u65B0\u65B9\u5F0F\u4E0D\u662F merge\u3001top \u6216 fresh\uFF0C\u5DF2\u6539\u7528\u6574\u5408\u6539\u5BEB\u3002",
   "ui.note_style_issue_part_name_invalid": "\u9019\u500B\u90E8\u5206\u540D\u7A31\u4E0D\u80FD\u7576\u4F5C\u6A94\u540D\u3002",
@@ -6779,12 +6804,14 @@ var zhTW = {
   "detail.preview": "\u9810\u89BD",
   "ui.map_file_description": "\u6B64\u6A94\u6848\u4FDD\u5B58\u5FC3\u667A\u5716\u7D50\u69CB\uFF1B\u5B8C\u6574\u5167\u5BB9\u4FDD\u5B58\u5728\u5404\u8B70\u984C\u7B46\u8A18\u3002\u5F9E\u6A94\u6848\u9078\u55AE\u9078\u64C7\u300C\u4EE5\u5FC3\u667A\u5716\u958B\u555F\u300D\u3002",
   "ui.preset_name_plain": "\u767D\u8A71\u8AAA\u660E",
-  "ui.preset_name_magazine": "\u96DC\u8A8C\u5C08\u6B04",
+  "ui.preset_name_magazine": "\u6558\u4E8B",
   "ui.preset_name_summary": "\u91CD\u9EDE\u6458\u8981",
   "ui.preset_name_guide": "\u5BE6\u7528\u6307\u5357",
-  "ui.preset_name_academic": "\u5B78\u8853\u56B4\u8B39",
+  "ui.preset_name_academic": "\u5C08\u696D",
   "ui.preset_name_auto": "AI \u5EFA\u8B70",
   "ui.preset_name_knowledge_tree": "\u77E5\u8B58\u6A39\u751F\u6210\u5668",
+  "ui.preset_name_academic_old": "\u5B78\u8853\u56B4\u8B39",
+  "ui.preset_name_magazine_old": "\u96DC\u8A8C\u5C08\u6B04",
   "ui.outline_topic_placeholder": "{\u586B\u5165\u7814\u7A76\u4E3B\u984C}",
   "ui.preset_copy_suffix": " \u526F\u672C",
   // coffee:begin (keep every coffee.* key in this one contiguous block)
@@ -20961,6 +20988,96 @@ function normalizeMathDelimiters(markdown) {
   return lines.join("\n");
 }
 
+// ai/section-aliases.ts
+var name = (zhTW2, en2) => ({ zh: zhTW2, en: en2 });
+var SECTION_NAME = {
+  // sources role: any one of the three names; a structure uses the one that fits its type
+  sources: name("\u4F86\u6E90", "Sources"),
+  source: name("\u51FA\u8655", "Source"),
+  references: name("\u53C3\u8003\u8CC7\u6599", "References"),
+  // log role (unchanged name)
+  log: name("\u66F4\u65B0\u7D00\u9304", "Update log"),
+  // atomic
+  oneSentence: name("\u4E00\u53E5\u8A71", "In one sentence"),
+  why: name("\u70BA\u4EC0\u9EBC", "Why"),
+  // hypothesis
+  ifTrue: name("\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230", "If true we would see"),
+  evidenceTable: name("\u8B49\u64DA\u5C0D\u7167", "Evidence table"),
+  // evidence
+  summary: name("\u6458\u8981", "Summary"),
+  relatedTopics: name("\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC", "Related topics"),
+  // conclusion
+  confidence: name("\u4FE1\u5FC3", "Confidence"),
+  scope: name("\u9069\u7528\u7BC4\u570D", "Scope"),
+  impact: name("\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65", "Impact and next steps"),
+  // action
+  goalDone: name("\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6", "Goal and done-when"),
+  steps: name("\u6B65\u9A5F", "Steps")
+};
+var NEW_STANDARD_HEADING_KEYS = [
+  "detail.background_and_mechanism",
+  "detail.disagreements_and_limits",
+  "detail.open_questions_to_check",
+  "detail.sources_heading"
+];
+var lowered = (value) => value.trim().toLocaleLowerCase();
+var SPELLINGS = ["zh-TW", "zh-CN", "en"];
+var spellings = (key2) => SPELLINGS.map((locale) => translate(locale, key2));
+var both = (value) => [value.zh, value.en];
+var rows;
+function sectionAliasRows() {
+  if (rows) return rows;
+  const sourcesNames = [
+    ...both(SECTION_NAME.sources),
+    ...both(SECTION_NAME.source),
+    ...both(SECTION_NAME.references),
+    ...spellings("detail.sources_heading"),
+    "\u51FA\u5904",
+    "\u53C2\u8003\u8D44\u6599"
+  ];
+  const legacySources = spellings("detail.evidence_and_sources");
+  rows = [
+    // role sources: the old standard name, and the three new names for each other
+    { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
+    // standard / textbook
+    { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
+    { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
+    { names: spellings("detail.open_questions_to_check"), aliases: spellings("detail.open_questions") },
+    // atomic
+    { names: both(SECTION_NAME.oneSentence), aliases: ["\u5B9A\u7FA9", "Definition"] },
+    { names: both(SECTION_NAME.why), aliases: ["\u89E3\u91CB", "Explanation"] },
+    // hypothesis: the old support and counterevidence sections both land on the one table
+    { names: both(SECTION_NAME.ifTrue), aliases: ["\u9810\u6E2C", "Prediction"] },
+    { names: both(SECTION_NAME.evidenceTable), aliases: ["\u652F\u6301", "\u53CD\u99C1", "Support", "Counterevidence"] },
+    // evidence
+    { names: both(SECTION_NAME.summary), aliases: ["\u5167\u5BB9", "Content"] },
+    { names: both(SECTION_NAME.relatedTopics), aliases: ["\u652F\u6301\u6216\u53CD\u99C1", "Supports or refutes"] },
+    // conclusion
+    { names: both(SECTION_NAME.confidence), aliases: ["\u4FE1\u5FC3\u7A0B\u5EA6"] },
+    { names: both(SECTION_NAME.scope), aliases: ["\u9069\u7528\u7BC4\u570D\u8207\u9650\u5236", "Scope and limits"] },
+    { names: both(SECTION_NAME.impact), aliases: ["\u5F8C\u7E8C\u884C\u52D5", "Next actions"] },
+    // action
+    { names: both(SECTION_NAME.goalDone), aliases: ["\u76EE\u6A19", "\u5B8C\u6210\u689D\u4EF6", "Goal", "Done when"] },
+    { names: both(SECTION_NAME.steps), aliases: ["\u6AA2\u67E5\u9EDE", "Checkpoints"] }
+  ];
+  return rows;
+}
+function sectionAliasesFor(heading) {
+  const key2 = lowered(heading);
+  const result = [];
+  for (const row of sectionAliasRows())
+    if (row.names.some((entry) => lowered(entry) === key2)) {
+      for (const alias of row.aliases)
+        if (lowered(alias) !== key2 && !result.some((existing) => lowered(existing) === lowered(alias)))
+          result.push(alias);
+    }
+  return result;
+}
+function isNewSourcesHeading(heading) {
+  const key2 = lowered(heading);
+  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key2);
+}
+
 // core/steps/task/source-registry.md
 var source_registry_default = "Source registry (retain these identities in citations):\n{{catalog}}\n";
 
@@ -21019,11 +21136,23 @@ var custom_detail_rule_callout_zh_default = "{{heading}} \u4F7F\u7528\u4E00\u500
 // core/steps/task/custom-detail-rule-callout.en.md
 var custom_detail_rule_callout_en_default = "In {{heading}}, use one `> [!{{type}}]{{fold}}` callout: {{body}}\n";
 
+// core/steps/task/voice-baseline.zh.md
+var voice_baseline_zh_default = "\u5171\u540C\u5BEB\u4F5C\u5E95\u7DDA\uFF08\u4E0D\u8AD6\u53E3\u543B\u90FD\u9069\u7528\uFF09\uFF1A\u4E0D\u8981\u7528\u300C\u9996\u5148\u300D\u300C\u5176\u6B21\u300D\u300C\u7E3D\u4E4B\u300D\u300C\u7D9C\u4E0A\u6240\u8FF0\u300D\u9019\u985E\u5957\u8A71\u4E32\u5834\u6216\u6536\u5C3E\uFF1B\u4E0D\u8A87\u98FE\uFF0C\u4E0D\u7528\u300C\u9A5A\u4EBA\u300D\u300C\u985B\u8986\u300D\u300C\u53F2\u7121\u524D\u4F8B\u300D\u9019\u985E\u5F62\u5BB9\uFF1B\u6578\u5B57\u8981\u5177\u9AD4\uFF0C\u5BEB\u51FA\u6578\u503C\u3001\u55AE\u4F4D\u3001\u5E74\u4EFD\u8207\u7BC4\u570D\uFF0C\u4E0D\u5BEB\u300C\u5F88\u591A\u300D\u300C\u5927\u5E45\u300D\u300C\u8FD1\u5E74\u300D\u3002{{terms}}\n";
+
+// core/steps/task/voice-baseline.en.md
+var voice_baseline_en_default = 'Writing baseline (applies to every voice): do not use filler transitions or wrap-ups such as "First", "Second", "In conclusion" or "To sum up"; do not exaggerate or use hype words such as "revolutionary" or "unprecedented"; state numbers concretely, with the value, unit, year and range, and never write "many", "significantly" or "recently".\n';
+
+// core/steps/task/voice-baseline-taiwan.zh.md
+var voice_baseline_taiwan_zh_default = "\u7528\u53F0\u7063\u7528\u8A9E\uFF0C\u4F8B\u5982\u300C\u8EDF\u9AD4\u300D\u300C\u8CC7\u6599\u300D\u300C\u54C1\u8CEA\u300D\uFF0C\u4E0D\u7528\u4E2D\u570B\u5927\u9678\u7528\u8A9E\u3002\n";
+
+// core/steps/task/voice-baseline-taiwan.en.md
+var voice_baseline_taiwan_en_default = 'For Traditional Chinese output, use Taiwan wording, for example "\u8EDF\u9AD4", "\u8CC7\u6599" and "\u54C1\u8CEA", not Mainland China wording.\n';
+
 // core/steps/task/textbook-detail-structure.zh.md
-var textbook_detail_structure_zh_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A{{headings}}\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002{{log}} \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C{{log}}\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n";
+var textbook_detail_structure_zh_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A{{headings}}\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u554F\u984C\uFF0C\u518D\u7528 2\u20134 \u9EDE\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002{{log}} \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C{{log}}\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n";
 
 // core/steps/task/textbook-detail-structure.en.md
-var textbook_detail_structure_en_default = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: {{headings}}. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). Give the core conclusions 3\u20135 points by default, conclusion first and then the reason, and do not repeat sentences the lead-in already said. {{log}} gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "{{log}}" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n';
+var textbook_detail_structure_en_default = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: {{headings}}. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). In the core conclusions, answer the question in the first sentence, then give 2\u20134 reasons, and do not repeat sentences the lead-in already said. {{log}} gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "{{log}}" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n';
 
 // core/steps/task/repair-counts.zh.md
 var repair_counts_zh_default = "\u4E0A\u4E00\u7248 detail \u6709\u6BB5\u843D\u7684\u9805\u76EE\u6578\u4E0D\u7B26\u5408\u8981\u6C42\uFF1A\n{{issues}}\n\u8ACB\u53EA\u8ABF\u6574\u9019\u4E9B\u6BB5\u843D\uFF0C\u8B93\u9805\u76EE\u6578\u7B26\u5408\u8981\u6C42\uFF08\u4EE5\u7B2C\u4E00\u5C64\u6E05\u55AE\u9805\u76EE\uFF0C\u6216 #### \u5C0F\u6A19\u984C\u8A08\u7B97\uFF09\u3002\u5176\u4ED6\u6BB5\u843D\u3001summary \u8207\u6240\u6709\u4F86\u6E90\u8A3B\u8173\u7DAD\u6301\u539F\u6A23\u3002\n";
@@ -21068,10 +21197,10 @@ var general_task_fresh_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1As
 var general_task_fresh_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail is a complete knowledge page based on this research, without duplication and keeping valid sources; do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
 
 // core/steps/task/conflict-rule.zh.md
-var conflict_rule_zh_default = "\u672C\u6B21\u767C\u73FE\u8207\u73FE\u6709 Detail \u4E0D\u4E00\u81F4\u6642\uFF0C\u5169\u7A2E\u8AAA\u6CD5\u90FD\u4FDD\u7559\u4E26\u5404\u6A19\u65E5\u671F\u8207\u4F86\u6E90\uFF0C\u5BEB\u4E00\u53E5\u76EE\u524D\u5224\u65B7\uFF08\u4F9D\u4F86\u6E90\u65B0\u820A\u8207\u5F37\u5F31\uFF09\uFF1B\u628A\u9019\u4E00\u9EDE\u52A0\u5165\u5F85\u78BA\u8A8D\u4E8B\u9805\u6BB5\uFF0C\u6C92\u6709\u8A72\u6BB5\u5C31\u5728\u76F8\u95DC\u6BB5\u843D\u4E26\u5217\uFF1B\u66F4\u65B0\u7D00\u9304\u5BEB\u4E00\u884C\u300C\u8207\u5148\u524D\u7D50\u8AD6\u4E0D\u4E00\u81F4\uFF1A\u2026\u300D\u3002\n";
+var conflict_rule_zh_default = "\u672C\u6B21\u767C\u73FE\u8207\u73FE\u6709 Detail \u4E0D\u4E00\u81F4\u6642\uFF0C\u5169\u7A2E\u8AAA\u6CD5\u90FD\u4FDD\u7559\u4E26\u5404\u6A19\u65E5\u671F\u8207\u4F86\u6E90\uFF0C\u5BEB\u4E00\u53E5\u76EE\u524D\u5224\u65B7\uFF08\u4F9D\u4F86\u6E90\u65B0\u820A\u8207\u5F37\u5F31\uFF09\uFF1B\u628A\u9019\u4E00\u9EDE\u52A0\u5165\u5F85\u78BA\u8A8D\u554F\u984C\u6BB5\uFF0C\u6C92\u6709\u8A72\u6BB5\u5C31\u5728\u76F8\u95DC\u6BB5\u843D\u4E26\u5217\uFF1B\u66F4\u65B0\u7D00\u9304\u5BEB\u4E00\u884C\u300C\u8207\u5148\u524D\u7D50\u8AD6\u4E0D\u4E00\u81F4\uFF1A\u2026\u300D\u3002\n";
 
 // core/steps/task/conflict-rule.en.md
-var conflict_rule_en_default = 'When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the open questions section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: \u2026".\n';
+var conflict_rule_en_default = 'When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the "Open questions to check" section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: \u2026".\n';
 
 // core/steps/task/synthesize-top.zh.md
 var synthesize_top_zh_default = "\u9019\u662F Synthesize \u6A21\u5F0F\uFF1Asummary \u5FC5\u9808\u662F\u9AD8\u54C1\u8CEA\u6574\u5408\u7D50\u8AD6\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u6574\u5408\u7684\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF0C\u6E05\u695A\u5448\u73FE\u5171\u8B58\u3001\u5206\u6B67\u3001\u53D6\u6368\u8207\u672A\u89E3\u554F\u984C\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\uFF1B\u82E5\u4ECB\u9762\u63D0\u4F9B\u78BA\u8A8D\u8349\u7A3F\uFF0C\u78BA\u8A8D\u5F8C\u624D\u6703\u5BEB\u56DE\u3002\n";
@@ -21191,6 +21320,15 @@ var DEFAULT_TASK = pair4(default_task_zh_default, default_task_en_default);
 var DETAIL_STRUCTURE_TEMPLATE = { zh: detail_structure_zh_default, en: detail_structure_en_default };
 var GENERAL_TASK = pair4(general_task_zh_default, general_task_en_default);
 var CONFLICT_RULE = pair4(conflict_rule_zh_default, conflict_rule_en_default);
+var VOICE_BASELINE_TEMPLATE = { zh: voice_baseline_zh_default, en: voice_baseline_en_default };
+var VOICE_BASELINE_TAIWAN = pair4(voice_baseline_taiwan_zh_default, voice_baseline_taiwan_en_default);
+function voiceBaseline(language2) {
+  const template2 = inLanguage(VOICE_BASELINE_TEMPLATE, language2);
+  if (instructionLanguageOf(language2) !== "zh") return renderTemplate(template2, {});
+  return renderTemplate(template2, {
+    terms: verbatimHeadingLanguage(language2) === null ? inLanguage(VOICE_BASELINE_TAIWAN, language2) : ""
+  });
+}
 var GENERAL_TASK_TOP = pair4(general_task_top_zh_default, general_task_top_en_default);
 var GENERAL_TASK_FRESH = pair4(general_task_fresh_zh_default, general_task_fresh_en_default);
 var SYNTHESIZE_TOP = pair4(synthesize_top_zh_default, synthesize_top_en_default);
@@ -21275,6 +21413,14 @@ function customDetailCallout(language2, values) {
 var STANDARD_TEMPLATE_ID = "standard";
 var TEXTBOOK_TEMPLATE_ID = "textbook";
 var STANDARD = [
+  ["core", "detail.core_conclusions", "detail.description_core_conclusions_answer_first", "none"],
+  ["knowledge", "detail.background_and_mechanism", "detail.description_background_and_mechanism", "none"],
+  ["tradeoffs", "detail.disagreements_and_limits", "detail.description_disagreements_and_limits", "none"],
+  ["questions", "detail.open_questions_to_check", "detail.description_open_questions_to_check", "none"],
+  ["sources", "detail.sources_heading", "detail.description_sources_heading", "sources"],
+  ["log", "detail.update_log", "detail.description_update_log", "log"]
+];
+var LEGACY_STANDARD = [
   ["core", "detail.core_conclusions", "detail.description_core_conclusions", "none"],
   ["knowledge", "detail.key_knowledge", "detail.description_key_knowledge", "none"],
   ["sources", "detail.evidence_and_sources", "detail.description_evidence_and_sources", "sources"],
@@ -21288,12 +21434,16 @@ function standardTemplate(language2, display = language2) {
     name: translate(display, "ui.detail_template_standard"),
     sections: STANDARD.map(([id, key2, descriptionKey, role]) => {
       const name2 = translate(language2, key2);
+      const spellings2 = NOTE_LANGUAGES.map((locale) => translate(locale, key2)).filter((alias) => alias !== name2);
+      const earlier = sectionAliasesFor(name2).filter(
+        (alias) => alias !== name2 && !spellings2.some((known) => known.toLocaleLowerCase() === alias.toLocaleLowerCase())
+      );
       return {
         id,
         name: name2,
         description: translate(language2, descriptionKey),
         role,
-        aliases: NOTE_LANGUAGES.map((locale) => translate(locale, key2)).filter((alias) => alias !== name2)
+        aliases: [...spellings2, ...earlier]
       };
     })
   };
@@ -25721,96 +25871,6 @@ function shapeInsets(kind, content) {
 var import_node_crypto15 = require("node:crypto");
 var import_obsidian34 = require("obsidian");
 
-// ai/section-aliases.ts
-var name = (zhTW2, en2) => ({ zh: zhTW2, en: en2 });
-var SECTION_NAME = {
-  // sources role: any one of the three names; a structure uses the one that fits its type
-  sources: name("\u4F86\u6E90", "Sources"),
-  source: name("\u51FA\u8655", "Source"),
-  references: name("\u53C3\u8003\u8CC7\u6599", "References"),
-  // log role (unchanged name)
-  log: name("\u66F4\u65B0\u7D00\u9304", "Update log"),
-  // atomic
-  oneSentence: name("\u4E00\u53E5\u8A71", "In one sentence"),
-  why: name("\u70BA\u4EC0\u9EBC", "Why"),
-  // hypothesis
-  ifTrue: name("\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230", "If true we would see"),
-  evidenceTable: name("\u8B49\u64DA\u5C0D\u7167", "Evidence table"),
-  // evidence
-  summary: name("\u6458\u8981", "Summary"),
-  relatedTopics: name("\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC", "Related topics"),
-  // conclusion
-  confidence: name("\u4FE1\u5FC3", "Confidence"),
-  scope: name("\u9069\u7528\u7BC4\u570D", "Scope"),
-  impact: name("\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65", "Impact and next steps"),
-  // action
-  goalDone: name("\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6", "Goal and done-when"),
-  steps: name("\u6B65\u9A5F", "Steps")
-};
-var NEW_STANDARD_HEADING_KEYS = [
-  "detail.background_and_mechanism",
-  "detail.disagreements_and_limits",
-  "detail.open_questions_to_check",
-  "detail.sources_heading"
-];
-var lowered = (value) => value.trim().toLocaleLowerCase();
-var SPELLINGS = ["zh-TW", "zh-CN", "en"];
-var spellings = (key2) => SPELLINGS.map((locale) => translate(locale, key2));
-var both = (value) => [value.zh, value.en];
-var rows;
-function sectionAliasRows() {
-  if (rows) return rows;
-  const sourcesNames = [
-    ...both(SECTION_NAME.sources),
-    ...both(SECTION_NAME.source),
-    ...both(SECTION_NAME.references),
-    ...spellings("detail.sources_heading"),
-    "\u51FA\u5904",
-    "\u53C2\u8003\u8D44\u6599"
-  ];
-  const legacySources = spellings("detail.evidence_and_sources");
-  rows = [
-    // role sources: the old standard name, and the three new names for each other
-    { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
-    // standard / textbook
-    { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
-    { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
-    { names: spellings("detail.open_questions_to_check"), aliases: spellings("detail.open_questions") },
-    // atomic
-    { names: both(SECTION_NAME.oneSentence), aliases: ["\u5B9A\u7FA9", "Definition"] },
-    { names: both(SECTION_NAME.why), aliases: ["\u89E3\u91CB", "Explanation"] },
-    // hypothesis: the old support and counterevidence sections both land on the one table
-    { names: both(SECTION_NAME.ifTrue), aliases: ["\u9810\u6E2C", "Prediction"] },
-    { names: both(SECTION_NAME.evidenceTable), aliases: ["\u652F\u6301", "\u53CD\u99C1", "Support", "Counterevidence"] },
-    // evidence
-    { names: both(SECTION_NAME.summary), aliases: ["\u5167\u5BB9", "Content"] },
-    { names: both(SECTION_NAME.relatedTopics), aliases: ["\u652F\u6301\u6216\u53CD\u99C1", "Supports or refutes"] },
-    // conclusion
-    { names: both(SECTION_NAME.confidence), aliases: ["\u4FE1\u5FC3\u7A0B\u5EA6"] },
-    { names: both(SECTION_NAME.scope), aliases: ["\u9069\u7528\u7BC4\u570D\u8207\u9650\u5236", "Scope and limits"] },
-    { names: both(SECTION_NAME.impact), aliases: ["\u5F8C\u7E8C\u884C\u52D5", "Next actions"] },
-    // action
-    { names: both(SECTION_NAME.goalDone), aliases: ["\u76EE\u6A19", "\u5B8C\u6210\u689D\u4EF6", "Goal", "Done when"] },
-    { names: both(SECTION_NAME.steps), aliases: ["\u6AA2\u67E5\u9EDE", "Checkpoints"] }
-  ];
-  return rows;
-}
-function sectionAliasesFor(heading) {
-  const key2 = lowered(heading);
-  const result = [];
-  for (const row of sectionAliasRows())
-    if (row.names.some((entry) => lowered(entry) === key2)) {
-      for (const alias of row.aliases)
-        if (lowered(alias) !== key2 && !result.some((existing) => lowered(existing) === lowered(alias)))
-          result.push(alias);
-    }
-  return result;
-}
-function isNewSourcesHeading(heading) {
-  const key2 = lowered(heading);
-  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key2);
-}
-
 // ai/result-utils.ts
 var SENTENCE_END = /[。！？；!?;]/;
 var WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\u303e\u3040-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{20000}-\u{3fffd}]/u;
@@ -25881,7 +25941,10 @@ function normalizeOutputScriptHeadings(detail, output, template2, context = {}) 
   if (!verbatimHeadingLanguage(output) || template2 && !isBuiltinTemplateId(template2.id)) return detail;
   const note = noteLanguageOf(output);
   const forms = /* @__PURE__ */ new Map();
-  for (const key2 of [...STANDARD.map(([, standardKey]) => standardKey), ...NEW_STANDARD_HEADING_KEYS]) {
+  for (const key2 of [
+    ...[...STANDARD, ...LEGACY_STANDARD].map(([, standardKey]) => standardKey),
+    ...NEW_STANDARD_HEADING_KEYS
+  ]) {
     const canonical = translate(note, key2);
     const written2 = translate(output, key2);
     if (written2 !== canonical) forms.set(written2, canonical);
@@ -26992,9 +27055,12 @@ function stripNoteStyleComments(text11) {
 }
 var NAME_LANGUAGES = ["zh-TW", "zh-CN", "en"];
 var lowered2 = (value) => value.trim().toLocaleLowerCase();
+var STANDARD_ROWS = [...STANDARD, ...LEGACY_STANDARD];
 function standardKeyOf(heading) {
   const key2 = lowered2(heading);
-  return STANDARD.findIndex(([, name2]) => NAME_LANGUAGES.some((language2) => lowered2(translate(language2, name2)) === key2));
+  return STANDARD_ROWS.findIndex(
+    ([, name2]) => NAME_LANGUAGES.some((language2) => lowered2(translate(language2, name2)) === key2)
+  );
 }
 function parseCount(line) {
   const head = /^(?:數量|数量|count)\s*[:：]\s*(.*)$/i.exec(line.trim());
@@ -27095,8 +27161,10 @@ function parseNoteStyleFile(text11, options) {
     }
     const { callouts, rest } = parseCallouts(content, sectionCode);
     const standard = standardKeyOf(heading.name);
-    const role = standard === 2 ? "sources" : standard === 5 ? "log" : "none";
-    const standardAliases = standard >= 0 ? NOTE_LANGUAGES.map((locale) => translate(locale, STANDARD[standard][1])).filter((alias) => alias !== heading.name) : [];
+    const role = standard >= 0 ? STANDARD_ROWS[standard][3] : "none";
+    const standardAliases = standard >= 0 ? NOTE_LANGUAGES.map((locale) => translate(locale, STANDARD_ROWS[standard][1])).filter(
+      (alias) => alias !== heading.name
+    ) : [];
     const aliases = [
       ...standardAliases,
       ...sectionAliasesFor(heading.name).filter(
@@ -27104,7 +27172,7 @@ function parseNoteStyleFile(text11, options) {
       )
     ];
     return {
-      id: standard >= 0 ? STANDARD[standard][0] : `s${position + 1}`,
+      id: standard >= 0 ? STANDARD_ROWS[standard][0] : `s${position + 1}`,
       name: heading.name,
       description: rest.join("\n").trim(),
       role,
@@ -27153,10 +27221,10 @@ var plain_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u767D\u8A71\u8AAA\u660E\u
 var plain_en_default = "Tone: plain explanation. Explain to a non-specialist reader in everyday language with short sentences and little jargon; explain any necessary term in one sentence the first time it appears. Lead with the conclusion and the key points, then add background, and do not pile up technical terms.\n";
 
 // ai/prompt-presets/magazine.zh.md
-var magazine_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u96DC\u8A8C\u5C08\u6B04\u3002\u4EE5\u6D41\u66A2\u3001\u6709\u89C0\u9EDE\u3001\u6709\u756B\u9762\u7684\u6558\u4E8B\u7B46\u8ABF\u5BEB\u4F5C\uFF0C\u53EF\u7528\u5C0F\u6A19\u8207\u5177\u9AD4\u4F8B\u5B50\u5E36\u51FA\u91CD\u9EDE\uFF0C\u8B93\u8B80\u8005\u9858\u610F\u4E00\u8DEF\u8B80\u4E0B\u53BB\uFF1B\u4FDD\u6301\u5167\u5BB9\u6E96\u78BA\uFF0C\u4E0D\u8A87\u5927\u3001\u4E0D\u7DE8\u9020\u3002\n";
+var magazine_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u6558\u4E8B\u3002\u5BEB\u7D66\u60F3\u4E00\u8DEF\u8B80\u4E0B\u53BB\u7684\u8B80\u8005\uFF1A\u4FDD\u7559\u5404\u6BB5\u7684\u6A19\u984C\uFF0C\u4F46\u6BB5\u5167\u7528\u9023\u8CAB\u7684\u6587\u5B57\u5BEB\u6210\uFF0C\u4E0D\u62C6\u6210\u689D\u5217\uFF1B\u6BCF\u4E00\u6BB5\u7528\u4E00\u500B\u5177\u9AD4\u7684\u4F8B\u5B50\u6216\u5834\u666F\u5E36\u51FA\u91CD\u9EDE\uFF0C\u53E5\u8207\u53E5\u4E4B\u9593\u81EA\u7136\u929C\u63A5\u3002\u539F\u672C\u5C31\u662F\u8868\u683C\u6216\u5F85\u8FA6\u6E05\u55AE\u7684\u6BB5\u843D\uFF08\u4F8B\u5982\u8B49\u64DA\u5C0D\u7167\u3001\u6B65\u9A5F\uFF09\u4FDD\u7559\u8A72\u5F62\u5F0F\u3002\u4FDD\u6301\u5167\u5BB9\u6E96\u78BA\uFF0C\u4E0D\u8A87\u5927\u3001\u4E0D\u7DE8\u9020\uFF1B\u4E0D\u78BA\u5B9A\u7684\u5730\u65B9\u7167\u5BE6\u8AAA\u3002\n";
 
 // ai/prompt-presets/magazine.en.md
-var magazine_en_default = "Tone: magazine column. Write in a fluent, opinionated, vivid narrative voice; use subheadings and concrete examples to carry the main points so the reader wants to keep reading. Keep the content accurate: no exaggeration and no invention.\n";
+var magazine_en_default = "Tone: narrative. Write for readers who want to keep reading: keep the section headings, but write each section as connected prose instead of a bullet list; carry each section's main point with one concrete example or scene, and let sentences follow on from one another naturally. Sections that are a table or a to-do list by design (such as an evidence table or steps) keep that form. Keep the content accurate: no exaggeration and no invention; say plainly what is uncertain.\n";
 
 // ai/prompt-presets/summary.zh.md
 var summary_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u91CD\u9EDE\u6458\u8981\u3002\u4EE5\u7CBE\u7C21\u7684\u689D\u5217\u8207\u77ED\u53E5\u5448\u73FE\u7D50\u8AD6\u3001\u95DC\u9375\u4E8B\u5BE6\u8207\u6578\u5B57\uFF0C\u53BB\u9664\u92EA\u9673\u8207\u4FEE\u98FE\uFF1B\u6BCF\u9EDE\u53EA\u8AAA\u4E00\u4EF6\u4E8B\uFF0C\u8B93\u8B80\u8005\u5728\u6700\u77ED\u6642\u9593\u5167\u638C\u63E1\u5168\u8C8C\u3002\n";
@@ -27171,10 +27239,10 @@ var guide_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u5BE6\u7528\u6307\u5357\u
 var guide_en_default = "Tone: practical guide. Write so the reader can act on it directly: state the situation and goal first, then give steps, checkpoints and common mistakes in order; prefer actionable advice and criteria for trade-offs.\n";
 
 // ai/prompt-presets/academic.zh.md
-var academic_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u5B78\u8853\u56B4\u8B39\uFF08\u9810\u8A2D\uFF09\u3002\u4EE5\u4E2D\u6027\u3001\u7CBE\u78BA\u3001\u4EE5\u8B49\u64DA\u70BA\u672C\u7684\u66F8\u9762\u8A9E\u5BEB\u4F5C\uFF1B\u660E\u78BA\u5340\u5206\u4E8B\u5BE6\u3001\u63A8\u8AD6\u8207\u4E0D\u78BA\u5B9A\u4E4B\u8655\uFF0C\u6A19\u660E\u4F86\u6E90\u8207\u9650\u5236\uFF0C\u907F\u514D\u53E3\u8A9E\u8207\u4FEE\u8FAD\u6027\u8A87\u98FE\u3002\n";
+var academic_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u5C08\u696D\uFF08\u9810\u8A2D\uFF09\u3002\u7D66\u61C2\u9019\u500B\u9818\u57DF\u7684\u8B80\u8005\uFF1A\u4EE5\u4E2D\u6027\u3001\u7CBE\u78BA\u7684\u66F8\u9762\u8A9E\u5BEB\u4F5C\uFF1B\u5206\u6E05\u4E8B\u5BE6\u3001\u63A8\u8AD6\u8207\u4E0D\u78BA\u5B9A\u4E4B\u8655\uFF0C\u6A19\u660E\u4F86\u6E90\u8207\u9650\u5236\uFF0C\u8853\u8A9E\u4E0D\u53E6\u5916\u89E3\u91CB\u3002\n";
 
 // ai/prompt-presets/academic.en.md
-var academic_en_default = "Tone: academic rigor (default). Write in neutral, precise, evidence-based formal prose; clearly separate facts, inferences and uncertainty, state sources and limits, and avoid colloquialism and rhetorical flourish.\n";
+var academic_en_default = "Tone: professional (default). Write for readers who know the field: neutral, precise formal prose; separate facts, inferences and uncertainty, state sources and limits, and do not explain the terms of the field.\n";
 
 // ai/prompt-presets/auto.zh.md
 var auto_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1AAI \u5EFA\u8B70\u3002\u8ACB\u4F9D\u4E3B\u984C\u6027\u8CEA\u8207\u4E0A\u4E0B\u6587\uFF08\u8B80\u8005\u3001\u7528\u9014\u3001\u65E2\u6709\u5167\u5BB9\u7684\u98A8\u683C\uFF09\u81EA\u884C\u9078\u64C7\u6700\u5408\u9069\u7684\u5BEB\u4F5C\u8A9E\u6C23\uFF1B\u4E26\u5728 detail \u6700\u958B\u982D\u4EE5\u4E00\u884C\u5BEB\u660E\u4F60\u9078\u64C7\u7684\u8A9E\u6C23\u8207\u7406\u7531\uFF08\u683C\u5F0F\uFF1A\u300C\u8A9E\u6C23\uFF1A<\u540D\u7A31>\uFF5C<\u4E00\u53E5\u7406\u7531>\u300D\uFF09\uFF0C\u4E4B\u5F8C\u518D\u958B\u59CB\u6B63\u6587\u3002\n";
@@ -27294,67 +27362,101 @@ function deletePreset(custom, id) {
 }
 
 // core/blocks/template/standard.zh-TW.md
-var standard_zh_TW_default = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var standard_zh_TW_default = "## \u6838\u5FC3\u7D50\u8AD6\n\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u8B70\u984C\u7684\u554F\u984C\uFF0C\u518D\u7528 2\u20134 \u9EDE\u7406\u7531\u652F\u6301\uFF1B\u6BCF\u9EDE\u4E00\u53E5\u7D50\u8AD6\u52A0\u4E00\u53E5\u7406\u7531\u3002\u4E0D\u653E\u80CC\u666F\u4ECB\u7D39\u3002\n\n## \u80CC\u666F\u8207\u6A5F\u5236\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u548C\u904B\u4F5C\u65B9\u5F0F\uFF1B\u4E0D\u91CD\u8907\u6838\u5FC3\u7D50\u8AD6\uFF0C\u4E5F\u4E0D\u653E\u4E0D\u540C\u770B\u6CD5\u3002\n\n## \u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236\n\u6709\u722D\u8B70\u7684\u5730\u65B9\u3001\u53CD\u4F8B\u3001\u9069\u7528\u689D\u4EF6\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u6C92\u6DB5\u84CB\u7684\u7BC4\u570D\uFF1B\u6C92\u6709\u722D\u8B70\u5C31\u53EA\u5BEB\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u554F\u984C\n\u9084\u6C92\u67E5\u8B49\u3001\u503C\u5F97\u958B\u6210\u5B50\u8B70\u984C\u7684\u554F\u984C\uFF1B\u6BCF\u9EDE\u5BEB\u6210\u4E00\u500B\u53EF\u4EE5\u7814\u7A76\u7684\u554F\u53E5\u3002\n\n## \u4F86\u6E90\n\u6B63\u6587\u7528\u8A3B\u8173\u6A19\u51FA\u8655\uFF1B\u9019\u6BB5\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/standard.zh-CN.md
-var standard_zh_CN_default = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var standard_zh_CN_default = "## \u6838\u5FC3\u7D50\u8AD6\n\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u8B70\u984C\u7684\u554F\u984C\uFF0C\u518D\u7528 2\u20134 \u9EDE\u7406\u7531\u652F\u6301\uFF1B\u6BCF\u9EDE\u4E00\u53E5\u7D50\u8AD6\u52A0\u4E00\u53E5\u7406\u7531\u3002\u4E0D\u653E\u80CC\u666F\u4ECB\u7D39\u3002\n\n## \u80CC\u666F\u8207\u6A5F\u5236\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u548C\u904B\u4F5C\u65B9\u5F0F\uFF1B\u4E0D\u91CD\u8907\u6838\u5FC3\u7D50\u8AD6\uFF0C\u4E5F\u4E0D\u653E\u4E0D\u540C\u770B\u6CD5\u3002\n\n## \u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236\n\u6709\u722D\u8B70\u7684\u5730\u65B9\u3001\u53CD\u4F8B\u3001\u9069\u7528\u689D\u4EF6\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u6C92\u6DB5\u84CB\u7684\u7BC4\u570D\uFF1B\u6C92\u6709\u722D\u8B70\u5C31\u53EA\u5BEB\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u554F\u984C\n\u9084\u6C92\u67E5\u8B49\u3001\u503C\u5F97\u958B\u6210\u5B50\u8B70\u984C\u7684\u554F\u984C\uFF1B\u6BCF\u9EDE\u5BEB\u6210\u4E00\u500B\u53EF\u4EE5\u7814\u7A76\u7684\u554F\u53E5\u3002\n\n## \u4F86\u6E90\n\u6B63\u6587\u7528\u8A3B\u8173\u6A19\u51FA\u8655\uFF1B\u9019\u6BB5\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/standard.en.md
-var standard_en_default = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+var standard_en_default = "## Core conclusions\nThe first sentence answers the topic's question directly, then 2\u20134 reasons, each one sentence of conclusion plus one sentence of reason. No background here.\n\n## Background and mechanism\nThe concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.\n\n## Disagreements and limits\nWhere the evidence is contested, counterexamples, when the conclusions apply, and what this research did not cover; write only limits if nothing is contested.\n\n## Open questions to check\nQuestions not yet verified that are worth opening as subtopics; write each as a question that can be researched.\n\n## Sources\nMark sources with footnotes in the body; this section holds only the source list, which is added to the end of this section automatically, without restating the body.\n\n## Update log\nAdd only one line saying what this update changed.\n";
 
 // core/blocks/template/textbook.zh-TW.md
-var textbook_zh_TW_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var textbook_zh_TW_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u80CC\u666F\u8207\u6A5F\u5236, ### \u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u554F\u984C, ### \u4F86\u6E90, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u554F\u984C\uFF0C\u518D\u7528 2\u20134 \u9EDE\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u8B70\u984C\u7684\u554F\u984C\uFF0C\u518D\u7528 2\u20134 \u9EDE\u7406\u7531\u652F\u6301\uFF1B\u6BCF\u9EDE\u4E00\u53E5\u7D50\u8AD6\u52A0\u4E00\u53E5\u7406\u7531\u3002\u4E0D\u653E\u80CC\u666F\u4ECB\u7D39\u3002\n\n## \u80CC\u666F\u8207\u6A5F\u5236\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u548C\u904B\u4F5C\u65B9\u5F0F\uFF1B\u4E0D\u91CD\u8907\u6838\u5FC3\u7D50\u8AD6\uFF0C\u4E5F\u4E0D\u653E\u4E0D\u540C\u770B\u6CD5\u3002\n\n## \u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236\n\u6709\u722D\u8B70\u7684\u5730\u65B9\u3001\u53CD\u4F8B\u3001\u9069\u7528\u689D\u4EF6\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u6C92\u6DB5\u84CB\u7684\u7BC4\u570D\uFF1B\u6C92\u6709\u722D\u8B70\u5C31\u53EA\u5BEB\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u554F\u984C\n\u9084\u6C92\u67E5\u8B49\u3001\u503C\u5F97\u958B\u6210\u5B50\u8B70\u984C\u7684\u554F\u984C\uFF1B\u6BCF\u9EDE\u5BEB\u6210\u4E00\u500B\u53EF\u4EE5\u7814\u7A76\u7684\u554F\u53E5\u3002\n\n## \u4F86\u6E90\n\u6B63\u6587\u7528\u8A3B\u8173\u6A19\u51FA\u8655\uFF1B\u9019\u6BB5\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/textbook.zh-CN.md
-var textbook_zh_CN_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var textbook_zh_CN_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u80CC\u666F\u8207\u6A5F\u5236, ### \u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u554F\u984C, ### \u4F86\u6E90, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u554F\u984C\uFF0C\u518D\u7528 2\u20134 \u9EDE\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u7B2C\u4E00\u53E5\u76F4\u63A5\u56DE\u7B54\u8B70\u984C\u7684\u554F\u984C\uFF0C\u518D\u7528 2\u20134 \u9EDE\u7406\u7531\u652F\u6301\uFF1B\u6BCF\u9EDE\u4E00\u53E5\u7D50\u8AD6\u52A0\u4E00\u53E5\u7406\u7531\u3002\u4E0D\u653E\u80CC\u666F\u4ECB\u7D39\u3002\n\n## \u80CC\u666F\u8207\u6A5F\u5236\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u548C\u904B\u4F5C\u65B9\u5F0F\uFF1B\u4E0D\u91CD\u8907\u6838\u5FC3\u7D50\u8AD6\uFF0C\u4E5F\u4E0D\u653E\u4E0D\u540C\u770B\u6CD5\u3002\n\n## \u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236\n\u6709\u722D\u8B70\u7684\u5730\u65B9\u3001\u53CD\u4F8B\u3001\u9069\u7528\u689D\u4EF6\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u6C92\u6DB5\u84CB\u7684\u7BC4\u570D\uFF1B\u6C92\u6709\u722D\u8B70\u5C31\u53EA\u5BEB\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u554F\u984C\n\u9084\u6C92\u67E5\u8B49\u3001\u503C\u5F97\u958B\u6210\u5B50\u8B70\u984C\u7684\u554F\u984C\uFF1B\u6BCF\u9EDE\u5BEB\u6210\u4E00\u500B\u53EF\u4EE5\u7814\u7A76\u7684\u554F\u53E5\u3002\n\n## \u4F86\u6E90\n\u6B63\u6587\u7528\u8A3B\u8173\u6A19\u51FA\u8655\uFF1B\u9019\u6BB5\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/textbook.en.md
-var textbook_en_default = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). Give the core conclusions 3\u20135 points by default, conclusion first and then the reason, and do not repeat sentences the lead-in already said. ### Update log gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "### Update log" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n\n## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+var textbook_en_default = `The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.
+
+Opening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.
+
+Body: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: ### Core conclusions, ### Background and mechanism, ### Disagreements and limits, ### Open questions to check, ### Sources, ### Update log. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write 'No new content this time' in sections with nothing to say). In the core conclusions, answer the question in the first sentence, then give 2\u20134 reasons, and do not repeat sentences the lead-in already said. ### Update log gets only one line saying what this page covers.
+
+Closing: put common misconceptions in the category where they fit best, as one short \`> [!warning]\` callout in the form "beginners often think ..., but actually ...". Just before "### Update log" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.
+
+## Core conclusions
+The first sentence answers the topic's question directly, then 2\u20134 reasons, each one sentence of conclusion plus one sentence of reason. No background here.
+
+## Background and mechanism
+The concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.
+
+## Disagreements and limits
+Where the evidence is contested, counterexamples, when the conclusions apply, and what this research did not cover; write only limits if nothing is contested.
+
+## Open questions to check
+Questions not yet verified that are worth opening as subtopics; write each as a question that can be researched.
+
+## Sources
+Mark sources with footnotes in the body; this section holds only the source list, which is added to the end of this section automatically, without restating the body.
+
+## Update log
+Add only one line saying what this update changed.
+`;
 
 // core/blocks/template/hypothesis.zh-TW.md
-var hypothesis_zh_TW_default = "## \u4E3B\u5F35\n\u7528\u4E00\u53E5\u8A71\u5BEB\u51FA\u9019\u500B\u5047\u8A2D\u4E3B\u5F35\u4EC0\u9EBC\uFF0C\u53EF\u88AB\u9A57\u8B49\u6216\u63A8\u7FFB\u3002\n\n## \u9810\u6E2C\n\u5982\u679C\u4E3B\u5F35\u6210\u7ACB\uFF0C\u61C9\u8A72\u89C0\u5BDF\u5230\u4EC0\u9EBC\uFF1B\u5BEB\u5177\u9AD4\u3001\u53EF\u6AA2\u67E5\u7684\u7D50\u679C\u3002\n\n## \u9A57\u8B49\u65B9\u5F0F\n\u8981\u600E\u9EBC\u78BA\u8A8D\u6216\u63A8\u7FFB\uFF1A\u627E\u4EC0\u9EBC\u8CC7\u6599\u3001\u505A\u4EC0\u9EBC\u6BD4\u8F03\u6216\u5BE6\u9A57\u3002\n\n## \u652F\u6301\n\u652F\u6301\u4E3B\u5F35\u7684\u8B49\u64DA\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\u3002\n\n## \u53CD\u99C1\n\u8207\u4E3B\u5F35\u885D\u7A81\u7684\u8B49\u64DA\u6216\u53CD\u4F8B\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\uFF1B\u6C92\u6709\u5C31\u8AAA\u9084\u6C92\u627E\u5230\u3002\n\n## \u76EE\u524D\u5224\u65B7\n\u7D9C\u5408\u652F\u6301\u8207\u53CD\u99C1\uFF0C\u5BEB\u76EE\u524D\u5F37\u5F31\uFF08\u5F31\uFF0F\u4E2D\uFF0F\u5F37\uFF09\u8207\u9084\u7F3A\u54EA\u4E9B\u8B49\u64DA\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var hypothesis_zh_TW_default = "## \u4E3B\u5F35\n\u4E00\u53E5\u53EF\u4EE5\u88AB\u63A8\u7FFB\u7684\u9673\u8FF0\uFF0C\u5BEB\u6E05\u5C0D\u8C61\u3001\u689D\u4EF6\u8207\u65B9\u5411\u3002\u4E0D\u653E\u7406\u7531\u8207\u8B49\u64DA\u3002\n\n## \u76EE\u524D\u5224\u65B7\n\u53EA\u7559\u4E00\u4EFD\uFF1A\u672A\u6AA2\u9A57\uFF0F\u504F\u652F\u6301\uFF0F\u504F\u53CD\u99C1\uFF0F\u5DF2\u63A8\u7FFB\u56DB\u9078\u4E00\uFF0C\u52A0\u4E00\u53E5\u7406\u7531\u548C\u9084\u7F3A\u4EC0\u9EBC\u8B49\u64DA\u3002\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u5224\u65B7\uFF1B\u5224\u65B7\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u5982\u679C\u6210\u7ACB\u6703\u770B\u5230\n\u5177\u9AD4\u3001\u53EF\u6AA2\u67E5\u7684\u9810\u6E2C\uFF0C\u6BCF\u9EDE\u4E00\u884C\u3002\n\n## \u4EC0\u9EBC\u6703\u63A8\u7FFB\u5B83\n\u4E8B\u5148\u5BEB\u597D\u7684\u53CD\u8B49\u689D\u4EF6\uFF1A\u770B\u5230\u4EC0\u9EBC\u7D50\u679C\uFF0C\u5C31\u4EE3\u8868\u4E3B\u5F35\u4E0D\u6210\u7ACB\u3002\n\n## \u9A57\u8B49\u65B9\u5F0F\n\u8981\u627E\u4EC0\u9EBC\u8CC7\u6599\u3001\u505A\u4EC0\u9EBC\u6BD4\u8F03\u6216\u5BE6\u9A57\u3002\n\n## \u8B49\u64DA\u5C0D\u7167\n\u4E00\u500B\u8868\u683C\uFF0C\u6B04\u4F4D\u70BA\u300C\u8B49\u64DA\uFF5C\u652F\u6301\uFF0F\u53CD\u99C1\uFF5C\u5F37\u5EA6\uFF5C\u9023\u5230\u7684\u8B70\u984C\u300D\uFF0C\u6BCF\u5247\u8B49\u64DA\u4E00\u5217\u4E26\u6A19\u51FA\u8655\u3002\u9023\u5230\u7684\u8B70\u984C\u53EA\u7528\u8B70\u984C\u9023\u7D50\u5BEB\u5728\u9019\u88E1\uFF0C\u4E0D\u53E6\u5916\u91CD\u6284\u652F\u6301\u8207\u53CD\u99C1\u7684\u5167\u5BB9\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/hypothesis.zh-CN.md
-var hypothesis_zh_CN_default = "## \u4E3B\u5F35\n\u7528\u4E00\u53E5\u8A71\u5BEB\u51FA\u9019\u500B\u5047\u8A2D\u4E3B\u5F35\u4EC0\u9EBC\uFF0C\u53EF\u88AB\u9A57\u8B49\u6216\u63A8\u7FFB\u3002\n\n## \u9810\u6E2C\n\u5982\u679C\u4E3B\u5F35\u6210\u7ACB\uFF0C\u61C9\u8A72\u89C0\u5BDF\u5230\u4EC0\u9EBC\uFF1B\u5BEB\u5177\u9AD4\u3001\u53EF\u6AA2\u67E5\u7684\u7D50\u679C\u3002\n\n## \u9A57\u8B49\u65B9\u5F0F\n\u8981\u600E\u9EBC\u78BA\u8A8D\u6216\u63A8\u7FFB\uFF1A\u627E\u4EC0\u9EBC\u8CC7\u6599\u3001\u505A\u4EC0\u9EBC\u6BD4\u8F03\u6216\u5BE6\u9A57\u3002\n\n## \u652F\u6301\n\u652F\u6301\u4E3B\u5F35\u7684\u8B49\u64DA\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\u3002\n\n## \u53CD\u99C1\n\u8207\u4E3B\u5F35\u885D\u7A81\u7684\u8B49\u64DA\u6216\u53CD\u4F8B\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\uFF1B\u6C92\u6709\u5C31\u8AAA\u9084\u6C92\u627E\u5230\u3002\n\n## \u76EE\u524D\u5224\u65B7\n\u7D9C\u5408\u652F\u6301\u8207\u53CD\u99C1\uFF0C\u5BEB\u76EE\u524D\u5F37\u5F31\uFF08\u5F31\uFF0F\u4E2D\uFF0F\u5F37\uFF09\u8207\u9084\u7F3A\u54EA\u4E9B\u8B49\u64DA\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var hypothesis_zh_CN_default = "## \u4E3B\u5F35\n\u4E00\u53E5\u53EF\u4EE5\u88AB\u63A8\u7FFB\u7684\u9673\u8FF0\uFF0C\u5BEB\u6E05\u5C0D\u8C61\u3001\u689D\u4EF6\u8207\u65B9\u5411\u3002\u4E0D\u653E\u7406\u7531\u8207\u8B49\u64DA\u3002\n\n## \u76EE\u524D\u5224\u65B7\n\u53EA\u7559\u4E00\u4EFD\uFF1A\u672A\u6AA2\u9A57\uFF0F\u504F\u652F\u6301\uFF0F\u504F\u53CD\u99C1\uFF0F\u5DF2\u63A8\u7FFB\u56DB\u9078\u4E00\uFF0C\u52A0\u4E00\u53E5\u7406\u7531\u548C\u9084\u7F3A\u4EC0\u9EBC\u8B49\u64DA\u3002\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u5224\u65B7\uFF1B\u5224\u65B7\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u5982\u679C\u6210\u7ACB\u6703\u770B\u5230\n\u5177\u9AD4\u3001\u53EF\u6AA2\u67E5\u7684\u9810\u6E2C\uFF0C\u6BCF\u9EDE\u4E00\u884C\u3002\n\n## \u4EC0\u9EBC\u6703\u63A8\u7FFB\u5B83\n\u4E8B\u5148\u5BEB\u597D\u7684\u53CD\u8B49\u689D\u4EF6\uFF1A\u770B\u5230\u4EC0\u9EBC\u7D50\u679C\uFF0C\u5C31\u4EE3\u8868\u4E3B\u5F35\u4E0D\u6210\u7ACB\u3002\n\n## \u9A57\u8B49\u65B9\u5F0F\n\u8981\u627E\u4EC0\u9EBC\u8CC7\u6599\u3001\u505A\u4EC0\u9EBC\u6BD4\u8F03\u6216\u5BE6\u9A57\u3002\n\n## \u8B49\u64DA\u5C0D\u7167\n\u4E00\u500B\u8868\u683C\uFF0C\u6B04\u4F4D\u70BA\u300C\u8B49\u64DA\uFF5C\u652F\u6301\uFF0F\u53CD\u99C1\uFF5C\u5F37\u5EA6\uFF5C\u9023\u5230\u7684\u8B70\u984C\u300D\uFF0C\u6BCF\u5247\u8B49\u64DA\u4E00\u5217\u4E26\u6A19\u51FA\u8655\u3002\u9023\u5230\u7684\u8B70\u984C\u53EA\u7528\u8B70\u984C\u9023\u7D50\u5BEB\u5728\u9019\u88E1\uFF0C\u4E0D\u53E6\u5916\u91CD\u6284\u652F\u6301\u8207\u53CD\u99C1\u7684\u5167\u5BB9\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/hypothesis.en.md
-var hypothesis_en_default = "## Claim\nState in one sentence what this hypothesis claims, so that it can be tested or refuted.\n\n## Prediction\nWhat should be observed if the claim holds; write concrete results that can be checked.\n\n## How to test\nHow to confirm or refute it: what data to look for, what comparison or experiment to run.\n\n## Support\nEvidence that supports the claim; give the source and strength of each point.\n\n## Counterevidence\nEvidence or counterexamples that conflict with the claim; give the source and strength of each point; if there is none, say none has been found yet.\n\n## Current judgment\nWeigh the support against the counterevidence; state the current strength (weak, medium or strong) and what evidence is still missing.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+var hypothesis_en_default = '## Claim\nOne statement that can be refuted, with the subject, the conditions and the direction stated. No reasons or evidence here.\n\n## Current judgment\nKeep only one: untested, leaning support, leaning against or refuted, plus a one-sentence reason and what is missing. This takes precedence over the earlier rule for inconsistencies: never list old and new ones; when it changes, rewrite this one and write "from X to Y: reason" in the update log.\n\n## If true we would see\nConcrete predictions that can be checked, one per line.\n\n## What would refute it\nCounter-conditions written in advance: which result would mean the claim fails.\n\n## How to test\nWhat data to look for, and what comparison or experiment to run.\n\n## Evidence table\nOne table with the columns "Evidence | Supports / refutes | Strength | Linked topic", one row per piece of evidence, each with its source. Write linked topics only here, as topic links; do not restate the supporting and refuting content elsewhere.\n\n## Sources\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/template/evidence.zh-TW.md
-var evidence_zh_TW_default = "## \u5167\u5BB9\n\u9019\u5247\u8B49\u64DA\u5177\u9AD4\u8AAA\u4E86\u4EC0\u9EBC\uFF1A\u4E8B\u5BE6\u3001\u6578\u64DA\u6216\u89C0\u5BDF\uFF0C\u4E0D\u52A0\u63A8\u8AD6\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53EF\u4FE1\u5EA6\n\u4F86\u6E90\u985E\u578B\u3001\u65B9\u6CD5\u3001\u6A23\u672C\u8207\u6642\u9593\uFF0C\u8A55\u4F30\u53EF\u4FE1\u5EA6\uFF08\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\uFF09\u4E26\u8AAA\u660E\u7406\u7531\u3002\n\n## \u652F\u6301\u6216\u53CD\u99C1\n\u9019\u5247\u8B49\u64DA\u652F\u6301\u6216\u53CD\u99C1\u54EA\u500B\u5047\u8A2D\u3001\u54EA\u4E00\u9EDE\uFF1B\u6C92\u6709\u9023\u5230\u5047\u8A2D\u5C31\u5BEB\u300C\u5C1A\u672A\u9023\u5230\u5047\u8A2D\u300D\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var evidence_zh_TW_default = "## \u6458\u8981\n\u9019\u5247\u8B49\u64DA\u8AAA\u4E86\u4EC0\u9EBC\uFF0C\u4E00\u5230\u4E09\u53E5\uFF0C\u4E0D\u52A0\u63A8\u8AD6\u3002\n\n## \u539F\u6587\u6216\u6578\u64DA\n\u95DC\u9375\u5F15\u6587\u8207\u6578\u5B57\uFF0C\u4FDD\u6301\u539F\u6A23\u4E26\u6A19\u51FA\u8655\u3002\u4E4B\u5F8C\u7684\u7814\u7A76\u4E0D\u5F97\u6539\u5BEB\u6216\u522A\u6389\u9019\u6BB5\u5DF2\u6709\u7684\u5F15\u6587\u8207\u6578\u5B57\uFF0C\u53EA\u80FD\u88DC\u5145\u3002\n\n## \u600E\u9EBC\u5F97\u5230\u7684\n\u7814\u7A76\u8A2D\u8A08\u3001\u6A23\u672C\u3001\u6642\u9593\u8207\u8CC7\u6599\u985E\u578B\u3002\n\n## \u53EF\u4FE1\u5EA6\n\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\u4E09\u9078\u4E00\uFF0C\u52A0\u4E0A\u7406\u7531\uFF1A\u5229\u76CA\u885D\u7A81\u3001\u6A23\u672C\u9650\u5236\u3001\u662F\u5426\u88AB\u91CD\u8907\u9A57\u8B49\u3002\u53EA\u7559\u4E00\u500B\u7B49\u7D1A\u3002\n\n## \u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC\n\u7528\u8B70\u984C\u9023\u7D50\u5BEB\u5B83\u652F\u6301\u6216\u53CD\u99C1\u54EA\u4E00\u9EDE\uFF1B\u9084\u6C92\u9023\u5230\u8B70\u984C\u5C31\u5BEB\u300C\u5C1A\u672A\u9023\u5230\u8B70\u984C\u300D\u3002\n\n## \u51FA\u8655\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/evidence.zh-CN.md
-var evidence_zh_CN_default = "## \u5167\u5BB9\n\u9019\u5247\u8B49\u64DA\u5177\u9AD4\u8AAA\u4E86\u4EC0\u9EBC\uFF1A\u4E8B\u5BE6\u3001\u6578\u64DA\u6216\u89C0\u5BDF\uFF0C\u4E0D\u52A0\u63A8\u8AD6\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53EF\u4FE1\u5EA6\n\u4F86\u6E90\u985E\u578B\u3001\u65B9\u6CD5\u3001\u6A23\u672C\u8207\u6642\u9593\uFF0C\u8A55\u4F30\u53EF\u4FE1\u5EA6\uFF08\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\uFF09\u4E26\u8AAA\u660E\u7406\u7531\u3002\n\n## \u652F\u6301\u6216\u53CD\u99C1\n\u9019\u5247\u8B49\u64DA\u652F\u6301\u6216\u53CD\u99C1\u54EA\u500B\u5047\u8A2D\u3001\u54EA\u4E00\u9EDE\uFF1B\u6C92\u6709\u9023\u5230\u5047\u8A2D\u5C31\u5BEB\u300C\u5C1A\u672A\u9023\u5230\u5047\u8A2D\u300D\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var evidence_zh_CN_default = "## \u6458\u8981\n\u9019\u5247\u8B49\u64DA\u8AAA\u4E86\u4EC0\u9EBC\uFF0C\u4E00\u5230\u4E09\u53E5\uFF0C\u4E0D\u52A0\u63A8\u8AD6\u3002\n\n## \u539F\u6587\u6216\u6578\u64DA\n\u95DC\u9375\u5F15\u6587\u8207\u6578\u5B57\uFF0C\u4FDD\u6301\u539F\u6A23\u4E26\u6A19\u51FA\u8655\u3002\u4E4B\u5F8C\u7684\u7814\u7A76\u4E0D\u5F97\u6539\u5BEB\u6216\u522A\u6389\u9019\u6BB5\u5DF2\u6709\u7684\u5F15\u6587\u8207\u6578\u5B57\uFF0C\u53EA\u80FD\u88DC\u5145\u3002\n\n## \u600E\u9EBC\u5F97\u5230\u7684\n\u7814\u7A76\u8A2D\u8A08\u3001\u6A23\u672C\u3001\u6642\u9593\u8207\u8CC7\u6599\u985E\u578B\u3002\n\n## \u53EF\u4FE1\u5EA6\n\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\u4E09\u9078\u4E00\uFF0C\u52A0\u4E0A\u7406\u7531\uFF1A\u5229\u76CA\u885D\u7A81\u3001\u6A23\u672C\u9650\u5236\u3001\u662F\u5426\u88AB\u91CD\u8907\u9A57\u8B49\u3002\u53EA\u7559\u4E00\u500B\u7B49\u7D1A\u3002\n\n## \u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC\n\u7528\u8B70\u984C\u9023\u7D50\u5BEB\u5B83\u652F\u6301\u6216\u53CD\u99C1\u54EA\u4E00\u9EDE\uFF1B\u9084\u6C92\u9023\u5230\u8B70\u984C\u5C31\u5BEB\u300C\u5C1A\u672A\u9023\u5230\u8B70\u984C\u300D\u3002\n\n## \u51FA\u8655\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/evidence.en.md
-var evidence_en_default = '## Content\nWhat this piece of evidence says: the facts, data or observations, without inference.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Credibility\nThe source type, method, sample and date; rate the credibility (low, medium or high) and give the reason.\n\n## Supports or refutes\nWhich hypothesis and which point this evidence supports or refutes; if it is not linked to a hypothesis, write "Not linked to a hypothesis yet".\n\n## Update log\nAdd only one line saying what this update changed.\n';
+var evidence_en_default = '## Summary\nWhat this piece of evidence says, in one to three sentences, with no inference added.\n\n## Source text or data\nThe key quotes and numbers, kept exactly as they are, with their source. Later research must not rewrite or delete the quotes and numbers already here; it may only add to them.\n\n## How it was obtained\nThe study design, sample, time and type of data.\n\n## Credibility\nExactly one of low, medium, high, with the reason: conflicts of interest, sample limits, whether it was replicated. Keep only one level.\n\n## Related topics\nUse topic links to say which point it supports or refutes; write "Not linked to a topic yet" if it is linked to none.\n\n## Source\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/template/action.zh-TW.md
-var action_zh_TW_default = "## \u76EE\u6A19\n\u9019\u500B\u884C\u52D5\u8981\u9054\u6210\u4EC0\u9EBC\uFF0C\u7528\u53EF\u8861\u91CF\u7684\u65B9\u5F0F\u5BEB\u3002\n\n## \u6B65\u9A5F\n\u4F9D\u9806\u5E8F\u5217\u51FA\u8981\u505A\u7684\u4E8B\uFF0C\u6BCF\u6B65\u4E00\u884C\uFF0C\u7528\u6709\u5E8F\u6E05\u55AE\u3002\n\n## \u6AA2\u67E5\u9EDE\n\u9014\u4E2D\u7528\u4F86\u78BA\u8A8D\u65B9\u5411\u6B63\u78BA\u7684\u6642\u9593\u9EDE\u6216\u6307\u6A19\u3002\n\n## \u5B8C\u6210\u689D\u4EF6\n\u505A\u5230\u4EC0\u9EBC\u5C31\u7B97\u5B8C\u6210\uFF1B\u5BEB\u53EF\u6AA2\u67E5\u7684\u689D\u4EF6\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var action_zh_TW_default = "## \u72C0\u614B\n\u672A\u958B\u59CB\uFF0F\u9032\u884C\u4E2D\uFF0F\u5361\u4F4F\uFF0F\u5B8C\u6210\u56DB\u9078\u4E00\uFF0C\u52A0\u65E5\u671F\u548C\u4E00\u53E5\u9032\u5EA6\u3002\u53EA\u7559\u4E00\u4EFD\uFF0C\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u72C0\u614B\uFF1B\u72C0\u614B\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6\n\u8981\u9054\u6210\u4EC0\u9EBC\uFF0C\u52A0\u4E0A\u53EF\u4EE5\u6AA2\u67E5\u7684\u5B8C\u6210\u689D\u4EF6\u3002\n\n## \u4E0B\u4E00\u6B65\n\u53EA\u5BEB\u6700\u8FD1\u7684\u4E00\u6B65\uFF0C\u52D5\u8A5E\u958B\u982D\uFF0C\u4E00\u884C\u3002\n\n## \u6B65\u9A5F\n\u7528\u5F85\u8FA6\u52FE\u9078\u6846\u6E05\u55AE\u5217\u51FA\u5168\u90E8\u6B65\u9A5F\uFF0C\u505A\u5B8C\u7684\u6253\u52FE\uFF0C\u7528\u6253\u52FE\u6578\u6A19\u793A\u9032\u5EA6\u3002\n\n## \u963B\u7919\u8207\u98A8\u96AA\n\u5361\u4F4F\u7684\u539F\u56E0\u548C\u53EF\u80FD\u51FA\u554F\u984C\u7684\u5730\u65B9\uFF0C\u6BCF\u9EDE\u4E00\u884C\uFF1B\u76EE\u524D\u6C92\u6709\u5C31\u5BEB\u300C\u76EE\u524D\u6C92\u6709\u300D\u3002\n\n## \u9810\u671F\u7522\u51FA\n\u505A\u5B8C\u6703\u5F97\u5230\u4EC0\u9EBC\uFF0C\u4E26\u9023\u56DE\u5B83\u5C6C\u65BC\u54EA\u500B\u8B70\u984C\u3002\n\n## \u53C3\u8003\u8CC7\u6599\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/action.zh-CN.md
-var action_zh_CN_default = "## \u76EE\u6A19\n\u9019\u500B\u884C\u52D5\u8981\u9054\u6210\u4EC0\u9EBC\uFF0C\u7528\u53EF\u8861\u91CF\u7684\u65B9\u5F0F\u5BEB\u3002\n\n## \u6B65\u9A5F\n\u4F9D\u9806\u5E8F\u5217\u51FA\u8981\u505A\u7684\u4E8B\uFF0C\u6BCF\u6B65\u4E00\u884C\uFF0C\u7528\u6709\u5E8F\u6E05\u55AE\u3002\n\n## \u6AA2\u67E5\u9EDE\n\u9014\u4E2D\u7528\u4F86\u78BA\u8A8D\u65B9\u5411\u6B63\u78BA\u7684\u6642\u9593\u9EDE\u6216\u6307\u6A19\u3002\n\n## \u5B8C\u6210\u689D\u4EF6\n\u505A\u5230\u4EC0\u9EBC\u5C31\u7B97\u5B8C\u6210\uFF1B\u5BEB\u53EF\u6AA2\u67E5\u7684\u689D\u4EF6\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var action_zh_CN_default = "## \u72C0\u614B\n\u672A\u958B\u59CB\uFF0F\u9032\u884C\u4E2D\uFF0F\u5361\u4F4F\uFF0F\u5B8C\u6210\u56DB\u9078\u4E00\uFF0C\u52A0\u65E5\u671F\u548C\u4E00\u53E5\u9032\u5EA6\u3002\u53EA\u7559\u4E00\u4EFD\uFF0C\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u72C0\u614B\uFF1B\u72C0\u614B\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6\n\u8981\u9054\u6210\u4EC0\u9EBC\uFF0C\u52A0\u4E0A\u53EF\u4EE5\u6AA2\u67E5\u7684\u5B8C\u6210\u689D\u4EF6\u3002\n\n## \u4E0B\u4E00\u6B65\n\u53EA\u5BEB\u6700\u8FD1\u7684\u4E00\u6B65\uFF0C\u52D5\u8A5E\u958B\u982D\uFF0C\u4E00\u884C\u3002\n\n## \u6B65\u9A5F\n\u7528\u5F85\u8FA6\u52FE\u9078\u6846\u6E05\u55AE\u5217\u51FA\u5168\u90E8\u6B65\u9A5F\uFF0C\u505A\u5B8C\u7684\u6253\u52FE\uFF0C\u7528\u6253\u52FE\u6578\u6A19\u793A\u9032\u5EA6\u3002\n\n## \u963B\u7919\u8207\u98A8\u96AA\n\u5361\u4F4F\u7684\u539F\u56E0\u548C\u53EF\u80FD\u51FA\u554F\u984C\u7684\u5730\u65B9\uFF0C\u6BCF\u9EDE\u4E00\u884C\uFF1B\u76EE\u524D\u6C92\u6709\u5C31\u5BEB\u300C\u76EE\u524D\u6C92\u6709\u300D\u3002\n\n## \u9810\u671F\u7522\u51FA\n\u505A\u5B8C\u6703\u5F97\u5230\u4EC0\u9EBC\uFF0C\u4E26\u9023\u56DE\u5B83\u5C6C\u65BC\u54EA\u500B\u8B70\u984C\u3002\n\n## \u53C3\u8003\u8CC7\u6599\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/action.en.md
-var action_en_default = "## Goal\nWhat this action should achieve, stated in a measurable way.\n\n## Steps\nList what to do in order, one step per line, as a numbered list.\n\n## Checkpoints\nThe times or indicators used along the way to confirm the direction is right.\n\n## Done when\nWhat counts as finished; write conditions that can be checked.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+var action_en_default = '## Status\nNot started, in progress, blocked or done, plus the date and one sentence of progress. Keep only one; this takes precedence over the earlier rule for inconsistencies: never list old and new status; when it changes, rewrite this one and write "from X to Y: reason" in the update log.\n\n## Goal and done-when\nWhat is to be achieved, plus a done-when condition that can be checked.\n\n## Next step\nOnly the nearest step, one line, starting with a verb.\n\n## Steps\nList all steps as a checkbox to-do list, tick the finished ones, and show progress by the ticks.\n\n## Blockers and risks\nWhy it is stuck and where it may go wrong, one line each; write "None for now" if there are none.\n\n## Expected output\nWhat you get when it is done, and which topic it links back to.\n\n## References\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/template/atomic.zh-TW.md
-var atomic_zh_TW_default = "## \u5B9A\u7FA9\n\u4E00\u53E5\u8A71\u5B9A\u7FA9\u9019\u500B\u6982\u5FF5\uFF0C\u4E0D\u8D85\u904E 40 \u5B57\u3002\n\n## \u89E3\u91CB\n\u6700\u591A\u4E09\u53E5\uFF0C\u8AAA\u660E\u5B83\u70BA\u4EC0\u9EBC\u6210\u7ACB\u3001\u548C\u76F8\u8FD1\u6982\u5FF5\u5DEE\u5728\u54EA\u3002\n\n## \u4F8B\u5B50\n\u4E00\u500B\u5177\u9AD4\u4F8B\u5B50\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var atomic_zh_TW_default = "## \u4E00\u53E5\u8A71\n\u5B9A\u7FA9\u6216\u4E3B\u5F35\uFF0C\u4E0D\u8D85\u904E 40 \u5B57\uFF0C\u812B\u96E2\u4E0A\u4E0B\u6587\u4E5F\u770B\u5F97\u61C2\u3002\u4E0D\u653E\u4F8B\u5B50\u8207\u7406\u7531\u3002\n\n## \u70BA\u4EC0\u9EBC\n\u6700\u591A\u4E09\u53E5\uFF1A\u70BA\u4EC0\u9EBC\u6210\u7ACB\u3001\u600E\u9EBC\u904B\u4F5C\u3002\u4E0D\u91CD\u8907\u4E0A\u9762\u90A3\u4E00\u53E5\u8A71\u3002\n\n## \u4F8B\u5B50\n\u4E00\u500B\u5177\u9AD4\u4F8B\u5B50\uFF1B\u9700\u8981\u6642\u518D\u52A0\u4E00\u884C\u5E38\u898B\u8AA4\u89E3\u3002\n\n## \u548C\u8AB0\u4E0D\u540C\n\u6700\u5BB9\u6613\u6DF7\u6DC6\u7684 1\u20132 \u500B\u76F8\u8FD1\u6982\u5FF5\uFF0C\u5404\u7528\u4E00\u53E5\u5BEB\u51FA\u5DEE\u7570\uFF1B\u6C92\u6709\u5BB9\u6613\u6DF7\u6DC6\u7684\u6982\u5FF5\u5C31\u4E0D\u5BEB\u9019\u6BB5\u3002\n\n## \u51FA\u8655\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/atomic.zh-CN.md
-var atomic_zh_CN_default = "## \u5B9A\u7FA9\n\u4E00\u53E5\u8A71\u5B9A\u7FA9\u9019\u500B\u6982\u5FF5\uFF0C\u4E0D\u8D85\u904E 40 \u5B57\u3002\n\n## \u89E3\u91CB\n\u6700\u591A\u4E09\u53E5\uFF0C\u8AAA\u660E\u5B83\u70BA\u4EC0\u9EBC\u6210\u7ACB\u3001\u548C\u76F8\u8FD1\u6982\u5FF5\u5DEE\u5728\u54EA\u3002\n\n## \u4F8B\u5B50\n\u4E00\u500B\u5177\u9AD4\u4F8B\u5B50\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var atomic_zh_CN_default = "## \u4E00\u53E5\u8A71\n\u5B9A\u7FA9\u6216\u4E3B\u5F35\uFF0C\u4E0D\u8D85\u904E 40 \u5B57\uFF0C\u812B\u96E2\u4E0A\u4E0B\u6587\u4E5F\u770B\u5F97\u61C2\u3002\u4E0D\u653E\u4F8B\u5B50\u8207\u7406\u7531\u3002\n\n## \u70BA\u4EC0\u9EBC\n\u6700\u591A\u4E09\u53E5\uFF1A\u70BA\u4EC0\u9EBC\u6210\u7ACB\u3001\u600E\u9EBC\u904B\u4F5C\u3002\u4E0D\u91CD\u8907\u4E0A\u9762\u90A3\u4E00\u53E5\u8A71\u3002\n\n## \u4F8B\u5B50\n\u4E00\u500B\u5177\u9AD4\u4F8B\u5B50\uFF1B\u9700\u8981\u6642\u518D\u52A0\u4E00\u884C\u5E38\u898B\u8AA4\u89E3\u3002\n\n## \u548C\u8AB0\u4E0D\u540C\n\u6700\u5BB9\u6613\u6DF7\u6DC6\u7684 1\u20132 \u500B\u76F8\u8FD1\u6982\u5FF5\uFF0C\u5404\u7528\u4E00\u53E5\u5BEB\u51FA\u5DEE\u7570\uFF1B\u6C92\u6709\u5BB9\u6613\u6DF7\u6DC6\u7684\u6982\u5FF5\u5C31\u4E0D\u5BEB\u9019\u6BB5\u3002\n\n## \u51FA\u8655\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/atomic.en.md
-var atomic_en_default = "## Definition\nDefine the concept in one sentence of no more than 25 words.\n\n## Explanation\nAt most three sentences on why it holds and how it differs from nearby concepts.\n\n## Example\nOne concrete example.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+var atomic_en_default = "## In one sentence\nA definition or claim of at most 40 words that is understood without any context. No example, no reasons.\n\n## Why\nAt most three sentences: why it holds and how it works. Do not repeat the sentence above.\n\n## Example\nOne concrete example; add one line on a common misunderstanding if it helps.\n\n## How it differs\nThe one or two most easily confused neighbouring concepts, one sentence each on the difference; leave this section out if nothing is easily confused.\n\n## Source\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+
+// core/blocks/template/guide.zh-TW.md
+var guide_zh_TW_default = "## \u9069\u7528\u60C5\u5883\n\u4EC0\u9EBC\u6642\u5019\u7528\u9019\u4EFD\u505A\u6CD5\u3001\u8981\u9054\u6210\u4EC0\u9EBC\uFF1B\u4E0D\u653E\u505A\u6CD5\u672C\u8EAB\u3002\n\n## \u505A\u6CD5\n\u6709\u5E8F\u6B65\u9A5F\uFF0C\u6BCF\u6B65\u4E00\u884C\uFF0C\u52D5\u8A5E\u958B\u982D\u3002\n\n## \u5E38\u898B\u932F\u8AA4\n\u6BCF\u9EDE\u5BEB\u6210\u300C\u932F\u8AA4 \u2192 \u6B63\u78BA\u505A\u6CD5\u300D\u3002\n\n## \u5224\u65B7\u6E96\u5247\n\u9047\u5230\u9078\u64C7\u6642\u600E\u9EBC\u53D6\u6368\uFF0C\u6BCF\u689D\u6E96\u5247\u4E00\u884C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/guide.zh-CN.md
+var guide_zh_CN_default = "## \u9069\u7528\u60C5\u5883\n\u4EC0\u9EBC\u6642\u5019\u7528\u9019\u4EFD\u505A\u6CD5\u3001\u8981\u9054\u6210\u4EC0\u9EBC\uFF1B\u4E0D\u653E\u505A\u6CD5\u672C\u8EAB\u3002\n\n## \u505A\u6CD5\n\u6709\u5E8F\u6B65\u9A5F\uFF0C\u6BCF\u6B65\u4E00\u884C\uFF0C\u52D5\u8A5E\u958B\u982D\u3002\n\n## \u5E38\u898B\u932F\u8AA4\n\u6BCF\u9EDE\u5BEB\u6210\u300C\u932F\u8AA4 \u2192 \u6B63\u78BA\u505A\u6CD5\u300D\u3002\n\n## \u5224\u65B7\u6E96\u5247\n\u9047\u5230\u9078\u64C7\u6642\u600E\u9EBC\u53D6\u6368\uFF0C\u6BCF\u689D\u6E96\u5247\u4E00\u884C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/guide.en.md
+var guide_en_default2 = '## When to use\nWhen to use this guide and what it achieves; do not put the method here.\n\n## How to do it\nOrdered steps, one per line, each starting with a verb.\n\n## Common mistakes\nWrite each as "mistake \u2192 right way".\n\n## Decision rules\nHow to choose when there is a choice, one rule per line.\n\n## Sources\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/template/conclusion.zh-TW.md
-var conclusion_zh_TW_default = "## \u7D50\u8AD6\n\u7528\u4E00\u5230\u4E09\u53E5\u8A71\u76F4\u63A5\u5BEB\u51FA\u9019\u500B\u8B70\u984C\u4E0B\u7684\u7D50\u8AD6\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u4F9D\u64DA\n\u8B93\u9019\u500B\u7D50\u8AD6\u6210\u7ACB\u7684\u7406\u7531\u8207\u63A8\u8AD6\uFF0C\u8AAA\u660E\u6BCF\u500B\u7406\u7531\u4F9D\u8CF4\u54EA\u4E9B\u4E8B\u5BE6\u3002\n\n## \u4FE1\u5FC3\u7A0B\u5EA6\n\u9019\u500B\u7D50\u8AD6\u6709\u591A\u53EF\u9760\uFF08\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\uFF09\uFF0C\u4EE5\u53CA\u4FE1\u5FC3\u4F86\u81EA\u54EA\u88E1\u3001\u7F3A\u4E86\u4EC0\u9EBC\u3002\n\n## \u9069\u7528\u7BC4\u570D\u8207\u9650\u5236\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u5728\u54EA\u4E9B\u60C5\u6CC1\u4E0B\u4E0D\u9069\u7528\uFF0C\u4EE5\u53CA\u9019\u6B21\u5224\u65B7\u7684\u9650\u5236\u3002\n\n## \u5F8C\u7E8C\u884C\u52D5\n\u5982\u679C\u7D50\u8AD6\u6210\u7ACB\uFF0C\u63A5\u4E0B\u4F86\u8981\u505A\u4EC0\u9EBC\uFF1B\u5982\u679C\u8981\u63A8\u7FFB\u5B83\uFF0C\u9700\u8981\u770B\u5230\u4EC0\u9EBC\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var conclusion_zh_TW_default = "## \u7D50\u8AD6\n\u4E00\u5230\u4E09\u53E5\uFF0C\u5148\u8B1B\u7D50\u8AD6\uFF0C\u4E0D\u653E\u7406\u7531\u3002\n\n## \u4FE1\u5FC3\n\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\u4E09\u9078\u4E00\uFF0C\u52A0\u4E0A\u6700\u5927\u7684\u4E0D\u78BA\u5B9A\u4F86\u81EA\u54EA\u88E1\u3002\u53EA\u7559\u4E00\u4EFD\uFF0C\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u4FE1\u5FC3\uFF1B\u4FE1\u5FC3\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u4F9D\u64DA\n2\u20134 \u500B\u7406\u7531\uFF0C\u6BCF\u500B\u9023\u5230\u5B83\u4F9D\u8CF4\u7684\u8B70\u984C\u6216\u8B49\u64DA\u3002\n\n## \u4EC0\u9EBC\u6703\u6539\u8B8A\u9019\u500B\u7D50\u8AD6\n\u770B\u5230\u4EC0\u9EBC\u8B49\u64DA\u6216\u689D\u4EF6\u8B8A\u5316\uFF0C\u9019\u500B\u7D50\u8AD6\u5C31\u8981\u6539\u3002\n\n## \u9069\u7528\u7BC4\u570D\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u54EA\u4E9B\u60C5\u6CC1\u4E0D\u9069\u7528\u3002\n\n## \u5F71\u97FF\u8207\u4E0B\u4E00\u6B65\n\u7D50\u8AD6\u6210\u7ACB\u7684\u8A71\u5F71\u97FF\u4EC0\u9EBC\u3001\u8981\u505A\u4EC0\u9EBC\uFF1B\u8981\u958B\u6210\u884C\u52D5\u8B70\u984C\u7684\uFF0C\u5BEB\u6210\u52D5\u8A5E\u958B\u982D\u7684\u4E00\u884C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/conclusion.zh-CN.md
-var conclusion_zh_CN_default = "## \u7D50\u8AD6\n\u7528\u4E00\u5230\u4E09\u53E5\u8A71\u76F4\u63A5\u5BEB\u51FA\u9019\u500B\u8B70\u984C\u4E0B\u7684\u7D50\u8AD6\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u4F9D\u64DA\n\u8B93\u9019\u500B\u7D50\u8AD6\u6210\u7ACB\u7684\u7406\u7531\u8207\u63A8\u8AD6\uFF0C\u8AAA\u660E\u6BCF\u500B\u7406\u7531\u4F9D\u8CF4\u54EA\u4E9B\u4E8B\u5BE6\u3002\n\n## \u4FE1\u5FC3\u7A0B\u5EA6\n\u9019\u500B\u7D50\u8AD6\u6709\u591A\u53EF\u9760\uFF08\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\uFF09\uFF0C\u4EE5\u53CA\u4FE1\u5FC3\u4F86\u81EA\u54EA\u88E1\u3001\u7F3A\u4E86\u4EC0\u9EBC\u3002\n\n## \u9069\u7528\u7BC4\u570D\u8207\u9650\u5236\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u5728\u54EA\u4E9B\u60C5\u6CC1\u4E0B\u4E0D\u9069\u7528\uFF0C\u4EE5\u53CA\u9019\u6B21\u5224\u65B7\u7684\u9650\u5236\u3002\n\n## \u5F8C\u7E8C\u884C\u52D5\n\u5982\u679C\u7D50\u8AD6\u6210\u7ACB\uFF0C\u63A5\u4E0B\u4F86\u8981\u505A\u4EC0\u9EBC\uFF1B\u5982\u679C\u8981\u63A8\u7FFB\u5B83\uFF0C\u9700\u8981\u770B\u5230\u4EC0\u9EBC\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var conclusion_zh_CN_default = "## \u7D50\u8AD6\n\u4E00\u5230\u4E09\u53E5\uFF0C\u5148\u8B1B\u7D50\u8AD6\uFF0C\u4E0D\u653E\u7406\u7531\u3002\n\n## \u4FE1\u5FC3\n\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\u4E09\u9078\u4E00\uFF0C\u52A0\u4E0A\u6700\u5927\u7684\u4E0D\u78BA\u5B9A\u4F86\u81EA\u54EA\u88E1\u3002\u53EA\u7559\u4E00\u4EFD\uFF0C\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u4FE1\u5FC3\uFF1B\u4FE1\u5FC3\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u4F9D\u64DA\n2\u20134 \u500B\u7406\u7531\uFF0C\u6BCF\u500B\u9023\u5230\u5B83\u4F9D\u8CF4\u7684\u8B70\u984C\u6216\u8B49\u64DA\u3002\n\n## \u4EC0\u9EBC\u6703\u6539\u8B8A\u9019\u500B\u7D50\u8AD6\n\u770B\u5230\u4EC0\u9EBC\u8B49\u64DA\u6216\u689D\u4EF6\u8B8A\u5316\uFF0C\u9019\u500B\u7D50\u8AD6\u5C31\u8981\u6539\u3002\n\n## \u9069\u7528\u7BC4\u570D\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u54EA\u4E9B\u60C5\u6CC1\u4E0D\u9069\u7528\u3002\n\n## \u5F71\u97FF\u8207\u4E0B\u4E00\u6B65\n\u7D50\u8AD6\u6210\u7ACB\u7684\u8A71\u5F71\u97FF\u4EC0\u9EBC\u3001\u8981\u505A\u4EC0\u9EBC\uFF1B\u8981\u958B\u6210\u884C\u52D5\u8B70\u984C\u7684\uFF0C\u5BEB\u6210\u52D5\u8A5E\u958B\u982D\u7684\u4E00\u884C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/conclusion.en.md
-var conclusion_en_default = "## Conclusion\nState the conclusion under this topic in one to three sentences, the conclusion first and the reasons after.\n\n## Basis\nThe reasons and inferences that make the conclusion hold, and which facts each reason depends on.\n\n## Confidence\nHow reliable the conclusion is (low, medium or high), where the confidence comes from, and what is missing.\n\n## Scope and limits\nThe conditions under which the conclusion holds, the cases where it does not apply, and the limits of this judgement.\n\n## Next actions\nWhat to do next if the conclusion holds; what would have to be seen to overturn it.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+var conclusion_en_default = '## Conclusion\nOne to three sentences, the conclusion first, with no reasons.\n\n## Confidence\nLow, medium or high, plus where the biggest uncertainty comes from. Keep only one; this takes precedence over the earlier rule for inconsistencies: never list old and new confidence; when it changes, rewrite this one and write "from X to Y: reason" in the update log.\n\n## Basis\nTwo to four reasons, each linked to the topic or evidence it depends on.\n\n## What would change it\nWhich evidence or change of conditions would make this conclusion change.\n\n## Scope\nThe conditions under which the conclusion holds and the cases where it does not apply.\n\n## Impact and next steps\nWhat follows if the conclusion holds and what to do; write anything to be opened as an action topic as one line that starts with a verb.\n\n## Sources\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/format/lean.zh.md
 var lean_zh_default = "detail \u6703\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u672C\u683C\u5F0F\u53EA\u7528\u6A19\u984C\u3001\u689D\u5217\u8207\u8868\u683C\uFF0C\u4F9D\u5167\u5BB9\u7684\u5F62\u614B\u9078\u7528\uFF1A\n\n- \u5206\u6BB5\uFF1A\u7528\u6A19\u984C\u5206\u6BB5\uFF0C\u6BB5\u843D\u5BEB\u4E00\u822C\u6587\u5B57\u3002\n- \u4E26\u5217\u7684\u9805\u76EE\uFF1A\u7528\u689D\u5217\u3002\n- \u5169\u500B\u4EE5\u4E0A\u7684\u9078\u9805\uFF0C\u6216\u5169\u500B\u4EE5\u4E0A\u7684\u6BD4\u8F03\u7DAD\u5EA6\uFF1AMarkdown \u8868\u683C\u3002\n\n\u898F\u5247\uFF1A\n1. \u53EA\u4F7F\u7528\u6A19\u984C\u3001\u6BB5\u843D\u3001\u689D\u5217\u8207\u8868\u683C\uFF1B\u4E0D\u8981\u4F7F\u7528 callout\uFF08`> [!\u2026]`\uFF09\u3001\u4EFB\u4F55\u5716\u8868\u3001`==highlight==` \u87A2\u5149\u6A19\u8A18\u6216 `- [ ]` \u4EFB\u52D9\u6E05\u55AE\u3002\u5F62\u614B\u6C92\u6709\u5C0D\u61C9\u7684\u8A9E\u6CD5\u6642\uFF0C\u5C31\u5BEB\u4E00\u822C\u6BB5\u843D\u3002\n2. \u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF0C\u4E0D\u52A0 callout\u3002\n3. \u6709\u6307\u5B9A\u9805\u76EE\u6578\u91CF\u7684\u6BB5\u843D\uFF0C\u9805\u76EE\u8981\u5BEB\u6210\u9802\u5C64\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\uFF0C\u4E0D\u8981\u653E\u9032 callout \u6216\u8868\u683C\u3002\n4. detail \u662F\u7D66\u8B80\u8005\u770B\u7684\u5167\u5BB9\uFF1A\u4E0D\u8981\u5BEB\u5167\u90E8 ID\uFF08\u7BC0\u9EDE\u3001\u8B49\u64DA\u3001\u4F86\u6E90\u6216\u5831\u544A\u7684 ID\uFF09\u3001\u5BE9\u67E5\u610F\u898B\uFF0C\u6216\u5C0D\u8349\u7A3F\u8207\u7814\u7A76\u904E\u7A0B\u672C\u8EAB\u7684\u8A55\u8AD6\u3002\n5. detail \u5167\u7684\u6A19\u984C\u4E00\u5F8B\u5F9E\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\u958B\u59CB\uFF0C\u5F80\u4E0B\u4F9D\u5E8F\u7528 ####\uFF0C\u4E0D\u8DF3\u7D1A\uFF1B\u4E0D\u8981\u7528 # \u6216 ##\u3002\n6. \u6578\u5B78\u5F0F\u53EA\u7528\u5728\u771F\u6B63\u7684\u516C\u5F0F\uFF1A\u884C\u5167\u7528 `$\u2026$`\uFF08\u9322\u5B57\u865F\u5167\u5074\u4E0D\u7559\u7A7A\u767D\uFF09\uFF0C\u7368\u7ACB\u4E00\u884C\u7684\u516C\u5F0F\u7528\u55AE\u7368\u6210\u884C\u7684 `$$`\uFF1B\u4E0D\u8981\u4F7F\u7528 `\\(`\u3001`\\)`\u3001`\\[`\u3001`\\]`\u3002\n7. \u4E0D\u8981\u7528 <iframe>\u3001<form>\u3001<object>\u3001<embed>\u3001<script>\u3001<style> \u8207 on\u2026 \u4E8B\u4EF6\u5C6C\u6027\uFF0C\u4E5F\u4E0D\u8981\u8F38\u51FA Obsidian \u4E0D\u652F\u63F4\u7684\u8A9E\u6CD5\uFF08\u4F8B\u5982 :::\uFF09\u3002\n";
@@ -27375,12 +27477,19 @@ var rich_en_default = `Additional requirements of the rich format (they follow t
 - Rules 3, 5 and 10 stay as they are, so the diagram and HTML safety rules apply as one: draw a diagram only when the content has a matching shape, and a chart with numbers only when the sources hold the numbers.
 `;
 
+// core/blocks/format/skim.zh.md
+var skim_zh_default = "\u689D\u5217\u901F\u8B80\u7684\u9644\u52A0\u8981\u6C42\uFF08\u63A5\u5728\u4E0A\u9762\u7684\u7CBE\u7C21\u683C\u5F0F\u4E4B\u5F8C\uFF09\uFF1A\n\n- \u8B93\u8B80\u8005\u6383\u904E\u5C31\u80FD\u6293\u5230\u91CD\u9EDE\uFF1A\u6BCF\u500B\u91CD\u9EDE\u53EA\u8B1B\u4E00\u4EF6\u4E8B\uFF0C\u5BEB\u6210\u4E00\u53E5\u8A71\uFF0C\u76F4\u63A5\u5BEB\u7D50\u8AD6\uFF0C\u4E0D\u92EA\u9673\u80CC\u666F\uFF0C\u4E0D\u5BEB\u904E\u5834\u53E5\u3002\n- \u80FD\u689D\u5217\u7684\u5167\u5BB9\u5C31\u7528\u689D\u5217\uFF1B\u6BCF\u689D\u4E0D\u8D85\u904E\u5169\u53E5\uFF0C\u6578\u5B57\u8207\u540D\u7A31\u653E\u5728\u53E5\u9996\uFF0C\u4E0D\u7528\u5F62\u5BB9\u8A5E\u5806\u780C\u3002\n- \u4E00\u822C\u6BB5\u843D\u6700\u591A\u5169\u53E5\uFF1B\u5169\u500B\u4EE5\u4E0A\u7684\u9078\u9805\u6216\u6BD4\u8F03\u7DAD\u5EA6\uFF0C\u4ECD\u7528 Markdown \u8868\u683C\u3002\n- \u672C\u689D\u53EA\u9650\u5236\u5BEB\u6CD5\uFF0C\u4E0D\u6539\u8B8A\u7CBE\u7C21\u683C\u5F0F\u7684\u5143\u7D20\u9650\u5236\u8207\u5B89\u5168\u898F\u5247\uFF1A\u898F\u5247 1 \u81F3 7 \u7167\u820A\uFF0C\u4E0D\u53EF\u7528 callout\u3001\u5716\u8868\u3001\u87A2\u5149\u6A19\u8A18\u8207\u4EFB\u52D9\u6E05\u55AE\u3002\n";
+
+// core/blocks/format/skim.en.md
+var skim_en_default = "Additional requirements of the skim list format (they follow the lean format above):\n\n- Let the reader catch the point at a glance: each point says one thing, in one sentence, states the conclusion directly, and has no build-up or transition sentences.\n- Use a bullet list for whatever can be listed; keep each item to two sentences at most, put numbers and names first, and do not pile up adjectives.\n- A plain paragraph is two sentences at most; two or more options or comparison dimensions still go in a Markdown table.\n- This only limits the writing: the element limits and safety rules of the lean format stay, so rules 1 to 7 stay as they are and callouts, diagrams, highlight marks and task lists are still not allowed.\n";
+
 // core/blocks/builtin.ts
 var strip2 = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
-var tone = (id, nameKey) => ({
+var tone = (id, nameKey, legacyNameKeys) => ({
   category: "tone",
   id,
   nameKey,
+  ...legacyNameKeys ? { legacyNameKeys } : {},
   body: (language2) => {
     var _a2, _b2;
     return id === "academic" ? "" : (_b2 = (_a2 = builtinPresets(language2, "tone").find((preset) => preset.id === id)) == null ? void 0 : _a2.text) != null ? _b2 : "";
@@ -27392,12 +27501,13 @@ function fileFor(files, language2) {
   const match = CANONICAL_LANGUAGES.find((item) => instructionLanguageOf(item) === instructionLanguageOf(language2));
   return files[match != null ? match : CANONICAL_LANGUAGES[0]];
 }
-var template = (id, nameKey, files) => {
+var template = (id, nameKey, files, omitEmpty = false) => {
   const table = Object.fromEntries(CANONICAL_LANGUAGES.map((language2, index) => [language2, files[index]]));
   return {
     category: "template",
     id,
     nameKey,
+    ...omitEmpty ? { omitEmpty: true } : {},
     body: (language2) => strip2(fileFor(table, language2)),
     sections: (language2) => strip2(fileFor(table, language2))
   };
@@ -27410,13 +27520,14 @@ var BUILTIN_BLOCKS = [
   template("standard", "ui.structure_name_standard", [standard_zh_TW_default, standard_zh_CN_default, standard_en_default]),
   template("textbook", "ui.structure_name_textbook", [textbook_zh_TW_default, textbook_zh_CN_default, textbook_en_default]),
   template("hypothesis", "ui.structure_name_hypothesis", [hypothesis_zh_TW_default, hypothesis_zh_CN_default, hypothesis_en_default]),
-  template("evidence", "ui.structure_name_evidence", [evidence_zh_TW_default, evidence_zh_CN_default, evidence_en_default]),
+  template("evidence", "ui.structure_name_evidence", [evidence_zh_TW_default, evidence_zh_CN_default, evidence_en_default], true),
   template("action", "ui.structure_name_action", [action_zh_TW_default, action_zh_CN_default, action_en_default]),
-  template("atomic", "ui.structure_name_atomic", [atomic_zh_TW_default, atomic_zh_CN_default, atomic_en_default]),
+  template("atomic", "ui.structure_name_atomic", [atomic_zh_TW_default, atomic_zh_CN_default, atomic_en_default], true),
   template("conclusion", "ui.structure_name_conclusion", [conclusion_zh_TW_default, conclusion_zh_CN_default, conclusion_en_default]),
-  tone("academic", "ui.preset_name_academic"),
+  template("guide", "ui.structure_name_guide", [guide_zh_TW_default, guide_zh_CN_default, guide_en_default2]),
+  tone("academic", "ui.preset_name_academic", ["ui.preset_name_academic_old"]),
   tone("plain", "ui.preset_name_plain"),
-  tone("magazine", "ui.preset_name_magazine"),
+  tone("magazine", "ui.preset_name_magazine", ["ui.preset_name_magazine_old"]),
   tone("summary", "ui.preset_name_summary"),
   tone("guide", "ui.preset_name_guide"),
   tone("auto", "ui.preset_name_auto")
@@ -27431,6 +27542,13 @@ var BUILTIN_FORMATS = [
     text: (language2) => `${inLanguage(OBSIDIAN_FORMAT, language2)}
 
 ${byInstruction(rich_zh_default, rich_en_default)(language2)}`
+  },
+  {
+    id: "skim",
+    nameKey: "ui.format_name_skim",
+    text: (language2) => `${byInstruction(lean_zh_default, lean_en_default)(language2)}
+
+${byInstruction(skim_zh_default, skim_en_default)(language2)}`
   }
 ];
 function lookupBuiltinFormat(id, language2) {
@@ -27933,6 +28051,7 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
       add(fixed(before != null ? before : "", "tone-rule"), [body, block], fixed(after != null ? after : "", "tone-rule"));
     }
   }
+  add(fixed(voiceBaseline(language2), "voice-baseline"));
   if ((isGeneral || step === "synthesize") && updateMode === "merge")
     add(
       fixed(inLanguage(modeFragment, language2), "step"),
@@ -28053,8 +28172,10 @@ function resolveBlockFolder(parent, role, exists, language2) {
   return `${parent}/${found != null ? found : translate(language2, FOLDER_KEYS[role])}`;
 }
 function builtinBlockNames(category, id) {
+  var _a2;
   const block = findBuiltinBlock(category, id);
-  return [...new Set(CANONICAL_LANGUAGES.map((language2) => translate(language2, block.nameKey)))];
+  const keys = [block.nameKey, ...(_a2 = block.legacyNameKeys) != null ? _a2 : []];
+  return [...new Set(keys.flatMap((key2) => CANONICAL_LANGUAGES.map((language2) => translate(language2, key2))))];
 }
 function builtinBlockText(category, id, language2) {
   return category === "template" ? builtinTemplateText(id, language2) : findBuiltinBlock(category, id).body(language2);
@@ -28111,7 +28232,7 @@ var BUILTIN_RECIPES = [
     nameKey: "ui.recipe_name_atomic",
     structure: "atomic",
     voice: "academic",
-    format: "standard",
+    format: "lean",
     update: "merge"
   },
   {
@@ -28120,14 +28241,14 @@ var BUILTIN_RECIPES = [
     structure: "hypothesis",
     voice: "academic",
     format: "standard",
-    update: "top"
+    update: "merge"
   },
   {
     id: "evidence",
     nameKey: "ui.recipe_name_evidence",
     structure: "evidence",
     voice: "academic",
-    format: "standard",
+    format: "lean",
     update: "merge"
   },
   {
@@ -28165,17 +28286,20 @@ var BUILTIN_RECIPES = [
 ];
 var LANGUAGES2 = ["zh-TW", "zh-CN", "en"];
 function builtinNames(category) {
-  if (category === "recipe") return BUILTIN_RECIPES.map(({ id, nameKey }) => ({ id, nameKey }));
-  if (category === "format") return BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey }));
+  if (category === "recipe") return BUILTIN_RECIPES.map(({ id, nameKey }) => ({ id, nameKeys: [nameKey] }));
+  if (category === "format") return BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKeys: [nameKey] }));
   const wanted = category === "structure" ? "template" : "tone";
-  return BUILTIN_BLOCKS.filter((block) => block.category === wanted).map(({ id, nameKey }) => ({ id, nameKey }));
+  return BUILTIN_BLOCKS.filter((block) => block.category === wanted).map(({ id, nameKey, legacyNameKeys }) => ({
+    id,
+    nameKeys: [nameKey, ...legacyNameKeys != null ? legacyNameKeys : []]
+  }));
 }
 var folded = (text11) => text11.toLocaleLowerCase();
 function builtinPartIdOf(category, name2) {
   var _a2;
   const key2 = folded(name2);
   return (_a2 = builtinNames(category).find(
-    ({ id, nameKey }) => id === name2 || LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key2)
+    ({ id, nameKeys }) => id === name2 || nameKeys.some((nameKey) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key2))
   )) == null ? void 0 : _a2.id;
 }
 function validatePartName(name2, category) {
@@ -28185,7 +28309,7 @@ function validatePartName(name2, category) {
   if (name2.includes("..")) return { ok: false, reason: "dots" };
   const key2 = folded(name2);
   const taken = builtinNames(category).some(
-    ({ nameKey }) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key2)
+    ({ nameKeys }) => nameKeys.some((nameKey) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key2))
   );
   return taken ? { ok: false, reason: "builtin" } : { ok: true };
 }
@@ -28295,7 +28419,7 @@ function partNameOfRef(category, ref, language2) {
   if (parsed.kind === "file") return parsed.name;
   const found = builtinNames(category).find((item) => item.id === parsed.id);
   if (!found) throw new Error(`Unknown built-in ${category}: ${parsed.id}`);
-  return translate(language2, found.nameKey);
+  return translate(language2, found.nameKeys[0]);
 }
 function slotValue(slot, parts, language2) {
   return slot === "update" ? parts.update : partNameOfRef(slot, parts[slot], language2);
@@ -28825,7 +28949,12 @@ var NoteStyleStore = class {
       }
       const built = parseTemplateBlock(builtinTemplateText(block.id, language2), { id: block.id, name: name2 });
       if (!built.ok) throw new Error(`Built-in template ${block.id} does not parse`);
-      return { template: { ...built.template }, name: name2, issues: [], notices: [] };
+      return {
+        template: { ...built.template, ...block.omitEmpty ? { omitEmpty: true } : {} },
+        name: name2,
+        issues: [],
+        notices: []
+      };
     }
     const text11 = this.blocks.template.get(parsed.name);
     if (text11 === void 0) return void 0;

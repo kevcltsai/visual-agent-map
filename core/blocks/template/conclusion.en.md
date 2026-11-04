@@ -1,20 +1,23 @@
 ## Conclusion
-State the conclusion under this topic in one to three sentences, the conclusion first and the reasons after.
-
-## Basis
-The reasons and inferences that make the conclusion hold, and which facts each reason depends on.
+One to three sentences, the conclusion first, with no reasons.
 
 ## Confidence
-How reliable the conclusion is (low, medium or high), where the confidence comes from, and what is missing.
+Low, medium or high, plus where the biggest uncertainty comes from. Keep only one; this takes precedence over the earlier rule for inconsistencies: never list old and new confidence; when it changes, rewrite this one and write "from X to Y: reason" in the update log.
 
-## Scope and limits
-The conditions under which the conclusion holds, the cases where it does not apply, and the limits of this judgement.
+## Basis
+Two to four reasons, each linked to the topic or evidence it depends on.
 
-## Next actions
-What to do next if the conclusion holds; what would have to be seen to overturn it.
+## What would change it
+Which evidence or change of conditions would make this conclusion change.
 
-## Evidence and sources
-The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.
+## Scope
+The conditions under which the conclusion holds and the cases where it does not apply.
+
+## Impact and next steps
+What follows if the conclusion holds and what to do; write anything to be opened as an action topic as one line that starts with a verb.
+
+## Sources
+Only the source list, which is added to the end of this section automatically; do not restate the body.
 
 ## Update log
 Add only one line saying what this update changed.

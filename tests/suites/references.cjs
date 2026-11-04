@@ -49,9 +49,9 @@ test('source footnotes: numbered by first use, one definition per source, placed
   assert.equal(api.resolveSummaryReferences('See [[x.md]] [S1]', groups), 'See External source: /Volumes/Refs/x.md');
   // canonicalDetail keeps definitions inside the evidence section.
   const { canonicalDetail } = load('main.ts', { obsidian });
-  const evidence = canonicalDetail(out, 'zh-TW').split('### 證據與來源')[1].split('### 取捨與限制')[0];
+  const evidence = canonicalDetail(out, 'zh-TW').split('### 來源')[1].split('### 更新紀錄')[0];
   assert.ok(evidence.includes('[^1]:') && evidence.includes('[^2]:') && evidence.includes('[^3]:'));
-  assert.ok(canonicalDetail(api.resolveDetailReferences('### Core conclusions\n\nA[S1]', groups), 'en').includes('### Evidence and sources\n\n[^1]: [[Maps/A/one.md|one]]'));
+  assert.ok(canonicalDetail(api.resolveDetailReferences('### Core conclusions\n\nA[S1]', groups), 'en').includes('### Sources\n\n[^1]: [[Maps/A/one.md|one]]'));
 });
 test('reference picker keeps source groups compact, collapsible and task-local', async () => {
   const css = fs.readFileSync(path.join(__dirname, '..', '..', 'styles.css'), 'utf8');
@@ -133,12 +133,12 @@ test('source footnotes survive reruns: numbers stay consistent, kept references 
 test('canonicalDetail gathers source footnote definitions into the evidence section', () => {
   const { canonicalDetail } = load('main.ts', { obsidian });
   const out = canonicalDetail('### Core conclusions\n\nA[^1]\n\n### Update log\n\n- today\n[^1]: [[a.md|a]]', 'en');
-  assert.ok(out.includes('### Evidence and sources\n\n[^1]: [[a.md|a]]\n\n### Tradeoffs and limitations'));
+  assert.ok(out.includes('### Sources\n\n[^1]: [[a.md|a]]\n\n### Update log'));
   assert.ok(out.includes('### Update log\n\n- today'));
   assert.equal(out.split('[^1]:').length, 2);
   const flat = canonicalDetail('Body[^1]\n\n[^1]: [[a.md|a]]', 'en');
-  assert.ok(flat.startsWith('### Core conclusions\n\nBody[^1]\n\n### Key knowledge'));
-  assert.ok(flat.includes('### Evidence and sources\n\n[^1]: [[a.md|a]]'));
+  assert.ok(flat.startsWith('### Core conclusions\n\nBody[^1]\n\n### Background and mechanism'));
+  assert.ok(flat.includes('### Sources\n\n[^1]: [[a.md|a]]'));
 });
 test('source footnotes leave code, links and the writer\'s own footnotes untouched', () => {
   const api = load('ai/reference-materials.ts', { obsidian });
@@ -157,7 +157,7 @@ test('source footnotes leave code, links and the writer\'s own footnotes untouch
   // canonicalDetail never moves lines out of a code block.
   const canon = canonicalDetail('### Core conclusions\n\n```\n[^x]: [[a.md|a]]\n```', 'en');
   assert.ok(canon.includes('```\n[^x]: [[a.md|a]]\n```'));
-  assert.ok(!canon.split('### Evidence and sources')[1].split('### ')[0].includes('[^x]'));
+  assert.ok(!canon.split('### Sources')[1].split('### ')[0].includes('[^x]'));
 });
 test('source footnotes never reuse the number of a footnote kept as written', () => {
   const api = load('ai/reference-materials.ts', { obsidian });

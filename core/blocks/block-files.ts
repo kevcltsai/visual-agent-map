@@ -59,10 +59,11 @@ export function resolveBlockFolder(
   return `${parent}/${found ?? translate(language, FOLDER_KEYS[role])}`;
 }
 
-/** The names a built-in block goes by (one per registered language, distinct). */
+/** The names a built-in block goes by (one per registered language, distinct), the earlier names of a renamed block included. */
 export function builtinBlockNames(category: BlockCategory, id: string): string[] {
   const block = findBuiltinBlock(category, id);
-  return [...new Set(CANONICAL_LANGUAGES.map(language => translate(language, block.nameKey)))];
+  const keys = [block.nameKey, ...(block.legacyNameKeys ?? [])];
+  return [...new Set(keys.flatMap(key => CANONICAL_LANGUAGES.map(language => translate(language, key))))];
 }
 
 /** The built-in a file base name stands for: equal to a name in any registered language, ignoring case, no "(n)" suffix. */

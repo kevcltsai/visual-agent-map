@@ -98,12 +98,15 @@ test('zh-CN prompt snapshots: every zh snapshot has a zh-CN twin (prompt and sch
   }
 });
 
+// note-style-editorial K2: the Taiwan wording sentence of the shared writing baseline is in zh-TW output only, by design.
+const TAIWAN_WORDING = '用台灣用語，例如「軟體」「資料」「品質」，不用中國大陸用語。';
 test('zh-CN prompt snapshots differ from zh-TW only on language names (one position each) and research.* dictionary texts', () => {
   assert.equal(TW.length, CN.length, 'registry name forms line up between zh-TW and zh-CN');
   const unexplained = [];
   let total = 0;
   for (const base of bases) {
-    const zh = fs.readFileSync(path.join(directory, twFile(base)), 'utf8');
+    const zhFull = fs.readFileSync(path.join(directory, twFile(base)), 'utf8');
+    const zh = zhFull.replace(TAIWAN_WORDING, '');
     const cn = stripVerbatim(fs.readFileSync(path.join(directory, cnFile(base)), 'utf8')).text;
     const twPositions = positions(zh, TW);
     const cnPositions = positions(cn, CN);

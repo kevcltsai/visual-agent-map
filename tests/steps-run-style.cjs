@@ -60,7 +60,7 @@ test('slice 1 (tracer): an empty store with no levels gives general research: St
   assert.deepEqual(plain(got.contextFields), {});
   assert.deepEqual(plain(got.issues), { missing: [], blockIssues: [], notices: [] });
   assert.deepEqual(plain(got.recipe), { ref: 'builtin:general', name: 'General research', source: 'kind' });
-  assert.deepEqual(plain(got.label), { templateName: 'Standard six', templateSource: 'kind', toneName: 'Academic rigor', styleName: 'General research' });
+  assert.deepEqual(plain(got.label), { templateName: 'Standard six', templateSource: 'kind', toneName: 'Professional', styleName: 'General research' });
 });
 
 test('slice 2 (was: choice, topic, map, workspace default; grilling Q10/Q15): the structure comes from the run, then the topic, then the kind; the map and the workspace default are not levels', async () => {
@@ -86,9 +86,9 @@ test('slice 3 (was: the tone chain choice, topic, map; grilling Q10/Q15): the vo
   const ask = request => store.runStyle({ outputLanguage: 'en', ...request });
   const tone = got => [got.toneText, got.label.toneName];
   assert.deepEqual(tone(ask({ topic: { tone: 'custom-tone-1' }, map: { tone: 'file:Clerk' } })), ['Talk like a pirate.', 'Pirate']);
-  assert.deepEqual(tone(ask({ map: { tone: 'file:Clerk' } })), [undefined, 'Academic rigor'], 'the map is no level');
+  assert.deepEqual(tone(ask({ map: { tone: 'file:Clerk' } })), [undefined, 'Professional'], 'the map is no level');
   assert.deepEqual(tone(ask({ topic: { tone: 'plain' } })), [M.lookupBuiltinBlock('tone', 'plain', 'en'), 'Plain explanation']);
-  assert.deepEqual(tone(ask({ topic: { tone: 'gone' } })), [undefined, 'Academic rigor']);
+  assert.deepEqual(tone(ask({ topic: { tone: 'gone' } })), [undefined, 'Professional']);
 });
 
 test('slice 4 (was: the workspace tone block fills in; grilling Q10): the kind style\'s voice is the voice and its name is the shown name; a topic tone or a run tone replaces it; the workspace tone key is not read', async () => {
@@ -105,8 +105,8 @@ test('slice 5 (was: a style file brings its own tone; grilling Q12): a style fil
   const ask = request => store.runStyle({ outputLanguage: 'en', ...request });
   const tone = got => [got.template.id, got.toneText, got.label.toneName];
   assert.deepEqual(tone(ask({})), ['textbook', 'Talk like a pirate.', 'Pirate']);
-  assert.deepEqual(tone(ask({ topic: { template: 'standard' } })), ['standard', undefined, 'Academic rigor'], 'an old topic structure is a style of its own: the voice is the kind default');
-  assert.deepEqual(tone(ask({ topic: { template: 'standard' }, map: { tone: 'file:Poet' } })), ['standard', undefined, 'Academic rigor']);
+  assert.deepEqual(tone(ask({ topic: { template: 'standard' } })), ['standard', undefined, 'Professional'], 'an old topic structure is a style of its own: the voice is the kind default');
+  assert.deepEqual(tone(ask({ topic: { template: 'standard' }, map: { tone: 'file:Poet' } })), ['standard', undefined, 'Professional']);
   assert.equal(ask({}).label.styleName, 'Mix');
   assert.equal(ask({}).label.fileName, 'Mix.md');
 });
@@ -198,33 +198,33 @@ test('slice 9: the template follows the output language and the names follow the
   assert.equal(headingOf(store.runStyle({ outputLanguage: 'zh-CN' }).template), '核心結論');
   assert.equal(store.runStyle({ outputLanguage: 'zh-TW' }).label.templateName, 'Standard six');
   const zh = await world({ language: 'zh-TW' });
-  assert.equal(zh.store.runStyle({ outputLanguage: 'en' }).label.toneName, '學術嚴謹');
+  assert.equal(zh.store.runStyle({ outputLanguage: 'en' }).label.toneName, '專業');
 });
 
 // The tone names a run can show, each with the text that tone really is (written here from the fixtures, not read from the store).
 const TEXT_OF_NAME = {
-  'Academic rigor': undefined,
+  'Professional': undefined,
   Pirate: 'Talk like a pirate.',
   Poet: 'Write as a poet.',
   Clerk: 'Write as a dry clerk.',
   'Plain explanation': () => M.lookupBuiltinBlock('tone', 'plain', 'en'),
-  'Magazine column': () => M.lookupBuiltinBlock('tone', 'magazine', 'en')
+  'Narrative': () => M.lookupBuiltinBlock('tone', 'magazine', 'en')
 };
 const textOfName = name => { const text = TEXT_OF_NAME[name]; return typeof text === 'function' ? text() : text; };
 
 test('slice 10: in every case the tone name shown is the tone whose text is sent; the style names match the known literals', async () => {
   const rows = [
-    { name: 'empty', request: {}, style: 'General research', tone: 'Academic rigor' },
+    { name: 'empty', request: {}, style: 'General research', tone: 'Professional' },
     { name: 'tone on the topic', request: { topic: { tone: 'custom-tone-1' }, map: { tone: 'file:Clerk' } }, files: TONE_FILES, tone: 'Pirate' },
-    { name: 'unknown topic tone', request: { topic: { tone: 'gone' } }, files: TONE_FILES, tone: 'Academic rigor' },
+    { name: 'unknown topic tone', request: { topic: { tone: 'gone' } }, files: TONE_FILES, tone: 'Professional' },
     { name: 'style voice', settings: MIX_KIND, request: {}, files: { ...TONE_FILES, ...mix('Standard six', 'Pirate') }, tone: 'Pirate', style: 'Mix' },
     { name: 'unreadable structure with a voice', settings: MIX_KIND, request: {}, files: { ...TONE_FILES, ...mix('Bad', 'Pirate'), [`${TPL}/Bad.md`]: BROKEN }, tone: 'Pirate' },
     { name: 'missing template', settings: { detailTemplates: CUSTOM() }, request: { topic: { template: 'gone-id', tone: 'plain' } }, tone: 'Plain explanation', style: 'Old setting (Standard six · Plain explanation)' },
     // literal names from the dialog
-    { name: 'Textbook', request: { topic: { template: 'textbook' } }, style: 'Old setting (Intro + six · Academic rigor)' },
+    { name: 'Textbook', request: { topic: { template: 'textbook' } }, style: 'Old setting (Intro + six · Professional)' },
     { name: 'Plain language', request: { topic: { template: 'standard', tone: 'plain' } }, style: 'Old setting (Standard six · Plain explanation)', tone: 'Plain explanation' },
-    { name: 'Custom A', settings: { detailTemplates: CUSTOM() }, request: { topic: { template: 'A', tone: 'magazine' } }, style: 'Old setting (Template A · Magazine column)', tone: 'Magazine column' },
-    { name: 'builtin Textbook style', settings: { noteStyleByKind: { topic: 'builtin:textbook' } }, request: {}, style: 'Textbook', tone: 'Academic rigor' }
+    { name: 'Custom A', settings: { detailTemplates: CUSTOM() }, request: { topic: { template: 'A', tone: 'magazine' } }, style: 'Old setting (Template A · Narrative)', tone: 'Narrative' },
+    { name: 'builtin Textbook style', settings: { noteStyleByKind: { topic: 'builtin:textbook' } }, request: {}, style: 'Textbook', tone: 'Professional' }
   ];
   for (const row of rows) {
     const { store } = await world(row.settings ?? {}, row.files ?? {});
@@ -282,9 +282,9 @@ test('toneOnly and map (was: a proposal run takes no tone from the workspace def
 test('P3 (was: the style name of a template and tone pair is the preset name or "Custom: template · tone"; grilling Q10): the style name is the style\'s own name, or "Old setting (structure · voice)" for an old topic', async () => {
   const { store } = await world({ detailTemplates: CUSTOM() });
   const name = (template, tone) => store.runStyle({ outputLanguage: 'en', topic: { template, tone } }).label.styleName;
-  assert.equal(name('standard', 'academic'), 'Old setting (Standard six · Academic rigor)');
-  assert.equal(name('textbook', 'academic'), 'Old setting (Intro + six · Academic rigor)');
-  assert.equal(name('A', 'magazine'), 'Old setting (Template A · Magazine column)');
+  assert.equal(name('standard', 'academic'), 'Old setting (Standard six · Professional)');
+  assert.equal(name('textbook', 'academic'), 'Old setting (Intro + six · Professional)');
+  assert.equal(name('A', 'magazine'), 'Old setting (Template A · Narrative)');
   assert.equal(name('textbook', 'plain'), 'Old setting (Intro + six · Plain explanation)');
   assert.equal(store.runStyle({ outputLanguage: 'en', topic: { template: 'A' } }).recipe.implicit, true);
   assert.equal(store.runStyle({ outputLanguage: 'en' }).label.styleName, 'General research');

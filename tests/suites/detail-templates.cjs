@@ -4,10 +4,14 @@ const api = load('ai/detail-templates.ts');
 
 test('standard template: six sections, language names, roles, other-language aliases', () => {
   const zh = api.standardTemplate('zh-TW'), en = api.standardTemplate('en');
-  assert.deepEqual(plain(zh.sections.map(s => s.name)), ['核心結論', '關鍵知識', '證據與來源', '取捨與限制', '待確認事項', '更新紀錄']);
-  assert.deepEqual(plain(en.sections.map(s => s.name)), ['Core conclusions', 'Key knowledge', 'Evidence and sources', 'Tradeoffs and limitations', 'Open questions', 'Update log']);
-  assert.deepEqual(plain(zh.sections.map(s => s.role)), ['none', 'none', 'sources', 'none', 'none', 'log']);
-  assert.deepEqual(plain(zh.sections[2].aliases), ['Evidence and sources']);
+  assert.deepEqual(plain(zh.sections.map(s => s.name)), ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', '來源', '更新紀錄']);
+  assert.deepEqual(plain(en.sections.map(s => s.name)), ['Core conclusions', 'Background and mechanism', 'Disagreements and limits', 'Open questions to check', 'Sources', 'Update log']);
+  assert.deepEqual(plain(zh.sections.map(s => s.role)), ['none', 'none', 'none', 'none', 'sources', 'log']);
+  // the earlier (0.29.0) names stay aliases, so a note written with them still lines up
+  assert.ok(['Sources', '證據與來源', 'Evidence and sources'].every(alias => plain(zh.sections[4].aliases).includes(alias)));
+  assert.ok(['關鍵知識', 'Key knowledge'].every(alias => plain(zh.sections[1].aliases).includes(alias)));
+  assert.ok(['取捨與限制', 'Tradeoffs and limitations'].every(alias => plain(zh.sections[2].aliases).includes(alias)));
+  assert.ok(['待確認事項', 'Open questions'].every(alias => plain(zh.sections[3].aliases).includes(alias)));
   assert.equal(zh.id, 'standard');
 });
 test('copyTemplate keeps both-language names as aliases so old notes still match', () => {
@@ -69,8 +73,8 @@ test('checkCounts reads sections by template name or alias', () => {
   assert.deepEqual(plain(api.checkCounts('### 核心結論\n\n- a\n\n### Examples\n\n- 1\n- 2\n- 3', t)), [{ section: 'Core conclusions', mode: 'min', n: 2, actual: 1 }]);
 });
 const STANDARD_DESCRIPTIONS = {
-  'zh-TW': ['直接回答研究問題，預設 3–5 點，先講結論再講理由。', '理解結論需要的概念、數據、機制與背景。', '支持結論的事實與數據，並標出處；來源清單會自動放在這段最後。', '各選項的優缺點、適用條件、風險，以及這次研究的限制。', '還沒查證或資料不足、值得下一步研究的問題。', '只新增一行，寫這次更新了什麼。'],
-  en: ['Answer the research question directly, 3–5 points by default; give the conclusion first, then the reason.', 'The concepts, data, mechanisms and background needed to understand the conclusions.', 'The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.', 'Pros and cons of the options, when each applies, the risks, and the limits of this research.', 'Questions not yet verified or lacking data that are worth researching next.', 'Add only one line saying what this update changed.']
+  'zh-TW': ['第一句直接回答議題的問題，再用 2–4 點理由支持；每點一句結論加一句理由。不放背景介紹。', '理解結論需要的概念、數據和運作方式；不重複核心結論，也不放不同看法。', '有爭議的地方、反例、適用條件，以及這次研究沒涵蓋的範圍；沒有爭議就只寫限制。', '還沒查證、值得開成子議題的問題；每點寫成一個可以研究的問句。', '正文用註腳標出處；這段只放來源清單，來源清單會自動放在這段最後，不重述正文。', '只新增一行，寫這次更新了什麼。'],
+  en: ["The first sentence answers the topic's question directly, then 2–4 reasons, each one sentence of conclusion plus one sentence of reason. No background here.", 'The concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.', 'Where the evidence is contested, counterexamples, when the conclusions apply, and what this research did not cover; write only limits if nothing is contested.', 'Questions not yet verified that are worth opening as subtopics; write each as a question that can be researched.', 'Mark sources with footnotes in the body; this section holds only the source list, which is added to the end of this section automatically, without restating the body.', 'Add only one line saying what this update changed.']
 };
 test('standard template: each section carries its AI instruction; copies keep them', () => {
   for (const language of ['zh-TW', 'en']) {
@@ -83,10 +87,10 @@ test('standard template: each section carries its AI instruction; copies keep th
 });
 test('detailStructurePrompt: Standard is the existing sentence plus six description lines; custom lists headings, log rule, descriptions and counts', () => {
   const standard = api.detailStructurePrompt(api.standardTemplate('zh-TW'), 'zh-TW', h => `STD(${h})`);
-  const zhNames = ['核心結論', '關鍵知識', '證據與來源', '取捨與限制', '待確認事項', '更新紀錄'];
-  assert.equal(standard, ['STD(### 核心結論, ### 關鍵知識, ### 證據與來源, ### 取捨與限制, ### 待確認事項, ### 更新紀錄)',
+  const zhNames = ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', '來源', '更新紀錄'];
+  assert.equal(standard, ['STD(### 核心結論, ### 背景與機制, ### 不同看法與限制, ### 待確認問題, ### 來源, ### 更新紀錄)',
     ...zhNames.map((name, i) => `### ${name}：${STANDARD_DESCRIPTIONS['zh-TW'][i]}`)].join('\n'));
-  const enNames = ['Core conclusions', 'Key knowledge', 'Evidence and sources', 'Tradeoffs and limitations', 'Open questions', 'Update log'];
+  const enNames = ['Core conclusions', 'Background and mechanism', 'Disagreements and limits', 'Open questions to check', 'Sources', 'Update log'];
   assert.equal(api.detailStructurePrompt(api.standardTemplate('en'), 'en', h => `STD(${h})`), [`STD(${enNames.map(n => `### ${n}`).join(', ')})`,
     ...enNames.map((name, i) => `### ${name}: ${STANDARD_DESCRIPTIONS.en[i]}`)].join('\n'));
   const t = { id: 't', name: 'T', sections: [
@@ -124,13 +128,13 @@ test('canonicalDetail without a template is unchanged (Standard)', () => {
 });
 test('canonicalDetail follows a custom template: order, aliases, empty fill, removed sections kept as text', () => {
   const out = utils.canonicalDetail('### 關鍵知識\n\nK\n\n### 取捨與限制\n\nT\n\n### 核心結論\n\nC', 'zh-TW', teach());
-  assert.deepEqual(out.split('\n').filter(l => l.startsWith('### ')), ['### 核心結論', '### 概念', '### 取捨與限制', '### 範例', '### 證據與來源', '### 待確認事項', '### 更新紀錄']); // '### 取捨與限制' is kept text, not a section
+  assert.deepEqual(out.split('\n').filter(l => l.startsWith('### ')), ['### 核心結論', '### 概念', '### 取捨與限制', '### 範例', '### 待確認問題', '### 來源', '### 更新紀錄']); // '### 取捨與限制' is kept text, not a section
   assert.match(out, /### 概念\n\nK\n\n### 取捨與限制\n\nT/); // unknown heading stays as text inside the section where it appeared
   assert.match(out, /### 範例\n\n本次無新增內容。/);
 });
 test('canonicalDetail keeps a user ### sub-heading inside its section', () => {
   const out = utils.canonicalDetail('### 核心結論\n\nA\n\n### 我的小節\n\nB\n\n### 更新紀錄\n\n- x', 'zh-TW');
-  assert.match(out, /### 核心結論\n\nA\n\n### 我的小節\n\nB\n\n### 關鍵知識/);
+  assert.match(out, /### 核心結論\n\nA\n\n### 我的小節\n\nB\n\n### 背景與機制/);
 });
 test('footnote definitions go to the sources section, or to the end when the template has none', () => {
   const noSources = { id: 'n', name: 'N', sections: [{ id: 'a', name: 'A', description: '', role: 'none', aliases: [] }, { id: 'b', name: 'B', description: '', role: 'log', aliases: [] }] };
@@ -217,8 +221,8 @@ test('normalizeTemplates: a custom template saved with the id textbook keeps its
 test('detailStructurePrompt: textbook states the intro, six headings in order, omit-empty override and the self-check before the update log', () => {
   const none = () => { throw new Error('standard sentence must not be used'); };
   for (const [language, names, intro, omit, selfCheck] of [
-    ['zh-TW', ['核心結論', '關鍵知識', '證據與來源', '取捨與限制', '待確認事項', '更新紀錄'], /開頭（導讀）：2–4 個流暢的段落，不加任何標題/, /不要保留標題，也不要寫「本次無新增內容」；這一條優先於後面格式規則/, /在「### 更新紀錄」之前（也就是它上面）加一小塊「\*\*自我檢核\*\*」/],
-    ['en', ['Core conclusions', 'Key knowledge', 'Evidence and sources', 'Tradeoffs and limitations', 'Open questions', 'Update log'], /Opening \(lead-in\): 2–4 flowing paragraphs with no heading at all/, /this rule overrides the later formatting rule/, /Just before "### Update log" \(that is, above it\) add a short block led by bold "\*\*Self-check\*\*"/]
+    ['zh-TW', ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', '來源', '更新紀錄'], /開頭（導讀）：2–4 個流暢的段落，不加任何標題/, /不要保留標題，也不要寫「本次無新增內容」；這一條優先於後面格式規則/, /在「### 更新紀錄」之前（也就是它上面）加一小塊「\*\*自我檢核\*\*」/],
+    ['en', ['Core conclusions', 'Background and mechanism', 'Disagreements and limits', 'Open questions to check', 'Sources', 'Update log'], /Opening \(lead-in\): 2–4 flowing paragraphs with no heading at all/, /this rule overrides the later formatting rule/, /Just before "### Update log" \(that is, above it\) add a short block led by bold "\*\*Self-check\*\*"/]
   ]) {
     const prompt = api.detailStructurePrompt(api.textbookTemplate(language), language, none);
     assert.match(prompt, intro); assert.match(prompt, omit); assert.match(prompt, selfCheck);
@@ -241,7 +245,7 @@ test('canonicalDetail textbook: no heading at all means the whole text is the in
   const tb = api.textbookTemplate('zh-TW');
   assert.equal(utils.canonicalDetail('只有一段導讀。', 'zh-TW', tb), '只有一段導讀。');
   const out = utils.canonicalDetail('### Key knowledge\n\nK\n\n### 核心結論\n\nC', 'zh-TW', tb);
-  assert.equal(out, '### 核心結論\n\nC\n\n### 關鍵知識\n\nK');
+  assert.equal(out, '### 核心結論\n\nC\n\n### 背景與機制\n\nK');
 });
 test('canonicalDetail textbook: empty sections and "no new content" placeholders (either language) are omitted with their heading', () => {
   const tb = api.textbookTemplate('en');
@@ -257,24 +261,24 @@ test('canonicalDetail textbook: "No new content this time" (en) and the zh promp
 test('canonicalDetail textbook: source footnotes go to the sources section, or the end when it is omitted; sources stay kept when they have definitions', () => {
   const tb = api.textbookTemplate('en');
   const withSources = utils.canonicalDetail('Intro\n\n### Core conclusions\n\nfact[^1]\n\n[^1]: [[Notes/X|X]]\n\n### Update log\n\n- x', 'en', tb);
-  assert.equal(withSources, 'Intro\n\n### Core conclusions\n\nfact[^1]\n\n### Evidence and sources\n\n[^1]: [[Notes/X|X]]\n\n### Update log\n\n- x');
+  assert.equal(withSources, 'Intro\n\n### Core conclusions\n\nfact[^1]\n\n### Sources\n\n[^1]: [[Notes/X|X]]\n\n### Update log\n\n- x');
   const noSources = { id: 'textbook', name: 'T', sections: [{ id: 'a', name: 'A', description: '', role: 'none', aliases: [] }, { id: 'b', name: 'B', description: '', role: 'log', aliases: [] }] };
   const atEnd = utils.canonicalDetail('### A\n\nfact[^1]\n\n[^1]: [[Notes/X|X]]\n\n### B\n\n- log', 'en', noSources);
   assert.equal(atEnd, '### A\n\nfact[^1]\n\n### B\n\n- log\n\n[^1]: [[Notes/X|X]]');
 });
 test('canonicalDetail: Standard and custom templates still fold leading text into the first section and fill empty sections (byte-identical regression)', () => {
   assert.equal(utils.canonicalDetail('Lead\n\n### Key knowledge\n\nK', 'en'),
-    '### Core conclusions\n\nLead\n\n### Key knowledge\n\nK\n\n### Evidence and sources\n\nNo new information in this task.\n\n### Tradeoffs and limitations\n\nNo new information in this task.\n\n### Open questions\n\nNo new information in this task.\n\n### Update log\n\nNo new information in this task.');
+    '### Core conclusions\n\nLead\n\n### Background and mechanism\n\nK\n\n### Disagreements and limits\n\nNo new information in this task.\n\n### Open questions to check\n\nNo new information in this task.\n\n### Sources\n\nNo new information in this task.\n\n### Update log\n\nNo new information in this task.');
   assert.equal(utils.canonicalDetail('Only text', 'zh-TW').split('\n\n')[1], 'Only text');
   const custom = api.copyTemplate(api.standardTemplate('en'), 'Custom', 'c1');
-  assert.ok(utils.canonicalDetail('Lead\n\n### Core conclusions\n\nC', 'en', custom).startsWith('### Core conclusions\n\nLead\n\nC\n\n### Key knowledge\n\nNo new information in this task.'));
+  assert.ok(utils.canonicalDetail('Lead\n\n### Core conclusions\n\nC', 'en', custom).startsWith('### Core conclusions\n\nLead\n\nC\n\n### Background and mechanism\n\nNo new information in this task.'));
 });
 test('canonicalDetail textbook: a placeholder-only evidence section with footnotes keeps the heading and footnotes, drops the placeholder (zh/en, with or without period)', () => {
   for (const [language, placeholder] of [['en', 'No new information in this task'], ['en', 'No new information in this task.'], ['zh-TW', '本次無新增內容'], ['zh-TW', '本次無新增內容。'], ['en', 'No new content this time.']]) {
-    const tb = api.textbookTemplate(language), heading = language === 'en' ? 'Evidence and sources' : '證據與來源';
+    const tb = api.textbookTemplate(language), heading = language === 'en' ? 'Sources' : '來源';
     const out = utils.canonicalDetail(`Intro\n\n### ${heading}\n\n${placeholder}\n\n[^1]: [[Notes/X|X]]`, language, tb);
     assert.equal(out, `Intro\n\n### ${heading}\n\n[^1]: [[Notes/X|X]]`);
   }
   const real = utils.canonicalDetail('### Evidence and sources\n\nReal evidence\n\n[^1]: [[Notes/X|X]]', 'en', api.textbookTemplate('en'));
-  assert.equal(real, '### Evidence and sources\n\nReal evidence\n\n[^1]: [[Notes/X|X]]');
+  assert.equal(real, '### Sources\n\nReal evidence\n\n[^1]: [[Notes/X|X]]', 'the 0.29.0 heading is rewritten to the new name');
 });

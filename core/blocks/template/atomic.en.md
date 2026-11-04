@@ -1,14 +1,17 @@
-## Definition
-Define the concept in one sentence of no more than 25 words.
+## In one sentence
+A definition or claim of at most 40 words that is understood without any context. No example, no reasons.
 
-## Explanation
-At most three sentences on why it holds and how it differs from nearby concepts.
+## Why
+At most three sentences: why it holds and how it works. Do not repeat the sentence above.
 
 ## Example
-One concrete example.
+One concrete example; add one line on a common misunderstanding if it helps.
 
-## Evidence and sources
-The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.
+## How it differs
+The one or two most easily confused neighbouring concepts, one sentence each on the difference; leave this section out if nothing is easily confused.
+
+## Source
+Only the source list, which is added to the end of this section automatically; do not restate the body.
 
 ## Update log
 Add only one line saying what this update changed.

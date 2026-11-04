@@ -33,7 +33,7 @@ test('academic rigor tone block is empty; the other tones equal the built-in ton
 
 test('template blocks are registered with names; every block has a name in all languages', () => {
   const templates = M.BUILTIN_BLOCKS.filter(block => block.category === 'template').map(block => block.id);
-  assert.equal(templates.join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion');
+  assert.equal(templates.join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion,guide');
   for (const block of M.BUILTIN_BLOCKS) {
     for (const language of LANGUAGES) assert.ok(M.translate(language, block.nameKey).length > 0, `${block.id} ${language}`);
   }

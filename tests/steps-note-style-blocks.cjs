@@ -543,6 +543,40 @@ test('P2 comments: a comment-only file is no change (academic: unmodified, promp
   assert.equal(await toneTextOf({ [`${TONE}/Academic rigor.md`]: `${academicFile}\nUse short sentences.\n` }, 'builtin:academic'), undefined);
 });
 
+test('K2 counter: an override file named after a voice\'s old name (three languages) or new name is still found for that voice; both names are the built-in\'s names', async () => {
+  for (const [id, names] of [['academic', ['學術嚴謹', '学术严谨', 'Academic rigor', '專業', '专业', 'Professional']], ['magazine', ['雜誌專欄', '杂志专栏', 'Magazine column', '敘事', '叙事', 'Narrative']]]) {
+    for (const name of names) {
+      assert.equal(B().builtinBlockIdOfName('tone', name), id, name);
+      assert.ok(B().builtinBlockNames('tone', id).includes(name), name);
+      const { store } = makeStore({}, { [`${TONE}/${name}.md`]: 'Edited.\n' });
+      await store.refresh();
+      assert.equal(store.listBlocks('tone').find(item => item.ref === `builtin:${id}`).fileName, `${name}.md`, name);
+    }
+  }
+});
+
+test('K2: the skim format is the lean text plus its skim rules (the lean safety rules stay), the guide structure and the skim format are built-in parts a style can name and a copy keeps', async () => {
+  const M2 = loadSource(`export { lookupBuiltinFormat, BUILTIN_FORMATS } from "./core/blocks/builtin";\nexport { parseRecipeFile } from "./ai/note-style-recipe";`);
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const lean = M2.lookupBuiltinFormat('lean', language), skim = M2.lookupBuiltinFormat('skim', language);
+    assert.ok(skim.startsWith(lean), `${language}: skim starts with the whole lean text`);
+    assert.ok(skim.length > lean.length + 100, language);
+    for (const rule of language === 'en' ? ['never use callouts', 'never use <iframe>'] : ['不要使用 callout', '不要用 <iframe>']) assert.ok(skim.includes(rule), `${language} ${rule}`);
+  }
+  assert.equal(M2.parseRecipeFile('---\n格式規則: 條列速讀\n結構: x\n---\n').format, 'builtin:skim');
+  assert.equal(M2.parseRecipeFile('---\nformat: Skim list\n---\n').format, 'builtin:skim');
+  assert.equal(M2.parseRecipeFile('---\n段落結構: 操作指南\n---\n').structure, 'builtin:guide');
+  const { store, v } = makeStore({});
+  await store.refresh();
+  for (const [category, id] of [['structure', 'guide'], ['format', 'skim']]) {
+    const ref = await store.createPart(category, `builtin:${id}`);
+    assert.match(ref, /^file:/, `${category} copy`);
+    await store.refresh();
+    assert.ok(store.listParts(category).some(item => item.ref === ref), `${category} copy is listed`);
+  }
+  assert.ok(Object.keys(v.files).length >= 2, 'both copies are files');
+});
+
 test('P2 academic Edit: ensureBlockFile writes only the design note (three languages), the file then reads as unmodified; other tones still get their own text', async () => {
   for (const language of LANGUAGES) {
     const { store, v } = makeStore({ language });

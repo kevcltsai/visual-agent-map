@@ -210,7 +210,7 @@ test('lifecycle: rename, move out and back, delete, and a new file with the old 
   await store.refresh();
   const again = ask('A');
   assert.equal(again.label.fileName, 'A.md');
-  assert.equal(again.label.toneName, 'Magazine column');
+  assert.equal(again.label.toneName, 'Narrative');
   v.files['WS/Other/A.md'] = v.files[note]; delete v.files[note]; // moved out
   await store.refresh();
   eq(ask('A').issues.missing, ['file:A']);
@@ -228,7 +228,7 @@ test('snapshot: a file edited after refresh() changes nothing until the next ref
   assert.equal(ask().toneText, first.toneText);
   await store.refresh();
   assert.notEqual(ask().toneText, first.toneText);
-  assert.equal(ask().label.toneName, 'Magazine column');
+  assert.equal(ask().label.toneName, 'Narrative');
 });
 
 const ROOT = 'WS/Note styles';
@@ -261,7 +261,7 @@ test('D12 (was ensureStyleFolder): no style file is written any more; opening th
   const moved = store.runStyle(request([{ template: 'uuid-1' }]));
   assert.equal(moved.contextFields.styleSelection, undefined, 'the saved template is read, not the block');
   eq(moved.template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
-  eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard six'], ['builtin', 'Intro + six'], ['builtin', 'Claim to verdict'], ['builtin', 'Content & credibility'], ['builtin', 'Goal to done'], ['builtin', 'Definition & example'], ['builtin', 'Conclusion & basis'], ['file', 'My notes']]);
+  eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard six'], ['builtin', 'Intro + six'], ['builtin', 'Claim to verdict'], ['builtin', 'Content & credibility'], ['builtin', 'Goal to done'], ['builtin', 'Definition & example'], ['builtin', 'Conclusion & basis'], ['builtin', 'How-to guide'], ['file', 'My notes']]);
 });
 
 test('D12 (was restore default; T5 P2b, decisions #22/#31): restoreDefault, builtinIdOfFile, restoreBlock, copyBlock and effectiveBlockKeys are gone from the store', () => {

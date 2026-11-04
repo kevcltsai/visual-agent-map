@@ -684,7 +684,12 @@ export class NoteStyleStore {
       }
       const built = parseTemplateBlock(builtinTemplateText(block.id, language), { id: block.id, name });
       if (!built.ok) throw new Error(`Built-in template ${block.id} does not parse`);
-      return { template: { ...built.template }, name, issues: [], notices: [] };
+      return {
+        template: { ...built.template, ...(block.omitEmpty ? { omitEmpty: true as const } : {}) },
+        name,
+        issues: [],
+        notices: []
+      };
     }
     const text = this.blocks.template.get(parsed.name);
     if (text === undefined) return undefined;

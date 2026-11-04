@@ -1,23 +1,23 @@
 ## Claim
-State in one sentence what this hypothesis claims, so that it can be tested or refuted.
-
-## Prediction
-What should be observed if the claim holds; write concrete results that can be checked.
-
-## How to test
-How to confirm or refute it: what data to look for, what comparison or experiment to run.
-
-## Support
-Evidence that supports the claim; give the source and strength of each point.
-
-## Counterevidence
-Evidence or counterexamples that conflict with the claim; give the source and strength of each point; if there is none, say none has been found yet.
+One statement that can be refuted, with the subject, the conditions and the direction stated. No reasons or evidence here.
 
 ## Current judgment
-Weigh the support against the counterevidence; state the current strength (weak, medium or strong) and what evidence is still missing.
+Keep only one: untested, leaning support, leaning against or refuted, plus a one-sentence reason and what is missing. This takes precedence over the earlier rule for inconsistencies: never list old and new ones; when it changes, rewrite this one and write "from X to Y: reason" in the update log.
 
-## Evidence and sources
-The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.
+## If true we would see
+Concrete predictions that can be checked, one per line.
+
+## What would refute it
+Counter-conditions written in advance: which result would mean the claim fails.
+
+## How to test
+What data to look for, and what comparison or experiment to run.
+
+## Evidence table
+One table with the columns "Evidence | Supports / refutes | Strength | Linked topic", one row per piece of evidence, each with its source. Write linked topics only here, as topic links; do not restate the supporting and refuting content elsewhere.
+
+## Sources
+Only the source list, which is added to the end of this section automatically; do not restate the body.
 
 ## Update log
 Add only one line saying what this update changed.

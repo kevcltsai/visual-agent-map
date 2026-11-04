@@ -100,7 +100,7 @@ test('R1-1: "Open this file" of a style file with a problem opens <Styles folder
 });
 
 // T6 P1: the one-line style choice (`styleChoiceField`), added beside the old field; the dialogs switch to it in P2.
-const recipe = (ref, name, extra = {}) => ({ ref, kind: ref.startsWith('file:') ? 'file' : 'builtin', name, structure: { name: 'Standard' }, voice: { name: 'Academic rigor' }, format: { name: 'Standard' }, update: 'merge', issues: [], ...extra });
+const recipe = (ref, name, extra = {}) => ({ ref, kind: ref.startsWith('file:') ? 'file' : 'builtin', name, structure: { name: 'Standard' }, voice: { name: 'Professional' }, format: { name: 'Standard' }, update: 'merge', issues: [], ...extra });
 const mineRecipe = recipe('file:Mine', 'Mine', { fileName: 'Mine.md', update: 'top' });
 const brokenRecipe = recipe('file:Broken', 'Broken', { fileName: 'Broken.md', issues: [{ line: 4, code: 'ui.detail_template_error_section_name_taken', values: [2], message: 'x' }] });
 const recipes = [recipe('builtin:general', 'General research'), recipe('builtin:textbook', 'Textbook', { structure: { name: 'Textbook' } }), recipe('builtin:aim', 'AIM report', { aimOnly: true }), mineRecipe, brokenRecipe];
@@ -181,12 +181,12 @@ test('styleChoiceField: four small labels under the select, polite live region, 
   const tags = dom.find(h.parent, i => i.attrs?.['aria-live'] === 'polite');
   assert.equal(tags.hidden, true);
   h.toggle.click(); h.select.value = 'file:Mine'; h.select.fire('change');
-  assert.equal(tags.hidden, false); assert.equal(tags.text, 'Standard · Academic rigor · Standard · New on top');
+  assert.equal(tags.hidden, false); assert.equal(tags.text, 'Standard · Professional · Standard · New on top');
   let writes = 0; const setText = tags.setText.bind(tags); tags.setText = value => { writes++; setText(value); };
   h.select.fire('change'); h.select.fire('change');
   assert.equal(writes, 0, 'the same text is not written again');
   h.select.value = 'builtin:textbook'; h.select.fire('change');
-  assert.equal(writes, 1); assert.equal(tags.text, 'Textbook · Academic rigor · Standard · Merge and rewrite');
+  assert.equal(writes, 1); assert.equal(tags.text, 'Textbook · Professional · Standard · Merge and rewrite');
   h.select.value = ''; h.select.fire('change');
   assert.equal(tags.text, ''); assert.equal(tags.hidden, true);
 });
@@ -220,7 +220,7 @@ test('stylePickerFor: recipes() is the store\'s listRecipes() as it is; builtinR
   assert.equal(builtins.length, 8); eq(builtins.filter(i => i.aimOnly).map(i => i.ref), ['builtin:aim']);
   eq(builtins.map(i => i.ref).slice(0, 2), ['builtin:general', 'builtin:atomic']);
   const textbook = builtins.find(i => i.ref === 'builtin:textbook');
-  eq([textbook.name, textbook.structure.name, textbook.voice.name, textbook.format.name, textbook.update], ['Textbook', 'Intro + six', 'Academic rigor', 'Standard format', 'merge']);
+  eq([textbook.name, textbook.structure.name, textbook.voice.name, textbook.format.name, textbook.update], ['Textbook', 'Intro + six', 'Professional', 'Standard format', 'merge']);
   const listed = [recipe('builtin:general', 'General research'), mineRecipe];
   const withList = loaded.stylePickerFor({}, { noteStyles: { ...base, listRecipes() { return listed; } } });
   assert.equal(withList.recipes(), listed);

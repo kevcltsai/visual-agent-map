@@ -35,8 +35,9 @@ test('recipe: the kind defaults and the eight built-in recipes follow design 3.2
   const row = id => plain(M.BUILTIN_RECIPES.find(recipe => recipe.id === id));
   for (const recipe of M.BUILTIN_RECIPES) {
     assert.equal(recipe.voice, 'academic', recipe.id);
-    assert.equal(recipe.format, 'standard', recipe.id);
-    assert.equal(recipe.update, recipe.id === 'hypothesis' ? 'top' : 'merge', recipe.id);
+    // note-style-editorial: atomic and evidence are short cards (lean); every type rewrites (hypothesis too, no longer "new on top").
+    assert.equal(recipe.format, recipe.id === 'atomic' || recipe.id === 'evidence' ? 'lean' : 'standard', recipe.id);
+    assert.equal(recipe.update, 'merge', recipe.id);
   }
   assert.equal(row('general').structure, 'standard');
   assert.equal(row('textbook').structure, 'textbook');
@@ -93,6 +94,46 @@ test('recipe: parseRecipeRef reads builtin:<id> and file:<name> only, and the na
     assert.equal(M.parseRecipeRef(bad), undefined, JSON.stringify(bad));
   assert.deepEqual(plain(M.parseRecipeRef('file:標準六段', 'format')), { kind: 'file', name: '標準六段' });
   assert.equal(M.parseRecipeRef('file:標準六段', 'structure'), undefined);
+});
+
+// ---- note-style-editorial K2: renamed voices, shared baseline ----
+const OLD_VOICE_NAMES = [
+  ['academic', ['學術嚴謹', '学术严谨', 'Academic rigor']],
+  ['magazine', ['雜誌專欄', '杂志专栏', 'Magazine column']]
+];
+const NEW_VOICE_NAMES = [
+  ['academic', ['專業', '专业', 'Professional']],
+  ['magazine', ['敘事', '叙事', 'Narrative']]
+];
+test('K2 counter: the old voice names (three languages) still resolve to academic and magazine, stay reserved, and the new names do too', () => {
+  for (const [id, names] of [...OLD_VOICE_NAMES, ...NEW_VOICE_NAMES])
+    for (const name of names) {
+      assert.equal(M.builtinPartIdOf('voice', name), id, name);
+      assert.deepEqual(plain(M.validatePartName(name, 'voice')), { ok: false, reason: 'builtin' }, name);
+      assert.equal(M.parseRecipeFile(`---\n寫作口吻: ${name}\n---\n`).voice, `builtin:${id}`, name);
+    }
+  assert.equal(M.translate('zh-TW', 'ui.preset_name_academic'), '專業');
+  assert.equal(M.translate('zh-TW', 'ui.preset_name_magazine'), '敘事');
+});
+
+test('K2 counter: the shared writing baseline follows the voice in a topic prompt; the Taiwan wording rule is in zh-TW output only', () => {
+  const TAIWAN = '台灣用語';
+  for (const step of ['research', 'quick', 'merge']) {
+    const zhTW = assemble(M.selectionFromContext(contextOf('zh-TW'), 'zh-TW'), 'zh-TW', step);
+    const zhCN = assemble(M.selectionFromContext(contextOf('zh-CN'), 'zh-CN'), 'zh-CN', step);
+    const en = assemble(M.selectionFromContext(contextOf('en'), 'en'), 'en', step);
+    const text = result => (typeof result === 'string' ? result : result.prompt ?? result.text ?? JSON.stringify(result));
+    assert.match(text(zhTW), /首先/, step);
+    assert.ok(text(zhTW).includes(TAIWAN), step);
+    assert.match(text(zhCN), /首先/, step);
+    assert.ok(!text(zhCN).includes(TAIWAN), `${step} zh-CN has no Taiwan wording rule`);
+    assert.match(text(en), /First/, step);
+    assert.ok(!text(en).includes(TAIWAN), step);
+  }
+  // the baseline comes after the voice text
+  const withTone = M.assembleTaskPrompt({ ...M.selectionFromContext(contextOf('en'), 'en'), tone: { id: 'custom-legacy', body: 'Tone: VOICE-MARK.' } }, 'research', { ...contextOf('en'), toneText: 'Tone: VOICE-MARK.' }, 'en');
+  const flat = typeof withTone === 'string' ? withTone : withTone.prompt ?? withTone.text ?? JSON.stringify(withTone);
+  assert.ok(flat.indexOf('VOICE-MARK') > -1 && flat.indexOf('VOICE-MARK') < flat.indexOf('First'));
 });
 
 // ---- recipe files ----
@@ -246,10 +287,10 @@ test('counter 10: a format body loses its blank lines at both ends; an empty or 
 });
 
 // ---- the conclusion structure ----
-test('recipe: the conclusion structure parses in three languages with the source and log sentences of Standard word for word', () => {
+test('recipe: the conclusion structure parses in three languages with the log sentence of Standard word for word and one sources section', () => {
   const headings = {
-    'zh-TW': ['結論', '依據', '信心程度', '適用範圍與限制', '後續行動', '證據與來源', '更新紀錄'],
-    en: ['Conclusion', 'Basis', 'Confidence', 'Scope and limits', 'Next actions', 'Evidence and sources', 'Update log']
+    'zh-TW': ['結論', '信心', '依據', '什麼會改變這個結論', '適用範圍', '影響與下一步', '來源', '更新紀錄'],
+    en: ['Conclusion', 'Confidence', 'Basis', 'What would change it', 'Scope', 'Impact and next steps', 'Sources', 'Update log']
   };
   headings['zh-CN'] = headings['zh-TW'];
   for (const language of LANGUAGES) {
@@ -257,11 +298,10 @@ test('recipe: the conclusion structure parses in three languages with the source
     assert.equal(parsed.ok, true, language);
     assert.deepEqual(plain(parsed.template.sections.map(section => section.name)), headings[language], language);
     const standard = M.parseTemplateBlock(M.builtinTemplateText('standard', language), { id: 'standard', name: 's' }).template;
-    for (const role of ['sources', 'log']) {
-      const a = standard.sections.find(section => section.role === role), b = parsed.template.sections.find(section => section.role === role);
-      assert.equal(b.name, a.name, `${language} ${role}`);
-      assert.equal(b.description, a.description, `${language} ${role}`);
-    }
+    const log = standard.sections.find(section => section.role === 'log'), conclusionLog = parsed.template.sections.find(section => section.role === 'log');
+    assert.equal(conclusionLog.name, log.name, language);
+    assert.equal(conclusionLog.description, log.description, language);
+    assert.equal(parsed.template.sections.filter(section => section.role === 'sources').length, 1, language);
     for (const section of parsed.template.sections) assert.ok(section.description.trim().length > 0, `${language} ${section.name}`);
     assert.equal(parsed.template.sections.some(section => section.count), false, language);
   }
@@ -349,9 +389,10 @@ test('P2a kinds: the six topic kinds and AIM each resolve to their built-in styl
     assert.equal(got.recipe.source, 'kind', label);
     assert.equal(got.template.id, structureOf[kind], label);
     assert.equal(got.toneText, undefined, label);
-    assert.equal(got.formatText, standardFormat('en'), label);
-    assert.equal(got.updateMode, kind === 'hypothesis' ? 'top' : 'merge', label);
-    assert.deepEqual(plain(got.contextFields), {}, label);
+    assert.equal(got.formatText, kind === 'atomic' || kind === 'evidence' ? M.lookupBuiltinFormat('lean', 'en') : standardFormat('en'), label);
+    assert.equal(got.updateMode, 'merge', label);
+    if (kind === 'atomic' || kind === 'evidence') assert.equal(got.contextFields.styleSelection.format.id, 'lean', label);
+    else assert.deepEqual(plain(got.contextFields), {}, label);
     assert.equal(got.recipe.aimDelivery, kind === 'aim' ? true : undefined, label);
     assert.deepEqual(plain(got.issues), { missing: [], blockIssues: [], notices: [] }, label);
   }

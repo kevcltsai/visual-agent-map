@@ -1,17 +1,17 @@
 ## Core conclusions
-Answer the research question directly, 3–5 points by default; give the conclusion first, then the reason.
+The first sentence answers the topic's question directly, then 2–4 reasons, each one sentence of conclusion plus one sentence of reason. No background here.
 
-## Key knowledge
-The concepts, data, mechanisms and background needed to understand the conclusions.
+## Background and mechanism
+The concepts, data and workings needed to understand the conclusions; do not repeat the core conclusions or the disagreements.
 
-## Evidence and sources
-The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.
+## Disagreements and limits
+Where the evidence is contested, counterexamples, when the conclusions apply, and what this research did not cover; write only limits if nothing is contested.
 
-## Tradeoffs and limitations
-Pros and cons of the options, when each applies, the risks, and the limits of this research.
+## Open questions to check
+Questions not yet verified that are worth opening as subtopics; write each as a question that can be researched.
 
-## Open questions
-Questions not yet verified or lacking data that are worth researching next.
+## Sources
+Mark sources with footnotes in the body; this section holds only the source list, which is added to the end of this section automatically, without restating the body.
 
 ## Update log
 Add only one line saying what this update changed.

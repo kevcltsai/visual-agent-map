@@ -1,14 +1,20 @@
-## Content
-What this piece of evidence says: the facts, data or observations, without inference.
+## Summary
+What this piece of evidence says, in one to three sentences, with no inference added.
 
-## Evidence and sources
-The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.
+## Source text or data
+The key quotes and numbers, kept exactly as they are, with their source. Later research must not rewrite or delete the quotes and numbers already here; it may only add to them.
+
+## How it was obtained
+The study design, sample, time and type of data.
 
 ## Credibility
-The source type, method, sample and date; rate the credibility (low, medium or high) and give the reason.
+Exactly one of low, medium, high, with the reason: conflicts of interest, sample limits, whether it was replicated. Keep only one level.
 
-## Supports or refutes
-Which hypothesis and which point this evidence supports or refutes; if it is not linked to a hypothesis, write "Not linked to a hypothesis yet".
+## Related topics
+Use topic links to say which point it supports or refutes; write "Not linked to a topic yet" if it is linked to none.
+
+## Source
+Only the source list, which is added to the end of this section automatically; do not restate the body.
 
 ## Update log
 Add only one line saying what this update changed.

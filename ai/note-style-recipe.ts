@@ -70,7 +70,7 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     nameKey: "ui.recipe_name_atomic",
     structure: "atomic",
     voice: "academic",
-    format: "standard",
+    format: "lean",
     update: "merge"
   },
   {
@@ -79,14 +79,14 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: "hypothesis",
     voice: "academic",
     format: "standard",
-    update: "top"
+    update: "merge"
   },
   {
     id: "evidence",
     nameKey: "ui.recipe_name_evidence",
     structure: "evidence",
     voice: "academic",
-    format: "standard",
+    format: "lean",
     update: "merge"
   },
   {
@@ -129,11 +129,15 @@ export type NameCategory = PartCategory | "recipe";
 const LANGUAGES: readonly UiLanguage[] = ["zh-TW", "zh-CN", "en"];
 
 /** The built-in names of a category: id and translation key. */
-function builtinNames(category: NameCategory): { id: string; nameKey: TranslationKey }[] {
-  if (category === "recipe") return BUILTIN_RECIPES.map(({ id, nameKey }) => ({ id, nameKey }));
-  if (category === "format") return BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey }));
+function builtinNames(category: NameCategory): { id: string; nameKeys: TranslationKey[] }[] {
+  if (category === "recipe") return BUILTIN_RECIPES.map(({ id, nameKey }) => ({ id, nameKeys: [nameKey] }));
+  if (category === "format") return BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKeys: [nameKey] }));
   const wanted = category === "structure" ? "template" : "tone";
-  return BUILTIN_BLOCKS.filter(block => block.category === wanted).map(({ id, nameKey }) => ({ id, nameKey }));
+  // A renamed voice keeps its earlier names (学术严谨 ...): they still resolve to it and stay reserved.
+  return BUILTIN_BLOCKS.filter(block => block.category === wanted).map(({ id, nameKey, legacyNameKeys }) => ({
+    id,
+    nameKeys: [nameKey, ...(legacyNameKeys ?? [])]
+  }));
 }
 
 const folded = (text: string): string => text.toLocaleLowerCase();
@@ -142,7 +146,8 @@ const folded = (text: string): string => text.toLocaleLowerCase();
 export function builtinPartIdOf(category: NameCategory, name: string): string | undefined {
   const key = folded(name);
   return builtinNames(category).find(
-    ({ id, nameKey }) => id === name || LANGUAGES.some(language => folded(translate(language, nameKey)) === key)
+    ({ id, nameKeys }) =>
+      id === name || nameKeys.some(nameKey => LANGUAGES.some(language => folded(translate(language, nameKey)) === key))
   )?.id;
 }
 
@@ -158,8 +163,8 @@ export function validatePartName(name: string, category: NameCategory): NameChec
   if (name.includes("/") || name.includes("\\")) return { ok: false, reason: "separator" };
   if (name.includes("..")) return { ok: false, reason: "dots" };
   const key = folded(name);
-  const taken = builtinNames(category).some(({ nameKey }) =>
-    LANGUAGES.some(language => folded(translate(language, nameKey)) === key)
+  const taken = builtinNames(category).some(({ nameKeys }) =>
+    nameKeys.some(nameKey => LANGUAGES.some(language => folded(translate(language, nameKey)) === key))
   );
   return taken ? { ok: false, reason: "builtin" } : { ok: true };
 }
@@ -313,7 +318,7 @@ export function partNameOfRef(category: PartCategory, ref: string, language: UiL
   if (parsed.kind === "file") return parsed.name;
   const found = builtinNames(category).find(item => item.id === parsed.id);
   if (!found) throw new Error(`Unknown built-in ${category}: ${parsed.id}`);
-  return translate(language, found.nameKey);
+  return translate(language, found.nameKeys[0]);
 }
 
 function slotValue(slot: PartCategory | "update", parts: RecipeFileParts, language: UiLanguage): string {

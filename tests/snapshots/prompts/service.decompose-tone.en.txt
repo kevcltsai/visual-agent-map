@@ -13,6 +13,8 @@ Return JSON only, without a Markdown code fence. Use this exact shape: {"summary
 Tone rule: the tone changes wording and presentation only and never lowers the source, citation or accuracy requirements; every other rule (source labelling, citations, fact checking, the JSON contract) still applies in full.
 Tone: example voice. Write warmly.
 
+Writing baseline (applies to every voice): do not use filler transitions or wrap-ups such as "First", "Second", "In conclusion" or "To sum up"; do not exaggerate or use hype words such as "revolutionary" or "unprecedented"; state numbers concretely, with the value, unit, year and range, and never write "many", "significantly" or "recently".
+
 Decompose mode: propose independently actionable subtopics at the requested depth and count. If existing subtopics already cover the need, return an empty array; do not pad the count. Summarize whether decomposition is useful and briefly explain why in detail. Do not update conclusions.
 
 

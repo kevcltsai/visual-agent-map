@@ -74,6 +74,7 @@ export const en = {
   "ui.shortcut_rename": "Rename the card",
   "ui.shortcut_add_subtopic": "Add a subtopic",
   "ui.shortcut_add_sibling": "Add a sibling topic",
+  "ui.shortcut_reorder_sibling": "Move the card earlier or later among its siblings",
   "ui.shortcut_remove": "Remove the card from the map",
   "ui.shortcut_card_tools": "Reach the card's tools",
   "ui.shortcut_context_menu": "Open the card's menu",

@@ -8,6 +8,7 @@ export const MAP_KEYBOARD_SHORTCUTS: readonly { keys: readonly string[]; action:
   { keys: ["F2"], action: "ui.shortcut_rename" },
   { keys: ["Mod+Enter"], action: "ui.shortcut_add_subtopic" },
   { keys: ["Shift+Enter"], action: "ui.shortcut_add_sibling" },
+  { keys: ["Alt+↑", "Alt+↓"], action: "ui.shortcut_reorder_sibling" },
   { keys: ["Delete", "Backspace"], action: "ui.shortcut_remove" },
   { keys: ["Tab"], action: "ui.shortcut_card_tools" },
   { keys: ["Shift+F10"], action: "ui.shortcut_context_menu" },
@@ -18,7 +19,10 @@ export const MAP_KEYBOARD_SHORTCUTS: readonly { keys: readonly string[]; action:
 ];
 
 export function shortcutLabel(keys: string, mac = Platform.isMacOS): string {
-  return keys.replace(/Mod/g, mac ? "⌘" : "Ctrl").replace(/Shift/g, mac ? "⇧" : "Shift");
+  return keys
+    .replace(/Mod/g, mac ? "⌘" : "Ctrl")
+    .replace(/Shift/g, mac ? "⇧" : "Shift")
+    .replace(/Alt/g, mac ? "⌥" : "Alt");
 }
 
 /** "Keyboard shortcuts": the map's keys, and where to give the VAM commands hotkeys of one's own. */

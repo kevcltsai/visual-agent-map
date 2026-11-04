@@ -74,6 +74,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.shortcut_rename": "重命名卡片",
   "ui.shortcut_add_subtopic": "添加子议题",
   "ui.shortcut_add_sibling": "添加同层议题",
+  "ui.shortcut_reorder_sibling": "将卡片在同层中前移或后移",
   "ui.shortcut_remove": "把卡片从图中移除",
   "ui.shortcut_card_tools": "移到卡片的工具",
   "ui.shortcut_context_menu": "打开卡片菜单",

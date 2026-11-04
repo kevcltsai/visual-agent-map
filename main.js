@@ -178,6 +178,7 @@ var en = {
   "ui.shortcut_rename": "Rename the card",
   "ui.shortcut_add_subtopic": "Add a subtopic",
   "ui.shortcut_add_sibling": "Add a sibling topic",
+  "ui.shortcut_reorder_sibling": "Move the card earlier or later among its siblings",
   "ui.shortcut_remove": "Remove the card from the map",
   "ui.shortcut_card_tools": "Reach the card's tools",
   "ui.shortcut_context_menu": "Open the card's menu",
@@ -2679,6 +2680,7 @@ var zhCN = {
   "ui.shortcut_rename": "\u91CD\u547D\u540D\u5361\u7247",
   "ui.shortcut_add_subtopic": "\u6DFB\u52A0\u5B50\u8BAE\u9898",
   "ui.shortcut_add_sibling": "\u6DFB\u52A0\u540C\u5C42\u8BAE\u9898",
+  "ui.shortcut_reorder_sibling": "\u5C06\u5361\u7247\u5728\u540C\u5C42\u4E2D\u524D\u79FB\u6216\u540E\u79FB",
   "ui.shortcut_remove": "\u628A\u5361\u7247\u4ECE\u56FE\u4E2D\u79FB\u9664",
   "ui.shortcut_card_tools": "\u79FB\u5230\u5361\u7247\u7684\u5DE5\u5177",
   "ui.shortcut_context_menu": "\u6253\u5F00\u5361\u7247\u83DC\u5355",
@@ -5180,6 +5182,7 @@ var zhTW = {
   "ui.shortcut_rename": "\u91CD\u65B0\u547D\u540D\u5361\u7247",
   "ui.shortcut_add_subtopic": "\u65B0\u589E\u5B50\u8B70\u984C",
   "ui.shortcut_add_sibling": "\u65B0\u589E\u540C\u5C64\u8B70\u984C",
+  "ui.shortcut_reorder_sibling": "\u5C07\u5361\u7247\u5728\u540C\u5C64\u4E2D\u524D\u79FB\u6216\u5F8C\u79FB",
   "ui.shortcut_remove": "\u628A\u5361\u7247\u5F9E\u5716\u4E2D\u79FB\u9664",
   "ui.shortcut_card_tools": "\u79FB\u5230\u5361\u7247\u7684\u5DE5\u5177",
   "ui.shortcut_context_menu": "\u958B\u555F\u5361\u7247\u9078\u55AE",
@@ -19373,6 +19376,21 @@ function reorderSiblings(nodes, parentId, movedId, beforeId) {
   });
   return result;
 }
+function shiftSibling(nodes, id, offset) {
+  const moved = nodes.find((node) => node.id === id);
+  if (!(moved == null ? void 0 : moved.parentId)) return nodes;
+  const slots = nodes.flatMap((node, index) => node.parentId === moved.parentId ? [index] : []);
+  const order = slots.map((index) => nodes[index]);
+  const from = order.indexOf(moved);
+  const to = from + offset;
+  if (to < 0 || to >= order.length) return nodes;
+  [order[from], order[to]] = [order[to], order[from]];
+  const result = nodes.slice();
+  slots.forEach((index, place) => {
+    result[index] = order[place];
+  });
+  return result;
+}
 function reorderTopLevel(nodes, rootId, movedId, dropX) {
   if (!Number.isFinite(dropX)) return nodes;
   const slots = nodes.flatMap((node, index) => node.parentId === rootId ? [index] : []);
@@ -26504,6 +26522,7 @@ var MAP_KEYBOARD_SHORTCUTS = [
   { keys: ["F2"], action: "ui.shortcut_rename" },
   { keys: ["Mod+Enter"], action: "ui.shortcut_add_subtopic" },
   { keys: ["Shift+Enter"], action: "ui.shortcut_add_sibling" },
+  { keys: ["Alt+\u2191", "Alt+\u2193"], action: "ui.shortcut_reorder_sibling" },
   { keys: ["Delete", "Backspace"], action: "ui.shortcut_remove" },
   { keys: ["Tab"], action: "ui.shortcut_card_tools" },
   { keys: ["Shift+F10"], action: "ui.shortcut_context_menu" },
@@ -26513,7 +26532,7 @@ var MAP_KEYBOARD_SHORTCUTS = [
   { keys: ["Esc"], action: "ui.shortcut_clear_selection" }
 ];
 function shortcutLabel(keys, mac = import_obsidian16.Platform.isMacOS) {
-  return keys.replace(/Mod/g, mac ? "\u2318" : "Ctrl").replace(/Shift/g, mac ? "\u21E7" : "Shift");
+  return keys.replace(/Mod/g, mac ? "\u2318" : "Ctrl").replace(/Shift/g, mac ? "\u21E7" : "Shift").replace(/Alt/g, mac ? "\u2325" : "Alt");
 }
 var KeyboardShortcutsModal = class extends import_obsidian16.Modal {
   constructor(app) {
@@ -49582,6 +49601,12 @@ function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
   if (statuses.includes("cancelled")) return "cancelled";
   return "not_started";
 }
+var ARROW_OFFSETS = /* @__PURE__ */ new Map([
+  ["ArrowUp", -1],
+  ["ArrowLeft", -1],
+  ["ArrowDown", 1],
+  ["ArrowRight", 1]
+]);
 var TASK_PROGRESS_PREFIX = "vam-task:";
 var MERGE_DONE_NOTICE_MS = 15e3;
 var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
@@ -52496,9 +52521,10 @@ ${request.requirements}` : preset.text,
    * the array order, which is what those arrangements lay out. A manual move or drag changes a position only, so the array
    * order can differ from this.
    */
-  onScreenSiblingOrder(map) {
+  onScreenSiblingOrder(map, onlyParentId) {
     const base = layoutOf(map).direction;
     return alignSiblingsToScreen(map.nodes, (parentId, childId) => {
+      if (onlyParentId !== void 0 && parentId !== onlyParentId) return null;
       const direction = layoutDirectionFor(map.nodes, childId, base);
       if (direction === "down" || direction === "up") return "x";
       if (direction === "right" || direction === "left") return "y";
@@ -52528,6 +52554,39 @@ ${request.requirements}` : preset.text,
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), void 0);
     });
     return box.placed;
+  }
+  /**
+   * A card dropped on empty canvas takes the place it was dropped at. The arrangements lay siblings out in array order, so it
+   * takes that place among its siblings there too; otherwise "Auto layout" would put it straight back.
+   */
+  placeDroppedCard(map, card, position) {
+    card.x = Math.round(position.x);
+    card.y = Math.round(position.y);
+    if (card.parentId && !map.aim) map.nodes = this.onScreenSiblingOrder(map, card.parentId);
+  }
+  /**
+   * Alt+Up/Down (Left/Right): the card trades places with the sibling before or after it, and the branch is laid out again in
+   * that order. One undo step. Nothing is written when the card is already first or last.
+   */
+  async shiftSiblingByKey(node, offset) {
+    const map = this.map;
+    if (!map || !node.parentId || map.aim) return;
+    const aligned = this.onScreenSiblingOrder(map);
+    if (shiftSibling(aligned, node.id, offset) === aligned) return;
+    if (!this.mergeUnlocked([node.id, node.parentId])) return;
+    const parentId = node.parentId;
+    this.focusNodeId = node.id;
+    try {
+      await this.mapChange((change2) => {
+        const next = shiftSibling(this.onScreenSiblingOrder(change2), node.id, offset);
+        change2.nodes = next;
+        const parent = change2.nodes.find((item) => item.id === parentId);
+        if (layoutOf(change2).direction === "timeline" && parent && !parent.parentId) this.arrangeAll(change2);
+        else this.arrangeBranch(change2, parentId, new Set(descendants(change2.nodes, parentId)), void 0);
+      });
+    } finally {
+      this.focusNodeId = null;
+    }
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   openTopicMenu(event) {
@@ -59144,6 +59203,12 @@ ${request.requirements}` : preset.text,
     card.addEventListener("keydown", (event) => {
       var _a3, _b3, _c2;
       if (event.target !== card) return;
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
+        event.preventDefault();
+        if (!event.isComposing && !this.selection.state.multiSelectMode && !this.aimLive() && !this.presentation)
+          this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)));
+        return;
+      }
       const target = this.keyboardNeighbor(node, event.key);
       if (target) {
         event.preventDefault();
@@ -66665,8 +66730,7 @@ ${addition}` : addition });
                 this.arrangeAll(map);
                 return;
               }
-              current.x = Math.round(position.x);
-              current.y = Math.round(position.y);
+              this.placeDroppedCard(map, current, position);
             })
           );
         } else if (e.metaKey || e.ctrlKey) {

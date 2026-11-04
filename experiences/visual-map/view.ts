@@ -219,6 +219,7 @@ import {
   medianHeight,
   reorderSiblings,
   reorderTopLevel,
+  shiftSibling,
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
@@ -609,6 +610,13 @@ interface MergeTask {
   run?: Promise<void>;
 }
 /** Progress keys for runs that have no card (multi-select synthesis, AI merge); Obsidian file names cannot contain ":". */
+/** Alt+arrow: how far a card trades places with its siblings (Up/Left earlier, Down/Right later). */
+const ARROW_OFFSETS = new Map<string, -1 | 1>([
+  ["ArrowUp", -1],
+  ["ArrowLeft", -1],
+  ["ArrowDown", 1],
+  ["ArrowRight", 1]
+]);
 const TASK_PROGRESS_PREFIX = "vam-task:";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
@@ -3814,9 +3822,10 @@ export class VisualAgentMapView extends ItemView {
    * the array order, which is what those arrangements lay out. A manual move or drag changes a position only, so the array
    * order can differ from this.
    */
-  private onScreenSiblingOrder(map: MapDocument): MapNode[] {
+  private onScreenSiblingOrder(map: MapDocument, onlyParentId?: string): MapNode[] {
     const base = layoutOf(map).direction;
     return alignSiblingsToScreen(map.nodes, (parentId, childId) => {
+      if (onlyParentId !== undefined && parentId !== onlyParentId) return null;
       const direction = layoutDirectionFor(map.nodes, childId, base) as LayoutKind;
       if (direction === "down" || direction === "up") return "x";
       if (direction === "right" || direction === "left") return "y";
@@ -3847,6 +3856,39 @@ export class VisualAgentMapView extends ItemView {
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
     });
     return box.placed;
+  }
+  /**
+   * A card dropped on empty canvas takes the place it was dropped at. The arrangements lay siblings out in array order, so it
+   * takes that place among its siblings there too; otherwise "Auto layout" would put it straight back.
+   */
+  private placeDroppedCard(map: MapDocument, card: MapNode, position: { x: number; y: number }): void {
+    card.x = Math.round(position.x);
+    card.y = Math.round(position.y);
+    if (card.parentId && !map.aim) map.nodes = this.onScreenSiblingOrder(map, card.parentId);
+  }
+  /**
+   * Alt+Up/Down (Left/Right): the card trades places with the sibling before or after it, and the branch is laid out again in
+   * that order. One undo step. Nothing is written when the card is already first or last.
+   */
+  private async shiftSiblingByKey(node: MapNode, offset: -1 | 1): Promise<void> {
+    const map = this.map;
+    if (!map || !node.parentId || map.aim) return;
+    const aligned = this.onScreenSiblingOrder(map);
+    if (shiftSibling(aligned, node.id, offset) === aligned) return;
+    if (!this.mergeUnlocked([node.id, node.parentId])) return;
+    const parentId = node.parentId;
+    this.focusNodeId = node.id;
+    try {
+      await this.mapChange(change => {
+        const next = shiftSibling(this.onScreenSiblingOrder(change), node.id, offset);
+        change.nodes = next;
+        const parent = change.nodes.find(item => item.id === parentId);
+        if (layoutOf(change).direction === "timeline" && parent && !parent.parentId) this.arrangeAll(change);
+        else this.arrangeBranch(change, parentId, new Set(descendants(change.nodes, parentId)), undefined);
+      });
+    } finally {
+      this.focusNodeId = null;
+    }
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   private openTopicMenu(event: MouseEvent): void {
@@ -11129,6 +11171,13 @@ export class VisualAgentMapView extends ItemView {
     });
     card.addEventListener("keydown", event => {
       if (event.target !== card) return;
+      // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
+        event.preventDefault();
+        if (!event.isComposing && !this.selection.state.multiSelectMode && !this.aimLive() && !this.presentation)
+          this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
+        return;
+      }
       const target = this.keyboardNeighbor(node, event.key);
       if (target) {
         event.preventDefault();
@@ -19208,8 +19257,7 @@ export class VisualAgentMapView extends ItemView {
                 this.arrangeAll(map);
                 return;
               }
-              current.x = Math.round(position.x);
-              current.y = Math.round(position.y);
+              this.placeDroppedCard(map, current, position);
             })
           );
         } else if (e.metaKey || e.ctrlKey) {

@@ -11068,7 +11068,8 @@ export class VisualAgentMapView extends ItemView {
     }
     this.enableDrag(card, node);
     // Built during a presentation too: the stylesheet hides them and every handler returns early while presenting, so ending it needs no repaint.
-    if (!this.selection.state.multiSelectMode && !this.aimLive() && !isAimNode(node)) {
+    // Left as it was while AIM is hidden: an AIM card keeps no resize handles (a source-text test pins this condition).
+    if (!this.selection.state.multiSelectMode && !this.map?.aim && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);

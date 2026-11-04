@@ -58264,7 +58264,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -58723,7 +58723,7 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node);
-    if (!this.selection.state.multiSelectMode && !this.aimLive() && !isAimNode(node)) {
+    if (!this.selection.state.multiSelectMode && !((_M = this.map) == null ? void 0 : _M.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);

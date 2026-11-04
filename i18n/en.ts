@@ -226,6 +226,10 @@ export const en = {
   "ui.ai_mode": "AI mode",
   "ui.ai_mode_hint":
     "Quick answers from the model's own knowledge without the web. Use Standard once the structure is settled, or when the topic is new or obscure.",
+  "ui.ai_mode_hint_standard":
+    "Standard searches the web and may add images, so it takes longer. Use it once the structure is settled, or when the topic is new or obscure.",
+  "ui.expand_summary_one_level_0": "1 level · up to {0}",
+  "ui.number_field_at_most_0": "At most {0}; a bigger number is brought back to {0}.",
   "ui.ai_mode_quick_desc": "a short overview from the model's knowledge and your sources, without the web",
   "ui.ai_mode_standard_desc": "a short overview that searches the web and may add images",
   "ui.expand_summary_0_1": "{0} levels · up to {1}",

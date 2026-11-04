@@ -312,6 +312,9 @@ var en = {
   "ui.quick_outline_review_hint": "Uncheck what you don't need and edit names, then create the subtopics.",
   "ui.ai_mode": "AI mode",
   "ui.ai_mode_hint": "Quick answers from the model's own knowledge without the web. Use Standard once the structure is settled, or when the topic is new or obscure.",
+  "ui.ai_mode_hint_standard": "Standard searches the web and may add images, so it takes longer. Use it once the structure is settled, or when the topic is new or obscure.",
+  "ui.expand_summary_one_level_0": "1 level \xB7 up to {0}",
+  "ui.number_field_at_most_0": "At most {0}; a bigger number is brought back to {0}.",
   "ui.ai_mode_quick_desc": "a short overview from the model's knowledge and your sources, without the web",
   "ui.ai_mode_standard_desc": "a short overview that searches the web and may add images",
   "ui.expand_summary_0_1": "{0} levels \xB7 up to {1}",
@@ -2810,6 +2813,9 @@ var zhCN = {
   "ui.quick_outline_review_hint": "\u53D6\u6D88\u4E0D\u9700\u8981\u7684\u9879\u76EE\u3001\u4FEE\u6539\u540D\u79F0\uFF0C\u518D\u521B\u5EFA\u5B50\u8BAE\u9898\u3002",
   "ui.ai_mode": "AI \u6A21\u5F0F",
   "ui.ai_mode_hint": "\u5FEB\u901F\u4E0D\u4E0A\u7F51\uFF0C\u7528\u6A21\u578B\u81EA\u5DF1\u7684\u77E5\u8BC6\u56DE\u7B54\u3002\u67B6\u6784\u7A33\u5B9A\u540E\u3001\u6216\u9898\u76EE\u8F83\u65B0\u8F83\u51B7\u95E8\u65F6\u7528\u6807\u51C6\u3002",
+  "ui.ai_mode_hint_standard": "\u6807\u51C6\u4F1A\u4E0A\u7F51\u641C\u7D22\u3001\u53EF\u80FD\u52A0\u56FE\u7247\uFF0C\u6BD4\u8F83\u4E45\u3002\u67B6\u6784\u7A33\u5B9A\u540E\u3001\u6216\u9898\u76EE\u8F83\u65B0\u8F83\u51B7\u95E8\u65F6\u7528\u3002",
+  "ui.expand_summary_one_level_0": "1 \u5C42\u30FB\u6700\u591A {0} \u4E2A",
+  "ui.number_field_at_most_0": "\u6700\u591A {0}\uFF1B\u586B\u66F4\u5927\u7684\u6570\u5B57\u4F1A\u6539\u56DE {0}\u3002",
   "ui.ai_mode_quick_desc": "\u4F9D\u6A21\u578B\u77E5\u8BC6\u4E0E\u4F60\u63D0\u4F9B\u7684\u6765\u6E90\u505A\u7B80\u77ED\u6982\u89C8\uFF0C\u4E0D\u641C\u7D22\u7F51\u7EDC",
   "ui.ai_mode_standard_desc": "\u641C\u7D22\u7F51\u7EDC\u5E76\u53EF\u914D\u56FE\u7684\u7B80\u77ED\u6982\u89C8",
   "ui.expand_summary_0_1": "{0} \u5C42\u30FB\u6700\u591A {1} \u4E2A",
@@ -5308,6 +5314,9 @@ var zhTW = {
   "ui.quick_outline_review_hint": "\u53D6\u6D88\u4E0D\u9700\u8981\u7684\u9805\u76EE\u3001\u4FEE\u6539\u540D\u7A31\uFF0C\u518D\u5EFA\u7ACB\u5B50\u8B70\u984C\u3002",
   "ui.ai_mode": "AI \u6A21\u5F0F",
   "ui.ai_mode_hint": "\u5FEB\u901F\u4E0D\u4E0A\u7DB2\uFF0C\u7528\u6A21\u578B\u81EA\u5DF1\u7684\u77E5\u8B58\u56DE\u7B54\u3002\u67B6\u69CB\u7A69\u5B9A\u5F8C\u3001\u6216\u984C\u76EE\u8F03\u65B0\u8F03\u51B7\u9580\u6642\u7528\u6A19\u6E96\u3002",
+  "ui.ai_mode_hint_standard": "\u6A19\u6E96\u6703\u4E0A\u7DB2\u641C\u5C0B\u3001\u53EF\u80FD\u52A0\u5716\u7247\uFF0C\u6BD4\u8F03\u4E45\u3002\u67B6\u69CB\u7A69\u5B9A\u5F8C\u3001\u6216\u984C\u76EE\u8F03\u65B0\u8F03\u51B7\u9580\u6642\u7528\u3002",
+  "ui.expand_summary_one_level_0": "1 \u5C64\u30FB\u6700\u591A {0} \u500B",
+  "ui.number_field_at_most_0": "\u6700\u591A {0}\uFF1B\u586B\u66F4\u5927\u7684\u6578\u5B57\u6703\u6539\u56DE {0}\u3002",
   "ui.ai_mode_quick_desc": "\u4F9D\u6A21\u578B\u77E5\u8B58\u8207\u4F60\u63D0\u4F9B\u7684\u4F86\u6E90\u505A\u7C21\u77ED\u6982\u89BD\uFF0C\u4E0D\u641C\u5C0B\u7DB2\u8DEF",
   "ui.ai_mode_standard_desc": "\u641C\u5C0B\u7DB2\u8DEF\u4E26\u53EF\u914D\u5716\u7684\u7C21\u77ED\u6982\u89BD",
   "ui.expand_summary_0_1": "{0} \u5C64\u30FB\u6700\u591A {1} \u500B",
@@ -38027,10 +38036,11 @@ function aiModeField(parent, options = {}) {
   const group = element.createDiv("vam-ai-mode");
   group.setAttr("role", "radiogroup");
   group.setAttr("aria-label", t("ui.ai_mode"));
-  element.createEl("p", { cls: "vam-hint", text: t("ui.ai_mode_hint") });
+  const hint = element.createEl("p", { cls: "vam-hint" });
   const buttons = /* @__PURE__ */ new Map();
   let current = (_a2 = options.initial) != null ? _a2 : DEFAULT_MAP_AI_MODE;
   const paint = () => {
+    hint.setText(t(current === "standard" ? "ui.ai_mode_hint_standard" : "ui.ai_mode_hint"));
     for (const [mode, button] of buttons) {
       button.setAttr("aria-checked", String(mode === current));
       button.tabIndex = mode === current ? 0 : -1;
@@ -40773,15 +40783,30 @@ var NextStepModal = class extends import_obsidian26.Modal {
       const input2 = field.createEl("input", { type: "number", attr: { min: "1", max: String(max), step: "1" } });
       input2.value = String(initial);
       input2.setAttr("aria-label", label);
+      const note = field.createSpan({ cls: "vam-field-note", text: t("ui.number_field_at_most_0", max) });
+      note.setAttr("role", "status");
+      note.hidden = true;
       const read = () => Math.min(max, Math.max(1, Math.round(Number(input2.value)) || 1));
+      input2.addEventListener("focus", () => input2.select());
+      input2.addEventListener("input", () => {
+        note.hidden = !(Math.round(Number(input2.value)) > max);
+      });
       input2.addEventListener("change", () => {
+        if (Math.round(Number(input2.value)) <= max) note.hidden = true;
         input2.value = String(read());
         refreshSummary();
       });
-      return read;
+      return {
+        read,
+        set: (value) => {
+          input2.value = String(Math.min(max, Math.max(1, value)));
+        }
+      };
     };
-    const quickLevels = numberField(t("ui.number_of_levels"), 2, QUICK_OUTLINE_MAX_LEVELS);
-    const quickTopics = numberField(t("ui.quick_outline_max_topics"), 15, QUICK_OUTLINE_MAX_TOPICS);
+    const quickLevelsField = numberField(t("ui.number_of_levels"), 2, QUICK_OUTLINE_MAX_LEVELS);
+    const quickTopicsField = numberField(t("ui.quick_outline_max_topics"), 15, QUICK_OUTLINE_MAX_TOPICS);
+    const quickLevels = quickLevelsField.read;
+    const quickTopics = quickTopicsField.read;
     limits.createEl("p", { text: t("ui.quick_outline_hint"), cls: "vam-hint" });
     const presetLabel = adjustFor.expand.createEl("label", { cls: "vam-field" });
     presetLabel.createSpan({ text: t("ui.outline_ai_preset") });
@@ -40902,6 +40927,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
           (_d2 = (_c2 = this.background) == null ? void 0 : _c2.outlineReady) == null ? void 0 : _d2.call(_c2, {
             nodes,
             dropped,
+            bounds,
             options: { ...options, signal: void 0, onProgress: void 0 }
           });
           return;
@@ -41142,7 +41168,10 @@ var NextStepModal = class extends import_obsidian26.Modal {
       const parts = [];
       if (currentMode === "research") parts.push(modeName());
       else if (currentMode === "expand") {
-        parts.push(t("ui.expand_summary_0_1", quickLevels(), quickTopics()));
+        const levels = quickLevels();
+        parts.push(
+          levels === 1 ? t("ui.expand_summary_one_level_0", quickTopics()) : t("ui.expand_summary_0_1", levels, quickTopics())
+        );
         if (shallow.checked) parts.push(modeName());
       } else
         parts.push(
@@ -41167,6 +41196,10 @@ var NextStepModal = class extends import_obsidian26.Modal {
     const waitingOutline = (_v = this.modelSettings) == null ? void 0 : _v.pendingOutline;
     if (waitingOutline && quickOutline) {
       shallow.checked = !!waitingOutline.options.shallowResearch;
+      if (waitingOutline.bounds) {
+        quickLevelsField.set(waitingOutline.bounds.levels);
+        quickTopicsField.set(waitingOutline.bounds.maxTopics);
+      }
       if (waitingOutline.options.mapAiMode) aiMode.set(waitingOutline.options.mapAiMode);
       shallowHint.hidden = !shallow.checked;
       shallowHint.setText(shallowHintText());
@@ -60114,6 +60147,7 @@ ${request.requirements}` : preset.text,
             return {
               nodes: waiting.nodes,
               dropped: waiting.dropped,
+              bounds: waiting.bounds,
               options: waiting.options,
               discard: () => {
                 if (this.quickOutlines.get(node.path) === waiting) this.quickOutlines.delete(node.path);

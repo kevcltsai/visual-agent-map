@@ -113,6 +113,8 @@ export interface PendingOutline {
   nodes: OutlineNode[];
   /** Headings the AI wrote beyond the chosen levels or size; they were left out. */
   dropped: number;
+  /** The levels and size the outline was generated with: the reopened dialog shows them again. */
+  bounds?: { levels: number; maxTopics: number };
   options: TaskOptions;
   /** Called once the reviewed outline was created: drops the waiting result. */
   discard: () => void;
@@ -1193,21 +1195,42 @@ export class NextStepModal extends Modal {
     expandPanel.createEl("p", { text: t("ui.quick_outline_mode_hint") });
     const limits = expandPanel.createDiv("vam-quick-limits");
     // How deep and how big the tree may grow: told to the AI, then enforced on its reply before the review.
-    const numberField = (label: string, initial: number, max: number): (() => number) => {
+    const numberField = (
+      label: string,
+      initial: number,
+      max: number
+    ): { read: () => number; set: (value: number) => void } => {
       const field = limits.createEl("label", { cls: "vam-field" });
       field.createSpan({ text: label });
       const input = field.createEl("input", { type: "number", attr: { min: "1", max: String(max), step: "1" } });
       input.value = String(initial);
       input.setAttr("aria-label", label);
+      // Told, never silently clamped: an over-limit entry keeps this note after it is brought back to the limit.
+      const note = field.createSpan({ cls: "vam-field-note", text: t("ui.number_field_at_most_0", max) });
+      note.setAttr("role", "status");
+      note.hidden = true;
       const read = (): number => Math.min(max, Math.max(1, Math.round(Number(input.value)) || 1));
+      // Focus selects the old value, so the next keystroke replaces it instead of landing after it ("2" + "1" = 21).
+      input.addEventListener("focus", () => input.select());
+      input.addEventListener("input", () => {
+        note.hidden = !(Math.round(Number(input.value)) > max);
+      });
       input.addEventListener("change", () => {
+        if (Math.round(Number(input.value)) <= max) note.hidden = true;
         input.value = String(read());
         refreshSummary();
       });
-      return read;
+      return {
+        read,
+        set: value => {
+          input.value = String(Math.min(max, Math.max(1, value)));
+        }
+      };
     };
-    const quickLevels = numberField(t("ui.number_of_levels"), 2, QUICK_OUTLINE_MAX_LEVELS);
-    const quickTopics = numberField(t("ui.quick_outline_max_topics"), 15, QUICK_OUTLINE_MAX_TOPICS);
+    const quickLevelsField = numberField(t("ui.number_of_levels"), 2, QUICK_OUTLINE_MAX_LEVELS);
+    const quickTopicsField = numberField(t("ui.quick_outline_max_topics"), 15, QUICK_OUTLINE_MAX_TOPICS);
+    const quickLevels = quickLevelsField.read;
+    const quickTopics = quickTopicsField.read;
     limits.createEl("p", { text: t("ui.quick_outline_hint"), cls: "vam-hint" });
     // The outline preset stays under Adjust.
     const presetLabel = adjustFor.expand.createEl("label", { cls: "vam-field" });
@@ -1332,6 +1355,7 @@ export class NextStepModal extends Modal {
           this.background?.outlineReady?.({
             nodes,
             dropped,
+            bounds,
             options: { ...options, signal: undefined, onProgress: undefined }
           });
           return;
@@ -1581,7 +1605,12 @@ export class NextStepModal extends Modal {
       const parts: string[] = [];
       if (currentMode === "research") parts.push(modeName());
       else if (currentMode === "expand") {
-        parts.push(t("ui.expand_summary_0_1", quickLevels(), quickTopics()));
+        const levels = quickLevels();
+        parts.push(
+          levels === 1
+            ? t("ui.expand_summary_one_level_0", quickTopics())
+            : t("ui.expand_summary_0_1", levels, quickTopics())
+        );
         if (shallow.checked) parts.push(modeName());
       } else
         parts.push(
@@ -1610,6 +1639,11 @@ export class NextStepModal extends Modal {
     if (waitingOutline && quickOutline) {
       // Reopened from the card badge or the Notice: straight into the review of the outline generated in the background.
       shallow.checked = !!waitingOutline.options.shallowResearch;
+      // The review shows the levels and size the outline was generated with, not the defaults.
+      if (waitingOutline.bounds) {
+        quickLevelsField.set(waitingOutline.bounds.levels);
+        quickTopicsField.set(waitingOutline.bounds.maxTopics);
+      }
       // The review shows the switch the outline was generated with.
       if (waitingOutline.options.mapAiMode) aiMode.set(waitingOutline.options.mapAiMode);
       shallowHint.hidden = !shallow.checked;

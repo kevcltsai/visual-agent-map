@@ -532,6 +532,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-outline-research-options.is-hidden { display: none; }
 .vam-field.vam-next-toggle input[type="radio"] { width: 18px; min-width: 18px; height: 18px; flex: 0 0 18px; margin: 0; }
 .vam-quick-limits input { width: 100%; max-width: 160px; }
+.vam-quick-limits .vam-field-note { font-size: var(--font-ui-smaller); color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
+.vam-quick-limits .vam-field-note[hidden] { display: none; }
 .vam-quick-limits > .vam-hint { grid-column: 1 / -1; margin: 0; }
 .vam-quick-limits > .vam-hint.is-error { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-next-choice button { margin-top: 12px; }

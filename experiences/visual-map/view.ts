@@ -981,7 +981,13 @@ export class VisualAgentMapView extends ItemView {
   /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
   private quickOutlines = new Map<
     string,
-    { mapPath: string; nodes: OutlineNode[]; dropped: number; options: TaskOptions }
+    {
+      mapPath: string;
+      nodes: OutlineNode[];
+      dropped: number;
+      bounds?: { levels: number; maxTopics: number };
+      options: TaskOptions;
+    }
   >();
   /** The AI structure review that hid its window. The view owns it: Stop, the result and the highlights. */
   private structureReviewTask: {
@@ -12188,6 +12194,7 @@ export class VisualAgentMapView extends ItemView {
             return {
               nodes: waiting.nodes,
               dropped: waiting.dropped,
+              bounds: waiting.bounds,
               options: waiting.options,
               discard: () => {
                 if (this.quickOutlines.get(node.path) === waiting) this.quickOutlines.delete(node.path);

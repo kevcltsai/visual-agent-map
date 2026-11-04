@@ -250,3 +250,61 @@ test('i18n: the locked notice and the toggle names exist in every language', () 
   assert.match(read('i18n/zh-TW.ts'), /"ui\.ai_locked_notice": "議題已鎖定，AI 不會修改"/);
   assert.match(t('ui.ai_locked_notice'), LOCKED_NOTICE);
 });
+
+// ---- ticket 03: bulk lock from the selection bar ---------------------------------------------------------------------
+const selectionButton = (h) => {
+  const bar = dom.element('div');
+  h.view.renderAiLockSelectionButton(bar);
+  return dom.findAll(bar, i => i.tag === 'button')[0];
+};
+
+test('03 bulk: the selection bar locks every selected topic in one undo step, then unlocks them in one', async () => {
+  const h = await harness(['A', 'B', 'C']);
+  const [a, b, c] = h.nodes;
+  h.view.selection.replaceMulti([a.id, b.id, c.id]);
+  let pending;
+  h.view.enqueue = fn => { pending = fn(); };
+  const button = selectionButton(h);
+  assert.equal(button.attrs['aria-pressed'], 'false');
+  button.click(); await pending;
+  for (const node of h.nodes) assert.equal((await h.repo.readNote(node.path)).aiLocked, true);
+  await h.view.history.undo().undo();
+  for (const node of h.nodes) assert.equal((await h.repo.readNote(node.path)).aiLocked, undefined, 'one undo unlocks all three');
+  assert.equal(h.view.history.canUndo, false);
+  await h.view.history.redo().redo();
+  await h.view.hydrate();
+  const again = selectionButton(h);
+  assert.equal(again.attrs['aria-pressed'], 'true', 'all locked: pressed');
+  assert.match(again.text, /解除|Unlock/);
+  again.click(); await pending;
+  for (const node of h.nodes) assert.equal((await h.repo.readNote(node.path)).aiLocked, undefined);
+  void c;
+});
+
+test('03 bulk: a mixed selection says how many are locked and the click locks the rest', async () => {
+  const h = await harness(['A', 'B', 'C']);
+  const [a, b, c] = h.nodes;
+  await h.view.setAiLock([a], true);
+  h.view.selection.replaceMulti([a.id, b.id, c.id]);
+  let pending;
+  h.view.enqueue = fn => { pending = fn(); };
+  const button = selectionButton(h);
+  assert.equal(button.attrs['aria-pressed'], 'mixed');
+  assert.match(button.attrs.title, /1.*3/, 'the title names 1 of 3');
+  assert.match(button.attrs['aria-label'], /1.*3/);
+  const before = h.raw(a);
+  button.click(); await pending;
+  for (const node of [a, b, c]) assert.equal((await h.repo.readNote(node.path)).aiLocked, true);
+  assert.equal(h.raw(a), before, 'the already locked note is not rewritten');
+  await h.view.history.undo().undo();
+  assert.equal((await h.repo.readNote(a.path)).aiLocked, true, 'undo leaves the topic that was locked before');
+  assert.equal((await h.repo.readNote(b.path)).aiLocked, undefined);
+});
+
+test('03 bulk: no selection disables it; AIM maps get no button; the bar wires it in', async () => {
+  const h = await harness(['A']);
+  assert.equal(selectionButton(h).disabled, true);
+  h.view.map.aim = { version: 1, branches: [] };
+  assert.equal(selectionButton(h), undefined);
+  assert.match(read('experiences/visual-map/view.ts'), /this\.renderAiLockSelectionButton\(selection\);/);
+});

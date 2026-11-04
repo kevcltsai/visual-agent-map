@@ -1090,6 +1090,8 @@ var en = {
   "ui.ai_unlock_card": "Unlock: let AI change this topic",
   "ui.ai_locked_state": "Locked from AI",
   "ui.ai_locked_skipped_0": "{0} locked topics skipped",
+  "ui.ai_unlock_selected": "Unlock for AI",
+  "ui.ai_locked_some_0_1": "{0} of {1} locked",
   "ui.model_and_advanced_settings": "Model and advanced settings",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
@@ -3547,6 +3549,8 @@ var zhCN = {
   "ui.ai_unlock_card": "\u89E3\u9664\u9501\u5B9A\uFF1A\u5141\u8BB8 AI \u4FEE\u6539\u6B64\u8BAE\u9898",
   "ui.ai_locked_state": "\u5DF2\u9501\u5B9A AI",
   "ui.ai_locked_skipped_0": "\u5DF2\u8DF3\u8FC7 {0} \u4E2A\u9501\u5B9A\u7684\u8BAE\u9898",
+  "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9501\u5B9A",
+  "ui.ai_locked_some_0_1": "{1} \u4E2A\u4E2D\u6709 {0} \u4E2A\u5DF2\u9501\u5B9A",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u4E0E\u9AD8\u7EA7\u8BBE\u7F6E",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
@@ -6004,6 +6008,8 @@ var zhTW = {
   "ui.ai_unlock_card": "\u89E3\u9664\u9396\u5B9A\uFF1A\u5141\u8A31 AI \u4FEE\u6539\u6B64\u8B70\u984C",
   "ui.ai_locked_state": "\u5DF2\u9396\u5B9A AI",
   "ui.ai_locked_skipped_0": "\u5DF2\u7565\u904E {0} \u500B\u9396\u5B9A\u7684\u8B70\u984C",
+  "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9396\u5B9A",
+  "ui.ai_locked_some_0_1": "{1} \u500B\u4E2D\u6709 {0} \u500B\u5DF2\u9396\u5B9A",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u8207\u9032\u968E\u8A2D\u5B9A",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
@@ -59632,6 +59638,35 @@ ${request.requirements}` : preset.text,
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
+  /**
+   * The selection bar's AI lock: one button whose `aria-pressed` is true when every selected topic is locked, false when
+   * none is and "mixed" otherwise (the title and name say how many). A click unlocks all when all are locked and locks
+   * the rest otherwise, in one undo step. Not on AIM maps.
+   */
+  renderAiLockSelectionButton(selection) {
+    if (!this.map || this.map.aim) return;
+    const nodes = [...this.selection.state.multiSelected].map((id) => {
+      var _a2;
+      return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === id);
+    }).filter((node) => !!node && !node.aimKind && !!this.notes.get(node.id));
+    const locked = nodes.filter((node) => {
+      var _a2;
+      return ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
+    }).length;
+    const all = nodes.length > 0 && locked === nodes.length;
+    const button = this.button(
+      selection,
+      t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"),
+      () => this.enqueue(() => this.setAiLock(nodes, !all)),
+      !nodes.length
+    );
+    button.setAttr("aria-pressed", all ? "true" : locked ? "mixed" : "false");
+    if (locked && !all) {
+      const state = t("ui.ai_locked_some_0_1", locked, nodes.length);
+      button.setAttr("title", state);
+      button.setAttr("aria-label", `${t("ui.ai_lock_toggle")} (${state})`);
+    }
+  }
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
   renderAiLockSection(panel, node) {
     var _a2;
@@ -60769,6 +60804,7 @@ ${request.requirements}` : preset.text,
         bracket.setAttr("title", t(check.reason));
       }
     }
+    this.renderAiLockSelectionButton(selection);
     this.button(
       selection,
       t("ui.move_to"),

@@ -1,4 +1,4 @@
-import { translate, uiLocale } from "../i18n";
+import { translate, uiLocale, type ContentLanguage } from "../i18n";
 import type { AiCalls } from "./ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "./provider-step-runner";
 import { prepareStep, type PreparedStep, type StepDefinition } from "./step-runner";
@@ -34,6 +34,22 @@ import {
   type RelevanceGradeResult,
   type RelevanceHierarchyFailure
 } from "./steps/relevance-grade/step";
+
+/**
+ * The words after "Grading failed." on the status bar. Messages the grading steps wrote for the learner pass through;
+ * anything else (a provider refusal, a stack of JSON, schema text) becomes one plain sentence, since the raw text
+ * helps nobody. The raw text still reaches the log through the exchange log.
+ */
+export function relevanceFailureDetail(error: unknown, language: ContentLanguage): string {
+  if (error instanceof RelevanceGradeError || (error as { name?: unknown } | null)?.name === "RelevanceGradeError")
+    return (error as Error).message;
+  const message = (error as { message?: unknown } | null)?.message;
+  const text = (typeof message === "string" ? message : "").trim();
+  const technical = /[{}[\]]|schema|json|required|properties|invalid_request|\$\.|\bat \S+:\d+/i.test(text);
+  if (!text || technical || text.length > 140)
+    return translate(uiLocale(language), "error.relevance_grade_unavailable");
+  return text;
+}
 
 export {
   gradableNodes,

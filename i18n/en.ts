@@ -2506,6 +2506,8 @@ export const en = {
   "error.relevance_grade_over_budget": "The map is too large to grade at once. Nothing was changed.",
   "error.relevance_grade_stopped": "Grading stopped.",
   "error.relevance_grade_invalid": "The AI grading could not be used: {0}",
+  "error.relevance_grade_unavailable":
+    "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
   "error.relevance_grade_hierarchy":
     "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
   // Share viewer (shipped inside the exported HTML file)

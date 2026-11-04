@@ -1229,7 +1229,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_skip_topic_not_seen": "AI 没有看到这个议题的完整笔记",
   "ui.map_chat_skip_topic_changed": "发送后议题又被修改过",
   "ui.map_chat_not_undoable":
-    "撤销会倒回这则回复的变更，但不会倒回它启动的 AI 工作（研究、展开、整合、分级、合并、找图）：它们完成时各自有可撤销记录。",
+    "撤销会倒回这则回复的变更，但不会倒回它启动的 AI 工作（研究、展开、整合、分级、合并、找图），那些工作完成时各自有可撤销记录。一旦 AI 工作写入这些卡片，这则回复就无法再撤销。",
   "ui.map_chat_undo_label": "AI 对话回复",
   "ui.map_chat_undo_files_changed": "文件已变更，无法撤销",
   "ui.map_chat_guard_exists": "那里已经有文件",
@@ -1351,7 +1351,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_canvas_consent": "等待你确认使用额度。同意后才会开始建立地图。",
   "ui.map_chat_canvas_plan": "确认计划后，地图会出现在这里",
   "ui.map_chat_plan_replace_hint": "发送新消息会取消这份计划",
-  "ui.map_chat_plan_irreversible": "撤销会倒回变更，但不会倒回这份计划启动的 AI 工作",
+  "ui.map_chat_plan_irreversible":
+    "撤销会倒回变更，但不会倒回这份计划启动的 AI 工作；一旦 AI 工作写入这些卡片，这则回复就无法再撤销",
   "ui.map_chat_plan_mark_delete": "会移除",
   "ui.map_chat_plan_title_applied": "已应用的计划",
   "ui.map_chat_plan_title_cancelled": "已取消的计划",

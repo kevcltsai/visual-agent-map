@@ -253,10 +253,14 @@ test('i18n: the locked notice and the toggle names exist in every language', () 
 });
 
 // ---- ticket 03: bulk lock from the selection bar ---------------------------------------------------------------------
+// The lock lives in the selection bar's More menu now: open it and take the lock entry (title, disabled, click) as a button-like object.
 const selectionButton = (h) => {
-  const bar = dom.element('div');
-  h.view.renderAiLockSelectionButton(bar);
-  return dom.findAll(bar, i => i.tag === 'button')[0];
+  const entries = [];
+  h.view.newMenu = () => { const m = { addItem(build) { const it = { attrs: {} }; const chain = { setTitle(t) { it.text = t; it.attrs.title = t; it.attrs['aria-label'] = t; return chain; }, setIcon() { return chain; }, setDisabled(v) { it.disabled = !!v; return chain; }, onClick(fn) { it.click = () => fn(); return chain; } }; build(chain); entries.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+  h.view.openSelectionMoreMenu({}, h.view.selection.state.multiSelected.size);
+  const entry = entries.find(i => /lock|鎖|解除/i.test(i.text));
+  if (entry) entry.attrs['aria-pressed'] = /解除|Unlock/.test(entry.text) ? 'true' : / \(/.test(entry.text) ? 'mixed' : 'false';
+  return entry;
 };
 
 test('03 bulk: the selection bar locks every selected topic in one undo step, then unlocks them in one', async () => {
@@ -307,7 +311,7 @@ test('03 bulk: no selection disables it; AIM maps get no button; the bar wires i
   assert.equal(selectionButton(h).disabled, true);
   h.view.map.aim = { version: 1, branches: [] };
   assert.equal(selectionButton(h), undefined);
-  assert.match(read('experiences/visual-map/view.ts'), /this\.renderAiLockSelectionButton\(selection\);/);
+  assert.match(read('experiences/visual-map/view.ts'), /openSelectionMoreMenu\(event: MouseEvent, count: number\)[\s\S]*?ui\.ai_lock_toggle/, 'the bar\'s More menu wires it in');
 });
 
 // ---- ticket 04: integrate, charts, integrate selection -------------------------------------------------------------

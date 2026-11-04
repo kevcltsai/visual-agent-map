@@ -73101,6 +73101,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
 .vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
 .vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; transform-origin: left bottom; }
+.vam-node > .vam-node-tools { --vam-tools-inset: 0px; --vam-tools-gap: 4px; }
 .vam-node > .vam-node-tools.is-below { bottom: auto; top: calc(100% - 6px - var(--vam-tools-inset, 0px)); transform-origin: right top; transform: translateY(-4px); }
 .vam-node > .vam-node-tools.is-below.is-align-left { transform-origin: left top; }
 .vam-node > .vam-node-tools:not(.is-below):not(.is-side-left):not(.is-side-right) { bottom: calc(100% - 6px - var(--vam-tools-inset, 0px)); }

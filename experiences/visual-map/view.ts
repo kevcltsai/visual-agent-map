@@ -216,6 +216,7 @@ import {
   layoutDirectionFor,
   layoutOf,
   medianHeight,
+  reorderSiblings,
   reorderTopLevel,
   type LayoutKind,
   type LayoutSpacing
@@ -3705,6 +3706,29 @@ export class VisualAgentMapView extends ItemView {
       map.nodes.find(item => item.id === parent.id)!.collapsed = false;
       this.arrangeBranch(map, parent.id, new Set([node.id, ...descendants(map.nodes, node.id)]), undefined);
     });
+  }
+  /**
+   * move_topic with `beforeId`: the card goes under `parent` (or stays there) right in front of `before`, in one undoable Map.md
+   * change. The children of `parent` change places in the map's order, which every arrangement follows; then the branch is
+   * laid out again in that order. A first-level topic of a timeline map is laid out as a dragged one is: the whole map again.
+   * False (nothing written) when `before` is no longer a child of `parent` on the map being edited.
+   */
+  private async chatMoveBefore(node: MapNode, parent: MapNode, before: MapNode): Promise<boolean> {
+    if (!this.mergeUnlocked([node.id, parent.id])) return false;
+    const box = { placed: false };
+    await this.mapChange(map => {
+      const moving = map.nodes.find(item => item.id === node.id);
+      const target = map.nodes.find(item => item.id === parent.id);
+      const next = map.nodes.find(item => item.id === before.id);
+      if (!moving || !target || next?.parentId !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
+      moving.parentId = parent.id;
+      target.collapsed = false;
+      map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
+      box.placed = true;
+      if (!map.aim && layoutOf(map).direction === "timeline" && !target.parentId) this.arrangeAll(map);
+      else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
+    });
+    return box.placed;
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   private openTopicMenu(event: MouseEvent): void {
@@ -16467,7 +16491,9 @@ export class VisualAgentMapView extends ItemView {
       case "edit_topic_note":
         return t("ui.map_chat_do_note_0", title(action.nodeId));
       case "move_topic":
-        return t("ui.map_chat_do_move_0_1", title(action.nodeId), title(action.newParentId));
+        return action.beforeId
+          ? t("ui.map_chat_do_move_before_0_1", title(action.nodeId), title(action.beforeId))
+          : t("ui.map_chat_do_move_0_1", title(action.nodeId), title(action.newParentId));
       case "delete_topic":
         return t("ui.map_chat_do_delete_0", title(action.nodeId));
       case "edit_md_file":
@@ -17180,7 +17206,14 @@ export class VisualAgentMapView extends ItemView {
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
         if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
-        await this.moveTopic(node, parent);
+        if (action.beforeId) {
+          const beforeId = real(action.beforeId);
+          if (beforeId === null) return skipped("ui.map_chat_skip_parent_missing");
+          const before = nodeOf(beforeId);
+          if (!before) return gone;
+          if (before.id === node.id || before.parentId !== parent.id) return skipped("ui.map_chat_skip_not_sibling");
+          if (!(await this.chatMoveBefore(node, parent, before))) return skipped("ui.map_chat_skip_not_sibling");
+        } else await this.moveTopic(node, parent);
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }

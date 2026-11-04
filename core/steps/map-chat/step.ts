@@ -79,7 +79,11 @@ export type MapChatAction =
   | { kind: "rename_topic"; nodeId: string; title: string }
   | { kind: "update_summary"; nodeId: string; summary: string }
   | { kind: "edit_topic_note"; nodeId: string; detail: string }
-  | { kind: "move_topic"; nodeId: string; newParentId: string }
+  /**
+   * `beforeId` (absent = none) puts the card in front of that child of `newParentId`, which also reorders cards that keep their
+   * parent; without it the card goes under `newParentId` as before.
+   */
+  | { kind: "move_topic"; nodeId: string; newParentId: string; beforeId?: string }
   | { kind: "delete_topic"; nodeId: string; branch: boolean }
   | { kind: "edit_md_file"; path: string; find: string; replace: string }
   | { kind: "create_md_file"; path: string; content: string }
@@ -152,7 +156,9 @@ export type MapChatRejectCode =
   /** A relation the map does not allow (a self link, a second link on a pair, a derivation or prerequisite cycle). */
   | "relation_not_allowed"
   /** A remove_relation for two cards that hold no relation. */
-  | "unknown_relation";
+  | "unknown_relation"
+  /** A move_topic whose `beforeId` is not a child of the target parent (at that point of the reply). */
+  | "not_sibling";
 export interface MapChatRejection {
   index: number;
   code: MapChatRejectCode;
@@ -200,6 +206,7 @@ export const MAP_CHAT_SCHEMA = {
           ref: STRING,
           parentId: STRING,
           newParentId: STRING,
+          beforeId: STRING,
           title: STRING,
           summary: STRING,
           detail: STRING,
@@ -229,6 +236,7 @@ export const MAP_CHAT_SCHEMA = {
           "ref",
           "parentId",
           "newParentId",
+          "beforeId",
           "title",
           "summary",
           "detail",
@@ -299,7 +307,8 @@ export function parseMapChat(
   if (typeof body.reply !== "string") throw invalid("reply");
   if (!Array.isArray(body.actions)) throw invalid("actions");
   const known = new Set(context.nodeIds);
-  // Parent links of the supplied cards, plus those of the cards this reply creates (for the cycle check).
+  // Parent links of the supplied cards, plus those of the cards this reply creates, as each kept move leaves them (for the
+  // cycle check and the `beforeId` of a move).
   const parents: Record<string, string | null | undefined> = { ...context.parents };
   const refs = new Set<string>();
   // The map's relations as the reply goes: an add or a remove changes it for the items after it (reversing = remove, then add).
@@ -416,7 +425,12 @@ export function parseMapChat(
           const nodeId = node("nodeId"),
             newParentId = node("newParentId", true);
           if (underOrSame(newParentId, nodeId)) throw new Dropped("cycle");
-          actions.push({ kind: "move_topic", nodeId, newParentId });
+          const given = text("beforeId", false);
+          const beforeId = given ? resolve(given, true) : "";
+          // The card to go before must already sit under the target parent (as the earlier items of this reply left it).
+          if (beforeId && (beforeId === nodeId || parents[beforeId] !== newParentId)) throw new Dropped("not_sibling");
+          actions.push({ kind: "move_topic", nodeId, newParentId, ...(beforeId ? { beforeId } : {}) });
+          parents[nodeId] = newParentId;
           break;
         }
         case "delete_topic":
@@ -554,7 +568,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 11,
+  version: 12,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

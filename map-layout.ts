@@ -611,6 +611,31 @@ export function arrangeNewTree(
 }
 
 /**
+ * Puts `movedId` in front of `beforeId` among the children of `parentId` (both must already be children of it). Only those
+ * children change places with each other in the array, which is the order every arrangement lays them out in; every other
+ * card keeps its index. An unknown id, a card that is not a child of `parentId` or `movedId === beforeId` returns `nodes` itself.
+ */
+export function reorderSiblings<T extends { id: string; parentId?: string | null }>(
+  nodes: T[],
+  parentId: string,
+  movedId: string,
+  beforeId: string
+): T[] {
+  if (movedId === beforeId) return nodes;
+  const slots = nodes.flatMap((node, index) => (node.parentId === parentId ? [index] : []));
+  const kids = slots.map(index => nodes[index]);
+  const moved = kids.find(node => node.id === movedId);
+  if (!moved || !kids.some(node => node.id === beforeId)) return nodes;
+  const others = kids.filter(node => node !== moved);
+  const at = others.findIndex(node => node.id === beforeId);
+  const order = [...others.slice(0, at), moved, ...others.slice(at)];
+  const result = nodes.slice();
+  slots.forEach((index, place) => {
+    result[index] = order[place];
+  });
+  return result;
+}
+/**
  * Moves a first-level topic of `rootId` to the place `dropX` (the canvas x of the dragged card's centre) points at: it goes
  * in front of the first other topic whose centre is right of `dropX`, or last when there is none. Only the topics change
  * places with each other in the array; every other card keeps its index. An unknown id, a card that is not a first-level

@@ -441,6 +441,11 @@ export class TopicRuns {
     try {
       const repo = this.ports.repository()!;
       const note = await repo.readNote(path, options.map);
+      // AI lock: no subtopics are proposed for a locked topic (no AI call).
+      if (note.aiLocked) {
+        fail(t("ui.ai_locked_notice"), false);
+        return;
+      }
       const used = options.runOnce?.model.trim()
         ? await this.ports.resolveModel(path, options.map, options.runOnce)
         : { model: note.model, reasoning: note.reasoning };
@@ -463,6 +468,11 @@ export class TopicRuns {
       }
       const latest = await repo.readNote(path, options.map);
       if (controller.signal.aborted) throw aborted();
+      // The late-result fence: suggestions for a topic locked meanwhile are not kept.
+      if (latest.aiLocked) {
+        fail(t("ui.ai_locked_notice"), false);
+        return;
+      }
       if (latest.thinkingOrigin !== note.thinkingOrigin)
         throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
       const pendingItems = suggestions.map(item => ({

@@ -1021,6 +1021,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.ai_unlock_card": "解除鎖定：允許 AI 修改此議題",
   "ui.ai_locked_state": "已鎖定 AI",
   "ui.ai_locked_skipped_0": "已略過 {0} 個鎖定的議題",
+  "ui.ai_locked_outline_skipped_0": "議題已鎖定，AI 不會修改。{0} 個大綱議題未加入。",
+  "ui.ai_locked_suggestions_skipped_0": "{0} 則建議涉及鎖定的議題，已略過",
   "ui.ai_unlock_selected": "解除 AI 鎖定",
   "ui.ai_locked_some_0_1": "{1} 個中有 {0} 個已鎖定",
   "ui.model_and_advanced_settings": "模型與進階設定",

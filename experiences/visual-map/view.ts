@@ -2623,6 +2623,7 @@ export class VisualAgentMapView extends ItemView {
       presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name }) => ({ id, name })),
       generate: async (request, signal): Promise<OutlineNode[]> => {
         const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+        if (note.aiLocked) throw new Error(t("ui.ai_locked_notice"));
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
@@ -2643,6 +2644,7 @@ export class VisualAgentMapView extends ItemView {
           nodes,
           placement: { kind: "under", parentId: node.id },
           source: null,
+          aiGenerated: true,
           shallowResearch: !!options.shallowResearch,
           researchEveryTopic: true,
           // The research of the new topics is the short overview in the dialog's AI mode (Quick when it has none).
@@ -2776,10 +2778,13 @@ export class VisualAgentMapView extends ItemView {
             );
             // Stopped, replaced or the view closed meanwhile: the late result is dropped.
             if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
+            // AI lock: suggestions that touch a locked topic are dropped, and the count is reported.
+            const { kept, skipped: lockedCount } = this.dropAiLockedSuggestions(review);
+            if (lockedCount) new Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
             own.state = "done";
-            own.result = review;
-            backgroundResultNotice(t("ui.structure_review_ready_0", review.suggestions.length), {
-              label: t("ui.structure_review_view_0", review.suggestions.length),
+            own.result = kept;
+            backgroundResultNotice(t("ui.structure_review_ready_0", kept.suggestions.length), {
+              label: t("ui.structure_review_view_0", kept.suggestions.length),
               open: () => this.reopenStructureReview(own)
             });
           } catch (error) {
@@ -3380,6 +3385,11 @@ export class VisualAgentMapView extends ItemView {
           outcome.skipped++;
           continue;
         }
+        if (note.aiLocked) {
+          // AI lock: a locked card keeps its tier, like a hand-set one, and is counted as skipped.
+          outcome.skipped++;
+          continue;
+        }
         if (note.relevance?.manual) {
           // A hand-set (pinned) card is never written by the AI, whatever the AI said.
           pinned.add(base.id);
@@ -3661,6 +3671,7 @@ export class VisualAgentMapView extends ItemView {
         new Notice(t("ui.merge_locked"));
         throw new Error(t("ui.merge_locked"));
       }
+      if (this.structureLockReason(suggestion)) throw new Error(t("ui.ai_locked_notice"));
     };
     const nodeOf = (id: string): MapNode => {
       const node = this.map?.nodes.find(item => item.id === id);
@@ -3675,6 +3686,8 @@ export class VisualAgentMapView extends ItemView {
     const write = (work: () => Promise<void>): Promise<void> =>
       this.plugin.mutate(async () => {
         guard();
+        // AI lock, at write time: the notes are read again, so a lock set after the review still counts.
+        if (this.structureLockReason(suggestion, await this.freshNotes())) throw new Error(t("ui.ai_locked_notice"));
         await work();
       });
     if (suggestion.kind === "strengthen")
@@ -3708,6 +3721,27 @@ export class VisualAgentMapView extends ItemView {
         () => resolve(false)
       ).open();
     });
+  }
+  /** Why a structure suggestion may not be applied (AI lock), or null: what it adds, moves or removes, and where. */
+  private structureLockReason(suggestion: StructureSuggestion, fresh?: ReadonlyMap<string, Note>): AiLockReason | null {
+    switch (suggestion.kind) {
+      case "strengthen":
+        return this.aiLockReason("addChild", [suggestion.targetId], fresh);
+      case "move":
+        return this.aiLockReason("move", [suggestion.targetId], fresh, { to: suggestion.newParentId ?? null });
+      case "reduce":
+        return this.aiLockReason("remove", [suggestion.targetId], fresh);
+      default:
+        return (
+          this.aiLockReason("remove", [suggestion.targetId], fresh) ??
+          (suggestion.mergeIntoId ? this.aiLockReason("addChild", [suggestion.mergeIntoId], fresh) : null)
+        );
+    }
+  }
+  /** The review without the suggestions that touch a locked topic, and how many were dropped. */
+  private dropAiLockedSuggestions(result: StructureReviewResult): { kept: StructureReviewResult; skipped: number } {
+    const suggestions = result.suggestions.filter(suggestion => !this.structureLockReason(suggestion));
+    return { kept: { ...result, suggestions }, skipped: result.suggestions.length - suggestions.length };
   }
   /** Moves one topic and its branch under a new parent, in one undo step. */
   private async moveTopic(node: MapNode, parent: MapNode): Promise<void> {
@@ -4119,6 +4153,17 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         const { map, path, parent } = current;
+        // AI lock: an outline from the AI may not add children under a locked topic; a user outline is the user's edit.
+        if (
+          request.aiGenerated &&
+          parent &&
+          this.aiLockReason("addChild", [parent.id], new Map([[parent.id, await repo.readNote(parent.path, map)]]))
+        ) {
+          const skippedCount = request.nodes.length;
+          new Notice(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          state.rejection = new Error(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          return;
+        }
         // A model chosen for the shallow research becomes the new topics' model; otherwise they inherit like new children.
         const baseModel = parent
           ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel)
@@ -13713,11 +13758,15 @@ export class VisualAgentMapView extends ItemView {
         kind: "topic"
       })
     ).template;
+    // AI lock: the parent is read again from disk before each child is added under it.
+    const parentLocked = async (): Promise<boolean> =>
+      (await this.plugin.repo.readNote(parent.path, this.map ?? undefined)).aiLocked === true;
     try {
       for (const item of items) {
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
+        if (owner === parent && (await parentLocked())) throw new Error(t("ui.ai_locked_notice"));
         await this.addNode(owner, item.title, false, false);
         created++;
         const child = this.map.nodes.at(-1)!;
@@ -17854,6 +17903,10 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
+      if (note.aiLocked) {
+        new Notice(t("ui.ai_locked_notice"));
+        return;
+      }
       const outline = this.quickOutline(parent);
       const limits = { levels: CHAT_EXPAND_LEVELS, maxTopics: CHAT_EXPAND_MAX_TOPICS };
       const generated = await outline.generate(

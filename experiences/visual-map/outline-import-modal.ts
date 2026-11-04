@@ -41,6 +41,8 @@ export interface OutlineImportRequest {
   nodes: OutlineNode[];
   placement?: OutlinePlacement;
   source: OutlineSource;
+  /** The outline came straight from the AI (quick explore, the chat's expand): the AI lock applies to its parent. */
+  aiGenerated?: boolean;
   shallowResearch: boolean;
   /** AI mode of the shallow research (Quick when omitted). */
   aiMode?: MapAiMode;

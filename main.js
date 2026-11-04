@@ -1090,6 +1090,8 @@ var en = {
   "ui.ai_unlock_card": "Unlock: let AI change this topic",
   "ui.ai_locked_state": "Locked from AI",
   "ui.ai_locked_skipped_0": "{0} locked topics skipped",
+  "ui.ai_locked_outline_skipped_0": "Topic is locked; AI will not change it. {0} outline topics were not added.",
+  "ui.ai_locked_suggestions_skipped_0": "{0} suggestions touch locked topics and were skipped",
   "ui.ai_unlock_selected": "Unlock for AI",
   "ui.ai_locked_some_0_1": "{0} of {1} locked",
   "ui.model_and_advanced_settings": "Model and advanced settings",
@@ -3549,6 +3551,8 @@ var zhCN = {
   "ui.ai_unlock_card": "\u89E3\u9664\u9501\u5B9A\uFF1A\u5141\u8BB8 AI \u4FEE\u6539\u6B64\u8BAE\u9898",
   "ui.ai_locked_state": "\u5DF2\u9501\u5B9A AI",
   "ui.ai_locked_skipped_0": "\u5DF2\u8DF3\u8FC7 {0} \u4E2A\u9501\u5B9A\u7684\u8BAE\u9898",
+  "ui.ai_locked_outline_skipped_0": "\u8BAE\u9898\u5DF2\u9501\u5B9A\uFF0CAI \u4E0D\u4F1A\u4FEE\u6539\u3002{0} \u4E2A\u5927\u7EB2\u8BAE\u9898\u672A\u52A0\u5165\u3002",
+  "ui.ai_locked_suggestions_skipped_0": "{0} \u6761\u5EFA\u8BAE\u6D89\u53CA\u9501\u5B9A\u7684\u8BAE\u9898\uFF0C\u5DF2\u8DF3\u8FC7",
   "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9501\u5B9A",
   "ui.ai_locked_some_0_1": "{1} \u4E2A\u4E2D\u6709 {0} \u4E2A\u5DF2\u9501\u5B9A",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u4E0E\u9AD8\u7EA7\u8BBE\u7F6E",
@@ -6008,6 +6012,8 @@ var zhTW = {
   "ui.ai_unlock_card": "\u89E3\u9664\u9396\u5B9A\uFF1A\u5141\u8A31 AI \u4FEE\u6539\u6B64\u8B70\u984C",
   "ui.ai_locked_state": "\u5DF2\u9396\u5B9A AI",
   "ui.ai_locked_skipped_0": "\u5DF2\u7565\u904E {0} \u500B\u9396\u5B9A\u7684\u8B70\u984C",
+  "ui.ai_locked_outline_skipped_0": "\u8B70\u984C\u5DF2\u9396\u5B9A\uFF0CAI \u4E0D\u6703\u4FEE\u6539\u3002{0} \u500B\u5927\u7DB1\u8B70\u984C\u672A\u52A0\u5165\u3002",
+  "ui.ai_locked_suggestions_skipped_0": "{0} \u5247\u5EFA\u8B70\u6D89\u53CA\u9396\u5B9A\u7684\u8B70\u984C\uFF0C\u5DF2\u7565\u904E",
   "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9396\u5B9A",
   "ui.ai_locked_some_0_1": "{1} \u500B\u4E2D\u6709 {0} \u500B\u5DF2\u9396\u5B9A",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u8207\u9032\u968E\u8A2D\u5B9A",
@@ -50115,6 +50121,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       generate: async (request, signal) => {
         var _a2, _b2;
         const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+        if (note.aiLocked) throw new Error(t("ui.ai_locked_notice"));
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
@@ -50138,6 +50145,7 @@ ${request.requirements}` : preset.text,
           nodes,
           placement: { kind: "under", parentId: node.id },
           source: null,
+          aiGenerated: true,
           shallowResearch: !!options.shallowResearch,
           researchEveryTopic: true,
           // The research of the new topics is the short overview in the dialog's AI mode (Quick when it has none).
@@ -50261,10 +50269,12 @@ ${request.requirements}` : preset.text,
               controller.signal
             );
             if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
+            const { kept, skipped: lockedCount } = this.dropAiLockedSuggestions(review);
+            if (lockedCount) new import_obsidian34.Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
             own2.state = "done";
-            own2.result = review;
-            backgroundResultNotice(t("ui.structure_review_ready_0", review.suggestions.length), {
-              label: t("ui.structure_review_view_0", review.suggestions.length),
+            own2.result = kept;
+            backgroundResultNotice(t("ui.structure_review_ready_0", kept.suggestions.length), {
+              label: t("ui.structure_review_view_0", kept.suggestions.length),
               open: () => this.reopenStructureReview(own2)
             });
           } catch (error) {
@@ -50828,6 +50838,10 @@ ${request.requirements}` : preset.text,
           outcome.skipped++;
           continue;
         }
+        if (note.aiLocked) {
+          outcome.skipped++;
+          continue;
+        }
         if ((_b2 = note.relevance) == null ? void 0 : _b2.manual) {
           pinned.add(base.id);
           continue;
@@ -51084,6 +51098,7 @@ ${request.requirements}` : preset.text,
         new import_obsidian34.Notice(t("ui.merge_locked"));
         throw new Error(t("ui.merge_locked"));
       }
+      if (this.structureLockReason(suggestion)) throw new Error(t("ui.ai_locked_notice"));
     };
     const nodeOf = (id) => {
       var _a2;
@@ -51098,6 +51113,7 @@ ${request.requirements}` : preset.text,
     }
     const write = (work) => this.plugin.mutate(async () => {
       guard();
+      if (this.structureLockReason(suggestion, await this.freshNotes())) throw new Error(t("ui.ai_locked_notice"));
       await work();
     });
     if (suggestion.kind === "strengthen")
@@ -51138,6 +51154,25 @@ ${request.requirements}` : preset.text,
         () => resolve(false)
       ).open();
     });
+  }
+  /** Why a structure suggestion may not be applied (AI lock), or null: what it adds, moves or removes, and where. */
+  structureLockReason(suggestion, fresh) {
+    var _a2, _b2;
+    switch (suggestion.kind) {
+      case "strengthen":
+        return this.aiLockReason("addChild", [suggestion.targetId], fresh);
+      case "move":
+        return this.aiLockReason("move", [suggestion.targetId], fresh, { to: (_a2 = suggestion.newParentId) != null ? _a2 : null });
+      case "reduce":
+        return this.aiLockReason("remove", [suggestion.targetId], fresh);
+      default:
+        return (_b2 = this.aiLockReason("remove", [suggestion.targetId], fresh)) != null ? _b2 : suggestion.mergeIntoId ? this.aiLockReason("addChild", [suggestion.mergeIntoId], fresh) : null;
+    }
+  }
+  /** The review without the suggestions that touch a locked topic, and how many were dropped. */
+  dropAiLockedSuggestions(result) {
+    const suggestions = result.suggestions.filter((suggestion) => !this.structureLockReason(suggestion));
+    return { kept: { ...result, suggestions }, skipped: result.suggestions.length - suggestions.length };
   }
   /** Moves one topic and its branch under a new parent, in one undo step. */
   async moveTopic(node, parent) {
@@ -51499,6 +51534,12 @@ ${request.requirements}` : preset.text,
           return;
         }
         const { map, path, parent } = current;
+        if (request.aiGenerated && parent && this.aiLockReason("addChild", [parent.id], /* @__PURE__ */ new Map([[parent.id, await repo.readNote(parent.path, map)]]))) {
+          const skippedCount = request.nodes.length;
+          new import_obsidian34.Notice(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          state.rejection = new Error(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          return;
+        }
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         await this.noteStyles.refresh();
@@ -60380,11 +60421,16 @@ ${request.requirements}` : preset.text,
       style: noteStyle,
       kind: "topic"
     })).template;
+    const parentLocked = async () => {
+      var _a3;
+      return (await this.plugin.repo.readNote(parent.path, (_a3 = this.map) != null ? _a3 : void 0)).aiLocked === true;
+    };
     try {
       for (const item of items) {
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
+        if (owner === parent && await parentLocked()) throw new Error(t("ui.ai_locked_notice"));
         await this.addNode(owner, item.title, false, false);
         created++;
         const child = this.map.nodes.at(-1);
@@ -64173,6 +64219,10 @@ ${addition}` : addition });
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
+      if (note.aiLocked) {
+        new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+        return;
+      }
       const outline = this.quickOutline(parent);
       const limits = { levels: CHAT_EXPAND_LEVELS, maxTopics: CHAT_EXPAND_MAX_TOPICS };
       const generated = await outline.generate(
@@ -72307,6 +72357,10 @@ var TopicRuns = class {
     try {
       const repo = this.ports.repository();
       const note = await repo.readNote(path, options.map);
+      if (note.aiLocked) {
+        fail2(t("ui.ai_locked_notice"), false);
+        return;
+      }
       const used = ((_c = options.runOnce) == null ? void 0 : _c.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
       if (controller.signal.aborted) throw aborted();
       const outputLanguage2 = (_d = options.outputLanguage) != null ? _d : this.ports.settings().language;
@@ -72327,6 +72381,10 @@ var TopicRuns = class {
       }
       const latest = await repo.readNote(path, options.map);
       if (controller.signal.aborted) throw aborted();
+      if (latest.aiLocked) {
+        fail2(t("ui.ai_locked_notice"), false);
+        return;
+      }
       if (latest.thinkingOrigin !== note.thinkingOrigin)
         throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
       const pendingItems = suggestions.map((item) => ({

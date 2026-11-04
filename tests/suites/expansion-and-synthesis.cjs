@@ -762,7 +762,7 @@ integrationTest('integration still refuses to save when the user edits a child a
   await view.integrateChildren(parent, options, '', (_result, commit) => { save = commit; }, message => failures.push(message));
   assert.equal(typeof save, 'function');
   await repo.updateNote(child.path, { detail: 'User edited this child' });
-  await assert.rejects(save('Merged summary', 'Merged detail'), /topic changed/);
+  await assert.rejects(save('Merged summary', 'Merged detail'), /overwrite/);
   assert.notEqual((await repo.readNote(parent.path)).summary, 'Merged summary');
 });
 integrationTest('synthesis content is explicit for one, three and four children, with full default and no descendants', async () => {

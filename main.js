@@ -2412,8 +2412,10 @@ var en = {
   "share.intro": "Creates one HTML file that opens in any browser, even offline. You choose where it is saved. Nothing is uploaded.",
   "share.option_full_name": "Include full notes",
   "share.option_full_desc": "Off: only the map structure and topic summaries are shared.",
+  "share.option_full_desc_on": "On: the full notes are shared along with the map structure.",
   "share.option_images_name": "Include images",
   "share.option_images_desc": "Off: pictures in notes are left out and marked in the text.",
+  "share.option_images_desc_on": "On: pictures in notes are included in the file.",
   "share.preview_topics_0": "{0} topics",
   "share.preview_counts_0_1_2": "{0} topics \xB7 {1} with note content \xB7 {2} images",
   "share.preview_size_0": "File size: {0}",
@@ -2461,7 +2463,11 @@ var en = {
   "share.translate_model_name": "Translation model",
   "share.translate_model_desc": "The AI model that translates the notes.",
   "share.translate_button": "Translate and save\u2026",
-  "share.translate_estimate_0_1_2": "About {0} AI calls, around {1} minutes ({2}).",
+  "share.translate_estimate_0_1_2": "About {0}, {1} ({2}).",
+  "share.translate_calls_0": "{0} AI calls",
+  "share.translate_calls_one": "1 AI call",
+  "share.translate_minutes_0": "around {0} minutes",
+  "share.translate_minutes_one": "around 1 minute",
   "share.translate_estimate_cached": "Everything selected was already translated in this session. No new AI calls are needed.",
   "share.translate_progress_0_1_2_3_4": "Translating {0}: language {1} of {2}, batch {3} of {4}",
   "share.translate_cancel": "Cancel translation",
@@ -4913,8 +4919,10 @@ var zhCN = {
   "share.intro": "\u751F\u6210\u4E00\u4E2A HTML \u6587\u4EF6\uFF0C\u4EFB\u4F55\u6D4F\u89C8\u5668\u90FD\u80FD\u6253\u5F00\uFF0C\u79BB\u7EBF\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u51B3\u5B9A\uFF0C\u4E0D\u4F1A\u4E0A\u4F20\u4EFB\u4F55\u5185\u5BB9\u3002",
   "share.option_full_name": "\u5305\u542B\u5B8C\u6574\u7B14\u8BB0",
   "share.option_full_desc": "\u5173\u95ED\u65F6\u53EA\u5206\u4EAB\u5730\u56FE\u7ED3\u6784\u4E0E\u8BAE\u9898\u6458\u8981\u3002",
+  "share.option_full_desc_on": "\u5F00\u542F\u65F6\uFF0C\u8FDE\u540C\u5730\u56FE\u7ED3\u6784\u4E00\u5E76\u5206\u4EAB\u5B8C\u6574\u7B14\u8BB0\u3002",
   "share.option_images_name": "\u5305\u542B\u56FE\u7247",
   "share.option_images_desc": "\u5173\u95ED\u65F6\u7B14\u8BB0\u91CC\u7684\u56FE\u7247\u4E0D\u653E\u8FDB\u6587\u4EF6\uFF0C\u5E76\u5728\u6587\u5B57\u4E2D\u6807\u793A\u3002",
+  "share.option_images_desc_on": "\u5F00\u542F\u65F6\uFF0C\u7B14\u8BB0\u91CC\u7684\u56FE\u7247\u4F1A\u653E\u8FDB\u6587\u4EF6\u3002",
   "share.preview_topics_0": "{0} \u4E2A\u8BAE\u9898",
   "share.preview_counts_0_1_2": "{0} \u4E2A\u8BAE\u9898\u30FB{1} \u7BC7\u6709\u7B14\u8BB0\u5185\u5BB9\u30FB{2} \u5F20\u56FE\u7247",
   "share.preview_size_0": "\u6587\u4EF6\u5927\u5C0F\uFF1A{0}",
@@ -4962,7 +4970,11 @@ var zhCN = {
   "share.translate_model_name": "\u7FFB\u8BD1\u7528\u7684\u6A21\u578B",
   "share.translate_model_desc": "\u8D1F\u8D23\u7FFB\u8BD1\u7B14\u8BB0\u7684 AI \u6A21\u578B\u3002",
   "share.translate_button": "\u7FFB\u8BD1\u5E76\u4FDD\u5B58\u2026",
-  "share.translate_estimate_0_1_2": "\u9884\u4F30\u7EA6 {0} \u6B21 AI \u8C03\u7528\u3001\u7EA6 {1} \u5206\u949F\uFF08{2}\uFF09\u3002",
+  "share.translate_estimate_0_1_2": "\u9884\u4F30{0}\u3001{1}\uFF08{2}\uFF09\u3002",
+  "share.translate_calls_0": "\u7EA6 {0} \u6B21 AI \u8C03\u7528",
+  "share.translate_calls_one": "\u7EA6 1 \u6B21 AI \u8C03\u7528",
+  "share.translate_minutes_0": "\u7EA6 {0} \u5206\u949F",
+  "share.translate_minutes_one": "\u7EA6 1 \u5206\u949F",
   "share.translate_estimate_cached": "\u52FE\u9009\u7684\u5185\u5BB9\u5728\u8FD9\u6B21\u4F7F\u7528\u4E2D\u90FD\u5DF2\u7FFB\u8BD1\u8FC7\uFF0C\u4E0D\u9700\u8981\u65B0\u7684 AI \u8C03\u7528\u3002",
   "share.translate_progress_0_1_2_3_4": "\u6B63\u5728\u7FFB\u8BD1{0}\uFF1A\u7B2C {1} / {2} \u79CD\u8BED\u8A00\uFF0C\u7B2C {3} / {4} \u6279",
   "share.translate_cancel": "\u53D6\u6D88\u7FFB\u8BD1",
@@ -7414,8 +7426,10 @@ var zhTW = {
   "share.intro": "\u7522\u751F\u4E00\u500B HTML \u6A94\uFF0C\u4EFB\u4F55\u700F\u89BD\u5668\u90FD\u80FD\u958B\u555F\uFF0C\u96E2\u7DDA\u4E5F\u53EF\u4EE5\u3002\u5B58\u653E\u4F4D\u7F6E\u7531\u4F60\u6C7A\u5B9A\uFF0C\u4E0D\u6703\u4E0A\u50B3\u4EFB\u4F55\u6771\u897F\u3002",
   "share.option_full_name": "\u5305\u542B\u5B8C\u6574\u7B46\u8A18",
   "share.option_full_desc": "\u95DC\u9589\u6642\u53EA\u5206\u4EAB\u5FC3\u667A\u5716\u7D50\u69CB\u8207\u8B70\u984C\u6458\u8981\u3002",
+  "share.option_full_desc_on": "\u958B\u555F\u6642\uFF0C\u9023\u540C\u5FC3\u667A\u5716\u7D50\u69CB\u4E00\u4F75\u5206\u4EAB\u5B8C\u6574\u7B46\u8A18\u3002",
   "share.option_images_name": "\u5305\u542B\u5716\u7247",
   "share.option_images_desc": "\u95DC\u9589\u6642\u7B46\u8A18\u88E1\u7684\u5716\u7247\u4E0D\u653E\u9032\u6A94\u6848\uFF0C\u4E26\u5728\u6587\u5B57\u4E2D\u6A19\u793A\u3002",
+  "share.option_images_desc_on": "\u958B\u555F\u6642\uFF0C\u7B46\u8A18\u88E1\u7684\u5716\u7247\u6703\u653E\u9032\u6A94\u6848\u3002",
   "share.preview_topics_0": "{0} \u500B\u8B70\u984C",
   "share.preview_counts_0_1_2": "{0} \u500B\u8B70\u984C\u30FB{1} \u7BC7\u6709\u7B46\u8A18\u5167\u5BB9\u30FB{2} \u5F35\u5716\u7247",
   "share.preview_size_0": "\u6A94\u6848\u5927\u5C0F\uFF1A{0}",
@@ -7463,7 +7477,11 @@ var zhTW = {
   "share.translate_model_name": "\u7FFB\u8B6F\u7528\u7684\u6A21\u578B",
   "share.translate_model_desc": "\u8CA0\u8CAC\u7FFB\u8B6F\u7B46\u8A18\u7684 AI \u6A21\u578B\u3002",
   "share.translate_button": "\u7FFB\u8B6F\u4E26\u5132\u5B58\u2026",
-  "share.translate_estimate_0_1_2": "\u9810\u4F30\u7D04 {0} \u6B21 AI \u547C\u53EB\u3001\u7D04 {1} \u5206\u9418\uFF08{2}\uFF09\u3002",
+  "share.translate_estimate_0_1_2": "\u9810\u4F30{0}\u3001{1}\uFF08{2}\uFF09\u3002",
+  "share.translate_calls_0": "\u7D04 {0} \u6B21 AI \u547C\u53EB",
+  "share.translate_calls_one": "\u7D04 1 \u6B21 AI \u547C\u53EB",
+  "share.translate_minutes_0": "\u7D04 {0} \u5206\u9418",
+  "share.translate_minutes_one": "\u7D04 1 \u5206\u9418",
   "share.translate_estimate_cached": "\u52FE\u9078\u7684\u5167\u5BB9\u5728\u9019\u6B21\u4F7F\u7528\u4E2D\u90FD\u5DF2\u7FFB\u8B6F\u904E\uFF0C\u4E0D\u9700\u8981\u65B0\u7684 AI \u547C\u53EB\u3002",
   "share.translate_progress_0_1_2_3_4": "\u6B63\u5728\u7FFB\u8B6F{0}\uFF1A\u7B2C {1} / {2} \u7A2E\u8A9E\u8A00\uFF0C\u7B2C {3} / {4} \u6279",
   "share.translate_cancel": "\u53D6\u6D88\u7FFB\u8B6F",
@@ -72504,17 +72522,19 @@ var ShareModal = class extends import_obsidian41.Modal {
   onOpen() {
     this.titleEl.setText(t("share.title"));
     this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
-    this.fullSetting = new import_obsidian41.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t("share.option_full_desc")).addToggle((toggle) => {
+    this.fullSetting = new import_obsidian41.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t(this.includeDetail ? "share.option_full_desc_on" : "share.option_full_desc")).addToggle((toggle) => {
       this.fullToggle = toggle;
       toggle.setValue(this.includeDetail).onChange((value) => {
         this.includeDetail = value;
+        this.fullSetting.setDesc(t(value ? "share.option_full_desc_on" : "share.option_full_desc"));
         this.restart();
       });
     });
-    this.imagesSetting = new import_obsidian41.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t("share.option_images_desc")).addToggle((toggle) => {
+    this.imagesSetting = new import_obsidian41.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t(this.includeImages ? "share.option_images_desc_on" : "share.option_images_desc")).addToggle((toggle) => {
       this.imagesToggle = toggle;
       toggle.setValue(this.includeImages).onChange((value) => {
         this.includeImages = value;
+        this.imagesSetting.setDesc(t(value ? "share.option_images_desc_on" : "share.option_images_desc"));
         this.restart();
       });
     });
@@ -72859,8 +72879,8 @@ var ShareModal = class extends import_obsidian41.Modal {
         note(
           estimate.calls === 0 ? t("share.translate_estimate_cached") : t(
             "share.translate_estimate_0_1_2",
-            estimate.calls,
-            estimate.minutes,
+            estimate.calls === 1 ? t("share.translate_calls_one") : t("share.translate_calls_0", estimate.calls),
+            estimate.minutes === 1 ? t("share.translate_minutes_one") : t("share.translate_minutes_0", estimate.minutes),
             host.modelLabel(this.resolvedModel())
           )
         );

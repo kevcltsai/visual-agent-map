@@ -1872,7 +1872,12 @@ export class MapChatPanel {
     card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
     card.createDiv({
       cls: "vam-map-chat-plan-sentence",
-      text: plan.summary ?? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
+      // Only a plan still waiting says it needs confirmation; an applied or cancelled one just names what it was.
+      text:
+        plan.summary ??
+        (plan.state === "pending"
+          ? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
+          : plan.reasons.join(t("ui.map_chat_count_separator")))
     });
     const groups = plan.groups ?? (plan.items.length ? [{ label: "", items: plan.items }] : []);
     for (const group of groups) {

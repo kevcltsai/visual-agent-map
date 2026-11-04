@@ -7109,6 +7109,17 @@ export class VisualAgentMapView extends ItemView {
       this.announcer?.setText(t("ui.text_node_added"));
     });
   }
+  /** Rects of the drawn cards that are not in `members`: a frame keeps its padding off them (ticket 31). */
+  private otherCardRects(members: readonly string[]): { x: number; y: number; w: number; h: number }[] {
+    const own = new Set(members);
+    const rects: { x: number; y: number; w: number; h: number }[] = [];
+    for (const [id, card] of this.cardEls) {
+      if (own.has(id)) continue;
+      const b = boxOf(card);
+      rects.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+    }
+    return rects;
+  }
   /**
    * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
    * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
@@ -7126,7 +7137,7 @@ export class VisualAgentMapView extends ItemView {
     };
     let layer: HTMLElement | null = null;
     for (const boundary of boundaries) {
-      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD);
+      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD, this.otherCardRects(boundary.members));
       if (!box) continue;
       if (!layer) {
         layer = stage.createDiv("vam-boundaries");
@@ -9563,7 +9574,8 @@ export class VisualAgentMapView extends ItemView {
           const b = boxOf(card);
           return { x: b.x, y: b.y, w: b.width, h: b.height };
         },
-        BOUNDARY_PAD
+        BOUNDARY_PAD,
+        this.otherCardRects(frame.members)
       );
       if (!box) continue;
       grow(box.x, box.y, box.w, box.h);

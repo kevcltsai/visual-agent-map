@@ -17307,7 +17307,7 @@ function treeTextNodes(items, nodeIds) {
   }
   return { attached, orphans };
 }
-function boundaryBounds(nodeIds, rectOf, pad) {
+function boundaryBounds(nodeIds, rectOf, pad, others = []) {
   const margin = finite(pad) && pad > 0 ? pad : 0;
   let left = Infinity;
   let top = Infinity;
@@ -17322,7 +17322,28 @@ function boundaryBounds(nodeIds, rectOf, pad) {
     bottom = Math.max(bottom, r.y + r.h);
   }
   if (left === Infinity) return null;
-  return { x: left - margin, y: top - margin, w: right - left + margin * 2, h: bottom - top + margin * 2 };
+  let padLeft = margin;
+  let padTop = margin;
+  let padRight = margin;
+  let padBottom = margin;
+  const half = (gap) => Math.max(0, gap / 2);
+  for (const o of others) {
+    if (!o || !finite(o.x) || !finite(o.y) || !finite(o.w) || !finite(o.h)) continue;
+    const oRight = o.x + o.w;
+    const oBottom = o.y + o.h;
+    const overlapsX = o.x < right && oRight > left;
+    const overlapsY = o.y < bottom && oBottom > top;
+    if (overlapsX && oBottom <= top) padTop = Math.min(padTop, half(top - oBottom));
+    if (overlapsX && o.y >= bottom) padBottom = Math.min(padBottom, half(o.y - bottom));
+    if (overlapsY && oRight <= left) padLeft = Math.min(padLeft, half(left - oRight));
+    if (overlapsY && o.x >= right) padRight = Math.min(padRight, half(o.x - right));
+  }
+  return {
+    x: left - padLeft,
+    y: top - padTop,
+    w: right - left + padLeft + padRight,
+    h: bottom - top + padTop + padBottom
+  };
 }
 function pruneBoundaries(items, existingIds) {
   const alive = new Set(existingIds);
@@ -17723,7 +17744,7 @@ function textLines(title) {
   return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT2));
 }
 function buildMapSvg(scene) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
   const width = num(scene == null ? void 0 : scene.width);
   const height = num(scene == null ? void 0 : scene.height);
   if (width === null || height === null || width <= 0 || height <= 0) return "";
@@ -17747,10 +17768,6 @@ function buildMapSvg(scene) {
     out.push(
       `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="12" fill="none" stroke="${stroke}" stroke-dasharray="6 4"/>`
     );
-    if (typeof b.label === "string" && b.label)
-      out.push(
-        `<text x="${box[0] + 8}" y="${box[1] + 16}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml(b.label.slice(0, TEXT_LIMIT2))}</text>`
-      );
     out.push("</g>");
   }
   for (const edge of (_e = scene.edges) != null ? _e : []) {
@@ -17815,6 +17832,19 @@ function buildMapSvg(scene) {
       );
     });
     out.push("</g>");
+  }
+  for (const b of (_n = scene.boundaries) != null ? _n : []) {
+    const box = rect(b == null ? void 0 : b.x, b == null ? void 0 : b.y, b == null ? void 0 : b.w, b == null ? void 0 : b.h);
+    if (!box || typeof b.label !== "string" || !b.label) continue;
+    const stroke = color(b.stroke, strokeColor);
+    const label = b.label.slice(0, TEXT_LIMIT2);
+    const wide = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/;
+    const textWidth = Array.from(label).reduce((sum, ch) => sum + (wide.test(ch) ? 13 : 7), 0);
+    const chipWidth = Math.max(20, Math.min(box[2] - 24, textWidth + 16));
+    const lines = wrapText(label, Math.max(7, chipWidth - 16));
+    out.push(
+      `<g><rect x="${box[0] + 12}" y="${box[1] - 10}" width="${chipWidth}" height="20" rx="10" fill="${background}" stroke="${stroke}"/><text x="${box[0] + 20}" y="${box[1] + 4}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml((_o = lines[0]) != null ? _o : "")}</text></g>`
+    );
   }
   out.push("</svg>");
   return out.filter(Boolean).join("\n");
@@ -56678,6 +56708,17 @@ ${request.requirements}` : preset.text,
    * The layer comes after the image layer, so Tab reaches the frames last, and is painted behind the images (CSS z-index).
    * The label is text only. Only the label chip takes the pointer; the frame area stays click-through.
    */
+  /** Rects of the drawn cards that are not in `members`: a frame keeps its padding off them (ticket 31). */
+  otherCardRects(members) {
+    const own2 = new Set(members);
+    const rects = [];
+    for (const [id, card] of this.cardEls) {
+      if (own2.has(id)) continue;
+      const b = boxOf(card);
+      rects.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+    }
+    return rects;
+  }
   renderBoundaries(stage, items, editable) {
     var _a2;
     const boundaries = items.filter((item) => item.kind === "boundary");
@@ -56690,7 +56731,7 @@ ${request.requirements}` : preset.text,
     };
     let layer = null;
     for (const boundary of boundaries) {
-      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD);
+      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD, this.otherCardRects(boundary.members));
       if (!box) continue;
       if (!layer) {
         layer = stage.createDiv("vam-boundaries");
@@ -58874,7 +58915,8 @@ ${request.requirements}` : preset.text,
           const b = boxOf(card);
           return { x: b.x, y: b.y, w: b.width, h: b.height };
         },
-        BOUNDARY_PAD
+        BOUNDARY_PAD,
+        this.otherCardRects(frame.members)
       );
       if (!box) continue;
       grow(box.x, box.y, box.w, box.h);

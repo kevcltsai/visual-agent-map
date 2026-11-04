@@ -252,3 +252,19 @@ test('the label dialog may be left blank only when asked to; the default still r
   assert.deepEqual(run(undefined), { saved: [], disabled: true });
   assert.deepEqual(run({ allowEmpty: true }), { saved: [''], disabled: false });
 });
+
+test('ticket 31: a frame stops short of a neighbouring non-member card, and the label chip is painted over the cards, not under them', async () => {
+  const saved = { ...BOX.third };
+  BOX.third = { x: 790, y: 40, w: 280, h: 80 }; // 10px right of the child card, which is the frame's right edge (780)
+  try {
+    const h = await harness(ids => [frame([ids.root, ids.child])]);
+    h.view.render();
+    const [f] = frames(h);
+    assert.equal(f.style.left, '84px');
+    assert.equal(f.style.width, '701px', 'right padding is half the 10px gap (5), not 16');
+  } finally { BOX.third = saved; }
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.doesNotMatch(css.match(/^\.vam-boundaries \{[^}]*\}/m)[0], /z-index/, 'the layer makes no stacking context');
+  assert.match(css.match(/^\.vam-boundary-label \{[^}]*\}/m)[0], /z-index: 2/);
+  assert.match(css.match(/^\.vam-boundary::before \{[^}]*\}/m)[0], /z-index: -2/);
+});

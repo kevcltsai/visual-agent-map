@@ -32,6 +32,14 @@ test('counter-example 3: a title with <script> is only escaped text', () => {
   assert.ok(svg.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
 });
 
+test('ticket 31: a frame label is drawn after every card, on a chip over the frame top edge', () => {
+  const svg = ex.buildMapSvg({ ...base, cards: [{ x: 0, y: 0, w: 200, h: 50, title: 'Above' }], boundaries: [{ x: 0, y: 20, w: 300, h: 100, label: 'Team A' }] });
+  const label = svg.indexOf('>Team A<');
+  assert.ok(label > 0);
+  assert.ok(label > svg.indexOf('>Above<'), 'the label comes after the card it could be covered by');
+  assert.match(svg, /<rect x="12" y="10" width="\d+" height="20" rx="10" fill="#fff"/, 'chip centred on the top edge (y 20)');
+});
+
 test('counter-example 4: http: and file: image hrefs skip that image only', () => {
   const hrefs = ['http://example.com/a.png', 'file:///etc/passwd', 'https://x/y.png', 'data:image/svg+xml;base64,PHN2Zz4=', 'data:text/html;base64,PGI+', 'javascript:alert(1)', PNG + '" onload="x'];
   const svg = ex.buildMapSvg({ ...base, images: [...hrefs.map(href => ({ x: 0, y: 0, w: 10, h: 10, href })), { x: 0, y: 0, w: 10, h: 10, href: PNG }], cards: [{ x: 0, y: 0, w: 50, h: 50, title: 'c', cover: { x: 0, y: 0, w: 5, h: 5, href: hrefs[0] } }] });

@@ -1,0 +1,168 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reply": {
+      "type": "string"
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "add_child",
+              "rename_topic",
+              "update_summary",
+              "edit_topic_note",
+              "move_topic",
+              "delete_topic",
+              "edit_md_file",
+              "create_md_file",
+              "select_topics",
+              "run_map_action",
+              "create_map",
+              "open_map",
+              "collapse_topic",
+              "expand_topic",
+              "auto_layout",
+              "focus_topic",
+              "set_topic_kind",
+              "ask_topic_kind"
+            ]
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "newParentId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "find": {
+            "type": "string"
+          },
+          "replace": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "nodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "all": {
+            "type": "boolean"
+          },
+          "branch": {
+            "type": "boolean"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "research_standard",
+              "expand",
+              "synthesize",
+              "rate_by_goal",
+              "merge",
+              "find_images",
+              ""
+            ]
+          },
+          "goal": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              ""
+            ]
+          },
+          "images": {
+            "type": "boolean"
+          },
+          "otherProvider": {
+            "type": "boolean"
+          },
+          "topicKind": {
+            "type": "string",
+            "enum": [
+              "topic",
+              "action",
+              "atomic",
+              "hypothesis",
+              "evidence",
+              "conclusion",
+              ""
+            ]
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "weak",
+              "medium",
+              "strong",
+              ""
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "nodeId",
+          "ref",
+          "parentId",
+          "newParentId",
+          "title",
+          "summary",
+          "detail",
+          "path",
+          "find",
+          "replace",
+          "content",
+          "nodeIds",
+          "all",
+          "branch",
+          "action",
+          "goal",
+          "direction",
+          "mode",
+          "images",
+          "otherProvider",
+          "topicKind",
+          "strength"
+        ]
+      }
+    }
+  },
+  "required": [
+    "reply",
+    "actions"
+  ]
+}

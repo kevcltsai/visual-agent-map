@@ -271,6 +271,7 @@ import {
   RELEVANCE_CONTEXT_MAX_LENGTH,
   RELEVANCE_GOAL_MAX_LENGTH,
   HYPOTHESIS_STRENGTHS,
+  readAiLocked,
   TOPIC_KINDS,
   RELEVANCE_LEVELS,
   type HypothesisStrength,
@@ -804,6 +805,8 @@ interface ChatRun {
   notes?: Set<string>;
   /** Markdown files the reply edited or created (vault paths): part of the reply's undo check. */
   files?: Set<string>;
+  /** Where the notes of the cards the reply deleted now are (Unassigned): part of the reply's undo check, as the cards are gone from the map. */
+  parked?: Set<string>;
 }
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
@@ -5510,6 +5513,14 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Removes a topic (or its branch) to Unassigned in one undo step; `adopterId` first takes over its children (merge). */
   private async removeToUnassigned(node: MapNode, branch: boolean, adopterId?: string): Promise<void> {
+    await this.removeToUnassignedEntry(node, branch, adopterId);
+  }
+  /** The same, handing back the undo step it pushed (undefined when nothing was removed). */
+  private async removeToUnassignedEntry(
+    node: MapNode,
+    branch: boolean,
+    adopterId?: string
+  ): Promise<TransactionEntry | undefined> {
     if (!this.map) return;
     const before = clone(this.map),
       ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
@@ -5556,6 +5567,7 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
+    return entry;
   }
   private mergeBusy(node: MapNode, except?: MergeTask): boolean {
     const batch = this.plugin.expansionBatches?.get(this.multiResearchKey()),
@@ -12987,6 +12999,70 @@ export class VisualAgentMapView extends ItemView {
       (targetId ? this.aiLockReason("write", [targetId], fresh) : null) ?? this.aiLockReason("remove", removed, fresh)
     );
   }
+  /** The notes of these cards read again from disk (a missing card or note is left out). */
+  private async freshNotesOf(ids: readonly string[]): Promise<Map<string, Note>> {
+    const fresh = new Map<string, Note>();
+    for (const id of new Set(ids)) {
+      const node = this.map?.nodes.find(item => item.id === id);
+      if (!node) continue;
+      try {
+        fresh.set(id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
+      } catch {
+        /* A missing note has no lock. */
+      }
+    }
+    return fresh;
+  }
+  /**
+   * The AI lock of a map chat write, read from disk at apply time (so a lock set after the reply was proposed still
+   * counts): what the tool would change, add under, move or remove. Null when the write may go ahead.
+   */
+  private async chatLockSkip(
+    action: Exclude<
+      MapChatAction,
+      { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" | "ask_topic_kind" }
+    >,
+    real: (id: string) => string | null
+  ): Promise<ChatOutcome | null> {
+    const refused: ChatOutcome = skipped("ui.ai_locked_notice");
+    const check = async (op: AiLockOp, ids: (string | null)[], to?: string | null): Promise<ChatOutcome | null> => {
+      const known = ids.filter((id): id is string => !!id);
+      if (!known.length) return null;
+      const involved = [...known, ...(to ? [to] : [])];
+      // The parents, the subtree and the related cards count too, so every card of the map is read when one may be removed.
+      const fresh = op === "remove" || op === "move" ? await this.freshNotes() : await this.freshNotesOf(involved);
+      return this.aiLockReason(op, known, fresh, to === undefined ? undefined : { to }) ? refused : null;
+    };
+    switch (action.kind) {
+      case "add_child":
+        return action.parentId ? check("addChild", [real(action.parentId)]) : null;
+      case "set_topic_kind":
+        return check(
+          "write",
+          action.nodeIds.map(id => real(id))
+        );
+      case "rename_topic":
+      case "update_summary":
+      case "edit_topic_note":
+        return check("write", [action.nodeId]);
+      case "move_topic":
+        return check("move", [action.nodeId], real(action.newParentId));
+      case "delete_topic":
+        return check("remove", [action.nodeId]);
+      case "edit_md_file": {
+        const key = normalizeVaultPath(action.path);
+        if (!key) return null;
+        const node = this.map?.nodes.find(item => item.path === key);
+        if (node) return check("write", [node.id]);
+        // A note that is not a card of this map: its own frontmatter decides.
+        const file = this.app.vault.getAbstractFileByPath(key);
+        const frontmatter = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
+        return frontmatter && readAiLocked(frontmatter) ? refused : null;
+      }
+      default:
+        return null;
+    }
+  }
   /** Every topic note of the map read again from disk: the write-time fence must not trust the view's copy. */
   private async freshNotes(): Promise<Map<string, Note>> {
     const fresh = new Map<string, Note>();
@@ -16141,6 +16217,7 @@ export class VisualAgentMapView extends ItemView {
         depth: depthOf(node),
         kind: this.topicKindOf(node.id),
         ...(strength ? { strength } : {}),
+        ...(this.notes.get(node.id)?.aiLocked ? { aiLocked: true } : {}),
         ...failureOf(node.id)
       };
     });
@@ -16842,7 +16919,7 @@ export class VisualAgentMapView extends ItemView {
       skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines: MapChatLine[] = [];
     const later: number[] = [];
-    const run: ChatRun = { refs: new Map(), created: [], notes: new Set(), files: new Set() };
+    const run: ChatRun = { refs: new Map(), created: [], notes: new Set(), files: new Set(), parked: new Set() };
     // Every entry the writes push is held back, then pushed as the reply's one undo step (a create_map's map switch clears
     // the history, and so what was collected for the old map; the new map's writes are collected from there).
     this.history.openGroup();
@@ -16908,7 +16985,8 @@ export class VisualAgentMapView extends ItemView {
         const box: { outcome: ChatOutcome } = { outcome: { status: "done" } };
         try {
           await this.plugin.mutate(async () => {
-            box.outcome = await this.applyChatWrite(action, own, same, run);
+            // Only this write's own entries join the reply; what another job pushes between two writes stays its own step.
+            box.outcome = await this.history.ownWrites(() => this.applyChatWrite(action, own, same, run));
           });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
@@ -16929,20 +17007,22 @@ export class VisualAgentMapView extends ItemView {
         !result.actions.some(action => action.kind === "auto_layout")
       ) {
         try {
-          await this.plugin.mutate(async () => {
-            if (!same() || !this.map) return;
-            // The layout measures the cards, so the held repaint comes first.
-            this.flushChatRender();
-            await this.mapChange(map => {
-              this.arrangeAll(map);
-            }, false);
-            const nodes = this.map?.nodes ?? [];
-            const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
-            const target = fresh.find(node => !node.parentId) ?? fresh[0];
-            // A card the reply asked to look at is where the view goes; this move to the new branch is only the default.
-            if (target && !result.actions.some(action => action.kind === "focus_topic")) this.focusNode(target);
-            arranged = true;
-          });
+          await this.plugin.mutate(() =>
+            this.history.ownWrites(async () => {
+              if (!same() || !this.map) return;
+              // The layout measures the cards, so the held repaint comes first.
+              this.flushChatRender();
+              await this.mapChange(map => {
+                this.arrangeAll(map);
+              }, false);
+              const nodes = this.map?.nodes ?? [];
+              const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
+              const target = fresh.find(node => !node.parentId) ?? fresh[0];
+              // A card the reply asked to look at is where the view goes; this move to the new branch is only the default.
+              if (target && !result.actions.some(action => action.kind === "focus_topic")) this.focusNode(target);
+              arranged = true;
+            })
+          );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
         }
@@ -16955,13 +17035,15 @@ export class VisualAgentMapView extends ItemView {
       const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];
       if (rough.length && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
-          await this.plugin.mutate(async () => {
-            if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
-            this.flushChatRender();
-            await this.mapChange(map => {
-              map.nodes = this.placeChatCards(map.nodes, new Set(rough));
-            }, false);
-          });
+          await this.plugin.mutate(() =>
+            this.history.ownWrites(async () => {
+              if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
+              this.flushChatRender();
+              await this.mapChange(map => {
+                map.nodes = this.placeChatCards(map.nodes, new Set(rough));
+              }, false);
+            })
+          );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
         }
@@ -16976,7 +17058,13 @@ export class VisualAgentMapView extends ItemView {
       if (wrote) {
         try {
           if (!this.closed && this.path === anchor.path)
-            await this.pushChatReplyEntry(entries, anchor.path, run.notes ?? new Set(), run.files ?? new Set());
+            await this.pushChatReplyEntry(
+              entries,
+              anchor.path,
+              run.notes ?? new Set(),
+              run.files ?? new Set(),
+              run.parked ?? new Set()
+            );
         } catch {
           // The check could not be read: the writes stay, without an undo step (never a half one).
         }
@@ -17195,6 +17283,9 @@ export class VisualAgentMapView extends ItemView {
     /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
     const real = (id: string): string | null =>
       id.startsWith(MAP_CHAT_NEW_PREFIX) ? (run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) ?? null) : id;
+    // AI lock: the real guard of the chat is here, on apply (a confirmation that comes later is checked again here).
+    const locked = await this.chatLockSkip(action, real);
+    if (locked) return locked;
     switch (action.kind) {
       case "add_child": {
         // An empty parent is a new root card.
@@ -17302,7 +17393,8 @@ export class VisualAgentMapView extends ItemView {
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
-        await this.removeToUnassigned(node, action.branch);
+        const removed = await this.removeToUnassignedEntry(node, action.branch);
+        for (const path of removed?.parkedPaths?.() ?? []) run.parked?.add(path);
         return done;
       }
       case "edit_md_file": {
@@ -17469,7 +17561,8 @@ export class VisualAgentMapView extends ItemView {
   private async chatReplyFingerprint(
     mapPath: string,
     noteIds: ReadonlySet<string>,
-    files: ReadonlySet<string>
+    files: ReadonlySet<string>,
+    parked: ReadonlySet<string> = new Set()
   ): Promise<string> {
     const map = await this.plugin.repo.readMap(mapPath);
     const notes: [string, string | null][] = [];
@@ -17480,6 +17573,8 @@ export class VisualAgentMapView extends ItemView {
       }
     const texts: [string, string | null][] = [];
     for (const path of files) texts.push([path, await this.chatFileText(path)]);
+    // Cards the reply deleted are not in the map any more; their notes, where they were parked, count like the others.
+    for (const path of parked) texts.push([path, await this.chatFileText(path)]);
     return JSON.stringify({
       map: { ...map, viewport: null, nodes: map.nodes.map(node => ({ ...node, x: null, y: null })) },
       notes,
@@ -17495,10 +17590,11 @@ export class VisualAgentMapView extends ItemView {
     entries: TransactionEntry[],
     mapPath: string,
     noteIds: ReadonlySet<string>,
-    files: ReadonlySet<string>
+    files: ReadonlySet<string>,
+    parked: ReadonlySet<string> = new Set()
   ): Promise<void> {
     if (!entries.length) return;
-    const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files);
+    const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint();
     const run = async (redo: boolean): Promise<void> => {
       if ((await fingerprint()) !== expected) throw this.chatUndoRefusal();
@@ -17519,7 +17615,8 @@ export class VisualAgentMapView extends ItemView {
       }
       expected = await fingerprint();
     };
-    this.history.push({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
+    // Solo: a job that began before the reply ended (an expand) must not fold the reply into its own step.
+    this.history.pushSolo({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
   }
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);
@@ -17549,6 +17646,18 @@ export class VisualAgentMapView extends ItemView {
     if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");
     const targets = known(action.nodeIds);
     if (action.nodeIds.length && !targets.length) return skipped("ui.map_chat_skip_topic_gone");
+    // AI lock: the actions that write into their target cards are a tool error when every target is locked (mixed targets
+    // skip the locked ones further on); integrating several cards writes a new topic only.
+    const lockedOnly = async (ids: string[]): Promise<boolean> => {
+      if (!ids.length) return false;
+      const fresh = await this.freshNotesOf(ids);
+      return ids.every(id => !!this.aiLockReason("write", [id], fresh));
+    };
+    const writesTargets =
+      action.action === "research_standard" || action.action === "expand" || action.action === "find_images";
+    const lockIds = targets.length ? targets : this.chatSelectionIds();
+    if ((writesTargets || (action.action === "synthesize" && lockIds.length === 1)) && (await lockedOnly(lockIds)))
+      return skipped("ui.ai_locked_notice");
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
@@ -17587,7 +17696,7 @@ export class VisualAgentMapView extends ItemView {
         const ids = targets.length ? targets : this.chatSelectionIds();
         const parents = known(ids)
           .map(id => this.map?.nodes.find(node => node.id === id))
-          .filter((node): node is MapNode => !!node);
+          .filter((node): node is MapNode => !!node && !this.aiLockReason("addChild", [node.id]));
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
         // The chat request is the confirmation of the changes, not of the AI call: each parent asks for its own model's
         // usage notice first, like the expand button. The subtopics are then added without the review window.
@@ -17773,6 +17882,11 @@ export class VisualAgentMapView extends ItemView {
         // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
         try {
           const note = await this.plugin.repo.readNote(again.node.path, this.map ?? undefined);
+          // AI lock: the picture the chat found is not put into a locked card.
+          if (note.aiLocked) {
+            outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
+            return;
+          }
           const before = note.detail.replace(/\s+$/, "");
           const addition = imageMarkdown(item.candidate);
           await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition });

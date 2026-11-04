@@ -5108,6 +5108,24 @@ integrationTest('chat 06: remove_relation removes that one relation; reversing i
   assert.equal(lines[0].text, 'Done: Remove the relation between “Mind” and “REM”');
   eq(await diskRelations(h), [{ kind: 'related', from: h.ids.a, to: h.ids.b }, { kind: 'supports', from: h.ids.b, to: h.ids.c }]);
 });
+integrationTest('relation references 02: an AI chat add or remove rewrites both end notes at once (only those); undo of the reply puts the lines back', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const scopes = [];
+  h.plugin.rebuildDerivedData = scope => { scopes.push(scope); return h.repo.rebuildDerivedData(scope ? { roots: [], paths: scope } : undefined); };
+  const pathOf = key => h.view.map.nodes.find(n => n.id === h.ids[key]).path;
+  const link = key => `[[${pathOf(key).replace(/\.md$/, '')}]]`;
+  const lines = key => h.contents.get(pathOf(key)).split('\n').filter(line => /^- (Supports|Supported by|Related):/.test(line));
+  const untouched = h.contents.get(pathOf('root'));
+  eq((await apply(h, [addRel(h.ids.c, h.ids.b, 'supports', 'A reason')])).map(l => l.status), ['done']);
+  eq(lines('c'), [`- Supports: ${link('b')}`]); eq(lines('b'), [`- Supported by: ${link('c')}`]);
+  eq(scopes.map(scope => [...scope].sort()), [[pathOf('b'), pathOf('c')].sort()], 'one refresh, limited to the two ends');
+  assert.equal(h.contents.get(pathOf('root')), untouched, 'another note is not written');
+  assert.doesNotMatch(h.contents.get(pathOf('c')), /A reason/, 'the description is not written');
+  eq((await apply(h, [{ kind: 'remove_relation', fromId: h.ids.b, toId: h.ids.c }])).map(l => l.status), ['done']);
+  eq(lines('c'), []); eq(lines('b'), []);
+  await h.view.travel(false);
+  eq(lines('c'), [`- Supports: ${link('b')}`], 'undoing the removal brings the lines back');
+});
 integrationTest('chat 06: a relation the map no longer allows (duplicate pair, cycle, self) or a pair with none is skipped and writes nothing', async () => {
   const h = await harness(); await h.view.hydrate();
   await linkOnDisk(h, [{ kind: 'prerequisite', from: h.ids.a, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.b, to: h.ids.c }]);

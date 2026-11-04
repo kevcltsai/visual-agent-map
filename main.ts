@@ -126,6 +126,7 @@ import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
 import { AIM_CREATE_MAP_COMMAND_ID } from "./experiences/aim/legacy-names";
+import { aimEnabled } from "./experiences/aim/availability";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
 export { extractJsonObject } from "./core/ai-task-service";
@@ -719,11 +720,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addLocalizedCommand("open-map", "ui.command_open_map", () => {
       void this.activateView().catch(error => new Notice(String(error)));
     });
-    this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
-      void this.activateView()
-        .then(() => this.views()[0]?.openAimStart())
-        .catch(error => new Notice(String(error)));
-    });
+    // AIM is hidden in this release (experiences/aim/availability.ts): no command, so the palette never offers it.
+    if (aimEnabled())
+      this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
+        void this.activateView()
+          .then(() => this.views()[0]?.openAimStart())
+          .catch(error => new Notice(String(error)));
+      });
     this.addLocalizedCommand("import-outline", "ui.command_import_outline", () => {
       void this.activateView()
         .then(() => this.views()[0]?.openOutlineImport())
@@ -1087,14 +1090,16 @@ export default class VisualAgentMapPlugin extends Plugin {
       return;
     }
     const mind = plan.moves.filter(move => move.kind === "mind").length;
-    let description = t(
-      "ui.organize_preview_0_1_2_3_4",
-      mind,
-      plan.moves.length - mind,
-      plan.skipped.length,
-      this.settings.mindMapsFolder,
-      this.settings.aimFolder
-    );
+    let description = aimEnabled()
+      ? t(
+          "ui.organize_preview_0_1_2_3_4",
+          mind,
+          plan.moves.length - mind,
+          plan.skipped.length,
+          this.settings.mindMapsFolder,
+          this.settings.aimFolder
+        )
+      : t("ui.organize_preview_hidden_0_1_2", mind, plan.skipped.length, this.settings.mindMapsFolder);
     if (plan.skipped.length)
       description += `\n${t("ui.organize_skipped_list_0", plan.skipped.map(item => item.mapPath).join(", "))}`;
     const toClean = await this.repo.emptyLegacyFolders(plan);

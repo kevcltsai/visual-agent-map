@@ -62,6 +62,7 @@ import {
   type NoteRelevance
 } from "./note-values";
 import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
+import { aimEnabled } from "./experiences/aim/availability";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
 
@@ -321,8 +322,11 @@ const NOTE_CSS_CLASS = "visual-agent-map-node";
  * Returns whether anything changed.
  */
 export function hasActiveAimAttempt(map: MapDocument): boolean {
-  return !!map.aim?.runs.some(run =>
-    run.attempts.some(attempt => attempt.status === "running" || attempt.status === "saving")
+  return (
+    aimEnabled() &&
+    !!map.aim?.runs.some(run =>
+      run.attempts.some(attempt => attempt.status === "running" || attempt.status === "saving")
+    )
   );
 }
 
@@ -1343,7 +1347,7 @@ export class Repository {
 
   async ensureWorkspace(): Promise<void> {
     await this.folder(this.settings.mindMapsFolder);
-    await this.folder(this.settings.aimFolder);
+    if (aimEnabled()) await this.folder(this.settings.aimFolder);
   }
 
   unique(folder: string, name: string, avoid?: ReadonlySet<string>): string {
@@ -2084,7 +2088,7 @@ export class Repository {
    * anyway (never on open), so later interface-language changes cannot change it.
    */
   private stampAimContentLanguage(map: MapDocument): void {
-    if (!map.aim) return;
+    if (!map.aim || !aimEnabled()) return;
     const resolved = resolveAimContentLanguage(map, this.settings.language);
     if (map.aim.contentLanguage === undefined) map.aim.contentLanguage = noteLanguageOf(resolved);
     // Both are written together on the first write; a map in an output-only language (ja, ko, the follow-the-input
@@ -2812,6 +2816,8 @@ export class Repository {
           throw new Error(this.message("error.map_folder_unreadable"));
         }
         if (hasActiveAimAttempt(map) || busy(file.path)) throw new Error(this.message("error.organize_aim_busy"));
+        // While AIM is hidden an AIM map stays where it is (the folder keeps it, so it is not removed below).
+        if (map.aim && !aimEnabled()) continue;
         const toRoot = normalizePath(`${next}/${root.split("/").at(-1) ?? safeName(map.title)}`);
         if (this.app.vault.getAbstractFileByPath(toRoot)) throw new Error(this.message("error.map_folder_exists"));
         moves.push({ mapPath: file.path, title: map.title, kind: map.aim ? "aim" : "mind", fromRoot: root, toRoot });
@@ -2909,6 +2915,8 @@ export class Repository {
         continue;
       }
       if (hasActiveAimAttempt(map)) plan.busy.push(map.title);
+      // While AIM is hidden an AIM map in the legacy Topics folder stays there; nothing creates or fills the AIM folder.
+      if (map.aim && !aimEnabled()) continue;
       const container = map.aim ? this.settings.aimFolder : this.settings.mindMapsFolder;
       // A misconfigured target equal to the source container would rename every topic on every run.
       if (container === this.settings.topicsFolder) continue;

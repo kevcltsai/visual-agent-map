@@ -242,6 +242,8 @@ export const en = {
   "ui.aim_create_map": "New AIM",
   "ui.aim_start_title": "Create an Adaptive Inquiry Map (AIM)",
   "ui.aim_empty_map_hint": "This Adaptive Inquiry Map has no topic yet. AIM starts with a research topic.",
+  "ui.aim_paused_notice":
+    "This map was built with AIM. AIM is paused in this version; unfinished research stays here, and the content can still be edited as usual.",
   "ui.aim_refresh_models": "Refresh model list",
   "ui.aim_refreshing_models": "Refreshing model list…",
   "ui.aim_models_refreshed": "Model list refreshed.",
@@ -1201,6 +1203,8 @@ export const en = {
   "ui.organize_only_skipped_0": "Nothing can be moved: {0} unreadable map(s) were skipped and left untouched.",
   "ui.organize_preview_0_1_2_3_4":
     "Move {0} mind map(s) into {3} and {1} AIM map(s) into {4}. Skipped and left untouched because they cannot be read: {2}. Obsidian updates links according to your settings; if any step fails, everything already moved is restored.",
+  "ui.organize_preview_hidden_0_1_2":
+    "Move {0} mind map(s) into {2}. Skipped and left untouched because they cannot be read: {1}. Obsidian updates links according to your settings; if any step fails, everything already moved is restored.",
   "ui.organize_skipped_list_0": "Skipped: {0}",
   "ui.organize_start": "Start organizing",
   "ui.organize_will_remove_0": "Afterwards these folders are empty and are moved to the trash: {0}.",
@@ -1357,6 +1361,7 @@ export const en = {
   "ui.map_chat_kind_choice_topics_separator": ", ",
   "ui.map_chat_line_done_0": "Done: {0}",
   "ui.map_chat_line_cards_skipped_0": " ({0} topics skipped: missing, AIM or without a note)",
+  "ui.map_chat_line_cards_skipped_hidden_0": " ({0} topics skipped: missing or without a note)",
   "ui.map_chat_line_skipped_0_1": "Skipped: {0} ({1})",
   "ui.map_chat_line_failed_0_1": "Failed: {0} ({1})",
   "ui.map_chat_do_add_child_0": "Add subtopic “{0}”",

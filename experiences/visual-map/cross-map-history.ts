@@ -3,6 +3,7 @@
  * In memory only, FIFO with a fixed size, one ledger per plugin instance. It holds the undo and redo functions of the
  * change, never a view. Imports nothing from obsidian or from a view.
  */
+import { aimEnabled } from "../aim/availability";
 export const CROSS_MAP_HISTORY_LIMIT = 20;
 
 export type LedgerStatus = "applied" | "undone" | "broken";
@@ -132,12 +133,13 @@ export function cutSourceProblem(
 ): CutSourceProblem | null {
   const present = new Set(sourceMap.nodes.map(node => node.id));
   if (sourceMap.id !== record.sourceMapId || record.nodeIds.every(id => !present.has(id))) return "gone";
-  if (sourceMap.aim) return "aim";
+  if (aimEnabled() && sourceMap.aim) return "aim";
   if (!found) return "changed";
   const ids = new Set(record.nodeIds);
   if (sourceMap.nodes.some(node => node.parentId !== null && ids.has(node.parentId) && !ids.has(node.id)))
     return "changed";
-  if (found.branch.some(node => node.aimKind !== undefined || node.aimQuestion !== undefined)) return "aim";
+  if (aimEnabled() && found.branch.some(node => node.aimKind !== undefined || node.aimQuestion !== undefined))
+    return "aim";
   return null;
 }
 

@@ -8,6 +8,7 @@ import type { SettingDefinition, SettingDefinitionGroup, SettingDefinitionItem, 
 import type { DropdownComponent } from "obsidian";
 import type { RecipeListItem } from "../ai/note-style-store";
 import { KIND_DEFAULT_RECIPE, STYLE_KINDS, type StyleKind } from "../ai/note-style-recipe";
+import { aimEnabled } from "../experiences/aim/availability";
 import { parseBlockRef } from "../core/blocks/block-files";
 import {
   MANAGE_TABS,
@@ -581,7 +582,7 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         {
           type: "group",
           heading: t("ui.settings_group_kinds"),
-          items: STYLE_KINDS.map(kind => ({
+          items: STYLE_KINDS.filter(kind => kind !== "aim" || aimEnabled()).map(kind => ({
             name: kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`),
             render: (setting: Setting) => renderNoteKindSetting(setting, this.plugin, kind)
           }))
@@ -813,10 +814,16 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
             render: setting =>
               this.renderMapFolderSetting(setting, "mindMapsFolder", "ui.mind_maps_folder", "Mind Maps")
           },
-          {
-            name: t("ui.aim_maps_folder"),
-            render: setting => this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
-          }
+          // AIM is hidden in this release (experiences/aim/availability.ts); the aimFolder value is kept untouched.
+          ...(aimEnabled()
+            ? [
+                {
+                  name: t("ui.aim_maps_folder"),
+                  render: (setting: Setting) =>
+                    this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
+                }
+              ]
+            : [])
         ]
       },
       {
@@ -850,7 +857,9 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
   /** Entry status of the "Note style" page: a row whose saved style is gone. */
   private noteStyleStatus(): "warning" | null {
     try {
-      return STYLE_KINDS.some(kind => missingStyleRef(this.plugin, kind)) ? "warning" : null;
+      return STYLE_KINDS.some(kind => (kind !== "aim" || aimEnabled()) && missingStyleRef(this.plugin, kind))
+        ? "warning"
+        : null;
     } catch {
       return null;
     }

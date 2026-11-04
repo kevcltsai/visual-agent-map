@@ -229,6 +229,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.aim_create_map": "新增 AIM",
   "ui.aim_start_title": "建立 Adaptive Inquiry Map（AIM）",
   "ui.aim_empty_map_hint": "這張 Adaptive Inquiry Map 目前沒有議題。AIM 會從研究議題開始。",
+  "ui.aim_paused_notice": "這張圖是用 AIM 建的。AIM 這一版先暫停，未完成的研究會停在這裡；內容都能照常編輯。",
   "ui.aim_refresh_models": "修復 Model 清單",
   "ui.aim_refreshing_models": "正在更新 Model 清單…",
   "ui.aim_models_refreshed": "Model 清單已更新。",
@@ -1135,6 +1136,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.organize_only_skipped_0": "沒有可搬移的項目：有 {0} 份無法讀取的心智圖已略過，且不會被動到。",
   "ui.organize_preview_0_1_2_3_4":
     "將把 {0} 份心智圖搬到「{3}」、{1} 份 AIM 搬到「{4}」。無法讀取而略過、不會被動到的有 {2} 份。連結會依你的 Obsidian 設定更新；任一步失敗會還原所有已搬移的項目。",
+  "ui.organize_preview_hidden_0_1_2":
+    "將把 {0} 份心智圖搬到「{2}」。無法讀取而略過、不會被動到的有 {1} 份。連結會依你的 Obsidian 設定更新；任一步失敗會還原所有已搬移的項目。",
   "ui.organize_skipped_list_0": "略過：{0}",
   "ui.organize_start": "開始整理",
   "ui.organize_will_remove_0": "整理後下列資料夾會是空的，並移到垃圾桶：{0}。",
@@ -1285,6 +1288,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_kind_choice_topics_separator": "、",
   "ui.map_chat_line_done_0": "完成：{0}",
   "ui.map_chat_line_cards_skipped_0": "（已略過 {0} 個議題：不存在、AIM 或沒有筆記）",
+  "ui.map_chat_line_cards_skipped_hidden_0": "（已略過 {0} 個議題：不存在或沒有筆記）",
   "ui.map_chat_line_skipped_0_1": "略過：{0}（{1}）",
   "ui.map_chat_line_failed_0_1": "失敗：{0}（{1}）",
   "ui.map_chat_do_add_child_0": "新增子議題「{0}」",

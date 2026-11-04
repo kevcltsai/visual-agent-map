@@ -69,23 +69,23 @@ AI actions for selected Markdown text produce editable drafts. You explicitly ac
 
 VAM has no telemetry and does not store API keys. AI tasks send relevant content, including research context, selected background files, or guest profiles, through your local CLI to OpenAI or Anthropic. The map AI chat also sends the map outline, the titles of your other maps, the cards you select or reference, the note open beside the map in full (shown as a chip you can remove), notes and text you drop in, and the last few messages; the chat can edit those notes and create new Markdown notes in your vault, but not inside the Obsidian settings folder. Your provider allowance or charges may apply. AI request/reply logging is off by default; enabled logs may contain private note content.
 
-The CLI inherits Obsidian's OS permissions; read-only or tool restrictions are not an OS sandbox. VAM runs the CLI program you installed, and when you use AIM, Standard research or picture search that program searches the web for you (Quick mode does not). Thumbnails of picture candidates are loaded from their websites. VAM may read vault Markdown paths to find its workspace and probe CLI paths outside the vault. Share files are written only where you choose in the save window; VAM never uploads them. Optional AI exchange logs and temporary files are stored in plugin data. Copy actions write requested text to the clipboard; VAM does not read clipboard contents or install/update your CLI.
+The CLI inherits Obsidian's OS permissions; read-only or tool restrictions are not an OS sandbox. VAM runs the CLI program you installed, and when you use Standard research or picture search that program searches the web for you (Quick mode does not). Thumbnails of picture candidates are loaded from their websites. VAM may read vault Markdown paths to find its workspace and probe CLI paths outside the vault. Share files are written only where you choose in the save window; VAM never uploads them. Optional AI exchange logs and temporary files are stored in plugin data. Copy actions write requested text to the clipboard; VAM does not read clipboard contents or install/update your CLI.
 
 ## Known limitations
 
-Desktop only; macOS with Obsidian 1.14.4 is the verified environment for AIM. Windows and Linux remain unverified.
+Desktop only. Windows and Linux remain unverified.
 
-AIM searches the web and provides source links, but finding a source does not prove its claims are true. AI judgments, unavailable sources, and account limits can leave research incomplete. Check important claims against the original sources.
+Standard research searches the web and provides source links, but finding a source does not prove its claims are true. AI judgments, unavailable sources, and account limits can leave research incomplete. Check important claims against the original sources.
 
 Researching several topics at once uses more of your provider allowance, and a busy model can make some topics fail; retry them, for example with another model. A note structure that requires an item count can send one extra AI request to fix the count.
 
 Images found by AI web search may not be free to reuse; check each source page. Outline search covers titles in the current map, not full text. Map undo/redo is temporary and clears when you switch maps or close the view.
 
-New mind maps are created in `Mind Maps/` and new AIM maps in `AIM/` inside your workspace folder (both names can be changed in settings, which renames the existing folder and closes the Settings window while it runs; Obsidian may ask about links for each map). Existing maps in `Topics/` keep working where they are; VAM never moves them on its own. To move them, run the command "Organize workspace folders", which shows a preview first and restores everything if a step fails. The Inbox is no longer managed: notes in an existing `Inbox/` folder are left untouched. When "Organize workspace folders" leaves the legacy `Topics/` folder or the `Inbox/` folder completely empty, it moves that empty folder to the trash (following your Obsidian trash setting); a folder that still contains anything is never touched. Maps saved with the pre-0.4 structure (outside these folders) can still be opened and viewed, but cannot be renamed, edited structurally, or organized. If Obsidian is closed or VAM is disabled while a move is running, some maps may be left in their new folder with outdated links inside VAM; run "Refresh VAM data" (it repairs those paths first) or start "Organize workspace folders" again.
+New mind maps are created in `Mind Maps/` inside your workspace folder (the name can be changed in settings, which renames the existing folder and closes the Settings window while it runs; Obsidian may ask about links for each map). Existing maps in `Topics/` keep working where they are; VAM never moves them on its own. To move them, run the command "Organize workspace folders", which shows a preview first and restores everything if a step fails. The Inbox is no longer managed: notes in an existing `Inbox/` folder are left untouched. When "Organize workspace folders" leaves the legacy `Topics/` folder or the `Inbox/` folder completely empty, it moves that empty folder to the trash (following your Obsidian trash setting); a folder that still contains anything is never touched. Maps saved with the pre-0.4 structure (outside these folders) can still be opened and viewed, but cannot be renamed, edited structurally, or organized. If Obsidian is closed or VAM is disabled while a move is running, some maps may be left in their new folder with outdated links inside VAM; run "Refresh VAM data" (it repairs those paths first) or start "Organize workspace folders" again.
 
 Map AI chat: tested live with Claude only; Codex was not tested live in the chat. A picture you inserted and one that could not load look alike, and the result line for a picture search says it started even if the search later finds nothing. Changes the chat applies from a reply cannot be undone. English and Simplified Chinese chat screens, pop-out windows and Windows or Linux were not checked.
 
-Share files: AIM research maps cannot be shared yet, and web images are not embedded: they keep their original address and are shown only when the reader is online. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
+Share files: web images are not embedded: they keep their original address and are shown only when the reader is online. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
 
 Coffee Tables stores what it needs to continue a conversation in the hidden `Coffee Tables/.sessions` folder. Obsidian Sync skips hidden folders, so on other devices you can read synced conversations but not continue them; continue them on the device where they started.
 
@@ -162,22 +162,22 @@ VAM 不會自行安裝或更新任一 CLI；至少需要一個服務，另一個
 
 VAM 不含遙測，也不儲存 API key。AI 任務會透過本機 CLI 將相關內容，包括研究脈絡、選取的背景檔或來賓設定，傳送至 OpenAI 或 Anthropic，可能使用帳號額度或產生費用。地圖 AI 對話另外會送出地圖大綱、你其他地圖的標題、你選取或加入參考的議題、地圖旁開著的整篇筆記（以可移除的標籤顯示）、你拖入的筆記與文字，以及最近幾則訊息；對話可以修改這些筆記，也能在 vault 新增 Markdown 筆記，但不會寫進 Obsidian 設定資料夾。AI 請求／回覆紀錄預設關閉；啟用後的紀錄可能包含私人筆記。
 
-CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sandbox。VAM 會執行你安裝的 CLI 程式；使用 AIM、標準研究或找圖時，該程式會代你上網搜尋（快速模式不會）。找圖候選的縮圖會直接從各網站載入。分享檔只會寫到你在存檔視窗選的位置，VAM 不會上傳。VAM 可能讀取 Vault 的 Markdown 路徑來尋找工作區，也會探測 Vault 外的 CLI 路徑。選用的 AI 往返紀錄與暫存檔會保存在外掛資料中。複製操作只將指定文字寫入剪貼簿；VAM 不讀取剪貼簿內容，也不會自行安裝或更新 CLI。
+CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sandbox。VAM 會執行你安裝的 CLI 程式；使用標準研究或找圖時，該程式會代你上網搜尋（快速模式不會）。找圖候選的縮圖會直接從各網站載入。分享檔只會寫到你在存檔視窗選的位置，VAM 不會上傳。VAM 可能讀取 Vault 的 Markdown 路徑來尋找工作區，也會探測 Vault 外的 CLI 路徑。選用的 AI 往返紀錄與暫存檔會保存在外掛資料中。複製操作只將指定文字寫入剪貼簿；VAM 不讀取剪貼簿內容，也不會自行安裝或更新 CLI。
 
 ## 已知限制
 
-僅支援桌面版；AIM 已驗證環境為 macOS 與 Obsidian 1.14.4。Windows 與 Linux 尚未驗證。
+僅支援桌面版。Windows 與 Linux 尚未驗證。
 
-AIM 會搜尋網路並提供來源連結，但找到來源不代表內容已證實。AI 判斷、無法存取的來源與帳號額度，都可能讓研究未能完成。重要主張請回到原始來源核對。
+標準研究會搜尋網路並提供來源連結，但找到來源不代表內容已證實。AI 判斷、無法存取的來源與帳號額度，都可能讓研究未能完成。重要主張請回到原始來源核對。
 
 同時研究多個議題會用掉較多額度，模型忙碌時部分議題可能失敗，可以重試，例如換一個模型。筆記結構設定了項目數時，可能多送一次 AI 請求來修正數量。
 
 AI 從網路找到的圖片不一定能自由使用，請查看各自的來源頁。大綱只搜尋目前地圖的議題名稱，不搜尋全文。地圖的復原／重做是暫存紀錄，切換地圖或關閉視圖後會清除。
 
-新的心智圖會建立在工作區資料夾內的 `Mind Maps/`，新的 AIM 會建立在 `AIM/`（資料夾名稱可在設定中修改，會一併重新命名既有資料夾，執行時設定視窗會關閉，Obsidian 可能會逐份詢問連結處理方式）。`Topics/` 內既有的地圖維持原位、照常可用；VAM 不會自行搬動它們。要搬移請執行「整理工作區資料夾」指令，它會先顯示預覽，任一步失敗會還原全部。收件匣（Inbox）不再由 VAM 管理：既有 `Inbox/` 內的筆記原封不動。當「整理工作區資料夾」讓舊的 `Topics/` 或 `Inbox/` 資料夾完全清空時，會把該空資料夾移到垃圾桶（依你的 Obsidian 垃圾桶設定）；仍有任何內容的資料夾絕不會被動到。以 0.4 前舊結構儲存的地圖（不在上述資料夾內）仍可開啟與檢視，但不能改名、不能修改結構，也不會被整理。若搬移進行中關閉了 Obsidian 或停用了 VAM，部分地圖可能已在新資料夾但 VAM 內的路徑尚未更新；請執行「重新整理 VAM 資料」（會先修復這些路徑），或再次執行「整理工作區資料夾」。
+新的心智圖會建立在工作區資料夾內的 `Mind Maps/`（資料夾名稱可在設定中修改，會一併重新命名既有資料夾，執行時設定視窗會關閉，Obsidian 可能會逐份詢問連結處理方式）。`Topics/` 內既有的地圖維持原位、照常可用；VAM 不會自行搬動它們。要搬移請執行「整理工作區資料夾」指令，它會先顯示預覽，任一步失敗會還原全部。收件匣（Inbox）不再由 VAM 管理：既有 `Inbox/` 內的筆記原封不動。當「整理工作區資料夾」讓舊的 `Topics/` 或 `Inbox/` 資料夾完全清空時，會把該空資料夾移到垃圾桶（依你的 Obsidian 垃圾桶設定）；仍有任何內容的資料夾絕不會被動到。以 0.4 前舊結構儲存的地圖（不在上述資料夾內）仍可開啟與檢視，但不能改名、不能修改結構，也不會被整理。若搬移進行中關閉了 Obsidian 或停用了 VAM，部分地圖可能已在新資料夾但 VAM 內的路徑尚未更新；請執行「重新整理 VAM 資料」（會先修復這些路徑），或再次執行「整理工作區資料夾」。
 
 地圖 AI 對話：只用 Claude 做過實機測試，Codex 未在對話中實機測試。已插入的圖與無法載入的圖看起來一樣，找圖的結果列即使之後找不到圖也會寫「已開始」。對話依回覆套用的變更無法復原。對話在英文與簡體中文畫面、彈出視窗、Windows 與 Linux 未檢查。
 
-分享檔：AIM 研究地圖目前不能分享，網路圖片不會內嵌，保留原網址，讀者連線時才顯示；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
+分享檔：網路圖片不會內嵌，保留原網址，讀者連線時才顯示；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
 
 Coffee Tables 把接續對談所需的資料存在隱藏資料夾 `Coffee Tables/.sessions`。Obsidian Sync 不同步隱藏資料夾，因此在其他裝置上可以閱讀同步過去的對談，但無法接著聊；請回到開始對談的裝置繼續。

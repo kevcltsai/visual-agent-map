@@ -367,6 +367,7 @@ import {
 } from "../../core/map-chat-layout";
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
 import { createAimMap } from "../aim/create-map";
+import { aimEnabled } from "../aim/availability";
 import {
   addOutlineToMap,
   createOutlineMap,
@@ -517,6 +518,19 @@ function isEditableTarget(target: unknown): boolean {
 function errorMessage(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : String(error);
+}
+
+/** An AIM card that keeps its AIM-only treatment (no appearance, topic type or AI lock) while AIM is available. */
+const isAimNode = (node: MapNode | null | undefined): boolean => aimEnabled() && !!node?.aimKind;
+
+/** A copy of `node` without any AIM field: what an old AIM map shares while AIM is hidden. */
+function withoutAimFields(node: MapNode): MapNode {
+  const copy = { ...node };
+  delete copy.aimKind;
+  delete copy.aimQuestion;
+  delete copy.aimConvergesFromNodeIds;
+  delete copy.aimDismissedQuestionRequestIds;
+  return copy;
 }
 
 /** What resolving a note style gives a view: the template, the ids that could not be used and, for a block, why. */
@@ -1197,6 +1211,13 @@ export class VisualAgentMapView extends ItemView {
   private menuClosedByKey = false;
   private closed = false;
   private aimViewEpoch = 0;
+  /**
+   * Whether `map` is an AIM map this view treats as one: its AIM controls, status bar and edit locks apply. While AIM is hidden
+   * (experiences/aim/availability.ts) an old AIM map is an ordinary map: all its data stays as saved, only the AIM parts are off.
+   */
+  private aimLive(map: MapDocument | null | undefined = this.map): boolean {
+    return aimEnabled() && !!map?.aim;
+  }
   private mapOpenEpoch = 0;
   private headerTitle = "";
   /** Raised by the header title refresh: the setState it causes asks the workspace to redraw the window title too. */
@@ -1434,7 +1455,7 @@ export class VisualAgentMapView extends ItemView {
     scope.register([], "F2", (event: KeyboardEvent): boolean => {
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
       if (this.presentation) return false;
-      if (this.selection.state.multiSelectMode || this.map?.aim) return true;
+      if (this.selection.state.multiSelectMode || this.aimLive()) return true;
       const active = this.contentEl.ownerDocument?.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
       const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
@@ -1451,7 +1472,7 @@ export class VisualAgentMapView extends ItemView {
       (event: KeyboardEvent): boolean => {
         if (this.closed || event.isComposing || event.defaultPrevented) return true;
         if (this.presentation) return false;
-        if (this.selection.state.multiSelectMode || this.map?.aim) return true;
+        if (this.selection.state.multiSelectMode || this.aimLive()) return true;
         const active = this.contentEl.ownerDocument?.activeElement;
         const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
         const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
@@ -2175,7 +2196,7 @@ export class VisualAgentMapView extends ItemView {
   private async hydrateFailedReportTargets(isCurrent: () => boolean): Promise<void> {
     const map = this.map,
       mapPath = this.path;
-    if (!mapPath || !map?.aim) return;
+    if (!mapPath || !aimEnabled() || !map?.aim) return;
     const failed = map.aim.runs.some(
       run => run.attempts.find(item => item.id === run.currentAttemptId)?.status === "failed"
     );
@@ -2232,7 +2253,7 @@ export class VisualAgentMapView extends ItemView {
     }
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
-    if (map.aim?.creationId && map.aim.rootDraft) {
+    if (aimEnabled() && map.aim?.creationId && map.aim.rootDraft) {
       // The draft is compared with the current model and reasoning at this moment (plan D9); createAimMap decides
       // workspace or manual, so no field is added to the map data.
       const resumed = await createAimMap(this.plugin.repo, this.plugin.settings.cliModel, {
@@ -2245,13 +2266,13 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
       map = resumed.map;
     }
-    if (map.aim?.questionDraft) {
+    if (aimEnabled() && map.aim?.questionDraft) {
       await this.aimRecovery.recoverQuestionDraft(path);
       if (!isCurrent()) return;
       map = await this.plugin.repo.readMap(path);
       if (!isCurrent()) return;
     }
-    if (map.aim) {
+    if (aimEnabled() && map.aim) {
       await this.aimRuns.recoverPending(path);
       if (!isCurrent()) return;
       await this.aimRuns.failInterrupted(path);
@@ -2261,8 +2282,8 @@ export class VisualAgentMapView extends ItemView {
       map = await this.plugin.repo.readMap(path);
       if (!isCurrent()) return;
     }
-    const clearedQuestionEdges = clearQuestionConvergenceEdges(map);
-    const repairedResultEdges = repairAimResultConvergence(map);
+    const clearedQuestionEdges = aimEnabled() && clearQuestionConvergenceEdges(map);
+    const repairedResultEdges = aimEnabled() && repairAimResultConvergence(map);
     if (clearedQuestionEdges || repairedResultEdges) {
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
@@ -2836,7 +2857,7 @@ export class VisualAgentMapView extends ItemView {
     this.structureHighlight = next;
   }
   // ---- Relevance grading: goal chip, status bar and change summary ----------------------------------------------
-  /** Mind maps only: not an AIM map. */
+  /** Mind maps only: not an AIM map. An old AIM map stays off while AIM is hidden too (goal grading has no visible UI there). */
   private relevanceGradeable(): boolean {
     return !!this.map && !this.map.aim && !!this.path;
   }
@@ -4073,7 +4094,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private setLayout(patch: { direction?: LayoutKind; spacing?: LayoutSpacing }): void {
     this.enqueue(async () => {
-      if (!this.map || this.map.aim) return;
+      if (!this.map || this.aimLive()) return;
       const before = layoutOf(this.map);
       const direction = patch.direction ?? before.direction;
       const spacing = patch.spacing ?? before.spacing ?? "standard";
@@ -4175,7 +4196,7 @@ export class VisualAgentMapView extends ItemView {
   /** Whether the open map can take an imported outline, and the selected topic for "under the selected topic". */
   private outlineImportTarget(): OutlineImportTarget {
     if (!this.map || !isManagedMapPath(this.plugin.settings, this.path)) return { map: "none" };
-    if (this.map.aim) return { map: "aim" };
+    if (this.aimLive()) return { map: "aim" };
     const node = this.map.nodes.find(item => item.id === this.selection.state.selected);
     if (!node) return { map: "editable" };
     return { map: "editable", selected: { id: node.id, title: this.notes.get(node.id)?.title ?? node.path } };
@@ -5090,6 +5111,7 @@ export class VisualAgentMapView extends ItemView {
   hasActiveAimWork(path: string): boolean {
     return (
       this.path === path &&
+      aimEnabled() &&
       !!this.map?.aim &&
       (this.aimBusy ||
         this.map.aim.runs.some(run =>
@@ -5165,12 +5187,13 @@ export class VisualAgentMapView extends ItemView {
           ).open()
         )
     );
-    menu.addItem(item =>
-      item
-        .setTitle(t("ui.aim_create_map"))
-        .setIcon("route")
-        .onClick(() => this.openAimStart())
-    );
+    if (aimEnabled())
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.aim_create_map"))
+          .setIcon("route")
+          .onClick(() => this.openAimStart())
+      );
     menu.showAtMouseEvent(event);
   }
   /** Research coverage is the map's headline fact: how much of the frontier already has a conclusion. */
@@ -5293,7 +5316,7 @@ export class VisualAgentMapView extends ItemView {
   /** Cards for the planned subtopics whose research notes do not exist yet, beside their question. */
   private renderAimPendingCards(shown: MapNode[]): void {
     const progress = this.aimProgress;
-    if (!progress || !this.aimBusy || !this.stageEl || !this.map?.aim) return;
+    if (!progress || !this.aimBusy || !this.stageEl || !aimEnabled() || !this.map?.aim) return;
     const branch = this.map.aim.branches.find(item => item.id === progress.branchId);
     const question = branch && shown.find(node => node.id === branch.questionNodeId);
     if (!branch || !question) return;
@@ -5746,7 +5769,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
   private openMerge(): void {
-    if (!this.map || this.map.aim || this.mergeOpen || !this.selection.state.multiSelected.size) return;
+    if (!this.map || this.aimLive() || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     // One AI merge per map: a running one is only reported.
     if (this.mergeTasks.has(this.path)) {
       new Notice(t("ui.merge_locked"));
@@ -6088,7 +6111,7 @@ export class VisualAgentMapView extends ItemView {
     const stale = (): never => {
       throw new Error(t("ui.merge_draft_stale"));
     };
-    if (this.closed || !this.map || this.map.aim || this.path !== snapshot.path || this.map.id !== snapshot.mapId) {
+    if (this.closed || !this.map || this.aimLive() || this.path !== snapshot.path || this.map.id !== snapshot.mapId) {
       if (content) stale();
       return;
     }
@@ -6385,7 +6408,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private removeByKey(node: MapNode): void {
     const map = this.map;
-    if (!map || map.aim) return;
+    if (!map || this.aimLive(map)) return;
     if (map.nodes.some(item => item.parentId === node.id)) {
       this.confirmRemoveNode(node);
       return;
@@ -6423,7 +6446,7 @@ export class VisualAgentMapView extends ItemView {
       t("ui.remove_from_map"),
       t("ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can"),
       [
-        ...(!this.map?.aim || node.aimKind !== "question"
+        ...(!this.aimLive() || node.aimKind !== "question"
           ? [
               {
                 label: t("ui.remove_only_this_node_children_become_roots"),
@@ -6443,7 +6466,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Free images only change on a map the user may edit: not AIM, not while picking topics. */
   private canEditCanvasItems(): boolean {
-    return !this.selection.state.multiSelectMode && !this.map?.aim;
+    return !this.selection.state.multiSelectMode && !this.aimLive();
   }
   /**
    * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
@@ -6936,7 +6959,7 @@ export class VisualAgentMapView extends ItemView {
    * item goes away. Built from the normal add-subtopic flow; the whole thing is one undo step.
    */
   private async promoteTextNode(id: string): Promise<void> {
-    if (!this.map || !this.canEditText() || this.map.aim) return;
+    if (!this.map || !this.canEditText() || this.aimLive()) return;
     const text = (this.map.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === id);
     if (!text) return;
     const parent = this.map.nodes.find(node => node.id === text.parentId) ?? null;
@@ -7139,7 +7162,7 @@ export class VisualAgentMapView extends ItemView {
   // ---- Summary brackets (summary-bracket plan, decisions #1, #2, #4) -------------------------------------------------
   /** Brackets change on a map the user may edit (topic selection mode included, where they are created), never while presenting. */
   private canEditSummary(): boolean {
-    return !!this.map && !this.map.aim && !this.presentation;
+    return !!this.map && !this.aimLive() && !this.presentation;
   }
   /** The rectangles of the cards drawn for a run of siblings and everything shown under them; null when none is drawn (folded away). */
   private summaryGeometry(parentId: string, range: readonly string[], text?: string): BracketResult | null {
@@ -7522,7 +7545,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Frames the given topics (ids that are cards of this map, deduplicated) with an optional label; one undo step. Returns the new id. */
   private async addBoundary(ids: readonly string[], label: string): Promise<string | null> {
-    if (!this.map || this.map.aim) return null;
+    if (!this.map || this.aimLive()) return null;
     const known = new Set(this.map.nodes.map(node => node.id)),
       members = [...new Set(ids)].filter(id => known.has(id));
     if (!members.length) return null;
@@ -7539,7 +7562,7 @@ export class VisualAgentMapView extends ItemView {
   /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
   private openAddBoundary(): void {
     const ids = [...this.selection.state.multiSelected];
-    if (!this.map || this.map.aim || !ids.length) return;
+    if (!this.map || this.aimLive() || !ids.length) return;
     new NameModal(
       this.app,
       t("ui.canvas_boundary_name"),
@@ -7890,7 +7913,7 @@ export class VisualAgentMapView extends ItemView {
         const menu = this.newMenu(cardId);
         // One topic outside topic selection: the card's own actions come first, in groups (the toolbar's actions).
         const topic = ids.length === 1 ? this.map?.nodes.find(item => item.id === cardId) : undefined;
-        const single = topic && !topic.aimKind && !this.selection.state.multiSelectMode ? topic : undefined;
+        const single = topic && !isAimNode(topic) && !this.selection.state.multiSelectMode ? topic : undefined;
         if (single) this.addCardMenuActions(menu, single);
         menu.addItem(item =>
           item
@@ -7899,7 +7922,7 @@ export class VisualAgentMapView extends ItemView {
             .onClick(() => this.addSummaryOver(ids))
         );
         // One topic only; the AIM conclusion cards have their own style row in the settings.
-        if (topic && !topic.aimKind)
+        if (topic && !isAimNode(topic))
           menu.addItem(item =>
             item
               .setTitle(t("ui.note_style_menu"))
@@ -8162,7 +8185,7 @@ export class VisualAgentMapView extends ItemView {
     removableQuestionNodeIds = new Set<string>()
   ): void {
     const data = map.aim;
-    if (!data) return;
+    if (!data || !aimEnabled()) return;
     const protectedIds = new Set<string>();
     const removableBranchIds = new Set(
       data.branches.filter(branch => removableQuestionNodeIds.has(branch.questionNodeId)).map(branch => branch.id)
@@ -8206,7 +8229,7 @@ export class VisualAgentMapView extends ItemView {
     originalNodes: MapNode[] = map.nodes
   ): void {
     const data = map.aim;
-    if (!data) return;
+    if (!data || !aimEnabled()) return;
     for (const question of originalNodes.filter(node => removedNodeIds.has(node.id) && node.aimQuestion)) {
       const parent = map.nodes.find(node => node.id === question.parentId && !removedNodeIds.has(node.id));
       if (parent)
@@ -8431,7 +8454,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   private clipboardReadOnly(): boolean {
-    return this.selection.state.multiSelectMode || !!this.map?.aim || this.outlineImportTarget().map !== "editable";
+    return this.selection.state.multiSelectMode || !!this.aimLive() || this.outlineImportTarget().map !== "editable";
   }
   private copyToClipboard(event: ClipboardEvent, mode: "copy" | "cut"): void {
     const map = this.map;
@@ -9300,7 +9323,7 @@ export class VisualAgentMapView extends ItemView {
     add(t("ui.export_md_vault"), "file-down", "md", "vault");
     add(t("ui.export_md_download"), "download", "md", "download");
     // The one place for export and sharing (the command palette's "Share map as HTML" opens the same dialog).
-    if (this.map && !this.map.aim) {
+    if (this.map && !this.aimLive()) {
       menu.addSeparator();
       menu.addItem(item =>
         item
@@ -9686,7 +9709,7 @@ export class VisualAgentMapView extends ItemView {
   mapCommand(action: MapCommandAction, checking: boolean): boolean {
     const map = this.map;
     if (!map || this.closed) return false;
-    const editable = !map.aim && !this.presentation && !this.selection.state.multiSelectMode;
+    const editable = !this.aimLive(map) && !this.presentation && !this.selection.state.multiSelectMode;
     const selected = map.nodes.find(node => node.id === this.selection.state.selected);
     const note = selected ? this.notes.get(selected.id) : undefined;
     const run = (applies: boolean, work: () => void): boolean => {
@@ -9732,7 +9755,8 @@ export class VisualAgentMapView extends ItemView {
       });
     };
     if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
-    if (this.map && !this.map.aim) add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
+    if (this.map && !this.aimLive())
+      add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
     menu.addSeparator();
     add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
@@ -9756,7 +9780,7 @@ export class VisualAgentMapView extends ItemView {
   private aimActiveForPath(path: string): boolean {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).some(leaf => {
       const view = leaf.view;
-      if (!(view instanceof VisualAgentMapView) || view.path !== path || !view.map?.aim) return false;
+      if (!(view instanceof VisualAgentMapView) || view.path !== path || !aimEnabled() || !view.map?.aim) return false;
       return (
         view.aimBusy ||
         view.map.aim.runs.some(run => {
@@ -10026,7 +10050,7 @@ export class VisualAgentMapView extends ItemView {
     switcher.createSpan({ text: this.map?.title ?? "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
     setIcon(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switcher.addEventListener("click", () => this.openMapSwitcher());
-    if (this.map && !this.map.aim && this.map.nodes.length) this.renderResearchProgress(toolbar);
+    if (this.map && !this.aimLive() && this.map.nodes.length) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
@@ -10052,7 +10076,7 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     const selectedNode = this.map?.nodes.find(node => node.id === this.selection.state.selected);
-    if (this.map?.aim) {
+    if (aimEnabled() && this.map?.aim) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
       const data = this.map.aim;
@@ -10123,7 +10147,10 @@ export class VisualAgentMapView extends ItemView {
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if (this.map?.aim) {
+    // The one line an old AIM map shows while AIM is hidden: no button, nothing to resume.
+    if (!aimEnabled() && this.map?.aim)
+      this.contentEl.createDiv({ cls: "vam-aim-attribution", text: t("ui.aim_paused_notice"), attr: { role: "note" } });
+    if (aimEnabled() && this.map?.aim) {
       const data = this.map.aim;
       const isAnswered = (node: MapNode) => data.branches.some(branch => branch.questionNodeId === node.id);
       const pending = this.map.nodes.find(node => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -10247,20 +10274,22 @@ export class VisualAgentMapView extends ItemView {
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
-      this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
+      if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
       if (this.deletedMap?.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
     }
-    if (!this.map.aim) this.renderMultiResearchStatus(this.contentEl);
+    if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
+    // Goal grading stays off for an old AIM map while AIM is hidden (a source-text test pins this condition).
     if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
-    if (!this.map.aim) this.renderBackgroundBars(this.contentEl);
+    if (!this.aimLive()) this.renderBackgroundBars(this.contentEl);
     // An empty map has nothing to select: leave topic selection (undo can empty a map while the bar is open).
     if (!this.map.nodes.length) {
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    this.renderMapTools(tools);
+    if (this.map?.aim && !aimEnabled()) this.renderHiddenAimMapTools(tools);
+    else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     // The workspace is a row: the chat window (put in first by mountMapChat) and the canvas.
     const canvas = workspace.createDiv("vam-canvas");
@@ -10387,7 +10416,7 @@ export class VisualAgentMapView extends ItemView {
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   private emptyCanvasState(): "idle" | "building" | "consent" | "plan" {
     const chat = this.chat;
-    if (!chat || this.map?.aim) return "idle";
+    if (!chat || this.aimLive()) return "idle";
     // The usage notice is open (or about to open, while the request is prepared): nothing is built until the user agrees.
     if (
       chat.awaitingConsent ||
@@ -10419,7 +10448,9 @@ export class VisualAgentMapView extends ItemView {
     }
     // Text only: the toolbar's "+ Topic" is the one button for it (a second one here broke the sentence and doubled the control).
     box.createSpan({
-      text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
+      text: t(
+        this.aimLive() ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first"
+      )
     });
   }
   /**
@@ -10447,6 +10478,30 @@ export class VisualAgentMapView extends ItemView {
     if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
     this.renderRelevanceGoalControl(tools);
   }
+  /**
+   * The same tools on an old AIM map while AIM is hidden: it is an ordinary map then. A separate method so renderMapTools keeps
+   * its AIM guard for the day AIM comes back (a source-text test pins that guard).
+   */
+  private renderHiddenAimMapTools(tools: HTMLElement): void {
+    if (!this.map) return;
+    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
+      "mod-cta"
+    );
+    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
+      "vam-topic-more"
+    );
+    if (!this.map.nodes.length) return;
+    const integrate = this.button(
+      tools,
+      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
+      () => {
+        this.applySelectionChange(this.selection.toggleMultiSelect());
+      }
+    );
+    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
+    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    // No goal control: goal grading is off for an AIM map (see renderMapTools).
+  }
   /** The chat started or ended something: an empty canvas follows it. */
   private refreshEmptyMap(): void {
     const box = this.emptyMapEl;
@@ -10473,6 +10528,8 @@ export class VisualAgentMapView extends ItemView {
       String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
     );
     if (node.aimKind) card.setAttr("data-aim-kind", node.aimKind);
+    // AIM is hidden: the card keeps its AIM shape (data-aim-kind) but takes the ordinary card's colour and style (styles.css, .vam-aim-hidden).
+    if (node.aimKind && !aimEnabled()) card.addClass("vam-aim-hidden");
     if (node.aimKind === "conclusion") {
       const background = createSvg("svg");
       background.addClass("vam-conclusion-background");
@@ -10537,6 +10594,7 @@ export class VisualAgentMapView extends ItemView {
       aimData = doc?.aim;
     // An AIM question, and the AIM root topic that owns the first branch, show the branch progress instead of note state.
     const aimProgress =
+      aimEnabled() &&
       !!aimData &&
       (node.aimKind === "question" ||
         (node.aimKind === "topic" &&
@@ -10558,7 +10616,7 @@ export class VisualAgentMapView extends ItemView {
             ? t("ui.aim_answered_not_started")
             : t(key[status])
       });
-    } else if (!node.aimKind || active || queued || !note || note.status !== "completed" || research) {
+    } else if (!isAimNode(node) || active || queued || !note || note.status !== "completed" || research) {
       const statusText = research
         ? this.researchStageText(research)
         : merging
@@ -10587,7 +10645,7 @@ export class VisualAgentMapView extends ItemView {
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
-      } else if (!note || note.status !== (node.aimKind ? "completed" : "idea") || active || queued) {
+      } else if (!note || note.status !== (isAimNode(node) ? "completed" : "idea") || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (note?.status ?? "error")}`,
           text: statusText
@@ -10636,8 +10694,8 @@ export class VisualAgentMapView extends ItemView {
     // The model tag follows the marker row (see paintModelTag).
     this.paintModelTag(card, header, note);
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
-    this.paintCardColor(card, note, !!node.aimKind);
-    this.paintCardStyle(card, note, !!node.aimKind);
+    this.paintCardColor(card, note, isAimNode(node));
+    this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
@@ -10694,7 +10752,7 @@ export class VisualAgentMapView extends ItemView {
     if (research?.stage === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
     const pendingCount = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
-    if (pendingCount && !this.selection.state.multiSelectMode && !this.map?.aim)
+    if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () =>
         this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
@@ -10703,8 +10761,8 @@ export class VisualAgentMapView extends ItemView {
       note &&
       note.researchMode === "local" &&
       !this.selection.state.multiSelectMode &&
-      !this.map?.aim &&
-      !node.aimKind &&
+      !this.aimLive() &&
+      !isAimNode(node) &&
       !active &&
       !queued &&
       !research &&
@@ -10719,7 +10777,7 @@ export class VisualAgentMapView extends ItemView {
     if (
       note?.status === "error" &&
       !this.selection.state.multiSelectMode &&
-      !node.aimKind &&
+      !isAimNode(node) &&
       !active &&
       !queued &&
       !research &&
@@ -10731,13 +10789,13 @@ export class VisualAgentMapView extends ItemView {
       waitingOutline &&
       waitingOutline.mapPath === this.path &&
       !this.selection.state.multiSelectMode &&
-      !this.map?.aim
+      !this.aimLive()
     )
       this.button(header, t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length), () =>
         this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !this.map?.aim) {
+    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !this.aimLive()) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -10772,7 +10830,7 @@ export class VisualAgentMapView extends ItemView {
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
     if (!this.selection.state.multiSelectMode) {
-      if (!this.map?.aim) {
+      if (!this.aimLive()) {
         const structure = this.button(tools, t("ui.node_tool_links"), () =>
           this.whenEditing(() => this.openNodePanel(node, "structure"))
         );
@@ -10794,13 +10852,13 @@ export class VisualAgentMapView extends ItemView {
           select.addClass("vam-node-tool", "vam-select-subtopics-tool");
           select.setAttr("aria-label", t("ui.select_subtopics_hint"));
         }
-        if (this.canEditText() && !node.aimKind)
+        if (this.canEditText() && !isAimNode(node))
           this.button(tools, t("ui.text_node_add"), () => this.whenEditing(() => this.addTextNodeUnder(node))).addClass(
             "vam-node-tool",
             "vam-add-text-tool"
           );
       }
-      if (node.aimKind === "question") {
+      if (aimEnabled() && this.map?.aim && node.aimKind === "question") {
         const remove = this.button(tools, t("ui.node_tool_remove"), () =>
           this.whenEditing(() => this.confirmRemoveNode(node))
         );
@@ -10808,6 +10866,7 @@ export class VisualAgentMapView extends ItemView {
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
       if (
+        aimEnabled() &&
         this.map?.aim &&
         node.aimKind === "synthesis" &&
         this.map.aim.branches.some(branch => branch.results.some(result => result.nodeId === node.id))
@@ -10823,7 +10882,7 @@ export class VisualAgentMapView extends ItemView {
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (this.map?.aim && assumptions.length) {
+      if (aimEnabled() && this.map?.aim && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -10836,7 +10895,7 @@ export class VisualAgentMapView extends ItemView {
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (this.map?.aim && node.aimKind === "conclusion") {
+      if (aimEnabled() && this.map?.aim && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -10850,12 +10909,12 @@ export class VisualAgentMapView extends ItemView {
     const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.selection.state.multiSelectMode && !this.map?.aim)
+    if (!this.selection.state.multiSelectMode && !this.aimLive())
       this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openNextStep(node))).addClass(
         "vam-node-tool",
         "vam-ai-explore"
       );
-    if (!this.selection.state.multiSelectMode && !this.map?.aim) {
+    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
       const add = this.button(card, "+", () => this.whenEditing(() => this.enqueue(() => this.addNode(node))));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
@@ -10868,7 +10927,7 @@ export class VisualAgentMapView extends ItemView {
     // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Edit card".
     // It is handled on the card: enableDrag captures the pointer on the card, so a real mouse reports the card (not the
     // title or the picture) as the dblclick target.
-    if (note && !this.selection.state.multiSelectMode && !this.map?.aim)
+    if (note && !this.selection.state.multiSelectMode && !this.aimLive())
       card.addEventListener("dblclick", event => this.onCardDoubleClick(event, card, title, node, note.title));
     // An unresearched topic's placeholder summary repeats its status, so the frontier card stays quiet.
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
@@ -10884,7 +10943,7 @@ export class VisualAgentMapView extends ItemView {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && this.map?.aim) {
+    if (node.aimKind === "conclusion" && aimEnabled() && this.map?.aim) {
       const branch = this.map.aim.branches.find(item => item.results.some(result => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some(item => item.parentId === node.id && item.aimKind === "question");
       if (
@@ -10901,7 +10960,12 @@ export class VisualAgentMapView extends ItemView {
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && this.map?.aim && !this.map.nodes.some(item => item.aimKind === "question")) {
+    if (
+      node.aimKind === "topic" &&
+      aimEnabled() &&
+      this.map?.aim &&
+      !this.map.nodes.some(item => item.aimKind === "question")
+    ) {
       const initialBranch = this.map.aim.branches.find(item => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter(item => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some(run => {
@@ -10945,7 +11009,7 @@ export class VisualAgentMapView extends ItemView {
         );
       }
     }
-    if (node.aimKind === "question" && this.map?.aim) {
+    if (node.aimKind === "question" && aimEnabled() && this.map?.aim) {
       const branch = this.map.aim.branches.find(item => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
@@ -10995,7 +11059,7 @@ export class VisualAgentMapView extends ItemView {
         }
       }
     }
-    if (node.aimKind === "answer" && this.map?.aim) {
+    if (node.aimKind === "answer" && aimEnabled() && this.map?.aim) {
       const branch = this.map.aim.branches.find(item => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find(item => item.id === branch.questionNodeId);
       if (branch) {
@@ -11012,6 +11076,7 @@ export class VisualAgentMapView extends ItemView {
     }
     this.enableDrag(card, node);
     // Built during a presentation too: the stylesheet hides them and every handler returns early while presenting, so ending it needs no repaint.
+    // Left as it was while AIM is hidden: an AIM card keeps no resize handles (a source-text test pins this condition).
     if (!this.selection.state.multiSelectMode && !this.map?.aim && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
@@ -11038,7 +11103,7 @@ export class VisualAgentMapView extends ItemView {
         this.moveKeyboardFocus(target);
         return;
       }
-      const editable = !this.selection.state.multiSelectMode && !this.map?.aim;
+      const editable = !this.selection.state.multiSelectMode && !this.aimLive();
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -11061,7 +11126,7 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
       }
-      if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !this.map?.aim) {
+      if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !this.aimLive()) {
         if (event.defaultPrevented) return; // the view scope already handled this F2
         event.preventDefault();
         this.renameNode(node, note.title);
@@ -11072,7 +11137,7 @@ export class VisualAgentMapView extends ItemView {
           this.applySelectionChange(this.selection.toggleByEnter(node.id));
         } else {
           this.selectMapNode(node);
-          if (node.aimKind === "question") this.openAimAnswer(node);
+          if (aimEnabled() && this.map?.aim && node.aimKind === "question") this.openAimAnswer(node);
           else this.openDetails(node);
         }
       }
@@ -11399,7 +11464,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Hypothesis and evidence features exist on ordinary maps only: not AIM. */
   private relationsEnabled(): boolean {
-    return !!this.map && !this.map.aim;
+    return !!this.map && !this.aimLive();
   }
   private isHypothesis(id: string): boolean {
     return this.notes.get(id)?.topicKind === "hypothesis";
@@ -11407,13 +11472,13 @@ export class VisualAgentMapView extends ItemView {
   /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM shows none). */
   private topicKindOf(id: string): TopicKind {
     const node = this.map?.nodes.find(item => item.id === id);
-    if (!this.relationsEnabled() || !node || node.aimKind) return "topic";
+    if (!this.relationsEnabled() || !node || isAimNode(node)) return "topic";
     return this.notes.get(id)?.topicKind ?? "topic";
   }
   /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
   private hypothesisStrengthOf(id: string): HypothesisStrength | undefined {
     const node = this.map?.nodes.find(item => item.id === id);
-    if (!this.relationsEnabled() || !node || node.aimKind || !this.isHypothesis(id)) return undefined;
+    if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return undefined;
     return this.notes.get(id)?.hypothesisStrength ?? "weak";
   }
   private hypothesisTagText(strength: HypothesisStrength): string {
@@ -11705,10 +11770,17 @@ export class VisualAgentMapView extends ItemView {
   shareSnapshot():
     { map: MapDocument; notes: Map<string, Note>; goal?: string; mapPath: string } | "none" | "aim" | "empty" {
     if (!this.map || !this.path) return "none";
-    if (this.map.aim || this.map.nodes.some(node => node.aimKind !== undefined)) return "aim";
+    if (aimEnabled() && (this.map.aim || this.map.nodes.some(node => node.aimKind !== undefined))) return "aim";
     if (!this.map.nodes.length) return "empty";
+    const copy = JSON.parse(JSON.stringify(this.map)) as MapDocument;
+    if (!aimEnabled() && copy.aim) {
+      // An old AIM map shares like any map (AIM is hidden): without its interim results and without any AIM data.
+      const superseded = supersededAimNodeIds(copy);
+      delete copy.aim;
+      copy.nodes = copy.nodes.filter(node => !superseded.has(node.id)).map(node => withoutAimFields(node));
+    }
     return {
-      map: JSON.parse(JSON.stringify(this.map)) as MapDocument,
+      map: copy,
       notes: new Map(this.notes),
       ...(this.relevanceGoal ? { goal: this.relevanceGoal } : {}),
       mapPath: this.path
@@ -11897,8 +11969,8 @@ export class VisualAgentMapView extends ItemView {
       this.paintCardLinks(card, header, node.id);
       this.paintModelTag(card, header, note);
     }
-    this.paintCardColor(card, note, !!node.aimKind);
-    this.paintCardStyle(card, note, !!node.aimKind);
+    this.paintCardColor(card, note, isAimNode(node));
+    this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
@@ -12430,7 +12502,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Sets a topic's type: the note's `topic-kind` and Map.md (viewport only) in one undoable step. Id, parent and relations are not touched. */
   private async changeTopicKind(node: MapNode, kind: TopicKind): Promise<void> {
-    if (!this.map || !this.relationsEnabled() || node.aimKind || this.topicKindOf(node.id) === kind) return;
+    if (!this.map || !this.relationsEnabled() || isAimNode(node) || this.topicKindOf(node.id) === kind) return;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .rewriteNote(node.path, path => this.plugin.repo.writeTopicKind(path, kind))
@@ -12748,7 +12820,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
   private renderAddSubtopic(actions: HTMLElement, node: MapNode, close?: () => void): void {
-    if (!this.relationsEnabled() || node.aimKind) return;
+    if (!this.relationsEnabled() || isAimNode(node)) return;
     const addChild = actions.createEl("button", { text: t("ui.add_subtopic_menu"), cls: "vam-add-subtopic" });
     addChild.addEventListener("click", event => {
       event.stopPropagation();
@@ -12818,7 +12890,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Markers can be edited only on an ordinary editable map: not an AIM map or the select mode. */
   private markersEditable(node: MapNode): boolean {
-    return this.relationsEnabled() && !node.aimKind && !this.selection.state.multiSelectMode;
+    return this.relationsEnabled() && !isAimNode(node) && !this.selection.state.multiSelectMode;
   }
   /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
   private renderMarkerSection(panel: HTMLElement, node: MapNode): void {
@@ -12866,7 +12938,7 @@ export class VisualAgentMapView extends ItemView {
   /** The directions this branch may take of its own: those the parse keeps (never the one opposite its parent's). */
   private branchLayoutChoices(node: MapNode): BranchDirection[] {
     const map = this.map;
-    if (!map || map.aim || !node.parentId) return [];
+    if (!map || this.aimLive(map) || !node.parentId) return [];
     const mapDirection = layoutOf(map).direction;
     if (!allowsBranchLayout(mapDirection)) return [];
     // Offer only what `cleanBranchLayouts` keeps: a value it would delete on parse must never be written.
@@ -12881,7 +12953,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** One undo step: sets or clears this branch's own arrangement (null follows the map), then re-arranges. */
   private async changeBranchLayout(node: MapNode, direction: BranchDirection | null): Promise<void> {
-    if (!this.map || this.map.aim) return;
+    if (!this.map || this.aimLive()) return;
     const latest = this.map.nodes.find(item => item.id === node.id);
     if (!latest) return;
     if (direction && !this.branchLayoutChoices(latest).includes(direction)) return;
@@ -13267,9 +13339,9 @@ export class VisualAgentMapView extends ItemView {
    * Locking first stops the AI runs on them; their late results are fenced at write time. Not on AIM maps.
    */
   async setAiLock(nodes: readonly MapNode[], locked: boolean): Promise<void> {
-    if (!this.map || this.map.aim) return;
+    if (!this.map || this.aimLive()) return;
     const targets = nodes.filter(
-      node => !node.aimKind && !!this.notes.get(node.id) && (this.notes.get(node.id)?.aiLocked === true) !== locked
+      node => !isAimNode(node) && !!this.notes.get(node.id) && (this.notes.get(node.id)?.aiLocked === true) !== locked
     );
     if (!targets.length) return;
     if (locked) for (const node of targets) this.stopAiOn(node.path);
@@ -13291,10 +13363,10 @@ export class VisualAgentMapView extends ItemView {
    * the rest otherwise, in one undo step. Not on AIM maps.
    */
   private renderAiLockSelectionButton(selection: HTMLElement): void {
-    if (!this.map || this.map.aim) return;
+    if (!this.map || this.aimLive()) return;
     const nodes = [...this.selection.state.multiSelected]
       .map(id => this.map?.nodes.find(node => node.id === id))
-      .filter((node): node is MapNode => !!node && !node.aimKind && !!this.notes.get(node.id));
+      .filter((node): node is MapNode => !!node && !isAimNode(node) && !!this.notes.get(node.id));
     const locked = nodes.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
     const all = nodes.length > 0 && locked === nodes.length;
     const button = this.button(
@@ -13312,7 +13384,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
   private renderAiLockSection(panel: HTMLElement, node: MapNode): void {
-    if (!this.map || this.map.aim || node.aimKind || this.selection.state.multiSelectMode) return;
+    if (!this.map || this.aimLive() || isAimNode(node) || this.selection.state.multiSelectMode) return;
     const section = panel.createDiv("vam-inspector-section vam-ai-lock-section");
     section.createEl("strong", { text: t("ui.ai_lock"), cls: "vam-topic-tree-heading vam-section-heading" });
     const group = section.createDiv("vam-topic-markers vam-choice-group");
@@ -13347,7 +13419,7 @@ export class VisualAgentMapView extends ItemView {
       cardAiLockButtons.delete(card);
       delete card.dataset.aiLocked;
     }
-    if (!this.map || this.map.aim || node.aimKind || this.notes.get(node.id)?.aiLocked !== true) return;
+    if (!this.map || this.aimLive() || isAimNode(node) || this.notes.get(node.id)?.aiLocked !== true) return;
     card.dataset.aiLocked = "true";
     const button = header.createEl("button", { cls: "vam-card-ai-lock" });
     cardAiLockButtons.set(card, button);
@@ -13474,7 +13546,7 @@ export class VisualAgentMapView extends ItemView {
     const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
     const targets = ids
       .map(id => this.map!.nodes.find(item => item.id === id))
-      .filter((item): item is MapNode => !!item && !item.aimKind && !!this.notes.get(item.id))
+      .filter((item): item is MapNode => !!item && !isAimNode(item) && !!this.notes.get(item.id))
       .filter(item => (TOPIC_COLORS.find(id => id === this.notes.get(item.id)?.color) ?? null) !== color);
     if (!targets.length) return;
     const viewport = clone(this.map.viewport);
@@ -13581,7 +13653,7 @@ export class VisualAgentMapView extends ItemView {
     const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
     const targets = ids
       .map(id => this.map!.nodes.find(item => item.id === id))
-      .filter((item): item is MapNode => !!item && !item.aimKind && !!this.notes.get(item.id))
+      .filter((item): item is MapNode => !!item && !isAimNode(item) && !!this.notes.get(item.id))
       .filter(item => this.styleOf(item.id).join() !== wanted.join());
     if (!targets.length) return;
     const viewport = clone(this.map.viewport);
@@ -13600,7 +13672,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
   private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
-    if (!this.relationsEnabled() || node.aimKind) return;
+    if (!this.relationsEnabled() || isAimNode(node)) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
     const editByPair = new Map<string, HTMLElement>();
@@ -14226,7 +14298,7 @@ export class VisualAgentMapView extends ItemView {
     return `multi-research:${this.path}`;
   }
   private openMultiResearch(retryBatchKey?: string): void {
-    if (!this.map || this.map.aim || !this.selection.state.multiSelected.size) return;
+    if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const shown = [...this.selection.state.multiSelected].flatMap(id => {
       const note = this.notes.get(id);
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
@@ -14253,7 +14325,7 @@ export class VisualAgentMapView extends ItemView {
     retryBatchKey?: string,
     onSettled?: (web: ResearchWebTally) => void
   ): Promise<void> {
-    if (!this.map || this.map.aim || !this.selection.state.multiSelected.size) return;
+    if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const key = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key)) {
       new Notice(t("ui.multi_research_already_running"));
@@ -14401,7 +14473,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Failed topics of a finished batch that still exist on the current map. */
   private retryableFailures(batch: ExpansionBatchState): MapNode[] {
-    if (batch.status === "running" || !this.map || this.map.aim) return [];
+    if (batch.status === "running" || !this.map || this.aimLive()) return [];
     return batch.failedPaths
       .map(path => this.map!.nodes.find(node => node.path === path))
       .filter((node): node is MapNode => !!node);
@@ -14433,7 +14505,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "Retry with <other provider>": only when {@link otherProviderTarget} has one. Never an automatic switch. */
   private renderOtherProviderButton(parent: HTMLElement, nodes: MapNode[], retryBatchKey?: string): void {
-    if (this.map?.aim) return;
+    if (this.aimLive()) return;
     const target = this.otherProviderTarget(nodes);
     if (!target) return;
     this.button(
@@ -14518,14 +14590,14 @@ export class VisualAgentMapView extends ItemView {
       !this.selection.state.multiSelected.size
     );
     // Frames are added from here (the only multi-selection surface); AIM maps get no entry (D11).
-    if (!this.map?.aim)
+    if (!this.aimLive())
       this.button(
         selection,
         t("ui.canvas_boundary_add"),
         () => this.openAddBoundary(),
         !this.selection.state.multiSelected.size
       );
-    if (!this.map?.aim) {
+    if (!this.aimLive()) {
       // Not natively disabled (like Merge): a disabled button cannot take focus, so the reason would stay unreadable.
       const check = this.summaryEntryCheck(this.summaryTargets()),
         bracket = this.button(selection, t("ui.summary_add"), () => this.addSummaryOver());
@@ -14553,7 +14625,7 @@ export class VisualAgentMapView extends ItemView {
     const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
     synthesize.addClass("mod-cta");
     if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
-    if (!this.map?.aim) {
+    if (!this.aimLive()) {
       // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
       const check = this.mergeCheck(),
         merge = this.button(selection, t("ui.merge"), () => this.openMerge());
@@ -14563,7 +14635,7 @@ export class VisualAgentMapView extends ItemView {
         merge.setAttr("title", t(check.reason));
       }
     }
-    if (!this.map?.aim) {
+    if (!this.aimLive()) {
       const running = this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running";
       const research = this.button(
         selection,
@@ -16020,7 +16092,7 @@ export class VisualAgentMapView extends ItemView {
   /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) the user did not ask to start blank. */
   private chatHero(): boolean {
     if (!this.chat || this.chat.hasMessages || !this.map || this.blankMapPaths.has(this.path)) return false;
-    return !this.map.aim && this.map.nodes.length === 0;
+    return !this.aimLive() && this.map.nodes.length === 0;
   }
   /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
   private placeChatPanel(): void {
@@ -16413,7 +16485,7 @@ export class VisualAgentMapView extends ItemView {
         kind: this.topicKindOf(node.id),
         ...(strength ? { strength } : {}),
         // The appearance the card shows (whitelisted values only); the context leaves it out on an AIM map.
-        ...(node.aimKind
+        ...(isAimNode(node)
           ? {}
           : {
               color: this.notes.get(node.id)?.color,
@@ -17051,7 +17123,12 @@ export class VisualAgentMapView extends ItemView {
         status: "done",
         text:
           t("ui.map_chat_line_done_0", label) +
-          (outcome.skippedCards ? t("ui.map_chat_line_cards_skipped_0", outcome.skippedCards) : "")
+          (outcome.skippedCards
+            ? t(
+                aimEnabled() ? "ui.map_chat_line_cards_skipped_0" : "ui.map_chat_line_cards_skipped_hidden_0",
+                outcome.skippedCards
+              )
+            : "")
       };
     return {
       status: outcome.status,
@@ -17724,7 +17801,7 @@ export class VisualAgentMapView extends ItemView {
       .map(id => (id ? this.map?.nodes.find(node => node.id === id) : undefined))
       .filter((node): node is MapNode => !!node);
     if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
-    const editable = nodes.filter(node => !node.aimKind && this.notes.get(node.id));
+    const editable = nodes.filter(node => !isAimNode(node) && this.notes.get(node.id));
     if (!editable.length) return skipped("ui.map_chat_skip_unavailable");
     if (editable.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
     // Named cards that are gone, belong to an AIM map or have no note are left out; the line says how many.
@@ -17779,7 +17856,7 @@ export class VisualAgentMapView extends ItemView {
     if (fromId === null || toId === null) return skipped("ui.map_chat_skip_parent_missing");
     const ends = [fromId, toId].map(id => this.map?.nodes.find(node => node.id === id));
     if (ends.some(node => !node)) return skipped("ui.map_chat_skip_topic_gone");
-    if (ends.some(node => node?.aimKind)) return skipped("ui.map_chat_skip_unavailable");
+    if (ends.some(node => isAimNode(node))) return skipped("ui.map_chat_skip_unavailable");
     const pair = (link: TopicRelation): boolean =>
       (link.from === fromId && link.to === toId) || (link.from === toId && link.to === fromId);
     const link: TopicRelation = {
@@ -17832,7 +17909,7 @@ export class VisualAgentMapView extends ItemView {
       .map(id => (id ? this.map?.nodes.find(node => node.id === id) : undefined))
       .filter((node): node is MapNode => !!node);
     if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
-    const typed = nodes.filter(node => !node.aimKind);
+    const typed = nodes.filter(node => !isAimNode(node));
     if (!typed.length) return skipped("ui.map_chat_skip_unavailable");
     if (typed.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
     const kind = action.topicKind;
@@ -18209,7 +18286,7 @@ export class VisualAgentMapView extends ItemView {
     const fence = (): { reason: TranslationKey } | { node: MapNode } => {
       if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
         return { reason: "ui.map_chat_images_stale_map" };
-      if (this.map.aim) return { reason: "ui.map_chat_images_stale_locked" };
+      if (this.aimLive()) return { reason: "ui.map_chat_images_stale_locked" };
       const node = this.map.nodes.find(candidate => candidate.id === block.nodeId);
       if (!node) return { reason: "ui.map_chat_images_stale_gone" };
       if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
@@ -18499,7 +18576,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Topic selection (remove, move, copy, synthesize, merge) exists only on editable, non-AIM maps. */
   private canSelectTopics(): boolean {
-    return !!this.map && !this.map.aim;
+    return !!this.map && !this.aimLive();
   }
   /** Starts topic selection with exactly the card's direct subtopics picked (replacing any earlier selection). */
   private selectSubtopics(node: MapNode): void {
@@ -19084,7 +19161,7 @@ export class VisualAgentMapView extends ItemView {
           this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {
           this.applySelectionChange(this.selection.click(node.id));
-          if (node.aimKind === "question") this.openAimAnswer(node);
+          if (aimEnabled() && this.map?.aim && node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
         }
       };
@@ -19803,7 +19880,7 @@ export class VisualAgentMapView extends ItemView {
    * row writes nothing.
    */
   private async chooseTopicStyle(node: MapNode): Promise<void> {
-    if (!this.map || this.map.aim || this.presentation || node.aimKind) return;
+    if (!this.map || this.aimLive() || this.presentation || isAimNode(node)) return;
     const path = node.path;
     const note = await this.plugin.repo.readNote(path, this.map);
     const refocus = (): void => this.cardEls.get(node.id)?.focus?.();

@@ -447,6 +447,7 @@ import { aimRepairHint, aimTimedOut } from "../aim/failure-hint";
 import { canvasPointerIntent } from "./canvas-gestures";
 import {
   hasMergeContent,
+  mergedAiLocked,
   sharedMergeAppearance,
   mergedDetail,
   mergedStatus,
@@ -5815,7 +5816,8 @@ export class VisualAgentMapView extends ItemView {
     new MergeTopicsModal(
       this.app,
       snapshot.sources.length,
-      this.notes.get(check.sources[0].id)?.title ?? "",
+      this.notes.get((check.sources.find(source => this.notes.get(source.id)?.aiLocked) ?? check.sources[0]).id)
+        ?.title ?? "",
       title =>
         this.enqueue(async () => {
           try {
@@ -6207,6 +6209,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (appearance) await repo.writeTopicAppearance(created.path, appearance);
+      if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(created.path, true);
       if (content) {
         const detailTemplate = (await this.mapStyle(language)).template;
         await repo.updateNote(
@@ -6325,6 +6328,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       const tx = this.beginMapTransaction().rewriteNote(target.path, async path => {
         await repo.updateNote(path, patch, { detailTemplate });
+        if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
       });
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
       entry = await tx

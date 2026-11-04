@@ -55912,6 +55912,7 @@ ${request.requirements}` : preset.text,
   queueCharts(job) {
     var _a2;
     const path = job.path;
+    if (job.saved.aiLocked) return;
     const snapshot = this.chartSnapshot(job.saved);
     const map = (_a2 = this.map) != null ? _a2 : void 0;
     this.plugin.addChartsAfterWrite({
@@ -55924,7 +55925,7 @@ ${request.requirements}` : preset.text,
         var _a3;
         if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
-        if (this.chartSnapshot(latest) !== snapshot) return false;
+        if (latest.aiLocked || this.chartSnapshot(latest) !== snapshot) return false;
         const top = job.updateMode === "top";
         if (top && !((_a3 = job.preserve) == null ? void 0 : _a3.call(job, charted))) return false;
         await this.plugin.repo.updateNote(
@@ -59613,6 +59614,9 @@ ${request.requirements}` : preset.text,
     (_a2 = this.startingTasks.get(path)) == null ? void 0 : _a2.abort();
     (_b2 = this.plugin.topicRuns.taskController(path)) == null ? void 0 : _b2.abort();
     this.plugin.topicRuns.stop(path);
+    this.plugin.abortChartJobs(path);
+    const synthesis = this.synthesisTasks.get(path);
+    if ((synthesis == null ? void 0 : synthesis.state) === "running") synthesis.controller.abort();
   }
   /**
    * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).
@@ -72170,6 +72174,14 @@ function runStyleLabelText(label, language2) {
 
 // experiences/visual-map/topic-run.ts
 var CHART_JOB_LIMIT = 3;
+function aiLockedError() {
+  const error = new Error(t("ui.ai_locked_notice"));
+  error.name = "AiLockedError";
+  return error;
+}
+function isAiLockedError(error) {
+  return error instanceof Error && error.name === "AiLockedError";
+}
 var TopicRuns = class {
   constructor(ports) {
     this.ports = ports;
@@ -72360,6 +72372,10 @@ var TopicRuns = class {
       }
       const repo = this.ports.repository();
       const note = await repo.readNote(path, options.map());
+      if (note.aiLocked) {
+        options.failed(t("ui.ai_locked_notice"));
+        return;
+      }
       const used = await this.modelOf(path, note, options.map(), options.runOnce);
       (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
       const progress = this.startProgress(path, used.model);
@@ -72432,6 +72448,10 @@ var TopicRuns = class {
     };
     const repo = this.ports.repository();
     const note = await repo.readNote(path, options.map());
+    if (note.aiLocked) {
+      fail2(t("ui.ai_locked_notice"));
+      return;
+    }
     const used = await this.modelOf(path, note, options.map(), options.runOnce);
     const noteSnapshot = (item) => JSON.stringify([
       item.title,
@@ -72496,6 +72516,7 @@ var TopicRuns = class {
         if (signal.aborted || prepared.viewChanged()) throw changed();
         if (await prepared.sourcesChanged()) throw changed();
         const latest = await repo.readNote(path, options.map());
+        if (latest.aiLocked) throw aiLockedError();
         if (noteSnapshot(latest) !== snapshot) throw changed();
         const mode = (_a3 = prepared.updateMode) != null ? _a3 : "merge";
         const noteLanguage = noteLanguageOf(outputLanguage2);
@@ -72576,7 +72597,8 @@ var TopicRuns = class {
       try {
         await options.drafted(result, save, result.summary, result.detail, note);
       } catch (error) {
-        if (signal.aborted || error instanceof Error && error.name === "AbortError") {
+        if (isAiLockedError(error)) fail2(t("ui.ai_locked_notice"));
+        else if (signal.aborted || error instanceof Error && error.name === "AbortError") {
           fail2(t("ui.research_stopped_existing_content_was_preserved"));
         } else {
           console.error("VAM synthesis write", error);

@@ -341,6 +341,16 @@ export interface TopicRunHandle {
   release(): void;
 }
 
+/** The error a write-time AI lock check throws; entries report it with the locked notice, not as a failure. */
+export function aiLockedError(): Error {
+  const error = new Error(t("ui.ai_locked_notice"));
+  error.name = "AiLockedError";
+  return error;
+}
+export function isAiLockedError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AiLockedError";
+}
+
 export class TopicRuns {
   /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
   get running(): Set<string> {
@@ -561,6 +571,11 @@ export class TopicRuns {
       }
       const repo = this.ports.repository()!;
       const note = await repo.readNote(path, options.map());
+      // AI lock: the directions lead to a rewrite of this topic, so a locked topic is refused before any AI call.
+      if (note.aiLocked) {
+        options.failed(t("ui.ai_locked_notice"));
+        return;
+      }
       const used = await this.modelOf(path, note, options.map(), options.runOnce);
       options.onStarted?.();
       const progress = this.startProgress(path, used.model);
@@ -637,6 +652,11 @@ export class TopicRuns {
     };
     const repo = this.ports.repository()!;
     const note = await repo.readNote(path, options.map());
+    // AI lock: a locked topic is refused before anything is written or any AI call is made.
+    if (note.aiLocked) {
+      fail(t("ui.ai_locked_notice"));
+      return;
+    }
     const used = await this.modelOf(path, note, options.map(), options.runOnce);
     const noteSnapshot = (item: Note): string =>
       JSON.stringify([
@@ -706,6 +726,8 @@ export class TopicRuns {
           if (signal.aborted || prepared.viewChanged()) throw changed();
           if (await prepared.sourcesChanged()) throw changed();
           const latest = await repo.readNote(path, options.map());
+          // The late-result fence: a topic locked while the AI ran gets nothing (its status is already back).
+          if (latest.aiLocked) throw aiLockedError();
           if (noteSnapshot(latest) !== snapshot) throw changed();
           const mode: WritebackMode = prepared.updateMode ?? "merge";
           const noteLanguage = noteLanguageOf(outputLanguage);
@@ -798,7 +820,8 @@ export class TopicRuns {
       try {
         await options.drafted(result, save, result.summary, result.detail, note);
       } catch (error) {
-        if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+        if (isAiLockedError(error)) fail(t("ui.ai_locked_notice"));
+        else if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {
           fail(t("ui.research_stopped_existing_content_was_preserved"));
         } else {
           console.error("VAM synthesis write", error);

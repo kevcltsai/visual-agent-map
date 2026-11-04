@@ -167,6 +167,7 @@ import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materi
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
+import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
 import { MapSwitcherModal } from "../../ui/modals/map-switcher-modal";
@@ -3850,11 +3851,11 @@ export class VisualAgentMapView extends ItemView {
       width: node.width,
       shape: coverShapes.get(picture.path) ?? null,
       card: () => this.cardForEditor(node),
-      onApply: ({ frame, width, ...look }) =>
+      onApply: ({ frame, width, title, summary, ...look }) =>
         new Promise<void>(done =>
           this.enqueue(async () => {
             try {
-              await this.changeTopicCoverFrame(node, frame, look, width);
+              await this.applyCardEdit(node, frame, look, width, { title, summary });
             } finally {
               done();
             }
@@ -3863,6 +3864,32 @@ export class VisualAgentMapView extends ItemView {
     });
     modal.open();
     return modal;
+  }
+  /**
+   * Apply of the "Edit card" dialog: the cover/size/position/width write, then a changed title or summary through
+   * noteChange (the same path as the map's rename and a summary write: validation, preview follow, undo bookkeeping).
+   * Everything pushed is folded into ONE undo step.
+   */
+  private async applyCardEdit(
+    node: MapNode,
+    frame: CoverFrame | null,
+    look: Omit<CoverLook, "frame">,
+    width: number | undefined,
+    text: { title?: string; summary?: string }
+  ): Promise<void> {
+    const mark = this.history.mark();
+    try {
+      const entry = await this.changeTopicCoverFrame(node, frame, look, width);
+      if (!entry) return;
+      const patch: NotePatch = {};
+      // An empty title is never written (the dialog refuses it too); the old title stays.
+      if (text.title?.trim() && !titleProblemText(text.title)) patch.title = text.title.trim();
+      if (text.summary !== undefined) patch.summary = text.summary;
+      if (Object.keys(patch).length) await this.noteChange(node, patch);
+    } finally {
+      this.history.collapseSince(mark, t("ui.topic_cover_frame_title"));
+      this.updateHistoryButtons();
+    }
   }
   /**
    * A detached copy of the topic's card for the "Edit card" dialog, so the dialog shows the card exactly as the map does
@@ -3878,6 +3905,19 @@ export class VisualAgentMapView extends ItemView {
         if (["id", "tabindex", "role", "data-node-id"].includes(name) || name.startsWith("aria-"))
           card.removeAttribute(name);
       card.removeClass(...CARD_EDITOR_STATES);
+      // The title and summary are typed in place, so they hold the saved text (not a streaming preview or extras).
+      const note = this.notes?.get(node.id);
+      const title = card.querySelector<HTMLElement>(".vam-card-title");
+      if (note && title) title.setText(note.title);
+      const summary = card.querySelector<HTMLElement>(".vam-card-summary");
+      if (note && summary) {
+        if (isPlaceholder(note.summary)) summary.remove();
+        else {
+          summary.removeClass("is-preview");
+          summary.setText(note.summary);
+          summary.removeAttribute("title");
+        }
+      }
       for (const property of ["left", "top", "height", "transform"]) card.style.removeProperty(property);
       return card;
     }

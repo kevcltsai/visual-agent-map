@@ -124,14 +124,16 @@ const withCapture = target => {
 };
 const num = value => parseFloat(value);
 
-test('dialog: titled "Edit card"; the card itself sits in the middle with its own width, and only its cover takes input', () => {
+test('dialog: titled "Edit card"; the card itself sits in the middle with its own width, and only its cover, width handle, title and summary take input', () => {
   const ui = openEditor({ initial: START });
   assert.equal(ui.modal.titleEl.text, 'Edit card');
   assert.ok(ui.cardEl, 'the card is in the dialog');
   assert.equal(ui.cardEl.style.width, '300px', 'the card keeps its own width');
   assert.equal(ui.cardEl.children[1], ui.cover, 'the cover takes the cover place: after the header, before the title');
   // The card-width handle (ticket 04) also takes input; everything else is shown, not edited.
-  for (const child of ui.cardEl.children) assert.equal(child.attrs.inert, child === ui.cover || dom.hasCls(child, 'vam-card-frame-width') ? undefined : '', dom.hasCls(child, 'vam-card-cover') ? 'cover' : child.cls);
+  // Ticket 05: the title and the summary take input too.
+  const live = child => child === ui.cover || ['vam-card-frame-width', 'vam-card-title', 'vam-card-summary'].some(name => dom.hasCls(child, name));
+  for (const child of ui.cardEl.children) assert.equal(child.attrs.inert, live(child) ? undefined : '', dom.hasCls(child, 'vam-card-cover') ? 'cover' : child.cls);
   assert.equal(dom.findAll(ui.el, i => dom.hasCls(i, 'vam-card-frame-image')).length, 0, 'no separate picture view');
 });
 
@@ -344,13 +346,15 @@ const { VisualAgentMapView } = replay.load(
   { window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o) }
 );
 const NOTE = 'Topics/m.md';
+const { History } = S.load('map-model.ts');
+const realHistory = () => { const history = new History(); Object.defineProperty(history, 'entries', { get: () => history.past }); return history; };
 async function harness(text, { cache = { frontmatter: {}, embeds: [{ link: 'img/a.png' }] }, nodes = [] } = {}) {
   const { repo, app, contents } = S.fixture('en', { linkIndex: true });
   await app.vault.create(NOTE, text);
   await app.vault.create('Topics/Map.md', S.core.serializeMap({ id: 'map-u', title: 'map-u', version: 1, nodes, viewport: { x: 0, y: 0, zoom: 1 } }));
   const view = Object.assign(Object.create(VisualAgentMapView.prototype), {
-    app, selection: new (S.load('experiences/visual-map/topic-selection.ts').TopicSelection)(),
-    plugin: { repo }, map: { nodes: JSON.parse(JSON.stringify(nodes)), viewport: { x: 0, y: 0, zoom: 1 } }, path: 'Topics/Map.md', history: { entries: [], push(entry) { this.entries.push(entry); } },
+    app, selection: new (S.load('experiences/visual-map/topic-selection.ts').TopicSelection)(), updateHistoryButtons() {},
+    plugin: { repo }, map: { nodes: JSON.parse(JSON.stringify(nodes)), viewport: { x: 0, y: 0, zoom: 1 } }, path: 'Topics/Map.md', history: realHistory(),
     beginMapTransaction: () => begin({ repo, rebuildDerivedData: async () => {}, onApplied: () => {}, checkConflict: async () => {} }),
     refreshAfterSavedChange: async () => {}
   });
@@ -630,7 +634,7 @@ test('position: switching to left or right with a picture over half the width se
   assert.ok(dom.find(big.cardEl, i => dom.hasCls(i, 'vam-card-side')).children.includes(big.coverEl), 'the cover is the picture column');
   assert.equal(big.coverEl.attrs.inert, undefined, 'the cover still takes input');
   const text = dom.find(big.cardEl, i => dom.hasCls(i, 'vam-card-side-text'));
-  assert.ok(text.children.every(child => child.attrs.inert === ''), 'the text column is shown, not edited');
+  assert.ok(text.children.every(child => (child.attrs.inert === '') === !(dom.hasCls(child, 'vam-card-title') || dom.hasCls(child, 'vam-card-summary'))), 'the text column is shown, only the title and summary take input');
   big.slider.value = '90';
   big.slider.input();
   big.choice('Right').click();
@@ -821,4 +825,182 @@ test('width: Apply from the opened dialog writes the map width and the note in o
   await dom.tick(); await dom.tick();
   assert.equal(h.view.history.entries.length, 1);
   assert.equal((await savedNode(h)).width, graph.CARD_WIDTH_MAX);
+});
+
+// ---- ticket 05: title and summary are typed in place
+const SUMMARY_TEXT = '---\ntype: topic\ntitle: M\nsummary: Old summary\ntopic-color: red\n---\n\n# M\n\n## Current Summary\n\nOld summary\n\n## Preview\n\nOld summary\n\n## Detail\n\nBody line\n';
+async function textHarness(text = SUMMARY_TEXT) {
+  const h = await harness(text, { nodes: mapNodes() });
+  Object.assign(h.view, {
+    notes: new Map(), render() {}, enqueue: fn => fn(),
+    plugin: { repo: h.repo, topicRuns: { stopTask() {}, dropPending() {}, flushPending: async () => {} }, pendingResearchOptions: new Map() }
+  });
+  h.view.notes.set('m', await h.repo.readNote(NOTE));
+  return h;
+}
+const openText = h => {
+  const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE, width: 360 });
+  const find = cls => dom.find(modal.contentEl, i => dom.hasCls(i, cls));
+  return {
+    modal, title: find('vam-card-title'), summary: find('vam-card-summary'), hint: find('vam-card-frame-hint'),
+    apply: dom.find(modal.contentEl, i => i.tag === 'button' && i.text === 'Apply'),
+    cancel: dom.find(modal.contentEl, i => i.tag === 'button' && i.text === 'Cancel'),
+    type(el, value) { el.text = value; el.fire('input'); }
+  };
+};
+const noteOf = h => h.contents.get(NOTE);
+const stamp = text => text.replace(/^updated: .*\n/m, '');
+const FRAMED = { cache: { frontmatter: {}, embeds: [{ link: 'img/a.png' }] } };
+
+test('text: the title and the summary of the dialog card are editable plain text, filled from the note', async () => {
+  const h = await textHarness();
+  const ui = openText(h);
+  assert.equal(ui.title.text, 'M');
+  assert.equal(ui.summary.text, 'Old summary');
+  for (const el of [ui.title, ui.summary]) {
+    assert.equal(el.attrs.contenteditable, 'plaintext-only');
+    assert.equal(el.attrs.inert, undefined);
+    assert.ok(el.attrs['aria-label']);
+  }
+  assert.equal(ui.apply.disabled, false);
+});
+
+test('text: changing the title writes what the map rename writes, byte for byte', async () => {
+  const viaRename = await textHarness();
+  await viaRename.view.noteChange({ id: 'm', path: NOTE }, { title: 'New name' });
+  const h = await textHarness();
+  const ui = openText(h);
+  ui.type(ui.title, '  New   name \n');
+  ui.apply.click();
+  await dom.tick(); await dom.tick();
+  assert.match(noteOf(h), /title: New name\n/);
+  assert.equal(stamp(noteOf(h).replace(/topic-cover-[^\n]*\n/g, '')), stamp(noteOf(viaRename)));
+});
+
+test('text: changing the summary writes what the existing summary write writes, and the preview follows', async () => {
+  const FOLLOW = '---\ntype: topic\ntitle: M\nsummary: Old summary\ntopic-color: red\n---\n\n# M\n\n## Current Summary\n\nOld summary\n\n## Detail\n\nBody line\n';
+  const viaSummary = await textHarness(FOLLOW);
+  await viaSummary.view.noteChange({ id: 'm', path: NOTE }, { summary: 'A new, longer summary' });
+  const h = await textHarness(FOLLOW);
+  const ui = openText(h);
+  ui.type(ui.summary, 'A new, longer summary');
+  ui.apply.click();
+  await dom.tick(); await dom.tick();
+  assert.equal(stamp(noteOf(h)), stamp(noteOf(viaSummary)), 'identical bytes to the existing summary write (the updated stamp aside)');
+  assert.match(noteOf(h), /## Current Summary\n\nA new, longer summary\n/);
+  assert.match(noteOf(h), /\[!info\]- Preview\n> A new, longer summary\n/, 'the preview follows the summary');
+  assert.match(noteOf(h), /Body line/);
+});
+
+test('text: a summary over the 2000-character limit is cut to it', async () => {
+  const h = await textHarness();
+  const ui = openText(h);
+  ui.type(ui.summary, 'x'.repeat(2500));
+  ui.apply.click();
+  await dom.tick(); await dom.tick();
+  assert.equal((await h.repo.readNote(NOTE)).summary.length, 2000);
+});
+
+test('text: an unchanged title and summary are not written; only the cover write remains', async () => {
+  const h = await textHarness();
+  const ui = openText(h);
+  ui.apply.click();
+  await dom.tick(); await dom.tick();
+  assert.match(noteOf(h), /title: M\n/);
+  assert.equal(h.view.history.past.length, 1);
+});
+
+test('text: an empty title is refused: Apply is off, a hint says why, Enter does not apply, and nothing is written', async () => {
+  const h = await textHarness();
+  const ui = openText(h);
+  ui.type(ui.title, '   ');
+  assert.equal(ui.apply.disabled, true);
+  assert.equal(ui.hint.text, 'Enter a name to save.');
+  assert.equal(ui.title.attrs['aria-invalid'], 'true');
+  ui.apply.click(); // a disabled button does not click; and the guard in apply() also holds
+  ui.title.keydown({ key: 'Enter', isComposing: false, preventDefault() {} });
+  await dom.tick(); await dom.tick();
+  assert.equal(noteOf(h), SUMMARY_TEXT, 'bytes unchanged');
+  assert.equal(h.view.history.past.length, 0);
+  ui.type(ui.title, 'Back');
+  assert.equal(ui.apply.disabled, false);
+  assert.equal(ui.hint.text, '');
+  ui.type(ui.title, 'Bad [[link]]');
+  assert.equal(ui.apply.disabled, true, 'the rename dialog\'s title checks apply too');
+  assert.ok(ui.hint.text);
+});
+
+test('text: Enter in the title or summary applies; Enter while an input method composes does nothing', async () => {
+  const h = await textHarness();
+  const ui = openText(h);
+  ui.type(ui.title, 'Composed');
+  let prevented = 0;
+  for (const el of [ui.title, ui.summary]) {
+    el.keydown({ key: 'Enter', isComposing: true, preventDefault() { prevented++; } });
+  }
+  await dom.tick(); await dom.tick();
+  assert.equal(prevented, 0, 'the composing Enter is left to the input method');
+  assert.equal(ui.modal.closeCount, 0, 'the dialog stays open');
+  assert.equal(noteOf(h), SUMMARY_TEXT, 'nothing written');
+  ui.summary.keydown({ key: 'Enter', isComposing: false, preventDefault() { prevented++; } });
+  await dom.tick(); await dom.tick();
+  assert.equal(prevented, 1, 'a real Enter inserts no line break');
+  assert.match(noteOf(h), /title: Composed\n/, 'a real Enter applies');
+});
+
+test('text: everything from the dialog (mask, size, position, width, title, summary) is ONE undo step; undo restores all bytes, redo writes all', async () => {
+  const h = await textHarness();
+  const mapBefore = await h.repo.readMap('Topics/Map.md');
+  const ui = openText(h);
+  dom.find(ui.modal.contentEl, i => dom.hasCls(i, 'vam-card-frame-width')).keydown({ key: 'End' });
+  ui.modal.setDraft(START);
+  ui.type(ui.title, 'Renamed');
+  ui.type(ui.summary, 'Fresh summary');
+  ui.apply.click();
+  await dom.tick(); await dom.tick();
+  assert.equal(h.view.history.past.length, 1, 'exactly one undo step');
+  assert.equal((await savedNode(h)).width, graph.CARD_WIDTH_MAX);
+  assert.match(noteOf(h), /title: Renamed\n/);
+  assert.match(noteOf(h), /topic-cover-frame/);
+  const afterNote = noteOf(h);
+  const afterMap = await h.repo.readMap('Topics/Map.md');
+  await h.view.history.undo().undo();
+  assert.equal(noteOf(h), SUMMARY_TEXT, 'note bytes restored, rename and summary included');
+  assert.deepEqual(await h.repo.readMap('Topics/Map.md'), mapBefore, 'map file restored');
+  await h.view.history.future.at(-1).redo();
+  assert.equal(stamp(noteOf(h)), stamp(afterNote), 'redo writes the same note (the updated stamp aside)');
+  assert.deepEqual(await h.repo.readMap('Topics/Map.md'), afterMap);
+});
+
+test('text: Cancel after typing a title and a summary leaves note and map bytes unchanged with no history', async () => {
+  const h = await textHarness();
+  const mapBefore = await h.repo.readMap('Topics/Map.md');
+  const ui = openText(h);
+  ui.type(ui.title, 'Nope');
+  ui.type(ui.summary, 'Nope either');
+  ui.cancel.click();
+  await dom.tick(); await dom.tick();
+  assert.equal(noteOf(h), SUMMARY_TEXT);
+  assert.deepEqual(await h.repo.readMap('Topics/Map.md'), mapBefore);
+  assert.equal(h.view.history.past.length, 0);
+});
+
+test('text: a topic without a summary gets an empty one to type in, right under the title; clearing the summary is allowed', async () => {
+  const h = await textHarness(TEXT);
+  const ui = openText(h);
+  assert.equal(ui.summary.text, '');
+  assert.equal(ui.summary.attrs['data-placeholder'], 'Add a summary');
+  assert.equal(ui.summary.parent.children.indexOf(ui.summary), ui.summary.parent.children.indexOf(ui.title) + 1);
+  ui.type(ui.summary, 'Typed from nothing');
+  ui.apply.click();
+  await dom.tick(); await dom.tick();
+  assert.equal((await h.repo.readNote(NOTE)).summary, 'Typed from nothing');
+});
+
+test('text: i18n has the new labels in every language, and the dialog shows the wrapped text in full', () => {
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const text = read(`i18n/${lang}.ts`);
+    for (const key of ['ui.card_edit_title_label', 'ui.card_edit_summary_label', 'ui.card_edit_summary_placeholder']) assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
+  }
+  assert.match(read('styles.css'), /\.vam-card-frame-stage \.vam-node \.vam-card-summary\.is-editable[^{]*\{[^}]*-webkit-line-clamp: unset/);
 });

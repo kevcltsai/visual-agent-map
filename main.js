@@ -624,6 +624,9 @@ var en = {
   "ui.topic_cover_frame_reset": "Show whole picture",
   "ui.topic_cover_frame_apply": "Apply",
   "ui.card_edit_picture_size": "Picture size",
+  "ui.card_edit_title_label": "Card title",
+  "ui.card_edit_summary_label": "Card summary",
+  "ui.card_edit_summary_placeholder": "Add a summary",
   "ui.card_edit_picture_position": "Picture position",
   "ui.card_edit_position_top": "Top",
   "ui.card_edit_position_bottom": "Bottom",
@@ -3080,6 +3083,9 @@ var zhCN = {
   "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5E94\u7528",
   "ui.card_edit_picture_size": "\u56FE\u7247\u5927\u5C0F",
+  "ui.card_edit_title_label": "\u5361\u7247\u6807\u9898",
+  "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
+  "ui.card_edit_summary_placeholder": "\u6DFB\u52A0\u6458\u8981",
   "ui.card_edit_picture_position": "\u56FE\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -5536,6 +5542,9 @@ var zhTW = {
   "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5957\u7528",
   "ui.card_edit_picture_size": "\u5716\u7247\u5927\u5C0F",
+  "ui.card_edit_title_label": "\u5361\u7247\u6A19\u984C",
+  "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
+  "ui.card_edit_summary_placeholder": "\u52A0\u4E0A\u6458\u8981",
   "ui.card_edit_picture_position": "\u5716\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -24669,6 +24678,26 @@ ${embed}${tail.includes("\n") ? tail : `${tail}
 // experiences/visual-map/cover-frame-editor.ts
 var import_obsidian12 = require("obsidian");
 
+// core/title-safety.ts
+function titleProblem(text11) {
+  if (text11.includes("```")) return "fence";
+  if (text11.includes("[[") || text11.includes("]]")) return "brackets";
+  return void 0;
+}
+function sanitizeGeneratedTitle(text11) {
+  let out = text11.replace(/`{3,}/g, "");
+  while (out.includes("[[") || out.includes("]]")) out = out.replace(/\[\[/g, "[").replace(/\]\]/g, "]");
+  return out;
+}
+
+// ui/modals/title-check.ts
+function titleProblemText(text11) {
+  const problem = titleProblem(text11);
+  if (problem === "fence") return t("ui.title_problem_fence");
+  if (problem === "brackets") return t("ui.title_problem_brackets");
+  return "";
+}
+
 // experiences/visual-map/cover-layout.ts
 var COVER_MAX_HEIGHT_RATIO = 1.5;
 var WHOLE = { x: 0, y: 0, w: 1, h: 1 };
@@ -24788,6 +24817,7 @@ var FRAME_KEY_STEP = 0.01;
 var WHOLE_EPSILON = 5e-4;
 var ROUND = 1e6;
 var FRAME_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+var oneLine = (value) => value.replace(/\s+/g, " ").trim();
 var round2 = (value) => Math.round(value * ROUND) / ROUND;
 var clamp = (value, low, high) => Math.min(Math.max(value, low), high);
 function dragCoverFrame(mode, start, dx, dy) {
@@ -24842,6 +24872,7 @@ function nudgeCoverFrameEdge(mode, frame, key2) {
   if (!dx && !dy) return null;
   return dragCoverFrame(mode, frame, dx, dy);
 }
+var SUMMARY_LIMIT2 = 2e3;
 var SIDE_SIZE_LIMIT = 0.5;
 var SIDE_SIZE = 0.45;
 var POSITION_KEY = {
@@ -24875,6 +24906,12 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     __publicField(this, "boxEl", null);
     __publicField(this, "statusEl", null);
     __publicField(this, "applyButton", null);
+    __publicField(this, "titleEl_", null);
+    __publicField(this, "summaryEl_", null);
+    __publicField(this, "hintEl", null);
+    __publicField(this, "loadFailed", false);
+    __publicField(this, "initialTitle", "");
+    __publicField(this, "initialSummary", "");
     this.draft = { ...(_a2 = options.initial) != null ? _a2 : WHOLE2 };
     this.size = parseCoverSize((_b2 = options.size) != null ? _b2 : COVER_SIZE_DEFAULT);
     this.position = parseCoverPosition(options.position);
@@ -24892,7 +24929,9 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.cardEl = card;
     arrangeCover(card, null, "top");
     const cover = this.buildCover(card);
-    for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
+    this.buildText(card);
+    for (const child of Array.from(card.children))
+      if (child !== cover && child !== this.titleEl_ && child !== this.summaryEl_) child.setAttr("inert", "");
     arrangeCover(card, cover, this.position);
     this.buildWidthHandle(card);
     const labelId = `vam-card-frame-label-${++labelSeq}`;
@@ -24902,6 +24941,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
       cls: "vam-card-frame-status vam-sr-only",
       attr: { "aria-live": "polite" }
     });
+    this.hintEl = this.contentEl.createDiv({ cls: "vam-card-frame-hint", attr: { role: "alert" } });
     const actions = this.contentEl.createDiv({ cls: "vam-card-frame-actions" });
     const reset = actions.createEl("button", { text: t("ui.topic_cover_frame_reset"), attr: { type: "button" } });
     reset.addEventListener("click", () => this.setDraft({ ...WHOLE2 }));
@@ -24914,7 +24954,67 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     });
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
+    this.checkText();
     cover.focus();
+  }
+  /** Makes the card's title and summary typeable in place (plain text; the card's own wrapping shows live). */
+  buildText(card) {
+    var _a2, _b2, _c;
+    const title = card.querySelector(".vam-card-title");
+    if (title) {
+      this.initialTitle = oneLine((_a2 = title.textContent) != null ? _a2 : "");
+      this.titleEl_ = this.makeEditable(title, "ui.card_edit_title_label");
+    }
+    let summary = card.querySelector(".vam-card-summary");
+    if (!summary && title) {
+      summary = card.createEl("p", { cls: "vam-card-summary" });
+      summary.remove();
+      const at = Array.from(card.children).indexOf(title) + 1;
+      card.insertBefore(summary, (_b2 = card.children[at]) != null ? _b2 : null);
+    }
+    if (summary) {
+      this.initialSummary = ((_c = summary.textContent) != null ? _c : "").trim();
+      summary.setAttr("data-placeholder", t("ui.card_edit_summary_placeholder"));
+      this.summaryEl_ = this.makeEditable(summary, "ui.card_edit_summary_label");
+    }
+  }
+  makeEditable(el, label) {
+    el.setAttr("contenteditable", "plaintext-only");
+    el.setAttr("role", "textbox");
+    el.setAttr("tabindex", "0");
+    el.setAttr("aria-label", t(label));
+    el.addClass("is-editable");
+    el.addEventListener("input", () => this.checkText());
+    el.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void this.apply();
+    });
+    return el;
+  }
+  /** The title as it would be written: one line, trimmed. */
+  titleValue() {
+    var _a2, _b2;
+    return oneLine((_b2 = (_a2 = this.titleEl_) == null ? void 0 : _a2.textContent) != null ? _b2 : this.initialTitle);
+  }
+  summaryValue() {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = this.summaryEl_) == null ? void 0 : _a2.textContent) != null ? _b2 : this.initialSummary).trim().slice(0, SUMMARY_LIMIT2).trim();
+  }
+  /** The reason the title cannot be written (empty, or a fence/brackets), "" when it is fine. Same checks as the rename dialog. */
+  titleProblem() {
+    if (!this.titleEl_) return "";
+    const value = this.titleValue();
+    return !value ? t("ui.name_required") : titleProblemText(value);
+  }
+  /** Shows why Apply is off (an empty title or a title the map would refuse) and keeps Apply off meanwhile. */
+  checkText() {
+    var _a2, _b2;
+    const problem = this.titleProblem();
+    (_a2 = this.hintEl) == null ? void 0 : _a2.setText(problem);
+    (_b2 = this.titleEl_) == null ? void 0 : _b2.setAttr("aria-invalid", problem ? "true" : "false");
+    if (this.applyButton) this.applyButton.disabled = !!problem || this.loadFailed || this.applying;
   }
   /** The width splitter on the card's right edge, the same setting and limits as the map's (map-graph.ts). */
   buildWidthHandle(card) {
@@ -25065,7 +25165,8 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     const img = this.windowEl.createEl("img", { attr: picture });
     this.imgEl = img;
     img.addEventListener("error", () => {
-      if (this.applyButton) this.applyButton.disabled = true;
+      this.loadFailed = true;
+      this.checkText();
       this.contentEl.createEl("p", { cls: "vam-card-frame-error", text: t("ui.topic_cover_frame_load_failed") });
     });
     img.addEventListener("load", () => {
@@ -25102,12 +25203,18 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     return cover;
   }
   async apply() {
-    if (this.applying) return;
+    if (this.applying || this.loadFailed) return;
+    if (this.titleProblem()) {
+      this.checkText();
+      return;
+    }
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
       const edit = { frame: frameToWrite(this.draft), size: this.size, position: this.position };
       if (this.width !== this.initialWidth) edit.width = this.width;
+      if (this.titleEl_ && this.titleValue() !== this.initialTitle) edit.title = this.titleValue();
+      if (this.summaryEl_ && this.summaryValue() !== this.initialSummary) edit.summary = this.summaryValue();
       await this.options.onApply(edit);
     } finally {
       this.close();
@@ -25675,26 +25782,6 @@ function otherProviderModel(failed, available, current) {
 
 // ui/modals/name-modal.ts
 var import_obsidian13 = require("obsidian");
-
-// core/title-safety.ts
-function titleProblem(text11) {
-  if (text11.includes("```")) return "fence";
-  if (text11.includes("[[") || text11.includes("]]")) return "brackets";
-  return void 0;
-}
-function sanitizeGeneratedTitle(text11) {
-  let out = text11.replace(/`{3,}/g, "");
-  while (out.includes("[[") || out.includes("]]")) out = out.replace(/\[\[/g, "[").replace(/\]\]/g, "]");
-  return out;
-}
-
-// ui/modals/title-check.ts
-function titleProblemText(text11) {
-  const problem = titleProblem(text11);
-  if (problem === "fence") return t("ui.title_problem_fence");
-  if (problem === "brackets") return t("ui.title_problem_brackets");
-  return "";
-}
 
 // ui/modals/action-bar.ts
 function modalActions(modal) {
@@ -41028,7 +41115,7 @@ Tree (JSON array; depth 0 is the root of the reviewed scope, parentId is null fo
 var STRUCTURE_SUGGESTION_KINDS = ["strengthen", "reduce", "move", "merge"];
 var STRUCTURE_REVIEW_MAX_SUGGESTIONS = 12;
 var STRUCTURE_REVIEW_TOKEN_BUDGET = 32e3;
-var SUMMARY_LIMIT2 = 240;
+var SUMMARY_LIMIT3 = 240;
 var TITLE_LIMIT2 = 200;
 var StructureReviewError = class extends Error {
   constructor(code, message) {
@@ -41083,7 +41170,7 @@ function buildStructureReviewNodes(nodes, describe, scopeRootId) {
     result.push({
       id,
       title: clip3((_a3 = info == null ? void 0 : info.title) != null ? _a3 : "", TITLE_LIMIT2),
-      summary: clip3((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT2),
+      summary: clip3((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT3),
       status: (_c = info == null ? void 0 : info.status) != null ? _c : "",
       parentId,
       depth
@@ -51602,10 +51689,10 @@ ${request.requirements}` : preset.text,
       width: node.width,
       shape: (_a2 = coverShapes.get(picture.path)) != null ? _a2 : null,
       card: () => this.cardForEditor(node),
-      onApply: ({ frame, width, ...look }) => new Promise(
+      onApply: ({ frame, width, title, summary, ...look }) => new Promise(
         (done) => this.enqueue(async () => {
           try {
-            await this.changeTopicCoverFrame(node, frame, look, width);
+            await this.applyCardEdit(node, frame, look, width, { title, summary });
           } finally {
             done();
           }
@@ -51616,12 +51703,32 @@ ${request.requirements}` : preset.text,
     return modal;
   }
   /**
+   * Apply of the "Edit card" dialog: the cover/size/position/width write, then a changed title or summary through
+   * noteChange (the same path as the map's rename and a summary write: validation, preview follow, undo bookkeeping).
+   * Everything pushed is folded into ONE undo step.
+   */
+  async applyCardEdit(node, frame, look, width, text11) {
+    var _a2;
+    const mark = this.history.mark();
+    try {
+      const entry = await this.changeTopicCoverFrame(node, frame, look, width);
+      if (!entry) return;
+      const patch = {};
+      if (((_a2 = text11.title) == null ? void 0 : _a2.trim()) && !titleProblemText(text11.title)) patch.title = text11.title.trim();
+      if (text11.summary !== void 0) patch.summary = text11.summary;
+      if (Object.keys(patch).length) await this.noteChange(node, patch);
+    } finally {
+      this.history.collapseSince(mark, t("ui.topic_cover_frame_title"));
+      this.updateHistoryButtons();
+    }
+  }
+  /**
    * A detached copy of the topic's card for the "Edit card" dialog, so the dialog shows the card exactly as the map does
    * (its width, fonts, wrapping, colour and shape). Copies carry no listeners; the tools, handles and the clip parts are
    * dropped, and the card is shown at its natural height (a set height would hide the cover being edited).
    */
   cardForEditor(node) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const live = (_a2 = this.cardEls) == null ? void 0 : _a2.get(node.id);
     if (live && typeof live.cloneNode === "function") {
       const card2 = live.cloneNode(true);
@@ -51630,13 +51737,25 @@ ${request.requirements}` : preset.text,
         if (["id", "tabindex", "role", "data-node-id"].includes(name) || name.startsWith("aria-"))
           card2.removeAttribute(name);
       card2.removeClass(...CARD_EDITOR_STATES);
+      const note2 = (_d = this.notes) == null ? void 0 : _d.get(node.id);
+      const title = card2.querySelector(".vam-card-title");
+      if (note2 && title) title.setText(note2.title);
+      const summary = card2.querySelector(".vam-card-summary");
+      if (note2 && summary) {
+        if (isPlaceholder(note2.summary)) summary.remove();
+        else {
+          summary.removeClass("is-preview");
+          summary.setText(note2.summary);
+          summary.removeAttribute("title");
+        }
+      }
       for (const property of ["left", "top", "height", "transform"]) card2.style.removeProperty(property);
       return card2;
     }
-    const note = (_d = this.notes) == null ? void 0 : _d.get(node.id);
+    const note = (_e = this.notes) == null ? void 0 : _e.get(node.id);
     const card = createDiv({ cls: "vam-node" });
     if (node.width) card.style.width = `${node.width}px`;
-    card.createEl("h3", { cls: "vam-card-title", text: (_e = note == null ? void 0 : note.title) != null ? _e : node.path });
+    card.createEl("h3", { cls: "vam-card-title", text: (_f = note == null ? void 0 : note.title) != null ? _f : node.path });
     if (note && !isPlaceholder(note.summary)) card.createEl("p", { cls: "vam-card-summary", text: note.summary });
     return card;
   }
@@ -70007,6 +70126,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-frame-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .vam-card-frame-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
 .vam-card-frame-label { display: none; }
+.vam-card-frame-hint { min-height: 1.2em; margin: 6px 0 0; color: #c0392b; text-align: center; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable { display: block; -webkit-line-clamp: unset; overflow: visible; white-space: pre-wrap; border-radius: 4px; cursor: text; user-select: text; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable:hover, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable:hover { outline: 1px dashed #4a90e2; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable:focus, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable:focus { outline: 2px solid #4a90e2; outline-offset: 2px; }
+.vam-card-frame-stage .vam-card-title.is-editable[aria-invalid="true"] { outline: 2px solid #c0392b; outline-offset: 2px; }
 .vam-card-frame-error { margin: 0 0 8px; color: #c0392b; text-align: center; }
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }

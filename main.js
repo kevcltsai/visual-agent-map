@@ -28934,7 +28934,11 @@ var NoteStyleStore = class {
       ...this.fileParts(
         ref,
         fileName,
-        { structure: file.structure, voice: file.voiceSet ? file.voice : void 0, format: file.formatSet ? file.format : void 0 },
+        {
+          structure: file.structure,
+          voice: file.voiceSet ? file.voice : void 0,
+          format: file.formatSet ? file.format : void 0
+        },
         file.lines,
         language2
       ),

@@ -576,7 +576,11 @@ export class NoteStyleStore {
       ...this.fileParts(
         ref,
         fileName,
-        { structure: file.structure, voice: file.voiceSet ? file.voice : undefined, format: file.formatSet ? file.format : undefined },
+        {
+          structure: file.structure,
+          voice: file.voiceSet ? file.voice : undefined,
+          format: file.formatSet ? file.format : undefined
+        },
         file.lines,
         language
       ),
@@ -637,7 +641,9 @@ export class NoteStyleStore {
       issue ? { ...part, issues: [issue, ...part.issues] } : part;
     let voice: VoicePart;
     if (voiceRef !== undefined)
-      voice = this.voicePart(voiceRef, language) ?? withIssue(this.voicePart(GLOBAL_PART_DEFAULT.voice, language)!, missingPart?.("voice", voiceRef));
+      voice =
+        this.voicePart(voiceRef, language) ??
+        withIssue(this.voicePart(GLOBAL_PART_DEFAULT.voice, language)!, missingPart?.("voice", voiceRef));
     else {
       const ref = this.globalPartRef("voice");
       const part = this.voicePart(ref, language);
@@ -646,7 +652,9 @@ export class NoteStyleStore {
     }
     let format: FormatPart;
     if (formatRef !== undefined)
-      format = this.formatPart(formatRef, language) ?? withIssue(this.formatPart(GLOBAL_PART_DEFAULT.format, language)!, missingPart?.("format", formatRef));
+      format =
+        this.formatPart(formatRef, language) ??
+        withIssue(this.formatPart(GLOBAL_PART_DEFAULT.format, language)!, missingPart?.("format", formatRef));
     else {
       const ref = this.globalPartRef("format");
       const part = this.formatPart(ref, language);

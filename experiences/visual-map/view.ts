@@ -137,7 +137,13 @@ import {
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
-import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
+import {
+  TOPIC_KIND_SHAPES,
+  hasSvgShape,
+  renderShapeBackground,
+  shapeInsets,
+  showsToResearch
+} from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import {
@@ -10684,7 +10690,11 @@ export class VisualAgentMapView extends ItemView {
         });
         if (active) chip.setAttr("role", "status");
       }
-      if (note) this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
+      if (note) {
+        if (showsToResearch(kind, note.status))
+          this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
+        else this.labelCard(card, note.title);
+      }
     }
     // Offline relevance grading: mind maps only, and only a valid tier shows anything. Side topics get a dashed border (see styles.css)
     // but are never hidden, moved or collapsed.
@@ -11980,7 +11990,9 @@ export class VisualAgentMapView extends ItemView {
       const label =
         note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
-      this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
+      if (showsToResearch(this.topicKindOf(node.id), note.status))
+        this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
+      else this.labelCard(card, note.title);
       if (note.status === "idea") status?.remove();
       else if (status) {
         status.className = `vam-status vam-status-${note.status}`;
@@ -12215,7 +12227,7 @@ export class VisualAgentMapView extends ItemView {
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
-          topicStatus: note.status,
+          ...(showsToResearch(this.topicKindOf(node.id), note.status) ? { topicStatus: note.status } : {}),
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
               .length ?? 0,

@@ -102,3 +102,8 @@ export function shapeInsets(kind: TopicKind, content: { width: number; height: n
   const vertical = (content.height * (1 / fit.height - 1)) / 2 + SAFETY;
   return { top: vertical, right: side, bottom: vertical, left: side };
 }
+
+/** A conclusion is written, not researched: its card never says "To research" (the type label already says what it is). */
+export function showsToResearch(kind: TopicKind, status: "idea" | "running" | "completed" | "error"): boolean {
+  return !(kind === "conclusion" && status === "idea");
+}

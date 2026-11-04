@@ -76,3 +76,13 @@ export function aiLockBlock(
   }
   return null;
 }
+
+/** The error a write-time AI lock check throws; entries report it with the locked notice, not as a failure. */
+export function aiLockedError(): Error {
+  const error = new Error("AI lock: the topic is locked");
+  error.name = "AiLockedError";
+  return error;
+}
+export function isAiLockedError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AiLockedError";
+}

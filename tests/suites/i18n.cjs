@@ -370,3 +370,12 @@ test('bug bash #34: zh-CN uses mainland wording (折叠, 点击, 添加文字), 
   assert.equal(translate('zh-CN', 'ui.collapse_all'), '全部折叠');
   assert.equal(translate('zh-CN', 'ui.map_chat_do_collapse_0', 'A'), '折叠“A”');
 });
+// Persona 25: the Synthesize dialog picks full content or summary in the same window (renderSynthesisContent), so the intro must not promise a next step.
+test('Synthesize intro does not promise a nonexistent next step for the content choice', () => {
+  const { translate } = load('i18n.ts');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const text = translate(lang, 'ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and', 3);
+    assert.doesNotMatch(text, /next step|下一步/i, lang);
+    assert.match(text, /3/, lang);
+  }
+});

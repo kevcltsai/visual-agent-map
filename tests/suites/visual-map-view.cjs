@@ -1217,6 +1217,19 @@ integrationTest('selection, arrow keys and select-mode toggles repaint only the 
   assert.equal(view.selection.state.selected, 'root'); assert.deepEqual(stops(), ['root']);
   assert.equal(fixture.renders(), 0, 'selection and arrow keys never call render()');
 });
+integrationTest('persona 11: Alt+arrow on a focused card reorders it among its siblings; plain arrows still walk, and Alt does nothing in select mode', () => {
+  const fixture = selectionView(load); const { view } = fixture; fixture.build(); let cards = fixture.cards();
+  const calls = []; view.enqueue = fn => fn(); view.shiftSiblingByKey = (node, offset) => { calls.push([node.id, offset]); };
+  const press = (id, init) => { const event = { target: cards[id], preventDefault() { this.prevented = true; }, ...init }; cards[id].handlers.get('keydown')(event); return event; };
+  assert.equal(press('a', { key: 'ArrowDown', altKey: true }).prevented, true);
+  press('b', { key: 'ArrowUp', altKey: true }); press('a', { key: 'ArrowRight', altKey: true });
+  assert.deepEqual(calls, [['a', 1], ['b', -1], ['a', 1]]);
+  press('a', { key: 'ArrowDown', altKey: true, ctrlKey: true }); press('a', { key: 'ArrowDown' });
+  assert.equal(calls.length, 3, 'only Alt alone reorders'); assert.equal(view.selection.state.selected, 'b', 'plain ArrowDown still walks the tree');
+  view.selection.toggleMultiSelect(); fixture.build(); cards = fixture.cards();
+  press('b', { key: 'ArrowDown', altKey: true });
+  assert.equal(calls.length, 3, 'select mode: no reordering');
+});
 integrationTest('select mode: the narrow bar names Merge / Research by count, keeps More for the rest and announces the topic count to screen readers', () => {
   const fixture = selectionView(load); const { view } = fixture;
   view.selection.toggleMultiSelect(); fixture.build();

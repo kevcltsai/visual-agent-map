@@ -258,7 +258,27 @@ test('Markdown is the whole outline, collapsed branches included, saved as .md',
   await h.view.exportMap('md', 'vault');
   await h.settle();
   assert.deepEqual(created(h), [`${MEDIA}/Export- Map-.md`]);
-  assert.equal(new TextDecoder().decode(h.contents.get(`${MEDIA}/Export- Map-.md`)), '- Root\n  - Child <b>\n');
+  assert.equal(new TextDecoder().decode(h.contents.get(`${MEDIA}/Export- Map-.md`)), '# Root\n## Child <b>\n');
+});
+
+test('persona 15: Markdown carries summaries, follows the on-screen order, and imports back', async () => {
+  const h = await harness();
+  const { repo } = h;
+  const second = h.view.map.nodes[1];
+  h.view.notes.get(h.root.id).summary = 'Why this map';
+  h.view.notes.get(second.id).summary = 'The child\nsummary';
+  const third = { ...second, id: 'zz-third', parentId: h.root.id, y: -500 };
+  h.view.notes.set(third.id, { ...h.view.notes.get(second.id), title: 'Above', summary: '' });
+  second.y = 500;
+  h.view.map.nodes.push(third);
+  await h.view.exportMap('md', 'vault');
+  await h.settle();
+  const text = new TextDecoder().decode(h.contents.get(`${MEDIA}/Export- Map-.md`));
+  assert.ok(text.includes('> Why this map') && text.includes('> The child summary'), text);
+  assert.ok(text.indexOf('Above') < text.indexOf('Child <b>'), 'the card higher on screen comes first');
+  const parsed = load('experiences/visual-map/outline-import.ts', { obsidian }).parseOutline(text);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.errors)), []);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.nodes.map(n => [n.title, n.parent]))), [['Root', null], ['Above', 0], ['Child <b>', 0]]);
 });
 
 test('PNG goes through the injected canvas at the limit-approved scale', async () => {

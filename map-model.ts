@@ -1187,6 +1187,12 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     this.solo.add(entry);
     this.push(entry);
   }
+  /** Removes `entry` when it is the newest undo step (nothing else changes); false when it is not. */
+  dropTop(entry: T): boolean {
+    if (this.past[this.past.length - 1] !== entry) return false;
+    this.past.pop();
+    return true;
+  }
   /** Ends the group and returns what it collected, oldest first (empty when nothing was pushed or the history was cleared). */
   closeGroup(): T[] {
     const entries = this.grouped ?? [];

@@ -2905,6 +2905,14 @@ integrationTest('B1 ui: the plan card has a one-sentence description, actions gr
   await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
 });
 
+integrationTest('persona-07 ui: an applied plan no longer says it needs confirmation', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); planButton(h, 'apply').click();
+  await until(() => h.view.chat.pendingPlan() === null && !h.view.chatApplying);
+  const text = visibleText(planCard(h)[0]); assert.doesNotMatch(text, /needs your confirmation/); assert.match(text, /Plan applied/);
+});
+
 integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the card says nothing changed', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
@@ -3609,6 +3617,45 @@ integrationTest('map chat merge: summary-only cards run the AI merge under the c
   assert.equal(merged[0].summary, 'Body needs rest. Mind needs calm.');
   assert.match(merged[0].detail, /Mind needs calm/);
   assert.equal(merged[0].color, 'red', 'the colour both sources share stays on the merged card');
+});
+// Persona 17: the reply's recolour and the AI merge it started (written later) are one undo step, one redo step.
+const mergeReply = async h => {
+  await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
+  await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
+  await h.view.hydrate();
+  h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
+  h.plugin.askModel = async () => ({ summary: 'Body needs rest. Mind needs calm.', detail: 'Body needs rest.\n\nMind needs calm.', visualReferences: [], suggestions: [{ title: 'AI picked name' }] });
+  await apply(h, [
+    lookAct([h.ids.a, h.ids.b], { color: 'red' }),
+    { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }
+  ]);
+  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+};
+integrationTest('persona 17: a chat reply that recolours and then AI-merges is one undo step and one redo step', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const before = (await h.saved()).map(n => n.id).sort(); const colourBefore = (await h.note('a')).color;
+  await mergeReply(h);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply'); assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1);
+  await h.view.travel(false);
+  eq((await h.saved()).map(n => n.id).sort(), before, 'both source cards are back after one undo'); assert.equal((await h.note('a')).color, colourBefore, 'and the colour is back too');
+  assert.equal(h.view.history.canUndo, false, 'nothing is left to undo');
+  await h.view.travel(true);
+  assert.equal(h.view.history.canRedo, false, 'one redo takes the whole reply back');
+  const titles = []; for (const n of await h.saved()) titles.push((await h.repo.readNote(n.path)).title);
+  assert.ok(titles.includes('Nothing to Fear'), 'the merged card is back after redo'); assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+});
+integrationTest('persona 17: when another step was pushed before the merge lands, the merge stays its own step', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const log = [];
+  await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
+  await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
+  await h.view.hydrate();
+  h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
+  h.plugin.askModel = async () => { h.view.history.push(foreignEntry('later edit', log)); return { summary: 'S.', detail: 'D.', visualReferences: [], suggestions: [] }; };
+  await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red' }), { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }]);
+  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1, 'the reply keeps its own step');
+  assert.ok(h.view.history.past.length >= 3, 'the merge is a separate step above the reply and the other edit');
 });
 integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
   const h = await harness(); await h.view.hydrate();

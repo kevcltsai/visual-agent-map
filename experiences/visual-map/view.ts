@@ -137,7 +137,13 @@ import {
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
-import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
+import {
+  TOPIC_KIND_SHAPES,
+  hasSvgShape,
+  renderShapeBackground,
+  shapeInsets,
+  showsToResearch
+} from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import {
@@ -161,10 +167,12 @@ import {
   TFile,
   TFolder,
   WorkspaceLeaf,
+  requestUrl,
   setIcon,
   setTooltip
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
+import { cardFailure } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
@@ -220,6 +228,7 @@ import {
   medianHeight,
   reorderSiblings,
   reorderTopLevel,
+  shiftSibling,
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
@@ -587,7 +596,14 @@ function aimQuestionStatus(
   return "not_started";
 }
 /** The AI merge that hid its dialog: owned by the view, one per map. It writes nothing until the draft is confirmed. */
+/** A chat reply's undo step, still open to the one AI merge the reply started (it lands later and joins the step). */
+interface ChatReplyStep {
+  entry: TransactionEntry;
+  absorb: (entry: TransactionEntry) => Promise<void>;
+}
 interface MergeTask {
+  /** The reply step this merge may join when it is written (the chat's merge); see {@link ChatReplyStep}. */
+  replyStep?: ChatReplyStep;
   mapPath: string;
   mapId: string;
   mapTitle: string;
@@ -612,6 +628,13 @@ interface MergeTask {
   run?: Promise<void>;
 }
 /** Progress keys for runs that have no card (multi-select synthesis, AI merge); Obsidian file names cannot contain ":". */
+/** Alt+arrow: how far a card trades places with its siblings (Up/Left earlier, Down/Right later). */
+const ARROW_OFFSETS = new Map<string, -1 | 1>([
+  ["ArrowUp", -1],
+  ["ArrowLeft", -1],
+  ["ArrowDown", 1],
+  ["ArrowRight", 1]
+]);
 const TASK_PROGRESS_PREFIX = "vam-task:";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
@@ -975,6 +998,8 @@ export class VisualAgentMapView extends ItemView {
   private mergeOpen = false;
   /** AI merges that hid their dialog, keyed by map path (one per map). */
   private mergeTasks = new Map<string, MergeTask>();
+  /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
+  private chatReplyStep: ChatReplyStep | undefined;
 
   /**
    * AI actions whose dialog hid itself and whose provider request is not accepted yet, keyed by node path (or
@@ -2006,6 +2031,8 @@ export class VisualAgentMapView extends ItemView {
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
+    // The conversation is memory-only (DATA_CONTRACTS): tell the user before it is dropped, unless it was saved as a note.
+    if (this.chat?.hasUnsavedTurns) new Notice(t("ui.map_chat_unsaved_on_close"));
     this.abortMapChat();
     this.chat?.dispose();
     this.relevancePanelCleanup?.();
@@ -3924,9 +3951,10 @@ export class VisualAgentMapView extends ItemView {
    * the array order, which is what those arrangements lay out. A manual move or drag changes a position only, so the array
    * order can differ from this.
    */
-  private onScreenSiblingOrder(map: MapDocument): MapNode[] {
+  private onScreenSiblingOrder(map: MapDocument, onlyParentId?: string): MapNode[] {
     const base = layoutOf(map).direction;
     return alignSiblingsToScreen(map.nodes, (parentId, childId) => {
+      if (onlyParentId !== undefined && parentId !== onlyParentId) return null;
       const direction = layoutDirectionFor(map.nodes, childId, base) as LayoutKind;
       if (direction === "down" || direction === "up") return "x";
       if (direction === "right" || direction === "left") return "y";
@@ -3957,6 +3985,60 @@ export class VisualAgentMapView extends ItemView {
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
     });
     return box.placed;
+  }
+  /**
+   * A card dropped on empty canvas takes the place it was dropped at. The arrangements lay siblings out in array order, so it
+   * takes that place among its siblings there too; otherwise "Auto layout" would put it straight back.
+   */
+  private placeDroppedCard(map: MapDocument, card: MapNode, position: { x: number; y: number }): void {
+    card.x = Math.round(position.x);
+    card.y = Math.round(position.y);
+    if (card.parentId && !map.aim && this.droppedAmongSiblings(map, card))
+      map.nodes = this.onScreenSiblingOrder(map, card.parentId);
+  }
+  /**
+   * Whether a dropped card sits in its siblings' lane: close to their column (right/left maps) or row (down/up maps), and
+   * between them or within one card of the first or last. Anywhere else is empty canvas, where a drop only moves the card.
+   */
+  private droppedAmongSiblings(map: MapDocument, card: MapNode): boolean {
+    const others = map.nodes.filter(item => item.parentId === card.parentId && item.id !== card.id);
+    if (!others.length) return false;
+    const direction = layoutDirectionFor(map.nodes, card.id, layoutOf(map).direction) as LayoutKind;
+    const vertical = direction === "down" || direction === "up";
+    if (!vertical && direction !== "right" && direction !== "left") return false;
+    const along = (item: MapNode): number => (vertical ? item.x : item.y);
+    const across = (item: MapNode): number => (vertical ? item.y : item.x);
+    const reach = vertical ? 300 : DEFAULT_CARD_HEIGHT;
+    const lane = vertical ? DEFAULT_CARD_HEIGHT : 300;
+    const first = Math.min(...others.map(along)) - reach;
+    const last = Math.max(...others.map(along)) + reach;
+    return (
+      along(card) >= first && along(card) <= last && others.some(item => Math.abs(across(item) - across(card)) < lane)
+    );
+  }
+  /**
+   * Alt+Up/Down (Left/Right): the card trades places with the sibling before or after it, and the branch is laid out again in
+   * that order. One undo step. Nothing is written when the card is already first or last.
+   */
+  private async shiftSiblingByKey(node: MapNode, offset: -1 | 1): Promise<void> {
+    const map = this.map;
+    if (!map || !node.parentId || map.aim) return;
+    const aligned = this.onScreenSiblingOrder(map);
+    if (shiftSibling(aligned, node.id, offset) === aligned) return;
+    if (!this.mergeUnlocked([node.id, node.parentId])) return;
+    const parentId = node.parentId;
+    this.focusNodeId = node.id;
+    try {
+      await this.mapChange(change => {
+        const next = shiftSibling(this.onScreenSiblingOrder(change), node.id, offset);
+        change.nodes = next;
+        const parent = change.nodes.find(item => item.id === parentId);
+        if (layoutOf(change).direction === "timeline" && parent && !parent.parentId) this.arrangeAll(change);
+        else this.arrangeBranch(change, parentId, new Set(descendants(change.nodes, parentId)), undefined);
+      });
+    } finally {
+      this.focusNodeId = null;
+    }
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   /**
@@ -6009,7 +6091,7 @@ export class VisualAgentMapView extends ItemView {
     },
     started: () => void,
     signal: AbortSignal,
-    options: { keepTitle?: boolean } = {}
+    options: { keepTitle?: boolean; replyStep?: ChatReplyStep } = {}
   ): Promise<boolean> {
     const stillValid = (): boolean => {
       const check = this.mergeCheck(snapshot.sources.map(source => source.id));
@@ -6050,6 +6132,7 @@ export class VisualAgentMapView extends ItemView {
         mapTitle: this.map?.title ?? "",
         title,
         ...(options.keepTitle ? { keepTitle: true } : {}),
+        ...(options.replyStep ? { replyStep: options.replyStep } : {}),
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
@@ -6162,7 +6245,15 @@ export class VisualAgentMapView extends ItemView {
       this.render();
       const previous = this.history.undoEntry;
       await this.confirmMergeDraft(task, result.summary, result.detail);
-      const entry = this.history.undoEntry;
+      let entry = this.history.undoEntry;
+      // A merge the chat reply started joins that reply's step when the reply is still the newest one: one undo, one redo.
+      let folded = false;
+      const step = task.replyStep;
+      if (step && entry && entry !== previous && previous === step.entry && this.history.dropTop(entry)) {
+        await step.absorb(entry);
+        entry = step.entry;
+        folded = true;
+      }
       let done = t("ui.merge_done_0", task.title);
       if (!check.ok) {
         const found = check.missing.length + check.added.length;
@@ -6173,7 +6264,7 @@ export class VisualAgentMapView extends ItemView {
         done = `${done} ${t("ui.merge_check_warning_0", String(found))}`;
       }
       // The Undo button only while this merge is still the newest history step.
-      if (entry && entry !== previous)
+      if (entry && (entry !== previous || folded))
         backgroundResultNotice(
           done,
           {
@@ -7247,6 +7338,17 @@ export class VisualAgentMapView extends ItemView {
       this.announcer?.setText(t("ui.text_node_added"));
     });
   }
+  /** Rects of the drawn cards that are not in `members`: a frame keeps its padding off them (ticket 31). */
+  private otherCardRects(members: readonly string[]): { x: number; y: number; w: number; h: number }[] {
+    const own = new Set(members);
+    const rects: { x: number; y: number; w: number; h: number }[] = [];
+    for (const [id, card] of this.cardEls) {
+      if (own.has(id)) continue;
+      const b = boxOf(card);
+      rects.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+    }
+    return rects;
+  }
   /**
    * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
    * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
@@ -7264,7 +7366,7 @@ export class VisualAgentMapView extends ItemView {
     };
     let layer: HTMLElement | null = null;
     for (const boundary of boundaries) {
-      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD);
+      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD, this.otherCardRects(boundary.members));
       if (!box) continue;
       if (!layer) {
         layer = stage.createDiv("vam-boundaries");
@@ -9701,7 +9803,8 @@ export class VisualAgentMapView extends ItemView {
           const b = boxOf(card);
           return { x: b.x, y: b.y, w: b.width, h: b.height };
         },
-        BOUNDARY_PAD
+        BOUNDARY_PAD,
+        this.otherCardRects(frame.members)
       );
       if (!box) continue;
       grow(box.x, box.y, box.w, box.h);
@@ -9820,7 +9923,15 @@ export class VisualAgentMapView extends ItemView {
     try {
       let blob: Blob;
       if (format === "md") {
-        const outline = mapOutline(map.nodes, id => this.notes.get(id)?.title ?? "");
+        const outline = mapOutline(
+          this.onScreenSiblingOrder(map),
+          id => this.notes.get(id)?.title ?? "",
+          id => {
+            const summary = this.notes.get(id)?.summary ?? "";
+            return isPlaceholder(summary) ? "" : summary;
+          },
+          map.title
+        );
         blob = new Blob([`${outline}\n`], { type: "text/markdown;charset=utf-8" });
       } else {
         const got = await this.collectExportScene(isCurrent);
@@ -9925,6 +10036,8 @@ export class VisualAgentMapView extends ItemView {
       });
     };
     if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
+    if (this.map && !this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
+      add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
     if (this.map && !this.aimLive())
       add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
@@ -9969,6 +10082,21 @@ export class VisualAgentMapView extends ItemView {
     new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, title =>
       this.enqueue(() => this.renameMapTo(title))
     ).open();
+  }
+  /** "Duplicate current mind map": copies the map and its notes into a new, independent map named "<title> copy" (or " 1", " 2" when taken) and opens it. */
+  private duplicateCurrentMap(): void {
+    if (!this.map) return;
+    const source = this.path;
+    this.enqueue(async () => {
+      if (!this.map || this.path !== source) return;
+      try {
+        const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+        const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
+        await this.openMapInMutation(await this.plugin.repo.duplicateMap(source, title));
+      } catch (error) {
+        errorNotice(error);
+      }
+    });
   }
   /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
   private async renameMapTo(title: string): Promise<void> {
@@ -10856,7 +10984,11 @@ export class VisualAgentMapView extends ItemView {
         });
         if (active) chip.setAttr("role", "status");
       }
-      if (note) this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
+      if (note) {
+        if (showsToResearch(kind, note.status))
+          this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
+        else this.labelCard(card, note.title);
+      }
     }
     // Offline relevance grading: mind maps only, and only a valid tier shows anything. Side topics get a dashed border (see styles.css)
     // but are never hidden, moved or collapsed.
@@ -10908,7 +11040,12 @@ export class VisualAgentMapView extends ItemView {
       issue.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
-    if (note?.status === "error" && note.lastError) errorDetails.push(note.lastError);
+    const technicalDetails: string[] = [];
+    if (note?.status === "error" && note.lastError) {
+      const failure = cardFailure(note.lastError);
+      errorDetails.push(failure.text);
+      if (failure.technical) technicalDetails.push(failure.technical);
+    }
     if (batch) {
       const currentNode = batch.currentPath ? this.map?.nodes.find(item => item.path === batch.currentPath) : undefined;
       const currentTitle = currentNode ? this.notes.get(currentNode.id)?.title : undefined;
@@ -10929,7 +11066,11 @@ export class VisualAgentMapView extends ItemView {
           text: `${batch.failures.length} ${t("ui.failed")}`
         });
         failure.setAttr("title", batch.failures.join("\n"));
-        errorDetails.push(...batch.failures);
+        for (const raw of batch.failures) {
+          const failure = cardFailure(raw);
+          errorDetails.push(failure.text);
+          if (failure.technical) technicalDetails.push(failure.technical);
+        }
       }
       this.renderRetryFailedButton(header, node.path, batch);
     }
@@ -11169,6 +11310,14 @@ export class VisualAgentMapView extends ItemView {
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
+      if (technicalDetails.length) {
+        const more = card.createEl("details", { cls: "vam-card-error-details" });
+        more.createEl("summary", { text: t("ui.technical_details") });
+        more.createEl("pre", { text: technicalDetails.join("\n\n") });
+        this.button(more, t("ui.copy_technical_details"), () => {
+          void navigator.clipboard?.writeText(technicalDetails.join("\n\n"));
+        });
+      }
     }
     if (node.aimKind === "conclusion" && aimEnabled() && this.map?.aim) {
       const branch = this.map.aim.branches.find(item => item.results.some(result => result.nodeId === node.id));
@@ -11324,6 +11473,13 @@ export class VisualAgentMapView extends ItemView {
     });
     card.addEventListener("keydown", event => {
       if (event.target !== card) return;
+      // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
+        event.preventDefault();
+        if (!event.isComposing && !this.selection.state.multiSelectMode && !this.aimLive() && !this.presentation)
+          this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
+        return;
+      }
       const target = this.keyboardNeighbor(node, event.key);
       if (target) {
         event.preventDefault();
@@ -12246,7 +12402,9 @@ export class VisualAgentMapView extends ItemView {
       const label =
         note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
-      this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
+      if (showsToResearch(this.topicKindOf(node.id), note.status))
+        this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
+      else this.labelCard(card, note.title);
       if (note.status === "idea") status?.remove();
       else if (status) {
         status.className = `vam-status vam-status-${note.status}`;
@@ -12398,7 +12556,7 @@ export class VisualAgentMapView extends ItemView {
         this.map?.nodes
           .filter(item => item.parentId === node.id)
           .map(item => this.notes.get(item.id)?.title ?? item.path) ?? [];
-      new NextStepModal(
+      const dialog = new NextStepModal(
         this.app,
         note.title,
         this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0,
@@ -12481,7 +12639,7 @@ export class VisualAgentMapView extends ItemView {
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
-          topicStatus: note.status,
+          ...(showsToResearch(this.topicKindOf(node.id), note.status) ? { topicStatus: note.status } : {}),
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
               .length ?? 0,
@@ -12492,7 +12650,8 @@ export class VisualAgentMapView extends ItemView {
               : undefined;
           })()
         }
-      ).open();
+      );
+      this.openMapModal(dialog);
     });
   }
   private openNodePanel(node: MapNode, mode: "structure" | "proposals"): void {
@@ -13670,7 +13829,7 @@ export class VisualAgentMapView extends ItemView {
     let locked = this.notes.get(node.id)?.aiLocked === true;
     const paint = (focus = false): void => {
       group.empty();
-      const choice = this.button(group, t("ui.ai_lock_toggle"), () => {
+      const choice = this.button(group, t(locked ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"), () => {
         this.enqueue(async () => {
           await this.setAiLock([node], !locked);
           locked = !locked;
@@ -14585,14 +14744,15 @@ export class VisualAgentMapView extends ItemView {
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
     });
     const names = shown.map(item => item.name);
-    new MultiResearchModal(
+    const dialog = new MultiResearchModal(
       this.app,
       names,
       this.modelChoices(),
       request => void this.startMultiResearch(request, retryBatchKey),
       this.fieldLinks(),
       shown.map(item => item.mode)
-    ).open();
+    );
+    this.openMapModal(dialog);
   }
   stopMultiResearch(): void {
     this.plugin.expansionCoordinator.stop(this.multiResearchKey());
@@ -15414,7 +15574,7 @@ export class VisualAgentMapView extends ItemView {
     // The styles are read again first (#38), so the line shows a style file made since the last run.
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
-      new NextStepModal(
+      const dialog = new NextStepModal(
         this.app,
         "",
         0,
@@ -15441,7 +15601,8 @@ export class VisualAgentMapView extends ItemView {
             ? { pending: { directions: pending.directions, discard: () => this.discardSelectionSynthesis() } }
             : {})
         }
-      ).open();
+      );
+      this.openMapModal(dialog);
     });
   }
   /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
@@ -15879,12 +16040,15 @@ export class VisualAgentMapView extends ItemView {
       sources.some(source => !this.map?.nodes.some(node => node.id === source.id && node.path === source.path))
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    const concluded = this.relationsEnabled();
     const integrated = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       this.map,
       this.path,
-      "workspace"
+      "workspace",
+      // A synthesis is a conclusion drawn from its sources (ordinary maps only; AIM has its own kinds).
+      concluded ? { topicKind: "conclusion" } : {}
     );
     const detailTemplate = (await this.mapStyle(language, { style: task.options.noteStyle, kind: "topic" })).template;
     try {
@@ -15909,6 +16073,13 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChangeSnapshots(
           map => {
             map.nodes.push(integrated);
+            // The new conclusion links back to every source it was drawn from ("derived from").
+            if (concluded)
+              for (const source of sources) {
+                const link = { kind: "derives_from" as const, from: integrated.id, to: source.id };
+                if (relationAllowed(map.topicRelations ?? [], link))
+                  setTopicRelations(map, [...(map.topicRelations ?? []), link]);
+              }
           },
           true,
           [integrated.path]
@@ -17656,10 +17827,11 @@ export class VisualAgentMapView extends ItemView {
       // so undo checks the files instead of writing an old snapshot over them. Another view of the same map keeps no entry
       // that would not know about these writes: its history is cleared, as for any change made outside it.
       const entries = this.history.closeGroup();
+      this.chatReplyStep = undefined;
       if (wrote) {
         try {
           if (!this.closed && this.path === anchor.path)
-            await this.pushChatReplyEntry(
+            this.chatReplyStep = await this.pushChatReplyEntry(
               entries,
               anchor.path,
               run.notes ?? new Set(),
@@ -18350,8 +18522,8 @@ export class VisualAgentMapView extends ItemView {
     noteIds: ReadonlySet<string>,
     files: ReadonlySet<string>,
     parked: ReadonlySet<string> = new Set()
-  ): Promise<void> {
-    if (!entries.length) return;
+  ): Promise<ChatReplyStep | undefined> {
+    if (!entries.length) return undefined;
     const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint();
     const run = async (redo: boolean): Promise<void> => {
@@ -18374,7 +18546,19 @@ export class VisualAgentMapView extends ItemView {
       expected = await fingerprint();
     };
     // Solo: a job that began before the reply ended (an expand) must not fold the reply into its own step.
-    this.history.pushSolo({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
+    const step: TransactionEntry = {
+      undo: () => run(false),
+      redo: () => run(true),
+      label: t("ui.map_chat_undo_label")
+    };
+    this.history.pushSolo(step);
+    return {
+      entry: step,
+      absorb: async (entry: TransactionEntry): Promise<void> => {
+        entries.push(entry);
+        expected = await fingerprint();
+      }
+    };
   }
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);
@@ -18504,7 +18688,8 @@ export class VisualAgentMapView extends ItemView {
         );
         if (hasMergeContent(sourceNotes, isPlaceholder)) {
           const began = await this.startMergeDraft(title, snapshot, () => {}, new AbortController().signal, {
-            keepTitle: true
+            keepTitle: true,
+            ...(this.chatReplyStep ? { replyStep: this.chatReplyStep } : {})
           });
           return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
         }
@@ -18667,7 +18852,63 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
     }
+    // The picture is in the Detail now. A remote link never becomes a card cover (covers read local files only), so the file is
+    // also saved beside the note; a failure here leaves the picture in the Detail as it is and says nothing more.
+    if (outcome.result.ok) await this.chatCoverFromPicture(block, item.candidate).catch(() => undefined);
     return outcome.result;
+  }
+  /** The bytes of a picked picture (a seam: it needs the network). */
+  private async chatFetchImage(url: string): Promise<ArrayBuffer> {
+    return (await requestUrl({ url, method: "GET", throw: true })).arrayBuffer;
+  }
+  /**
+   * Makes a picked web picture the card's cover: only when the card has no cover and has not turned it off (a cover set by hand,
+   * and `topic-cover: none`, stay as they are). The picture is checked by its bytes ({@link acceptImage}), stored beside the note,
+   * embedded in `## User Notes` and set as `topic-cover`, as one undoable step.
+   */
+  private async chatCoverFromPicture(block: MapChatImages, candidate: ImageCandidate): Promise<void> {
+    const sameMap = (): boolean =>
+      !this.closed && !!this.map && this.path === block.mapPath && this.map.id === block.mapId;
+    const target = (): MapNode | null => {
+      if (!sameMap() || this.aimLive()) return null;
+      const node = this.map?.nodes.find(item => item.id === block.nodeId);
+      return node && this.cardAcceptsImages(node) && !this.isMerging(node.id) ? node : null;
+    };
+    const hasNoCover = (node: MapNode): boolean => {
+      const file = this.app.vault.getAbstractFileByPath(node.path);
+      if (!(file instanceof TFile)) return false;
+      const cache = this.app.metadataCache.getFileCache(file);
+      // Any `topic-cover` the owner wrote (even a link that does not resolve now) is theirs and stays.
+      const declared: unknown = cache?.frontmatter?.["topic-cover"];
+      if (declared !== undefined && declared !== null) return false;
+      return (
+        resolveCoverWithFrame(cache, link => this.app.metadataCache.getFirstLinkpathDest(link, node.path)) === null
+      );
+    };
+    const first = target();
+    if (!first || !hasNoCover(first)) return;
+    const data = await this.chatFetchImage(candidate.url);
+    const node = target();
+    if (!node || !this.map || !hasNoCover(node)) return;
+    const accepted = acceptImage({ mime: "image/*", size: data.byteLength, bytes: data });
+    if (!accepted.ok) return;
+    const name = safeImageName(candidate.title, accepted.mime);
+    if (!name) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .createAttachment("image", { name, data, sourcePath: node.path })
+      .rewriteNote(node.path, async (path, attachment) => {
+        const note = this.app.vault.getAbstractFileByPath(path);
+        if (!(note instanceof TFile)) throw new Error(path);
+        const link = attachment("image");
+        await this.app.vault.process(note, content => withCover(appendImageEmbed(content, link), link));
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_cover") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   private chatTranscriptTurn(turn: MapChatSavedTurn): TranscriptTurn {
@@ -19494,8 +19735,7 @@ export class VisualAgentMapView extends ItemView {
                 this.arrangeAll(map);
                 return;
               }
-              current.x = Math.round(position.x);
-              current.y = Math.round(position.y);
+              this.placeDroppedCard(map, current, position);
             })
           );
         } else if (e.metaKey || e.ctrlKey) {

@@ -2,7 +2,7 @@
 One statement that can be refuted, with the subject, the conditions and the direction stated. No reasons or evidence here.
 
 ## Current judgment
-Keep only one: untested, leaning support, leaning against or refuted, plus a one-sentence reason and what is missing. This takes precedence over the earlier rule for inconsistencies: never list old and new ones; when it changes, rewrite this one and write "from X to Y: reason" in the update log.
+Keep only one: untested, leaning support, leaning against or refuted, with a short reason and what is missing. No weak/medium/strong rating (the Strength label has it). This takes precedence over the earlier rule for inconsistencies: list one only; on change rewrite it, log "from X to Y: reason".
 
 ## If true we would see
 Concrete predictions that can be checked, one per line.

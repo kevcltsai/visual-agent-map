@@ -339,7 +339,7 @@ integrationTest('saved integration is not offered for retry when derived-data re
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const plugin = { abortChartJobs: () => {}, addChartsAfterWrite: () => {}, repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => { throw new Error('refresh unavailable'); }, askModel: async () => ({ summary: 'Combined', detail: 'Combined knowledge', suggestions: [] }) };
+  const plugin = { abortChartJobs: () => {}, addChartsAfterWrite: () => {}, repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async paths => { if (!paths) throw new Error('refresh unavailable'); }, askModel: async () => ({ summary: 'Combined', detail: 'Combined knowledge', suggestions: [] }) };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.focusNode = () => {};
   await view.createIntegratedNode('Combined', [first, second], 'Compare', '');
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);

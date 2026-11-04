@@ -187,10 +187,6 @@ export function buildMapSvg(scene: MapScene): string {
     out.push(
       `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="12" fill="none" stroke="${stroke}" stroke-dasharray="6 4"/>`
     );
-    if (typeof b.label === "string" && b.label)
-      out.push(
-        `<text x="${box[0] + 8}" y="${box[1] + 16}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml(b.label.slice(0, TEXT_LIMIT))}</text>`
-      );
     out.push("</g>");
   }
   for (const edge of scene.edges ?? []) {
@@ -264,6 +260,21 @@ export function buildMapSvg(scene: MapScene): string {
       );
     });
     out.push("</g>");
+  }
+  // Frame labels last, as a chip on the frame's top edge (as on screen), so no card is drawn over a label.
+  for (const b of scene.boundaries ?? []) {
+    const box = rect(b?.x, b?.y, b?.w, b?.h);
+    if (!box || typeof b.label !== "string" || !b.label) continue;
+    const stroke = color(b.stroke, strokeColor);
+    const label = b.label.slice(0, TEXT_LIMIT);
+    const wide = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/;
+    const textWidth = Array.from(label).reduce((sum, ch) => sum + (wide.test(ch) ? 13 : 7), 0);
+    const chipWidth = Math.max(20, Math.min(box[2] - 24, textWidth + 16));
+    const lines = wrapText(label, Math.max(7, chipWidth - 16));
+    out.push(
+      `<g><rect x="${box[0] + 12}" y="${box[1] - 10}" width="${chipWidth}" height="20" rx="10" fill="${background}" stroke="${stroke}"/>` +
+        `<text x="${box[0] + 20}" y="${box[1] + 4}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml(lines[0] ?? "")}</text></g>`
+    );
   }
   out.push("</svg>");
   return out.filter(Boolean).join("\n");
@@ -416,10 +427,19 @@ export interface OutlineNode {
 }
 
 /**
- * Markdown outline of the whole map in node order, two spaces per level. Collapsed branches are written out in full:
- * collapsing is a view state, not content.
+ * Markdown outline of the whole map in the given node order, written as headings (`#` to `######`), which is the form
+ * the outline import reads, so the file can be imported back with the same structure. Collapsed branches are written out
+ * in full: collapsing is a view state, not content. A card's summary follows its heading as one `>` quote line (the import
+ * ignores it, and no summary text can turn into a heading or a fence). Research text is not written: it holds its own
+ * headings and would break the round trip; OPML carries it. Several roots are put under one heading with the map title
+ * (the import takes one root); a level deeper than six is written as level six, the most Markdown has.
  */
-export function mapOutline(nodes: OutlineNode[], titleOf: (id: string) => string): string {
+export function mapOutline(
+  nodes: OutlineNode[],
+  titleOf: (id: string) => string,
+  summaryOf: (id: string) => string = () => "",
+  mapTitle = ""
+): string {
   const ids = new Set(nodes.map(n => n.id));
   const children = new Map<string, OutlineNode[]>();
   const roots: OutlineNode[] = [];
@@ -430,18 +450,23 @@ export function mapOutline(nodes: OutlineNode[], titleOf: (id: string) => string
       children.set(node.parentId, list);
     } else roots.push(node);
   }
+  const oneLine = (value: string | undefined): string => (value ?? "").replace(/\s+/g, " ").trim();
   const lines: string[] = [];
   const seen = new Set<string>();
+  const wrap = roots.length > 1;
+  if (wrap) lines.push(`# ${oneLine(mapTitle) || "Map"}`);
   const walk = (node: OutlineNode, depth: number): void => {
     if (seen.has(node.id)) return;
     seen.add(node.id);
-    const title =
-      String(titleOf(node.id) ?? "")
-        .replace(/\s+/g, " ")
-        .trim() || node.id;
-    lines.push(`${"  ".repeat(depth)}- ${title}`);
+    const title = oneLine(titleOf(node.id)) || node.id;
+    lines.push(`${"#".repeat(Math.min(6, depth + 1 + (wrap ? 1 : 0)))} ${title}`);
+    const summary = oneLine(summaryOf(node.id));
+    if (summary) lines.push("", `> ${summary}`, "");
     for (const child of children.get(node.id) ?? []) walk(child, depth + 1);
   };
   for (const root of roots) walk(root, 0);
-  return lines.join("\n");
+  return lines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\n+$/, "");
 }

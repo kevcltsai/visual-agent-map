@@ -639,3 +639,36 @@ test('share exporter assemble: compact translations are rebuilt from the payload
   const blocked = linked.assemble(options, withEntry({ title: 'A2', summary: 'S2', detailSegments: linkedExtraction.units.map(unit => `T:${unit.text}`), detailCheck: compact.detailCheckOf(linkedExtraction) }));
   assert.ok(blocked.leakCategories.includes('wikilink') && !blocked.html);
 });
+
+// ---- persona 35: copy plurals and toggle descriptions ----
+test('share dialog persona-35: the estimate says "1 AI call" and "around 1 minute" in the singular', async () => {
+  const service = { estimate: () => ({ calls: 1, minutes: 1, perLanguage: [] }) };
+  const d = dialog({ host: { service } });
+  await open(d);
+  d.tick('ja');
+  assert.match(d.text(), /About 1 AI call, around 1 minute \(M\(claude:sonnet\)\)\./);
+  assert.doesNotMatch(d.text(), /1 AI calls|1 minutes/);
+});
+
+test('share dialog persona-35: the estimate keeps the plural for 2 or more', async () => {
+  const service = { estimate: () => ({ calls: 3, minutes: 2, perLanguage: [] }) };
+  const d = dialog({ host: { service } });
+  await open(d);
+  d.tick('ja');
+  assert.match(d.text(), /About 3 AI calls, around 2 minutes \(M\(claude:sonnet\)\)\./);
+});
+
+test('share dialog persona-35: a toggle description follows the toggle state', async () => {
+  const d = dialog();
+  await open(d);
+  const full = d.setting('Include full notes');
+  const images = d.setting('Include images');
+  const on = full.toggle.value;
+  assert.equal(full.desc.startsWith(on ? 'On:' : 'Off:'), true, full.desc);
+  full.toggle.fn(!on);
+  assert.equal(full.desc.startsWith(on ? 'Off:' : 'On:'), true, full.desc);
+  const img = images.toggle.value;
+  assert.equal(images.desc.startsWith(img ? 'On:' : 'Off:'), true, images.desc);
+  images.toggle.fn(!img);
+  assert.equal(images.desc.startsWith(img ? 'Off:' : 'On:'), true, images.desc);
+});

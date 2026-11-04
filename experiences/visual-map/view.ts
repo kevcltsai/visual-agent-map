@@ -14841,6 +14841,11 @@ export class VisualAgentMapView extends ItemView {
       prepare: async note => {
         if (!children.length && !selectedSources.some(group => group.documents.length))
           return t("ui.choose_another_note_source_first");
+        // Children still being researched write back after this read and would fail the sources check: wait for them.
+        await this.plugin.topicRuns.whenIdle(
+          children.map(child => child.path),
+          options?.signal
+        );
         childSources = await readSources();
         const sourceSnapshot = JSON.stringify(childSources.documents);
         if (!children.length && !selectedSources.some(group => group.documents.length))
@@ -15345,7 +15350,14 @@ export class VisualAgentMapView extends ItemView {
         releaseStarting();
         failed(t("ui.ai_running_ai"));
       },
-      model: async () => (modelChoice = await this.selectionModel(sources)),
+      model: async () => {
+        // Sources still being researched write back after the read and would fail the sources check: wait for them.
+        await this.plugin.topicRuns.whenIdle(
+          sources.map(source => source.path),
+          controller.signal
+        );
+        return (modelChoice = await this.selectionModel(sources));
+      },
       readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
       begin: group => {
         task = {

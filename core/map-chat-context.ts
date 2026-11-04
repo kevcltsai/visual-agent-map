@@ -139,6 +139,8 @@ export interface MapChatContextInput {
   mapTitles?: string[];
   /** There is no map the reply could edit (a map that cannot be changed): it has to start with `create_map`. */
   noEditableMap?: boolean;
+  /** The map still has its placeholder name (nobody named it): the first reply may name it with `rename_map`. */
+  mapNeedsName?: boolean;
 }
 export interface MapChatContext {
   /** The context as the JSON text put in the prompt. */
@@ -341,6 +343,9 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
   const json = JSON.stringify({
     mapTitle: input.mapTitle,
     ...(input.noEditableMap ? { noEditableMap: true } : {}),
+    // An empty map the reply can edit is where the tree goes: it is not a reason to make another map.
+    ...(!input.noEditableMap && !input.outline.length ? { emptyMap: true } : {}),
+    ...(!input.noEditableMap && input.mapNeedsName ? { mapNeedsName: true } : {}),
     mapTitles,
     outline: treeOrder(input.outline).map(node => ({
       id: node.id,

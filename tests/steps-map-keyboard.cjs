@@ -296,59 +296,120 @@ const typeAndSave = (modal, text) => { const input = findAll(modal.contentEl, i 
 const cardOf = (h, id) => h.stage.children.find(c => c.dataset.nodeId === id);
 const noteCount = h => [...h.contents.keys()].filter(p => p.endsWith('.md') && !p.endsWith('Map.md')).length;
 
-test('36: Mod+Enter opens the name dialog, saving puts keyboard focus on the new card, and one undo step removes it (redo restores it)', async () => {
+// Ticket 21: a new card needs no name first. It appears at once as "New topic" (1, 2, ...) with its title open for typing.
+const nameField = (h, id) => findAll(cardOf(h, id), i => i.classes.has('vam-card-title-input'))[0];
+const press = (field, key, init = {}) => field.handlers.get('keydown')({ key, isComposing: false, stopPropagation() {}, preventDefault() {}, ...init });
+const freshCard = h => h.map().nodes.find(n => !Object.values(h.ids).includes(n.id));
+const modCtrlEnter = h => h.view.scope.keys.find(k => k.key === 'Enter' && k.modifiers.includes('Mod')).func({ key: 'Enter', isComposing: false, defaultPrevented: false }, {});
+
+test('21: Mod+Enter makes a card named "New topic" at once (no dialog); its title field is focused with the name selected, and one undo step removes the card (redo restores it)', async () => {
   const h = await harness(); realAdd(h);
   const notesBefore = noteCount(h), past = h.view.history.past.length;
   h.view.contentEl.ownerDocument = { activeElement: h.card('leaf') };
-  send(h, 'leaf', 'Enter', { ctrlKey: true }); h.view.scope.keys.find(k => k.key === 'Enter' && k.modifiers.includes('Mod')).func({ key: 'Enter', isComposing: false, defaultPrevented: false }, {});
-  await tick();
-  assert.equal(h.modals.filter(m => m.constructor.name === 'NameModal').length >= 1, true, 'the name dialog opens first');
-  assert.equal(h.map().nodes.length, 4, 'nothing created before the name is saved');
-  const focusedBefore = make.last;
-  typeAndSave(nameModal(h), 'Fresh');
+  modCtrlEnter(h);
   await until(() => h.map().nodes.length === 5); await tick(); await tick();
-  const fresh = h.map().nodes.find(n => n.id !== undefined && !Object.values(h.ids).includes(n.id));
+  assert.equal(h.modals.filter(m => m.constructor.name === 'NameModal').length, 0, 'no name dialog');
+  const fresh = freshCard(h);
   assert.equal(fresh.parentId, h.ids.leaf, 'a child of the focused card');
+  assert.equal(h.view.notes.get(fresh.id).title, 'New topic');
   assert.equal(h.view.history.past.length, past + 1, 'one history entry');
-  assert.equal(make.last, cardOf(h, fresh.id), 'DOM focus is on the new card, not the parent');
-  assert.notEqual(make.last, focusedBefore);
+  const field = nameField(h, fresh.id);
+  assert.ok(field, 'the card shows a title field'); assert.equal(field.value, 'New topic');
+  assert.equal(make.last, field, 'DOM focus is on the title field'); assert.equal(h.view.inlineName.fresh, false, 'the name was selected once');
   await h.view.travel(false); await tick();
-  assert.equal(h.map().nodes.some(n => n.id === fresh.id), false, 'undo removes the card');
-  assert.equal(unassignedHas(h, 'Fresh'), true, 'its note waits in Unassigned');
+  assert.equal(h.map().nodes.some(n => n.id === fresh.id), false, 'one undo removes the whole card');
   await h.view.travel(true); await tick();
   assert.equal(h.map().nodes.some(n => n.id === fresh.id), true, 'redo brings the card back');
-  assert.equal(unassignedHas(h, 'Fresh'), false, 'the note left Unassigned');
   assert.equal(noteCount(h), notesBefore + 1);
 });
 
-test('36: Esc in the name dialog (close without save) leaves notes, nodes and history alone and does not move focus', async () => {
+test('21: typing in the field and Enter renames the card (one more undo step); the type row is gone once the edit ends', async () => {
   const h = await harness(); realAdd(h);
-  const notes = noteCount(h), past = h.view.history.past.length, last = make.last;
   await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
-  nameModal(h).close(); await tick(); await tick();
-  assert.equal(noteCount(h), notes); assert.equal(h.map().nodes.length, 4); assert.equal(h.view.history.past.length, past);
-  assert.equal(make.last, last, 'no card took focus'); assert.deepEqual(h.cameraMoves, []);
+  const fresh = freshCard(h), past = h.view.history.past.length;
+  const field = nameField(h, fresh.id); field.value = '手機設計';
+  press(field, 'Enter');
+  await until(() => h.view.notes.get(fresh.id).title === '手機設計'); await tick(); await tick();
+  assert.equal(h.view.history.past.length, past + 1);
+  assert.equal(h.view.inlineName, null, 'the edit ended');
+  assert.equal(nameField(h, fresh.id), undefined);
 });
 
-test('36: Enter during IME composition in the name dialog does not save', async () => {
+test('21: Esc, a blank name and leaving the field keep the default name and add no card', async () => {
+  for (const finish of [f => press(f, 'Escape'), f => { f.value = '   '; press(f, 'Enter'); }]) {
+    const h = await harness(); realAdd(h);
+    await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
+    const fresh = freshCard(h), past = h.view.history.past.length, notes = noteCount(h);
+    const field = nameField(h, fresh.id); field.value = field.value === 'New topic' ? 'Typed then dropped' : field.value;
+    finish(field); await tick(); await tick();
+    assert.equal(h.view.notes.get(fresh.id).title, 'New topic', 'the default name stays, no empty card');
+    assert.equal(h.map().nodes.length, 5); assert.equal(noteCount(h), notes); assert.equal(h.view.history.past.length, past, 'no history entry for the ended edit');
+    assert.equal(h.view.inlineName, null); assert.equal(nameField(h, fresh.id), undefined);
+  }
+});
+
+test('21: Enter while an input method is composing does not end the edit', async () => {
   const h = await harness(); realAdd(h);
   await h.view.addNode(null);
-  const input = findAll(nameModal(h).contentEl, i => i.tag === 'input')[0]; input.value = 'Composing';
-  input.keydown({ key: 'Enter', isComposing: true }); await tick(); await tick();
-  assert.equal(h.map().nodes.length, 4); assert.equal(nameModal(h).closeCount, 0);
+  const fresh = freshCard(h), field = nameField(h, fresh.id); field.value = 'ㄕㄡˇ';
+  press(field, 'Enter', { isComposing: true }); await tick(); await tick();
+  assert.ok(h.view.inlineName, 'still editing'); assert.equal(h.view.notes.get(fresh.id).title, 'New topic'); assert.equal(h.view.history.past.length > 0, true);
+  assert.equal(nameField(h, fresh.id), field, 'the same field stays');
 });
 
-test('36: Shift+Enter on a root adds a new root and focus lands on that root card', async () => {
+test('21: new cards of one map are "New topic", "New topic 1", "New topic 2" in order', async () => {
+  const h = await harness(); realAdd(h);
+  const leaf = h.map().nodes.find(n => n.id === h.ids.leaf);
+  for (let n = 0; n < 3; n++) { h.view.inlineName = null; await h.view.addNode(leaf); }
+  const titles = h.map().nodes.filter(n => !Object.values(h.ids).includes(n.id)).map(n => h.view.notes.get(n.id).title);
+  assert.equal(JSON.stringify(titles), JSON.stringify(['New topic', 'New topic 1', 'New topic 2']));
+});
+
+test('21: the card "+" and the toolbar "+ Topic" open a type list (six types and a text block) instead of a name dialog; a pick adds with that type', async () => {
+  const h = await harness(); realAdd(h);
+  const menus = [];
+  h.view.newMenu = () => { const m = { items: [], addItem(cb) { const it = { setTitle(t) { this.title = t; return this; }, setIcon() { return this; }, onClick(f) { this.run = f; return this; } }; cb(it); m.items.push(it); return m; }, showAtMouseEvent() { m.shown = true; }, select(n) { m.selected = n; } }; menus.push(m); return m; };
+  h.view.canEditText = () => true;
+  const textUnder = []; h.view.addTextNodeUnder = parent => textUnder.push(parent?.id ?? null);
+  const leaf = h.map().nodes.find(n => n.id === h.ids.leaf);
+  h.view.openAddMenu({}, leaf);
+  const menu = menus[0];
+  assert.equal(menu.shown, true); assert.equal(menu.selected, 0, 'Enter takes the first row');
+  assert.equal(menu.items.length, 7, 'six types then the text block');
+  assert.equal(menu.items[0].title, 'Topic'); assert.equal(menu.items.at(-1).title, 'Add text');
+  assert.equal(h.modals.filter(m => m.constructor.name === 'NameModal').length, 0);
+  assert.equal(h.map().nodes.length, 4, 'nothing is made before a pick');
+  menu.items[0].run(); await until(() => h.map().nodes.length === 5); await tick();
+  const fresh = freshCard(h);
+  assert.equal(fresh.parentId, h.ids.leaf); assert.equal(h.view.notes.get(fresh.id).title, 'New topic'); assert.ok(h.view.inlineName, 'the title is open for typing');
+  menu.items.at(-1).run(); await tick();
+  assert.equal(JSON.stringify(textUnder), JSON.stringify([h.ids.leaf]), 'the text block goes under the card');
+});
+
+test('21: the undo key in a pristine new-card field removes the card in one step; after typing it is left to the field', async () => {
+  const h = await harness(); realAdd(h);
+  await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
+  const fresh = freshCard(h), field = nameField(h, fresh.id);
+  const undo = h.view.scope.keys.find(k => k.key === 'z' && k.modifiers.length === 1);
+  field.closest = selector => (selector.includes('vam-card-title-input') || selector.includes('input') ? field : null);
+  h.view.inlineName.draft = 'typed';
+  assert.equal(undo.func({ key: 'z', isComposing: false, target: field }, {}), true, 'typed text: native undo');
+  h.view.inlineName.draft = 'New topic';
+  assert.equal(undo.func({ key: 'z', isComposing: false, target: field }, {}), false, 'pristine: handled');
+  await until(() => !h.map().nodes.some(n => n.id === fresh.id)); await tick();
+  assert.equal(h.map().nodes.length, 4); assert.equal(h.view.inlineName, null);
+});
+
+test('21: Shift+Enter on a root adds a new root named "New topic" and its field has the focus', async () => {
   const h = await harness(); realAdd(h);
   const roots = h.map().nodes.filter(n => !n.parentId).length;
   h.view.contentEl.ownerDocument = { activeElement: h.card('root') };
   h.view.scope.keys.find(k => k.key === 'Enter' && k.modifiers.length === 1 && k.modifiers[0] === 'Shift').func({ key: 'Enter', isComposing: false, defaultPrevented: false }, {});
-  await tick();
-  typeAndSave(nameModal(h), 'Second root');
   await until(() => h.map().nodes.length === 5); await tick(); await tick();
-  const fresh = h.map().nodes.find(n => !Object.values(h.ids).includes(n.id));
+  const fresh = freshCard(h);
   assert.equal(fresh.parentId ?? null, null); assert.equal(h.map().nodes.filter(n => !n.parentId).length, roots + 1);
-  assert.equal(make.last, cardOf(h, fresh.id));
+  assert.equal(make.last, nameField(h, fresh.id)); assert.equal(h.view.notes.get(fresh.id).title, 'New topic');
+  assert.equal(h.modals.filter(m => m.constructor.name === 'NameModal').length, 0);
 });
 
 test('36: addNode with focus=false (AI suggestion, outline import, map chat) does not take focus', async () => {

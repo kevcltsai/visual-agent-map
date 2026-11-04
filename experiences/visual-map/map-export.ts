@@ -217,7 +217,9 @@ export function buildMapSvg(scene: MapScene): string {
       out.push(`<svg x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" viewBox="${box.join(" ")}">`);
     out.push(imageElement(card.cover));
     const fill = color(card.textColor, textColor);
-    const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
+    // A masked cover's picture reaches past its window; the text starts under what is shown.
+    const shownCover = card.cover?.window ?? card.cover;
+    const coverBox = shownCover ? rect(shownCover.x, shownCover.y, shownCover.w, shownCover.h) : null;
     const top = (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
     const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
     const shown = textLines(card.title).slice(0, fits);

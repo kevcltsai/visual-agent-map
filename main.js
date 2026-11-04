@@ -619,21 +619,21 @@ var en = {
   "ui.topic_cover": "Topic cover",
   "ui.topic_cover_off": "Turn card cover off",
   "ui.topic_cover_on": "Turn card cover on",
-  "ui.topic_cover_frame_adjust": "Adjust area",
-  "ui.topic_cover_frame_title": "Adjust cover area",
-  "ui.topic_cover_frame_reset": "Reset to whole image",
+  "ui.topic_cover_frame_adjust": "Edit card",
+  "ui.topic_cover_frame_title": "Edit card",
+  "ui.topic_cover_frame_reset": "Show whole picture",
   "ui.topic_cover_frame_apply": "Apply",
-  "ui.topic_cover_frame_box": "Cover area. Arrow keys move it; Shift and arrow keys resize it from the bottom right.",
+  "ui.topic_cover_frame_box": "Cover picture. Drag inside to move what the card shows; arrow keys move it, Shift and arrow keys resize it from the bottom right.",
   "ui.topic_cover_frame_status": "Left {0}%, top {1}%, width {2}%, height {3}%",
   "ui.topic_cover_frame_load_failed": "The picture could not be loaded.",
-  "ui.topic_cover_frame_handle_nw": "Resize from top-left corner",
-  "ui.topic_cover_frame_handle_n": "Resize from top edge",
-  "ui.topic_cover_frame_handle_ne": "Resize from top-right corner",
-  "ui.topic_cover_frame_handle_e": "Resize from right edge",
-  "ui.topic_cover_frame_handle_se": "Resize from bottom-right corner",
-  "ui.topic_cover_frame_handle_s": "Resize from bottom edge",
-  "ui.topic_cover_frame_handle_sw": "Resize from bottom-left corner",
-  "ui.topic_cover_frame_handle_w": "Resize from left edge",
+  "ui.topic_cover_frame_handle_nw": "Top-left corner: hide or show the top and left",
+  "ui.topic_cover_frame_handle_n": "Top edge: hide or show the top",
+  "ui.topic_cover_frame_handle_ne": "Top-right corner: hide or show the top and right",
+  "ui.topic_cover_frame_handle_e": "Right edge: hide or show the right",
+  "ui.topic_cover_frame_handle_se": "Bottom-right corner: hide or show the bottom and right",
+  "ui.topic_cover_frame_handle_s": "Bottom edge: hide or show the bottom",
+  "ui.topic_cover_frame_handle_sw": "Bottom-left corner: hide or show the bottom and left",
+  "ui.topic_cover_frame_handle_w": "Left edge: hide or show the left",
   "ui.topic_kind_topic": "Topic",
   "ui.topic_kind_atomic": "Atomic knowledge",
   "ui.topic_kind_hypothesis": "Hypothesis",
@@ -3069,21 +3069,21 @@ var zhCN = {
   "ui.topic_cover": "\u8BAE\u9898\u5C01\u9762",
   "ui.topic_cover_off": "\u5173\u95ED\u5361\u7247\u5C01\u9762",
   "ui.topic_cover_on": "\u5F00\u542F\u5361\u7247\u5C01\u9762",
-  "ui.topic_cover_frame_adjust": "\u8C03\u6574\u8303\u56F4",
-  "ui.topic_cover_frame_title": "\u8C03\u6574\u5C01\u9762\u8303\u56F4",
-  "ui.topic_cover_frame_reset": "\u91CD\u8BBE\u4E3A\u5168\u56FE",
+  "ui.topic_cover_frame_adjust": "\u7F16\u8F91\u5361\u7247",
+  "ui.topic_cover_frame_title": "\u7F16\u8F91\u5361\u7247",
+  "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5E94\u7528",
-  "ui.topic_cover_frame_box": "\u5C01\u9762\u8303\u56F4\u3002\u65B9\u5411\u952E\u79FB\u52A8\uFF1BShift \u52A0\u65B9\u5411\u952E\u4ECE\u53F3\u4E0B\u89D2\u7F29\u653E\u3002",
+  "ui.topic_cover_frame_box": "\u5C01\u9762\u56FE\u7247\u3002\u5728\u91CC\u9762\u62D6\u52A8\u53EF\u79FB\u52A8\u5361\u7247\u663E\u793A\u7684\u90E8\u5206\uFF1B\u65B9\u5411\u952E\u79FB\u52A8\uFF0CShift \u52A0\u65B9\u5411\u952E\u4ECE\u53F3\u4E0B\u89D2\u7F29\u653E\u3002",
   "ui.topic_cover_frame_status": "\u5DE6 {0}%\u3001\u4E0A {1}%\u3001\u5BBD {2}%\u3001\u9AD8 {3}%",
   "ui.topic_cover_frame_load_failed": "\u65E0\u6CD5\u52A0\u8F7D\u56FE\u7247\u3002",
-  "ui.topic_cover_frame_handle_nw": "\u4ECE\u5DE6\u4E0A\u89D2\u8C03\u6574",
-  "ui.topic_cover_frame_handle_n": "\u4ECE\u4E0A\u8FB9\u8C03\u6574",
-  "ui.topic_cover_frame_handle_ne": "\u4ECE\u53F3\u4E0A\u89D2\u8C03\u6574",
-  "ui.topic_cover_frame_handle_e": "\u4ECE\u53F3\u8FB9\u8C03\u6574",
-  "ui.topic_cover_frame_handle_se": "\u4ECE\u53F3\u4E0B\u89D2\u8C03\u6574",
-  "ui.topic_cover_frame_handle_s": "\u4ECE\u4E0B\u8FB9\u8C03\u6574",
-  "ui.topic_cover_frame_handle_sw": "\u4ECE\u5DE6\u4E0B\u89D2\u8C03\u6574",
-  "ui.topic_cover_frame_handle_w": "\u4ECE\u5DE6\u8FB9\u8C03\u6574",
+  "ui.topic_cover_frame_handle_nw": "\u5DE6\u4E0A\u89D2\uFF1A\u906E\u853D\u6216\u663E\u793A\u4E0A\u65B9\u4E0E\u5DE6\u65B9",
+  "ui.topic_cover_frame_handle_n": "\u4E0A\u8FB9\uFF1A\u906E\u853D\u6216\u663E\u793A\u4E0A\u65B9",
+  "ui.topic_cover_frame_handle_ne": "\u53F3\u4E0A\u89D2\uFF1A\u906E\u853D\u6216\u663E\u793A\u4E0A\u65B9\u4E0E\u53F3\u65B9",
+  "ui.topic_cover_frame_handle_e": "\u53F3\u8FB9\uFF1A\u906E\u853D\u6216\u663E\u793A\u53F3\u65B9",
+  "ui.topic_cover_frame_handle_se": "\u53F3\u4E0B\u89D2\uFF1A\u906E\u853D\u6216\u663E\u793A\u4E0B\u65B9\u4E0E\u53F3\u65B9",
+  "ui.topic_cover_frame_handle_s": "\u4E0B\u8FB9\uFF1A\u906E\u853D\u6216\u663E\u793A\u4E0B\u65B9",
+  "ui.topic_cover_frame_handle_sw": "\u5DE6\u4E0B\u89D2\uFF1A\u906E\u853D\u6216\u663E\u793A\u4E0B\u65B9\u4E0E\u5DE6\u65B9",
+  "ui.topic_cover_frame_handle_w": "\u5DE6\u8FB9\uFF1A\u906E\u853D\u6216\u663E\u793A\u5DE6\u65B9",
   "ui.topic_kind_topic": "\u4E00\u822C\u8BAE\u9898",
   "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8BC6",
   "ui.topic_kind_hypothesis": "\u5047\u8BBE",
@@ -5519,21 +5519,21 @@ var zhTW = {
   "ui.topic_cover": "\u8B70\u984C\u5C01\u9762",
   "ui.topic_cover_off": "\u95DC\u9589\u5361\u7247\u5C01\u9762",
   "ui.topic_cover_on": "\u958B\u555F\u5361\u7247\u5C01\u9762",
-  "ui.topic_cover_frame_adjust": "\u8ABF\u6574\u7BC4\u570D",
-  "ui.topic_cover_frame_title": "\u8ABF\u6574\u5C01\u9762\u7BC4\u570D",
-  "ui.topic_cover_frame_reset": "\u91CD\u8A2D\u70BA\u5168\u5716",
+  "ui.topic_cover_frame_adjust": "\u7DE8\u8F2F\u5361\u7247",
+  "ui.topic_cover_frame_title": "\u7DE8\u8F2F\u5361\u7247",
+  "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5957\u7528",
-  "ui.topic_cover_frame_box": "\u5C01\u9762\u7BC4\u570D\u3002\u65B9\u5411\u9375\u79FB\u52D5\uFF1BShift \u52A0\u65B9\u5411\u9375\u5F9E\u53F3\u4E0B\u89D2\u7E2E\u653E\u3002",
+  "ui.topic_cover_frame_box": "\u5C01\u9762\u5716\u7247\u3002\u5728\u88E1\u9762\u62D6\u66F3\u53EF\u79FB\u52D5\u5361\u7247\u986F\u793A\u7684\u90E8\u5206\uFF1B\u65B9\u5411\u9375\u79FB\u52D5\uFF0CShift \u52A0\u65B9\u5411\u9375\u5F9E\u53F3\u4E0B\u89D2\u7E2E\u653E\u3002",
   "ui.topic_cover_frame_status": "\u5DE6 {0}%\u3001\u4E0A {1}%\u3001\u5BEC {2}%\u3001\u9AD8 {3}%",
   "ui.topic_cover_frame_load_failed": "\u7121\u6CD5\u8F09\u5165\u5716\u7247\u3002",
-  "ui.topic_cover_frame_handle_nw": "\u5F9E\u5DE6\u4E0A\u89D2\u8ABF\u6574",
-  "ui.topic_cover_frame_handle_n": "\u5F9E\u4E0A\u908A\u8ABF\u6574",
-  "ui.topic_cover_frame_handle_ne": "\u5F9E\u53F3\u4E0A\u89D2\u8ABF\u6574",
-  "ui.topic_cover_frame_handle_e": "\u5F9E\u53F3\u908A\u8ABF\u6574",
-  "ui.topic_cover_frame_handle_se": "\u5F9E\u53F3\u4E0B\u89D2\u8ABF\u6574",
-  "ui.topic_cover_frame_handle_s": "\u5F9E\u4E0B\u908A\u8ABF\u6574",
-  "ui.topic_cover_frame_handle_sw": "\u5F9E\u5DE6\u4E0B\u89D2\u8ABF\u6574",
-  "ui.topic_cover_frame_handle_w": "\u5F9E\u5DE6\u908A\u8ABF\u6574",
+  "ui.topic_cover_frame_handle_nw": "\u5DE6\u4E0A\u89D2\uFF1A\u906E\u853D\u6216\u986F\u793A\u4E0A\u65B9\u8207\u5DE6\u65B9",
+  "ui.topic_cover_frame_handle_n": "\u4E0A\u908A\uFF1A\u906E\u853D\u6216\u986F\u793A\u4E0A\u65B9",
+  "ui.topic_cover_frame_handle_ne": "\u53F3\u4E0A\u89D2\uFF1A\u906E\u853D\u6216\u986F\u793A\u4E0A\u65B9\u8207\u53F3\u65B9",
+  "ui.topic_cover_frame_handle_e": "\u53F3\u908A\uFF1A\u906E\u853D\u6216\u986F\u793A\u53F3\u65B9",
+  "ui.topic_cover_frame_handle_se": "\u53F3\u4E0B\u89D2\uFF1A\u906E\u853D\u6216\u986F\u793A\u4E0B\u65B9\u8207\u53F3\u65B9",
+  "ui.topic_cover_frame_handle_s": "\u4E0B\u908A\uFF1A\u906E\u853D\u6216\u986F\u793A\u4E0B\u65B9",
+  "ui.topic_cover_frame_handle_sw": "\u5DE6\u4E0B\u89D2\uFF1A\u906E\u853D\u6216\u986F\u793A\u4E0B\u65B9\u8207\u5DE6\u65B9",
+  "ui.topic_cover_frame_handle_w": "\u5DE6\u908A\uFF1A\u906E\u853D\u6216\u986F\u793A\u5DE6\u65B9",
   "ui.topic_kind_topic": "\u4E00\u822C\u8B70\u984C",
   "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8B58",
   "ui.topic_kind_hypothesis": "\u5047\u8A2D",
@@ -17563,7 +17563,7 @@ function textLines(title) {
   return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT2));
 }
 function buildMapSvg(scene) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
   const width = num(scene == null ? void 0 : scene.width);
   const height = num(scene == null ? void 0 : scene.height);
   if (width === null || height === null || width <= 0 || height <= 0) return "";
@@ -17618,7 +17618,8 @@ function buildMapSvg(scene) {
       out.push(`<svg x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" viewBox="${box.join(" ")}">`);
     out.push(imageElement(card.cover));
     const fill2 = color(card.textColor, textColor);
-    const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
+    const shownCover = (_j = (_i = card.cover) == null ? void 0 : _i.window) != null ? _j : card.cover;
+    const coverBox = shownCover ? rect(shownCover.x, shownCover.y, shownCover.w, shownCover.h) : null;
     const top = (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
     const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
     const shown = textLines(card.title).slice(0, fits);
@@ -17631,7 +17632,7 @@ function buildMapSvg(scene) {
     if (card.clipped === true) out.push("</svg>");
     out.push("</g>");
   }
-  for (const summary of (_i = scene.summaries) != null ? _i : []) {
+  for (const summary of (_k = scene.summaries) != null ? _k : []) {
     if (typeof (summary == null ? void 0 : summary.d) !== "string" || !PATH_DATA.test(summary.d) || summary.d.length > 4e3) continue;
     const [x, y] = [num(summary.x), num(summary.y)];
     if (x === null || y === null) continue;
@@ -24608,6 +24609,51 @@ ${embed}${tail.includes("\n") ? tail : `${tail}
 
 // experiences/visual-map/cover-frame-editor.ts
 var import_obsidian12 = require("obsidian");
+
+// experiences/visual-map/cover-layout.ts
+var COVER_MAX_HEIGHT_RATIO = 1.5;
+var WHOLE = { x: 0, y: 0, w: 1, h: 1 };
+function coverWindow(pictureWidth, pictureHeight, frame, displayWidth) {
+  if (!(pictureWidth > 0 && pictureHeight > 0 && Number.isFinite(pictureWidth) && Number.isFinite(pictureHeight)))
+    return null;
+  if (!(displayWidth > 0 && Number.isFinite(displayWidth))) return null;
+  const mask = frame != null ? frame : WHOLE;
+  const tall = pictureHeight / pictureWidth;
+  const natural = mask.h * displayWidth * tall;
+  const cap = COVER_MAX_HEIGHT_RATIO * displayWidth;
+  const scale = natural > cap ? cap / natural : 1;
+  const unscaledWidth = mask.w * displayWidth;
+  return {
+    left: mask.x * displayWidth + unscaledWidth * (1 - scale) / 2,
+    width: unscaledWidth * scale,
+    height: natural * scale,
+    scale
+  };
+}
+function coverFrameRatio(width, height, frame) {
+  var _a2;
+  if (!coverWindow(width, height, frame, 1)) return null;
+  return Math.max(width / (height * ((_a2 = frame == null ? void 0 : frame.h) != null ? _a2 : 1)), 1 / COVER_MAX_HEIGHT_RATIO);
+}
+function placeCoverFrame(parts, shape2, mask) {
+  const win = coverWindow(shape2, 1, mask, 1);
+  if (!win) return null;
+  parts.frame.style.setProperty("aspect-ratio", String(coverFrameRatio(shape2, 1, mask)));
+  parts.frame.addClass("is-sized");
+  if (!mask || !parts.window) return win;
+  const style = parts.window.style;
+  style.setProperty("left", `${win.left * 100}%`);
+  style.setProperty("width", `${win.width * 100}%`);
+  style.setProperty("aspect-ratio", String(win.width / win.height));
+  const img = parts.img.style;
+  img.setProperty("width", `${100 / mask.w}%`);
+  img.setProperty("height", `${100 / mask.h}%`);
+  img.setProperty("left", `${-mask.x / mask.w * 100}%`);
+  img.setProperty("top", `${-mask.y / mask.h * 100}%`);
+  return win;
+}
+
+// experiences/visual-map/cover-frame-editor.ts
 var MIN_FRAME_SIDE = 0.08;
 var FRAME_KEY_STEP = 0.01;
 var WHOLE_EPSILON = 5e-4;
@@ -24647,8 +24693,7 @@ function frameToWrite(frame) {
   return !frame || isWholeFrame(frame) ? null : frame;
 }
 var labelSeq = 0;
-var EDGE_TOUCH = 5e-4;
-var WHOLE = { x: 0, y: 0, w: 1, h: 1 };
+var WHOLE2 = { x: 0, y: 0, w: 1, h: 1 };
 var HANDLE_KEY = {
   move: "ui.topic_cover_frame_box",
   nw: "ui.topic_cover_frame_handle_nw",
@@ -24660,57 +24705,52 @@ var HANDLE_KEY = {
   sw: "ui.topic_cover_frame_handle_sw",
   w: "ui.topic_cover_frame_handle_w"
 };
+function nudgeCoverFrameEdge(mode, frame, key2) {
+  const horizontal = mode.includes("e") || mode.includes("w");
+  const vertical = mode.includes("n") || mode.includes("s");
+  const dx = !horizontal ? 0 : key2 === "ArrowRight" ? FRAME_KEY_STEP : key2 === "ArrowLeft" ? -FRAME_KEY_STEP : 0;
+  const dy = !vertical ? 0 : key2 === "ArrowDown" ? FRAME_KEY_STEP : key2 === "ArrowUp" ? -FRAME_KEY_STEP : 0;
+  if (!dx && !dy) return null;
+  return dragCoverFrame(mode, frame, dx, dy);
+}
 var CoverFrameModal = class extends import_obsidian12.Modal {
   constructor(app, options) {
     var _a2;
     super(app);
     this.options = options;
     __publicField(this, "draft");
+    __publicField(this, "shape");
+    __publicField(this, "drag", null);
     __publicField(this, "applying", false);
+    __publicField(this, "coverEl", null);
+    __publicField(this, "windowEl", null);
+    __publicField(this, "imgEl", null);
+    __publicField(this, "ghostEl", null);
     __publicField(this, "boxEl", null);
     __publicField(this, "statusEl", null);
     __publicField(this, "applyButton", null);
-    this.draft = { ...(_a2 = options.initial) != null ? _a2 : WHOLE };
+    this.draft = { ...(_a2 = options.initial) != null ? _a2 : WHOLE2 };
+    this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen() {
+    var _a2, _b2;
     this.modalEl.addClass("vam-card-frame-modal");
     this.titleEl.setText(t("ui.topic_cover_frame_title"));
     const stage = this.contentEl.createDiv({ cls: "vam-card-frame-stage" });
-    const img = stage.createEl("img", {
-      cls: "vam-card-frame-image",
-      attr: { src: this.options.src, alt: "", draggable: "false" }
-    });
-    img.addEventListener("error", () => {
-      var _a2;
-      if (this.applyButton) this.applyButton.disabled = true;
-      (_a2 = this.statusEl) == null ? void 0 : _a2.setText(t("ui.topic_cover_frame_load_failed"));
-    });
-    const box = stage.createDiv({ cls: "vam-card-frame-box" });
-    box.setAttr("tabindex", "0");
-    box.setAttr("role", "group");
+    const given = (_b2 = (_a2 = this.options).card) == null ? void 0 : _b2.call(_a2);
+    const card = given ? stage.appendChild(given) : stage.createDiv({ cls: "vam-node" });
+    const cover = this.buildCover(card);
+    for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
     const labelId = `vam-card-frame-label-${++labelSeq}`;
-    stage.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
-    box.setAttr("aria-labelledby", labelId);
-    this.boxEl = box;
-    this.bindDrag(box, "move", stage);
-    for (const mode of FRAME_HANDLES) {
-      const handle = box.createEl("button", {
-        cls: `vam-card-frame-handle is-${mode}`,
-        attr: { type: "button", "aria-label": t(HANDLE_KEY[mode]) }
-      });
-      handle.dataset.mode = mode;
-      this.bindDrag(handle, mode, stage);
-    }
-    box.addEventListener("keydown", (event) => {
-      const next = nudgeCoverFrame(this.draft, event.key, event.shiftKey);
-      if (!next) return;
-      event.preventDefault();
-      this.setDraft(next);
+    this.contentEl.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
+    cover.setAttr("aria-labelledby", labelId);
+    this.statusEl = this.contentEl.createDiv({
+      cls: "vam-card-frame-status vam-sr-only",
+      attr: { "aria-live": "polite" }
     });
-    this.statusEl = this.contentEl.createDiv({ cls: "vam-card-frame-status", attr: { "aria-live": "polite" } });
     const actions = this.contentEl.createDiv({ cls: "vam-card-frame-actions" });
     const reset = actions.createEl("button", { text: t("ui.topic_cover_frame_reset"), attr: { type: "button" } });
-    reset.addEventListener("click", () => this.setDraft({ ...WHOLE }));
+    reset.addEventListener("click", () => this.setDraft({ ...WHOLE2 }));
     const cancel = actions.createEl("button", { text: t("ui.cancel"), attr: { type: "button" } });
     cancel.addEventListener("click", () => this.close());
     this.applyButton = actions.createEl("button", {
@@ -24720,7 +24760,60 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     });
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
-    box.focus();
+    cover.focus();
+  }
+  /** Replaces the card's cover (or adds one before the title) with the editable cover: picture, window, mask box, handles. */
+  buildCover(card) {
+    var _a2;
+    const old = card.querySelector(".vam-card-cover");
+    const before = old != null ? old : card.querySelector(".vam-card-title");
+    const cover = card.createDiv({ cls: "vam-card-cover is-framed" });
+    cover.remove();
+    ((_a2 = before == null ? void 0 : before.parentElement) != null ? _a2 : card).insertBefore(cover, before != null ? before : null);
+    old == null ? void 0 : old.remove();
+    cover.setAttr("tabindex", "0");
+    cover.setAttr("role", "group");
+    const picture = { src: this.options.src, alt: "", draggable: "false" };
+    this.ghostEl = cover.createEl("img", { cls: "vam-card-frame-ghost", attr: { ...picture, "aria-hidden": "true" } });
+    this.windowEl = cover.createDiv({ cls: "vam-card-cover-window" });
+    const img = this.windowEl.createEl("img", { attr: picture });
+    this.imgEl = img;
+    img.addEventListener("error", () => {
+      if (this.applyButton) this.applyButton.disabled = true;
+      this.contentEl.createEl("p", { cls: "vam-card-frame-error", text: t("ui.topic_cover_frame_load_failed") });
+    });
+    img.addEventListener("load", () => {
+      const shape2 = img.naturalWidth / img.naturalHeight;
+      if (this.shape || !coverWindow(img.naturalWidth, img.naturalHeight, null, 1)) return;
+      this.shape = shape2;
+      this.setDraft(this.draft);
+    });
+    const box = cover.createDiv({ cls: "vam-card-frame-box" });
+    this.boxEl = box;
+    this.bindDrag(box, "move");
+    for (const mode of FRAME_HANDLES) {
+      const handle = box.createEl("button", {
+        cls: `vam-card-frame-handle is-${mode}`,
+        attr: { type: "button", "aria-label": t(HANDLE_KEY[mode]) }
+      });
+      handle.dataset.mode = mode;
+      this.bindDrag(handle, mode);
+      handle.addEventListener("keydown", (event) => {
+        const next = nudgeCoverFrameEdge(mode, this.draft, event.key);
+        if (!next) return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.setDraft(next);
+      });
+    }
+    cover.addEventListener("keydown", (event) => {
+      const next = nudgeCoverFrame(this.draft, event.key, event.shiftKey);
+      if (!next) return;
+      event.preventDefault();
+      this.setDraft(next);
+    });
+    this.coverEl = cover;
+    return cover;
   }
   async apply() {
     if (this.applying) return;
@@ -24735,17 +24828,6 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
   setDraft(frame) {
     var _a2;
     this.draft = frame;
-    const box = this.boxEl;
-    if (!box) return;
-    const percent = (value) => `${round2(value * 100)}%`;
-    box.toggleClass("is-at-w", frame.x < EDGE_TOUCH);
-    box.toggleClass("is-at-n", frame.y < EDGE_TOUCH);
-    box.toggleClass("is-at-e", frame.x + frame.w > 1 - EDGE_TOUCH);
-    box.toggleClass("is-at-s", frame.y + frame.h > 1 - EDGE_TOUCH);
-    box.style.left = percent(frame.x);
-    box.style.top = percent(frame.y);
-    box.style.width = percent(frame.w);
-    box.style.height = percent(frame.h);
     (_a2 = this.statusEl) == null ? void 0 : _a2.setText(
       t(
         "ui.topic_cover_frame_status",
@@ -24755,38 +24837,63 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
         Math.round(frame.h * 100)
       )
     );
+    const cover = this.coverEl;
+    const box = this.boxEl;
+    if (!cover || !box || !this.windowEl || !this.imgEl || !this.ghostEl || !this.shape) return;
+    const win = placeCoverFrame({ frame: cover, window: this.windowEl, img: this.imgEl }, this.shape, frame);
+    if (!win) return;
+    box.style.setProperty("left", `${win.left * 100}%`);
+    box.style.setProperty("width", `${win.width * 100}%`);
+    box.style.setProperty("aspect-ratio", String(win.width / win.height));
+    const anchor = this.drag ? this.drag.start.y : frame.y;
+    const shift = `translateY(${(frame.y - anchor) / frame.h * 100}%)`;
+    this.windowEl.style.setProperty("transform", shift);
+    box.style.setProperty("transform", shift);
+    const ghost = this.ghostEl.style;
+    ghost.setProperty("left", `${(win.left - frame.x * win.scale) * 100}%`);
+    ghost.setProperty("width", `${win.scale * 100}%`);
+    ghost.setProperty("aspect-ratio", String(this.shape));
+    ghost.setProperty("top", `${-anchor / frame.h * 100}%`);
   }
   /** Pointer capture keeps the drag on this element even when the pointer leaves it or the dialog. */
-  bindDrag(target, mode, stage) {
-    let drag = null;
+  bindDrag(target, mode) {
     target.addEventListener("pointerdown", (event) => {
-      var _a2;
+      var _a2, _b2, _c, _d;
       if (mode === "move" && event.target !== target) return;
-      const rect2 = stage.getBoundingClientRect();
-      if (!rect2.width || !rect2.height) return;
+      const cover = this.coverEl;
+      const width = (_a2 = cover == null ? void 0 : cover.getBoundingClientRect().width) != null ? _a2 : 0;
+      const scale = this.shape ? (_c = (_b2 = coverWindow(this.shape, 1, this.draft, 1)) == null ? void 0 : _b2.scale) != null ? _c : 1 : 1;
+      if (!cover || !width || !this.shape) return;
       event.preventDefault();
       event.stopPropagation();
-      (_a2 = target.setPointerCapture) == null ? void 0 : _a2.call(target, event.pointerId);
-      drag = {
+      (_d = target.setPointerCapture) == null ? void 0 : _d.call(target, event.pointerId);
+      cover.addClass("is-active", "is-dragging");
+      const across = width * scale;
+      this.drag = {
         id: event.pointerId,
+        mode,
         x: event.clientX,
         y: event.clientY,
-        width: rect2.width,
-        height: rect2.height,
+        across,
+        down: across / this.shape,
         start: { ...this.draft }
       };
     });
     target.addEventListener("pointermove", (event) => {
-      if (!drag || event.pointerId !== drag.id) return;
+      const drag = this.drag;
+      if (!drag || drag.mode !== mode || event.pointerId !== drag.id) return;
       this.setDraft(
-        dragCoverFrame(mode, drag.start, (event.clientX - drag.x) / drag.width, (event.clientY - drag.y) / drag.height)
+        dragCoverFrame(mode, drag.start, (event.clientX - drag.x) / drag.across, (event.clientY - drag.y) / drag.down)
       );
     });
     const end = (event) => {
-      var _a2;
-      if (!drag || event.pointerId !== drag.id) return;
+      var _a2, _b2;
+      const drag = this.drag;
+      if (!drag || drag.mode !== mode || event.pointerId !== drag.id) return;
       (_a2 = target.releasePointerCapture) == null ? void 0 : _a2.call(target, drag.id);
-      drag = null;
+      this.drag = null;
+      (_b2 = this.coverEl) == null ? void 0 : _b2.removeClass("is-dragging");
+      this.setDraft(this.draft);
     };
     target.addEventListener("pointerup", end);
     target.addEventListener("pointercancel", end);
@@ -48241,27 +48348,27 @@ var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
 var cardCutLabels = /* @__PURE__ */ new WeakMap();
 var cardCovers = /* @__PURE__ */ new WeakMap();
-var COVER_MAX_HEIGHT_RATIO = 1.5;
-function coverFrameRatio(width, height, frame) {
-  var _a2, _b2;
-  if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) return null;
-  return Math.max(width * ((_a2 = frame == null ? void 0 : frame.w) != null ? _a2 : 1) / (height * ((_b2 = frame == null ? void 0 : frame.h) != null ? _b2 : 1)), 1 / COVER_MAX_HEIGHT_RATIO);
-}
+var CARD_EDITOR_STATES = [
+  "is-clipped",
+  "is-selected",
+  "is-drop-target",
+  "is-cut",
+  "is-marquee-hit",
+  "is-marquee-remove",
+  "is-presenting",
+  "is-search-current",
+  "is-search-match",
+  "vam-structure-suggested"
+];
+var CARD_EDITOR_DROP = [
+  ".vam-node-tools",
+  ".vam-add-child",
+  ".vam-card-resize",
+  ".vam-card-resize-y",
+  ".vam-card-fade",
+  ".vam-card-more"
+].join(", ");
 var coverShapes = /* @__PURE__ */ new Map();
-function placeCoverFrame(parts, shape2, mask) {
-  const ratio = coverFrameRatio(shape2, 1, mask);
-  if (!ratio) return;
-  parts.frame.style.setProperty("aspect-ratio", String(ratio));
-  parts.frame.addClass("is-sized");
-  if (!mask || !parts.window) return;
-  const region = shape2 * mask.w / mask.h;
-  parts.window.style.setProperty("aspect-ratio", String(region));
-  const img = parts.img.style;
-  img.setProperty("width", `${100 / mask.w}%`);
-  img.setProperty("height", `${100 / mask.h}%`);
-  img.setProperty("left", `${-mask.x / mask.w * 100}%`);
-  img.setProperty("top", `${-mask.y / mask.h * 100}%`);
-}
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var cardLinkButtons = /* @__PURE__ */ new WeakMap();
@@ -51159,13 +51266,13 @@ ${request.requirements}` : preset.text,
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       const src = image instanceof import_obsidian34.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
-      return src ? { src, frame: cover.frame } : null;
+      return src ? { src, path: cover.path, frame: cover.frame } : null;
     } catch (e) {
       return null;
     }
   }
   /**
-   * A card's double-click: on the cover picture it opens "Adjust cover area", on the title it renames. The point is
+   * A card's double-click: on the cover picture it opens "Edit card", on the title it renames. The point is
    * checked against both boxes because enableDrag captures the pointer on the card, so the target is often the card.
    */
   onCardDoubleClick(event, card, title, node, noteTitle2) {
@@ -51186,14 +51293,17 @@ ${request.requirements}` : preset.text,
     event.preventDefault();
     this.renameNode(node, noteTitle2);
   }
-  /** Opens the "Adjust area" dialog for the topic's cover picture. Only Apply writes (one undo step); Cancel and close do not. */
+  /** Opens the "Edit card" dialog for the topic's card. Only Apply writes (one undo step); Cancel and close do not. */
   openCoverFrameEditor(node) {
+    var _a2;
     if (!this.markersEditable(node)) return null;
     const picture = this.coverPictureOf(node);
     if (!picture) return null;
     const modal = new CoverFrameModal(this.app, {
       src: picture.src,
       initial: picture.frame,
+      shape: (_a2 = coverShapes.get(picture.path)) != null ? _a2 : null,
+      card: () => this.cardForEditor(node),
       onApply: (frame) => new Promise(
         (done) => this.enqueue(async () => {
           try {
@@ -51206,6 +51316,31 @@ ${request.requirements}` : preset.text,
     });
     modal.open();
     return modal;
+  }
+  /**
+   * A detached copy of the topic's card for the "Edit card" dialog, so the dialog shows the card exactly as the map does
+   * (its width, fonts, wrapping, colour and shape). Copies carry no listeners; the tools, handles and the clip parts are
+   * dropped, and the card is shown at its natural height (a set height would hide the cover being edited).
+   */
+  cardForEditor(node) {
+    var _a2, _b2, _c, _d, _e;
+    const live = (_a2 = this.cardEls) == null ? void 0 : _a2.get(node.id);
+    if (live && typeof live.cloneNode === "function") {
+      const card2 = live.cloneNode(true);
+      for (const extra of Array.from(card2.querySelectorAll(CARD_EDITOR_DROP))) extra.remove();
+      for (const name of Array.from((_c = (_b2 = card2.getAttributeNames) == null ? void 0 : _b2.call(card2)) != null ? _c : []))
+        if (["id", "tabindex", "role", "data-node-id"].includes(name) || name.startsWith("aria-"))
+          card2.removeAttribute(name);
+      card2.removeClass(...CARD_EDITOR_STATES);
+      for (const property of ["left", "top", "height", "transform"]) card2.style.removeProperty(property);
+      return card2;
+    }
+    const note = (_d = this.notes) == null ? void 0 : _d.get(node.id);
+    const card = createDiv({ cls: "vam-node" });
+    if (node.width) card.style.width = `${node.width}px`;
+    card.createEl("h3", { cls: "vam-card-title", text: (_e = note == null ? void 0 : note.title) != null ? _e : node.path });
+    if (note && !isPlaceholder(note.summary)) card.createEl("p", { cls: "vam-card-summary", text: note.summary });
+    return card;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   openKindMenu(event, pick) {
@@ -54730,7 +54865,7 @@ ${request.requirements}` : preset.text,
       );
     if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
     if (this.markersEditable(node) && this.coverPictureOf(node))
-      add(t("ui.topic_cover_frame_title"), "crop", () => this.openCoverFrameEditor(node));
+      add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
     menu.addSeparator();
     menu.addItem(
       (item) => item.setTitle(t("ui.open_details_in_right_sidebar")).setIcon("panel-right").onClick(() => this.openDetails(node))
@@ -56109,10 +56244,11 @@ ${request.requirements}` : preset.text,
         const win2 = coverInfo.frame && frame.classList.contains("is-sized") ? frame.querySelector(".vam-card-cover-window") : null;
         if (href && coverInfo.frame && win2 && win2.offsetWidth > 0 && win2.offsetHeight > 0) {
           const mask = coverInfo.frame;
-          const winX = box.x + frame.offsetLeft + (frame.offsetWidth - win2.offsetWidth) / 2;
+          const winX = box.x + frame.offsetLeft + win2.offsetLeft;
           const winY = box.y + frame.offsetTop + win2.offsetTop;
           const w = win2.offsetWidth / mask.w;
           const h = win2.offsetHeight / mask.h;
+          const shownHeight = Math.min(win2.offsetHeight, Math.max(0, frame.offsetHeight - win2.offsetTop));
           item.cover = {
             x: winX - mask.x * w,
             y: winY - mask.y * h,
@@ -56120,7 +56256,7 @@ ${request.requirements}` : preset.text,
             h,
             href,
             fit: "fill",
-            window: { x: winX, y: winY, w: win2.offsetWidth, h: win2.offsetHeight }
+            window: { x: winX, y: winY, w: win2.offsetWidth, h: shownHeight || win2.offsetHeight }
           };
         } else if (href)
           item.cover = {
@@ -69509,16 +69645,22 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
 .vam-card-cover.is-framed { position: relative; }
-.vam-card-cover-window { position: absolute; top: 0; height: 100%; width: auto; left: 50%; transform: translateX(-50%); overflow: hidden; }
+.vam-card-cover.is-framed.is-sized { background: transparent; border-radius: 0; }
+.vam-card-cover-window { position: absolute; top: 0; height: auto; overflow: hidden; border-radius: var(--radius-s); }
 .vam-card-cover.is-framed:not(.is-sized) img { visibility: hidden; }
 .vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; }
 .vam-node .vam-card-cover .vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
-.vam-card-frame-modal { max-width: 640px; }
-.vam-card-frame-stage { position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto; overflow: hidden; touch-action: none; user-select: none; }
-.vam-card-frame-image { display: block; max-width: 100%; max-height: 60vh; -webkit-user-drag: none; }
-.vam-card-frame-box { position: absolute; box-sizing: border-box; border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); cursor: move; touch-action: none; }
-.vam-card-frame-box:focus-visible { outline: 2px solid #4a90e2; outline-offset: 2px; }
-.vam-card-frame-handle { position: absolute; width: 18px; height: 18px; min-width: 0; padding: 0; border: 2px solid #4a90e2; border-radius: 50%; background: #fff; box-shadow: none; touch-action: none; transform: translate(-50%, -50%); }
+.vam-card-frame-modal { width: auto; max-width: min(720px, 96vw); }
+.vam-card-frame-stage { display: flex; justify-content: center; padding: 16px 12px 20px; overflow: auto; max-height: 70vh; }
+.vam-card-frame-stage > .vam-node { position: relative; left: auto; top: auto; flex: 0 0 auto; transform: none; cursor: default; }
+.vam-card-frame-stage .vam-card-cover.is-framed { overflow: visible; touch-action: none; user-select: none; }
+.vam-card-frame-stage .vam-card-cover:focus-visible { outline: 2px solid #4a90e2; outline-offset: 2px; }
+.vam-card-cover img.vam-card-frame-ghost { position: absolute; display: none; height: auto; max-width: none; opacity: 0.3; pointer-events: none; }
+.vam-card-frame-stage .vam-card-cover.is-dragging img.vam-card-frame-ghost { display: block; }
+.vam-card-frame-box { position: absolute; top: 0; box-sizing: border-box; border: 2px solid transparent; cursor: move; touch-action: none; }
+.vam-card-cover:hover .vam-card-frame-box, .vam-card-cover:focus-within .vam-card-frame-box, .vam-card-cover.is-active .vam-card-frame-box { border-color: #4a90e2; }
+.vam-card-frame-handle { position: absolute; width: 18px; height: 18px; min-width: 0; padding: 0; border: 2px solid #4a90e2; border-radius: 50%; background: #fff; box-shadow: none; touch-action: none; transform: translate(-50%, -50%); opacity: 0; }
+.vam-card-cover:hover .vam-card-frame-handle, .vam-card-cover:focus-within .vam-card-frame-handle, .vam-card-cover.is-active .vam-card-frame-handle { opacity: 1; }
 .vam-card-frame-handle.is-nw { left: 0; top: 0; cursor: nwse-resize; }
 .vam-card-frame-handle.is-n { left: 50%; top: 0; cursor: ns-resize; }
 .vam-card-frame-handle.is-ne { left: 100%; top: 0; cursor: nesw-resize; }
@@ -69528,11 +69670,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-frame-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .vam-card-frame-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
 .vam-card-frame-label { display: none; }
-.vam-card-frame-box.is-at-w .vam-card-frame-handle.is-nw, .vam-card-frame-box.is-at-w .vam-card-frame-handle.is-w, .vam-card-frame-box.is-at-w .vam-card-frame-handle.is-sw { margin-left: 9px; }
-.vam-card-frame-box.is-at-e .vam-card-frame-handle.is-ne, .vam-card-frame-box.is-at-e .vam-card-frame-handle.is-e, .vam-card-frame-box.is-at-e .vam-card-frame-handle.is-se { margin-left: -9px; }
-.vam-card-frame-box.is-at-n .vam-card-frame-handle.is-nw, .vam-card-frame-box.is-at-n .vam-card-frame-handle.is-n, .vam-card-frame-box.is-at-n .vam-card-frame-handle.is-ne { margin-top: 9px; }
-.vam-card-frame-box.is-at-s .vam-card-frame-handle.is-sw, .vam-card-frame-box.is-at-s .vam-card-frame-handle.is-s, .vam-card-frame-box.is-at-s .vam-card-frame-handle.is-se { margin-top: -9px; }
-.vam-card-frame-status { margin: 12px 0 0; text-align: center; }
+.vam-card-frame-error { margin: 0 0 8px; color: #c0392b; text-align: center; }
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }

@@ -1,4 +1,4 @@
-// Card cover frame editor (cover-frame packet 03): the pure frame math, the dialog, and the one-undo write.
+// Card cover frame editor, now the "Edit card" dialog (card editor 01): the pure frame math, the dialog, and the one-undo write.
 // The picture file is never changed or cropped; the dialog only edits the `topic-cover-frame` mask.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,7 +11,7 @@ const dom = require('./support-dom.cjs');
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const Modal = dom.makeModal();
-const editor = S.load('experiences/visual-map/cover-frame-editor.ts', { obsidian: { ...S.obsidian, Modal } });
+const editor = S.load('experiences/visual-map/cover-frame-editor.ts', { obsidian: { ...S.obsidian, Modal } }, { createDiv: o => dom.element('div', o) });
 const cover = S.load('experiences/visual-map/card-cover.ts', { obsidian: { parseYaml: () => ({}), stringifyYaml: () => '', normalizePath: p => p } });
 const near = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 1e-9, `${message}: ${actual} vs ${expected}`);
 const nearFrame = (actual, expected, message = 'frame') => {
@@ -85,22 +85,35 @@ test('whole-picture frames are recognised, and they are written as no frame', ()
   assert.deepEqual(editor.frameToWrite(START), START);
 });
 
-// ---- the dialog
-function openEditor({ initial = null, src = 'app://res/img/a.png' } = {}) {
+// ---- the dialog ("Edit card", owner 2026-11-04): the real card in the middle, the mask edited on its cover.
+// The test picture is 400 x 200 (shape 2) and the cover is 400 px wide, so one picture width is 400 px and one picture
+// height 200 px on screen.
+const plainCard = () => {
+  const c = dom.element('div', { cls: 'vam-node' });
+  c.style.width = '300px';
+  c.createDiv('vam-node-header');
+  c.createEl('h3', { cls: 'vam-card-title', text: 'Topic title' });
+  c.createEl('p', { cls: 'vam-card-summary', text: 'Summary' });
+  return c;
+};
+function openEditor({ initial = null, src = 'app://res/img/a.png', shape = 2, card = plainCard } = {}) {
   const applied = [];
-  const modal = new editor.CoverFrameModal({}, { src, initial, onApply: async frame => { applied.push(frame); } });
+  const modal = new editor.CoverFrameModal({}, { src, initial, shape, card, onApply: async frame => { applied.push(frame); } });
   modal.open();
   const el = modal.contentEl;
-  const stage = dom.find(el, i => dom.hasCls(i, 'vam-card-frame-stage'));
-  stage.getBoundingClientRect = () => ({ left: 100, top: 50, width: 400, height: 200 });
+  const cardEl = dom.find(el, i => dom.hasCls(i, 'vam-node'));
+  const cover = dom.find(el, i => dom.hasCls(i, 'vam-card-cover'));
+  cover.getBoundingClientRect = () => ({ left: 100, top: 50, width: 400, height: 200 });
   const box = dom.find(el, i => dom.hasCls(i, 'vam-card-frame-box'));
-  const handle = name => dom.byLabel(el, name);
+  const win = dom.find(el, i => dom.hasCls(i, 'vam-card-cover-window'));
   const named = dom.findAll(el, i => i.tag === 'button' && dom.hasCls(i, 'vam-card-frame-handle'));
+  const handleOf = mode => named.find(b => b.dataset.mode === mode);
   const status = dom.find(el, i => dom.hasCls(i, 'vam-card-frame-status'));
   const text = label => dom.find(el, i => i.tag === 'button' && i.text === label);
-  return { modal, el, stage, box, handle, named, status, text, applied };
+  return { modal, el, cardEl, cover, box, win, named, handleOf, status, text, applied };
 }
-const shown = ui => ({ x: parseFloat(ui.box.style.left), y: parseFloat(ui.box.style.top), w: parseFloat(ui.box.style.width), h: parseFloat(ui.box.style.height) });
+const pct = v => Math.round(v * 1e6) / 1e4;
+const shown = ui => { const f = ui.modal.draft; return { x: pct(f.x), y: pct(f.y), w: pct(f.w), h: pct(f.h) }; };
 const pointer = (target, type, x, y, extra = {}) => target.fire(type, { pointerId: 7, clientX: x, clientY: y, ...extra });
 const withCapture = target => {
   const log = [];
@@ -109,49 +122,105 @@ const withCapture = target => {
   target.hasPointerCapture = () => true;
   return log;
 };
+const num = value => parseFloat(value);
 
-test('dialog: shows the whole picture, a frame box and eight handles that are real buttons with their own names', () => {
+test('dialog: titled "Edit card"; the card itself sits in the middle with its own width, and only its cover takes input', () => {
   const ui = openEditor({ initial: START });
-  assert.equal(dom.find(ui.el, i => i.tag === 'img').attrs.src, 'app://res/img/a.png');
+  assert.equal(ui.modal.titleEl.text, 'Edit card');
+  assert.ok(ui.cardEl, 'the card is in the dialog');
+  assert.equal(ui.cardEl.style.width, '300px', 'the card keeps its own width');
+  assert.equal(ui.cardEl.children[1], ui.cover, 'the cover takes the cover place: after the header, before the title');
+  for (const child of ui.cardEl.children) assert.equal(child.attrs.inert, child === ui.cover ? undefined : '', dom.hasCls(child, 'vam-card-cover') ? 'cover' : child.cls);
+  assert.equal(dom.findAll(ui.el, i => dom.hasCls(i, 'vam-card-frame-image')).length, 0, 'no separate picture view');
+});
+
+test('dialog: an old cover in the copied card is replaced, not doubled', () => {
+  const card = () => { const c = plainCard(); c.insertBefore(dom.element('div', { cls: 'vam-card-cover' }), c.children[1]); return c; };
+  const ui = openEditor({ card });
+  assert.equal(dom.findAll(ui.cardEl, i => dom.hasCls(i, 'vam-card-cover')).length, 1);
+});
+
+test('dialog: the cover is laid out by the map rule, and eight handles are real buttons with their own names', () => {
+  const ui = openEditor({ initial: START });
+  assert.equal(dom.findAll(ui.win, i => i.tag === 'img')[0].attrs.src, 'app://res/img/a.png');
   assert.equal(ui.named.length, 8);
   const names = ui.named.map(b => b.attrs['aria-label']);
   assert.ok(names.every(Boolean), 'every handle has a name');
   assert.equal(new Set(names).size, 8, 'the names differ');
-  assert.equal(ui.box.attrs.tabindex, '0', 'the frame can take focus');
-  assert.equal(ui.box.attrs['aria-label'], undefined, 'no aria-label on the frame: Obsidian would show it as a tooltip over the status line');
-  const labelId = ui.box.attrs['aria-labelledby'];
-  const label = dom.find(ui.el, i => i.attrs.id === labelId);
-  assert.ok(label && label.text, 'the frame is named through aria-labelledby');
-  assert.deepEqual(shown(ui), { x: 20, y: 30, w: 40, h: 40 });
-  assert.match(ui.status.text, /20/);
+  assert.equal(ui.cover.attrs.tabindex, '0', 'the cover can take focus');
+  assert.equal(ui.cover.attrs['aria-label'], undefined, 'no aria-label: Obsidian would show it as a tooltip');
+  const label = dom.find(ui.el, i => i.attrs.id === ui.cover.attrs['aria-labelledby']);
+  assert.ok(label && label.text, 'the cover is named through aria-labelledby');
+  // Window: 0.4 D wide at 0.2 D; region 0.4 x 0.4 of a 2:1 picture -> 0.4 D x 0.2 D, so the cover is D / 0.2 D = 5.
+  near(num(ui.win.style.left), 20, 'window left');
+  near(num(ui.win.style.width), 40, 'window width');
+  near(Number(ui.win.style['aspect-ratio']), 2, 'window shape');
+  near(Number(ui.cover.style['aspect-ratio']), 5, 'cover shape');
+  for (const key of ['left', 'width', 'aspect-ratio']) assert.equal(ui.box.style[key], ui.win.style[key], `the mask box follows the window: ${key}`);
+});
+
+test('dialog: no percentage is shown; the numbers are only for screen readers', () => {
+  const ui = openEditor({ initial: START });
+  assert.ok(dom.hasCls(ui.status, 'vam-sr-only'), 'the status line is screen-reader text');
   assert.equal(ui.status.attrs['aria-live'], 'polite');
+  assert.match(ui.status.text, /20/);
+  const visible = dom.findAll(ui.el, i => i !== ui.status && i.text && !dom.hasCls(i, 'vam-card-frame-label')).map(i => i.text).join(' | ');
+  assert.doesNotMatch(visible, /%/);
 });
 
 test('dialog: no frame starts as the whole picture', () => {
   assert.deepEqual(shown(openEditor()), { x: 0, y: 0, w: 100, h: 100 });
 });
 
-test('dialog: dragging the inside moves the frame with pointer capture and stops at the picture edge', () => {
+test('dialog: dragging inside moves the mask with pointer capture over the still picture, and stops at the picture edge', () => {
   const ui = openEditor({ initial: START });
   const log = withCapture(ui.box);
   pointer(ui.box, 'pointerdown', 200, 100);
   assert.deepEqual(log[0], ['set', 7], 'pointer capture is taken');
-  pointer(ui.box, 'pointermove', 240, 120); // +40px of 400 = +10%, +20px of 200 = +10%
+  assert.ok(dom.hasCls(ui.cover, 'is-dragging'), 'the faint whole picture shows while dragging');
+  pointer(ui.box, 'pointermove', 240, 120); // +40px of 400 = +10% of the picture width, +20px of 200 = +10% of its height
   assert.deepEqual(shown(ui), { x: 30, y: 40, w: 40, h: 40 });
+  near(num(ui.win.style.left), 30, 'the window slides right with the pointer');
+  near(num(ui.win.style.width), 40, 'and keeps its size');
+  near(num(/translateY\(([-\d.e]+)%\)/.exec(ui.win.style.transform)[1]), 25, 'and moves down by the same 0.1 picture height (0.1 / 0.4 of itself)');
+  const ghost = dom.find(ui.el, i => dom.hasCls(i, 'vam-card-frame-ghost'));
+  near(num(ghost.style.left), 0, 'the picture does not move');
+  near(num(ghost.style.top), -75, 'the picture top stays where it was at the start (0.3 picture heights above)');
   pointer(ui.box, 'pointermove', 2000, 2000);
   assert.deepEqual(shown(ui), { x: 60, y: 60, w: 40, h: 40 });
   pointer(ui.box, 'pointerup', 2000, 2000);
   assert.deepEqual(log[log.length - 1], ['release', 7]);
+  assert.ok(!dom.hasCls(ui.cover, 'is-dragging'));
+  assert.equal(ui.win.style.transform, 'translateY(0%)', 'after the drag the window starts at the top of the cover again, as on the map');
   pointer(ui.box, 'pointermove', 100, 50);
   assert.deepEqual(shown(ui), { x: 60, y: 60, w: 40, h: 40 }, 'moves after release are ignored');
 });
 
-test('dialog: dragging a corner handle resizes, and the minimum holds', () => {
+test('dialog: a handle hides its side and the picture keeps its scale; left and right hiding keep the rest in place', () => {
+  const ui = openEditor();
+  const scale = () => num(ui.win.style.width) / (ui.modal.draft.w * 100);
+  const w = ui.handleOf('w');
+  withCapture(w);
+  pointer(w, 'pointerdown', 100, 150);
+  pointer(w, 'pointermove', 200, 150); // 100px of 400 = hide the left quarter
+  assert.deepEqual(shown(ui), { x: 25, y: 0, w: 75, h: 100 });
+  near(num(ui.win.style.left), 25, 'the rest stays where it was (it does not move left)');
+  near(scale(), 1, 'nor does it stretch');
+  near(Number(ui.cover.style['aspect-ratio']), 2, 'hiding a side does not change the height');
+  pointer(w, 'pointerup', 200, 150);
+  const n = ui.handleOf('n');
+  withCapture(n);
+  pointer(n, 'pointerdown', 250, 50);
+  pointer(n, 'pointermove', 250, 100); // 50px of 200 = hide the top quarter
+  assert.deepEqual(shown(ui), { x: 25, y: 25, w: 75, h: 75 });
+  near(Number(ui.cover.style['aspect-ratio']), 1 / (0.75 * 0.5), 'hiding the top makes the cover, and so the card, shorter');
+  near(scale(), 1, 'the picture keeps its scale');
+  pointer(n, 'pointerup', 250, 100);
+});
+
+test('dialog: dragging a corner handle moves two sides, and the 8 percent minimum holds', () => {
   const ui = openEditor({ initial: START });
-  const se = ui.handle(ui.named[0].attrs['aria-label']);
-  const handleOf = mode => ui.named.find(b => b.dataset.mode === mode);
-  const corner = handleOf('se');
-  assert.ok(se && corner);
+  const corner = ui.handleOf('se');
   withCapture(corner);
   pointer(corner, 'pointerdown', 300, 130);
   pointer(corner, 'pointermove', 340, 150);
@@ -163,29 +232,58 @@ test('dialog: dragging a corner handle resizes, and the minimum holds', () => {
   assert.deepEqual(shown(ui), { x: 20, y: 30, w: 8, h: 8 }, 'a cancelled drag stops following the pointer');
 });
 
-test('dialog: arrow keys move 1 percent and Shift+arrows resize from the bottom-right', () => {
+test('dialog: touch works the same way (pointer events), and a touch shows the handles', () => {
   const ui = openEditor({ initial: START });
-  let prevented = 0;
-  ui.box.keydown({ key: 'ArrowRight', shiftKey: false, preventDefault() { prevented++; } });
-  assert.deepEqual(shown(ui), { x: 21, y: 30, w: 40, h: 40 });
-  ui.box.keydown({ key: 'ArrowDown', shiftKey: true });
-  assert.deepEqual(shown(ui), { x: 21, y: 30, w: 40, h: 41 });
-  assert.equal(prevented, 1, 'a handled arrow key does not scroll the page');
-  ui.box.keydown({ key: 'a', shiftKey: false, preventDefault() { prevented++; } });
-  assert.equal(prevented, 1, 'other keys are left alone');
-  assert.match(ui.status.text, /21/, 'the status line follows');
+  withCapture(ui.box);
+  pointer(ui.box, 'pointerdown', 200, 100, { pointerType: 'touch', pointerId: 3 });
+  pointer(ui.box, 'pointermove', 160, 100, { pointerType: 'touch', pointerId: 3 });
+  assert.deepEqual(shown(ui), { x: 10, y: 30, w: 40, h: 40 });
+  pointer(ui.box, 'pointermove', 100, 100, { pointerType: 'touch', pointerId: 9 });
+  assert.deepEqual(shown(ui), { x: 10, y: 30, w: 40, h: 40 }, 'another finger does not take over');
+  assert.ok(dom.hasCls(ui.cover, 'is-active'), 'handles stay visible after a touch');
 });
 
-test('dialog: reset puts the draft back to the whole picture without writing', () => {
+test('dialog: arrow keys move the mask 1 percent, Shift+arrows resize from the bottom-right, a handle moves only its edges', () => {
   const ui = openEditor({ initial: START });
-  ui.text('Reset to whole image').click();
+  let prevented = 0;
+  ui.cover.keydown({ key: 'ArrowRight', shiftKey: false, preventDefault() { prevented++; } });
+  assert.deepEqual(shown(ui), { x: 21, y: 30, w: 40, h: 40 });
+  ui.cover.keydown({ key: 'ArrowDown', shiftKey: true });
+  assert.deepEqual(shown(ui), { x: 21, y: 30, w: 40, h: 41 });
+  assert.equal(prevented, 1, 'a handled arrow key does not scroll the page');
+  ui.cover.keydown({ key: 'a', shiftKey: false, preventDefault() { prevented++; } });
+  assert.equal(prevented, 1, 'other keys are left alone');
+  assert.match(ui.status.text, /21/, 'the screen-reader status follows');
+  let stopped = 0;
+  ui.handleOf('w').keydown({ key: 'ArrowRight', preventDefault() {}, stopPropagation() { stopped++; } });
+  assert.deepEqual(shown(ui), { x: 22, y: 30, w: 39, h: 41 }, 'the left handle hides 1 percent more of the left');
+  assert.equal(stopped, 1, 'the cover does not also move the mask');
+  ui.handleOf('w').keydown({ key: 'ArrowDown', preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(shown(ui), { x: 22, y: 30, w: 39, h: 41 }, 'an edge handle ignores the other direction');
+  ui.handleOf('ne').keydown({ key: 'ArrowUp', preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(shown(ui), { x: 22, y: 29, w: 39, h: 42 });
+});
+
+test('handle keys: pure edge nudges clamp like drags', () => {
+  nearFrame(editor.nudgeCoverFrameEdge('e', START, 'ArrowRight'), { x: 0.2, y: 0.3, w: 0.41, h: 0.4 });
+  nearFrame(editor.nudgeCoverFrameEdge('s', START, 'ArrowUp'), { x: 0.2, y: 0.3, w: 0.4, h: 0.39 });
+  nearFrame(editor.nudgeCoverFrameEdge('nw', { x: 0, y: 0, w: 0.5, h: 0.5 }, 'ArrowLeft'), { x: 0, y: 0, w: 0.5, h: 0.5 });
+  assert.equal(editor.nudgeCoverFrameEdge('n', START, 'ArrowLeft'), null);
+  assert.equal(editor.nudgeCoverFrameEdge('e', START, 'Enter'), null);
+});
+
+test('dialog: "Show whole picture" puts the draft back to the whole picture without writing', () => {
+  const ui = openEditor({ initial: START });
+  ui.text('Show whole picture').click();
   assert.deepEqual(shown(ui), { x: 0, y: 0, w: 100, h: 100 });
+  near(num(ui.win.style.left), 0, 'whole picture: from the left edge');
+  near(num(ui.win.style.width), 100, 'whole picture: full width');
   assert.equal(ui.applied.length, 0);
 });
 
 test('dialog: apply hands over the frame once and closes; a whole-picture draft hands over null', async () => {
   const ui = openEditor({ initial: START });
-  ui.box.keydown({ key: 'ArrowRight', shiftKey: false });
+  ui.cover.keydown({ key: 'ArrowRight', shiftKey: false });
   ui.text('Apply').click();
   ui.text('Apply').click();
   await dom.tick();
@@ -193,7 +291,7 @@ test('dialog: apply hands over the frame once and closes; a whole-picture draft 
   nearFrame(ui.applied[0], { x: 0.21, y: 0.3, w: 0.4, h: 0.4 });
   assert.equal(ui.modal.closeCount, 1);
   const whole = openEditor({ initial: START });
-  whole.text('Reset to whole image').click();
+  whole.text('Show whole picture').click();
   whole.text('Apply').click();
   await dom.tick();
   assert.deepEqual(whole.applied, [null]);
@@ -201,22 +299,39 @@ test('dialog: apply hands over the frame once and closes; a whole-picture draft 
 
 test('dialog: cancel and close write nothing', async () => {
   const cancel = openEditor({ initial: START });
-  cancel.box.keydown({ key: 'ArrowRight', shiftKey: false });
+  cancel.cover.keydown({ key: 'ArrowRight', shiftKey: false });
   cancel.text('Cancel').click();
   await dom.tick();
   assert.deepEqual(cancel.applied, []);
   assert.equal(cancel.modal.closeCount, 1);
   const close = openEditor({ initial: START });
-  close.box.keydown({ key: 'ArrowRight', shiftKey: true });
+  close.cover.keydown({ key: 'ArrowRight', shiftKey: true });
   close.modal.close();
   await dom.tick();
   assert.deepEqual(close.applied, []);
 });
 
-test('dialog: a picture that cannot be loaded disables Apply', () => {
+test('dialog: a picture that cannot be loaded disables Apply and says so', () => {
   const ui = openEditor({ initial: START });
-  dom.find(ui.el, i => i.tag === 'img').fire('error');
+  dom.find(ui.win, i => i.tag === 'img').fire('error');
   assert.equal(ui.text('Apply').disabled, true);
+  assert.ok(dom.find(ui.el, i => dom.hasCls(i, 'vam-card-frame-error')));
+});
+
+test('dialog: without a known shape the cover waits for the picture, then sizes from it', () => {
+  const ui = openEditor({ initial: START, shape: null });
+  assert.equal(ui.cover.style['aspect-ratio'], undefined, 'the 96 px placeholder until the picture is measured');
+  pointer(ui.box, 'pointerdown', 200, 100);
+  assert.ok(!dom.hasCls(ui.cover, 'is-dragging'), 'no drag before the size is known');
+  const img = dom.find(ui.win, i => i.tag === 'img');
+  img.naturalWidth = 400; img.naturalHeight = 200;
+  img.fire('load');
+  near(Number(ui.cover.style['aspect-ratio']), 5, 'sized from the loaded picture');
+});
+
+test('dialog: without a card the dialog still edits a plain card', () => {
+  const ui = openEditor({ initial: START, card: undefined });
+  assert.ok(ui.cardEl && ui.cover);
 });
 
 // ---- the write
@@ -289,10 +404,9 @@ test('open: the dialog starts from the note frame, and cancelling leaves the fil
   const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE });
   opened = modal;
   assert.ok(opened, 'a dialog opens for a note with a cover picture');
-  const box = dom.find(opened.contentEl, i => dom.hasCls(i, 'vam-card-frame-box'));
-  assert.equal(box.style.left, '20%');
-  assert.equal(dom.find(opened.contentEl, i => i.tag === 'img').attrs.src, 'app://res/img/a.png');
-  box.keydown({ key: 'ArrowRight', shiftKey: false });
+  nearFrame(opened.draft, START, 'the dialog starts from the note frame');
+  assert.equal(dom.find(dom.find(opened.contentEl, i => dom.hasCls(i, 'vam-card-cover-window')), i => i.tag === 'img').attrs.src, 'app://res/img/a.png');
+  dom.find(opened.contentEl, i => dom.hasCls(i, 'vam-card-cover')).keydown({ key: 'ArrowRight', shiftKey: false });
   opened.close();
   await dom.tick();
   assert.equal(h.contents.get(NOTE), framed, 'byte-identical');
@@ -307,13 +421,13 @@ test('open: no dialog when the topic has no cover picture or the cover is off', 
 });
 
 // ---- the panel button
-test('panel: "Adjust area" appears with the cover switch only when the topic has a cover picture, and opens the dialog', async () => {
+test('panel: "Edit card" appears with the cover switch only when the topic has a cover picture, and opens the dialog', async () => {
   const withPicture = await harness(TEXT);
   const calls = [];
   Object.assign(withPicture.view, { enqueue: fn => fn(), openCoverFrameEditor: node => { calls.push(node.id); return null; } });
   const panel = dom.element('div');
   withPicture.view.renderCoverSection(panel, { id: 'm', path: NOTE });
-  const adjust = dom.find(panel, i => i.tag === 'button' && i.text === 'Adjust area');
+  const adjust = dom.find(panel, i => i.tag === 'button' && i.text === 'Edit card');
   assert.ok(adjust, 'the button is there');
   adjust.click();
   assert.deepEqual(calls, ['m']);
@@ -321,7 +435,7 @@ test('panel: "Adjust area" appears with the cover switch only when the topic has
     const none = await harness(TEXT, { cache });
     const p = dom.element('div');
     none.view.renderCoverSection(p, { id: 'm', path: NOTE });
-    assert.equal(dom.find(p, i => i.tag === 'button' && i.text === 'Adjust area'), undefined, 'no picture or cover off: no button');
+    assert.equal(dom.find(p, i => i.tag === 'button' && i.text === 'Edit card'), undefined, 'no picture or cover off: no button');
   }
   const locked = await harness(TEXT);
   locked.view.selection.toggleMultiSelect();
@@ -342,16 +456,11 @@ test('i18n: every language has the new strings; the stylesheet uses no CSS varia
   assert.match(lines.join('\n'), /touch-action: none/);
 });
 
-test('decision 10: at a whole-picture frame every handle moves inward; away from the edges none does', () => {
-  const whole = openEditor();
-  for (const side of ['w', 'e', 'n', 's']) assert.ok(whole.box.classes.includes(`is-at-${side}`), side);
-  const inner = openEditor({ initial: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } });
-  assert.ok(!inner.box.classes.some(c => c.startsWith('is-at-')));
+test('the dialog cover does not clip its handles: it overflows the card box instead of moving them inward', () => {
   const css = read('styles.css');
-  assert.match(css, /\.vam-card-frame-box\.is-at-w[^{]*\{[^}]*margin-left: 9px/);
-  assert.match(css, /\.vam-card-frame-box\.is-at-e[^{]*\{[^}]*margin-left: -9px/);
-  assert.match(css, /\.vam-card-frame-box\.is-at-n[^{]*\{[^}]*margin-top: 9px/);
-  assert.match(css, /\.vam-card-frame-box\.is-at-s[^{]*\{[^}]*margin-top: -9px/);
+  assert.match(css, /\.vam-card-frame-stage \.vam-card-cover\.is-framed \{[^}]*overflow: visible/);
+  assert.doesNotMatch(css, /is-at-[nswe]/, 'no inward-moved handles any more');
+  assert.match(css, /\.vam-card-cover:hover \.vam-card-frame-handle[^{]*\{[^}]*opacity: 1/, 'handles show on hover, focus or touch');
 });
 
 // ---- entries on the card itself (owner 2026-11-04: "I cannot click the picture to frame it")
@@ -371,7 +480,7 @@ function dblHarnessView(view) {
   return { calls, fire, cover, title, card };
 }
 
-test('card: double-clicking the cover picture opens "Adjust cover area"; the title still renames; elsewhere nothing', async () => {
+test('card: double-clicking the cover picture opens "Edit card"; the title still renames; elsewhere nothing', async () => {
   const h = await harness(TEXT);
   const d = dblHarnessView(h.view);
   assert.equal(d.fire(100, 75), true);
@@ -394,7 +503,7 @@ test('card: when the dialog cannot open (cover off, not editable) a double-click
   assert.deepEqual(d.calls.rename, []);
 });
 
-test('card: the right-click menu has "Adjust cover area" only for an editable topic with a cover picture', async () => {
+test('card: the right-click menu has "Edit card" only for an editable topic with a cover picture', async () => {
   const items = h => {
     const titles = [];
     const menu = { addItem(fn) { const item = { setTitle(x) { titles.push(x); return item; }, setIcon() { return item; }, setWarning() { return item; }, onClick(cb) { item.cb = cb; return item; } }; fn(item); }, addSeparator() {} };
@@ -404,10 +513,10 @@ test('card: the right-click menu has "Adjust cover area" only for an editable to
     h.view.addCardMenuActions(menu, h.view.map.nodes[0]);
     return titles;
   };
-  assert.ok(items(await harness(TEXT)).includes('Adjust cover area'));
+  assert.ok(items(await harness(TEXT)).includes('Edit card'));
   for (const cache of [{ frontmatter: {}, embeds: [] }, { frontmatter: { 'topic-cover': 'none' }, embeds: [{ link: 'img/a.png' }] }])
-    assert.equal(items(await harness(TEXT, { cache })).includes('Adjust cover area'), false);
+    assert.equal(items(await harness(TEXT, { cache })).includes('Edit card'), false);
   const locked = await harness(TEXT);
   locked.view.selection.toggleMultiSelect();
-  assert.equal(items(locked).includes('Adjust cover area'), false);
+  assert.equal(items(locked).includes('Edit card'), false);
 });

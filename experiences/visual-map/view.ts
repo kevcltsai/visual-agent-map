@@ -132,6 +132,8 @@ import {
   type CoverFrame
 } from "./card-cover";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
+import { coverFrameRatio, placeCoverFrame } from "./cover-layout";
+export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -596,43 +598,30 @@ const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 /** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
 const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement }>();
-/** A card cover is as wide as the card's content and at most this many times as tall; a taller picture is scaled down whole (letterboxed), never cropped. */
-export const COVER_MAX_HEIGHT_RATIO = 1.5;
-/**
- * Width over height of the card's cover frame for a picture of this size, or of the part of it a cover frame (mask) shows
- * (a very tall picture or region is held at 1 / COVER_MAX_HEIGHT_RATIO).
- */
-export function coverFrameRatio(width: number, height: number, frame?: CoverFrame | null): number | null {
-  if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) return null;
-  return Math.max((width * (frame?.w ?? 1)) / (height * (frame?.h ?? 1)), 1 / COVER_MAX_HEIGHT_RATIO);
-}
+/** What the "Edit card" dialog leaves out of its copy of a card: the tools, the "+", the size handles and the clip parts. */
+/** Map-only states a copied card must not carry into the dialog. */
+const CARD_EDITOR_STATES = [
+  "is-clipped",
+  "is-selected",
+  "is-drop-target",
+  "is-cut",
+  "is-marquee-hit",
+  "is-marquee-remove",
+  "is-presenting",
+  "is-search-current",
+  "is-search-match",
+  "vam-structure-suggested"
+];
+const CARD_EDITOR_DROP = [
+  ".vam-node-tools",
+  ".vam-add-child",
+  ".vam-card-resize",
+  ".vam-card-resize-y",
+  ".vam-card-fade",
+  ".vam-card-more"
+].join(", ");
 /** Picture shapes (width over height) already seen, by image path, so a redraw sizes the frame at once and nothing jumps. */
 const coverShapes = new Map<string, number>();
-/**
- * Lays a picture into its (already sized) cover frame. Whole picture: nothing to place (CSS contains it). With a mask:
- * the window is the framed region, as wide as the frame or, when the frame is capped, scaled down whole and centred;
- * the picture is sized and shifted inside the window so only the region shows. Inline percentages, no CSS variables.
- */
-function placeCoverFrame(
-  parts: { frame: HTMLElement; window: HTMLElement | null; img: HTMLImageElement },
-  shape: number,
-  mask: CoverFrame | null
-): void {
-  const ratio = coverFrameRatio(shape, 1, mask);
-  if (!ratio) return;
-  parts.frame.style.setProperty("aspect-ratio", String(ratio));
-  parts.frame.addClass("is-sized");
-  if (!mask || !parts.window) return;
-  const region = (shape * mask.w) / mask.h;
-  // The window keeps the region's own shape (CSS: full height, width from this ratio, centred), so a card clipped
-  // short scales the region down whole instead of stretching it.
-  parts.window.style.setProperty("aspect-ratio", String(region));
-  const img = parts.img.style;
-  img.setProperty("width", `${100 / mask.w}%`);
-  img.setProperty("height", `${100 / mask.h}%`);
-  img.setProperty("left", `${(-mask.x / mask.w) * 100}%`);
-  img.setProperty("top", `${(-mask.y / mask.h) * 100}%`);
-}
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -3785,7 +3774,7 @@ export class VisualAgentMapView extends ItemView {
     return entry;
   }
   /** The topic's cover picture (resource path) and its valid frame; null when it has no picture or the cover is off. */
-  private coverPictureOf(node: MapNode): { src: string; frame: CoverFrame | null } | null {
+  private coverPictureOf(node: MapNode): { src: string; path: string; frame: CoverFrame | null } | null {
     try {
       const file = this.app.vault.getAbstractFileByPath(node.path);
       if (!(file instanceof TFile)) return null;
@@ -3795,13 +3784,13 @@ export class VisualAgentMapView extends ItemView {
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       const src = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
-      return src ? { src, frame: cover.frame } : null;
+      return src ? { src, path: cover.path, frame: cover.frame } : null;
     } catch {
       return null;
     }
   }
   /**
-   * A card's double-click: on the cover picture it opens "Adjust cover area", on the title it renames. The point is
+   * A card's double-click: on the cover picture it opens "Edit card", on the title it renames. The point is
    * checked against both boxes because enableDrag captures the pointer on the card, so the target is often the card.
    */
   private onCardDoubleClick(
@@ -3832,7 +3821,7 @@ export class VisualAgentMapView extends ItemView {
     event.preventDefault();
     this.renameNode(node, noteTitle);
   }
-  /** Opens the "Adjust area" dialog for the topic's cover picture. Only Apply writes (one undo step); Cancel and close do not. */
+  /** Opens the "Edit card" dialog for the topic's card. Only Apply writes (one undo step); Cancel and close do not. */
   private openCoverFrameEditor(node: MapNode): CoverFrameModal | null {
     if (!this.markersEditable(node)) return null;
     const picture = this.coverPictureOf(node);
@@ -3840,6 +3829,8 @@ export class VisualAgentMapView extends ItemView {
     const modal = new CoverFrameModal(this.app, {
       src: picture.src,
       initial: picture.frame,
+      shape: coverShapes.get(picture.path) ?? null,
+      card: () => this.cardForEditor(node),
       onApply: frame =>
         new Promise<void>(done =>
           this.enqueue(async () => {
@@ -3853,6 +3844,30 @@ export class VisualAgentMapView extends ItemView {
     });
     modal.open();
     return modal;
+  }
+  /**
+   * A detached copy of the topic's card for the "Edit card" dialog, so the dialog shows the card exactly as the map does
+   * (its width, fonts, wrapping, colour and shape). Copies carry no listeners; the tools, handles and the clip parts are
+   * dropped, and the card is shown at its natural height (a set height would hide the cover being edited).
+   */
+  private cardForEditor(node: MapNode): HTMLElement {
+    const live = this.cardEls?.get(node.id);
+    if (live && typeof live.cloneNode === "function") {
+      const card = live.cloneNode(true) as HTMLElement;
+      for (const extra of Array.from(card.querySelectorAll(CARD_EDITOR_DROP))) extra.remove();
+      for (const name of Array.from(card.getAttributeNames?.() ?? []))
+        if (["id", "tabindex", "role", "data-node-id"].includes(name) || name.startsWith("aria-"))
+          card.removeAttribute(name);
+      card.removeClass(...CARD_EDITOR_STATES);
+      for (const property of ["left", "top", "height", "transform"]) card.style.removeProperty(property);
+      return card;
+    }
+    const note = this.notes?.get(node.id);
+    const card = createDiv({ cls: "vam-node" });
+    if (node.width) card.style.width = `${node.width}px`;
+    card.createEl("h3", { cls: "vam-card-title", text: note?.title ?? node.path });
+    if (note && !isPlaceholder(note.summary)) card.createEl("p", { cls: "vam-card-summary", text: note.summary });
+    return card;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
@@ -7622,9 +7637,9 @@ export class VisualAgentMapView extends ItemView {
         () => this.toggleCollapsed(node)
       );
     if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
-    // The same dialog as the panel's "Adjust area"; only for an editable topic whose cover picture is showing.
+    // "Edit card", the same dialog as the panel's button; only for an editable topic whose cover picture is showing.
     if (this.markersEditable(node) && this.coverPictureOf(node))
-      add(t("ui.topic_cover_frame_title"), "crop", () => this.openCoverFrameEditor(node));
+      add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
     menu.addSeparator();
     menu.addItem(item =>
       item
@@ -9209,13 +9224,14 @@ export class VisualAgentMapView extends ItemView {
             ? frame.querySelector<HTMLElement>(".vam-card-cover-window")
             : null;
         if (href && coverInfo.frame && win && win.offsetWidth > 0 && win.offsetHeight > 0) {
-          // A masked cover: the whole picture is placed so the framed region fills the window; the export clips to the window.
+          // A masked cover: the whole picture is placed so the framed region fills the window (at the window's own place
+          // in the cover, cover-layout.ts); the export clips to the window, and to the cover when a short card cuts it.
           const mask = coverInfo.frame;
-          // The window is centred in the frame by CSS (a transform), which offsetLeft does not see.
-          const winX = box.x + frame.offsetLeft + (frame.offsetWidth - win.offsetWidth) / 2;
+          const winX = box.x + frame.offsetLeft + win.offsetLeft;
           const winY = box.y + frame.offsetTop + win.offsetTop;
           const w = win.offsetWidth / mask.w;
           const h = win.offsetHeight / mask.h;
+          const shownHeight = Math.min(win.offsetHeight, Math.max(0, frame.offsetHeight - win.offsetTop));
           item.cover = {
             x: winX - mask.x * w,
             y: winY - mask.y * h,
@@ -9223,7 +9239,7 @@ export class VisualAgentMapView extends ItemView {
             h,
             href,
             fit: "fill",
-            window: { x: winX, y: winY, w: win.offsetWidth, h: win.offsetHeight }
+            window: { x: winX, y: winY, w: win.offsetWidth, h: shownHeight || win.offsetHeight }
           };
         } else if (href)
           item.cover = {
@@ -10633,7 +10649,7 @@ export class VisualAgentMapView extends ItemView {
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     title.setAttr("dir", "auto");
-    // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Adjust cover area".
+    // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Edit card".
     // It is handled on the card: enableDrag captures the pointer on the card, so a real mouse reports the card (not the
     // title or the picture) as the dblclick target.
     if (note && !this.selection.state.multiSelectMode && !this.map?.aim)

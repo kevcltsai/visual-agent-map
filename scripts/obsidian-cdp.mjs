@@ -85,8 +85,17 @@ export async function connectCdp(vault) {
 }
 
 // Leaves Restricted Mode for a harness vault without clicking "Trust author": that button reloads the window, which can
-// bring Obsidian to the front. Enabling through the plugin API and dropping the leftover prompt keeps the app in the background.
-export const trustExpression = `(async()=>{const prompts=app.plugins.isEnabled()?[]:[...document.querySelectorAll(".modal-container.mod-confirmation")].filter(m=>m.querySelector("button.mod-cancel"));if(!app.plugins.isEnabled())await app.plugins.setEnable(true);for(const id of JSON.parse(await app.vault.adapter.read(app.vault.configDir+"/community-plugins.json")))if(!app.plugins.enabledPlugins.has(id))await app.plugins.enablePluginAndSave(id);prompts.forEach(m=>m.remove());return {enabled:[...app.plugins.enabledPlugins],prompts:document.querySelectorAll(".modal-container.mod-confirmation").length}})()`;
+// bring Obsidian to the front. The leftover trust prompt is dismissed through its own cancel button so the Modal closes
+// properly and pops its Escape keymap scope; removing only its DOM left that scope on top of the window stack, where it
+// swallowed the view's shortcuts (the first ⌘Z did nothing). The result reports any scope still left behind.
+export const trustExpression = `(async()=>{const depth=()=>app.keymap.getWindowStack(activeWindow).prevScopes.length;const before=depth();const prompts=app.plugins.isEnabled()?[]:[...document.querySelectorAll(".modal-container.mod-confirmation")].filter(m=>m.querySelector("button.mod-cancel"));prompts.forEach(m=>m.querySelector("button.mod-cancel").click());if(!app.plugins.isEnabled())await app.plugins.setEnable(true);for(const id of JSON.parse(await app.vault.adapter.read(app.vault.configDir+"/community-plugins.json")))if(!app.plugins.enabledPlugins.has(id))await app.plugins.enablePluginAndSave(id);const after=depth();return {enabled:[...app.plugins.enabledPlugins],prompts:document.querySelectorAll(".modal-container.mod-confirmation").length,scopesBefore:before,scopesAfter:after,leakedScopes:after-(before-prompts.length)}})()`;
+
+// Throws when trusting left a prompt open or a keymap scope on the window stack, so a harness run never continues
+// with shortcuts blocked.
+export function assertTrusted(result) {
+  if (result.prompts !== 0 || result.leakedScopes !== 0) throw new Error(`Trusting the vault left ${result.prompts} prompt(s) and ${result.leakedScopes} keymap scope(s) behind: ${JSON.stringify(result)}`);
+  return result;
+}
 
 const usage = `Usage: node scripts/obsidian-cdp.mjs --vault=<path> <command>
   wait                 wait until the instance answers and its workspace is ready
@@ -104,7 +113,7 @@ async function cli(args) {
   const cdp = await connectCdp(vault);
   try {
     if (command === "eval" && value) return process.stdout.write(`${JSON.stringify(await cdp.evaluate(value))}\n`);
-    if (command === "trust") return process.stdout.write(`${JSON.stringify(await cdp.evaluate(trustExpression))}\n`);
+    if (command === "trust") return process.stdout.write(`${JSON.stringify(assertTrusted(await cdp.evaluate(trustExpression)))}\n`);
     if (command === "screenshot" && value) return process.stdout.write(`${await cdp.screenshot(resolve(value))}\n`);
     if (command === "errors") {
       await delay(200);

@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import { connectCdp, devToolsPortFile, trustExpression, waitForInstance } from "./obsidian-cdp.mjs";
+import { assertTrusted, connectCdp, devToolsPortFile, trustExpression, waitForInstance } from "./obsidian-cdp.mjs";
 import { canonicalVault, sourceFingerprint } from "./test-harness.mjs";
 import { enterHeavy } from "./heavy-lock.mjs";
 
@@ -101,7 +101,7 @@ try {
   report.driver = driver.kind;
   const appVersion = await driver.version();
   // A freshly created harness vault opens in Restricted Mode; trusting it is part of preparing the owned test vault.
-  if (driver.kind === "cdp") report.diagnostics.trusted = await driver.evaluate(trustExpression);
+  if (driver.kind === "cdp") report.diagnostics.trusted = assertTrusted(await driver.evaluate(trustExpression));
   check("Obsidian runtime version", appVersion === environment.source.obsidianRuntime.version, `${appVersion} matches harness runtime`);
   const activeVaultPath = (await driver.vaultPath()).replace(/\/$/, "");
   check(`${driver.kind.toUpperCase()} targets the test vault`, activeVaultPath === vault.replace(/\/$/, ""), activeVaultPath);

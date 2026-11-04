@@ -334,3 +334,19 @@ test('re-space race: a drag queued before the re-space wins, and memory and disk
   assert.equal(disk.nodes[2].y, 900);
   assert.deepEqual(JSON.parse(JSON.stringify(view.map.nodes)), disk.nodes, 'memory equals disk: mapChange raises no conflict dialog and keeps history');
 });
+
+test('History (chat 04): a group holds back every pushed entry past the 80-entry cap and hands them back in order; clear() empties it', () => {
+  const { History } = load('map-model.ts');
+  const entry = label => ({ label, undo: async () => {}, redo: async () => {} });
+  const h = new History(); const earlier = entry('earlier'); h.push(earlier);
+  h.openGroup();
+  for (let i = 0; i < 90; i++) h.push(entry(`e${i}`));
+  assert.equal(h.undoEntry, earlier, 'grouped entries are not undo steps of their own');
+  const taken = h.closeGroup();
+  assert.deepEqual([...taken].map(e => e.label), Array.from({ length: 90 }, (_, i) => `e${i}`));
+  assert.equal(h.undoEntry, earlier);
+  h.push(entry('after')); assert.equal(h.undoEntry.label, 'after', 'a closed group no longer holds anything back');
+  const c = new History(); c.openGroup(); c.push(entry('old map')); c.clear(); c.push(entry('new map'));
+  assert.deepEqual([...c.closeGroup()].map(e => e.label), ['new map'], 'what was collected before clear() is gone with that history');
+  assert.equal(new History().closeGroup().length, 0, 'no group: nothing');
+});

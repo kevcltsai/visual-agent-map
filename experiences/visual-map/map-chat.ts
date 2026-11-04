@@ -87,6 +87,8 @@ export interface MapChatPlanCard {
   summary?: string;
   /** The same actions by kind of work, each folded on the card; `items` is shown flat when absent. */
   groups?: { label: string; items: string[]; danger?: { mark: string } }[];
+  /** The plan starts AI work (research, expand, …): undo does not take that part back, and the card says so. */
+  aiWork?: boolean;
   state: "pending" | "applied" | "cancelled";
   apply(): void;
   cancel(): void;
@@ -1908,8 +1910,8 @@ export class MapChatPanel {
       text: t("ui.map_chat_plan_cancel"),
       attr: { type: "button" }
     });
-    // Said before the button is pressed, not after: applying clears the undo history.
-    buttons.createSpan({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
+    // Said before the button is pressed, not after: undo takes the plan's changes back, but not the AI work it starts.
+    if (plan.aiWork) buttons.createSpan({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
     // A second press does nothing: the buttons stop working as soon as one is used. They disappear with the repaint, so the
     // keyboard goes back to the message field instead of falling to the page.
     apply.addEventListener("click", () => {

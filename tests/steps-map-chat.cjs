@@ -399,8 +399,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 9 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text; D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 9);
+test('C1: the style is not part of the action schema, and the step version is 10 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text; D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 10);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -586,11 +586,11 @@ test('B1 plan: 16 actions need a plan, 15 do not', () => {
   assert.equal(plan(renameRows(15)), null);
   assert.deepEqual(plain(plan(renameRows(16))), { reasons: ['many_actions'], estimatedCalls: 0 });
 });
-test('B1 plan: delete_topic with branch:true needs a plan only when the card has subtopics', () => {
-  assert.deepEqual(plain(plan([{ kind: 'delete_topic', nodeId: 'a', branch: true }]).reasons), ['delete_branch']);
-  assert.equal(plan([{ kind: 'delete_topic', nodeId: 'a1', branch: true }]), null, 'a leaf has no branch to take');
-  assert.equal(plan([{ kind: 'delete_topic', nodeId: 'a', branch: false }]), null, 'the card alone is moved');
-  assert.deepEqual(plain(plan([{ kind: 'add_child', parentId: 'a1', title: 'T', summary: '' }, { kind: 'delete_topic', nodeId: 'a1', branch: true }]).reasons), ['delete_branch'], 'a child added by the same reply counts');
+test('chat 04: deleting a branch no longer needs a plan (the reply is one undo step); the three other reasons stay', () => {
+  assert.equal(plan([{ kind: 'delete_topic', nodeId: 'a', branch: true }]), null, 'a branch with subtopics');
+  assert.equal(plan([{ kind: 'add_child', parentId: 'a1', title: 'T', summary: '' }, { kind: 'delete_topic', nodeId: 'a1', branch: true }]), null);
+  assert.deepEqual(plain(plan([...Array.from({ length: 16 }, () => ({ kind: 'delete_topic', nodeId: 'a', branch: true }))]).reasons), ['many_actions']);
+  assert.deepEqual(plain(plan([{ kind: 'create_map', title: 'M' }]).reasons), ['new_map']);
 });
 test('B1 plan: 10 research targets need a plan, 9 do not; no targets means the selection at that point', () => {
   assert.equal(MAP_CHAT_PLAN_RESEARCH_LIMIT, 10);

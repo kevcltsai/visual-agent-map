@@ -1107,6 +1107,8 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
   private epoch = 0;
   /** Entries pushed out of the front by the 80-entry cap, so a mark's position survives the cap. */
   private dropped = 0;
+  /** While a group is open, pushed entries are collected here (no cap) instead of becoming undo steps of their own. */
+  private grouped: T[] | null = null;
   get canUndo(): boolean {
     return this.past.length > 0;
   }
@@ -1120,6 +1122,11 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     return this.future[this.future.length - 1];
   }
   push(entry: T): void {
+    if (this.grouped) {
+      this.grouped.push(entry);
+      this.future = [];
+      return;
+    }
     this.past.push(entry);
     if (this.past.length > 80) {
       this.past.shift();
@@ -1141,6 +1148,21 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     this.past = [];
     this.future = [];
     this.epoch++;
+    // An open group stays open, but what it collected belonged to the history that is gone.
+    if (this.grouped) this.grouped = [];
+  }
+  /**
+   * Starts collecting: every entry pushed until {@link closeGroup} is held back (the 80-entry cap does not apply to it), so the
+   * caller can push them as one step. A group already open is kept.
+   */
+  openGroup(): void {
+    this.grouped ??= [];
+  }
+  /** Ends the group and returns what it collected, oldest first (empty when nothing was pushed or the history was cleared). */
+  closeGroup(): T[] {
+    const entries = this.grouped ?? [];
+    this.grouped = null;
+    return entries;
   }
   /** Marks the present end of the history; collapseSince folds everything pushed after it into one entry. */
   mark(): HistoryMark {

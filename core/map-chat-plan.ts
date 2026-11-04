@@ -18,7 +18,7 @@ export const MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
 /** A reply that adds this many cards or more is followed by one automatic layout and a move of the view to the new cards. */
 export const MAP_CHAT_AUTO_LAYOUT_MIN_NEW = 5;
 
-export type MapChatPlanReason = "many_actions" | "delete_branch" | "many_research" | "new_map";
+export type MapChatPlanReason = "many_actions" | "many_research" | "new_map";
 
 export interface MapChatPlan {
   /** Every condition that holds, in a fixed order. */
@@ -71,22 +71,13 @@ export function planFor(
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons: MapChatPlanReason[] = [];
   if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT) reasons.push("many_actions");
-  // Cards that have a child: in the map as it was sent, or created by this very reply.
-  const parentsWithChildren = new Set<string>();
-  for (const parent of Object.values(context.parents)) if (parent) parentsWithChildren.add(parent);
-  for (const action of actions)
-    if (action.kind === "add_child" && action.parentId) parentsWithChildren.add(action.parentId);
   let research = 0;
   let calls = 0;
   let imageSearches = 0;
   let selection = context.selectedCount;
-  let deletesBranch = false;
   let createsMap = false;
   for (const action of actions) {
     switch (action.kind) {
-      case "delete_topic":
-        if (action.branch && parentsWithChildren.has(action.nodeId)) deletesBranch = true;
-        break;
       case "create_map":
         createsMap = true;
         break;
@@ -125,7 +116,6 @@ export function planFor(
         break;
     }
   }
-  if (deletesBranch) reasons.push("delete_branch");
   if (research >= MAP_CHAT_PLAN_RESEARCH_LIMIT) reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
   return reasons.length ? { reasons, estimatedCalls: calls } : null;

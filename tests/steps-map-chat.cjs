@@ -399,8 +399,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 7 (the prompt lost the detailed and redo texts and gained the no-count rule; D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 7);
+test('C1: the style is not part of the action schema, and the step version is 8 (the prompt lost the detailed and redo texts, gained the no-count rule and the topic-type and relation text; D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 8);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 

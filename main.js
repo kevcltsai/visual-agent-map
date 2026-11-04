@@ -22875,7 +22875,15 @@ var REFERENCE_TEXT = {
     archived: "\u5DF2\u5C01\u5B58",
     unassigned: "\u672A\u6B78\u985E",
     colon: "\uFF1A",
-    listSeparator: "\u3001"
+    listSeparator: "\u3001",
+    relations: [
+      ["supports", "\u652F\u6301", "\u88AB\u652F\u6301"],
+      ["contradicts", "\u53CD\u99C1", "\u88AB\u53CD\u99C1"],
+      ["verifies", "\u9A57\u8B49", "\u88AB\u9A57\u8B49"],
+      ["derives_from", "\u63A8\u5C0E\u81EA", "\u63A8\u5C0E\u51FA"],
+      ["prerequisite", "\u662F\u524D\u7F6E\u77E5\u8B58\u65BC", "\u524D\u7F6E\u77E5\u8B58"],
+      ["related", "\u76F8\u95DC", "\u76F8\u95DC"]
+    ]
   },
   en: {
     labels: ENGLISH_REFERENCE_LABELS,
@@ -22883,9 +22891,36 @@ var REFERENCE_TEXT = {
     archived: "Archived",
     unassigned: "Unassigned",
     colon: ": ",
-    listSeparator: ", "
+    listSeparator: ", ",
+    relations: [
+      ["supports", "Supports", "Supported by"],
+      ["contradicts", "Contradicts", "Contradicted by"],
+      ["verifies", "Verifies", "Verified by"],
+      ["derives_from", "Derived from", "Derives"],
+      ["prerequisite", "Prerequisite for", "Prerequisites"],
+      ["related", "Related", "Related"]
+    ]
   }
 };
+function relationReferences(map, nodeId, language2, hasNote) {
+  const ref = REFERENCE_TEXT[language2];
+  const notes = new Map(map.nodes.filter((node) => hasNote(node.path)).map((node) => [node.id, node.path]));
+  if (!notes.has(nodeId)) return [];
+  const lines = [];
+  for (const [kind, start, finish] of ref.relations) {
+    const ends = (side) => {
+      var _a2;
+      return ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => r.kind === kind && r[side] === nodeId).map((r) => notes.get(side === "from" ? r.to : r.from)).filter((path) => path !== void 0);
+    };
+    const groups = start === finish ? [[start, [...ends("from"), ...ends("to")]]] : [[start, ends("from")], [finish, ends("to")]];
+    for (const [label, paths] of groups)
+      if (paths.length)
+        lines.push(
+          `${label}${ref.colon}${[...new Set(paths)].map((path) => `[[${noteLink(path)}]]`).join(ref.listSeparator)}`
+        );
+  }
+  return lines;
+}
 function localizeReference(value, language2) {
   const match = /^(所屬主題|所屬心智圖|母議題|子議題|來源議題|狀態|Topic|Mind map|Parent topic|Child topics|Source topic|Status)[：:]\s*(.*)$/.exec(
     value
@@ -24154,6 +24189,10 @@ ${body}`);
       );
     }
   }
+  /** True when `path` is an existing Markdown file (a topic note a relation line can link to). */
+  isNoteFile(path) {
+    return path.endsWith(".md") && this.app.vault.getAbstractFileByPath(path) instanceof import_obsidian11.TFile;
+  }
   /** The node note with derived lifecycle fields and references applied, or null when it is not a VAM node note. */
   derivedNoteContent(file, content, ownership2, topics) {
     var _a2;
@@ -24196,7 +24235,8 @@ ${body}`);
         `${topicLabel}${ref.colon}[[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
         `${mapLabel}${ref.colon}[[${noteLink(owner.mapPath)}]]`,
         `${parentLabel}${ref.colon}${parent ? `[[${noteLink(parent.path)}]]` : ref.none}`,
-        `${childLabel}${ref.colon}${children.length ? children.map((child) => `[[${noteLink(child.path)}]]`).join(ref.listSeparator) : ref.none}`
+        `${childLabel}${ref.colon}${children.length ? children.map((child) => `[[${noteLink(child.path)}]]`).join(ref.listSeparator) : ref.none}`,
+        ...relationReferences(owner.map, owner.node.id, language2, (path) => this.isNoteFile(path))
       ];
       body = withoutReference(body);
     } else if (topic && (state === "unassigned" || state === "archived")) {

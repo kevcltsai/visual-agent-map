@@ -1772,6 +1772,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "detail.purpose": "用途：{0}",
   "detail.palette": "配色：{0}",
   "detail.reusable_formula": "可套用公式：{0}",
+  "schema.summary_description": "適合心智圖的一句繁體中文結論，80 字內",
+  "schema.detail_description": "完整的繁體中文 Markdown 分析",
   "research.fast": "快速概覽：先回答核心問題，簡短列出關鍵依據與缺口；不要做完整調查。",
   "research.normal": "一般研究：提供足以支持結論的主要證據、限制與待確認事項。",
   "research.deep": "深入研究：檢查來源間的一致與分歧，詳列重要證據、限制與待查問題。",

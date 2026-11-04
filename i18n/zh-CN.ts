@@ -1770,6 +1770,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "detail.purpose": "用途：{0}",
   "detail.palette": "配色：{0}",
   "detail.reusable_formula": "可应用公式：{0}",
+  "schema.summary_description": "适合思维导图的一句简体中文结论，80 字内",
+  "schema.detail_description": "完整的简体中文 Markdown 分析",
   "research.fast": "快速概览：先回答核心问题，简短列出关键依据与缺口；不要做完整调查。",
   "research.normal": "一般研究：提供足以支持结论的主要证据、限制与待确认事项。",
   "research.deep": "深入研究：检查来源间的一致与分歧，详列重要证据、限制与待查问题。",

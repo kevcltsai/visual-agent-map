@@ -1801,6 +1801,8 @@ var en = {
   "detail.purpose": "Purpose: {0}",
   "detail.palette": "Palette: {0}",
   "detail.reusable_formula": "Reusable formula: {0}",
+  "schema.summary_description": "A one-sentence conclusion that fits a mind map, written in the output language, within 80 words",
+  "schema.detail_description": "A complete Markdown analysis written in the output language",
   "research.fast": "Quick overview: answer the core question first and briefly list key evidence and gaps; do not conduct a full investigation.",
   "research.normal": "Normal research: provide the main evidence, limitations, and open questions needed to support the conclusion.",
   "research.deep": "Deep research: compare sources for agreement and disagreement, and detail key evidence, limitations, and open questions.",
@@ -4303,6 +4305,8 @@ var zhCN = {
   "detail.purpose": "\u7528\u9014\uFF1A{0}",
   "detail.palette": "\u914D\u8272\uFF1A{0}",
   "detail.reusable_formula": "\u53EF\u5E94\u7528\u516C\u5F0F\uFF1A{0}",
+  "schema.summary_description": "\u9002\u5408\u601D\u7EF4\u5BFC\u56FE\u7684\u4E00\u53E5\u7B80\u4F53\u4E2D\u6587\u7ED3\u8BBA\uFF0C80 \u5B57\u5185",
+  "schema.detail_description": "\u5B8C\u6574\u7684\u7B80\u4F53\u4E2D\u6587 Markdown \u5206\u6790",
   "research.fast": "\u5FEB\u901F\u6982\u89C8\uFF1A\u5148\u56DE\u7B54\u6838\u5FC3\u95EE\u9898\uFF0C\u7B80\u77ED\u5217\u51FA\u5173\u952E\u4F9D\u636E\u4E0E\u7F3A\u53E3\uFF1B\u4E0D\u8981\u505A\u5B8C\u6574\u8C03\u67E5\u3002",
   "research.normal": "\u4E00\u822C\u7814\u7A76\uFF1A\u63D0\u4F9B\u8DB3\u4EE5\u652F\u6301\u7ED3\u8BBA\u7684\u4E3B\u8981\u8BC1\u636E\u3001\u9650\u5236\u4E0E\u5F85\u786E\u8BA4\u4E8B\u9879\u3002",
   "research.deep": "\u6DF1\u5165\u7814\u7A76\uFF1A\u68C0\u67E5\u6765\u6E90\u95F4\u7684\u4E00\u81F4\u4E0E\u5206\u6B67\uFF0C\u8BE6\u5217\u91CD\u8981\u8BC1\u636E\u3001\u9650\u5236\u4E0E\u5F85\u67E5\u95EE\u9898\u3002",
@@ -6805,6 +6809,8 @@ var zhTW = {
   "detail.purpose": "\u7528\u9014\uFF1A{0}",
   "detail.palette": "\u914D\u8272\uFF1A{0}",
   "detail.reusable_formula": "\u53EF\u5957\u7528\u516C\u5F0F\uFF1A{0}",
+  "schema.summary_description": "\u9069\u5408\u5FC3\u667A\u5716\u7684\u4E00\u53E5\u7E41\u9AD4\u4E2D\u6587\u7D50\u8AD6\uFF0C80 \u5B57\u5167",
+  "schema.detail_description": "\u5B8C\u6574\u7684\u7E41\u9AD4\u4E2D\u6587 Markdown \u5206\u6790",
   "research.fast": "\u5FEB\u901F\u6982\u89BD\uFF1A\u5148\u56DE\u7B54\u6838\u5FC3\u554F\u984C\uFF0C\u7C21\u77ED\u5217\u51FA\u95DC\u9375\u4F9D\u64DA\u8207\u7F3A\u53E3\uFF1B\u4E0D\u8981\u505A\u5B8C\u6574\u8ABF\u67E5\u3002",
   "research.normal": "\u4E00\u822C\u7814\u7A76\uFF1A\u63D0\u4F9B\u8DB3\u4EE5\u652F\u6301\u7D50\u8AD6\u7684\u4E3B\u8981\u8B49\u64DA\u3001\u9650\u5236\u8207\u5F85\u78BA\u8A8D\u4E8B\u9805\u3002",
   "research.deep": "\u6DF1\u5165\u7814\u7A76\uFF1A\u6AA2\u67E5\u4F86\u6E90\u9593\u7684\u4E00\u81F4\u8207\u5206\u6B67\uFF0C\u8A73\u5217\u91CD\u8981\u8B49\u64DA\u3001\u9650\u5236\u8207\u5F85\u67E5\u554F\u984C\u3002",
@@ -36588,17 +36594,16 @@ var response_schema_default = {
 
 // core/steps/task/schemas.ts
 function localizedResponseSchema(language2) {
-  if (language2 === "zh-CN") {
+  if (instructionLanguageOf(language2) === "zh") {
     return {
       ...response_schema_default,
       properties: {
         ...response_schema_default.properties,
-        summary: { type: "string", description: "\u9002\u5408\u601D\u7EF4\u5BFC\u56FE\u7684\u4E00\u53E5\u7B80\u4F53\u4E2D\u6587\u7ED3\u8BBA\uFF0C80 \u5B57\u5185" },
-        detail: { type: "string", description: "\u5B8C\u6574\u7684\u7B80\u4F53\u4E2D\u6587 Markdown \u5206\u6790" }
+        summary: { type: "string", description: translate(language2, "schema.summary_description") },
+        detail: { type: "string", description: translate(language2, "schema.detail_description") }
       }
     };
   }
-  if (instructionLanguageOf(language2) === "zh") return response_schema_default;
   const variables5 = { language: languagePromptName(language2, "en", "plain") };
   return {
     ...response_schema_default,

@@ -1870,6 +1870,8 @@ export const en = {
   "detail.purpose": "Purpose: {0}",
   "detail.palette": "Palette: {0}",
   "detail.reusable_formula": "Reusable formula: {0}",
+  "schema.summary_description": "A one-sentence conclusion that fits a mind map, written in the output language, within 80 words",
+  "schema.detail_description": "A complete Markdown analysis written in the output language",
   "research.fast":
     "Quick overview: answer the core question first and briefly list key evidence and gaps; do not conduct a full investigation.",
   "research.normal":

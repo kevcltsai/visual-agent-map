@@ -5,7 +5,7 @@ import SummaryDescription from "./schema-summary-description.md";
 import DetailDescription from "./schema-detail-description.md";
 import { renderTemplate } from "../../step-runner";
 import baseResponseSchema from "../../../response-schema.json";
-import { instructionLanguageOf, languagePromptName, type ContentLanguage } from "../../../i18n";
+import { instructionLanguageOf, languagePromptName, translate, type ContentLanguage } from "../../../i18n";
 
 /** How a task context is answered: the response schema sent to the model and the flags its parser needs. */
 export interface TaskResponseShape {
@@ -21,17 +21,17 @@ export interface TaskResponseShape {
  * zh-TW keeps the file's Traditional wording unchanged, zh-CN has the same sentences in Simplified Chinese; every other language names itself.
  */
 export function localizedResponseSchema(language: ContentLanguage): typeof baseResponseSchema {
-  if (language === "zh-CN") {
+  if (instructionLanguageOf(language) === "zh") {
+    // The Chinese-instruction languages read their own dictionary row (zh-TW is the file's wording, zh-CN is Simplified).
     return {
       ...baseResponseSchema,
       properties: {
         ...baseResponseSchema.properties,
-        summary: { type: "string", description: "适合思维导图的一句简体中文结论，80 字内" },
-        detail: { type: "string", description: "完整的简体中文 Markdown 分析" }
+        summary: { type: "string", description: translate(language, "schema.summary_description") },
+        detail: { type: "string", description: translate(language, "schema.detail_description") }
       }
     };
   }
-  if (instructionLanguageOf(language) === "zh") return baseResponseSchema;
   const variables = { language: languagePromptName(language, "en", "plain") };
   return {
     ...baseResponseSchema,

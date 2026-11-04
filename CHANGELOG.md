@@ -14,69 +14,38 @@ A card's cover picture now shows the whole picture instead of a 96 px strip cut 
 
 ### Note styles
 
-Decide how VAM writes and updates each kind of note. In Settings › Note style, pick a style for each topic type, for example "Hypothesis test" for hypothesis topics.
+Choose how VAM writes and updates each kind of note, for example "Hypothesis test" for hypothesis topics (Settings › Note style).
 
-- **Built-in or your own.** Choose a built-in style, or write your own as Markdown files in the Styles, Structures, Voices and Formats folders (Manage under Custom, then New…).
-- **Three ways to update a note.** Merge and rewrite folds new findings into the whole note, keeping both sides with dates where they disagree. New on top leaves your text as it was and adds findings above it under a dated heading. Save new content only backs up the note, then replaces the Detail.
-- **Safe to try.** Each update adds one line to the update log, and one Undo returns the note to how it was.
-- **A style for one topic.** Right-click a topic and choose Note style… to give it its own style, or "Follow the topic type" to go back.
-- **A style for one run.** Research, Research selected topics and Import outline show the style in use; "Use another style this time" applies a different one to that run only.
-- **Preview AI instructions** still shows the exact text the AI receives for each step.
+- Use a built-in style, or write your own as Markdown files.
+- When you research a topic again, choose how the note is updated: merge and rewrite, add new findings on top, or replace it after a backup. One Undo brings the old note back.
+- Give one topic its own style from its right-click menu, or use another style for a single run.
 
-### Cards, links and marks
+### Cards and canvas
 
-Make cards say more at a glance. Select a topic, bold its title in the topic panel, and attach a link to the page you read.
+Make a map say more at a glance: bold a topic's title, attach a web link, or drag a card's edge to make it bigger.
 
-- **Card styles.** Give a topic a bold title, small or large text, a thick border or a thick line to its parent. "Apply to whole branch" copies the styles down. Shared pages and exported images show them.
-- **Topic web links.** Attach web addresses to a topic from the card's link button or the topic panel. Shared pages list them as links that open in a new tab.
-- **More icons.** The marker menu now groups priority 1 to 5 and progress (0 to 100%) as pick-one, and status, four flags and four faces as combinable. Icons show on cards, in the outline and on shared pages.
-- **Summary brackets.** Select adjacent child topics and add a curly bracket with a conclusion beside them. Integrating the parent reads it as direction; the AI never rewrites it. Shared pages and exported images draw it.
-- **Resize a card.** Drag a card's right edge, bottom edge or corner to make it wider or taller, and double-click a handle to reset. Lines, frames, exports and shared pages follow the size.
+- Card styles, web links, more icons, and summary brackets beside a group of topics.
+- Free text blocks anywhere on the canvas, and text notes under a topic without creating a file.
+- Drag a topic onto another to make it a child, or drag several selected topics at once.
 
-### Text nodes and dragging
+### Easier first use
 
-Jot things down and rearrange by hand. Right-click the canvas, add a text node, and drag a topic onto another card to make it a child.
-
-- **Free text blocks.** Add a text block anywhere on the canvas and link it to one or more topics with a dashed line. Auto layout never moves it, and the chat never rewrites your text.
-- **Text nodes on the tree.** Add a plain text note under a topic without creating a note file; it follows layout, folding and presentation. "Turn into topic card" makes it a real topic.
-- **Drag onto a card to make a child.** Release a dragged topic over another card and it moves under it with its subtopics, as one undo step. In selection mode, a checked topic drags the whole group.
-- **Drag selected topics together.** In selection mode, drag any checked topic and all checked topics move together, as one undo step.
-
-### AI chat and first use
-
-Start with one sentence. Open the chat, type "Plan a three-day trip to Tainan", and agree to the usage notice to build your first map.
-
-- **Clear about waiting.** While the AI usage notice is open, the chat says it is waiting for your confirmation, and the map builds only after you agree. The notice says plainly what is sent and that it uses your allowance.
-- **Better suggestions.** Choosing a suggestion replaces the message box, and suggestions and examples look like buttons.
-- **Connection problems explained.** When Codex or Claude Code is not ready, a notice says why and offers "Fix connection…".
-- **A blank start.** A fresh install opens a blank mind map: start with one sentence, or add topics yourself.
-- **Language.** A new install follows Obsidian's language when VAM has it (English, Traditional or Simplified Chinese), otherwise English. A language you chose is kept.
-
-### Notes, previews and running tasks
-
-Copies, previews and AI runs now behave the way you expect. Copy a topic into another map and the copy keeps the note's real title.
-
-- **Copy and paste keep the real title.** Pasting a topic into another map, or Copy to…, names the copy after the note's own title instead of its file name, and no longer edits other notes' titles.
-- **Previews follow the latest summary.** The hover preview updates when a new summary is written; one you edited or cleared yourself is kept.
-- **No more stuck "AI running" cards.** If a task was interrupted by a reload or closing Obsidian, the card now shows it as interrupted so you can run it again.
-- **No double runs.** Clicking Research, Integrate or Synthesize twice no longer starts two runs, and Stop now reaches every AI run.
+Open the chat, type "Plan a three-day trip to Tainan", and agree to the usage notice to build your first map. The chat now says clearly when it is waiting for you, or when Codex or Claude Code is not connected.
 
 ### Changed
 
-- **Upgrading from 0.28.0.** Your custom note structures and writing tones become files and styles with the same names, and your old settings stay in place, so going back to an older version still works.
-- **Note style defaults.** General topics gain one rule for conflicts between old and new content, other topic types use their own built-in style, and hypothesis topics put new findings on top.
-- **No more map-wide styles.** A style or tone chosen for a whole map is no longer used, and the map menu no longer has style or voice items; you see one notice listing those maps. AIM conclusion notes follow the AIM row in Settings › Note style, and read as before with the default AIM report.
-- **Renamed.** "Writing tone" is now "voice", and "content template" is now "note structure".
-- **The built-in Taiwan travel sample and the five-step tour are gone.** A fresh install opens a blank mind map; maps you already copied out of the sample work as before. AIM research maps cannot be shared yet.
+- Note styles replace map-wide styles and writing tones, and "writing tone" is now called "voice". Your custom templates are converted automatically, and you see one notice listing the affected maps.
+- Hypothesis topics now add new findings on top instead of rewriting the note.
+- The built-in Taiwan travel sample and its tour are gone. A fresh install opens a blank map.
 
 ### Fixes
 
-- Many small fixes to keyboard focus, the hover preview, card tool buttons, Settings, exported images, zoom, the chat window, Import outline and wording in all three languages.
+- Copies keep the note's real title, previews follow the latest summary, interrupted AI tasks no longer stay stuck on "running", and a double click no longer starts two runs. Plus many small fixes to keyboard use, settings, export and wording.
 
 ### Known issues
 
-- Radial, fishbone and timeline layouts do not draw summary brackets yet, and text nodes wait for the next Auto layout in a few cases.
-- Only the right and left layouts make room for a resized card; other layouts may overlap it, and AI Next Step maps keep the standard size.
+- Radial, fishbone and timeline layouts do not draw summary brackets yet.
+- Only the right and left layouts make room for a resized card.
 
 ## [0.28.0] - 2026-11-01
 

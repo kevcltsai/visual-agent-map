@@ -850,17 +850,15 @@ test('P1 AIM off: the manage window lists no AIM report and no "AIM conclusion n
   await settle();
   assert.equal(rowFor(modal.contentEl, 'AIM report'), undefined);
   assert.ok(rowsOf(modal.contentEl).every(row => !rowTexts(row).some(text => text.includes('AIM'))));
-  const count = tab => {
-    const setting = { name: '', desc: '', setName(v) { this.name = v; return this; }, setDesc(v) { this.desc = v; return this; }, addButton() { return this; } };
-    hiddenSettings.renderNoteCustomSetting(setting, setup.plugin, tab);
-    return setting.desc;
+  const count = settingsModule => {
+    const setting = { name: '', descEl: dom.element('div'), setName(v) { this.name = v; return this; }, addButton() { return this; } };
+    settingsModule.renderMyStylesSetting(setting, setup.plugin);
+    return setting.name;
   };
-  const shown = rowsOf(modal.contentEl).length;
-  assert.equal(count('recipe'), M.translate('en', 'ui.manage_count_0_1', shown, 0));
+  const off = count(hiddenSettings);
   const onSettings = S.load('ui/settings-tab.ts', { obsidian });
-  const on = { desc: '', setName() { return this; }, setDesc(v) { this.desc = v; return this; }, addButton() { return this; } };
-  onSettings.renderNoteCustomSetting(on, setup.plugin, 'recipe');
-  assert.equal(on.desc, M.translate('en', 'ui.manage_count_0_1', shown + 1, 0), 'with AIM on the AIM report counts');
+  assert.equal(count(onSettings), off, 'the AIM report is built in, so the My styles row counts the same with AIM on or off');
+  assert.equal(off, M.translate('en', 'ui.my_styles_count_0_1', 0, 0));
 });
 
 test('P1 popout: a modal opened for a button in another window is moved to that window\'s body; in the same window, or with no anchor, nothing moves', () => {
@@ -881,4 +879,70 @@ test('P1 popout: a modal opened for a button in another window is moved to that 
   openInWindowOf(none, undefined);
   assert.equal(none.opened, 1);
   assert.equal(none.containerEl.ownerDocument, main);
+});
+
+
+// ---- listUnusedCopies (settings-redesign P3, A5): read-only, shared with the manage window's clean-up ----
+const same = (actual, expected) => assert.deepEqual(plain(actual), expected);
+const STYLES_DIR = language => dirOf(language, 'recipe');
+const VOICE_DIR = language => dirOf(language, 'tone');
+
+test('P3 unused copies: a part file equal to a built-in, or to another file, and used by nothing, is a copy; of equal unused files the one without a (n) suffix stays', async () => {
+  const probe = await makeStore();
+  await probe.store.createPart('format', 'builtin:lean', 'Copy of lean');
+  const leanText = probe.v.files[`${dirOf('en', 'format')}/Copy of lean.md`];
+  assert.ok(leanText);
+  const files = {
+    [`${dirOf('en', 'format')}/Copy of lean.md`]: leanText,
+    [`${VOICE_DIR('en')}/Calm.md`]: 'Calm and short.\n',
+    [`${VOICE_DIR('en')}/Calm (2).md`]: 'Calm and short.\n',
+    [`${VOICE_DIR('en')}/Calm (3).md`]: 'Calm and short.\n',
+    [`${VOICE_DIR('en')}/Unique.md`]: 'Only mine.\n'
+  };
+  const { store, v } = await makeStore(files);
+  const before = JSON.stringify(v.files);
+  const copies = store.listUnusedCopies().map(copy => [copy.category, copy.name, copy.sameAs]);
+  same(copies, [['voice', 'Calm (2)', 'file:Calm'], ['voice', 'Calm (3)', 'file:Calm'], ['format', 'Copy of lean', 'builtin:lean']]);
+  assert.equal(writes(v), 0);
+  assert.equal(JSON.stringify(v.files), before, 'nothing is written');
+  assert.ok(store.listUnusedCopies().every(copy => copy.fileName === `${copy.name}.md` && copy.ref === `file:${copy.name}`));
+});
+
+test('P3 unused copies: a copy a style uses is not unused; when the kept one is used, the others are copies; a style a topic names counts as used', async () => {
+  const voiceDir = VOICE_DIR('en');
+  const style = (voice) => `---\nvoice: ${voice}\n---\n`;
+  const files = {
+    [`${voiceDir}/Calm.md`]: 'Calm and short.\n',
+    [`${voiceDir}/Calm (2).md`]: 'Calm and short.\n',
+    [`${STYLES_DIR('en')}/Uses second.md`]: style('Calm (2)')
+  };
+  const { store } = await makeStore(files);
+  // "Calm (2)" is used by a style; "Calm" is equal to it and unused, so "Calm" is the copy
+  same(store.listUnusedCopies().filter(copy => copy.category === 'voice').map(copy => [copy.name, copy.sameAs]), [['Calm', 'file:Calm (2)']]);
+  // two styles with the same four settings: an unused one is a copy of the other unless a topic uses it
+  const twin = { [`${STYLES_DIR('en')}/Twin.md`]: '---\nstructure: Standard six\nupdate: top\n---\n', [`${STYLES_DIR('en')}/Twin (2).md`]: '---\nstructure: Standard six\nupdate: top\n---\n' };
+  const pair = await makeStore(twin);
+  same(pair.store.listUnusedCopies().map(copy => [copy.category, copy.name, copy.sameAs]), [['recipe', 'Twin (2)', 'file:Twin']]);
+  same(pair.store.listUnusedCopies(new Set(['file:Twin (2)'])).map(copy => copy.name), ['Twin'], 'the topic keeps (2), so the other is the copy');
+  same(pair.store.listUnusedCopies(new Set(['file:Twin', 'file:Twin (2)'])), []);
+  // used by a type
+  const used = await makeStore(twin, { noteStyleByKind: { topic: 'file:Twin (2)' } });
+  same(used.store.listUnusedCopies().map(copy => copy.name), ['Twin']);
+});
+
+test('P3 unused copies: a style equal to a built-in one (same four settings, voice and format following the global ones) is a copy; a style that sets its voice apart is not, and the AIM report is never the original', async () => {
+  const dir = STYLES_DIR('en');
+  const files = {
+    [`${dir}/Like general.md`]: '---\nstructure: Standard six\nupdate: merge\n---\n',
+    [`${dir}/Own voice.md`]: '---\nstructure: Standard six\nvoice: Plain explanation\nupdate: merge\n---\n',
+    [`${dir}/Like aim.md`]: '---\nstructure: Standard six\nvoice: Professional\nformat: Standard format\nupdate: merge\n---\n'
+  };
+  const { store } = await makeStore(files);
+  same(store.listUnusedCopies().map(copy => [copy.name, copy.sameAs]), [['Like general', 'builtin:general']]);
+});
+
+test('P3 unused copies: nothing to report for a store with no files, and the call does not need a refresh or create a folder', async () => {
+  const { store, v } = await makeStore();
+  same(store.listUnusedCopies(), []);
+  assert.equal(writes(v), 0);
 });

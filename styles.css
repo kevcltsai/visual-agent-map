@@ -1671,6 +1671,24 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-editor-example { overflow-x: auto; padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); color: var(--text-normal); }
 .vam-editor-example h2 { font-size: var(--font-ui-medium); }
 
+/* Note style page (settings-redesign P3): the "How notes are written" card, the topic-type row tags and the My styles row. */
+.vam-style-card { flex-wrap: wrap; }
+.vam-style-card-body { flex: 1 1 100%; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
+.vam-style-card-label { margin: 8px 0 0; font-size: var(--font-ui-small); color: var(--text-muted); }
+.vam-style-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.vam-style-chip { border: 1px solid var(--background-modifier-border); background: var(--background-primary); color: var(--text-normal); border-radius: 999px; padding: 8px 16px; min-height: 40px; box-shadow: none; cursor: pointer; }
+.vam-style-chip[aria-checked="true"] { border-color: var(--interactive-accent); background: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: var(--font-semibold); }
+.vam-style-chip:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-style-sample { background: var(--background-primary); border-radius: var(--radius-m); padding: 12px 14px; line-height: 1.7; }
+.vam-style-sample-caption { display: block; margin-bottom: 4px; font-size: var(--font-ui-smaller); color: var(--text-faint); }
+.vam-style-tag { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: var(--radius-s); font-size: var(--font-ui-smaller); font-weight: normal; }
+.vam-style-tag.is-warn { background: rgba(var(--color-orange-rgb), 0.18); color: var(--color-orange); }
+.vam-style-tag.is-info { background: rgba(var(--color-blue-rgb), 0.18); color: var(--color-blue); }
+.vam-style-unused { color: var(--color-orange); }
+/* The topic-type pickers show the whole style name: no cut-off, and the row makes room instead. */
+.vam-block-row > .setting-item-control { flex: 0 0 auto; max-width: 100%; }
+.vam-block-row select.dropdown { max-width: none; width: auto; text-overflow: clip; }
+
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-map-search { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); padding: 4px 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-view .vam-map-search-input { width: 180px; min-width: 0; flex: 1 1 auto; }

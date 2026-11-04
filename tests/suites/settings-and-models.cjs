@@ -464,7 +464,7 @@ test('settings page: every control and saved key is still reachable after the re
 
 test('settings page: the two sub-page intro rows render with an empty name and the sentence as the description, and stay out of search', () => {
   const { tab, plugin } = groupedTab();
-  const intros = [["AI connection"], ["Note style"]];
+  const intros = [["AI connection"]];
   for (const [pageName] of intros) {
     const item = pageNamed(tab, pageName).items[0];
     assert.equal(item.searchable, false, `${pageName} intro is not a search entry`);
@@ -476,13 +476,11 @@ test('settings page: the two sub-page intro rows render with an empty name and t
     assert.equal(view.name, '', `${pageName} intro: no name left after render`);
     assert.equal(view.desc, item.name, `${pageName} intro: desc is the intro text`);
   }
+  // P3: the Note style page opens with the "How notes are written" card instead of an intro row (its Preview button is tested in steps-note-style-settings.cjs)
   const noteItem = pageNamed(tab, 'Note style').items[0];
-  let opened = 0; plugin.openPromptPreview = () => { opened++; };
-  const v = { buttons: [] };
-  noteItem.render({ setName() { return this; }, setDesc() { return this; }, addButton(cb) { const b = { setButtonText() { return this; }, onClick(h) { v.click = h; return this; }, buttonEl: { addClass() {} } }; cb(b); v.buttons.push(b); return this; } });
-  assert.equal(v.buttons.length, 1);
-  v.click();
-  assert.equal(opened, 1, 'the Note style intro button opens the prompt preview');
+  assert.equal(noteItem.name, 'How notes are written');
+  assert.equal(typeof noteItem.render, 'function');
+  assert.notEqual(noteItem.searchable, false, 'the card is a search entry');
 });
 
 test('AI connection entry: shows how many CLIs are connected and warns only when none is', () => {
@@ -499,12 +497,12 @@ test('AI connection entry: shows how many CLIs are connected and warns only when
   assert.equal(statusOf(page), null);
 });
 
-test('Note style page: a "Topic types" group of seven rows in kind order (the AIM row last), then "Custom" with four manage rows, then "More" with only File location; no Structure, Voice or By topic type row', () => {
+test('Note style page: a "Topic types" group of seven rows in kind order (the AIM row last), then "My styles" with one row, then "More" with only File location; no Structure, Voice or By topic type row', () => {
   const note = pageNamed(groupedTab().tab, 'Note style');
   const groups = note.items.filter(item => item.type === 'group');
-  assert.deepEqual(plain(groups.map(group => group.heading)), ['Topic types', 'Custom', 'More']);
+  assert.deepEqual(plain(groups.map(group => group.heading)), ['Topic types', 'My styles', 'More']);
   assert.deepEqual(plain(groups[0].items.map(row => row.name)), ['Topic', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion', 'Action', 'AIM conclusion note']);
-  assert.deepEqual(plain(groups[1].items.map(row => row.name)), ['Note styles', 'Structures', 'Voices', 'Format rules']);
+  assert.deepEqual(plain(groups[1].items.map(row => row.name)), ['My styles']);
   assert.deepEqual(plain(groups[2].items.map(row => row.name)), ['File location']);
   const names = flattenDefinitions(note.items).map(row => row.name);
   for (const gone of ['Structure', 'Voice', 'By topic type']) assert.ok(!names.includes(gone), `${gone} row is gone`);

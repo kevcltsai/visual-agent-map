@@ -1675,7 +1675,7 @@ var en = {
   "ui.synthesis_stage_two_fixed": "Sources, content, language and note structure were fixed when the directions were requested; only the extra requirements can still change.",
   "ui.synthesis_needs_name": "Enter a name for the new topic first.",
   "ui.connection_repair": "Fix connection\u2026",
-  "ui.note_style_kind_row_aria_0": "Note style for {0}",
+  "ui.note_style_kind_row_aria_0": "Sections for {0}",
   "ui.note_style_recipe_issue_0_1": "\u26A0 Line {0}: {1}",
   "ui.note_style_row_missing_0_1": 'The style set for {0}, "{1}", was not found; this type uses its built-in style instead.',
   "ui.note_style_label_0_1": "Note style: {0} \xB7 {1}",
@@ -2520,6 +2520,33 @@ var en = {
   "ui.settings_group_advanced": "Advanced",
   "ui.settings_group_kinds": "Topic types",
   "ui.settings_group_more": "More",
+  "ui.note_style_card_title": "How notes are written",
+  "ui.note_style_card_desc": "Applies to every topic. To make one type different, change it below.",
+  "ui.note_style_voice_label": "Voice",
+  "ui.note_style_format_label": "Length and layout",
+  "ui.note_style_sample_caption": "It will read like this",
+  "ui.note_style_sample_academic": "Total housing cost is driven mainly by rent and how often you move; in Taipei, buying only costs less per year than renting after 10 or more years ([source]).",
+  "ui.note_style_sample_plain": "In short: if you will live in Taipei for under 10 years, renting is usually cheaper; the longer you stay, the more buying pays off ([source]).",
+  "ui.note_style_sample_magazine": "Picture year 11 in Taipei: rent has kept rising, and only now does the home you stretched to buy start saving you money ([source]).",
+  "ui.note_style_voice_other_0": "The current voice is \u201C{0}\u201D, which is not one of the choices above.",
+  "ui.note_style_chip_format_standard": "Standard",
+  "ui.note_style_chip_format_lean": "Lean",
+  "ui.note_style_chip_format_rich": "Rich",
+  "ui.note_style_chip_format_skim": "Skim list",
+  "ui.note_style_format_desc_standard": "Paragraphs first, key points in callouts.",
+  "ui.note_style_format_desc_lean": "3 to 5 bullet points per section, no callouts.",
+  "ui.note_style_format_desc_rich": "At least one callout, table or diagram per section.",
+  "ui.note_style_format_desc_skim": "All bullet points, quick to scan.",
+  "ui.note_style_format_other_0": "The current format is \u201C{0}\u201D, which is not one of the choices above.",
+  "ui.note_style_set_apart_0": "{0} (set apart)",
+  "ui.note_style_voice_retired_0": "{0} (retired)",
+  "ui.note_style_tag_voice_retired": "Voice retired",
+  "ui.settings_group_my_styles": "My styles",
+  "ui.my_styles_count_0_1": "{0} styles, {1} structures, voices and formats",
+  "ui.my_styles_unused_0": "{0} unused copies can be cleared at once",
+  "ui.my_styles_path_desc": "Stored in the folder below. Rename here and settings follow.",
+  "ui.my_styles_manage": "Manage\u2026",
+  "ui.my_styles_manage_aria": "Manage my styles",
   "ui.settings_group_custom": "Custom",
   "ui.manage_title": "Custom note styles",
   "ui.manage_tab_recipe": "Note styles",
@@ -4181,7 +4208,7 @@ var zhCN = {
   "ui.synthesis_stage_two_fixed": "\u53D6\u5F97\u65B9\u5411\u65F6\u5DF2\u56FA\u5B9A\u6765\u6E90\u3001\u5185\u5BB9\u8303\u56F4\u3001\u8BED\u8A00\u4E0E\u7B14\u8BB0\u7ED3\u6784\uFF1B\u73B0\u5728\u53EA\u80FD\u8C03\u6574\u989D\u5916\u8981\u6C42\u3002",
   "ui.synthesis_needs_name": "\u8BF7\u5148\u66FF\u65B0\u8BAE\u9898\u53D6\u540D\u3002",
   "ui.connection_repair": "\u4FEE\u590D\u8FDE\u63A5\u2026",
-  "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B14\u8BB0\u98CE\u683C",
+  "ui.note_style_kind_row_aria_0": "{0}\u7684\u6BB5\u843D",
   "ui.note_style_recipe_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}",
   "ui.note_style_row_missing_0_1": "\u4E3A\u201C{0}\u201D\u6307\u5B9A\u7684\u7B14\u8BB0\u98CE\u683C\u201C{1}\u201D\u627E\u4E0D\u5230\uFF0C\u8FD9\u4E2A\u7C7B\u578B\u6539\u7528\u5185\u7F6E\u7684\u98CE\u683C\u3002",
   "ui.note_style_label_0_1": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0} \xB7 {1}",
@@ -5026,6 +5053,33 @@ var zhCN = {
   "ui.settings_group_advanced": "\u9AD8\u7EA7",
   "ui.settings_group_kinds": "\u8BAE\u9898\u7C7B\u578B",
   "ui.settings_group_more": "\u66F4\u591A",
+  "ui.note_style_card_title": "\u7B14\u8BB0\u8981\u600E\u4E48\u5199",
+  "ui.note_style_card_desc": "\u5957\u7528\u5230\u5168\u90E8\u8BAE\u9898\u3002\u67D0\u79CD\u7C7B\u578B\u8981\u4E0D\u540C\uFF0C\u518D\u5230\u4E0B\u9762\u6539\u3002",
+  "ui.note_style_voice_label": "\u53E3\u543B",
+  "ui.note_style_format_label": "\u957F\u77ED\u4E0E\u7248\u9762",
+  "ui.note_style_sample_caption": "\u5199\u51FA\u6765\u4F1A\u50CF\u8FD9\u6837",
+  "ui.note_style_sample_academic": "\u79DF\u623F\u7684\u603B\u6210\u672C\u4E3B\u8981\u7531\u6708\u79DF\u4E0E\u642C\u8FC1\u9891\u7387\u51B3\u5B9A\uFF1B\u4EE5\u53F0\u5317\u4E3A\u4F8B\uFF0C\u6301\u6709 10 \u5E74\u4EE5\u4E0A\u65F6\uFF0C\u8D2D\u623F\u7684\u5E74\u5316\u6210\u672C\u624D\u53EF\u80FD\u4F4E\u4E8E\u79DF\u623F\uFF08[\u6765\u6E90]\uFF09\u3002",
+  "ui.note_style_sample_plain": "\u7B80\u5355\u8BF4\uFF1A\u5728\u53F0\u5317\u4F4F\u4E0D\u5230 10 \u5E74\uFF0C\u79DF\u623F\u901A\u5E38\u6BD4\u8F83\u7701\uFF1B\u4F4F\u5F97\u8D8A\u4E45\uFF0C\u4E70\u623F\u624D\u5F00\u59CB\u5212\u7B97\uFF08[\u6765\u6E90]\uFF09\u3002",
+  "ui.note_style_sample_magazine": "\u60F3\u8C61\u4F60\u5728\u53F0\u5317\u4F4F\u4E86\u7B2C 11 \u5E74\uFF1A\u623F\u79DF\u4E00\u8DEF\u6DA8\uFF0C\u8FD9\u65F6\u5F53\u521D\u54AC\u7259\u4E70\u4E0B\u7684\u623F\u5B50\uFF0C\u624D\u5F00\u59CB\u771F\u6B63\u66FF\u4F60\u7701\u94B1\uFF08[\u6765\u6E90]\uFF09\u3002",
+  "ui.note_style_voice_other_0": "\u76EE\u524D\u7684\u53E3\u543B\u662F\u201C{0}\u201D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9009\u9879\u4E2D\u3002",
+  "ui.note_style_chip_format_standard": "\u6807\u51C6",
+  "ui.note_style_chip_format_lean": "\u7CBE\u7B80",
+  "ui.note_style_chip_format_rich": "\u4E30\u5BCC",
+  "ui.note_style_chip_format_skim": "\u6761\u5217\u901F\u8BFB",
+  "ui.note_style_format_desc_standard": "\u6BB5\u843D\u4E3A\u4E3B\uFF0C\u91CD\u70B9\u7528\u63D0\u793A\u6846\u6807\u51FA\u3002",
+  "ui.note_style_format_desc_lean": "\u6BCF\u6BB5 3\uFF5E5 \u70B9\u6761\u5217\uFF0C\u4E0D\u52A0\u63D0\u793A\u6846\u3002",
+  "ui.note_style_format_desc_rich": "\u6BCF\u6BB5\u81F3\u5C11\u4E00\u4E2A\u63D0\u793A\u6846\u3001\u8868\u683C\u6216\u56FE\u3002",
+  "ui.note_style_format_desc_skim": "\u5168\u90E8\u6761\u5217\uFF0C\u4E00\u773C\u626B\u5B8C\u3002",
+  "ui.note_style_format_other_0": "\u76EE\u524D\u7684\u683C\u5F0F\u662F\u201C{0}\u201D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9009\u9879\u4E2D\u3002",
+  "ui.note_style_set_apart_0": "{0}\uFF08\u53E6\u5916\u6307\u5B9A\uFF09",
+  "ui.note_style_voice_retired_0": "{0}\uFF08\u5DF2\u505C\u7528\uFF09",
+  "ui.note_style_tag_voice_retired": "\u53E3\u543B\u5DF2\u505C\u7528",
+  "ui.settings_group_my_styles": "\u6211\u7684\u98CE\u683C",
+  "ui.my_styles_count_0_1": "{0} \u4EFD\u98CE\u683C\u3001{1} \u4EFD\u6BB5\u843D\u3001\u53E3\u543B\u4E0E\u683C\u5F0F",
+  "ui.my_styles_unused_0": "\u6709 {0} \u4EFD\u6CA1\u5728\u7528\u7684\u526F\u672C\uFF0C\u53EF\u4EE5\u4E00\u6B21\u6E05\u6389",
+  "ui.my_styles_path_desc": "\u5B58\u5728\u4E0B\u9762\u8FD9\u4E2A\u6587\u4EF6\u5939\uFF0C\u70B9\u4E00\u4E0B\u5728\u6587\u4EF6\u7BA1\u7406\u5668\u663E\u793A\u3002\u5728\u8FD9\u91CC\u6539\u540D\uFF0C\u8BBE\u7F6E\u4F1A\u4E00\u8D77\u66F4\u65B0\u3002",
+  "ui.my_styles_manage": "\u7BA1\u7406\u2026",
+  "ui.my_styles_manage_aria": "\u7BA1\u7406\u6211\u7684\u98CE\u683C",
   "ui.settings_group_custom": "\u81EA\u5B9A\u4E49",
   "ui.manage_title": "\u81EA\u5B9A\u4E49\u7B14\u8BB0\u98CE\u683C",
   "ui.manage_tab_recipe": "\u7B14\u8BB0\u98CE\u683C",
@@ -6687,7 +6741,7 @@ var zhTW = {
   "ui.synthesis_stage_two_fixed": "\u53D6\u5F97\u65B9\u5411\u6642\u5DF2\u56FA\u5B9A\u4F86\u6E90\u3001\u5167\u5BB9\u7BC4\u570D\u3001\u8A9E\u8A00\u8207\u7B46\u8A18\u7D50\u69CB\uFF1B\u73FE\u5728\u53EA\u80FD\u8ABF\u6574\u984D\u5916\u8981\u6C42\u3002",
   "ui.synthesis_needs_name": "\u8ACB\u5148\u66FF\u65B0\u8B70\u984C\u53D6\u540D\u3002",
   "ui.connection_repair": "\u4FEE\u5FA9\u9023\u7DDA\u2026",
-  "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B46\u8A18\u98A8\u683C",
+  "ui.note_style_kind_row_aria_0": "{0}\u7684\u6BB5\u843D",
   "ui.note_style_recipe_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}",
   "ui.note_style_row_missing_0_1": "\u70BA\u300C{0}\u300D\u6307\u5B9A\u7684\u7B46\u8A18\u98A8\u683C\u300C{1}\u300D\u627E\u4E0D\u5230\uFF0C\u9019\u500B\u985E\u578B\u6539\u7528\u5167\u5EFA\u7684\u98A8\u683C\u3002",
   "ui.note_style_label_0_1": "\u7B46\u8A18\u98A8\u683C\uFF1A{0} \xB7 {1}",
@@ -7532,6 +7586,33 @@ var zhTW = {
   "ui.settings_group_advanced": "\u9032\u968E",
   "ui.settings_group_kinds": "\u8B70\u984C\u985E\u578B",
   "ui.settings_group_more": "\u66F4\u591A",
+  "ui.note_style_card_title": "\u7B46\u8A18\u8981\u600E\u9EBC\u5BEB",
+  "ui.note_style_card_desc": "\u5957\u7528\u5230\u5168\u90E8\u8B70\u984C\u3002\u67D0\u7A2E\u985E\u578B\u8981\u4E0D\u540C\uFF0C\u518D\u5230\u4E0B\u9762\u6539\u3002",
+  "ui.note_style_voice_label": "\u53E3\u543B",
+  "ui.note_style_format_label": "\u9577\u77ED\u8207\u7248\u9762",
+  "ui.note_style_sample_caption": "\u5BEB\u51FA\u4F86\u6703\u50CF\u9019\u6A23",
+  "ui.note_style_sample_academic": "\u79DF\u5C4B\u7684\u7E3D\u6210\u672C\u4E3B\u8981\u7531\u6708\u79DF\u8207\u642C\u9077\u983B\u7387\u6C7A\u5B9A\uFF1B\u4EE5\u53F0\u5317\u70BA\u4F8B\uFF0C\u6301\u6709 10 \u5E74\u4EE5\u4E0A\u6642\uFF0C\u8CFC\u5C4B\u7684\u5E74\u5316\u6210\u672C\u624D\u53EF\u80FD\u4F4E\u65BC\u79DF\u5C4B\uFF08[\u4F86\u6E90]\uFF09\u3002",
+  "ui.note_style_sample_plain": "\u7C21\u55AE\u8AAA\uFF1A\u5728\u53F0\u5317\u4F4F\u4E0D\u5230 10 \u5E74\uFF0C\u79DF\u623F\u901A\u5E38\u6BD4\u8F03\u7701\uFF1B\u4F4F\u5F97\u8D8A\u4E45\uFF0C\u8CB7\u623F\u624D\u958B\u59CB\u5212\u7B97\uFF08[\u4F86\u6E90]\uFF09\u3002",
+  "ui.note_style_sample_magazine": "\u60F3\u50CF\u4F60\u5728\u53F0\u5317\u4F4F\u4E86\u7B2C 11 \u5E74\uFF1A\u623F\u79DF\u4E00\u8DEF\u6F32\uFF0C\u9019\u6642\u7576\u521D\u54AC\u7259\u8CB7\u4E0B\u7684\u623F\u5B50\uFF0C\u624D\u958B\u59CB\u771F\u6B63\u66FF\u4F60\u7701\u9322\uFF08[\u4F86\u6E90]\uFF09\u3002",
+  "ui.note_style_voice_other_0": "\u76EE\u524D\u7684\u53E3\u543B\u662F\u300C{0}\u300D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9078\u9805\u4E2D\u3002",
+  "ui.note_style_chip_format_standard": "\u6A19\u6E96",
+  "ui.note_style_chip_format_lean": "\u7CBE\u7C21",
+  "ui.note_style_chip_format_rich": "\u8C50\u5BCC",
+  "ui.note_style_chip_format_skim": "\u689D\u5217\u901F\u8B80",
+  "ui.note_style_format_desc_standard": "\u6BB5\u843D\u70BA\u4E3B\uFF0C\u91CD\u9EDE\u7528\u63D0\u793A\u6846\u6A19\u51FA\u3002",
+  "ui.note_style_format_desc_lean": "\u6BCF\u6BB5 3\uFF5E5 \u9EDE\u689D\u5217\uFF0C\u4E0D\u52A0\u63D0\u793A\u6846\u3002",
+  "ui.note_style_format_desc_rich": "\u6BCF\u6BB5\u81F3\u5C11\u4E00\u500B\u63D0\u793A\u6846\u3001\u8868\u683C\u6216\u5716\u3002",
+  "ui.note_style_format_desc_skim": "\u5168\u90E8\u689D\u5217\uFF0C\u4E00\u773C\u6383\u5B8C\u3002",
+  "ui.note_style_format_other_0": "\u76EE\u524D\u7684\u683C\u5F0F\u662F\u300C{0}\u300D\uFF0C\u4E0D\u5728\u4E0A\u9762\u7684\u9078\u9805\u4E2D\u3002",
+  "ui.note_style_set_apart_0": "{0}\uFF08\u53E6\u5916\u6307\u5B9A\uFF09",
+  "ui.note_style_voice_retired_0": "{0}\uFF08\u5DF2\u505C\u7528\uFF09",
+  "ui.note_style_tag_voice_retired": "\u53E3\u543B\u5DF2\u505C\u7528",
+  "ui.settings_group_my_styles": "\u6211\u7684\u98A8\u683C",
+  "ui.my_styles_count_0_1": "{0} \u4EFD\u98A8\u683C\u3001{1} \u4EFD\u6BB5\u843D\u3001\u53E3\u543B\u8207\u683C\u5F0F",
+  "ui.my_styles_unused_0": "\u6709 {0} \u4EFD\u6C92\u5728\u7528\u7684\u8907\u672C\uFF0C\u53EF\u4EE5\u4E00\u6B21\u6E05\u6389",
+  "ui.my_styles_path_desc": "\u5B58\u5728\u4E0B\u9762\u9019\u500B\u8CC7\u6599\u593E\uFF0C\u9EDE\u4E00\u4E0B\u5728\u6A94\u6848\u7E3D\u7BA1\u986F\u793A\u3002\u5728\u9019\u88E1\u6539\u540D\uFF0C\u8A2D\u5B9A\u6703\u4E00\u8D77\u66F4\u65B0\u3002",
+  "ui.my_styles_manage": "\u7BA1\u7406\u2026",
+  "ui.my_styles_manage_aria": "\u7BA1\u7406\u6211\u7684\u98A8\u683C",
   "ui.settings_group_custom": "\u81EA\u8A02",
   "ui.manage_title": "\u81EA\u8A02\u7B46\u8A18\u98A8\u683C",
   "ui.manage_tab_recipe": "\u7B46\u8A18\u98A8\u683C",
@@ -29402,6 +29483,75 @@ var NoteStyleStore = class {
       });
     }
     return items;
+  }
+  /**
+   * The user's files that are only copies nobody uses (settings-redesign A5): used by no type, no style and no topic
+   * (`topicRecipeRefs`: style refs the topics' `note-style` name, which the store cannot see), and identical to a built-in
+   * part or style, or to another file of the same category. Of several identical unused files one stays: the one without a
+   * " (n)" suffix, else the first by name; a used file keeps all its identical copies from being "the one". Read only: it
+   * creates and writes nothing. Parts are compared by text, styles by their four settings.
+   */
+  listUnusedCopies(topicRecipeRefs = /* @__PURE__ */ new Set()) {
+    const language2 = this.settings.language;
+    const suffixed = (name2) => / \(\d+\)$/.test(name2) ? 1 : 0;
+    const order = (a, b) => suffixed(a) - suffixed(b) || a.localeCompare(b);
+    const copies = [];
+    const sweep = (category, entries, builtinKeys2) => {
+      var _a2, _b2;
+      const groups = /* @__PURE__ */ new Map();
+      for (const entry of entries) groups.set(entry.key, [...(_a2 = groups.get(entry.key)) != null ? _a2 : [], entry]);
+      for (const entry of entries) {
+        if (entry.used) continue;
+        const builtin = builtinKeys2.get(entry.key);
+        const same = groups.get(entry.key).filter((other) => other !== entry);
+        const keeper = [...groups.get(entry.key)].sort((a, b) => order(a.name, b.name))[0];
+        const sameFile = (_b2 = same.find((other) => other.used)) != null ? _b2 : keeper !== entry ? keeper : void 0;
+        const sameAs = builtin != null ? builtin : sameFile ? fileRef(sameFile.name) : void 0;
+        if (sameAs === void 0) continue;
+        copies.push({ category, ref: fileRef(entry.name), name: entry.name, fileName: `${entry.name}.md`, sameAs });
+      }
+    };
+    for (const category of ["structure", "voice", "format"]) {
+      const { files } = this.partStore(category);
+      const builtinKeys2 = /* @__PURE__ */ new Map();
+      const items = this.listParts(category);
+      for (const item of items) {
+        if (item.kind !== "builtin" || item.retired) continue;
+        try {
+          builtinKeys2.set(this.partSourceText(category, item.ref, language2), item.ref);
+        } catch (e) {
+        }
+      }
+      const entries = items.filter((item) => item.kind === "file" && files.has(item.name)).map((item) => ({ name: item.name, key: files.get(item.name), used: item.usedBy.length > 0 }));
+      sweep(category, entries, builtinKeys2);
+    }
+    const recipes = this.listRecipes();
+    const usedRefs = new Set(recipes.filter((item) => item.usedByKinds.length > 0).map((item) => item.ref));
+    for (const ref of topicRecipeRefs) usedRefs.add(ref);
+    const recipeKey = (file) => JSON.stringify([
+      file.structure,
+      file.voiceSet ? file.voice : "global",
+      file.formatSet ? file.format : "global",
+      file.update
+    ]);
+    const builtinKeys = /* @__PURE__ */ new Map();
+    for (const recipe of BUILTIN_RECIPES) {
+      if (recipe.structure === AIM_DELIVERY_STRUCTURE) continue;
+      const key2 = JSON.stringify([
+        builtinRef(recipe.structure),
+        recipe.followsVoice ? "global" : builtinRef(recipe.voice),
+        recipe.followsFormat ? "global" : builtinRef(recipe.format),
+        recipe.update
+      ]);
+      if (!builtinKeys.has(key2)) builtinKeys.set(key2, builtinRef(recipe.id));
+    }
+    const recipeEntries = [...this.recipes].map(([name2, text11]) => ({
+      name: name2,
+      key: recipeKey(parseRecipeFile(text11)),
+      used: usedRefs.has(fileRef(name2))
+    }));
+    sweep("recipe", recipeEntries, builtinKeys);
+    return copies;
   }
   /** The text of a user's style file as the last `refresh()` or write left it (what the editor compares before it saves). */
   recipeText(ref) {
@@ -70064,12 +70214,108 @@ function renderSettingsIntro(setting, text11) {
   setting.setName("");
   setting.setDesc(text11);
 }
-function renderNoteStyleIntro(setting, plugin) {
-  renderSettingsIntro(setting, t("ui.settings_note_style_intro"));
+var CARD_VOICES = [
+  { id: "academic", name: "ui.preset_name_academic", sample: "ui.note_style_sample_academic" },
+  { id: "plain", name: "ui.preset_name_plain", sample: "ui.note_style_sample_plain" },
+  { id: "magazine", name: "ui.preset_name_magazine", sample: "ui.note_style_sample_magazine" }
+];
+var CARD_FORMATS = [
+  { id: "standard", name: "ui.note_style_chip_format_standard", desc: "ui.note_style_format_desc_standard" },
+  { id: "lean", name: "ui.note_style_chip_format_lean", desc: "ui.note_style_format_desc_lean" },
+  { id: "rich", name: "ui.note_style_chip_format_rich", desc: "ui.note_style_format_desc_rich" },
+  { id: "skim", name: "ui.note_style_chip_format_skim", desc: "ui.note_style_format_desc_skim" }
+];
+function renderRadioGroup(parent, label, choices, current, pick) {
+  const labelEl = parent.createEl("p", { text: label, cls: "vam-style-card-label" });
+  const id = `vam-radio-${label}`;
+  labelEl.setAttr("id", id);
+  const group = parent.createDiv({ cls: "vam-style-chips", attr: { role: "radiogroup", "aria-labelledby": id } });
+  const stop = choices.findIndex((choice2) => choice2.value === current);
+  const buttons = choices.map((choice2, index) => {
+    const checked = index === stop;
+    const chip = group.createEl("button", {
+      text: choice2.label,
+      cls: "vam-style-chip",
+      attr: {
+        type: "button",
+        role: "radio",
+        "aria-checked": String(checked),
+        tabindex: checked || stop < 0 && index === 0 ? "0" : "-1"
+      }
+    });
+    chip.addEventListener("click", () => pick(choice2.value));
+    chip.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      const next = (index + step + choices.length) % choices.length;
+      pick(choices[next].value);
+    });
+    return chip;
+  });
+  return buttons;
+}
+function renderNoteStyleCard(setting, plugin) {
+  setting.setName(t("ui.note_style_card_title")).setDesc(t("ui.note_style_card_desc"));
+  setting.settingEl.addClass("vam-style-card");
   setting.addButton((button) => {
     button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
     button.buttonEl.addClass("mod-muted");
   });
+  const body = setting.settingEl.createDiv({ cls: "vam-style-card-body" });
+  const partName = (category, ref) => {
+    var _a2;
+    const found = plugin.noteStyles.listParts(category).find((item) => item.ref === ref);
+    return (_a2 = found == null ? void 0 : found.name) != null ? _a2 : ref;
+  };
+  const draw = (focus) => {
+    body.empty();
+    const defaults2 = plugin.settings.noteStyleDefaults;
+    const voice = globalPartRef(defaults2, "voice");
+    const format = globalPartRef(defaults2, "format");
+    const voiceChoices = CARD_VOICES.map((item) => ({ value: `builtin:${item.id}`, label: t(item.name) }));
+    const formatChoices = CARD_FORMATS.map((item) => ({ value: `builtin:${item.id}`, label: t(item.name) }));
+    const pick = (category) => (value) => {
+      void plugin.setGlobalPart(category, value).then(() => {
+        redrawKindRows(plugin);
+        draw({ category, value });
+      }).catch(() => void 0);
+    };
+    const refocus = (category, choices, buttons) => {
+      var _a2;
+      if ((focus == null ? void 0 : focus.category) !== category) return;
+      (_a2 = buttons[choices.findIndex((choice2) => choice2.value === focus.value)]) == null ? void 0 : _a2.focus();
+    };
+    const voiceButtons = renderRadioGroup(body, t("ui.note_style_voice_label"), voiceChoices, voice, pick("voice"));
+    refocus("voice", voiceChoices, voiceButtons);
+    const sampleBox = body.createDiv({ cls: "vam-style-sample", attr: { "aria-live": "polite" } });
+    const chosen = CARD_VOICES.find((item) => `builtin:${item.id}` === voice);
+    if (chosen) {
+      sampleBox.createSpan({ text: t("ui.note_style_sample_caption"), cls: "vam-style-sample-caption" });
+      sampleBox.createSpan({ text: t(chosen.sample) });
+    } else {
+      sampleBox.createSpan({ text: t("ui.note_style_voice_other_0", partName("voice", voice)) });
+    }
+    const formatButtons = renderRadioGroup(
+      body,
+      t("ui.note_style_format_label"),
+      formatChoices,
+      format,
+      pick("format")
+    );
+    refocus("format", formatChoices, formatButtons);
+    const chosenFormat = CARD_FORMATS.find((item) => `builtin:${item.id}` === format);
+    body.createEl("p", {
+      text: chosenFormat ? t(chosenFormat.desc) : t("ui.note_style_format_other_0", partName("format", format)),
+      cls: "setting-item-description",
+      attr: { "aria-live": "polite" }
+    });
+  };
+  draw();
+  void plugin.noteStyles.refresh().then(
+    () => draw(),
+    () => void 0
+  );
 }
 function renderNoteLocationSetting(setting, plugin, refresh) {
   const store = plugin.noteStyles;
@@ -70145,6 +70391,28 @@ function missingStyleRef(plugin, kind) {
   if (typeof saved !== "string" || !saved) return void 0;
   return offeredStyles(plugin, kind).some((item) => item.ref === saved) ? void 0 : saved;
 }
+function isRetiredVoice(ref) {
+  const parsed = parseRecipeRef(ref, "voice");
+  return (parsed == null ? void 0 : parsed.kind) === "builtin" && BUILTIN_BLOCKS.some((block) => block.category === "tone" && block.id === parsed.id && block.retired === true);
+}
+function kindStyleLine(item) {
+  const apart = (name2, source) => !item.aimOnly && source === "style" ? t("ui.note_style_set_apart_0", name2) : name2;
+  const voiceName = item.voice.name;
+  const voice = apart(
+    !item.aimOnly && isRetiredVoice(item.voice.ref) ? t("ui.note_style_voice_retired_0", voiceName) : voiceName,
+    item.voiceSource
+  );
+  const parts = [item.structure.name, voice, apart(item.format.name, item.formatSource)];
+  if (!item.aimOnly) parts.push(t(UPDATE_MODE_KEYS[item.update]));
+  return parts.join(" \xB7 ");
+}
+function kindStyleTags(item) {
+  if (item.aimOnly) return [];
+  const tags = [];
+  if (isRetiredVoice(item.voice.ref)) tags.push({ text: t("ui.note_style_tag_voice_retired"), cls: "is-warn" });
+  if (item.update === "fresh") tags.push({ text: t(UPDATE_MODE_KEYS.fresh), cls: "is-info" });
+  return tags;
+}
 var kindRows = /* @__PURE__ */ new WeakMap();
 function redrawKindRows(plugin) {
   const rows2 = kindRows.get(plugin);
@@ -70164,6 +70432,11 @@ function renderNoteKindSetting(setting, plugin, kind) {
   let shownDesc;
   let loaded = false;
   let picker;
+  let tagEls = [];
+  const writeTags = (item) => {
+    for (const el of tagEls) el.remove();
+    tagEls = item ? kindStyleTags(item).map((tag) => setting.nameEl.createSpan({ text: tag.text, cls: `vam-style-tag ${tag.cls}` })) : [];
+  };
   const writeDesc = (line) => {
     const key2 = line ? `${line.error ? "!" : ""}${line.text}` : "";
     if (key2 === shownDesc) return;
@@ -70208,7 +70481,8 @@ function renderNoteKindSetting(setting, plugin, kind) {
     if (missing) writeDesc({ text: `\u26A0 ${t("ui.note_style_row_missing_0_1", kindName, missingName())}`, error: true });
     else if (issue2)
       writeDesc({ text: t("ui.note_style_recipe_issue_0_1", issue2.line, recipeIssueText(issue2)), error: true });
-    else writeDesc(current ? { text: styleTags(current) } : void 0);
+    else writeDesc(current ? { text: kindStyleLine(current) } : void 0);
+    writeTags(missing || issue2 ? void 0 : current);
   };
   setting.addDropdown((dropdown) => {
     picker = dropdown;
@@ -70231,20 +70505,30 @@ function renderNoteKindSetting(setting, plugin, kind) {
   rows2.add({ el: setting.settingEl, redraw: readAgain });
   kindRows.set(plugin, rows2);
 }
-function renderNoteCustomSetting(setting, plugin, tab) {
+function renderMyStylesSetting(setting, plugin) {
   const { noteStyles: store } = plugin;
-  const name2 = manageTabName(tab);
-  setting.setName(name2);
   const describe = () => {
-    const items = tab === "recipe" ? store.listRecipes().filter((item) => aimEnabled() || !item.aimOnly) : store.listParts(tab);
-    const shown = items.filter((item) => !("retired" in item && item.retired === true && item.usedBy.length === 0));
-    const builtin = shown.filter((item) => item.kind === "builtin").length;
-    setting.setDesc(t("ui.manage_count_0_1", builtin, shown.length - builtin));
+    const own2 = (items) => items.filter((item) => item.kind === "file").length;
+    const styles = own2(store.listRecipes());
+    const parts = ["structure", "voice", "format"].reduce(
+      (sum, category) => sum + own2(store.listParts(category)),
+      0
+    );
+    setting.setName(t("ui.my_styles_count_0_1", styles, parts));
+    const unused = store.listUnusedCopies().length;
+    setting.descEl.empty();
+    if (unused) setting.descEl.createDiv({ text: t("ui.my_styles_unused_0", unused), cls: "vam-style-unused" });
+    const line = setting.descEl.createDiv({ text: `${t("ui.my_styles_path_desc")} ` });
+    const link = line.createEl("a", { text: store.folder(), cls: "vam-field-link", attr: { href: "#", role: "link" } });
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      void plugin.openNoteStylesFolder();
+    });
   };
   describe();
   setting.addButton((button) => {
-    button.setButtonText(t("ui.manage_button")).onClick(() => {
-      const modal = new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, () => {
+    button.setButtonText(t("ui.my_styles_manage")).onClick(() => {
+      const modal = new NoteStyleManageModal(plugin.app, plugin, "recipe", button.buttonEl, () => {
         var _a2;
         describe();
         redrawKindRows(plugin);
@@ -70252,7 +70536,7 @@ function renderNoteCustomSetting(setting, plugin, tab) {
       });
       openInWindowOf(modal, button.buttonEl);
     });
-    button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name2));
+    button.buttonEl.setAttr("aria-label", t("ui.my_styles_manage_aria"));
   });
   void store.refresh().then(describe, () => void 0);
 }
@@ -70493,9 +70777,8 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
       status: () => this.noteStyleStatus(),
       items: [
         {
-          name: t("ui.settings_note_style_intro"),
-          searchable: false,
-          render: (setting) => renderNoteStyleIntro(setting, this.plugin)
+          name: t("ui.note_style_card_title"),
+          render: (setting) => renderNoteStyleCard(setting, this.plugin)
         },
         {
           type: "group",
@@ -70507,11 +70790,13 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
         },
         {
           type: "group",
-          heading: t("ui.settings_group_custom"),
-          items: MANAGE_TABS.map((tab) => ({
-            name: manageTabName(tab),
-            render: (setting) => renderNoteCustomSetting(setting, this.plugin, tab)
-          }))
+          heading: t("ui.settings_group_my_styles"),
+          items: [
+            {
+              name: t("ui.settings_group_my_styles"),
+              render: (setting) => renderMyStylesSetting(setting, this.plugin)
+            }
+          ]
         },
         {
           type: "group",

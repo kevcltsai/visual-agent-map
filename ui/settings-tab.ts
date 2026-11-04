@@ -7,19 +7,19 @@ import { App, Modal, normalizePath, PluginSettingTab, Setting } from "obsidian";
 import type { SettingDefinition, SettingDefinitionGroup, SettingDefinitionItem, SettingDefinitionPage } from "obsidian";
 import type { DropdownComponent } from "obsidian";
 import type { RecipeListItem } from "../ai/note-style-store";
-import { KIND_DEFAULT_RECIPE, STYLE_KINDS, type StyleKind } from "../ai/note-style-recipe";
+import {
+  globalPartRef,
+  KIND_DEFAULT_RECIPE,
+  parseRecipeRef,
+  STYLE_KINDS,
+  UPDATE_MODE_KEYS,
+  type StyleKind
+} from "../ai/note-style-recipe";
+import { BUILTIN_BLOCKS } from "../core/blocks/builtin";
 import { openInWindowOf } from "./modals/open-in-window";
 import { aimEnabled } from "../experiences/aim/availability";
 import { parseBlockRef } from "../core/blocks/block-files";
-import {
-  MANAGE_TABS,
-  NoteStyleManageModal,
-  manageTabName,
-  recipeIssueText,
-  styleKindName,
-  styleTags,
-  type ManageTab
-} from "./modals/note-style-manage-modal";
+import { NoteStyleManageModal, recipeIssueText, styleKindName } from "./modals/note-style-manage-modal";
 
 /**
  * A sub-page's opening sentence as a grey description-only row. Obsidian puts the definition `name` into the row
@@ -30,15 +30,136 @@ export function renderSettingsIntro(setting: Setting, text: string): void {
   setting.setDesc(text);
 }
 
+/** The voices the card offers (the retired ones are not listed), each with its sample sentence. */
+const CARD_VOICES = [
+  { id: "academic", name: "ui.preset_name_academic", sample: "ui.note_style_sample_academic" },
+  { id: "plain", name: "ui.preset_name_plain", sample: "ui.note_style_sample_plain" },
+  { id: "magazine", name: "ui.preset_name_magazine", sample: "ui.note_style_sample_magazine" }
+] as const satisfies readonly { id: string; name: TranslationKey; sample: TranslationKey }[];
+
+/** The formats the card offers, each with its one-line explanation. */
+const CARD_FORMATS = [
+  { id: "standard", name: "ui.note_style_chip_format_standard", desc: "ui.note_style_format_desc_standard" },
+  { id: "lean", name: "ui.note_style_chip_format_lean", desc: "ui.note_style_format_desc_lean" },
+  { id: "rich", name: "ui.note_style_chip_format_rich", desc: "ui.note_style_format_desc_rich" },
+  { id: "skim", name: "ui.note_style_chip_format_skim", desc: "ui.note_style_format_desc_skim" }
+] as const satisfies readonly { id: string; name: TranslationKey; desc: TranslationKey }[];
+
 /**
- * The first row of the "Note style" page: the one-line help and the "Preview AI instructions" button on its right.
+ * A row of choices as one radio group: each choice is a button with role "radio" and `aria-checked`; Tab reaches the
+ * checked one (the first when none is checked), the arrow keys move to and pick the next or previous choice, Enter and
+ * Space pick the focused one.
  */
-export function renderNoteStyleIntro(setting: Setting, plugin: VisualAgentMapPlugin): void {
-  renderSettingsIntro(setting, t("ui.settings_note_style_intro"));
+function renderRadioGroup(
+  parent: HTMLElement,
+  label: string,
+  choices: { value: string; label: string }[],
+  current: string | undefined,
+  pick: (value: string) => void
+): HTMLElement[] {
+  const labelEl = parent.createEl("p", { text: label, cls: "vam-style-card-label" });
+  const id = `vam-radio-${label}`;
+  labelEl.setAttr("id", id);
+  const group = parent.createDiv({ cls: "vam-style-chips", attr: { role: "radiogroup", "aria-labelledby": id } });
+  const stop = choices.findIndex(choice => choice.value === current);
+  const buttons: HTMLElement[] = choices.map((choice, index) => {
+    const checked = index === stop;
+    const chip = group.createEl("button", {
+      text: choice.label,
+      cls: "vam-style-chip",
+      attr: {
+        type: "button",
+        role: "radio",
+        "aria-checked": String(checked),
+        tabindex: checked || (stop < 0 && index === 0) ? "0" : "-1"
+      }
+    });
+    chip.addEventListener("click", () => pick(choice.value));
+    chip.addEventListener("keydown", (event: KeyboardEvent) => {
+      const step =
+        event.key === "ArrowRight" || event.key === "ArrowDown"
+          ? 1
+          : event.key === "ArrowLeft" || event.key === "ArrowUp"
+            ? -1
+            : 0;
+      if (!step) return;
+      event.preventDefault();
+      const next = (index + step + choices.length) % choices.length;
+      pick(choices[next].value);
+    });
+    return chip;
+  });
+  return buttons;
+}
+
+/**
+ * The "How notes are written" card at the top of the Note style page: the global voice (chips plus a sample sentence that
+ * follows the choice), the global length and layout (chips plus a one-line explanation) and "Preview AI instructions".
+ * A chip writes `noteStyleDefaults` (choosing the default again deletes the key); a voice or format that is a file has
+ * no chip and no sample, and the card says which one is in use. Opening the page writes nothing.
+ */
+export function renderNoteStyleCard(setting: Setting, plugin: VisualAgentMapPlugin): void {
+  setting.setName(t("ui.note_style_card_title")).setDesc(t("ui.note_style_card_desc"));
+  setting.settingEl.addClass("vam-style-card");
   setting.addButton(button => {
     button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
     button.buttonEl.addClass("mod-muted");
   });
+  const body = setting.settingEl.createDiv({ cls: "vam-style-card-body" });
+  const partName = (category: "voice" | "format", ref: string): string => {
+    const found = plugin.noteStyles.listParts(category).find(item => item.ref === ref);
+    return found?.name ?? ref;
+  };
+  const draw = (focus?: { category: "voice" | "format"; value: string }): void => {
+    body.empty();
+    const defaults = plugin.settings.noteStyleDefaults;
+    const voice = globalPartRef(defaults, "voice");
+    const format = globalPartRef(defaults, "format");
+    const voiceChoices = CARD_VOICES.map(item => ({ value: `builtin:${item.id}`, label: t(item.name) }));
+    const formatChoices = CARD_FORMATS.map(item => ({ value: `builtin:${item.id}`, label: t(item.name) }));
+    const pick = (category: "voice" | "format") => (value: string) => {
+      void plugin
+        .setGlobalPart(category, value)
+        .then(() => {
+          redrawKindRows(plugin);
+          draw({ category, value });
+        })
+        .catch(() => undefined);
+    };
+    const refocus = (category: "voice" | "format", choices: { value: string }[], buttons: HTMLElement[]): void => {
+      if (focus?.category !== category) return;
+      buttons[choices.findIndex(choice => choice.value === focus.value)]?.focus();
+    };
+    const voiceButtons = renderRadioGroup(body, t("ui.note_style_voice_label"), voiceChoices, voice, pick("voice"));
+    refocus("voice", voiceChoices, voiceButtons);
+    const sampleBox = body.createDiv({ cls: "vam-style-sample", attr: { "aria-live": "polite" } });
+    const chosen = CARD_VOICES.find(item => `builtin:${item.id}` === voice);
+    if (chosen) {
+      sampleBox.createSpan({ text: t("ui.note_style_sample_caption"), cls: "vam-style-sample-caption" });
+      sampleBox.createSpan({ text: t(chosen.sample) });
+    } else {
+      sampleBox.createSpan({ text: t("ui.note_style_voice_other_0", partName("voice", voice)) });
+    }
+    const formatButtons = renderRadioGroup(
+      body,
+      t("ui.note_style_format_label"),
+      formatChoices,
+      format,
+      pick("format")
+    );
+    refocus("format", formatChoices, formatButtons);
+    const chosenFormat = CARD_FORMATS.find(item => `builtin:${item.id}` === format);
+    body.createEl("p", {
+      text: chosenFormat ? t(chosenFormat.desc) : t("ui.note_style_format_other_0", partName("format", format)),
+      cls: "setting-item-description",
+      attr: { "aria-live": "polite" }
+    });
+  };
+  draw();
+  void plugin.noteStyles.refresh().then(
+    () => draw(),
+    () => undefined
+  );
 }
 
 /**
@@ -137,6 +258,42 @@ export function missingStyleRef(plugin: VisualAgentMapPlugin, kind: StyleKind): 
   return offeredStyles(plugin, kind).some(item => item.ref === saved) ? undefined : saved;
 }
 
+/** Whether a voice ref is a retired built-in (listed nowhere in new choices, but a style may still name it). */
+function isRetiredVoice(ref: string): boolean {
+  const parsed = parseRecipeRef(ref, "voice");
+  return (
+    parsed?.kind === "builtin" &&
+    BUILTIN_BLOCKS.some(block => block.category === "tone" && block.id === parsed.id && block.retired === true)
+  );
+}
+
+/**
+ * A topic-type row's small line "structure · voice · format · update mode". A voice or format the style fixes itself
+ * says "set apart" (the ones that follow the global choice say nothing); a retired voice says "retired". The AIM report
+ * has its own voice and format and no update mode, so it is not marked.
+ */
+export function kindStyleLine(item: RecipeListItem): string {
+  const apart = (name: string, source: RecipeListItem["voiceSource"]): string =>
+    !item.aimOnly && source === "style" ? t("ui.note_style_set_apart_0", name) : name;
+  const voiceName = item.voice.name;
+  const voice = apart(
+    !item.aimOnly && isRetiredVoice(item.voice.ref) ? t("ui.note_style_voice_retired_0", voiceName) : voiceName,
+    item.voiceSource
+  );
+  const parts = [item.structure.name, voice, apart(item.format.name, item.formatSource)];
+  if (!item.aimOnly) parts.push(t(UPDATE_MODE_KEYS[item.update]));
+  return parts.join(" · ");
+}
+
+/** The small tags beside a topic-type row's name: "voice retired" and "only new content". */
+export function kindStyleTags(item: RecipeListItem): { text: string; cls: string }[] {
+  if (item.aimOnly) return [];
+  const tags: { text: string; cls: string }[] = [];
+  if (isRetiredVoice(item.voice.ref)) tags.push({ text: t("ui.note_style_tag_voice_retired"), cls: "is-warn" });
+  if (item.update === "fresh") tags.push({ text: t(UPDATE_MODE_KEYS.fresh), cls: "is-info" });
+  return tags;
+}
+
 /** The topic-type rows that are on screen, by plugin; each draws itself again from the store. */
 const kindRows = new WeakMap<VisualAgentMapPlugin, Set<{ el: HTMLElement; redraw: () => void }>>();
 
@@ -168,6 +325,13 @@ export function renderNoteKindSetting(setting: Setting, plugin: VisualAgentMapPl
   // Until the first read of the style files is done, a saved file choice is not called "not found".
   let loaded = false;
   let picker: DropdownComponent | undefined;
+  let tagEls: HTMLElement[] = [];
+  const writeTags = (item: RecipeListItem | undefined): void => {
+    for (const el of tagEls) el.remove();
+    tagEls = item
+      ? kindStyleTags(item).map(tag => setting.nameEl.createSpan({ text: tag.text, cls: `vam-style-tag ${tag.cls}` }))
+      : [];
+  };
   const writeDesc = (line: { text: string; error?: boolean } | undefined): void => {
     const key = line ? `${line.error ? "!" : ""}${line.text}` : "";
     if (key === shownDesc) return;
@@ -214,7 +378,8 @@ export function renderNoteKindSetting(setting: Setting, plugin: VisualAgentMapPl
     if (missing) writeDesc({ text: `⚠ ${t("ui.note_style_row_missing_0_1", kindName, missingName())}`, error: true });
     else if (issue)
       writeDesc({ text: t("ui.note_style_recipe_issue_0_1", issue.line, recipeIssueText(issue)), error: true });
-    else writeDesc(current ? { text: styleTags(current) } : undefined);
+    else writeDesc(current ? { text: kindStyleLine(current) } : undefined);
+    writeTags(missing || issue ? undefined : current);
   };
   setting.addDropdown(dropdown => {
     picker = dropdown;
@@ -240,26 +405,35 @@ export function renderNoteKindSetting(setting: Setting, plugin: VisualAgentMapPl
 }
 
 /**
- * One "Custom" row: the number of built-in and own items of a tab and a Manage button that opens the manage window on it.
- * The count is written from what was read last, then again after the files are read and after the window closes.
+ * The "My styles" row: how many styles and parts are the user's own, how many unused copies there are (the amber line,
+ * only when there are any), the folder (a link that shows it in the file explorer) and "Manage…", which opens the manage
+ * window in the window the button is in. Counts are written from what was read last, then again after the files are read
+ * and after the window closes. Reading is all it does: nothing is created or written.
  */
-export function renderNoteCustomSetting(setting: Setting, plugin: VisualAgentMapPlugin, tab: ManageTab): void {
+export function renderMyStylesSetting(setting: Setting, plugin: VisualAgentMapPlugin): void {
   const { noteStyles: store } = plugin;
-  const name = manageTabName(tab);
-  setting.setName(name);
   const describe = (): void => {
-    // The AIM report is counted only while AIM is on.
-    const items =
-      tab === "recipe" ? store.listRecipes().filter(item => aimEnabled() || !item.aimOnly) : store.listParts(tab);
-    // A retired built-in counts only while a style still uses it (the manage window lists it the same way).
-    const shown = items.filter(item => !("retired" in item && item.retired === true && item.usedBy.length === 0));
-    const builtin = shown.filter(item => item.kind === "builtin").length;
-    setting.setDesc(t("ui.manage_count_0_1", builtin, shown.length - builtin));
+    const own = <T extends { kind: string }>(items: T[]): number => items.filter(item => item.kind === "file").length;
+    const styles = own(store.listRecipes());
+    const parts = (["structure", "voice", "format"] as const).reduce(
+      (sum, category) => sum + own(store.listParts(category)),
+      0
+    );
+    setting.setName(t("ui.my_styles_count_0_1", styles, parts));
+    const unused = store.listUnusedCopies().length;
+    setting.descEl.empty();
+    if (unused) setting.descEl.createDiv({ text: t("ui.my_styles_unused_0", unused), cls: "vam-style-unused" });
+    const line = setting.descEl.createDiv({ text: `${t("ui.my_styles_path_desc")} ` });
+    const link = line.createEl("a", { text: store.folder(), cls: "vam-field-link", attr: { href: "#", role: "link" } });
+    link.addEventListener("click", (event: Event) => {
+      event.preventDefault();
+      void plugin.openNoteStylesFolder();
+    });
   };
   describe();
   setting.addButton(button => {
-    button.setButtonText(t("ui.manage_button")).onClick(() => {
-      const modal = new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, () => {
+    button.setButtonText(t("ui.my_styles_manage")).onClick(() => {
+      const modal = new NoteStyleManageModal(plugin.app, plugin, "recipe", button.buttonEl, () => {
         describe();
         // The styles may have changed in the window: the topic-type rows of this page are drawn again.
         redrawKindRows(plugin);
@@ -268,7 +442,7 @@ export function renderNoteCustomSetting(setting: Setting, plugin: VisualAgentMap
       });
       openInWindowOf(modal, button.buttonEl);
     });
-    button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name));
+    button.buttonEl.setAttr("aria-label", t("ui.my_styles_manage_aria"));
   });
   void store.refresh().then(describe, () => undefined);
 }
@@ -581,9 +755,8 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       status: () => this.noteStyleStatus(),
       items: [
         {
-          name: t("ui.settings_note_style_intro"),
-          searchable: false,
-          render: setting => renderNoteStyleIntro(setting, this.plugin)
+          name: t("ui.note_style_card_title"),
+          render: setting => renderNoteStyleCard(setting, this.plugin)
         },
         {
           type: "group",
@@ -595,11 +768,13 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         },
         {
           type: "group",
-          heading: t("ui.settings_group_custom"),
-          items: MANAGE_TABS.map(tab => ({
-            name: manageTabName(tab),
-            render: (setting: Setting) => renderNoteCustomSetting(setting, this.plugin, tab)
-          }))
+          heading: t("ui.settings_group_my_styles"),
+          items: [
+            {
+              name: t("ui.settings_group_my_styles"),
+              render: (setting: Setting) => renderMyStylesSetting(setting, this.plugin)
+            }
+          ]
         },
         {
           type: "group",

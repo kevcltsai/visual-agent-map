@@ -13,7 +13,7 @@ const openedModals = [];
 class FakeModal { constructor(app) { this.app = app; } open() { openedModals.push(this); } close() {} }
 const notices = [];
 const obsidian = { ...S.obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: FakeModal, Notice: dom.makeNotice(notices) };
-const { renderNoteStyleIntro, renderNoteLocationSetting, renderNoteKindSetting, renderNoteCustomSetting, shownStyleRef, missingStyleRef } = S.load('ui/settings-tab.ts', { obsidian });
+const { renderNoteStyleCard, renderNoteLocationSetting, renderNoteKindSetting, renderMyStylesSetting, kindStyleLine, shownStyleRef, missingStyleRef } = S.load('ui/settings-tab.ts', { obsidian });
 const { styleIssueText } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
 const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: dom.createFragment });
 const { parseNoteStyleFile } = loadSource('export { parseNoteStyleFile } from "./ai/note-style-file";');
@@ -31,9 +31,11 @@ function fakeSetting() {
   const emptyDesc = descEl.empty.bind(descEl);
   descEl.empty = () => { view.descWrites++; emptyDesc(); };
   const settingEl = dom.element('div');
-  view.descEl = descEl;
+  const nameEl = dom.element('div');
+  nameEl.setText = text => { view.name = text; };
+  view.descEl = descEl; view.settingEl = settingEl; view.nameEl = nameEl;
   const setting = {
-    descEl, settingEl, nameEl: { setText: text => { view.name = text; } },
+    descEl, settingEl, nameEl,
     setName(name) { view.name = name; return this; }, setDesc(desc) { view.desc = desc; return this; }, setHeading() { view.heading = true; return this; },
     addDropdown(build) {
       const selectEl = dom.element('select'); selectEl.focus = () => { view.focused = selectEl; };
@@ -78,7 +80,8 @@ function row({ exists = true, folder = 'WS/Styles', settings = {}, items = [], r
   const plugin = {
     settings: settingsObject, saveSettings: async () => { log.saved++; }, openNoteStylesFolder: async () => { log.opened++; },
     openPromptPreview: trigger => { log.previewed.push(trigger); },
-    noteStyles: { folderExists: () => exists, folder: () => settingsObject.noteStylesFolder ?? folder, refresh: async () => {}, listBlocks: () => items, listRecipes: () => recipes, listParts: category => (category === 'format' ? formats : []) }
+    setGlobalPart: (...args) => Plugin.prototype.setGlobalPart.apply(plugin, args),
+    noteStyles: { folderExists: () => exists, folder: () => settingsObject.noteStylesFolder ?? folder, refresh: async () => {}, listBlocks: () => items, listRecipes: () => recipes, listParts: category => (category === 'format' ? formats : []), listUnusedCopies: () => [] }
   };
   return { setting, view, log, plugin, settings: settingsObject };
 }
@@ -87,20 +90,147 @@ function row({ exists = true, folder = 'WS/Styles', settings = {}, items = [], r
 const item = (ref, name, extra = {}) => ({ ref, kind: ref.startsWith('builtin:') ? 'builtin' : 'file', name, modified: false, issues: [], ...extra });
 const TEMPLATES = () => [item('builtin:standard', 'Standard'), item('builtin:textbook', 'Textbook')];
 
-test('intro: the Note style sub-page opens with a plain row (not a heading) holding the help line and a muted Preview AI instructions button that gets the focus back', () => {
-  const { setting, view, log, plugin } = row();
-  view.name = t('ui.settings_note_style_intro'); // Obsidian applies the definition name before render
-  renderNoteStyleIntro(setting, plugin);
-  assert.notEqual(view.heading, true, 'an ordinary row, not a heading');
-  assert.equal(view.name, '', 'the sentence is in the description only, not also in the name Obsidian pre-filled');
-  assert.equal(view.desc, t('ui.settings_note_style_intro'));
-  assert.equal(view.desc, 'Pick the note style AI uses for each topic type. A style picked on a topic or for one run still wins.');
+const plainOf = value => JSON.parse(JSON.stringify(value));
+const radiosOf = (view, label) => { const group = dom.findAll(view.settingEl, node => node.attrs.role === 'radiogroup').find(node => node.attrs['aria-labelledby'] && dom.findAll(view.settingEl, p => p.attrs.id === node.attrs['aria-labelledby'] && p.text === label).length); return group ? group.children : []; };
+const checkedOf = buttons => buttons.filter(button => button.attrs['aria-checked'] === 'true').map(button => button.text);
+const sampleOf = view => dom.find(view.settingEl, node => node.hasClass('vam-style-sample'));
+const cardRow = (settings = {}) => {
+  const state = row({ settings });
+  state.plugin.saveSettings = async () => { state.log.saved++; state.saves.push(JSON.stringify(state.settings.noteStyleDefaults ?? null)); };
+  state.saves = [];
+  state.view.name = t('ui.note_style_card_title');
+  renderNoteStyleCard(state.setting, state.plugin);
+  return state;
+};
+
+test('P3 card: the top of the Note style page is the "How notes are written" card with its help line and a muted Preview AI instructions button that opens from itself; drawing it writes nothing', async () => {
+  const { view, log, plugin, settings } = cardRow();
+  await flush();
+  assert.notEqual(view.heading, true);
+  assert.equal(view.name, 'How notes are written');
+  assert.equal(view.desc, 'Applies to every topic. To make one type different, change it below.');
   assert.equal(view.buttons.length, 1);
   assert.equal(view.buttons[0].text, 'Preview AI instructions');
   assert.equal(view.buttons[0].buttonEl.hasClass('mod-muted'), true);
   view.buttons[0].click();
   assert.deepEqual(log.previewed, [view.buttons[0].buttonEl]);
+  assert.equal(log.saved, 0);
+  assert.equal('noteStyleDefaults' in settings, false);
+  assert.equal(plugin.settings.noteStyleDefaults, undefined);
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_card_title'), '筆記要怎麼寫');
 });
+
+test('P3 card: voice chips are Professional, Plain explanation, Narrative (retired voices are not listed) and format chips are Standard, Lean, Rich, Skim list; the defaults are the ones checked', async () => {
+  const { view } = cardRow();
+  await flush();
+  const voices = radiosOf(view, 'Voice');
+  const formats = radiosOf(view, 'Length and layout');
+  assert.deepEqual(voices.map(button => button.text), ['Professional', 'Plain explanation', 'Narrative']);
+  assert.deepEqual(formats.map(button => button.text), ['Standard', 'Lean', 'Rich', 'Skim list']);
+  assert.deepEqual(checkedOf(voices), ['Professional']);
+  assert.deepEqual(checkedOf(formats), ['Standard']);
+  assert.ok([...voices, ...formats].every(button => button.attrs.role === 'radio'));
+  const unchecked = voices.filter(button => button.attrs['aria-checked'] === 'false');
+  assert.ok(unchecked.every(button => button.attrs.tabindex === '-1'), 'Tab reaches only the checked chip');
+  assert.equal(voices[0].attrs.tabindex, '0');
+});
+
+test('P3 card: a chip writes noteStyleDefaults; choosing the default again deletes the key and, when empty, the whole setting', async () => {
+  const { view, settings, saves } = cardRow();
+  await flush();
+  radiosOf(view, 'Voice')[1].fire('click');
+  await flush();
+  assert.deepEqual(plainOf(settings.noteStyleDefaults), { voice: 'builtin:plain' });
+  radiosOf(view, 'Length and layout')[1].fire('click');
+  await flush();
+  assert.deepEqual(plainOf(settings.noteStyleDefaults), { voice: 'builtin:plain', format: 'builtin:lean' });
+  assert.deepEqual(checkedOf(radiosOf(view, 'Voice')), ['Plain explanation']);
+  assert.deepEqual(checkedOf(radiosOf(view, 'Length and layout')), ['Lean']);
+  radiosOf(view, 'Voice')[0].fire('click');
+  await flush();
+  assert.deepEqual(plainOf(settings.noteStyleDefaults), { format: 'builtin:lean' }, 'the voice key is deleted');
+  radiosOf(view, 'Length and layout')[0].fire('click');
+  await flush();
+  assert.equal('noteStyleDefaults' in settings, false, 'no key left: the setting goes');
+  assert.equal(saves.length, 4);
+});
+
+test('P3 card: the sample sentence follows the chosen voice (one sentence per built-in voice, in each language); a voice that is a file has no sample and the card says which voice is in use', async () => {
+  const { view } = cardRow();
+  await flush();
+  const text = () => sampleOf(view).children.map(child => child.text).join('|');
+  const seen = new Set();
+  for (const [index, id] of [[0, 'academic'], [1, 'plain'], [2, 'magazine']]) {
+    radiosOf(view, 'Voice')[index].fire('click');
+    await flush();
+    assert.equal(text(), `${t('ui.note_style_sample_caption')}|${t(`ui.note_style_sample_${id}`)}`);
+    seen.add(text());
+  }
+  assert.equal(seen.size, 3, 'three different sentences');
+  for (const language of ['zh-TW', 'zh-CN', 'en']) for (const id of ['academic', 'plain', 'magazine']) assert.ok(i18n.translate(language, `ui.note_style_sample_${id}`).length > 10);
+  // a voice file as the global voice: no sample, no chip checked
+  const file = cardRow({ noteStyleDefaults: { voice: 'file:Calm' } });
+  await flush();
+  assert.deepEqual(checkedOf(radiosOf(file.view, 'Voice')), []);
+  const box = sampleOf(file.view);
+  assert.equal(box.children.length, 1);
+  assert.equal(box.children[0].text, 'The current voice is “file:Calm”, which is not one of the choices above.');
+});
+
+test('P3 card: the chips are a keyboard radio group: Tab lands on the checked chip, the arrow keys pick the next or previous one (wrapping) and keep the focus on the new chip', async () => {
+  const { view, settings } = cardRow();
+  await flush();
+  const press = (button, key) => { let prevented = false; button.fire('keydown', { key, preventDefault() { prevented = true; } }); return prevented; };
+  const groups = dom.findAll(view.settingEl, node => node.attrs.role === 'radiogroup');
+  assert.equal(groups.length, 2);
+  assert.ok(groups.every(group => group.attrs['aria-labelledby']));
+  assert.equal(press(radiosOf(view, 'Voice')[0], 'ArrowRight'), true);
+  await flush();
+  assert.deepEqual(plainOf(settings.noteStyleDefaults), { voice: 'builtin:plain' });
+  assert.equal(radiosOf(view, 'Voice')[1].focused, true, 'the focus follows the pick');
+  assert.equal(radiosOf(view, 'Voice')[1].attrs.tabindex, '0');
+  assert.equal(press(radiosOf(view, 'Voice')[1], 'ArrowLeft'), true);
+  await flush();
+  assert.equal('noteStyleDefaults' in settings, false);
+  press(radiosOf(view, 'Voice')[0], 'ArrowLeft');
+  await flush();
+  assert.deepEqual(plainOf(settings.noteStyleDefaults), { voice: 'builtin:magazine' }, 'wraps around');
+  assert.equal(press(radiosOf(view, 'Voice')[2], 'a'), false, 'other keys are left alone');
+});
+
+test('P3 card: the format line explains the chosen format; a format that is a file says which one is in use', async () => {
+  const { view } = cardRow();
+  await flush();
+  const line = () => dom.find(view.settingEl, node => node.tag === 'p' && node.hasClass('setting-item-description')).text;
+  assert.equal(line(), 'Paragraphs first, key points in callouts.');
+  const names = ['lean', 'rich', 'skim'];
+  for (const [index, id] of names.entries()) {
+    radiosOf(view, 'Length and layout')[index + 1].fire('click');
+    await flush();
+    assert.equal(line(), t(`ui.note_style_format_desc_${id}`));
+  }
+  const file = cardRow({ noteStyleDefaults: { format: 'file:Mine' } });
+  await flush();
+  assert.deepEqual(checkedOf(radiosOf(file.view, 'Length and layout')), []);
+});
+
+test('P3 card: choosing a chip draws the topic-type rows of the page again, so their lines show the new voice', async () => {
+  const recipes = RECIPES();
+  const settings = { language: 'en' };
+  const plugin = { app: {}, settings, saveSettings: async () => {}, noteStyles: { refresh: async () => {}, listRecipes: () => recipes, listParts: () => [] } };
+  plugin.setGlobalPart = (...args) => Plugin.prototype.setGlobalPart.apply(plugin, args);
+  const kind = fakeSetting();
+  renderNoteKindSetting(kind.setting, plugin, 'topic');
+  const card = fakeSetting();
+  renderNoteStyleCard(card.setting, plugin);
+  await flush();
+  assert.match(lines(kind.view)[0], /Academic/);
+  for (const r of recipes) r.voice = { ref: 'builtin:plain', name: 'Plain explanation' };
+  radiosOf(card.view, 'Voice')[1].fire('click');
+  await flush();
+  assert.match(lines(kind.view)[0], /Plain explanation/);
+});
+
 test('File location row: the folder path (read-only), a Show in file explorer button, and "no files yet" until a file exists', async () => {
   const none = row({ items: TEMPLATES() });
   renderNoteLocationSetting(none.setting, none.plugin, () => { none.log.refreshed++; });
@@ -201,7 +331,7 @@ function kindRow(kind, { settings = {}, recipes = RECIPES() } = {}) {
   const plugin = {
     settings: settingsObject, saveSettings: async () => { saves.push(JSON.stringify(settingsObject.noteStyleByKind ?? null)); },
     setKindStyle: (...args) => Plugin.prototype.setKindStyle.apply(plugin, args),
-    noteStyles: { refresh: async () => {}, listRecipes: () => recipes }
+    noteStyles: { refresh: async () => {}, listRecipes: () => recipes, listParts: () => [] }
   };
   renderNoteKindSetting(setting, plugin, kind);
   return { view, setting, settings: settingsObject, saves, plugin };
@@ -252,11 +382,11 @@ test('seven rows: the description lists the four parts "structure · voice · fo
   assert.deepEqual(lines(aim.view), ['AIM report · Academic · Standard format']);
 });
 
-test('seven rows: every picker is named "Note style for <type>" (zh-TW: "<類型>的筆記風格"), all different', async () => {
-  for (const kind of KIND_ORDER) assert.equal(kindRow(kind).view.dropdown.selectEl.attrs['aria-label'], `Note style for ${kindName(kind)}`);
+test('seven rows: every picker is named "Sections for <type>" (zh-TW: "<類型>的段落", P3 / A1), all different', async () => {
+  for (const kind of KIND_ORDER) assert.equal(kindRow(kind).view.dropdown.selectEl.attrs['aria-label'], `Sections for ${kindName(kind)}`);
   assert.equal(new Set(KIND_ORDER.map(kind => kindRow(kind).view.dropdown.selectEl.attrs['aria-label'])).size, 7);
-  assert.equal(i18n.translate('zh-TW', 'ui.note_style_kind_row_aria_0', i18n.translate('zh-TW', 'ui.topic_kind_hypothesis')), '假設的筆記風格');
-  assert.equal(i18n.translate('zh-TW', 'ui.note_style_kind_row_aria_0', i18n.translate('zh-TW', 'ui.note_style_kind_aim')), 'AIM 結論筆記的筆記風格');
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_kind_row_aria_0', i18n.translate('zh-TW', 'ui.topic_kind_hypothesis')), '假設的段落');
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_kind_row_aria_0', i18n.translate('zh-TW', 'ui.note_style_kind_aim')), 'AIM 結論筆記的段落');
   assert.equal(kindRow('topic').view.descEl.attrs['aria-live'], 'polite');
 });
 
@@ -371,7 +501,7 @@ test('Bug bash E #20: a style recipe or a format rule file counts as a file in t
   await flush();
   assert.equal(page.view.desc, t('ui.note_style_location_empty'));
   const manage = fakeSetting();
-  renderNoteCustomSetting(manage.setting, page.plugin, 'recipe');
+  renderMyStylesSetting(manage.setting, page.plugin);
   manage.view.buttons[0].click();
   recipes.push({ ref: 'file:R', kind: 'file', name: 'R', fileName: 'R.md' });
   openedModals.at(-1).onClosed();
@@ -379,66 +509,78 @@ test('Bug bash E #20: a style recipe or a format rule file counts as a file in t
   assert.equal(page.view.desc, t('ui.note_style_location_desc'));
 });
 
-// ---- the "Custom" rows (Note style recipe T5 P3) ----
-function customRow(tab, { recipes = RECIPES(), parts = [] } = {}) {
-  const { setting, view } = fakeSetting();
-  const refreshes = { n: 0 };
-  const plugin = { app: { marker: 'app' }, settings: { language: 'en' }, noteStyles: { refresh: async () => { refreshes.n++; }, listRecipes: () => recipes, listParts: () => parts } };
-  renderNoteCustomSetting(setting, plugin, tab);
-  return { view, plugin, refreshes };
-}
+// ---- the "My styles" row (settings-redesign P3; replaces the four "Custom" rows) ----
 const part = (ref, name) => ({ ref, kind: ref.startsWith('builtin:') ? 'builtin' : 'file', name, issues: [], usedBy: [] });
+function mineRow({ recipes = RECIPES(), parts = {}, unused = [], folder = 'WS/Styles' } = {}) {
+  const { setting, view } = fakeSetting();
+  const log = { refreshes: 0, opened: 0, writes: 0 };
+  const plugin = {
+    app: { marker: 'app' }, settings: { language: 'en' }, openNoteStylesFolder: async () => { log.opened++; },
+    noteStyles: { refresh: async () => { log.refreshes++; }, folder: () => folder, listRecipes: () => recipes, listParts: category => parts[category] ?? [], listUnusedCopies: () => unused }
+  };
+  renderMyStylesSetting(setting, plugin);
+  return { view, plugin, log };
+}
+const pathLink = view => dom.find(view.descEl, node => node.tag === 'a');
 
-test('Custom rows: each row is named after its tab, says how many built-in and own items exist, and its Manage button (named after the row) opens the window on that tab with itself as the trigger', async () => {
+test('P3 My styles: one row names how many styles and how many structures, voices and formats are the user\'s own (built-ins and the AIM report are not counted); Manage… opens the manage window on the styles tab with itself as the trigger', async () => {
   openedModals.length = 0;
-  const parts = [part('builtin:a', 'A'), part('builtin:b', 'B'), part('file:Mine', 'Mine')];
-  const styles = customRow('recipe', { recipes: [...RECIPES(), rec('file:Mine', 'Mine'), rec('file:Other', 'Other')] });
-  assert.equal(styles.view.name, 'Note styles');
-  assert.equal(styles.view.desc, '7 built-in, 2 mine');
-  const names = [];
-  for (const [tab, name] of [['structure', 'Structures'], ['voice', 'Voices'], ['format', 'Format rules']]) {
-    const row = customRow(tab, { parts });
-    names.push(row.view.name);
-    assert.equal(row.view.name, name);
-    assert.equal(row.view.desc, '2 built-in, 1 mine');
-    assert.equal(row.view.buttons.length, 1);
-    assert.equal(row.view.buttons[0].text, 'Manage');
-    assert.equal(row.view.buttons[0].buttonEl.attrs['aria-label'], `Manage ${name}`);
-    row.view.buttons[0].click();
-    const modal = openedModals.at(-1);
-    assert.equal(modal.tab, tab);
-    assert.equal(modal.trigger, row.view.buttons[0].buttonEl);
-    assert.equal(modal.plugin, row.plugin);
-    await flush();
-    assert.equal(row.refreshes.n, 1, 'the files are read again after drawing');
-  }
-  assert.equal(new Set(names).size, 3);
-  assert.equal(i18n.translate('zh-TW', 'ui.manage_count_0_1', 8, 2), '內建 8 份、我的 2 份');
-  assert.equal(i18n.translate('zh-TW', 'ui.manage_tab_recipe'), '筆記風格');
-  assert.equal(i18n.translate('zh-TW', 'ui.settings_group_custom'), '自訂');
+  const parts = { structure: [part('builtin:a', 'A'), part('file:S1', 'S1')], voice: [part('builtin:b', 'B'), part('file:V1', 'V1'), part('file:V2', 'V2')], format: [part('file:F1', 'F1')] };
+  const state = mineRow({ recipes: [...RECIPES(), rec('file:Mine', 'Mine'), rec('file:Other', 'Other')], parts });
+  assert.equal(state.view.name, '2 styles, 4 structures, voices and formats');
+  assert.equal(state.view.buttons.length, 1);
+  assert.equal(state.view.buttons[0].text, 'Manage…');
+  assert.equal(state.view.buttons[0].buttonEl.attrs['aria-label'], 'Manage my styles');
+  state.view.buttons[0].click();
+  const modal = openedModals.at(-1);
+  assert.equal(modal.tab, 'recipe');
+  assert.equal(modal.trigger, state.view.buttons[0].buttonEl);
+  assert.equal(modal.plugin, state.plugin);
+  await flush();
+  assert.equal(state.log.refreshes, 1, 'the files are read again after drawing');
+  assert.equal(i18n.translate('zh-TW', 'ui.my_styles_count_0_1', 2, 4), '2 份風格、4 份段落、口吻與格式');
+  assert.equal(i18n.translate('zh-TW', 'ui.settings_group_my_styles'), '我的風格');
+  assert.equal(i18n.translate('zh-TW', 'ui.my_styles_manage'), '管理…');
 });
 
-test('Custom rows: the count is written again when the window closes (after files were made in it), and drawing the row writes no setting', async () => {
+test('P3 My styles: the unused-copy line shows the number only when there are unused copies; the folder path is a link that shows the folder in the file explorer', async () => {
+  const none = mineRow();
+  assert.equal(dom.find(none.view.descEl, node => node.hasClass('vam-style-unused')), undefined);
+  const three = mineRow({ unused: [{ ref: 'file:a' }, { ref: 'file:b' }, { ref: 'file:c' }] });
+  assert.equal(dom.find(three.view.descEl, node => node.hasClass('vam-style-unused')).text, '3 unused copies can be cleared at once');
+  assert.equal(i18n.translate('zh-TW', 'ui.my_styles_unused_0', 3), '有 3 份沒在用的複本，可以一次清掉');
+  const link = pathLink(three.view);
+  assert.equal(link.text, 'WS/Styles');
+  let prevented = false;
+  link.fire('click', { preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(three.log.opened, 1);
+});
+
+test('P3 My styles: the numbers are written again when the window closes (after files were made in it), and drawing the row writes no setting', async () => {
   openedModals.length = 0;
-  const parts = [part('builtin:a', 'A')];
-  const row = customRow('voice', { parts });
-  assert.equal(row.view.desc, '1 built-in, 0 mine');
-  row.view.buttons[0].click();
-  parts.push(part('file:New', 'New'));
+  const recipes = RECIPES();
+  const unused = [];
+  const state = mineRow({ recipes, unused });
+  assert.equal(state.view.name, '0 styles, 0 structures, voices and formats');
+  state.view.buttons[0].click();
+  recipes.push(rec('file:New', 'New'));
+  unused.push({ ref: 'file:New' });
   openedModals.at(-1).onClosed();
-  assert.equal(row.view.desc, '1 built-in, 1 mine');
-  assert.equal(row.plugin.settings.noteStyleByKind, undefined);
+  assert.equal(state.view.name, '1 styles, 0 structures, voices and formats');
+  assert.ok(dom.find(state.view.descEl, node => node.hasClass('vam-style-unused')));
+  assert.equal(state.plugin.settings.noteStyleByKind, undefined);
 });
 
 test('F1 R6 (was failing first): when the manage window closes, the seven topic-type rows of the open page are drawn again from the store, so a style made or deleted in the window shows in their pickers', async () => {
   openedModals.length = 0;
   const recipes = RECIPES();
   const settings = { language: 'en' };
-  const plugin = { app: {}, settings, saveSettings: async () => {}, noteStyles: { refresh: async () => {}, listRecipes: () => recipes, listParts: () => [] } };
+  const plugin = { app: {}, settings, saveSettings: async () => {}, noteStyles: { refresh: async () => {}, folder: () => 'WS/Styles', listRecipes: () => recipes, listParts: () => [], listUnusedCopies: () => [] } };
   plugin.setKindStyle = (...args) => Plugin.prototype.setKindStyle.apply(plugin, args);
   const rows = KIND_ORDER.map(kind => { const { setting, view } = fakeSetting(); renderNoteKindSetting(setting, plugin, kind); return { kind, view }; });
   const manage = fakeSetting();
-  renderNoteCustomSetting(manage.setting, plugin, 'recipe');
+  renderMyStylesSetting(manage.setting, plugin);
   await flush();
   for (const row of rows) assert.equal(optionsOf(row.view).some(option => option[0] === 'file:Fresh'), false);
   manage.view.buttons[0].click();
@@ -450,9 +592,87 @@ test('F1 R6 (was failing first): when the manage window closes, the seven topic-
   assert.equal('noteStyleByKind' in settings, false, 'drawing again saves nothing');
 });
 
-test('K3 (P4): the Custom row counts a retired built-in only while a style uses it', async () => {
+test('K3 (P4, now on the My styles row): a retired built-in is never counted, only the user\'s own files are', async () => {
   const retired = (ref, name, usedBy) => ({ ...part(ref, name), retired: true, usedBy });
-  const parts = [part('builtin:a', 'A'), retired('builtin:r1', 'R1', []), retired('builtin:r2', 'R2', ['Old']), part('file:Mine', 'Mine')];
-  const row = customRow('voice', { parts });
-  assert.equal(row.view.desc, '2 built-in, 1 mine');
+  const parts = { voice: [part('builtin:a', 'A'), retired('builtin:r1', 'R1', []), retired('builtin:r2', 'R2', ['Old']), part('file:Mine', 'Mine')] };
+  assert.equal(mineRow({ parts }).view.name, '0 styles, 1 structures, voices and formats');
+});
+
+// ---- the topic-type rows: set apart, voice retired, only new content (settings-redesign P3) ----
+test('P3 rows: a voice or format the style sets apart says "(set apart)" in the line; the ones that follow the global choice say nothing; the AIM report is never marked', async () => {
+  const apart = rec('builtin:evidence', 'Evidence', { format: { ref: 'builtin:lean', name: 'Lean format' }, formatSource: 'style', voiceSource: 'global' });
+  assert.equal(kindStyleLine(apart), `Standard six · Academic · Lean format (set apart) · ${t('ui.update_mode_merge')}`);
+  const both = rec('file:X', 'X', { voiceSource: 'style', formatSource: 'style' });
+  assert.equal(kindStyleLine(both), `Standard six · Academic (set apart) · Standard format (set apart) · ${t('ui.update_mode_merge')}`);
+  assert.equal(kindStyleLine(rec('file:Y', 'Y', { voiceSource: 'global', formatSource: 'global' })), `Standard six · Academic · Standard format · ${t('ui.update_mode_merge')}`);
+  assert.equal(kindStyleLine(rec('builtin:aim', 'AIM report', { aimOnly: true, voiceSource: 'style', formatSource: 'style', structure: { ref: 'aim-delivery', name: 'AIM report' } })), 'AIM report · Academic · Standard format');
+  const row = kindRow('evidence', { settings: { noteStyleByKind: { evidence: 'builtin:evidence' } }, recipes: [...RECIPES().filter(r => r.ref !== 'builtin:evidence'), apart] });
+  await flush();
+  assert.match(lines(row.view)[0], /Lean format \(set apart\)/);
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_set_apart_0', '精簡'), '精簡（另外指定）');
+});
+
+const tagTexts = view => view.nameEl.children.map(child => child.text);
+test('P3 rows: "Voice retired" shows beside the name only when the style\'s voice is a retired built-in (summary, guide, auto), and the line marks that voice', async () => {
+  for (const id of ['summary', 'guide', 'auto']) {
+    const retired = rec('file:Old', 'Old', { voice: { ref: `builtin:${id}`, name: 'Key-point summary' }, voiceSource: 'style' });
+    const row = kindRow('atomic', { settings: { noteStyleByKind: { atomic: 'file:Old' } }, recipes: [...RECIPES(), retired] });
+    await flush();
+    assert.deepEqual(tagTexts(row.view), ['Voice retired'], id);
+    assert.equal(row.view.nameEl.children[0].hasClass('vam-style-tag'), true);
+    assert.match(lines(row.view)[0], /Key-point summary \(retired\) \(set apart\)/);
+  }
+  for (const id of ['academic', 'plain', 'magazine']) {
+    const live = rec('file:Live', 'Live', { voice: { ref: `builtin:${id}`, name: 'X' }, voiceSource: 'style' });
+    const row = kindRow('atomic', { settings: { noteStyleByKind: { atomic: 'file:Live' } }, recipes: [...RECIPES(), live] });
+    await flush();
+    assert.deepEqual(tagTexts(row.view), [], id);
+  }
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_tag_voice_retired'), '口吻已停用');
+});
+
+test('P3 rows: "Only new content" shows only when the update mode is fresh, named like the update mode; choosing another style takes the tags away again', async () => {
+  const fresh = rec('file:Fresh', 'Fresh', { update: 'fresh' });
+  const row = kindRow('hypothesis', { settings: { noteStyleByKind: { hypothesis: 'file:Fresh' } }, recipes: [...RECIPES(), fresh] });
+  await flush();
+  assert.deepEqual(tagTexts(row.view), [t('ui.update_mode_fresh')]);
+  assert.equal(t('ui.update_mode_fresh'), 'Save new content only');
+  assert.equal(i18n.translate('zh-TW', 'ui.update_mode_fresh'), '只存新內容');
+  for (const update of ['merge', 'top']) {
+    const other = kindRow('hypothesis', { settings: { noteStyleByKind: { hypothesis: 'file:Other' } }, recipes: [...RECIPES(), rec('file:Other', 'Other', { update })] });
+    await flush();
+    assert.deepEqual(tagTexts(other.view), [], update);
+  }
+  await row.view.dropdown.change('builtin:hypothesis');
+  assert.deepEqual(tagTexts(row.view), [], 'redrawn without the tag');
+  const both = kindRow('atomic', { settings: { noteStyleByKind: { atomic: 'file:B' } }, recipes: [...RECIPES(), rec('file:B', 'B', { update: 'fresh', voice: { ref: 'builtin:summary', name: 'S' }, voiceSource: 'style' })] });
+  await flush();
+  assert.deepEqual(tagTexts(both.view), ['Voice retired', 'Save new content only']);
+});
+
+test('P3 rows: a style with a problem or a missing style shows no tags; the dropdown stays a style picker (no new key) and rendering saves nothing', async () => {
+  const bad = rec('file:Bad', 'Bad', { update: 'fresh', issues: [{ line: 4, code: 'part_missing', values: ['Gone'], message: 'x' }] });
+  const row = kindRow('topic', { settings: { noteStyleByKind: { topic: 'file:Bad' } }, recipes: [...RECIPES(), bad] });
+  await flush();
+  assert.deepEqual(tagTexts(row.view), []);
+  const gone = kindRow('topic', { settings: { noteStyleByKind: { topic: 'file:Gone' } } });
+  await flush();
+  assert.deepEqual(tagTexts(gone.view), []);
+  assert.equal(row.saves.length + gone.saves.length, 0);
+  assert.equal(JSON.stringify(Object.keys(row.settings)), '["language","noteStyleByKind"]');
+});
+
+test('P3 page: opening the Note style page writes nothing, at the card, the rows and the My styles row together', async () => {
+  const writes = [];
+  const recipes = RECIPES();
+  const settings = { language: 'en' };
+  const plugin = { app: {}, settings, saveSettings: async () => { writes.push('save'); }, openNoteStylesFolder: async () => { writes.push('folder'); }, noteStyles: { refresh: async () => {}, folder: () => 'WS/S', listRecipes: () => recipes, listParts: () => [], listUnusedCopies: () => [] } };
+  plugin.setKindStyle = (...args) => Plugin.prototype.setKindStyle.apply(plugin, args);
+  const before = JSON.stringify(settings);
+  renderNoteStyleCard(fakeSetting().setting, plugin);
+  for (const kind of KIND_ORDER) renderNoteKindSetting(fakeSetting().setting, plugin, kind);
+  renderMyStylesSetting(fakeSetting().setting, plugin);
+  await flush();
+  assert.deepEqual(writes, []);
+  assert.equal(JSON.stringify(settings), before);
 });

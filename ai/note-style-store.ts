@@ -46,6 +46,7 @@ import {
   type NoteStyleDefaults,
   type PartCategory,
   type PartSource,
+  type RecipeFile,
   type RecipeFileParts,
   type StyleKind,
   type UpdateMode
@@ -225,6 +226,16 @@ export interface RecipeListItem {
   issues: NoteStyleIssue[];
   /** The kinds that use this style: the saved choice, else the kind's built-in style. */
   usedByKinds: StyleKind[];
+}
+
+/** A file that is only a copy nobody uses (see `listUnusedCopies`). */
+export interface UnusedCopy {
+  category: "recipe" | PartCategory;
+  ref: string;
+  name: string;
+  fileName: string;
+  /** The built-in or file it equals. */
+  sameAs: string;
 }
 
 export interface SaveRecipeInput extends RecipeFileParts {
@@ -1106,6 +1117,84 @@ export class NoteStyleStore {
       });
     }
     return items;
+  }
+
+  /**
+   * The user's files that are only copies nobody uses (settings-redesign A5): used by no type, no style and no topic
+   * (`topicRecipeRefs`: style refs the topics' `note-style` name, which the store cannot see), and identical to a built-in
+   * part or style, or to another file of the same category. Of several identical unused files one stays: the one without a
+   * " (n)" suffix, else the first by name; a used file keeps all its identical copies from being "the one". Read only: it
+   * creates and writes nothing. Parts are compared by text, styles by their four settings.
+   */
+  listUnusedCopies(topicRecipeRefs: ReadonlySet<string> = new Set()): UnusedCopy[] {
+    const language = this.settings.language;
+    const suffixed = (name: string): number => (/ \(\d+\)$/.test(name) ? 1 : 0);
+    const order = (a: string, b: string): number => suffixed(a) - suffixed(b) || a.localeCompare(b);
+    const copies: UnusedCopy[] = [];
+    /** One category: `entries` are its files with a comparison key; `builtinKeys` are the keys of the built-ins. */
+    const sweep = (
+      category: UnusedCopy["category"],
+      entries: { name: string; key: string; used: boolean }[],
+      builtinKeys: Map<string, string>
+    ): void => {
+      const groups = new Map<string, typeof entries>();
+      for (const entry of entries) groups.set(entry.key, [...(groups.get(entry.key) ?? []), entry]);
+      for (const entry of entries) {
+        if (entry.used) continue;
+        const builtin = builtinKeys.get(entry.key);
+        const same = groups.get(entry.key)!.filter(other => other !== entry);
+        const keeper = [...groups.get(entry.key)!].sort((a, b) => order(a.name, b.name))[0];
+        const sameFile = same.find(other => other.used) ?? (keeper !== entry ? keeper : undefined);
+        const sameAs = builtin ?? (sameFile ? fileRef(sameFile.name) : undefined);
+        if (sameAs === undefined) continue;
+        copies.push({ category, ref: fileRef(entry.name), name: entry.name, fileName: `${entry.name}.md`, sameAs });
+      }
+    };
+    for (const category of ["structure", "voice", "format"] as const) {
+      const { files } = this.partStore(category);
+      const builtinKeys = new Map<string, string>();
+      const items = this.listParts(category);
+      for (const item of items) {
+        if (item.kind !== "builtin" || item.retired) continue;
+        try {
+          builtinKeys.set(this.partSourceText(category, item.ref, language), item.ref);
+        } catch {
+          /* A built-in with no text cannot be copied. */
+        }
+      }
+      const entries = items
+        .filter(item => item.kind === "file" && files.has(item.name))
+        .map(item => ({ name: item.name, key: files.get(item.name)!, used: item.usedBy.length > 0 }));
+      sweep(category, entries, builtinKeys);
+    }
+    const recipes = this.listRecipes();
+    const usedRefs = new Set(recipes.filter(item => item.usedByKinds.length > 0).map(item => item.ref));
+    for (const ref of topicRecipeRefs) usedRefs.add(ref);
+    const recipeKey = (file: RecipeFile): string =>
+      JSON.stringify([
+        file.structure,
+        file.voiceSet ? file.voice : "global",
+        file.formatSet ? file.format : "global",
+        file.update
+      ]);
+    const builtinKeys = new Map<string, string>();
+    for (const recipe of BUILTIN_RECIPES) {
+      if (recipe.structure === AIM_DELIVERY_STRUCTURE) continue;
+      const key = JSON.stringify([
+        builtinRef(recipe.structure),
+        recipe.followsVoice ? "global" : builtinRef(recipe.voice),
+        recipe.followsFormat ? "global" : builtinRef(recipe.format),
+        recipe.update
+      ]);
+      if (!builtinKeys.has(key)) builtinKeys.set(key, builtinRef(recipe.id));
+    }
+    const recipeEntries = [...this.recipes].map(([name, text]) => ({
+      name,
+      key: recipeKey(parseRecipeFile(text)),
+      used: usedRefs.has(fileRef(name))
+    }));
+    sweep("recipe", recipeEntries, builtinKeys);
+    return copies;
   }
 
   /** The text of a user's style file as the last `refresh()` or write left it (what the editor compares before it saves). */

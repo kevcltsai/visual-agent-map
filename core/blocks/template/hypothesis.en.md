@@ -14,7 +14,7 @@ Counter-conditions written in advance: which result would mean the claim fails.
 What data to look for, and what comparison or experiment to run.
 
 ## Evidence table
-One table with the columns "Evidence | Supports / refutes | Strength | Linked topic", one row per piece of evidence, each with its source. Write linked topics only here, as topic links; do not restate the supporting and refuting content elsewhere.
+A four-column Markdown table whose header row is written exactly as `| Evidence | Supports or refutes | Strength | Linked topic |`, one row per piece of evidence, each with its source. Write linked topics only here, as topic links; do not restate the supporting and refuting content elsewhere.
 
 ## Sources
 Only the source list, which is added to the end of this section automatically; do not restate the body.

@@ -618,3 +618,12 @@ test('ensureBlockFile reports created: true for a file it just wrote, false for 
   assert.equal((await store.ensureBlockFile('template', 'builtin:standard')).created, false);
   assert.equal((await store.ensureBlockFile('tone', 'file:Mine')).created, false);
 });
+
+test('S1b: the hypothesis Evidence table section gives a copyable Markdown header row, not a full-width bar list', () => {
+  const header = { 'zh-TW': '| 證據 | 支持或反駁 | 強度 | 連到的議題 |', 'zh-CN': '| 證據 | 支持或反駁 | 強度 | 連到的議題 |', en: '| Evidence | Supports or refutes | Strength | Linked topic |' };
+  for (const language of LANGUAGES) {
+    const text = fs.readFileSync(path.join(__dirname, '..', 'core', 'blocks', 'template', `hypothesis.${language}.md`), 'utf8');
+    assert.ok(text.includes(`\`${header[language]}\``), language);
+    assert.ok(!text.includes('｜'), `${language}: no full-width bar column list`);
+  }
+});

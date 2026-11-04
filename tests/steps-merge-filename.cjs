@@ -69,7 +69,7 @@ test('same-level merge: a name that is really taken by another note keeps the nu
   assert.equal(h.files.has(`${NOTES}/Budget.md`), true);
 });
 
-test('merge into a parent: the parent file is renamed with its new title and the map follows', async () => {
+test('merge into a parent: a new name changes only the title; the parent keeps its path and id (existing contract)', async () => {
   const h = await harness(['Users', 'Kid1', 'Kid2']);
   const [parent, k1, k2] = h.nodes;
   k1.parentId = parent.id; k2.parentId = parent.id;
@@ -77,38 +77,6 @@ test('merge into a parent: the parent file is renamed with its new title and the
   await h.view.hydrate();
   await h.view.mergeSelected('Customers', snapshot(h, [parent, k1, k2], parent.id));
   const node = h.view.map.nodes.find(n => n.id === parent.id);
-  assert.equal(node.path, `${NOTES}/Customers.md`);
-  assert.equal(h.files.has(`${NOTES}/Users.md`), false);
+  assert.equal(node.path, `${NOTES}/Users.md`);
   assert.equal((await h.repo.readNote(node.path)).title, 'Customers');
-  const saved = await h.repo.readMap(MAP);
-  assert.equal(saved.nodes.find(n => n.id === parent.id).path, `${NOTES}/Customers.md`, 'Map.md is saved with the new path');
-});
-
-test('merge into a parent: undo restores Users.md and redo renames again', async () => {
-  const h = await harness(['Users', 'Kid1']);
-  const [parent, k1] = h.nodes;
-  k1.parentId = parent.id;
-  await h.repo.saveMap(MAP, h.view.map);
-  await h.view.hydrate();
-  await h.view.mergeSelected('Customers', snapshot(h, [parent, k1], parent.id));
-  const entry = h.view.history.undoEntry;
-  await entry.undo();
-  assert.equal(h.files.has(`${NOTES}/Users.md`), true);
-  assert.equal(h.files.has(`${NOTES}/Customers.md`), false);
-  assert.equal((await h.repo.readNote(`${NOTES}/Users.md`)).title, 'Users');
-  await entry.redo();
-  assert.equal(h.files.has(`${NOTES}/Customers.md`), true);
-  assert.equal(h.files.has(`${NOTES}/Users.md`), false);
-});
-
-test('merge into a parent: an unchanged title leaves the file name alone; a taken name is not overwritten', async () => {
-  const h = await harness(['Users', 'Kid1', 'Customers']);
-  const [parent, k1] = h.nodes;
-  k1.parentId = parent.id;
-  await h.repo.saveMap(MAP, h.view.map);
-  await h.view.hydrate();
-  await h.view.mergeSelected('Customers', snapshot(h, [parent, k1], parent.id));
-  const node = h.view.map.nodes.find(n => n.id === parent.id);
-  assert.equal(node.path, `${NOTES}/Users.md`, 'the name "Customers" belongs to another note: keep Users.md');
-  assert.equal(h.files.has(`${NOTES}/Customers.md`), true);
 });

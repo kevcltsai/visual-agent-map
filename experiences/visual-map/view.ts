@@ -248,7 +248,6 @@ import {
   normalizeReasoningLevel,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
-  safeName,
   type Note,
   type NotePatch,
   type TopicInfo,
@@ -6482,12 +6481,8 @@ export class VisualAgentMapView extends ItemView {
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
       });
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
-      // The parent's file name follows its new title, but only while it still carries the old title's name (a name the
-      // user chose by hand stays); a name another note holds is never taken.
-      if (patch.title && target.path.slice(target.path.lastIndexOf("/") + 1) === `${safeName(sourceNotes[0].title)}.md`)
-        tx.rename(target.path, patch.title);
       entry = await tx
-        .editMap(mapPath, (map, resolve) => {
+        .editMap(mapPath, map => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen.
           map.viewport = clone(viewport);
           const ids = new Set(children.map(child => child.id));
@@ -6504,8 +6499,6 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
-          const parent = map.nodes.find(item => item.id === target.id);
-          if (parent) parent.path = resolve(target.path);
           this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
           if (adopted.size) this.arrangeBranch(map, target.id, adopted, undefined);
         })

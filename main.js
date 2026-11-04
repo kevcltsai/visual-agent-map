@@ -56138,9 +56138,7 @@ ${request.requirements}` : preset.text,
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
       });
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
-      if (patch.title && target.path.slice(target.path.lastIndexOf("/") + 1) === `${safeName(sourceNotes[0].title)}.md`)
-        tx.rename(target.path, patch.title);
-      entry = await tx.editMap(mapPath, (map, resolve) => {
+      entry = await tx.editMap(mapPath, (map) => {
         map.viewport = clone(viewport);
         const ids = new Set(children.map((child) => child.id));
         if (!map.nodes.some((item) => item.id === target.id) || children.some((child) => !map.nodes.some((item) => item.id === child.id)))
@@ -56153,8 +56151,6 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.filter((item) => !ids.has(item.id));
-        const parent = map.nodes.find((item) => item.id === target.id);
-        if (parent) parent.path = resolve(target.path);
         this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
         if (adopted.size) this.arrangeBranch(map, target.id, adopted, void 0);
       }).commit({ label: t("ui.merge_topics_history") });

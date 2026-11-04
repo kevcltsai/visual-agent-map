@@ -4840,9 +4840,12 @@ integrationTest('bug bash #27: the Rename tool on a card opens a dialog titled �
   view.stageEl = element('div'); view.viewportEl = element('div');
   view.labelCard = () => {}; // the card's accessible-name bookkeeping needs a real DOM; the tools do not
   view.renderNode(node);
-  const rename = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-rename-tool')); assert.ok(rename, 'the card has a Rename tool');
-  assert.equal(rename.text, '改名', 'the tool itself is in zh-TW');
-  rename.click(); await tick();
+  const more = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-more-tool')); assert.ok(more, 'the card has a More tool');
+  assert.equal(more.text, '⋯ 更多', 'the tool itself is in zh-TW');
+  const entries = [];
+  view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); entries.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+  more.click(); const rename = entries.find(e => e.title === '改名'); assert.ok(rename, 'More lists Rename, in zh-TW');
+  rename.fn(); await tick();
   assert.ok((h.control.modals ?? []).length === 1, 'one dialog opened');
   assert.equal(h.control.modals[0].titleText, '重新命名');
 });

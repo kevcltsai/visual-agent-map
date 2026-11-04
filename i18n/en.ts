@@ -1082,6 +1082,11 @@ export const en = {
   "ui.node_tool_details": "Details",
   "ui.select_subtopics": "Select subtopics",
   "ui.select_subtopics_hint": "Select every direct subtopic of this topic",
+  "ui.card_more": "⋯ More",
+  "ui.card_more_hint": "More actions for this topic",
+  "ui.selection_more_hint": "More actions for the selected topics",
+  "ui.selection_help": "?",
+  "ui.selection_help_hint": "How to select topics",
   "ui.node_tool_remove": "Remove",
   "ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from":
     "The file was moved or deleted. You can remove this node from the map.",

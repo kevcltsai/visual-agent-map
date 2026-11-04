@@ -224,16 +224,21 @@ test('frames cannot be changed on an AIM map; in selection mode they are drawn b
   assert.equal((await sel.onDisk()).length, 1, 'but not removable there');
 });
 
-test('the selection bar offers "Add frame" for the selected topics', async () => {
+test('the selection bar offers "Add frame" for the selected topics, in its More menu', async () => {
   const h = await harness();
+  const entriesOf = () => {
+    let listed = [];
+    h.view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, setDisabled(v) { it.disabled = v; return chain; }, setChecked() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); listed.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+    const more = find(h.view.renderSelectionBar(element('div')), i => i.tag === 'button' && i.attrs?.['aria-label'] === 'More actions for the selected topics');
+    if (!more) return null;
+    more.click(); return listed;
+  };
   h.view.selection.replaceMulti([h.ids.root, h.ids.child]);
-  const bar = h.view.renderSelectionBar(element('div'));
-  const add = find(bar, i => i.tag === 'button' && i.text === 'Add frame');
-  assert.ok(add, 'button present');
+  const add = entriesOf().find(i => i.title === 'Add frame');
+  assert.ok(add, 'entry present');
   assert.ok(!add.disabled);
   h.view.selection.replaceMulti([]);
-  const empty = find(h.view.renderSelectionBar(element('div')), i => i.tag === 'button' && i.text === 'Add frame');
-  assert.equal(empty.disabled, true);
+  assert.equal(entriesOf(), null, 'no topic picked: no bar content, so no frame entry either');
 });
 
 test('the label dialog may be left blank only when asked to; the default still refuses an empty name', () => {

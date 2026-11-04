@@ -1088,6 +1088,11 @@ var en = {
   "ui.node_tool_details": "Details",
   "ui.select_subtopics": "Select subtopics",
   "ui.select_subtopics_hint": "Select every direct subtopic of this topic",
+  "ui.card_more": "\u22EF More",
+  "ui.card_more_hint": "More actions for this topic",
+  "ui.selection_more_hint": "More actions for the selected topics",
+  "ui.selection_help": "?",
+  "ui.selection_help_hint": "How to select topics",
   "ui.node_tool_remove": "Remove",
   "ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from": "The file was moved or deleted. You can remove this node from the map.",
   "ui.remove_from_map": "Remove from map",
@@ -3594,6 +3599,11 @@ var zhCN = {
   "ui.node_tool_details": "\u8BE6\u60C5",
   "ui.select_subtopics": "\u9009\u62E9\u5B50\u8BAE\u9898",
   "ui.select_subtopics_hint": "\u9009\u62E9\u8FD9\u4E2A\u8BAE\u9898\u5E95\u4E0B\u6240\u6709\u76F4\u5C5E\u5B50\u8BAE\u9898",
+  "ui.card_more": "\u22EF \u66F4\u591A",
+  "ui.card_more_hint": "\u8FD9\u4E2A\u8BAE\u9898\u7684\u66F4\u591A\u64CD\u4F5C",
+  "ui.selection_more_hint": "\u5DF2\u9009\u8BAE\u9898\u7684\u66F4\u591A\u64CD\u4F5C",
+  "ui.selection_help": "?",
+  "ui.selection_help_hint": "\u9009\u62E9\u8BAE\u9898\u7684\u64CD\u4F5C\u8BF4\u660E",
   "ui.node_tool_remove": "\u79FB\u9664",
   "ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from": "\u6587\u4EF6\u5DF2\u79FB\u52A8\u6216\u5220\u9664\uFF0C\u53EF\u4ECE\u56FE\u4E2D\u79FB\u9664\u6B64\u8BAE\u9898\u3002",
   "ui.remove_from_map": "\u4ECE\u56FE\u4E2D\u79FB\u9664",
@@ -6100,6 +6110,11 @@ var zhTW = {
   "ui.node_tool_details": "\u8A73\u60C5",
   "ui.select_subtopics": "\u9078\u53D6\u5B50\u8B70\u984C",
   "ui.select_subtopics_hint": "\u9078\u53D6\u9019\u500B\u8B70\u984C\u5E95\u4E0B\u6240\u6709\u76F4\u5C6C\u5B50\u8B70\u984C",
+  "ui.card_more": "\u22EF \u66F4\u591A",
+  "ui.card_more_hint": "\u9019\u500B\u8B70\u984C\u7684\u66F4\u591A\u52D5\u4F5C",
+  "ui.selection_more_hint": "\u5DF2\u9078\u8B70\u984C\u7684\u66F4\u591A\u52D5\u4F5C",
+  "ui.selection_help": "?",
+  "ui.selection_help_hint": "\u9078\u53D6\u8B70\u984C\u7684\u64CD\u4F5C\u8AAA\u660E",
   "ui.node_tool_remove": "\u79FB\u9664",
   "ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from": "\u6A94\u6848\u5DF2\u79FB\u52D5\u6216\u522A\u9664\uFF0C\u53EF\u5F9E\u5716\u4E2D\u79FB\u9664\u6B64\u8B70\u984C\u3002",
   "ui.remove_from_map": "\u5F9E\u5716\u4E2D\u79FB\u9664",
@@ -31567,6 +31582,93 @@ function statusBarClearance(target, status) {
   if (!status || !(status.right > status.left) || !(status.bottom > status.top)) return 0;
   if (status.left >= target.right || status.right <= target.left) return 0;
   return status.top < target.bottom ? Math.max(0, Math.ceil(target.bottom - status.top)) : 0;
+}
+function overlapArea(a, b) {
+  const width = Math.min(a.right, b.right) - Math.max(a.left, b.left), height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return width > 0 && height > 0 ? width * height : 0;
+}
+function chooseCardToolsSpot(input2) {
+  var _a2, _b2, _c, _d;
+  const { card, row, size, others, controls, visible } = input2;
+  const edge = (_a2 = input2.edge) != null ? _a2 : 6, maxInset = (_b2 = input2.maxInset) != null ? _b2 : 14, margin = 8;
+  const candidates = [];
+  const slides = [0];
+  for (let step = 8; step <= 120; step += 8) slides.push(-step, step);
+  for (let inset = 0; inset <= maxInset; inset += 4) {
+    for (const slide of slides) {
+      const bottom = card.top + edge + inset;
+      candidates.push({
+        side: "top",
+        inset,
+        slide,
+        rect: { left: row.left + slide, right: row.right + slide, top: bottom - size.height, bottom }
+      });
+    }
+  }
+  for (let inset = 0; inset <= maxInset; inset += 4) {
+    for (const slide of slides) {
+      const top = card.bottom - edge - inset;
+      candidates.push({
+        side: "bottom",
+        inset,
+        slide,
+        rect: { left: row.left + slide, right: row.right + slide, top, bottom: top + size.height }
+      });
+    }
+  }
+  const sideTop = card.top + edge;
+  candidates.push({
+    side: "right",
+    inset: 0,
+    slide: 0,
+    rect: { left: card.right + 4, right: card.right + 4 + size.width, top: sideTop, bottom: sideTop + size.height }
+  });
+  candidates.push({
+    side: "left",
+    inset: 0,
+    slide: 0,
+    rect: { left: card.left - 4 - size.width, right: card.left - 4, top: sideTop, bottom: sideTop + size.height }
+  });
+  const scored = candidates.map((candidate) => ({
+    ...candidate,
+    overlap: others.reduce((total2, other) => total2 + overlapArea(candidate.rect, other), 0),
+    blocked: controls.some((control) => rectsIntersect(candidate.rect, control)) || candidate.rect.left < visible.left || candidate.rect.right > visible.right || candidate.rect.top < visible.top || candidate.rect.bottom > visible.bottom
+  }));
+  const chosen = (_d = (_c = scored.find((item) => item.overlap === 0 && !item.blocked)) != null ? _c : scored.find((item) => item.overlap === 0)) != null ? _d : scored.reduce((best, item) => item.overlap < best.overlap ? item : best);
+  let dx = 0, dy = 0;
+  const row2 = chosen.rect;
+  if (row2.left < visible.left + margin) dx = visible.left + margin - row2.left;
+  else if (row2.right > visible.right - margin) dx = visible.right - margin - row2.right;
+  if (row2.top < visible.top + margin) dy = visible.top + margin - row2.top;
+  else if (row2.bottom > visible.bottom - margin) dy = visible.bottom - margin - row2.bottom;
+  const union = () => ({
+    left: Math.min(card.left, row2.left) + dx,
+    right: Math.max(card.right, row2.right) + dx,
+    top: Math.min(card.top, row2.top) + dy,
+    bottom: Math.max(card.bottom, row2.bottom) + dy
+  });
+  for (let round3 = 0; round3 < controls.length + 1; round3++) {
+    const box = union(), hit = controls.find((control) => rectsIntersect(box, control));
+    if (!hit) break;
+    const down = hit.bottom + margin - box.top, right = hit.right + margin - box.left;
+    const downFits = box.bottom + down <= visible.bottom, rightFits = box.right + right <= visible.right;
+    if (downFits && (!rightFits || down <= right)) dy += down;
+    else if (rightFits) dx += right;
+    else dy += down;
+  }
+  return {
+    side: chosen.side,
+    inset: chosen.inset,
+    slide: chosen.slide,
+    overlap: chosen.overlap,
+    rect: {
+      left: row2.left + dx,
+      right: row2.right + dx,
+      top: row2.top + dy,
+      bottom: row2.bottom + dy
+    },
+    pan: { dx, dy }
+  };
 }
 
 // experiences/visual-map/relevance-summary-modal.ts
@@ -60237,29 +60339,35 @@ ${request.requirements}` : preset.text,
     }
     const tools = card.createDiv("vam-node-tools");
     const count = descendants(this.map.nodes, node.id).size;
+    const more = [];
     if (count) {
-      const collapse = this.button(
-        node.collapsed ? header : tools,
-        node.collapsed ? t("ui.expand_0", count) : t("ui.collapse"),
-        () => this.whenEditing(() => this.toggleCollapsed(node))
-      );
-      collapse.addClass("vam-collapse-button", ...node.collapsed ? ["is-collapsed"] : []);
-      collapse.setAttr("aria-expanded", String(!node.collapsed));
+      if (node.collapsed) {
+        const collapse = this.button(
+          header,
+          t("ui.expand_0", count),
+          () => this.whenEditing(() => this.toggleCollapsed(node))
+        );
+        collapse.addClass("vam-collapse-button", "is-collapsed");
+        collapse.setAttr("aria-expanded", "false");
+      } else
+        more.push({
+          title: t("ui.collapse"),
+          icon: "chevrons-down-up",
+          action: () => this.whenEditing(() => this.toggleCollapsed(node))
+        });
     }
     if (!this.selection.state.multiSelectMode) {
       if (!this.aimLive()) {
-        const structure2 = this.button(
-          tools,
-          t("ui.node_tool_links"),
-          () => this.whenEditing(() => this.openNodePanel(node, "structure"))
-        );
-        structure2.addClass("vam-node-tool", "vam-structure-tool");
-        structure2.setAttr("aria-label", t("ui.structure_and_links"));
+        more.push({
+          title: t("ui.structure_and_links"),
+          icon: "git-fork",
+          action: () => this.whenEditing(() => this.openNodePanel(node, "structure"))
+        });
         if (note)
-          this.button(
-            tools,
-            t("ui.node_tool_rename"),
-            () => this.whenEditing(
+          more.push({
+            title: t("ui.node_tool_rename"),
+            icon: "pencil",
+            action: () => this.whenEditing(
               () => new NameModal(
                 this.app,
                 t("ui.rename_topic"),
@@ -60267,31 +60375,26 @@ ${request.requirements}` : preset.text,
                 (title2) => this.enqueue(() => this.noteChange(node, { title: title2 }))
               ).open()
             )
-          ).addClass("vam-node-tool", "vam-rename-tool");
-        if (!node.collapsed && this.map.nodes.some((item) => item.parentId === node.id)) {
-          const select = this.button(
-            tools,
-            t("ui.select_subtopics"),
-            () => this.whenEditing(() => this.selectSubtopics(node))
-          );
-          select.addClass("vam-node-tool", "vam-select-subtopics-tool");
-          select.setAttr("aria-label", t("ui.select_subtopics_hint"));
-        }
+          });
+        if (!node.collapsed && this.map.nodes.some((item) => item.parentId === node.id))
+          more.push({
+            title: t("ui.select_subtopics"),
+            icon: "list-checks",
+            action: () => this.whenEditing(() => this.selectSubtopics(node))
+          });
         if (this.canEditText() && !isAimNode(node))
-          this.button(tools, t("ui.text_node_add"), () => this.whenEditing(() => this.addTextNodeUnder(node))).addClass(
-            "vam-node-tool",
-            "vam-add-text-tool"
-          );
+          more.push({
+            title: t("ui.text_node_add"),
+            icon: "text-cursor-input",
+            action: () => this.whenEditing(() => this.addTextNodeUnder(node))
+          });
       }
-      if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim) && node.aimKind === "question") {
-        const remove = this.button(
-          tools,
-          t("ui.node_tool_remove"),
-          () => this.whenEditing(() => this.confirmRemoveNode(node))
-        );
-        remove.addClass("vam-node-tool", "vam-remove-tool");
-        remove.setAttr("aria-label", t("ui.remove_from_map"));
-      }
+      if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim) && node.aimKind === "question")
+        more.push({
+          title: t("ui.remove_from_map"),
+          icon: "trash",
+          action: () => this.whenEditing(() => this.confirmRemoveNode(node))
+        });
       if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
@@ -60327,14 +60430,22 @@ ${request.requirements}` : preset.text,
         steer.setAttr("title", t("ui.aim_steer_hint"));
       }
     }
-    const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
-    details.addClass("vam-node-tool", "vam-detail-button");
-    details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
     if (!this.selection.state.multiSelectMode && !this.aimLive())
       this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openNextStep(node))).addClass(
         "vam-node-tool",
         "vam-ai-explore"
       );
+    const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
+    details.addClass("vam-node-tool", "vam-detail-button");
+    details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
+    if (more.length) {
+      const moreButton = this.button(tools, t("ui.card_more"), () => {
+      });
+      moreButton.addClass("vam-node-tool", "vam-more-tool");
+      moreButton.setAttr("aria-label", t("ui.card_more_hint"));
+      moreButton.setAttr("aria-haspopup", "menu");
+      moreButton.addEventListener("click", (event) => this.openCardMoreMenu(event, node, more));
+    }
     if (!this.selection.state.multiSelectMode && !this.aimLive()) {
       const add = this.button(card, "+", () => {
       });
@@ -60741,6 +60852,13 @@ ${request.requirements}` : preset.text,
     }
     return depth;
   }
+  /** The card's "More" menu: the tools that do not float over the map. Focus returns to the card when it closes. */
+  openCardMoreMenu(event, node, items) {
+    const menu = this.newMenu(node.id);
+    for (const entry of items)
+      menu.addItem((item) => item.setTitle(entry.title).setIcon(entry.icon).onClick(entry.action));
+    menu.showAtMouseEvent(event);
+  }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
    * or past the canvas edge (a row wider than a card on the left edge); a row wider than the visible canvas wraps. Measured,
@@ -60760,7 +60878,8 @@ ${request.requirements}` : preset.text,
     tools.toggleClass("is-wrapped", false);
     tools.style.removeProperty("max-width");
     tools.style.removeProperty("margin-left");
-    const visible = { left: visibleLeft, right: this.viewportEl.getBoundingClientRect().right };
+    const canvasRect = this.viewportEl.getBoundingClientRect();
+    const visible = { left: visibleLeft, right: canvasRect.right };
     const place = cardToolsPlacement(cardRect, tools.getBoundingClientRect().width, visible, 10 * zoom);
     tools.toggleClass("is-align-left", place.side === "left");
     if (place.maxWidth !== null) {
@@ -60768,6 +60887,57 @@ ${request.requirements}` : preset.text,
       tools.style.maxWidth = `${place.maxWidth / (zoom * Math.max(1, 1 / zoom))}px`;
     }
     if (place.shift) tools.style.marginLeft = `${place.shift / zoom}px`;
+    this.placeCardTools(card, tools, cardRect, place, zoom, canvasRect, visibleLeft);
+  }
+  /**
+   * Puts the selected card's tool row on a side where it covers no other card (above, below, then beside), and pans the
+   * canvas when the row or the card would sit under a floating control or past the canvas edge. Measured, so it follows
+   * panning and zooming. A host that cannot measure (no card rectangles) keeps the row above the card.
+   */
+  placeCardTools(card, tools, cardRect, place, zoom, canvasRect, visibleLeft) {
+    var _a2;
+    for (const name2 of ["is-below", "is-side-left", "is-side-right"]) tools.toggleClass(name2, false);
+    tools.style.removeProperty("--vam-tools-inset");
+    tools.style.removeProperty("translate");
+    tools.style.removeProperty("--vam-tools-gap");
+    if (cardRect.top === void 0 || cardRect.bottom === void 0 || !this.cardEls) return;
+    const box = tools.getBoundingClientRect();
+    const width = box.width, height = box.height || 32;
+    if (!(width > 0)) return;
+    const gap = 10 * zoom;
+    const rowRight = place.side === "left" ? void 0 : cardRect.right - gap;
+    const rowLeft = place.side === "left" ? cardRect.left + gap + place.shift : rowRight - width;
+    const others = [];
+    for (const other of this.cardEls.values()) {
+      if (other === card || !other.isConnected) continue;
+      const rect2 = (_a2 = other.getBoundingClientRect) == null ? void 0 : _a2.call(other);
+      if (rect2 && rect2.right > rect2.left && rect2.bottom > rect2.top) others.push(rect2);
+    }
+    const spot = chooseCardToolsSpot({
+      card: cardRect,
+      row: { left: rowLeft, right: rowLeft + width },
+      size: { width, height },
+      others,
+      controls: this.floatingControlRects(),
+      visible: { left: visibleLeft, right: canvasRect.right, top: canvasRect.top, bottom: canvasRect.bottom }
+    });
+    if (spot.side === "bottom") tools.toggleClass("is-below", true);
+    if (spot.side === "left" || spot.side === "right") {
+      tools.toggleClass("is-align-left", false);
+      tools.toggleClass(spot.side === "left" ? "is-side-left" : "is-side-right", true);
+      tools.style.removeProperty("margin-left");
+      tools.style.setProperty("--vam-tools-gap", `${4 / zoom}px`);
+    }
+    if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
+    if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);
+    if ((spot.pan.dx || spot.pan.dy) && this.map) {
+      this.map.viewport = {
+        ...this.map.viewport,
+        x: this.map.viewport.x + spot.pan.dx,
+        y: this.map.viewport.y + spot.pan.dy
+      };
+      this.transform();
+    }
   }
   /** Repaints only the named cards from the current selection state (class, aria-selected, roving tabindex, checkbox). */
   paintCards(ids) {
@@ -62642,35 +62812,6 @@ ${request.requirements}` : preset.text,
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  /**
-   * The selection bar's AI lock: one button whose `aria-pressed` is true when every selected topic is locked, false when
-   * none is and "mixed" otherwise (the title and name say how many). A click unlocks all when all are locked and locks
-   * the rest otherwise, in one undo step. Not on AIM maps.
-   */
-  renderAiLockSelectionButton(selection) {
-    if (!this.map || this.aimLive()) return;
-    const nodes = [...this.selection.state.multiSelected].map((id) => {
-      var _a2;
-      return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === id);
-    }).filter((node) => !!node && !isAimNode(node) && !!this.notes.get(node.id));
-    const locked = nodes.filter((node) => {
-      var _a2;
-      return ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
-    }).length;
-    const all = nodes.length > 0 && locked === nodes.length;
-    const button = this.button(
-      selection,
-      t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"),
-      () => this.enqueue(() => this.setAiLock(nodes, !all)),
-      !nodes.length
-    );
-    button.setAttr("aria-pressed", all ? "true" : locked ? "mixed" : "false");
-    if (locked && !all) {
-      const state = t("ui.ai_locked_some_0_1", locked, nodes.length);
-      button.setAttr("title", state);
-      button.setAttr("aria-label", `${t("ui.ai_lock_toggle")} (${state})`);
-    }
-  }
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
   renderAiLockSection(panel, node) {
     var _a2;
@@ -63779,88 +63920,101 @@ ${request.requirements}` : preset.text,
       dismiss.setAttr("aria-label", t("ui.dismiss"));
     }
   }
+  /**
+   * The narrow bar along the canvas bottom: nothing until a card is picked, then the names, Merge / Research, Move to…,
+   * More (everything else), the gesture help and Done. The canvas keeps its height free (see `has-selection-bar`).
+   */
   renderSelectionBar(workspace) {
-    var _a2;
+    var _a2, _b2;
     const selection = workspace.createDiv("vam-selection-bar");
+    const count = this.selection.state.multiSelected.size;
+    (_a2 = workspace.toggleClass) == null ? void 0 : _a2.call(workspace, "has-selection-bar", count > 0);
+    if (!count) {
+      selection.addClass("is-empty");
+      return selection;
+    }
     const names3 = [...this.selection.state.multiSelected].map((id) => {
       var _a3;
       return (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title;
     }).filter(Boolean);
     selection.createSpan({
       attr: { dir: "auto" },
-      text: this.selection.state.multiSelected.size ? t(
-        "ui.selected_0_1_2",
-        this.selection.state.multiSelected.size,
-        names3.slice(0, 2).join(t("ui.list_separator")),
-        names3.length > 2 ? "\u2026" : ""
-      ) : t("ui.prompt_select_topics")
+      text: t("ui.selected_0_1_2", count, names3.slice(0, 2).join(t("ui.list_separator")), names3.length > 2 ? "\u2026" : "")
     });
-    selection.createSpan({ cls: "vam-hint vam-selection-hint", text: t("ui.drag_to_select_topics_hint") });
-    this.button(
-      selection,
-      t("ui.clear"),
-      () => {
-        this.applySelectionChange(this.selection.clearMulti());
-      },
-      !this.selection.state.multiSelected.size
-    );
-    this.button(
-      selection,
-      t("ui.remove"),
-      () => this.confirmRemoveSelected(),
-      !this.selection.state.multiSelected.size
-    );
-    if (!this.aimLive())
-      this.button(
-        selection,
-        t("ui.canvas_boundary_add"),
-        () => this.openAddBoundary(),
-        !this.selection.state.multiSelected.size
-      );
-    if (!this.aimLive()) {
-      const check = this.summaryEntryCheck(this.summaryTargets()), bracket = this.button(selection, t("ui.summary_add"), () => this.addSummaryOver());
-      if (!check.ok) {
-        bracket.setAttr("aria-disabled", "true");
-        bracket.setAttr("title", t(check.reason));
-      }
-    }
-    this.renderAiLockSelectionButton(selection);
-    this.button(
-      selection,
-      t("ui.move_to"),
-      () => this.chooseSelectedParent(false),
-      !this.selection.state.multiSelected.size
-    );
-    this.button(
-      selection,
-      t("ui.copy_to"),
-      () => this.chooseSelectedParent(true),
-      !this.selection.state.multiSelected.size
-    );
-    const count = this.selection.state.multiSelected.size;
-    const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
-    synthesize.addClass("mod-cta");
-    if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
     if (!this.aimLive()) {
       const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
       if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
+      if (count > 1) merge.addClass("mod-cta");
       if (!check.ok) {
         merge.setAttr("aria-disabled", "true");
         merge.setAttr("title", t(check.reason));
       }
+      const running = ((_b2 = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _b2.status) === "running";
+      const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running);
+      research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
+      if (count === 1) research.addClass("mod-cta");
     }
-    if (!this.aimLive()) {
-      const running = ((_a2 = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _a2.status) === "running";
-      const research = this.button(
-        selection,
-        t("ui.multi_research"),
-        () => this.openMultiResearch(),
-        !this.selection.state.multiSelected.size || running
-      );
-      if (count)
-        research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
-    }
+    this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
+    const more = this.button(selection, t("ui.card_more"), () => {
+    });
+    more.setAttr("aria-label", t("ui.selection_more_hint"));
+    more.setAttr("aria-haspopup", "menu");
+    more.addClass("vam-selection-more");
+    more.addEventListener("click", (event) => this.openSelectionMoreMenu(event, count));
+    const help = this.button(
+      selection,
+      t("ui.selection_help"),
+      () => new import_obsidian34.Notice(t("ui.drag_to_select_topics_hint"), 12e3)
+    );
+    help.setAttr("aria-label", t("ui.selection_help_hint"));
+    help.setAttr("title", t("ui.selection_help_hint"));
+    help.addClass("vam-selection-help");
+    this.button(
+      selection,
+      t("ui.finish_topic_selection"),
+      () => this.applySelectionChange(this.selection.toggleMultiSelect())
+    );
     return selection;
+  }
+  /** What the narrow selection bar has no room for: Synthesize, Copy to…, frame, summary bracket, AI lock, Clear, Remove. */
+  openSelectionMoreMenu(event, count) {
+    const menu = this.newMenu();
+    const add = (title, icon, action, disabled = false) => {
+      menu.addItem((item) => item.setTitle(title).setIcon(icon).setDisabled(disabled).onClick(action));
+    };
+    add(
+      count > 1 ? t("ui.synthesize_0_topics", count) : t("ui.synthesize"),
+      "git-merge",
+      () => this.integrateSelected(),
+      count < 2
+    );
+    add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
+    if (!this.aimLive()) {
+      add(t("ui.canvas_boundary_add"), "square-dashed", () => this.openAddBoundary());
+      add(t("ui.summary_add"), "brackets", () => this.addSummaryOver());
+      const nodes = [...this.selection.state.multiSelected].map((id) => {
+        var _a2;
+        return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === id);
+      }).filter((node) => !!node && !isAimNode(node) && !!this.notes.get(node.id));
+      const all = nodes.length > 0 && nodes.every((node) => {
+        var _a2;
+        return ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
+      });
+      const locked = nodes.filter((node) => {
+        var _a2;
+        return ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
+      }).length;
+      add(
+        `${t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle")}${locked && !all ? ` (${t("ui.ai_locked_some_0_1", locked, nodes.length)})` : ""}`,
+        all ? "unlock" : "lock",
+        () => this.enqueue(() => this.setAiLock(nodes, !all)),
+        !nodes.length
+      );
+    }
+    menu.addSeparator();
+    add(t("ui.clear"), "x", () => this.applySelectionChange(this.selection.clearMulti()));
+    add(t("ui.remove"), "trash", () => this.confirmRemoveSelected());
+    menu.showAtMouseEvent(event);
   }
   /** The dialog's choices for each child's research; the data sources the user picked go to every child. */
   researchChoices(options) {
@@ -72947,6 +73101,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
 .vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
 .vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; transform-origin: left bottom; }
+.vam-node > .vam-node-tools.is-below { bottom: auto; top: calc(100% - 6px - var(--vam-tools-inset, 0px)); transform-origin: right top; transform: translateY(-4px); }
+.vam-node > .vam-node-tools.is-below.is-align-left { transform-origin: left top; }
+.vam-node > .vam-node-tools:not(.is-below):not(.is-side-left):not(.is-side-right) { bottom: calc(100% - 6px - var(--vam-tools-inset, 0px)); }
+.vam-node > .vam-node-tools.is-side-right { bottom: auto; top: 6px; right: auto; left: calc(100% + var(--vam-tools-gap, 4px)); margin-left: 0; transform-origin: left top; transform: translateX(-4px); }
+.vam-node > .vam-node-tools.is-side-left { bottom: auto; top: 6px; left: auto; right: calc(100% + var(--vam-tools-gap, 4px)); transform-origin: right top; transform: translateX(4px); }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }

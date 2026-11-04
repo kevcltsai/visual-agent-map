@@ -243,6 +243,11 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
    no space in the card, so showing or hiding them never moves its content. */
 .vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
 .vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; transform-origin: left bottom; }
+.vam-node > .vam-node-tools.is-below { bottom: auto; top: calc(100% - 6px - var(--vam-tools-inset, 0px)); transform-origin: right top; transform: translateY(-4px); }
+.vam-node > .vam-node-tools.is-below.is-align-left { transform-origin: left top; }
+.vam-node > .vam-node-tools:not(.is-below):not(.is-side-left):not(.is-side-right) { bottom: calc(100% - 6px - var(--vam-tools-inset, 0px)); }
+.vam-node > .vam-node-tools.is-side-right { bottom: auto; top: 6px; right: auto; left: calc(100% + var(--vam-tools-gap, 4px)); margin-left: 0; transform-origin: left top; transform: translateX(-4px); }
+.vam-node > .vam-node-tools.is-side-left { bottom: auto; top: 6px; left: auto; right: calc(100% + var(--vam-tools-gap, 4px)); transform-origin: right top; transform: translateX(4px); }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
 /* In select mode every picked card is selected, so only hover and focus show a card's tools there. */
 .vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; pointer-events: auto; transform: none; }
@@ -622,9 +627,14 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-aim-answer-option input { width: 20px; height: 20px; flex: 0 0 20px; margin: 1px 0 0; }
 .vam-aim-answer-option:focus-within { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 /* Left-anchored and clear of the bottom-right zoom cluster; the names sit on their own line so the buttons never move. */
-.vam-selection-bar { position: absolute; z-index: 6; bottom: 64px; left: 16px; width: max-content; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; max-width: calc(100% - 32px); padding: 8px 12px; border: 1px solid var(--interactive-accent); border-radius: 10px; background: var(--background-primary); box-shadow: var(--shadow-s); }
-.vam-selection-bar { bottom: calc(64px + var(--vam-status-clearance, 0px)); }
-.vam-selection-bar > span { flex: 0 0 100%; width: 0; min-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-selection-bar { position: absolute; z-index: 6; bottom: 0; left: 0; right: 0; display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; box-sizing: border-box; min-height: 44px; padding: 6px 12px; border-top: 1px solid var(--interactive-accent); background: var(--background-primary); box-shadow: var(--shadow-s); }
+.vam-selection-bar { bottom: var(--vam-status-clearance, 0px); }
+.vam-selection-bar > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-selection-bar > button { flex: 0 0 auto; }
+.vam-selection-bar.is-empty { display: none; }
+/* The bar takes the canvas bottom: the map and the floating controls stop above it, so it covers no card. */
+.vam-canvas.has-selection-bar { padding-bottom: 44px; box-sizing: border-box; }
+.vam-canvas.has-selection-bar .vam-zoom-controls, .vam-canvas.has-selection-bar .vam-canvas-hint { margin-bottom: 44px; }
 /* AI chat window: the first child of the workspace, left of the canvas. It folds to a narrow edge (one button) and, on a narrow
    pane, lays over the canvas when opened. On an empty map the same elements are the opening screen, in the middle of the canvas. */
 .vam-canvas { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }

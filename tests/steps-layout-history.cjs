@@ -374,6 +374,13 @@ test('persona 11: dropping a card where it already sits, or in the middle, chang
   assert.deepEqual(childTitles(h), ['B', 'A', 'C', 'D']);
 });
 
+test('persona 11: a card dropped on empty canvas, away from its siblings, keeps its place in the order', async () => {
+  const h = await harness(SIBLINGS);
+  await h.view.mapChange(map => h.view.placeDroppedCard(map, map.nodes.find(n => n.id === h.node('D').id), { x: 1500, y: 0 }));
+  await h.view.mapChange(map => h.view.placeDroppedCard(map, map.nodes.find(n => n.id === h.node('A').id), { x: 420, y: 3000 }));
+  assert.deepEqual(Array.from(h.view.map.nodes, n => h.titleOf(n.id)), ['Root', 'A', 'B', 'C', 'D'], 'array order untouched');
+});
+
 test('persona 11: Alt+arrow trades places with the sibling, stays after Auto layout, is one undo, and stops at the ends', async () => {
   const h = await harness(SIBLINGS);
   await h.view.shiftSiblingByKey(h.node('D'), -1);

@@ -52574,7 +52574,26 @@ ${request.requirements}` : preset.text,
   placeDroppedCard(map, card, position) {
     card.x = Math.round(position.x);
     card.y = Math.round(position.y);
-    if (card.parentId && !map.aim) map.nodes = this.onScreenSiblingOrder(map, card.parentId);
+    if (card.parentId && !map.aim && this.droppedAmongSiblings(map, card))
+      map.nodes = this.onScreenSiblingOrder(map, card.parentId);
+  }
+  /**
+   * Whether a dropped card sits in its siblings' lane: close to their column (right/left maps) or row (down/up maps), and
+   * between them or within one card of the first or last. Anywhere else is empty canvas, where a drop only moves the card.
+   */
+  droppedAmongSiblings(map, card) {
+    const others = map.nodes.filter((item) => item.parentId === card.parentId && item.id !== card.id);
+    if (!others.length) return false;
+    const direction = layoutDirectionFor(map.nodes, card.id, layoutOf(map).direction);
+    const vertical = direction === "down" || direction === "up";
+    if (!vertical && direction !== "right" && direction !== "left") return false;
+    const along = (item) => vertical ? item.x : item.y;
+    const across = (item) => vertical ? item.y : item.x;
+    const reach = vertical ? 300 : DEFAULT_CARD_HEIGHT;
+    const lane = vertical ? DEFAULT_CARD_HEIGHT : 300;
+    const first = Math.min(...others.map(along)) - reach;
+    const last = Math.max(...others.map(along)) + reach;
+    return along(card) >= first && along(card) <= last && others.some((item) => Math.abs(across(item) - across(card)) < lane);
   }
   /**
    * Alt+Up/Down (Left/Right): the card trades places with the sibling before or after it, and the branch is laid out again in

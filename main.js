@@ -185,6 +185,9 @@ var en = {
   "ui.shortcut_search_map": "Search the map",
   "ui.shortcut_undo": "Undo",
   "ui.shortcut_redo": "Redo",
+  "ui.shortcut_copy": "Copy the selected cards",
+  "ui.shortcut_cut": "Cut the selected cards",
+  "ui.shortcut_paste": "Paste the copied or cut cards",
   "ui.shortcut_clear_selection": "Clear the selection",
   "ui.open_coffee_tables": "Open Coffee Tables",
   "ui.model_discovery_summary_0_1": "Codex: {0} \xB7 Claude CLI candidates: {1}",
@@ -2687,6 +2690,9 @@ var zhCN = {
   "ui.shortcut_search_map": "\u641C\u7D22\u5FC3\u667A\u56FE",
   "ui.shortcut_undo": "\u64A4\u9500",
   "ui.shortcut_redo": "\u91CD\u505A",
+  "ui.shortcut_copy": "\u590D\u5236\u9009\u4E2D\u7684\u5361\u7247",
+  "ui.shortcut_cut": "\u526A\u5207\u9009\u4E2D\u7684\u5361\u7247",
+  "ui.shortcut_paste": "\u7C98\u8D34\u590D\u5236\u6216\u526A\u5207\u7684\u5361\u7247",
   "ui.shortcut_clear_selection": "\u53D6\u6D88\u9009\u53D6",
   "ui.open_coffee_tables": "\u6253\u5F00 Coffee Tables",
   "ui.model_discovery_summary_0_1": "Codex\uFF1A{0} \xB7 Claude CLI \u5019\u9009\u6A21\u578B\uFF1A{1}",
@@ -5189,6 +5195,9 @@ var zhTW = {
   "ui.shortcut_search_map": "\u641C\u5C0B\u5FC3\u667A\u5716",
   "ui.shortcut_undo": "\u5FA9\u539F",
   "ui.shortcut_redo": "\u91CD\u505A",
+  "ui.shortcut_copy": "\u8907\u88FD\u9078\u53D6\u7684\u5361\u7247",
+  "ui.shortcut_cut": "\u526A\u4E0B\u9078\u53D6\u7684\u5361\u7247",
+  "ui.shortcut_paste": "\u8CBC\u4E0A\u8907\u88FD\u6216\u526A\u4E0B\u7684\u5361\u7247",
   "ui.shortcut_clear_selection": "\u53D6\u6D88\u9078\u53D6",
   "ui.open_coffee_tables": "\u958B\u555F Coffee Tables",
   "ui.model_discovery_summary_0_1": "Codex\uFF1A{0} \xB7 Claude CLI \u5019\u9078\u6A21\u578B\uFF1A{1}",
@@ -26529,6 +26538,9 @@ var MAP_KEYBOARD_SHORTCUTS = [
   { keys: ["Mod+F"], action: "ui.shortcut_search_map" },
   { keys: ["Mod+Z"], action: "ui.shortcut_undo" },
   { keys: ["Mod+Shift+Z"], action: "ui.shortcut_redo" },
+  { keys: ["Mod+C"], action: "ui.shortcut_copy" },
+  { keys: ["Mod+X"], action: "ui.shortcut_cut" },
+  { keys: ["Mod+V"], action: "ui.shortcut_paste" },
   { keys: ["Esc"], action: "ui.shortcut_clear_selection" }
 ];
 function shortcutLabel(keys, mac = import_obsidian16.Platform.isMacOS) {
@@ -60195,7 +60207,7 @@ ${request.requirements}` : preset.text,
         var _a3, _b3;
         return (_b3 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : item.path;
       })) != null ? _d : [];
-      new NextStepModal(
+      const dialog = new NextStepModal(
         this.app,
         note.title,
         (_f = (_e = this.map) == null ? void 0 : _e.nodes.filter((item) => item.parentId === node.id).length) != null ? _f : 0,
@@ -60283,7 +60295,8 @@ ${request.requirements}` : preset.text,
             return (pending2 == null ? void 0 : pending2.state) === "directions" && pending2.mapPath === this.path ? { directions: pending2.directions, discard: () => this.discardSynthesis(node) } : void 0;
           })()
         }
-      ).open();
+      );
+      this.openMapModal(dialog);
     });
   }
   openNodePanel(node, mode) {
@@ -62271,14 +62284,15 @@ ${request.requirements}` : preset.text,
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
     });
     const names3 = shown.map((item) => item.name);
-    new MultiResearchModal(
+    const dialog = new MultiResearchModal(
       this.app,
       names3,
       this.modelChoices(),
       (request) => void this.startMultiResearch(request, retryBatchKey),
       this.fieldLinks(),
       shown.map((item) => item.mode)
-    ).open();
+    );
+    this.openMapModal(dialog);
   }
   stopMultiResearch() {
     this.plugin.expansionCoordinator.stop(this.multiResearchKey());
@@ -63047,7 +63061,7 @@ ${request.requirements}` : preset.text,
     this.enqueue(async () => {
       var _a3;
       const current = await this.mapStyle(settings.language, { kind: "topic" });
-      new NextStepModal(
+      const dialog = new NextStepModal(
         this.app,
         "",
         0,
@@ -63071,7 +63085,8 @@ ${request.requirements}` : preset.text,
           },
           ...pending2 ? { pending: { directions: pending2.directions, discard: () => this.discardSelectionSynthesis() } } : {}
         }
-      ).open();
+      );
+      this.openMapModal(dialog);
     });
   }
   /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
@@ -69622,7 +69637,38 @@ var OutlineView = class extends import_obsidian39.ItemView {
       this.query = input2.value;
       this.renderTree();
     });
+    input2.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.isComposing || !this.query.trim()) return;
+      const path = this.firstMatchPath();
+      if (!path) return;
+      event.preventDefault();
+      this.setActive(path);
+      void this.openNote(path);
+    });
     this.renderTree();
+  }
+  /** The first topic, in outline order, whose own title contains the search text (not one that only has a matching child). */
+  firstMatchPath() {
+    var _a2, _b2;
+    if (!this.map) return null;
+    const query = foldOutlineSearch(this.query.trim());
+    if (!query) return null;
+    const children = /* @__PURE__ */ new Map();
+    for (const node of this.map.nodes) children.set(node.parentId, [...(_a2 = children.get(node.parentId)) != null ? _a2 : [], node]);
+    const find = (node) => {
+      var _a3, _b3;
+      if (foldOutlineSearch((_a3 = this.titles.get(node.id)) != null ? _a3 : node.path).includes(query)) return node.path;
+      for (const child of (_b3 = children.get(node.id)) != null ? _b3 : []) {
+        const found = find(child);
+        if (found) return found;
+      }
+      return null;
+    };
+    for (const root of (_b2 = children.get(null)) != null ? _b2 : []) {
+      const found = find(root);
+      if (found) return found;
+    }
+    return null;
   }
   renderCoffee() {
     this.contentEl.createEl("h4", { text: t("ui.coffee_segments") });

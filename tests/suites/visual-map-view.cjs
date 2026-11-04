@@ -1414,7 +1414,7 @@ integrationTest('AI merge shows on the cards ("Merging…" chip, running frame) 
   const task = { mapPath: view.path, mapId: 'm', mapTitle: 'M', title: 'T', sources: [{ id: 'a', path: 'a.md' }, { id: 'b', path: 'b.md' }], parentId: 'root', targetId: null, model: 'x', sourceContent: '', controller: new AbortController(), state: 'running', progress: '' };
   const chips = card => { const all = el => [el, ...el.children.flatMap(all)]; return all(card).filter(e => e.classes?.has('vam-status')).map(e => e.text); };
   fixture.build(); let cards = fixture.cards();
-  assert.deepEqual(chips(cards.a), []); assert.notEqual(cards.a.dataset.status, 'running');
+  assert.deepEqual(chips(cards.a), ['Researched']); assert.notEqual(cards.a.dataset.status, 'running');
   view.mergeTasks.set(view.path, task); fixture.build(); cards = fixture.cards();
   for (const id of ['a', 'b']) { assert.deepEqual(chips(cards[id]), ['Merging…'], `${id} is marked`); assert.equal(cards[id].dataset.status, 'running'); }
   for (const id of ['root', 'c']) { assert.equal(chips(cards[id]).includes('Merging…'), false, `${id} is not`); assert.notEqual(cards[id].dataset.status, 'running'); }
@@ -1426,7 +1426,7 @@ integrationTest('AI merge shows on the cards ("Merging…" chip, running frame) 
   assert.ok(texts.includes('Merging:')); assert.equal(texts.includes('Stop merge'), false, 'no Stop once the result is being written');
   const stop = (task.state = 'running', all(bar()).find(e => e.tag === 'button' && e.text === 'Stop merge')); stop.handlers.get('click')();
   assert.equal(view.mergeTasks.size, 0); assert.equal(task.controller.signal.aborted, true);
-  fixture.build(); assert.deepEqual(chips(fixture.cards().a), []); assert.equal(texts.length > 0 && all(bar()).some(e => e.text === 'Merging:'), false, 'the bar is gone');
+  fixture.build(); assert.deepEqual(chips(fixture.cards().a), ['Researched']); assert.equal(texts.length > 0 && all(bar()).some(e => e.text === 'Merging:'), false, 'the bar is gone');
 });
 integrationTest('AI merge lock: a merging card cannot be dragged; other cards still can', () => {
   for (const [merging, expected] of [[true, 0], [false, 1]]) {
@@ -1535,20 +1535,28 @@ integrationTest('card tools: labelled actions wait for hover, focus or selection
   const { translate } = load('i18n.ts');
   assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_rename', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '結構', '改名', '詳情', 'AI 探索']);
 });
-integrationTest('status pill: researched topics show none, other states keep theirs and screen readers still hear the status', () => {
-  const pills = status => {
+integrationTest('status pill: researched topics show "Researched", unresearched ones show none, other states keep theirs and screen readers still hear the status', () => {
+  const pills = (status, setup) => {
     const fixture = selectionView(load);
     fixture.view.notes.get('a').status = status;
+    setup?.(fixture.view);
     fixture.build();
     const card = fixture.cards().a, found = [];
     const walk = item => { if (item.classes?.has('vam-status')) found.push(item); item.children.forEach(walk); };
     walk(card);
-    return { found, label: fixture.view.stageEl.children.find(item => item.dataset.nodeId === 'a') };
+    return { found, card, label: fixture.view.stageEl.children.find(item => item.dataset.nodeId === 'a') };
   };
-  assert.equal(pills('completed').found.length, 0, 'completed cards have no pill');
-  for (const status of ['idea', 'error']) assert.equal(pills(status).found.length, 1, `${status} keeps its pill`);
+  const done = pills('completed');
+  assert.deepEqual(done.found.map(item => [item.text, [...item.classes].sort().join(' ')]), [['Researched', 'vam-status vam-status-completed']], 'completed cards show the Researched pill');
+  assert.equal(pills('idea').found.length, 0, 'unresearched cards have no pill');
+  assert.equal(pills('idea').card.dataset.status, 'idea', 'the card still carries its status');
+  assert.equal(pills('error').found.length, 1, 'error keeps its pill');
+  const running = pills('idea', view => { view.plugin.topicRuns.isBusy = path => path === 'a.md'; });
+  assert.deepEqual(running.found.map(item => item.text), ['AI running'], 'a running card keeps its pill');
   const labelled = selectionView(load); labelled.build();
   assert.ok(labelled.cards().a.attrs['aria-labelledby'], 'the card is still named');
+  const nameOf = card => { const walk = item => (item.classes?.has('vam-card-label') ? item : item.children.map(walk).find(Boolean)); return walk(card)?.textContent; };
+  assert.match(nameOf(done.card), /Researched/, 'the accessible name still carries the status');
 });
 integrationTest('the more-actions menu holds Organize notes and folders; toolbar keeps Select several topics; the zoom cluster Layout menu holds Auto layout', () => {
   const menus = [];
@@ -3494,6 +3502,23 @@ integrationTest('topic-markers: refreshing a card replaces its symbols and its n
   f.view.refreshCard(node, false);
   assert.doesNotMatch(label.text, /Markers/);
 });
+integrationTest('status pill: an AIM idea card has the same pill after a full render and after refreshCard; a plain idea card has none after either', () => {
+  for (const [aimKind, expected] of [['research', ['Not started']], [undefined, []]]) {
+    const f = heFixture({ notes: heNotes([['fact', { status: 'idea' }], ['hyp', {}], ['other', {}]]), aim: !!aimKind });
+    if (aimKind) f.view.map.nodes[0].aimKind = aimKind;
+    f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
+    const node = f.view.map.nodes[0], card = f.view.stageEl.children[0];
+    f.view.stageEl.querySelector = () => card; f.view.drawEdges = () => {};
+    const header = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-node-header'));
+    const pills = () => header.children.filter(c => (c.cls ?? '').split(/\s+/).includes('vam-status')).map(c => c.text);
+    const plainQuery = card.querySelector.bind(card);
+    card.querySelector = sel => (sel.includes('> .vam-status') ? header.children.find(c => (c.cls ?? '').split(/\s+/).includes('vam-status') && !(c.cls ?? '').includes('vam-aim-question-status')) ?? null : plainQuery(sel));
+    const rendered = pills();
+    f.view.refreshCard(node, false);
+    assert.deepEqual(pills(), rendered, `${aimKind ?? 'plain'}: refreshCard agrees with the full render`);
+    assert.equal(rendered.length, expected.length, `${aimKind ?? 'plain'} idea card pill count`);
+  }
+});
 integrationTest('topic-markers: refreshCard keeps the marker row where it was (after the type tag), and the row carries the tag style', () => {
   const f = heFixture({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) });
   f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
@@ -3501,6 +3526,9 @@ integrationTest('topic-markers: refreshCard keeps the marker row where it was (a
   f.view.stageEl.querySelector = () => card; f.view.drawEdges = () => {};
   const header = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-node-header'));
   const order = () => header.children.map(c => (c.cls ?? '').split(/\s+/).find(n => ['vam-card-markers', 'vam-kind-tag', 'vam-status'].includes(n)) ?? c.cls);
+  // The stand-in cannot match ":not(...)"; find the card's own status pill the way the real selector does.
+  const plainQuery = card.querySelector.bind(card);
+  card.querySelector = sel => (sel.includes('> .vam-status') ? header.children.find(c => (c.cls ?? '').split(/\s+/).includes('vam-status') && !(c.cls ?? '').includes('vam-aim-question-status')) ?? null : plainQuery(sel));
   const before = order(), at = before.indexOf('vam-card-markers');
   assert.ok(at > before.indexOf('vam-kind-tag') && before.indexOf('vam-kind-tag') >= 0, 'first draw: after the type tag');
   assert.match(header.children[at].cls, /vam-hypothesis-tag/);

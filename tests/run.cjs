@@ -55,7 +55,8 @@ const suites = [
   'check-test-wiring.cjs',
   'check-workflows.cjs',
   'heavy-lock.cjs',
-  'obsidian-cdp-trust.cjs'
+  'obsidian-cdp-trust.cjs',
+  'obsidian-cdp-input.cjs'
 ];
 const directory = path.join(__dirname, 'suites');
 assert.deepEqual(fs.readdirSync(directory).filter(file => file.endsWith('.cjs')).sort(), suites.slice().sort(), 'tests/run.cjs must list every file in tests/suites');

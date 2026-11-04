@@ -169,7 +169,7 @@ test('counter 5: the fixed parts are present and equal their fragments', () => {
       assert.equal(fixed('json-contract').text, m.withProviderOutput(m.inLanguage(m.JSON_CONTRACT, language), provider, language));
       assert.equal(fixed('json-contract').text.includes('StructuredOutput'), provider === 'claude');
       assert.equal(fixed('step').text, m.inLanguage(m.GENERAL_TASK, language));
-      assert.ok(fixed('step').text.includes('80'));
+      assert.ok(fixed('step').text.includes(language === 'en' ? '160' : '80'));
       assert.ok(fixed('reference-citations'));
       const withoutSources = m.assembleTaskPrompt(m.selectionFromContext({ ...context, sourceContext: undefined }, language), 'research', { ...context, sourceContext: undefined }, language, provider);
       assert.equal(withoutSources.segments.some(s => s.source.id === 'reference-citations'), false);

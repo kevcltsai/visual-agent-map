@@ -12,6 +12,7 @@ const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-ch
 const mapChatService = loadWithAiCalls('core/map-chat-service.ts');
 const { partialReply, MapChatService, providerMapChatRunner } = mapChatService;
 const { History, serializeMap } = load('map-model.ts');
+const { countChatLines, splitChatLines } = load('core/map-chat-layout.ts');
 
 const CONFIG = '.obsidian';
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -1282,4 +1283,20 @@ test('chat 08: the schema lists the colours, markers and formats as enums, and b
   const en = render('en'), zh = render('zh-TW');
   assert.match(en, /- set_appearance: nodeIds/); assert.match(en, /Priority and progress hold one value each/); assert.match(en, /do not send set_appearance/);
   assert.match(zh, /- set_appearance：nodeIds/); assert.match(zh, /優先度與進度各只能有一個值/); assert.match(zh, /不要送 set_appearance/);
+});
+
+// ---- result lines: notes are shown but not counted ----
+test('auto-layout line is a note: 7 add_child lines plus it count 7 done, and Show all counts 7', () => {
+  const cards = Array.from({ length: 7 }, (_, i) => ({ status: 'done', text: `Added ${i}` }));
+  const notes = ['Arranged the map automatically', 'Undo takes back this reply'];
+  const lines = [...cards, { status: 'done', text: notes[0] }, { status: 'done', text: notes[1] }];
+  assert.deepEqual(plain(countChatLines(lines, notes)), { done: 7, skipped: 0, failed: 0 });
+  const split = plain(splitChatLines(lines, notes));
+  assert.equal(split.results.length, 7); assert.deepEqual(split.notes.map(line => line.text), notes);
+  assert.deepEqual(plain(countChatLines(lines, notes[1])), { done: 8, skipped: 0, failed: 0 }, 'a single ignored text still works');
+});
+test('one or two new cards and no layout line: counts and lines are unchanged', () => {
+  const lines = [{ status: 'done', text: 'Added 0' }, { status: 'skipped', text: 'Skipped 1' }];
+  assert.deepEqual(plain(countChatLines(lines, ['Arranged', 'Undo'])), { done: 1, skipped: 1, failed: 0 });
+  assert.deepEqual(plain(splitChatLines(lines, ['Arranged', 'Undo'])), { results: lines, notes: [] });
 });

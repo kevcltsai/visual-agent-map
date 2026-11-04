@@ -76,6 +76,15 @@ export function prepareTestVault({ vault = canonicalVault, artifact = root, prof
   } finally { rmSync(staging, { recursive: true, force: true }); }
 }
 
+// Session vaults get Obsidian's DOM menus so CDP can open them in the background. An existing nativeMenus choice and every
+// other appearance key stay as they are; the owner vault never reaches this.
+function ensureNativeMenusOff(vault) {
+  const path = join(vault, ".obsidian/appearance.json");
+  const current = existsSync(path) ? json(path) : {};
+  if (Object.hasOwn(current, "nativeMenus")) return;
+  writeFileSync(path, JSON.stringify({ ...current, nativeMenus: false }, null, 2));
+}
+
 // Refresh only installed code in an owned Vault. Preserve every fixture, note, and attachment.
 export function updateCurrentTestVault({ vault = canonicalVault, artifact = root, source = {}, owner = canonicalVault } = {}) {
   if (!existsSync(vault) || lstatSync(vault).isSymbolicLink() || !lstatSync(vault).isDirectory() || !existsSync(join(vault, marker))) throw new Error("Refusing to update a missing or unowned test vault.");
@@ -87,6 +96,7 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
   const installedManifest = json(join(plugin, "manifest.json"));
   if (manifest.id !== "visual-agent-map" || installedManifest.id !== manifest.id || installedManifest.version !== record.version) throw new Error("Installed plugin identity/version does not match the owned test-vault record.");
   if (record.profile !== "onboarding" && !isOwnerVault(vault, owner)) ensureSourceSelectionFixture(vault, record.workspaceRoot, { preserveExisting: true });
+  if (!isOwnerVault(vault, owner)) ensureNativeMenusOff(vault);
   const staging = mkdtempSync(join(plugin, ".vam-update-")), replaced = [];
   try {
     for (const name of assets) copyFileSync(join(artifact, name), join(staging, name));

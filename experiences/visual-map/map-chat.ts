@@ -7,6 +7,7 @@ import {
   chatSuggestionKeys,
   clampMapChatWidth,
   countChatLines,
+  splitChatLines,
   MAP_CHAT_EXAMPLE_KEYS,
   MAP_CHAT_OPEN_ENDED_KEYS,
   chatSuggestionFill,
@@ -234,6 +235,8 @@ export interface MapChatHost {
 }
 
 const LABEL_LIMIT = 40;
+/** Result lines that are notes: shown, but not counted as results. */
+const chatNoteTexts = (): string[] => [t("ui.map_chat_not_undoable"), t("ui.map_chat_auto_layout_added")];
 const clip = (value: string, limit = LABEL_LIMIT): string => {
   const text = value.replace(/\s+/g, " ").trim();
   const characters = [...text];
@@ -1004,9 +1007,7 @@ export class MapChatPanel {
     this.host.stateChanged?.();
     // The results of an applied plan arrive well after the reply: say them once, like the results of a reply.
     if (lines?.length)
-      this.announce(
-        t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, t("ui.map_chat_not_undoable"))))
-      );
+      this.announce(t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, chatNoteTexts()))));
   }
   /** Offers a short list to pick from under the last answer. */
   showChoices(choices: MapChatChoices): void {
@@ -1452,7 +1453,7 @@ export class MapChatPanel {
   }
   private spokenTurn(reply: string, lines: MapChatLine[]): string {
     const said = t("ui.map_chat_live_done_0", clip(reply, 160));
-    const counts = this.countsText(countChatLines(lines, t("ui.map_chat_not_undoable")));
+    const counts = this.countsText(countChatLines(lines, chatNoteTexts()));
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
   /** A reply came in while the window is folded to its edge: the edge shows a dot. */
@@ -1829,10 +1830,7 @@ export class MapChatPanel {
    * happened in words, so the colour is never the only sign.
    */
   private buildLines(row: HTMLElement, message: MapChatMessage): void {
-    const closing = t("ui.map_chat_not_undoable");
-    const lines = message.lines.map(settledLine);
-    const results = lines.filter(line => line.text !== closing);
-    const notes = lines.filter(line => line.text === closing);
+    const { results, notes } = splitChatLines(message.lines.map(settledLine), chatNoteTexts());
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
     const fold = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
     const shown = !fold || message.linesOpen === true;

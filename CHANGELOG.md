@@ -5,6 +5,8 @@
 - **AIM is paused in this version.** Its entry points and settings are hidden; a map built with AIM still opens and edits like any other map, except that card resizing and grading by a goal stay off while AIM is paused. Nothing in your vault is deleted.
 - **AI lock.** Lock a topic (topic panel, card button or selection bar; `ai-locked: true`) and no AI action changes it, its children or its relations; your own edits still work.
 - **Grading by goal works again with Codex.** The grade request no longer gets refused for a missing `anchor`, and a grading failure now reads as one plain sentence instead of raw error text.
+- **Integrating while a child is being researched.** Synthesizing a topic now waits for its children's running research instead of failing with "The topic changed".
+- **Standard research follows the interface language.** In an English interface a Standard research now writes in English instead of Chinese, and the "Use AI on selection" button changes language when you switch the interface language.
 - **Explore dialog remembers and explains.** Typing in the Levels and size fields replaces the old number and tells you when it is over the limit; the outline review reopens with the levels and size you set; the AI mode hint follows Quick or Standard.
 
 ### Cards, links and marks

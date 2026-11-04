@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { load } = require('./support-replay.cjs');
+const { load, loadSource } = require('./support-replay.cjs');
 
 const root = path.resolve(__dirname, '..');
 
@@ -48,7 +48,10 @@ function setup(initial, options = {}) {
     document: { activeElement: null },
     window: { getSelection: () => null, innerWidth: 1000, innerHeight: 800, requestAnimationFrame: callback => callback(), setTimeout, clearTimeout }
   };
-  const { MarkdownSelectionAi } = load('experiences/markdown-context/selection-ai.ts', { obsidian }, globals);
+  // `sharedLanguage`: one bundle for the selection AI and the interface language, so a test can switch the language.
+  const { MarkdownSelectionAi, setUiLanguage } = options.sharedLanguage
+    ? loadSource('export * from "./experiences/markdown-context/selection-ai"; export { setUiLanguage } from "./i18n";', { obsidian }, globals)
+    : load('experiences/markdown-context/selection-ai.ts', { obsidian }, globals);
   const markdown = 'Intro. Selected words here. Outro.';
   const selected = 'Selected words here.';
   const view = Object.assign(new MarkdownView(), {
@@ -65,8 +68,27 @@ function setup(initial, options = {}) {
   const panel = () => app.workspace.containerEl.children.find(item => item.cls === 'vam-context-ai-panel');
   const imageAction = () => app.workspace.containerEl.children.find(item => item.cls.includes('vam-image-action-pill'));
   const fire = (type, event = {}) => { for (const listener of listeners[type] ?? []) listener(event); };
-  return { ai, markdown, launcher, panel, imageAction, fire, selected, image: new HTMLImageElement(), setAutoOpen: value => { autoOpen = value; } };
+  return { ai, setUiLanguage, markdown, launcher, panel, imageAction, fire, selected, image: new HTMLImageElement(), setAutoOpen: value => { autoOpen = value; } };
 }
+
+test('persona 09: the launcher text follows the interface language after it changes (zh-TW start, switch to en and back)', () => {
+  const { ai, launcher, setUiLanguage } = setup(true, { sharedLanguage: true });
+  setUiLanguage('zh-TW');
+  ai.refreshLanguage();
+  assert.equal(launcher.textContent, '用 AI 處理選取文字');
+  setUiLanguage('en');
+  ai.refreshLanguage();
+  assert.equal(launcher.textContent, 'Use AI on selection');
+  assert.equal(launcher.attrs['aria-label'], 'Use AI on selection');
+  setUiLanguage('zh-TW');
+  ai.refreshLanguage();
+  assert.equal(launcher.textContent, '用 AI 處理選取文字');
+});
+
+test('persona 09: the plugin refreshes the launcher when the interface language changes', () => {
+  const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  assert.match(main, /refreshLocalizedEntrypoints\(\): void \{[\s\S]*?this\.markdownSelectionAi\?\.refreshLanguage\(\)/);
+});
 
 test('auto-open on: selecting text shows the launcher', () => {
   const { launcher, fire } = setup(true);

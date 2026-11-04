@@ -4,11 +4,11 @@
   "properties": {
     "summary": {
       "type": "string",
-      "description": "適合心智圖的一句繁體中文結論，80 字內"
+      "description": "A one-sentence conclusion that fits a mind map, written in the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings), within 80 words"
     },
     "detail": {
       "type": "string",
-      "description": "完整的繁體中文 Markdown 分析"
+      "description": "A complete Markdown analysis written in the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings)"
     },
     "suggestions": {
       "type": "array",

@@ -730,6 +730,41 @@ integrationTest('synthesis directions and draft are separate steps; only confirm
   assert.equal(saved.rules, 'Legacy sentinel');
   assert.equal(saved.summary, 'Edited summary'); assert.match(saved.detail, /Edited detail/);
 });
+async function integrationWithChild() {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'model-a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const child = await repo.createNote('Child', 'model-a', mapDoc, mapPath, 'workspace'); child.parentId = parent.id; mapDoc.nodes.push(child); await repo.saveMap(mapPath, mapDoc);
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, mutate: async work => work(), askModel: async () => ({ summary: 'Draft summary', detail: 'Draft detail', visualReferences: [], suggestions: [] }) };
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
+  const options = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
+  return { repo, parent, child, plugin, view, options };
+}
+integrationTest('integrating a topic while a child is still being researched waits for the child and does not report a changed topic (persona 08)', async () => {
+  const { repo, parent, child, plugin, view, options } = await integrationWithChild();
+  const research = plugin.topicRuns.begin(child.path, 'research');
+  let save; const failures = [];
+  const run = view.integrateChildren(parent, options, '', (_result, commit) => { save = commit; }, message => failures.push(message));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(save, undefined, 'the integration waits while the child is being researched');
+  await repo.updateNote(child.path, { summary: 'Researched summary', detail: 'Researched detail' });
+  research.release();
+  await run;
+  assert.deepEqual(failures, []);
+  await save('Merged summary', 'Merged detail');
+  assert.equal((await repo.readNote(parent.path)).summary, 'Merged summary');
+});
+integrationTest('integration still refuses to save when the user edits a child after the draft (persona 08 guard)', async () => {
+  const { repo, parent, child, view, options } = await integrationWithChild();
+  let save; const failures = [];
+  await view.integrateChildren(parent, options, '', (_result, commit) => { save = commit; }, message => failures.push(message));
+  assert.equal(typeof save, 'function');
+  await repo.updateNote(child.path, { detail: 'User edited this child' });
+  await assert.rejects(save('Merged summary', 'Merged detail'), /topic changed/);
+  assert.notEqual((await repo.readNote(parent.path)).summary, 'Merged summary');
+});
 integrationTest('synthesis content is explicit for one, three and four children, with full default and no descendants', async () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const { referenceBatches } = load('ai/reference-materials.ts', { obsidian });

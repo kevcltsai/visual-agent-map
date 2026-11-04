@@ -99,6 +99,7 @@ import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-writ
 export { formatIssuesPatch };
 import {
   fishboneSpinePathData,
+  relationAxisFor,
   relationLabelPoint,
   relationPathData,
   treeEdgePathData,
@@ -19157,11 +19158,12 @@ export class VisualAgentMapView extends ItemView {
           const from = shifted(link.fromId, dx, dy),
             to = shifted(link.toId, dx, dy);
           if (!path || !from || !to) continue;
-          const d = relationPathData(from, to);
+          const axis = relationAxisFor(layoutOf(this.map).direction),
+            d = relationPathData(from, to, axis);
           path.setAttribute("d", d);
           this.relationHitEls.get(link.key)?.setAttribute("d", d);
           this.relationGapEls.get(link.key)?.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
         for (const edge of tree) {
           const path = this.edgeEls.get(edge.key);
@@ -19240,11 +19242,12 @@ export class VisualAgentMapView extends ItemView {
           const mine = { x, y, ...size },
             from = link.dragIsFrom ? mine : link.far,
             to = link.dragIsFrom ? link.far : mine,
-            d = relationPathData(from, to);
+            axis = relationAxisFor(layoutOf(this.map).direction),
+            d = relationPathData(from, to, axis);
           path.setAttribute("d", d);
           this.relationHitEls.get(link.key)?.setAttribute("d", d);
           this.relationGapEls.get(link.key)?.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
         for (const edge of touching) {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
@@ -19443,8 +19446,10 @@ export class VisualAgentMapView extends ItemView {
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
+    // In a map that grows sideways the lines lean to the left and right edges, in one that grows up or down to the ends.
+    const axis = relationAxisFor(layoutOf(this.map).direction);
     for (const link of links) {
-      const d = relationPathData(boxOf(link.from), boxOf(link.to)),
+      const d = relationPathData(boxOf(link.from), boxOf(link.to), axis),
         marker =
           link.kind === "related"
             ? null
@@ -19500,7 +19505,7 @@ export class VisualAgentMapView extends ItemView {
       label.addClass("vam-relation-label");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
+      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to), axis));
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
     this.selection.pruneRelation(new Set(this.relationEls.keys()));

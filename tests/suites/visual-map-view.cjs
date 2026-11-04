@@ -3073,6 +3073,30 @@ integrationTest('hypothesis-evidence: cards stacked one above the other are join
   const sides = nearestSides(heBox(0, 0), heBox(0, 200));
   assert.deepEqual([sides.from.ny, sides.to.ny], [1, -1], 'the normals point away from each card');
 });
+integrationTest('hypothesis-evidence: in a map that grows sideways a column of evidence meets the hypothesis from the side, however far up or down, so no line runs behind the cards between; up-down maps lean to the ends', () => {
+  const { relationPathData, relationLabelPoint, nearestSides, relationAxisFor, AXIS_GAP } = heGeo();
+  assert.equal(AXIS_GAP, 32);
+  assert.deepEqual(['right', 'left', 'balanced', 'down', 'up', 'radial', 'fishbone', 'timeline'].map(relationAxisFor), ['sides', 'sides', 'sides', 'ends', 'ends', undefined, undefined, undefined]);
+  // The owner's auto-laid-out map: the hypothesis on the left, six evidence cards stacked in a column on the right.
+  const hyp = heBox(115, 770, 475, 322), column = [70, 335, 645, 908, 1172, 1572].map(y => heBox(728, y, 475, 222));
+  for (const card of column) {
+    const { from, to } = nearestSides(card, hyp, 'sides');
+    assert.deepEqual([from.x, from.nx, to.x, to.nx], [728, -1, 590, 1], `evidence at y ${card.y}: its left edge to the hypothesis' right edge`);
+    const xs = heNums(relationPathData(card, hyp, 'sides')).filter((_, i) => i % 2 === 0);
+    assert.ok(xs.every(x => x >= 590 && x <= 728), `evidence at y ${card.y}: the curve stays in the gap between the two columns (${xs})`);
+  }
+  // Before the fix (and still with no axis) the far cards left their bottom or top edge and ran behind the cards between.
+  assert.equal(nearestSides(column[0], hyp).from.ny, 1);
+  assert.equal(nearestSides(column[5], hyp).from.ny, -1);
+  // The preference needs room for two shortest arms; under that the closer-axis rule decides.
+  assert.equal(relationPathData(heBox(0, 0), heBox(311, 600), 'sides'), relationPathData(heBox(0, 0), heBox(311, 600)));
+  assert.equal(relationPathData(heBox(0, 0), heBox(312, 600), 'sides'), 'M 280 50 C 296 50, 296 650, 312 650');
+  // The mirror in an up-down map: a card far to the side but a row below still meets the bottom edge.
+  assert.equal(relationPathData(heBox(0, 0), heBox(900, 132), 'ends'), 'M 140 100 C 140 116, 1040 116, 1040 132');
+  assert.equal(relationPathData(heBox(0, 0), heBox(900, 132)), 'M 280 50 C 340 50, 840 182, 900 182', 'with no axis the wide gap wins');
+  const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] = heNums(relationPathData(column[0], hyp, 'sides'));
+  assert.deepEqual(plain(relationLabelPoint(column[0], hyp, 'sides')), { x: (x1 + 3 * cx1 + 3 * cx2 + x2) / 8, y: (y1 + 3 * cy1 + 3 * cy2 + y2) / 8 }, 'the label follows the same curve');
+});
 integrationTest('hypothesis-evidence: the control arms are clamped to 16..60 and never leave a 60px margin around the two cards (same-side layouts included)', () => {
   const { relationPathData, relationLabelPoint } = heGeo();
   assert.deepEqual(heNums(relationPathData(heBox(0, 0), heBox(290, 0))).slice(2, 4), [296, 50], 'a 10px gap still gets a 16px arm');

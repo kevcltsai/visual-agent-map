@@ -24732,6 +24732,12 @@ var originBaseline = (origin) => (0, import_node_crypto6.createHash)("sha256").u
 // experiences/visual-map/relation-geometry.ts
 var MIN_CONTROL = 16;
 var MAX_CONTROL = 60;
+var AXIS_GAP = 2 * MIN_CONTROL;
+function relationAxisFor(direction) {
+  if (direction === "right" || direction === "left" || direction === "balanced") return "sides";
+  if (direction === "down" || direction === "up") return "ends";
+  return void 0;
+}
 function axisGap(aStart, aSize, bStart, bSize) {
   return Math.max(bStart - (aStart + aSize), aStart - (bStart + bSize));
 }
@@ -24739,13 +24745,14 @@ var centreOf = (box) => ({
   x: box.x + box.width / 2,
   y: box.y + box.height / 2
 });
-function nearestSides(a, b) {
+function nearestSides(a, b, axis = void 0) {
   const horizontal = axisGap(a.x, a.width, b.x, b.width), vertical = axisGap(a.y, a.height, b.y, b.height);
   if (horizontal < 0 && vertical < 0) {
     const from = centreOf(a), to = centreOf(b);
     return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
   }
-  if (horizontal >= vertical) {
+  const sideways = axis === "sides" && horizontal >= AXIS_GAP ? true : axis === "ends" && vertical >= AXIS_GAP ? false : horizontal >= vertical;
+  if (sideways) {
     const rightward = centreOf(b).x >= centreOf(a).x, sign2 = rightward ? 1 : -1;
     return {
       from: { x: rightward ? a.x + a.width : a.x, y: a.y + a.height / 2, nx: sign2, ny: 0 },
@@ -24761,8 +24768,8 @@ function nearestSides(a, b) {
   };
 }
 var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
-function curveOf(a, b) {
-  const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
+function curveOf(a, b, axis = void 0) {
+  const { from, to, gap } = nearestSides(a, b, axis), length = gap > 0 ? controlLength(gap) : 0;
   return {
     p1: { x: from.x, y: from.y },
     c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
@@ -24770,12 +24777,12 @@ function curveOf(a, b) {
     p2: { x: to.x, y: to.y }
   };
 }
-function relationPathData(a, b) {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
+function relationPathData(a, b, axis = void 0) {
+  const { p1, c1, c2, p2 } = curveOf(a, b, axis);
   return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
 }
-function relationLabelPoint(a, b) {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
+function relationLabelPoint(a, b, axis = void 0) {
+  const { p1, c1, c2, p2 } = curveOf(a, b, axis);
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
 function treeEdgePathData(parent, child, direction, depth = 1) {
@@ -66242,11 +66249,11 @@ ${addition}` : addition });
           const path = this.relationEls.get(link.key);
           const from = shifted(link.fromId, dx, dy), to = shifted(link.toId, dx, dy);
           if (!path || !from || !to) continue;
-          const d = relationPathData(from, to);
+          const axis = relationAxisFor(layoutOf(this.map).direction), d = relationPathData(from, to, axis);
           path.setAttribute("d", d);
           (_a3 = this.relationHitEls.get(link.key)) == null ? void 0 : _a3.setAttribute("d", d);
           (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
         for (const edge of tree) {
           const path = this.edgeEls.get(edge.key);
@@ -66310,11 +66317,11 @@ ${addition}` : addition });
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
-          const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, d = relationPathData(from, to);
+          const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, axis = relationAxisFor(layoutOf(this.map).direction), d = relationPathData(from, to, axis);
           path.setAttribute("d", d);
           (_a3 = this.relationHitEls.get(link.key)) == null ? void 0 : _a3.setAttribute("d", d);
           (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
         for (const edge of touching2) {
           const path = this.edgeEls.get(edge.key);
@@ -66490,8 +66497,9 @@ ${addition}` : addition });
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
+    const axis = relationAxisFor(layoutOf(this.map).direction);
     for (const link of links) {
-      const d = relationPathData(boxOf(link.from), boxOf(link.to)), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
+      const d = relationPathData(boxOf(link.from), boxOf(link.to), axis), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
       const path = createSvg("path");
       path.setAttribute("d", d);
       if (marker5) path.setAttribute("marker-end", marker5);
@@ -66539,7 +66547,7 @@ ${addition}` : addition });
       label.addClass("vam-relation-label");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
+      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to), axis));
     }
     this.selection.pruneRelation(new Set(this.relationEls.keys()));
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;

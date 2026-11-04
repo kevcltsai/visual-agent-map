@@ -18,6 +18,24 @@ export interface RelationAnchor {
 
 export const MIN_CONTROL = 16;
 export const MAX_CONTROL = 60;
+/**
+ * The axis a map's semantic lines lean to: "sides" (left and right edges) in a map that grows sideways, "ends" (top and
+ * bottom edges) in one that grows up or down. Undefined keeps the closer-axis rule alone.
+ */
+export type RelationAxis = "sides" | "ends";
+/**
+ * With a preferred axis, a semantic line uses it whenever the cards are at least this far apart along it (room for two
+ * shortest arms), however far apart they are on the other axis. A column of evidence beside a hypothesis in a map that
+ * grows sideways then meets it from the side, instead of leaving its bottom edge and running behind the cards between.
+ */
+export const AXIS_GAP = 2 * MIN_CONTROL;
+
+/** The preferred axis of a map laid out in `direction`: sideways for right, left and balanced, up-down for down and up. */
+export function relationAxisFor(direction: string): RelationAxis | undefined {
+  if (direction === "right" || direction === "left" || direction === "balanced") return "sides";
+  if (direction === "down" || direction === "up") return "ends";
+  return undefined;
+}
 
 /** Distance between two cards along one axis; negative when they overlap on that axis. */
 function axisGap(aStart: number, aSize: number, bStart: number, bSize: number): number {
@@ -31,12 +49,14 @@ const centreOf = (box: RelationBox): { x: number; y: number } => ({
 
 /**
  * The two edge midpoints a semantic line joins. When the horizontal gap is at least the vertical gap the cards face each
- * other left and right; otherwise top and bottom. Cards that overlap on both axes join centre to centre (no normal).
+ * other left and right; otherwise top and bottom. A preferred `axis` wins whenever the gap along it is at least
+ * `AXIS_GAP`. Cards that overlap on both axes join centre to centre (no normal).
  * `gap` is the distance the line crosses, which sets the length of the curve's control arms.
  */
 export function nearestSides(
   a: RelationBox,
-  b: RelationBox
+  b: RelationBox,
+  axis: RelationAxis | undefined = undefined
 ): { from: RelationAnchor; to: RelationAnchor; gap: number } {
   const horizontal = axisGap(a.x, a.width, b.x, b.width),
     vertical = axisGap(a.y, a.height, b.y, b.height);
@@ -45,7 +65,13 @@ export function nearestSides(
       to = centreOf(b);
     return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
   }
-  if (horizontal >= vertical) {
+  const sideways =
+    axis === "sides" && horizontal >= AXIS_GAP
+      ? true
+      : axis === "ends" && vertical >= AXIS_GAP
+        ? false
+        : horizontal >= vertical;
+  if (sideways) {
     const rightward = centreOf(b).x >= centreOf(a).x,
       sign = rightward ? 1 : -1;
     return {
@@ -72,8 +98,8 @@ interface Curve {
   p2: { x: number; y: number };
 }
 
-function curveOf(a: RelationBox, b: RelationBox): Curve {
-  const { from, to, gap } = nearestSides(a, b),
+function curveOf(a: RelationBox, b: RelationBox, axis: RelationAxis | undefined = undefined): Curve {
+  const { from, to, gap } = nearestSides(a, b, axis),
     length = gap > 0 ? controlLength(gap) : 0;
   return {
     p1: { x: from.x, y: from.y },
@@ -84,14 +110,18 @@ function curveOf(a: RelationBox, b: RelationBox): Curve {
 }
 
 /** Cubic Bezier from the nearest edge of `a` to the nearest edge of `b`; the arms follow the edges' normals, so it never takes a wide arc. */
-export function relationPathData(a: RelationBox, b: RelationBox): string {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
+export function relationPathData(a: RelationBox, b: RelationBox, axis: RelationAxis | undefined = undefined): string {
+  const { p1, c1, c2, p2 } = curveOf(a, b, axis);
   return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
 }
 
 /** Where the label sits: the midpoint of the line (t = 0.5). */
-export function relationLabelPoint(a: RelationBox, b: RelationBox): { x: number; y: number } {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
+export function relationLabelPoint(
+  a: RelationBox,
+  b: RelationBox,
+  axis: RelationAxis | undefined = undefined
+): { x: number; y: number } {
+  const { p1, c1, c2, p2 } = curveOf(a, b, axis);
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
 

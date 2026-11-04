@@ -143,7 +143,7 @@ test('resolveMergeModel: the parent topic model wins, otherwise the workspace mo
 test('mergeGoalTask: both languages keep all information, drop duplicates, add no conclusion and cap the summary at 80', () => {
   const { mergeGoalTask, synthesisGoalTask } = load('experiences/visual-map/steps/fragments.ts');
   const en = mergeGoalTask('en'), zh = mergeGoalTask('zh-TW');
-  assert.match(en, /every piece of information/); assert.match(en, /Do not add conclusions/); assert.match(en, /80 characters/); assert.match(en, /contradict/);
+  assert.match(en, /every piece of information/); assert.match(en, /Do not add conclusions/); assert.match(en, /160 characters/); assert.match(en, /contradict/);
   assert.match(zh, /全部資訊/); assert.match(zh, /不加入來源沒有的結論/); assert.match(zh, /80/); assert.match(zh, /矛盾/);
   assert.notEqual(en, synthesisGoalTask('en'));
 });

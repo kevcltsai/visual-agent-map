@@ -12,6 +12,30 @@ export const INSET_GAP = 8;
 /** The viewport a new map is created with (map-model.ts); it is the only one the initial helper replaces. */
 export const DEFAULT_VIEWPORT: Readonly<MapViewport> = { x: 40, y: 40, zoom: 1 };
 
+/** Areas of the canvas that floating controls cover. A plain number means the top only (the toolbar). */
+export interface CanvasInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+export type CanvasInset = number | CanvasInsets;
+export function normalizeInset(inset: CanvasInset): CanvasInsets {
+  return typeof inset === "number" ? { top: inset, right: 0, bottom: 0, left: 0 } : inset;
+}
+
+/** Bottom safe area: from the zoom bar's top edge to the canvas bottom, plus a gap. 0 when it is not laid out. */
+export function bottomInsetFromRects(canvasBottom: number, barRect?: { top: number; bottom: number }): number {
+  if (!barRect || !(barRect.bottom > barRect.top)) return 0;
+  return Math.max(0, Math.ceil(canvasBottom - barRect.top)) + INSET_GAP;
+}
+
+/** Left safe area: an overlay panel's right edge measured from the canvas left. 0 when there is no overlay panel. */
+export function leftInsetFromRects(canvasLeft: number, panelRect?: { left: number; right: number }): number {
+  if (!panelRect || !(panelRect.right > panelRect.left)) return 0;
+  return Math.max(0, Math.ceil(panelRect.right - canvasLeft));
+}
+
 /** Safe area height: the toolbar's bottom edge measured from the canvas top, plus a gap. 0 when it is not laid out. */
 export function insetFromRects(canvasTop: number, toolsRect?: { top: number; bottom: number }): number {
   if (!toolsRect || !(toolsRect.bottom > toolsRect.top)) return 0;
@@ -30,13 +54,14 @@ export function focusViewport(
   viewport: MapViewport,
   point: { x: number; y: number },
   size: { width: number; height: number },
-  inset: number
+  inset: CanvasInset
 ): MapViewport {
   const zoom = viewport.zoom;
+  const box = normalizeInset(inset);
   return {
     zoom,
-    x: size.width / 2 - point.x * zoom,
-    y: inset + (size.height - inset) / 2 - point.y * zoom
+    x: box.left + (size.width - box.left - box.right) / 2 - point.x * zoom,
+    y: box.top + (size.height - box.top - box.bottom) / 2 - point.y * zoom
   };
 }
 
@@ -47,29 +72,33 @@ export const FIT_MIN_ZOOM = 0.25;
 export function fitIsClamped(
   bounds: { minX: number; minY: number; maxX: number; maxY: number },
   size: { width: number; height: number },
-  inset: number
+  inset: CanvasInset
 ): boolean {
-  const availableHeight = Math.max(1, size.height - inset);
+  const box = normalizeInset(inset);
+  const availableWidth = Math.max(1, size.width - box.left - box.right);
+  const availableHeight = Math.max(1, size.height - box.top - box.bottom);
   const w = bounds.maxX - bounds.minX,
     h = bounds.maxY - bounds.minY;
-  return Math.min((size.width - 80) / w, (availableHeight - 80) / h) < FIT_MIN_ZOOM;
+  return Math.min((availableWidth - 80) / w, (availableHeight - 80) / h) < FIT_MIN_ZOOM;
 }
 
-/** Show-all viewport: the bounds are fitted and centred in the area below the inset. */
+/** Show-all viewport: the bounds are fitted and centred in the area left inside the inset. */
 export function fitViewport(
   bounds: { minX: number; minY: number; maxX: number; maxY: number },
   size: { width: number; height: number },
-  inset: number,
+  inset: CanvasInset,
   maxZoom = 1.2
 ): MapViewport {
-  const availableHeight = Math.max(1, size.height - inset);
+  const box = normalizeInset(inset);
+  const availableWidth = Math.max(1, size.width - box.left - box.right);
+  const availableHeight = Math.max(1, size.height - box.top - box.bottom);
   const w = bounds.maxX - bounds.minX,
     h = bounds.maxY - bounds.minY;
-  const zoom = Math.max(FIT_MIN_ZOOM, Math.min(maxZoom, (size.width - 80) / w, (availableHeight - 80) / h));
+  const zoom = Math.max(FIT_MIN_ZOOM, Math.min(maxZoom, (availableWidth - 80) / w, (availableHeight - 80) / h));
   return {
     zoom,
-    x: (size.width - w * zoom) / 2 - bounds.minX * zoom,
-    y: inset + (availableHeight - h * zoom) / 2 - bounds.minY * zoom
+    x: box.left + (availableWidth - w * zoom) / 2 - bounds.minX * zoom,
+    y: box.top + (availableHeight - h * zoom) / 2 - bounds.minY * zoom
   };
 }
 

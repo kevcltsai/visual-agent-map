@@ -10,7 +10,7 @@ Use the selected local Markdown sources first. Use web research only to fill gap
 
 Return JSON only, without a Markdown code fence. Use this exact shape: {"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}. Return an empty visualReferences array when there are no visual references.
 
-General task: summary is one new insight for the mind map, within 80 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.
+General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.
 
 When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the open questions section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
 

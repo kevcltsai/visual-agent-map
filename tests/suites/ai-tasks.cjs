@@ -340,13 +340,33 @@ integrationTest('AIM task timeout text follows the interface language while the 
 });
 test('summary truncation never leaves trailing whitespace and prefers a sentence boundary', () => {
   const { truncateSummary } = load('ai/result-utils.ts');
-  const spaced = truncateSummary(`${'a'.repeat(79)} tail that continues past the limit`);
-  assert.equal(spaced, spaced.trimEnd()); assert.ok(Array.from(spaced).length <= 80);
-  const observed = truncateSummary('三個來源大致一致，公開版為 1.14.4（2026-10-05）；但 changelog 公開條目標為「1.14」，需注意 Catalyst 1.14.4 於 10/1 先行，且尚有標示差異。');
-  assert.equal(observed, observed.trimEnd()); assert.ok(Array.from(observed).length <= 80); assert.match(observed, /…$/);
+  const width = text => Array.from(text).reduce((sum, ch) => sum + (/[\u1100-\u115f\u2e80-\u303e\u3040-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{20000}-\u{3fffd}]/u.test(ch) ? 1 : 0.5), 0);
+  const spacedInput = `${'a'.repeat(159)} tail that continues past the limit`;
+  assert.ok(width(spacedInput) > 80, 'the sample really exceeds the width limit');
+  const spaced = truncateSummary(spacedInput);
+  assert.notEqual(spaced, spacedInput, 'it is truncated');
+  assert.equal(spaced, spaced.trimEnd()); assert.ok(Array.from(spaced).length <= 160); assert.ok(width(spaced) <= 80, `display width ${width(spaced)} <= 80`);
+  const observed = truncateSummary('三個來源大致一致，公開版為 1.14.4（2026-10-05）；但 changelog 公開條目標為「1.14」，需注意 Catalyst 1.14.4 於 10/1 先行，且尚有標示差異，另外還有許多補充說明與後續追蹤事項需要再確認');
+  assert.equal(observed, observed.trimEnd()); assert.ok(Array.from(observed).length <= 160); assert.ok(width(observed) <= 80, `display width ${width(observed)} <= 80`); assert.match(observed, /…$/);
   assert.equal(truncateSummary(`${'第一句完整結論'.repeat(7)}。${'後續補充說明'.repeat(15)}`), `${'第一句完整結論'.repeat(7)}。`);
   assert.equal(truncateSummary('  Short.  '), 'Short.');
   assert.equal(Array.from(truncateSummary('字'.repeat(200))).length, 80);
+});
+test('summary truncation measures display width: English keeps 100-150 chars, Chinese keeps 80', () => {
+  const { truncateSummary } = load('ai/result-utils.ts');
+  const english = `${'Reduce cognitive load by chunking '.repeat(4).trim()}.`; // ~135 chars
+  assert.ok(english.length > 100 && english.length < 150);
+  assert.equal(truncateSummary(english), english, 'English between 100 and 150 chars is kept whole');
+  const sentence = 'Short sentence.';
+  const long = `${sentence} ${'word '.repeat(60)}`; // > 160 chars
+  const cut = truncateSummary(long);
+  assert.ok(long.length > 160); assert.ok(cut.length <= 160); assert.match(cut, /…$|\.$/); assert.equal(cut, cut.trimEnd());
+  const noStop = truncateSummary('word '.repeat(80));
+  assert.ok(noStop.length <= 160 && noStop.length > 100); assert.match(noStop, /…$/);
+  const chinese = `${'字'.repeat(79)}。`;
+  assert.equal(truncateSummary(chinese), chinese, 'Chinese within 80 and ending a sentence is unchanged');
+  assert.equal(Array.from(truncateSummary('字'.repeat(81))).length, 80);
+  assert.equal(truncateSummary(`中文${'a'.repeat(200)}`).length <= 159, true);
 });
 test('search failure detection uses the structured status and still honours legacy wording', () => {
   const { reportedSearchFailure } = load('ai/result-utils.ts');
@@ -367,7 +387,7 @@ integrationTest('isolated web research requests a structured search status and r
   assert.ok(call[3].required.includes('searchStatus'));
   assert.deepEqual(plain(call[3].properties.searchStatus.enum), ['completed', 'failed', 'not_attempted']);
   assert.equal(result.searchStatus, 'not_attempted');
-  assert.equal(result.summary, result.summary.trimEnd()); assert.ok(Array.from(result.summary).length <= 80);
+  assert.equal(result.summary, result.summary.trimEnd()); assert.ok(Array.from(result.summary).length <= 160);
   let localCall;
   plugin.claudeCli = () => ({ runTask: async (...args) => { localCall = args; return JSON.stringify({ summary: 'Local', detail: 'Local detail', suggestions: [], visualReferences: [] }); } });
   const local = await plugin.askModel({ title: 'Topic', summary: '', rules: '', detail: '', task: 'Plan', ancestors: '', mode: 'task', researchMode: 'local', visualMode: 'off', aimIsolatedResearch: true }, 'claude:sonnet', 'low');

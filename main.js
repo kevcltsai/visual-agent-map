@@ -24705,7 +24705,14 @@ function sizeCoverBox(frame, size, side = false) {
   if (width >= 1 && !side) frame.style.removeProperty("width");
   else frame.style.setProperty("width", `${width * 100}%`);
 }
-var SIDE_OUTSIDE = ["vam-add-child", "vam-card-resize", "vam-card-resize-y", "vam-card-fade", "vam-card-more"];
+var SIDE_OUTSIDE = [
+  "vam-add-child",
+  "vam-card-resize",
+  "vam-card-resize-y",
+  "vam-card-frame-width",
+  "vam-card-fade",
+  "vam-card-more"
+];
 var POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
 var hasCls = (el, cls) => {
   var _a2, _b2, _c;
@@ -24847,13 +24854,16 @@ var isSide = (position) => position === "left" || position === "right";
 var SIZE_STEP = 1;
 var CoverFrameModal = class extends import_obsidian12.Modal {
   constructor(app, options) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     super(app);
     this.options = options;
     __publicField(this, "draft");
     __publicField(this, "size");
     __publicField(this, "position");
     __publicField(this, "cardEl", null);
+    __publicField(this, "width");
+    __publicField(this, "initialWidth");
+    __publicField(this, "widthHandle", null);
     __publicField(this, "sizeSlider", null);
     __publicField(this, "shape");
     __publicField(this, "drag", null);
@@ -24868,6 +24878,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.draft = { ...(_a2 = options.initial) != null ? _a2 : WHOLE2 };
     this.size = parseCoverSize((_b2 = options.size) != null ? _b2 : COVER_SIZE_DEFAULT);
     this.position = parseCoverPosition(options.position);
+    this.initialWidth = this.width = (_c = clampCardWidth(options.width)) != null ? _c : CARD_WIDTH;
     this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen() {
@@ -24883,6 +24894,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     const cover = this.buildCover(card);
     for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
     arrangeCover(card, cover, this.position);
+    this.buildWidthHandle(card);
     const labelId = `vam-card-frame-label-${++labelSeq}`;
     this.contentEl.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
     cover.setAttr("aria-labelledby", labelId);
@@ -24903,6 +24915,62 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
     cover.focus();
+  }
+  /** The width splitter on the card's right edge, the same setting and limits as the map's (map-graph.ts). */
+  buildWidthHandle(card) {
+    const handle = card.createSpan({
+      cls: "vam-card-frame-width",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.card_resize_label"),
+        "aria-valuemin": String(CARD_WIDTH_MIN),
+        "aria-valuemax": String(CARD_WIDTH_MAX),
+        tabindex: "0"
+      }
+    });
+    this.widthHandle = handle;
+    handle.setAttr("aria-valuenow", String(this.width));
+    let drag = null;
+    handle.addEventListener("pointerdown", (event) => {
+      var _a2;
+      event.preventDefault();
+      event.stopPropagation();
+      (_a2 = handle.setPointerCapture) == null ? void 0 : _a2.call(handle, event.pointerId);
+      drag = { id: event.pointerId, x: event.clientX, from: this.width };
+    });
+    handle.addEventListener("pointermove", (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      this.setWidth(drag.from + (event.clientX - drag.x));
+    });
+    const end = (event) => {
+      var _a2;
+      if (!drag || event.pointerId !== drag.id) return;
+      (_a2 = handle.releasePointerCapture) == null ? void 0 : _a2.call(handle, drag.id);
+      drag = null;
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    handle.addEventListener("keydown", (event) => {
+      let next;
+      if (event.key === "ArrowRight") next = this.width + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = this.width - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = CARD_WIDTH_MIN;
+      else if (event.key === "End") next = CARD_WIDTH_MAX;
+      else if (event.key === "Enter") next = CARD_WIDTH;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.setWidth(next);
+    });
+  }
+  /** Sets the dialog card's width (clamped to the map's limits); wrapping and the cover follow, as they are proportions. */
+  setWidth(value) {
+    var _a2, _b2, _c;
+    this.width = (_a2 = clampCardWidth(value)) != null ? _a2 : this.width;
+    (_b2 = this.cardEl) == null ? void 0 : _b2.style.setProperty("width", `${this.width}px`);
+    (_c = this.widthHandle) == null ? void 0 : _c.setAttr("aria-valuenow", String(this.width));
+    this.setDraft(this.draft);
   }
   /** The tool row above the card: the picture size slider (30-100% of the content width). */
   buildTools(row) {
@@ -25038,7 +25106,9 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size, position: this.position });
+      const edit = { frame: frameToWrite(this.draft), size: this.size, position: this.position };
+      if (this.width !== this.initialWidth) edit.width = this.width;
+      await this.options.onApply(edit);
     } finally {
       this.close();
     }
@@ -51455,10 +51525,10 @@ ${request.requirements}` : preset.text,
   }
   /**
    * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame`, and with `look` the picture size, in one
-   * undoable step, the same way changeTopicCover writes. The picture file is never touched; undo writes the old note
+   * undoable step, the same way changeTopicCover writes. With `width`, the card width goes into Map.md in that same step. The picture file is never touched; undo writes the old note
    * text back.
    */
-  async changeTopicCoverFrame(node, frame, look = {}) {
+  async changeTopicCoverFrame(node, frame, look = {}, width) {
     if (!this.map || !this.markersEditable(node)) return null;
     const write = { ...look, frame: frameToWrite(frame) };
     const viewport = clone(this.map.viewport);
@@ -51468,6 +51538,11 @@ ${request.requirements}` : preset.text,
       await this.app.vault.process(file, (content) => withCoverLook(content, write));
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
+      const target = width === void 0 ? void 0 : map.nodes.find((item) => item.id === node.id);
+      if (target && width !== void 0) {
+        if (width === CARD_WIDTH) delete target.width;
+        else target.width = clampCardWidth(width);
+      }
     }).commit({ deferRebuild: true, label: t("ui.topic_cover_frame_title") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
@@ -51524,12 +51599,13 @@ ${request.requirements}` : preset.text,
       initial: picture.frame,
       size: picture.size,
       position: picture.position,
+      width: node.width,
       shape: (_a2 = coverShapes.get(picture.path)) != null ? _a2 : null,
       card: () => this.cardForEditor(node),
-      onApply: ({ frame, ...look }) => new Promise(
+      onApply: ({ frame, width, ...look }) => new Promise(
         (done) => this.enqueue(async () => {
           try {
-            await this.changeTopicCoverFrame(node, frame, look);
+            await this.changeTopicCoverFrame(node, frame, look, width);
           } finally {
             done();
           }
@@ -69913,6 +69989,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-frame-stage { display: flex; justify-content: center; padding: 16px 12px 20px; overflow: auto; max-height: 70vh; }
 .vam-card-frame-stage > .vam-node { position: relative; left: auto; top: auto; flex: 0 0 auto; transform: none; cursor: default; }
 .vam-card-frame-stage .vam-card-cover.is-framed { overflow: visible; touch-action: none; user-select: none; }
+.vam-card-frame-width { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; background: rgba(74, 144, 226, 0.35); touch-action: none; }
+.vam-card-frame-width:hover, .vam-card-frame-width:focus-visible { background: #4a90e2; outline: none; }
 .vam-card-frame-stage .vam-card-cover:focus-visible { outline: 2px solid #4a90e2; outline-offset: 2px; }
 .vam-card-cover img.vam-card-frame-ghost { position: absolute; display: none; height: auto; max-width: none; opacity: 0.3; pointer-events: none; }
 .vam-card-frame-stage .vam-card-cover.is-dragging img.vam-card-frame-ghost { display: block; }

@@ -142,7 +142,14 @@ export function coverCardLayout(
 }
 
 /** Card children that stay outside the side layout's text column: they are drawn over or around the card, not in it. */
-const SIDE_OUTSIDE = ["vam-add-child", "vam-card-resize", "vam-card-resize-y", "vam-card-fade", "vam-card-more"];
+const SIDE_OUTSIDE = [
+  "vam-add-child",
+  "vam-card-resize",
+  "vam-card-resize-y",
+  "vam-card-frame-width",
+  "vam-card-fade",
+  "vam-card-more"
+];
 const POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
 
 // Only classList and children are read, so lighter stand-in elements (and cards without a cover) are left alone.

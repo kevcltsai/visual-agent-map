@@ -130,7 +130,8 @@ test('dialog: titled "Edit card"; the card itself sits in the middle with its ow
   assert.ok(ui.cardEl, 'the card is in the dialog');
   assert.equal(ui.cardEl.style.width, '300px', 'the card keeps its own width');
   assert.equal(ui.cardEl.children[1], ui.cover, 'the cover takes the cover place: after the header, before the title');
-  for (const child of ui.cardEl.children) assert.equal(child.attrs.inert, child === ui.cover ? undefined : '', dom.hasCls(child, 'vam-card-cover') ? 'cover' : child.cls);
+  // The card-width handle (ticket 04) also takes input; everything else is shown, not edited.
+  for (const child of ui.cardEl.children) assert.equal(child.attrs.inert, child === ui.cover || dom.hasCls(child, 'vam-card-frame-width') ? undefined : '', dom.hasCls(child, 'vam-card-cover') ? 'cover' : child.cls);
   assert.equal(dom.findAll(ui.el, i => dom.hasCls(i, 'vam-card-frame-image')).length, 0, 'no separate picture view');
 });
 
@@ -343,13 +344,13 @@ const { VisualAgentMapView } = replay.load(
   { window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o) }
 );
 const NOTE = 'Topics/m.md';
-async function harness(text, { cache = { frontmatter: {}, embeds: [{ link: 'img/a.png' }] } } = {}) {
+async function harness(text, { cache = { frontmatter: {}, embeds: [{ link: 'img/a.png' }] }, nodes = [] } = {}) {
   const { repo, app, contents } = S.fixture('en', { linkIndex: true });
   await app.vault.create(NOTE, text);
-  await app.vault.create('Topics/Map.md', S.core.serializeMap({ id: 'map-u', title: 'map-u', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }));
+  await app.vault.create('Topics/Map.md', S.core.serializeMap({ id: 'map-u', title: 'map-u', version: 1, nodes, viewport: { x: 0, y: 0, zoom: 1 } }));
   const view = Object.assign(Object.create(VisualAgentMapView.prototype), {
     app, selection: new (S.load('experiences/visual-map/topic-selection.ts').TopicSelection)(),
-    plugin: { repo }, map: { nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }, path: 'Topics/Map.md', history: { entries: [], push(entry) { this.entries.push(entry); } },
+    plugin: { repo }, map: { nodes: JSON.parse(JSON.stringify(nodes)), viewport: { x: 0, y: 0, zoom: 1 } }, path: 'Topics/Map.md', history: { entries: [], push(entry) { this.entries.push(entry); } },
     beginMapTransaction: () => begin({ repo, rebuildDerivedData: async () => {}, onApplied: () => {}, checkConflict: async () => {} }),
     refreshAfterSavedChange: async () => {}
   });
@@ -358,7 +359,7 @@ async function harness(text, { cache = { frontmatter: {}, embeds: [{ link: 'img/
   vault.getAbstractFileByPath = p => (p === 'img/a.png' ? new S.obsidian.TFile('img/a.png') : getFile(p));
   vault.getResourcePath = f => `app://res/${f.path}`;
   app.metadataCache = { getFileCache: () => cache, getFirstLinkpathDest: link => (link === 'img/a.png' ? new S.obsidian.TFile('img/a.png') : null) };
-  return { view, contents };
+  return { view, contents, repo };
 }
 const TEXT = '---\ntype: topic\ntitle: M\ntopic-color: red\n---\n\nBody line\n';
 
@@ -685,4 +686,139 @@ test('open: a copied side-layout card is taken apart and rebuilt around the edit
   assert.ok(card.classes.includes('has-cover-right'));
   assert.equal(dom.findAll(card, i => dom.hasCls(i, 'vam-card-cover')).length, 1);
   assert.equal(dom.find(modal.contentEl, i => i.tag === 'input').value, '40');
+});
+
+// ---- ticket 04: card width in the dialog (same setting and limits as dragging the card edge on the map)
+const graph = S.load('map-graph.ts');
+const widthHandle = ui => dom.find(ui.cardEl, i => dom.hasCls(i, 'vam-card-frame-width'));
+const dialogWidth = ui => ui.cardEl.style.width;
+const openWide = (width, extra = {}) => {
+  const applied = [];
+  const modal = new editor.CoverFrameModal({}, { src: 'app://res/img/a.png', initial: null, shape: 2, card: plainCard, width, onApply: async e => { applied.push(e); }, ...extra });
+  modal.open();
+  const cardEl = dom.find(modal.contentEl, i => dom.hasCls(i, 'vam-node'));
+  return { modal, cardEl, applied, handle: dom.find(cardEl, i => dom.hasCls(i, 'vam-card-frame-width')), apply: dom.find(modal.contentEl, i => i.tag === 'button' && i.text === 'Apply') };
+};
+
+test('width: the dialog has a focusable separator on the card edge with the map limits and the card-width label', () => {
+  const ui = openWide(360);
+  assert.ok(ui.handle, 'the right-edge handle exists');
+  assert.equal(ui.handle.attrs.role, 'separator');
+  assert.equal(ui.handle.attrs.tabindex, '0');
+  assert.equal(ui.handle.attrs['aria-label'], 'Card width');
+  assert.equal(ui.handle.attrs['aria-valuemin'], String(graph.CARD_WIDTH_MIN));
+  assert.equal(ui.handle.attrs['aria-valuemax'], String(graph.CARD_WIDTH_MAX));
+  assert.equal(ui.handle.attrs['aria-valuenow'], '360');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.match(read(`i18n/${lang}.ts`), /"ui\.card_resize_label": "[^"]+"/, lang);
+});
+
+test('width: dragging the right edge changes the card width live and clamps to the map limits (200-560)', () => {
+  const ui = openWide(undefined);
+  assert.equal(ui.handle.attrs['aria-valuenow'], String(graph.CARD_WIDTH), 'no stored width: the standard width');
+  const at = (type, x) => ui.handle.fire(type, { pointerId: 3, clientX: x, clientY: 0 });
+  at('pointerdown', 500);
+  at('pointermove', 540);
+  assert.equal(dialogWidth(ui), '320px', 'live, before Apply');
+  at('pointermove', 5000);
+  assert.equal(dialogWidth(ui), `${graph.CARD_WIDTH_MAX}px`, 'clamped to the map maximum');
+  at('pointermove', -5000);
+  assert.equal(dialogWidth(ui), `${graph.CARD_WIDTH_MIN}px`, 'clamped to the map minimum');
+  at('pointerup', -5000);
+  at('pointermove', 600);
+  assert.equal(dialogWidth(ui), `${graph.CARD_WIDTH_MIN}px`, 'a finished drag stays put');
+});
+
+test('width: arrows step by the map step, Home/End jump to the limits, Enter restores the standard width', () => {
+  const ui = openWide(360);
+  const key = k => ui.handle.keydown({ key: k });
+  key('ArrowRight');
+  assert.equal(dialogWidth(ui), `${360 + graph.CARD_WIDTH_STEP}px`);
+  key('ArrowLeft'); key('ArrowLeft');
+  assert.equal(dialogWidth(ui), `${360 - graph.CARD_WIDTH_STEP}px`);
+  key('End');
+  assert.equal(dialogWidth(ui), `${graph.CARD_WIDTH_MAX}px`);
+  key('ArrowRight');
+  assert.equal(dialogWidth(ui), `${graph.CARD_WIDTH_MAX}px`, 'cannot pass the maximum');
+  key('Home');
+  assert.equal(dialogWidth(ui), `${graph.CARD_WIDTH_MIN}px`);
+  key('ArrowLeft');
+  assert.equal(dialogWidth(ui), `${graph.CARD_WIDTH_MIN}px`, 'cannot pass the minimum');
+  key('Enter');
+  assert.equal(dialogWidth(ui), `${graph.CARD_WIDTH}px`);
+  assert.equal(ui.handle.attrs['aria-valuenow'], String(graph.CARD_WIDTH));
+});
+
+test('width: Apply hands over the width only when it changed; Cancel hands over nothing', async () => {
+  const same = openWide(360);
+  same.handle.keydown({ key: 'ArrowRight' }); same.handle.keydown({ key: 'ArrowLeft' });
+  same.apply.click();
+  await dom.tick();
+  assert.equal(same.applied.length, 1);
+  assert.ok(!('width' in same.applied[0]), 'unchanged width is not part of the edit');
+  const changed = openWide(360);
+  changed.handle.keydown({ key: 'End' });
+  changed.apply.click();
+  await dom.tick();
+  assert.equal(changed.applied[0].width, graph.CARD_WIDTH_MAX);
+  const cancelled = openWide(360);
+  cancelled.handle.keydown({ key: 'End' });
+  cancelled.modal.close();
+  await dom.tick();
+  assert.deepEqual(cancelled.applied, []);
+});
+
+const mapNodes = () => [{ id: 'm', path: NOTE, parentId: null, x: 0, y: 0, collapsed: false, width: 360 }, { id: 'k', path: 'Topics/k.md', parentId: 'm', x: 400, y: 0, collapsed: false }];
+const savedNode = async (h, id = 'm') => (await h.repo.readMap('Topics/Map.md')).nodes.find(n => n.id === id);
+
+test('width: Apply writes note and map width as ONE undo step; one undo restores both, redo writes both', async () => {
+  const h = await harness(TEXT, { nodes: mapNodes() });
+  const before = await h.repo.readMap('Topics/Map.md');
+  const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, { size: 0.5 }, 480);
+  assert.equal(h.view.history.entries.length, 1, 'exactly one undo entry');
+  assert.equal((await savedNode(h)).width, 480);
+  assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"/);
+  const other = await savedNode(h, 'k');
+  assert.deepEqual([other.x, other.y, other.parentId], [400, 0, 'm'], 'layout and links of other cards unchanged');
+  await entry.undo();
+  assert.equal(h.contents.get(NOTE), TEXT, 'note restored');
+  assert.deepEqual(await h.repo.readMap('Topics/Map.md'), before, 'map file restored');
+  await entry.redo();
+  assert.equal((await savedNode(h)).width, 480);
+  assert.match(h.contents.get(NOTE), /topic-cover-size: "0\.5"/);
+});
+
+test('width: the standard width removes the key; an over-limit value is clamped to the map limit; no width leaves the map alone', async () => {
+  const h = await harness(TEXT, { nodes: mapNodes() });
+  await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, {}, graph.CARD_WIDTH);
+  assert.equal('width' in (await savedNode(h)), false);
+  await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, {}, 9999);
+  assert.equal((await savedNode(h)).width, graph.CARD_WIDTH_MAX);
+  await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, null);
+  assert.equal((await savedNode(h)).width, graph.CARD_WIDTH_MAX, 'a call without width keeps the stored width');
+});
+
+test('width: opening the dialog passes the card width; Cancel after a width change leaves note and map bytes unchanged', async () => {
+  const h = await harness(TEXT, { nodes: mapNodes() });
+  const mapBefore = await h.repo.readMap('Topics/Map.md');
+  h.view.enqueue = fn => fn();
+  const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE, width: 360 });
+  const handle = dom.find(modal.contentEl, i => dom.hasCls(i, 'vam-card-frame-width'));
+  assert.equal(handle.attrs['aria-valuenow'], '360', 'starts at the map width');
+  handle.keydown({ key: 'End' });
+  modal.close();
+  await dom.tick();
+  assert.equal(h.contents.get(NOTE), TEXT);
+  assert.deepEqual(await h.repo.readMap('Topics/Map.md'), mapBefore);
+  assert.equal(h.view.history.entries.length, 0);
+});
+
+test('width: Apply from the opened dialog writes the map width and the note in one history entry', async () => {
+  const h = await harness(TEXT, { nodes: mapNodes() });
+  h.view.enqueue = fn => fn();
+  const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE, width: 360 });
+  dom.find(modal.contentEl, i => dom.hasCls(i, 'vam-card-frame-width')).keydown({ key: 'End' });
+  dom.find(modal.contentEl, i => i.tag === 'button' && i.text === 'Apply').click();
+  await dom.tick(); await dom.tick();
+  assert.equal(h.view.history.entries.length, 1);
+  assert.equal((await savedNode(h)).width, graph.CARD_WIDTH_MAX);
 });

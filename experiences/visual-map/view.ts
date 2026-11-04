@@ -3755,13 +3755,14 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame`, and with `look` the picture size, in one
-   * undoable step, the same way changeTopicCover writes. The picture file is never touched; undo writes the old note
+   * undoable step, the same way changeTopicCover writes. With `width`, the card width goes into Map.md in that same step. The picture file is never touched; undo writes the old note
    * text back.
    */
   private async changeTopicCoverFrame(
     node: MapNode,
     frame: CoverFrame | null,
-    look: Omit<CoverLook, "frame"> = {}
+    look: Omit<CoverLook, "frame"> = {},
+    width?: number
   ): Promise<TransactionEntry | null> {
     if (!this.map || !this.markersEditable(node)) return null;
     const write: CoverLook = { ...look, frame: frameToWrite(frame) };
@@ -3774,6 +3775,12 @@ export class VisualAgentMapView extends ItemView {
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
+        // The card width is the map's own setting (as dragging the card edge): written in this same step, one undo.
+        const target = width === undefined ? undefined : map.nodes.find(item => item.id === node.id);
+        if (target && width !== undefined) {
+          if (width === CARD_WIDTH) delete target.width;
+          else target.width = clampCardWidth(width);
+        }
       })
       .commit({ deferRebuild: true, label: t("ui.topic_cover_frame_title") });
     this.history.push(entry);
@@ -3840,13 +3847,14 @@ export class VisualAgentMapView extends ItemView {
       initial: picture.frame,
       size: picture.size,
       position: picture.position,
+      width: node.width,
       shape: coverShapes.get(picture.path) ?? null,
       card: () => this.cardForEditor(node),
-      onApply: ({ frame, ...look }) =>
+      onApply: ({ frame, width, ...look }) =>
         new Promise<void>(done =>
           this.enqueue(async () => {
             try {
-              await this.changeTopicCoverFrame(node, frame, look);
+              await this.changeTopicCoverFrame(node, frame, look, width);
             } finally {
               done();
             }

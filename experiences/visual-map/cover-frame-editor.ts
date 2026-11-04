@@ -9,6 +9,7 @@ import {
   type CoverFrame,
   type CoverPosition
 } from "./card-cover";
+import { CARD_WIDTH, CARD_WIDTH_MAX, CARD_WIDTH_MIN, CARD_WIDTH_STEP, clampCardWidth } from "../../map-graph";
 import { arrangeCover, coverWindow, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 
 /** The smallest a frame side can be, as a fraction of the picture. */
@@ -97,6 +98,8 @@ export interface CardCoverEdit {
   frame: CoverFrame | null;
   size: number;
   position: CoverPosition;
+  /** The card width to write to the map (CARD_WIDTH: the standard width). Present only when the user changed it. */
+  width?: number;
 }
 
 /** Switching to left or right with a picture wider than this sets it to SIDE_SIZE, so the text keeps room beside it. */
@@ -122,6 +125,8 @@ export interface CoverFrameModalOptions {
   size?: number;
   /** The note's picture position; top when absent. */
   position?: CoverPosition;
+  /** The topic's card width on the map (absent: the standard width). The dialog's right edge changes it within the map's limits. */
+  width?: number;
   /** The picture's width over height when the map already measured it, so the card has its size before the picture loads. */
   shape?: number | null;
   /**
@@ -155,6 +160,9 @@ export class CoverFrameModal extends Modal {
   private size: number;
   private position: CoverPosition;
   private cardEl: HTMLElement | null = null;
+  private width: number;
+  private readonly initialWidth: number;
+  private widthHandle: HTMLElement | null = null;
   private sizeSlider: HTMLInputElement | null = null;
   private shape: number | null;
   private drag: CoverDrag | null = null;
@@ -174,6 +182,7 @@ export class CoverFrameModal extends Modal {
     this.draft = { ...(options.initial ?? WHOLE) };
     this.size = parseCoverSize(options.size ?? COVER_SIZE_DEFAULT);
     this.position = parseCoverPosition(options.position);
+    this.initialWidth = this.width = clampCardWidth(options.width) ?? CARD_WIDTH;
     this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen(): void {
@@ -191,6 +200,7 @@ export class CoverFrameModal extends Modal {
     // The rest of the card is shown, not edited (ticket 05 adds the text).
     for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
     arrangeCover(card, cover, this.position);
+    this.buildWidthHandle(card);
     // aria-labelledby, not aria-label: Obsidian shows an aria-label as a tooltip, which would cover the picture.
     const labelId = `vam-card-frame-label-${++labelSeq}`;
     this.contentEl.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
@@ -213,6 +223,61 @@ export class CoverFrameModal extends Modal {
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
     cover.focus();
+  }
+  /** The width splitter on the card's right edge, the same setting and limits as the map's (map-graph.ts). */
+  private buildWidthHandle(card: HTMLElement): void {
+    const handle = card.createSpan({
+      cls: "vam-card-frame-width",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.card_resize_label"),
+        "aria-valuemin": String(CARD_WIDTH_MIN),
+        "aria-valuemax": String(CARD_WIDTH_MAX),
+        tabindex: "0"
+      }
+    });
+    this.widthHandle = handle;
+    // The copied card already has its width; the style is only written when the user changes it.
+    handle.setAttr("aria-valuenow", String(this.width));
+    let drag: { id: number; x: number; from: number } | null = null;
+    handle.addEventListener("pointerdown", (event: PointerEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handle.setPointerCapture?.(event.pointerId);
+      drag = { id: event.pointerId, x: event.clientX, from: this.width };
+    });
+    handle.addEventListener("pointermove", (event: PointerEvent) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      this.setWidth(drag.from + (event.clientX - drag.x));
+    });
+    const end = (event: PointerEvent): void => {
+      if (!drag || event.pointerId !== drag.id) return;
+      handle.releasePointerCapture?.(drag.id);
+      drag = null;
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    // The map's keys: arrows step, Home/End the limits, Enter the standard width.
+    handle.addEventListener("keydown", (event: KeyboardEvent) => {
+      let next: number;
+      if (event.key === "ArrowRight") next = this.width + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = this.width - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = CARD_WIDTH_MIN;
+      else if (event.key === "End") next = CARD_WIDTH_MAX;
+      else if (event.key === "Enter") next = CARD_WIDTH;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.setWidth(next);
+    });
+  }
+  /** Sets the dialog card's width (clamped to the map's limits); wrapping and the cover follow, as they are proportions. */
+  private setWidth(value: number): void {
+    this.width = clampCardWidth(value) ?? this.width;
+    this.cardEl?.style.setProperty("width", `${this.width}px`);
+    this.widthHandle?.setAttr("aria-valuenow", String(this.width));
+    this.setDraft(this.draft);
   }
   /** The tool row above the card: the picture size slider (30-100% of the content width). */
   private buildTools(row: HTMLElement): void {
@@ -356,7 +421,9 @@ export class CoverFrameModal extends Modal {
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size, position: this.position });
+      const edit: CardCoverEdit = { frame: frameToWrite(this.draft), size: this.size, position: this.position };
+      if (this.width !== this.initialWidth) edit.width = this.width;
+      await this.options.onApply(edit);
     } finally {
       this.close();
     }

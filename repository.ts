@@ -1358,6 +1358,12 @@ export class Repository {
     return path;
   }
 
+  /** `folder/<title>.md` when that exact name is free (no number added), else null. */
+  exactFreePath(folder: string, title: string): string | null {
+    const path = normalizePath(`${folder}/${safeName(title)}.md`);
+    return this.pathTaken(path) ? null : path;
+  }
+
   /** Taken when the path exists, or when a sibling has the same name once case and Unicode form are folded. */
   private pathTaken(path: string): boolean {
     return !!this.app.vault.getAbstractFileByPath(path) || !!this.foldedSibling(path, "");

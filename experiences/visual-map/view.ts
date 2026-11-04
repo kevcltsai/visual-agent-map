@@ -248,6 +248,7 @@ import {
   normalizeReasoningLevel,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
+  safeName,
   type Note,
   type NotePatch,
   type TopicInfo,
@@ -6372,17 +6373,25 @@ export class VisualAgentMapView extends ItemView {
           sourcePaths: sources.map(source => source.path),
           status: mergedStatus(detail)
         });
-      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id);
+      // The sources may hold the title's file name until they are parked: the merged note takes it once they are.
+      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id, sanitizeGeneratedTitle(title));
       for (const source of sources) tx.park(source.path, parkFolder, before.id, "unassigned");
       entry = await tx
-        .editMap(mapPath, map => {
+        .editMap(mapPath, (map, resolve) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen.
           map.viewport = clone(viewport);
           const ids = new Set(sources.map(source => source.id)),
             first = map.nodes.find(item => item.id === sources[0].id);
           if (!first || sources.some(source => !map.nodes.some(item => item.id === source.id)))
             throw new Error(t("ui.merge_missing_note"));
-          const merged: MapNode = { ...created, parentId: check.parentId, x: first.x, y: first.y, collapsed: false },
+          const merged: MapNode = {
+              ...created,
+              path: resolve(created.path),
+              parentId: check.parentId,
+              x: first.x,
+              y: first.y,
+              collapsed: false
+            },
             adopted = new Set<string>();
           for (const item of map.nodes)
             if (item.parentId !== null && ids.has(item.parentId)) {
@@ -6473,8 +6482,12 @@ export class VisualAgentMapView extends ItemView {
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
       });
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
+      // The parent's file name follows its new title, but only while it still carries the old title's name (a name the
+      // user chose by hand stays); a name another note holds is never taken.
+      if (patch.title && target.path.slice(target.path.lastIndexOf("/") + 1) === `${safeName(sourceNotes[0].title)}.md`)
+        tx.rename(target.path, patch.title);
       entry = await tx
-        .editMap(mapPath, map => {
+        .editMap(mapPath, (map, resolve) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen.
           map.viewport = clone(viewport);
           const ids = new Set(children.map(child => child.id));
@@ -6491,6 +6504,8 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
+          const parent = map.nodes.find(item => item.id === target.id);
+          if (parent) parent.path = resolve(target.path);
           this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
           if (adopted.size) this.arrangeBranch(map, target.id, adopted, undefined);
         })

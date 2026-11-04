@@ -50,7 +50,7 @@ const centreOf = (box: RelationBox): { x: number; y: number } => ({
 /**
  * The two edge midpoints a semantic line joins. When the horizontal gap is at least the vertical gap the cards face each
  * other left and right; otherwise top and bottom. A preferred `axis` wins whenever the gap along it is at least
- * `AXIS_GAP`. Cards that overlap on both axes join centre to centre (no normal).
+ * `AXIS_GAP`. Cards that overlap or touch on both axes join centre to centre (no normal).
  * `gap` is the distance the line crosses, which sets the length of the curve's control arms.
  */
 export function nearestSides(
@@ -60,7 +60,8 @@ export function nearestSides(
 ): { from: RelationAnchor; to: RelationAnchor; gap: number } {
   const horizontal = axisGap(a.x, a.width, b.x, b.width),
     vertical = axisGap(a.y, a.height, b.y, b.height);
-  if (horizontal < 0 && vertical < 0) {
+  // Cards that only touch (a gap of exactly 0) leave no edge-to-edge run either: it would be a zero-length line.
+  if (horizontal <= 0 && vertical <= 0) {
     const from = centreOf(a),
       to = centreOf(b);
     return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };

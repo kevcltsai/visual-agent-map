@@ -20,7 +20,7 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   view.notes = new Map([[topic.id, { title: 'Parent', summary: '', status: 'completed' }]]);
   view.render = () => {};
   let added = 0, opened = [], details = [], next = [], renders = 0;
-  view.addNode = () => { added++; }; view.enqueue = work => work(); view.openNodePanel = (topic, mode) => opened.push([topic.id, mode]);
+  view.addNode = () => { throw new Error('the card + asks for a type first'); }; view.openAddMenu = (event, parent) => { added += parent.id === topic.id ? 1 : 0; }; view.enqueue = work => work(); view.openNodePanel = (topic, mode) => opened.push([topic.id, mode]);
   view.openDetails = topic => details.push(topic.id); view.openNextStep = topic => next.push(topic.id); view.render = () => { renders++; };
   view.renderNode(topic);
   const plus = buttons.find(button => button.text === '+');
@@ -2143,9 +2143,9 @@ integrationTest('hypothesis-evidence: the panel "Add subtopic…" opens the six-
   menus[0].clicks.forEach(click => click());
   assert.deepEqual(calls, heKindIds.map(kind => ['other', undefined, true, true, kind]));
 });
-integrationTest('hypothesis-evidence: the card "+" still creates an ordinary topic in one click (no kind argument)', () => {
+integrationTest('hypothesis-evidence: the card "+" opens the type list for its card (no name dialog, nothing is added before a pick)', () => {
   const { view } = heFixture();
-  const calls = []; view.addNode = (...args) => calls.push(args.map(a => (a && a.id) ?? a)); view.enqueue = work => work();
+  const calls = []; view.addNode = () => { throw new Error('not before a pick'); }; view.openAddMenu = (event, parent) => calls.push([parent.id]); view.enqueue = work => work();
   view.stageEl = hePatch(dom.element('stage')); view.renderNode(view.map.nodes[2]);
   const plus = dom.button(view.stageEl.children[0], '+');
   plus.click();
@@ -3080,6 +3080,15 @@ integrationTest('hypothesis-evidence: cards stacked one above the other are join
   assert.equal(relationPathData(heBox(500, 0), heBox(0, 0)), 'M 500 50 C 440 50, 340 50, 280 50', 'right to left leaves the left edge');
   const sides = nearestSides(heBox(0, 0), heBox(0, 200));
   assert.deepEqual([sides.from.ny, sides.to.ny], [1, -1], 'the normals point away from each card');
+});
+integrationTest('hypothesis-evidence: cards that touch edge to edge (stacked diamonds) still get a line with length, so the line and its label are not 0 wide', () => {
+  const { relationPathData, relationLabelPoint } = heGeo();
+  for (const [a, b] of [[heBox(0, 0), heBox(0, 100)], [heBox(0, 100), heBox(0, 0)], [heBox(0, 0), heBox(280, 0)], [heBox(0, 0), heBox(40, 100)]]) {
+    const [x1, y1, , , , , x2, y2] = heNums(relationPathData(a, b));
+    assert.ok(Math.hypot(x2 - x1, y2 - y1) > 0, `touching ${JSON.stringify([a, b])}: the line has a length (${x1},${y1} to ${x2},${y2})`);
+    const label = relationLabelPoint(a, b);
+    assert.ok(Number.isFinite(label.x) && Number.isFinite(label.y));
+  }
 });
 integrationTest('hypothesis-evidence: in a map that grows sideways a column of evidence meets the hypothesis from the side, however far up or down, so no line runs behind the cards between; up-down maps lean to the ends', () => {
   const { relationPathData, relationLabelPoint, nearestSides, relationAxisFor, AXIS_GAP } = heGeo();

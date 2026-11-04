@@ -1312,6 +1312,10 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_do_rate_0": "依目标“{0}”分级议题",
   "ui.map_chat_do_merge_0": "把选取的议题合并成“{0}”",
   "ui.map_chat_do_create_map_0": "建立新地图“{0}”",
+  "ui.new_topic": "新议题",
+  "ui.untitled_mind_map": "未命名心智图",
+  "ui.map_chat_do_rename_map_0": "将这张地图命名为“{0}”",
+  "ui.map_chat_skip_map_named": "这张地图已有你取的名字",
   "ui.map_chat_do_open_map_0": "切换到地图“{0}”",
   "ui.map_chat_do_collapse_0": "折叠“{0}”",
   "ui.map_chat_do_expand_topic_0": "展开“{0}”",
@@ -1547,6 +1551,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":
     "自动模式会对简单任务使用 Low、对复杂整合使用 Medium；手动选择不会被覆盖。",
   "ui.stop_research": "停止研究",
+  "ui.stop_expand": "停止展开",
   "ui.research_stopped_existing_content_was_preserved": "研究已停止，原有内容保留。",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "议题内容已变更，过时的 AI 结果未写入。",
   "ui.shallow_research_for_expanded_subtopics_0": "子题研究：{0}",

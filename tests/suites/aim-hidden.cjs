@@ -547,6 +547,42 @@ test('aim-hidden: R3 the colour, style and border selectors match a hidden AIM c
   for (const line of added) for (const selector of line.slice(0, line.indexOf(' {')).split(/,\s*(?=[.\[:])/)) assert.match(selector, /\.vam-aim-hidden/, `selector needs the marker: ${selector.slice(0, 80)}`);
 });
 
+test('aim-hidden: R4 a coloured hidden question card keeps its diamond; no hidden ::before rule turns it into a stripe', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const splitTop = text => { const parts = []; let depth = 0, cur = ''; for (const ch of text) { if (ch === '(' || ch === '[') depth++; if (ch === ')' || ch === ']') depth--; if (ch === ',' && depth === 0) { parts.push(cur.trim()); cur = ''; } else cur += ch; } parts.push(cur.trim()); return parts; };
+  // a mini cascade: the card's classes and attributes, selectors with .class, [attr], [attr="v"], :not(...), :where(...)
+  const matchSimple = (sel, card) => { const m = sel.match(/^\.([\w-]+)$/); if (m) return card.classes.has(m[1]); const a = sel.match(/^\[([\w-]+)(?:="([^"]*)")?\]$/); if (a) return a[1] in card.attrs && (a[2] === undefined || card.attrs[a[1]] === a[2]); return null; };
+  const tokens = compound => compound.match(/:not\((?:[^()]|\([^()]*\))*\)|:where\((?:[^()]|\([^()]*\))*\)|\.[\w-]+|\[[^\]]+\]/g) ?? [];
+  const evaluate = (tokenList, card) => { let matched = true, spec = 0; for (const t of tokenList) { if (t.startsWith(':where(')) { if (!splitTop(t.slice(7, -1)).some(part => evaluate(tokens(part), card).matched)) matched = false; continue; } if (t.startsWith(':not(')) { const r = splitTop(t.slice(5, -1)).map(part => evaluate(tokens(part), card)); if (r.some(x => x.matched)) matched = false; spec += Math.max(0, ...r.map(x => x.spec)); continue; } const hit = matchSimple(t, card); if (!hit) matched = false; spec += 10; } return { matched, spec }; };
+  const cardOf = extra => ({ classes: new Set(['vam-node', 'vam-aim-hidden']), attrs: { 'data-aim-kind': 'question', 'data-topic-color': 'red', ...extra } });
+  for (const extra of [{}, { 'data-topic-kind': 'atomic' }]) {
+    const card = cardOf(extra);
+    const winners = {};
+    css.split('\n').forEach((line, order) => {
+      if (/^\s|^\/\*|^@/.test(line) || !line.includes('::before {')) return;
+      const body = line.slice(line.indexOf('{') + 1, line.lastIndexOf('}'));
+      for (const selector of splitTop(line.slice(0, line.indexOf(' {')))) {
+        if (!selector.endsWith('::before')) continue;
+        const compounds = selector.slice(0, -8).split(/\s+/).filter(Boolean);
+        const last = compounds[compounds.length - 1], ancestors = compounds.slice(0, -1);
+        if (ancestors.some(a => a !== '.vam-view' && a !== '.vam-map')) continue; // an ancestor-only selector: the card has the view as parent
+        const r = evaluate(tokens(last), card);
+        if (!r.matched) continue;
+        const spec = r.spec + ancestors.length * 10;
+        for (const decl of body.split(';').map(d => d.trim()).filter(Boolean)) { const [prop, ...rest] = decl.split(':'); const key = prop.trim(); if (!winners[key] || spec >= winners[key].spec) winners[key] = { spec, value: rest.join(':').trim() }; }
+      }
+    });
+    const label = JSON.stringify(extra);
+    assert.equal(winners.width?.value, '174px', `the diamond keeps its width ${label}`);
+    assert.equal(winners.left?.value, '50%', `the diamond stays centred, not a left stripe ${label}`);
+    assert.equal(winners.top?.value, '50%', `the diamond stays centred ${label}`);
+    assert.ok(!winners.bottom || winners.bottom.value === 'auto', `no stripe bottom offset ${label}`);
+    assert.equal(winners.height?.value, '174px', `the diamond keeps its height ${label}`);
+    assert.equal(winners.background?.value, 'var(--vam-card-bg)', `the colour shows through the diamond fill ${label}`);
+    assert.equal(winners['border-radius']?.value, '10px', `the diamond corners ${label}`);
+  }
+});
+
 integrationTest('aim-hidden: R3 decision 5 deleting a node whose note moves to Unassigned changes the aim block only by the moved notePath values', async () => {
   const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
   const vault = hiddenVault();

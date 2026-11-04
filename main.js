@@ -19914,6 +19914,12 @@ var History = class {
     this.solo.add(entry);
     this.push(entry);
   }
+  /** Removes `entry` when it is the newest undo step (nothing else changes); false when it is not. */
+  dropTop(entry) {
+    if (this.past[this.past.length - 1] !== entry) return false;
+    this.past.pop();
+    return true;
+  }
   /** Ends the group and returns what it collected, oldest first (empty when nothing was pushed or the history was cleared). */
   closeGroup() {
     var _a2;
@@ -50963,6 +50969,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "mergeOpen", false);
     /** AI merges that hid their dialog, keyed by map path (one per map). */
     __publicField(this, "mergeTasks", /* @__PURE__ */ new Map());
+    /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
+    __publicField(this, "chatReplyStep");
     /**
      * AI actions whose dialog hid itself and whose provider request is not accepted yet, keyed by node path (or
      * `selection:<map path>`). The value is the dialog's controller, so a card or bar Stop pressed before acceptance
@@ -55549,6 +55557,7 @@ ${request.requirements}` : preset.text,
         mapTitle: (_b2 = (_a3 = this.map) == null ? void 0 : _a3.title) != null ? _b2 : "",
         title,
         ...options.keepTitle ? { keepTitle: true } : {},
+        ...options.replyStep ? { replyStep: options.replyStep } : {},
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: (_c = snapshot.targetId) != null ? _c : null,
@@ -55658,7 +55667,14 @@ ${request.requirements}` : preset.text,
       this.render();
       const previous = this.history.undoEntry;
       await this.confirmMergeDraft(task, result.summary, result.detail);
-      const entry = this.history.undoEntry;
+      let entry = this.history.undoEntry;
+      let folded2 = false;
+      const step = task.replyStep;
+      if (step && entry && entry !== previous && previous === step.entry && this.history.dropTop(entry)) {
+        await step.absorb(entry);
+        entry = step.entry;
+        folded2 = true;
+      }
       let done = t("ui.merge_done_0", task.title);
       if (!check.ok) {
         const found = check.missing.length + check.added.length;
@@ -55668,7 +55684,7 @@ ${request.requirements}` : preset.text,
         );
         done = `${done} ${t("ui.merge_check_warning_0", String(found))}`;
       }
-      if (entry && entry !== previous)
+      if (entry && (entry !== previous || folded2))
         backgroundResultNotice(
           done,
           {
@@ -66121,10 +66137,11 @@ ${note.detail.trim()}` : "",
     } finally {
       await this.settleChatBatch(run);
       const entries = this.history.closeGroup();
+      this.chatReplyStep = void 0;
       if (wrote) {
         try {
           if (!this.closed && this.path === anchor.path)
-            await this.pushChatReplyEntry(
+            this.chatReplyStep = await this.pushChatReplyEntry(
               entries,
               anchor.path,
               (_b2 = run.notes) != null ? _b2 : /* @__PURE__ */ new Set(),
@@ -66716,7 +66733,7 @@ ${note.detail.trim()}` : "",
    * touched. Then the entries run like one (newest first for undo); a failure part-way puts back what already ran.
    */
   async pushChatReplyEntry(entries, mapPath, noteIds, files, parked = /* @__PURE__ */ new Set()) {
-    if (!entries.length) return;
+    if (!entries.length) return void 0;
     const fingerprint2 = () => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint2();
     const run = async (redo) => {
@@ -66737,7 +66754,19 @@ ${note.detail.trim()}` : "",
       }
       expected = await fingerprint2();
     };
-    this.history.pushSolo({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
+    const step = {
+      undo: () => run(false),
+      redo: () => run(true),
+      label: t("ui.map_chat_undo_label")
+    };
+    this.history.pushSolo(step);
+    return {
+      entry: step,
+      absorb: async (entry) => {
+        entries.push(entry);
+        expected = await fingerprint2();
+      }
+    };
   }
   chatSelect(ids) {
     this.selection.chatSelect(ids);
@@ -66856,7 +66885,8 @@ ${note.detail.trim()}` : "",
         if (hasMergeContent(sourceNotes, isPlaceholder)) {
           const began = await this.startMergeDraft(title, snapshot, () => {
           }, new AbortController().signal, {
-            keepTitle: true
+            keepTitle: true,
+            ...this.chatReplyStep ? { replyStep: this.chatReplyStep } : {}
           });
           return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
         }

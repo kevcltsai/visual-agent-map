@@ -293,14 +293,17 @@ import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
 import {
+  bottomInsetFromRects,
   cardToolsPlacement,
   clearToolbar,
+  type CanvasInsets,
   fitIsClamped,
   fitViewport,
   focusViewport,
   initialViewport,
   insetFromRects,
   isObscured,
+  leftInsetFromRects,
   rectsIntersect,
   statusBarClearance
 } from "./viewport-inset";
@@ -10569,7 +10572,8 @@ export class VisualAgentMapView extends ItemView {
                 : note
                   ? topicStatusLabel(note.status, this.plugin.settings.language)
                   : t("ui.note_missing");
-      // A researched topic is the normal state, so only the other states earn a pill; screen readers still hear it.
+      // An unresearched topic (idea, not running or queued) has nothing to say, so it earns no pill; researched, running,
+      // queued, error and the rest do. Screen readers hear the status through the card label either way.
       if (research) {
         const chip = header.createSpan({ cls: "vam-status vam-status-running" });
         // Not a live region: this card is rebuilt on every render. Stage changes go through the view's announcer.
@@ -10583,7 +10587,7 @@ export class VisualAgentMapView extends ItemView {
         this.trackResearchElapsed(elapsedEl, research.startedAt);
         if (research.slow)
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
-      } else if (!note || note.status !== "completed" || active || queued) {
+      } else if (!note || note.status !== "idea" || active || queued) {
         const chip = header.createSpan({
           cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (note?.status ?? "error")}`,
           text: statusText
@@ -11871,11 +11875,14 @@ export class VisualAgentMapView extends ItemView {
         note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
       this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
-      if (note.status === "completed") status?.remove();
+      if (note.status === "idea") status?.remove();
       else if (status) {
         status.className = `vam-status vam-status-${note.status}`;
         status.setText(label);
-      } else header?.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
+      } else if (header) {
+        const chip = header.createSpan({ cls: `vam-status vam-status-${note.status}`, text: label });
+        if (header.firstChild && header.firstChild !== chip) header.insertBefore(chip, header.firstChild);
+      }
     }
     // The label above was rewritten from the title and status; a typed topic keeps its type (a hypothesis its strength) in the accessible name.
     const kind = this.topicKindOf(node.id);
@@ -15774,6 +15781,21 @@ export class VisualAgentMapView extends ItemView {
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools")?.getBoundingClientRect?.();
     return canvas ? insetFromRects(canvas.top, tools) : 0;
   }
+  /**
+   * The four sides a programmatic viewport (Show all, focus) keeps clear: the toolbar above, the zoom bar below, and an
+   * overlay chat panel on the left (a docked panel is not on the canvas, so it adds nothing). The card tool row is not counted.
+   */
+  private canvasInsets(): CanvasInsets {
+    const canvas = this.viewportEl?.getBoundingClientRect?.();
+    if (!canvas) return { top: 0, right: 0, bottom: 0, left: 0 };
+    const rectOf = (selector: string) => this.contentEl?.querySelector<HTMLElement>(selector)?.getBoundingClientRect?.();
+    return {
+      top: insetFromRects(canvas.top, rectOf(".vam-map-tools")),
+      right: 0,
+      bottom: bottomInsetFromRects(canvas.bottom, rectOf(".vam-zoom-controls")),
+      left: leftInsetFromRects(canvas.left, rectOf(".vam-map-chat.is-overlay"))
+    };
+  }
   /** Lifts a never-moved default viewport below the toolbar. In memory only; it is saved with the next real pan or zoom. */
   private applyInitialViewport(): void {
     if (!this.map) return;
@@ -15824,7 +15846,7 @@ export class VisualAgentMapView extends ItemView {
       this.map.viewport,
       { x: node.x + (node.width ?? CARD_WIDTH) / 2, y: node.y + 80 },
       { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
-      this.canvasInset()
+      this.canvasInsets()
     );
     this.transform();
     if (persist) this.saveViewport();
@@ -15862,11 +15884,12 @@ export class VisualAgentMapView extends ItemView {
       maxY = Math.max(...boxes.map(b => b.y + b.h));
     const fitBounds = { minX, minY, maxX, maxY };
     const fitSize = { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight };
-    this.map.viewport = fitViewport(fitBounds, fitSize, this.canvasInset());
+    const fitInset = this.canvasInsets();
+    this.map.viewport = fitViewport(fitBounds, fitSize, fitInset);
     this.transform();
     this.saveViewport();
     // The zoom floor keeps text readable; when it holds some cards off screen, say so instead of hiding them silently.
-    if (fitIsClamped(fitBounds, fitSize, this.canvasInset())) {
+    if (fitIsClamped(fitBounds, fitSize, fitInset)) {
       const hint = t("ui.fit_clamped");
       this.announcer?.setText(hint);
       new Notice(hint);
@@ -17215,11 +17238,8 @@ export class VisualAgentMapView extends ItemView {
               await this.mapChange(map => {
                 this.arrangeAll(map);
               }, false);
-              const nodes = this.map?.nodes ?? [];
-              const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
-              const target = fresh.find(node => !node.parentId) ?? fresh[0];
-              // A card the reply asked to look at is where the view goes; this move to the new branch is only the default.
-              if (target && !result.actions.some(action => action.kind === "focus_topic")) this.focusNode(target);
+              // A card the reply asked to look at is where the view goes; showing the whole map is only the default.
+              if (!result.actions.some(action => action.kind === "focus_topic")) this.fit();
               arranged = true;
             })
           );
@@ -17309,6 +17329,9 @@ export class VisualAgentMapView extends ItemView {
       }
       lines[index] = this.chatLine(label, outcome);
     }
+    // addNode selects each card it makes, which leaves the last one selected; the reply's new branch root is the better start.
+    const branchRoot = this.chatBranchRoot(run);
+    if (branchRoot && same() && !this.closed) this.applySelectionChange(this.selection.setSelected(branchRoot.id));
     const all = [...lines];
     if (result.rejected.length)
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
@@ -17316,6 +17339,12 @@ export class VisualAgentMapView extends ItemView {
     if (later.some(index => result.actions[index].kind === "run_map_action" && lines[index]?.status === "done"))
       all.push({ status: "done", text: t("ui.map_chat_not_undoable") });
     return all;
+  }
+  /** The root of the branch a reply made: its first card without a parent, else the first card it made. */
+  private chatBranchRoot(run: ChatRun): MapNode | undefined {
+    const nodes = this.map?.nodes ?? [];
+    const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
+    return fresh.find(node => !node.parentId) ?? fresh[0];
   }
   /** Places the cards a reply made (and only those): each new branch beside its parent, a new tree below the others. */
   private placeChatCards(nodes: MapNode[], fresh: Set<string>): MapNode[] {

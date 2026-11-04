@@ -81,7 +81,7 @@ function makeView() {
     plugin: { repo: { updateMap: async (...args) => { writes.push(args); } }, mutate: async fn => { await fn(); } },
     viewportEl: { clientWidth: 1000, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 1000, bottom: 600 }) },
     stageEl: { style: {}, querySelector: () => null },
-    contentEl: { querySelector: () => ({ getBoundingClientRect: () => ({ top: 12, bottom: 50 }) }) },
+    contentEl: { querySelector: selector => (selector === '.vam-map-tools' ? { getBoundingClientRect: () => ({ top: 12, bottom: 50 }) } : null) },
     path: 'Map.md', viewportTimer: null, viewportQueued: false, history: {}
   });
   view.selection.setSelected('a');
@@ -374,7 +374,7 @@ test('applyInitialViewport moves a saved viewport that draws a card under the to
     view.map.nodes[0].x = 684; view.map.nodes[0].y = 0;
     view.map.nodes[1].x = 5000; view.map.nodes[1].y = 5000;
     view.viewportEl.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1440, bottom: 700 });
-    view.contentEl = { querySelector: () => ({ getBoundingClientRect: () => ({ left: 12, top: 12, right: 720, bottom: 50 }) }) };
+    view.contentEl = { querySelector: selector => (selector === '.vam-map-tools' ? { getBoundingClientRect: () => ({ left: 12, top: 12, right: 720, bottom: 50 }) } : null) };
     view.applyInitialViewport();
     assert.equal(view.map.viewport.y, moves ? 58 : 300, `saved y ${saved.y}`);
     assert.equal(view.viewportTimer, null);
@@ -390,7 +390,7 @@ test('applyInitialViewport lifts a saved viewport only on the first paint of a m
   view.map.nodes[0].x = 684; view.map.nodes[0].y = 0;
   view.map.nodes[1].x = 5000; view.map.nodes[1].y = 5000;
   view.viewportEl.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1440, bottom: 700 });
-  view.contentEl = { querySelector: () => ({ getBoundingClientRect: () => ({ left: 12, top: 12, right: 720, bottom: 50 }) }) };
+  view.contentEl = { querySelector: selector => (selector === '.vam-map-tools' ? { getBoundingClientRect: () => ({ left: 12, top: 12, right: 720, bottom: 50 }) } : null) };
   view.applyInitialViewport();
   assert.equal(view.map.viewport.y, 58, 'first paint lifts the card clear');
   view.map.viewport = { x: 0, y: 0, zoom: 1 }; // the user pans the card back under the toolbar
@@ -411,6 +411,54 @@ test('render order: toolbar overlay before the viewport, zoom controls in a seco
   assert.ok(controls > at('canvas.insertBefore(overlay, this.viewportEl);'), 'the controls overlay is appended after the viewport');
   assert.ok(at('const zoom = controls.createDiv("vam-zoom-controls");') > controls);
   assert.equal(render.includes('overlay.createDiv("vam-zoom-controls")'), false);
+});
+
+// ---- Map trial bug 5: Show all and focus keep the card area clear of the zoom bar and an overlay chat panel ----
+test('four-sided inset: a number is the top only; Show all keeps the lowest card above a bottom inset and the leftmost right of a left inset', () => {
+  const bounds = { minX: 0, minY: 0, maxX: 900, maxY: 1200 }, size = { width: 1000, height: 600 };
+  const old = inset.fitViewport(bounds, size, 58);
+  assert.deepEqual({ ...inset.fitViewport(bounds, size, { top: 58, right: 0, bottom: 0, left: 0 }) }, { ...old }, 'a number equals a top-only object');
+  const bottom = inset.fitViewport(bounds, size, { top: 58, right: 0, bottom: 68, left: 0 });
+  assert.ok(bottom.y >= 58 - 1e-6, 'top kept');
+  assert.ok(bottom.y + 1200 * bottom.zoom <= 600 - 68 + 1e-6, `lowest card bottom ${bottom.y + 1200 * bottom.zoom} stays above the zoom bar at 532`);
+  assert.ok(old.y + 1200 * old.zoom > 600 - 68, 'without the bottom inset the card would sit under the bar');
+  const left = inset.fitViewport({ minX: 0, minY: 0, maxX: 900, maxY: 300 }, size, { top: 58, right: 0, bottom: 0, left: 300 });
+  assert.ok(left.x >= 300 - 1e-6, `leftmost card ${left.x} is right of the panel edge 300`);
+  assert.ok(left.x + 900 * left.zoom <= 1000 + 1e-6, 'the right edge stays in the canvas');
+  const focus = inset.focusViewport({ x: 0, y: 0, zoom: 1 }, { x: 140, y: 80 }, size, { top: 58, right: 0, bottom: 68, left: 300 });
+  assert.equal(focus.x, 300 + (1000 - 300) / 2 - 140);
+  assert.equal(focus.y, 58 + (600 - 58 - 68) / 2 - 80);
+  assert.deepEqual({ ...inset.focusViewport({ x: 0, y: 0, zoom: 1 }, { x: 140, y: 80 }, size, 58) }, { zoom: 1, x: 500 - 140, y: 58 + (600 - 58) / 2 - 80 }, 'a number keeps the old centring');
+  const wide = { minX: 0, minY: 0, maxX: 9000, maxY: 300 };
+  assert.equal(inset.fitIsClamped(wide, size, 58), inset.fitIsClamped(wide, size, { top: 58, right: 0, bottom: 0, left: 0 }));
+  assert.equal(inset.fitIsClamped({ minX: 0, minY: 0, maxX: 2500, maxY: 300 }, size, { top: 0, right: 0, bottom: 0, left: 300 }), true, 'a left panel narrows the fit width');
+  assert.equal(inset.fitIsClamped({ minX: 0, minY: 0, maxX: 2500, maxY: 300 }, size, 0), false);
+});
+
+test('Show all measures the zoom bar and the overlay chat panel; a docked panel and a missing bar add nothing', () => {
+  const rects = { tools: { left: 12, top: 12, right: 400, bottom: 50 }, zoom: { left: 900, top: 540, right: 990, bottom: 590 }, chat: { left: 0, top: 0, right: 300, bottom: 600 } };
+  const fixture = parts => {
+    const { view, nodes } = makeView();
+    nodes[0].x = 0; nodes[0].y = 0; nodes[1].x = 600; nodes[1].y = 1020;
+    view.cardEls.set('a', { getBoundingClientRect: () => ({}) });
+    view.contentEl = { querySelector: selector => ({ '.vam-map-tools': parts.tools, '.vam-zoom-controls': parts.zoom, '.vam-map-chat.is-overlay': parts.chat })[selector] ? { getBoundingClientRect: () => ({ '.vam-map-tools': parts.tools, '.vam-zoom-controls': parts.zoom, '.vam-map-chat.is-overlay': parts.chat })[selector] } : null };
+    view.stageEl = { style: {}, querySelector: () => null };
+    return { view, nodes };
+  };
+  const bare = fixture({ tools: rects.tools });
+  bare.view.fit();
+  assert.deepEqual({ ...bare.view.canvasInsets() }, { top: 58, right: 0, bottom: 0, left: 0 }, 'no bar, no overlay: top only');
+  const withBar = fixture({ tools: rects.tools, zoom: rects.zoom });
+  withBar.view.fit();
+  assert.deepEqual({ ...withBar.view.canvasInsets() }, { top: 58, right: 0, bottom: 68, left: 0 });
+  const v = withBar.view.map.viewport;
+  assert.ok(withBar.nodes[1].y * v.zoom + v.y + 180 * v.zoom <= 600 - 68 + 1e-6, `lowest card bottom stays above the zoom bar (zoom ${v.zoom})`);
+  const overlay = fixture({ tools: rects.tools, zoom: rects.zoom, chat: rects.chat });
+  overlay.nodes[0].y = 400; overlay.nodes[1].x = 400; overlay.nodes[1].y = 400;
+  overlay.view.fit();
+  assert.equal(overlay.view.canvasInsets().left, 300);
+  const o = overlay.view.map.viewport;
+  assert.ok(overlay.nodes[0].x * o.zoom + o.x >= 300 - 1e-6, `leftmost card ${overlay.nodes[0].x * o.zoom + o.x} is right of the panel edge`);
 });
 
 // ---- UX review A theme 3: zoom keeps the selected card ----

@@ -414,8 +414,8 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const p = page(); const rootEl = p.root; ctx.page = p;
-  const focused = [];
-  Object.assign(view, { path: MAP, contentEl: rootEl, focusNode(node) { focused.push(node.id); }, closed: false });
+  const focused = [], fits = [];
+  Object.assign(view, { path: MAP, contentEl: rootEl, focusNode(node) { focused.push(node.id); }, fit() { fits.push(true); }, closed: false });
   view.map = await repo.readMap(MAP);
   if (aim) view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   const rawSend = view.sendMapChat.bind(view); view.sendMapChat = (...args) => withTimeout(rawSend(...args));
@@ -435,7 +435,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   };
   await reload();
   const h = {
-    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, clock: ctx.clock, get intervals() { return ctx.intervals; }, repaint, renders: () => renders, workspace: () => workspaceEl,
+    repo, app, contents, files, view, plugin, ids, control, notices, focused, fits, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, clock: ctx.clock, get intervals() { return ctx.intervals; }, repaint, renders: () => renders, workspace: () => workspaceEl,
     setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
     // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
     leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
@@ -2501,13 +2501,13 @@ integrationTest('B1 view operations: collapse, expand, auto layout and focus eac
   assert.equal((await h.saved()).find(n => n.id === h.ids.a).collapsed, true, 'saved'); assert.equal(chat.isBusy, false);
   await apply(h, [{ kind: 'expand_topic', nodeId: h.ids.a }]); assert.equal(!!(await h.saved()).find(n => n.id === h.ids.a).collapsed, false);
 });
-integrationTest('B1 view operations: a reply that adds five cards is arranged once and the view goes to the new root; four cards are not; an explicit auto_layout is not doubled', async () => {
+integrationTest('B1 view operations: a reply that adds five cards is arranged once and the view shows the whole map and the new root is selected; four cards are not; an explicit auto_layout is not doubled', async () => {
   const counted = async () => { const h = await harness({ empty: true }); await h.view.hydrate(); h.layouts = 0; const original = h.view.mapChange.bind(h.view); h.view.mapChange = async (change, rebuild) => { h.layouts++; return original(change, rebuild); }; return h; };
   const tree = count => [addRoot('r', 'Root'), ...Array.from({ length: count - 1 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
   const four = await counted(); const fourLines = await apply(four, tree(4));
-  assert.equal(four.layouts, 0, 'four cards: no layout'); eq(four.focused, []); assert.ok(!fourLines.some(l => /Arranged the map automatically/.test(l.text)));
+  assert.equal(four.layouts, 0, 'four cards: no layout'); eq(four.focused, []); eq(four.fits, []); eq([four.view.selection.state.selected], [four.view.map.nodes.find(n => !n.parentId).id]); assert.ok(!fourLines.some(l => /Arranged the map automatically/.test(l.text)));
   const five = await counted(); const fiveLines = await apply(five, tree(5)); const root = five.view.map.nodes.find(n => !n.parentId);
-  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, [root.id]); assert.ok(fiveLines.some(l => l.status === 'done' && /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines));
+  assert.equal(five.layouts, 1, 'five cards: exactly one layout'); eq(five.focused, []); eq(five.fits.length, 1); eq([five.view.selection.state.selected], [root.id]); assert.ok(fiveLines.some(l => l.status === 'done' && /Arranged the map automatically/.test(l.text)), JSON.stringify(fiveLines));
   assert.equal(fiveLines.at(-1).text, 'Arranged the map automatically after adding many topics', 'it comes after every card line');
   const explicit = await counted(); const explicitLines = await apply(explicit, [...tree(5), { kind: 'auto_layout' }]);
   assert.equal(explicit.layouts, 1, 'the reply\'s own auto_layout is the only one'); assert.equal(explicitLines.filter(l => /Arrange/.test(l.text)).length, 1);
@@ -3068,12 +3068,12 @@ test('B1 fix 5: a new message, and a pick in any list, end every list of maps sh
   findAll(g.parts.log(), i => hasClass(i, 'vam-map-chat-choice')).at(-1).click(); eq(findAll(g.parts.log(), i => hasClass(i, 'vam-map-chat-choice')).map(b => !b.disabled), [false, false], 'a pick ends every list');
 });
 
-integrationTest('B1 fix 6: a reply that asks to look at a card keeps that view; the automatic move to the new branch is only the default', async () => {
+integrationTest('B1 fix 6: a reply that asks to look at a card keeps that view; showing the whole map is only the default', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate();
   const tree = [addRoot('r', 'Root'), ...Array.from({ length: 5 }, (_, i) => addRoot(`c${i}`, `Kid ${i}`, 'new:r'))];
   await apply(h, [...tree, { kind: 'focus_topic', nodeId: 'new:c2' }]);
-  const kid = h.view.map.nodes.filter(n => n.parentId)[2]; eq(h.focused, [kid.id], 'only the card the reply named');
-  const plain = await harness({ empty: true }); await plain.view.hydrate(); await apply(plain, tree); eq(plain.focused, [plain.view.map.nodes.find(n => !n.parentId).id], 'without focus_topic the new root, as before');
+  const kid = h.view.map.nodes.filter(n => n.parentId)[2]; eq(h.focused, [kid.id], 'only the card the reply named'); eq(h.fits, [], 'the view is not moved to show the whole map');
+  const plain = await harness({ empty: true }); await plain.view.hydrate(); await apply(plain, tree); eq(plain.focused, [], 'no centring on one card'); eq(plain.fits.length, 1, 'without focus_topic the whole map is shown');
 });
 
 test('B1 fix 8: the count a plan names is the one it was judged by (a selection made earlier in the reply counts)', () => {

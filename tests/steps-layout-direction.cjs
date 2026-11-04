@@ -417,4 +417,33 @@ test('V6: in a left map the cards a map chat reply adds (and its auto_layout) go
   }
 });
 
+// ---- Map trial bug 2: after a reply that made cards, the new branch's root is selected (a presentation starts at 1/N) ----
+test('V7: a reply that made cards ends with the new branch root selected, also below the auto-layout threshold; Show all replaces the centring', async () => {
+  for (const count of [7, 2]) {
+    const h = await harness(tree4.slice(0, 1));
+    const kids = Array.from({ length: count - 1 }, (_, i) => ({ kind: 'add_child', ref: `k${i}`, parentId: 'new:r', title: `Kid${i}` }));
+    await chatApply(h, [{ kind: 'add_child', ref: 'r', parentId: '', title: 'Branch' }, ...kids]);
+    h.view.notes = new Map(await Promise.all(h.view.map.nodes.map(async n => [n.id, await h.repo.readNote(n.path)])));
+    assert.equal(h.view.map.nodes.length, count + 1);
+    assert.equal(h.view.selection.state.selected, h.named('Branch').id, `${count} new cards: the branch root, not the last card`);
+    assert.equal(h.fits(), count >= 5 ? 1 : 0, `${count} new cards: Show all only after an auto layout`);
+  }
+});
+
+test('V7: a reply with focus_topic still selects the branch root and does not move the view; a reply that made nothing keeps the selection', async () => {
+  const h = await harness(tree4);
+  h.view.selection.setSelected(h.named('B').id);
+  await chatApply(h, [{ kind: 'focus_topic', nodeId: h.named('A').id }]);
+  assert.equal(h.view.selection.state.selected, h.named('B').id, 'no created cards: selection untouched');
+  const kids = Array.from({ length: 6 }, (_, i) => ({ kind: 'add_child', ref: `k${i}`, parentId: i ? 'new:k0' : h.named('Root').id, title: `Kid${i}` }));
+  await chatApply(h, [...kids, { kind: 'focus_topic', nodeId: h.named('A').id }]);
+  assert.equal(h.fits(), 0, 'focus_topic keeps the view where the reply put it');
+});
+
+test('V7: a manual add still selects the new card', async () => {
+  const h = await harness(tree4);
+  await h.view.addNode(h.named('Root'), 'Added');
+  assert.equal(h.view.selection.state.selected, h.named('Added').id);
+});
+
 module.exports = { layout, node, snap, sample, sampleHeight, folded, converging, sized, sizedHeight, branchBase };

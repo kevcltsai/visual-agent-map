@@ -1252,7 +1252,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_do_set_kind_many_0_1": "把 {0} 张议题的类型改为{1}",
   "ui.map_chat_do_add_relation_0_1_2": "把“{0}”连到“{1}”（{2}）",
   "ui.map_chat_do_remove_relation_0_1": "删除“{0}”与“{1}”之间的关系",
-  "ui.map_chat_skip_relation_not_allowed": "地图不允许这条关系",
+  "ui.map_chat_skip_relation_not_allowed": "心智图不允许这条关系",
   "ui.map_chat_skip_relation_missing": "这两张议题之间没有关系",
   "ui.map_chat_kind_with_strength_0_1": "{0}（{1}）",
   "ui.map_chat_do_ask_kind_0": "提供选项：要怎么把议题变成{0}",

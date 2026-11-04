@@ -1553,7 +1553,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.stop_research": "停止研究",
   "ui.stop_expand": "停止展开",
   "ui.research_stopped_existing_content_was_preserved": "研究已停止，原有内容保留。",
-  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "AI 结果没有保存：AI 作业期间这张卡被修改过，保存会盖掉修改。心智图没有被改动。可以重新执行；会再用 1 次 AI。",
+  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved":
+    "AI 结果没有保存：AI 作业期间这张卡被修改过，保存会盖掉修改。心智图没有被改动。可以重新执行；会再用 1 次 AI。",
   "ui.shallow_research_for_expanded_subtopics_0": "子题研究：{0}",
   "ui.select_the_parent_topic_before_its_child": "请先勾选子议题的父议题。",
   "ui.first_level_topic_names_must_be_unique": "第一层子议题名称不能重复。",
@@ -1566,7 +1567,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.choose_synthesis_direction": "选择整合方向",
   "ui.discard_synthesis": "放弃",
   "ui.synthesis_pending_review_first": "请先处理或放弃这个主题待处理的整合结果。",
-  "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "整合结果没有保存：AI 作业期间，别的动作（例如子题研究）刚好写回这张卡，保存会盖掉它。心智图没有被改动。可以重新整合；会再用 1 次 AI。",
+  "ui.the_topic_changed_the_synthesis_draft_was_not_saved":
+    "整合结果没有保存：AI 作业期间，别的动作（例如子题研究）刚好写回这张卡，保存会盖掉它。心智图没有被改动。可以重新整合；会再用 1 次 AI。",
   "detail.core_conclusions": "核心结论",
   "detail.key_knowledge": "关键知识",
   "detail.evidence_and_sources": "证据与来源",

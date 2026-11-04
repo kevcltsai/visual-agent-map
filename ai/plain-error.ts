@@ -40,12 +40,21 @@ export function plainFailure(context: string, error: unknown, locale?: ContentLa
               ? raw.replace(/[.。]+$/, "")
               : "";
   const first = reason ? say("error.plain_failed_reason_0_1", context, reason) : say("error.plain_failed_0", context);
-  const next = kind === "auth" ? say("error.plain_next_signin") : kind === "quota" ? say("error.plain_next_quota") : say("error.plain_next_retry");
+  const next =
+    kind === "auth"
+      ? say("error.plain_next_signin")
+      : kind === "quota"
+        ? say("error.plain_next_quota")
+        : say("error.plain_next_retry");
   return `${first} ${say("error.plain_map_unchanged")} ${next}`;
 }
 
 /** The card's own wording for a stored failure: plain main text plus the raw text when it is technical. */
 export function cardFailure(raw: string, locale?: ContentLanguage): { text: string; technical: string | null } {
-  const text = plainFailure(locale ? translate(locale, "error.plain_card_context") : t("error.plain_card_context"), raw, locale);
+  const text = plainFailure(
+    locale ? translate(locale, "error.plain_card_context") : t("error.plain_card_context"),
+    raw,
+    locale
+  );
   return { text, technical: isTechnicalErrorText(raw) || classifyProviderError(raw) || NETWORK.test(raw) ? raw : null };
 }

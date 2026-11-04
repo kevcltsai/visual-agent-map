@@ -1634,7 +1634,8 @@ export const en = {
   "ui.stop_research": "Stop research",
   "ui.stop_expand": "Stop expanding",
   "ui.research_stopped_existing_content_was_preserved": "Research stopped. Existing content was preserved.",
-  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "The AI result was not saved: this card was edited while AI was working, and saving would overwrite that edit. Your map was not changed. Run it again; it uses 1 more AI call.",
+  "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved":
+    "The AI result was not saved: this card was edited while AI was working, and saving would overwrite that edit. Your map was not changed. Run it again; it uses 1 more AI call.",
   "ui.shallow_research_for_expanded_subtopics_0": "Subtopic research: {0}",
   "ui.select_the_parent_topic_before_its_child": "Select the parent topic before its child.",
   "ui.first_level_topic_names_must_be_unique": "First-level topic names must be unique.",
@@ -1648,7 +1649,8 @@ export const en = {
   "ui.choose_synthesis_direction": "Choose synthesis direction",
   "ui.discard_synthesis": "Discard",
   "ui.synthesis_pending_review_first": "Choose or discard the pending synthesis on this topic first.",
-  "ui.the_topic_changed_the_synthesis_draft_was_not_saved": "Integration was not saved: something else, such as research on a subtopic, wrote to this card while AI was working, and saving would overwrite it. Your map was not changed. Run integration again; it uses 1 more AI call.",
+  "ui.the_topic_changed_the_synthesis_draft_was_not_saved":
+    "Integration was not saved: something else, such as research on a subtopic, wrote to this card while AI was working, and saving would overwrite it. Your map was not changed. Run integration again; it uses 1 more AI call.",
   "detail.core_conclusions": "Core conclusions",
   "detail.key_knowledge": "Key knowledge",
   "detail.evidence_and_sources": "Evidence and sources",

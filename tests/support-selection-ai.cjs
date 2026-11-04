@@ -38,7 +38,7 @@ class Setting {
  * Select `selected` inside `markdown`, open the panel, press the first preset button and answer every model call
  * with the next entry of `replies`. Returns the prompts of the prepared steps the panel passed to `run`, in order.
  */
-async function runPanel({ markdown, selected, replies, steps = false, outcome = false, notices = [] }) {
+async function runPanel({ markdown, selected, replies, steps = false, outcome = false, notices = [], lockDuring = null, applyAfter = null }) {
   const obsidian = { Component, MarkdownView, MarkdownRenderer: { render: async () => {} }, Notice: class { constructor(message) { notices.push(message); } }, Setting, setIcon() {}, Platform: { isMacOS: true }, requestUrl: async () => ({ json: {} }), parseYaml: text => require('yaml').parse(text) };
   const globals = {
     HTMLElement: FakeElement, HTMLImageElement: class {}, HTMLTextAreaElement: class {}, HTMLButtonElement: class {},
@@ -46,22 +46,25 @@ async function runPanel({ markdown, selected, replies, steps = false, outcome = 
     window: { getSelection: () => null, innerWidth: 1000, innerHeight: 800, requestAnimationFrame: callback => callback(), setTimeout, clearTimeout }
   };
   const { MarkdownSelectionAi } = load('experiences/markdown-context/selection-ai.ts', { obsidian }, globals);
+  // `lockDuring`: the note text the editor holds from the moment the model call starts (a lock set while the draft is made).
+  const state = { markdown, replaced: [] };
   const view = Object.assign(new MarkdownView(), {
     file: { path: 'Note.md' }, containerEl: new FakeElement(), getMode: () => 'source',
-    editor: { getValue: () => markdown, getSelection: () => selected, getCursor: () => ({ line: 0, ch: 0 }), posToOffset: () => markdown.indexOf(selected), replaceRange() {} }
+    editor: { getValue: () => state.markdown, getSelection: () => selected, getCursor: () => ({ line: 0, ch: 0 }), posToOffset: () => markdown.indexOf(selected), replaceRange(...args) { state.replaced.push(args); } }
   });
   const app = { workspace: { containerEl: new FakeElement(), getLeavesOfType: () => [{ view }], getActiveViewOfType: () => view } };
   const sent = [];
   const queue = [...replies];
-  const ai = new MarkdownSelectionAi(app, { model: () => 'test-model', autoOpen: () => true, language: () => 'English', run: async prepared => { sent.push(steps ? { step: `${prepared.step.id}@${prepared.step.version}`, prompt: prepared.prompt } : prepared.prompt); return queue.shift(); } });
+  const ai = new MarkdownSelectionAi(app, { model: () => 'test-model', autoOpen: () => true, language: () => 'English', run: async prepared => { if (lockDuring !== null) state.markdown = lockDuring; sent.push(steps ? { step: `${prepared.step.id}@${prepared.step.version}`, prompt: prepared.prompt } : prepared.prompt); return queue.shift(); } });
   assert(ai.openForSelection(false), 'the panel opened');
   const panel = app.workspace.containerEl.children.find(item => item.cls === 'vam-context-ai-panel');
   const presets = panel.descendants().find(item => item.cls === 'vam-context-ai-presets');
   presets.children[0].listeners.click[0]();
   for (let turn = 0; turn < 50 && sent.length < replies.length; turn++) await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));
+  if (applyAfter) panel.descendants().find(item => item.cls === 'vam-context-ai-result-actions').children.find(item => item.textContent === applyAfter).listeners.click[0]();
   if (!outcome) return sent;
-  return { sent, output: panel.descendants().find(item => item.cls === 'vam-context-ai-output').value, status: panel.descendants().filter(item => item.cls.split(' ').includes('vam-context-ai-status')).map(item => item.textContent).join('|') };
+  return { sent, replaced: state.replaced, output: panel.descendants().find(item => item.cls === 'vam-context-ai-output')?.value, status: panel.descendants().filter(item => item.cls.split(' ').includes('vam-context-ai-status')).map(item => item.textContent).join('|') };
 }
 function assert(value, message) { if (!value) throw new Error(message); }
 

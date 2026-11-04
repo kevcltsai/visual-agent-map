@@ -593,7 +593,7 @@ test('07 chat: a rename of a locked card is a tool error saying it is locked, an
   assert.equal((await h.repo.readNote(b.path)).title, 'Renamed');
 });
 
-test('07 chat: every write tool on a locked target is refused (summary, note, kind, child, move, delete, related delete)', async () => {
+test('07 chat: every write tool on a locked target is refused (summary, note, kind, collapse, expand, child, move, delete, related delete)', async () => {
   const h = await harness(['A', 'B', 'C', 'D']);
   const [a, b, c, d] = h.nodes;
   c.parentId = a.id;
@@ -603,6 +603,8 @@ test('07 chat: every write tool on a locked target is refused (summary, note, ki
   const mapBefore = h.contents.get(MAP), noteBefore = h.raw(a);
   const actions = [
     { kind: 'update_summary', nodeId: a.id, summary: 'S' },
+    { kind: 'collapse_topic', nodeId: a.id },
+    { kind: 'expand_topic', nodeId: a.id },
     { kind: 'edit_topic_note', nodeId: a.id, detail: 'D' },
     { kind: 'set_topic_kind', nodeIds: [a.id], topicKind: 'hypothesis' },
     { kind: 'add_child', parentId: a.id, title: 'New child' },
@@ -724,4 +726,87 @@ test('08 note text lock: only a frontmatter `ai-locked: true` counts', () => {
   assert.equal(values.noteTextAiLocked('Body\nai-locked: true\n', parse), false, 'a body line is not frontmatter');
   assert.equal(values.noteTextAiLocked('---\nai-locked: "true"\n---\n', parse), false);
   assert.equal(values.noteTextAiLocked('---\nai-locked: [\n---\n', parse), false, 'broken YAML reads as unlocked');
+});
+
+// ---- fix batch after review: outline window lock, chat collapse/expand, late fences ------------------------------------
+const outlineModal = (create, generate, locked = false) => {
+  const Modal = dom.makeModal();
+  const mod = S.load('experiences/visual-map/outline-import-modal.ts', { obsidian: { ...obsidian, Modal, Notice: class {} } });
+  const generator = { presets: { settings: { language: 'en', promptPresets: [] }, async saveSettings() {} }, initialTopic: 'Sleep', generate };
+  const modal = new mod.OutlineImportModal({}, create, { list: () => [], watch: () => () => {} }, { map: 'editable', selected: { id: 'n1', title: 'Sleep' } }, 'under', generator, {}, async () => 'cur');
+  modal.open();
+  const button = text => dom.find(modal.modalEl, i => i.tag === 'button' && i.text === text);
+  return { modal, button, area: () => dom.find(modal.contentEl, i => i.tag === 'textarea' && i.cls?.includes('vam-outline-text')) };
+};
+
+test('fix B1: the outline window refuses AI generation under a locked parent before any provider call', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  await h.view.setAiLock([p], true);
+  let outlineCalls = 0, started = 0;
+  h.host.outlineGeneration = { generate: async () => { outlineCalls++; return { nodes: [], markdown: '# X' }; } };
+  h.host.currentModelChoice = () => ({ model: 'gpt-6-luna', reasoning: 'low' });
+  const generator = h.view.outlineGenerator('P');
+  await assert.rejects(generator.generate({ topic: 'P', presetText: 'x', placement: { kind: 'under', parentId: p.id } }, new AbortController().signal, () => { started++; return {}; }), LOCKED_NOTICE);
+  assert.equal(outlineCalls, 0, 'provider calls: 0');
+  assert.equal(started, 0);
+  assert.match(h.notices.join('\n'), LOCKED_NOTICE);
+});
+
+test('fix B1: AI-generated outline text carries aiGenerated; pasted, or typed over it, does not', async () => {
+  const requests = [];
+  const m = outlineModal(async request => { requests.push(request); }, async () => '# Sleep\n## A\n');
+  m.area().value = '# Pasted\n## B\n'; m.area().fire('input');
+  m.button(t('ui.outline_import_add')).fire('click'); await dom.tick();
+  assert.equal(requests.length, 1);
+  assert.equal('aiGenerated' in requests[0], false, 'a pasted outline is the user\'s own edit');
+  const g = outlineModal(async request => { requests.push(request); }, async () => '# Sleep\n## A\n');
+  g.button(t('ui.outline_ai_run')).fire('click'); await dom.tick(); await dom.tick();
+  assert.match(g.area().value, /Sleep/);
+  g.button(t('ui.outline_import_add')).fire('click'); await dom.tick();
+  assert.equal(requests[1].aiGenerated, true, 'text produced by the AI is marked');
+  const e = outlineModal(async request => { requests.push(request); }, async () => '# Sleep\n## A\n');
+  e.button(t('ui.outline_ai_run')).fire('click'); await dom.tick(); await dom.tick();
+  e.area().value = '# Mine\n'; e.area().fire('input');
+  e.button(t('ui.outline_import_add')).fire('click'); await dom.tick();
+  assert.equal('aiGenerated' in requests[2], false, 'text typed over the AI text is the user\'s');
+});
+
+test('fix B1: an AI-generated outline is blocked at import when the parent got locked meanwhile; the same text pasted is not', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  const count = h.view.map.nodes.length;
+  const outline = [{ index: 0, title: 'One', level: 1, parent: null, line: 1 }];
+  await h.view.setAiLock([p], true);
+  await assert.rejects(h.view.importOutline({ nodes: outline, source: null, shallowResearch: false, aiGenerated: true, placement: { kind: 'under', parentId: p.id } }), LOCKED_NOTICE);
+  assert.equal(h.view.map.nodes.length, count, 'nothing written');
+  await h.view.importOutline({ nodes: outline, source: null, shallowResearch: false, placement: { kind: 'under', parentId: p.id } });
+  assert.equal(h.view.map.nodes.length, count + 1, 'the pasted outline still goes in');
+});
+
+const PLAN = JSON.stringify({ action: 'transform', query: '', instruction: 'Make it shorter', placement: 'after', captionInstruction: '' });
+test('fix M2a: selection AI: a note locked while the draft is generating is not written on accept', async () => {
+  const result = await runPanel({ markdown: OPEN_NOTE, selected: 'text to rewrite', replies: [PLAN, 'Rewritten'], outcome: true, lockDuring: LOCKED_NOTE, applyAfter: t('ui.context_ai_insert_here') });
+  assert.equal(result.sent.length, 2, 'the draft was generated');
+  assert.equal(result.replaced.length, 0, 'nothing written');
+  assert.match(result.status, LOCKED_NOTICE);
+  const open = await runPanel({ markdown: OPEN_NOTE, selected: 'text to rewrite', replies: [PLAN, 'Rewritten'], outcome: true, applyAfter: t('ui.context_ai_insert_here') });
+  assert.equal(open.replaced.length, 1, 'an unlocked note is written');
+});
+
+test('fix M2b: child-topic suggestions: a topic locked while the AI proposes stores and offers nothing', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  const gate = h.hold();
+  const failures = [], offered = [];
+  const reply = { summary: 's', detail: 'd', visualReferences: [], suggestions: [{ title: 'Child', task: 't', contribution: '' }] };
+  h.host.askModel = async (_c, _m, _r, _s, _e, accepted) => { accepted?.(); await new Promise(resolve => gate.push(resolve)); return reply; };
+  const run = h.host.topicRuns.start(p.path, 'proposeChildren', { map: h.view.map, buildContext: async () => ({ title: 'P' }), offer: items => offered.push(items), failed: message => failures.push(message) });
+  await until(() => gate.length === 1);
+  await h.repo.writeAiLocked(p.path, true);
+  gate[0]();
+  await run;
+  assert.equal(offered.length, 0, 'nothing offered');
+  assert.equal(h.host.pendingSuggestions.has(p.path), false, 'nothing stored');
+  assert.ok(failures.some(message => LOCKED_NOTICE.test(message)));
 });

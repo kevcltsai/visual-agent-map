@@ -37147,6 +37147,8 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
     __publicField(this, "unwatch");
     __publicField(this, "placement", "tree");
     __publicField(this, "generation");
+    /** The outline box holds text the AI produced and the user has not typed over since (the AI lock applies to it). */
+    __publicField(this, "aiText", false);
     __publicField(this, "disarm");
     this.placement = initialPlacement === "under" && target.selected ? "under" : "tree";
   }
@@ -37166,7 +37168,10 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
     this.textarea = source.createEl("textarea", { cls: "vam-task-input vam-outline-text" });
     this.textarea.rows = 8;
     this.textarea.setAttr("aria-label", t("ui.outline_import_text_label"));
-    this.textarea.addEventListener("input", () => this.refresh());
+    this.textarea.addEventListener("input", () => {
+      this.aiText = false;
+      this.refresh();
+    });
     this.preview = source.createDiv("vam-outline-preview");
     this.placementField();
     const research = this.contentEl.createDiv("vam-outline-section");
@@ -37432,6 +37437,7 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
         if (this.detached) return;
         if (controller.signal.aborted) throw new Error(t("ui.outline_ai_stopped"));
         this.textarea.value = sanitizeOutlineDraft(markdown).trimEnd();
+        this.aiText = true;
         this.refresh();
         status.setText(t("ui.outline_ai_filled", this.nodes.length));
       }).catch((error) => {
@@ -37451,6 +37457,7 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
       this.restoreResult = () => {
         if (prefill.markdown !== void 0) {
           this.textarea.value = sanitizeOutlineDraft(prefill.markdown).trimEnd();
+          this.aiText = true;
           this.refresh();
           status.setText(t("ui.outline_ai_filled", this.nodes.length));
         } else if (prefill.message) status.setText(prefill.message);
@@ -37500,6 +37507,7 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
         nodes: this.nodes,
         placement: this.placementRequest(),
         source: null,
+        ...this.aiText ? { aiGenerated: true } : {},
         shallowResearch,
         ...shallowResearch ? { aiMode: this.mode() } : {},
         ...model ? { model } : {},
@@ -50027,12 +50035,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       initialTopic,
       ...prefill ? { prefill } : {},
       generate: async (request, signal, started) => {
-        var _a2, _b2, _c, _d, _e;
+        var _a2, _b2, _c, _d, _e, _f;
         if (((_a2 = this.outlineDraftTask) == null ? void 0 : _a2.state) === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
         const current = this.plugin.currentModelChoice();
         const parent = ((_b2 = request.placement) == null ? void 0 : _b2.kind) === "under" ? (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === request.placement.parentId) : void 0;
-        const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_d = this.map) != null ? _d : void 0) : null;
+        if (parent && this.aiLockReason(
+          "addChild",
+          [parent.id],
+          /* @__PURE__ */ new Map([[parent.id, await this.plugin.repo.readNote(parent.path, (_d = this.map) != null ? _d : void 0)]])
+        )) {
+          new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+          throw new Error(t("ui.ai_locked_notice"));
+        }
+        const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_e = this.map) != null ? _e : void 0) : null;
         const { model, reasoning } = resolveTaskModel({
           runOnce: request.model ? { model: request.model } : null,
           override: (inherited == null ? void 0 : inherited.origin) === "override" ? { model: inherited.model, reasoning: current.reasoning } : null,
@@ -50084,7 +50100,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
         });
         signal.removeEventListener("abort", forward);
         if (!ran || !run.task) throw new Error(t("ui.outline_ai_not_started"));
-        return (_e = run.task.markdown) != null ? _e : "";
+        return (_f = run.task.markdown) != null ? _f : "";
       }
     };
   }
@@ -59779,6 +59795,9 @@ ${request.requirements}` : preset.text,
       case "update_summary":
       case "edit_topic_note":
         return check("write", [action.nodeId]);
+      case "collapse_topic":
+      case "expand_topic":
+        return check("write", [real(action.nodeId)]);
       case "move_topic":
         return check("move", [action.nodeId], real(action.newParentId));
       case "delete_topic":

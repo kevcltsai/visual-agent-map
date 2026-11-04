@@ -2476,6 +2476,18 @@ export class VisualAgentMapView extends ItemView {
           request.placement?.kind === "under"
             ? this.map?.nodes.find(node => node.id === (request.placement as { parentId: string }).parentId)
             : undefined;
+        // AI lock: no outline for a locked parent, read fresh so a lock set meanwhile counts; refused before any AI.
+        if (
+          parent &&
+          this.aiLockReason(
+            "addChild",
+            [parent.id],
+            new Map([[parent.id, await this.plugin.repo.readNote(parent.path, this.map ?? undefined)]])
+          )
+        ) {
+          new Notice(t("ui.ai_locked_notice"));
+          throw new Error(t("ui.ai_locked_notice"));
+        }
         const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined) : null;
         const { model, reasoning } = resolveTaskModel({
           runOnce: request.model ? { model: request.model } : null,
@@ -13045,6 +13057,9 @@ export class VisualAgentMapView extends ItemView {
       case "update_summary":
       case "edit_topic_note":
         return check("write", [action.nodeId]);
+      case "collapse_topic":
+      case "expand_topic":
+        return check("write", [real(action.nodeId)]);
       case "move_topic":
         return check("move", [action.nodeId], real(action.newParentId));
       case "delete_topic":

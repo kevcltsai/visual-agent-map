@@ -127,11 +127,15 @@ import {
   resolveCoverWithFrame,
   withCover,
   withCoverOff,
-  withCoverFrame,
+  withCoverLook,
   withCoverOn,
-  type CoverFrame
+  type CoverFrame,
+  type CoverLook,
+  type CoverPosition
 } from "./card-cover";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
+import { arrangeCover, coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
+export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -211,6 +215,7 @@ import {
   layoutDirectionFor,
   layoutOf,
   medianHeight,
+  reorderSiblings,
   reorderTopLevel,
   type LayoutKind,
   type LayoutSpacing
@@ -597,44 +602,31 @@ const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
 const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 /** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
-const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement }>();
-/** A card cover is as wide as the card's content and at most this many times as tall; a taller picture is scaled down whole (letterboxed), never cropped. */
-export const COVER_MAX_HEIGHT_RATIO = 1.5;
-/**
- * Width over height of the card's cover frame for a picture of this size, or of the part of it a cover frame (mask) shows
- * (a very tall picture or region is held at 1 / COVER_MAX_HEIGHT_RATIO).
- */
-export function coverFrameRatio(width: number, height: number, frame?: CoverFrame | null): number | null {
-  if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) return null;
-  return Math.max((width * (frame?.w ?? 1)) / (height * (frame?.h ?? 1)), 1 / COVER_MAX_HEIGHT_RATIO);
-}
+const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement; position: CoverPosition }>();
+/** What the "Edit card" dialog leaves out of its copy of a card: the tools, the "+", the size handles and the clip parts. */
+/** Map-only states a copied card must not carry into the dialog. */
+const CARD_EDITOR_STATES = [
+  "is-clipped",
+  "is-selected",
+  "is-drop-target",
+  "is-cut",
+  "is-marquee-hit",
+  "is-marquee-remove",
+  "is-presenting",
+  "is-search-current",
+  "is-search-match",
+  "vam-structure-suggested"
+];
+const CARD_EDITOR_DROP = [
+  ".vam-node-tools",
+  ".vam-add-child",
+  ".vam-card-resize",
+  ".vam-card-resize-y",
+  ".vam-card-fade",
+  ".vam-card-more"
+].join(", ");
 /** Picture shapes (width over height) already seen, by image path, so a redraw sizes the frame at once and nothing jumps. */
 const coverShapes = new Map<string, number>();
-/**
- * Lays a picture into its (already sized) cover frame. Whole picture: nothing to place (CSS contains it). With a mask:
- * the window is the framed region, as wide as the frame or, when the frame is capped, scaled down whole and centred;
- * the picture is sized and shifted inside the window so only the region shows. Inline percentages, no CSS variables.
- */
-function placeCoverFrame(
-  parts: { frame: HTMLElement; window: HTMLElement | null; img: HTMLImageElement },
-  shape: number,
-  mask: CoverFrame | null
-): void {
-  const ratio = coverFrameRatio(shape, 1, mask);
-  if (!ratio) return;
-  parts.frame.style.setProperty("aspect-ratio", String(ratio));
-  parts.frame.addClass("is-sized");
-  if (!mask || !parts.window) return;
-  const region = (shape * mask.w) / mask.h;
-  // The window keeps the region's own shape (CSS: full height, width from this ratio, centred), so a card clipped
-  // short scales the region down whole instead of stretching it.
-  parts.window.style.setProperty("aspect-ratio", String(region));
-  const img = parts.img.style;
-  img.setProperty("width", `${100 / mask.w}%`);
-  img.setProperty("height", `${100 / mask.h}%`);
-  img.setProperty("left", `${(-mask.x / mask.w) * 100}%`);
-  img.setProperty("top", `${(-mask.y / mask.h) * 100}%`);
-}
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -3768,6 +3760,29 @@ export class VisualAgentMapView extends ItemView {
       this.arrangeBranch(map, parent.id, new Set([node.id, ...descendants(map.nodes, node.id)]), undefined);
     });
   }
+  /**
+   * move_topic with `beforeId`: the card goes under `parent` (or stays there) right in front of `before`, in one undoable Map.md
+   * change. The children of `parent` change places in the map's order, which every arrangement follows; then the branch is
+   * laid out again in that order. A first-level topic of a timeline map is laid out as a dragged one is: the whole map again.
+   * False (nothing written) when `before` is no longer a child of `parent` on the map being edited.
+   */
+  private async chatMoveBefore(node: MapNode, parent: MapNode, before: MapNode): Promise<boolean> {
+    if (!this.mergeUnlocked([node.id, parent.id])) return false;
+    const box = { placed: false };
+    await this.mapChange(map => {
+      const moving = map.nodes.find(item => item.id === node.id);
+      const target = map.nodes.find(item => item.id === parent.id);
+      const next = map.nodes.find(item => item.id === before.id);
+      if (!moving || !target || next?.parentId !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
+      moving.parentId = parent.id;
+      target.collapsed = false;
+      map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
+      box.placed = true;
+      if (!map.aim && layoutOf(map).direction === "timeline" && !target.parentId) this.arrangeAll(map);
+      else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
+    });
+    return box.placed;
+  }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   private openTopicMenu(event: MouseEvent): void {
     const menu = this.newMenu();
@@ -3817,21 +3832,33 @@ export class VisualAgentMapView extends ItemView {
     return entry;
   }
   /**
-   * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame` in one undoable step, the same way
-   * changeTopicCover writes. The picture file is never touched; undo writes the old note text back.
+   * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame`, and with `look` the picture size, in one
+   * undoable step, the same way changeTopicCover writes. With `width`, the card width goes into Map.md in that same step. The picture file is never touched; undo writes the old note
+   * text back.
    */
-  private async changeTopicCoverFrame(node: MapNode, frame: CoverFrame | null): Promise<TransactionEntry | null> {
+  private async changeTopicCoverFrame(
+    node: MapNode,
+    frame: CoverFrame | null,
+    look: Omit<CoverLook, "frame"> = {},
+    width?: number
+  ): Promise<TransactionEntry | null> {
     if (!this.map || !this.markersEditable(node)) return null;
-    const write = frameToWrite(frame);
+    const write: CoverLook = { ...look, frame: frameToWrite(frame) };
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .rewriteNote(node.path, async path => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await this.app.vault.process(file, content => withCoverFrame(content, write));
+        await this.app.vault.process(file, content => withCoverLook(content, write));
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
+        // The card width is the map's own setting (as dragging the card edge): written in this same step, one undo.
+        const target = width === undefined ? undefined : map.nodes.find(item => item.id === node.id);
+        if (target && width !== undefined) {
+          if (width === CARD_WIDTH) delete target.width;
+          else target.width = clampCardWidth(width);
+        }
       })
       .commit({ deferRebuild: true, label: t("ui.topic_cover_frame_title") });
     this.history.push(entry);
@@ -3839,7 +3866,9 @@ export class VisualAgentMapView extends ItemView {
     return entry;
   }
   /** The topic's cover picture (resource path) and its valid frame; null when it has no picture or the cover is off. */
-  private coverPictureOf(node: MapNode): { src: string; frame: CoverFrame | null } | null {
+  private coverPictureOf(
+    node: MapNode
+  ): { src: string; path: string; frame: CoverFrame | null; size: number; position: CoverPosition } | null {
     try {
       const file = this.app.vault.getAbstractFileByPath(node.path);
       if (!(file instanceof TFile)) return null;
@@ -3849,13 +3878,13 @@ export class VisualAgentMapView extends ItemView {
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       const src = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
-      return src ? { src, frame: cover.frame } : null;
+      return src ? { src, path: cover.path, frame: cover.frame, size: cover.size, position: cover.position } : null;
     } catch {
       return null;
     }
   }
   /**
-   * A card's double-click: on the cover picture it opens "Adjust cover area", on the title it renames. The point is
+   * A card's double-click: on the cover picture it opens "Edit card", on the title it renames. The point is
    * checked against both boxes because enableDrag captures the pointer on the card, so the target is often the card.
    */
   private onCardDoubleClick(
@@ -3886,7 +3915,7 @@ export class VisualAgentMapView extends ItemView {
     event.preventDefault();
     this.renameNode(node, noteTitle);
   }
-  /** Opens the "Adjust area" dialog for the topic's cover picture. Only Apply writes (one undo step); Cancel and close do not. */
+  /** Opens the "Edit card" dialog for the topic's card. Only Apply writes (one undo step); Cancel and close do not. */
   private openCoverFrameEditor(node: MapNode): CoverFrameModal | null {
     if (!this.markersEditable(node)) return null;
     const picture = this.coverPictureOf(node);
@@ -3894,11 +3923,16 @@ export class VisualAgentMapView extends ItemView {
     const modal = new CoverFrameModal(this.app, {
       src: picture.src,
       initial: picture.frame,
-      onApply: frame =>
+      size: picture.size,
+      position: picture.position,
+      width: node.width,
+      shape: coverShapes.get(picture.path) ?? null,
+      card: () => this.cardForEditor(node),
+      onApply: ({ frame, width, ...look }) =>
         new Promise<void>(done =>
           this.enqueue(async () => {
             try {
-              await this.changeTopicCoverFrame(node, frame);
+              await this.changeTopicCoverFrame(node, frame, look, width);
             } finally {
               done();
             }
@@ -3907,6 +3941,30 @@ export class VisualAgentMapView extends ItemView {
     });
     modal.open();
     return modal;
+  }
+  /**
+   * A detached copy of the topic's card for the "Edit card" dialog, so the dialog shows the card exactly as the map does
+   * (its width, fonts, wrapping, colour and shape). Copies carry no listeners; the tools, handles and the clip parts are
+   * dropped, and the card is shown at its natural height (a set height would hide the cover being edited).
+   */
+  private cardForEditor(node: MapNode): HTMLElement {
+    const live = this.cardEls?.get(node.id);
+    if (live && typeof live.cloneNode === "function") {
+      const card = live.cloneNode(true) as HTMLElement;
+      for (const extra of Array.from(card.querySelectorAll(CARD_EDITOR_DROP))) extra.remove();
+      for (const name of Array.from(card.getAttributeNames?.() ?? []))
+        if (["id", "tabindex", "role", "data-node-id"].includes(name) || name.startsWith("aria-"))
+          card.removeAttribute(name);
+      card.removeClass(...CARD_EDITOR_STATES);
+      for (const property of ["left", "top", "height", "transform"]) card.style.removeProperty(property);
+      return card;
+    }
+    const note = this.notes?.get(node.id);
+    const card = createDiv({ cls: "vam-node" });
+    if (node.width) card.style.width = `${node.width}px`;
+    card.createEl("h3", { cls: "vam-card-title", text: note?.title ?? node.path });
+    if (note && !isPlaceholder(note.summary)) card.createEl("p", { cls: "vam-card-summary", text: note.summary });
+    return card;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
@@ -5389,6 +5447,7 @@ export class VisualAgentMapView extends ItemView {
       if (!summary && title) {
         summary = card.createEl("p", { cls: "vam-card-summary" });
         title.after(summary);
+        this.arrangeCardCover(card);
       }
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
@@ -7715,9 +7774,9 @@ export class VisualAgentMapView extends ItemView {
         () => this.toggleCollapsed(node)
       );
     if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
-    // The same dialog as the panel's "Adjust area"; only for an editable topic whose cover picture is showing.
+    // "Edit card", the same dialog as the panel's button; only for an editable topic whose cover picture is showing.
     if (this.markersEditable(node) && this.coverPictureOf(node))
-      add(t("ui.topic_cover_frame_title"), "crop", () => this.openCoverFrameEditor(node));
+      add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
     menu.addSeparator();
     menu.addItem(item =>
       item
@@ -9280,6 +9339,15 @@ export class VisualAgentMapView extends ItemView {
       };
       // card-height: only a fixed-height card that cuts its content says so, so a map without heights exports unchanged.
       if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
+      // topic-cover-position: under or beside the picture the title is not below the cover, so it goes where the card
+      // draws it (and wraps at its own width). A top cover leaves the scene as it was.
+      const placedTitle = ["has-cover-bottom", "has-cover-left", "has-cover-right"].some(cls =>
+        card.classList.contains(cls)
+      );
+      if (placedTitle && titleEl && titleEl.offsetWidth > 0) {
+        item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
+        item.title = wrapText(title, titleEl.offsetWidth);
+      }
       // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
@@ -9304,13 +9372,14 @@ export class VisualAgentMapView extends ItemView {
             ? frame.querySelector<HTMLElement>(".vam-card-cover-window")
             : null;
         if (href && coverInfo.frame && win && win.offsetWidth > 0 && win.offsetHeight > 0) {
-          // A masked cover: the whole picture is placed so the framed region fills the window; the export clips to the window.
+          // A masked cover: the whole picture is placed so the framed region fills the window (at the window's own place
+          // in the cover, cover-layout.ts); the export clips to the window, and to the cover when a short card cuts it.
           const mask = coverInfo.frame;
-          // The window is centred in the frame by CSS (a transform), which offsetLeft does not see.
-          const winX = box.x + frame.offsetLeft + (frame.offsetWidth - win.offsetWidth) / 2;
+          const winX = box.x + frame.offsetLeft + win.offsetLeft;
           const winY = box.y + frame.offsetTop + win.offsetTop;
           const w = win.offsetWidth / mask.w;
           const h = win.offsetHeight / mask.h;
+          const shownHeight = Math.min(win.offsetHeight, Math.max(0, frame.offsetHeight - win.offsetTop));
           item.cover = {
             x: winX - mask.x * w,
             y: winY - mask.y * h,
@@ -9318,7 +9387,7 @@ export class VisualAgentMapView extends ItemView {
             h,
             href,
             fit: "fill",
-            window: { x: winX, y: winY, w: win.offsetWidth, h: win.offsetHeight }
+            window: { x: winX, y: winY, w: win.offsetWidth, h: shownHeight || win.offsetHeight }
           };
         } else if (href)
           item.cover = {
@@ -10729,7 +10798,7 @@ export class VisualAgentMapView extends ItemView {
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     title.setAttr("dir", "auto");
-    // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Adjust cover area".
+    // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Edit card".
     // It is handled on the card: enableDrag captures the pointer on the card, so a real mouse reports the card (not the
     // title or the picture) as the dblclick target.
     if (note && !this.selection.state.multiSelectMode && !this.map?.aim)
@@ -10974,6 +11043,8 @@ export class VisualAgentMapView extends ItemView {
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    // Bottom, left and right need the whole card (the summary, the text column), so the cover is placed once it is built.
+    this.arrangeCardCover(card);
     if (shownNode.height) this.ensureClipParts(card);
     this.fitKindShape(card, kind);
   }
@@ -11316,28 +11387,39 @@ export class VisualAgentMapView extends ItemView {
       old.frame.remove();
       cardCovers.delete(card);
     }
+    const placed = this.paintCoverFrame(card, notePath);
+    // Every way out puts the card back in order: no cover undoes a side layout, a cover goes where its position says.
+    arrangeCover(card, placed?.frame ?? null, placed?.position ?? "top");
+  }
+  private paintCoverFrame(card: HTMLElement, notePath: string): { frame: HTMLElement; position: CoverPosition } | null {
     let source: string | undefined;
     let imagePath = "";
     let mask: CoverFrame | null = null;
+    let size = 1;
+    let position: CoverPosition = "top";
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
-      if (!(file instanceof TFile)) return;
+      if (!(file instanceof TFile)) return null;
       const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
         this.app.metadataCache.getFirstLinkpathDest(link, notePath)
       );
-      if (!cover || !("path" in cover)) return;
+      if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
       imagePath = cover.path;
       mask = cover.frame;
+      size = cover.size;
+      position = cover.position;
     } catch {
-      return;
+      return null;
     }
-    if (!source) return;
+    if (!source) return null;
     const frame = createDiv({ cls: "vam-card-cover" });
     // A frame (mask) puts the picture inside a window that shows only the framed region; the file itself is never changed.
     const windowEl = mask ? frame.createDiv({ cls: "vam-card-cover-window" }) : null;
     if (mask) frame.addClass("is-framed");
+    // The picture size (k) makes the whole box narrower; the mask is the same region of the picture at any size.
+    sizeCoverBox(frame, size, position === "left" || position === "right");
     const img = (windowEl ?? frame).createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
@@ -11350,6 +11432,7 @@ export class VisualAgentMapView extends ItemView {
       this.coverObserver?.unobserve(img);
       frame.remove();
       cardCovers.delete(card);
+      arrangeCover(card, null, "top");
     });
     // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
     img.addEventListener("load", () => {
@@ -11359,12 +11442,10 @@ export class VisualAgentMapView extends ItemView {
       placeCoverFrame(parts, shape, mask);
       this.afterCoverSized(card);
     });
-    cardCovers.set(card, { frame, img });
-    const title = card.querySelector<HTMLElement>(".vam-card-title");
-    card.insertBefore(frame, title);
+    cardCovers.set(card, { frame, img, position });
     if (typeof IntersectionObserver !== "function") {
       img.setAttr("src", source);
-      return;
+      return { frame, position };
     }
     this.coverObserver ??= new IntersectionObserver(entries => {
       for (const entry of entries) {
@@ -11376,6 +11457,12 @@ export class VisualAgentMapView extends ItemView {
       }
     });
     this.coverObserver.observe(img);
+    return { frame, position };
+  }
+  /** Puts the card's cover where its position says (after the card is built, or after its text changed). */
+  private arrangeCardCover(card: HTMLElement): void {
+    const cover = cardCovers.get(card);
+    arrangeCover(card, cover?.frame ?? null, cover?.position ?? "top");
   }
   /**
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
@@ -11691,6 +11778,7 @@ export class VisualAgentMapView extends ItemView {
       if (!summary && title) {
         summary = createEl("p", { cls: "vam-card-summary" });
         title.after(summary);
+        this.arrangeCardCover(card);
       }
       summary?.setText(note.summary);
       summary?.setAttr("title", note.summary);
@@ -16694,7 +16782,9 @@ export class VisualAgentMapView extends ItemView {
       case "edit_topic_note":
         return t("ui.map_chat_do_note_0", title(action.nodeId));
       case "move_topic":
-        return t("ui.map_chat_do_move_0_1", title(action.nodeId), title(action.newParentId));
+        return action.beforeId
+          ? t("ui.map_chat_do_move_before_0_1", title(action.nodeId), title(action.beforeId))
+          : t("ui.map_chat_do_move_0_1", title(action.nodeId), title(action.newParentId));
       case "delete_topic":
         return t("ui.map_chat_do_delete_0", title(action.nodeId));
       case "edit_md_file":
@@ -16723,6 +16813,15 @@ export class VisualAgentMapView extends ItemView {
       }
       case "ask_topic_kind":
         return t("ui.map_chat_do_ask_kind_0", this.chatKindText(action.topicKind));
+      case "add_relation":
+        return t(
+          "ui.map_chat_do_add_relation_0_1_2",
+          title(action.fromId),
+          title(action.toId),
+          t(RELATION_NAME_KEY[action.relationKind])
+        );
+      case "remove_relation":
+        return t("ui.map_chat_do_remove_relation_0_1", title(action.fromId), title(action.toId));
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
@@ -17336,6 +17435,9 @@ export class VisualAgentMapView extends ItemView {
       }
       case "set_topic_kind":
         return this.chatSetTopicKind(action, real, run);
+      case "add_relation":
+      case "remove_relation":
+        return this.chatChangeRelation(action, real);
       case "collapse_topic":
       case "expand_topic": {
         this.flushChatRender();
@@ -17398,7 +17500,14 @@ export class VisualAgentMapView extends ItemView {
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
         if (!canParent(this.map.nodes, node.id, parent.id)) return skipped("ui.map_chat_skip_cycle");
-        await this.moveTopic(node, parent);
+        if (action.beforeId) {
+          const beforeId = real(action.beforeId);
+          if (beforeId === null) return skipped("ui.map_chat_skip_parent_missing");
+          const before = nodeOf(beforeId);
+          if (!before) return gone;
+          if (before.id === node.id || before.parentId !== parent.id) return skipped("ui.map_chat_skip_not_sibling");
+          if (!(await this.chatMoveBefore(node, parent, before))) return skipped("ui.map_chat_skip_not_sibling");
+        } else await this.moveTopic(node, parent);
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
       }
@@ -17480,6 +17589,58 @@ export class VisualAgentMapView extends ItemView {
         return done;
       }
     }
+  }
+  /**
+   * add_relation / remove_relation: the same Map.md write as a relation added or removed by hand (`addRelation`,
+   * `removeRelation`), checked again on the map being edited with the same rule (`relationAllowed`): a self link, a second
+   * relation on a pair and a derivation or prerequisite cycle are refused. Never on an AIM map or an AIM card.
+   */
+  private async chatChangeRelation(
+    action: Extract<MapChatAction, { kind: "add_relation" | "remove_relation" }>,
+    real: (id: string) => string | null
+  ): Promise<ChatOutcome> {
+    if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const fromId = real(action.fromId),
+      toId = real(action.toId);
+    if (fromId === null || toId === null) return skipped("ui.map_chat_skip_parent_missing");
+    const ends = [fromId, toId].map(id => this.map?.nodes.find(node => node.id === id));
+    if (ends.some(node => !node)) return skipped("ui.map_chat_skip_topic_gone");
+    if (ends.some(node => node?.aimKind)) return skipped("ui.map_chat_skip_unavailable");
+    const pair = (link: TopicRelation): boolean =>
+      (link.from === fromId && link.to === toId) || (link.from === toId && link.to === fromId);
+    const link: TopicRelation = {
+      kind: action.kind === "add_relation" ? action.relationKind : "related",
+      from: fromId,
+      to: toId
+    };
+    /** Why the change cannot be made on `list`; null when it can. */
+    const refusal = (list: readonly TopicRelation[]): TranslationKey | null =>
+      action.kind === "remove_relation"
+        ? list.some(pair)
+          ? null
+          : "ui.map_chat_skip_relation_missing"
+        : relationAllowed(list, link)
+          ? null
+          : "ui.map_chat_skip_relation_not_allowed";
+    // Checked on the map on screen first (nothing is written for a refused one), then again inside the write.
+    const early = refusal(this.map.topicRelations ?? []);
+    if (early) return skipped(early);
+    const box: { refused: TranslationKey | null } = { refused: null };
+    await this.mapChange(map => {
+      const list = map.topicRelations ?? [];
+      box.refused = refusal(list);
+      if (box.refused) return;
+      if (action.kind === "remove_relation") {
+        setTopicRelations(
+          map,
+          list.filter(item => !pair(item))
+        );
+        return;
+      }
+      const description = action.description ? normalizeRelationDescription(action.description) : undefined;
+      setTopicRelations(map, [...list, description ? { ...link, description } : link]);
+    }, false);
+    return box.refused ? skipped(box.refused) : { status: "done" };
   }
   /**
    * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every

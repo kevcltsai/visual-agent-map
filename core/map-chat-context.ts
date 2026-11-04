@@ -145,6 +145,8 @@ export interface MapChatContext {
   aim: boolean;
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;
+  /** The relations sent (none on an AIM map), for the parser's checks of a relation the reply adds or removes. */
+  relations?: MapChatRelation[];
   /** Normalised path -> content hash of every Markdown file sent whole in this turn. */
   mdHashes: Record<string, string>;
   /** Card id -> what the model saw of that card this turn; the baseline every card action is checked against. */
@@ -193,6 +195,33 @@ const kindFields = (node: MapChatOutlineNode, aim: boolean): { kind?: TopicKind;
   if (aim || !node.kind || node.kind === "topic") return {};
   return { kind: node.kind, ...(node.kind === "hypothesis" && node.strength ? { strength: node.strength } : {}) };
 };
+
+/**
+ * The outline in tree order: each card is followed by its subtopics, and the children of one parent keep the order they have in
+ * the input (the map's own order, which every arrangement lays them out in). A card whose parent is not in the outline counts
+ * as a root where it stands.
+ */
+function treeOrder(outline: readonly MapChatOutlineNode[]): MapChatOutlineNode[] {
+  const present = new Set(outline.map(node => node.id));
+  const children = new Map<string, MapChatOutlineNode[]>();
+  const roots: MapChatOutlineNode[] = [];
+  for (const node of outline)
+    if (node.parentId !== null && present.has(node.parentId) && node.parentId !== node.id)
+      children.set(node.parentId, [...(children.get(node.parentId) ?? []), node]);
+    else roots.push(node);
+  const ordered: MapChatOutlineNode[] = [];
+  const seen = new Set<string>();
+  const walk = (node: MapChatOutlineNode): void => {
+    if (seen.has(node.id)) return;
+    seen.add(node.id);
+    ordered.push(node);
+    for (const child of children.get(node.id) ?? []) walk(child);
+  };
+  for (const root of roots) walk(root);
+  // A parent loop (never written by the plugin) leaves cards unreached: they follow in input order rather than vanish.
+  for (const node of outline) walk(node);
+  return ordered;
+}
 
 export function buildMapChatContext(input: MapChatContextInput): MapChatContext {
   const hashes: Record<string, string> = {};
@@ -292,7 +321,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     mapTitle: input.mapTitle,
     ...(input.noEditableMap ? { noEditableMap: true } : {}),
     mapTitles,
-    outline: input.outline.map(node => ({
+    outline: treeOrder(input.outline).map(node => ({
       id: node.id,
       title: clip(node.title, TITLE_LIMIT),
       summary: clip(node.summary, SUMMARY_LIMIT),
@@ -351,6 +380,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     noEditableMap: !!input.noEditableMap,
     aim: !!input.aim,
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
+    relations: relations.map(link => ({ kind: link.kind, from: link.from, to: link.to })),
     mdHashes: hashes,
     topicHashes
   };

@@ -102,6 +102,8 @@
 .vam-node.is-clipped > p { flex: 0 10000 auto; }
 .vam-node.is-clipped > .vam-card-cover { flex: 0 100 auto; }
 .vam-node.is-clipped > h3 { flex: 0 1 auto; }
+/* Side layouts (topic-cover-position left / right): the picture column and the text column sit in one .vam-card-side row. A short card cuts that row at its own bottom, so each column is cut from its bottom: the picture from its bottom edge, and in the text column the summary (lower) before the title. The row shrinks like the cover (weight 100), after anything below it in the card. */
+.vam-node.is-clipped > .vam-card-side { flex: 0 100 auto; min-height: 0; overflow: hidden; }
 .vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
 .vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
 .vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }
@@ -262,19 +264,41 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
 .vam-card-cover.is-framed { position: relative; }
-/* The window is the framed region at its own aspect-ratio (set by the view): full height of the cover, width from the ratio, centred, so a card clipped short scales it down whole like contain and never stretches it. */
-.vam-card-cover-window { position: absolute; top: 0; height: 100%; width: auto; left: 50%; transform: translateX(-50%); overflow: hidden; }
+/* A picture size below 100% (topic-cover-size): the view sets the width; the box stays centred in the card. */
+.vam-card-cover.is-resized { margin-left: auto; margin-right: auto; }
+/* Picture beside the text (left / right): the cover is the picture column (its width set by the view from the picture size), the text takes the rest; the card is as tall as the taller column. Bottom: the cover follows the summary. */
+.vam-card-side { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 0; }
+.vam-node.has-cover-right .vam-card-side { flex-direction: row-reverse; }
+.vam-node .vam-card-side > .vam-card-cover { flex: 0 1 auto; margin: 0; }
+.vam-card-side-text { flex: 1 1 0; min-width: 0; }
+.vam-card-side-text > .vam-card-title { margin-top: 0; }
+/* A masked cover: the box is the card's content width and as tall as the window; the part a mask hides at the sides is empty card, not frame colour. */
+.vam-card-cover.is-framed.is-sized { background: transparent; border-radius: 0; }
+/* The window is the masked region at its own scale (cover-layout.ts): left and width are inline percentages of the content width, height follows from its inline aspect-ratio, top is the top of the cover. Never stretched; a card clipped short cuts it from its bottom. */
+.vam-card-cover-window { position: absolute; top: 0; height: auto; overflow: hidden; border-radius: var(--radius-s); }
 .vam-card-cover.is-framed:not(.is-sized) img { visibility: hidden; }
 .vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; }
 /* Out-specifies Obsidian's core `.workspace-leaf-content img:not([width])` (0,2,1), which would otherwise cap the width and squash a sideways crop. */
 .vam-node .vam-card-cover .vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
-/* "Adjust area" dialog of the card cover frame: the whole picture, a white frame, the outside dimmed. No CSS variables. */
-.vam-card-frame-modal { max-width: 640px; }
-.vam-card-frame-stage { position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto; overflow: hidden; touch-action: none; user-select: none; }
-.vam-card-frame-image { display: block; max-width: 100%; max-height: 60vh; -webkit-user-drag: none; }
-.vam-card-frame-box { position: absolute; box-sizing: border-box; border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); cursor: move; touch-action: none; }
-.vam-card-frame-box:focus-visible { outline: 2px solid #4a90e2; outline-offset: 2px; }
-.vam-card-frame-handle { position: absolute; width: 18px; height: 18px; min-width: 0; padding: 0; border: 2px solid #4a90e2; border-radius: 50%; background: #fff; box-shadow: none; touch-action: none; transform: translate(-50%, -50%); }
+/* "Edit card" dialog: the real card in the middle, edited in place. The mask box sits over the window; its handles show on hover, focus or touch. No CSS variables of its own. */
+.vam-card-frame-modal { width: auto; max-width: min(720px, 96vw); }
+.vam-card-frame-tools { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: center; margin: 0 0 4px; }
+.vam-card-frame-tool { display: inline-flex; gap: 8px; align-items: center; }
+.vam-card-frame-positions { display: inline-flex; gap: 4px; }
+.vam-card-frame-position.is-active { background: #4a90e2; color: #fff; }
+.vam-card-frame-stage { display: flex; justify-content: center; padding: 16px 12px 20px; overflow: auto; max-height: 70vh; }
+.vam-card-frame-stage > .vam-node { position: relative; left: auto; top: auto; flex: 0 0 auto; transform: none; cursor: default; }
+.vam-card-frame-stage .vam-card-cover.is-framed { overflow: visible; touch-action: none; user-select: none; }
+.vam-card-frame-width { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; background: rgba(74, 144, 226, 0.35); touch-action: none; }
+.vam-card-frame-width:hover, .vam-card-frame-width:focus-visible { background: #4a90e2; outline: none; }
+.vam-card-frame-stage .vam-card-cover:focus-visible { outline: 2px solid #4a90e2; outline-offset: 2px; }
+/* The faint whole picture behind the window while a drag runs; out-specifies `.vam-card-cover img` (display, height). */
+.vam-card-cover img.vam-card-frame-ghost { position: absolute; display: none; height: auto; max-width: none; opacity: 0.3; pointer-events: none; }
+.vam-card-frame-stage .vam-card-cover.is-dragging img.vam-card-frame-ghost { display: block; }
+.vam-card-frame-box { position: absolute; top: 0; box-sizing: border-box; border: 2px solid transparent; cursor: move; touch-action: none; }
+.vam-card-cover:hover .vam-card-frame-box, .vam-card-cover:focus-within .vam-card-frame-box, .vam-card-cover.is-active .vam-card-frame-box { border-color: #4a90e2; }
+.vam-card-frame-handle { position: absolute; width: 18px; height: 18px; min-width: 0; padding: 0; border: 2px solid #4a90e2; border-radius: 50%; background: #fff; box-shadow: none; touch-action: none; transform: translate(-50%, -50%); opacity: 0; }
+.vam-card-cover:hover .vam-card-frame-handle, .vam-card-cover:focus-within .vam-card-frame-handle, .vam-card-cover.is-active .vam-card-frame-handle { opacity: 1; }
 .vam-card-frame-handle.is-nw { left: 0; top: 0; cursor: nwse-resize; }
 .vam-card-frame-handle.is-n { left: 50%; top: 0; cursor: ns-resize; }
 .vam-card-frame-handle.is-ne { left: 100%; top: 0; cursor: nesw-resize; }
@@ -284,12 +308,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-frame-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .vam-card-frame-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
 .vam-card-frame-label { display: none; }
-/* A handle on the picture's own edge moves inward by its radius so the stage (overflow hidden) does not clip it. */
-.vam-card-frame-box.is-at-w .vam-card-frame-handle.is-nw, .vam-card-frame-box.is-at-w .vam-card-frame-handle.is-w, .vam-card-frame-box.is-at-w .vam-card-frame-handle.is-sw { margin-left: 9px; }
-.vam-card-frame-box.is-at-e .vam-card-frame-handle.is-ne, .vam-card-frame-box.is-at-e .vam-card-frame-handle.is-e, .vam-card-frame-box.is-at-e .vam-card-frame-handle.is-se { margin-left: -9px; }
-.vam-card-frame-box.is-at-n .vam-card-frame-handle.is-nw, .vam-card-frame-box.is-at-n .vam-card-frame-handle.is-n, .vam-card-frame-box.is-at-n .vam-card-frame-handle.is-ne { margin-top: 9px; }
-.vam-card-frame-box.is-at-s .vam-card-frame-handle.is-sw, .vam-card-frame-box.is-at-s .vam-card-frame-handle.is-s, .vam-card-frame-box.is-at-s .vam-card-frame-handle.is-se { margin-top: -9px; }
-.vam-card-frame-status { margin: 12px 0 0; text-align: center; }
+.vam-card-frame-error { margin: 0 0 8px; color: #c0392b; text-align: center; }
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }

@@ -25,6 +25,8 @@ export interface SceneCard {
   /** card-height: set only when the card is a fixed height that cuts its text; the last drawn line then ends with an ellipsis. Absent leaves the SVG unchanged. */
   clipped?: boolean;
   cover?: SceneImage | null;
+  /** topic-cover-position bottom / left / right: the title's top-left as the card draws it. Absent: under the cover. */
+  titleAt?: { x: number; y: number };
 }
 export interface SceneImage {
   x: number;
@@ -217,14 +219,21 @@ export function buildMapSvg(scene: MapScene): string {
       out.push(`<svg x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" viewBox="${box.join(" ")}">`);
     out.push(imageElement(card.cover));
     const fill = color(card.textColor, textColor);
-    const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
-    const top = (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
+    // A masked cover's picture reaches past its window; the text starts under what is shown.
+    const shownCover = card.cover?.window ?? card.cover;
+    const coverBox = shownCover ? rect(shownCover.x, shownCover.y, shownCover.w, shownCover.h) : null;
+    const titleX = num(card.titleAt?.x);
+    const titleY = num(card.titleAt?.y);
+    const placed = titleX !== null && titleY !== null;
+    // The title's top plus its first baseline (14), the same 22 below a cover's bottom as before (8 margin + 14).
+    const top = placed ? titleY + 14 : (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
+    const left = placed ? titleX : box[0] + 14;
     const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
     const shown = textLines(card.title).slice(0, fits);
     if (card.clipped === true && shown.length) shown[shown.length - 1] += "…";
     shown.forEach((line, i) => {
       out.push(
-        `<text x="${box[0] + 14}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize ?? 13}"${titleWeight === undefined ? "" : ` font-weight="${titleWeight}"`} fill="${fill}">${escapeXml(line)}</text>`
+        `<text x="${left}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize ?? 13}"${titleWeight === undefined ? "" : ` font-weight="${titleWeight}"`} fill="${fill}">${escapeXml(line)}</text>`
       );
     });
     if (card.clipped === true) out.push("</svg>");

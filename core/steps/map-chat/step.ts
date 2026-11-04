@@ -3,7 +3,14 @@ import { instructionLanguageOf, type ContentLanguage } from "../../../i18n";
 import type { ReasoningLevel } from "../../../ai/types";
 import { languageVariables } from "../_shared/fragments";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
-import type { MapChatContext } from "../../map-chat-context";
+import type { MapChatContext, MapChatRelation } from "../../map-chat-context";
+import {
+  RELATION_DESCRIPTION_MAX_LENGTH,
+  TOPIC_RELATION_KINDS,
+  relationAllowed,
+  type TopicRelation,
+  type TopicRelationKind
+} from "../../../map-model";
 import { HYPOTHESIS_STRENGTHS, TOPIC_KINDS, type HypothesisStrength, type TopicKind } from "../../../note-values";
 import languageEn from "./language.en.md";
 import languageZh from "./language.zh.md";
@@ -30,7 +37,9 @@ export const MAP_CHAT_ACTION_KINDS = [
   "auto_layout",
   "focus_topic",
   "set_topic_kind",
-  "ask_topic_kind"
+  "ask_topic_kind",
+  "add_relation",
+  "remove_relation"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -70,7 +79,11 @@ export type MapChatAction =
   | { kind: "rename_topic"; nodeId: string; title: string }
   | { kind: "update_summary"; nodeId: string; summary: string }
   | { kind: "edit_topic_note"; nodeId: string; detail: string }
-  | { kind: "move_topic"; nodeId: string; newParentId: string }
+  /**
+   * `beforeId` (absent = none) puts the card in front of that child of `newParentId`, which also reorders cards that keep their
+   * parent; without it the card goes under `newParentId` as before.
+   */
+  | { kind: "move_topic"; nodeId: string; newParentId: string; beforeId?: string }
   | { kind: "delete_topic"; nodeId: string; branch: boolean }
   | { kind: "edit_md_file"; path: string; find: string; replace: string }
   | { kind: "create_md_file"; path: string; content: string }
@@ -111,7 +124,20 @@ export type MapChatAction =
    * The user's words could mean only the type, or also new content (for example "make it atomic knowledge": a new type, or one
    * single concept). Nothing is applied: the view offers the choices under the answer and acts on the one the user picks.
    */
-  | { kind: "ask_topic_kind"; nodeIds: string[]; topicKind: TopicKind };
+  | { kind: "ask_topic_kind"; nodeIds: string[]; topicKind: TopicKind }
+  /**
+   * Adds one relation `fromId` (A) -> `toId` (B) of `relationKind` (`related` has no direction), with an optional one-line
+   * `description` (absent = none). Either end may be a `new:<ref>` card of this reply. Same rules as a relation added by hand.
+   */
+  | {
+      kind: "add_relation";
+      fromId: string;
+      toId: string;
+      relationKind: TopicRelationKind;
+      description?: string;
+    }
+  /** Removes the one relation between two cards (a pair holds at most one, of any kind and in either direction). */
+  | { kind: "remove_relation"; fromId: string; toId: string };
 
 export type MapChatRejectCode =
   | "bad_item"
@@ -124,7 +150,15 @@ export type MapChatRejectCode =
   /** A `ref` that is malformed or repeated, or a `new:` id that no earlier kept action defines (or one used where it cannot be). */
   | "bad_ref"
   /** A topic type on a map that has none (AIM). An `add_child` that carries one is kept as an ordinary topic and counted here too. */
-  | "no_topic_kinds";
+  | "no_topic_kinds"
+  /** A relation action on a map that has no relations (AIM). */
+  | "no_relations"
+  /** A relation the map does not allow (a self link, a second link on a pair, a derivation or prerequisite cycle). */
+  | "relation_not_allowed"
+  /** A remove_relation for two cards that hold no relation. */
+  | "unknown_relation"
+  /** A move_topic whose `beforeId` is not a child of the target parent (at that point of the reply). */
+  | "not_sibling";
 export interface MapChatRejection {
   index: number;
   code: MapChatRejectCode;
@@ -172,6 +206,7 @@ export const MAP_CHAT_SCHEMA = {
           ref: STRING,
           parentId: STRING,
           newParentId: STRING,
+          beforeId: STRING,
           title: STRING,
           summary: STRING,
           detail: STRING,
@@ -189,7 +224,11 @@ export const MAP_CHAT_SCHEMA = {
           images: { type: "boolean" },
           otherProvider: { type: "boolean" },
           topicKind: { type: "string", enum: [...TOPIC_KINDS, ""] },
-          strength: { type: "string", enum: [...HYPOTHESIS_STRENGTHS, ""] }
+          strength: { type: "string", enum: [...HYPOTHESIS_STRENGTHS, ""] },
+          fromId: STRING,
+          toId: STRING,
+          relationKind: { type: "string", enum: [...TOPIC_RELATION_KINDS, ""] },
+          description: STRING
         },
         required: [
           "kind",
@@ -197,6 +236,7 @@ export const MAP_CHAT_SCHEMA = {
           "ref",
           "parentId",
           "newParentId",
+          "beforeId",
           "title",
           "summary",
           "detail",
@@ -214,7 +254,11 @@ export const MAP_CHAT_SCHEMA = {
           "images",
           "otherProvider",
           "topicKind",
-          "strength"
+          "strength",
+          "fromId",
+          "toId",
+          "relationKind",
+          "description"
         ]
       }
     }
@@ -246,7 +290,11 @@ class Dropped extends Error {
  */
 export function parseMapChat(
   raw: string,
-  context: Pick<MapChatContext, "nodeIds" | "parents"> & { noEditableMap?: boolean; aim?: boolean }
+  context: Pick<MapChatContext, "nodeIds" | "parents"> & {
+    noEditableMap?: boolean;
+    aim?: boolean;
+    relations?: readonly MapChatRelation[];
+  }
 ): MapChatResult {
   let value: unknown;
   try {
@@ -259,9 +307,18 @@ export function parseMapChat(
   if (typeof body.reply !== "string") throw invalid("reply");
   if (!Array.isArray(body.actions)) throw invalid("actions");
   const known = new Set(context.nodeIds);
-  // Parent links of the supplied cards, plus those of the cards this reply creates (for the cycle check).
+  // Parent links of the supplied cards, plus those of the cards this reply creates, as each kept move leaves them (for the
+  // cycle check and the `beforeId` of a move).
   const parents: Record<string, string | null | undefined> = { ...context.parents };
   const refs = new Set<string>();
+  // The map's relations as the reply goes: an add or a remove changes it for the items after it (reversing = remove, then add).
+  let relations: TopicRelation[] = (context.relations ?? []).map(link => ({
+    kind: link.kind,
+    from: link.from,
+    to: link.to
+  }));
+  const samePair = (link: TopicRelation, a: string, b: string): boolean =>
+    (link.from === a && link.to === b) || (link.from === b && link.to === a);
   let created = false;
   const underOrSame = (id: string, ancestor: string): boolean => {
     for (let at: string | null | undefined = id, hops = 0; at && hops < 10_000; at = parents[at], hops++)
@@ -368,7 +425,12 @@ export function parseMapChat(
           const nodeId = node("nodeId"),
             newParentId = node("newParentId", true);
           if (underOrSame(newParentId, nodeId)) throw new Dropped("cycle");
-          actions.push({ kind: "move_topic", nodeId, newParentId });
+          const given = text("beforeId", false);
+          const beforeId = given ? resolve(given, true) : "";
+          // The card to go before must already sit under the target parent (as the earlier items of this reply left it).
+          if (beforeId && (beforeId === nodeId || parents[beforeId] !== newParentId)) throw new Dropped("not_sibling");
+          actions.push({ kind: "move_topic", nodeId, newParentId, ...(beforeId ? { beforeId } : {}) });
+          parents[nodeId] = newParentId;
           break;
         }
         case "delete_topic":
@@ -469,6 +531,31 @@ export function parseMapChat(
           actions.push({ kind: "set_topic_kind", nodeIds, topicKind: typed, ...(power ? { strength: power } : {}) });
           break;
         }
+        case "add_relation": {
+          const fromId = node("fromId", true),
+            toId = node("toId", true);
+          const given = text("relationKind");
+          if (!(TOPIC_RELATION_KINDS as readonly string[]).includes(given)) throw new Dropped("bad_value");
+          const relationKind = given as TopicRelationKind;
+          // One line, the same limit as the description field of a relation added by hand; a longer one is not cut, it is refused.
+          const description = text("description", false).replace(/\s+/g, " ");
+          if ([...description].length > RELATION_DESCRIPTION_MAX_LENGTH) throw new Dropped("bad_value");
+          if (context.aim) throw new Dropped("no_relations");
+          if (!relationAllowed(relations, { kind: relationKind, from: fromId, to: toId }))
+            throw new Dropped("relation_not_allowed");
+          relations = [...relations, { kind: relationKind, from: fromId, to: toId }];
+          actions.push({ kind: "add_relation", fromId, toId, relationKind, ...(description ? { description } : {}) });
+          break;
+        }
+        case "remove_relation": {
+          const fromId = node("fromId", true),
+            toId = node("toId", true);
+          if (context.aim) throw new Dropped("no_relations");
+          if (!relations.some(link => samePair(link, fromId, toId))) throw new Dropped("unknown_relation");
+          relations = relations.filter(link => !samePair(link, fromId, toId));
+          actions.push({ kind: "remove_relation", fromId, toId });
+          break;
+        }
       }
     } catch (error) {
       if (!(error instanceof Dropped)) throw error;
@@ -481,7 +568,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 10,
+  version: 12,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

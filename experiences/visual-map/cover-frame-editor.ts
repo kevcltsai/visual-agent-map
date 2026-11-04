@@ -1,6 +1,16 @@
 import { Modal, type App } from "obsidian";
 import { t, type TranslationKey } from "../../i18n";
-import type { CoverFrame } from "./card-cover";
+import {
+  COVER_POSITIONS,
+  COVER_SIZE_DEFAULT,
+  COVER_SIZE_MIN,
+  parseCoverPosition,
+  parseCoverSize,
+  type CoverFrame,
+  type CoverPosition
+} from "./card-cover";
+import { CARD_WIDTH, CARD_WIDTH_MAX, CARD_WIDTH_MIN, CARD_WIDTH_STEP, clampCardWidth } from "../../map-graph";
+import { arrangeCover, coverWindow, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 
 /** The smallest a frame side can be, as a fraction of the picture. */
 export const MIN_FRAME_SIDE = 0.08;
@@ -60,7 +70,6 @@ export function frameToWrite(frame: CoverFrame | null): CoverFrame | null {
 }
 
 let labelSeq = 0;
-const EDGE_TOUCH = 0.0005;
 const WHOLE: CoverFrame = { x: 0, y: 0, w: 1, h: 1 };
 const HANDLE_KEY: Record<FrameDragMode, TranslationKey> = {
   move: "ui.topic_cover_frame_box",
@@ -74,22 +83,94 @@ const HANDLE_KEY: Record<FrameDragMode, TranslationKey> = {
   w: "ui.topic_cover_frame_handle_w"
 };
 
+/** Arrow keys on one handle move only that handle's edges, 1% per press. Null for any other key. */
+export function nudgeCoverFrameEdge(mode: FrameDragMode, frame: CoverFrame, key: string): CoverFrame | null {
+  const horizontal = mode.includes("e") || mode.includes("w");
+  const vertical = mode.includes("n") || mode.includes("s");
+  const dx = !horizontal ? 0 : key === "ArrowRight" ? FRAME_KEY_STEP : key === "ArrowLeft" ? -FRAME_KEY_STEP : 0;
+  const dy = !vertical ? 0 : key === "ArrowDown" ? FRAME_KEY_STEP : key === "ArrowUp" ? -FRAME_KEY_STEP : 0;
+  if (!dx && !dy) return null;
+  return dragCoverFrame(mode, frame, dx, dy);
+}
+
+/** What Apply hands over: the frame to write (null: whole picture, remove the key), the picture size (k) and position. */
+export interface CardCoverEdit {
+  frame: CoverFrame | null;
+  size: number;
+  position: CoverPosition;
+  /** The card width to write to the map (CARD_WIDTH: the standard width). Present only when the user changed it. */
+  width?: number;
+}
+
+/** Switching to left or right with a picture wider than this sets it to SIDE_SIZE, so the text keeps room beside it. */
+export const SIDE_SIZE_LIMIT = 0.5;
+export const SIDE_SIZE = 0.45;
+const POSITION_KEY: Record<CoverPosition, TranslationKey> = {
+  top: "ui.card_edit_position_top",
+  bottom: "ui.card_edit_position_bottom",
+  left: "ui.card_edit_position_left",
+  right: "ui.card_edit_position_right"
+};
+const isSide = (position: CoverPosition): boolean => position === "left" || position === "right";
+
+/** The picture-size slider works in whole percents of the card's content width. */
+const SIZE_STEP = 1;
+
 export interface CoverFrameModalOptions {
-  /** The picture's resource path; the file itself is shown whole and never changed. */
+  /** The picture's resource path; the file itself is shown as it is and never changed. */
   src: string;
   /** The note's frame, or null for the whole picture. */
   initial: CoverFrame | null;
-  /** Called once by Apply with the frame to write (null: whole picture, remove the key). Cancel and close never call it. */
-  onApply: (frame: CoverFrame | null) => Promise<void> | void;
+  /** The note's picture size (k, 0.3-1); the default 1 when absent. */
+  size?: number;
+  /** The note's picture position; top when absent. */
+  position?: CoverPosition;
+  /** The topic's card width on the map (absent: the standard width). The dialog's right edge changes it within the map's limits. */
+  width?: number;
+  /** The picture's width over height when the map already measured it, so the card has its size before the picture loads. */
+  shape?: number | null;
+  /**
+   * A detached copy of the topic's card as the map draws it (same width, fonts and line wrapping). Its cover is replaced
+   * by the editable one; everything else is shown as it is and does not take input. Without it, a plain card.
+   */
+  card?: () => HTMLElement;
+  /** Called once by Apply with the frame and size to write. Cancel and close never call it. */
+  onApply: (edit: CardCoverEdit) => Promise<void> | void;
+}
+
+interface CoverDrag {
+  id: number;
+  mode: FrameDragMode;
+  x: number;
+  y: number;
+  /** Screen pixels per picture width and per picture height at the start of the drag. */
+  across: number;
+  down: number;
+  start: CoverFrame;
 }
 
 /**
- * The "Adjust area" dialog: the whole picture, a white frame with the outside dimmed, eight handle buttons and the
- * inside to drag. Pointer events with pointer capture (touch works); the frame also takes arrow keys. Only Apply writes.
+ * The "Edit card" dialog: one card in the middle that looks like the card on the map, edited in place. On its cover,
+ * a tool row above it sets the picture size and position, dragging inside moves the mask over the still picture, the eight handles (shown on hover, focus or touch) hide a side,
+ * and arrow keys move the mask 1% (Shift and arrow keys resize it from the bottom right). The picture keeps its scale
+ * (cover-layout.ts). Pointer events with pointer capture, so touch works. Only Apply writes.
  */
 export class CoverFrameModal extends Modal {
   private draft: CoverFrame;
+  private size: number;
+  private position: CoverPosition;
+  private cardEl: HTMLElement | null = null;
+  private width: number;
+  private readonly initialWidth: number;
+  private widthHandle: HTMLElement | null = null;
+  private sizeSlider: HTMLInputElement | null = null;
+  private shape: number | null;
+  private drag: CoverDrag | null = null;
   private applying = false;
+  private coverEl: HTMLElement | null = null;
+  private windowEl: HTMLElement | null = null;
+  private imgEl: HTMLImageElement | null = null;
+  private ghostEl: HTMLImageElement | null = null;
   private boxEl: HTMLElement | null = null;
   private statusEl: HTMLElement | null = null;
   private applyButton: HTMLButtonElement | null = null;
@@ -99,43 +180,36 @@ export class CoverFrameModal extends Modal {
   ) {
     super(app);
     this.draft = { ...(options.initial ?? WHOLE) };
+    this.size = parseCoverSize(options.size ?? COVER_SIZE_DEFAULT);
+    this.position = parseCoverPosition(options.position);
+    this.initialWidth = this.width = clampCardWidth(options.width) ?? CARD_WIDTH;
+    this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen(): void {
     this.modalEl.addClass("vam-card-frame-modal");
     this.titleEl.setText(t("ui.topic_cover_frame_title"));
+    this.buildTools(this.contentEl.createDiv({ cls: "vam-card-frame-tools" }));
     const stage = this.contentEl.createDiv({ cls: "vam-card-frame-stage" });
-    const img = stage.createEl("img", {
-      cls: "vam-card-frame-image",
-      attr: { src: this.options.src, alt: "", draggable: "false" }
-    });
-    img.addEventListener("error", () => {
-      if (this.applyButton) this.applyButton.disabled = true;
-      this.statusEl?.setText(t("ui.topic_cover_frame_load_failed"));
-    });
-    const box = stage.createDiv({ cls: "vam-card-frame-box" });
-    box.setAttr("tabindex", "0");
-    box.setAttr("role", "group");
-    // aria-labelledby, not aria-label: Obsidian shows an aria-label as a tooltip, which would cover the status line.
+    const given = this.options.card?.();
+    // Without the map card, the stylesheet's default card (its width and padding), empty but for the cover.
+    const card = given ? stage.appendChild(given) : stage.createDiv({ cls: "vam-node" });
+    this.cardEl = card;
+    // A copied side layout is taken apart first, so every text child is a direct child that can be made inert.
+    arrangeCover(card, null, "top");
+    const cover = this.buildCover(card);
+    // The rest of the card is shown, not edited (ticket 05 adds the text).
+    for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
+    arrangeCover(card, cover, this.position);
+    this.buildWidthHandle(card);
+    // aria-labelledby, not aria-label: Obsidian shows an aria-label as a tooltip, which would cover the picture.
     const labelId = `vam-card-frame-label-${++labelSeq}`;
-    stage.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
-    box.setAttr("aria-labelledby", labelId);
-    this.boxEl = box;
-    this.bindDrag(box, "move", stage);
-    for (const mode of FRAME_HANDLES) {
-      const handle = box.createEl("button", {
-        cls: `vam-card-frame-handle is-${mode}`,
-        attr: { type: "button", "aria-label": t(HANDLE_KEY[mode]) }
-      });
-      handle.dataset.mode = mode;
-      this.bindDrag(handle, mode, stage);
-    }
-    box.addEventListener("keydown", (event: KeyboardEvent) => {
-      const next = nudgeCoverFrame(this.draft, event.key, event.shiftKey);
-      if (!next) return;
-      event.preventDefault();
-      this.setDraft(next);
+    this.contentEl.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
+    cover.setAttr("aria-labelledby", labelId);
+    // Screen readers hear the numbers; nothing shows them.
+    this.statusEl = this.contentEl.createDiv({
+      cls: "vam-card-frame-status vam-sr-only",
+      attr: { "aria-live": "polite" }
     });
-    this.statusEl = this.contentEl.createDiv({ cls: "vam-card-frame-status", attr: { "aria-live": "polite" } });
     const actions = this.contentEl.createDiv({ cls: "vam-card-frame-actions" });
     const reset = actions.createEl("button", { text: t("ui.topic_cover_frame_reset"), attr: { type: "button" } });
     reset.addEventListener("click", () => this.setDraft({ ...WHOLE }));
@@ -148,32 +222,214 @@ export class CoverFrameModal extends Modal {
     });
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
-    box.focus();
+    cover.focus();
+  }
+  /** The width splitter on the card's right edge, the same setting and limits as the map's (map-graph.ts). */
+  private buildWidthHandle(card: HTMLElement): void {
+    const handle = card.createSpan({
+      cls: "vam-card-frame-width",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.card_resize_label"),
+        "aria-valuemin": String(CARD_WIDTH_MIN),
+        "aria-valuemax": String(CARD_WIDTH_MAX),
+        tabindex: "0"
+      }
+    });
+    this.widthHandle = handle;
+    // The copied card already has its width; the style is only written when the user changes it.
+    handle.setAttr("aria-valuenow", String(this.width));
+    let drag: { id: number; x: number; from: number } | null = null;
+    handle.addEventListener("pointerdown", (event: PointerEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handle.setPointerCapture?.(event.pointerId);
+      drag = { id: event.pointerId, x: event.clientX, from: this.width };
+    });
+    handle.addEventListener("pointermove", (event: PointerEvent) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      this.setWidth(drag.from + (event.clientX - drag.x));
+    });
+    const end = (event: PointerEvent): void => {
+      if (!drag || event.pointerId !== drag.id) return;
+      handle.releasePointerCapture?.(drag.id);
+      drag = null;
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    // The map's keys: arrows step, Home/End the limits, Enter the standard width.
+    handle.addEventListener("keydown", (event: KeyboardEvent) => {
+      let next: number;
+      if (event.key === "ArrowRight") next = this.width + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = this.width - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = CARD_WIDTH_MIN;
+      else if (event.key === "End") next = CARD_WIDTH_MAX;
+      else if (event.key === "Enter") next = CARD_WIDTH;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.setWidth(next);
+    });
+  }
+  /** Sets the dialog card's width (clamped to the map's limits); wrapping and the cover follow, as they are proportions. */
+  private setWidth(value: number): void {
+    this.width = clampCardWidth(value) ?? this.width;
+    this.cardEl?.style.setProperty("width", `${this.width}px`);
+    this.widthHandle?.setAttr("aria-valuenow", String(this.width));
+    this.setDraft(this.draft);
+  }
+  /** The tool row above the card: the picture size slider (30-100% of the content width). */
+  private buildTools(row: HTMLElement): void {
+    const label = row.createEl("label", { cls: "vam-card-frame-tool" });
+    label.createSpan({ text: t("ui.card_edit_picture_size") });
+    const slider = label.createEl("input", {
+      cls: "vam-card-frame-size",
+      type: "range",
+      attr: { min: String(COVER_SIZE_MIN * 100), max: "100", step: String(SIZE_STEP) }
+    });
+    slider.value = String(Math.round(this.size * 100));
+    const update = (): void => {
+      const value = Number(slider.value);
+      if (!Number.isFinite(value)) return;
+      // The range input already holds 30-100; a stray value is clamped to it (never read as "invalid, default").
+      this.size = Math.min(1, Math.max(COVER_SIZE_MIN, value / 100));
+      slider.setAttr("aria-valuetext", `${Math.round(this.size * 100)}%`);
+      this.setDraft(this.draft);
+    };
+    slider.setAttr("aria-valuetext", `${Math.round(this.size * 100)}%`);
+    slider.addEventListener("input", update);
+    slider.addEventListener("change", update);
+    this.sizeSlider = slider;
+    const place = row.createDiv({ cls: "vam-card-frame-tool" });
+    const placeLabel = place.createSpan({ text: t("ui.card_edit_picture_position") });
+    const group = place.createDiv({ cls: "vam-card-frame-positions" });
+    group.setAttr("role", "radiogroup");
+    const groupLabel = `vam-card-frame-position-${labelSeq + 1}`;
+    placeLabel.setAttr("id", groupLabel);
+    group.setAttr("aria-labelledby", groupLabel);
+    const choices: HTMLButtonElement[] = [];
+    const paint = (): void => {
+      for (const [index, choice] of choices.entries()) {
+        const on = COVER_POSITIONS[index] === this.position;
+        choice.setAttr("aria-checked", String(on));
+        choice.setAttr("tabindex", on ? "0" : "-1");
+        choice.toggleClass("is-active", on);
+      }
+    };
+    for (const position of COVER_POSITIONS) {
+      const choice = group.createEl("button", {
+        cls: "vam-card-frame-position",
+        text: t(POSITION_KEY[position]),
+        attr: { type: "button", role: "radio" }
+      });
+      choice.dataset.position = position;
+      choice.addEventListener("click", () => {
+        this.setPosition(position);
+        paint();
+      });
+      // Arrow keys move between the four choices, as in any radio group.
+      choice.addEventListener("keydown", (event: KeyboardEvent) => {
+        const step =
+          event.key === "ArrowRight" || event.key === "ArrowDown"
+            ? 1
+            : event.key === "ArrowLeft" || event.key === "ArrowUp"
+              ? -1
+              : 0;
+        if (!step) return;
+        event.preventDefault();
+        const index = (COVER_POSITIONS.indexOf(this.position) + step + COVER_POSITIONS.length) % COVER_POSITIONS.length;
+        this.setPosition(COVER_POSITIONS[index]);
+        paint();
+        choices[index].focus();
+      });
+      choices.push(choice);
+    }
+    paint();
+  }
+  /** Moves the picture on the dialog card; moving it beside the text with a picture over half the width makes it 45%. */
+  private setPosition(position: CoverPosition): void {
+    if (position === this.position) return;
+    // Only a move from top or bottom to a side shrinks the picture; left to right keeps the size the user chose there.
+    const toSide = isSide(position) && !isSide(this.position);
+    this.position = position;
+    if (toSide && this.size > SIDE_SIZE_LIMIT) {
+      this.size = SIDE_SIZE;
+      if (this.sizeSlider) {
+        this.sizeSlider.value = String(Math.round(SIDE_SIZE * 100));
+        this.sizeSlider.setAttr("aria-valuetext", `${Math.round(SIDE_SIZE * 100)}%`);
+      }
+    }
+    if (this.cardEl && this.coverEl) arrangeCover(this.cardEl, this.coverEl, position);
+    this.setDraft(this.draft);
+  }
+  /** Replaces the card's cover (or adds one before the title) with the editable cover: picture, window, mask box, handles. */
+  private buildCover(card: HTMLElement): HTMLElement {
+    const old = card.querySelector<HTMLElement>(".vam-card-cover");
+    const before = old ?? card.querySelector<HTMLElement>(".vam-card-title");
+    const cover = card.createDiv({ cls: "vam-card-cover is-framed" });
+    cover.remove();
+    (before?.parentElement ?? card).insertBefore(cover, before ?? null);
+    old?.remove();
+    cover.setAttr("tabindex", "0");
+    cover.setAttr("role", "group");
+    const picture = { src: this.options.src, alt: "", draggable: "false" };
+    // The whole picture, faint, while a drag runs: it shows where the mask can go.
+    this.ghostEl = cover.createEl("img", { cls: "vam-card-frame-ghost", attr: { ...picture, "aria-hidden": "true" } });
+    this.windowEl = cover.createDiv({ cls: "vam-card-cover-window" });
+    const img = this.windowEl.createEl("img", { attr: picture });
+    this.imgEl = img;
+    img.addEventListener("error", () => {
+      if (this.applyButton) this.applyButton.disabled = true;
+      this.contentEl.createEl("p", { cls: "vam-card-frame-error", text: t("ui.topic_cover_frame_load_failed") });
+    });
+    img.addEventListener("load", () => {
+      const shape = img.naturalWidth / img.naturalHeight;
+      if (this.shape || !coverWindow(img.naturalWidth, img.naturalHeight, null, 1)) return;
+      this.shape = shape;
+      this.setDraft(this.draft);
+    });
+    const box = cover.createDiv({ cls: "vam-card-frame-box" });
+    this.boxEl = box;
+    this.bindDrag(box, "move");
+    for (const mode of FRAME_HANDLES) {
+      const handle = box.createEl("button", {
+        cls: `vam-card-frame-handle is-${mode}`,
+        attr: { type: "button", "aria-label": t(HANDLE_KEY[mode]) }
+      });
+      handle.dataset.mode = mode;
+      this.bindDrag(handle, mode);
+      handle.addEventListener("keydown", (event: KeyboardEvent) => {
+        const next = nudgeCoverFrameEdge(mode, this.draft, event.key);
+        if (!next) return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.setDraft(next);
+      });
+    }
+    cover.addEventListener("keydown", (event: KeyboardEvent) => {
+      const next = nudgeCoverFrame(this.draft, event.key, event.shiftKey);
+      if (!next) return;
+      event.preventDefault();
+      this.setDraft(next);
+    });
+    this.coverEl = cover;
+    return cover;
   }
   private async apply(): Promise<void> {
     if (this.applying) return;
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply(frameToWrite(this.draft));
+      const edit: CardCoverEdit = { frame: frameToWrite(this.draft), size: this.size, position: this.position };
+      if (this.width !== this.initialWidth) edit.width = this.width;
+      await this.options.onApply(edit);
     } finally {
       this.close();
     }
   }
   private setDraft(frame: CoverFrame): void {
     this.draft = frame;
-    const box = this.boxEl;
-    if (!box) return;
-    const percent = (value: number): string => `${round(value * 100)}%`;
-    // A handle sits on its edge; where the edge is the picture's edge the handles move inward so none is clipped.
-    box.toggleClass("is-at-w", frame.x < EDGE_TOUCH);
-    box.toggleClass("is-at-n", frame.y < EDGE_TOUCH);
-    box.toggleClass("is-at-e", frame.x + frame.w > 1 - EDGE_TOUCH);
-    box.toggleClass("is-at-s", frame.y + frame.h > 1 - EDGE_TOUCH);
-    box.style.left = percent(frame.x);
-    box.style.top = percent(frame.y);
-    box.style.width = percent(frame.w);
-    box.style.height = percent(frame.h);
     this.statusEl?.setText(
       t(
         "ui.topic_cover_frame_status",
@@ -183,36 +439,66 @@ export class CoverFrameModal extends Modal {
         Math.round(frame.h * 100)
       )
     );
+    const cover = this.coverEl;
+    const box = this.boxEl;
+    if (cover) sizeCoverBox(cover, this.size, isSide(this.position));
+    if (!cover || !box || !this.windowEl || !this.imgEl || !this.ghostEl || !this.shape) return;
+    // The map's own placement, so the dialog card is the map card.
+    const win = placeCoverFrame({ frame: cover, window: this.windowEl, img: this.imgEl }, this.shape, frame);
+    if (!win) return;
+    box.style.setProperty("left", `${win.left * 100}%`);
+    box.style.setProperty("width", `${win.width * 100}%`);
+    box.style.setProperty("aspect-ratio", String(win.width / win.height));
+    // During a drag the picture stays still: the window is shifted down by how far its top moved since the drag began
+    // (between drags the window starts at the top of the cover, as on the map). Percentages of the window's own height.
+    const anchor = this.drag ? this.drag.start.y : frame.y;
+    const shift = `translateY(${((frame.y - anchor) / frame.h) * 100}%)`;
+    this.windowEl.style.setProperty("transform", shift);
+    box.style.setProperty("transform", shift);
+    const ghost = this.ghostEl.style;
+    ghost.setProperty("left", `${(win.left - frame.x * win.scale) * 100}%`);
+    ghost.setProperty("width", `${win.scale * 100}%`);
+    ghost.setProperty("aspect-ratio", String(this.shape));
+    // Top as a percentage of the cover's height (the window's height, h of the picture).
+    ghost.setProperty("top", `${(-anchor / frame.h) * 100}%`);
   }
   /** Pointer capture keeps the drag on this element even when the pointer leaves it or the dialog. */
-  private bindDrag(target: HTMLElement, mode: FrameDragMode, stage: HTMLElement): void {
-    let drag: { id: number; x: number; y: number; width: number; height: number; start: CoverFrame } | null = null;
+  private bindDrag(target: HTMLElement, mode: FrameDragMode): void {
     target.addEventListener("pointerdown", (event: PointerEvent) => {
       if (mode === "move" && event.target !== target) return;
-      const rect = stage.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
+      const cover = this.coverEl;
+      const width = cover?.getBoundingClientRect().width ?? 0;
+      const scale = this.shape ? (coverWindow(this.shape, 1, this.draft, 1)?.scale ?? 1) : 1;
+      if (!cover || !width || !this.shape) return;
       event.preventDefault();
       event.stopPropagation();
       target.setPointerCapture?.(event.pointerId);
-      drag = {
+      cover.addClass("is-active", "is-dragging");
+      const across = width * scale;
+      this.drag = {
         id: event.pointerId,
+        mode,
         x: event.clientX,
         y: event.clientY,
-        width: rect.width,
-        height: rect.height,
+        across,
+        down: across / this.shape,
         start: { ...this.draft }
       };
     });
     target.addEventListener("pointermove", (event: PointerEvent) => {
-      if (!drag || event.pointerId !== drag.id) return;
+      const drag = this.drag;
+      if (!drag || drag.mode !== mode || event.pointerId !== drag.id) return;
       this.setDraft(
-        dragCoverFrame(mode, drag.start, (event.clientX - drag.x) / drag.width, (event.clientY - drag.y) / drag.height)
+        dragCoverFrame(mode, drag.start, (event.clientX - drag.x) / drag.across, (event.clientY - drag.y) / drag.down)
       );
     });
     const end = (event: PointerEvent): void => {
-      if (!drag || event.pointerId !== drag.id) return;
+      const drag = this.drag;
+      if (!drag || drag.mode !== mode || event.pointerId !== drag.id) return;
       target.releasePointerCapture?.(drag.id);
-      drag = null;
+      this.drag = null;
+      this.coverEl?.removeClass("is-dragging");
+      this.setDraft(this.draft);
     };
     target.addEventListener("pointerup", end);
     target.addEventListener("pointercancel", end);

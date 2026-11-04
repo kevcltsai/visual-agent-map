@@ -1083,6 +1083,8 @@ export const en = {
   "ui.ai_unlock_card": "Unlock: let AI change this topic",
   "ui.ai_locked_state": "Locked from AI",
   "ui.ai_locked_skipped_0": "{0} locked topics skipped",
+  "ui.ai_locked_outline_skipped_0": "Topic is locked; AI will not change it. {0} outline topics were not added.",
+  "ui.ai_locked_suggestions_skipped_0": "{0} suggestions touch locked topics and were skipped",
   "ui.ai_unlock_selected": "Unlock for AI",
   "ui.ai_locked_some_0_1": "{0} of {1} locked",
   "ui.model_and_advanced_settings": "Model and advanced settings",

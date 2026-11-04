@@ -1958,7 +1958,8 @@ export class VisualAgentMapView extends ItemView {
     return false;
   }
   private firstCardId(): string | undefined {
-    return this.cardEls.keys().next().value as string | undefined;
+    for (const id of this.cardEls.keys()) return id;
+    return undefined;
   }
   private mapFocusLookup(): {
     card: (id: string) => HTMLElement | undefined;

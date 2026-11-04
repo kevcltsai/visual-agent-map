@@ -49287,7 +49287,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     return false;
   }
   firstCardId() {
-    return this.cardEls.keys().next().value;
+    for (const id of this.cardEls.keys()) return id;
+    return void 0;
   }
   mapFocusLookup() {
     return { card: (id) => this.cardEls.get(id), text: (id) => this.textEls.get(id) };

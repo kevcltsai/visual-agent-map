@@ -1284,6 +1284,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_kind_choice_rewrite_message_0_1": "把{0}的議題類型改為{1}，並依這個類型重寫每張的筆記。",
   "ui.map_chat_kind_choice_topics_separator": "、",
   "ui.map_chat_line_done_0": "完成：{0}",
+  "ui.map_chat_line_cards_skipped_0": "（已略過 {0} 個議題：不存在、AIM 或沒有筆記）",
   "ui.map_chat_line_skipped_0_1": "略過：{0}（{1}）",
   "ui.map_chat_line_failed_0_1": "失敗：{0}（{1}）",
   "ui.map_chat_do_add_child_0": "新增子議題「{0}」",

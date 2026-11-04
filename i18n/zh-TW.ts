@@ -1550,6 +1550,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":
     "自動模式會對簡單任務使用 Low、對複雜整合使用 Medium；手動選擇不會被覆蓋。",
   "ui.stop_research": "停止研究",
+  "ui.stop_expand": "停止展開",
   "ui.research_stopped_existing_content_was_preserved": "研究已停止，原有內容保留。",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "議題內容已變更，過時的 AI 結果未寫入。",
   "ui.shallow_research_for_expanded_subtopics_0": "子題研究：{0}",

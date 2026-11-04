@@ -35,6 +35,14 @@ export const CHART_JOB_LIMIT = 3;
 export type TopicRunKind =
   "research" | "proposeChildren" | "integrateDirection" | "integrateChildren" | "synthesizeSelection";
 
+/** The i18n key of the Stop button on a card: expanding (proposing subtopics) is not research. */
+export function stopLabelKey(
+  kind: TopicRunKind | undefined,
+  quickExpandPending: boolean
+): "ui.stop_expand" | "ui.stop_research" {
+  return quickExpandPending || kind === "proposeChildren" ? "ui.stop_expand" : "ui.stop_research";
+}
+
 /** The part of the AI task service the chart step uses. */
 export interface ChartTasks {
   chartEligible(context: TaskContext): boolean;
@@ -348,6 +356,7 @@ export class TopicRuns {
     return this.ports.running();
   }
   private readonly controllers = new Map<string, AbortController>();
+  private readonly kinds = new Map<string, TopicRunKind>();
   private disposed = false;
   /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
   private readonly charts = new Map<string, AbortController>();
@@ -368,6 +377,7 @@ export class TopicRuns {
     if (this.disposed || this.controllers.has(path)) return null;
     const controller = new AbortController();
     this.controllers.set(path, controller);
+    this.kinds.set(path, kind);
     this.running.add(path);
     return {
       path,
@@ -376,6 +386,7 @@ export class TopicRuns {
       release: () => {
         if (this.controllers.get(path) !== controller) return;
         this.controllers.delete(path);
+        this.kinds.delete(path);
         this.running.delete(path);
         this.wakeIdleWaiters();
       }
@@ -1366,6 +1377,11 @@ export class TopicRuns {
 
   isRunning(path: string): boolean {
     return this.controllers.has(path);
+  }
+
+  /** The kind of the run in flight on the topic, if this module started one. */
+  runKind(path: string): TopicRunKind | undefined {
+    return this.kinds.get(path);
   }
 
   /** Whether the topic has a run in flight, or another path (chat expansion, a reload leftover) holds it in the running set. */

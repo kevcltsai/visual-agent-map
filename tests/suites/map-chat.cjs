@@ -5078,3 +5078,85 @@ integrationTest('chat 05 / M3: an entry that fails part-way through the reply\'s
   await assert.rejects(() => h.view.history.undoEntry.undo(), /boom/);
   eq(log, ['second.undo', 'first.undo', 'second.redo'], 'newest first; the one that ran is run back');
 });
+
+// ---- chat 06: the AI chat adds and removes relations ---------------------------------------------------------------------
+const linkOnDisk = async (h, relations) => {
+  await h.plugin.mutate(() => h.view.mapChange(map => { map.topicRelations = relations.map(r => ({ ...r })); }, false));
+  h.view.history.clear();
+};
+const diskRelations = async h => (await h.repo.readMap(MAP)).topicRelations ?? [];
+const addRel = (fromId, toId, relationKind, description) => ({ kind: 'add_relation', fromId, toId, relationKind, ...(description ? { description } : {}) });
+integrationTest('chat 06: add_relation writes the relation (with its description) to Map.md, the same shape as one added by hand', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [addRel(h.ids.c, h.ids.b, 'supports', 'A short reason'), addRel(h.ids.a, h.ids.b, 'related')]);
+  eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
+  assert.equal(lines[0].text, 'Done: Link “REM” to “Mind” (Supports)');
+  eq(await diskRelations(h), [{ kind: 'supports', from: h.ids.c, to: h.ids.b, description: 'A short reason' }, { kind: 'related', from: h.ids.a, to: h.ids.b }]);
+});
+integrationTest('chat 06: add_relation can link a card the same reply created', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await apply(h, [{ kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 's', ref: 'd' }, addRel('new:d', h.ids.a, 'contradicts')]);
+  eq(lines.map(l => l.status), ['done', 'done']);
+  const made = h.view.map.nodes.find(n => h.view.notes.get(n.id)?.title === 'Dreams');
+  eq(await diskRelations(h), [{ kind: 'contradicts', from: made.id, to: h.ids.a }]);
+});
+integrationTest('chat 06: remove_relation removes that one relation; reversing is remove then add', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await linkOnDisk(h, [{ kind: 'supports', from: h.ids.c, to: h.ids.b }, { kind: 'related', from: h.ids.a, to: h.ids.b }]);
+  const lines = await apply(h, [{ kind: 'remove_relation', fromId: h.ids.b, toId: h.ids.c }, addRel(h.ids.b, h.ids.c, 'supports')]);
+  eq(lines.map(l => l.status), ['done', 'done']);
+  assert.equal(lines[0].text, 'Done: Remove the relation between “Mind” and “REM”');
+  eq(await diskRelations(h), [{ kind: 'related', from: h.ids.a, to: h.ids.b }, { kind: 'supports', from: h.ids.b, to: h.ids.c }]);
+});
+integrationTest('chat 06: a relation the map no longer allows (duplicate pair, cycle, self) or a pair with none is skipped and writes nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await linkOnDisk(h, [{ kind: 'prerequisite', from: h.ids.a, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.b, to: h.ids.c }]);
+  const before = h.contents.get(MAP);
+  const lines = await apply(h, [addRel(h.ids.b, h.ids.a, 'supports'), addRel(h.ids.c, h.ids.a, 'prerequisite'), addRel(h.ids.a, h.ids.a, 'related'), { kind: 'remove_relation', fromId: h.ids.root, toId: h.ids.a }]);
+  eq(lines.map(l => l.status), ['skipped', 'skipped', 'skipped', 'skipped']);
+  eq(lines.map(l => l.text), ['Skipped: Link “Mind” to “Body” (Supports) (the map does not allow that relation)', 'Skipped: Link “REM” to “Body” (Prerequisite) (the map does not allow that relation)', 'Skipped: Link “Body” to “Body” (Related) (the map does not allow that relation)', 'Skipped: Remove the relation between “Sleep” and “Body” (the two topics hold no relation)']);
+  assert.equal(h.contents.get(MAP), before, 'Map.md is not written');
+  assert.equal(h.view.history.canUndo, false, 'nothing to undo');
+});
+integrationTest('chat 06: on an AIM map a relation action writes nothing and is skipped', async () => {
+  const h = await harness({ aim: true }); await h.view.hydrate(); const before = h.contents.get(MAP);
+  const lines = await apply(h, [addRel(h.ids.a, h.ids.b, 'supports'), { kind: 'remove_relation', fromId: h.ids.a, toId: h.ids.b }]);
+  eq(lines.map(l => l.status), ['skipped', 'skipped']); assert.equal(h.contents.get(MAP), before);
+});
+integrationTest('chat 06: an AIM send tells the parser, so a reply that adds a relation is counted as skipped and writes nothing', async () => {
+  const h = await harness({ aim: true }); const before = h.contents.get(MAP);
+  h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'add_relation', fromId: h.ids.a, toId: h.ids.b, relationKind: 'supports' }] }), request.context);
+  h.open(); h.type('link these two'); await h.view.sendMapChat();
+  await until(() => !h.view.chat.isBusy);
+  assert.equal(h.contents.get(MAP), before);
+  assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
+});
+integrationTest('chat 06: a real send checks a duplicate relation against the map it sent, and counts it as skipped', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await linkOnDisk(h, [{ kind: 'supports', from: h.ids.c, to: h.ids.b }]); h.view.map = await h.repo.readMap(MAP);
+  h.control.reply = async request => stepApi.parseMapChat(JSON.stringify({ reply: 'ok', actions: [{ kind: 'add_relation', fromId: h.ids.b, toId: h.ids.c, relationKind: 'contradicts' }] }), request.context);
+  h.open(); h.type('link these two'); await h.view.sendMapChat();
+  await until(() => !h.view.chat.isBusy);
+  eq(await diskRelations(h), [{ kind: 'supports', from: h.ids.c, to: h.ids.b }]);
+  assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
+});
+integrationTest('chat 06: Undo takes back every relation write of one reply in one step, with the reply\'s other writes; Redo puts them back', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await linkOnDisk(h, [{ kind: 'supports', from: h.ids.c, to: h.ids.b }]);
+  const before = JSON.stringify(await diskRelations(h));
+  await apply(h, [
+    { kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 's', ref: 'd' },
+    addRel('new:d', h.ids.a, 'verifies', 'why'),
+    { kind: 'remove_relation', fromId: h.ids.c, toId: h.ids.b },
+    addRel(h.ids.b, h.ids.c, 'supports'),
+    { kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }
+  ]);
+  const after = JSON.stringify(await diskRelations(h)); assert.notEqual(after, before);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.equal(JSON.stringify(await diskRelations(h)), before, 'every relation change is taken back');
+  assert.equal((await h.note('a')).title, 'Body'); assert.equal((await h.saved()).length, 4);
+  assert.equal(h.view.history.canUndo, false, 'one step');
+  await h.view.travel(true);
+  assert.equal(JSON.stringify((await diskRelations(h)).map(r => [r.kind, r.description ?? ''])), JSON.stringify(JSON.parse(after).map(r => [r.kind, r.description ?? ''])), 'redo puts them back');
+});

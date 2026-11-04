@@ -59,7 +59,7 @@ export interface TopicRelation {
   /** Optional single-line note, written through `normalizeRelationDescription`; read back as stored. */
   description?: string;
 }
-const TOPIC_RELATION_KINDS: readonly string[] = [
+export const TOPIC_RELATION_KINDS: readonly TopicRelationKind[] = [
   "supports",
   "contradicts",
   "verifies",
@@ -119,7 +119,7 @@ export function sanitizeTopicRelations(
       !r ||
       typeof r !== "object" ||
       typeof r.kind !== "string" ||
-      !TOPIC_RELATION_KINDS.includes(r.kind) ||
+      !(TOPIC_RELATION_KINDS as readonly string[]).includes(r.kind) ||
       typeof r.from !== "string" ||
       typeof r.to !== "string" ||
       !ids.has(r.from) ||

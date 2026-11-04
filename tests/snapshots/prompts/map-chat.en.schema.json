@@ -31,7 +31,9 @@
               "auto_layout",
               "focus_topic",
               "set_topic_kind",
-              "ask_topic_kind"
+              "ask_topic_kind",
+              "add_relation",
+              "remove_relation"
             ]
           },
           "nodeId": {
@@ -131,6 +133,27 @@
               "strong",
               ""
             ]
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationKind": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "verifies",
+              "derives_from",
+              "related",
+              "prerequisite",
+              ""
+            ]
+          },
+          "description": {
+            "type": "string"
           }
         },
         "required": [
@@ -156,7 +179,11 @@
           "images",
           "otherProvider",
           "topicKind",
-          "strength"
+          "strength",
+          "fromId",
+          "toId",
+          "relationKind",
+          "description"
         ]
       }
     }

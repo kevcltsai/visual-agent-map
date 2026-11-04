@@ -1,10 +1,13 @@
-// Detached watcher: keeps one harness-launched Obsidian instance out of the owner's foreground for its whole life.
+// Detached watcher: keeps one harness-launched Obsidian instance out of the owner's foreground for its whole life
+// (activation policy `prohibited` prevents it; the poll below is the fallback).
 // Obsidian 1.14+ opens Settings etc. in new windows and each one activates the app, so a short launch-time window is not enough.
 // Usage: node keep-background.mjs <app-profile> <obsidian-app-bundle>
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
+import { connectCdp, devToolsPortFile } from "./obsidian-cdp.mjs";
 
 // The pattern is built here, never passed as an argument: a watcher whose own command line contained it would match
 // its own pgrep and never exit.
@@ -24,6 +27,30 @@ export function focusAction({ frontPid, frontPath, instancePid, ownerApp = null,
   return { ownerApp, reopen: Boolean(ownerApp?.path) && !allowFocus && ownerApp.path !== obsidianPath };
 }
 
+// Prevention beats the polling below: a `prohibited` activation policy (set in the main process through the renderer's
+// `remote`) makes macOS refuse to activate the instance at all, so new windows never reach the front. `accessory` was
+// tried and still activates. Pure decision: the policy to apply now, or null when nothing should be touched.
+// Only a harness profile (<vault>/.vam-app) whose own DevToolsActivePort exists is ever contacted.
+export function policyAction({ appProfile, portFileExists, allowFocus = false, applied = null }) {
+  if (!appProfile || basename(appProfile) !== ".vam-app" || !portFileExists) return null;
+  const desired = allowFocus ? "regular" : "prohibited";
+  return desired === applied ? null : desired;
+}
+
+export const policyExpression = policy => `String(require("electron").remote.app.setActivationPolicy(${JSON.stringify(policy)}))`;
+
+// Never throws: a failed attempt just means the polling fallback keeps working and the next tick retries.
+export async function applyPolicy(appProfile, policy, connect = connectCdp, timeoutMs = 3000) {
+  let cdp;
+  try {
+    const attempt = (async () => { cdp = await connect(dirname(appProfile)); await cdp.evaluate(policyExpression(policy)); })();
+    attempt.catch(() => {});
+    await Promise.race([attempt, delay(timeoutMs).then(() => { throw new Error("timeout"); })]);
+    return true;
+  } catch { return false; }
+  finally { try { cdp?.close(); } catch { /* already closed */ } }
+}
+
 export function frontApp() {
   const info = spawnSync("sh", ["-c", "lsappinfo info -only pid -only bundlepath \"$(lsappinfo front)\""], { encoding: "utf8" }).stdout ?? "";
   return { pid: Number(/"pid"=(\d+)/.exec(info)?.[1]), path: /"LSBundlePath"="([^"]+)"/.exec(info)?.[1] };
@@ -33,30 +60,38 @@ function processAlive(pid) {
   try { process.kill(pid, 0); return true; } catch (error) { return error.code === "EPERM"; }
 }
 
-export function watch(appProfile, obsidianApp, previous = frontApp(), intervalSeconds = 0.2) {
+export async function watch(appProfile, obsidianApp, previous = frontApp(), intervalSeconds = 0.2) {
   const pattern = instancePattern(appProfile);
   let started = false;
   let misses = 0;
   let ownerApp = previous.path ? previous : null;
+  let appliedPolicy = null;
+  let lastAttempt = 0;
   for (;;) {
     const found = spawnSync("pgrep", ["-f", "--", pattern], { encoding: "utf8" });
     const instancePid = Number(found.stdout.trim().split("\n")[0]);
     if (found.status !== 0 || !instancePid) {
       // Launch is asynchronous: give `open` a moment to create the process before treating absence as the end.
-      if (!started) { misses++; if (misses < 100) { spawnSync("sleep", [String(intervalSeconds)]); continue; } }
+      if (!started) { misses++; if (misses < 100) { await delay(intervalSeconds * 1000); continue; } }
       return;
     }
     started = true;
+    const allowFocus = existsSync(join(appProfile, "allow-focus"));
+    const policy = policyAction({ appProfile, portFileExists: existsSync(devToolsPortFile(dirname(appProfile))), allowFocus, applied: appliedPolicy });
+    if (policy && Date.now() - lastAttempt > 1000) {
+      lastAttempt = Date.now();
+      if (await applyPolicy(appProfile, policy)) appliedPolicy = policy;
+    }
     const front = frontApp();
     const testPids = spawnSync("pgrep", ["-f", "--", "MacOS/Obsidian --user-data-dir="], { encoding: "utf8" }).stdout.split("\n").filter(Boolean).map(Number);
-    const action = focusAction({ frontPid: front.pid, frontPath: front.path, instancePid, ownerApp, allowFocus: existsSync(join(appProfile, "allow-focus")), testPids, ownerAlive: ownerApp ? processAlive(ownerApp.pid) : true, obsidianPath: obsidianApp });
+    const action = focusAction({ frontPid: front.pid, frontPath: front.path, instancePid, ownerApp, allowFocus, testPids, ownerAlive: ownerApp ? processAlive(ownerApp.pid) : true, obsidianPath: obsidianApp });
     ownerApp = action.ownerApp;
     if (action.reopen) spawnSync("open", ["-a", ownerApp.path]);
-    spawnSync("sleep", [String(intervalSeconds)]);
+    await delay(intervalSeconds * 1000);
   }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [appProfile, obsidianApp, ownerPid, ownerPath] = process.argv.slice(2);
-  watch(appProfile, obsidianApp, ownerPath ? { pid: Number(ownerPid), path: ownerPath } : { pid: NaN, path: undefined });
+  await watch(appProfile, obsidianApp, ownerPath ? { pid: Number(ownerPid), path: ownerPath } : { pid: NaN, path: undefined });
 }

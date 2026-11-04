@@ -1232,7 +1232,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_skip_topic_not_seen": "AI 沒有看到這個議題的完整筆記",
   "ui.map_chat_skip_topic_changed": "送出後議題又被修改過",
   "ui.map_chat_not_undoable":
-    "復原會倒回這則回覆的變更，但不會倒回它啟動的 AI 工作（研究、展開、整合、分級、合併、找圖）：它們完成時各自有可復原紀錄。",
+    "復原會倒回這則回覆的變更，但不會倒回它啟動的 AI 工作（研究、展開、整合、分級、合併、找圖），那些工作完成時各自有可復原紀錄。一旦 AI 工作寫入這些卡片，這則回覆就無法再復原。",
   "ui.map_chat_undo_label": "AI 對話回覆",
   "ui.map_chat_undo_files_changed": "檔案已變更，無法復原",
   "ui.map_chat_guard_exists": "那裡已經有檔案",
@@ -1354,7 +1354,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_canvas_consent": "等待你確認使用額度。同意後才會開始建立心智圖。",
   "ui.map_chat_canvas_plan": "確認計畫後，心智圖會出現在這裡",
   "ui.map_chat_plan_replace_hint": "送出新訊息會取消這份計畫",
-  "ui.map_chat_plan_irreversible": "復原會倒回變更，但不會倒回這份計畫啟動的 AI 工作",
+  "ui.map_chat_plan_irreversible":
+    "復原會倒回變更，但不會倒回這份計畫啟動的 AI 工作；一旦 AI 工作寫入這些卡片，這則回覆就無法再復原",
   "ui.map_chat_plan_mark_delete": "會移除",
   "ui.map_chat_plan_title_applied": "已套用的計畫",
   "ui.map_chat_plan_title_cancelled": "已取消的計畫",

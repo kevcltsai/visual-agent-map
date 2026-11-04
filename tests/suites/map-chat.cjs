@@ -458,7 +458,7 @@ const topicBaseline = (h, { full = true } = {}) => {
   const selected = full ? h.view.map.nodes.map(n => ({ id: n.id, ...state(n.id), path: n.path })) : [];
   return buildMapChatContext({ mapTitle: 'm', outline, selected, references: [], snippets: [], files: [], history: [] }).topicHashes;
 };
-const NOT_UNDOABLE = 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.';
+const NOT_UNDOABLE = 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.';
 // Resolves with the action lines; the closing "cannot be undone" line is left out and reported as `.notice` (true when it was there).
 const apply = async (h, actions, hashes = {}, alive, topicHashes) => {
   const all = await withTimeout(h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: hashes, topicHashes: topicHashes ?? topicBaseline(h) }, alive));
@@ -2914,17 +2914,17 @@ integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the ca
 
 integrationTest('B1 ui: result lines name their status in words; five or fewer are all shown; the closing "cannot be undone" line is always last', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
-  chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B (the topic is no longer on the map)' }, { status: 'failed', text: 'Failed: C (boom)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.' }]);
+  chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'skipped', text: 'Skipped: B (the topic is no longer on the map)' }, { status: 'failed', text: 'Failed: C (boom)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.' }]);
   const lines = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')); eq(lines.map(l => l.text.split(':')[0].split(' ')[0]), ['Done:', 'Skipped:', 'Failed:', 'Undo'].map(s => s.replace(':', ''))); assert.ok(hasClass(lines.at(-1), 'is-note'));
   assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')).length, 0);
 });
 
 integrationTest('B1 ui: more than five result lines fold into a count; the toggle shows them all and back; the closing line stays last; focus stays on the toggle', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.begin('q');
-  const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.' }];
+  const lines = [...Array.from({ length: 18 }, (_, i) => ({ status: 'done', text: `Done: card ${i}` })), { status: 'skipped', text: 'Skipped: x (y)' }, { status: 'skipped', text: 'Skipped: z (w)' }, { status: 'failed', text: 'Failed: q (r)' }, { status: 'done', text: 'Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.' }];
   chat.finish('r', lines);
   const text = () => visibleText(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines'))); const shown = () => findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line'));
-  assert.match(text(), /18 done, 2 skipped, 1 failed/); eq(shown().map(l => l.text), ['Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.'], 'folded: only the closing line');
+  assert.match(text(), /18 done, 2 skipped, 1 failed/); eq(shown().map(l => l.text), ['Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.'], 'folded: only the closing line');
   let toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.text, 'Show all 21 results'); assert.equal(toggle.attrs['aria-expanded'], 'false'); toggle.click();
   assert.equal(shown().length, 22); assert.ok(hasClass(shown().at(-1), 'is-note'), 'still last'); toggle = find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-toggle')); assert.equal(toggle.attrs['aria-expanded'], 'true'); assert.equal(h.page.doc.activeElement, toggle);
   toggle.click(); assert.equal(shown().length, 1);
@@ -4926,7 +4926,7 @@ integrationTest('chat 04: a plan card that starts AI work says, next to the butt
   h.control.reply = async () => ({ reply: 'plan', actions: [...planActions(h, 15), { kind: 'run_map_action', action: 'research_standard', nodeIds: [h.ids.a], title: '', goal: '', direction: '', mode: '', images: false }], rejected: [] });
   h.type('many'); await h.view.sendMapChat();
   const buttons = find(planCard(h)[0], i => hasClass(i, 'vam-map-chat-plan-buttons'));
-  eq(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning')).map(i => i.text), ['Undo takes back the changes, but not the AI work this plan starts.']);
+  eq(findAll(buttons, i => hasClass(i, 'vam-map-chat-plan-warning')).map(i => i.text), ['Undo takes back the changes, but not the AI work this plan starts. Once that work writes to these cards, this reply can no longer be undone.']);
 });
 
 // ---- chat 04: one reply is one undo step -------------------------------------------------------------------------------
@@ -5008,4 +5008,73 @@ integrationTest('chat 04: after create_map the reply\'s step belongs to the new 
   await h.view.travel(false);
   assert.equal((await h.repo.readMap(newPath)).nodes.length, 0, 'the cards built in the new map are taken back'); assert.equal(h.view.path, newPath, 'the new map stays open');
   assert.equal(JSON.stringify((await h.repo.readMap(oldPath)).nodes), oldNodes, 'the old map is unchanged');
+});
+// ---- chat 05: reply undo fixes (review M1-M3) ---------------------------------------------------------------------------
+const foreignEntry = (label, log) => ({ label, undo: async () => { log.push(`${label}.undo`); }, redo: async () => { log.push(`${label}.redo`); } });
+integrationTest('chat 05 / M1: an entry another job pushes while a reply is applied stays its own undo step; undoing the reply leaves it alone', async () => {
+  const h = await harness(); await h.view.hydrate(); const log = [];
+  const pending = apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }, { kind: 'rename_topic', nodeId: h.ids.b, title: 'Sleep cycle' }]);
+  // Queued behind the reply's first write: it runs between the reply's writes, like an expand job's.
+  const queued = h.plugin.mutate(async () => { h.view.history.push(foreignEntry('expand', log)); });
+  eq((await pending).map(l => l.status), ['done', 'done']); await queued;
+  const labels = h.view.history.past.map(e => e.label);
+  eq(labels, ['expand', 'AI chat reply'], 'the foreign entry is not inside the reply');
+  await h.view.travel(false);
+  eq(log, [], 'undoing the reply does not undo the other job');
+  assert.equal((await h.note('a')).title, 'Body'); assert.equal((await h.note('b')).title !== 'Sleep cycle', true);
+  assert.equal(h.view.history.undoEntry.label, 'expand', 'the other step is still there to undo on its own');
+});
+integrationTest('chat 05 / M1: a collapseSince of a job that straddles the end of the reply does not fold the reply\'s entry into its own step', async () => {
+  const h = await harness(); await h.view.hydrate(); const log = [];
+  const mark = h.view.history.mark();
+  const pending = apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }, { kind: 'rename_topic', nodeId: h.ids.b, title: 'Sleep cycle' }]);
+  const queued = h.plugin.mutate(async () => { h.view.history.push(foreignEntry('expand-1', log)); });
+  await pending; await queued;
+  h.view.history.push(foreignEntry('expand-2', log)); h.view.history.collapseSince(mark, 'expand');
+  assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1, 'the reply is still a step of its own');
+  await h.view.history.undoEntry.undo();
+  eq(log, ['expand-2.undo', 'expand-1.undo'], 'the folded step holds only the job\'s entries');
+  assert.equal((await h.note('a')).title, 'Body clock', 'the reply\'s rename was not undone by it');
+});
+integrationTest('chat 05 / M2: when the AI work a reply started writes to a card the reply made, Undo refuses with the stale notice and changes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const wrote = { done: false };
+  const before = new Set(h.view.map.nodes.map(n => n.id));
+  h.view.startMultiResearch = async () => {
+    const made = h.view.map.nodes.find(n => !before.has(n.id));
+    await h.repo.updateNote(made.path, { summary: 'written by the research' }); wrote.done = true;
+  };
+  await withTimeout(h.view.applyMapChatActions({ actions: [{ kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 'What we dream', ref: 'x' }, researchAct({ nodeIds: ['new:x'] })], rejected: [] }, { mdHashes: {}, topicHashes: topicBaseline(h) }));
+  await until(() => wrote.done); await h.view.hydrate();
+  const state = JSON.stringify([(await h.saved()).map(n => n.id).sort(), [...h.contents.entries()].sort()]);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await assert.rejects(() => h.view.travel(false), /Files have changed since; this cannot be undone\./);
+  assert.equal(JSON.stringify([(await h.saved()).map(n => n.id).sort(), [...h.contents.entries()].sort()]), state, 'nothing was changed');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply', 'the step stays where it was');
+});
+integrationTest('chat 05 / M2: the texts say the AI work is not undone and that writing to these cards ends this reply\'s undo (en, zh-TW, zh-CN)', () => {
+  for (const [language, pattern] of [['en', /no longer be undone/], ['zh-TW', /無法再復原/], ['zh-CN', /无法再撤销/]]) {
+    const texts = require(`../../i18n/${language}.ts`);
+    const table = texts.default ?? texts[Object.keys(texts)[0]];
+    for (const key of ['ui.map_chat_not_undoable', 'ui.map_chat_plan_irreversible']) assert.match(table[key], pattern, `${language} ${key}`);
+  }
+});
+integrationTest('chat 05 / M3: editing the note of a card the reply deleted refuses the whole undo', async () => {
+  const h = await harness(); await h.view.hydrate();
+  eq((await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.b, title: 'Sleep cycle' }, { kind: 'delete_topic', nodeId: h.ids.a, branch: false }])).map(l => l.status), ['done', 'done']);
+  const parked = [...h.contents.keys()].filter(path => /Unassigned/.test(path));
+  assert.equal(parked.length, 1, `the deleted card's note is parked: ${[...h.contents.keys()]}`);
+  await h.app.vault.process(h.app.vault.getAbstractFileByPath(parked[0]), text => `${text}\nedited by hand\n`);
+  await h.view.hydrate();
+  const entry = h.view.history.undoEntry; const state = JSON.stringify([...h.contents.entries()].sort()); const nodes = JSON.stringify((await h.saved()).map(n => n.id).sort());
+  await assert.rejects(() => h.view.travel(false), /Files have changed since; this cannot be undone\./);
+  assert.equal(JSON.stringify([...h.contents.entries()].sort()), state, 'no file was touched'); assert.equal(JSON.stringify((await h.saved()).map(n => n.id).sort()), nodes, 'the map is as it was');
+  assert.equal(h.view.history.undoEntry, entry);
+});
+integrationTest('chat 05 / M3: an entry that fails part-way through the reply\'s undo puts back the ones already undone', async () => {
+  const h = await harness(); await h.view.hydrate(); const log = [];
+  const first = { undo: async () => { log.push('first.undo'); throw new Error('boom'); }, redo: async () => { log.push('first.redo'); } };
+  const second = { undo: async () => { log.push('second.undo'); }, redo: async () => { log.push('second.redo'); } };
+  await h.view.pushChatReplyEntry([first, second], h.view.path, new Set(), new Set());
+  await assert.rejects(() => h.view.history.undoEntry.undo(), /boom/);
+  eq(log, ['second.undo', 'first.undo', 'second.redo'], 'newest first; the one that ran is run back');
 });

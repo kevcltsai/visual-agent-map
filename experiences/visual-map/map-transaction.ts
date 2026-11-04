@@ -37,6 +37,8 @@ export interface TransactionEntry {
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   label?: string;
+  /** Where the notes this step moved are now (parked or moved targets); read after commit. */
+  parkedPaths?: () => string[];
 }
 export interface CommitOptions {
   /** Skip the derived-data rebuild during commit; the caller rebuilds. Undo and redo still rebuild. */
@@ -389,7 +391,12 @@ export function begin(deps: TransactionDeps): Transaction {
       }
       await run(files, maps, rebuild, notes);
     };
-    return { undo: () => apply("undo"), redo: () => apply("redo"), ...(label === undefined ? {} : { label }) };
+    return {
+      undo: () => apply("undo"),
+      redo: () => apply("redo"),
+      parkedPaths: () => ops.filter(op => op.kind === "move" && op.target).map(op => op.target),
+      ...(label === undefined ? {} : { label })
+    };
   }
 
   /**

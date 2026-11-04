@@ -1300,7 +1300,7 @@ export const en = {
   "ui.map_chat_skip_topic_not_seen": "the AI was not shown this topic's note in full",
   "ui.map_chat_skip_topic_changed": "the topic changed after you sent the message",
   "ui.map_chat_not_undoable":
-    "Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.",
+    "Undo takes back this reply’s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.",
   "ui.map_chat_undo_label": "AI chat reply",
   "ui.map_chat_undo_files_changed": "Files have changed since; this cannot be undone.",
   "ui.map_chat_guard_exists": "a file already exists there",
@@ -1424,7 +1424,8 @@ export const en = {
   "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
   "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",
   "ui.map_chat_plan_replace_hint": "Sending a new message cancels this plan.",
-  "ui.map_chat_plan_irreversible": "Undo takes back the changes, but not the AI work this plan starts.",
+  "ui.map_chat_plan_irreversible":
+    "Undo takes back the changes, but not the AI work this plan starts. Once that work writes to these cards, this reply can no longer be undone.",
   "ui.map_chat_plan_mark_delete": "Removes",
   "ui.map_chat_plan_title_applied": "Applied plan",
   "ui.map_chat_plan_title_cancelled": "Cancelled plan",

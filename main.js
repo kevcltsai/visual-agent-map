@@ -63375,12 +63375,15 @@ ${note.detail.trim()}` : "",
       return !((_a3 = this.map) == null ? void 0 : _a3.nodes.some((node) => node.id === source.id && node.path === source.path));
     }))
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    const concluded = this.relationsEnabled();
     const integrated = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       this.map,
       this.path,
-      "workspace"
+      "workspace",
+      // A synthesis is a conclusion drawn from its sources (ordinary maps only; AIM has its own kinds).
+      concluded ? { topicKind: "conclusion" } : {}
     );
     const detailTemplate = (await this.mapStyle(language2, { style: task.options.noteStyle, kind: "topic" })).template;
     try {
@@ -63404,7 +63407,14 @@ ${note.detail.trim()}` : "",
       try {
         await this.mapChangeSnapshots(
           (map) => {
+            var _a3, _b2;
             map.nodes.push(integrated);
+            if (concluded)
+              for (const source of sources) {
+                const link = { kind: "derives_from", from: integrated.id, to: source.id };
+                if (relationAllowed((_a3 = map.topicRelations) != null ? _a3 : [], link))
+                  setTopicRelations(map, [...(_b2 = map.topicRelations) != null ? _b2 : [], link]);
+              }
           },
           true,
           [integrated.path]

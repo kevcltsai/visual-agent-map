@@ -35339,6 +35339,12 @@ var aim_gap_audit_schema_default = aimGapAuditSchema;
 // ai/types.ts
 var SEARCH_STATUSES = ["completed", "failed", "not_attempted"];
 
+// core/steps/task/schema-summary-description.md
+var schema_summary_description_default = "A one-sentence conclusion that fits a mind map, written in {{language}}, within 80 words\n";
+
+// core/steps/task/schema-detail-description.md
+var schema_detail_description_default = "A complete Markdown analysis written in {{language}}\n";
+
 // response-schema.json
 var response_schema_default = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -35378,13 +35384,26 @@ var response_schema_default = {
 };
 
 // core/steps/task/schemas.ts
-function taskResponseShape(context) {
-  const isAimGapAudit = context.responseContract === "aim-gap-audit" && context.promptProfile === "aim" && context.researchMode === "local";
-  const isDeliveryAcceptance = context.responseContract === "aim-delivery-acceptance" && context.promptProfile === "aim" && context.researchMode === "local";
-  const deliverySchema = {
+function localizedResponseSchema(language2) {
+  if (instructionLanguageOf(language2) === "zh") return response_schema_default;
+  const variables5 = { language: languagePromptName(language2, "en", "plain") };
+  return {
     ...response_schema_default,
     properties: {
       ...response_schema_default.properties,
+      summary: { type: "string", description: renderTemplate(schema_summary_description_default, variables5) },
+      detail: { type: "string", description: renderTemplate(schema_detail_description_default, variables5) }
+    }
+  };
+}
+function taskResponseShape(context, language2) {
+  const responseSchema = localizedResponseSchema(language2);
+  const isAimGapAudit = context.responseContract === "aim-gap-audit" && context.promptProfile === "aim" && context.researchMode === "local";
+  const isDeliveryAcceptance = context.responseContract === "aim-delivery-acceptance" && context.promptProfile === "aim" && context.researchMode === "local";
+  const deliverySchema = {
+    ...responseSchema,
+    properties: {
+      ...responseSchema.properties,
       summary: {
         type: "string",
         description: "A short plain-language preview. Never put machine-readable review markers here."
@@ -35398,23 +35417,23 @@ function taskResponseShape(context) {
   };
   const isIsolatedWebResearch = context.aimIsolatedResearch === true && context.researchMode !== "local";
   const webResearchSchema = {
-    ...response_schema_default,
+    ...responseSchema,
     properties: {
-      ...response_schema_default.properties,
+      ...responseSchema.properties,
       searchStatus: {
         type: "string",
         enum: [...SEARCH_STATUSES],
         description: "completed only when at least one web search or page fetch returned usable results for this task; failed when searching was attempted without usable results; not_attempted when no search ran."
       }
     },
-    required: [...response_schema_default.required, "searchStatus"]
+    required: [...responseSchema.required, "searchStatus"]
   };
   const contract = context.promptProfile === "aim" && !isAimGapAudit ? context.aimContract : void 0;
   const schema = contract ? aimContractSchema(
     contract,
-    isIsolatedWebResearch ? webResearchSchema : response_schema_default,
+    isIsolatedWebResearch ? webResearchSchema : responseSchema,
     context.aimEvidenceLookup === true
-  ) : isAimGapAudit ? aim_gap_audit_schema_default : isDeliveryAcceptance ? deliverySchema : isIsolatedWebResearch ? webResearchSchema : response_schema_default;
+  ) : isAimGapAudit ? aim_gap_audit_schema_default : isDeliveryAcceptance ? deliverySchema : isIsolatedWebResearch ? webResearchSchema : responseSchema;
   return { schema, isAimGapAudit, isIsolatedWebResearch, ...contract ? { contract } : {} };
 }
 
@@ -35634,7 +35653,7 @@ var AiTaskService = class {
     if (!input2.countRepair) (_c = input2.onWorkingFindingsSent) == null ? void 0 : _c.call(input2, (_b2 = context.workingFindings) != null ? _b2 : "");
     const pluginDirectory = this.options.pluginDirectory();
     const outputLanguage2 = (_d = context.outputLanguage) != null ? _d : this.options.language();
-    const shape2 = taskResponseShape(context);
+    const shape2 = taskResponseShape(context, outputLanguage2);
     const step = prepareStep(createTaskStep(taskStepId(context, role), shape2.schema), {
       context,
       language: outputLanguage2,
@@ -75931,6 +75950,12 @@ var MarkdownSelectionAi = class extends import_obsidian44.Component {
     __publicField(this, "panel", null);
     __publicField(this, "imageAction");
   }
+  /** The interface language changed: the launcher text is set once at load, so set it again. */
+  refreshLanguage() {
+    if (!this.launcher) return;
+    this.launcher.setText(t("ui.context_ai_open"));
+    this.launcher.setAttribute("aria-label", t("ui.context_ai_open"));
+  }
   onload() {
     this.imageAction = this.addChild(new ImageTranslateAction(this.app, this.options));
     this.launcher = this.app.workspace.containerEl.createEl("button", {
@@ -76821,6 +76846,8 @@ var VisualAgentMapPlugin = class extends import_obsidian45.Plugin {
     /** The blank map made on first install; finishStartup opens it. Null on every other start. */
     __publicField(this, "firstInstallMapPath", null);
     __publicField(this, "languageSwitchPending", false);
+    /** The floating "Use AI on selection" button; its text follows the interface language. */
+    __publicField(this, "markdownSelectionAi", null);
     __publicField(this, "unreadableReported", /* @__PURE__ */ new Map());
   }
   /** Background chart steps (running and queued), keyed by note path; owned by {@link topicRuns}. */
@@ -77001,7 +77028,7 @@ var VisualAgentMapPlugin = class extends import_obsidian45.Plugin {
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);
-    const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
+    const markdownSelectionAi = this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",
       modelLabel: (model) => this.modelLabel(model),
@@ -77937,11 +77964,12 @@ ${t("ui.organize_link_wait_hint")}`;
     this.localizedCommands.push({ command: this.addCommand({ id, name: t(key2), callback }), key: key2 });
   }
   refreshLocalizedEntrypoints() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     (_a2 = this.ribbonIcon) == null ? void 0 : _a2.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     (_b2 = this.coffeeRibbonIcon) == null ? void 0 : _b2.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
+    (_c = this.markdownSelectionAi) == null ? void 0 : _c.refreshLanguage();
     for (const { command, key: key2 } of this.localizedCommands)
-      command.name = `${(_d = (_c = this.manifest) == null ? void 0 : _c.name) != null ? _d : "Visual Agent Map"}: ${translate(this.settings.language, key2)}`;
+      command.name = `${(_e = (_d = this.manifest) == null ? void 0 : _d.name) != null ? _e : "Visual Agent Map"}: ${translate(this.settings.language, key2)}`;
   }
   coffeeViews() {
     return this.app.workspace.getLeavesOfType(COFFEE_TABLES_VIEW_TYPE).map((leaf) => leaf.view).filter((view) => view instanceof CoffeeTablesView);
@@ -78301,7 +78329,7 @@ ${t("ui.organize_link_wait_hint")}`;
       const selected = normalizeReasoningLevel(reasoning != null ? reasoning : this.settings.cliReasoning);
       this.aiCalls.prewarm(model, {
         effort: effectiveReasoningLevel({ mode }, selected),
-        schema: response_schema_default,
+        schema: localizedResponseSchema(this.settings.language),
         webSearch
       });
     } catch (e) {

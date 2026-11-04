@@ -165,7 +165,7 @@ export class AiTaskService {
     if (!input.countRepair) input.onWorkingFindingsSent?.(context.workingFindings ?? "");
     const pluginDirectory = this.options.pluginDirectory();
     const outputLanguage = context.outputLanguage ?? this.options.language();
-    const shape = taskResponseShape(context);
+    const shape = taskResponseShape(context, outputLanguage);
     const step = prepareStep(createTaskStep(taskStepId(context, role), shape.schema), {
       context,
       language: outputLanguage,

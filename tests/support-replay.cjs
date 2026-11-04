@@ -19,10 +19,10 @@ function load(entry, overrides = {}, globals = {}) {
  * Bundles TypeScript `contents` (imports resolve from the repository root) into one module, so several product modules
  * share a single copy of module state such as the interface language. `load` gives every entry its own copy.
  */
-function loadSource(contents, overrides = {}) {
+function loadSource(contents, overrides = {}, globals = {}) {
   const code = buildSync({ stdin: { contents, resolveDir: root, loader: 'ts', sourcefile: 'support-replay-entry.ts' }, external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, URL, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, URL, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout, ...globals });
   return module.exports;
 }
 

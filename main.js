@@ -37678,12 +37678,13 @@ function ledgerFor(plugin) {
 function cutSourceProblem(sourceMap, record, found) {
   const present = new Set(sourceMap.nodes.map((node) => node.id));
   if (sourceMap.id !== record.sourceMapId || record.nodeIds.every((id) => !present.has(id))) return "gone";
-  if (sourceMap.aim) return "aim";
+  if (aimEnabled() && sourceMap.aim) return "aim";
   if (!found) return "changed";
   const ids = new Set(record.nodeIds);
   if (sourceMap.nodes.some((node) => node.parentId !== null && ids.has(node.parentId) && !ids.has(node.id)))
     return "changed";
-  if (found.branch.some((node) => node.aimKind !== void 0 || node.aimQuestion !== void 0)) return "aim";
+  if (aimEnabled() && found.branch.some((node) => node.aimKind !== void 0 || node.aimQuestion !== void 0))
+    return "aim";
   return null;
 }
 var noteParts = (text11) => {
@@ -49142,6 +49143,15 @@ function errorMessage(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
+var isAimNode = (node) => aimEnabled() && !!(node == null ? void 0 : node.aimKind);
+function withoutAimFields(node) {
+  const copy = { ...node };
+  delete copy.aimKind;
+  delete copy.aimQuestion;
+  delete copy.aimConvergesFromNodeIds;
+  delete copy.aimDismissedQuestionRequestIds;
+  return copy;
+}
 function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
   var _a2, _b2;
   if (activeQuestionNodeId === questionNodeId) return "running";
@@ -49691,6 +49701,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     }
     this.restoreMapFocus(this.lastMapFocus);
   }
+  /**
+   * Whether `map` is an AIM map this view treats as one: its AIM controls, status bar and edit locks apply. While AIM is hidden
+   * (experiences/aim/availability.ts) an old AIM map is an ordinary map: all its data stays as saved, only the AIM parts are off.
+   */
+  aimLive(map = this.map) {
+    return aimEnabled() && !!(map == null ? void 0 : map.aim);
+  }
   getViewType() {
     return VIEW_TYPE;
   }
@@ -49845,28 +49862,28 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     scope.register(["Mod", "Shift"], "z", run(true));
     scope.register(["Mod", "Shift"], "Z", run(true));
     scope.register([], "F2", (event) => {
-      var _a2, _b2, _c;
+      var _a2, _b2;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
       if (this.presentation) return false;
-      if (this.selection.state.multiSelectMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
-      const active = (_b2 = this.contentEl.ownerDocument) == null ? void 0 : _b2.activeElement;
+      if (this.selection.state.multiSelectMode || this.aimLive()) return true;
+      const active = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
-      const node = entry && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry[0]));
+      const node = entry && ((_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === entry[0]));
       const note = node && this.notes.get(node.id);
       if (!node || !note) return true;
       this.renameNode(node, note.title);
       return false;
     });
     const cardKey = (sibling) => (event) => {
-      var _a2, _b2, _c, _d, _e;
+      var _a2, _b2, _c, _d;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
       if (this.presentation) return false;
-      if (this.selection.state.multiSelectMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
-      const active = (_b2 = this.contentEl.ownerDocument) == null ? void 0 : _b2.activeElement;
+      if (this.selection.state.multiSelectMode || this.aimLive()) return true;
+      const active = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
-      const node = entry && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry[0]));
+      const node = entry && ((_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === entry[0]));
       if (!node) return true;
-      const parent = sibling ? (_e = (_d = this.map) == null ? void 0 : _d.nodes.find((item) => item.id === node.parentId)) != null ? _e : null : node;
+      const parent = sibling ? (_d = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === node.parentId)) != null ? _d : null : node;
       this.enqueue(() => this.addNode(parent));
       return false;
     };
@@ -50549,22 +50566,22 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
   async hydrate(isCurrent = () => true) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c;
     this.aimFailedReports.clear();
     let goal;
     let level;
     let context;
-    if (this.path && !((_a2 = this.map) == null ? void 0 : _a2.aim)) {
+    if (this.path && !this.aimLive()) {
       try {
         ({ goal, level, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch (e) {
       }
     }
     const loaded = /* @__PURE__ */ new Map();
-    for (const node of (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []) {
+    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
       if (!isCurrent()) return;
       try {
-        loaded.set(node.id, await this.plugin.repo.readNote(node.path, (_d = this.map) != null ? _d : void 0));
+        loaded.set(node.id, await this.plugin.repo.readNote(node.path, (_c = this.map) != null ? _c : void 0));
       } catch (e) {
       }
     }
@@ -50578,7 +50595,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
   async hydrateFailedReportTargets(isCurrent) {
     var _a2;
     const map = this.map, mapPath = this.path;
-    if (!mapPath || !(map == null ? void 0 : map.aim)) return;
+    if (!mapPath || !aimEnabled() || !(map == null ? void 0 : map.aim)) return;
     const failed = map.aim.runs.some(
       (run) => {
         var _a3;
@@ -50636,7 +50653,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     }
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
-    if (((_c = map.aim) == null ? void 0 : _c.creationId) && map.aim.rootDraft) {
+    if (aimEnabled() && ((_c = map.aim) == null ? void 0 : _c.creationId) && map.aim.rootDraft) {
       const resumed = await createAimMap(this.plugin.repo, this.plugin.settings.cliModel, {
         requestId: map.aim.creationId,
         topic: map.title,
@@ -50647,13 +50664,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       if (!isCurrent()) return;
       map = resumed.map;
     }
-    if ((_d = map.aim) == null ? void 0 : _d.questionDraft) {
+    if (aimEnabled() && ((_d = map.aim) == null ? void 0 : _d.questionDraft)) {
       await this.aimRecovery.recoverQuestionDraft(path);
       if (!isCurrent()) return;
       map = await this.plugin.repo.readMap(path);
       if (!isCurrent()) return;
     }
-    if (map.aim) {
+    if (aimEnabled() && map.aim) {
       await this.aimRuns.recoverPending(path);
       if (!isCurrent()) return;
       await this.aimRuns.failInterrupted(path);
@@ -50663,8 +50680,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       map = await this.plugin.repo.readMap(path);
       if (!isCurrent()) return;
     }
-    const clearedQuestionEdges = clearQuestionConvergenceEdges(map);
-    const repairedResultEdges = repairAimResultConvergence(map);
+    const clearedQuestionEdges = aimEnabled() && clearQuestionConvergenceEdges(map);
+    const repairedResultEdges = aimEnabled() && repairAimResultConvergence(map);
     if (clearedQuestionEdges || repairedResultEdges) {
       await this.plugin.repo.saveMap(path, map);
       if (!isCurrent()) return;
@@ -51201,7 +51218,7 @@ ${request.requirements}` : preset.text,
   // ---- Relevance grading: goal chip, status bar and change summary ----------------------------------------------
   /** Mind maps only: not an AIM map. */
   relevanceGradeable() {
-    return !!this.map && !this.map.aim && !!this.path;
+    return !!this.map && !this.aimLive() && !!this.path;
   }
   /**
    * One toolbar button, the same level as "Select topics": it shows the goal and opens a panel under it with the goal,
@@ -52343,7 +52360,7 @@ ${request.requirements}` : preset.text,
   setLayout(patch) {
     this.enqueue(async () => {
       var _a2, _b2, _c;
-      if (!this.map || this.map.aim) return;
+      if (!this.map || this.aimLive()) return;
       const before = layoutOf(this.map);
       const direction = (_a2 = patch.direction) != null ? _a2 : before.direction;
       const spacing = (_c = (_b2 = patch.spacing) != null ? _b2 : before.spacing) != null ? _c : "standard";
@@ -52428,7 +52445,7 @@ ${request.requirements}` : preset.text,
   outlineImportTarget() {
     var _a2, _b2;
     if (!this.map || !isManagedMapPath(this.plugin.settings, this.path)) return { map: "none" };
-    if (this.map.aim) return { map: "aim" };
+    if (this.aimLive()) return { map: "aim" };
     const node = this.map.nodes.find((item) => item.id === this.selection.state.selected);
     if (!node) return { map: "editable" };
     return { map: "editable", selected: { id: node.id, title: (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path } };
@@ -53262,7 +53279,7 @@ ${request.requirements}` : preset.text,
   /** Whether this view is running or saving AIM work for the map at `path`. */
   hasActiveAimWork(path) {
     var _a2;
-    return this.path === path && !!((_a2 = this.map) == null ? void 0 : _a2.aim) && (this.aimBusy || this.map.aim.runs.some(
+    return this.path === path && aimEnabled() && !!((_a2 = this.map) == null ? void 0 : _a2.aim) && (this.aimBusy || this.map.aim.runs.some(
       (run) => run.attempts.some((attempt) => attempt.status === "running" || attempt.status === "saving")
     ));
   }
@@ -53333,9 +53350,10 @@ ${request.requirements}` : preset.text,
         ).open()
       )
     );
-    menu.addItem(
-      (item) => item.setTitle(t("ui.aim_create_map")).setIcon("route").onClick(() => this.openAimStart())
-    );
+    if (aimEnabled())
+      menu.addItem(
+        (item) => item.setTitle(t("ui.aim_create_map")).setIcon("route").onClick(() => this.openAimStart())
+      );
     menu.showAtMouseEvent(event);
   }
   /** Research coverage is the map's headline fact: how much of the frontier already has a conclusion. */
@@ -53456,7 +53474,7 @@ ${request.requirements}` : preset.text,
   renderAimPendingCards(shown) {
     var _a2;
     const progress = this.aimProgress;
-    if (!progress || !this.aimBusy || !this.stageEl || !((_a2 = this.map) == null ? void 0 : _a2.aim)) return;
+    if (!progress || !this.aimBusy || !this.stageEl || !aimEnabled() || !((_a2 = this.map) == null ? void 0 : _a2.aim)) return;
     const branch = this.map.aim.branches.find((item) => item.id === progress.branchId);
     const question = branch && shown.find((node) => node.id === branch.questionNodeId);
     if (!branch || !question) return;
@@ -53883,7 +53901,7 @@ ${request.requirements}` : preset.text,
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
   openMerge() {
     var _a2, _b2, _c, _d;
-    if (!this.map || this.map.aim || this.mergeOpen || !this.selection.state.multiSelected.size) return;
+    if (!this.map || this.aimLive() || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     if (this.mergeTasks.has(this.path)) {
       new import_obsidian34.Notice(t("ui.merge_locked"));
       return;
@@ -54189,7 +54207,7 @@ ${request.requirements}` : preset.text,
     const stale = () => {
       throw new Error(t("ui.merge_draft_stale"));
     };
-    if (this.closed || !this.map || this.map.aim || this.path !== snapshot.path || this.map.id !== snapshot.mapId) {
+    if (this.closed || !this.map || this.aimLive() || this.path !== snapshot.path || this.map.id !== snapshot.mapId) {
       if (content) stale();
       return;
     }
@@ -54441,7 +54459,7 @@ ${request.requirements}` : preset.text,
   removeByKey(node) {
     var _a2, _b2, _c, _d;
     const map = this.map;
-    if (!map || map.aim) return;
+    if (!map || this.aimLive(map)) return;
     if (map.nodes.some((item) => item.parentId === node.id)) {
       this.confirmRemoveNode(node);
       return;
@@ -54468,7 +54486,7 @@ ${request.requirements}` : preset.text,
   }
   /** The delete confirmation. `hooks` lets a caller run the chosen removal itself and hear about a cancel. */
   confirmRemoveNode(node, hooks = {}) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     if (!this.mergeUnlocked(this.branchIds(node.id))) {
       (_a2 = hooks.dismissed) == null ? void 0 : _a2.call(hooks);
       return;
@@ -54479,7 +54497,7 @@ ${request.requirements}` : preset.text,
       t("ui.remove_from_map"),
       t("ui.the_note_will_move_to_this_topic_s_unassigned_folder_you_can"),
       [
-        ...!((_c = this.map) == null ? void 0 : _c.aim) || node.aimKind !== "question" ? [
+        ...!this.aimLive() || node.aimKind !== "question" ? [
           {
             label: t("ui.remove_only_this_node_children_become_roots"),
             warning: true,
@@ -54497,8 +54515,7 @@ ${request.requirements}` : preset.text,
   }
   /** Free images only change on a map the user may edit: not AIM, not while picking topics. */
   canEditCanvasItems() {
-    var _a2;
-    return !this.selection.state.multiSelectMode && !((_a2 = this.map) == null ? void 0 : _a2.aim);
+    return !this.selection.state.multiSelectMode && !this.aimLive();
   }
   /**
    * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
@@ -54979,7 +54996,7 @@ ${request.requirements}` : preset.text,
    */
   async promoteTextNode(id) {
     var _a2, _b2, _c;
-    if (!this.map || !this.canEditText() || this.map.aim) return;
+    if (!this.map || !this.canEditText() || this.aimLive()) return;
     const text11 = ((_a2 = this.map.canvasItems) != null ? _a2 : []).find((item) => item.kind === "text" && item.id === id);
     if (!text11) return;
     const parent = (_b2 = this.map.nodes.find((node) => node.id === text11.parentId)) != null ? _b2 : null;
@@ -55179,7 +55196,7 @@ ${request.requirements}` : preset.text,
   // ---- Summary brackets (summary-bracket plan, decisions #1, #2, #4) -------------------------------------------------
   /** Brackets change on a map the user may edit (topic selection mode included, where they are created), never while presenting. */
   canEditSummary() {
-    return !!this.map && !this.map.aim && !this.presentation;
+    return !!this.map && !this.aimLive() && !this.presentation;
   }
   /** The rectangles of the cards drawn for a run of siblings and everything shown under them; null when none is drawn (folded away). */
   summaryGeometry(parentId, range, text11) {
@@ -55548,7 +55565,7 @@ ${request.requirements}` : preset.text,
   }
   /** Frames the given topics (ids that are cards of this map, deduplicated) with an optional label; one undo step. Returns the new id. */
   async addBoundary(ids, label) {
-    if (!this.map || this.map.aim) return null;
+    if (!this.map || this.aimLive()) return null;
     const known = new Set(this.map.nodes.map((node) => node.id)), members = [...new Set(ids)].filter((id2) => known.has(id2));
     if (!members.length) return null;
     const id = `frame-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, text11 = label.trim();
@@ -55564,7 +55581,7 @@ ${request.requirements}` : preset.text,
   /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
   openAddBoundary() {
     const ids = [...this.selection.state.multiSelected];
-    if (!this.map || this.map.aim || !ids.length) return;
+    if (!this.map || this.aimLive() || !ids.length) return;
     new NameModal(
       this.app,
       t("ui.canvas_boundary_name"),
@@ -55890,12 +55907,12 @@ ${request.requirements}` : preset.text,
         const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
         const menu2 = this.newMenu(cardId);
         const topic = ids.length === 1 ? (_d = this.map) == null ? void 0 : _d.nodes.find((item) => item.id === cardId) : void 0;
-        const single = topic && !topic.aimKind && !this.selection.state.multiSelectMode ? topic : void 0;
+        const single = topic && !isAimNode(topic) && !this.selection.state.multiSelectMode ? topic : void 0;
         if (single) this.addCardMenuActions(menu2, single);
         menu2.addItem(
           (item) => item.setTitle(t("ui.summary_add")).setIcon("brackets").onClick(() => this.addSummaryOver(ids))
         );
-        if (topic && !topic.aimKind)
+        if (topic && !isAimNode(topic))
           menu2.addItem(
             (item) => item.setTitle(t("ui.note_style_menu")).setIcon("palette").onClick(() => void this.chooseTopicStyle(topic))
           );
@@ -56122,7 +56139,7 @@ ${request.requirements}` : preset.text,
   assertAimReferencesRemain(map, ids, moving = false, removableQuestionNodeIds = /* @__PURE__ */ new Set()) {
     var _a2, _b2, _c;
     const data = map.aim;
-    if (!data) return;
+    if (!data || !aimEnabled()) return;
     const protectedIds = /* @__PURE__ */ new Set();
     const removableBranchIds = new Set(
       data.branches.filter((branch) => removableQuestionNodeIds.has(branch.questionNodeId)).map((branch) => branch.id)
@@ -56152,7 +56169,7 @@ ${request.requirements}` : preset.text,
   removeAimReferences(map, removedNodeIds, originalNodes = map.nodes) {
     var _a2, _b2, _c;
     const data = map.aim;
-    if (!data) return;
+    if (!data || !aimEnabled()) return;
     for (const question of originalNodes.filter((node) => removedNodeIds.has(node.id) && node.aimQuestion)) {
       const parent = map.nodes.find((node) => node.id === question.parentId && !removedNodeIds.has(node.id));
       if (parent)
@@ -56343,8 +56360,7 @@ ${request.requirements}` : preset.text,
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   clipboardReadOnly() {
-    var _a2;
-    return this.selection.state.multiSelectMode || !!((_a2 = this.map) == null ? void 0 : _a2.aim) || this.outlineImportTarget().map !== "editable";
+    return this.selection.state.multiSelectMode || !!this.aimLive() || this.outlineImportTarget().map !== "editable";
   }
   copyToClipboard(event, mode) {
     var _a2, _b2, _c;
@@ -57116,7 +57132,7 @@ ${request.requirements}` : preset.text,
     add(t("ui.export_svg_download"), "download", "svg", "download");
     add(t("ui.export_md_vault"), "file-down", "md", "vault");
     add(t("ui.export_md_download"), "download", "md", "download");
-    if (this.map && !this.map.aim) {
+    if (this.map && !this.aimLive()) {
       menu.addSeparator();
       menu.addItem(
         (item) => item.setTitle(t("ui.export_share_html")).setIcon("globe").onClick(() => this.plugin.openShare(this))
@@ -57465,7 +57481,7 @@ ${request.requirements}` : preset.text,
   mapCommand(action, checking) {
     const map = this.map;
     if (!map || this.closed) return false;
-    const editable = !map.aim && !this.presentation && !this.selection.state.multiSelectMode;
+    const editable = !this.aimLive(map) && !this.presentation && !this.selection.state.multiSelectMode;
     const selected = map.nodes.find((node) => node.id === this.selection.state.selected);
     const note = selected ? this.notes.get(selected.id) : void 0;
     const run = (applies, work) => {
@@ -57515,7 +57531,8 @@ ${request.requirements}` : preset.text,
       });
     };
     if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
-    if (this.map && !this.map.aim) add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
+    if (this.map && !this.aimLive())
+      add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
     menu.addSeparator();
     add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
@@ -57541,7 +57558,7 @@ ${request.requirements}` : preset.text,
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).some((leaf) => {
       var _a2;
       const view = leaf.view;
-      if (!(view instanceof _VisualAgentMapView) || view.path !== path || !((_a2 = view.map) == null ? void 0 : _a2.aim)) return false;
+      if (!(view instanceof _VisualAgentMapView) || view.path !== path || !aimEnabled() || !((_a2 = view.map) == null ? void 0 : _a2.aim)) return false;
       return view.aimBusy || view.map.aim.runs.some((run) => {
         const attempt = run.attempts.find((item) => item.id === run.currentAttemptId);
         return (attempt == null ? void 0 : attempt.status) === "running" || (attempt == null ? void 0 : attempt.status) === "saving";
@@ -57754,7 +57771,7 @@ ${request.requirements}` : preset.text,
     this.paint();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -57810,7 +57827,7 @@ ${request.requirements}` : preset.text,
     switcher.createSpan({ text: (_j = (_i = this.map) == null ? void 0 : _i.title) != null ? _j : "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
     (0, import_obsidian34.setIcon)(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switcher.addEventListener("click", () => this.openMapSwitcher());
-    if (this.map && !this.map.aim && this.map.nodes.length) this.renderResearchProgress(toolbar);
+    if (this.map && !this.aimLive() && this.map.nodes.length) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
@@ -57839,7 +57856,7 @@ ${request.requirements}` : preset.text,
       );
     }
     const selectedNode = (_k = this.map) == null ? void 0 : _k.nodes.find((node) => node.id === this.selection.state.selected);
-    if ((_l = this.map) == null ? void 0 : _l.aim) {
+    if (aimEnabled() && ((_l = this.map) == null ? void 0 : _l.aim)) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
       const data = this.map.aim;
@@ -57908,7 +57925,7 @@ ${request.requirements}` : preset.text,
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if ((_v = this.map) == null ? void 0 : _v.aim) {
+    if (aimEnabled() && ((_v = this.map) == null ? void 0 : _v.aim)) {
       const data = this.map.aim;
       const isAnswered = (node) => data.branches.some((branch) => branch.questionNodeId === node.id);
       const pending2 = this.map.nodes.find((node) => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -58015,19 +58032,20 @@ ${request.requirements}` : preset.text,
         this.button(actions, t("ui.repair_agent_workspace"), () => this.enqueue(() => this.plugin.repairWorkspace()));
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
-      this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
+      if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
       if ((_y = this.deletedMap) == null ? void 0 : _y.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
     }
-    if (!this.map.aim) this.renderMultiResearchStatus(this.contentEl);
-    if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
-    if (!this.map.aim) this.renderBackgroundBars(this.contentEl);
+    if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
+    if (!this.aimLive()) this.renderRelevanceStatus(this.contentEl);
+    if (!this.aimLive()) this.renderBackgroundBars(this.contentEl);
     if (!this.map.nodes.length) {
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    this.renderMapTools(tools);
+    if (((_z = this.map) == null ? void 0 : _z.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
+    else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
     this.viewportEl = canvas.createDiv("vam-viewport");
@@ -58109,7 +58127,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_z = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _z.focus({ preventScroll: true });
+        (_A = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _A.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -58118,9 +58136,9 @@ ${request.requirements}` : preset.text,
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_A = this.stageEl.querySelector(
+        (_B = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _A.focus({ preventScroll: true });
+        )) == null ? void 0 : _B.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -58144,10 +58162,10 @@ ${request.requirements}` : preset.text,
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   emptyCanvasState() {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     const chat = this.chat;
-    if (!chat || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return "idle";
-    if (chat.awaitingConsent || chat.isBusy && chat.stageKind === "preparing" && ((_c = (_b2 = this.plugin).usageNoticePending) == null ? void 0 : _c.call(_b2, this.plugin.settings.cliModel)))
+    if (!chat || this.aimLive()) return "idle";
+    if (chat.awaitingConsent || chat.isBusy && chat.stageKind === "preparing" && ((_b2 = (_a2 = this.plugin).usageNoticePending) == null ? void 0 : _b2.call(_a2, this.plugin.settings.cliModel)))
       return "consent";
     if (chat.isBusy || this.chatApplying) return "building";
     return chat.pendingPlan() ? "plan" : "idle";
@@ -58172,7 +58190,9 @@ ${request.requirements}` : preset.text,
       return;
     }
     box.createSpan({
-      text: t(this.map.aim ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first")
+      text: t(
+        this.aimLive() ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first"
+      )
     });
   }
   /**
@@ -58200,6 +58220,30 @@ ${request.requirements}` : preset.text,
     if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
     this.renderRelevanceGoalControl(tools);
   }
+  /**
+   * The same tools on an old AIM map while AIM is hidden: it is an ordinary map then. A separate method so renderMapTools keeps
+   * its AIM guard for the day AIM comes back (a source-text test pins that guard).
+   */
+  renderHiddenAimMapTools(tools) {
+    if (!this.map) return;
+    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
+      "mod-cta"
+    );
+    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
+      "vam-topic-more"
+    );
+    if (!this.map.nodes.length) return;
+    const integrate = this.button(
+      tools,
+      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
+      () => {
+        this.applySelectionChange(this.selection.toggleMultiSelect());
+      }
+    );
+    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
+    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    this.renderRelevanceGoalControl(tools);
+  }
   /** The chat started or ended something: an empty canvas follows it. */
   refreshEmptyMap() {
     const box = this.emptyMapEl;
@@ -58209,7 +58253,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -58397,28 +58441,28 @@ ${request.requirements}` : preset.text,
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
     const pendingCount = (_u = (_t = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _t.length) != null ? _u : 0;
-    if (pendingCount && !this.selection.state.multiSelectMode && !((_v = this.map) == null ? void 0 : _v.aim))
+    if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(
         header,
         t("ui.view_0_expansion_suggestions", pendingCount),
         () => this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
-    if (note && note.researchMode === "local" && !this.selection.state.multiSelectMode && !((_w = this.map) == null ? void 0 : _w.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
+    if (note && note.researchMode === "local" && !this.selection.state.multiSelectMode && !this.aimLive() && !isAimNode(node) && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
       this.button(header, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
         "aria-label",
         t("ui.rerun_standard_0", note.title)
       );
-    if ((note == null ? void 0 : note.status) === "error" && !this.selection.state.multiSelectMode && !node.aimKind && !active && !queued && !research && !merging)
+    if ((note == null ? void 0 : note.status) === "error" && !this.selection.state.multiSelectMode && !isAimNode(node) && !active && !queued && !research && !merging)
       this.renderOtherProviderButton(header, [node]);
     const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.selection.state.multiSelectMode && !((_x = this.map) == null ? void 0 : _x.aim))
+    if (waitingOutline && waitingOutline.mapPath === this.path && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(
         header,
         t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length),
         () => this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !((_y = this.map) == null ? void 0 : _y.aim)) {
+    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !this.aimLive()) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -58448,7 +58492,7 @@ ${request.requirements}` : preset.text,
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
     if (!this.selection.state.multiSelectMode) {
-      if (!((_z = this.map) == null ? void 0 : _z.aim)) {
+      if (!this.aimLive()) {
         const structure2 = this.button(
           tools,
           t("ui.node_tool_links"),
@@ -58478,13 +58522,13 @@ ${request.requirements}` : preset.text,
           select.addClass("vam-node-tool", "vam-select-subtopics-tool");
           select.setAttr("aria-label", t("ui.select_subtopics_hint"));
         }
-        if (this.canEditText() && !node.aimKind)
+        if (this.canEditText() && !isAimNode(node))
           this.button(tools, t("ui.text_node_add"), () => this.whenEditing(() => this.addTextNodeUnder(node))).addClass(
             "vam-node-tool",
             "vam-add-text-tool"
           );
       }
-      if (node.aimKind === "question") {
+      if (aimEnabled() && ((_v = this.map) == null ? void 0 : _v.aim) && node.aimKind === "question") {
         const remove = this.button(
           tools,
           t("ui.node_tool_remove"),
@@ -58493,7 +58537,7 @@ ${request.requirements}` : preset.text,
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
-      if (((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -58505,7 +58549,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (((_B = this.map) == null ? void 0 : _B.aim) && assumptions.length) {
+      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -58517,7 +58561,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (((_C = this.map) == null ? void 0 : _C.aim) && node.aimKind === "conclusion") {
+      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -58531,35 +58575,35 @@ ${request.requirements}` : preset.text,
     const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.selection.state.multiSelectMode && !((_D = this.map) == null ? void 0 : _D.aim))
+    if (!this.selection.state.multiSelectMode && !this.aimLive())
       this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openNextStep(node))).addClass(
         "vam-node-tool",
         "vam-ai-explore"
       );
-    if (!this.selection.state.multiSelectMode && !((_E = this.map) == null ? void 0 : _E.aim)) {
+    if (!this.selection.state.multiSelectMode && !this.aimLive()) {
       const add = this.button(card, "+", () => this.whenEditing(() => this.enqueue(() => this.addNode(node))));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const title = card.createEl("h3", { text: (_F = note == null ? void 0 : note.title) != null ? _F : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_G = note == null ? void 0 : note.title) != null ? _G : node.path);
+    const title = card.createEl("h3", { text: (_z = note == null ? void 0 : note.title) != null ? _z : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_A = note == null ? void 0 : note.title) != null ? _A : node.path);
     title.setAttr("dir", "auto");
-    if (note && !this.selection.state.multiSelectMode && !((_H = this.map) == null ? void 0 : _H.aim))
+    if (note && !this.selection.state.multiSelectMode && !this.aimLive())
       card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node, note.title));
-    if ((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary)
+    if ((_B = research == null ? void 0 : research.preview) == null ? void 0 : _B.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_J = note == null ? void 0 : note.summary) != null ? _J : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_K = note == null ? void 0 : note.summary) != null ? _K : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_C = note == null ? void 0 : note.summary) != null ? _C : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_D = note == null ? void 0 : note.summary) != null ? _D : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && ((_L = this.map) == null ? void 0 : _L.aim)) {
+    if (node.aimKind === "conclusion" && aimEnabled() && ((_E = this.map) == null ? void 0 : _E.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -58572,7 +58616,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && ((_M = this.map) == null ? void 0 : _M.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && aimEnabled() && ((_F = this.map) == null ? void 0 : _F.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -58608,11 +58652,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && ((_N = this.map) == null ? void 0 : _N.aim)) {
+    if (node.aimKind === "question" && aimEnabled() && ((_G = this.map) == null ? void 0 : _G.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_P = (_O = node.aimQuestion) == null ? void 0 : _O.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _P : branch.answerSnapshot.selections;
+        const labels = (_I = (_H = node.aimQuestion) == null ? void 0 : _H.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _I : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -58655,11 +58699,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
+    if (node.aimKind === "answer" && aimEnabled() && ((_J = this.map) == null ? void 0 : _J.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_S = (_R = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
+        const labels = (_L = (_K = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _K.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _L : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -58668,7 +58712,7 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node);
-    if (!this.selection.state.multiSelectMode && !((_T = this.map) == null ? void 0 : _T.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !this.aimLive() && !isAimNode(node)) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -58685,7 +58729,7 @@ ${request.requirements}` : preset.text,
       if (this.plugin.detailsShown()) this.openDetails(node);
     });
     card.addEventListener("keydown", (event) => {
-      var _a3, _b3, _c2, _d2;
+      var _a3, _b3, _c2;
       if (event.target !== card) return;
       const target = this.keyboardNeighbor(node, event.key);
       if (target) {
@@ -58693,7 +58737,7 @@ ${request.requirements}` : preset.text,
         this.moveKeyboardFocus(target);
         return;
       }
-      const editable = !this.selection.state.multiSelectMode && !((_a3 = this.map) == null ? void 0 : _a3.aim);
+      const editable = !this.selection.state.multiSelectMode && !this.aimLive();
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -58710,12 +58754,12 @@ ${request.requirements}` : preset.text,
         if (event.key === "Enter" && event.shiftKey && plain) {
           if (event.defaultPrevented) return;
           event.preventDefault();
-          const parent = (_c2 = (_b3 = this.map) == null ? void 0 : _b3.nodes.find((item) => item.id === node.parentId)) != null ? _c2 : null;
+          const parent = (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.parentId)) != null ? _b3 : null;
           this.whenEditing(() => this.enqueue(() => this.addNode(parent)));
           return;
         }
       }
-      if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !((_d2 = this.map) == null ? void 0 : _d2.aim)) {
+      if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !this.aimLive()) {
         if (event.defaultPrevented) return;
         event.preventDefault();
         this.renameNode(node, note.title);
@@ -58726,7 +58770,7 @@ ${request.requirements}` : preset.text,
           this.applySelectionChange(this.selection.toggleByEnter(node.id));
         } else {
           this.selectMapNode(node);
-          if (node.aimKind === "question") this.openAimAnswer(node);
+          if (aimEnabled() && ((_c2 = this.map) == null ? void 0 : _c2.aim) && node.aimKind === "question") this.openAimAnswer(node);
           else this.openDetails(node);
         }
       }
@@ -59041,7 +59085,7 @@ ${request.requirements}` : preset.text,
   }
   /** Hypothesis and evidence features exist on ordinary maps only: not AIM. */
   relationsEnabled() {
-    return !!this.map && !this.map.aim;
+    return !!this.map && !this.aimLive();
   }
   isHypothesis(id) {
     var _a2;
@@ -59051,14 +59095,14 @@ ${request.requirements}` : preset.text,
   topicKindOf(id) {
     var _a2, _b2, _c;
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
-    if (!this.relationsEnabled() || !node || node.aimKind) return "topic";
+    if (!this.relationsEnabled() || !node || isAimNode(node)) return "topic";
     return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.topicKind) != null ? _c : "topic";
   }
   /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
   hypothesisStrengthOf(id) {
     var _a2, _b2, _c;
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
-    if (!this.relationsEnabled() || !node || node.aimKind || !this.isHypothesis(id)) return void 0;
+    if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return void 0;
     return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.hypothesisStrength) != null ? _c : "weak";
   }
   hypothesisTagText(strength) {
@@ -59350,10 +59394,16 @@ ${request.requirements}` : preset.text,
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot() {
     if (!this.map || !this.path) return "none";
-    if (this.map.aim || this.map.nodes.some((node) => node.aimKind !== void 0)) return "aim";
+    if (aimEnabled() && (this.map.aim || this.map.nodes.some((node) => node.aimKind !== void 0))) return "aim";
     if (!this.map.nodes.length) return "empty";
+    const copy = JSON.parse(JSON.stringify(this.map));
+    if (!aimEnabled() && copy.aim) {
+      const superseded = supersededAimNodeIds(copy);
+      delete copy.aim;
+      copy.nodes = copy.nodes.filter((node) => !superseded.has(node.id)).map((node) => withoutAimFields(node));
+    }
     return {
-      map: JSON.parse(JSON.stringify(this.map)),
+      map: copy,
       notes: new Map(this.notes),
       ...this.relevanceGoal ? { goal: this.relevanceGoal } : {},
       mapPath: this.path
@@ -60025,7 +60075,7 @@ ${request.requirements}` : preset.text,
   }
   /** Sets a topic's type: the note's `topic-kind` and Map.md (viewport only) in one undoable step. Id, parent and relations are not touched. */
   async changeTopicKind(node, kind) {
-    if (!this.map || !this.relationsEnabled() || node.aimKind || this.topicKindOf(node.id) === kind) return;
+    if (!this.map || !this.relationsEnabled() || isAimNode(node) || this.topicKindOf(node.id) === kind) return;
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeTopicKind(path, kind)).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
@@ -60314,7 +60364,7 @@ ${request.requirements}` : preset.text,
   }
   /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
   renderAddSubtopic(actions, node, close) {
-    if (!this.relationsEnabled() || node.aimKind) return;
+    if (!this.relationsEnabled() || isAimNode(node)) return;
     const addChild = actions.createEl("button", { text: t("ui.add_subtopic_menu"), cls: "vam-add-subtopic" });
     addChild.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -60382,7 +60432,7 @@ ${request.requirements}` : preset.text,
   }
   /** Markers can be edited only on an ordinary editable map: not an AIM map or the select mode. */
   markersEditable(node) {
-    return this.relationsEnabled() && !node.aimKind && !this.selection.state.multiSelectMode;
+    return this.relationsEnabled() && !isAimNode(node) && !this.selection.state.multiSelectMode;
   }
   /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
   renderMarkerSection(panel, node) {
@@ -60428,7 +60478,7 @@ ${request.requirements}` : preset.text,
   /** The directions this branch may take of its own: those the parse keeps (never the one opposite its parent's). */
   branchLayoutChoices(node) {
     const map = this.map;
-    if (!map || map.aim || !node.parentId) return [];
+    if (!map || this.aimLive(map) || !node.parentId) return [];
     const mapDirection = layoutOf(map).direction;
     if (!allowsBranchLayout(mapDirection)) return [];
     return BRANCH_DIRECTIONS.filter((direction) => {
@@ -60443,7 +60493,7 @@ ${request.requirements}` : preset.text,
   /** One undo step: sets or clears this branch's own arrangement (null follows the map), then re-arranges. */
   async changeBranchLayout(node, direction) {
     var _a2;
-    if (!this.map || this.map.aim) return;
+    if (!this.map || this.aimLive()) return;
     const latest = this.map.nodes.find((item) => item.id === node.id);
     if (!latest) return;
     if (direction && !this.branchLayoutChoices(latest).includes(direction)) return;
@@ -60808,11 +60858,11 @@ ${request.requirements}` : preset.text,
    * Locking first stops the AI runs on them; their late results are fenced at write time. Not on AIM maps.
    */
   async setAiLock(nodes, locked) {
-    if (!this.map || this.map.aim) return;
+    if (!this.map || this.aimLive()) return;
     const targets = nodes.filter(
       (node) => {
         var _a2;
-        return !node.aimKind && !!this.notes.get(node.id) && ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true !== locked;
+        return !isAimNode(node) && !!this.notes.get(node.id) && ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true !== locked;
       }
     );
     if (!targets.length) return;
@@ -60833,11 +60883,11 @@ ${request.requirements}` : preset.text,
    * the rest otherwise, in one undo step. Not on AIM maps.
    */
   renderAiLockSelectionButton(selection) {
-    if (!this.map || this.map.aim) return;
+    if (!this.map || this.aimLive()) return;
     const nodes = [...this.selection.state.multiSelected].map((id) => {
       var _a2;
       return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === id);
-    }).filter((node) => !!node && !node.aimKind && !!this.notes.get(node.id));
+    }).filter((node) => !!node && !isAimNode(node) && !!this.notes.get(node.id));
     const locked = nodes.filter((node) => {
       var _a2;
       return ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
@@ -60859,7 +60909,7 @@ ${request.requirements}` : preset.text,
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
   renderAiLockSection(panel, node) {
     var _a2;
-    if (!this.map || this.map.aim || node.aimKind || this.selection.state.multiSelectMode) return;
+    if (!this.map || this.aimLive() || isAimNode(node) || this.selection.state.multiSelectMode) return;
     const section3 = panel.createDiv("vam-inspector-section vam-ai-lock-section");
     section3.createEl("strong", { text: t("ui.ai_lock"), cls: "vam-topic-tree-heading vam-section-heading" });
     const group = section3.createDiv("vam-topic-markers vam-choice-group");
@@ -60894,7 +60944,7 @@ ${request.requirements}` : preset.text,
       cardAiLockButtons.delete(card);
       delete card.dataset.aiLocked;
     }
-    if (!this.map || this.map.aim || node.aimKind || ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) !== true) return;
+    if (!this.map || this.aimLive() || isAimNode(node) || ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) !== true) return;
     card.dataset.aiLocked = "true";
     const button = header.createEl("button", { cls: "vam-card-ai-lock" });
     cardAiLockButtons.set(card, button);
@@ -61013,7 +61063,7 @@ ${request.requirements}` : preset.text,
   async changeTopicColor(node, color2, branch = false) {
     if (!this.map || !this.markersEditable(node)) return;
     const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
-    const targets = ids.map((id) => this.map.nodes.find((item) => item.id === id)).filter((item) => !!item && !item.aimKind && !!this.notes.get(item.id)).filter((item) => {
+    const targets = ids.map((id) => this.map.nodes.find((item) => item.id === id)).filter((item) => !!item && !isAimNode(item) && !!this.notes.get(item.id)).filter((item) => {
       var _a2;
       return ((_a2 = TOPIC_COLORS.find((id) => {
         var _a3;
@@ -61122,7 +61172,7 @@ ${request.requirements}` : preset.text,
     if (!this.map || !this.markersEditable(node)) return;
     const wanted = readTopicStyle({ "topic-style": styles });
     const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
-    const targets = ids.map((id) => this.map.nodes.find((item) => item.id === id)).filter((item) => !!item && !item.aimKind && !!this.notes.get(item.id)).filter((item) => this.styleOf(item.id).join() !== wanted.join());
+    const targets = ids.map((id) => this.map.nodes.find((item) => item.id === id)).filter((item) => !!item && !isAimNode(item) && !!this.notes.get(item.id)).filter((item) => this.styleOf(item.id).join() !== wanted.join());
     if (!targets.length) return;
     const viewport = clone(this.map.viewport);
     let transaction = this.beginMapTransaction();
@@ -61139,7 +61189,7 @@ ${request.requirements}` : preset.text,
   }
   /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
   renderHypothesisSection(panel, node, close) {
-    if (!this.relationsEnabled() || node.aimKind) return;
+    if (!this.relationsEnabled() || isAimNode(node)) return;
     const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section3.createDiv("vam-hypothesis-body");
     const editByPair = /* @__PURE__ */ new Map();
@@ -61714,7 +61764,7 @@ ${request.requirements}` : preset.text,
     return `multi-research:${this.path}`;
   }
   openMultiResearch(retryBatchKey) {
-    if (!this.map || this.map.aim || !this.selection.state.multiSelected.size) return;
+    if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const shown = [...this.selection.state.multiSelected].flatMap((id) => {
       const note = this.notes.get(id);
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
@@ -61737,7 +61787,7 @@ ${request.requirements}` : preset.text,
    * topics that were counted, and how many of those made none.
    */
   async startMultiResearch(request, retryBatchKey, onSettled) {
-    if (!this.map || this.map.aim || !this.selection.state.multiSelected.size) return;
+    if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const key2 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key2)) {
       new import_obsidian34.Notice(t("ui.multi_research_already_running"));
@@ -61868,7 +61918,7 @@ ${request.requirements}` : preset.text,
   }
   /** Failed topics of a finished batch that still exist on the current map. */
   retryableFailures(batch) {
-    if (batch.status === "running" || !this.map || this.map.aim) return [];
+    if (batch.status === "running" || !this.map || this.aimLive()) return [];
     return batch.failedPaths.map((path) => this.map.nodes.find((node) => node.path === path)).filter((node) => !!node);
   }
   renderRetryFailedButton(parent, batchKey, batch) {
@@ -61897,8 +61947,7 @@ ${request.requirements}` : preset.text,
   }
   /** "Retry with <other provider>": only when {@link otherProviderTarget} has one. Never an automatic switch. */
   renderOtherProviderButton(parent, nodes, retryBatchKey) {
-    var _a2;
-    if ((_a2 = this.map) == null ? void 0 : _a2.aim) return;
+    if (this.aimLive()) return;
     const target = this.otherProviderTarget(nodes);
     if (!target) return;
     this.button(
@@ -61954,7 +62003,7 @@ ${request.requirements}` : preset.text,
     }
   }
   renderSelectionBar(workspace) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2;
     const selection = workspace.createDiv("vam-selection-bar");
     const names3 = [...this.selection.state.multiSelected].map((id) => {
       var _a3;
@@ -61984,14 +62033,14 @@ ${request.requirements}` : preset.text,
       () => this.confirmRemoveSelected(),
       !this.selection.state.multiSelected.size
     );
-    if (!((_a2 = this.map) == null ? void 0 : _a2.aim))
+    if (!this.aimLive())
       this.button(
         selection,
         t("ui.canvas_boundary_add"),
         () => this.openAddBoundary(),
         !this.selection.state.multiSelected.size
       );
-    if (!((_b2 = this.map) == null ? void 0 : _b2.aim)) {
+    if (!this.aimLive()) {
       const check = this.summaryEntryCheck(this.summaryTargets()), bracket = this.button(selection, t("ui.summary_add"), () => this.addSummaryOver());
       if (!check.ok) {
         bracket.setAttr("aria-disabled", "true");
@@ -62015,7 +62064,7 @@ ${request.requirements}` : preset.text,
     const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
     synthesize.addClass("mod-cta");
     if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
-    if (!((_c = this.map) == null ? void 0 : _c.aim)) {
+    if (!this.aimLive()) {
       const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
       if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
       if (!check.ok) {
@@ -62023,8 +62072,8 @@ ${request.requirements}` : preset.text,
         merge.setAttr("title", t(check.reason));
       }
     }
-    if (!((_d = this.map) == null ? void 0 : _d.aim)) {
-      const running = ((_e = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _e.status) === "running";
+    if (!this.aimLive()) {
+      const running = ((_a2 = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _a2.status) === "running";
       const research = this.button(
         selection,
         t("ui.multi_research"),
@@ -63350,7 +63399,7 @@ ${note.detail.trim()}` : "",
   /** Whether the opening screen is showing: nothing said yet, and an empty map (not an AIM one) the user did not ask to start blank. */
   chatHero() {
     if (!this.chat || this.chat.hasMessages || !this.map || this.blankMapPaths.has(this.path)) return false;
-    return !this.map.aim && this.map.nodes.length === 0;
+    return !this.aimLive() && this.map.nodes.length === 0;
   }
   /** Mounts the panel where it belongs now: the opening screen's place, or the first child of the workspace. */
   placeChatPanel() {
@@ -63751,7 +63800,7 @@ ${note.detail.trim()}` : "",
         kind: this.topicKindOf(node.id),
         ...strength ? { strength } : {},
         // The appearance the card shows (whitelisted values only); the context leaves it out on an AIM map.
-        ...node.aimKind ? {} : {
+        ...isAimNode(node) ? {} : {
           color: (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.color,
           markers: (_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.markers,
           styles: (_c = this.notes.get(node.id)) == null ? void 0 : _c.style
@@ -64876,7 +64925,7 @@ ${note.detail.trim()}` : "",
       return id ? (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === id) : void 0;
     }).filter((node) => !!node);
     if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
-    const editable = nodes.filter((node) => !node.aimKind && this.notes.get(node.id));
+    const editable = nodes.filter((node) => !isAimNode(node) && this.notes.get(node.id));
     if (!editable.length) return skipped("ui.map_chat_skip_unavailable");
     if (editable.some((node) => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
     const skippedCards = new Set(action.nodeIds.map((id) => {
@@ -64928,7 +64977,7 @@ ${note.detail.trim()}` : "",
       return (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === id);
     });
     if (ends.some((node) => !node)) return skipped("ui.map_chat_skip_topic_gone");
-    if (ends.some((node) => node == null ? void 0 : node.aimKind)) return skipped("ui.map_chat_skip_unavailable");
+    if (ends.some((node) => isAimNode(node))) return skipped("ui.map_chat_skip_unavailable");
     const pair6 = (link2) => link2.from === fromId && link2.to === toId || link2.from === toId && link2.to === fromId;
     const link = {
       kind: action.kind === "add_relation" ? action.relationKind : "related",
@@ -64969,7 +65018,7 @@ ${note.detail.trim()}` : "",
       return id ? (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === id) : void 0;
     }).filter((node) => !!node);
     if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
-    const typed = nodes.filter((node) => !node.aimKind);
+    const typed = nodes.filter((node) => !isAimNode(node));
     if (!typed.length) return skipped("ui.map_chat_skip_unavailable");
     if (typed.some((node) => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
     const kind = action.topicKind;
@@ -65309,7 +65358,7 @@ ${note.detail.trim()}` : "",
     const fence = () => {
       if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
         return { reason: "ui.map_chat_images_stale_map" };
-      if (this.map.aim) return { reason: "ui.map_chat_images_stale_locked" };
+      if (this.aimLive()) return { reason: "ui.map_chat_images_stale_locked" };
       const node = this.map.nodes.find((candidate) => candidate.id === block.nodeId);
       if (!node) return { reason: "ui.map_chat_images_stale_gone" };
       if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
@@ -65592,7 +65641,7 @@ ${addition}` : addition });
   }
   /** Topic selection (remove, move, copy, synthesize, merge) exists only on editable, non-AIM maps. */
   canSelectTopics() {
-    return !!this.map && !this.map.aim;
+    return !!this.map && !this.aimLive();
   }
   /** Starts topic selection with exactly the card's direct subtopics picked (replacing any earlier selection). */
   selectSubtopics(node) {
@@ -66077,7 +66126,7 @@ ${addition}` : addition });
         }
       };
       const drop = (e, landed) => {
-        var _a3, _b3, _c2;
+        var _a3, _b3, _c2, _d;
         if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
         const putBack = () => {
@@ -66156,7 +66205,7 @@ ${addition}` : addition });
           this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {
           this.applySelectionChange(this.selection.click(node.id));
-          if (node.aimKind === "question") this.openAimAnswer(node);
+          if (aimEnabled() && ((_d = this.map) == null ? void 0 : _d.aim) && node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
         }
       };
@@ -66796,7 +66845,7 @@ ${addition}` : addition });
    */
   async chooseTopicStyle(node) {
     var _a2;
-    if (!this.map || this.map.aim || this.presentation || node.aimKind) return;
+    if (!this.map || this.aimLive() || this.presentation || isAimNode(node)) return;
     const path = node.path;
     const note = await this.plugin.repo.readNote(path, this.map);
     const refocus = () => {

@@ -25,6 +25,8 @@ export interface SceneCard {
   /** card-height: set only when the card is a fixed height that cuts its text; the last drawn line then ends with an ellipsis. Absent leaves the SVG unchanged. */
   clipped?: boolean;
   cover?: SceneImage | null;
+  /** The card's summary as the screen shows it: wrapped lines, the top-left of its box, and its font size. Absent: the card shows none. */
+  summary?: { lines: string[]; x: number; y: number; size?: number; textColor?: string };
   /** topic-cover-position bottom / left / right: the title's top-left as the card draws it. Absent: under the cover. */
   titleAt?: { x: number; y: number };
 }
@@ -232,6 +234,21 @@ export function buildMapSvg(scene: MapScene): string {
         `<text x="${left}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize ?? 13}"${titleWeight === undefined ? "" : ` font-weight="${titleWeight}"`} fill="${fill}">${escapeXml(line)}</text>`
       );
     });
+    const sum = card.summary;
+    const sumX = num(sum?.x);
+    const sumY = num(sum?.y);
+    if (sum && sumX !== null && sumY !== null) {
+      const sumSize = numberIn(sum.size, 8, 40) ?? 12;
+      const sumStep = Math.max(14, Math.round(sumSize * 1.5));
+      const sumLines = textLines(sum.lines).filter(line => line.length > 0);
+      const room = Math.max(0, Math.floor((box[1] + box[3] - 8 - sumY) / sumStep));
+      sumLines.slice(0, room).forEach((line, i, drawn) => {
+        const cut = i === drawn.length - 1 && drawn.length < sumLines.length ? "…" : "";
+        out.push(
+          `<text x="${sumX}" y="${sumY + sumSize + i * sumStep}" font-family="${FONT}" font-size="${sumSize}" fill="${color(sum.textColor, fill)}">${escapeXml(line + cut)}</text>`
+        );
+      });
+    }
     if (card.clipped === true) out.push("</svg>");
     out.push("</g>");
   }
@@ -280,21 +297,46 @@ export function buildMapSvg(scene: MapScene): string {
   return out.filter(Boolean).join("\n");
 }
 
-/** Lays a title out in lines no wider than `maxWidth` px (wide characters count 13, the rest 7). */
+/** Lays a title out in lines no wider than `maxWidth` px (wide characters count 13, the rest 7). A latin word moves whole to the next line; only a word wider than a line is cut, as the screen's `overflow-wrap: anywhere` does. */
 export function wrapText(text: string, maxWidth: number): string[] {
+  const WIDE = "\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef";
+  const wide = new RegExp(`[${WIDE}]`);
+  const tokens = new RegExp(`[${WIDE}]|\\s+|[^\\s${WIDE}]+`, "gu");
+  const widthOf = (token: string): number => Array.from(token).reduce((sum, ch) => sum + (wide.test(ch) ? 13 : 7), 0);
   const lines: string[] = [];
   for (const paragraph of String(text ?? "").split(/\r?\n/)) {
     let line = "";
     let used = 0;
-    for (const ch of Array.from(paragraph)) {
-      const w = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 7;
-      if (used + w > maxWidth && line) {
-        lines.push(line);
-        line = "";
-        used = 0;
+    const flush = (): void => {
+      lines.push(line);
+      line = "";
+      used = 0;
+    };
+    for (const token of paragraph.match(tokens) ?? []) {
+      const w = widthOf(token);
+      if (used + w <= maxWidth || (!line && w <= maxWidth)) {
+        line += token;
+        used += w;
+        continue;
       }
-      line += ch;
-      used += w;
+      if (w <= maxWidth) {
+        // Whitespace that would overflow stays at the line's end; a word starts the next line.
+        if (/^\s+$/.test(token)) {
+          line += token;
+          continue;
+        }
+        if (line) flush();
+        line = token;
+        used = w;
+        continue;
+      }
+      // A word wider than a whole line: cut it by character.
+      for (const ch of Array.from(token)) {
+        const cw = wide.test(ch) ? 13 : 7;
+        if (used + cw > maxWidth && line) flush();
+        line += ch;
+        used += cw;
+      }
     }
     lines.push(line);
   }

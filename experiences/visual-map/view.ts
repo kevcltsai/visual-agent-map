@@ -9707,6 +9707,25 @@ export class VisualAgentMapView extends ItemView {
         item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
         item.title = wrapText(title, titleEl.offsetWidth);
       }
+      // The summary the card shows (at most its clamp of lines) is drawn where the screen puts it.
+      const summaryEl = card.querySelector<HTMLElement>(".vam-card-summary");
+      const summaryText = (
+        summaryEl?.querySelector<HTMLElement>(".vam-card-preview-text") ?? summaryEl
+      )?.textContent?.trim();
+      if (summaryEl && summaryText && summaryEl.offsetWidth > 0) {
+        const summaryStyle = computed(summaryEl);
+        const clamp = parseInt(summaryStyle.getPropertyValue("-webkit-line-clamp"), 10);
+        const size = parseFloat(summaryStyle.fontSize);
+        const lines = wrapText(summaryText, summaryEl.offsetWidth);
+        item.summary = {
+          lines: Number.isFinite(clamp) && clamp > 0 ? lines.slice(0, clamp) : lines,
+          x: box.x + summaryEl.offsetLeft,
+          y: box.y + summaryEl.offsetTop,
+          size: Number.isFinite(size) && size > 0 ? Math.round((size * 13) / 15) : undefined,
+          textColor: colorOf(summaryStyle.color)
+        };
+        if (item.summary.lines.length < lines.length) item.summary.lines[item.summary.lines.length - 1] += "…";
+      }
       // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");

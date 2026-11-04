@@ -1390,6 +1390,10 @@ export const en = {
   "ui.map_chat_do_rate_0": "Prioritize topics by the goal “{0}”",
   "ui.map_chat_do_merge_0": "Merge the selected topics into “{0}”",
   "ui.map_chat_do_create_map_0": "Create the map “{0}”",
+  "ui.new_topic": "New topic",
+  "ui.untitled_mind_map": "Untitled mind map",
+  "ui.map_chat_do_rename_map_0": "Name this map “{0}”",
+  "ui.map_chat_skip_map_named": "you already named this map",
   "ui.map_chat_do_open_map_0": "Open the map “{0}”",
   "ui.map_chat_do_collapse_0": "Collapse “{0}”",
   "ui.map_chat_do_expand_topic_0": "Expand “{0}”",
@@ -1629,6 +1633,7 @@ export const en = {
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":
     "Auto uses Low for simple tasks and Medium for complex synthesis; manual choices are preserved.",
   "ui.stop_research": "Stop research",
+  "ui.stop_expand": "Stop expanding",
   "ui.research_stopped_existing_content_was_preserved": "Research stopped. Existing content was preserved.",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved":
     "The topic changed, so the outdated AI result was not saved.",

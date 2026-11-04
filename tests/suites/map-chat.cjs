@@ -4939,6 +4939,10 @@ const chat04Reply = h => [
   { kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs total darkness' },
   { kind: 'create_md_file', path: 'Notes/New/Plan.md', content: '# Plan\n' }
 ];
+const chat04Look = h => [
+  { kind: 'add_relation', fromId: h.ids.b, toId: h.ids.c, relationKind: 'supports' },
+  { kind: 'set_appearance', nodeIds: [h.ids.a], color: 'red', markers: ['flag-red'] }
+];
 const chat04State = async h => JSON.stringify({
   nodes: (await h.saved()).map(n => [n.id, n.parentId]).sort(),
   titles: await Promise.all(h.view.map.nodes.map(async n => (await h.repo.readNote(n.path)).title)),
@@ -4962,22 +4966,26 @@ integrationTest('chat 04: Undo takes a whole reply back (map, card notes, the ed
   assert.equal(await chat04State(h), after, 'redo puts the reply back');
   await h.view.travel(false); assert.equal(await chat04State(h), before, 'and it can be undone again');
 });
-for (const [what, change] of [
+for (const [what, change, ...rest] of [
   ['a card note the reply wrote', async h => h.repo.updateNote(h.node('a').path, { title: 'Edited by hand' })],
   ['the edited Markdown file', async h => h.app.vault.process(h.app.vault.getAbstractFileByPath('Notes/Research.md'), () => 'changed by hand\n')],
   ['the created Markdown file', async h => h.app.vault.process(h.app.vault.getAbstractFileByPath('Notes/New/Plan.md'), () => '# Plan\nmore\n')],
-  ['the map structure', async h => h.plugin.mutate(() => h.view.mapChange(map => { map.nodes.find(n => n.id === h.ids.b).collapsed = true; }))]
+  ['the map structure', async h => h.plugin.mutate(() => h.view.mapChange(map => { map.nodes.find(n => n.id === h.ids.b).collapsed = true; }))],
+  ['the appearance the reply set (changed by hand)', async h => h.repo.writeTopicAppearance(h.node('a').path, { color: 'blue' }), 'look'],
+  ['the relation the reply added (deleted by hand)', async h => h.plugin.mutate(() => h.view.removeRelation(h.view.map.topicRelations[0])), 'look']
 ])
   integrationTest(`chat 04: when ${what} changed after the reply, Undo refuses the whole step and touches nothing`, async () => {
     const h = await harness(); await h.view.hydrate();
-    await apply(h, chat04Reply(h), h.hashes('Notes/Research.md'));
+    const look = rest[0] === 'look';
+    await apply(h, look ? chat04Look(h) : chat04Reply(h), h.hashes('Notes/Research.md'));
     // A map change is its own newer step: undo it first would be the user's own; here the reply's step must be on top.
     const entry = h.view.history.undoEntry;
     await change(h); await h.view.hydrate();
     while (h.view.history.undoEntry !== entry) h.view.history.past.pop();
-    const changed = await chat04State(h); const files = JSON.stringify([...h.contents.entries()].sort());
+    const state = async () => JSON.stringify([await chat04State(h), (await h.repo.readMap(MAP)).topicRelations ?? [], (await h.note('a')).color ?? null]);
+    const changed = await state(); const files = JSON.stringify([...h.contents.entries()].sort());
     await assert.rejects(() => h.view.travel(false), /Files have changed since; this cannot be undone\./);
-    assert.equal(await chat04State(h), changed, 'nothing was undone, not even part of it');
+    assert.equal(await state(), changed, 'nothing was undone, not even part of it');
     assert.equal(JSON.stringify([...h.contents.entries()].sort()), files);
     assert.equal(h.view.history.undoEntry, entry, 'the step stays where it was');
   });
@@ -5230,6 +5238,32 @@ integrationTest('chat 07: a real send counts a beforeId under another parent as 
   assert.ok(resultTexts(h).includes('1 suggested changes were invalid and were ignored.'), resultTexts(h).join(' | '));
   eq(JSON.parse(h.control.requests[0].context.json).outline.map(n => n.id), [h.ids.root, h.ids.a, h.ids.c, h.ids.b]);
 });
+// Decision 2026-11-04 #5: the order the model is told and reorders is the order on screen, not the array order a manual move leaves.
+const dragTo = async (h, id, y) => { await h.plugin.mutate(() => h.view.mapChange(map => { map.nodes.find(n => n.id === id).y = y; }, false)); h.view.history.clear(); };
+const sentOutline = async h => { h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); const n = h.control.requests.length; h.open(); h.type('order?'); await h.view.sendMapChat(); await until(() => !h.view.chat.isBusy); return JSON.parse(h.control.requests[n].context.json).outline; };
+integrationTest('chat 07 / B2: after a manual drag (array order differs from the screen) the context lists the siblings in screen order', async () => {
+  const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
+  await dragTo(h, ids.Dusk, Math.min(...h.view.map.nodes.map(n => n.y)) - 200);
+  eq((await kidsOf(h, h.ids.root)), ['Body', 'Mind', 'Dawn', 'Noon', 'Dusk'], 'the array order is unchanged by a drag');
+  const outline = await sentOutline(h);
+  eq(outline.filter(n => n.parentId === h.ids.root).map(n => h.view.notes.get(n.id)?.title), ['Dusk', 'Body', 'Mind', 'Dawn', 'Noon']);
+});
+integrationTest('chat 07 / B2: after a plain move (moveTopic) the moved card is listed where it is drawn', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await h.plugin.mutate(() => h.view.moveTopic(h.view.map.nodes.find(n => n.id === h.ids.c), h.view.map.nodes.find(n => n.id === h.ids.root)));
+  const screen = h.view.map.nodes.filter(n => n.parentId === h.ids.root).sort((l, r) => l.y - r.y).map(n => n.id);
+  const outline = await sentOutline(h);
+  eq(outline.filter(n => n.parentId === h.ids.root).map(n => n.id), screen);
+});
+integrationTest('chat 07 / B2: "move Mind to the front" after a drag gives the screen order the user expects (Mind first), not the array order', async () => {
+  const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
+  await dragTo(h, ids.Dusk, Math.min(...h.view.map.nodes.map(n => n.y)) - 200);
+  // On screen Dusk is first, so "to the front" is in front of Dusk.
+  const lines = await apply(h, [{ kind: 'move_topic', nodeId: ids.Mind, newParentId: h.ids.root, beforeId: ids.Dusk }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const ys = (await h.saved()).filter(n => n.parentId === h.ids.root).sort((l, r) => l.y - r.y).map(n => h.view.notes.get(n.id)?.title);
+  eq(ys, ['Mind', 'Dusk', 'Body', 'Dawn', 'Noon'], 'screen order: Mind in front of Dusk, the rest as they were seen');
+});
 integrationTest('chat 07: in a timeline map a first-level topic is reordered along the axis, and Undo takes it back', async () => {
   const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
   await h.plugin.mutate(() => h.view.mapChange(map => { map.layout = { direction: 'timeline' }; h.view.arrangeAll(map); }, false));
@@ -5255,6 +5289,16 @@ integrationTest('chat 08: set_appearance sets colour, markers and styles on ever
     assert.equal(body(h.contents.get(h.node(key).path)), body(before[key]), 'the note body is not rewritten');
   }
   eq(await looksOf(h, 'c'), { color: null, markers: [], style: [] }, 'other cards are untouched');
+});
+integrationTest('chat 08 / L1: set_appearance counts the cards it could not touch (gone, or no note) as skipped in its line, while the others are set', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.notes.delete(h.ids.c);
+  const lines = await apply(h, [lookAct([h.ids.a, h.ids.c, 'no-such-card'], { color: 'red' })]);
+  eq(lines.map(l => l.status), ['done']); assert.match(lines[0].text, /^Done: Set the appearance of 3 topics/);
+  assert.match(lines[0].text, /2 topics skipped/, lines[0].text);
+  eq((await looksOf(h, 'a')).color, 'red');
+  const clean = await apply(h, [lookAct([h.ids.b], { color: 'red' })]);
+  assert.doesNotMatch(clean[0].text, /skipped/, 'no filtered card, nothing to count');
 });
 integrationTest('chat 08: a single-choice marker group keeps one value and the text size one choice, as in the panel', async () => {
   const h = await harness();

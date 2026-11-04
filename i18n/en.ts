@@ -1356,6 +1356,7 @@ export const en = {
     "Change the type of {0} to {1}, and rewrite each note to fit that type.",
   "ui.map_chat_kind_choice_topics_separator": ", ",
   "ui.map_chat_line_done_0": "Done: {0}",
+  "ui.map_chat_line_cards_skipped_0": " ({0} topics skipped: missing, AIM or without a note)",
   "ui.map_chat_line_skipped_0_1": "Skipped: {0} ({1})",
   "ui.map_chat_line_failed_0_1": "Failed: {0} ({1})",
   "ui.map_chat_do_add_child_0": "Add subtopic “{0}”",

@@ -81,7 +81,7 @@ import {
   type PresentationAction,
   type PresentationState
 } from "./presentation-mode";
-import { readingOrder } from "./presentation-order";
+import { alignSiblingsToScreen, bySiblingAxis, readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import {
   begin as beginTransaction,
@@ -787,7 +787,8 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
 }
 /** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
 type ChatOutcome =
-  { status: "done"; images?: MapChatImages } | { status: "skipped" | "failed"; reason: string; created?: boolean };
+  | { status: "done"; images?: MapChatImages; skippedCards?: number }
+  | { status: "skipped" | "failed"; reason: string; created?: boolean };
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 interface ChatRun {
   refs: Map<string, string>;
@@ -3764,6 +3765,21 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   /**
+   * `map.nodes` with every parent's children in on-screen order: sorted along the sibling axis of the arrangement they sit in
+   * (y for right/left, x for down/up). A first level of a timeline, and the roots of a balanced, radial or fishbone map, keep
+   * the array order, which is what those arrangements lay out. A manual move or drag changes a position only, so the array
+   * order can differ from this.
+   */
+  private onScreenSiblingOrder(map: MapDocument): MapNode[] {
+    const base = layoutOf(map).direction;
+    return alignSiblingsToScreen(map.nodes, (parentId, childId) => {
+      const direction = layoutDirectionFor(map.nodes, childId, base) as LayoutKind;
+      if (direction === "down" || direction === "up") return "x";
+      if (direction === "right" || direction === "left") return "y";
+      return null;
+    });
+  }
+  /**
    * move_topic with `beforeId`: the card goes under `parent` (or stays there) right in front of `before`, in one undoable Map.md
    * change. The children of `parent` change places in the map's order, which every arrangement follows; then the branch is
    * laid out again in that order. A first-level topic of a timeline map is laid out as a dragged one is: the whole map again.
@@ -3777,6 +3793,8 @@ export class VisualAgentMapView extends ItemView {
       const target = map.nodes.find(item => item.id === parent.id);
       const next = map.nodes.find(item => item.id === before.id);
       if (!moving || !target || next?.parentId !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
+      // The children of the new parent first take the order on screen (what the model was told), so the reorder keeps what was seen.
+      map.nodes = this.onScreenSiblingOrder(map);
       moving.parentId = parent.id;
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
@@ -11184,8 +11202,8 @@ export class VisualAgentMapView extends ItemView {
   private displayedNeighbor(node: MapNode, key: string): MapNode | undefined {
     if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)) return undefined;
     const shown = this.canvasNodes();
-    const byY = (a: MapNode, b: MapNode): number => a.y - b.y || a.x - b.x;
-    const byX = (a: MapNode, b: MapNode): number => a.x - b.x || a.y - b.y;
+    const byY = bySiblingAxis("y");
+    const byX = bySiblingAxis("x");
     // Cards in a branch with its own arrangement follow that arrangement's keys; timeline, radial and fishbone follow the right map's.
     const direction = layoutDirectionFor(this.map.nodes, node.id, layoutOf(this.map).direction) as LayoutKind;
     const byId = new Map(shown.map(item => [item.id, item]));
@@ -13195,6 +13213,10 @@ export class VisualAgentMapView extends ItemView {
         return check("write", [real(action.nodeId)]);
       case "move_topic":
         return check("move", [action.nodeId], real(action.newParentId));
+      // A relation writes both end notes' lines and Map.md: a locked end refuses it (the end cards can be ones of this reply).
+      case "add_relation":
+      case "remove_relation":
+        return check("write", [real(action.fromId), real(action.toId)]);
       case "delete_topic":
         return check("remove", [action.nodeId]);
       case "edit_md_file": {
@@ -16355,7 +16377,7 @@ export class VisualAgentMapView extends ItemView {
       };
     };
     // Type and strength come from the same readers the cards use, so an AIM map (and an AIM card) reads as an ordinary topic.
-    const outline: MapChatOutlineNode[] = map.nodes.map(node => {
+    const outline: MapChatOutlineNode[] = this.onScreenSiblingOrder(map).map(node => {
       const strength = this.hypothesisStrengthOf(node.id);
       return {
         id: node.id,
@@ -16999,7 +17021,13 @@ export class VisualAgentMapView extends ItemView {
           (outcome.images.modelLabel ? t("ui.map_chat_model_suffix_0", outcome.images.modelLabel) : ""),
         images: outcome.images
       };
-    if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
+    if (outcome.status === "done")
+      return {
+        status: "done",
+        text:
+          t("ui.map_chat_line_done_0", label) +
+          (outcome.skippedCards ? t("ui.map_chat_line_cards_skipped_0", outcome.skippedCards) : "")
+      };
     return {
       status: outcome.status,
       text: t(
@@ -17668,6 +17696,10 @@ export class VisualAgentMapView extends ItemView {
     const editable = nodes.filter(node => !node.aimKind && this.notes.get(node.id));
     if (!editable.length) return skipped("ui.map_chat_skip_unavailable");
     if (editable.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    // Named cards that are gone, belong to an AIM map or have no note are left out; the line says how many.
+    const skippedCards =
+      new Set(action.nodeIds.map(id => real(id) ?? id)).size - new Set(editable.map(node => node.id)).size;
+    const done = (): ChatOutcome => (skippedCards > 0 ? { status: "done", skippedCards } : { status: "done" });
     const change: TopicAppearanceChange = {
       ...(action.color ? { color: action.color === "none" ? null : action.color } : {}),
       addMarkers: action.markers ?? [],
@@ -17690,7 +17722,7 @@ export class VisualAgentMapView extends ItemView {
       run?.notes?.add(node.id);
       transaction.rewriteNote(node.path, path => this.plugin.repo.writeTopicAppearance(path, change));
     }
-    if (!changes) return { status: "done" };
+    if (!changes) return done();
     const viewport = clone(this.map.viewport);
     const entry = await transaction
       .editMap(this.path, map => {
@@ -17699,7 +17731,7 @@ export class VisualAgentMapView extends ItemView {
       .commit({ deferRebuild: true, label: t("ui.topic_appearance") });
     // Inside a reply this joins the reply's one undo step (see applyMapChatActions).
     this.history.push(entry);
-    return { status: "done" };
+    return done();
   }
   /**
    * add_relation / remove_relation: the same Map.md write as a relation added or removed by hand (`addRelation`,

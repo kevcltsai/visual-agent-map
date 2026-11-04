@@ -612,6 +612,11 @@ test('07 chat: every write tool on a locked target is refused (summary, note, ki
     { kind: 'move_topic', nodeId: a.id, newParentId: b.id },
     { kind: 'move_topic', nodeId: b.id, newParentId: a.id },
     { kind: 'move_topic', nodeId: c.id, newParentId: b.id },
+    { kind: 'move_topic', nodeId: b.id, newParentId: a.id, beforeId: c.id },
+    { kind: 'add_relation', fromId: b.id, toId: a.id, relationKind: 'supports' },
+    { kind: 'add_relation', fromId: a.id, toId: b.id, relationKind: 'supports' },
+    { kind: 'remove_relation', fromId: d.id, toId: a.id },
+    { kind: 'remove_relation', fromId: a.id, toId: d.id },
     { kind: 'delete_topic', nodeId: a.id, branch: true },
     { kind: 'delete_topic', nodeId: c.id, branch: true },
     { kind: 'delete_topic', nodeId: d.id, branch: true }
@@ -623,6 +628,32 @@ test('07 chat: every write tool on a locked target is refused (summary, note, ki
   }
   assert.equal(h.contents.get(MAP), mapBefore);
   assert.equal(h.raw(a), noteBefore);
+});
+
+test('07 chat: one reply of remove_relation(D, A) then delete_topic(D) with A locked removes neither the relation nor D', async () => {
+  const h = await harness(['A', 'B', 'C', 'D']);
+  const [a, , , d] = h.nodes;
+  h.view.map.topicRelations = [{ kind: 'related', from: d.id, to: a.id }];
+  await h.repo.saveMap(MAP, h.view.map);
+  await h.view.setAiLock([a], true);
+  const mapBefore = h.contents.get(MAP);
+  for (const action of [{ kind: 'remove_relation', fromId: d.id, toId: a.id }, { kind: 'delete_topic', nodeId: d.id, branch: true }]) {
+    const outcome = await applyChat(h, action);
+    assert.equal(outcome.status, 'skipped', JSON.stringify(action));
+    assert.match(outcome.reason, LOCKED_NOTICE, JSON.stringify(action));
+  }
+  assert.equal(h.contents.get(MAP), mapBefore, 'the relation is still there');
+  assert.ok(h.view.map.nodes.some(n => n.id === d.id), 'D is not deleted');
+});
+
+test('07 chat: add_relation / remove_relation between unlocked cards still go through', async () => {
+  const h = await harness(['A', 'B', 'C']);
+  const [a, b, c] = h.nodes;
+  await h.view.setAiLock([c], true);
+  const added = await applyChat(h, { kind: 'add_relation', fromId: a.id, toId: b.id, relationKind: 'supports' });
+  assert.equal(added.status, 'done', JSON.stringify(added));
+  const removed = await applyChat(h, { kind: 'remove_relation', fromId: a.id, toId: b.id });
+  assert.equal(removed.status, 'done', JSON.stringify(removed));
 });
 
 test('07 chat: edit_md_file on a locked note is refused', async () => {

@@ -90,3 +90,39 @@ export function stepOrder(order: string[], currentId: string | null, delta: 1 | 
   if (index < 0 || index >= total) return null;
   return { id: order[index], index, total };
 }
+
+/** Sibling comparator along an axis: "y" for right/left maps, "x" for down/up maps (the order the keyboard walk and the reading order use). */
+export const bySiblingAxis =
+  (axis: "x" | "y") =>
+  (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+    axis === "y" ? a.y - b.y || a.x - b.x : a.x - b.x || a.y - b.y;
+
+/**
+ * `nodes` with the children of every parent put in on-screen order: they take the slots the children had in the array, sorted
+ * along the sibling axis `axisOf` names for that parent (null keeps the array order there, e.g. a timeline's first level, a
+ * balanced or radial root). Every other card keeps its index; ties keep array order. Returns `nodes` itself when nothing moves.
+ */
+export function alignSiblingsToScreen<T extends { id: string; parentId: string | null; x: number; y: number }>(
+  nodes: readonly T[],
+  axisOf: (parentId: string | null, firstChildId: string) => "x" | "y" | null
+): T[] {
+  const slots = new Map<string | null, number[]>();
+  nodes.forEach((node, index) => {
+    const list = slots.get(node.parentId);
+    if (list) list.push(index);
+    else slots.set(node.parentId, [index]);
+  });
+  const result = nodes.slice();
+  let moved = false;
+  for (const [parentId, list] of slots) {
+    if (list.length < 2) continue;
+    const axis = axisOf(parentId, nodes[list[0]].id);
+    if (!axis) continue;
+    const order = list.map(index => nodes[index]).sort(bySiblingAxis(axis));
+    list.forEach((index, place) => {
+      if (result[index] !== order[place]) moved = true;
+      result[index] = order[place];
+    });
+  }
+  return moved ? result : (nodes as T[]);
+}

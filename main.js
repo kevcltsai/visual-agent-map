@@ -1333,6 +1333,7 @@ var en = {
   "ui.map_chat_kind_choice_rewrite_message_0_1": "Change the type of {0} to {1}, and rewrite each note to fit that type.",
   "ui.map_chat_kind_choice_topics_separator": ", ",
   "ui.map_chat_line_done_0": "Done: {0}",
+  "ui.map_chat_line_cards_skipped_0": " ({0} topics skipped: missing, AIM or without a note)",
   "ui.map_chat_line_skipped_0_1": "Skipped: {0} ({1})",
   "ui.map_chat_line_failed_0_1": "Failed: {0} ({1})",
   "ui.map_chat_do_add_child_0": "Add subtopic \u201C{0}\u201D",
@@ -3812,6 +3813,7 @@ var zhCN = {
   "ui.map_chat_kind_choice_rewrite_message_0_1": "\u628A{0}\u7684\u8BAE\u9898\u7C7B\u578B\u6539\u4E3A{1}\uFF0C\u5E76\u4F9D\u8FD9\u4E2A\u7C7B\u578B\u91CD\u5199\u6BCF\u5F20\u7684\u7B14\u8BB0\u3002",
   "ui.map_chat_kind_choice_topics_separator": "\u3001",
   "ui.map_chat_line_done_0": "\u5B8C\u6210\uFF1A{0}",
+  "ui.map_chat_line_cards_skipped_0": "\uFF08\u5DF2\u7565\u8FC7 {0} \u4E2A\u8BAE\u9898\uFF1A\u4E0D\u5B58\u5728\u3001AIM \u6216\u6CA1\u6709\u7B14\u8BB0\uFF09",
   "ui.map_chat_line_skipped_0_1": "\u7565\u8FC7\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_line_failed_0_1": "\u5931\u8D25\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_do_add_child_0": "\u65B0\u589E\u5B50\u8BAE\u9898\u201C{0}\u201D",
@@ -6291,6 +6293,7 @@ var zhTW = {
   "ui.map_chat_kind_choice_rewrite_message_0_1": "\u628A{0}\u7684\u8B70\u984C\u985E\u578B\u6539\u70BA{1}\uFF0C\u4E26\u4F9D\u9019\u500B\u985E\u578B\u91CD\u5BEB\u6BCF\u5F35\u7684\u7B46\u8A18\u3002",
   "ui.map_chat_kind_choice_topics_separator": "\u3001",
   "ui.map_chat_line_done_0": "\u5B8C\u6210\uFF1A{0}",
+  "ui.map_chat_line_cards_skipped_0": "\uFF08\u5DF2\u7565\u904E {0} \u500B\u8B70\u984C\uFF1A\u4E0D\u5B58\u5728\u3001AIM \u6216\u6C92\u6709\u7B46\u8A18\uFF09",
   "ui.map_chat_line_skipped_0_1": "\u7565\u904E\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_line_failed_0_1": "\u5931\u6557\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_do_add_child_0": "\u65B0\u589E\u5B50\u8B70\u984C\u300C{0}\u300D",
@@ -18024,6 +18027,28 @@ function stepOrder(order, currentId, delta) {
   const index = at < 0 ? delta === 1 ? 0 : total2 - 1 : at + delta;
   if (index < 0 || index >= total2) return null;
   return { id: order[index], index, total: total2 };
+}
+var bySiblingAxis = (axis) => (a, b) => axis === "y" ? a.y - b.y || a.x - b.x : a.x - b.x || a.y - b.y;
+function alignSiblingsToScreen(nodes, axisOf) {
+  const slots = /* @__PURE__ */ new Map();
+  nodes.forEach((node, index) => {
+    const list = slots.get(node.parentId);
+    if (list) list.push(index);
+    else slots.set(node.parentId, [index]);
+  });
+  const result = nodes.slice();
+  let moved = false;
+  for (const [parentId, list] of slots) {
+    if (list.length < 2) continue;
+    const axis = axisOf(parentId, nodes[list[0]].id);
+    if (!axis) continue;
+    const order = list.map((index) => nodes[index]).sort(bySiblingAxis(axis));
+    list.forEach((index, place) => {
+      if (result[index] !== order[place]) moved = true;
+      result[index] = order[place];
+    });
+  }
+  return moved ? result : nodes;
 }
 
 // experiences/visual-map/map-search-bar.ts
@@ -52031,6 +52056,21 @@ ${request.requirements}` : preset.text,
     });
   }
   /**
+   * `map.nodes` with every parent's children in on-screen order: sorted along the sibling axis of the arrangement they sit in
+   * (y for right/left, x for down/up). A first level of a timeline, and the roots of a balanced, radial or fishbone map, keep
+   * the array order, which is what those arrangements lay out. A manual move or drag changes a position only, so the array
+   * order can differ from this.
+   */
+  onScreenSiblingOrder(map) {
+    const base = layoutOf(map).direction;
+    return alignSiblingsToScreen(map.nodes, (parentId, childId) => {
+      const direction = layoutDirectionFor(map.nodes, childId, base);
+      if (direction === "down" || direction === "up") return "x";
+      if (direction === "right" || direction === "left") return "y";
+      return null;
+    });
+  }
+  /**
    * move_topic with `beforeId`: the card goes under `parent` (or stays there) right in front of `before`, in one undoable Map.md
    * change. The children of `parent` change places in the map's order, which every arrangement follows; then the branch is
    * laid out again in that order. A first-level topic of a timeline map is laid out as a dragged one is: the whole map again.
@@ -52044,6 +52084,7 @@ ${request.requirements}` : preset.text,
       const target = map.nodes.find((item) => item.id === parent.id);
       const next = map.nodes.find((item) => item.id === before.id);
       if (!moving || !target || (next == null ? void 0 : next.parentId) !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
+      map.nodes = this.onScreenSiblingOrder(map);
       moving.parentId = parent.id;
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
@@ -58796,8 +58837,8 @@ ${request.requirements}` : preset.text,
     var _a2, _b2;
     if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key2)) return void 0;
     const shown = this.canvasNodes();
-    const byY = (a, b) => a.y - b.y || a.x - b.x;
-    const byX = (a, b) => a.x - b.x || a.y - b.y;
+    const byY = bySiblingAxis("y");
+    const byX = bySiblingAxis("x");
     const direction = layoutDirectionFor(this.map.nodes, node.id, layoutOf(this.map).direction);
     const byId = new Map(shown.map((item) => [item.id, item]));
     const sideOf2 = (card) => {
@@ -60704,6 +60745,10 @@ ${request.requirements}` : preset.text,
         return check("write", [real(action.nodeId)]);
       case "move_topic":
         return check("move", [action.nodeId], real(action.newParentId));
+      // A relation writes both end notes' lines and Map.md: a locked end refuses it (the end cards can be ones of this reply).
+      case "add_relation":
+      case "remove_relation":
+        return check("write", [real(action.fromId), real(action.toId)]);
       case "delete_topic":
         return check("remove", [action.nodeId]);
       case "edit_md_file": {
@@ -63677,7 +63722,7 @@ ${note.detail.trim()}` : "",
         ...target ? { retryWith: this.plugin.modelLabel(target) } : {}
       };
     };
-    const outline = map.nodes.map((node) => {
+    const outline = this.onScreenSiblingOrder(map).map((node) => {
       var _a3, _b2, _c, _d;
       const strength = this.hypothesisStrengthOf(node.id);
       return {
@@ -64231,7 +64276,11 @@ ${note.detail.trim()}` : "",
         text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle) + (outcome.images.modelLabel ? t("ui.map_chat_model_suffix_0", outcome.images.modelLabel) : ""),
         images: outcome.images
       };
-    if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
+    if (outcome.status === "done")
+      return {
+        status: "done",
+        text: t("ui.map_chat_line_done_0", label) + (outcome.skippedCards ? t("ui.map_chat_line_cards_skipped_0", outcome.skippedCards) : "")
+      };
     return {
       status: outcome.status,
       text: t(
@@ -64813,6 +64862,11 @@ ${note.detail.trim()}` : "",
     const editable = nodes.filter((node) => !node.aimKind && this.notes.get(node.id));
     if (!editable.length) return skipped("ui.map_chat_skip_unavailable");
     if (editable.some((node) => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    const skippedCards = new Set(action.nodeIds.map((id) => {
+      var _a3;
+      return (_a3 = real(id)) != null ? _a3 : id;
+    })).size - new Set(editable.map((node) => node.id)).size;
+    const done = () => skippedCards > 0 ? { status: "done", skippedCards } : { status: "done" };
     const change2 = {
       ...action.color ? { color: action.color === "none" ? null : action.color } : {},
       addMarkers: (_a2 = action.markers) != null ? _a2 : [],
@@ -64834,13 +64888,13 @@ ${note.detail.trim()}` : "",
       (_g = run == null ? void 0 : run.notes) == null ? void 0 : _g.add(node.id);
       transaction.rewriteNote(node.path, (path) => this.plugin.repo.writeTopicAppearance(path, change2));
     }
-    if (!changes) return { status: "done" };
+    if (!changes) return done();
     const viewport = clone(this.map.viewport);
     const entry = await transaction.editMap(this.path, (map) => {
       map.viewport = clone(viewport);
     }).commit({ deferRebuild: true, label: t("ui.topic_appearance") });
     this.history.push(entry);
-    return { status: "done" };
+    return done();
   }
   /**
    * add_relation / remove_relation: the same Map.md write as a relation added or removed by hand (`addRelation`,

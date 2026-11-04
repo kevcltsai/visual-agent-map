@@ -1281,6 +1281,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_kind_choice_rewrite_message_0_1": "把{0}的议题类型改为{1}，并依这个类型重写每张的笔记。",
   "ui.map_chat_kind_choice_topics_separator": "、",
   "ui.map_chat_line_done_0": "完成：{0}",
+  "ui.map_chat_line_cards_skipped_0": "（已略过 {0} 个议题：不存在、AIM 或没有笔记）",
   "ui.map_chat_line_skipped_0_1": "略过：{0}（{1}）",
   "ui.map_chat_line_failed_0_1": "失败：{0}（{1}）",
   "ui.map_chat_do_add_child_0": "新增子议题“{0}”",

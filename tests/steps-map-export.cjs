@@ -3,6 +3,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support.cjs');
 const ex = load('experiences/visual-map/map-export.ts');
+const { obsidian } = require('./support.cjs');
+const imp = load('experiences/visual-map/outline-import.ts', { obsidian });
 const plain = value => JSON.parse(JSON.stringify(value));
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 const base = { width: 400, height: 300, title: 'Map', theme: { background: '#fff', text: '#111' } };
@@ -62,9 +64,9 @@ test('counter-example 5: over the limits exportLimits returns scaleDown or refus
 });
 
 test('counter-example 6: the outline writes collapsed branches in full', () => {
-  const nodes = [{ id: 'r', parentId: null, collapsed: true }, { id: 'a', parentId: 'r', collapsed: true }, { id: 'a1', parentId: 'a' }, { id: 'b', parentId: 'r' }, { id: 'orphan', parentId: 'gone' }];
-  const titles = { r: 'Root', a: 'A\nline', a1: 'A1', b: 'B', orphan: 'Orphan' };
-  assert.equal(ex.mapOutline(nodes, id => titles[id]), '- Root\n  - A line\n    - A1\n  - B\n- Orphan');
+  const nodes = [{ id: 'r', parentId: null, collapsed: true }, { id: 'a', parentId: 'r', collapsed: true }, { id: 'a1', parentId: 'a' }, { id: 'b', parentId: 'r' }];
+  const titles = { r: 'Root', a: 'A\nline', a1: 'A1', b: 'B' };
+  assert.equal(ex.mapOutline(nodes, id => titles[id]), '# Root\n## A line\n### A1\n## B');
   assert.equal(ex.mapOutline([{ id: 'x', parentId: 'y' }, { id: 'y', parentId: 'x' }], id => id), '');
 });
 
@@ -134,4 +136,23 @@ test('card-height export: a clipped card whose lines all fit still ends with an 
   assert.match(svg, />short…</);
   const none = ex.buildMapSvg({ ...base, cards: [{ x: 0, y: 0, w: 200, h: 200, title: [], clipped: true }] });
   assert.ok(!none.includes('…'));
+});
+
+test('persona 15: the outline carries each summary and imports back with the same structure (round trip)', () => {
+  const nodes = [{ id: 'r', parentId: null }, { id: 'a', parentId: 'r' }, { id: 'a1', parentId: 'a' }, { id: 'b', parentId: 'r' }];
+  const titles = { r: 'Root', a: 'Alpha', a1: 'Deep', b: 'Beta' };
+  const summaries = { r: 'The goal', a: 'Line one\n# not a heading\n```', b: '' };
+  const md = ex.mapOutline(nodes, id => titles[id], id => summaries[id] ?? '');
+  assert.ok(md.includes('> The goal') && md.includes('> Line one # not a heading ```'), md);
+  const parsed = imp.parseOutline(md);
+  assert.deepEqual(plain(parsed.errors), []);
+  assert.deepEqual(plain(parsed.nodes.map(n => [n.title, n.parent, n.level])), [['Root', null, 1], ['Alpha', 0, 2], ['Deep', 1, 3], ['Beta', 0, 2]]);
+});
+
+test('persona 15: several roots go under one map-title heading so the import accepts them; depth is capped at six', () => {
+  const md = ex.mapOutline([{ id: 'x', parentId: null }, { id: 'y', parentId: null }], id => id.toUpperCase(), () => '', 'My map');
+  assert.equal(md, '# My map\n## X\n## Y');
+  assert.deepEqual(plain(imp.parseOutline(md).errors), []);
+  const chain = Array.from({ length: 8 }, (_, i) => ({ id: `n${i}`, parentId: i ? `n${i - 1}` : null }));
+  assert.ok(ex.mapOutline(chain, id => id).split('\n').every(line => !line.startsWith('#######')));
 });

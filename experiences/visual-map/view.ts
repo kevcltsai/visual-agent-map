@@ -9818,7 +9818,15 @@ export class VisualAgentMapView extends ItemView {
     try {
       let blob: Blob;
       if (format === "md") {
-        const outline = mapOutline(map.nodes, id => this.notes.get(id)?.title ?? "");
+        const outline = mapOutline(
+          this.onScreenSiblingOrder(map),
+          id => this.notes.get(id)?.title ?? "",
+          id => {
+            const summary = this.notes.get(id)?.summary ?? "";
+            return isPlaceholder(summary) ? "" : summary;
+          },
+          map.title
+        );
         blob = new Blob([`${outline}\n`], { type: "text/markdown;charset=utf-8" });
       } else {
         const got = await this.collectExportScene(isCurrent);

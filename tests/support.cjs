@@ -19,10 +19,10 @@ const { buildSync } = require('./build.cjs');
 // Obsidian's own YAML options, so frontmatter in tests round-trips like the real app (not a one-line-per-key stub).
 const YAML = require('yaml');
 const root = path.resolve(__dirname, '..');
-function load(entry, overrides = {}, windowValues = {}) {
+function load(entry, overrides = {}, windowValues = {}, buildOptions = {}) {
   if (overrides.obsidian && !overrides.obsidian.Component) overrides = { ...overrides, obsidian: { ...overrides.obsidian, Component: class {} } };
   if (overrides.obsidian && !overrides.obsidian.MarkdownRenderChild) overrides = { ...overrides, obsidian: { ...overrides.obsidian, MarkdownRenderChild: class {} } };
-  const code = buildSync({ entryPoints: [path.join(root, entry)], external: ['obsidian', 'node:*'] }).outputFiles[0].text;
+  const code = buildSync({ entryPoints: [path.join(root, entry)], external: ['obsidian', 'node:*'], ...buildOptions }).outputFiles[0].text;
   const module = { exports: {} };
   vm.runInNewContext(code, { get activeWindow() { return windowValues.activeWindow; }, module, exports: module.exports, require: name => overrides[name] || require(name), console, TextDecoder, TextEncoder, Blob, URL, crypto: require('node:crypto').webcrypto, process, AbortController, navigator: windowValues.navigator, CSS: windowValues.CSS, document: windowValues.document, createSvg: windowValues.createSvg, createEl: windowValues.createEl, Option: class { constructor(text, value) { this.tag = 'option'; this.text = text; this.value = value; this.cls = ''; this.children = []; this.attrs = {}; } }, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {}, window: { setTimeout, clearTimeout, ...windowValues } });
   // The view reaches the running set, stop registry and pending suggestions only through plugin.topicRuns (04c): a plugin double gets a TopicRuns over its own fields.
@@ -32,6 +32,8 @@ function load(entry, overrides = {}, windowValues = {}) {
   }
   return module.exports;
 }
+/** Same as load, with AIM hidden the way the shipped build has it (tests/suites/aim-hidden.cjs). */
+const loadHidden = (entry, overrides = {}, windowValues = {}) => load(entry, overrides, windowValues, { define: { __VAM_AIM__: 'false' } });
 const core = load('map-model.ts');
 const layout = load('map-layout.ts');
 const logging = load('log-manager.ts');
@@ -162,7 +164,7 @@ function fixture(language = 'zh-TW', options = {}) {
   }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; const block = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]; return { frontmatter: block ? obsidian.parseYaml(block) : {} }; }, getFirstLinkpathDest: link => { const key = link.replace(/\.md$/, ''); return Array.from(files.values()).find(file => file instanceof TFile && (file.basename === key || file.path.replace(/\.md$/, '') === key)) || null; } }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async () => {} } };
   // Opt-in link index: resolvedLinks is computed from the current text (frontmatter and body wikilinks), like Obsidian's.
   if (options.linkIndex) Object.defineProperty(app.metadataCache, 'resolvedLinks', { configurable: true, get: () => { const index = {}; for (const [path, text] of contents) { if (!(files.get(path) instanceof TFile) || !path.endsWith('.md')) continue; for (const match of String(text).matchAll(/!?\[\[([^\]|#\n]+)/g)) { const dest = app.metadataCache.getFirstLinkpathDest(match[1].trim()); if (!dest) continue; index[path] ||= {}; index[path][dest.path] = (index[path][dest.path] || 0) + 1; } } return index; } });
-  return { app, contents, files, repo: new Repository(app, { ...DEFAULT_SETTINGS, language }) };
+  return { app, contents, files, repo: new (options.Repository ?? Repository)(app, { ...DEFAULT_SETTINGS, language }) };
 }
 async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a') {
   const mapDoc = { id, title: id, version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -288,4 +290,4 @@ async function coverageThreeAnswers(subject) {
 const languageIds = () => load('i18n/languages.ts').LANGUAGES.map(item => item.id);
 /** Dictionary text of the i18n facade plus every registered language file, for tests that scan translation keys and values. */
 const i18nSource = (language) => [language ? [] : ['i18n.ts', ...languageIds().map(id => `i18n/${id}.ts`)], language ? [`i18n/${language}.ts`] : []].flat().map(file => require('node:fs').readFileSync(path.join(root, file), 'utf8')).join('\n');
-module.exports = { startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };
+module.exports = { loadHidden, startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };

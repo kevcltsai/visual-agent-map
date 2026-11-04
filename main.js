@@ -18261,6 +18261,12 @@ function upgradeLegacyAimData(value) {
   return upgraded;
 }
 
+// experiences/aim/availability.ts
+var AIM_ENABLED = false;
+function aimEnabled() {
+  return typeof __VAM_AIM__ === "boolean" ? __VAM_AIM__ : AIM_ENABLED;
+}
+
 // log-manager.ts
 var LogManager = class {
   constructor(limit = 500) {
@@ -19545,7 +19551,9 @@ function parseMap(content, log) {
   var _a2, _b2;
   const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
   if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
-  const map = upgradeLegacyAimData(JSON.parse(block[1]));
+  const parsed = JSON.parse(block[1]);
+  const map = aimEnabled() ? upgradeLegacyAimData(parsed) : parsed;
+  const checkAim = aimEnabled() || map.aim === void 0;
   if (map.version !== 1 || typeof map.id !== "string" || typeof map.title !== "string" || !Array.isArray(map.nodes))
     throw new Error(t("ui.invalid_mind_map_format"));
   if (map.detailTemplateId !== void 0 && typeof map.detailTemplateId !== "string") delete map.detailTemplateId;
@@ -19565,7 +19573,7 @@ function parseMap(content, log) {
   for (const n of map.nodes) {
     if (!n || typeof n.id !== "string" || typeof n.path !== "string" || !n.path.endsWith(".md") || !Number.isFinite(n.x) || !Number.isFinite(n.y) || n.parentId !== null && typeof n.parentId !== "string" || ids.has(n.id))
       throw new Error(t("ui.invalid_node_data_or_duplicate_id"));
-    if (n.aimDismissedQuestionRequestIds !== void 0 && (!Array.isArray(n.aimDismissedQuestionRequestIds) || new Set(n.aimDismissedQuestionRequestIds).size !== n.aimDismissedQuestionRequestIds.length || n.aimDismissedQuestionRequestIds.some((id) => typeof id !== "string" || !id.trim())))
+    if (checkAim && n.aimDismissedQuestionRequestIds !== void 0 && (!Array.isArray(n.aimDismissedQuestionRequestIds) || new Set(n.aimDismissedQuestionRequestIds).size !== n.aimDismissedQuestionRequestIds.length || n.aimDismissedQuestionRequestIds.some((id) => typeof id !== "string" || !id.trim())))
       throw new Error("Invalid dismissed AIM question identities.");
     ids.add(n.id);
     n.collapsed = n.collapsed === true;
@@ -19579,13 +19587,13 @@ function parseMap(content, log) {
       if (height === void 0) delete n.height;
       else n.height = height;
     }
-    if (n.aimKind !== void 0 && !["topic", "question", "answer", "research", "synthesis", "conclusion"].includes(n.aimKind))
+    if (checkAim && n.aimKind !== void 0 && !["topic", "question", "answer", "research", "synthesis", "conclusion"].includes(n.aimKind))
       throw new Error("Invalid AIM node kind.");
-    if (n.aimConvergesFromNodeIds !== void 0 && (!Array.isArray(n.aimConvergesFromNodeIds) || new Set(n.aimConvergesFromNodeIds).size !== n.aimConvergesFromNodeIds.length || n.aimConvergesFromNodeIds.some(
+    if (checkAim && n.aimConvergesFromNodeIds !== void 0 && (!Array.isArray(n.aimConvergesFromNodeIds) || new Set(n.aimConvergesFromNodeIds).size !== n.aimConvergesFromNodeIds.length || n.aimConvergesFromNodeIds.some(
       (id) => typeof id !== "string" || id === n.id || !map.nodes.some((candidate) => candidate.id === id)
     )))
       throw new Error("Invalid AIM convergence references.");
-    if (n.aimQuestion !== void 0) {
+    if (checkAim && n.aimQuestion !== void 0) {
       const question = n.aimQuestion;
       if (n.aimKind !== "question" || !question || typeof question.requestId !== "string" || !question.requestId.trim() || !(question.parentBranchId === void 0 || question.parentBranchId === null || typeof question.parentBranchId === "string") || !Array.isArray(question.options) || question.options.length < 2 || question.options.some(
         (option) => !option || typeof option.id !== "string" || !option.id.trim() || typeof option.label !== "string" || !option.label.trim()
@@ -19599,7 +19607,7 @@ function parseMap(content, log) {
     if (!canParent(map.nodes, n.id, n.parentId))
       throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
   cleanBranchLayouts(map.nodes, (_b2 = (_a2 = map.layout) == null ? void 0 : _a2.direction) != null ? _b2 : "right", map.aim !== void 0);
-  if (map.aim !== void 0) validateAimMap(map);
+  if (map.aim !== void 0 && aimEnabled()) validateAimMap(map);
   if (!map.viewport || !Number.isFinite(map.viewport.x) || !Number.isFinite(map.viewport.y) || !Number.isFinite(map.viewport.zoom))
     map.viewport = { x: 40, y: 40, zoom: 1 };
   map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
@@ -22415,7 +22423,7 @@ function splitOpenItems(value) {
 var NOTE_CSS_CLASS = "visual-agent-map-node";
 function hasActiveAimAttempt(map) {
   var _a2;
-  return !!((_a2 = map.aim) == null ? void 0 : _a2.runs.some(
+  return aimEnabled() && !!((_a2 = map.aim) == null ? void 0 : _a2.runs.some(
     (run) => run.attempts.some((attempt) => attempt.status === "running" || attempt.status === "saving")
   ));
 }
@@ -23207,7 +23215,7 @@ var Repository = class {
   }
   async ensureWorkspace() {
     await this.folder(this.settings.mindMapsFolder);
-    await this.folder(this.settings.aimFolder);
+    if (aimEnabled()) await this.folder(this.settings.aimFolder);
   }
   unique(folder, name, avoid) {
     const base = (0, import_obsidian11.normalizePath)(`${folder}/${safeName(name)}`);
@@ -23834,7 +23842,7 @@ ${body}`);
    * anyway (never on open), so later interface-language changes cannot change it.
    */
   stampAimContentLanguage(map) {
-    if (!map.aim) return;
+    if (!map.aim || !aimEnabled()) return;
     const resolved = resolveAimContentLanguage(map, this.settings.language);
     if (map.aim.contentLanguage === void 0) map.aim.contentLanguage = noteLanguageOf(resolved);
     if (map.outputLanguage === void 0 && isOutputOnlyLanguage(resolved)) map.outputLanguage = resolved;
@@ -24456,6 +24464,7 @@ ${body}`;
           throw new Error(this.message("error.map_folder_unreadable"));
         }
         if (hasActiveAimAttempt(map) || busy(file.path)) throw new Error(this.message("error.organize_aim_busy"));
+        if (map.aim && !aimEnabled()) continue;
         const toRoot = (0, import_obsidian11.normalizePath)(`${next}/${(_a2 = root.split("/").at(-1)) != null ? _a2 : safeName(map.title)}`);
         if (this.app.vault.getAbstractFileByPath(toRoot)) throw new Error(this.message("error.map_folder_exists"));
         moves.push({ mapPath: file.path, title: map.title, kind: map.aim ? "aim" : "mind", fromRoot: root, toRoot });
@@ -24547,6 +24556,7 @@ ${body}`;
         continue;
       }
       if (hasActiveAimAttempt(map)) plan.busy.push(map.title);
+      if (map.aim && !aimEnabled()) continue;
       const container = map.aim ? this.settings.aimFolder : this.settings.mindMapsFolder;
       if (container === this.settings.topicsFolder) continue;
       const base = (0, import_obsidian11.normalizePath)(`${container}/${(_a2 = root.split("/").at(-1)) != null ? _a2 : safeName(map.title)}`);
@@ -69223,7 +69233,7 @@ function shareSummaries(map) {
   return out;
 }
 function buildSharePayload(map, notesById, options) {
-  if (map.aim || map.nodes.some((node) => node.aimKind !== void 0))
+  if (aimEnabled() && (map.aim || map.nodes.some((node) => node.aimKind !== void 0)))
     throw new ShareError("aim-map", "AIM maps cannot be shared.");
   const nodes = map.nodes.map((node) => {
     var _a2, _b2, _c, _d;

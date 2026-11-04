@@ -1,5 +1,6 @@
 import { validateAimResearchPlan } from "./experiences/aim/research-plan";
 import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
+import { aimEnabled } from "./experiences/aim/availability";
 import type { AiResult } from "./ai/types";
 import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
@@ -588,7 +589,11 @@ function validRetainedReports(reports: unknown): reports is AimRetainedReport[] 
 export function parseMap(content: string, log?: RelationLogger): MapDocument {
   const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
   if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
-  const map = upgradeLegacyAimData(JSON.parse(block[1]) as MapDocument);
+  // While AIM is hidden an old AIM map is kept exactly as saved: no legacy-name rewrite, and (below) no AIM validation, so a
+  // reference left dangling by an ordinary edit cannot make the map unopenable. A map without `aim` is validated as always.
+  const parsed = JSON.parse(block[1]) as MapDocument;
+  const map = aimEnabled() ? upgradeLegacyAimData(parsed) : parsed;
+  const checkAim = aimEnabled() || map.aim === undefined;
   if (map.version !== 1 || typeof map.id !== "string" || typeof map.title !== "string" || !Array.isArray(map.nodes))
     throw new Error(t("ui.invalid_mind_map_format"));
   if (map.detailTemplateId !== undefined && typeof map.detailTemplateId !== "string") delete map.detailTemplateId;
@@ -622,6 +627,7 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
     )
       throw new Error(t("ui.invalid_node_data_or_duplicate_id"));
     if (
+      checkAim &&
       n.aimDismissedQuestionRequestIds !== undefined &&
       (!Array.isArray(n.aimDismissedQuestionRequestIds) ||
         new Set(n.aimDismissedQuestionRequestIds).size !== n.aimDismissedQuestionRequestIds.length ||
@@ -641,11 +647,13 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
       else n.height = height;
     }
     if (
+      checkAim &&
       n.aimKind !== undefined &&
       !["topic", "question", "answer", "research", "synthesis", "conclusion"].includes(n.aimKind)
     )
       throw new Error("Invalid AIM node kind.");
     if (
+      checkAim &&
       n.aimConvergesFromNodeIds !== undefined &&
       (!Array.isArray(n.aimConvergesFromNodeIds) ||
         new Set(n.aimConvergesFromNodeIds).size !== n.aimConvergesFromNodeIds.length ||
@@ -654,7 +662,7 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
         ))
     )
       throw new Error("Invalid AIM convergence references.");
-    if (n.aimQuestion !== undefined) {
+    if (checkAim && n.aimQuestion !== undefined) {
       const question = n.aimQuestion;
       if (
         n.aimKind !== "question" ||
@@ -689,7 +697,7 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
     if (!canParent(map.nodes, n.id, n.parentId))
       throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
   cleanBranchLayouts(map.nodes, map.layout?.direction ?? "right", map.aim !== undefined);
-  if (map.aim !== undefined) validateAimMap(map);
+  if (map.aim !== undefined && aimEnabled()) validateAimMap(map);
   if (
     !map.viewport ||
     !Number.isFinite(map.viewport.x) ||

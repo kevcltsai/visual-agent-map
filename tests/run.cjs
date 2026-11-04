@@ -37,6 +37,7 @@ const suites = [
   'aim-language-audit.cjs',
   'aim-flow-limits.cjs',
   'aim-note-paths.cjs',
+  'aim-hidden.cjs',
   'workspace-folders.cjs',
   'upgrade-0.18.cjs',
   'partial-structured.cjs',
@@ -86,6 +87,7 @@ if (process.env.VAM_AFFECTED_TESTS) {
 const group = process.env.VAM_SUITES;
 if (group) {
   assert.ok(group === 'aim' || group === 'other', `bad VAM_SUITES=${group}`);
-  selected = selected.filter(suite => suite.startsWith('aim-') === (group === 'aim'));
+  // aim-hidden.cjs tests the shipped (AIM off) build, not the AIM feature, so it belongs to `other`.
+  selected = selected.filter(suite => (suite.startsWith('aim-') && suite !== 'aim-hidden.cjs') === (group === 'aim'));
 }
 for (const suite of selected) require(path.join(directory, suite));

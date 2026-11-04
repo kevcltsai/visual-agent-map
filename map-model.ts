@@ -1109,6 +1109,10 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
   private dropped = 0;
   /** While a group is open, pushed entries are collected here (no cap) instead of becoming undo steps of their own. */
   private grouped: T[] | null = null;
+  /** Depth of {@link ownWrites} calls running: only then do pushes go into the open group. */
+  private owning = 0;
+  /** Entries that stay a step of their own when collapseSince folds the ones around them (a closed group's step). */
+  private solo = new WeakSet<object>();
   get canUndo(): boolean {
     return this.past.length > 0;
   }
@@ -1122,7 +1126,7 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     return this.future[this.future.length - 1];
   }
   push(entry: T): void {
-    if (this.grouped) {
+    if (this.grouped && this.owning > 0) {
       this.grouped.push(entry);
       this.future = [];
       return;
@@ -1158,6 +1162,23 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
   openGroup(): void {
     this.grouped ??= [];
   }
+  /**
+   * Runs `work`; entries pushed meanwhile join the open group (when there is one). Pushes outside it, such as another job's
+   * between two such calls, stay steps of their own.
+   */
+  async ownWrites<R>(work: () => Promise<R>): Promise<R> {
+    this.owning++;
+    try {
+      return await work();
+    } finally {
+      this.owning--;
+    }
+  }
+  /** Pushes `entry` as a step that collapseSince never folds into another one. */
+  pushSolo(entry: T): void {
+    this.solo.add(entry);
+    this.push(entry);
+  }
   /** Ends the group and returns what it collected, oldest first (empty when nothing was pushed or the history was cleared). */
   closeGroup(): T[] {
     const entries = this.grouped ?? [];
@@ -1185,7 +1206,14 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
     if (mark.epoch !== this.epoch) return;
     const start = Math.max(0, mark.length - (this.dropped - mark.dropped));
     if (this.past.length - start < 2) return;
-    const entries = this.past.splice(start);
+    const all = this.past.splice(start);
+    const entries = all.filter(entry => !this.solo.has(entry));
+    if (entries.length < 2) {
+      this.past.push(...all);
+      return;
+    }
+    // Solo steps keep their place below the folded one, so folding never takes a step that is not the caller's.
+    this.past.push(...all.filter(entry => this.solo.has(entry)));
     const run = async (list: T[], redo: boolean): Promise<void> => {
       const done: T[] = [];
       try {

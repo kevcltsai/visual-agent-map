@@ -574,3 +574,154 @@ test('06 structure: suggestions touching a locked topic are dropped and counted;
   await assert.rejects(h.view.applyStructureSuggestion({ kind: 'strengthen', targetId: c.id, basis }, 'New', () => null), LOCKED_NOTICE);
   assert.equal(h.view.map.nodes.length, count);
 });
+
+// ---- ticket 07: map chat ---------------------------------------------------------------------------------------------
+const chatBaseline = h => ({ mdHashes: {}, topicHashes: Object.fromEntries(h.view.map.nodes.map(n => [n.id, { title: h.view.notes.get(n.id).title, parentId: n.parentId }])) });
+const applyChat = (h, action, baseline = chatBaseline(h)) => h.view.applyChatWrite(action, baseline, () => true);
+
+test('07 chat: a rename of a locked card is a tool error saying it is locked, and nothing is written', async () => {
+  const h = await harness(['A', 'B']);
+  const [a, b] = h.nodes;
+  await h.view.setAiLock([a], true);
+  const before = h.raw(a);
+  const outcome = await applyChat(h, { kind: 'rename_topic', nodeId: a.id, title: 'Renamed' });
+  assert.equal(outcome.status, 'skipped');
+  assert.match(outcome.reason, LOCKED_NOTICE);
+  assert.equal(h.raw(a), before);
+  const ok = await applyChat(h, { kind: 'rename_topic', nodeId: b.id, title: 'Renamed' });
+  assert.equal(ok.status, 'done', 'an unlocked card is renamed as before');
+  assert.equal((await h.repo.readNote(b.path)).title, 'Renamed');
+});
+
+test('07 chat: every write tool on a locked target is refused (summary, note, kind, child, move, delete, related delete)', async () => {
+  const h = await harness(['A', 'B', 'C', 'D']);
+  const [a, b, c, d] = h.nodes;
+  c.parentId = a.id;
+  h.view.map.topicRelations = [{ kind: 'related', from: d.id, to: a.id }];
+  await h.repo.saveMap(MAP, h.view.map);
+  await h.view.setAiLock([a], true);
+  const mapBefore = h.contents.get(MAP), noteBefore = h.raw(a);
+  const actions = [
+    { kind: 'update_summary', nodeId: a.id, summary: 'S' },
+    { kind: 'edit_topic_note', nodeId: a.id, detail: 'D' },
+    { kind: 'set_topic_kind', nodeIds: [a.id], topicKind: 'hypothesis' },
+    { kind: 'add_child', parentId: a.id, title: 'New child' },
+    { kind: 'move_topic', nodeId: a.id, newParentId: b.id },
+    { kind: 'move_topic', nodeId: b.id, newParentId: a.id },
+    { kind: 'move_topic', nodeId: c.id, newParentId: b.id },
+    { kind: 'delete_topic', nodeId: a.id, branch: true },
+    { kind: 'delete_topic', nodeId: c.id, branch: true },
+    { kind: 'delete_topic', nodeId: d.id, branch: true }
+  ];
+  for (const action of actions) {
+    const outcome = await applyChat(h, action);
+    assert.equal(outcome.status, 'skipped', JSON.stringify(action));
+    assert.match(outcome.reason, LOCKED_NOTICE, JSON.stringify(action));
+  }
+  assert.equal(h.contents.get(MAP), mapBefore);
+  assert.equal(h.raw(a), noteBefore);
+});
+
+test('07 chat: edit_md_file on a locked note is refused', async () => {
+  const h = await harness(['A']);
+  const [a] = h.nodes;
+  await h.view.setAiLock([a], true);
+  const before = h.raw(a);
+  const outcome = await applyChat(h, { kind: 'edit_md_file', path: a.path, find: 'A', replace: 'Z' }, { mdHashes: {}, topicHashes: {} });
+  assert.equal(outcome.status, 'skipped');
+  assert.match(outcome.reason, LOCKED_NOTICE);
+  assert.equal(h.raw(a), before);
+});
+
+test('07 chat: a card locked between the proposal and the confirmation is refused on apply', async () => {
+  const h = await harness(['A']);
+  const [a] = h.nodes;
+  const baseline = chatBaseline(h); // what the model saw: unlocked
+  await h.repo.writeAiLocked(a.path, true); // locked before the user confirms; the view has not refreshed
+  const before = h.raw(a);
+  const outcome = await applyChat(h, { kind: 'delete_topic', nodeId: a.id, branch: false }, baseline);
+  assert.equal(outcome.status, 'skipped');
+  assert.match(outcome.reason, LOCKED_NOTICE);
+  assert.equal(h.raw(a), before);
+  assert.ok(h.view.map.nodes.some(n => n.id === a.id));
+});
+
+test('07 chat: a picture is not inserted into a locked card; run_map_action on locked cards is skipped', async () => {
+  const h = await harness(['A']);
+  const [a] = h.nodes;
+  await h.view.setAiLock([a], true);
+  const before = h.raw(a);
+  const result = await h.view.chatInsertImage({ mapPath: MAP, mapId: h.view.map.id, nodeId: a.id }, { candidate: { url: 'https://example.org/a.png', title: 'A', source: 'https://example.org' } });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, LOCKED_NOTICE);
+  assert.equal(h.raw(a), before);
+  h.view.canSelectTopics = () => true;
+  for (const action of ['expand', 'research_standard', 'find_images']) {
+    const outcome = await h.view.runChatSelection({ kind: 'run_map_action', action, nodeIds: [a.id], direction: '' });
+    assert.equal(outcome.status, 'skipped', action);
+    assert.match(outcome.reason, LOCKED_NOTICE, action);
+  }
+  assert.equal(h.calls.length, 0);
+});
+
+test('07 chat context: locked cards are marked only when the map has one; without locks the bytes are unchanged', () => {
+  const { buildMapChatContext } = S.load('core/map-chat-context.ts', { obsidian });
+  const input = { mapTitle: 'M', outline: [{ id: 'n1', title: 'Root', summary: '', parentId: null, depth: 0 }, { id: 'n2', title: 'Child', summary: '', parentId: 'n1', depth: 1 }], selected: [], references: [], snippets: [], files: [], history: [] };
+  const plain = buildMapChatContext(input).json;
+  const withFalse = buildMapChatContext({ ...input, outline: input.outline.map(n => ({ ...n, aiLocked: false })) }).json;
+  assert.equal(withFalse, plain, 'no lock: byte for byte the same');
+  assert.doesNotMatch(plain, /aiLocked/);
+  const locked = JSON.parse(buildMapChatContext({ ...input, outline: [{ ...input.outline[0], aiLocked: true }, input.outline[1]] }).json);
+  assert.equal(locked.outline[0].aiLocked, true);
+  assert.equal('aiLocked' in locked.outline[1], false);
+  assert.match(locked.aiLockedNote, /locked/i);
+});
+
+// ---- ticket 08: editor selection AI and image translate --------------------------------------------------------------
+const { runPanel } = require('./support-selection-ai.cjs');
+const LOCKED_NOTE = '---\ntype: topic\nai-locked: true\n---\n\nSome text to rewrite.\n';
+const OPEN_NOTE = '---\ntype: topic\n---\n\nSome text to rewrite.\n';
+
+test('08 selection AI: a locked note gets no AI call and a locked notice; an unlocked note runs as before', async () => {
+  const notices = [];
+  const locked = await runPanel({ markdown: LOCKED_NOTE, selected: 'text to rewrite', replies: ['Rewritten'], outcome: true, notices });
+  assert.equal(locked.sent.length, 0, 'provider calls: 0');
+  assert.match(locked.status + notices.join('\n'), LOCKED_NOTICE);
+  const open = await runPanel({ markdown: OPEN_NOTE, selected: 'text to rewrite', replies: ['Rewritten'], outcome: true });
+  assert.equal(open.sent.length, 1);
+});
+
+test('08 image translate: a locked note is not written and no image AI runs; an unlocked note is written as before', async () => {
+  class Component { load() {} unload() {} registerDomEvent() {} }
+  class MarkdownView {}
+  const notices = [];
+  const { ImageTranslateAction } = S.load('experiences/markdown-context/image-translate-action.ts', { obsidian: { Component, MarkdownView, Notice: class { constructor(m) { notices.push(m); } }, setIcon() {}, parseYaml: text => require('yaml').parse(text) } });
+  const embed = '![egg](https://x/egg.png)';
+  const write = async text => {
+    let content = text;
+    const app = { workspace: { getLeavesOfType: () => [] }, vault: { process: async (_file, edit) => { content = edit(content); } } };
+    let error;
+    try { await new ImageTranslateAction(app, {}).write({ token: { text: embed, occurrence: 0, count: 1 } }, { path: 'Note.md' }, '![[egg-en.png]]', 'replace'); } catch (e) { error = e; }
+    return { content, error };
+  };
+  const lockedText = `---\nai-locked: true\n---\n\n${embed}\n`;
+  const lockedWrite = await write(lockedText);
+  assert.equal(lockedWrite.content, lockedText, 'the locked note is unchanged');
+  assert.match(lockedWrite.error?.message ?? '', LOCKED_NOTICE);
+  const openText = `---\ntype: topic\n---\n\n${embed}\n`;
+  assert.equal((await write(openText)).content, '---\ntype: topic\n---\n\n![[egg-en.png]]\n');
+  let calls = 0;
+  const action = new ImageTranslateAction({ workspace: { getLeavesOfType: () => [] } }, { model: () => 'm', run: async () => { calls++; return ''; }, saveImage: async () => '' });
+  await action.translate({ view: { editor: { getValue: () => lockedText }, containerEl: {} }, path: 'Note.md', image: {}, token: null }, 'en', 'replace', {}, {});
+  assert.equal(calls, 0, 'provider calls: 0');
+  assert.match(notices.join('\n'), LOCKED_NOTICE);
+});
+
+test('08 note text lock: only a frontmatter `ai-locked: true` counts', () => {
+  const parse = text => require('yaml').parse(text);
+  assert.equal(values.noteTextAiLocked(LOCKED_NOTE, parse), true);
+  assert.equal(values.noteTextAiLocked(OPEN_NOTE, parse), false);
+  assert.equal(values.noteTextAiLocked('Body\nai-locked: true\n', parse), false, 'a body line is not frontmatter');
+  assert.equal(values.noteTextAiLocked('---\nai-locked: "true"\n---\n', parse), false);
+  assert.equal(values.noteTextAiLocked('---\nai-locked: [\n---\n', parse), false, 'broken YAML reads as unlocked');
+});

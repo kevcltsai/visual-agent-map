@@ -607,6 +607,7 @@ test('07 chat: every write tool on a locked target is refused (summary, note, ki
     { kind: 'expand_topic', nodeId: a.id },
     { kind: 'edit_topic_note', nodeId: a.id, detail: 'D' },
     { kind: 'set_topic_kind', nodeIds: [a.id], topicKind: 'hypothesis' },
+    { kind: 'set_appearance', nodeIds: [a.id], color: 'red', markers: ['star'] },
     { kind: 'add_child', parentId: a.id, title: 'New child' },
     { kind: 'move_topic', nodeId: a.id, newParentId: b.id },
     { kind: 'move_topic', nodeId: b.id, newParentId: a.id },

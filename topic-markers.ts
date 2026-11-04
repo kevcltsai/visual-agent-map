@@ -147,3 +147,22 @@ export function markerSymbol(id: TopicMarker): string {
 export function markerLabelKey(id: TopicMarker): TranslationKey {
   return LABEL_KEYS[id];
 }
+
+/**
+ * The list to write after turning `add` on and `remove` off, or null when the key should be removed; "all" in `remove` turns
+ * every whitelisted marker off. Each change is the toggle of the marker panel ({@link toggleTopicMarker}), made only when it
+ * changes what is shown, so a single-choice group still holds one value and unknown values stay as they are.
+ */
+export function changeTopicMarkers(
+  raw: unknown,
+  add: readonly TopicMarker[],
+  remove: readonly (TopicMarker | "all")[]
+): string[] | null {
+  let current: unknown = raw;
+  const shown = (): TopicMarker[] => readTopicMarkers({ "topic-markers": current });
+  const off = remove.includes("all") ? shown() : remove.filter((id): id is TopicMarker => id !== "all");
+  for (const id of off) if (shown().includes(id)) current = toggleTopicMarker(current, id);
+  for (const id of add) if (!shown().includes(id)) current = toggleTopicMarker(current, id);
+  const list: unknown[] = Array.isArray(current) ? current : typeof current === "string" && current ? [current] : [];
+  return list.length ? (list as string[]) : null;
+}

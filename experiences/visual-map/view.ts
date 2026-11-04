@@ -249,7 +249,9 @@ import {
   type Note,
   type NotePatch,
   type TopicInfo,
-  isPlaceholder
+  isPlaceholder,
+  topicAppearanceValues,
+  type TopicAppearanceChange
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import type { DetailTemplate } from "../../ai/detail-templates";
@@ -13179,6 +13181,7 @@ export class VisualAgentMapView extends ItemView {
       case "add_child":
         return action.parentId ? check("addChild", [real(action.parentId)]) : null;
       case "set_topic_kind":
+      case "set_appearance":
         return check(
           "write",
           action.nodeIds.map(id => real(id))
@@ -16362,6 +16365,14 @@ export class VisualAgentMapView extends ItemView {
         depth: depthOf(node),
         kind: this.topicKindOf(node.id),
         ...(strength ? { strength } : {}),
+        // The appearance the card shows (whitelisted values only); the context leaves it out on an AIM map.
+        ...(node.aimKind
+          ? {}
+          : {
+              color: this.notes.get(node.id)?.color,
+              markers: this.notes.get(node.id)?.markers,
+              styles: this.notes.get(node.id)?.style
+            }),
         ...(this.notes.get(node.id)?.aiLocked ? { aiLocked: true } : {}),
         ...failureOf(node.id)
       };
@@ -16864,6 +16875,10 @@ export class VisualAgentMapView extends ItemView {
         );
       case "remove_relation":
         return t("ui.map_chat_do_remove_relation_0_1", title(action.fromId), title(action.toId));
+      case "set_appearance":
+        return action.nodeIds.length === 1
+          ? t("ui.map_chat_do_appearance_0", title(action.nodeIds[0]))
+          : t("ui.map_chat_do_appearance_many_0", action.nodeIds.length);
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
@@ -17480,6 +17495,8 @@ export class VisualAgentMapView extends ItemView {
       case "add_relation":
       case "remove_relation":
         return this.chatChangeRelation(action, real);
+      case "set_appearance":
+        return this.chatSetAppearance(action, real, run);
       case "collapse_topic":
       case "expand_topic": {
         this.flushChatRender();
@@ -17631,6 +17648,58 @@ export class VisualAgentMapView extends ItemView {
         return done;
       }
     }
+  }
+  /**
+   * set_appearance: the colour, markers and styles of every target in one step, with the topic panel's rules (one colour, one
+   * value per single-choice marker group, one text size; unknown frontmatter values stay). Only the notes whose appearance
+   * really changes are written; Map.md changes only its viewport. A card of an AIM map (or an AIM card) has none and is skipped.
+   */
+  private async chatSetAppearance(
+    action: Extract<MapChatAction, { kind: "set_appearance" }>,
+    real: (id: string) => string | null,
+    run?: ChatRun
+  ): Promise<ChatOutcome> {
+    if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const nodes = action.nodeIds
+      .map(id => real(id))
+      .map(id => (id ? this.map?.nodes.find(node => node.id === id) : undefined))
+      .filter((node): node is MapNode => !!node);
+    if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
+    const editable = nodes.filter(node => !node.aimKind && this.notes.get(node.id));
+    if (!editable.length) return skipped("ui.map_chat_skip_unavailable");
+    if (editable.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    const change: TopicAppearanceChange = {
+      ...(action.color ? { color: action.color === "none" ? null : action.color } : {}),
+      addMarkers: action.markers ?? [],
+      removeMarkers: action.removeMarkers ?? [],
+      addStyles: action.formats ?? [],
+      removeStyles: action.removeFormats ?? []
+    };
+    const transaction = this.beginMapTransaction();
+    let changes = 0;
+    for (const node of editable) {
+      const note = this.notes.get(node.id);
+      // The card's shown values decide whether anything changes (the write itself reads the note again).
+      const shown = {
+        "topic-color": note?.color,
+        "topic-markers": note?.markers ?? [],
+        "topic-style": note?.style ?? []
+      };
+      if (!Object.keys(topicAppearanceValues(shown, change)).length) continue;
+      changes++;
+      run?.notes?.add(node.id);
+      transaction.rewriteNote(node.path, path => this.plugin.repo.writeTopicAppearance(path, change));
+    }
+    if (!changes) return { status: "done" };
+    const viewport = clone(this.map.viewport);
+    const entry = await transaction
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_appearance") });
+    // Inside a reply this joins the reply's one undo step (see applyMapChatActions).
+    this.history.push(entry);
+    return { status: "done" };
   }
   /**
    * add_relation / remove_relation: the same Map.md write as a relation added or removed by hand (`addRelation`,

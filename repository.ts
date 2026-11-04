@@ -2,6 +2,7 @@ import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, s
 import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
 import {
+  changeTopicStyles,
   readTopicColor,
   readTopicStyle,
   setTopicStyle,
@@ -10,7 +11,7 @@ import {
   type TopicStyle
 } from "./topic-colors";
 import { addTopicLink, readTopicLinks, removeTopicLink, type AddTopicLinkResult } from "./topic-links";
-import { readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
+import { changeTopicMarkers, readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
 import { createHash } from "node:crypto";
 import {
   contentLocale,
@@ -485,6 +486,35 @@ type FrontmatterValue = string | string[] | boolean | null;
  * is already there keeps its place; new keys go at the end. Strings are written as JSON strings, which are valid YAML
  * double-quoted scalars.
  */
+/** What a map chat reply changes in a topic's appearance; see {@link Repository.writeTopicAppearance}. */
+export interface TopicAppearanceChange {
+  /** A colour, null to remove it; absent keeps it. */
+  color?: TopicColor | null;
+  addMarkers?: readonly TopicMarker[];
+  removeMarkers?: readonly (TopicMarker | "all")[];
+  addStyles?: readonly TopicStyle[];
+  removeStyles?: readonly (TopicStyle | "all")[];
+}
+/** The frontmatter keys an appearance change writes: only those whose value really changes (null removes a key). */
+export function topicAppearanceValues(
+  fm: Record<string, unknown>,
+  change: TopicAppearanceChange
+): Record<string, string | string[] | null> {
+  const values: Record<string, string | string[] | null> = {};
+  const same = (next: unknown, raw: unknown): boolean =>
+    JSON.stringify(next) === JSON.stringify(raw === undefined ? null : raw);
+  if (change.color !== undefined && (readTopicColor(fm) ?? null) !== change.color) values["topic-color"] = change.color;
+  if (change.addMarkers?.length || change.removeMarkers?.length) {
+    const next = changeTopicMarkers(fm["topic-markers"], change.addMarkers ?? [], change.removeMarkers ?? []);
+    if (!same(next, fm["topic-markers"])) values["topic-markers"] = next;
+  }
+  if (change.addStyles?.length || change.removeStyles?.length) {
+    const next = changeTopicStyles(fm["topic-style"], change.addStyles ?? [], change.removeStyles ?? []);
+    if (!same(next, fm["topic-style"])) values["topic-style"] = next;
+  }
+  return values;
+}
+
 export function setFrontmatterKeys(content: string, values: Record<string, FrontmatterValue>): string {
   const eol = content.includes("\r\n") ? "\r\n" : "\n";
   const render = (key: string, value: string | string[] | boolean): string[] =>
@@ -1948,6 +1978,19 @@ export class Repository {
       const next = "toggle" in change ? toggleTopicStyle(raw, change.toggle) : setTopicStyle(raw, change.set);
       const same = JSON.stringify(next) === JSON.stringify(raw === undefined ? null : raw);
       return same ? content : setFrontmatterKeys(content, { "topic-style": next });
+    });
+  }
+
+  /**
+   * The appearance change of a map chat reply, in one `vault.process` call that reads the current values: `color` (null
+   * removes it, absent keeps it), markers and styles turned on or off with the same rules as the topic panel
+   * ({@link changeTopicMarkers}, {@link changeTopicStyles}). Only keys whose value changes are written, values this version
+   * does not know are kept, `updated` is not bumped, and a note that would not change is returned byte for byte.
+   */
+  async writeTopicAppearance(path: string, change: TopicAppearanceChange): Promise<void> {
+    await this.app.vault.process(this.file(path), content => {
+      const values = topicAppearanceValues(frontmatter(content), change);
+      return Object.keys(values).length ? setFrontmatterKeys(content, values) : content;
     });
   }
 

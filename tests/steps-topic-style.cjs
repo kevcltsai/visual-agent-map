@@ -92,3 +92,11 @@ test('style compat: the 0.28 frontmatter writer keeps topic-style when it change
   }
   assert.equal(summary.endsWith('\n---\n\n# T\n\nbody\n'), true);
 });
+
+test('chat 08: changeTopicStyles turns styles on and off with the toggle rule; the text size stays one choice, unknown values stay', () => {
+  const plainList = value => (value === null ? null : JSON.parse(JSON.stringify(value)));
+  assert.deepEqual(plainList(m.changeTopicStyles(['text-small', 'glow'], ['text-large', 'bold'], [])), ['glow', 'text-large', 'bold']);
+  assert.deepEqual(plainList(m.changeTopicStyles(['bold', 'line-thick'], ['bold'], ['line-thick'])), ['bold']);
+  assert.deepEqual(plainList(m.changeTopicStyles(['bold', 'glow'], [], ['all'])), ['glow']);
+  assert.equal(m.changeTopicStyles(['bold'], [], ['bold']), null);
+});

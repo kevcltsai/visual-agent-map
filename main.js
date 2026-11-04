@@ -776,6 +776,8 @@ var en = {
   "ui.the_node_to_relink_was_not_found": "The node to relink was not found.",
   "ui.change_saved_refresh_failed": "The change was saved, but the view could not refresh. Reopen the map to see it.",
   "ui.rename_current_mind_map": "Rename current mind map",
+  "ui.duplicate_current_mind_map": "Duplicate current mind map",
+  "ui.duplicate_map_title": "{0} copy",
   "ui.update_the_topic_folder_and_mind_map_name_together": "Update the topic folder and mind map name together.",
   "ui.repair_missing_mind_map": "Repair missing mind map",
   "ui.rebuild_a_missing_map_from_existing_topic_notes": "Rebuild a missing map from existing topic notes.",
@@ -1817,6 +1819,7 @@ var en = {
   "error.target_exists": "Target file already exists",
   "error.note_in_multiple_maps": "A topic note appears in two mind maps",
   "error.topic_folder_exists": "A topic folder with this name already exists.",
+  "error.duplicate_map_unsupported": "Maps made by AIM research cannot be duplicated yet.",
   "detail.no_conclusion_yet": "No conclusion yet",
   "detail.preview": "Preview",
   "ui.map_file_description": "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu.",
@@ -3282,6 +3285,8 @@ var zhCN = {
   "ui.the_node_to_relink_was_not_found": "\u627E\u4E0D\u5230\u8981\u91CD\u65B0\u94FE\u63A5\u7684\u8BAE\u9898\u3002",
   "ui.change_saved_refresh_failed": "\u66F4\u6539\u5DF2\u4FDD\u5B58\uFF0C\u4F46\u754C\u9762\u65E0\u6CD5\u5237\u65B0\u3002\u8BF7\u91CD\u65B0\u6253\u5F00\u5730\u56FE\u67E5\u770B\u3002",
   "ui.rename_current_mind_map": "\u91CD\u547D\u540D\u5F53\u524D\u5FC3\u667A\u56FE",
+  "ui.duplicate_current_mind_map": "\u590D\u5236\u5F53\u524D\u5FC3\u667A\u56FE",
+  "ui.duplicate_map_title": "{0} \u526F\u672C",
   "ui.update_the_topic_folder_and_mind_map_name_together": "\u540C\u65F6\u66F4\u65B0\u4E3B\u9898\u6587\u4EF6\u5939\u4E0E\u5FC3\u667A\u56FE\u540D\u79F0\u3002",
   "ui.repair_missing_mind_map": "\u4FEE\u590D\u9057\u5931\u7684\u5FC3\u667A\u56FE",
   "ui.rebuild_a_missing_map_from_existing_topic_notes": "\u4ECE\u73B0\u6709\u8BAE\u9898\u7B14\u8BB0\u91CD\u65B0\u521B\u5EFA\u7F3A\u5C11\u7684\u5FC3\u667A\u56FE\u3002",
@@ -4323,6 +4328,7 @@ var zhCN = {
   "error.target_exists": "\u76EE\u6807\u6587\u4EF6\u5DF2\u5B58\u5728",
   "error.note_in_multiple_maps": "\u8BAE\u9898\u7B14\u8BB0\u540C\u65F6\u51FA\u73B0\u5728\u4E24\u5F20\u5FC3\u667A\u56FE",
   "error.topic_folder_exists": "\u540C\u540D\u4E3B\u9898\u6587\u4EF6\u5939\u5DF2\u5B58\u5728\u3002",
+  "error.duplicate_map_unsupported": "AIM \u7814\u7A76\u751F\u6210\u7684\u5730\u56FE\u76EE\u524D\u8FD8\u4E0D\u80FD\u590D\u5236\u3002",
   "detail.no_conclusion_yet": "\u5C1A\u672A\u5F62\u6210\u7ED3\u8BBA",
   "detail.preview": "\u9884\u89C8",
   "ui.map_file_description": "\u6B64\u6587\u4EF6\u4FDD\u5B58\u5FC3\u667A\u56FE\u7ED3\u6784\uFF1B\u5B8C\u6574\u5185\u5BB9\u4FDD\u5B58\u5728\u5404\u8BAE\u9898\u7B14\u8BB0\u3002\u4ECE\u6587\u4EF6\u83DC\u5355\u9009\u62E9\u201C\u4EE5\u5FC3\u667A\u56FE\u6253\u5F00\u201D\u3002",
@@ -5788,6 +5794,8 @@ var zhTW = {
   "ui.the_node_to_relink_was_not_found": "\u627E\u4E0D\u5230\u8981\u91CD\u65B0\u9023\u7D50\u7684\u8B70\u984C\u3002",
   "ui.change_saved_refresh_failed": "\u8B8A\u66F4\u5DF2\u5132\u5B58\uFF0C\u4F46\u756B\u9762\u7121\u6CD5\u91CD\u65B0\u6574\u7406\u3002\u8ACB\u91CD\u65B0\u958B\u555F\u5FC3\u667A\u5716\u67E5\u770B\u3002",
   "ui.rename_current_mind_map": "\u91CD\u65B0\u547D\u540D\u76EE\u524D\u5FC3\u667A\u5716",
+  "ui.duplicate_current_mind_map": "\u8907\u88FD\u76EE\u524D\u5FC3\u667A\u5716",
+  "ui.duplicate_map_title": "{0} \u526F\u672C",
   "ui.update_the_topic_folder_and_mind_map_name_together": "\u540C\u6642\u66F4\u65B0\u4E3B\u984C\u8CC7\u6599\u593E\u8207\u5FC3\u667A\u5716\u540D\u7A31\u3002",
   "ui.repair_missing_mind_map": "\u4FEE\u5FA9\u907A\u5931\u7684\u5FC3\u667A\u5716",
   "ui.rebuild_a_missing_map_from_existing_topic_notes": "\u5F9E\u73FE\u6709\u8B70\u984C\u7B46\u8A18\u91CD\u65B0\u5EFA\u7ACB\u7F3A\u5C11\u7684\u5FC3\u667A\u5716\u3002",
@@ -6829,6 +6837,7 @@ var zhTW = {
   "error.target_exists": "\u76EE\u6A19\u6A94\u6848\u5DF2\u5B58\u5728",
   "error.note_in_multiple_maps": "\u8B70\u984C\u7B46\u8A18\u540C\u6642\u51FA\u73FE\u5728\u5169\u5F35\u5FC3\u667A\u5716",
   "error.topic_folder_exists": "\u540C\u540D\u4E3B\u984C\u8CC7\u6599\u593E\u5DF2\u5B58\u5728\u3002",
+  "error.duplicate_map_unsupported": "AIM \u7814\u7A76\u7522\u751F\u7684\u5730\u5716\u76EE\u524D\u9084\u4E0D\u80FD\u8907\u88FD\u3002",
   "detail.no_conclusion_yet": "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6",
   "detail.preview": "\u9810\u89BD",
   "ui.map_file_description": "\u6B64\u6A94\u6848\u4FDD\u5B58\u5FC3\u667A\u5716\u7D50\u69CB\uFF1B\u5B8C\u6574\u5167\u5BB9\u4FDD\u5B58\u5728\u5404\u8B70\u984C\u7B46\u8A18\u3002\u5F9E\u6A94\u6848\u9078\u55AE\u9078\u64C7\u300C\u4EE5\u5FC3\u667A\u5716\u958B\u555F\u300D\u3002",
@@ -23351,6 +23360,7 @@ function coordinatePrint(map) {
   const nodes = [...map.nodes].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   return JSON.stringify(nodes.map((node) => [node.id, node.x, node.y]));
 }
+var cloneJson = (value) => JSON.parse(JSON.stringify(value));
 var Repository = class {
   constructor(app, settings) {
     this.settings = settings;
@@ -24657,6 +24667,60 @@ ${body}`;
     await this.app.vault.create(path, serializeMap(map, this.noteLanguage));
     if (aim == null ? void 0 : aim.creationId) await this.ensureTopicFolders(root);
     return path;
+  }
+  /**
+   * Copies a (non-AIM) map, notes included, to a new map named `title` next to it. The copy is independent: its own
+   * map id, its own note files (new node ids, same titles, body links between the copied notes pointing at the copies)
+   * and its own Map.md. The source is only read. Returns the new Map.md path.
+   */
+  async duplicateMap(sourcePath, title) {
+    const source = await this.readMap(sourcePath);
+    if (source.aim) throw new Error(this.message("error.duplicate_map_unsupported"));
+    const nodes = new Set(source.nodes.map((node) => node.id));
+    const copies = /* @__PURE__ */ new Map(), pairs = [];
+    const mapPath = await this.createMap(title);
+    const target = await this.readMap(mapPath);
+    for (const node of source.nodes) {
+      const copy = await this.duplicateNote(node.path, target, mapPath, { keepTitle: true });
+      copies.set(node.id, copy);
+      pairs.push({ from: node.path, to: copy.path });
+    }
+    await this.rewriteCopiedNoteLinks(pairs);
+    const fresh = (id) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = copies.get(id)) == null ? void 0 : _a2.id) != null ? _b2 : id;
+    };
+    const freshIds = (ids) => ids.map(fresh);
+    await this.updateMap(mapPath, (map) => {
+      map.nodes = source.nodes.map((node) => {
+        const copy = copies.get(node.id);
+        return {
+          ...cloneJson(node),
+          id: copy.id,
+          path: copy.path,
+          parentId: node.parentId && nodes.has(node.parentId) ? fresh(node.parentId) : null
+        };
+      });
+      map.viewport = { ...source.viewport };
+      for (const key2 of ["outputLanguage", "aiMode", "layout", "detailTemplateId", "toneId"])
+        if (source[key2] !== void 0) map[key2] = cloneJson(source[key2]);
+      if (source.topicRelations)
+        map.topicRelations = source.topicRelations.map((relation) => ({
+          ...relation,
+          from: fresh(relation.from),
+          to: fresh(relation.to)
+        }));
+      if (source.canvasItems)
+        map.canvasItems = source.canvasItems.map((item) => {
+          const next = cloneJson(item);
+          if (typeof next.parentId === "string") next.parentId = fresh(next.parentId);
+          if (Array.isArray(next.members)) next.members = freshIds(next.members);
+          if (Array.isArray(next.links)) next.links = freshIds(next.links);
+          return next;
+        });
+    });
+    await this.rebuildDerivedData({ roots: [this.topicRoot(mapPath)] });
+    return mapPath;
   }
   /** Why `path` cannot be a Mind Maps/AIM folder, or null: empty, inside/around the legacy Topics folder, or clashing with the other one. */
   mapFolderProblem(key2, path) {
@@ -59246,6 +59310,8 @@ ${request.requirements}` : preset.text,
       });
     };
     if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
+    if (this.map && !this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
+      add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
     if (this.map && !this.aimLive())
       add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
@@ -59292,6 +59358,21 @@ ${request.requirements}` : preset.text,
       this.map.title,
       (title) => this.enqueue(() => this.renameMapTo(title))
     ).open();
+  }
+  /** "Duplicate current mind map": copies the map and its notes into a new, independent map named "<title> copy" (or " 1", " 2" when taken) and opens it. */
+  duplicateCurrentMap() {
+    if (!this.map) return;
+    const source = this.path;
+    this.enqueue(async () => {
+      if (!this.map || this.path !== source) return;
+      try {
+        const titles = (await this.plugin.repo.topics()).map((topic) => topic.title);
+        const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
+        await this.openMapInMutation(await this.plugin.repo.duplicateMap(source, title));
+      } catch (error) {
+        errorNotice(error);
+      }
+    });
   }
   /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
   async renameMapTo(title) {

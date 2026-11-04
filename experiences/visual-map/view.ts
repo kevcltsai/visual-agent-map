@@ -9923,6 +9923,8 @@ export class VisualAgentMapView extends ItemView {
       });
     };
     if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
+    if (this.map && !this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
+      add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
     if (this.map && !this.aimLive())
       add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
@@ -9967,6 +9969,21 @@ export class VisualAgentMapView extends ItemView {
     new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, title =>
       this.enqueue(() => this.renameMapTo(title))
     ).open();
+  }
+  /** "Duplicate current mind map": copies the map and its notes into a new, independent map named "<title> copy" (or " 1", " 2" when taken) and opens it. */
+  private duplicateCurrentMap(): void {
+    if (!this.map) return;
+    const source = this.path;
+    this.enqueue(async () => {
+      if (!this.map || this.path !== source) return;
+      try {
+        const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+        const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
+        await this.openMapInMutation(await this.plugin.repo.duplicateMap(source, title));
+      } catch (error) {
+        errorNotice(error);
+      }
+    });
   }
   /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
   private async renameMapTo(title: string): Promise<void> {

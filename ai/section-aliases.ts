@@ -109,7 +109,8 @@ export function sectionAliasesFor(heading: string): string[] {
   for (const row of sectionAliasRows())
     if (row.names.some(entry => lowered(entry) === key))
       for (const alias of row.aliases)
-        if (lowered(alias) !== key && !result.some(existing => lowered(existing) === lowered(alias))) result.push(alias);
+        if (lowered(alias) !== key && !result.some(existing => lowered(existing) === lowered(alias)))
+          result.push(alias);
   return result;
 }
 

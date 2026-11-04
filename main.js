@@ -25801,7 +25801,8 @@ function sectionAliasesFor(heading) {
   for (const row of sectionAliasRows())
     if (row.names.some((entry) => lowered(entry) === key2)) {
       for (const alias of row.aliases)
-        if (lowered(alias) !== key2 && !result.some((existing) => lowered(existing) === lowered(alias))) result.push(alias);
+        if (lowered(alias) !== key2 && !result.some((existing) => lowered(existing) === lowered(alias)))
+          result.push(alias);
     }
   return result;
 }
@@ -27098,7 +27099,9 @@ function parseNoteStyleFile(text11, options) {
     const standardAliases = standard >= 0 ? NOTE_LANGUAGES.map((locale) => translate(locale, STANDARD[standard][1])).filter((alias) => alias !== heading.name) : [];
     const aliases = [
       ...standardAliases,
-      ...sectionAliasesFor(heading.name).filter((alias) => !standardAliases.some((known) => lowered2(known) === lowered2(alias)))
+      ...sectionAliasesFor(heading.name).filter(
+        (alias) => !standardAliases.some((known) => lowered2(known) === lowered2(alias))
+      )
     ];
     return {
       id: standard >= 0 ? STANDARD[standard][0] : `s${position + 1}`,

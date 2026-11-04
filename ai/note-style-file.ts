@@ -300,7 +300,9 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
     // Old names of the editorial redesign (section-aliases.ts) join the aliases of the standard spellings.
     const aliases = [
       ...standardAliases,
-      ...sectionAliasesFor(heading.name).filter(alias => !standardAliases.some(known => lowered(known) === lowered(alias)))
+      ...sectionAliasesFor(heading.name).filter(
+        alias => !standardAliases.some(known => lowered(known) === lowered(alias))
+      )
     ];
     return {
       id: standard >= 0 ? STANDARD[standard][0] : `s${position + 1}`,

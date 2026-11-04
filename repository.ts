@@ -30,7 +30,7 @@ import {
   type TranslationKey,
   type UiLanguage
 } from "./i18n";
-import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord } from "./map-model";
+import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord, type TopicRelationKind } from "./map-model";
 import type { CoffeeStyle } from "./experiences/coffee-tables/types";
 import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
@@ -1025,6 +1025,12 @@ interface ReferenceText {
   readonly unassigned: string;
   readonly colon: string;
   readonly listSeparator: string;
+  /**
+   * The wording of a topic relation at each end, `[kind, start, finish]` in the order the lines are written. Start is
+   * the relation's `from` end (A supports B: A reads "Supports: [[B]]", B reads "Supported by: [[A]]"); `related` has
+   * no direction, so both ends read the same.
+   */
+  readonly relations: ReadonlyArray<readonly [TopicRelationKind, string, string]>;
 }
 const REFERENCE_TEXT: Readonly<Record<NoteLanguage, ReferenceText>> = {
   "zh-TW": {
@@ -1033,7 +1039,15 @@ const REFERENCE_TEXT: Readonly<Record<NoteLanguage, ReferenceText>> = {
     archived: "已封存",
     unassigned: "未歸類",
     colon: "：",
-    listSeparator: "、"
+    listSeparator: "、",
+    relations: [
+      ["supports", "支持", "被支持"],
+      ["contradicts", "反駁", "被反駁"],
+      ["verifies", "驗證", "被驗證"],
+      ["derives_from", "推導自", "推導出"],
+      ["prerequisite", "是前置知識於", "前置知識"],
+      ["related", "相關", "相關"]
+    ]
   },
   en: {
     labels: ENGLISH_REFERENCE_LABELS,
@@ -1041,9 +1055,51 @@ const REFERENCE_TEXT: Readonly<Record<NoteLanguage, ReferenceText>> = {
     archived: "Archived",
     unassigned: "Unassigned",
     colon: ": ",
-    listSeparator: ", "
+    listSeparator: ", ",
+    relations: [
+      ["supports", "Supports", "Supported by"],
+      ["contradicts", "Contradicts", "Contradicted by"],
+      ["verifies", "Verifies", "Verified by"],
+      ["derives_from", "Derived from", "Derives"],
+      ["prerequisite", "Prerequisite for", "Prerequisites"],
+      ["related", "Related", "Related"]
+    ]
   }
 };
+/**
+ * The relation lines of the topic `nodeId` in `map`: one line per wording that has any relation, in kind order with the
+ * start wording first, the other ends joined like Child topics. A relation is skipped when either end is not a topic
+ * of the map with a Markdown note (`hasNote`). Descriptions are never written.
+ */
+function relationReferences(
+  map: MapDocument,
+  nodeId: string,
+  language: NoteLanguage,
+  hasNote: (path: string) => boolean
+): string[] {
+  const ref = REFERENCE_TEXT[language];
+  const notes = new Map(map.nodes.filter(node => hasNote(node.path)).map(node => [node.id, node.path]));
+  if (!notes.has(nodeId)) return [];
+  const lines: string[] = [];
+  for (const [kind, start, finish] of ref.relations) {
+    const ends = (side: "from" | "to"): string[] =>
+      (map.topicRelations ?? [])
+        .filter(r => r.kind === kind && r[side] === nodeId)
+        .map(r => notes.get(side === "from" ? r.to : r.from))
+        .filter((path): path is string => path !== undefined);
+    const groups =
+      start === finish
+        ? [[start, [...ends("from"), ...ends("to")]] as const]
+        : [[start, ends("from")] as const, [finish, ends("to")] as const];
+    for (const [label, paths] of groups)
+      if (paths.length)
+        lines.push(
+          `${label}${ref.colon}${[...new Set(paths)].map(path => `[[${noteLink(path)}]]`).join(ref.listSeparator)}`
+        );
+  }
+  return lines;
+}
+
 function localizeReference(value: string, language: NoteLanguage): string {
   const match =
     /^(所屬主題|所屬心智圖|母議題|子議題|來源議題|狀態|Topic|Mind map|Parent topic|Child topics|Source topic|Status)[：:]\s*(.*)$/.exec(
@@ -2509,6 +2565,11 @@ export class Repository {
     }
   }
 
+  /** True when `path` is an existing Markdown file (a topic note a relation line can link to). */
+  private isNoteFile(path: string): boolean {
+    return path.endsWith(".md") && this.app.vault.getAbstractFileByPath(path) instanceof TFile;
+  }
+
   /** The node note with derived lifecycle fields and references applied, or null when it is not a VAM node note. */
   private derivedNoteContent(
     file: TFile,
@@ -2577,7 +2638,8 @@ export class Repository {
         `${parentLabel}${ref.colon}${parent ? `[[${noteLink(parent.path)}]]` : ref.none}`,
         `${childLabel}${ref.colon}${
           children.length ? children.map(child => `[[${noteLink(child.path)}]]`).join(ref.listSeparator) : ref.none
-        }`
+        }`,
+        ...relationReferences(owner.map, owner.node.id, language, path => this.isNoteFile(path))
       ];
       body = withoutReference(body);
     } else if (topic && (state === "unassigned" || state === "archived")) {

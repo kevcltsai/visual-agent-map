@@ -301,18 +301,39 @@ test('dialog: apply hands over the frame once and closes; a whole-picture draft 
   assert.deepEqual(whole.applied.map(edit => edit.frame), [null]);
 });
 
-test('dialog: cancel and close write nothing', async () => {
-  const cancel = openEditor({ initial: START });
-  cancel.cover.keydown({ key: 'ArrowRight', shiftKey: false });
-  cancel.text('Cancel').click();
-  await dom.tick();
-  assert.deepEqual(cancel.applied, []);
-  assert.equal(cancel.modal.closeCount, 1);
-  const close = openEditor({ initial: START });
-  close.cover.keydown({ key: 'ArrowRight', shiftKey: true });
-  close.modal.close();
-  await dom.tick();
-  assert.deepEqual(close.applied, []);
+test('dialog: Cancel and closing write nothing, after a mask move, a size change or a position change; a note without a size starts at 100 percent', async () => {
+  {
+    const cancel = openEditor({ initial: START });
+    cancel.cover.keydown({ key: 'ArrowRight', shiftKey: false });
+    cancel.text('Cancel').click();
+    await dom.tick();
+    assert.deepEqual(cancel.applied, []);
+    assert.equal(cancel.modal.closeCount, 1);
+    const close = openEditor({ initial: START });
+    close.cover.keydown({ key: 'ArrowRight', shiftKey: true });
+    close.modal.close();
+    await dom.tick();
+    assert.deepEqual(close.applied, []);
+  }
+  {
+    const applied = [];
+    const modal = new editor.CoverFrameModal({}, { src: 'x', initial: null, shape: 2, card: plainCard, onApply: async edit => { applied.push(edit); } });
+    modal.open();
+    const slider = dom.find(modal.contentEl, i => i.tag === 'input');
+    assert.equal(slider.value, '100');
+    slider.value = '50';
+    slider.input();
+    modal.close();
+    await dom.tick();
+    assert.deepEqual(applied, []);
+  }
+  {
+    const cancel = openPlaced();
+    cancel.choice('Left').click();
+    cancel.modal.close();
+    await dom.tick();
+    assert.deepEqual(cancel.applied, []);
+  }
 });
 
 test('dialog: a picture that cannot be loaded disables Apply and says so', () => {
@@ -367,16 +388,40 @@ async function harness(text, { cache = { frontmatter: {}, embeds: [{ link: 'img/
 }
 const TEXT = '---\ntype: topic\ntitle: M\ntopic-color: red\n---\n\nBody line\n';
 
-test('write: applying a frame is one history entry, one undo returns the note byte for byte, redo writes it again', async () => {
-  const h = await harness(TEXT);
-  const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START);
-  assert.ok(entry);
-  assert.equal(h.view.history.entries.length, 1, 'exactly one undo entry');
-  assert.match(h.contents.get(NOTE), /topic-color: red\ntopic-cover-frame: "0\.2 0\.3 0\.4 0\.4"\n---\n\nBody line\n$/);
-  await entry.undo();
-  assert.equal(h.contents.get(NOTE), TEXT);
-  await entry.redo();
-  assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"/);
+test('write: frame, size and position are ONE history entry; one undo returns the note byte for byte, redo writes it again', async () => {
+  {
+    // frame only: no size or position line appears
+    const h = await harness(TEXT);
+    const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START);
+    assert.ok(entry);
+    assert.equal(h.view.history.entries.length, 1, 'exactly one undo entry');
+    assert.match(h.contents.get(NOTE), /topic-color: red\ntopic-cover-frame: "0\.2 0\.3 0\.4 0\.4"\n---\n\nBody line\n$/);
+    await entry.undo();
+    assert.equal(h.contents.get(NOTE), TEXT);
+    await entry.redo();
+    assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"/);
+  }
+  {
+    // frame + size, and the default size removes the key
+    const h = await harness(TEXT);
+    const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, { size: 0.5 });
+    assert.equal(h.view.history.entries.length, 1, 'exactly one undo entry');
+    assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"\ntopic-cover-size: "0\.5"\n---/);
+    await entry.undo();
+    assert.equal(h.contents.get(NOTE), TEXT);
+    const sized = await harness('---\ntype: topic\ntopic-cover-size: "0.5"\n---\n');
+    await sized.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, null, { size: 1 });
+    assert.equal(sized.contents.get(NOTE), '---\ntype: topic\n---\n', 'the default size removes the key');
+  }
+  {
+    // frame + size + position
+    const h = await harness(TEXT);
+    const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, { size: 0.45, position: 'left' });
+    assert.equal(h.view.history.entries.length, 1);
+    assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"\ntopic-cover-size: "0\.45"\ntopic-cover-position: "left"\n---/);
+    await entry.undo();
+    assert.equal(h.contents.get(NOTE), TEXT);
+  }
 });
 
 test('write: a whole-picture frame removes the key, and undo brings the old frame line back', async () => {
@@ -400,7 +445,7 @@ test('write: a topic that is not editable is refused and nothing is written', as
   assert.equal(h.view.history.entries.length, 0);
 });
 
-test('open: the dialog starts from the note frame, and cancelling leaves the file byte-identical with no history', async () => {
+test('open: the dialog starts from the note frame and shows the cover picture', async () => {
   const framed = cover.withCoverFrame(TEXT, START);
   const h = await harness(framed, { cache: { frontmatter: { 'topic-cover-frame': '0.2 0.3 0.4 0.4' }, embeds: [{ link: 'img/a.png' }] } });
   let opened = null;
@@ -412,11 +457,56 @@ test('open: the dialog starts from the note frame, and cancelling leaves the fil
   assert.ok(opened, 'a dialog opens for a note with a cover picture');
   nearFrame(opened.draft, START, 'the dialog starts from the note frame');
   assert.equal(dom.find(dom.find(opened.contentEl, i => dom.hasCls(i, 'vam-card-cover-window')), i => i.tag === 'img').attrs.src, 'app://res/img/a.png');
-  dom.find(opened.contentEl, i => dom.hasCls(i, 'vam-card-cover')).keydown({ key: 'ArrowRight', shiftKey: false });
-  opened.close();
-  await dom.tick();
-  assert.equal(h.contents.get(NOTE), framed, 'byte-identical');
-  assert.equal(h.view.history.entries.length, 0);
+});
+
+test('open: Cancel or closing the dialog, after any change, leaves note and map bytes unchanged with no history', async () => {
+  {
+    // a framed note, closed after a mask move
+      const framed = cover.withCoverFrame(TEXT, START);
+      const h = await harness(framed, { cache: { frontmatter: { 'topic-cover-frame': '0.2 0.3 0.4 0.4' }, embeds: [{ link: 'img/a.png' }] } });
+      let opened = null;
+      const Real = h.view.openCoverFrameEditor;
+      assert.equal(typeof Real, 'function');
+      h.view.enqueue = fn => fn();
+      const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE });
+      opened = modal;
+      assert.ok(opened, 'a dialog opens for a note with a cover picture');
+      nearFrame(opened.draft, START, 'the dialog starts from the note frame');
+      assert.equal(dom.find(dom.find(opened.contentEl, i => dom.hasCls(i, 'vam-card-cover-window')), i => i.tag === 'img').attrs.src, 'app://res/img/a.png');
+      dom.find(opened.contentEl, i => dom.hasCls(i, 'vam-card-cover')).keydown({ key: 'ArrowRight', shiftKey: false });
+      opened.close();
+      await dom.tick();
+      assert.equal(h.contents.get(NOTE), framed, 'byte-identical');
+      assert.equal(h.view.history.entries.length, 0);
+  }
+  {
+    // a width change, closed
+      const h = await harness(TEXT, { nodes: mapNodes() });
+      const mapBefore = await h.repo.readMap('Topics/Map.md');
+      h.view.enqueue = fn => fn();
+      const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE, width: 360 });
+      const handle = dom.find(modal.contentEl, i => dom.hasCls(i, 'vam-card-frame-width'));
+      assert.equal(handle.attrs['aria-valuenow'], '360', 'starts at the map width');
+      handle.keydown({ key: 'End' });
+      modal.close();
+      await dom.tick();
+      assert.equal(h.contents.get(NOTE), TEXT);
+      assert.deepEqual(await h.repo.readMap('Topics/Map.md'), mapBefore);
+      assert.equal(h.view.history.entries.length, 0);
+  }
+  {
+    // a typed title and summary, Cancel button
+      const h = await textHarness();
+      const mapBefore = await h.repo.readMap('Topics/Map.md');
+      const ui = openText(h);
+      ui.type(ui.title, 'Nope');
+      ui.type(ui.summary, 'Nope either');
+      ui.cancel.click();
+      await dom.tick(); await dom.tick();
+      assert.equal(noteOf(h), SUMMARY_TEXT);
+      assert.deepEqual(await h.repo.readMap('Topics/Map.md'), mapBefore);
+      assert.equal(h.view.history.past.length, 0);
+  }
 });
 
 test('open: no dialog when the topic has no cover picture or the cover is off', async () => {
@@ -565,31 +655,6 @@ test('size slider: in the tool row above the card, 30-100 percent, starts from t
   nearFrame(applied[0].frame, START);
 });
 
-test('size slider: cancel writes nothing; a dialog for a note without a size starts at 100 percent', async () => {
-  const applied = [];
-  const modal = new editor.CoverFrameModal({}, { src: 'x', initial: null, shape: 2, card: plainCard, onApply: async edit => { applied.push(edit); } });
-  modal.open();
-  const slider = dom.find(modal.contentEl, i => i.tag === 'input');
-  assert.equal(slider.value, '100');
-  slider.value = '50';
-  slider.input();
-  modal.close();
-  await dom.tick();
-  assert.deepEqual(applied, []);
-});
-
-test('write: frame and size are one history entry; undo returns the note byte for byte', async () => {
-  const h = await harness(TEXT);
-  const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, { size: 0.5 });
-  assert.equal(h.view.history.entries.length, 1, 'exactly one undo entry');
-  assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"\ntopic-cover-size: "0\.5"\n---/);
-  await entry.undo();
-  assert.equal(h.contents.get(NOTE), TEXT);
-  const sized = await harness('---\ntype: topic\ntopic-cover-size: "0.5"\n---\n');
-  await sized.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, null, { size: 1 });
-  assert.equal(sized.contents.get(NOTE), '---\ntype: topic\n---\n', 'the default size removes the key');
-});
-
 test('open: the dialog gets the note size, and Apply sends frame and size to one write', async () => {
   const h = await harness(TEXT, { cache: { frontmatter: { 'topic-cover-size': '0.6' }, embeds: [{ link: 'img/a.png' }] } });
   h.view.enqueue = fn => fn();
@@ -651,7 +716,7 @@ test('position: switching to left or right with a picture over half the width se
   assert.equal(back.slider.value, '40', 'going back to top keeps the size');
 });
 
-test('position: arrow keys move between the choices; Apply hands over frame, size and position once; Cancel writes nothing', async () => {
+test('position: arrow keys move between the choices; Apply hands over frame, size and position once', async () => {
   const ui = openPlaced({ size: 0.8 });
   let prevented = 0;
   ui.choices[0].keydown({ key: 'ArrowRight', preventDefault() { prevented++; } });
@@ -667,20 +732,6 @@ test('position: arrow keys move between the choices; Apply hands over frame, siz
   assert.equal(ui.applied[0].position, 'right');
   assert.equal(ui.applied[0].size, 0.45);
   nearFrame(ui.applied[0].frame, START, 'the mask is unchanged by the position');
-  const cancel = openPlaced();
-  cancel.choice('Left').click();
-  cancel.modal.close();
-  await dom.tick();
-  assert.deepEqual(cancel.applied, []);
-});
-
-test('write: frame, size and position are one history entry; undo returns the note byte for byte', async () => {
-  const h = await harness(TEXT);
-  const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, { size: 0.45, position: 'left' });
-  assert.equal(h.view.history.entries.length, 1);
-  assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"\ntopic-cover-size: "0\.45"\ntopic-cover-position: "left"\n---/);
-  await entry.undo();
-  assert.equal(h.contents.get(NOTE), TEXT);
 });
 
 test('open: a copied side-layout card is taken apart and rebuilt around the editable cover', async () => {
@@ -799,32 +850,6 @@ test('width: the standard width removes the key; an over-limit value is clamped 
   assert.equal((await savedNode(h)).width, graph.CARD_WIDTH_MAX);
   await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, null);
   assert.equal((await savedNode(h)).width, graph.CARD_WIDTH_MAX, 'a call without width keeps the stored width');
-});
-
-test('width: opening the dialog passes the card width; Cancel after a width change leaves note and map bytes unchanged', async () => {
-  const h = await harness(TEXT, { nodes: mapNodes() });
-  const mapBefore = await h.repo.readMap('Topics/Map.md');
-  h.view.enqueue = fn => fn();
-  const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE, width: 360 });
-  const handle = dom.find(modal.contentEl, i => dom.hasCls(i, 'vam-card-frame-width'));
-  assert.equal(handle.attrs['aria-valuenow'], '360', 'starts at the map width');
-  handle.keydown({ key: 'End' });
-  modal.close();
-  await dom.tick();
-  assert.equal(h.contents.get(NOTE), TEXT);
-  assert.deepEqual(await h.repo.readMap('Topics/Map.md'), mapBefore);
-  assert.equal(h.view.history.entries.length, 0);
-});
-
-test('width: Apply from the opened dialog writes the map width and the note in one history entry', async () => {
-  const h = await harness(TEXT, { nodes: mapNodes() });
-  h.view.enqueue = fn => fn();
-  const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE, width: 360 });
-  dom.find(modal.contentEl, i => dom.hasCls(i, 'vam-card-frame-width')).keydown({ key: 'End' });
-  dom.find(modal.contentEl, i => i.tag === 'button' && i.text === 'Apply').click();
-  await dom.tick(); await dom.tick();
-  assert.equal(h.view.history.entries.length, 1);
-  assert.equal((await savedNode(h)).width, graph.CARD_WIDTH_MAX);
 });
 
 // ---- ticket 05: title and summary are typed in place
@@ -970,19 +995,6 @@ test('text: everything from the dialog (mask, size, position, width, title, summ
   await h.view.history.future.at(-1).redo();
   assert.equal(stamp(noteOf(h)), stamp(afterNote), 'redo writes the same note (the updated stamp aside)');
   assert.deepEqual(await h.repo.readMap('Topics/Map.md'), afterMap);
-});
-
-test('text: Cancel after typing a title and a summary leaves note and map bytes unchanged with no history', async () => {
-  const h = await textHarness();
-  const mapBefore = await h.repo.readMap('Topics/Map.md');
-  const ui = openText(h);
-  ui.type(ui.title, 'Nope');
-  ui.type(ui.summary, 'Nope either');
-  ui.cancel.click();
-  await dom.tick(); await dom.tick();
-  assert.equal(noteOf(h), SUMMARY_TEXT);
-  assert.deepEqual(await h.repo.readMap('Topics/Map.md'), mapBefore);
-  assert.equal(h.view.history.past.length, 0);
 });
 
 test('text: a topic without a summary gets an empty one to type in, right under the title; clearing the summary is allowed', async () => {

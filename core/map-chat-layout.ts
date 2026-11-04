@@ -101,13 +101,24 @@ export interface ChatLineCounts {
   skipped: number;
   failed: number;
 }
-/** Counts result lines by status. `ignore` lines (the closing "cannot be undone" note) are not results. */
-export function countChatLines(
-  lines: readonly { status: "done" | "skipped" | "failed"; text: string }[],
-  ignore?: string
-): ChatLineCounts {
+type ChatLineLike = { status: "done" | "skipped" | "failed"; text: string };
+const noteSet = (notes?: string | readonly string[]): readonly string[] =>
+  notes === undefined ? [] : typeof notes === "string" ? [notes] : notes;
+/** Splits result lines from notes (the "cannot be undone" line, the auto-layout line): notes show but are not results. */
+export function splitChatLines<T extends ChatLineLike>(
+  lines: readonly T[],
+  notes?: string | readonly string[]
+): { results: T[]; notes: T[] } {
+  const texts = noteSet(notes);
+  return {
+    results: lines.filter(line => !texts.includes(line.text)),
+    notes: lines.filter(line => texts.includes(line.text))
+  };
+}
+/** Counts result lines by status. `ignore` lines (the closing "cannot be undone" note, the auto-layout note) are not results. */
+export function countChatLines(lines: readonly ChatLineLike[], ignore?: string | readonly string[]): ChatLineCounts {
   const counts: ChatLineCounts = { done: 0, skipped: 0, failed: 0 };
-  for (const line of lines) if (line.text !== ignore) counts[line.status]++;
+  for (const line of splitChatLines(lines, ignore).results) counts[line.status]++;
   return counts;
 }
 

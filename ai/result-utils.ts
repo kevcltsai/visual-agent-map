@@ -22,23 +22,39 @@ export { fencedLines } from "./markdown-blocks";
 
 const SENTENCE_END = /[。！？；!?;]/;
 
+// Full-width and CJK code points take a whole unit of display width; every other character takes half a unit.
+const WIDE_CHARACTER =
+  /[\u1100-\u115f\u2e80-\u303e\u3040-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{20000}-\u{3fffd}]/u;
+const characterWidth = (character: string): number => (WIDE_CHARACTER.test(character) ? 1 : 0.5);
+
 /**
- * Shortens a map summary to `limit` code points without leaving trailing whitespace.
+ * Shortens a map summary to `limit` display units without leaving trailing whitespace. CJK and full-width characters
+ * count 1, other characters 0.5 (80 units = 80 Chinese characters or about 160 Latin ones).
  * Prefers a sentence end, then a word gap, in the second half of the window; otherwise
  * cuts hard. Shortened text that does not end a sentence gets an ellipsis within the limit.
  */
 export function truncateSummary(value: string, limit = 80): string {
   const characters = Array.from(value.trim());
-  if (characters.length <= limit) return characters.join("");
-  const floor = Math.floor(limit / 2);
-  for (let index = limit - 1; index >= floor; index--) {
+  const widths = characters.map(characterWidth);
+  const total = widths.reduce((sum, width) => sum + width, 0);
+  if (total <= limit) return characters.join("");
+  // `end(count)` is the width of the first `count` characters.
+  const prefix: number[] = [0];
+  for (const width of widths) prefix.push(prefix[prefix.length - 1] + width);
+  const floor = limit / 2;
+  for (let index = characters.length - 1; index >= 0; index--) {
+    if (prefix[index + 1] > limit || prefix[index + 1] < floor) continue;
     const character = characters[index];
     if (SENTENCE_END.test(character) || (character === "." && /\s/.test(characters[index + 1] ?? "")))
       return characters.slice(0, index + 1).join("");
   }
-  const window = characters.slice(0, limit - 1);
+  // Room for the ellipsis (one unit) is kept inside the limit.
+  let count = 0;
+  while (count < characters.length && prefix[count + 1] <= limit - 1) count++;
+  const window = characters.slice(0, count);
   let gap = -1;
-  for (let index = window.length - 1; index >= floor && gap < 0; index--) if (/\s/.test(window[index])) gap = index;
+  for (let index = window.length - 1; index >= 0 && prefix[index] >= floor && gap < 0; index--)
+    if (/\s/.test(window[index])) gap = index;
   return `${(gap >= 0 ? window.slice(0, gap) : window).join("").trimEnd()}…`;
 }
 

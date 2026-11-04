@@ -20755,7 +20755,7 @@ var synthesis_goal_en_default = "Using the direct subtopics and selected note so
 var merge_goal_zh_default = '\u628A\u63D0\u4F9B\u7684\u4F86\u6E90\u8B70\u984C\u5408\u4F75\u6210\u9019\u4E00\u500B\u8B70\u984C\uFF1A\u4FDD\u7559\u6BCF\u500B\u4F86\u6E90\u7684\u5168\u90E8\u8CC7\u8A0A\uFF08\u4E8B\u5BE6\u3001\u6578\u5B57\u3001\u689D\u4EF6\u3001\u4F8B\u5B50\u3001\u4F86\u6E90\u9023\u7D50\u8207\u5F85\u78BA\u8A8D\u4E8B\u9805\uFF09\uFF0C\u53EA\u522A\u9664\u91CD\u8907\u7684\u90E8\u5206\uFF1B\u4E0D\u52A0\u5165\u4F86\u6E90\u6C92\u6709\u7684\u7D50\u8AD6\u3001\u6BD4\u8F03\u3001\u8A55\u50F9\u6216\u5EFA\u8B70\uFF1B\u4F86\u6E90\u5F7C\u6B64\u77DB\u76FE\u6642\u4E26\u5217\u5448\u73FE\u4E26\u8A3B\u660E\u51FA\u81EA\u54EA\u500B\u8B70\u984C\u3002summary \u662F\u4E00\u53E5 80 \u5B57\u5167\u3001\u53EA\u6839\u64DA\u4F86\u6E90\u7684\u5408\u4F75\u5F8C\u76EE\u524D\u7406\u89E3\u3002detail \u662F\u5B8C\u6574\u77E5\u8B58\u9801\u3002suggestions \u53EA\u56DE\u50B3\u4E00\u7B46\uFF0C\u683C\u5F0F {"title":"\u5408\u4F75\u5F8C\u7684\u8B70\u984C\u540D\u7A31","task":"","contribution":"","parentTitle":""}\uFF1Btitle \u662F\u4F60\u66FF\u5408\u4F75\u5F8C\u9019\u500B\u8B70\u984C\u53D6\u7684\u540D\u7A31\uFF1A20 \u5B57\u5167\u3001\u6982\u62EC\u6240\u6709\u4F86\u6E90\u3001\u4F7F\u7528\u8F38\u51FA\u8A9E\u8A00\u3001\u4E0D\u52A0\u5F15\u865F\u3002\n';
 
 // experiences/visual-map/steps/merge-goal.en.md
-var merge_goal_en_default = 'Merge the provided source topics into this one topic. Keep every piece of information from each source (facts, numbers, conditions, examples, source links and open questions) and remove only duplicates. Do not add conclusions, comparisons, judgements or recommendations the sources do not contain. Where sources contradict each other, show both and name the topic each comes from. summary is one sentence of at most 80 characters, based only on the sources. detail is the complete knowledge page. Return exactly one suggestion, shaped {"title":"the merged topic name","task":"","contribution":"","parentTitle":""}; title is the name you give the merged topic: concise (at most 8 words), covering all sources, in the output language, without quotation marks.\n';
+var merge_goal_en_default = 'Merge the provided source topics into this one topic. Keep every piece of information from each source (facts, numbers, conditions, examples, source links and open questions) and remove only duplicates. Do not add conclusions, comparisons, judgements or recommendations the sources do not contain. Where sources contradict each other, show both and name the topic each comes from. summary is one sentence of at most 160 characters, based only on the sources. detail is the complete knowledge page. Return exactly one suggestion, shaped {"title":"the merged topic name","task":"","contribution":"","parentTitle":""}; title is the name you give the merged topic: concise (at most 8 words), covering all sources, in the output language, without quotation marks.\n';
 
 // experiences/visual-map/steps/fragments.ts
 var text3 = (template2) => renderTemplate(template2, {});
@@ -21014,19 +21014,19 @@ var detail_structure_en_default = "The detail must use exactly these six level-t
 var general_task_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u6703\u76F4\u63A5\u53D6\u4EE3\u820A Detail \u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u5FC5\u9808\u5438\u6536\u820A\u5167\u5BB9\u8207\u672C\u6B21\u767C\u73FE\u3001\u53BB\u9664\u91CD\u8907\u3001\u4FDD\u7559\u4ECD\u6709\u6548\u7684\u4F86\u6E90\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task.en.md
-var general_task_en_default = "General task: summary is one new insight for the mind map, within 80 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
 
 // core/steps/task/general-task-top.zh.md
 var general_task_top_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task-top.en.md
-var general_task_top_en_default = "General task: summary is one new insight for the mind map, within 80 characters. Detail returns only what this research newly found, split by section heading (###); omit sections with nothing new. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_top_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail returns only what this research newly found, split by section heading (###); omit sections with nothing new. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
 
 // core/steps/task/general-task-fresh.zh.md
 var general_task_fresh_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u4E00\u4EFD\u6839\u64DA\u672C\u6B21\u7814\u7A76\u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u53BB\u9664\u91CD\u8907\u4E26\u4FDD\u7559\u6709\u6548\u7684\u4F86\u6E90\uFF1B\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
 
 // core/steps/task/general-task-fresh.en.md
-var general_task_fresh_en_default = "General task: summary is one new insight for the mind map, within 80 characters. Detail is a complete knowledge page based on this research, without duplication and keeping valid sources; do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+var general_task_fresh_en_default = "General task: summary is one new insight for the mind map, within 160 characters. Detail is a complete knowledge page based on this research, without duplication and keeping valid sources; do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
 
 // core/steps/task/conflict-rule.zh.md
 var conflict_rule_zh_default = "\u672C\u6B21\u767C\u73FE\u8207\u73FE\u6709 Detail \u4E0D\u4E00\u81F4\u6642\uFF0C\u5169\u7A2E\u8AAA\u6CD5\u90FD\u4FDD\u7559\u4E26\u5404\u6A19\u65E5\u671F\u8207\u4F86\u6E90\uFF0C\u5BEB\u4E00\u53E5\u76EE\u524D\u5224\u65B7\uFF08\u4F9D\u4F86\u6E90\u65B0\u820A\u8207\u5F37\u5F31\uFF09\uFF1B\u628A\u9019\u4E00\u9EDE\u52A0\u5165\u5F85\u78BA\u8A8D\u4E8B\u9805\u6BB5\uFF0C\u6C92\u6709\u8A72\u6BB5\u5C31\u5728\u76F8\u95DC\u6BB5\u843D\u4E26\u5217\uFF1B\u66F4\u65B0\u7D00\u9304\u5BEB\u4E00\u884C\u300C\u8207\u5148\u524D\u7D50\u8AD6\u4E0D\u4E00\u81F4\uFF1A\u2026\u300D\u3002\n";
@@ -21038,13 +21038,13 @@ var conflict_rule_en_default = 'When a new finding disagrees with the existing D
 var synthesize_top_zh_default = "\u9019\u662F Synthesize \u6A21\u5F0F\uFF1Asummary \u5FC5\u9808\u662F\u9AD8\u54C1\u8CEA\u6574\u5408\u7D50\u8AD6\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u6574\u5408\u7684\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF0C\u6E05\u695A\u5448\u73FE\u5171\u8B58\u3001\u5206\u6B67\u3001\u53D6\u6368\u8207\u672A\u89E3\u554F\u984C\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\uFF1B\u82E5\u4ECB\u9762\u63D0\u4F9B\u78BA\u8A8D\u8349\u7A3F\uFF0C\u78BA\u8A8D\u5F8C\u624D\u6703\u5BEB\u56DE\u3002\n";
 
 // core/steps/task/synthesize-top.en.md
-var synthesize_top_en_default = "Synthesize mode: summary is a high-quality integrated conclusion within 80 characters. Detail returns only what this synthesis newly found, split by section heading (###), omitting sections with nothing new, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). If the UI offers draft review, write only after confirmation.\n";
+var synthesize_top_en_default = "Synthesize mode: summary is a high-quality integrated conclusion within 160 characters. Detail returns only what this synthesis newly found, split by section heading (###), omitting sections with nothing new, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). If the UI offers draft review, write only after confirmation.\n";
 
 // core/steps/task/synthesize-fresh.zh.md
 var synthesize_fresh_zh_default = "\u9019\u662F Synthesize \u6A21\u5F0F\uFF1Asummary \u5FC5\u9808\u662F\u9AD8\u54C1\u8CEA\u6574\u5408\u7D50\u8AD6\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u4E00\u4EFD\u6839\u64DA\u4F86\u6E90\u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u6536\u6582\u91CD\u8907\u5167\u5BB9\u3001\u6E05\u695A\u5448\u73FE\u5171\u8B58\u3001\u5206\u6B67\u3001\u53D6\u6368\u8207\u672A\u89E3\u554F\u984C\uFF1B\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\uFF1B\u82E5\u4ECB\u9762\u63D0\u4F9B\u78BA\u8A8D\u8349\u7A3F\uFF0C\u78BA\u8A8D\u5F8C\u624D\u6703\u5BEB\u56DE\u3002\n";
 
 // core/steps/task/synthesize-fresh.en.md
-var synthesize_fresh_en_default = "Synthesize mode: summary is a high-quality integrated conclusion within 80 characters. Detail is a complete knowledge page based on the sources, removes duplication, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions; do not write an update log section (the plugin writes it). If the UI offers draft review, write only after confirmation.\n";
+var synthesize_fresh_en_default = "Synthesize mode: summary is a high-quality integrated conclusion within 160 characters. Detail is a complete knowledge page based on the sources, removes duplication, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions; do not write an update log section (the plugin writes it). If the UI offers draft review, write only after confirmation.\n";
 
 // core/steps/task/label-detail-top.zh.md
 var label_detail_top_zh_default = "\u4EE5\u4E0B\u662F\u73FE\u6709\u7B46\u8A18\uFF0C\u53EA\u4F9B\u53C3\u8003\uFF1B\u53EA\u56DE\u50B3\u672C\u6B21\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\n";
@@ -21098,7 +21098,7 @@ var heading_rule_note_en_default = "The six standard Detail headings are fixed i
 var merge_zh_default = "\u9019\u662F Merge \u6A21\u5F0F\uFF1A\u628A\u4F86\u6E90\u8B70\u984C\u5408\u4F75\u6210\u4E00\u7BC7\uFF0C\u53EA\u6574\u7406\u4F86\u6E90\u88E1\u5DF2\u7D93\u5BEB\u7684\u5167\u5BB9\u3002summary \u662F\u4E00\u53E5 80 \u5B57\u5167\u3001\u53EA\u6839\u64DA\u4F86\u6E90\u7684\u5408\u4F75\u5F8C\u76EE\u524D\u7406\u89E3\u3002detail \u4FDD\u7559\u6BCF\u500B\u4F86\u6E90\u7684\u5168\u90E8\u8CC7\u8A0A\uFF08\u4E8B\u5BE6\u3001\u6578\u5B57\u3001\u689D\u4EF6\u3001\u4F8B\u5B50\u3001\u4F86\u6E90\u9023\u7D50\u8207\u5F85\u78BA\u8A8D\u4E8B\u9805\uFF09\uFF0C\u53EA\u522A\u9664\u91CD\u8907\uFF0C\u4E26\u653E\u9032\u4E0B\u5217\u6A19\u984C\u4E4B\u4E0B\u3002\u4E0D\u5F97\u65B0\u589E\u4F86\u6E90\u6C92\u6709\u7684\u6BD4\u8F03\u3001\u8DA8\u52E2\u3001\u56E0\u679C\u3001\u8A55\u50F9\u3001\u5EFA\u8B70\u3001\u63A8\u8AD6\u6216\u5F85\u78BA\u8A8D\u4E8B\u9805\uFF1B\u4F86\u6E90\u6C92\u6709\u5BEB\u7684\u6BB5\u843D\u5C31\u5BEB\u300C\u9019\u6B21\u6C92\u6709\u65B0\u5167\u5BB9\u300D\uFF0C\u4E0D\u8981\u81EA\u5DF1\u88DC\u3002\u4F86\u6E90\u5F7C\u6B64\u77DB\u76FE\u6642\u4E26\u5217\u5448\u73FE\u4E26\u8A3B\u660E\u51FA\u81EA\u54EA\u500B\u8B70\u984C\u3002\u4FDD\u7559\u4F86\u6E90\u539F\u6709\u7684\u8868\u683C\u3001\u5716\u7247\u8207\u9023\u7D50\uFF0C\u4E0D\u65B0\u589E\u4F86\u6E90\u6C92\u6709\u7684\u63D0\u793A\u6846\u3001\u5F85\u8FA6\u6E05\u55AE\u3001\u5716\u8868\u6216\u91CD\u9EDE\u6A19\u793A\u3002\u4E0B\u5217\u6A19\u984C\u7684\u8AAA\u660E\u53EA\u7528\u4F86\u6C7A\u5B9A\u4F86\u6E90\u5167\u5BB9\u653E\u54EA\u4E00\u6BB5\uFF0C\u4E0D\u662F\u8981\u4F60\u88DC\u5BEB\u5167\u5BB9\u3002\n";
 
 // core/steps/task/merge.en.md
-var merge_en_default = `Merge mode: combine the source topics into one page by organizing only what the sources already say. summary is one sentence of at most 80 characters, based only on the sources. detail keeps every piece of information from each source (facts, numbers, conditions, examples, source links and open questions) and removes only duplicates, placed under the headings below. Do not add comparisons, trends, causal claims, judgements, recommendations, inferences or open questions the sources do not contain; a section the sources have nothing for says "No new content this time" and is not filled in by you. Where sources contradict each other, show both side by side and name the topic each comes from. Keep the sources' tables, images and links, and do not add callouts, task lists, charts or highlights they do not have. The section descriptions below only decide where source content goes; they are not a request to write more.
+var merge_en_default = `Merge mode: combine the source topics into one page by organizing only what the sources already say. summary is one sentence of at most 160 characters, based only on the sources. detail keeps every piece of information from each source (facts, numbers, conditions, examples, source links and open questions) and removes only duplicates, placed under the headings below. Do not add comparisons, trends, causal claims, judgements, recommendations, inferences or open questions the sources do not contain; a section the sources have nothing for says "No new content this time" and is not filled in by you. Where sources contradict each other, show both side by side and name the topic each comes from. Keep the sources' tables, images and links, and do not add callouts, task lists, charts or highlights they do not have. The section descriptions below only decide where source content goes; they are not a request to write more.
 `;
 
 // core/steps/task/merge-repair.zh.md
@@ -21111,7 +21111,7 @@ var merge_repair_en_default = 'The previous merged summary and detail (shown abo
 var synthesize_zh_default = "\u9019\u662F Synthesize \u6A21\u5F0F\uFF1Asummary \u5FC5\u9808\u662F\u9AD8\u54C1\u8CEA\u6574\u5408\u7D50\u8AD6\uFF0C80 \u5B57\u5167\uFF1Bdetail \u5FC5\u9808\u6574\u5408\u4F86\u6E90\u5B8C\u6574\u77E5\u8B58\u3001\u6536\u6582\u91CD\u8907\u5167\u5BB9\u3001\u6E05\u695A\u5448\u73FE\u5171\u8B58\u3001\u5206\u6B67\u3001\u53D6\u6368\u8207\u672A\u89E3\u554F\u984C\uFF1B\u82E5\u4ECB\u9762\u63D0\u4F9B\u78BA\u8A8D\u8349\u7A3F\uFF0C\u78BA\u8A8D\u5F8C\u624D\u6703\u5BEB\u56DE\u3002\n";
 
 // core/steps/task/synthesize.en.md
-var synthesize_en_default = "Synthesize mode: summary is a high-quality integrated conclusion within 80 characters. Detail integrates complete source knowledge, removes duplication, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions. If the UI offers draft review, write only after confirmation.\n";
+var synthesize_en_default = "Synthesize mode: summary is a high-quality integrated conclusion within 160 characters. Detail integrates complete source knowledge, removes duplication, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions. If the UI offers draft review, write only after confirmation.\n";
 
 // core/steps/task/visual-auto.zh.md
 var visual_auto_zh_default = "\u5716\u7247\u80FD\u660E\u986F\u5E6B\u52A9\u7406\u89E3\u6216\u4F7F\u7528\u8005\u660E\u78BA\u8981\u6C42\u5716\u7247\u6642\uFF0C\u624D\u641C\u5C0B\u5716\u7247\u53C3\u8003\u3002\n";
@@ -21766,9 +21766,17 @@ var MAP_CHAT_EXAMPLE_KEYS = [
   "ui.map_chat_example_learn",
   "ui.map_chat_example_decide"
 ];
+var noteSet = (notes) => notes === void 0 ? [] : typeof notes === "string" ? [notes] : notes;
+function splitChatLines(lines, notes) {
+  const texts2 = noteSet(notes);
+  return {
+    results: lines.filter((line) => !texts2.includes(line.text)),
+    notes: lines.filter((line) => texts2.includes(line.text))
+  };
+}
 function countChatLines(lines, ignore) {
   const counts = { done: 0, skipped: 0, failed: 0 };
-  for (const line of lines) if (line.text !== ignore) counts[line.status]++;
+  for (const line of splitChatLines(lines, ignore).results) counts[line.status]++;
   return counts;
 }
 var CHAT_PLAN_GROUP_ORDER = ["create", "change", "delete", "research", "view"];
@@ -25667,19 +25675,29 @@ var import_obsidian34 = require("obsidian");
 
 // ai/result-utils.ts
 var SENTENCE_END = /[。！？；!?;]/;
+var WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\u303e\u3040-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{20000}-\u{3fffd}]/u;
+var characterWidth = (character) => WIDE_CHARACTER.test(character) ? 1 : 0.5;
 function truncateSummary(value, limit = 80) {
   var _a2;
   const characters = Array.from(value.trim());
-  if (characters.length <= limit) return characters.join("");
-  const floor = Math.floor(limit / 2);
-  for (let index = limit - 1; index >= floor; index--) {
+  const widths = characters.map(characterWidth);
+  const total2 = widths.reduce((sum, width) => sum + width, 0);
+  if (total2 <= limit) return characters.join("");
+  const prefix = [0];
+  for (const width of widths) prefix.push(prefix[prefix.length - 1] + width);
+  const floor = limit / 2;
+  for (let index = characters.length - 1; index >= 0; index--) {
+    if (prefix[index + 1] > limit || prefix[index + 1] < floor) continue;
     const character = characters[index];
     if (SENTENCE_END.test(character) || character === "." && /\s/.test((_a2 = characters[index + 1]) != null ? _a2 : ""))
       return characters.slice(0, index + 1).join("");
   }
-  const window2 = characters.slice(0, limit - 1);
+  let count = 0;
+  while (count < characters.length && prefix[count + 1] <= limit - 1) count++;
+  const window2 = characters.slice(0, count);
   let gap = -1;
-  for (let index = window2.length - 1; index >= floor && gap < 0; index--) if (/\s/.test(window2[index])) gap = index;
+  for (let index = window2.length - 1; index >= 0 && prefix[index] >= floor && gap < 0; index--)
+    if (/\s/.test(window2[index])) gap = index;
   return `${(gap >= 0 ? window2.slice(0, gap) : window2).join("").trimEnd()}\u2026`;
 }
 var LEGACY_SEARCH_FAILURE = /\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i;
@@ -30623,6 +30641,7 @@ function settledLine(line) {
 }
 var STAGE_ORDER = { preparing: 0, consent: 1, waiting: 2, writing: 3, applying: 4 };
 var LABEL_LIMIT2 = 40;
+var chatNoteTexts = () => [t("ui.map_chat_not_undoable"), t("ui.map_chat_auto_layout_added")];
 var clip2 = (value, limit = LABEL_LIMIT2) => {
   const text11 = value.replace(/\s+/g, " ").trim();
   const characters = [...text11];
@@ -31375,7 +31394,7 @@ ${typed}` : draft;
     (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
     if (lines == null ? void 0 : lines.length)
       this.announce(
-        t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, t("ui.map_chat_not_undoable"))))
+        t("ui.map_chat_live_results_0", this.countsText(countChatLines(lines, chatNoteTexts())))
       );
   }
   /** Offers a short list to pick from under the last answer. */
@@ -31796,7 +31815,7 @@ ${typed}` : draft;
   }
   spokenTurn(reply, lines) {
     const said = t("ui.map_chat_live_done_0", clip2(reply, 160));
-    const counts = this.countsText(countChatLines(lines, t("ui.map_chat_not_undoable")));
+    const counts = this.countsText(countChatLines(lines, chatNoteTexts()));
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
   /** A reply came in while the window is folded to its edge: the edge shows a dot. */
@@ -32151,10 +32170,7 @@ ${shown}` : t("ui.map_chat_model_label"));
    * happened in words, so the colour is never the only sign.
    */
   buildLines(row, message) {
-    const closing = t("ui.map_chat_not_undoable");
-    const lines = message.lines.map(settledLine);
-    const results = lines.filter((line) => line.text !== closing);
-    const notes = lines.filter((line) => line.text === closing);
+    const { results, notes } = splitChatLines(message.lines.map(settledLine), chatNoteTexts());
     const list = row.createDiv({ cls: "vam-map-chat-lines" });
     const fold2 = results.length > MAP_CHAT_LINES_FOLD_ABOVE;
     const shown = !fold2 || message.linesOpen === true;

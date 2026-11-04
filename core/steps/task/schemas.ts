@@ -5,7 +5,7 @@ import SummaryDescription from "./schema-summary-description.md";
 import DetailDescription from "./schema-detail-description.md";
 import { renderTemplate } from "../../step-runner";
 import baseResponseSchema from "../../../response-schema.json";
-import { instructionLanguageOf, languagePromptName, type ContentLanguage } from "../../../i18n";
+import { instructionLanguageOf, languagePromptName, translate, type ContentLanguage } from "../../../i18n";
 
 /** How a task context is answered: the response schema sent to the model and the flags its parser needs. */
 export interface TaskResponseShape {
@@ -18,10 +18,20 @@ export interface TaskResponseShape {
 /**
  * The response schema with its two prose field descriptions written for the output language. The descriptions are part of
  * what the model reads, so the fixed Chinese wording in `response-schema.json` pulled English and other runs into Chinese.
- * A Chinese-instruction language (zh-TW, zh-CN) keeps the file's wording unchanged; every other language names itself.
+ * zh-TW keeps the file's Traditional wording unchanged, zh-CN has the same sentences in Simplified Chinese; every other language names itself.
  */
 export function localizedResponseSchema(language: ContentLanguage): typeof baseResponseSchema {
-  if (instructionLanguageOf(language) === "zh") return baseResponseSchema;
+  if (instructionLanguageOf(language) === "zh") {
+    // The Chinese-instruction languages read their own dictionary row (zh-TW is the file's wording, zh-CN is Simplified).
+    return {
+      ...baseResponseSchema,
+      properties: {
+        ...baseResponseSchema.properties,
+        summary: { type: "string", description: translate(language, "schema.summary_description") },
+        detail: { type: "string", description: translate(language, "schema.detail_description") }
+      }
+    };
+  }
   const variables = { language: languagePromptName(language, "en", "plain") };
   return {
     ...baseResponseSchema,

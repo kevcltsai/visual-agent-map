@@ -61338,7 +61338,11 @@ ${request.requirements}` : preset.text,
       case "move_topic":
         return check("move", [action.nodeId], real(action.newParentId));
       case "reorder_topics":
-        return check("move", action.nodeIds.map((id) => real(id)), real(action.parentId));
+        return check(
+          "move",
+          action.nodeIds.map((id) => real(id)),
+          real(action.parentId)
+        );
       // A relation writes both end notes' lines and Map.md: a locked end refuses it (the end cards can be ones of this reply).
       case "add_relation":
       case "remove_relation":

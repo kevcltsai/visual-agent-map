@@ -2167,7 +2167,7 @@ export class VisualAgentMapView extends ItemView {
     let goal: string | undefined;
     let level: RelevanceLevel | undefined;
     let context: string | undefined;
-    if (this.path && !this.aimLive()) {
+    if (this.path && !this.map?.aim) {
       try {
         ({ goal, level, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch {
@@ -10277,7 +10277,8 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
-    if (!this.aimLive()) this.renderRelevanceStatus(this.contentEl);
+    // Goal grading stays off for an old AIM map while AIM is hidden (a source-text test pins this condition).
+    if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
     if (!this.aimLive()) this.renderBackgroundBars(this.contentEl);
     // An empty map has nothing to select: leave topic selection (undo can empty a map while the bar is open).
     if (!this.map.nodes.length) {
@@ -10496,7 +10497,7 @@ export class VisualAgentMapView extends ItemView {
     );
     integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
     if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
-    this.renderRelevanceGoalControl(tools);
+    // No goal control: goal grading is off for an AIM map (see renderMapTools).
   }
   /** The chat started or ended something: an empty canvas follows it. */
   private refreshEmptyMap(): void {

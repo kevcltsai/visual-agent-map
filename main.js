@@ -50575,22 +50575,22 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     if (this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
   }
   async hydrate(isCurrent = () => true) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     this.aimFailedReports.clear();
     let goal;
     let level;
     let context;
-    if (this.path && !this.aimLive()) {
+    if (this.path && !((_a2 = this.map) == null ? void 0 : _a2.aim)) {
       try {
         ({ goal, level, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch (e) {
       }
     }
     const loaded = /* @__PURE__ */ new Map();
-    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
+    for (const node of (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []) {
       if (!isCurrent()) return;
       try {
-        loaded.set(node.id, await this.plugin.repo.readNote(node.path, (_c = this.map) != null ? _c : void 0));
+        loaded.set(node.id, await this.plugin.repo.readNote(node.path, (_d = this.map) != null ? _d : void 0));
       } catch (e) {
       }
     }
@@ -58049,7 +58049,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     if (!this.aimLive()) this.renderMultiResearchStatus(this.contentEl);
-    if (!this.aimLive()) this.renderRelevanceStatus(this.contentEl);
+    if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
     if (!this.aimLive()) this.renderBackgroundBars(this.contentEl);
     if (!this.map.nodes.length) {
       this.selection.exitMultiSelect("emptyMap");
@@ -58253,7 +58253,6 @@ ${request.requirements}` : preset.text,
     );
     integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
     if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
-    this.renderRelevanceGoalControl(tools);
   }
   /** The chat started or ended something: an empty canvas follows it. */
   refreshEmptyMap() {

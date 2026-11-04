@@ -443,6 +443,7 @@ import { aimRepairHint, aimTimedOut } from "../aim/failure-hint";
 import { canvasPointerIntent } from "./canvas-gestures";
 import {
   hasMergeContent,
+  sharedMergeAppearance,
   mergedDetail,
   mergedStatus,
   mergeTitleFromResult,
@@ -584,6 +585,8 @@ interface MergeTask {
   mapTitle: string;
   /** The fallback name (first source's title) until the AI names the topic; then the AI's name. */
   title: string;
+  /** The name was given by the user (the map chat's merge): the AI's suggested name does not replace it. */
+  keepTitle?: boolean;
   sources: { id: string; path: string }[];
   parentId: string | null;
   /** Parent mode: the parent topic that keeps its card (first of `sources`); null when a new topic replaces siblings. */
@@ -5793,7 +5796,12 @@ export class VisualAgentMapView extends ItemView {
       check.targetId
     );
     if (locked) new Notice(t("ui.ai_locked_notice"));
-    const withContent = !locked && hasMergeContent(check.sources.map(source => this.notes.get(source.id)));
+    const withContent =
+      !locked &&
+      hasMergeContent(
+        check.sources.map(source => this.notes.get(source.id)),
+        isPlaceholder
+      );
     this.mergeOpen = true;
     new MergeTopicsModal(
       this.app,
@@ -5845,7 +5853,8 @@ export class VisualAgentMapView extends ItemView {
       sources: { id: string; path: string }[];
     },
     started: () => void,
-    signal: AbortSignal
+    signal: AbortSignal,
+    options: { keepTitle?: boolean } = {}
   ): Promise<boolean> {
     const stillValid = (): boolean => {
       const check = this.mergeCheck(snapshot.sources.map(source => source.id));
@@ -5885,6 +5894,7 @@ export class VisualAgentMapView extends ItemView {
         mapId: snapshot.mapId,
         mapTitle: this.map?.title ?? "",
         title,
+        ...(options.keepTitle ? { keepTitle: true } : {}),
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
@@ -5959,7 +5969,7 @@ export class VisualAgentMapView extends ItemView {
       };
       let result = await ask(request);
       if (!(await sourcesUnchanged())) return;
-      task.title = mergeTitleFromResult(result, task.title);
+      if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
       // Programmatic content check, one repair round; whatever is still wrong then is applied with a warning.
       let check = await this.checkMergeResult(task, result);
       if (!check.ok) {
@@ -5981,7 +5991,7 @@ export class VisualAgentMapView extends ItemView {
           if (again.missing.length + again.added.length <= check.missing.length + check.added.length) {
             result = repaired;
             check = again;
-            task.title = mergeTitleFromResult(result, task.title);
+            if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
           }
         } catch (error) {
           if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
@@ -6160,13 +6170,15 @@ export class VisualAgentMapView extends ItemView {
     }
     if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before);
     let detail = "";
-    if (!content) {
-      const sourceNotes: Note[] = [];
-      for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
+    const sourceNotes: Note[] = [];
+    for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
+    if (!content)
       detail = mergedDetail(
         sources.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
       );
-    }
+    // The new topic keeps the colour, markers and styles all sources share (a chat's "merge and make it red" colours the
+    // sources first, as the merged card does not exist yet).
+    const appearance = sharedMergeAppearance(sourceNotes);
     const model = content?.task.model ?? (await this.mergeModel(check.parentId)).model;
     // The new topic keeps the type (and a hypothesis its strength) of the first source in reading order.
     const firstNote = this.notes.get(sources[0].id),
@@ -6185,6 +6197,7 @@ export class VisualAgentMapView extends ItemView {
     let entry: TransactionEntry;
     try {
       if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
+      if (appearance) await repo.writeTopicAppearance(created.path, appearance);
       if (content) {
         const detailTemplate = (await this.mapStyle(language)).template;
         await repo.updateNote(
@@ -18166,6 +18179,17 @@ export class VisualAgentMapView extends ItemView {
           targetId: check.targetId,
           sources: check.sources.map(source => ({ id: source.id, path: source.path }))
         };
+        // The same merge as the merge button, without its dialog: sources with content (Detail or a summary) are merged
+        // by AI in the background under the name the user gave; only all-empty cards get the structure merge.
+        const sourceNotes = await Promise.all(
+          snapshot.sources.map(source => this.plugin.repo.readNote(source.path, this.map ?? undefined))
+        );
+        if (hasMergeContent(sourceNotes, isPlaceholder)) {
+          const began = await this.startMergeDraft(title, snapshot, () => {}, new AbortController().signal, {
+            keepTitle: true
+          });
+          return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
+        }
         await this.plugin.mutate(() => this.mergeSelected(title, snapshot));
         return { status: "done" };
       }

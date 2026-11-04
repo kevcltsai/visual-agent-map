@@ -3585,6 +3585,31 @@ integrationTest('B2 merge: two merges in one reply are both completed; the secon
   assert.ok(!titles.some(t2 => /^Merge p\d$/.test(t2)), 'the four sources are gone from the map');
   assert.equal(h.view.mergeTasks.size, 0); assert.equal(h.control.nested, 0);
 });
+// Jobs-sim #6 (2026-11-05): "merge X and Y into one card called Z, and make it red". Cards with a summary are content: the
+// chat starts the AI merge (as the merge button does), keeps the name the user gave, and the merged card keeps the colour
+// both sources were given just before, instead of a blank "No conclusion yet" card without the colour.
+integrationTest('map chat merge: summary-only cards run the AI merge under the chat\'s name; the merged card has the content and the shared colour', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
+  await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
+  await h.view.hydrate();
+  const asks = [];
+  h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
+  h.plugin.askModel = async context => { asks.push(context.mode); return { summary: 'Body needs rest. Mind needs calm.', detail: 'Body needs rest.\n\nMind needs calm.', visualReferences: [], suggestions: [{ title: 'AI picked name' }] }; };
+  const lines = await apply(h, [
+    lookAct([h.ids.a, h.ids.b], { color: 'red' }),
+    { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }
+  ]);
+  eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
+  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  eq(asks, ['merge'], 'the AI merge ran once');
+  const merged = [];
+  for (const n of await h.saved()) { const note = await h.repo.readNote(n.path); if (note.title === 'Nothing to Fear') merged.push(note); }
+  assert.equal(merged.length, 1, 'the merged card keeps the name from the chat');
+  assert.equal(merged[0].summary, 'Body needs rest. Mind needs calm.');
+  assert.match(merged[0].detail, /Mind needs calm/);
+  assert.equal(merged[0].color, 'red', 'the colour both sources share stays on the merged card');
+});
 integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
   const h = await harness(); await h.view.hydrate();
   h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });

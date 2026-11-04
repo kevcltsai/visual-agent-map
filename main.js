@@ -49032,11 +49032,32 @@ ${source.detail.trim()}`).join("\n\n");
 function mergedStatus(detail) {
   return detail.trim() ? "completed" : "idea";
 }
-function hasMergeContent(notes) {
+function hasMergeContent(notes, isPlaceholderSummary) {
   return notes.some((note) => {
-    var _a2;
-    return ((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : "").trim() !== "";
+    var _a2, _b2;
+    const summary = ((_a2 = note == null ? void 0 : note.summary) != null ? _a2 : "").trim();
+    return ((_b2 = note == null ? void 0 : note.detail) != null ? _b2 : "").trim() !== "" || summary !== "" && !isPlaceholderSummary(summary);
   });
+}
+function sharedMergeAppearance(notes) {
+  var _a2, _b2;
+  if (!notes.length || notes.some((note) => !note)) return void 0;
+  const all = notes;
+  const color2 = all[0].color && all.every((note) => note.color === all[0].color) ? all[0].color : void 0;
+  const markers = ((_a2 = all[0].markers) != null ? _a2 : []).filter((marker5) => all.every((note) => {
+    var _a3;
+    return ((_a3 = note.markers) != null ? _a3 : []).includes(marker5);
+  }));
+  const styles = ((_b2 = all[0].style) != null ? _b2 : []).filter((style) => all.every((note) => {
+    var _a3;
+    return ((_a3 = note.style) != null ? _a3 : []).includes(style);
+  }));
+  if (!color2 && !markers.length && !styles.length) return void 0;
+  return {
+    ...color2 ? { color: color2 } : {},
+    ...markers.length ? { addMarkers: markers } : {},
+    ...styles.length ? { addStyles: styles } : {}
+  };
 }
 function resolveMergeModel(parentModel, workspaceModel) {
   return inheritModel(parentModel, workspaceModel);
@@ -53962,7 +53983,10 @@ ${request.requirements}` : preset.text,
       check.targetId
     );
     if (locked) new import_obsidian34.Notice(t("ui.ai_locked_notice"));
-    const withContent = !locked && hasMergeContent(check.sources.map((source) => this.notes.get(source.id)));
+    const withContent = !locked && hasMergeContent(
+      check.sources.map((source) => this.notes.get(source.id)),
+      isPlaceholder
+    );
     this.mergeOpen = true;
     new MergeTopicsModal(
       this.app,
@@ -54002,7 +54026,7 @@ ${request.requirements}` : preset.text,
    * nothing); once accepted, `started` hides the dialog and the task lives on the cards and the status bar until the
    * merged result is written (no draft review). Resolves false when AI did not start.
    */
-  async startMergeDraft(title, snapshot, started, signal) {
+  async startMergeDraft(title, snapshot, started, signal, options = {}) {
     var _a2;
     const stillValid = () => {
       var _a3;
@@ -54036,6 +54060,7 @@ ${request.requirements}` : preset.text,
         mapId: snapshot.mapId,
         mapTitle: (_b2 = (_a3 = this.map) == null ? void 0 : _a3.title) != null ? _b2 : "",
         title,
+        ...options.keepTitle ? { keepTitle: true } : {},
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: (_c = snapshot.targetId) != null ? _c : null,
@@ -54110,7 +54135,7 @@ ${request.requirements}` : preset.text,
       };
       let result = await ask(request);
       if (!await sourcesUnchanged()) return;
-      task.title = mergeTitleFromResult(result, task.title);
+      if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
       let check = await this.checkMergeResult(task, result);
       if (!check.ok) {
         try {
@@ -54130,7 +54155,7 @@ ${request.requirements}` : preset.text,
           if (again.missing.length + again.added.length <= check.missing.length + check.added.length) {
             result = repaired;
             check = again;
-            task.title = mergeTitleFromResult(result, task.title);
+            if (!task.keepTitle) task.title = mergeTitleFromResult(result, task.title);
           }
         } catch (error) {
           if (task.controller.signal.aborted || this.closed || !this.isLiveMergeTask(task)) throw error;
@@ -54285,13 +54310,13 @@ ${request.requirements}` : preset.text,
     }
     if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before);
     let detail = "";
-    if (!content) {
-      const sourceNotes = [];
-      for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
+    const sourceNotes = [];
+    for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
+    if (!content)
       detail = mergedDetail(
         sources.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
       );
-    }
+    const appearance = sharedMergeAppearance(sourceNotes);
     const model = (_b2 = content == null ? void 0 : content.task.model) != null ? _b2 : (await this.mergeModel(check.parentId)).model;
     const firstNote = this.notes.get(sources[0].id), firstKind = firstNote == null ? void 0 : firstNote.topicKind, firstStrength = (firstNote == null ? void 0 : firstNote.topicKind) === "hypothesis" ? firstNote.hypothesisStrength : void 0;
     const created = await repo.createNote(
@@ -54306,6 +54331,7 @@ ${request.requirements}` : preset.text,
     let entry;
     try {
       if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
+      if (appearance) await repo.writeTopicAppearance(created.path, appearance);
       if (content) {
         const detailTemplate = (await this.mapStyle(language2)).template;
         await repo.updateNote(
@@ -65320,6 +65346,19 @@ ${note.detail.trim()}` : "",
           targetId: check.targetId,
           sources: check.sources.map((source) => ({ id: source.id, path: source.path }))
         };
+        const sourceNotes = await Promise.all(
+          snapshot.sources.map((source) => {
+            var _a3;
+            return this.plugin.repo.readNote(source.path, (_a3 = this.map) != null ? _a3 : void 0);
+          })
+        );
+        if (hasMergeContent(sourceNotes, isPlaceholder)) {
+          const began = await this.startMergeDraft(title, snapshot, () => {
+          }, new AbortController().signal, {
+            keepTitle: true
+          });
+          return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
+        }
         await this.plugin.mutate(() => this.mergeSelected(title, snapshot));
         return { status: "done" };
       }

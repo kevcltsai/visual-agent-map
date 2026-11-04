@@ -128,11 +128,29 @@ const phase2 = load('experiences/visual-map/merge-topics.ts', { obsidian: { ...r
 const { translate } = load('i18n.ts');
 const label = key => translate('en', key);
 
-test('hasMergeContent: any source with non-blank Detail counts, summary alone does not', () => {
-  assert.equal(phase2.hasMergeContent([{ detail: '' }, { detail: '  \n' }, undefined, {}]), false);
-  assert.equal(phase2.hasMergeContent([{ detail: '' }, { detail: 'x' }]), true);
-  assert.equal(phase2.hasMergeContent([{ summary: 'only a summary' }]), false);
-  assert.equal(phase2.hasMergeContent([]), false);
+// 2026-11-05 (jobs-sim #6, decision 2026-11-05-map-chat-merge-empty#1): a real summary is content too; only the
+// "no conclusion yet" placeholder and blank text are not.
+test('hasMergeContent: non-blank Detail or a real summary counts; blank text and the placeholder summary do not', () => {
+  const placeholder = summary => summary === 'No conclusion yet';
+  assert.equal(phase2.hasMergeContent([{ detail: '' }, { detail: '  \n' }, undefined, {}], placeholder), false);
+  assert.equal(phase2.hasMergeContent([{ detail: '' }, { detail: 'x' }], placeholder), true);
+  assert.equal(phase2.hasMergeContent([{ summary: 'only a summary' }], placeholder), true);
+  assert.equal(phase2.hasMergeContent([{ summary: 'No conclusion yet', detail: '' }, { summary: '  ' }], placeholder), false);
+  assert.equal(phase2.hasMergeContent([], placeholder), false);
+});
+
+test('sharedMergeAppearance: the colour all sources share, and the markers and styles every source has', () => {
+  assert.deepEqual(plain(phase2.sharedMergeAppearance([{ color: 'red' }, { color: 'red', markers: ['flag-red'] }])), { color: 'red' });
+  assert.deepEqual(
+    plain(phase2.sharedMergeAppearance([
+      { color: 'red', markers: ['priority-2', 'flag-red'], style: ['bold', 'text-large'] },
+      { color: 'blue', markers: ['flag-red'], style: ['bold'] }
+    ])),
+    { addMarkers: ['flag-red'], addStyles: ['bold'] }
+  );
+  assert.equal(phase2.sharedMergeAppearance([{ color: 'red' }, {}]), undefined, 'one plain source: nothing is shared');
+  assert.equal(phase2.sharedMergeAppearance([{ color: 'red' }, undefined]), undefined, 'an unknown source shares nothing');
+  assert.equal(phase2.sharedMergeAppearance([]), undefined);
 });
 
 test('resolveMergeModel: the parent topic model wins, otherwise the workspace model', () => {

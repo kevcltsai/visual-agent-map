@@ -20063,6 +20063,10 @@ function relationNotePaths(before, after) {
   }
   return [...paths];
 }
+var noteAt = (ops, path, direction) => {
+  const renamed = ops.find((op) => op.kind === "rename" && op.original === path);
+  return renamed && direction === "undo" ? renamed.target : path;
+};
 var baseNameOf = (path) => path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 var tagged = (error, kind) => Object.assign(error, { kind });
 var GUARD_FIELDS = ["title", "summary", "detail", "status"];
@@ -20109,8 +20113,10 @@ function begin(deps) {
           throw problem;
         }
         entry.moved = true;
-        entry.lifecycleSet = true;
-        await repo.setLifecycle(step.to, step.lifecycle.topicId, step.lifecycle.mapId, step.lifecycle.state);
+        if (step.lifecycle) {
+          entry.lifecycleSet = true;
+          await repo.setLifecycle(step.to, step.lifecycle.topicId, step.lifecycle.mapId, step.lifecycle.state);
+        }
       }
       for (const step of notes.after) await rewrite(step);
       for (const item of maps) {
@@ -20158,7 +20164,7 @@ function begin(deps) {
           problems.push(problem);
         }
       }
-      if (step.lifecycleSet) {
+      if (step.lifecycleSet && step.restore) {
         try {
           await repo.setLifecycle(at, step.restore.topicId, step.restore.mapId, step.restore.state);
         } catch (problem) {
@@ -20209,8 +20215,8 @@ function begin(deps) {
   function entryFor(ops, records, rebuild2, label, noteRecords = [], attachments = []) {
     const toward = (op, direction) => op.kind === "create" === (direction === "undo");
     const sequence = (direction) => {
-      const moved = ops.filter((op) => op.kind === "move"), created = ops.filter((op) => op.kind === "create");
-      return direction === "undo" ? [...moved.reverse(), ...created.reverse()] : [...created, ...moved];
+      const moved = ops.filter((op) => op.kind === "move"), created = ops.filter((op) => op.kind === "create"), renamed = ops.filter((op) => op.kind === "rename");
+      return direction === "undo" ? [...renamed.reverse(), ...created.reverse(), ...moved.reverse()] : [...moved, ...created, ...renamed];
     };
     const choosePark = () => {
       const taken = /* @__PURE__ */ new Set();
@@ -20222,9 +20228,10 @@ function begin(deps) {
     };
     const guarded = async (direction) => {
       for (const note of noteRecords) {
-        if (!exists(note.path)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
+        const at = noteAt(ops, note.path, direction);
+        if (!exists(at)) throw tagged(new Error(t("error.map_transaction_stale")), "stale");
         const expected = direction === "undo" ? note.guardAfter : note.guardBefore;
-        if (!sameGuard(guardOf(await repo.readNote(note.path)), expected))
+        if (!sameGuard(guardOf(await repo.readNote(at)), expected))
           throw tagged(new Error(t("error.map_transaction_stale")), "guard");
       }
     };
@@ -20235,7 +20242,10 @@ function begin(deps) {
       for (const op of ops) {
         if (!op.target) fail2();
         const here = toward(op, direction) ? op.original : op.target, there = toward(op, direction) ? op.target : op.original;
-        if (!exists(here) || exists(there)) fail2();
+        const vacated = ops.some(
+          (other) => other !== op && (toward(other, direction) ? other.original : other.target) === there
+        );
+        if (!exists(here) || exists(there) && !vacated) fail2();
       }
       for (const record of records) {
         const expected = direction === "undo" ? record.after : record.before;
@@ -20252,7 +20262,7 @@ function begin(deps) {
       await guarded(direction);
       await stale(direction);
       const files = sequence(direction).map(
-        (op) => toward(op, direction) ? { from: op.original, to: op.target, lifecycle: op.lifecycle, restore: op.previous } : { from: op.target, to: op.original, lifecycle: op.previous, restore: op.lifecycle }
+        (op) => toward(op, direction) ? op.kind === "rename" ? { from: op.original, to: op.target } : { from: op.original, to: op.target, lifecycle: op.lifecycle, restore: op.previous } : op.kind === "rename" ? { from: op.target, to: op.original } : { from: op.target, to: op.original, lifecycle: op.previous, restore: op.lifecycle }
       );
       const undoing = direction === "undo";
       const maps = records.map((record) => ({
@@ -20263,9 +20273,8 @@ function begin(deps) {
       }));
       const notes = { before: [], after: [] };
       for (const note of noteRecords) {
-        const restore = await readText(repo, note.path);
-        if (undoing)
-          notes.after.push({ path: note.path, restore, apply: () => writeText(repo, note.path, note.beforeText) });
+        const at = noteAt(ops, note.path, direction), restore = await readText(repo, at);
+        if (undoing) notes.after.push({ path: at, restore, apply: () => writeText(repo, note.path, note.beforeText) });
         else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
       }
       await run(files, maps, rebuild2, notes, refresh);
@@ -20296,8 +20305,24 @@ function begin(deps) {
       moves.push({ kind: "move", path, folder, lifecycle });
       return transaction;
     },
-    create(path, parkFolder, topicId) {
-      moves.push({ kind: "create", path, folder: parkFolder, lifecycle: { topicId, mapId: "", state: "unassigned" } });
+    create(path, parkFolder, topicId, title) {
+      moves.push({
+        kind: "create",
+        path,
+        folder: parkFolder,
+        lifecycle: { topicId, mapId: "", state: "unassigned" },
+        ...title === void 0 ? {} : { title }
+      });
+      return transaction;
+    },
+    rename(path, title) {
+      moves.push({
+        kind: "rename",
+        path,
+        folder: "",
+        lifecycle: { topicId: "", mapId: "", state: "unassigned" },
+        title
+      });
       return transaction;
     },
     park(path, folder, topicId, state) {
@@ -20326,22 +20351,26 @@ function begin(deps) {
       if (committed) throw new Error("A transaction can only be committed once.");
       committed = true;
       for (const note of noteOps)
-        if (moves.some((move) => move.path === note.path))
+        if (moves.some((move) => move.path === note.path && move.kind !== "rename"))
           throw new Error(`A note cannot be rewritten and moved in one step: ${note.path}`);
       const mapPaths = [...new Set(edits.map((item) => item.mapPath))];
       for (const mapPath of mapPaths) await deps.checkConflict(mapPath);
       const ops = [];
+      const wanted = /* @__PURE__ */ new Map();
       for (const move of moves) {
         const note = await repo.readNote(move.path);
-        ops.push({
+        const op = {
           kind: move.kind,
           original: move.path,
           folder: move.folder,
           lifecycle: move.lifecycle,
           previous: { topicId: note.topicId, mapId: note.mapId, state: note.topicState },
           target: ""
-        });
+        };
+        if (move.title !== void 0) wanted.set(op, move.title);
+        ops.push(op);
       }
+      const started = new Map(ops.map((op) => [op.original, op]));
       const befores = /* @__PURE__ */ new Map();
       for (const mapPath of mapPaths) befores.set(mapPath, await repo.readMap(mapPath));
       const rebuildRequested = !options.deferRebuild;
@@ -20367,7 +20396,7 @@ function begin(deps) {
           await note.write(note.path, attachment);
         }
         for (const op of ops) {
-          if (op.kind === "create") continue;
+          if (op.kind !== "move") continue;
           const entry = {
             from: op.original,
             to: "",
@@ -20389,11 +20418,32 @@ function begin(deps) {
           entry.lifecycleSet = true;
           await repo.setLifecycle(op.target, op.lifecycle.topicId, op.lifecycle.mapId, op.lifecycle.state);
         }
-        for (const note of noteRecords) note.guardAfter = guardOf(await repo.readNote(note.path));
+        for (const op of [...ops]) {
+          const title = wanted.get(op);
+          if (title === void 0) continue;
+          const to = repo.exactFreePath(op.original.slice(0, op.original.lastIndexOf("/")), title);
+          if (!to || to === op.original) {
+            if (op.kind === "rename") ops.splice(ops.indexOf(op), 1);
+            continue;
+          }
+          const entry = { from: op.original, to, moved: false, lifecycleSet: false };
+          journal.files.push(entry);
+          try {
+            await repo.moveExact(op.original, to);
+          } catch (problem) {
+            if (!exists(op.original) && exists(to)) entry.moved = true;
+            throw problem;
+          }
+          entry.moved = true;
+          if (op.kind === "create") op.original = to;
+          else op.target = to;
+        }
+        for (const note of noteRecords) note.guardAfter = guardOf(await repo.readNote(noteAt(ops, note.path, "undo")));
         const resolve = (originalPath) => {
-          const found = ops.find((op) => op.kind === "move" && op.original === originalPath);
+          const found = started.get(originalPath);
           if (!found) throw new Error(`Not a moved note: ${originalPath}`);
-          return found.target;
+          if (found.kind === "create") return found.original;
+          return found.kind === "rename" && !ops.includes(found) ? originalPath : found.target;
         };
         for (const mapPath of mapPaths) {
           const before = befores.get(mapPath);
@@ -23452,6 +23502,11 @@ var Repository = class {
     let path = `${base}.md`, number = 2;
     while ((avoid == null ? void 0 : avoid.has(path)) || this.pathTaken(path)) path = `${base} ${number++}.md`;
     return path;
+  }
+  /** `folder/<title>.md` when that exact name is free (no number added), else null. */
+  exactFreePath(folder, title) {
+    const path = (0, import_obsidian11.normalizePath)(`${folder}/${safeName(title)}.md`);
+    return this.pathTaken(path) ? null : path;
   }
   /** Taken when the path exists, or when a sibling has the same name once case and Unicode form are folded. */
   pathTaken(path) {
@@ -56001,14 +56056,21 @@ ${request.requirements}` : preset.text,
           sourcePaths: sources.map((source) => source.path),
           status: mergedStatus(detail)
         });
-      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id);
+      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id, sanitizeGeneratedTitle(title));
       for (const source of sources) tx.park(source.path, parkFolder, before.id, "unassigned");
-      entry = await tx.editMap(mapPath, (map) => {
+      entry = await tx.editMap(mapPath, (map, resolve) => {
         map.viewport = clone(viewport);
         const ids = new Set(sources.map((source) => source.id)), first = map.nodes.find((item) => item.id === sources[0].id);
         if (!first || sources.some((source) => !map.nodes.some((item) => item.id === source.id)))
           throw new Error(t("ui.merge_missing_note"));
-        const merged = { ...created, parentId: check.parentId, x: first.x, y: first.y, collapsed: false }, adopted = /* @__PURE__ */ new Set();
+        const merged = {
+          ...created,
+          path: resolve(created.path),
+          parentId: check.parentId,
+          x: first.x,
+          y: first.y,
+          collapsed: false
+        }, adopted = /* @__PURE__ */ new Set();
         for (const item of map.nodes)
           if (item.parentId !== null && ids.has(item.parentId)) {
             item.parentId = merged.id;
@@ -56076,7 +56138,9 @@ ${request.requirements}` : preset.text,
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
       });
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
-      entry = await tx.editMap(mapPath, (map) => {
+      if (patch.title && target.path.slice(target.path.lastIndexOf("/") + 1) === `${safeName(sourceNotes[0].title)}.md`)
+        tx.rename(target.path, patch.title);
+      entry = await tx.editMap(mapPath, (map, resolve) => {
         map.viewport = clone(viewport);
         const ids = new Set(children.map((child) => child.id));
         if (!map.nodes.some((item) => item.id === target.id) || children.some((child) => !map.nodes.some((item) => item.id === child.id)))
@@ -56089,6 +56153,8 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.filter((item) => !ids.has(item.id));
+        const parent = map.nodes.find((item) => item.id === target.id);
+        if (parent) parent.path = resolve(target.path);
         this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
         if (adopted.size) this.arrangeBranch(map, target.id, adopted, void 0);
       }).commit({ label: t("ui.merge_topics_history") });

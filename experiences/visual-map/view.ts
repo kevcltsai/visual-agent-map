@@ -3797,14 +3797,25 @@ export class VisualAgentMapView extends ItemView {
    * A card's double-click: on the cover picture it opens "Adjust cover area", on the title it renames. The point is
    * checked against both boxes because enableDrag captures the pointer on the card, so the target is often the card.
    */
-  private onCardDoubleClick(event: MouseEvent, card: HTMLElement, title: HTMLElement, node: MapNode, noteTitle: string): void {
+  private onCardDoubleClick(
+    event: MouseEvent,
+    card: HTMLElement,
+    title: HTMLElement,
+    node: MapNode,
+    noteTitle: string
+  ): void {
     const target = event.target as Element | null;
     if (target?.closest?.("button")) return;
     const within = (el: Element | null): boolean => {
       if (!el) return false;
       if (target === el) return true;
       const box = el.getBoundingClientRect();
-      return event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+      return (
+        event.clientX >= box.left &&
+        event.clientX <= box.right &&
+        event.clientY >= box.top &&
+        event.clientY <= box.bottom
+      );
     };
     if (target?.closest?.(".vam-card-cover") || within(card.querySelector(".vam-card-cover"))) {
       if (this.openCoverFrameEditor(node)) event.preventDefault();

@@ -1547,6 +1547,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":
     "自动模式会对简单任务使用 Low、对复杂整合使用 Medium；手动选择不会被覆盖。",
   "ui.stop_research": "停止研究",
+  "ui.stop_expand": "停止展开",
   "ui.research_stopped_existing_content_was_preserved": "研究已停止，原有内容保留。",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "议题内容已变更，过时的 AI 结果未写入。",
   "ui.shallow_research_for_expanded_subtopics_0": "子题研究：{0}",

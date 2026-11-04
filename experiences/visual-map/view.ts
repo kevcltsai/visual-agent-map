@@ -804,6 +804,8 @@ interface ChatRun {
   notes?: Set<string>;
   /** Markdown files the reply edited or created (vault paths): part of the reply's undo check. */
   files?: Set<string>;
+  /** Where the notes of the cards the reply deleted now are (Unassigned): part of the reply's undo check, as the cards are gone from the map. */
+  parked?: Set<string>;
 }
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
@@ -5510,6 +5512,14 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Removes a topic (or its branch) to Unassigned in one undo step; `adopterId` first takes over its children (merge). */
   private async removeToUnassigned(node: MapNode, branch: boolean, adopterId?: string): Promise<void> {
+    await this.removeToUnassignedEntry(node, branch, adopterId);
+  }
+  /** The same, handing back the undo step it pushed (undefined when nothing was removed). */
+  private async removeToUnassignedEntry(
+    node: MapNode,
+    branch: boolean,
+    adopterId?: string
+  ): Promise<TransactionEntry | undefined> {
     if (!this.map) return;
     const before = clone(this.map),
       ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
@@ -5556,6 +5566,7 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
+    return entry;
   }
   private mergeBusy(node: MapNode, except?: MergeTask): boolean {
     const batch = this.plugin.expansionBatches?.get(this.multiResearchKey()),
@@ -16842,7 +16853,7 @@ export class VisualAgentMapView extends ItemView {
       skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines: MapChatLine[] = [];
     const later: number[] = [];
-    const run: ChatRun = { refs: new Map(), created: [], notes: new Set(), files: new Set() };
+    const run: ChatRun = { refs: new Map(), created: [], notes: new Set(), files: new Set(), parked: new Set() };
     // Every entry the writes push is held back, then pushed as the reply's one undo step (a create_map's map switch clears
     // the history, and so what was collected for the old map; the new map's writes are collected from there).
     this.history.openGroup();
@@ -16908,7 +16919,8 @@ export class VisualAgentMapView extends ItemView {
         const box: { outcome: ChatOutcome } = { outcome: { status: "done" } };
         try {
           await this.plugin.mutate(async () => {
-            box.outcome = await this.applyChatWrite(action, own, same, run);
+            // Only this write's own entries join the reply; what another job pushes between two writes stays its own step.
+            box.outcome = await this.history.ownWrites(() => this.applyChatWrite(action, own, same, run));
           });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
@@ -16929,20 +16941,22 @@ export class VisualAgentMapView extends ItemView {
         !result.actions.some(action => action.kind === "auto_layout")
       ) {
         try {
-          await this.plugin.mutate(async () => {
-            if (!same() || !this.map) return;
-            // The layout measures the cards, so the held repaint comes first.
-            this.flushChatRender();
-            await this.mapChange(map => {
-              this.arrangeAll(map);
-            }, false);
-            const nodes = this.map?.nodes ?? [];
-            const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
-            const target = fresh.find(node => !node.parentId) ?? fresh[0];
-            // A card the reply asked to look at is where the view goes; this move to the new branch is only the default.
-            if (target && !result.actions.some(action => action.kind === "focus_topic")) this.focusNode(target);
-            arranged = true;
-          });
+          await this.plugin.mutate(() =>
+            this.history.ownWrites(async () => {
+              if (!same() || !this.map) return;
+              // The layout measures the cards, so the held repaint comes first.
+              this.flushChatRender();
+              await this.mapChange(map => {
+                this.arrangeAll(map);
+              }, false);
+              const nodes = this.map?.nodes ?? [];
+              const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
+              const target = fresh.find(node => !node.parentId) ?? fresh[0];
+              // A card the reply asked to look at is where the view goes; this move to the new branch is only the default.
+              if (target && !result.actions.some(action => action.kind === "focus_topic")) this.focusNode(target);
+              arranged = true;
+            })
+          );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
         }
@@ -16955,13 +16969,15 @@ export class VisualAgentMapView extends ItemView {
       const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];
       if (rough.length && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
-          await this.plugin.mutate(async () => {
-            if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
-            this.flushChatRender();
-            await this.mapChange(map => {
-              map.nodes = this.placeChatCards(map.nodes, new Set(rough));
-            }, false);
-          });
+          await this.plugin.mutate(() =>
+            this.history.ownWrites(async () => {
+              if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
+              this.flushChatRender();
+              await this.mapChange(map => {
+                map.nodes = this.placeChatCards(map.nodes, new Set(rough));
+              }, false);
+            })
+          );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
         }
@@ -16976,7 +16992,13 @@ export class VisualAgentMapView extends ItemView {
       if (wrote) {
         try {
           if (!this.closed && this.path === anchor.path)
-            await this.pushChatReplyEntry(entries, anchor.path, run.notes ?? new Set(), run.files ?? new Set());
+            await this.pushChatReplyEntry(
+              entries,
+              anchor.path,
+              run.notes ?? new Set(),
+              run.files ?? new Set(),
+              run.parked ?? new Set()
+            );
         } catch {
           // The check could not be read: the writes stay, without an undo step (never a half one).
         }
@@ -17302,7 +17324,8 @@ export class VisualAgentMapView extends ItemView {
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
-        await this.removeToUnassigned(node, action.branch);
+        const removed = await this.removeToUnassignedEntry(node, action.branch);
+        for (const path of removed?.parkedPaths?.() ?? []) run.parked?.add(path);
         return done;
       }
       case "edit_md_file": {
@@ -17469,7 +17492,8 @@ export class VisualAgentMapView extends ItemView {
   private async chatReplyFingerprint(
     mapPath: string,
     noteIds: ReadonlySet<string>,
-    files: ReadonlySet<string>
+    files: ReadonlySet<string>,
+    parked: ReadonlySet<string> = new Set()
   ): Promise<string> {
     const map = await this.plugin.repo.readMap(mapPath);
     const notes: [string, string | null][] = [];
@@ -17480,6 +17504,8 @@ export class VisualAgentMapView extends ItemView {
       }
     const texts: [string, string | null][] = [];
     for (const path of files) texts.push([path, await this.chatFileText(path)]);
+    // Cards the reply deleted are not in the map any more; their notes, where they were parked, count like the others.
+    for (const path of parked) texts.push([path, await this.chatFileText(path)]);
     return JSON.stringify({
       map: { ...map, viewport: null, nodes: map.nodes.map(node => ({ ...node, x: null, y: null })) },
       notes,
@@ -17495,10 +17521,11 @@ export class VisualAgentMapView extends ItemView {
     entries: TransactionEntry[],
     mapPath: string,
     noteIds: ReadonlySet<string>,
-    files: ReadonlySet<string>
+    files: ReadonlySet<string>,
+    parked: ReadonlySet<string> = new Set()
   ): Promise<void> {
     if (!entries.length) return;
-    const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files);
+    const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint();
     const run = async (redo: boolean): Promise<void> => {
       if ((await fingerprint()) !== expected) throw this.chatUndoRefusal();
@@ -17519,7 +17546,8 @@ export class VisualAgentMapView extends ItemView {
       }
       expected = await fingerprint();
     };
-    this.history.push({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
+    // Solo: a job that began before the reply ended (an expand) must not fold the reply into its own step.
+    this.history.pushSolo({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
   }
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);

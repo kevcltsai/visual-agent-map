@@ -1292,7 +1292,7 @@ var en = {
   "ui.map_chat_guard_duplicate_identity_key": "the file repeats an identity field in its front matter",
   "ui.map_chat_skip_topic_not_seen": "the AI was not shown this topic's note in full",
   "ui.map_chat_skip_topic_changed": "the topic changed after you sent the message",
-  "ui.map_chat_not_undoable": "Undo takes back this reply\u2019s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search): each records its own undo step when it finishes.",
+  "ui.map_chat_not_undoable": "Undo takes back this reply\u2019s changes, but not the AI work it started (research, expand, integrate, rating, merge, picture search); that work records its own undo step when it finishes. Once it writes to these cards, this reply can no longer be undone.",
   "ui.map_chat_undo_label": "AI chat reply",
   "ui.map_chat_undo_files_changed": "Files have changed since; this cannot be undone.",
   "ui.map_chat_guard_exists": "a file already exists there",
@@ -1413,7 +1413,7 @@ var en = {
   "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
   "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",
   "ui.map_chat_plan_replace_hint": "Sending a new message cancels this plan.",
-  "ui.map_chat_plan_irreversible": "Undo takes back the changes, but not the AI work this plan starts.",
+  "ui.map_chat_plan_irreversible": "Undo takes back the changes, but not the AI work this plan starts. Once that work writes to these cards, this reply can no longer be undone.",
   "ui.map_chat_plan_mark_delete": "Removes",
   "ui.map_chat_plan_title_applied": "Applied plan",
   "ui.map_chat_plan_title_cancelled": "Cancelled plan",
@@ -3753,7 +3753,7 @@ var zhCN = {
   "ui.map_chat_guard_duplicate_identity_key": "\u6587\u4EF6\u7684 front matter \u91CD\u590D\u4E86\u8BC6\u522B\u5B57\u6BB5",
   "ui.map_chat_skip_topic_not_seen": "AI \u6CA1\u6709\u770B\u5230\u8FD9\u4E2A\u8BAE\u9898\u7684\u5B8C\u6574\u7B14\u8BB0",
   "ui.map_chat_skip_topic_changed": "\u53D1\u9001\u540E\u8BAE\u9898\u53C8\u88AB\u4FEE\u6539\u8FC7",
-  "ui.map_chat_not_undoable": "\u64A4\u9500\u4F1A\u5012\u56DE\u8FD9\u5219\u56DE\u590D\u7684\u53D8\u66F4\uFF0C\u4F46\u4E0D\u4F1A\u5012\u56DE\u5B83\u542F\u52A8\u7684 AI \u5DE5\u4F5C\uFF08\u7814\u7A76\u3001\u5C55\u5F00\u3001\u6574\u5408\u3001\u5206\u7EA7\u3001\u5408\u5E76\u3001\u627E\u56FE\uFF09\uFF1A\u5B83\u4EEC\u5B8C\u6210\u65F6\u5404\u81EA\u6709\u53EF\u64A4\u9500\u8BB0\u5F55\u3002",
+  "ui.map_chat_not_undoable": "\u64A4\u9500\u4F1A\u5012\u56DE\u8FD9\u5219\u56DE\u590D\u7684\u53D8\u66F4\uFF0C\u4F46\u4E0D\u4F1A\u5012\u56DE\u5B83\u542F\u52A8\u7684 AI \u5DE5\u4F5C\uFF08\u7814\u7A76\u3001\u5C55\u5F00\u3001\u6574\u5408\u3001\u5206\u7EA7\u3001\u5408\u5E76\u3001\u627E\u56FE\uFF09\uFF0C\u90A3\u4E9B\u5DE5\u4F5C\u5B8C\u6210\u65F6\u5404\u81EA\u6709\u53EF\u64A4\u9500\u8BB0\u5F55\u3002\u4E00\u65E6 AI \u5DE5\u4F5C\u5199\u5165\u8FD9\u4E9B\u5361\u7247\uFF0C\u8FD9\u5219\u56DE\u590D\u5C31\u65E0\u6CD5\u518D\u64A4\u9500\u3002",
   "ui.map_chat_undo_label": "AI \u5BF9\u8BDD\u56DE\u590D",
   "ui.map_chat_undo_files_changed": "\u6587\u4EF6\u5DF2\u53D8\u66F4\uFF0C\u65E0\u6CD5\u64A4\u9500",
   "ui.map_chat_guard_exists": "\u90A3\u91CC\u5DF2\u7ECF\u6709\u6587\u4EF6",
@@ -3874,7 +3874,7 @@ var zhCN = {
   "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u786E\u8BA4\u4F7F\u7528\u989D\u5EA6\u3002\u540C\u610F\u540E\u624D\u4F1A\u5F00\u59CB\u5EFA\u7ACB\u5730\u56FE\u3002",
   "ui.map_chat_canvas_plan": "\u786E\u8BA4\u8BA1\u5212\u540E\uFF0C\u5730\u56FE\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC",
   "ui.map_chat_plan_replace_hint": "\u53D1\u9001\u65B0\u6D88\u606F\u4F1A\u53D6\u6D88\u8FD9\u4EFD\u8BA1\u5212",
-  "ui.map_chat_plan_irreversible": "\u64A4\u9500\u4F1A\u5012\u56DE\u53D8\u66F4\uFF0C\u4F46\u4E0D\u4F1A\u5012\u56DE\u8FD9\u4EFD\u8BA1\u5212\u542F\u52A8\u7684 AI \u5DE5\u4F5C",
+  "ui.map_chat_plan_irreversible": "\u64A4\u9500\u4F1A\u5012\u56DE\u53D8\u66F4\uFF0C\u4F46\u4E0D\u4F1A\u5012\u56DE\u8FD9\u4EFD\u8BA1\u5212\u542F\u52A8\u7684 AI \u5DE5\u4F5C\uFF1B\u4E00\u65E6 AI \u5DE5\u4F5C\u5199\u5165\u8FD9\u4E9B\u5361\u7247\uFF0C\u8FD9\u5219\u56DE\u590D\u5C31\u65E0\u6CD5\u518D\u64A4\u9500",
   "ui.map_chat_plan_mark_delete": "\u4F1A\u79FB\u9664",
   "ui.map_chat_plan_title_applied": "\u5DF2\u5E94\u7528\u7684\u8BA1\u5212",
   "ui.map_chat_plan_title_cancelled": "\u5DF2\u53D6\u6D88\u7684\u8BA1\u5212",
@@ -6214,7 +6214,7 @@ var zhTW = {
   "ui.map_chat_guard_duplicate_identity_key": "\u6A94\u6848\u7684 front matter \u91CD\u8907\u4E86\u8B58\u5225\u6B04\u4F4D",
   "ui.map_chat_skip_topic_not_seen": "AI \u6C92\u6709\u770B\u5230\u9019\u500B\u8B70\u984C\u7684\u5B8C\u6574\u7B46\u8A18",
   "ui.map_chat_skip_topic_changed": "\u9001\u51FA\u5F8C\u8B70\u984C\u53C8\u88AB\u4FEE\u6539\u904E",
-  "ui.map_chat_not_undoable": "\u5FA9\u539F\u6703\u5012\u56DE\u9019\u5247\u56DE\u8986\u7684\u8B8A\u66F4\uFF0C\u4F46\u4E0D\u6703\u5012\u56DE\u5B83\u555F\u52D5\u7684 AI \u5DE5\u4F5C\uFF08\u7814\u7A76\u3001\u5C55\u958B\u3001\u6574\u5408\u3001\u5206\u7D1A\u3001\u5408\u4F75\u3001\u627E\u5716\uFF09\uFF1A\u5B83\u5011\u5B8C\u6210\u6642\u5404\u81EA\u6709\u53EF\u5FA9\u539F\u7D00\u9304\u3002",
+  "ui.map_chat_not_undoable": "\u5FA9\u539F\u6703\u5012\u56DE\u9019\u5247\u56DE\u8986\u7684\u8B8A\u66F4\uFF0C\u4F46\u4E0D\u6703\u5012\u56DE\u5B83\u555F\u52D5\u7684 AI \u5DE5\u4F5C\uFF08\u7814\u7A76\u3001\u5C55\u958B\u3001\u6574\u5408\u3001\u5206\u7D1A\u3001\u5408\u4F75\u3001\u627E\u5716\uFF09\uFF0C\u90A3\u4E9B\u5DE5\u4F5C\u5B8C\u6210\u6642\u5404\u81EA\u6709\u53EF\u5FA9\u539F\u7D00\u9304\u3002\u4E00\u65E6 AI \u5DE5\u4F5C\u5BEB\u5165\u9019\u4E9B\u5361\u7247\uFF0C\u9019\u5247\u56DE\u8986\u5C31\u7121\u6CD5\u518D\u5FA9\u539F\u3002",
   "ui.map_chat_undo_label": "AI \u5C0D\u8A71\u56DE\u8986",
   "ui.map_chat_undo_files_changed": "\u6A94\u6848\u5DF2\u8B8A\u66F4\uFF0C\u7121\u6CD5\u5FA9\u539F",
   "ui.map_chat_guard_exists": "\u90A3\u88E1\u5DF2\u7D93\u6709\u6A94\u6848",
@@ -6335,7 +6335,7 @@ var zhTW = {
   "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u78BA\u8A8D\u4F7F\u7528\u984D\u5EA6\u3002\u540C\u610F\u5F8C\u624D\u6703\u958B\u59CB\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002",
   "ui.map_chat_canvas_plan": "\u78BA\u8A8D\u8A08\u756B\u5F8C\uFF0C\u5FC3\u667A\u5716\u6703\u51FA\u73FE\u5728\u9019\u88E1",
   "ui.map_chat_plan_replace_hint": "\u9001\u51FA\u65B0\u8A0A\u606F\u6703\u53D6\u6D88\u9019\u4EFD\u8A08\u756B",
-  "ui.map_chat_plan_irreversible": "\u5FA9\u539F\u6703\u5012\u56DE\u8B8A\u66F4\uFF0C\u4F46\u4E0D\u6703\u5012\u56DE\u9019\u4EFD\u8A08\u756B\u555F\u52D5\u7684 AI \u5DE5\u4F5C",
+  "ui.map_chat_plan_irreversible": "\u5FA9\u539F\u6703\u5012\u56DE\u8B8A\u66F4\uFF0C\u4F46\u4E0D\u6703\u5012\u56DE\u9019\u4EFD\u8A08\u756B\u555F\u52D5\u7684 AI \u5DE5\u4F5C\uFF1B\u4E00\u65E6 AI \u5DE5\u4F5C\u5BEB\u5165\u9019\u4E9B\u5361\u7247\uFF0C\u9019\u5247\u56DE\u8986\u5C31\u7121\u6CD5\u518D\u5FA9\u539F",
   "ui.map_chat_plan_mark_delete": "\u6703\u79FB\u9664",
   "ui.map_chat_plan_title_applied": "\u5DF2\u5957\u7528\u7684\u8A08\u756B",
   "ui.map_chat_plan_title_cancelled": "\u5DF2\u53D6\u6D88\u7684\u8A08\u756B",
@@ -19666,6 +19666,10 @@ var History = class {
     __publicField(this, "dropped", 0);
     /** While a group is open, pushed entries are collected here (no cap) instead of becoming undo steps of their own. */
     __publicField(this, "grouped", null);
+    /** Depth of {@link ownWrites} calls running: only then do pushes go into the open group. */
+    __publicField(this, "owning", 0);
+    /** Entries that stay a step of their own when collapseSince folds the ones around them (a closed group's step). */
+    __publicField(this, "solo", /* @__PURE__ */ new WeakSet());
   }
   get canUndo() {
     return this.past.length > 0;
@@ -19680,7 +19684,7 @@ var History = class {
     return this.future[this.future.length - 1];
   }
   push(entry) {
-    if (this.grouped) {
+    if (this.grouped && this.owning > 0) {
       this.grouped.push(entry);
       this.future = [];
       return;
@@ -19716,6 +19720,23 @@ var History = class {
     var _a2;
     (_a2 = this.grouped) != null ? _a2 : this.grouped = [];
   }
+  /**
+   * Runs `work`; entries pushed meanwhile join the open group (when there is one). Pushes outside it, such as another job's
+   * between two such calls, stay steps of their own.
+   */
+  async ownWrites(work) {
+    this.owning++;
+    try {
+      return await work();
+    } finally {
+      this.owning--;
+    }
+  }
+  /** Pushes `entry` as a step that collapseSince never folds into another one. */
+  pushSolo(entry) {
+    this.solo.add(entry);
+    this.push(entry);
+  }
   /** Ends the group and returns what it collected, oldest first (empty when nothing was pushed or the history was cleared). */
   closeGroup() {
     var _a2;
@@ -19744,7 +19765,13 @@ var History = class {
     if (mark.epoch !== this.epoch) return;
     const start = Math.max(0, mark.length - (this.dropped - mark.dropped));
     if (this.past.length - start < 2) return;
-    const entries = this.past.splice(start);
+    const all = this.past.splice(start);
+    const entries = all.filter((entry) => !this.solo.has(entry));
+    if (entries.length < 2) {
+      this.past.push(...all);
+      return;
+    }
+    this.past.push(...all.filter((entry) => this.solo.has(entry)));
     const run = async (list, redo) => {
       const done = [];
       try {
@@ -20018,7 +20045,12 @@ function begin(deps) {
       }
       await run(files, maps, rebuild2, notes);
     };
-    return { undo: () => apply("undo"), redo: () => apply("redo"), ...label === void 0 ? {} : { label } };
+    return {
+      undo: () => apply("undo"),
+      redo: () => apply("redo"),
+      parkedPaths: () => ops.filter((op) => op.kind === "move" && op.target).map((op) => op.target),
+      ...label === void 0 ? {} : { label }
+    };
   }
   async function place(owner) {
     for (const source of sources) {
@@ -52802,6 +52834,10 @@ ${request.requirements}` : preset.text,
   }
   /** Removes a topic (or its branch) to Unassigned in one undo step; `adopterId` first takes over its children (merge). */
   async removeToUnassigned(node, branch, adopterId) {
+    await this.removeToUnassignedEntry(node, branch, adopterId);
+  }
+  /** The same, handing back the undo step it pushed (undefined when nothing was removed). */
+  async removeToUnassignedEntry(node, branch, adopterId) {
     if (!this.map) return;
     const before = clone(this.map), ids = branch ? /* @__PURE__ */ new Set([node.id, ...descendants(before.nodes, node.id)]) : /* @__PURE__ */ new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
@@ -52843,6 +52879,7 @@ ${request.requirements}` : preset.text,
     this.history.push(entry);
     if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
+    return entry;
   }
   mergeBusy(node, except) {
     var _a2, _b2, _c, _d;
@@ -63252,7 +63289,7 @@ ${note.detail.trim()}` : "",
    * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_c) => (_c = this.map) == null ? void 0 : _c.id)() }) {
-    var _a2, _b2, _c2, _d;
+    var _a2, _b2, _c2, _d, _e;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
     const same = () => {
       var _a3;
@@ -63261,7 +63298,7 @@ ${note.detail.trim()}` : "",
     const lost = () => skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines = [];
     const later = [];
-    const run = { refs: /* @__PURE__ */ new Map(), created: [], notes: /* @__PURE__ */ new Set(), files: /* @__PURE__ */ new Set() };
+    const run = { refs: /* @__PURE__ */ new Map(), created: [], notes: /* @__PURE__ */ new Set(), files: /* @__PURE__ */ new Set(), parked: /* @__PURE__ */ new Set() };
     this.history.openGroup();
     const laterBatch = { imageSearches: 0 };
     let laidOutCount = 0;
@@ -63310,7 +63347,7 @@ ${note.detail.trim()}` : "",
         const box = { outcome: { status: "done" } };
         try {
           await this.plugin.mutate(async () => {
-            box.outcome = await this.applyChatWrite(action, own2, same, run);
+            box.outcome = await this.history.ownWrites(() => this.applyChatWrite(action, own2, same, run));
           });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
@@ -63325,19 +63362,21 @@ ${note.detail.trim()}` : "",
       let arranged = false;
       if (run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same() && !result.actions.some((action) => action.kind === "auto_layout")) {
         try {
-          await this.plugin.mutate(async () => {
-            var _a3, _b3, _c3;
-            if (!same() || !this.map) return;
-            this.flushChatRender();
-            await this.mapChange((map) => {
-              this.arrangeAll(map);
-            }, false);
-            const nodes = (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b3 : [];
-            const fresh = run.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
-            const target = (_c3 = fresh.find((node) => !node.parentId)) != null ? _c3 : fresh[0];
-            if (target && !result.actions.some((action) => action.kind === "focus_topic")) this.focusNode(target);
-            arranged = true;
-          });
+          await this.plugin.mutate(
+            () => this.history.ownWrites(async () => {
+              var _a3, _b3, _c3;
+              if (!same() || !this.map) return;
+              this.flushChatRender();
+              await this.mapChange((map) => {
+                this.arrangeAll(map);
+              }, false);
+              const nodes = (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b3 : [];
+              const fresh = run.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
+              const target = (_c3 = fresh.find((node) => !node.parentId)) != null ? _c3 : fresh[0];
+              if (target && !result.actions.some((action) => action.kind === "focus_topic")) this.focusNode(target);
+              arranged = true;
+            })
+          );
         } catch (e) {
         }
       }
@@ -63346,14 +63385,16 @@ ${note.detail.trim()}` : "",
       const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];
       if (rough.length && !this.closed && this.path === anchor.path && ((_a2 = this.map) == null ? void 0 : _a2.id) === anchor.id) {
         try {
-          await this.plugin.mutate(async () => {
-            var _a3;
-            if (this.closed || this.path !== anchor.path || ((_a3 = this.map) == null ? void 0 : _a3.id) !== anchor.id) return;
-            this.flushChatRender();
-            await this.mapChange((map) => {
-              map.nodes = this.placeChatCards(map.nodes, new Set(rough));
-            }, false);
-          });
+          await this.plugin.mutate(
+            () => this.history.ownWrites(async () => {
+              var _a3;
+              if (this.closed || this.path !== anchor.path || ((_a3 = this.map) == null ? void 0 : _a3.id) !== anchor.id) return;
+              this.flushChatRender();
+              await this.mapChange((map) => {
+                map.nodes = this.placeChatCards(map.nodes, new Set(rough));
+              }, false);
+            })
+          );
         } catch (e) {
         }
       }
@@ -63363,7 +63404,13 @@ ${note.detail.trim()}` : "",
       if (wrote) {
         try {
           if (!this.closed && this.path === anchor.path)
-            await this.pushChatReplyEntry(entries, anchor.path, (_b2 = run.notes) != null ? _b2 : /* @__PURE__ */ new Set(), (_c2 = run.files) != null ? _c2 : /* @__PURE__ */ new Set());
+            await this.pushChatReplyEntry(
+              entries,
+              anchor.path,
+              (_b2 = run.notes) != null ? _b2 : /* @__PURE__ */ new Set(),
+              (_c2 = run.files) != null ? _c2 : /* @__PURE__ */ new Set(),
+              (_d = run.parked) != null ? _d : /* @__PURE__ */ new Set()
+            );
         } catch (e) {
         }
         for (const view of this.plugin.views()) if (view !== this && touched.has(view.path)) view.history.clear();
@@ -63397,7 +63444,7 @@ ${note.detail.trim()}` : "",
               action,
               run
             );
-            outcome = resolved ? await this.runChatSelection(resolved.action, (_d = result.message) != null ? _d : "", laterBatch) : skipped("ui.map_chat_skip_parent_missing");
+            outcome = resolved ? await this.runChatSelection(resolved.action, (_e = result.message) != null ? _e : "", laterBatch) : skipped("ui.map_chat_skip_parent_missing");
           }
         } catch (error) {
           outcome = { status: "failed", reason: errorMessage(error) };
@@ -63544,7 +63591,7 @@ ${note.detail.trim()}` : "",
   }
   /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
   async applyChatWrite(action, baseline, same, run = { refs: /* @__PURE__ */ new Map(), created: [] }) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const hashes = baseline.mdHashes;
     if (!same() || !this.map) return skipped("ui.map_chat_skip_map_changed");
     const nodeOf = (id) => {
@@ -63650,7 +63697,8 @@ ${note.detail.trim()}` : "",
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
-        await this.removeToUnassigned(node, action.branch);
+        const removed = await this.removeToUnassignedEntry(node, action.branch);
+        for (const path of (_g = (_f = removed == null ? void 0 : removed.parkedPaths) == null ? void 0 : _f.call(removed)) != null ? _g : []) (_h = run.parked) == null ? void 0 : _h.add(path);
         return done;
       }
       case "edit_md_file": {
@@ -63809,7 +63857,7 @@ ${note.detail.trim()}` : "",
    * What a reply's undo step checks before it touches anything: the structure of Map.md (positions and viewport are layout,
    * as in every map transaction), the whole text of every note the reply wrote, and of every Markdown file it edited or created.
    */
-  async chatReplyFingerprint(mapPath, noteIds, files) {
+  async chatReplyFingerprint(mapPath, noteIds, files, parked = /* @__PURE__ */ new Set()) {
     const map = await this.plugin.repo.readMap(mapPath);
     const notes = [];
     for (const node of map.nodes)
@@ -63819,6 +63867,7 @@ ${note.detail.trim()}` : "",
       }
     const texts2 = [];
     for (const path of files) texts2.push([path, await this.chatFileText(path)]);
+    for (const path of parked) texts2.push([path, await this.chatFileText(path)]);
     return JSON.stringify({
       map: { ...map, viewport: null, nodes: map.nodes.map((node) => ({ ...node, x: null, y: null })) },
       notes,
@@ -63830,9 +63879,9 @@ ${note.detail.trim()}` : "",
    * reply touched with what it left (or what the last undo left): any difference refuses the whole step and nothing is
    * touched. Then the entries run like one (newest first for undo); a failure part-way puts back what already ran.
    */
-  async pushChatReplyEntry(entries, mapPath, noteIds, files) {
+  async pushChatReplyEntry(entries, mapPath, noteIds, files, parked = /* @__PURE__ */ new Set()) {
     if (!entries.length) return;
-    const fingerprint2 = () => this.chatReplyFingerprint(mapPath, noteIds, files);
+    const fingerprint2 = () => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint2();
     const run = async (redo) => {
       if (await fingerprint2() !== expected) throw this.chatUndoRefusal();
@@ -63852,7 +63901,7 @@ ${note.detail.trim()}` : "",
       }
       expected = await fingerprint2();
     };
-    this.history.push({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
+    this.history.pushSolo({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
   }
   chatSelect(ids) {
     this.selection.chatSelect(ids);

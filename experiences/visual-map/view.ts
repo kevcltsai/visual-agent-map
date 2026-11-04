@@ -10144,6 +10144,9 @@ export class VisualAgentMapView extends ItemView {
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
+    // The one line an old AIM map shows while AIM is hidden: no button, nothing to resume.
+    if (!aimEnabled() && this.map?.aim)
+      this.contentEl.createDiv({ cls: "vam-aim-attribution", text: t("ui.aim_paused_notice"), attr: { role: "note" } });
     if (aimEnabled() && this.map?.aim) {
       const data = this.map.aim;
       const isAnswered = (node: MapNode) => data.branches.some(branch => branch.questionNodeId === node.id);
@@ -17091,7 +17094,12 @@ export class VisualAgentMapView extends ItemView {
         status: "done",
         text:
           t("ui.map_chat_line_done_0", label) +
-          (outcome.skippedCards ? t("ui.map_chat_line_cards_skipped_0", outcome.skippedCards) : "")
+          (outcome.skippedCards
+            ? t(
+                aimEnabled() ? "ui.map_chat_line_cards_skipped_0" : "ui.map_chat_line_cards_skipped_hidden_0",
+                outcome.skippedCards
+              )
+            : "")
       };
     return {
       status: outcome.status,

@@ -328,6 +328,7 @@ var en = {
   "ui.aim_create_map": "New AIM",
   "ui.aim_start_title": "Create an Adaptive Inquiry Map (AIM)",
   "ui.aim_empty_map_hint": "This Adaptive Inquiry Map has no topic yet. AIM starts with a research topic.",
+  "ui.aim_paused_notice": "This map was built with AIM. AIM is paused in this version; unfinished research stays here, and the content can still be edited as usual.",
   "ui.aim_refresh_models": "Refresh model list",
   "ui.aim_refreshing_models": "Refreshing model list\u2026",
   "ui.aim_models_refreshed": "Model list refreshed.",
@@ -1192,6 +1193,7 @@ var en = {
   "ui.organize_nothing_to_do": "No maps in the legacy Topics folder need organizing.",
   "ui.organize_only_skipped_0": "Nothing can be moved: {0} unreadable map(s) were skipped and left untouched.",
   "ui.organize_preview_0_1_2_3_4": "Move {0} mind map(s) into {3} and {1} AIM map(s) into {4}. Skipped and left untouched because they cannot be read: {2}. Obsidian updates links according to your settings; if any step fails, everything already moved is restored.",
+  "ui.organize_preview_hidden_0_1_2": "Move {0} mind map(s) into {2}. Skipped and left untouched because they cannot be read: {1}. Obsidian updates links according to your settings; if any step fails, everything already moved is restored.",
   "ui.organize_skipped_list_0": "Skipped: {0}",
   "ui.organize_start": "Start organizing",
   "ui.organize_will_remove_0": "Afterwards these folders are empty and are moved to the trash: {0}.",
@@ -1334,6 +1336,7 @@ var en = {
   "ui.map_chat_kind_choice_topics_separator": ", ",
   "ui.map_chat_line_done_0": "Done: {0}",
   "ui.map_chat_line_cards_skipped_0": " ({0} topics skipped: missing, AIM or without a note)",
+  "ui.map_chat_line_cards_skipped_hidden_0": " ({0} topics skipped: missing or without a note)",
   "ui.map_chat_line_skipped_0_1": "Skipped: {0} ({1})",
   "ui.map_chat_line_failed_0_1": "Failed: {0} ({1})",
   "ui.map_chat_do_add_child_0": "Add subtopic \u201C{0}\u201D",
@@ -2808,6 +2811,7 @@ var zhCN = {
   "ui.aim_create_map": "\u6DFB\u52A0 AIM",
   "ui.aim_start_title": "\u521B\u5EFA Adaptive Inquiry Map\uFF08AIM\uFF09",
   "ui.aim_empty_map_hint": "\u8FD9\u5F20 Adaptive Inquiry Map \u5F53\u524D\u6CA1\u6709\u8BAE\u9898\u3002AIM \u4F1A\u4ECE\u7814\u7A76\u8BAE\u9898\u5F00\u59CB\u3002",
+  "ui.aim_paused_notice": "\u8FD9\u5F20\u56FE\u662F\u7528 AIM \u5EFA\u7684\u3002AIM \u8FD9\u4E00\u7248\u5148\u6682\u505C\uFF0C\u672A\u5B8C\u6210\u7684\u7814\u7A76\u4F1A\u505C\u5728\u8FD9\u91CC\uFF1B\u5185\u5BB9\u90FD\u80FD\u7167\u5E38\u7F16\u8F91\u3002",
   "ui.aim_refresh_models": "\u4FEE\u590D Model \u5217\u8868",
   "ui.aim_refreshing_models": "\u6B63\u5728\u66F4\u65B0 Model \u5217\u8868\u2026",
   "ui.aim_models_refreshed": "Model \u5217\u8868\u5DF2\u66F4\u65B0\u3002",
@@ -3672,6 +3676,7 @@ var zhCN = {
   "ui.organize_nothing_to_do": "\u65E7 Topics \u6587\u4EF6\u5939\u5185\u6CA1\u6709\u9700\u8981\u6574\u7406\u7684\u5FC3\u667A\u56FE\u3002",
   "ui.organize_only_skipped_0": "\u6CA1\u6709\u53EF\u79FB\u52A8\u7684\u9879\u76EE\uFF1A\u6709 {0} \u4EFD\u65E0\u6CD5\u8BFB\u53D6\u7684\u5FC3\u667A\u56FE\u5DF2\u7565\u8FC7\uFF0C\u4E14\u4E0D\u4F1A\u88AB\u52A8\u5230\u3002",
   "ui.organize_preview_0_1_2_3_4": "\u5C06\u628A {0} \u4EFD\u5FC3\u667A\u56FE\u642C\u5230\u201C{3}\u201D\u3001{1} \u4EFD AIM \u642C\u5230\u201C{4}\u201D\u3002\u65E0\u6CD5\u8BFB\u53D6\u800C\u7565\u8FC7\u3001\u4E0D\u4F1A\u88AB\u52A8\u5230\u7684\u6709 {2} \u4EFD\u3002\u94FE\u63A5\u4F1A\u4F9D\u4F60\u7684 Obsidian \u8BBE\u7F6E\u66F4\u65B0\uFF1B\u4EFB\u4E00\u6B65\u5931\u8D25\u4F1A\u8FD8\u539F\u6240\u6709\u5DF2\u79FB\u52A8\u7684\u9879\u76EE\u3002",
+  "ui.organize_preview_hidden_0_1_2": "\u5C06\u628A {0} \u4EFD\u5FC3\u667A\u56FE\u642C\u5230\u201C{2}\u201D\u3002\u65E0\u6CD5\u8BFB\u53D6\u800C\u7565\u8FC7\u3001\u4E0D\u4F1A\u88AB\u52A8\u5230\u7684\u6709 {1} \u4EFD\u3002\u94FE\u63A5\u4F1A\u4F9D\u4F60\u7684 Obsidian \u8BBE\u7F6E\u66F4\u65B0\uFF1B\u4EFB\u4E00\u6B65\u5931\u8D25\u4F1A\u8FD8\u539F\u6240\u6709\u5DF2\u79FB\u52A8\u7684\u9879\u76EE\u3002",
   "ui.organize_skipped_list_0": "\u7565\u8FC7\uFF1A{0}",
   "ui.organize_start": "\u5F00\u59CB\u6574\u7406",
   "ui.organize_will_remove_0": "\u6574\u7406\u540E\u4E0B\u5217\u6587\u4EF6\u5939\u4F1A\u662F\u7A7A\u7684\uFF0C\u5E76\u79FB\u5230\u5783\u573E\u6876\uFF1A{0}\u3002",
@@ -3814,6 +3819,7 @@ var zhCN = {
   "ui.map_chat_kind_choice_topics_separator": "\u3001",
   "ui.map_chat_line_done_0": "\u5B8C\u6210\uFF1A{0}",
   "ui.map_chat_line_cards_skipped_0": "\uFF08\u5DF2\u7565\u8FC7 {0} \u4E2A\u8BAE\u9898\uFF1A\u4E0D\u5B58\u5728\u3001AIM \u6216\u6CA1\u6709\u7B14\u8BB0\uFF09",
+  "ui.map_chat_line_cards_skipped_hidden_0": "\uFF08\u5DF2\u7565\u8FC7 {0} \u4E2A\u8BAE\u9898\uFF1A\u4E0D\u5B58\u5728\u6216\u6CA1\u6709\u7B14\u8BB0\uFF09",
   "ui.map_chat_line_skipped_0_1": "\u7565\u8FC7\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_line_failed_0_1": "\u5931\u8D25\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_do_add_child_0": "\u65B0\u589E\u5B50\u8BAE\u9898\u201C{0}\u201D",
@@ -5288,6 +5294,7 @@ var zhTW = {
   "ui.aim_create_map": "\u65B0\u589E AIM",
   "ui.aim_start_title": "\u5EFA\u7ACB Adaptive Inquiry Map\uFF08AIM\uFF09",
   "ui.aim_empty_map_hint": "\u9019\u5F35 Adaptive Inquiry Map \u76EE\u524D\u6C92\u6709\u8B70\u984C\u3002AIM \u6703\u5F9E\u7814\u7A76\u8B70\u984C\u958B\u59CB\u3002",
+  "ui.aim_paused_notice": "\u9019\u5F35\u5716\u662F\u7528 AIM \u5EFA\u7684\u3002AIM \u9019\u4E00\u7248\u5148\u66AB\u505C\uFF0C\u672A\u5B8C\u6210\u7684\u7814\u7A76\u6703\u505C\u5728\u9019\u88E1\uFF1B\u5167\u5BB9\u90FD\u80FD\u7167\u5E38\u7DE8\u8F2F\u3002",
   "ui.aim_refresh_models": "\u4FEE\u5FA9 Model \u6E05\u55AE",
   "ui.aim_refreshing_models": "\u6B63\u5728\u66F4\u65B0 Model \u6E05\u55AE\u2026",
   "ui.aim_models_refreshed": "Model \u6E05\u55AE\u5DF2\u66F4\u65B0\u3002",
@@ -6152,6 +6159,7 @@ var zhTW = {
   "ui.organize_nothing_to_do": "\u820A Topics \u8CC7\u6599\u593E\u5167\u6C92\u6709\u9700\u8981\u6574\u7406\u7684\u5FC3\u667A\u5716\u3002",
   "ui.organize_only_skipped_0": "\u6C92\u6709\u53EF\u642C\u79FB\u7684\u9805\u76EE\uFF1A\u6709 {0} \u4EFD\u7121\u6CD5\u8B80\u53D6\u7684\u5FC3\u667A\u5716\u5DF2\u7565\u904E\uFF0C\u4E14\u4E0D\u6703\u88AB\u52D5\u5230\u3002",
   "ui.organize_preview_0_1_2_3_4": "\u5C07\u628A {0} \u4EFD\u5FC3\u667A\u5716\u642C\u5230\u300C{3}\u300D\u3001{1} \u4EFD AIM \u642C\u5230\u300C{4}\u300D\u3002\u7121\u6CD5\u8B80\u53D6\u800C\u7565\u904E\u3001\u4E0D\u6703\u88AB\u52D5\u5230\u7684\u6709 {2} \u4EFD\u3002\u9023\u7D50\u6703\u4F9D\u4F60\u7684 Obsidian \u8A2D\u5B9A\u66F4\u65B0\uFF1B\u4EFB\u4E00\u6B65\u5931\u6557\u6703\u9084\u539F\u6240\u6709\u5DF2\u642C\u79FB\u7684\u9805\u76EE\u3002",
+  "ui.organize_preview_hidden_0_1_2": "\u5C07\u628A {0} \u4EFD\u5FC3\u667A\u5716\u642C\u5230\u300C{2}\u300D\u3002\u7121\u6CD5\u8B80\u53D6\u800C\u7565\u904E\u3001\u4E0D\u6703\u88AB\u52D5\u5230\u7684\u6709 {1} \u4EFD\u3002\u9023\u7D50\u6703\u4F9D\u4F60\u7684 Obsidian \u8A2D\u5B9A\u66F4\u65B0\uFF1B\u4EFB\u4E00\u6B65\u5931\u6557\u6703\u9084\u539F\u6240\u6709\u5DF2\u642C\u79FB\u7684\u9805\u76EE\u3002",
   "ui.organize_skipped_list_0": "\u7565\u904E\uFF1A{0}",
   "ui.organize_start": "\u958B\u59CB\u6574\u7406",
   "ui.organize_will_remove_0": "\u6574\u7406\u5F8C\u4E0B\u5217\u8CC7\u6599\u593E\u6703\u662F\u7A7A\u7684\uFF0C\u4E26\u79FB\u5230\u5783\u573E\u6876\uFF1A{0}\u3002",
@@ -6294,6 +6302,7 @@ var zhTW = {
   "ui.map_chat_kind_choice_topics_separator": "\u3001",
   "ui.map_chat_line_done_0": "\u5B8C\u6210\uFF1A{0}",
   "ui.map_chat_line_cards_skipped_0": "\uFF08\u5DF2\u7565\u904E {0} \u500B\u8B70\u984C\uFF1A\u4E0D\u5B58\u5728\u3001AIM \u6216\u6C92\u6709\u7B46\u8A18\uFF09",
+  "ui.map_chat_line_cards_skipped_hidden_0": "\uFF08\u5DF2\u7565\u904E {0} \u500B\u8B70\u984C\uFF1A\u4E0D\u5B58\u5728\u6216\u6C92\u6709\u7B46\u8A18\uFF09",
   "ui.map_chat_line_skipped_0_1": "\u7565\u904E\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_line_failed_0_1": "\u5931\u6557\uFF1A{0}\uFF08{1}\uFF09",
   "ui.map_chat_do_add_child_0": "\u65B0\u589E\u5B50\u8B70\u984C\u300C{0}\u300D",
@@ -57771,7 +57780,7 @@ ${request.requirements}` : preset.text,
     this.paint();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -57925,7 +57934,9 @@ ${request.requirements}` : preset.text,
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if (aimEnabled() && ((_v = this.map) == null ? void 0 : _v.aim)) {
+    if (!aimEnabled() && ((_v = this.map) == null ? void 0 : _v.aim))
+      this.contentEl.createDiv({ cls: "vam-aim-attribution", text: t("ui.aim_paused_notice"), attr: { role: "note" } });
+    if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim)) {
       const data = this.map.aim;
       const isAnswered = (node) => data.branches.some((branch) => branch.questionNodeId === node.id);
       const pending2 = this.map.nodes.find((node) => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -57979,10 +57990,10 @@ ${request.requirements}` : preset.text,
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
     }
-    if ((_w = this.deletedMap) == null ? void 0 : _w.deleted)
+    if ((_x = this.deletedMap) == null ? void 0 : _x.deleted)
       this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
     const startingSelection = this.startingTasks.get(this.selectionTaskKey());
-    if (startingSelection && !(((_x = this.integrationTask) == null ? void 0 : _x.mapPath) === this.path && this.integrationTask.state === "running")) {
+    if (startingSelection && !(((_y = this.integrationTask) == null ? void 0 : _y.mapPath) === this.path && this.integrationTask.state === "running")) {
       const state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
@@ -58033,7 +58044,7 @@ ${request.requirements}` : preset.text,
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
-      if ((_y = this.deletedMap) == null ? void 0 : _y.deleted)
+      if ((_z = this.deletedMap) == null ? void 0 : _z.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
     }
@@ -58044,7 +58055,7 @@ ${request.requirements}` : preset.text,
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    if (((_z = this.map) == null ? void 0 : _z.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
+    if (((_A = this.map) == null ? void 0 : _A.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
@@ -58127,7 +58138,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_A = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _A.focus({ preventScroll: true });
+        (_B = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _B.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -58136,9 +58147,9 @@ ${request.requirements}` : preset.text,
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_B = this.stageEl.querySelector(
+        (_C = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _B.focus({ preventScroll: true });
+        )) == null ? void 0 : _C.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -64345,7 +64356,10 @@ ${note.detail.trim()}` : "",
     if (outcome.status === "done")
       return {
         status: "done",
-        text: t("ui.map_chat_line_done_0", label) + (outcome.skippedCards ? t("ui.map_chat_line_cards_skipped_0", outcome.skippedCards) : "")
+        text: t("ui.map_chat_line_done_0", label) + (outcome.skippedCards ? t(
+          aimEnabled() ? "ui.map_chat_line_cards_skipped_0" : "ui.map_chat_line_cards_skipped_hidden_0",
+          outcome.skippedCards
+        ) : "")
       };
     return {
       status: outcome.status,
@@ -67776,12 +67790,12 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
   entries() {
     const store = this.plugin.noteStyles;
     if (this.tab === "recipe")
-      return store.listRecipes().map((item) => ({
+      return store.listRecipes().filter((item) => aimEnabled() || !item.aimOnly).map((item) => ({
         ref: item.ref,
         builtin: item.kind === "builtin",
         name: item.name,
         issues: item.issues,
-        used: item.usedByKinds.map(styleKindName),
+        used: item.usedByKinds.filter((kind) => kind !== "aim" || aimEnabled()).map(styleKindName),
         tags: styleTags(item),
         aimOnly: item.aimOnly === true
       }));
@@ -68503,7 +68517,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
         {
           type: "group",
           heading: t("ui.settings_group_kinds"),
-          items: STYLE_KINDS.map((kind) => ({
+          items: STYLE_KINDS.filter((kind) => kind !== "aim" || aimEnabled()).map((kind) => ({
             name: kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`),
             render: (setting) => renderNoteKindSetting(setting, this.plugin, kind)
           }))
@@ -68709,10 +68723,13 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
             name: t("ui.mind_maps_folder"),
             render: (setting) => this.renderMapFolderSetting(setting, "mindMapsFolder", "ui.mind_maps_folder", "Mind Maps")
           },
-          {
-            name: t("ui.aim_maps_folder"),
-            render: (setting) => this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
-          }
+          // AIM is hidden in this release (experiences/aim/availability.ts); the aimFolder value is kept untouched.
+          ...aimEnabled() ? [
+            {
+              name: t("ui.aim_maps_folder"),
+              render: (setting) => this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
+            }
+          ] : []
         ]
       },
       {
@@ -68747,7 +68764,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
   /** Entry status of the "Note style" page: a row whose saved style is gone. */
   noteStyleStatus() {
     try {
-      return STYLE_KINDS.some((kind) => missingStyleRef(this.plugin, kind)) ? "warning" : null;
+      return STYLE_KINDS.some((kind) => (kind !== "aim" || aimEnabled()) && missingStyleRef(this.plugin, kind)) ? "warning" : null;
     } catch (e) {
       return null;
     }
@@ -76744,12 +76761,13 @@ var VisualAgentMapPlugin = class extends import_obsidian45.Plugin {
     this.addLocalizedCommand("open-map", "ui.command_open_map", () => {
       void this.activateView().catch((error) => new import_obsidian45.Notice(String(error)));
     });
-    this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
-      void this.activateView().then(() => {
-        var _a2;
-        return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
-      }).catch((error) => new import_obsidian45.Notice(String(error)));
-    });
+    if (aimEnabled())
+      this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
+        void this.activateView().then(() => {
+          var _a2;
+          return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
+        }).catch((error) => new import_obsidian45.Notice(String(error)));
+      });
     this.addLocalizedCommand("import-outline", "ui.command_import_outline", () => {
       void this.activateView().then(() => {
         var _a2;
@@ -77099,14 +77117,14 @@ ${error}`;
       return;
     }
     const mind = plan.moves.filter((move) => move.kind === "mind").length;
-    let description = t(
+    let description = aimEnabled() ? t(
       "ui.organize_preview_0_1_2_3_4",
       mind,
       plan.moves.length - mind,
       plan.skipped.length,
       this.settings.mindMapsFolder,
       this.settings.aimFolder
-    );
+    ) : t("ui.organize_preview_hidden_0_1_2", mind, plan.skipped.length, this.settings.mindMapsFolder);
     if (plan.skipped.length)
       description += `
 ${t("ui.organize_skipped_list_0", plan.skipped.map((item) => item.mapPath).join(", "))}`;

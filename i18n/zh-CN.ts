@@ -229,6 +229,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.aim_create_map": "添加 AIM",
   "ui.aim_start_title": "创建 Adaptive Inquiry Map（AIM）",
   "ui.aim_empty_map_hint": "这张 Adaptive Inquiry Map 当前没有议题。AIM 会从研究议题开始。",
+  "ui.aim_paused_notice": "这张图是用 AIM 建的。AIM 这一版先暂停，未完成的研究会停在这里；内容都能照常编辑。",
   "ui.aim_refresh_models": "修复 Model 列表",
   "ui.aim_refreshing_models": "正在更新 Model 列表…",
   "ui.aim_models_refreshed": "Model 列表已更新。",
@@ -1132,6 +1133,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.organize_only_skipped_0": "没有可移动的项目：有 {0} 份无法读取的心智图已略过，且不会被动到。",
   "ui.organize_preview_0_1_2_3_4":
     "将把 {0} 份心智图搬到“{3}”、{1} 份 AIM 搬到“{4}”。无法读取而略过、不会被动到的有 {2} 份。链接会依你的 Obsidian 设置更新；任一步失败会还原所有已移动的项目。",
+  "ui.organize_preview_hidden_0_1_2":
+    "将把 {0} 份心智图搬到“{2}”。无法读取而略过、不会被动到的有 {1} 份。链接会依你的 Obsidian 设置更新；任一步失败会还原所有已移动的项目。",
   "ui.organize_skipped_list_0": "略过：{0}",
   "ui.organize_start": "开始整理",
   "ui.organize_will_remove_0": "整理后下列文件夹会是空的，并移到垃圾桶：{0}。",
@@ -1282,6 +1285,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_kind_choice_topics_separator": "、",
   "ui.map_chat_line_done_0": "完成：{0}",
   "ui.map_chat_line_cards_skipped_0": "（已略过 {0} 个议题：不存在、AIM 或没有笔记）",
+  "ui.map_chat_line_cards_skipped_hidden_0": "（已略过 {0} 个议题：不存在或没有笔记）",
   "ui.map_chat_line_skipped_0_1": "略过：{0}（{1}）",
   "ui.map_chat_line_failed_0_1": "失败：{0}（{1}）",
   "ui.map_chat_do_add_child_0": "新增子议题“{0}”",

@@ -335,3 +335,108 @@ test('aim-hidden: D11 the share snapshot of an old AIM map has no aim block, no 
   assert.equal(snapshot.map.nodes.some(item => Object.keys(item).some(key => key.startsWith('aim'))), false);
   assert.ok(doc.aim && doc.nodes.some(item => item.aimKind), 'the open map itself is untouched');
 });
+
+// ---- The plugin shell: commands, workspace, settings, note styles, text --------------------------------------------
+const dom = require('../support-dom.cjs');
+/** Loads the plugin the way steps-note-style-onload.cjs does and records the commands it registers and the folders it creates. */
+async function onloadShell(loader, saved) {
+  const commands = [], folders = [], writes = [];
+  const record = (name, sink) => (...args) => { sink?.push(args[0]); writes.push([name, args[0]]); return Promise.resolve(); };
+  const Main = loader('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice([]) } });
+  const bare = new Main.default();
+  const plugin = new Proxy(bare, { get: (target, key, receiver) => key in target || typeof key !== 'string' || !/^(register|add)/.test(key) ? Reflect.get(target, key, receiver) : () => ({ setAttribute() {}, addClass() {}, addEventListener() {} }) });
+  plugin.manifest = { id: 'visual-agent-map', version: '0.0.0-test', dir: '' };
+  const vault = {
+    adapter: { exists: async () => false, list: async () => ({ files: [], folders: [] }), read: async () => '', write: record('adapter.write'), mkdir: record('adapter.mkdir') },
+    getAbstractFileByPath: () => null, read: async () => '', getMarkdownFiles: () => [], getFiles: () => [], getAllLoadedFiles: () => [], getRoot: () => ({ children: [] }), on: (name, handler) => ({ name, handler }),
+    create: record('create'), createFolder: record('createFolder', folders), modify: record('modify'), process: record('process'), rename: record('rename'), trash: record('trash'), delete: record('delete')
+  };
+  plugin.app = { vault, fileManager: { trashFile: record('trashFile'), renameFile: record('renameFile') }, metadataCache: { on: () => ({}), getFileCache: () => null },
+    workspace: { onLayoutReady: callback => callback(), on: () => ({}), getLeaf: () => ({ setViewState: async () => {}, view: {} }), revealLeaf: async () => {}, requestSaveLayout() {}, getLeavesOfType: () => [], getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: true } };
+  plugin.loadData = async () => saved;
+  plugin.saveData = async () => {};
+  plugin.addCommand = command => { commands.push(command); return command; };
+  await plugin.onload(); await plugin.ready; await new Promise(resolve => setImmediate(resolve));
+  return { plugin, commands, folders, writes };
+}
+
+integrationTest('aim-hidden: N1 the command palette has no AIM command; with AIM on it does', async () => {
+  const shown = await onloadShell(load, { migrated: true, structureVersion: 2, workspaceInitialized: true });
+  const hidden = await onloadShell(loadHidden, { migrated: true, structureVersion: 2, workspaceInitialized: true });
+  assert.ok(shown.commands.some(command => command.id === 'create-mindsearch-map'), 'AIM on: the command exists');
+  assert.equal(hidden.commands.some(command => command.id === 'create-mindsearch-map'), false);
+  assert.equal(hidden.commands.some(command => /AIM|Adaptive Inquiry/i.test(command.name)), false, 'no command name mentions AIM');
+  assert.ok(hidden.commands.some(command => command.id === 'open-map'), 'the other commands are still there');
+  assert.equal(hidden.commands.length, shown.commands.length - 1);
+});
+
+integrationTest('aim-hidden: N2 a first install and a workspace repair create Mind Maps and never the AIM folder', async () => {
+  const fresh = await onloadShell(loadHidden, null);
+  assert.ok(fresh.folders.includes('Agent Workspace/Mind Maps'), 'the first install creates Mind Maps');
+  assert.equal(fresh.folders.some(path => /\/AIM(\/|$)/.test(path)), false, 'first install: no AIM folder');
+  const repaired = await onloadShell(loadHidden, { migrated: true, structureVersion: 2, workspaceInitialized: false });
+  repaired.folders.length = 0;
+  await repaired.plugin.repairWorkspace();
+  assert.ok(repaired.folders.includes('Agent Workspace/Mind Maps'));
+  assert.equal(repaired.folders.some(path => /\/AIM(\/|$)/.test(path)), false, 'repair: no AIM folder');
+  const control = await onloadShell(load, null);
+  assert.ok(control.folders.includes('Agent Workspace/AIM'), 'AIM on: the same first install does create it');
+});
+
+function settingsRows(loader, recipes) {
+  const { VisualAgentMapSettingTab } = loader('ui/settings-tab.ts', { obsidian: { ...obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: class {} } });
+  const plugin = { settings: { cliModel: 'm', language: 'en' }, subscribeModelDiscovery: () => () => {}, subscribeCurrentModel: () => () => {},
+    codexDiagnostic: () => ({ installed: true, executable: 'codex' }), claudeDiagnostic: () => ({ installed: true, executable: 'claude' }), noteStyles: { listRecipes: () => recipes } };
+  const flatten = items => items.flatMap(item => (item.type === 'group' || item.type === 'page') ? [item, ...flatten(item.items || [])] : [item]);
+  return flatten(new VisualAgentMapSettingTab({}, plugin).getSettingDefinitions());
+}
+const recipesWithAim = [
+  { ref: 'builtin:general', name: 'General research', kind: 'builtin', structure: { name: 'S' }, voice: { name: 'V' }, format: { name: 'F' }, update: 'rewrite', issues: [], usedByKinds: ['topic', 'aim'] },
+  { ref: 'builtin:aim', name: 'AIM report', kind: 'builtin', aimOnly: true, structure: { name: 'S' }, voice: { name: 'V' }, format: { name: 'F' }, update: 'rewrite', issues: [], usedByKinds: ['aim'] }
+];
+
+test('aim-hidden: N1 the settings have no AIM maps folder row and no AIM note style row; with AIM on both are there', () => {
+  const names = loader => settingsRows(loader, recipesWithAim).map(row => row.name ?? row.heading).filter(Boolean);
+  const shown = names(load), hidden = names(loadHidden);
+  assert.ok(shown.includes('AIM folder') && shown.includes('AIM conclusion note'), `AIM on: ${shown.join(' | ')}`);
+  assert.equal(hidden.some(name => /AIM|Adaptive/i.test(name)), false, hidden.filter(name => /AIM/.test(name)).join(' | '));
+  assert.ok(hidden.includes('Mind maps folder') || hidden.some(name => /Mind Maps? folder/i.test(name)), 'the Mind Maps folder row stays');
+  assert.equal(hidden.length, shown.length - 2);
+});
+
+test('aim-hidden: N1 the note style manager lists no AIM report and names no AIM kind', () => {
+  const entries = loader => {
+    const { NoteStyleManageModal } = loader('ui/modals/note-style-manage-modal.ts', { obsidian: { ...obsidian, Modal: class {}, Setting: class {} } });
+    const modal = Object.create(NoteStyleManageModal.prototype);
+    modal.tab = 'recipe'; modal.plugin = { noteStyles: { listRecipes: () => recipesWithAim, listParts: () => [] } };
+    return modal.entries();
+  };
+  const shown = entries(load), hidden = entries(loadHidden);
+  assert.deepEqual(shown.map(entry => entry.name), ['General research', 'AIM report']);
+  assert.deepEqual(hidden.map(entry => entry.name), ['General research']);
+  assert.equal(JSON.stringify(hidden).includes('AIM'), false, 'the used-by list does not name the AIM kind');
+});
+
+test('aim-hidden: E4 the notice line has the agreed text in three languages and is a plain line without a button', () => {
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-TW', 'ui.aim_paused_notice'), '這張圖是用 AIM 建的。AIM 這一版先暫停，未完成的研究會停在這裡；內容都能照常編輯。');
+  assert.equal(translate('zh-CN', 'ui.aim_paused_notice'), '这张图是用 AIM 建的。AIM 这一版先暂停，未完成的研究会停在这里；内容都能照常编辑。');
+  assert.match(translate('en', 'ui.aim_paused_notice'), /^This map was built with AIM\. AIM is paused in this version;/);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const start = source.indexOf('if (!aimEnabled() && this.map?.aim)');
+  assert.ok(start > 0, 'the line is drawn only while AIM is hidden and the map has an aim block');
+  const statement = source.slice(start, source.indexOf(';', start) + 1);
+  assert.match(statement, /createDiv\(\{[^}]*text: t\("ui\.aim_paused_notice"\)/);
+  assert.doesNotMatch(statement, /button|click/i);
+});
+
+test('aim-hidden: N1 the text a new user can reach names no AIM: the hidden-variant strings are used and carry no AIM wording', () => {
+  const { translate } = load('i18n.ts');
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    for (const key of ['ui.organize_preview_hidden_0_1_2', 'ui.map_chat_line_cards_skipped_hidden_0']) assert.doesNotMatch(translate(language, key, 1, 2, 'x'), /AIM|Adaptive/i, `${language} ${key}`);
+  }
+  const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
+  assert.match(main, /aimEnabled\(\)\s*\? t\(\s*"ui\.organize_preview_0_1_2_3_4"[\s\S]*?: t\("ui\.organize_preview_hidden_0_1_2"/);
+  const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(view, /aimEnabled\(\) \? "ui\.map_chat_line_cards_skipped_0" : "ui\.map_chat_line_cards_skipped_hidden_0"/);
+});

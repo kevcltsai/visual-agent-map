@@ -5,6 +5,7 @@ import type { RecipeListItem } from "../../ai/note-style-store";
 import { UPDATE_MODE_KEYS, type StyleKind } from "../../ai/note-style-recipe";
 import { NoteStyleEditorModal, namePartProblem, suggestRecipeName } from "./note-style-editor-modal";
 import { styleIssueText } from "../../experiences/visual-map/note-style-picker";
+import { aimEnabled } from "../../experiences/aim/availability";
 
 /** The four pages of the manage window, in tab order. */
 export const MANAGE_TABS = ["recipe", "structure", "voice", "format"] as const;
@@ -168,15 +169,18 @@ export class NoteStyleManageModal extends Modal {
   private entries(): Entry[] {
     const store = this.plugin.noteStyles;
     if (this.tab === "recipe")
-      return store.listRecipes().map(item => ({
-        ref: item.ref,
-        builtin: item.kind === "builtin",
-        name: item.name,
-        issues: item.issues,
-        used: item.usedByKinds.map(styleKindName),
-        tags: styleTags(item),
-        aimOnly: item.aimOnly === true
-      }));
+      return store
+        .listRecipes()
+        .filter(item => aimEnabled() || !item.aimOnly)
+        .map(item => ({
+          ref: item.ref,
+          builtin: item.kind === "builtin",
+          name: item.name,
+          issues: item.issues,
+          used: item.usedByKinds.filter(kind => kind !== "aim" || aimEnabled()).map(styleKindName),
+          tags: styleTags(item),
+          aimOnly: item.aimOnly === true
+        }));
     return store.listParts(this.tab).map(item => ({
       ref: item.ref,
       builtin: item.kind === "builtin",

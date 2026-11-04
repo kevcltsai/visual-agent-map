@@ -308,6 +308,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-frame-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .vam-card-frame-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
 .vam-card-frame-label { display: none; }
+.vam-card-frame-hint { min-height: 1.2em; margin: 6px 0 0; color: #c0392b; text-align: center; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable { display: block; -webkit-line-clamp: unset; overflow: visible; white-space: pre-wrap; border-radius: 4px; cursor: text; user-select: text; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable:hover, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable:hover { outline: 1px dashed #4a90e2; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable:focus, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable:focus { outline: 2px solid #4a90e2; outline-offset: 2px; }
+.vam-card-frame-stage .vam-card-title.is-editable[aria-invalid="true"] { outline: 2px solid #c0392b; outline-offset: 2px; }
+.vam-card-frame-stage .vam-card-summary.is-editable:empty::before { content: attr(data-placeholder); color: #888; font-style: italic; }
 .vam-card-frame-error { margin: 0 0 8px; color: #c0392b; text-align: center; }
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
@@ -1703,6 +1709,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-card-links { flex: none; margin-inline-start: auto; padding: 0 4px; min-height: 0; border: 0; box-shadow: none; background: transparent; color: var(--text-accent); font-size: var(--font-ui-smaller); line-height: 1.4; cursor: pointer; }
 .vam-view .vam-card-links:hover { text-decoration: underline; }
 .vam-view .vam-card-links:focus-visible, .vam-view .vam-topic-link-item:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-card-ai-lock { flex: none; display: inline-flex; align-items: center; padding: 0 2px; min-height: 0; border: 0; box-shadow: none; background: transparent; color: var(--text-muted); cursor: pointer; }
+.vam-view .vam-card-ai-lock svg { width: 14px; height: 14px; }
+.vam-view .vam-card-ai-lock:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-view .vam-topic-link-menu { position: absolute; z-index: 50; display: flex; flex-direction: column; min-width: 160px; max-width: 320px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-view .vam-topic-link-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; border: 0; box-shadow: none; background: transparent; color: var(--text-normal); font-weight: 400; }
 .vam-view .vam-topic-link-item:hover { background: var(--background-modifier-hover); }

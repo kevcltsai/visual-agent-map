@@ -47,6 +47,7 @@ import {
   managedHeadingValue,
   managedSectionValue,
   readRelevance,
+  readAiLocked,
   readTopicKind,
   readHypothesisStrength,
   type HypothesisStrength,
@@ -115,6 +116,8 @@ export interface Note {
   referencePaths?: string[];
   /** Read-only grading from frontmatter (see readRelevance); absent when missing or invalid. */
   relevance?: NoteRelevance;
+  /** From `ai-locked: true` (see readAiLocked): AI may not change this topic or its relations. Absent = unlocked. */
+  aiLocked?: true;
   /** From `topic-kind` frontmatter; set only for a hypothesis (absent = ordinary topic). */
   topicKind?: Exclude<TopicKind, "topic">;
   /** From `hypothesis-strength`; set only for a hypothesis (missing or invalid reads as weak). */
@@ -1505,6 +1508,7 @@ export class Repository {
       ...(typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {}),
       ...(noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {}),
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
+      ...(readAiLocked(fm) ? { aiLocked: true as const } : {}),
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
       ...(readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {}),
       ...(readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {}),
@@ -1886,6 +1890,18 @@ export class Repository {
   async writeTopicMarkers(path: string, id: TopicMarker): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
       setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
+    );
+  }
+
+  /**
+   * Sets (`ai-locked: true`) or removes the AI lock. No other key changes and `updated` is not bumped; a note already in
+   * the asked state is returned as it is, byte for byte.
+   */
+  async writeAiLocked(path: string, locked: boolean): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      readAiLocked(frontmatter(content)) === locked
+        ? content
+        : setFrontmatterKeys(content, { "ai-locked": locked ? true : null })
     );
   }
 

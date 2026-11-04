@@ -1,4 +1,15 @@
-import { Component, MarkdownRenderer, MarkdownView, Notice, Platform, setIcon, type App, type Editor } from "obsidian";
+import {
+  Component,
+  MarkdownRenderer,
+  MarkdownView,
+  Notice,
+  parseYaml,
+  Platform,
+  setIcon,
+  type App,
+  type Editor
+} from "obsidian";
+import { noteTextAiLocked } from "../../note-values";
 import { getUiLanguage, t } from "../../i18n";
 import type { PreparedStep } from "../../core/step-runner";
 import { unsafeMermaid } from "../../ai/mermaid-safety";
@@ -595,6 +606,12 @@ class SelectionAiPanel extends Component {
     trigger?: HTMLElement
   ): Promise<void> {
     if (this.controller) return;
+    // AI lock: a locked note gets no AI draft (nothing could be written back into it).
+    if (this.noteLocked()) {
+      this.status.setText(t("ui.ai_locked_notice"));
+      new Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const controller = new AbortController();
     this.controller = controller;
     const output = this.output,
@@ -783,7 +800,25 @@ class SelectionAiPanel extends Component {
     this.applyResult(this.output.value, action, this.status);
   }
 
+  /** True when the note the panel works on is locked for AI (`ai-locked: true`), read from the editor as it is now. */
+  private noteLocked(): boolean {
+    const { view, markdown } = this.snapshot;
+    let current = markdown;
+    try {
+      current = view.editor.getValue();
+    } catch {
+      /* A closed editor: the text the panel opened on decides. */
+    }
+    return noteTextAiLocked(current, parseYaml);
+  }
+
   private applyResult(result: string, action: "append" | "replace" | "after", status: HTMLElement): void {
+    // AI lock, at write time: a note locked while the draft was made is not written.
+    if (this.noteLocked()) {
+      status.setText(t("ui.ai_locked_notice"));
+      new Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const { view, path, markdown, text, matchAt } = this.snapshot;
     const viewStillOpen = this.app.workspace.getLeavesOfType("markdown").some(leaf => leaf.view === view);
     if (!viewStillOpen || view.file?.path !== path || view.editor.getValue() !== markdown) {

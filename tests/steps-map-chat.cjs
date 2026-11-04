@@ -111,7 +111,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 21);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 22);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -400,8 +400,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 13 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 13);
+test('C1: the style is not part of the action schema, and the step version is 14 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 14);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -474,7 +474,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-6)), ['focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-7)), ['focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'reorder_topics']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -522,11 +522,11 @@ test('B1 view operations: collapse_topic, expand_topic and focus_topic need a ca
   const bad = parse(reply(item('collapse_topic'), item('focus_topic', { nodeId: 'ghost' })));
   assert.deepEqual(bad.rejected.map(entry => entry.code), ['missing_field', 'unknown_node']);
 });
-test('B1 schema: ref is a required string property and the kinds list ends with the view operations, then the topic type actions (chat 03), then the relation actions (chat 06), then the appearance action (chat 08)', () => {
+test('B1 schema: ref is a required string property and the kinds list ends with the view operations, then the topic type actions (chat 03), then the relation actions (chat 06), then the appearance action (chat 08), then reorder_topics (persona 23)', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'reorder_topics']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
@@ -1299,4 +1299,47 @@ test('one or two new cards and no layout line: counts and lines are unchanged', 
   const lines = [{ status: 'done', text: 'Added 0' }, { status: 'skipped', text: 'Skipped 1' }];
   assert.deepEqual(plain(countChatLines(lines, ['Arranged', 'Undo'])), { done: 1, skipped: 1, failed: 0 });
   assert.deepEqual(plain(splitChatLines(lines, ['Arranged', 'Undo'])), { results: lines, notes: [] });
+});
+
+// ---- AI chat sorts the cards under one parent (persona 23) ------------------------------------------------------------------
+test('persona 23: reorder_topics keeps the listed children of one parent in the given order; a new: card of this reply can be listed', () => {
+  const got = parse(reply(
+    item('reorder_topics', { parentId: 'r', nodeIds: ['b', ' a ', 'b'] }),
+    child('n1', 'r'),
+    item('reorder_topics', { parentId: 'r', nodeIds: ['new:n1', 'a'] })
+  ));
+  assert.deepEqual(got.actions, [
+    { kind: 'reorder_topics', parentId: 'r', nodeIds: ['b', 'a'] },
+    { kind: 'add_child', parentId: 'r', title: 'n1', summary: '', ref: 'n1' },
+    { kind: 'reorder_topics', parentId: 'r', nodeIds: ['new:n1', 'a'] }
+  ]);
+  assert.deepEqual(got.rejected, []);
+});
+test('persona 23: reorder_topics is dropped and counted when a card is not a child of the parent, the parent or a card is unknown, or fewer than two cards are listed', () => {
+  const got = parse(reply(
+    item('reorder_topics', { parentId: 'r', nodeIds: ['a', 'a1'] }),
+    item('reorder_topics', { parentId: 'ghost', nodeIds: ['a', 'b'] }),
+    item('reorder_topics', { parentId: 'r', nodeIds: ['a', 'ghost'] }),
+    item('reorder_topics', { parentId: 'r', nodeIds: ['a'] }),
+    item('reorder_topics', { parentId: '', nodeIds: ['a', 'b'] }),
+    item('reorder_topics', { parentId: 'r', nodeIds: ['a', 'new:zz'] })
+  ));
+  assert.deepEqual(got.actions, []);
+  assert.deepEqual(codes(got), ['0:not_sibling', '1:unknown_node', '2:unknown_node', '3:missing_field', '4:missing_field', '5:bad_ref']);
+});
+test('persona 23: a kept move updates the parent links, so a later reorder_topics sees where the card went', () => {
+  const got = parse(reply(
+    item('move_topic', { nodeId: 'a1', newParentId: 'b' }),
+    item('reorder_topics', { parentId: 'b', nodeIds: ['a1', 'a'] }),
+    item('reorder_topics', { parentId: 'r', nodeIds: ['a1', 'b'] })
+  ));
+  assert.deepEqual(got.actions.map(a => a.kind), ['move_topic']);
+  assert.deepEqual(codes(got), ['1:not_sibling', '2:not_sibling']);
+});
+test('persona 23: both prompts offer reorder_topics for sorting cards under one parent', () => {
+  const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
+  assert.match(render('en'), /use reorder_topics instead/);
+  assert.match(render('en'), /- reorder_topics: parentId/);
+  assert.match(render('zh-TW'), /reorder_topics：parentId/);
+  assert.doesNotMatch(render('en'), /take the card that should end up last/);
 });

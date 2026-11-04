@@ -34,7 +34,8 @@
               "ask_topic_kind",
               "add_relation",
               "remove_relation",
-              "set_appearance"
+              "set_appearance",
+              "reorder_topics"
             ]
           },
           "nodeId": {

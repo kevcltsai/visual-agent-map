@@ -5308,6 +5308,32 @@ integrationTest('chat 07: in a timeline map a first-level topic is reordered alo
   assert.equal(h.contents.get(MAP), before);
 });
 
+integrationTest('persona 23: one reorder_topics action sorts the five siblings, Map.md and the layout follow, and Undo takes it back in one step', async () => {
+  const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
+  const before = h.contents.get(MAP);
+  const order = ['Dusk', 'Noon', 'Mind', 'Dawn', 'Body'];
+  const lines = await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: order.map(title => ids[title]) }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  assert.equal(lines[0].text, 'Done: Put 5 topics under “Sleep” in a new order');
+  eq(await kidsOf(h, h.ids.root), order);
+  const ys = (await h.saved()).filter(n => n.parentId === h.ids.root).sort((l, r) => l.y - r.y).map(n => h.view.notes.get(n.id)?.title);
+  eq(ys, order);
+  await h.view.travel(false);
+  eq(await kidsOf(h, h.ids.root), ['Body', 'Mind', 'Dawn', 'Noon', 'Dusk']);
+  assert.equal(h.contents.get(MAP), before, 'Map.md is back byte for byte');
+  assert.equal(h.view.history.canUndo, false, 'one step');
+});
+integrationTest('persona 23: reorder_topics of some siblings keeps the others in their places, and a card that moved away since is skipped without a write', async () => {
+  const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
+  eq((await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: [ids.Noon, ids.Body] }])).map(l => l.status), ['done']);
+  eq(await kidsOf(h, h.ids.root), ['Noon', 'Mind', 'Dawn', 'Body', 'Dusk']);
+  await apply(h, [{ kind: 'move_topic', nodeId: ids.Dusk, newParentId: h.ids.a }]);
+  const before = h.contents.get(MAP);
+  const lines = await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: [ids.Dusk, ids.Mind] }]);
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(MAP), before);
+});
+
 // ---- chat 08: the AI chat sets the appearance ------------------------------------------------------------------------------
 const lookAct = (nodeIds, fields = {}) => ({ kind: 'set_appearance', nodeIds, ...fields });
 const looksOf = async (h, key) => { const note = await h.note(key); return { color: note.color ?? null, markers: note.markers ?? [], style: note.style ?? [] }; };

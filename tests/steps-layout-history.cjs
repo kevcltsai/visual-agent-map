@@ -398,3 +398,11 @@ test('persona 11: shiftSibling moves only siblings and returns the same array wh
   assert.deepEqual(shiftSibling(nodes, 'a', 1).map(n => n.id), ['r', 'b', 'x', 'a', 'c']);
   for (const [id, offset] of [['a', -1], ['c', 1], ['r', 1], ['zz', 1]]) assert.equal(shiftSibling(nodes, id, offset), nodes);
 });
+
+test('persona 23: orderSiblings puts the listed children in the given order among the places they hold, and returns the same array when nothing changes', () => {
+  const { orderSiblings } = load('map-layout.ts');
+  const nodes = [{ id: 'r', parentId: null }, { id: 'a', parentId: 'r' }, { id: 'x', parentId: 'a' }, { id: 'b', parentId: 'r' }, { id: 'y', parentId: 'q' }, { id: 'c', parentId: 'r' }, { id: 'd', parentId: 'r' }];
+  assert.deepEqual(orderSiblings(nodes, 'r', ['d', 'c', 'b', 'a']).map(n => n.id), ['r', 'd', 'x', 'c', 'y', 'b', 'a']);
+  assert.deepEqual(orderSiblings(nodes, 'r', ['c', 'a']).map(n => n.id), ['r', 'c', 'x', 'b', 'y', 'a', 'd'], 'a subset trades only its own places');
+  for (const ids of [['a', 'b', 'c', 'd'], ['a', 'c'], ['a'], ['a', 'x'], ['a', 'a'], ['a', 'zz']]) assert.equal(orderSiblings(nodes, 'r', ids), nodes, ids.join());
+});

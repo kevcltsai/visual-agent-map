@@ -219,6 +219,7 @@ import {
   medianHeight,
   reorderSiblings,
   reorderTopLevel,
+  orderSiblings,
   shiftSibling,
   type LayoutKind,
   type LayoutSpacing
@@ -3856,6 +3857,22 @@ export class VisualAgentMapView extends ItemView {
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
     });
     return box.placed;
+  }
+  /**
+   * reorder_topics: the listed children of `parent` take the given order among their siblings, in one undoable Map.md change,
+   * then the branch is laid out again in that order (a first-level topic of a timeline map: the whole map, as a drag does).
+   * Nothing is written when they already are in that order.
+   */
+  private async chatReorderChildren(parent: MapNode, ids: string[]): Promise<void> {
+    await this.mapChange(map => {
+      // The children first take the order on screen (what the model was told), so the reorder keeps what was seen.
+      const aligned = this.onScreenSiblingOrder(map);
+      const next = orderSiblings(aligned, parent.id, ids);
+      if (next === aligned) return;
+      map.nodes = next;
+      if (!map.aim && layoutOf(map).direction === "timeline" && !parent.parentId) this.arrangeAll(map);
+      else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
+    });
   }
   /**
    * A card dropped on empty canvas takes the place it was dropped at. The arrangements lay siblings out in array order, so it
@@ -13375,6 +13392,8 @@ export class VisualAgentMapView extends ItemView {
         return check("write", [real(action.nodeId)]);
       case "move_topic":
         return check("move", [action.nodeId], real(action.newParentId));
+      case "reorder_topics":
+        return check("move", action.nodeIds.map(id => real(id)), real(action.parentId));
       // A relation writes both end notes' lines and Map.md: a locked end refuses it (the end cards can be ones of this reply).
       case "add_relation":
       case "remove_relation":
@@ -17051,6 +17070,8 @@ export class VisualAgentMapView extends ItemView {
         return action.beforeId
           ? t("ui.map_chat_do_move_before_0_1", title(action.nodeId), title(action.beforeId))
           : t("ui.map_chat_do_move_0_1", title(action.nodeId), title(action.newParentId));
+      case "reorder_topics":
+        return t("ui.map_chat_do_reorder_0_1", title(action.parentId), action.nodeIds.length);
       case "delete_topic":
         return t("ui.map_chat_do_delete_0", title(action.nodeId));
       case "edit_md_file":
@@ -17798,6 +17819,19 @@ export class VisualAgentMapView extends ItemView {
           if (!(await this.chatMoveBefore(node, parent, before))) return skipped("ui.map_chat_skip_not_sibling");
         } else await this.moveTopic(node, parent);
         await this.chatTopicAccept(node.id, baseline.topicHashes);
+        return done;
+      }
+      case "reorder_topics": {
+        const parentId = real(action.parentId);
+        const ids = action.nodeIds.map(id => real(id));
+        if (parentId === null || ids.some(id => id === null)) return skipped("ui.map_chat_skip_parent_missing");
+        const parent = nodeOf(parentId);
+        const kids = ids.map(id => nodeOf(id!));
+        if (!parent || kids.some(kid => !kid)) return gone;
+        if (this.isMerging(parent.id) || kids.some(kid => this.isMerging(kid!.id)))
+          return skipped("ui.map_chat_skip_merge_locked");
+        if (kids.some(kid => kid!.parentId !== parent.id)) return skipped("ui.map_chat_skip_not_sibling");
+        await this.chatReorderChildren(parent, ids as string[]);
         return done;
       }
       case "delete_topic": {

@@ -1586,6 +1586,7 @@ var en = {
   "ui.auto": "Auto",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "Auto uses Low for simple tasks and Medium for complex synthesis; manual choices are preserved.",
   "ui.stop_research": "Stop research",
+  "ui.stop_expand": "Stop expanding",
   "ui.research_stopped_existing_content_was_preserved": "Research stopped. Existing content was preserved.",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "The topic changed, so the outdated AI result was not saved.",
   "ui.shallow_research_for_expanded_subtopics_0": "Subtopic research: {0}",
@@ -4087,6 +4088,7 @@ var zhCN = {
   "ui.auto": "\u81EA\u52A8 (Auto)",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52A8\u6A21\u5F0F\u4F1A\u5BF9\u7B80\u5355\u4EFB\u52A1\u4F7F\u7528 Low\u3001\u5BF9\u590D\u6742\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52A8\u9009\u62E9\u4E0D\u4F1A\u88AB\u8986\u76D6\u3002",
   "ui.stop_research": "\u505C\u6B62\u7814\u7A76",
+  "ui.stop_expand": "\u505C\u6B62\u5C55\u5F00",
   "ui.research_stopped_existing_content_was_preserved": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u539F\u6709\u5185\u5BB9\u4FDD\u7559\u3002",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "\u8BAE\u9898\u5185\u5BB9\u5DF2\u53D8\u66F4\uFF0C\u8FC7\u65F6\u7684 AI \u7ED3\u679C\u672A\u5199\u5165\u3002",
   "ui.shallow_research_for_expanded_subtopics_0": "\u5B50\u9898\u7814\u7A76\uFF1A{0}",
@@ -6588,6 +6590,7 @@ var zhTW = {
   "ui.auto": "\u81EA\u52D5 (Auto)",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52D5\u6A21\u5F0F\u6703\u5C0D\u7C21\u55AE\u4EFB\u52D9\u4F7F\u7528 Low\u3001\u5C0D\u8907\u96DC\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52D5\u9078\u64C7\u4E0D\u6703\u88AB\u8986\u84CB\u3002",
   "ui.stop_research": "\u505C\u6B62\u7814\u7A76",
+  "ui.stop_expand": "\u505C\u6B62\u5C55\u958B",
   "ui.research_stopped_existing_content_was_preserved": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u539F\u6709\u5167\u5BB9\u4FDD\u7559\u3002",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002",
   "ui.shallow_research_for_expanded_subtopics_0": "\u5B50\u984C\u7814\u7A76\uFF1A{0}",
@@ -29945,6 +29948,1194 @@ async function backupNote(port, input2) {
   }
 }
 
+// core/ai-lock.ts
+function isAiLocked(notes, id) {
+  var _a2;
+  if (!id) return false;
+  return typeof notes === "function" ? notes(id) : ((_a2 = notes.get(id)) == null ? void 0 : _a2.aiLocked) === true;
+}
+function aiLockBlock(op, targets, map, notes, options = {}) {
+  var _a2, _b2;
+  const nodes = (_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : [];
+  const parentOf = (id) => {
+    var _a3, _b3;
+    return (_b3 = (_a3 = nodes.find((node) => node.id === id)) == null ? void 0 : _a3.parentId) != null ? _b3 : null;
+  };
+  for (const id of targets) {
+    if (isAiLocked(notes, id)) return "locked";
+    if (op === "write" || op === "addChild") continue;
+    if (isAiLocked(notes, parentOf(id))) return "lockedParent";
+    if (op === "move") {
+      if (options.to !== void 0 && isAiLocked(notes, options.to)) return "lockedParent";
+      continue;
+    }
+    const subtree = /* @__PURE__ */ new Set([id]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const node of nodes)
+        if (node.parentId && subtree.has(node.parentId) && !subtree.has(node.id)) {
+          subtree.add(node.id);
+          grew = true;
+        }
+    }
+    for (const member of subtree) if (member !== id && isAiLocked(notes, member)) return "lockedDescendant";
+    for (const relation of (_b2 = map == null ? void 0 : map.topicRelations) != null ? _b2 : []) {
+      const other = subtree.has(relation.from) ? relation.to : subtree.has(relation.to) ? relation.from : null;
+      if (other && !subtree.has(other) && isAiLocked(notes, other)) return "lockedRelation";
+    }
+  }
+  return null;
+}
+function aiLockedError() {
+  const error = new Error("AI lock: the topic is locked");
+  error.name = "AiLockedError";
+  return error;
+}
+function isAiLockedError(error) {
+  return error instanceof Error && error.name === "AiLockedError";
+}
+
+// core/steps/task/carry-sources.ts
+var HEADING_KEY = "note.earlier_research_sources";
+var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
+var TOKEN = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
+function outsideCode(text11) {
+  const lines = text11.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  return lines.filter((_, index) => !code[index]);
+}
+function keysOf(text11) {
+  return [...linksOf([text11]).keys()];
+}
+function plainLine(line) {
+  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+  return `- ${stripped}`;
+}
+function linkTokens(line, wanted) {
+  const out = [];
+  for (const match of line.matchAll(TOKEN)) {
+    const token = match[0];
+    if (!wanted(keysOf(token))) continue;
+    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
+    else out.push(token.replace(/^!/, ""));
+  }
+  return out;
+}
+function carriedSourceLines(previousTexts, nextTexts) {
+  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
+  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
+  if (!missing.size) return [];
+  const covered = /* @__PURE__ */ new Set();
+  const lines = [];
+  const add = (line) => {
+    if (line.trim() && !lines.includes(line)) lines.push(line);
+  };
+  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
+  for (const line of previousTexts.flatMap(outsideCode)) {
+    const keys = keysOf(line);
+    if (!open(keys)) continue;
+    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
+    if (definition) add(`- ${definition[1].trim()}`);
+    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
+    else add(plainLine(line));
+    for (const key2 of keys) covered.add(key2);
+  }
+  return lines;
+}
+function carryForwardSources(detail, previousTexts, nextTexts, language2, template2) {
+  const carried = carriedSourceLines(previousTexts, nextTexts);
+  if (!carried.length) return detail;
+  const heading = translateNote(language2, HEADING_KEY);
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
+  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
+  const keys = sourcesHeadingKeys(template2);
+  const start = lines.findIndex((line, index) => {
+    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+    return !!match && keys.has(match[1].toLocaleLowerCase());
+  });
+  if (start < 0) return `${detail.trimEnd()}
+
+### ${heading}
+
+${carried.join("\n")}
+`;
+  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
+}
+function insertAfterBlock(lines, code, start, add, stop, separate = false) {
+  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
+  if (end < 0) end = lines.length;
+  while (end > start + 1 && !lines[end - 1].trim()) end--;
+  return [
+    ...lines.slice(0, end),
+    ...separate ? [""] : [],
+    ...add,
+    ...end < lines.length && lines[end].trim() ? [""] : [],
+    ...lines.slice(end)
+  ].join("\n");
+}
+
+// ai/note-style-label.ts
+function runStyleLabelText(label, language2) {
+  return label.templateSource === "kind" ? translate(
+    language2,
+    "ui.note_style_label_0_1_2",
+    label.templateName,
+    label.toneName,
+    translate(language2, "ui.note_style_source_kind")
+  ) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
+}
+
+// experiences/visual-map/topic-run.ts
+var CHART_JOB_LIMIT = 3;
+function stopLabelKey(kind, quickExpandPending) {
+  return quickExpandPending || kind === "proposeChildren" ? "ui.stop_expand" : "ui.stop_research";
+}
+var TopicRuns = class {
+  constructor(ports) {
+    this.ports = ports;
+    __publicField(this, "controllers", /* @__PURE__ */ new Map());
+    __publicField(this, "kinds", /* @__PURE__ */ new Map());
+    __publicField(this, "disposed", false);
+    /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
+    __publicField(this, "charts", /* @__PURE__ */ new Map());
+    /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
+    __publicField(this, "chartProgressIds", /* @__PURE__ */ new Map());
+    __publicField(this, "chartProgressSeq", 0);
+    /** Jobs waiting for a free slot, first in first out. */
+    __publicField(this, "chartQueue", []);
+    __publicField(this, "chartRunning", 0);
+    /** Callers waiting in {@link whenIdle}; woken whenever a run or chart step ends. */
+    __publicField(this, "idleWaiters", /* @__PURE__ */ new Set());
+  }
+  /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
+  get running() {
+    return this.ports.running();
+  }
+  /**
+   * Registers a run for the topic. Returns null when the topic already has one or the module is disposed. Every run
+   * calls this synchronously, before its first await, so a second click on the same topic is refused.
+   */
+  begin(path, kind) {
+    if (this.disposed || this.controllers.has(path)) return null;
+    const controller = new AbortController();
+    this.controllers.set(path, controller);
+    this.kinds.set(path, kind);
+    this.running.add(path);
+    return {
+      path,
+      kind,
+      signal: controller.signal,
+      release: () => {
+        if (this.controllers.get(path) !== controller) return;
+        this.controllers.delete(path);
+        this.kinds.delete(path);
+        this.running.delete(path);
+        this.wakeIdleWaiters();
+      }
+    };
+  }
+  wakeIdleWaiters() {
+    for (const wake of [...this.idleWaiters]) wake();
+  }
+  /**
+   * Resolves once none of the topics has a run or a background chart step in flight (or `signal` aborts). A run that
+   * reads other topics as its sources calls this first: a child's research writing back during the read-to-save
+   * window would otherwise look like an edit and fail the sources check, though the user touched nothing.
+   */
+  async whenIdle(paths, signal) {
+    const busy = () => paths.some((path) => this.running.has(path) || this.charts.has(path));
+    while (busy() && !(signal == null ? void 0 : signal.aborted) && !this.disposed) {
+      await new Promise((resolve) => {
+        const wake = () => {
+          this.idleWaiters.delete(wake);
+          signal == null ? void 0 : signal.removeEventListener("abort", wake);
+          resolve();
+        };
+        this.idleWaiters.add(wake);
+        signal == null ? void 0 : signal.addEventListener("abort", wake, { once: true });
+      });
+    }
+  }
+  async start(path, kind, options) {
+    if (kind === "synthesizeSelection") return this.runSelection(path, options);
+    if (kind === "proposeChildren") return this.runProposal(path, options);
+    if (kind === "integrateDirection") return this.runDirections(path, options);
+    if (kind === "integrateChildren") return this.runIntegration(path, options);
+    return this.startResearch(path, kind, options);
+  }
+  async runProposal(path, options) {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const fail2 = (message, retryable) => {
+      var _a3;
+      if (options.failed) options.failed(message, retryable);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    if (this.running.has(path)) {
+      (_a2 = options.failed) == null ? void 0 : _a2.call(options, t("ui.ai_running_ai"));
+      return;
+    }
+    const handle = this.begin(path, "proposeChildren");
+    if (!handle) return;
+    const controller = this.controllers.get(path);
+    const modalSignal = options.signal;
+    const abortBeforeAcceptance = () => controller.abort();
+    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
+    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    let accepted = false;
+    const acceptDispatch = () => {
+      var _a3;
+      if (accepted || controller.signal.aborted) return;
+      accepted = true;
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      (_a3 = options.accepted) == null ? void 0 : _a3.call(options);
+    };
+    const activeTasks = this.ports.activeTasks();
+    activeTasks.set(path, controller);
+    (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
+    const aborted = () => new DOMException("Aborted", "AbortError");
+    try {
+      const repo = this.ports.repository();
+      const note = await repo.readNote(path, options.map);
+      if (note.aiLocked) {
+        fail2(t("ui.ai_locked_notice"), false);
+        return;
+      }
+      const used = ((_c = options.runOnce) == null ? void 0 : _c.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
+      if (controller.signal.aborted) throw aborted();
+      const outputLanguage2 = (_d = options.outputLanguage) != null ? _d : this.ports.settings().language;
+      const result = await this.ports.askModel(
+        await options.buildContext(note, outputLanguage2),
+        used.model,
+        used.reasoning,
+        controller.signal,
+        void 0,
+        acceptDispatch
+      );
+      if (!accepted) acceptDispatch();
+      if (controller.signal.aborted) throw aborted();
+      const suggestions = result.suggestions.filter((item) => !item.parentTitle).slice(0, 7);
+      if (suggestions.length === 0) {
+        fail2(result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
+        return;
+      }
+      const latest = await repo.readNote(path, options.map);
+      if (controller.signal.aborted) throw aborted();
+      if (latest.aiLocked) {
+        fail2(t("ui.ai_locked_notice"), false);
+        return;
+      }
+      if (latest.thinkingOrigin !== note.thinkingOrigin)
+        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+      const pendingItems = suggestions.map((item) => ({
+        ...item,
+        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
+      }));
+      const flush = async () => {
+        var _a3, _b3;
+        await ((_b3 = (_a3 = this.pendingSuggestions).flush) == null ? void 0 : _b3.call(_a3));
+      };
+      this.pendingSuggestions.set(path, pendingItems);
+      await flush();
+      if (controller.signal.aborted) {
+        this.pendingSuggestions.delete(path);
+        await flush();
+        throw aborted();
+      }
+      (_e = options.onStored) == null ? void 0 : _e.call(options);
+      options.offer(pendingItems);
+    } catch (error) {
+      const kind = (_f = options.classifyError) == null ? void 0 : _f.call(options, error);
+      const cancelled2 = kind !== "partial" && (controller.signal.aborted || kind === "stopped");
+      if (!cancelled2) {
+        console.error("Visual Agent Map AI split", error);
+        fail2(this.ports.recordFailure(t("log.ai_split_failed"), error), kind !== "partial");
+      }
+    } finally {
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      handle.release();
+      (_g = options.onReleased) == null ? void 0 : _g.call(options);
+    }
+  }
+  /** One signal that aborts when the registered run is stopped (Stop, stopAll, dispose) or the entry's own signal aborts. */
+  linked(handle, external) {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (handle.signal.aborted || (external == null ? void 0 : external.aborted)) controller.abort();
+    handle.signal.addEventListener("abort", abort, { once: true });
+    external == null ? void 0 : external.addEventListener("abort", abort, { once: true });
+    return {
+      signal: controller.signal,
+      dispose: () => {
+        handle.signal.removeEventListener("abort", abort);
+        external == null ? void 0 : external.removeEventListener("abort", abort);
+      }
+    };
+  }
+  /** Stage, seconds and the unsaved preview of one request; an entry the topic already has (a chart step) is left alone. */
+  startProgress(path, model) {
+    var _a2;
+    const progress = this.ports.progress();
+    if (!progress || ((_a2 = progress.get) == null ? void 0 : _a2.call(progress, path))) return { end: () => {
+    } };
+    let attempt = "starting";
+    progress.begin(path, attempt, Date.now(), model);
+    return {
+      observer: {
+        onAttempt: (id) => {
+          attempt = id;
+          progress.newAttempt(path, id, Date.now());
+        },
+        onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
+        onPreview: (id, fields) => progress.preview(path, id, fields != null ? fields : {})
+      },
+      end: () => progress.end(path, attempt)
+    };
+  }
+  async modelOf(path, note, map, runOnce) {
+    return (runOnce == null ? void 0 : runOnce.model.trim()) ? await this.ports.resolveModel(path, map, runOnce) : { model: note.model, reasoning: note.reasoning };
+  }
+  async runDirections(path, options) {
+    var _a2, _b2, _c, _d;
+    if (this.running.has(path)) {
+      options.failed(t("ui.ai_running_ai"));
+      return;
+    }
+    const handle = this.begin(path, "integrateDirection");
+    if (!handle) return;
+    const link = this.linked(handle, options.signal);
+    const free = () => {
+      link.dispose();
+      handle.release();
+    };
+    try {
+      const blocked = (_a2 = options.precheck) == null ? void 0 : _a2.call(options);
+      if (blocked) {
+        options.failed(blocked);
+        return;
+      }
+      const repo = this.ports.repository();
+      const note = await repo.readNote(path, options.map());
+      if (note.aiLocked) {
+        options.failed(t("ui.ai_locked_notice"));
+        return;
+      }
+      const used = await this.modelOf(path, note, options.map(), options.runOnce);
+      (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
+      const progress = this.startProgress(path, used.model);
+      try {
+        const context = await options.buildContext(note);
+        if (typeof context === "string") {
+          options.failed(context);
+          return;
+        }
+        const result = await this.ports.askModel(
+          context,
+          used.model,
+          used.reasoning,
+          link.signal,
+          void 0,
+          options.accepted,
+          void 0,
+          progress.observer
+        );
+        progress.end();
+        (_c = options.accepted) == null ? void 0 : _c.call(options);
+        if (link.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        const angles = result.suggestions.slice(0, 2);
+        if (!angles.length) {
+          options.failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
+          return;
+        }
+        options.found(angles);
+      } catch (error) {
+        if (link.signal.aborted || error instanceof Error && error.name === "AbortError") {
+          options.failed(t("ui.research_stopped_existing_content_was_preserved"));
+          return;
+        }
+        console.error("Visual Agent Map integration directions", error);
+        options.failed(this.ports.recordFailure(t("log.integration_directions_failed"), error));
+      } finally {
+        progress.end();
+        free();
+        await ((_d = options.onSettled) == null ? void 0 : _d.call(options));
+      }
+    } finally {
+      free();
+    }
+  }
+  async runIntegration(path, options) {
+    var _a2;
+    if (this.running.has(path)) {
+      (_a2 = options.failed) == null ? void 0 : _a2.call(options, t("ui.ai_running_ai"));
+      return;
+    }
+    const handle = this.begin(path, "integrateChildren");
+    if (!handle) return;
+    const link = this.linked(handle, options.signal);
+    const free = () => {
+      link.dispose();
+      handle.release();
+    };
+    try {
+      await this.integrate(path, options, link.signal, free);
+    } finally {
+      free();
+    }
+  }
+  async integrate(path, options, signal, free) {
+    var _a2, _b2, _c, _d, _e, _f;
+    const fail2 = (message) => {
+      var _a3;
+      if (options.failed) options.failed(message);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    const repo = this.ports.repository();
+    const note = await repo.readNote(path, options.map());
+    if (note.aiLocked) {
+      fail2(t("ui.ai_locked_notice"));
+      return;
+    }
+    const used = await this.modelOf(path, note, options.map(), options.runOnce);
+    const noteSnapshot = (item) => JSON.stringify([
+      item.title,
+      item.summary,
+      item.detail,
+      item.prompt,
+      item.rules,
+      item.model,
+      item.reasoning,
+      item.sourcePaths,
+      item.referencePaths,
+      item.thinkingOrigin,
+      item.newFindings
+    ]);
+    const snapshot = noteSnapshot(note);
+    const prepared = await options.prepare(note);
+    if (typeof prepared === "string") {
+      fail2(prepared);
+      return;
+    }
+    const language2 = this.ports.settings().language;
+    const outputLanguage2 = (_a2 = options.outputLanguage) != null ? _a2 : language2;
+    const detailTemplate = prepared.detailTemplate;
+    this.abortCharts(path);
+    let original = null;
+    try {
+      original = await this.readOriginal((_b2 = prepared.updateMode) != null ? _b2 : "merge", path, options);
+      if (((_c = prepared.updateMode) != null ? _c : "merge") === "fresh" && original === null) {
+        fail2(t("ui.writeback_backup_failed"));
+        return;
+      }
+      await repo.updateNote(path, { status: "running" });
+      await ((_d = options.onStarted) == null ? void 0 : _d.call(options));
+    } catch (error) {
+      try {
+        await repo.updateNote(path, { status: note.status });
+      } catch (e) {
+      }
+      throw error;
+    }
+    const progress = this.startProgress(path, used.model);
+    const changed = () => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    try {
+      const context = await options.buildContext(note);
+      const result = await this.ports.askModel(
+        context,
+        used.model,
+        used.reasoning,
+        signal,
+        void 0,
+        options.accepted,
+        void 0,
+        progress.observer
+      );
+      progress.end();
+      (_e = options.accepted) == null ? void 0 : _e.call(options);
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+      await repo.updateNote(path, { status: note.status });
+      const raw = await this.snapshotRaw(original, path, options);
+      const save = async (summary, detail) => this.ports.mutate()(async () => {
+        var _a3, _b3;
+        if (signal.aborted || prepared.viewChanged()) throw changed();
+        if (await prepared.sourcesChanged()) throw changed();
+        const latest = await repo.readNote(path, options.map());
+        if (latest.aiLocked) throw aiLockedError();
+        if (noteSnapshot(latest) !== snapshot) throw changed();
+        const mode = (_a3 = prepared.updateMode) != null ? _a3 : "merge";
+        const noteLanguage = noteLanguageOf(outputLanguage2);
+        const references2 = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2));
+        let written2;
+        let issues;
+        let record;
+        if (mode === "top") {
+          issues = [];
+          const composed = await this.composeWrite({
+            mode,
+            path,
+            oldDetail: latest.detail,
+            aiDetail: detail,
+            summary,
+            template: detailTemplate,
+            language: noteLanguage,
+            signal,
+            hooks: options,
+            raw
+          });
+          if (!composed.ok) throw new Error(composed.message);
+          written2 = composed.detail;
+          record = composed.record;
+        } else {
+          const canonicalOnly = canonicalDetail(detail, noteLanguage, detailTemplate);
+          issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
+          const carried = mode === "fresh" ? canonicalOnly : carryForwardSources(
+            canonicalOnly,
+            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
+            [summary, canonicalOnly, references2],
+            outputLanguage2,
+            detailTemplate
+          );
+          const composed = await this.composeWrite({
+            mode,
+            path,
+            oldDetail: latest.detail,
+            aiDetail: carried,
+            summary,
+            template: detailTemplate,
+            language: noteLanguage,
+            signal,
+            hooks: options,
+            raw
+          });
+          if (!composed.ok) throw new Error(composed.message);
+          written2 = composed.detail;
+          record = composed.record;
+        }
+        await repo.updateNote(
+          path,
+          {
+            summary,
+            detail: written2,
+            visualReferences: references2,
+            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+            ...options.findingsSent() ? { newFindings: "" } : {},
+            status: "completed",
+            ...formatIssuesPatch(issues, language2)
+          },
+          { detailTemplate }
+        );
+        const saved = await repo.readNote(path, options.map());
+        await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
+        (_b3 = options.queueCharts) == null ? void 0 : _b3.call(options, {
+          path,
+          saved,
+          context,
+          detail: saved.detail,
+          formatIssues: issues,
+          model: used.model,
+          language: outputLanguage2,
+          template: detailTemplate,
+          ...mode === "top" && record ? this.chartGuard(mode, record) : {}
+        });
+      });
+      try {
+        await options.drafted(result, save, result.summary, result.detail, note);
+      } catch (error) {
+        if (isAiLockedError(error)) fail2(t("ui.ai_locked_notice"));
+        else if (signal.aborted || error instanceof Error && error.name === "AbortError") {
+          fail2(t("ui.research_stopped_existing_content_was_preserved"));
+        } else {
+          console.error("VAM synthesis write", error);
+          fail2(this.ports.recordFailure(t("log.child_integration_failed"), error));
+        }
+      }
+    } catch (error) {
+      if (signal.aborted || error instanceof Error && error.name === "AbortError") {
+        await repo.updateNote(path, { status: note.status });
+        fail2(t("ui.research_stopped_existing_content_was_preserved"));
+      } else {
+        console.error("Visual Agent Map child integration", error);
+        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        fail2(this.ports.recordFailure(t("log.child_integration_failed"), error));
+      }
+    } finally {
+      progress.end();
+      free();
+      await ((_f = options.onSettled) == null ? void 0 : _f.call(options));
+    }
+  }
+  async runSelection(path, options) {
+    const handle = this.begin(path, "synthesizeSelection");
+    if (!handle) {
+      options.refused();
+      return;
+    }
+    const onStop = () => options.stop();
+    handle.signal.addEventListener("abort", onStop, { once: true });
+    const free = () => {
+      handle.signal.removeEventListener("abort", onStop);
+      handle.release();
+    };
+    try {
+      await this.synthesizeSelection(options, free);
+    } finally {
+      free();
+    }
+  }
+  async synthesizeSelection(options, free) {
+    const aborted = () => new DOMException("Aborted", "AbortError");
+    const changed = () => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    let progress;
+    try {
+      const chosen = await options.model();
+      const sources = await options.readSources();
+      options.begin(sources);
+      const taskProgress = options.startProgress(chosen.model);
+      const context = await options.buildContext(sources);
+      const ask = () => this.ports.askModel(
+        context,
+        chosen.model,
+        chosen.reasoning,
+        options.signal,
+        void 0,
+        options.accepted,
+        void 0,
+        taskProgress.observer
+      );
+      if (options.step === "draft") {
+        const draft = async () => {
+          try {
+            const result2 = await ask();
+            taskProgress.end();
+            if (!options.current()) return;
+            if (options.signal.aborted || options.mapChanged())
+              throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
+            const latest2 = await options.readSources();
+            if (JSON.stringify(latest2.documents) !== options.recordedSources()) throw changed();
+            if (options.signal.aborted) throw aborted();
+            if (options.closed()) throw changed();
+            const mark = options.applying();
+            await this.ports.mutate()(() => options.write(result2));
+            options.written(mark);
+          } catch (error) {
+            if (!options.current()) return;
+            options.draftFailed(error);
+          } finally {
+            taskProgress.end();
+          }
+        };
+        await draft();
+        options.finished();
+        return;
+      }
+      progress = taskProgress;
+      const result = await ask();
+      taskProgress.end();
+      options.accepted();
+      if (!options.current()) return;
+      if (options.signal.aborted || options.mapChanged()) throw aborted();
+      const latest = await options.readSources();
+      if (JSON.stringify(latest.documents) !== options.recordedSources()) throw changed();
+      const angles = result.suggestions.slice(0, 2);
+      if (!angles.length) options.noDirections();
+      else options.found(angles);
+    } catch (error) {
+      options.fail(error);
+    } finally {
+      progress == null ? void 0 : progress.end();
+      free();
+      options.settled();
+    }
+  }
+  /** What the chart step needs to keep a "top" write-back's old text: the diagrammed text must still hold it, byte for byte. */
+  chartGuard(mode, record) {
+    return { updateMode: mode, preserve: (charted) => chartPreserves(record, charted) };
+  }
+  /** "fresh" only: reads the whole note file before the run changes any field; null when it cannot be read. */
+  async readOriginal(mode, path, hooks) {
+    if (mode !== "fresh" || !hooks.readRaw) return null;
+    try {
+      return await hooks.readRaw(path);
+    } catch (e) {
+      return null;
+    }
+  }
+  /** The file once the run has marked the topic running (the baseline the write-time check compares with). */
+  async snapshotRaw(original, path, hooks) {
+    if (original === null || !hooks.readRaw) return null;
+    try {
+      return { original, started: await hooks.readRaw(path) };
+    } catch (e) {
+      return null;
+    }
+  }
+  /**
+   * Builds the text to save for one of the three write-back ways. Runs inside the mutation queue after the stale fence.
+   * `top`: pure insert, blocked when the old text would not come back. `fresh`: the whole note file is backed up first and
+   * read again just before the write; anything that fails or differs means nothing is written (`message` says why).
+   */
+  async composeWrite(input2) {
+    var _a2;
+    const { mode, path, signal, hooks, raw } = input2;
+    const base = {
+      mode,
+      oldDetail: input2.oldDetail,
+      aiDetail: input2.aiDetail,
+      summary: input2.summary,
+      template: input2.template,
+      language: input2.language
+    };
+    const compose = (_a2 = this.ports.composeWriteback) != null ? _a2 : composeWriteback;
+    if (mode !== "fresh") {
+      const composed = compose({ ...base, now: /* @__PURE__ */ new Date() });
+      return composed.ok ? composed : { ok: false, message: t("ui.writeback_top_failed") };
+    }
+    const stopped = { ok: false, message: t("ui.research_stopped_existing_content_was_preserved") };
+    const failed = { ok: false, message: t("ui.writeback_backup_failed") };
+    if (!hooks.backupNote || !hooks.readRaw || !raw) return failed;
+    if (signal.aborted) return stopped;
+    try {
+      if (await hooks.readRaw(path) !== raw.started)
+        return { ok: false, message: t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved") };
+      const backup = await hooks.backupNote(path, raw.original);
+      if (!backup.ok) return failed;
+      const composed = compose({ ...base, now: /* @__PURE__ */ new Date(), backupPath: backup.path });
+      if (!composed.ok) return failed;
+      if (await hooks.readRaw(path) !== raw.started) return failed;
+      if (signal.aborted) return stopped;
+      return composed;
+    } catch (e) {
+      return failed;
+    }
+  }
+  /** Reads the note, resolves the model and style and builds the request; null (after telling the entry) when the topic has no task. */
+  async researchPrelude(path, options, givenStyle, overrides) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    const repo = this.ports.repository();
+    const note = await repo.readNote(path, options.map);
+    const used = ((_a2 = options.runOnce) == null ? void 0 : _a2.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
+    if (!((_b2 = overrides.task) != null ? _b2 : note.prompt)) {
+      const message = t("ui.enter_a_question_or_task_for_ai_first");
+      if (options.failed) options.failed(message);
+      else (_c = options.notify) == null ? void 0 : _c.call(options, message);
+      return null;
+    }
+    const outputLanguage2 = (_d = overrides.outputLanguage) != null ? _d : this.ports.settings().language;
+    const runStyle = givenStyle != null ? givenStyle : options.resolveStyle ? await options.resolveStyle(outputLanguage2) : this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
+    const detailTemplate = runStyle.template;
+    const context = withThinkingOrigin(
+      {
+        title: note.title,
+        summary: summaryForPrompt(note.summary, outputLanguage2),
+        rules: "",
+        detail: note.detail,
+        task: note.prompt,
+        ancestors: (_f = await ((_e = options.ancestors) == null ? void 0 : _e.call(options, outputLanguage2))) != null ? _f : "",
+        userTexts: (_h = (_g = options.userTexts) == null ? void 0 : _g.call(options)) != null ? _h : "",
+        workingFindings: note.newFindings,
+        sourceContext: "",
+        mode: "task",
+        researchMode: note.researchMode,
+        researchDepth: "normal",
+        visualMode: note.visualMode,
+        ...runStyle.toneText ? { toneText: runStyle.toneText } : {},
+        ...overrides,
+        detailTemplate,
+        ...runStyle.contextFields,
+        updateMode: runStyle.updateMode,
+        addCharts: (_i = overrides.addCharts) != null ? _i : true
+      },
+      note
+    );
+    const styleLabel = runStyle.recipe.source !== "kind" || runStyle.recipe.ref !== "builtin:general" ? runStyleLabelText(runStyle.label, this.ports.settings().language) : void 0;
+    return { note, used, context, styleLabel };
+  }
+  async startResearch(path, kind, options) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    if (this.disposed) return null;
+    const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};
+    const settings = () => this.ports.settings();
+    if (this.running.has(path)) {
+      (_b2 = options.failed) == null ? void 0 : _b2.call(options, t("ui.ai_running_ai"));
+      return null;
+    }
+    const handle = this.begin(path, kind);
+    if (!handle) return null;
+    const controller = this.controllers.get(path);
+    let prelude;
+    const repo = this.ports.repository();
+    try {
+      prelude = await this.researchPrelude(path, options, givenStyle, overrides);
+    } catch (error) {
+      handle.release();
+      throw error;
+    }
+    if (!prelude) {
+      handle.release();
+      return null;
+    }
+    const { note, used, context, styleLabel } = prelude;
+    if (note.aiLocked) {
+      handle.release();
+      if (options.failed) options.failed(t("ui.ai_locked_notice"));
+      else (_c = options.notify) == null ? void 0 : _c.call(options, t("ui.ai_locked_notice"));
+      return null;
+    }
+    const language2 = settings().language;
+    this.pendingSuggestions.delete(path);
+    this.abortCharts(path);
+    const activeTasks = this.ports.activeTasks();
+    const abortFromTaskModal = () => controller.abort();
+    if ((_d = overrides.signal) == null ? void 0 : _d.aborted) controller.abort();
+    else (_e = overrides.signal) == null ? void 0 : _e.addEventListener("abort", abortFromTaskModal, { once: true });
+    activeTasks.set(path, controller);
+    const progress = this.ports.progress();
+    let progressAttempt = "starting";
+    progress == null ? void 0 : progress.begin(path, progressAttempt, Date.now(), used.model, styleLabel);
+    const observer = {
+      onAttempt: (id) => {
+        progressAttempt = id;
+        progress == null ? void 0 : progress.newAttempt(path, id, Date.now());
+      },
+      onStage: (id, stage, query) => progress == null ? void 0 : progress.stage(path, id, stage, Date.now(), query),
+      onPreview: (id, fields) => progress == null ? void 0 : progress.preview(path, id, fields != null ? fields : {}),
+      onSlow: (id, slow, resend) => progress == null ? void 0 : progress.markSlow(path, id, slow, resend)
+    };
+    const releaseRun = () => {
+      var _a3;
+      (_a3 = overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
+      if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      handle.release();
+    };
+    const fail2 = (message) => {
+      var _a3;
+      if (options.failed) options.failed(message);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    const releaseStartup = () => {
+      progress == null ? void 0 : progress.end(path, progressAttempt);
+      releaseRun();
+    };
+    let startupStatusAttempted = false;
+    let raw = null;
+    try {
+      startupStatusAttempted = true;
+      const original = await this.readOriginal((_f = context.updateMode) != null ? _f : "merge", path, options);
+      if (((_g = context.updateMode) != null ? _g : "merge") === "fresh" && original === null) {
+        fail2(t("ui.writeback_backup_failed"));
+        releaseStartup();
+        return null;
+      }
+      await repo.updateNote(path, { status: "running" });
+      await ((_h = options.onStarted) == null ? void 0 : _h.call(options));
+      raw = await this.snapshotRaw(original, path, options);
+      if (controller.signal.aborted) {
+        try {
+          await repo.updateNote(path, { status: note.status });
+        } finally {
+          releaseStartup();
+        }
+        return null;
+      }
+    } catch (error) {
+      try {
+        if (startupStatusAttempted) await repo.updateNote(path, { status: note.status });
+      } catch (e) {
+      } finally {
+        releaseStartup();
+      }
+      throw error;
+    }
+    let exchangeId = "";
+    let resolveAccepted;
+    const acceptedPromise = new Promise((resolve) => {
+      resolveAccepted = resolve;
+    });
+    let requestAccepted = false;
+    const markAccepted = () => {
+      var _a3;
+      if (requestAccepted) return;
+      requestAccepted = true;
+      resolveAccepted(true);
+      (_a3 = options.accepted) == null ? void 0 : _a3.call(options);
+    };
+    const exchanges = () => settings().aiExchangeLoggingEnabled ? this.ports.exchanges() : void 0;
+    const completion = this.ports.askModel(
+      context,
+      used.model,
+      used.reasoning,
+      controller.signal,
+      (id) => {
+        exchangeId = id;
+      },
+      markAccepted,
+      void 0,
+      observer
+    ).then(
+      (result) => this.ports.mutate()(async () => {
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m;
+        progress == null ? void 0 : progress.end(path, progressAttempt);
+        const latest = await repo.readNote(path, options.map);
+        const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
+        const locked = latest.aiLocked === true;
+        if (controller.signal.aborted || stale || locked) {
+          await repo.updateNote(path, { status: note.status });
+          if (exchangeId)
+            (_a3 = exchanges()) == null ? void 0 : _a3.failed(
+              exchangeId,
+              t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
+            );
+          if (locked) fail2(t("ui.ai_locked_notice"));
+          else if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          return;
+        }
+        const mode = (_b3 = context.updateMode) != null ? _b3 : "merge";
+        const writeLanguage = noteLanguageOf((_c2 = context.outputLanguage) != null ? _c2 : settings().language);
+        const composed = await this.composeWrite({
+          mode,
+          path,
+          oldDetail: latest.detail,
+          // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
+          aiDetail: mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, context.detailTemplate),
+          summary: result.summary,
+          template: (_d2 = context.detailTemplate) != null ? _d2 : standardTemplate(writeLanguage),
+          language: writeLanguage,
+          signal: controller.signal,
+          hooks: options,
+          raw
+        });
+        if (!composed.ok) {
+          await repo.updateNote(path, { status: note.status });
+          if (exchangeId) (_e2 = exchanges()) == null ? void 0 : _e2.failed(exchangeId, composed.message);
+          fail2(composed.message);
+          return;
+        }
+        await repo.updateNote(
+          path,
+          {
+            summary: result.summary,
+            detail: composed.detail,
+            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
+            newFindings: "",
+            status: "completed",
+            // The topic remembers the mode of its latest research (Quick is stored as local).
+            ...context.researchMode ? { researchMode: context.researchMode } : {},
+            ...mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language2)
+          },
+          { detailTemplate: context.detailTemplate }
+        );
+        const saved = await repo.readNote(path, options.map);
+        (_f2 = options.onWritten) == null ? void 0 : _f2.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_g2 = exchanges()) == null ? void 0 : _g2.completed(exchangeId);
+        this.ports.clearOtherHistory(options.origin);
+        (_i = options.queueCharts) == null ? void 0 : _i.call(options, {
+          path,
+          saved,
+          context,
+          detail: saved.detail,
+          formatIssues: mode === "top" ? [] : result.formatIssues,
+          model: used.model,
+          language: (_h2 = context.outputLanguage) != null ? _h2 : settings().language,
+          template: context.detailTemplate,
+          ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
+        });
+        if (result.suggestions.length) {
+          this.pendingSuggestions.set(
+            path,
+            result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
+          );
+          try {
+            await ((_k = (_j = this.pendingSuggestions).flush) == null ? void 0 : _k.call(_j));
+          } catch (error) {
+            (_l = options.notify) == null ? void 0 : _l.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
+          }
+        }
+        (_m = options.done) == null ? void 0 : _m.call(options, result);
+      })
+    ).catch(
+      (error) => this.ports.mutate()(async () => {
+        var _a3, _b3, _c2;
+        progress == null ? void 0 : progress.end(path, progressAttempt);
+        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
+          await repo.updateNote(path, { status: note.status });
+          fail2(t("ui.research_stopped_existing_content_was_preserved"));
+          return;
+        }
+        console.error("Visual Agent Map AI task", error);
+        if (exchangeId && ((_b3 = (_a3 = exchanges()) == null ? void 0 : _a3.getEntries().find((item) => item.id === exchangeId)) == null ? void 0 : _b3.status) === "parsed")
+          (_c2 = exchanges()) == null ? void 0 : _c2.failed(
+            exchangeId,
+            t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
+          );
+        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        fail2(this.ports.recordFailure(t("log.ai_task_failed"), error));
+      })
+    ).finally(() => {
+      progress == null ? void 0 : progress.end(path, progressAttempt);
+      releaseRun();
+      this.ports.refreshViews();
+    }).catch(() => {
+    });
+    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
+    if (!accepted) {
+      await completion;
+      return null;
+    }
+    return { finished: completion };
+  }
+  /** The current store of suggestions awaiting a decision (onload swaps the plugin's for the persisted one). */
+  get pendingSuggestions() {
+    return this.ports.pendingSuggestions();
+  }
+  isRunning(path) {
+    return this.controllers.has(path);
+  }
+  /** The kind of the run in flight on the topic, if this module started one. */
+  runKind(path) {
+    return this.kinds.get(path);
+  }
+  /** Whether the topic has a run in flight, or another path (chat expansion, a reload leftover) holds it in the running set. */
+  isBusy(path) {
+    return this.running.has(path);
+  }
+  /** Whether any stoppable AI task (shared registry: AiCalls, shallow expansion, selection synthesis) is registered for the path. */
+  hasTask(path) {
+    return this.ports.activeTasks().has(path);
+  }
+  taskController(path) {
+    return this.ports.activeTasks().get(path);
+  }
+  /** Aborts the registered task of the path, if any. */
+  stopTask(path) {
+    var _a2;
+    (_a2 = this.ports.activeTasks().get(path)) == null ? void 0 : _a2.abort();
+  }
+  /** Registers the stop handle of a run the view owns (selection synthesis, until ticket 05). */
+  registerTask(path, controller) {
+    this.ports.activeTasks().set(path, controller);
+  }
+  /** Releases the stop handle, only when it is still the one registered. */
+  releaseTask(path, controller) {
+    const tasks = this.ports.activeTasks();
+    if (tasks.get(path) === controller) tasks.delete(path);
+  }
+  pending(path) {
+    return this.pendingSuggestions.get(path);
+  }
+  dropPending(path) {
+    this.pendingSuggestions.delete(path);
+  }
+  /** Persists the pending store when it is the persisted one (a plain Map has nothing to flush). */
+  async flushPending() {
+    var _a2, _b2;
+    await ((_b2 = (_a2 = this.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
+  }
+  stop(path) {
+    var _a2;
+    (_a2 = this.controllers.get(path)) == null ? void 0 : _a2.abort();
+  }
+  stopAll() {
+    for (const controller of this.controllers.values()) controller.abort();
+    this.abortCharts();
+  }
+  get chartJobs() {
+    return this.charts;
+  }
+  /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
+  abortCharts(path) {
+    for (const [key2, controller] of [...this.charts])
+      if (path === void 0 || key2 === path) {
+        controller.abort();
+        this.charts.delete(key2);
+        this.wakeIdleWaiters();
+        this.endChartProgress(key2);
+        const queued = this.chartQueue.findIndex((item) => item.controller === controller);
+        if (queued >= 0) this.chartQueue.splice(queued, 1);
+      }
+  }
+  endChartProgress(path) {
+    const id = this.chartProgressIds.get(path);
+    if (id === void 0) return;
+    this.chartProgressIds.delete(path);
+    this.ports.progress().end(path, id);
+  }
+  pumpChartQueue() {
+    while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
+      this.chartRunning++;
+      this.chartQueue.shift().start();
+    }
+  }
+  /**
+   * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
+   * a failure, Stop, a stale note or unload leaves the note as written (the chart exchange is marked failed with the
+   * reason). `apply` runs in the mutation queue and returns false when the note no longer equals its snapshot at
+   * write time or is running again; only then are the diagrams not applied.
+   */
+  addChartsAfterWrite(job) {
+    var _a2, _b2;
+    if ((_b2 = (_a2 = this.ports.repository()) == null ? void 0 : _a2.isDisposed) == null ? void 0 : _b2.call(_a2)) return;
+    if (!this.ports.aiTasks().chartEligible(job.context) || !job.detail.trim()) return;
+    this.abortCharts(job.path);
+    const controller = new AbortController();
+    this.charts.set(job.path, controller);
+    const progressId = `charts-${++this.chartProgressSeq}`;
+    this.chartProgressIds.set(job.path, progressId);
+    this.ports.progress().begin(job.path, progressId, Date.now(), job.model);
+    this.ports.progress().stage(job.path, progressId, "charts", Date.now());
+    let exchangeId = "";
+    const run = async () => {
+      try {
+        const detail = await this.ports.aiTasks().chartDetail({
+          input: job.context,
+          detail: job.detail,
+          countIssues: job.countIssues,
+          model: job.model,
+          signal: controller.signal,
+          onExchange: (id) => {
+            exchangeId = id;
+          }
+        });
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        if (detail === job.detail) return;
+        let applied = false;
+        await this.ports.mutate()(async () => {
+          applied = !controller.signal.aborted && await job.apply(detail);
+        });
+        if (!applied) this.ports.aiTasks().failExchange(exchangeId, t("log.chart_stale_not_applied"));
+      } catch (error) {
+        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError")
+          this.ports.aiTasks().failExchange(exchangeId, t("log.chart_stopped_not_applied"));
+        else {
+          console.warn("Visual Agent Map chart step", error);
+          this.ports.aiTasks().failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
+        }
+      } finally {
+        if (this.charts.get(job.path) === controller) {
+          this.charts.delete(job.path);
+          this.wakeIdleWaiters();
+        }
+        if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
+        this.chartRunning--;
+        this.pumpChartQueue();
+      }
+    };
+    this.chartQueue.push({
+      controller,
+      start: () => {
+        void run();
+      }
+    });
+    this.pumpChartQueue();
+  }
+  /** Stops every run and refuses new ones. */
+  dispose() {
+    this.disposed = true;
+    this.stopAll();
+  }
+};
+
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian17 = require("obsidian");
 function builtinRecipeItems() {
@@ -36198,53 +37389,6 @@ ${value}`).join("\n\n");
     }
   }
 };
-
-// core/ai-lock.ts
-function isAiLocked(notes, id) {
-  var _a2;
-  if (!id) return false;
-  return typeof notes === "function" ? notes(id) : ((_a2 = notes.get(id)) == null ? void 0 : _a2.aiLocked) === true;
-}
-function aiLockBlock(op, targets, map, notes, options = {}) {
-  var _a2, _b2;
-  const nodes = (_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : [];
-  const parentOf = (id) => {
-    var _a3, _b3;
-    return (_b3 = (_a3 = nodes.find((node) => node.id === id)) == null ? void 0 : _a3.parentId) != null ? _b3 : null;
-  };
-  for (const id of targets) {
-    if (isAiLocked(notes, id)) return "locked";
-    if (op === "write" || op === "addChild") continue;
-    if (isAiLocked(notes, parentOf(id))) return "lockedParent";
-    if (op === "move") {
-      if (options.to !== void 0 && isAiLocked(notes, options.to)) return "lockedParent";
-      continue;
-    }
-    const subtree = /* @__PURE__ */ new Set([id]);
-    for (let grew = true; grew; ) {
-      grew = false;
-      for (const node of nodes)
-        if (node.parentId && subtree.has(node.parentId) && !subtree.has(node.id)) {
-          subtree.add(node.id);
-          grew = true;
-        }
-    }
-    for (const member of subtree) if (member !== id && isAiLocked(notes, member)) return "lockedDescendant";
-    for (const relation of (_b2 = map == null ? void 0 : map.topicRelations) != null ? _b2 : []) {
-      const other = subtree.has(relation.from) ? relation.to : subtree.has(relation.to) ? relation.from : null;
-      if (other && !subtree.has(other) && isAiLocked(notes, other)) return "lockedRelation";
-    }
-  }
-  return null;
-}
-function aiLockedError() {
-  const error = new Error("AI lock: the topic is locked");
-  error.name = "AiLockedError";
-  return error;
-}
-function isAiLockedError(error) {
-  return error instanceof Error && error.name === "AiLockedError";
-}
 
 // core/steps/map-chat/language.en.md
 var language_en_default2 = "Write the reply, and every title, summary, note text and new file text you produce, in {{language}}.\n";
@@ -58665,7 +59809,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -58839,7 +59983,7 @@ ${request.requirements}` : preset.text,
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
-        t("ui.stop_research"),
+        t(stopLabelKey(this.plugin.topicRuns.runKind(node.path), !!((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)))),
         () => {
           var _a3, _b3;
           return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.topicRuns.taskController(node.path)) == null ? void 0 : _b3.abort();
@@ -58853,7 +59997,7 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_u = (_t = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _t.length) != null ? _u : 0;
+    const pendingCount = (_v = (_u = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _u.length) != null ? _v : 0;
     if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(
         header,
@@ -58941,7 +60085,7 @@ ${request.requirements}` : preset.text,
             "vam-add-text-tool"
           );
       }
-      if (aimEnabled() && ((_v = this.map) == null ? void 0 : _v.aim) && node.aimKind === "question") {
+      if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim) && node.aimKind === "question") {
         const remove = this.button(
           tools,
           t("ui.node_tool_remove"),
@@ -58950,7 +60094,7 @@ ${request.requirements}` : preset.text,
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
-      if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -58962,7 +60106,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && assumptions.length) {
+      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -58974,7 +60118,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && node.aimKind === "conclusion") {
+      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -58999,24 +60143,24 @@ ${request.requirements}` : preset.text,
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const title = card.createEl("h3", { text: (_z = note == null ? void 0 : note.title) != null ? _z : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_A = note == null ? void 0 : note.title) != null ? _A : node.path);
+    const title = card.createEl("h3", { text: (_A = note == null ? void 0 : note.title) != null ? _A : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_B = note == null ? void 0 : note.title) != null ? _B : node.path);
     title.setAttr("dir", "auto");
     if (note && !this.selection.state.multiSelectMode && !this.aimLive())
       card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node, note.title));
-    if ((_B = research == null ? void 0 : research.preview) == null ? void 0 : _B.summary)
+    if ((_C = research == null ? void 0 : research.preview) == null ? void 0 : _C.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_C = note == null ? void 0 : note.summary) != null ? _C : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_D = note == null ? void 0 : note.summary) != null ? _D : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_D = note == null ? void 0 : note.summary) != null ? _D : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_E = note == null ? void 0 : note.summary) != null ? _E : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && aimEnabled() && ((_E = this.map) == null ? void 0 : _E.aim)) {
+    if (node.aimKind === "conclusion" && aimEnabled() && ((_F = this.map) == null ? void 0 : _F.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -59029,7 +60173,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && aimEnabled() && ((_F = this.map) == null ? void 0 : _F.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && aimEnabled() && ((_G = this.map) == null ? void 0 : _G.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -59065,11 +60209,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && aimEnabled() && ((_G = this.map) == null ? void 0 : _G.aim)) {
+    if (node.aimKind === "question" && aimEnabled() && ((_H = this.map) == null ? void 0 : _H.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_I = (_H = node.aimQuestion) == null ? void 0 : _H.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _I : branch.answerSnapshot.selections;
+        const labels = (_J = (_I = node.aimQuestion) == null ? void 0 : _I.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _J : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -59112,11 +60256,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && aimEnabled() && ((_J = this.map) == null ? void 0 : _J.aim)) {
+    if (node.aimKind === "answer" && aimEnabled() && ((_K = this.map) == null ? void 0 : _K.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_L = (_K = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _K.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _L : branch.answerSnapshot.selections;
+        const labels = (_M = (_L = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _L.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _M : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -59125,7 +60269,7 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node);
-    if (!this.selection.state.multiSelectMode && !((_M = this.map) == null ? void 0 : _M.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_N = this.map) == null ? void 0 : _N.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -70433,7 +71577,7 @@ var ELEMENT_NODE = 1;
 var TEXT_NODE = 3;
 var PLACEHOLDER_OPEN = "\u27E6";
 var PLACEHOLDER_CLOSE = "\u27E7";
-var TOKEN = /⟦(\/?)(\d+)(\/?)⟧/g;
+var TOKEN2 = /⟦(\/?)(\d+)(\/?)⟧/g;
 var BLOCK_TAGS2 = /* @__PURE__ */ new Set([
   "address",
   "article",
@@ -70568,7 +71712,7 @@ function buildText(nodes, parts) {
   return out;
 }
 function hasTranslatableText(text11) {
-  return HAS_LETTER.test(text11.replace(TOKEN, ""));
+  return HAS_LETTER.test(text11.replace(TOKEN2, ""));
 }
 function extractSegments(root) {
   const units = [];
@@ -70601,7 +71745,7 @@ function extractSegments(root) {
     const raw = buildText(run, parts);
     const text11 = raw.trim();
     if (!text11 || !hasTranslatableText(text11) || raw.includes("\u27E6\u27E6")) return;
-    const stripped = raw.replace(TOKEN, "");
+    const stripped = raw.replace(TOKEN2, "");
     if (stripped.includes(PLACEHOLDER_OPEN) || stripped.includes(PLACEHOLDER_CLOSE)) return;
     const lead = raw.slice(0, raw.length - raw.trimStart().length);
     const trail = raw.slice(raw.trimEnd().length);
@@ -70634,13 +71778,13 @@ function extractSegments(root) {
   walk(root);
   return { units };
 }
-var tokensOf = (text11) => [...text11.matchAll(TOKEN)].map((match) => match[0]);
+var tokensOf = (text11) => [...text11.matchAll(TOKEN2)].map((match) => match[0]);
 function placeholdersMatch(source, translated) {
   if (!translated.trim()) return false;
   const a = tokensOf(source);
   const b = tokensOf(translated);
   if (a.length !== b.length || a.some((token, i) => token !== b[i])) return false;
-  const rest = translated.replace(TOKEN, "");
+  const rest = translated.replace(TOKEN2, "");
   return !rest.includes(PLACEHOLDER_OPEN) && !rest.includes(PLACEHOLDER_CLOSE);
 }
 function rebuild(unit, translated, doc) {
@@ -70657,7 +71801,7 @@ function rebuild(unit, translated, doc) {
   };
   addText(unit.lead);
   let last = 0;
-  for (const match of translated.matchAll(TOKEN)) {
+  for (const match of translated.matchAll(TOKEN2)) {
     addText(translated.slice(last, match.index));
     last = ((_a2 = match.index) != null ? _a2 : 0) + match[0].length;
     const part = unit.parts[Number(match[2]) - 1];
@@ -73975,1137 +75119,6 @@ var ResearchProgressStore = class {
         if (this.entries.has(path)) this.notify(path);
       }, wait)
     );
-  }
-};
-
-// core/steps/task/carry-sources.ts
-var HEADING_KEY = "note.earlier_research_sources";
-var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
-var TOKEN2 = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
-function outsideCode(text11) {
-  const lines = text11.replace(/\r\n/g, "\n").split("\n");
-  const code = fencedLines(lines);
-  return lines.filter((_, index) => !code[index]);
-}
-function keysOf(text11) {
-  return [...linksOf([text11]).keys()];
-}
-function plainLine(line) {
-  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
-  return `- ${stripped}`;
-}
-function linkTokens(line, wanted) {
-  const out = [];
-  for (const match of line.matchAll(TOKEN2)) {
-    const token = match[0];
-    if (!wanted(keysOf(token))) continue;
-    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
-    else out.push(token.replace(/^!/, ""));
-  }
-  return out;
-}
-function carriedSourceLines(previousTexts, nextTexts) {
-  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
-  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
-  if (!missing.size) return [];
-  const covered = /* @__PURE__ */ new Set();
-  const lines = [];
-  const add = (line) => {
-    if (line.trim() && !lines.includes(line)) lines.push(line);
-  };
-  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
-  for (const line of previousTexts.flatMap(outsideCode)) {
-    const keys = keysOf(line);
-    if (!open(keys)) continue;
-    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
-    if (definition) add(`- ${definition[1].trim()}`);
-    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
-    else add(plainLine(line));
-    for (const key2 of keys) covered.add(key2);
-  }
-  return lines;
-}
-function carryForwardSources(detail, previousTexts, nextTexts, language2, template2) {
-  const carried = carriedSourceLines(previousTexts, nextTexts);
-  if (!carried.length) return detail;
-  const heading = translateNote(language2, HEADING_KEY);
-  const lines = detail.split("\n");
-  const code = fencedLines(lines);
-  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
-  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
-  const keys = sourcesHeadingKeys(template2);
-  const start = lines.findIndex((line, index) => {
-    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
-    return !!match && keys.has(match[1].toLocaleLowerCase());
-  });
-  if (start < 0) return `${detail.trimEnd()}
-
-### ${heading}
-
-${carried.join("\n")}
-`;
-  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
-}
-function insertAfterBlock(lines, code, start, add, stop, separate = false) {
-  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
-  if (end < 0) end = lines.length;
-  while (end > start + 1 && !lines[end - 1].trim()) end--;
-  return [
-    ...lines.slice(0, end),
-    ...separate ? [""] : [],
-    ...add,
-    ...end < lines.length && lines[end].trim() ? [""] : [],
-    ...lines.slice(end)
-  ].join("\n");
-}
-
-// ai/note-style-label.ts
-function runStyleLabelText(label, language2) {
-  return label.templateSource === "kind" ? translate(
-    language2,
-    "ui.note_style_label_0_1_2",
-    label.templateName,
-    label.toneName,
-    translate(language2, "ui.note_style_source_kind")
-  ) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
-}
-
-// experiences/visual-map/topic-run.ts
-var CHART_JOB_LIMIT = 3;
-var TopicRuns = class {
-  constructor(ports) {
-    this.ports = ports;
-    __publicField(this, "controllers", /* @__PURE__ */ new Map());
-    __publicField(this, "disposed", false);
-    /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
-    __publicField(this, "charts", /* @__PURE__ */ new Map());
-    /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
-    __publicField(this, "chartProgressIds", /* @__PURE__ */ new Map());
-    __publicField(this, "chartProgressSeq", 0);
-    /** Jobs waiting for a free slot, first in first out. */
-    __publicField(this, "chartQueue", []);
-    __publicField(this, "chartRunning", 0);
-    /** Callers waiting in {@link whenIdle}; woken whenever a run or chart step ends. */
-    __publicField(this, "idleWaiters", /* @__PURE__ */ new Set());
-  }
-  /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
-  get running() {
-    return this.ports.running();
-  }
-  /**
-   * Registers a run for the topic. Returns null when the topic already has one or the module is disposed. Every run
-   * calls this synchronously, before its first await, so a second click on the same topic is refused.
-   */
-  begin(path, kind) {
-    if (this.disposed || this.controllers.has(path)) return null;
-    const controller = new AbortController();
-    this.controllers.set(path, controller);
-    this.running.add(path);
-    return {
-      path,
-      kind,
-      signal: controller.signal,
-      release: () => {
-        if (this.controllers.get(path) !== controller) return;
-        this.controllers.delete(path);
-        this.running.delete(path);
-        this.wakeIdleWaiters();
-      }
-    };
-  }
-  wakeIdleWaiters() {
-    for (const wake of [...this.idleWaiters]) wake();
-  }
-  /**
-   * Resolves once none of the topics has a run or a background chart step in flight (or `signal` aborts). A run that
-   * reads other topics as its sources calls this first: a child's research writing back during the read-to-save
-   * window would otherwise look like an edit and fail the sources check, though the user touched nothing.
-   */
-  async whenIdle(paths, signal) {
-    const busy = () => paths.some((path) => this.running.has(path) || this.charts.has(path));
-    while (busy() && !(signal == null ? void 0 : signal.aborted) && !this.disposed) {
-      await new Promise((resolve) => {
-        const wake = () => {
-          this.idleWaiters.delete(wake);
-          signal == null ? void 0 : signal.removeEventListener("abort", wake);
-          resolve();
-        };
-        this.idleWaiters.add(wake);
-        signal == null ? void 0 : signal.addEventListener("abort", wake, { once: true });
-      });
-    }
-  }
-  async start(path, kind, options) {
-    if (kind === "synthesizeSelection") return this.runSelection(path, options);
-    if (kind === "proposeChildren") return this.runProposal(path, options);
-    if (kind === "integrateDirection") return this.runDirections(path, options);
-    if (kind === "integrateChildren") return this.runIntegration(path, options);
-    return this.startResearch(path, kind, options);
-  }
-  async runProposal(path, options) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
-    const fail2 = (message, retryable) => {
-      var _a3;
-      if (options.failed) options.failed(message, retryable);
-      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
-    };
-    if (this.running.has(path)) {
-      (_a2 = options.failed) == null ? void 0 : _a2.call(options, t("ui.ai_running_ai"));
-      return;
-    }
-    const handle = this.begin(path, "proposeChildren");
-    if (!handle) return;
-    const controller = this.controllers.get(path);
-    const modalSignal = options.signal;
-    const abortBeforeAcceptance = () => controller.abort();
-    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
-    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    let accepted = false;
-    const acceptDispatch = () => {
-      var _a3;
-      if (accepted || controller.signal.aborted) return;
-      accepted = true;
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      (_a3 = options.accepted) == null ? void 0 : _a3.call(options);
-    };
-    const activeTasks = this.ports.activeTasks();
-    activeTasks.set(path, controller);
-    (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
-    const aborted = () => new DOMException("Aborted", "AbortError");
-    try {
-      const repo = this.ports.repository();
-      const note = await repo.readNote(path, options.map);
-      if (note.aiLocked) {
-        fail2(t("ui.ai_locked_notice"), false);
-        return;
-      }
-      const used = ((_c = options.runOnce) == null ? void 0 : _c.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
-      if (controller.signal.aborted) throw aborted();
-      const outputLanguage2 = (_d = options.outputLanguage) != null ? _d : this.ports.settings().language;
-      const result = await this.ports.askModel(
-        await options.buildContext(note, outputLanguage2),
-        used.model,
-        used.reasoning,
-        controller.signal,
-        void 0,
-        acceptDispatch
-      );
-      if (!accepted) acceptDispatch();
-      if (controller.signal.aborted) throw aborted();
-      const suggestions = result.suggestions.filter((item) => !item.parentTitle).slice(0, 7);
-      if (suggestions.length === 0) {
-        fail2(result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
-        return;
-      }
-      const latest = await repo.readNote(path, options.map);
-      if (controller.signal.aborted) throw aborted();
-      if (latest.aiLocked) {
-        fail2(t("ui.ai_locked_notice"), false);
-        return;
-      }
-      if (latest.thinkingOrigin !== note.thinkingOrigin)
-        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-      const pendingItems = suggestions.map((item) => ({
-        ...item,
-        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
-      }));
-      const flush = async () => {
-        var _a3, _b3;
-        await ((_b3 = (_a3 = this.pendingSuggestions).flush) == null ? void 0 : _b3.call(_a3));
-      };
-      this.pendingSuggestions.set(path, pendingItems);
-      await flush();
-      if (controller.signal.aborted) {
-        this.pendingSuggestions.delete(path);
-        await flush();
-        throw aborted();
-      }
-      (_e = options.onStored) == null ? void 0 : _e.call(options);
-      options.offer(pendingItems);
-    } catch (error) {
-      const kind = (_f = options.classifyError) == null ? void 0 : _f.call(options, error);
-      const cancelled2 = kind !== "partial" && (controller.signal.aborted || kind === "stopped");
-      if (!cancelled2) {
-        console.error("Visual Agent Map AI split", error);
-        fail2(this.ports.recordFailure(t("log.ai_split_failed"), error), kind !== "partial");
-      }
-    } finally {
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      if (activeTasks.get(path) === controller) activeTasks.delete(path);
-      handle.release();
-      (_g = options.onReleased) == null ? void 0 : _g.call(options);
-    }
-  }
-  /** One signal that aborts when the registered run is stopped (Stop, stopAll, dispose) or the entry's own signal aborts. */
-  linked(handle, external) {
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    if (handle.signal.aborted || (external == null ? void 0 : external.aborted)) controller.abort();
-    handle.signal.addEventListener("abort", abort, { once: true });
-    external == null ? void 0 : external.addEventListener("abort", abort, { once: true });
-    return {
-      signal: controller.signal,
-      dispose: () => {
-        handle.signal.removeEventListener("abort", abort);
-        external == null ? void 0 : external.removeEventListener("abort", abort);
-      }
-    };
-  }
-  /** Stage, seconds and the unsaved preview of one request; an entry the topic already has (a chart step) is left alone. */
-  startProgress(path, model) {
-    var _a2;
-    const progress = this.ports.progress();
-    if (!progress || ((_a2 = progress.get) == null ? void 0 : _a2.call(progress, path))) return { end: () => {
-    } };
-    let attempt = "starting";
-    progress.begin(path, attempt, Date.now(), model);
-    return {
-      observer: {
-        onAttempt: (id) => {
-          attempt = id;
-          progress.newAttempt(path, id, Date.now());
-        },
-        onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
-        onPreview: (id, fields) => progress.preview(path, id, fields != null ? fields : {})
-      },
-      end: () => progress.end(path, attempt)
-    };
-  }
-  async modelOf(path, note, map, runOnce) {
-    return (runOnce == null ? void 0 : runOnce.model.trim()) ? await this.ports.resolveModel(path, map, runOnce) : { model: note.model, reasoning: note.reasoning };
-  }
-  async runDirections(path, options) {
-    var _a2, _b2, _c, _d;
-    if (this.running.has(path)) {
-      options.failed(t("ui.ai_running_ai"));
-      return;
-    }
-    const handle = this.begin(path, "integrateDirection");
-    if (!handle) return;
-    const link = this.linked(handle, options.signal);
-    const free = () => {
-      link.dispose();
-      handle.release();
-    };
-    try {
-      const blocked = (_a2 = options.precheck) == null ? void 0 : _a2.call(options);
-      if (blocked) {
-        options.failed(blocked);
-        return;
-      }
-      const repo = this.ports.repository();
-      const note = await repo.readNote(path, options.map());
-      if (note.aiLocked) {
-        options.failed(t("ui.ai_locked_notice"));
-        return;
-      }
-      const used = await this.modelOf(path, note, options.map(), options.runOnce);
-      (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
-      const progress = this.startProgress(path, used.model);
-      try {
-        const context = await options.buildContext(note);
-        if (typeof context === "string") {
-          options.failed(context);
-          return;
-        }
-        const result = await this.ports.askModel(
-          context,
-          used.model,
-          used.reasoning,
-          link.signal,
-          void 0,
-          options.accepted,
-          void 0,
-          progress.observer
-        );
-        progress.end();
-        (_c = options.accepted) == null ? void 0 : _c.call(options);
-        if (link.signal.aborted) throw new DOMException("Aborted", "AbortError");
-        const angles = result.suggestions.slice(0, 2);
-        if (!angles.length) {
-          options.failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-          return;
-        }
-        options.found(angles);
-      } catch (error) {
-        if (link.signal.aborted || error instanceof Error && error.name === "AbortError") {
-          options.failed(t("ui.research_stopped_existing_content_was_preserved"));
-          return;
-        }
-        console.error("Visual Agent Map integration directions", error);
-        options.failed(this.ports.recordFailure(t("log.integration_directions_failed"), error));
-      } finally {
-        progress.end();
-        free();
-        await ((_d = options.onSettled) == null ? void 0 : _d.call(options));
-      }
-    } finally {
-      free();
-    }
-  }
-  async runIntegration(path, options) {
-    var _a2;
-    if (this.running.has(path)) {
-      (_a2 = options.failed) == null ? void 0 : _a2.call(options, t("ui.ai_running_ai"));
-      return;
-    }
-    const handle = this.begin(path, "integrateChildren");
-    if (!handle) return;
-    const link = this.linked(handle, options.signal);
-    const free = () => {
-      link.dispose();
-      handle.release();
-    };
-    try {
-      await this.integrate(path, options, link.signal, free);
-    } finally {
-      free();
-    }
-  }
-  async integrate(path, options, signal, free) {
-    var _a2, _b2, _c, _d, _e, _f;
-    const fail2 = (message) => {
-      var _a3;
-      if (options.failed) options.failed(message);
-      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
-    };
-    const repo = this.ports.repository();
-    const note = await repo.readNote(path, options.map());
-    if (note.aiLocked) {
-      fail2(t("ui.ai_locked_notice"));
-      return;
-    }
-    const used = await this.modelOf(path, note, options.map(), options.runOnce);
-    const noteSnapshot = (item) => JSON.stringify([
-      item.title,
-      item.summary,
-      item.detail,
-      item.prompt,
-      item.rules,
-      item.model,
-      item.reasoning,
-      item.sourcePaths,
-      item.referencePaths,
-      item.thinkingOrigin,
-      item.newFindings
-    ]);
-    const snapshot = noteSnapshot(note);
-    const prepared = await options.prepare(note);
-    if (typeof prepared === "string") {
-      fail2(prepared);
-      return;
-    }
-    const language2 = this.ports.settings().language;
-    const outputLanguage2 = (_a2 = options.outputLanguage) != null ? _a2 : language2;
-    const detailTemplate = prepared.detailTemplate;
-    this.abortCharts(path);
-    let original = null;
-    try {
-      original = await this.readOriginal((_b2 = prepared.updateMode) != null ? _b2 : "merge", path, options);
-      if (((_c = prepared.updateMode) != null ? _c : "merge") === "fresh" && original === null) {
-        fail2(t("ui.writeback_backup_failed"));
-        return;
-      }
-      await repo.updateNote(path, { status: "running" });
-      await ((_d = options.onStarted) == null ? void 0 : _d.call(options));
-    } catch (error) {
-      try {
-        await repo.updateNote(path, { status: note.status });
-      } catch (e) {
-      }
-      throw error;
-    }
-    const progress = this.startProgress(path, used.model);
-    const changed = () => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-    try {
-      const context = await options.buildContext(note);
-      const result = await this.ports.askModel(
-        context,
-        used.model,
-        used.reasoning,
-        signal,
-        void 0,
-        options.accepted,
-        void 0,
-        progress.observer
-      );
-      progress.end();
-      (_e = options.accepted) == null ? void 0 : _e.call(options);
-      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      await repo.updateNote(path, { status: note.status });
-      const raw = await this.snapshotRaw(original, path, options);
-      const save = async (summary, detail) => this.ports.mutate()(async () => {
-        var _a3, _b3;
-        if (signal.aborted || prepared.viewChanged()) throw changed();
-        if (await prepared.sourcesChanged()) throw changed();
-        const latest = await repo.readNote(path, options.map());
-        if (latest.aiLocked) throw aiLockedError();
-        if (noteSnapshot(latest) !== snapshot) throw changed();
-        const mode = (_a3 = prepared.updateMode) != null ? _a3 : "merge";
-        const noteLanguage = noteLanguageOf(outputLanguage2);
-        const references2 = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2));
-        let written2;
-        let issues;
-        let record;
-        if (mode === "top") {
-          issues = [];
-          const composed = await this.composeWrite({
-            mode,
-            path,
-            oldDetail: latest.detail,
-            aiDetail: detail,
-            summary,
-            template: detailTemplate,
-            language: noteLanguage,
-            signal,
-            hooks: options,
-            raw
-          });
-          if (!composed.ok) throw new Error(composed.message);
-          written2 = composed.detail;
-          record = composed.record;
-        } else {
-          const canonicalOnly = canonicalDetail(detail, noteLanguage, detailTemplate);
-          issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
-          const carried = mode === "fresh" ? canonicalOnly : carryForwardSources(
-            canonicalOnly,
-            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-            [summary, canonicalOnly, references2],
-            outputLanguage2,
-            detailTemplate
-          );
-          const composed = await this.composeWrite({
-            mode,
-            path,
-            oldDetail: latest.detail,
-            aiDetail: carried,
-            summary,
-            template: detailTemplate,
-            language: noteLanguage,
-            signal,
-            hooks: options,
-            raw
-          });
-          if (!composed.ok) throw new Error(composed.message);
-          written2 = composed.detail;
-          record = composed.record;
-        }
-        await repo.updateNote(
-          path,
-          {
-            summary,
-            detail: written2,
-            visualReferences: references2,
-            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
-            ...options.findingsSent() ? { newFindings: "" } : {},
-            status: "completed",
-            ...formatIssuesPatch(issues, language2)
-          },
-          { detailTemplate }
-        );
-        const saved = await repo.readNote(path, options.map());
-        await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
-        (_b3 = options.queueCharts) == null ? void 0 : _b3.call(options, {
-          path,
-          saved,
-          context,
-          detail: saved.detail,
-          formatIssues: issues,
-          model: used.model,
-          language: outputLanguage2,
-          template: detailTemplate,
-          ...mode === "top" && record ? this.chartGuard(mode, record) : {}
-        });
-      });
-      try {
-        await options.drafted(result, save, result.summary, result.detail, note);
-      } catch (error) {
-        if (isAiLockedError(error)) fail2(t("ui.ai_locked_notice"));
-        else if (signal.aborted || error instanceof Error && error.name === "AbortError") {
-          fail2(t("ui.research_stopped_existing_content_was_preserved"));
-        } else {
-          console.error("VAM synthesis write", error);
-          fail2(this.ports.recordFailure(t("log.child_integration_failed"), error));
-        }
-      }
-    } catch (error) {
-      if (signal.aborted || error instanceof Error && error.name === "AbortError") {
-        await repo.updateNote(path, { status: note.status });
-        fail2(t("ui.research_stopped_existing_content_was_preserved"));
-      } else {
-        console.error("Visual Agent Map child integration", error);
-        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
-        fail2(this.ports.recordFailure(t("log.child_integration_failed"), error));
-      }
-    } finally {
-      progress.end();
-      free();
-      await ((_f = options.onSettled) == null ? void 0 : _f.call(options));
-    }
-  }
-  async runSelection(path, options) {
-    const handle = this.begin(path, "synthesizeSelection");
-    if (!handle) {
-      options.refused();
-      return;
-    }
-    const onStop = () => options.stop();
-    handle.signal.addEventListener("abort", onStop, { once: true });
-    const free = () => {
-      handle.signal.removeEventListener("abort", onStop);
-      handle.release();
-    };
-    try {
-      await this.synthesizeSelection(options, free);
-    } finally {
-      free();
-    }
-  }
-  async synthesizeSelection(options, free) {
-    const aborted = () => new DOMException("Aborted", "AbortError");
-    const changed = () => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-    let progress;
-    try {
-      const chosen = await options.model();
-      const sources = await options.readSources();
-      options.begin(sources);
-      const taskProgress = options.startProgress(chosen.model);
-      const context = await options.buildContext(sources);
-      const ask = () => this.ports.askModel(
-        context,
-        chosen.model,
-        chosen.reasoning,
-        options.signal,
-        void 0,
-        options.accepted,
-        void 0,
-        taskProgress.observer
-      );
-      if (options.step === "draft") {
-        const draft = async () => {
-          try {
-            const result2 = await ask();
-            taskProgress.end();
-            if (!options.current()) return;
-            if (options.signal.aborted || options.mapChanged())
-              throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
-            const latest2 = await options.readSources();
-            if (JSON.stringify(latest2.documents) !== options.recordedSources()) throw changed();
-            if (options.signal.aborted) throw aborted();
-            if (options.closed()) throw changed();
-            const mark = options.applying();
-            await this.ports.mutate()(() => options.write(result2));
-            options.written(mark);
-          } catch (error) {
-            if (!options.current()) return;
-            options.draftFailed(error);
-          } finally {
-            taskProgress.end();
-          }
-        };
-        await draft();
-        options.finished();
-        return;
-      }
-      progress = taskProgress;
-      const result = await ask();
-      taskProgress.end();
-      options.accepted();
-      if (!options.current()) return;
-      if (options.signal.aborted || options.mapChanged()) throw aborted();
-      const latest = await options.readSources();
-      if (JSON.stringify(latest.documents) !== options.recordedSources()) throw changed();
-      const angles = result.suggestions.slice(0, 2);
-      if (!angles.length) options.noDirections();
-      else options.found(angles);
-    } catch (error) {
-      options.fail(error);
-    } finally {
-      progress == null ? void 0 : progress.end();
-      free();
-      options.settled();
-    }
-  }
-  /** What the chart step needs to keep a "top" write-back's old text: the diagrammed text must still hold it, byte for byte. */
-  chartGuard(mode, record) {
-    return { updateMode: mode, preserve: (charted) => chartPreserves(record, charted) };
-  }
-  /** "fresh" only: reads the whole note file before the run changes any field; null when it cannot be read. */
-  async readOriginal(mode, path, hooks) {
-    if (mode !== "fresh" || !hooks.readRaw) return null;
-    try {
-      return await hooks.readRaw(path);
-    } catch (e) {
-      return null;
-    }
-  }
-  /** The file once the run has marked the topic running (the baseline the write-time check compares with). */
-  async snapshotRaw(original, path, hooks) {
-    if (original === null || !hooks.readRaw) return null;
-    try {
-      return { original, started: await hooks.readRaw(path) };
-    } catch (e) {
-      return null;
-    }
-  }
-  /**
-   * Builds the text to save for one of the three write-back ways. Runs inside the mutation queue after the stale fence.
-   * `top`: pure insert, blocked when the old text would not come back. `fresh`: the whole note file is backed up first and
-   * read again just before the write; anything that fails or differs means nothing is written (`message` says why).
-   */
-  async composeWrite(input2) {
-    var _a2;
-    const { mode, path, signal, hooks, raw } = input2;
-    const base = {
-      mode,
-      oldDetail: input2.oldDetail,
-      aiDetail: input2.aiDetail,
-      summary: input2.summary,
-      template: input2.template,
-      language: input2.language
-    };
-    const compose = (_a2 = this.ports.composeWriteback) != null ? _a2 : composeWriteback;
-    if (mode !== "fresh") {
-      const composed = compose({ ...base, now: /* @__PURE__ */ new Date() });
-      return composed.ok ? composed : { ok: false, message: t("ui.writeback_top_failed") };
-    }
-    const stopped = { ok: false, message: t("ui.research_stopped_existing_content_was_preserved") };
-    const failed = { ok: false, message: t("ui.writeback_backup_failed") };
-    if (!hooks.backupNote || !hooks.readRaw || !raw) return failed;
-    if (signal.aborted) return stopped;
-    try {
-      if (await hooks.readRaw(path) !== raw.started)
-        return { ok: false, message: t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved") };
-      const backup = await hooks.backupNote(path, raw.original);
-      if (!backup.ok) return failed;
-      const composed = compose({ ...base, now: /* @__PURE__ */ new Date(), backupPath: backup.path });
-      if (!composed.ok) return failed;
-      if (await hooks.readRaw(path) !== raw.started) return failed;
-      if (signal.aborted) return stopped;
-      return composed;
-    } catch (e) {
-      return failed;
-    }
-  }
-  /** Reads the note, resolves the model and style and builds the request; null (after telling the entry) when the topic has no task. */
-  async researchPrelude(path, options, givenStyle, overrides) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
-    const repo = this.ports.repository();
-    const note = await repo.readNote(path, options.map);
-    const used = ((_a2 = options.runOnce) == null ? void 0 : _a2.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
-    if (!((_b2 = overrides.task) != null ? _b2 : note.prompt)) {
-      const message = t("ui.enter_a_question_or_task_for_ai_first");
-      if (options.failed) options.failed(message);
-      else (_c = options.notify) == null ? void 0 : _c.call(options, message);
-      return null;
-    }
-    const outputLanguage2 = (_d = overrides.outputLanguage) != null ? _d : this.ports.settings().language;
-    const runStyle = givenStyle != null ? givenStyle : options.resolveStyle ? await options.resolveStyle(outputLanguage2) : this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
-    const detailTemplate = runStyle.template;
-    const context = withThinkingOrigin(
-      {
-        title: note.title,
-        summary: summaryForPrompt(note.summary, outputLanguage2),
-        rules: "",
-        detail: note.detail,
-        task: note.prompt,
-        ancestors: (_f = await ((_e = options.ancestors) == null ? void 0 : _e.call(options, outputLanguage2))) != null ? _f : "",
-        userTexts: (_h = (_g = options.userTexts) == null ? void 0 : _g.call(options)) != null ? _h : "",
-        workingFindings: note.newFindings,
-        sourceContext: "",
-        mode: "task",
-        researchMode: note.researchMode,
-        researchDepth: "normal",
-        visualMode: note.visualMode,
-        ...runStyle.toneText ? { toneText: runStyle.toneText } : {},
-        ...overrides,
-        detailTemplate,
-        ...runStyle.contextFields,
-        updateMode: runStyle.updateMode,
-        addCharts: (_i = overrides.addCharts) != null ? _i : true
-      },
-      note
-    );
-    const styleLabel = runStyle.recipe.source !== "kind" || runStyle.recipe.ref !== "builtin:general" ? runStyleLabelText(runStyle.label, this.ports.settings().language) : void 0;
-    return { note, used, context, styleLabel };
-  }
-  async startResearch(path, kind, options) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
-    if (this.disposed) return null;
-    const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};
-    const settings = () => this.ports.settings();
-    if (this.running.has(path)) {
-      (_b2 = options.failed) == null ? void 0 : _b2.call(options, t("ui.ai_running_ai"));
-      return null;
-    }
-    const handle = this.begin(path, kind);
-    if (!handle) return null;
-    const controller = this.controllers.get(path);
-    let prelude;
-    const repo = this.ports.repository();
-    try {
-      prelude = await this.researchPrelude(path, options, givenStyle, overrides);
-    } catch (error) {
-      handle.release();
-      throw error;
-    }
-    if (!prelude) {
-      handle.release();
-      return null;
-    }
-    const { note, used, context, styleLabel } = prelude;
-    if (note.aiLocked) {
-      handle.release();
-      if (options.failed) options.failed(t("ui.ai_locked_notice"));
-      else (_c = options.notify) == null ? void 0 : _c.call(options, t("ui.ai_locked_notice"));
-      return null;
-    }
-    const language2 = settings().language;
-    this.pendingSuggestions.delete(path);
-    this.abortCharts(path);
-    const activeTasks = this.ports.activeTasks();
-    const abortFromTaskModal = () => controller.abort();
-    if ((_d = overrides.signal) == null ? void 0 : _d.aborted) controller.abort();
-    else (_e = overrides.signal) == null ? void 0 : _e.addEventListener("abort", abortFromTaskModal, { once: true });
-    activeTasks.set(path, controller);
-    const progress = this.ports.progress();
-    let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(path, progressAttempt, Date.now(), used.model, styleLabel);
-    const observer = {
-      onAttempt: (id) => {
-        progressAttempt = id;
-        progress == null ? void 0 : progress.newAttempt(path, id, Date.now());
-      },
-      onStage: (id, stage, query) => progress == null ? void 0 : progress.stage(path, id, stage, Date.now(), query),
-      onPreview: (id, fields) => progress == null ? void 0 : progress.preview(path, id, fields != null ? fields : {}),
-      onSlow: (id, slow, resend) => progress == null ? void 0 : progress.markSlow(path, id, slow, resend)
-    };
-    const releaseRun = () => {
-      var _a3;
-      (_a3 = overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
-      if (activeTasks.get(path) === controller) activeTasks.delete(path);
-      handle.release();
-    };
-    const fail2 = (message) => {
-      var _a3;
-      if (options.failed) options.failed(message);
-      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
-    };
-    const releaseStartup = () => {
-      progress == null ? void 0 : progress.end(path, progressAttempt);
-      releaseRun();
-    };
-    let startupStatusAttempted = false;
-    let raw = null;
-    try {
-      startupStatusAttempted = true;
-      const original = await this.readOriginal((_f = context.updateMode) != null ? _f : "merge", path, options);
-      if (((_g = context.updateMode) != null ? _g : "merge") === "fresh" && original === null) {
-        fail2(t("ui.writeback_backup_failed"));
-        releaseStartup();
-        return null;
-      }
-      await repo.updateNote(path, { status: "running" });
-      await ((_h = options.onStarted) == null ? void 0 : _h.call(options));
-      raw = await this.snapshotRaw(original, path, options);
-      if (controller.signal.aborted) {
-        try {
-          await repo.updateNote(path, { status: note.status });
-        } finally {
-          releaseStartup();
-        }
-        return null;
-      }
-    } catch (error) {
-      try {
-        if (startupStatusAttempted) await repo.updateNote(path, { status: note.status });
-      } catch (e) {
-      } finally {
-        releaseStartup();
-      }
-      throw error;
-    }
-    let exchangeId = "";
-    let resolveAccepted;
-    const acceptedPromise = new Promise((resolve) => {
-      resolveAccepted = resolve;
-    });
-    let requestAccepted = false;
-    const markAccepted = () => {
-      var _a3;
-      if (requestAccepted) return;
-      requestAccepted = true;
-      resolveAccepted(true);
-      (_a3 = options.accepted) == null ? void 0 : _a3.call(options);
-    };
-    const exchanges = () => settings().aiExchangeLoggingEnabled ? this.ports.exchanges() : void 0;
-    const completion = this.ports.askModel(
-      context,
-      used.model,
-      used.reasoning,
-      controller.signal,
-      (id) => {
-        exchangeId = id;
-      },
-      markAccepted,
-      void 0,
-      observer
-    ).then(
-      (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m;
-        progress == null ? void 0 : progress.end(path, progressAttempt);
-        const latest = await repo.readNote(path, options.map);
-        const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-        const locked = latest.aiLocked === true;
-        if (controller.signal.aborted || stale || locked) {
-          await repo.updateNote(path, { status: note.status });
-          if (exchangeId)
-            (_a3 = exchanges()) == null ? void 0 : _a3.failed(
-              exchangeId,
-              t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
-            );
-          if (locked) fail2(t("ui.ai_locked_notice"));
-          else if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-          return;
-        }
-        const mode = (_b3 = context.updateMode) != null ? _b3 : "merge";
-        const writeLanguage = noteLanguageOf((_c2 = context.outputLanguage) != null ? _c2 : settings().language);
-        const composed = await this.composeWrite({
-          mode,
-          path,
-          oldDetail: latest.detail,
-          // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
-          aiDetail: mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, context.detailTemplate),
-          summary: result.summary,
-          template: (_d2 = context.detailTemplate) != null ? _d2 : standardTemplate(writeLanguage),
-          language: writeLanguage,
-          signal: controller.signal,
-          hooks: options,
-          raw
-        });
-        if (!composed.ok) {
-          await repo.updateNote(path, { status: note.status });
-          if (exchangeId) (_e2 = exchanges()) == null ? void 0 : _e2.failed(exchangeId, composed.message);
-          fail2(composed.message);
-          return;
-        }
-        await repo.updateNote(
-          path,
-          {
-            summary: result.summary,
-            detail: composed.detail,
-            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
-            newFindings: "",
-            status: "completed",
-            // The topic remembers the mode of its latest research (Quick is stored as local).
-            ...context.researchMode ? { researchMode: context.researchMode } : {},
-            ...mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language2)
-          },
-          { detailTemplate: context.detailTemplate }
-        );
-        const saved = await repo.readNote(path, options.map);
-        (_f2 = options.onWritten) == null ? void 0 : _f2.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_g2 = exchanges()) == null ? void 0 : _g2.completed(exchangeId);
-        this.ports.clearOtherHistory(options.origin);
-        (_i = options.queueCharts) == null ? void 0 : _i.call(options, {
-          path,
-          saved,
-          context,
-          detail: saved.detail,
-          formatIssues: mode === "top" ? [] : result.formatIssues,
-          model: used.model,
-          language: (_h2 = context.outputLanguage) != null ? _h2 : settings().language,
-          template: context.detailTemplate,
-          ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
-        });
-        if (result.suggestions.length) {
-          this.pendingSuggestions.set(
-            path,
-            result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-          );
-          try {
-            await ((_k = (_j = this.pendingSuggestions).flush) == null ? void 0 : _k.call(_j));
-          } catch (error) {
-            (_l = options.notify) == null ? void 0 : _l.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
-          }
-        }
-        (_m = options.done) == null ? void 0 : _m.call(options, result);
-      })
-    ).catch(
-      (error) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2;
-        progress == null ? void 0 : progress.end(path, progressAttempt);
-        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
-          await repo.updateNote(path, { status: note.status });
-          fail2(t("ui.research_stopped_existing_content_was_preserved"));
-          return;
-        }
-        console.error("Visual Agent Map AI task", error);
-        if (exchangeId && ((_b3 = (_a3 = exchanges()) == null ? void 0 : _a3.getEntries().find((item) => item.id === exchangeId)) == null ? void 0 : _b3.status) === "parsed")
-          (_c2 = exchanges()) == null ? void 0 : _c2.failed(
-            exchangeId,
-            t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
-          );
-        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
-        fail2(this.ports.recordFailure(t("log.ai_task_failed"), error));
-      })
-    ).finally(() => {
-      progress == null ? void 0 : progress.end(path, progressAttempt);
-      releaseRun();
-      this.ports.refreshViews();
-    }).catch(() => {
-    });
-    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
-    if (!accepted) {
-      await completion;
-      return null;
-    }
-    return { finished: completion };
-  }
-  /** The current store of suggestions awaiting a decision (onload swaps the plugin's for the persisted one). */
-  get pendingSuggestions() {
-    return this.ports.pendingSuggestions();
-  }
-  isRunning(path) {
-    return this.controllers.has(path);
-  }
-  /** Whether the topic has a run in flight, or another path (chat expansion, a reload leftover) holds it in the running set. */
-  isBusy(path) {
-    return this.running.has(path);
-  }
-  /** Whether any stoppable AI task (shared registry: AiCalls, shallow expansion, selection synthesis) is registered for the path. */
-  hasTask(path) {
-    return this.ports.activeTasks().has(path);
-  }
-  taskController(path) {
-    return this.ports.activeTasks().get(path);
-  }
-  /** Aborts the registered task of the path, if any. */
-  stopTask(path) {
-    var _a2;
-    (_a2 = this.ports.activeTasks().get(path)) == null ? void 0 : _a2.abort();
-  }
-  /** Registers the stop handle of a run the view owns (selection synthesis, until ticket 05). */
-  registerTask(path, controller) {
-    this.ports.activeTasks().set(path, controller);
-  }
-  /** Releases the stop handle, only when it is still the one registered. */
-  releaseTask(path, controller) {
-    const tasks = this.ports.activeTasks();
-    if (tasks.get(path) === controller) tasks.delete(path);
-  }
-  pending(path) {
-    return this.pendingSuggestions.get(path);
-  }
-  dropPending(path) {
-    this.pendingSuggestions.delete(path);
-  }
-  /** Persists the pending store when it is the persisted one (a plain Map has nothing to flush). */
-  async flushPending() {
-    var _a2, _b2;
-    await ((_b2 = (_a2 = this.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
-  }
-  stop(path) {
-    var _a2;
-    (_a2 = this.controllers.get(path)) == null ? void 0 : _a2.abort();
-  }
-  stopAll() {
-    for (const controller of this.controllers.values()) controller.abort();
-    this.abortCharts();
-  }
-  get chartJobs() {
-    return this.charts;
-  }
-  /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
-  abortCharts(path) {
-    for (const [key2, controller] of [...this.charts])
-      if (path === void 0 || key2 === path) {
-        controller.abort();
-        this.charts.delete(key2);
-        this.wakeIdleWaiters();
-        this.endChartProgress(key2);
-        const queued = this.chartQueue.findIndex((item) => item.controller === controller);
-        if (queued >= 0) this.chartQueue.splice(queued, 1);
-      }
-  }
-  endChartProgress(path) {
-    const id = this.chartProgressIds.get(path);
-    if (id === void 0) return;
-    this.chartProgressIds.delete(path);
-    this.ports.progress().end(path, id);
-  }
-  pumpChartQueue() {
-    while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
-      this.chartRunning++;
-      this.chartQueue.shift().start();
-    }
-  }
-  /**
-   * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
-   * a failure, Stop, a stale note or unload leaves the note as written (the chart exchange is marked failed with the
-   * reason). `apply` runs in the mutation queue and returns false when the note no longer equals its snapshot at
-   * write time or is running again; only then are the diagrams not applied.
-   */
-  addChartsAfterWrite(job) {
-    var _a2, _b2;
-    if ((_b2 = (_a2 = this.ports.repository()) == null ? void 0 : _a2.isDisposed) == null ? void 0 : _b2.call(_a2)) return;
-    if (!this.ports.aiTasks().chartEligible(job.context) || !job.detail.trim()) return;
-    this.abortCharts(job.path);
-    const controller = new AbortController();
-    this.charts.set(job.path, controller);
-    const progressId = `charts-${++this.chartProgressSeq}`;
-    this.chartProgressIds.set(job.path, progressId);
-    this.ports.progress().begin(job.path, progressId, Date.now(), job.model);
-    this.ports.progress().stage(job.path, progressId, "charts", Date.now());
-    let exchangeId = "";
-    const run = async () => {
-      try {
-        const detail = await this.ports.aiTasks().chartDetail({
-          input: job.context,
-          detail: job.detail,
-          countIssues: job.countIssues,
-          model: job.model,
-          signal: controller.signal,
-          onExchange: (id) => {
-            exchangeId = id;
-          }
-        });
-        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-        if (detail === job.detail) return;
-        let applied = false;
-        await this.ports.mutate()(async () => {
-          applied = !controller.signal.aborted && await job.apply(detail);
-        });
-        if (!applied) this.ports.aiTasks().failExchange(exchangeId, t("log.chart_stale_not_applied"));
-      } catch (error) {
-        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError")
-          this.ports.aiTasks().failExchange(exchangeId, t("log.chart_stopped_not_applied"));
-        else {
-          console.warn("Visual Agent Map chart step", error);
-          this.ports.aiTasks().failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
-        }
-      } finally {
-        if (this.charts.get(job.path) === controller) {
-          this.charts.delete(job.path);
-          this.wakeIdleWaiters();
-        }
-        if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
-        this.chartRunning--;
-        this.pumpChartQueue();
-      }
-    };
-    this.chartQueue.push({
-      controller,
-      start: () => {
-        void run();
-      }
-    });
-    this.pumpChartQueue();
-  }
-  /** Stops every run and refuses new ones. */
-  dispose() {
-    this.disposed = true;
-    this.stopAll();
   }
 };
 

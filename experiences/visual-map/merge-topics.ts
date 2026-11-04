@@ -4,6 +4,8 @@ import { descendants, inheritModel, type MapNode } from "../../map-model";
 import { actionStatus, modalActions } from "../../ui/modals/action-bar";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
+import type { TopicColor, TopicStyle } from "../../topic-colors";
+import type { TopicMarker } from "../../topic-markers";
 
 /** Why the selection cannot be merged; the first condition that fails, as the i18n key that explains it. */
 export type MergeBlock =
@@ -83,9 +85,39 @@ export function mergedStatus(detail: string): "completed" | "idea" {
   return detail.trim() ? "completed" : "idea";
 }
 
-/** Whether any source has Detail text: the same test as `mergedStatus`, so AI is offered exactly when there is content. */
-export function hasMergeContent(notes: ({ detail?: string } | undefined)[]): boolean {
-  return notes.some(note => (note?.detail ?? "").trim() !== "");
+/**
+ * Whether any source has content for an AI merge: Detail text, or a summary that is not the "no conclusion yet"
+ * placeholder (`isPlaceholderSummary`). A card that only has a summary (as after an expand) is content too, so its merge
+ * does not end as a blank card.
+ */
+export function hasMergeContent(
+  notes: ({ detail?: string; summary?: string } | undefined)[],
+  isPlaceholderSummary: (summary: string) => boolean
+): boolean {
+  return notes.some(note => {
+    const summary = (note?.summary ?? "").trim();
+    return (note?.detail ?? "").trim() !== "" || (summary !== "" && !isPlaceholderSummary(summary));
+  });
+}
+
+/**
+ * The appearance a merged card keeps: the colour when every source has that same colour, and the markers and text styles
+ * every source has. Undefined when the sources share nothing (a merge of differently styled cards starts plain).
+ */
+export function sharedMergeAppearance(
+  notes: ({ color?: TopicColor; markers?: readonly TopicMarker[]; style?: readonly TopicStyle[] } | undefined)[]
+): { color?: TopicColor; addMarkers?: TopicMarker[]; addStyles?: TopicStyle[] } | undefined {
+  if (!notes.length || notes.some(note => !note)) return undefined;
+  const all = notes as { color?: TopicColor; markers?: readonly TopicMarker[]; style?: readonly TopicStyle[] }[];
+  const color = all[0].color && all.every(note => note.color === all[0].color) ? all[0].color : undefined;
+  const markers = (all[0].markers ?? []).filter(marker => all.every(note => (note.markers ?? []).includes(marker)));
+  const styles = (all[0].style ?? []).filter(style => all.every(note => (note.style ?? []).includes(style)));
+  if (!color && !markers.length && !styles.length) return undefined;
+  return {
+    ...(color ? { color } : {}),
+    ...(markers.length ? { addMarkers: markers } : {}),
+    ...(styles.length ? { addStyles: styles } : {})
+  };
 }
 
 /** The merged topic's model: its parent's model when there is a parent (like a new subtopic), else the workspace model. */

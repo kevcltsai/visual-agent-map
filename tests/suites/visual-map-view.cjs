@@ -3081,6 +3081,15 @@ integrationTest('hypothesis-evidence: cards stacked one above the other are join
   const sides = nearestSides(heBox(0, 0), heBox(0, 200));
   assert.deepEqual([sides.from.ny, sides.to.ny], [1, -1], 'the normals point away from each card');
 });
+integrationTest('hypothesis-evidence: cards that touch edge to edge (stacked diamonds) still get a line with length, so the line and its label are not 0 wide', () => {
+  const { relationPathData, relationLabelPoint } = heGeo();
+  for (const [a, b] of [[heBox(0, 0), heBox(0, 100)], [heBox(0, 100), heBox(0, 0)], [heBox(0, 0), heBox(280, 0)], [heBox(0, 0), heBox(40, 100)]]) {
+    const [x1, y1, , , , , x2, y2] = heNums(relationPathData(a, b));
+    assert.ok(Math.hypot(x2 - x1, y2 - y1) > 0, `touching ${JSON.stringify([a, b])}: the line has a length (${x1},${y1} to ${x2},${y2})`);
+    const label = relationLabelPoint(a, b);
+    assert.ok(Number.isFinite(label.x) && Number.isFinite(label.y));
+  }
+});
 integrationTest('hypothesis-evidence: in a map that grows sideways a column of evidence meets the hypothesis from the side, however far up or down, so no line runs behind the cards between; up-down maps lean to the ends', () => {
   const { relationPathData, relationLabelPoint, nearestSides, relationAxisFor, AXIS_GAP } = heGeo();
   assert.equal(AXIS_GAP, 32);

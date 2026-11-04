@@ -1632,6 +1632,7 @@ export const en = {
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":
     "Auto uses Low for simple tasks and Medium for complex synthesis; manual choices are preserved.",
   "ui.stop_research": "Stop research",
+  "ui.stop_expand": "Stop expanding",
   "ui.research_stopped_existing_content_was_preserved": "Research stopped. Existing content was preserved.",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved":
     "The topic changed, so the outdated AI result was not saved.",

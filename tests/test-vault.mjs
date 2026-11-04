@@ -314,3 +314,30 @@ test('applyPolicy evaluates the requested policy and reports failure instead of 
   assert.equal(await applyPolicy(policyProfile, 'prohibited', async () => ({ evaluate: async () => { throw new Error('eval failed'); }, close() {} })), false);
   assert.equal(await applyPolicy(policyProfile, 'prohibited', () => new Promise(() => {}), 50), false);
 });
+
+test('new test vaults write appearance.json with native menus off', t => {
+  const { vault } = environment(t); prepareTestVault({ vault });
+  assert.deepEqual(JSON.parse(readFileSync(join(vault, '.obsidian/appearance.json'), 'utf8')), { nativeMenus: false });
+});
+
+test('in-place refresh turns native menus off for session vaults only when unset, keeping other keys', t => {
+  const { folder, vault } = environment(t);
+  const appearance = join(vault, '.obsidian/appearance.json');
+  const read = () => JSON.parse(readFileSync(appearance, 'utf8'));
+  prepareTestVault({ vault });
+  rmSync(appearance); updateCurrentTestVault({ vault });
+  assert.deepEqual(read(), { nativeMenus: false });
+  writeFileSync(appearance, '{"theme":"system"}'); updateCurrentTestVault({ vault });
+  assert.deepEqual(read(), { theme: 'system', nativeMenus: false });
+  writeFileSync(appearance, '{"nativeMenus":true,"theme":"moonstone"}'); updateCurrentTestVault({ vault });
+  assert.deepEqual(read(), { nativeMenus: true, theme: 'moonstone' });
+  // Owner vault: appearance.json stays byte-identical (and is not created when absent).
+  const owner = join(folder, 'owner', 'current'); prepareTestVault({ vault: owner });
+  const ownerAppearance = join(owner, '.obsidian/appearance.json');
+  writeFileSync(ownerAppearance, '{"theme":"system"}');
+  const before = readFileSync(ownerAppearance);
+  updateCurrentTestVault({ vault: owner, owner });
+  assert.deepEqual(readFileSync(ownerAppearance), before);
+  rmSync(ownerAppearance); updateCurrentTestVault({ vault: owner, owner });
+  assert.equal(existsSync(ownerAppearance), false);
+});

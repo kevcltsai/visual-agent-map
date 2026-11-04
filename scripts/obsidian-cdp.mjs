@@ -37,6 +37,68 @@ export async function waitForInstance(vault, timeoutMs = 60_000) {
   throw new Error(`Timed out waiting for Obsidian on ${vault}: ${last?.message ?? "workspace not ready"}`);
 }
 
+const MODIFIER_BITS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
+const NAMED_KEYS = {
+  enter: { key: "Enter", code: "Enter", vk: 13, text: "\r" }, escape: { key: "Escape", code: "Escape", vk: 27 },
+  tab: { key: "Tab", code: "Tab", vk: 9 }, backspace: { key: "Backspace", code: "Backspace", vk: 8 }, delete: { key: "Delete", code: "Delete", vk: 46 },
+  space: { key: " ", code: "Space", vk: 32, text: " " }, arrowup: { key: "ArrowUp", code: "ArrowUp", vk: 38 }, arrowdown: { key: "ArrowDown", code: "ArrowDown", vk: 40 },
+  arrowleft: { key: "ArrowLeft", code: "ArrowLeft", vk: 37 }, arrowright: { key: "ArrowRight", code: "ArrowRight", vk: 39 },
+  home: { key: "Home", code: "Home", vk: 36 }, end: { key: "End", code: "End", vk: 35 }, pageup: { key: "PageUp", code: "PageUp", vk: 33 }, pagedown: { key: "PageDown", code: "PageDown", vk: 34 }
+};
+
+// Turns "Mod+Enter" into the fields of Input.dispatchKeyEvent. `Mod` is Meta on darwin and Ctrl elsewhere. Unknown names throw.
+export function parseKeyCombo(combo, platform = process.platform) {
+  const parts = String(combo).split("+");
+  const name = parts.pop();
+  let modifiers = 0;
+  for (const part of parts) {
+    const lower = part.toLowerCase();
+    const bit = lower === "mod" ? (platform === "darwin" ? MODIFIER_BITS.meta : MODIFIER_BITS.ctrl)
+      : lower === "cmd" || lower === "meta" ? MODIFIER_BITS.meta : MODIFIER_BITS[lower === "control" ? "ctrl" : lower];
+    if (!bit) throw new Error(`Unknown modifier "${part}" in key combo "${combo}".`);
+    modifiers |= bit;
+  }
+  const named = NAMED_KEYS[name.toLowerCase()];
+  if (named) return { key: named.key, code: named.code, windowsVirtualKeyCode: named.vk, modifiers, text: named.text ?? "" };
+  const fn = /^F([1-9]|1[0-2])$/i.exec(name);
+  if (fn) return { key: `F${fn[1]}`, code: `F${fn[1]}`, windowsVirtualKeyCode: 111 + Number(fn[1]), modifiers, text: "" };
+  if (/^[a-z]$/i.test(name)) {
+    const hasCommand = modifiers & (MODIFIER_BITS.ctrl | MODIFIER_BITS.meta);
+    return { key: name, code: `Key${name.toUpperCase()}`, windowsVirtualKeyCode: name.toUpperCase().charCodeAt(0), modifiers, text: hasCommand ? "" : name };
+  }
+  if (/^[0-9]$/.test(name)) {
+    const hasCommand = modifiers & (MODIFIER_BITS.ctrl | MODIFIER_BITS.meta);
+    return { key: name, code: `Digit${name}`, windowsVirtualKeyCode: name.charCodeAt(0), modifiers, text: hasCommand ? "" : name };
+  }
+  throw new Error(`Unknown key "${name}" in key combo "${combo}".`);
+}
+
+// Trusted (isTrusted) mouse and keyboard input; in-page dispatched events do not trigger Obsidian's or VAM's handlers.
+export function createInput(send, platform = process.platform) {
+  const mouse = (type, x, y) => send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+  return {
+    async click(x, y) {
+      await mouse("mousePressed", x, y);
+      await mouse("mouseReleased", x, y);
+    },
+    async press(combo) {
+      const { key, code, windowsVirtualKeyCode, modifiers, text } = parseKeyCombo(combo, platform);
+      const event = { key, code, windowsVirtualKeyCode, modifiers };
+      await send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...event });
+      if (text) await send("Input.dispatchKeyEvent", { type: "char", ...event, text, unmodifiedText: text });
+      await send("Input.dispatchKeyEvent", { type: "keyUp", ...event });
+    }
+  };
+}
+
+// Clicks the centre of the first element matching `selector` that has a size; throws (sending nothing) when none does.
+export async function clickSelector(cdp, selector) {
+  const point = await cdp.evaluate(`(()=>{for(const el of document.querySelectorAll(${JSON.stringify(selector)})){const r=el.getBoundingClientRect();if(r.width>0&&r.height>0)return {x:r.left+r.width/2,y:r.top+r.height/2}}return null})()`);
+  if (!point) throw new Error(`No visible element matches selector: ${selector}`);
+  await cdp.click(point.x, point.y);
+  return point;
+}
+
 export async function connectCdp(vault) {
   const page = await pageTarget(vault);
   const socket = new WebSocket(page.webSocketDebuggerUrl);
@@ -67,6 +129,7 @@ export async function connectCdp(vault) {
   // Enabling Runtime replays the exceptions and console messages buffered since the page started.
   await send("Runtime.enable");
   return {
+    ...createInput(send),
     async evaluate(expression) {
       const result = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
       if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
@@ -97,10 +160,12 @@ export function assertTrusted(result) {
   return result;
 }
 
-const usage = `Usage: node scripts/obsidian-cdp.mjs --vault=<path> <command>
+export const usage = `Usage: node scripts/obsidian-cdp.mjs --vault=<path> <command>
   wait                 wait until the instance answers and its workspace is ready
   trust                leave Restricted Mode and enable the vault's plugins
   eval <expression>    evaluate JavaScript in the app window (promises are awaited) and print the JSON value
+  click <selector>     click the centre of the first visible element matching a CSS selector (trusted mouse input)
+  key <combo>          press a key combo such as Mod+Enter, F2, Escape (Mod = Meta on macOS, Ctrl elsewhere)
   screenshot <file>    save a PNG of the app window without focusing it
   errors               print uncaught exceptions captured since the window loaded`;
 
@@ -114,6 +179,8 @@ async function cli(args) {
   try {
     if (command === "eval" && value) return process.stdout.write(`${JSON.stringify(await cdp.evaluate(value))}\n`);
     if (command === "trust") return process.stdout.write(`${JSON.stringify(assertTrusted(await cdp.evaluate(trustExpression)))}\n`);
+    if (command === "click" && value) return process.stdout.write(`${JSON.stringify(await clickSelector(cdp, value))}\n`);
+    if (command === "key" && value) { await cdp.press(value); return process.stdout.write(`${value}\n`); }
     if (command === "screenshot" && value) return process.stdout.write(`${await cdp.screenshot(resolve(value))}\n`);
     if (command === "errors") {
       await delay(200);

@@ -33,6 +33,8 @@ import { DEFAULT_TONE_ID, findPreset, type PromptPreset } from "./prompt-presets
 import {
   AIM_DELIVERY_STRUCTURE,
   BUILTIN_RECIPES,
+  globalPartRef,
+  GLOBAL_PART_DEFAULT,
   KIND_DEFAULT_RECIPE,
   parseRecipeFile,
   parseRecipeRef,
@@ -41,7 +43,9 @@ import {
   STYLE_KINDS,
   updateRecipeFileText,
   validatePartName,
+  type NoteStyleDefaults,
   type PartCategory,
+  type PartSource,
   type RecipeFileParts,
   type StyleKind,
   type UpdateMode
@@ -79,6 +83,8 @@ export interface NoteStyleSettings {
   noteStyleFiles?: Record<string, string>;
   /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. */
   noteStyleByKind?: Partial<Record<StyleKind, string>>;
+  /** The global voice and format (part refs); a missing key is the built-in default (academic, standard). */
+  noteStyleDefaults?: NoteStyleDefaults;
   /** The marker of the conversion to this model, and the old id -> new ref table that implicit styles read. */
   noteStyleRecipe?: {
     migrated: 1;
@@ -136,6 +142,10 @@ export interface RunStyle {
   /** The format rules text; "" adds no format text. */
   readonly formatText: string;
   readonly updateMode: UpdateMode;
+  /** Whether the voice is the global voice (`global`) or the style's own (`style`, shown as "set apart"). */
+  readonly voiceSource: PartSource;
+  /** Whether the format is the global format or the style's own. */
+  readonly formatSource: PartSource;
   readonly contextFields: Readonly<{ styleSelection?: StyleSelection }>;
   readonly label: Readonly<{
     /** In the interface language. */
@@ -203,8 +213,13 @@ export interface RecipeListItem {
   /** The AIM report: only for the AIM kind, and not a copy source. */
   aimOnly?: true;
   structure: { ref: string; name: string };
+  /** The voice in effect: the global one when `voiceSource` is `global`. */
   voice: { ref: string; name: string };
+  /** The format in effect: the global one when `formatSource` is `global`. */
   format: { ref: string; name: string };
+  /** Whether the voice and the format follow the global ones or are the style's own ("set apart"). */
+  voiceSource: PartSource;
+  formatSource: PartSource;
   update: UpdateMode;
   description: string;
   issues: NoteStyleIssue[];
@@ -262,9 +277,15 @@ interface Candidate {
   structure: StructurePart;
   voice: VoicePart;
   format: FormatPart;
+  voiceSource: PartSource;
+  formatSource: PartSource;
+  /** Global voice or format refs that could not be read (the built-in default stands in). */
+  globalMissing: string[];
   /** Problems of the recipe file itself (an unreadable update mode). */
   issues: BlockIssue[];
 }
+/** The parts of a candidate that depend on the global voice and format. */
+type GlobalAwareParts = Pick<Candidate, "voice" | "format" | "voiceSource" | "formatSource" | "globalMissing">;
 
 export class NoteStyleStore {
   /** Structure (template) and voice (tone) file text by base name (no ".md"), as of the last `refresh()` or write. */
@@ -468,6 +489,7 @@ export class NoteStyleStore {
     language: ContentLanguage
   ): RunStyle {
     const source = sourceOf;
+    for (const ref of chosen.globalMissing) if (!missing.includes(ref)) missing.push(ref);
     const { structure, voice } = chosen;
     const aimDelivery = chosen.aimDelivery;
     const { format } = chosen;
@@ -494,6 +516,8 @@ export class NoteStyleStore {
       ...(voice.text ? { toneText: voice.text } : {}),
       formatText: format.text,
       updateMode: chosen.update,
+      voiceSource: chosen.voiceSource,
+      formatSource: chosen.formatSource,
       contextFields: Object.freeze(contextFields),
       label: Object.freeze({
         templateName: aimDelivery ? chosen.name : structure.name,
@@ -524,8 +548,12 @@ export class NoteStyleStore {
         update: recipe.update,
         ...(aim ? { aimDelivery: true as const } : {}),
         structure: this.structurePart(`builtin:${aim ? "standard" : recipe.structure}`, language)!,
-        voice: this.voicePart(`builtin:${recipe.voice}`, language)!,
-        format: this.formatPart(`builtin:${recipe.format}`, language)!,
+        ...this.globalAwareParts(
+          recipe.followsVoice ? undefined : `builtin:${recipe.voice}`,
+          recipe.followsFormat ? undefined : `builtin:${recipe.format}`,
+          undefined,
+          language
+        ),
         issues: []
       };
     }
@@ -545,7 +573,13 @@ export class NoteStyleStore {
       name: parsed.name,
       update: file.update,
       fileName,
-      ...this.fileParts(ref, fileName, file, file.lines, language),
+      ...this.fileParts(
+        ref,
+        fileName,
+        { structure: file.structure, voice: file.voiceSet ? file.voice : undefined, format: file.formatSet ? file.format : undefined },
+        file.lines,
+        language
+      ),
       issues
     };
   }
@@ -557,10 +591,10 @@ export class NoteStyleStore {
   private fileParts(
     ref: string,
     fileName: string,
-    file: Pick<RecipeFileParts, "structure" | "voice" | "format">,
+    file: Pick<RecipeFileParts, "structure"> & Partial<Pick<RecipeFileParts, "voice" | "format">>,
     lines: Partial<Record<PartCategory | "update", number>>,
     language: ContentLanguage
-  ): { structure: StructurePart; voice: VoicePart; format: FormatPart } {
+  ): { structure: StructurePart } & GlobalAwareParts {
     const missingPart = (category: PartCategory, partRef: string): BlockIssue => ({
       line: lines[category] ?? 1,
       code: "ui.note_style_issue_part_missing",
@@ -578,12 +612,53 @@ export class NoteStyleStore {
       structure:
         this.structurePart(file.structure, language) ??
         withIssue(this.structurePart("builtin:standard", language)!, missingPart("structure", file.structure)),
-      voice:
-        this.voicePart(file.voice, language) ??
-        withIssue(this.voicePart("builtin:academic", language)!, missingPart("voice", file.voice)),
-      format:
-        this.formatPart(file.format, language) ??
-        withIssue(this.formatPart("builtin:standard", language)!, missingPart("format", file.format))
+      ...this.globalAwareParts(file.voice, file.format, missingPart, language)
+    };
+  }
+
+  /** The global voice or format ref (the built-in default when not set or not a part ref). */
+  globalPartRef(category: "voice" | "format"): string {
+    return globalPartRef(this.settings.noteStyleDefaults, category);
+  }
+
+  /**
+   * The voice and format of a style. A ref given is the style's own (a part that cannot be read is the built-in stand-in
+   * with an issue from `missingPart`); an undefined one follows the global voice or format, and a global part that cannot
+   * be read is the built-in default and is reported missing.
+   */
+  private globalAwareParts(
+    voiceRef: string | undefined,
+    formatRef: string | undefined,
+    missingPart: ((category: PartCategory, ref: string) => BlockIssue) | undefined,
+    language: ContentLanguage
+  ): GlobalAwareParts {
+    const globalMissing: string[] = [];
+    const withIssue = <T extends { issues: BlockIssue[] }>(part: T, issue: BlockIssue | undefined): T =>
+      issue ? { ...part, issues: [issue, ...part.issues] } : part;
+    let voice: VoicePart;
+    if (voiceRef !== undefined)
+      voice = this.voicePart(voiceRef, language) ?? withIssue(this.voicePart(GLOBAL_PART_DEFAULT.voice, language)!, missingPart?.("voice", voiceRef));
+    else {
+      const ref = this.globalPartRef("voice");
+      const part = this.voicePart(ref, language);
+      if (!part) globalMissing.push(ref);
+      voice = part ?? this.voicePart(GLOBAL_PART_DEFAULT.voice, language)!;
+    }
+    let format: FormatPart;
+    if (formatRef !== undefined)
+      format = this.formatPart(formatRef, language) ?? withIssue(this.formatPart(GLOBAL_PART_DEFAULT.format, language)!, missingPart?.("format", formatRef));
+    else {
+      const ref = this.globalPartRef("format");
+      const part = this.formatPart(ref, language);
+      if (!part) globalMissing.push(ref);
+      format = part ?? this.formatPart(GLOBAL_PART_DEFAULT.format, language)!;
+    }
+    return {
+      voice,
+      format,
+      voiceSource: voiceRef !== undefined ? "style" : "global",
+      formatSource: formatRef !== undefined ? "style" : "global",
+      globalMissing
     };
   }
 
@@ -609,10 +684,13 @@ export class NoteStyleStore {
       const own = BUILTIN_RECIPES.find(item => `builtin:${item.id}` === KIND_DEFAULT_RECIPE[kind])?.structure;
       structure = this.structurePart(`builtin:${own && own !== AIM_DELIVERY_STRUCTURE ? own : "standard"}`, language);
     }
-    let voice = toneId ? this.legacyVoice(toneId, language) : undefined;
+    let legacyVoice = toneId ? this.legacyVoice(toneId, language) : undefined;
     // A tone id that names nothing is academic rigor, and the entry tells the user (never silently).
-    if (toneId && !voice) miss(toneId);
-    voice ??= this.voicePart("builtin:academic", language)!;
+    if (toneId && !legacyVoice) miss(toneId);
+    // An old tone is the style's own voice; a topic with no tone follows the global voice, and the format always does.
+    if (toneId) legacyVoice ??= this.voicePart(GLOBAL_PART_DEFAULT.voice, language)!;
+    const global = this.globalAwareParts(undefined, undefined, undefined, language);
+    const voice = legacyVoice ?? global.voice;
     const resolvedStructure = structure ?? this.structurePart("builtin:standard", language)!;
     return {
       ref: "legacy",
@@ -620,8 +698,9 @@ export class NoteStyleStore {
       update: "merge",
       implicit: true,
       structure: resolvedStructure,
+      ...global,
       voice,
-      format: this.formatPart("builtin:standard", language)!,
+      voiceSource: legacyVoice ? "style" : "global",
       issues: []
     };
   }
@@ -962,8 +1041,10 @@ export class NoteStyleStore {
         structure: aim
           ? { ref: recipe.structure, name: translate(language, recipe.nameKey) }
           : partOf("structure", builtinRef(recipe.structure)),
-        voice: partOf("voice", builtinRef(recipe.voice)),
-        format: partOf("format", builtinRef(recipe.format)),
+        voice: partOf("voice", recipe.followsVoice ? this.globalPartRef("voice") : builtinRef(recipe.voice)),
+        format: partOf("format", recipe.followsFormat ? this.globalPartRef("format") : builtinRef(recipe.format)),
+        voiceSource: recipe.followsVoice ? "global" : "style",
+        formatSource: recipe.followsFormat ? "global" : "style",
         update: recipe.update,
         description: "",
         issues: [],
@@ -1006,8 +1087,10 @@ export class NoteStyleStore {
         name: base,
         fileName: `${base}.md`,
         structure: partOf("structure", file.structure),
-        voice: partOf("voice", file.voice),
-        format: partOf("format", file.format),
+        voice: partOf("voice", file.voiceSet ? file.voice : this.globalPartRef("voice")),
+        format: partOf("format", file.formatSet ? file.format : this.globalPartRef("format")),
+        voiceSource: file.voiceSet ? "style" : "global",
+        formatSource: file.formatSet ? "style" : "global",
         update: file.update,
         description: file.description,
         issues,
@@ -1199,7 +1282,11 @@ export class NoteStyleStore {
    * The style a draft (not saved) would give a run of `kind`, in the same shape as `runStyle` and from the same code: for
    * the same parts, it equals `runStyle` of the style file `saveRecipe` would write. Reads only the loaded cache.
    */
-  draftStyle(draft: RecipeFileParts & { name: string }, kind: StyleKind, language: ContentLanguage): RunStyle {
+  draftStyle(
+    draft: Omit<RecipeFileParts, "voice" | "format"> & { voice?: string; format?: string; name: string },
+    kind: StyleKind,
+    language: ContentLanguage
+  ): RunStyle {
     const ref = fileRef(draft.name);
     const fileName = `${draft.name}.md`;
     const chosen: Candidate = {

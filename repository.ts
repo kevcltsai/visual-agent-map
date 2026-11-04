@@ -141,6 +141,8 @@ export interface Settings {
   defaultNoteStyleId?: string;
   /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. Read only until the settings page writes it. */
   noteStyleByKind?: Partial<Record<StyleKind, string>>;
+  /** The global voice and format (part refs); a missing key is the built-in default (academic, standard). */
+  noteStyleDefaults?: { voice?: string; format?: string };
   /** The marker of the conversion to the recipe model, and the old id -> new ref table that implicit styles read. */
   noteStyleRecipe?: {
     migrated: 1;

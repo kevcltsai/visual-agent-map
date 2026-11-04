@@ -306,3 +306,64 @@ test('folder rename follows the folder only; default folder name follows the lan
   assert.equal(makeStore({ language: 'zh-TW' }).store.folder(), 'WS/筆記風格');
   assert.equal(store.folderExists(), false);
 });
+
+// ---- note-style-settings-redesign P2: opening 0.29.0 data changes nothing (decisions #2) ----
+test('P2 old fixture: a 0.29.0 data.json with four-key style files and 0.28.0 implicit-style topics opens without any write; files and setting keys stay byte for byte; the four-key styles stay "set apart"', async () => {
+  const S = require('./support.cjs');
+  const Main = S.load('main.ts', { obsidian: S.obsidian });
+  const saved = {
+    noteStylesFolder: 'WS/S',
+    noteStyleByKind: { atomic: 'file:Mine', hypothesis: 'file:Mine' },
+    noteStyleRecipe: { migrated: 1, mapsNotified: true, legacy: { templates: { t1: 'file:OldStruct' }, tones: { p1: 'file:OldVoice' } } },
+    detailTemplates: [], promptPresets: []
+  };
+  const before = JSON.stringify(saved);
+  const settings = { ...Main.settingsFromSaved(JSON.parse(before)), workspaceFolder: 'WS', language: 'en' };
+  assert.equal('noteStyleDefaults' in settings, false, 'loading adds no new key');
+  assert.deepEqual(plain(settings.noteStyleByKind), saved.noteStyleByKind);
+  assert.deepEqual(plain(settings.noteStyleRecipe), saved.noteStyleRecipe);
+  const settingsBefore = JSON.stringify(settings);
+  const files = {
+    'WS/S/Styles/Mine.md': '---\nstructure: OldStruct\nvoice: Professional\nformat: Lean format\nupdate: top\n---\nMy style.\n',
+    'WS/S/Structures/OldStruct.md': '## Findings\nWhat we found.\n',
+    'WS/S/Voices/OldVoice.md': 'Speak calmly.\n'
+  };
+  const v = vault(files);
+  v.folders.add('WS/S');
+  const saves = () => v.saves || 0;
+  const live = makeStoreWith(settings, v);
+  await live.refresh();
+  live.listRecipes(); live.listParts('structure'); live.listParts('voice'); live.listParts('format');
+  const requests = [
+    ...['topic', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action', 'aim'].map(kind => ({ kind, outputLanguage: 'en' })),
+    { kind: 'topic', topic: { template: 't1', tone: 'p1' }, outputLanguage: 'en' },
+    { kind: 'topic', topic: { tone: 'p1' }, outputLanguage: 'en' },
+    { kind: 'topic', topic: { template: 't1' }, outputLanguage: 'en' }
+  ];
+  const results = requests.map(request => live.runStyle(request));
+  assert.deepEqual(v.writes, [], 'nothing created');
+  assert.deepEqual(v.trashed, []);
+  assert.deepEqual(plain(v.files), plain(files), 'every file is byte for byte as it was');
+  assert.equal(saves(), 0);
+  assert.equal(JSON.stringify(settings), settingsBefore, 'the settings object (and so data.json) is unchanged');
+  const atomic = results[1];
+  assert.equal(atomic.voiceSource, 'style'); assert.equal(atomic.formatSource, 'style');
+  assert.equal(atomic.updateMode, 'top');
+  assert.equal(results[7].voiceSource, 'style', 'an old tone is the style\'s own');
+  assert.equal(results[7].toneText, 'Speak calmly.');
+  assert.equal(results[8].voiceSource, 'style');
+  assert.equal(results[9].voiceSource, 'global');
+  assert.equal(results[0].voiceSource, 'global');
+  assert.equal(results[6].voiceSource, 'style', 'AIM does not follow the global voice');
+  // opening the same data with a global voice set still writes nothing
+  const set = { ...settings, noteStyleDefaults: { voice: 'builtin:plain' } };
+  const again = makeStoreWith(set, v);
+  await again.refresh();
+  again.runStyle({ kind: 'atomic', outputLanguage: 'en' });
+  assert.deepEqual(v.writes, []);
+  assert.deepEqual(plain(v.files), plain(files));
+  assert.equal(again.runStyle({ kind: 'atomic', outputLanguage: 'en' }).toneText, atomic.toneText, 'a four-key style keeps its own voice');
+});
+function makeStoreWith(settings, v) {
+  return new M.NoteStyleStore({ settings: () => settings, port: v.port, save: async () => { v.saves = (v.saves || 0) + 1; } });
+}

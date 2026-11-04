@@ -54,6 +54,10 @@ export interface BuiltinRecipe {
   readonly format: string;
   /** Not applied for the AIM report. */
   readonly update: UpdateMode;
+  /** The voice is the global voice (`noteStyleDefaults.voice`) unless false. */
+  readonly followsVoice: boolean;
+  /** The format is the global format (`noteStyleDefaults.format`) unless false: the style fixes its own. */
+  readonly followsFormat: boolean;
 }
 
 export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
@@ -63,7 +67,9 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: "standard",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   },
   {
     id: "atomic",
@@ -71,7 +77,9 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: "atomic",
     voice: "academic",
     format: "lean",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: false
   },
   {
     id: "hypothesis",
@@ -79,7 +87,9 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: "hypothesis",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   },
   {
     id: "evidence",
@@ -87,7 +97,9 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: "evidence",
     voice: "academic",
     format: "lean",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: false
   },
   {
     id: "conclusion",
@@ -95,7 +107,9 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: "conclusion",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   },
   {
     id: "action",
@@ -103,7 +117,9 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: "action",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   },
   {
     id: "aim",
@@ -111,7 +127,9 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: AIM_DELIVERY_STRUCTURE,
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: false,
+    followsFormat: false
   },
   {
     id: "textbook",
@@ -119,9 +137,23 @@ export const BUILTIN_RECIPES: readonly BuiltinRecipe[] = [
     structure: "textbook",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   }
 ];
+
+/** The global voice and format (decisions #2): part refs; a missing key is the built-in default. */
+export interface NoteStyleDefaults {
+  voice?: string;
+  format?: string;
+}
+export const GLOBAL_PART_DEFAULT: Readonly<Record<"voice" | "format", string>> = {
+  voice: "builtin:academic",
+  format: "builtin:standard"
+};
+/** Where a style's voice or format comes from: the global setting, or the style itself (fixed by it, "set apart"). */
+export type PartSource = "global" | "style";
 
 export type PartCategory = "structure" | "voice" | "format";
 /** What a name is checked in: a part category, or the recipes themselves. */
@@ -187,11 +219,18 @@ export function parseRecipeRef(ref: unknown, category: NameCategory = "recipe"):
 }
 
 export interface RecipeFile {
-  /** A reference per part: `builtin:<id>` or `file:<name>`. A missing key is the general research part. */
+  /**
+   * A reference per part: `builtin:<id>` or `file:<name>`. A missing structure key is the general research part; a missing
+   * voice or format key is the general research part here too, but the style follows the global one (see `voiceSet`).
+   */
   structure: string;
   voice: string;
   format: string;
   update: UpdateMode;
+  /** The file has a voice key (even an empty or unreadable one): the voice is the style's own. Otherwise it follows the global voice. */
+  voiceSet: boolean;
+  /** The file has a format key: the format is the style's own. Otherwise it follows the global format. */
+  formatSet: boolean;
   /** The first non-empty line of the text after the frontmatter, or "". */
   description: string;
   /** 1-based line of each key that was read. */
@@ -233,6 +272,8 @@ export function parseRecipeFile(text: string): RecipeFile {
     voice: `builtin:${GENERAL.voice}`,
     format: `builtin:${GENERAL.format}`,
     update: GENERAL.update,
+    voiceSet: false,
+    formatSet: false,
     description: "",
     lines: {},
     issues: []
@@ -287,6 +328,8 @@ export function parseRecipeFile(text: string): RecipeFile {
       }
     }
   }
+  result.voiceSet = result.lines.voice !== undefined;
+  result.formatSet = result.lines.format !== undefined;
   result.description =
     lines
       .slice(bodyStart)
@@ -385,4 +428,27 @@ export function updateRecipeFileText(oldText: string, parts: RecipeFileParts, la
   );
   lines.splice(closing, 0, ...added);
   return `${bom}${lines.join("\n")}`;
+}
+
+/** The global voice or format ref: the saved one when it is a part ref of that category, else the built-in default. */
+export function globalPartRef(defaults: NoteStyleDefaults | undefined, category: "voice" | "format"): string {
+  const saved = defaults?.[category];
+  return typeof saved === "string" && parseRecipeRef(saved, category) ? saved : GLOBAL_PART_DEFAULT[category];
+}
+
+/**
+ * The defaults after the global voice or format is set to `ref`: a new object, the input is not changed. Choosing the
+ * built-in default deletes its key, and the result is undefined when no key is left (delete the setting then).
+ * Throws when `ref` is not a part ref of that category.
+ */
+export function withGlobalPart(
+  defaults: NoteStyleDefaults | undefined,
+  category: "voice" | "format",
+  ref: string
+): NoteStyleDefaults | undefined {
+  if (!parseRecipeRef(ref, category)) throw new Error(`Not a ${category} reference: ${ref}`);
+  const next: NoteStyleDefaults = { ...defaults };
+  if (ref === GLOBAL_PART_DEFAULT[category]) delete next[category];
+  else next[category] = ref;
+  return next.voice !== undefined || next.format !== undefined ? next : undefined;
 }

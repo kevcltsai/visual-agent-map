@@ -304,3 +304,132 @@ test('R1-L1 (T6 P3): a topic tone that cannot be read is reported missing and th
   assert.deepEqual(plain(store.runStyle({ topic: { style: 'builtin:textbook', tone: 'gone' }, kind: 'topic', outputLanguage: 'en' }).issues.missing), []);
   assert.deepEqual(v.writes, []); assert.equal(counter.saves, 0);
 });
+
+// ---- note-style-settings-redesign P2: the global voice and format (noteStyleDefaults, decisions #2) ----
+const FORMATS = `${STYLES}/Formats`;
+const styleFile = (name, body) => ({ [`${RECIPES}/${name}.md`]: body });
+/** The prompt-relevant parts of a run style: what the assembler reads, not the style's own name or source. */
+const promptParts = got => plain({ template: got.template, toneText: got.toneText, formatText: got.formatText, updateMode: got.updateMode, contextFields: got.contextFields, aim: got.recipe.aimDelivery });
+const ALL_FOUR = (voice, format) => `---\nstructure: standard\nvoice: ${voice}\nformat: ${format}\nupdate: merge\n---\n`;
+
+test('P2 global voice: with voice = builtin:plain a plain topic prompt equals the style file that writes plain; sources say global', async () => {
+  const explicit = await world({ noteStyleByKind: { topic: 'file:Mine' } }, styleFile('Mine', ALL_FOUR('Plain explanation', 'Standard format')));
+  const want = explicit.store.runStyle({ outputLanguage: 'en' });
+  assert.ok(want.toneText, 'plain adds text');
+  assert.deepEqual(plain(want.issues), { missing: [], blockIssues: [], notices: [] }, 'the fixture file reads cleanly');
+  assert.equal(want.voiceSource, 'style');
+  for (const patch of [{}, { noteStyleByKind: { topic: 'builtin:general' } }]) {
+    const global = await world({ ...patch, noteStyleDefaults: { voice: 'builtin:plain' } });
+    const got = global.store.runStyle({ outputLanguage: 'en' });
+    assert.deepEqual(promptParts(got), promptParts(want));
+    assert.equal(got.label.toneName, want.label.toneName);
+    assert.equal(got.voiceSource, 'global');
+    assert.equal(got.formatSource, 'global');
+    assert.deepEqual(global.v.writes, []); assert.equal(global.counter.saves, 0);
+  }
+});
+
+test('P2 global voice: a style that writes its voice is unchanged by the global voice (also an explicit academic); AIM has zero diff', async () => {
+  const files = { ...styleFile('Mine', ALL_FOUR('Professional', 'Standard format')), ...styleFile('Poet', ALL_FOUR('Poet', 'Standard format')), ...TONE_FILES };
+  const base = await world({ noteStyleByKind: { topic: 'file:Mine', atomic: 'file:Poet' } }, files);
+  const set = await world({ noteStyleByKind: { topic: 'file:Mine', atomic: 'file:Poet' }, noteStyleDefaults: { voice: 'builtin:plain', format: 'builtin:rich' } }, files);
+  for (const kind of ['topic', 'atomic']) {
+    const was = base.store.runStyle({ kind, outputLanguage: 'en' });
+    const now = set.store.runStyle({ kind, outputLanguage: 'en' });
+    assert.deepEqual(plain(now), plain(was), kind);
+    assert.equal(now.voiceSource, 'style'); assert.equal(now.formatSource, 'style');
+  }
+  const aimWas = base.store.runStyle({ kind: 'aim', outputLanguage: 'en' });
+  const aimNow = set.store.runStyle({ kind: 'aim', outputLanguage: 'en' });
+  assert.deepEqual(plain(aimNow), plain(aimWas));
+  assert.equal(aimNow.recipe.aimDelivery, true);
+  assert.equal(aimNow.voiceSource, 'style'); assert.equal(aimNow.formatSource, 'style');
+});
+
+test('P2 global format: format = builtin:lean makes a general topic equal a style that writes lean; atomic and evidence stay lean by themselves, others follow', async () => {
+  const explicit = await world({ noteStyleByKind: { topic: 'file:Mine' } }, styleFile('Mine', ALL_FOUR('Professional', 'Lean format')));
+  const want = explicit.store.runStyle({ outputLanguage: 'en' });
+  assert.deepEqual(plain(want.issues.blockIssues), [], 'the fixture file reads cleanly');
+  assert.equal(want.contextFields.styleSelection.format.id, 'lean');
+  const global = await world({ noteStyleDefaults: { format: 'builtin:lean' } });
+  assert.deepEqual(promptParts(global.store.runStyle({ outputLanguage: 'en' })), promptParts(want));
+  const rich = await world({ noteStyleDefaults: { format: 'builtin:rich' } });
+  const plainWorld = await world();
+  for (const kind of ['atomic', 'evidence']) {
+    const got = rich.store.runStyle({ kind, outputLanguage: 'en' });
+    assert.equal(got.formatText, plainWorld.store.runStyle({ kind, outputLanguage: 'en' }).formatText, `${kind} keeps lean`);
+    assert.equal(got.formatSource, 'style');
+    assert.equal(got.voiceSource, 'global');
+  }
+  for (const kind of ['topic', 'hypothesis', 'conclusion', 'action']) {
+    const got = rich.store.runStyle({ kind, outputLanguage: 'en' });
+    assert.equal(got.formatSource, 'global', kind);
+    assert.notEqual(got.formatText, plainWorld.store.runStyle({ kind, outputLanguage: 'en' }).formatText, `${kind} follows rich`);
+  }
+  assert.equal(rich.store.runStyle({ choice: { style: 'builtin:textbook' }, outputLanguage: 'en' }).formatSource, 'global');
+});
+
+test('P2 style files: a missing voice or format key follows the global one; a present key (even empty) is the style\'s own', async () => {
+  const files = { ...styleFile('Bare', '---\nstructure: standard\n---\n'), ...styleFile('OnlyVoice', '---\nvoice: Professional\n---\n'), ...styleFile('Empty', '---\nvoice:\nformat:\n---\n') };
+  const w = await world({ noteStyleDefaults: { voice: 'builtin:plain', format: 'builtin:lean' } }, files);
+  const bare = w.store.runStyle({ choice: { style: 'file:Bare' }, outputLanguage: 'en' });
+  assert.equal(bare.voiceSource, 'global'); assert.equal(bare.formatSource, 'global');
+  assert.equal(bare.label.toneName, 'Plain explanation');
+  const ov = w.store.runStyle({ choice: { style: 'file:OnlyVoice' }, outputLanguage: 'en' });
+  assert.equal(ov.voiceSource, 'style'); assert.equal(ov.toneText, undefined); assert.equal(ov.formatSource, 'global');
+  const empty = w.store.runStyle({ choice: { style: 'file:Empty' }, outputLanguage: 'en' });
+  assert.equal(empty.voiceSource, 'style'); assert.equal(empty.formatSource, 'style');
+  assert.equal(empty.toneText, undefined);
+});
+
+test('P2 implicit 0.28.0 styles: an old tone is the style\'s own, a missing tone and the format follow the global ones', async () => {
+  const w = await world({ noteStyleDefaults: { voice: 'builtin:plain', format: 'builtin:lean' } });
+  const tonePlusNothing = w.store.runStyle({ topic: { tone: 'academic' }, kind: 'topic', outputLanguage: 'en' });
+  assert.equal(tonePlusNothing.voiceSource, 'style'); assert.equal(tonePlusNothing.toneText, undefined);
+  assert.equal(tonePlusNothing.formatSource, 'global');
+  const templateOnly = w.store.runStyle({ topic: { template: 'textbook' }, kind: 'topic', outputLanguage: 'en' });
+  assert.equal(templateOnly.voiceSource, 'global'); assert.equal(templateOnly.label.toneName, 'Plain explanation');
+  const stale = w.store.runStyle({ topic: { tone: 'gone' }, kind: 'topic', outputLanguage: 'en' });
+  assert.equal(stale.voiceSource, 'style', 'a stored tone id that names nothing is academic, still the style\'s own');
+  assert.equal(stale.toneText, undefined);
+});
+
+test('P2 an unreadable global part falls back to the built-in default and is reported missing; a bad value in settings is ignored', async () => {
+  const gone = await world({ noteStyleDefaults: { voice: 'file:Gone', format: 'file:GoneFormat' } });
+  const got = gone.store.runStyle({ outputLanguage: 'en' });
+  assert.equal(got.toneText, undefined);
+  assert.equal(got.formatText, M.inLanguage(M.OBSIDIAN_FORMAT, 'en'));
+  assert.deepEqual(plain(got.issues.missing), ['file:Gone', 'file:GoneFormat']);
+  const junk = await world({ noteStyleDefaults: { voice: 42, format: 'academic' } });
+  const same = junk.store.runStyle({ outputLanguage: 'en' });
+  assert.deepEqual(plain(same.issues.missing), []);
+  assert.equal(same.toneText, undefined);
+  const file = await world({ noteStyleDefaults: { voice: 'file:Pirate' } }, TONE_FILES);
+  assert.equal(file.store.runStyle({ outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
+});
+
+test('P2 draftStyle: a draft with its own voice and format is the style\'s own; one without them follows the global ones', async () => {
+  const w = await world({ noteStyleDefaults: { voice: 'builtin:plain' } });
+  const own = w.store.draftStyle({ name: 'D', structure: 'builtin:standard', voice: 'builtin:academic', format: 'builtin:standard', update: 'merge' }, 'topic', 'en');
+  assert.equal(own.voiceSource, 'style'); assert.equal(own.formatSource, 'style'); assert.equal(own.toneText, undefined);
+  const follow = w.store.draftStyle({ name: 'D', structure: 'builtin:standard', update: 'merge' }, 'topic', 'en');
+  assert.equal(follow.voiceSource, 'global'); assert.equal(follow.formatSource, 'global');
+  assert.equal(follow.label.toneName, 'Plain explanation');
+});
+
+test('P2 helpers: globalPartRef reads a valid ref else the default; withGlobalPart sets, and choosing the default deletes the key (the whole object when empty)', () => {
+  const R = loadSource(`export { globalPartRef, withGlobalPart } from "./ai/note-style-recipe";`);
+  assert.equal(R.globalPartRef(undefined, 'voice'), 'builtin:academic');
+  assert.equal(R.globalPartRef({}, 'format'), 'builtin:standard');
+  assert.equal(R.globalPartRef({ voice: 'builtin:plain' }, 'voice'), 'builtin:plain');
+  assert.equal(R.globalPartRef({ voice: 'bogus' }, 'voice'), 'builtin:academic');
+  assert.deepEqual(plain(R.withGlobalPart(undefined, 'voice', 'builtin:plain')), { voice: 'builtin:plain' });
+  assert.deepEqual(plain(R.withGlobalPart({ voice: 'builtin:plain' }, 'format', 'builtin:lean')), { voice: 'builtin:plain', format: 'builtin:lean' });
+  assert.deepEqual(plain(R.withGlobalPart({ voice: 'builtin:plain', format: 'builtin:lean' }, 'voice', 'builtin:academic')), { format: 'builtin:lean' });
+  assert.equal(R.withGlobalPart({ voice: 'builtin:plain' }, 'voice', 'builtin:academic'), undefined);
+  assert.equal(R.withGlobalPart(undefined, 'format', 'builtin:standard'), undefined);
+  const input = { voice: 'builtin:plain' };
+  R.withGlobalPart(input, 'voice', 'builtin:academic');
+  assert.deepEqual(input, { voice: 'builtin:plain' }, 'the input is not changed');
+  assert.throws(() => R.withGlobalPart(undefined, 'voice', 'not a ref'));
+});

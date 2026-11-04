@@ -36,6 +36,7 @@ __export(main_exports, {
   hasLegacyChatModel: () => hasLegacyChatModel,
   markdownImages: () => markdownImages,
   normalizeNoteStyleByKind: () => normalizeNoteStyleByKind,
+  normalizeNoteStyleDefaults: () => normalizeNoteStyleDefaults,
   normalizeNoteStyleRecipeMarker: () => normalizeNoteStyleRecipeMarker,
   obsidianAppLanguage: () => obsidianAppLanguage,
   settingsFromSaved: () => settingsFromSaved,
@@ -28280,7 +28281,9 @@ var BUILTIN_RECIPES = [
     structure: "standard",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   },
   {
     id: "atomic",
@@ -28288,7 +28291,9 @@ var BUILTIN_RECIPES = [
     structure: "atomic",
     voice: "academic",
     format: "lean",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: false
   },
   {
     id: "hypothesis",
@@ -28296,7 +28301,9 @@ var BUILTIN_RECIPES = [
     structure: "hypothesis",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   },
   {
     id: "evidence",
@@ -28304,7 +28311,9 @@ var BUILTIN_RECIPES = [
     structure: "evidence",
     voice: "academic",
     format: "lean",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: false
   },
   {
     id: "conclusion",
@@ -28312,7 +28321,9 @@ var BUILTIN_RECIPES = [
     structure: "conclusion",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   },
   {
     id: "action",
@@ -28320,7 +28331,9 @@ var BUILTIN_RECIPES = [
     structure: "action",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   },
   {
     id: "aim",
@@ -28328,7 +28341,9 @@ var BUILTIN_RECIPES = [
     structure: AIM_DELIVERY_STRUCTURE,
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: false,
+    followsFormat: false
   },
   {
     id: "textbook",
@@ -28336,9 +28351,15 @@ var BUILTIN_RECIPES = [
     structure: "textbook",
     voice: "academic",
     format: "standard",
-    update: "merge"
+    update: "merge",
+    followsVoice: true,
+    followsFormat: true
   }
 ];
+var GLOBAL_PART_DEFAULT = {
+  voice: "builtin:academic",
+  format: "builtin:standard"
+};
 var LANGUAGES2 = ["zh-TW", "zh-CN", "en"];
 function builtinNames(category) {
   if (category === "recipe") return BUILTIN_RECIPES.map(({ id, nameKey }) => ({ id, nameKeys: [nameKey] }));
@@ -28404,6 +28425,8 @@ function parseRecipeFile(text11) {
     voice: `builtin:${GENERAL.voice}`,
     format: `builtin:${GENERAL.format}`,
     update: GENERAL.update,
+    voiceSet: false,
+    formatSet: false,
     description: "",
     lines: {},
     issues: []
@@ -28458,6 +28481,8 @@ function parseRecipeFile(text11) {
       }
     }
   }
+  result.voiceSet = result.lines.voice !== void 0;
+  result.formatSet = result.lines.format !== void 0;
   result.description = (_b2 = (_a2 = lines.slice(bodyStart).find((line) => line.trim())) == null ? void 0 : _a2.trim()) != null ? _b2 : "";
   return result;
 }
@@ -28524,6 +28549,17 @@ function updateRecipeFileText(oldText, parts, language2) {
   );
   lines.splice(closing, 0, ...added);
   return `${bom}${lines.join("\n")}`;
+}
+function globalPartRef(defaults2, category) {
+  const saved = defaults2 == null ? void 0 : defaults2[category];
+  return typeof saved === "string" && parseRecipeRef(saved, category) ? saved : GLOBAL_PART_DEFAULT[category];
+}
+function withGlobalPart(defaults2, category, ref) {
+  if (!parseRecipeRef(ref, category)) throw new Error(`Not a ${category} reference: ${ref}`);
+  const next = { ...defaults2 };
+  if (ref === GLOBAL_PART_DEFAULT[category]) delete next[category];
+  else next[category] = ref;
+  return next.voice !== void 0 || next.format !== void 0 ? next : void 0;
 }
 
 // ai/note-style-migrate.ts
@@ -28814,6 +28850,7 @@ var NoteStyleStore = class {
   assemble(chosen, sourceOf, missing, language2) {
     var _a2, _b2;
     const source = sourceOf;
+    for (const ref of chosen.globalMissing) if (!missing.includes(ref)) missing.push(ref);
     const { structure: structure2, voice } = chosen;
     const aimDelivery = chosen.aimDelivery;
     const { format } = chosen;
@@ -28838,6 +28875,8 @@ var NoteStyleStore = class {
       ...voice.text ? { toneText: voice.text } : {},
       formatText: format.text,
       updateMode: chosen.update,
+      voiceSource: chosen.voiceSource,
+      formatSource: chosen.formatSource,
       contextFields: Object.freeze(contextFields),
       label: Object.freeze({
         templateName: aimDelivery ? chosen.name : structure2.name,
@@ -28867,8 +28906,12 @@ var NoteStyleStore = class {
         update: recipe.update,
         ...aim ? { aimDelivery: true } : {},
         structure: this.structurePart(`builtin:${aim ? "standard" : recipe.structure}`, language2),
-        voice: this.voicePart(`builtin:${recipe.voice}`, language2),
-        format: this.formatPart(`builtin:${recipe.format}`, language2),
+        ...this.globalAwareParts(
+          recipe.followsVoice ? void 0 : `builtin:${recipe.voice}`,
+          recipe.followsFormat ? void 0 : `builtin:${recipe.format}`,
+          void 0,
+          language2
+        ),
         issues: []
       };
     }
@@ -28888,7 +28931,13 @@ var NoteStyleStore = class {
       name: parsed.name,
       update: file.update,
       fileName,
-      ...this.fileParts(ref, fileName, file, file.lines, language2),
+      ...this.fileParts(
+        ref,
+        fileName,
+        { structure: file.structure, voice: file.voiceSet ? file.voice : void 0, format: file.formatSet ? file.format : void 0 },
+        file.lines,
+        language2
+      ),
       issues
     };
   }
@@ -28897,7 +28946,7 @@ var NoteStyleStore = class {
    * the line of its key (`lines`). Shared by a style file and by a draft that is not saved yet.
    */
   fileParts(ref, fileName, file, lines, language2) {
-    var _a2, _b2, _c;
+    var _a2;
     const missingPart = (category, partRef2) => {
       var _a3;
       return {
@@ -28916,8 +28965,46 @@ var NoteStyleStore = class {
     });
     return {
       structure: (_a2 = this.structurePart(file.structure, language2)) != null ? _a2 : withIssue(this.structurePart("builtin:standard", language2), missingPart("structure", file.structure)),
-      voice: (_b2 = this.voicePart(file.voice, language2)) != null ? _b2 : withIssue(this.voicePart("builtin:academic", language2), missingPart("voice", file.voice)),
-      format: (_c = this.formatPart(file.format, language2)) != null ? _c : withIssue(this.formatPart("builtin:standard", language2), missingPart("format", file.format))
+      ...this.globalAwareParts(file.voice, file.format, missingPart, language2)
+    };
+  }
+  /** The global voice or format ref (the built-in default when not set or not a part ref). */
+  globalPartRef(category) {
+    return globalPartRef(this.settings.noteStyleDefaults, category);
+  }
+  /**
+   * The voice and format of a style. A ref given is the style's own (a part that cannot be read is the built-in stand-in
+   * with an issue from `missingPart`); an undefined one follows the global voice or format, and a global part that cannot
+   * be read is the built-in default and is reported missing.
+   */
+  globalAwareParts(voiceRef, formatRef, missingPart, language2) {
+    var _a2, _b2;
+    const globalMissing = [];
+    const withIssue = (part, issue2) => issue2 ? { ...part, issues: [issue2, ...part.issues] } : part;
+    let voice;
+    if (voiceRef !== void 0)
+      voice = (_a2 = this.voicePart(voiceRef, language2)) != null ? _a2 : withIssue(this.voicePart(GLOBAL_PART_DEFAULT.voice, language2), missingPart == null ? void 0 : missingPart("voice", voiceRef));
+    else {
+      const ref = this.globalPartRef("voice");
+      const part = this.voicePart(ref, language2);
+      if (!part) globalMissing.push(ref);
+      voice = part != null ? part : this.voicePart(GLOBAL_PART_DEFAULT.voice, language2);
+    }
+    let format;
+    if (formatRef !== void 0)
+      format = (_b2 = this.formatPart(formatRef, language2)) != null ? _b2 : withIssue(this.formatPart(GLOBAL_PART_DEFAULT.format, language2), missingPart == null ? void 0 : missingPart("format", formatRef));
+    else {
+      const ref = this.globalPartRef("format");
+      const part = this.formatPart(ref, language2);
+      if (!part) globalMissing.push(ref);
+      format = part != null ? part : this.formatPart(GLOBAL_PART_DEFAULT.format, language2);
+    }
+    return {
+      voice,
+      format,
+      voiceSource: voiceRef !== void 0 ? "style" : "global",
+      formatSource: formatRef !== void 0 ? "style" : "global",
+      globalMissing
     };
   }
   /**
@@ -28938,9 +29025,11 @@ var NoteStyleStore = class {
       const own2 = (_a2 = BUILTIN_RECIPES.find((item) => `builtin:${item.id}` === KIND_DEFAULT_RECIPE[kind])) == null ? void 0 : _a2.structure;
       structure2 = this.structurePart(`builtin:${own2 && own2 !== AIM_DELIVERY_STRUCTURE ? own2 : "standard"}`, language2);
     }
-    let voice = toneId ? this.legacyVoice(toneId, language2) : void 0;
-    if (toneId && !voice) miss(toneId);
-    voice != null ? voice : voice = this.voicePart("builtin:academic", language2);
+    let legacyVoice = toneId ? this.legacyVoice(toneId, language2) : void 0;
+    if (toneId && !legacyVoice) miss(toneId);
+    if (toneId) legacyVoice != null ? legacyVoice : legacyVoice = this.voicePart(GLOBAL_PART_DEFAULT.voice, language2);
+    const global = this.globalAwareParts(void 0, void 0, void 0, language2);
+    const voice = legacyVoice != null ? legacyVoice : global.voice;
     const resolvedStructure = structure2 != null ? structure2 : this.structurePart("builtin:standard", language2);
     return {
       ref: "legacy",
@@ -28948,8 +29037,9 @@ var NoteStyleStore = class {
       update: "merge",
       implicit: true,
       structure: resolvedStructure,
+      ...global,
       voice,
-      format: this.formatPart("builtin:standard", language2),
+      voiceSource: legacyVoice ? "style" : "global",
       issues: []
     };
   }
@@ -29254,8 +29344,10 @@ var NoteStyleStore = class {
         name: translate(language2, recipe.nameKey),
         ...aim ? { aimOnly: true } : {},
         structure: aim ? { ref: recipe.structure, name: translate(language2, recipe.nameKey) } : partOf("structure", builtinRef(recipe.structure)),
-        voice: partOf("voice", builtinRef(recipe.voice)),
-        format: partOf("format", builtinRef(recipe.format)),
+        voice: partOf("voice", recipe.followsVoice ? this.globalPartRef("voice") : builtinRef(recipe.voice)),
+        format: partOf("format", recipe.followsFormat ? this.globalPartRef("format") : builtinRef(recipe.format)),
+        voiceSource: recipe.followsVoice ? "global" : "style",
+        formatSource: recipe.followsFormat ? "global" : "style",
         update: recipe.update,
         description: "",
         issues: [],
@@ -29295,8 +29387,10 @@ var NoteStyleStore = class {
         name: base,
         fileName: `${base}.md`,
         structure: partOf("structure", file.structure),
-        voice: partOf("voice", file.voice),
-        format: partOf("format", file.format),
+        voice: partOf("voice", file.voiceSet ? file.voice : this.globalPartRef("voice")),
+        format: partOf("format", file.formatSet ? file.format : this.globalPartRef("format")),
+        voiceSource: file.voiceSet ? "style" : "global",
+        formatSource: file.formatSet ? "style" : "global",
         update: file.update,
         description: file.description,
         issues,
@@ -77031,6 +77125,16 @@ function normalizeNoteStyleByKind(value) {
   }
   return Object.keys(kept).length ? kept : void 0;
 }
+function normalizeNoteStyleDefaults(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const saved = value;
+  const kept = {};
+  for (const category of ["voice", "format"]) {
+    const ref = saved[category];
+    if (typeof ref === "string" && parseRecipeRef(ref, category)) kept[category] = ref;
+  }
+  return kept.voice !== void 0 || kept.format !== void 0 ? kept : void 0;
+}
 function isStringMap(value) {
   return !!value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item) => typeof item === "string");
 }
@@ -77070,6 +77174,7 @@ function settingsFromSaved(saved, appLocale) {
     defaultDetailTemplateId: typeof (saved == null ? void 0 : saved.defaultDetailTemplateId) === "string" ? saved.defaultDetailTemplateId : void 0,
     ...typeof (saved == null ? void 0 : saved.defaultNoteStyleId) === "string" && saved.defaultNoteStyleId ? { defaultNoteStyleId: saved.defaultNoteStyleId } : {},
     ...normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) ? { noteStyleByKind: normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) } : {},
+    ...normalizeNoteStyleDefaults(saved == null ? void 0 : saved.noteStyleDefaults) ? { noteStyleDefaults: normalizeNoteStyleDefaults(saved == null ? void 0 : saved.noteStyleDefaults) } : {},
     ...normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) } : {},
     ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},
     ...(saved == null ? void 0 : saved.noteStyleFiles) && typeof saved.noteStyleFiles === "object" && !Array.isArray(saved.noteStyleFiles) ? {
@@ -78294,6 +78399,17 @@ ${t("ui.organize_link_wait_hint")}`;
     else next[kind] = ref;
     if (Object.keys(next).length) this.settings.noteStyleByKind = next;
     else delete this.settings.noteStyleByKind;
+    await this.saveSettings();
+  }
+  /**
+   * Sets the global voice or format (a part ref). Choosing the built-in default (academic, standard) removes the key, and
+   * the whole object when no key is left. Does nothing for a value that is not a part ref of that category.
+   */
+  async setGlobalPart(category, ref) {
+    if (!parseRecipeRef(ref, category)) return;
+    const next = withGlobalPart(this.settings.noteStyleDefaults, category, ref);
+    if (next) this.settings.noteStyleDefaults = next;
+    else delete this.settings.noteStyleDefaults;
     await this.saveSettings();
   }
   /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */

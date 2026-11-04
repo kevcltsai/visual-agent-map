@@ -676,3 +676,51 @@ test('P2b frontmatter: note-style is read when it is a non-empty string, written
   assert.equal(contents.get(note.path).includes('note-style'), false);
   assert.equal((await repo.readNote(note.path)).detailTemplateId, 'u1');
 });
+
+// ---- note-style-settings-redesign P2: follow flags, key presence, noteStyleDefaults in settings (decisions #2) ----
+test('P2 built-in follow flags: the voice always follows the global one except AIM; the format follows except atomic, evidence (fixed lean) and AIM', () => {
+  for (const recipe of M.BUILTIN_RECIPES) {
+    assert.equal(recipe.followsVoice, recipe.id !== 'aim', `${recipe.id} voice`);
+    assert.equal(recipe.followsFormat, !['aim', 'atomic', 'evidence'].includes(recipe.id), `${recipe.id} format`);
+  }
+});
+
+test('P2 parseRecipeFile: voiceSet and formatSet say whether the file has the key (even empty or unreadable); the refs keep the general default', () => {
+  const none = M.parseRecipeFile('---\nstructure: standard\n---\n');
+  assert.equal(none.voiceSet, false); assert.equal(none.formatSet, false);
+  assert.equal(none.voice, 'builtin:academic'); assert.equal(none.format, 'builtin:standard');
+  const both = M.parseRecipeFile('---\nvoice: plain\n寫作口吻: x\n格式規則: lean\n---\n');
+  assert.equal(both.voiceSet, true); assert.equal(both.formatSet, true);
+  const empty = M.parseRecipeFile('---\nvoice:\nformat: a/b\n---\n');
+  assert.equal(empty.voiceSet, true); assert.equal(empty.formatSet, true);
+  const nofm = M.parseRecipeFile('no frontmatter');
+  assert.equal(nofm.voiceSet, false); assert.equal(nofm.formatSet, false);
+});
+
+test('P2 settings: noteStyleDefaults is kept only as valid part refs of the right category, and absent stays absent (no key is added on load)', () => {
+  assert.equal('noteStyleDefaults' in Main.settingsFromSaved({}), false);
+  assert.equal('noteStyleDefaults' in Main.settingsFromSaved({ noteStyleDefaults: {} }), false);
+  assert.equal('noteStyleDefaults' in Main.settingsFromSaved({ noteStyleDefaults: 'x' }), false);
+  assert.deepEqual(plain(Main.settingsFromSaved({ noteStyleDefaults: { voice: 'builtin:plain', format: 'file:Mine', other: 1 } }).noteStyleDefaults), { voice: 'builtin:plain', format: 'file:Mine' });
+  assert.deepEqual(plain(Main.settingsFromSaved({ noteStyleDefaults: { voice: 'academic', format: 5 } }).noteStyleDefaults ?? null), null);
+  assert.deepEqual(plain(Main.settingsFromSaved({ noteStyleDefaults: { voice: 'builtin:academic' } }).noteStyleDefaults), { voice: 'builtin:academic' }, 'a stored default value is not rewritten on load');
+});
+
+test('P2 plugin.setGlobalPart: sets the key; choosing the built-in default deletes it and the whole object once both are default; an invalid ref writes nothing', async () => {
+  const { default: Plugin } = Main;
+  const saves = [];
+  const plugin = { settings: {}, saveSettings: async () => { saves.push(JSON.stringify(plugin.settings.noteStyleDefaults ?? null)); } };
+  const set = (...args) => Plugin.prototype.setGlobalPart.apply(plugin, args);
+  await set('voice', 'builtin:plain');
+  await set('format', 'builtin:lean');
+  assert.deepEqual(plain(plugin.settings.noteStyleDefaults), { voice: 'builtin:plain', format: 'builtin:lean' });
+  await set('voice', 'builtin:academic');
+  assert.deepEqual(plain(plugin.settings.noteStyleDefaults), { format: 'builtin:lean' });
+  await set('format', 'builtin:standard');
+  assert.equal('noteStyleDefaults' in plugin.settings, false);
+  const count = saves.length;
+  await set('voice', 'builtin:');
+  await set('format', 'file:a/b');
+  assert.equal(saves.length, count, 'nothing is saved for an invalid ref');
+  assert.equal('noteStyleDefaults' in plugin.settings, false);
+});

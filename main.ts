@@ -47,6 +47,7 @@ import {
   KIND_DEFAULT_RECIPE,
   parseRecipeRef,
   STYLE_KINDS,
+  withGlobalPart,
   type PartCategory,
   type StyleKind
 } from "./ai/note-style-recipe";
@@ -162,6 +163,17 @@ export function normalizeNoteStyleByKind(value: unknown): Settings["noteStyleByK
   }
   return Object.keys(kept).length ? kept : undefined;
 }
+/** The global voice and format: only the two keys, each a part ref of its category; nothing left = no key. */
+export function normalizeNoteStyleDefaults(value: unknown): Settings["noteStyleDefaults"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const saved = value as Record<string, unknown>;
+  const kept: { voice?: string; format?: string } = {};
+  for (const category of ["voice", "format"] as const) {
+    const ref = saved[category];
+    if (typeof ref === "string" && parseRecipeRef(ref, category)) kept[category] = ref;
+  }
+  return kept.voice !== undefined || kept.format !== undefined ? kept : undefined;
+}
 function isStringMap(value: unknown): value is Record<string, string> {
   return (
     !!value &&
@@ -217,6 +229,9 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
       : {}),
     ...(normalizeNoteStyleByKind(saved?.noteStyleByKind)
       ? { noteStyleByKind: normalizeNoteStyleByKind(saved?.noteStyleByKind) }
+      : {}),
+    ...(normalizeNoteStyleDefaults(saved?.noteStyleDefaults)
+      ? { noteStyleDefaults: normalizeNoteStyleDefaults(saved?.noteStyleDefaults) }
       : {}),
     ...(normalizeNoteStyleRecipeMarker(saved?.noteStyleRecipe)
       ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved?.noteStyleRecipe) }
@@ -1511,6 +1526,17 @@ export default class VisualAgentMapPlugin extends Plugin {
     else next[kind] = ref;
     if (Object.keys(next).length) this.settings.noteStyleByKind = next;
     else delete this.settings.noteStyleByKind;
+    await this.saveSettings();
+  }
+  /**
+   * Sets the global voice or format (a part ref). Choosing the built-in default (academic, standard) removes the key, and
+   * the whole object when no key is left. Does nothing for a value that is not a part ref of that category.
+   */
+  async setGlobalPart(category: "voice" | "format", ref: string): Promise<void> {
+    if (!parseRecipeRef(ref, category)) return;
+    const next = withGlobalPart(this.settings.noteStyleDefaults, category, ref);
+    if (next) this.settings.noteStyleDefaults = next;
+    else delete this.settings.noteStyleDefaults;
     await this.saveSettings();
   }
   /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */

@@ -1317,6 +1317,10 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_do_rate_0": "依目標「{0}」分級議題",
   "ui.map_chat_do_merge_0": "把選取的議題合併成「{0}」",
   "ui.map_chat_do_create_map_0": "建立新心智圖「{0}」",
+  "ui.new_topic": "新議題",
+  "ui.untitled_mind_map": "未命名心智圖",
+  "ui.map_chat_do_rename_map_0": "將這張心智圖命名為「{0}」",
+  "ui.map_chat_skip_map_named": "這張心智圖已有你取的名字",
   "ui.map_chat_do_open_map_0": "切換到心智圖「{0}」",
   "ui.map_chat_do_collapse_0": "收合「{0}」",
   "ui.map_chat_do_expand_topic_0": "展開「{0}」",
@@ -1552,6 +1556,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":
     "自動模式會對簡單任務使用 Low、對複雜整合使用 Medium；手動選擇不會被覆蓋。",
   "ui.stop_research": "停止研究",
+  "ui.stop_expand": "停止展開",
   "ui.research_stopped_existing_content_was_preserved": "研究已停止，原有內容保留。",
   "ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved": "議題內容已變更，過時的 AI 結果未寫入。",
   "ui.shallow_research_for_expanded_subtopics_0": "子題研究：{0}",

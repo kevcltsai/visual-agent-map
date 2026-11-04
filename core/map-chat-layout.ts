@@ -142,6 +142,7 @@ export function chatPlanGroupOf(kind: MapChatAction["kind"]): ChatPlanGroup {
     case "ask_topic_kind":
     case "add_relation":
     case "set_appearance":
+    case "rename_map":
       return "change";
     case "delete_topic":
     case "remove_relation":

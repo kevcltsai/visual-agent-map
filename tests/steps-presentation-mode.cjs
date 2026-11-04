@@ -366,6 +366,7 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8'), /\.vam-stage\[data-presenting\] \.vam-node-tools[^{]*\.vam-add-child[^{]*\{[^}]*display: none/, 'the stylesheet hides the tools and the plus while presenting');
   const h = await harness();
   h.recordModalsOnly();
+  let typeLists = 0; h.view.newMenu = () => ({ addItem() { return this; }, showAtMouseEvent() { typeLists++; }, select() {} });
   const find = (root, pred) => { const out = []; const walk = n => { if (pred(n)) out.push(n); (n.children ?? []).forEach(walk); }; walk(root); return out; };
   const byClass = (key, name) => find(h.card(key), n => n.classes?.has(name))[0];
   const click = el => el.handlers.get('click')({ stopPropagation() {}, preventDefault() {} });
@@ -378,7 +379,7 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   assert.ok(tools.every(Boolean), 'every tool exists on the card');
   for (const el of tools) click(el);
   await h.settle();
-  assert.deepEqual(h.modals, [], 'no dialog opens');
+  assert.deepEqual(h.modals, [], 'no dialog opens'); assert.equal(typeLists, 0, 'no type list opens');
   assert.equal(bytes(), before, 'Map.md is unchanged');
   assert.deepEqual((await h.saved()).nodes.map(n => ({ id: n.id, collapsed: n.collapsed })), mapBefore, 'nothing was folded');
   assert.equal(h.view.history.canUndo, false, 'undo stays disabled: no tool left an undo step');
@@ -388,7 +389,7 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   assert.equal(h.view.map.nodes.length, count + 1, 'the internal path (AI write-back) still creates a node during a presentation');
   h.view.exitPresentation();
   click(byClass('root', 'vam-add-child')); await h.settle();
-  assert.equal(h.modals.length, 1, 'after leaving, the "+" opens its dialog again');
+  assert.equal(typeLists, 1, 'after leaving, the "+" opens its type list again');
 });
 
 // Overlaps the tools test above on purpose: there the stylesheet assertion fails first on the old code, so this one shows the undo assertion failing on its own.

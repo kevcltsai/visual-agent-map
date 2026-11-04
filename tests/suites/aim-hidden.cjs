@@ -228,14 +228,17 @@ test('aim-hidden: E1 the card of an AIM node has the generic tools and none of t
   assert.equal(hidden.some(label => /Steer|Correct|new question|Answer|Retry|Start|Continue|Resume|direction/i.test(label ?? '')), false, 'no AIM action');
 });
 
-integrationTest('aim-hidden: the New map menu offers only New mind map', () => {
+integrationTest('aim-hidden: with AIM hidden the New map button makes the map at once (no one-row menu, no name dialog); with AIM on the menu lists both', () => {
   const menus = [];
   class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', setTitle(value) { this.title = value; return this; }, setIcon() { return this; }, onClick() { return this; } }; callback(item); this.items.push(item); return this; } addSeparator() {} showAtMouseEvent() {} showAtPosition() {} setNoIcon() { return this; } }
-  for (const [loader, expected] of [[load, ['New mind map', 'New AIM']], [loadHidden, ['New mind map']]]) {
+  for (const [loader, expected] of [[load, ['New mind map', 'New AIM']], [loadHidden, []]]) {
     const { VisualAgentMapView } = loader('main.ts', { obsidian: { ...obsidian, Menu } });
     const view = new VisualAgentMapView({ app: {} }, { repo: {}, settings: { ...DEFAULT_SETTINGS } });
+    let direct = 0; view.openNewMindMapModal = () => { direct++; };
+    const before = menus.length;
     view.openNewMapMenu({});
-    assert.deepEqual(menus.at(-1).items.map(item => item.title), expected);
+    if (expected.length) assert.deepEqual(menus.at(-1).items.map(item => item.title), expected);
+    else { assert.equal(menus.length, before, 'no menu'); assert.equal(direct, 1, 'the map is made directly'); }
   }
 });
 

@@ -43,6 +43,7 @@ export const MAP_CHAT_ACTION_KINDS = [
   "add_relation",
   "remove_relation",
   "set_appearance",
+  "rename_map",
   "reorder_topics"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
@@ -117,6 +118,8 @@ export type MapChatAction =
   | { kind: "create_map"; title: string }
   /** Always the last action: switch to the map the title names (matched by the view, not the model). */
   | { kind: "open_map"; title: string }
+  /** Always the first action: names the map the user is talking in (an empty map still waiting for its name); no other map is made. */
+  | { kind: "rename_map"; title: string }
   | { kind: "collapse_topic"; nodeId: string }
   | { kind: "expand_topic"; nodeId: string }
   | { kind: "auto_layout" }
@@ -538,6 +541,11 @@ export function parseMapChat(
           if (index !== 0) throw new Dropped("bad_value");
           actions.push({ kind: "create_map", title: text("title") });
           created = true;
+          break;
+        }
+        case "rename_map": {
+          if (index !== 0) throw new Dropped("bad_value");
+          actions.push({ kind: "rename_map", title: text("title") });
           break;
         }
         case "open_map": {

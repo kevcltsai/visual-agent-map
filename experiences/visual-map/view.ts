@@ -161,6 +161,7 @@ import {
   TFile,
   TFolder,
   WorkspaceLeaf,
+  requestUrl,
   setIcon,
   setTooltip
 } from "obsidian";
@@ -18613,7 +18614,63 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
     }
+    // The picture is in the Detail now. A remote link never becomes a card cover (covers read local files only), so the file is
+    // also saved beside the note; a failure here leaves the picture in the Detail as it is and says nothing more.
+    if (outcome.result.ok) await this.chatCoverFromPicture(block, item.candidate).catch(() => undefined);
     return outcome.result;
+  }
+  /** The bytes of a picked picture (a seam: it needs the network). */
+  private async chatFetchImage(url: string): Promise<ArrayBuffer> {
+    return (await requestUrl({ url, method: "GET", throw: true })).arrayBuffer;
+  }
+  /**
+   * Makes a picked web picture the card's cover: only when the card has no cover and has not turned it off (a cover set by hand,
+   * and `topic-cover: none`, stay as they are). The picture is checked by its bytes ({@link acceptImage}), stored beside the note,
+   * embedded in `## User Notes` and set as `topic-cover`, as one undoable step.
+   */
+  private async chatCoverFromPicture(block: MapChatImages, candidate: ImageCandidate): Promise<void> {
+    const sameMap = (): boolean =>
+      !this.closed && !!this.map && this.path === block.mapPath && this.map.id === block.mapId;
+    const target = (): MapNode | null => {
+      if (!sameMap() || this.aimLive()) return null;
+      const node = this.map?.nodes.find(item => item.id === block.nodeId);
+      return node && this.cardAcceptsImages(node) && !this.isMerging(node.id) ? node : null;
+    };
+    const hasNoCover = (node: MapNode): boolean => {
+      const file = this.app.vault.getAbstractFileByPath(node.path);
+      if (!(file instanceof TFile)) return false;
+      const cache = this.app.metadataCache.getFileCache(file);
+      // Any `topic-cover` the owner wrote (even a link that does not resolve now) is theirs and stays.
+      const declared: unknown = cache?.frontmatter?.["topic-cover"];
+      if (declared !== undefined && declared !== null) return false;
+      return (
+        resolveCoverWithFrame(cache, link => this.app.metadataCache.getFirstLinkpathDest(link, node.path)) === null
+      );
+    };
+    const first = target();
+    if (!first || !hasNoCover(first)) return;
+    const data = await this.chatFetchImage(candidate.url);
+    const node = target();
+    if (!node || !this.map || !hasNoCover(node)) return;
+    const accepted = acceptImage({ mime: "image/*", size: data.byteLength, bytes: data });
+    if (!accepted.ok) return;
+    const name = safeImageName(candidate.title, accepted.mime);
+    if (!name) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .createAttachment("image", { name, data, sourcePath: node.path })
+      .rewriteNote(node.path, async (path, attachment) => {
+        const note = this.app.vault.getAbstractFileByPath(path);
+        if (!(note instanceof TFile)) throw new Error(path);
+        const link = attachment("image");
+        await this.app.vault.process(note, content => withCover(appendImageEmbed(content, link), link));
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_cover") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   private chatTranscriptTurn(turn: MapChatSavedTurn): TranscriptTurn {

@@ -62582,6 +62582,10 @@ ${request.requirements}` : preset.text,
         var _a3;
         if (!children.length && !selectedSources.some((group) => group.documents.length))
           return t("ui.choose_another_note_source_first");
+        await this.plugin.topicRuns.whenIdle(
+          children.map((child) => child.path),
+          options == null ? void 0 : options.signal
+        );
         childSources = await readSources();
         const sourceSnapshot = JSON.stringify(childSources.documents);
         if (!children.length && !selectedSources.some((group) => group.documents.length))
@@ -63036,7 +63040,13 @@ ${request.requirements}` : preset.text,
         releaseStarting();
         failed(t("ui.ai_running_ai"));
       },
-      model: async () => modelChoice = await this.selectionModel(sources),
+      model: async () => {
+        await this.plugin.topicRuns.whenIdle(
+          sources.map((source) => source.path),
+          controller.signal
+        );
+        return modelChoice = await this.selectionModel(sources);
+      },
       readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
       begin: (group) => {
         task = {
@@ -73994,6 +74004,8 @@ var TopicRuns = class {
     /** Jobs waiting for a free slot, first in first out. */
     __publicField(this, "chartQueue", []);
     __publicField(this, "chartRunning", 0);
+    /** Callers waiting in {@link whenIdle}; woken whenever a run or chart step ends. */
+    __publicField(this, "idleWaiters", /* @__PURE__ */ new Set());
   }
   /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
   get running() {
@@ -74016,8 +74028,31 @@ var TopicRuns = class {
         if (this.controllers.get(path) !== controller) return;
         this.controllers.delete(path);
         this.running.delete(path);
+        this.wakeIdleWaiters();
       }
     };
+  }
+  wakeIdleWaiters() {
+    for (const wake of [...this.idleWaiters]) wake();
+  }
+  /**
+   * Resolves once none of the topics has a run or a background chart step in flight (or `signal` aborts). A run that
+   * reads other topics as its sources calls this first: a child's research writing back during the read-to-save
+   * window would otherwise look like an edit and fail the sources check, though the user touched nothing.
+   */
+  async whenIdle(paths, signal) {
+    const busy = () => paths.some((path) => this.running.has(path) || this.charts.has(path));
+    while (busy() && !(signal == null ? void 0 : signal.aborted) && !this.disposed) {
+      await new Promise((resolve) => {
+        const wake = () => {
+          this.idleWaiters.delete(wake);
+          signal == null ? void 0 : signal.removeEventListener("abort", wake);
+          resolve();
+        };
+        this.idleWaiters.add(wake);
+        signal == null ? void 0 : signal.addEventListener("abort", wake, { once: true });
+      });
+    }
   }
   async start(path, kind, options) {
     if (kind === "synthesizeSelection") return this.runSelection(path, options);
@@ -74906,6 +74941,7 @@ var TopicRuns = class {
       if (path === void 0 || key2 === path) {
         controller.abort();
         this.charts.delete(key2);
+        this.wakeIdleWaiters();
         this.endChartProgress(key2);
         const queued = this.chartQueue.findIndex((item) => item.controller === controller);
         if (queued >= 0) this.chartQueue.splice(queued, 1);
@@ -74968,7 +75004,10 @@ var TopicRuns = class {
           this.ports.aiTasks().failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
         }
       } finally {
-        if (this.charts.get(job.path) === controller) this.charts.delete(job.path);
+        if (this.charts.get(job.path) === controller) {
+          this.charts.delete(job.path);
+          this.wakeIdleWaiters();
+        }
         if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
         this.chartRunning--;
         this.pumpChartQueue();

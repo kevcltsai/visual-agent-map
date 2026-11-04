@@ -2905,6 +2905,14 @@ integrationTest('B1 ui: the plan card has a one-sentence description, actions gr
   await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
 });
 
+integrationTest('persona-07 ui: an applied plan no longer says it needs confirmation', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); planButton(h, 'apply').click();
+  await until(() => h.view.chat.pendingPlan() === null && !h.view.chatApplying);
+  const text = visibleText(planCard(h)[0]); assert.doesNotMatch(text, /needs your confirmation/); assert.match(text, /Plan applied/);
+});
+
 integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the card says nothing changed', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });

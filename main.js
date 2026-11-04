@@ -35397,6 +35397,16 @@ var response_schema_default = {
 
 // core/steps/task/schemas.ts
 function localizedResponseSchema(language2) {
+  if (language2 === "zh-CN") {
+    return {
+      ...response_schema_default,
+      properties: {
+        ...response_schema_default.properties,
+        summary: { type: "string", description: "\u9002\u5408\u601D\u7EF4\u5BFC\u56FE\u7684\u4E00\u53E5\u7B80\u4F53\u4E2D\u6587\u7ED3\u8BBA\uFF0C80 \u5B57\u5185" },
+        detail: { type: "string", description: "\u5B8C\u6574\u7684\u7B80\u4F53\u4E2D\u6587 Markdown \u5206\u6790" }
+      }
+    };
+  }
   if (instructionLanguageOf(language2) === "zh") return response_schema_default;
   const variables5 = { language: languagePromptName(language2, "en", "plain") };
   return {

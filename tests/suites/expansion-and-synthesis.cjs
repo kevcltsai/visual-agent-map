@@ -1018,7 +1018,7 @@ integrationTest('direct synthesis write: Undo restores the parent note verbatim,
   await f.view.history.redo().redo();
   assert.equal((await f.repo.readNote(f.parent.path)).summary, 'Draft summary');
   await f.repo.updateNote(f.parent.path, { summary: 'Edited after the write' });
-  await assert.rejects(f.view.history.undo().undo(), /the synthesis draft was not saved/i);
+  await assert.rejects(f.view.history.undo().undo(), /Integration was not saved/i);
   assert.equal((await f.repo.readNote(f.parent.path)).summary, 'Edited after the write');
 });
 integrationTest('direct synthesis write: Undo is verbatim when the parent already carried format issues', async () => {
@@ -1105,7 +1105,7 @@ integrationTest('a parent topic edited while the draft AI call is pending refuse
   await until(() => accepted === 1);
   await f.repo.updateNote(f.parent.path, { summary: 'Edited while drafting' });
   gate.resolve(); await drafting;
-  const task = f.view.synthesisTasks.get(f.parent.path); assert.equal(task.state, 'failed'); assert.match(task.progress, /the synthesis draft was not saved/i);
+  const task = f.view.synthesisTasks.get(f.parent.path); assert.equal(task.state, 'failed'); assert.match(task.progress, /Integration was not saved/i);
   assert.equal(f.view.history.undoEntry, undefined, 'a refused write records no history step');
   const after = await f.repo.readNote(f.parent.path); assert.equal(after.summary, 'Edited while drafting'); assert.equal(after.detail, 'Existing knowledge');
 });

@@ -17843,7 +17843,7 @@ function textLines(title) {
   return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT2));
 }
 function buildMapSvg(scene) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
   const width = num(scene == null ? void 0 : scene.width);
   const height = num(scene == null ? void 0 : scene.height);
   if (width === null || height === null || width <= 0 || height <= 0) return "";
@@ -17909,10 +17909,25 @@ function buildMapSvg(scene) {
         `<text x="${left}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize != null ? titleSize : 13}"${titleWeight === void 0 ? "" : ` font-weight="${titleWeight}"`} fill="${fill2}">${escapeXml(line)}</text>`
       );
     });
+    const sum = card.summary;
+    const sumX = num(sum == null ? void 0 : sum.x);
+    const sumY = num(sum == null ? void 0 : sum.y);
+    if (sum && sumX !== null && sumY !== null) {
+      const sumSize = (_m = numberIn(sum.size, 8, 40)) != null ? _m : 12;
+      const sumStep = Math.max(14, Math.round(sumSize * 1.5));
+      const sumLines = textLines(sum.lines).filter((line) => line.length > 0);
+      const room = Math.max(0, Math.floor((box[1] + box[3] - 8 - sumY) / sumStep));
+      sumLines.slice(0, room).forEach((line, i, drawn) => {
+        const cut = i === drawn.length - 1 && drawn.length < sumLines.length ? "\u2026" : "";
+        out.push(
+          `<text x="${sumX}" y="${sumY + sumSize + i * sumStep}" font-family="${FONT}" font-size="${sumSize}" fill="${color(sum.textColor, fill2)}">${escapeXml(line + cut)}</text>`
+        );
+      });
+    }
     if (card.clipped === true) out.push("</svg>");
     out.push("</g>");
   }
-  for (const summary of (_m = scene.summaries) != null ? _m : []) {
+  for (const summary of (_n = scene.summaries) != null ? _n : []) {
     if (typeof (summary == null ? void 0 : summary.d) !== "string" || !PATH_DATA.test(summary.d) || summary.d.length > 4e3) continue;
     const [x, y] = [num(summary.x), num(summary.y)];
     if (x === null || y === null) continue;
@@ -17932,7 +17947,7 @@ function buildMapSvg(scene) {
     });
     out.push("</g>");
   }
-  for (const b of (_n = scene.boundaries) != null ? _n : []) {
+  for (const b of (_o = scene.boundaries) != null ? _o : []) {
     const box = rect(b == null ? void 0 : b.x, b == null ? void 0 : b.y, b == null ? void 0 : b.w, b == null ? void 0 : b.h);
     if (!box || typeof b.label !== "string" || !b.label) continue;
     const stroke = color(b.stroke, strokeColor);
@@ -17942,26 +17957,50 @@ function buildMapSvg(scene) {
     const chipWidth = Math.max(20, Math.min(box[2] - 24, textWidth + 16));
     const lines = wrapText(label, Math.max(7, chipWidth - 16));
     out.push(
-      `<g><rect x="${box[0] + 12}" y="${box[1] - 10}" width="${chipWidth}" height="20" rx="10" fill="${background}" stroke="${stroke}"/><text x="${box[0] + 20}" y="${box[1] + 4}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml((_o = lines[0]) != null ? _o : "")}</text></g>`
+      `<g><rect x="${box[0] + 12}" y="${box[1] - 10}" width="${chipWidth}" height="20" rx="10" fill="${background}" stroke="${stroke}"/><text x="${box[0] + 20}" y="${box[1] + 4}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml((_p = lines[0]) != null ? _p : "")}</text></g>`
     );
   }
   out.push("</svg>");
   return out.filter(Boolean).join("\n");
 }
 function wrapText(text11, maxWidth) {
+  var _a2;
+  const WIDE = "\u1100-\u11FF\u2E80-\uA4CF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF";
+  const wide = new RegExp(`[${WIDE}]`);
+  const tokens2 = new RegExp(`[${WIDE}]|\\s+|[^\\s${WIDE}]+`, "gu");
+  const widthOf = (token) => Array.from(token).reduce((sum, ch) => sum + (wide.test(ch) ? 13 : 7), 0);
   const lines = [];
   for (const paragraph of String(text11 != null ? text11 : "").split(/\r?\n/)) {
     let line = "";
     let used = 0;
-    for (const ch of Array.from(paragraph)) {
-      const w = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 7;
-      if (used + w > maxWidth && line) {
-        lines.push(line);
-        line = "";
-        used = 0;
+    const flush = () => {
+      lines.push(line);
+      line = "";
+      used = 0;
+    };
+    for (const token of (_a2 = paragraph.match(tokens2)) != null ? _a2 : []) {
+      const w = widthOf(token);
+      if (used + w <= maxWidth || !line && w <= maxWidth) {
+        line += token;
+        used += w;
+        continue;
       }
-      line += ch;
-      used += w;
+      if (w <= maxWidth) {
+        if (/^\s+$/.test(token)) {
+          line += token;
+          continue;
+        }
+        if (line) flush();
+        line = token;
+        used = w;
+        continue;
+      }
+      for (const ch of Array.from(token)) {
+        const cw = wide.test(ch) ? 13 : 7;
+        if (used + cw > maxWidth && line) flush();
+        line += ch;
+        used += cw;
+      }
     }
     lines.push(line);
   }
@@ -59223,7 +59262,7 @@ ${request.requirements}` : preset.text,
    * pictures alone are over the limit (read no further).
    */
   async collectExportScene(isCurrent) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
     const map = this.map;
     if (!map) return null;
     const win = window;
@@ -59301,6 +59340,22 @@ ${request.requirements}` : preset.text,
         item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
         item.title = wrapText(title, titleEl.offsetWidth);
       }
+      const summaryEl = card.querySelector(".vam-card-summary");
+      const summaryText2 = (_f = (_e = (_d = summaryEl == null ? void 0 : summaryEl.querySelector(".vam-card-preview-text")) != null ? _d : summaryEl) == null ? void 0 : _e.textContent) == null ? void 0 : _f.trim();
+      if (summaryEl && summaryText2 && summaryEl.offsetWidth > 0) {
+        const summaryStyle = computed(summaryEl);
+        const clamp2 = parseInt(summaryStyle.getPropertyValue("-webkit-line-clamp"), 10);
+        const size = parseFloat(summaryStyle.fontSize);
+        const lines = wrapText(summaryText2, summaryEl.offsetWidth);
+        item.summary = {
+          lines: Number.isFinite(clamp2) && clamp2 > 0 ? lines.slice(0, clamp2) : lines,
+          x: box.x + summaryEl.offsetLeft,
+          y: box.y + summaryEl.offsetTop,
+          size: Number.isFinite(size) && size > 0 ? Math.round(size * 13 / 15) : void 0,
+          textColor: colorOf(summaryStyle.color)
+        };
+        if (item.summary.lines.length < lines.length) item.summary.lines[item.summary.lines.length - 1] += "\u2026";
+      }
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
         if (Number.isFinite(size) && size > 0) item.titleSize = Math.round(size * 13 / 15);
@@ -59355,14 +59410,14 @@ ${request.requirements}` : preset.text,
         y: box.y,
         w: box.width,
         h: box.height,
-        title: wrapText((_d = body == null ? void 0 : body.textContent) != null ? _d : "", box.width - 28),
+        title: wrapText((_g = body == null ? void 0 : body.textContent) != null ? _g : "", box.width - 28),
         fill: colorOf(style.backgroundColor),
         stroke: colorOf(style.borderTopColor),
         textColor: colorOf(computed(body != null ? body : el).color)
       });
     }
     const images = [];
-    for (const item of (_e = map.canvasItems) != null ? _e : []) {
+    for (const item of (_h = map.canvasItems) != null ? _h : []) {
       if (item.kind !== "image") continue;
       const image = item;
       const href = await imageHref(image.path);
@@ -59373,7 +59428,7 @@ ${request.requirements}` : preset.text,
       images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
     }
     const boundaries = [];
-    for (const item of (_f = map.canvasItems) != null ? _f : []) {
+    for (const item of (_i = map.canvasItems) != null ? _i : []) {
       if (item.kind !== "boundary") continue;
       const frame = item;
       const box = boundaryBounds(
@@ -59395,11 +59450,11 @@ ${request.requirements}` : preset.text,
         w: box.w,
         h: box.h,
         ...frame.label ? { label: frame.label } : {},
-        stroke: colorOf(computed((_g = this.viewportEl) != null ? _g : this.contentEl).getPropertyValue("--text-muted"))
+        stroke: colorOf(computed((_j = this.viewportEl) != null ? _j : this.contentEl).getPropertyValue("--text-muted"))
       });
     }
     const summaryScenes = [];
-    for (const item of (_h = map.canvasItems) != null ? _h : []) {
+    for (const item of (_k = map.canvasItems) != null ? _k : []) {
       if (item.kind !== "summary") continue;
       const summary = item;
       const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes), summary.text);
@@ -59419,13 +59474,13 @@ ${request.requirements}` : preset.text,
         y: geometry.label.y,
         side: geometry.side,
         text: lines,
-        stroke: colorOf(computed((_i = this.viewportEl) != null ? _i : this.contentEl).getPropertyValue("--text-muted")),
-        textColor: colorOf(computed((_j = this.viewportEl) != null ? _j : this.contentEl).getPropertyValue("--text-normal"))
+        stroke: colorOf(computed((_l = this.viewportEl) != null ? _l : this.contentEl).getPropertyValue("--text-muted")),
+        textColor: colorOf(computed((_m = this.viewportEl) != null ? _m : this.contentEl).getPropertyValue("--text-normal"))
       });
     }
     const edges = [];
-    for (const el of Array.from((_l = (_k = this.edgesEl) == null ? void 0 : _k.children) != null ? _l : [])) {
-      if (((_m = el.tagName) == null ? void 0 : _m.toLowerCase()) !== "path") continue;
+    for (const el of Array.from((_o = (_n = this.edgesEl) == null ? void 0 : _n.children) != null ? _o : [])) {
+      if (((_p = el.tagName) == null ? void 0 : _p.toLowerCase()) !== "path") continue;
       const d = el.getAttribute("d");
       const style = computed(el);
       const stroke = colorOf(style.stroke);
@@ -59433,18 +59488,18 @@ ${request.requirements}` : preset.text,
       edges.push({
         d,
         stroke,
-        ...((_n = el.getAttribute("class")) != null ? _n : "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {},
-        ...((_o = el.getAttribute("data-line-thick")) != null ? _o : null) !== null ? { width: parseFloat(style.strokeWidth) > 0 ? parseFloat(style.strokeWidth) : 4 } : {}
+        ...((_q = el.getAttribute("class")) != null ? _q : "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {},
+        ...((_r = el.getAttribute("data-line-thick")) != null ? _r : null) !== null ? { width: parseFloat(style.strokeWidth) > 0 ? parseFloat(style.strokeWidth) : 4 } : {}
       });
       try {
-        const bbox = (_p = el.getBBox) == null ? void 0 : _p.call(el);
+        const bbox = (_s = el.getBBox) == null ? void 0 : _s.call(el);
         if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
       } catch (e) {
       }
     }
     if (!cards.length && !images.length) return { refuse: "empty" };
     const margin = 24;
-    const root = computed((_q = this.viewportEl) != null ? _q : this.contentEl);
+    const root = computed((_t = this.viewportEl) != null ? _t : this.contentEl);
     const variable = (name2) => colorOf(root.getPropertyValue(name2));
     const scene = {
       x: bounds.minX - margin,

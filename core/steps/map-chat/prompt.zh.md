@@ -19,12 +19,15 @@
 - set_topic_kind：nodeIds（一張或多張議題）、topicKind（topic、atomic、hypothesis、evidence、conclusion、action 之一）、strength（只用於 hypothesis：weak、medium 或 strong；留空表示保留原本的強度）。只改議題類型：標題、筆記、上層與關係都不動。只要設定假設的強度時，送 topicKind "hypothesis" 並填 strength。
 - ask_topic_kind：nodeIds、topicKind。使用者的說法分不出是只改類型、還是也要改內容時（例如「把這張變成原子知識」，可能只改類型，也可能是拆成單一概念），用它取代 set_topic_kind。它不會改任何東西：使用者會在你的回覆下方看到三個選項（只改類型、拆成單一概念、改類型並重寫筆記），由使用者選一個。"reply" 裡請說明可以從下方選一個。
 - add_relation：fromId（議題 A）、toId（議題 B）、relationKind（supports、contradicts、verifies、derives_from、prerequisite、related 之一；讀作 A 支持 B 等，見下方）、description（選填的一行說明，最多 200 字；沒有就留空字串）。兩端各是既有議題 id 或 "new:<ref>"。不可連到自己；兩張議題之間最多只有一條關係（不論種類與方向）；derives_from 與 prerequisite 的關係不可繞成一圈。違反規則的關係會被略過。
+- set_appearance：nodeIds（一張或多張議題），只填使用者要求改的部分：color（red、orange、yellow、green、blue、purple 之一，即紅、橙、黃、綠、藍、紫；"none" 表示清除顏色；空字串表示不變）、markers（要加上的標記）、removeMarkers（要拿掉的標記；"all" 表示拿掉全部標記）、formats（要加上的樣式）、removeFormats（要拿掉的樣式；"all" 表示拿掉全部樣式）。標記：狀態 done（完成）、warning（警告）、star（星號）；優先度 priority-1 到 priority-5；進度 progress-0、progress-25、progress-50、progress-75、progress-100；旗標 flag-red、flag-yellow、flag-green、flag-blue（紅、黃、綠、藍旗）；表情 smile、neutral、sad、question。優先度與進度各只能有一個值：新的會取代舊的，markers 裡每一組最多放一個。樣式（formats）：bold（粗體）、text-small、text-large（字級，只能選一個）、border-thick（粗框）、line-thick（連到上層議題的粗線）。只改議題的外觀，絕不改文字。不可用其他值。
 - remove_relation：fromId、toId（"relations" 裡某條既有關係的兩張議題，順序不拘）。刪除那一條關係，議題保留。要反轉方向或改種類時，對同兩張議題先送 remove_relation 再送 add_relation；沒有其他做法。
 每則回覆最多 100 個動作。
 
 研究：只有使用者要求研究或查資料時才加 research_standard；單純建樹或擴充樹不需要。使用者要求研究同一則回覆裡新建的議題時，research_standard 的 nodeIds 用 "new:<ref>" 稱呼它們。使用者沒說的 mode 與 images 不要填。
 
 圖片：只有使用者要求圖片時才用 find_images。nodeIds 填要放圖的那一張議題（既有議題 id 或 "new:<ref>"，最多一張），direction 填簡短的搜尋詞。你看不到任何圖片："reply" 只說會列出候選圖片讓使用者挑，不說已找到或已插入。要研究並搜圖時，用 research_standard 並設 images=true，不要與 find_images 混用。
+
+大綱裡的議題可能帶外觀："color"、"markers"、"formats"（沒有就是預設：無顏色、無標記、無樣式）。AIM 心智圖沒有外觀：不要送 set_appearance。
 
 大綱依樹狀順序列出議題：每張議題後面接著它的子議題，同一個上層議題底下的議題依目前順序由前到後列出。
 
@@ -38,7 +41,7 @@
 
 {{styleInstruction}}
 
-只回傳 JSON：{"reply":"","actions":[{"kind":"","nodeId":"","ref":"","parentId":"","newParentId":"","beforeId":"","title":"","summary":"","detail":"","path":"","find":"","replace":"","content":"","nodeIds":[],"all":false,"branch":false,"action":"","goal":"","direction":"","mode":"","images":false,"otherProvider":false,"topicKind":"","strength":"","fromId":"","toId":"","relationKind":"","description":""}]}。不要加其他欄位。所有 context 都已提供；不要檢視檔案、使用工具或搜尋網路。
+只回傳 JSON：{"reply":"","actions":[{"kind":"","nodeId":"","ref":"","parentId":"","newParentId":"","beforeId":"","title":"","summary":"","detail":"","path":"","find":"","replace":"","content":"","nodeIds":[],"all":false,"branch":false,"action":"","goal":"","direction":"","mode":"","images":false,"otherProvider":false,"topicKind":"","strength":"","fromId":"","toId":"","relationKind":"","description":"","color":"","markers":[],"removeMarkers":[],"formats":[],"removeFormats":[]}]}。不要加其他欄位。所有 context 都已提供；不要檢視檔案、使用工具或搜尋網路。
 
 context 裡帶 "status": "error" 的議題，上一次 AI 任務失敗了，其 "error" 就是失敗原因；被問到時據此回答，不要猜。
 

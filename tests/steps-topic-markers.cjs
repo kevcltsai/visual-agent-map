@@ -115,3 +115,12 @@ test('markers toggle: legacy multi-value single-choice group follows the shown v
   assert.deepEqual(own(m.toggleTopicMarker(['progress-25', 'progress-75'], 'progress-75')), ['progress-75']);
   assert.equal(m.toggleTopicMarker(['progress-25', 'progress-75'], 'progress-25'), null);
 });
+
+test('chat 08: changeTopicMarkers turns markers on and off with the toggle rule; a single-choice group keeps one value, unknown values stay', () => {
+  const plainList = value => (value === null ? null : JSON.parse(JSON.stringify(value)));
+  assert.deepEqual(plainList(m.changeTopicMarkers(['priority-1', 'custom', 'star'], ['priority-3', 'flag-red'], [])), ['custom', 'star', 'priority-3', 'flag-red']);
+  assert.deepEqual(plainList(m.changeTopicMarkers(['star', 'done'], ['star'], ['done'])), ['star'], 'one already on is not toggled off');
+  assert.deepEqual(plainList(m.changeTopicMarkers(['star', 'custom', 'progress-50'], [], ['all'])), ['custom'], '"all" removes every whitelisted marker only');
+  assert.equal(m.changeTopicMarkers(['star'], [], ['star']), null, 'an emptied list removes the key');
+  assert.equal(m.changeTopicMarkers(undefined, [], ['warning']), null);
+});

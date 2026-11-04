@@ -1,6 +1,8 @@
 import { normalizeVaultPath } from "./map-chat-guard";
 import type { HypothesisStrength, TopicKind } from "../note-values";
 import type { TopicRelationKind } from "../map-model";
+import type { TopicColor, TopicStyle } from "../topic-colors";
+import type { TopicMarker } from "../topic-markers";
 
 /**
  * Builds what the model sees in a map chat turn. Pure: the caller reads the map, the selection and the Markdown text; this
@@ -37,6 +39,12 @@ export interface MapChatOutlineNode {
   kind?: TopicKind;
   /** A hypothesis's strength; sent only next to `kind: "hypothesis"`. Dropped on an AIM map. */
   strength?: HypothesisStrength;
+  /** The card's colour; absent (the default) is not sent. Dropped on an AIM map. */
+  color?: TopicColor;
+  /** The card's markers; none (the default) is not sent. Dropped on an AIM map. */
+  markers?: TopicMarker[];
+  /** The card's styles, sent as `formats`; none (the default) is not sent. Dropped on an AIM map. */
+  styles?: TopicStyle[];
   /** Set only for a card whose last AI task failed. */
   status?: "error";
   /** Why it failed; only with `status: "error"`. */
@@ -221,6 +229,19 @@ function treeOrder(outline: readonly MapChatOutlineNode[]): MapChatOutlineNode[]
   return ordered;
 }
 
+/** The card's appearance, only what differs from the default; nothing on an AIM map. */
+const appearanceFields = (
+  node: MapChatOutlineNode,
+  aim: boolean
+): { color?: TopicColor; markers?: TopicMarker[]; formats?: TopicStyle[] } =>
+  aim
+    ? {}
+    : {
+        ...(node.color ? { color: node.color } : {}),
+        ...(node.markers?.length ? { markers: [...node.markers] } : {}),
+        ...(node.styles?.length ? { formats: [...node.styles] } : {})
+      };
+
 export function buildMapChatContext(input: MapChatContextInput): MapChatContext {
   const hashes: Record<string, string> = {};
   const topicHashes: Record<string, MapChatTopicHash> = {};
@@ -326,6 +347,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       parentId: node.parentId,
       depth: node.depth,
       ...kindFields(node, !!input.aim),
+      ...appearanceFields(node, !!input.aim),
       ...errorFields(node)
     })),
     ...(relations.length ? { relations } : {}),

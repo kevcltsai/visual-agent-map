@@ -68,6 +68,24 @@ export function setTopicStyle(raw: unknown, styles: readonly TopicStyle[]): stri
   return next.length ? (next as string[]) : null;
 }
 
+/**
+ * The list to write after turning `add` on and `remove` off, or null when the key should be removed; "all" in `remove` turns
+ * every whitelisted style off. Each change is the toggle of the style panel ({@link toggleTopicStyle}), made only when it
+ * changes what is shown, so the text size stays one choice and unknown values stay as they are.
+ */
+export function changeTopicStyles(
+  raw: unknown,
+  add: readonly TopicStyle[],
+  remove: readonly (TopicStyle | "all")[]
+): string[] | null {
+  let current: unknown = raw;
+  const shown = (): TopicStyle[] => readTopicStyle({ "topic-style": current });
+  const off = remove.includes("all") ? shown() : remove.filter((id): id is TopicStyle => id !== "all");
+  for (const id of off) if (shown().includes(id)) current = toggleTopicStyle(current, id);
+  for (const id of add) if (!shown().includes(id)) current = toggleTopicStyle(current, id);
+  return rawStyleList(current).length ? (rawStyleList(current) as string[]) : null;
+}
+
 const STYLE_LABEL_KEYS: Record<TopicStyle, TranslationKey> = {
   bold: "ui.topic_style_bold",
   "text-small": "ui.topic_style_size_small",

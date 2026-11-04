@@ -27,7 +27,7 @@ const { VisualAgentMapView } = replay.load(
     console: { ...console, error: (...a) => errors.push(a), warn: (...a) => errors.push(a) }
   }
 );
-const files = new Set(['img/a.png', 'img/b.jpg']);
+const files = new Set(['img/a.png', 'img/b.jpg', 'img/tall.png', 'img/bad.png', 'img/redraw.png']);
 const make = (cache, extra = {}) => {
   const note = new S.obsidian.TFile('Topics/n.md');
   const view = Object.assign(Object.create(VisualAgentMapView.prototype), {
@@ -166,13 +166,173 @@ test('renderNode paints the cover before the title; the header, model tag and co
   assert.match(source, /\.on\("changed"/);
 });
 
-test('the frame is 96px tall with object-fit cover, fixed before the image loads', () => {
+test('the frame shows the whole picture: 96px placeholder, then the picture ratio, never object-fit cover', () => {
   const css = read('styles.css');
   const frame = css.split('\n').find(line => line.startsWith('.vam-card-cover {'));
   assert.ok(frame);
-  assert.match(frame, /height: 96px/);
+  assert.match(frame, /height: 96px/, 'placeholder before the picture is measured');
+  const sized = css.split('\n').find(line => line.startsWith('.vam-card-cover.is-sized'));
+  assert.match(sized, /height: auto/);
   const image = css.split('\n').find(line => line.startsWith('.vam-card-cover img'));
-  assert.match(image, /object-fit: cover/);
+  assert.match(image, /object-fit: contain/);
+  assert.doesNotMatch(css.split('\n').filter(l => l.includes('.vam-card-cover')).join('\n'), /object-fit: cover/);
+});
+
+test('coverFrameRatio: portrait, landscape and square keep their shape; a very tall picture is held at 1.5x the width', () => {
+  const { coverFrameRatio, COVER_MAX_HEIGHT_RATIO } = S.load('experiences/visual-map/view.ts', { obsidian: { ...S.obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
+  assert.equal(COVER_MAX_HEIGHT_RATIO, 1.5);
+  assert.equal(coverFrameRatio(300, 100), 3);
+  assert.equal(coverFrameRatio(100, 100), 1);
+  assert.equal(coverFrameRatio(200, 300), 2 / 3);
+  assert.equal(coverFrameRatio(100, 1000), 2 / 3, 'taller than 1.5x is capped');
+  for (const bad of [[0, 10], [10, 0], [NaN, 10], [-1, 5]]) assert.equal(coverFrameRatio(...bad), null);
+});
+
+test('a loaded picture sizes its frame once and relays the card out once; a redraw sizes at once from the remembered shape', () => {
+  before();
+  const view = make({ embeds: [{ link: 'img/b.jpg' }] });
+  const calls = [];
+  Object.assign(view, { map: { nodes: [] }, topicKindOf: () => 'topic', fitKindShape: (c, k) => calls.push(['fit', k]), drawEdges: () => calls.push(['edges']) });
+  const c = card();
+  c.dataset.nodeId = 'n1';
+  view.paintCover(c, 'Topics/n.md');
+  const frame = frames(c)[0], img = imgs(c)[0];
+  assert.equal(frame.style['aspect-ratio'], undefined, 'unknown shape: placeholder');
+  img.naturalWidth = 200; img.naturalHeight = 1000;
+  img.fire('load');
+  img.fire('load');
+  assert.equal(frame.style['aspect-ratio'], String(2 / 3));
+  assert.ok(frame.classes.includes('is-sized'));
+  assert.deepEqual(calls, [['fit', 'topic'], ['edges']], 'one relayout and one edge redraw, not two');
+  const again = card();
+  view.paintCover(again, 'Topics/n.md');
+  assert.equal(frames(again)[0].style['aspect-ratio'], String(2 / 3), 'a redraw does not jump');
+});
+
+test('counterexample: a picture that cannot be measured keeps the placeholder and does not relayout', () => {
+  before();
+  const view = make({ embeds: [{ link: 'img/a.png' }] });
+  const calls = [];
+  Object.assign(view, { map: { nodes: [] }, topicKindOf: () => 'topic', fitKindShape: () => calls.push('fit'), drawEdges: () => calls.push('edges') });
+  const c = card();
+  c.dataset.nodeId = 'n1';
+  view.paintCover(c, 'Topics/n.md');
+  imgs(c)[0].naturalWidth = 0; imgs(c)[0].naturalHeight = 0;
+  imgs(c)[0].fire('load');
+  assert.equal(frames(c)[0].style['aspect-ratio'], undefined);
+  assert.deepEqual(calls, []);
+});
+
+// ---- cover frame: the card shows only the framed part of the picture (a mask, not a cropped file) -----------------------
+test('coverFrameRatio with a frame: the region shape, capped like the whole picture', () => {
+  const { coverFrameRatio } = S.load('experiences/visual-map/view.ts', { obsidian: { ...S.obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
+  // The Rewire case: a 2:3 portrait, a band 100% wide and 1/3 tall -> 2 : 1.
+  assert.equal(coverFrameRatio(200, 300, { x: 0, y: 0.4, w: 1, h: 1 / 3 }), 2);
+  assert.equal(coverFrameRatio(200, 300, { x: 0, y: 0, w: 1, h: 1 }), 2 / 3, 'the whole picture is the same as no frame');
+  assert.equal(coverFrameRatio(100, 100, { x: 0, y: 0, w: 0.1, h: 1 }), 2 / 3, 'a very tall region is held at 1.5x the width');
+  assert.equal(coverFrameRatio(0, 100, { x: 0, y: 0, w: 1, h: 1 }), null);
+});
+
+// Picture shapes are remembered by path for the whole run, so each measured test uses its own picture.
+const framed = (frontmatter, link = 'img/a.png') => make({ frontmatter, embeds: [{ link }] });
+const windows = c => dom.findAll(c, i => dom.hasCls(i, 'vam-card-cover-window'));
+const relay = view => Object.assign(view, { map: { nodes: [] }, topicKindOf: () => 'topic', fitKindShape() {}, drawEdges() {} });
+
+test('a valid frame: the frame takes the region shape and the picture is placed so only the region shows', () => {
+  before();
+  const view = relay(framed({ 'topic-cover-frame': '0.1 0.4 0.8 0.2' })), c = card();
+  c.dataset.nodeId = 'n1';
+  view.paintCover(c, 'Topics/n.md');
+  const [frame] = frames(c), [img] = imgs(c), [win] = windows(c);
+  assert.ok(win, 'a window holds the picture');
+  assert.equal(win.children[0], img);
+  img.naturalWidth = 400; img.naturalHeight = 300;
+  img.fire('load');
+  const ratio = (400 * 0.8) / (300 * 0.2);
+  assert.equal(frame.style['aspect-ratio'], String(ratio));
+  assert.ok(frame.classes.includes('is-sized') && frame.classes.includes('is-framed'));
+  assert.equal(win.style['aspect-ratio'], String((400 * 0.8) / (300 * 0.2)), 'the window keeps the region shape');
+  assert.equal(img.style.width, `${100 / 0.8}%`);
+  assert.equal(img.style.height, `${100 / 0.2}%`);
+  assert.equal(img.style.left, `${(-0.1 / 0.8) * 100}%`);
+  assert.equal(img.style.top, `${(-0.4 / 0.2) * 100}%`);
+  assert.equal(img.attrs['data-src'], 'app://res/img/a.png', 'the original file is shown as it is');
+});
+
+test('a tall region is scaled down whole inside the capped frame (masked, not cropped, not stretched)', () => {
+  before();
+  const view = relay(framed({ 'topic-cover-frame': '0 0 0.1 1' }, 'img/tall.png')), c = card();
+  c.dataset.nodeId = 'n1';
+  view.paintCover(c, 'Topics/n.md');
+  const [img] = imgs(c), [win] = windows(c), [frame] = frames(c);
+  img.naturalWidth = 100; img.naturalHeight = 100;
+  img.fire('load');
+  assert.equal(frame.style['aspect-ratio'], String(2 / 3));
+  const regionRatio = 0.1;
+  assert.equal(win.style['aspect-ratio'], String(regionRatio), 'the window keeps the region shape; CSS scales it whole and centres it');
+  assert.equal(win.style.width, undefined, 'no inline width: a clipped card must not stretch the region');
+});
+
+test('counter-example: an invalid frame shows the whole picture with no window and no error', () => {
+  for (const bad of ['0.1 0.2 0.3', '0 0 1.5 1', '0.8 0 0.5 1', '0 0 0 1', 'x y z w']) {
+    before();
+    const view = relay(framed({ 'topic-cover-frame': bad }, 'img/bad.png')), c = card();
+    c.dataset.nodeId = 'n1';
+    view.paintCover(c, 'Topics/n.md');
+    assert.equal(frames(c).length, 1, bad);
+    assert.equal(windows(c).length, 0, bad);
+    const [img] = imgs(c), [frame] = frames(c);
+    img.naturalWidth = 200; img.naturalHeight = 300;
+    img.fire('load');
+    assert.equal(frame.style['aspect-ratio'], String(2 / 3), `${bad}: the whole picture's shape`);
+    assert.ok(!frame.classes.includes('is-framed'), bad);
+    assert.equal(img.style.width, undefined, bad);
+    assert.equal(errors.length, 0);
+  }
+});
+
+test('counter-example: topic-cover none beats a valid frame (no cover at all)', () => {
+  before();
+  const c = card();
+  make({ frontmatter: { 'topic-cover': 'none', 'topic-cover-frame': '0.1 0.2 0.5 0.5' }, embeds: [{ link: 'img/a.png' }] }).paintCover(c, 'Topics/n.md');
+  assert.equal(frames(c).length, 0);
+});
+
+test('a framed picture that fails to load removes its frame like any cover', () => {
+  before();
+  const c = card();
+  relay(framed({ 'topic-cover-frame': '0.1 0.2 0.5 0.5' })).paintCover(c, 'Topics/n.md');
+  imgs(c)[0].fire('error');
+  assert.equal(frames(c).length, 0);
+  assert.equal(errors.length, 0);
+});
+
+test('a redraw of a framed cover sizes at once from the remembered picture shape', () => {
+  before();
+  const view = relay(framed({ 'topic-cover-frame': '0 0 0.5 0.5' }, 'img/redraw.png'));
+  const c = card();
+  c.dataset.nodeId = 'n1';
+  view.paintCover(c, 'Topics/n.md');
+  imgs(c)[0].naturalWidth = 300; imgs(c)[0].naturalHeight = 100;
+  imgs(c)[0].fire('load');
+  const again = card();
+  view.paintCover(again, 'Topics/n.md');
+  assert.equal(frames(again)[0].style['aspect-ratio'], String(3), 'no jump');
+  assert.equal(imgs(again)[0].style.width, '200%');
+});
+
+test('the stylesheet gives the framed cover a positioned window and uses no CSS variable of its own', () => {
+  const lines = read('styles.css').split('\n').filter(l => /\.vam-card-cover/.test(l));
+  const text = lines.join('\n');
+  assert.match(text, /\.vam-card-cover\.is-framed[^{]*\{[^}]*position: relative/);
+  assert.match(text, /\.vam-card-cover-window[^{]*\{[^}]*position: absolute[^}]*overflow: hidden/);
+  // Decision 9: the window is full height, width from its own aspect-ratio, centred (never stretched on a clipped card).
+  const windowRule = lines.find(l => /^\.vam-card-cover-window \{/.test(l));
+  assert.match(windowRule, /height: 100%/);
+  assert.match(windowRule, /width: auto/);
+  assert.match(windowRule, /left: 50%[^}]*translateX\(-50%\)/);
+  assert.doesNotMatch(windowRule, /width: 100%/);
+  assert.match(text, /is-framed:not\(\.is-sized\)[^{]*\{[^}]*visibility: hidden/);
 });
 
 // map-images P4b: the topic menu turns a topic's cover off or on again as one undoable rewriteNote transaction.
@@ -260,4 +420,23 @@ test('P4b: changeTopicCover refuses a topic that is not editable', async () => {
   h.view.selection.toggleMultiSelect();
   assert.equal(await h.view.changeTopicCover({ id: 'm', path: NOTE }), null);
   assert.equal(h.contents.get(NOTE), TEXT);
+});
+
+// Obsidian core `.workspace-leaf-content img:not([width])` is (0,2,1) and would cap the width of the oversized picture inside the window.
+function specificity(selector) {
+  const sel = selector.replace(/:not\(([^)]*)\)/g, ' $1 ');
+  const ids = (sel.match(/#[\w-]+/g) || []).length;
+  const classes = (sel.match(/\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+/g) || []).length;
+  const tags = (sel.replace(/\[[^\]]*\]/g, '').match(/(^|[\s>+~])[a-z][\w-]*/gi) || []).length;
+  return [ids, classes, tags];
+}
+const beats = (a, b) => { for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
+
+test('counter-example: the window picture rule out-specifies Obsidian core img:not([width]) (0,2,1)', () => {
+  assert.deepEqual(specificity('.workspace-leaf-content img:not([width])'), [0, 2, 1], 'the helper reads the core rule');
+  const rule = read('styles.css').split('\n').find(l => /vam-card-cover-window img \{/.test(l));
+  assert.ok(rule, 'rule exists');
+  assert.match(rule, /max-width: none/);
+  const selector = rule.slice(0, rule.indexOf('{')).trim();
+  assert.ok(beats(specificity(selector), [0, 2, 1]), `${selector} -> ${specificity(selector)}`);
 });

@@ -63,11 +63,6 @@ import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
 
-/** Saved map-chat answer length: anything but "detailed" is the default "concise". */
-export function normalizeMapChatStyle(value: unknown): "concise" | "detailed" {
-  return value === "detailed" ? "detailed" : "concise";
-}
-
 /** Saved width of the map chat's side window: a whole number from 280 to 560; anything else is the default. */
 export function normalizeMapChatWidth(value: unknown): number {
   return clampMapChatWidth(value);
@@ -167,8 +162,6 @@ export interface Settings {
   codexPath: string;
   claudePath: string;
   cliModel: string;
-  /** Answer length of the map AI chat; remembered between sessions. */
-  mapChatStyle: "concise" | "detailed";
   /** Width in pixels of the map AI chat's side window (280 to 560); remembered between sessions. */
   mapChatWidth: number;
   /** Whether the side window was open when the map was last used; remembered between sessions. */
@@ -281,7 +274,6 @@ export const DEFAULT_SETTINGS: Settings = {
   codexPath: "codex",
   claudePath: "claude",
   cliModel: FALLBACK_MODEL,
-  mapChatStyle: "concise",
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
   mapChatOpen: true,
   cliReasoning: "low",

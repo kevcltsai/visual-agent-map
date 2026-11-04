@@ -382,27 +382,25 @@ test('discardSince after clear drops what was pushed since the clear and leaves 
   assert.equal(plainHistory.redo().label, 'y');
 });
 
-// ---- Packet C1: answer style ----
-test('C1: concise and detailed prompts differ in both languages, and no style means concise', () => {
+// ---- Packet C1: answer style (the switch and the detailed re-send are gone; concise is the only style) ----
+test('C1: a request without style or redo renders the concise style in both languages, and a stray style or redo field changes nothing', () => {
   for (const language of ['en', 'zh-TW']) {
     const none = mapChatStep.render(request({ language }));
-    const concise = mapChatStep.render(request({ language, style: 'concise' }));
-    const detailed = mapChatStep.render(request({ language, style: 'detailed' }));
-    assert.equal(none, concise, language); assert.notEqual(concise, detailed, language);
-    assert.ok(!/\{\{[a-zA-Z]+\}\}/.test(detailed), language);
+    assert.equal(mapChatStep.render(request({ language, style: 'detailed', redo: true })), none, language);
+    assert.ok(!/\{\{[a-zA-Z]+\}\}/.test(none), language);
+    assert.doesNotMatch(none, /detailed|must be an empty list|必須是空清單|詳細/i, language);
   }
-  assert.match(mapChatStep.render(request({ style: 'concise' })), /single sentence/);
-  assert.match(mapChatStep.render(request({ style: 'detailed' })), /Explain fully/);
-  assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'concise' })), /一句話確認/);
-  assert.ok(!/一句話確認/.test(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed' }))));
+  assert.match(mapChatStep.render(request({})), /single sentence/);
+  assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /一句話確認/);
 });
-test('C1: a redo prompt says actions must be empty; a normal prompt does not', () => {
-  assert.match(mapChatStep.render(request({ style: 'detailed', redo: true })), /actions" must be an empty list/);
-  assert.ok(!/actions" must be an empty list/.test(mapChatStep.render(request({ style: 'detailed' }))));
-  assert.match(mapChatStep.render(request({ language: 'zh-TW', style: 'detailed', redo: true })), /"actions" 必須是空清單/);
+test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule when actions are listed (en and zh)', () => {
+  assert.match(mapChatStep.render(request({})), /Never write how many cards or files you will create or change in "reply"/);
+  assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /"reply" 不可寫出將建立或修改的數量/);
+  assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
+  assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 7 (chat 03: topic types; D-2026-10-231 mode replaced depth in 6; B3 find_images was 5)', () => {
-  assert.equal(mapChatStep.version, 7);
+test('C1: the style is not part of the action schema, and the step version is 10 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text; D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 10);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 

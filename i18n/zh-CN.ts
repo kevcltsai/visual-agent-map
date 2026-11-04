@@ -1442,6 +1442,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_saved_0": "已存成 {0}",
   "ui.map_chat_save_failed_0": "无法存下对话：{0}",
   "ui.map_chat_save_default_name": "对话",
+  "ui.map_chat_unsaved_on_close": "关闭此标签页后不会保留心智图对话。想留下请先点“把对话存成笔记”。",
   "ui.map_chat_note_title": "心智图 AI 对话",
   "ui.map_chat_note_map": "心智图",
   "ui.map_chat_note_saved": "存档时间",

@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
-const { chatNoteName, chatFirstSentence, transcriptMarkdown, replyMarkdown, escapeText, localDate, localStamp } = load('core/map-chat-transcript.ts');
+const { chatNoteName, chatFirstSentence, hasUnsavedChat, transcriptMarkdown, replyMarkdown, escapeText, localDate, localStamp } = load('core/map-chat-transcript.ts');
 
 const FALLBACK = 'Chat';
 const day = new Date(2026, 9, 26, 23, 59);
@@ -234,4 +234,12 @@ test('B3-fix the key splitter leaves wikilink targets alone', () => {
   assert.ok(out.includes('[[Maps/node-id/Notes/A|node-id card'.replace('node-id card', 'node-id card')) || out.includes('[[Maps/node-id/Notes/A|'), 'the target path is intact');
   assert.ok(out.includes('[[topic-id notes]]'));
   assert.doesNotMatch(out.replace(/\[\[[^\]]*\]\]/g, ''), /agent-map-node|node-id|topic-id/, 'outside links the keys are split');
+});
+
+// ---- persona ticket 16: the conversation lives in memory only, so closing the view with unsaved turns must warn ----------
+test('persona-16: closing warns only when finished turns exist that were not saved as a note', () => {
+  assert.equal(hasUnsavedChat(0, 0), false, 'an empty chat has nothing to lose');
+  assert.equal(hasUnsavedChat(2, 0), true, 'never saved');
+  assert.equal(hasUnsavedChat(2, 2), false, 'saved after the last turn');
+  assert.equal(hasUnsavedChat(3, 2), true, 'a turn finished after the save');
 });

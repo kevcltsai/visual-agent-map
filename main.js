@@ -35123,6 +35123,14 @@ function aiLockBlock(op, targets, map, notes, options = {}) {
   }
   return null;
 }
+function aiLockedError() {
+  const error = new Error("AI lock: the topic is locked");
+  error.name = "AiLockedError";
+  return error;
+}
+function isAiLockedError(error) {
+  return error instanceof Error && error.name === "AiLockedError";
+}
 
 // core/steps/map-chat/language.en.md
 var language_en_default2 = "Write the reply, and every title, summary, note text and new file text you produce, in {{language}}.\n";
@@ -52849,7 +52857,12 @@ ${request.requirements}` : preset.text,
       targetId: check.targetId,
       sources: check.sources.map((source) => ({ id: source.id, path: source.path }))
     };
-    const withContent = hasMergeContent(check.sources.map((source) => this.notes.get(source.id)));
+    const locked = !!this.mergeLockReason(
+      check.sources.map((source) => source.id),
+      check.targetId
+    );
+    if (locked) new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+    const withContent = !locked && hasMergeContent(check.sources.map((source) => this.notes.get(source.id)));
     this.mergeOpen = true;
     new MergeTopicsModal(
       this.app,
@@ -52899,6 +52912,14 @@ ${request.requirements}` : preset.text,
         return ((_a4 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a4.path) === node.path;
       });
     };
+    if (this.mergeLockReason(
+      snapshot.sources.map((source) => source.id),
+      snapshot.targetId,
+      await this.freshNotes()
+    )) {
+      new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+      return false;
+    }
     await this.refreshNoteStyles();
     if (!stillValid()) {
       new import_obsidian34.Notice(t("ui.merge_draft_stale"));
@@ -53052,7 +53073,8 @@ ${request.requirements}` : preset.text,
       if (!this.closed) this.render();
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
-      new import_obsidian34.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
+      if (isAiLockedError(error)) new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+      else new import_obsidian34.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
     } finally {
       progress.end();
     }
@@ -53146,6 +53168,12 @@ ${request.requirements}` : preset.text,
       new import_obsidian34.Notice(t("ui.merge_missing_note"));
       return;
     }
+    if (content && this.mergeLockReason(
+      check.sources.map((source) => source.id),
+      check.targetId,
+      await this.freshNotes()
+    ))
+      throw aiLockedError();
     const sources = check.sources, mapPath = this.path, repo = this.plugin.repo, before = clone(this.map), language2 = this.plugin.settings.language;
     if (content) {
       let latest;
@@ -59608,6 +59636,27 @@ ${request.requirements}` : preset.text,
       return ((_b2 = (_a2 = fresh == null ? void 0 : fresh.get(id)) != null ? _a2 : this.notes.get(id)) == null ? void 0 : _b2.aiLocked) === true;
     }, options);
   }
+  /**
+   * Why the AI may not merge these topics (AI lock), or null: the sources leave the map (their subtree, their parent's
+   * child list and their semantic relations count), and in parent mode the parent topic is rewritten.
+   */
+  mergeLockReason(ids, targetId, fresh) {
+    var _a2;
+    const removed = ids.filter((id) => id !== targetId);
+    return (_a2 = targetId ? this.aiLockReason("write", [targetId], fresh) : null) != null ? _a2 : this.aiLockReason("remove", removed, fresh);
+  }
+  /** Every topic note of the map read again from disk: the write-time fence must not trust the view's copy. */
+  async freshNotes() {
+    var _a2, _b2, _c;
+    const fresh = /* @__PURE__ */ new Map();
+    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
+      try {
+        fresh.set(node.id, await this.plugin.repo.readNote(node.path, (_c = this.map) != null ? _c : void 0));
+      } catch (e) {
+      }
+    }
+    return fresh;
+  }
   /** Stops every AI run on the topic through the same handles its Stop button uses. */
   stopAiOn(path) {
     var _a2, _b2;
@@ -63845,6 +63894,12 @@ ${note.detail.trim()}` : "",
         if (this.mergeTasks.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
         const check = this.mergeCheck();
         if (!check.ok) return skipped("ui.map_chat_skip_unavailable");
+        if (this.mergeLockReason(
+          check.sources.map((source) => source.id),
+          check.targetId,
+          await this.freshNotes()
+        ))
+          return skipped("ui.ai_locked_notice");
         const snapshot = {
           path: this.path,
           mapId: map.id,
@@ -72174,14 +72229,6 @@ function runStyleLabelText(label, language2) {
 
 // experiences/visual-map/topic-run.ts
 var CHART_JOB_LIMIT = 3;
-function aiLockedError() {
-  const error = new Error(t("ui.ai_locked_notice"));
-  error.name = "AiLockedError";
-  return error;
-}
-function isAiLockedError(error) {
-  return error instanceof Error && error.name === "AiLockedError";
-}
 var TopicRuns = class {
   constructor(ports) {
     this.ports = ports;

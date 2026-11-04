@@ -3,6 +3,7 @@
  * It imports neither obsidian nor the view; everything it needs from the plugin comes through lazy ports, because the
  * plugin replaces some of those objects after construction.
  */
+import { aiLockedError, isAiLockedError } from "../../core/ai-lock";
 import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
@@ -339,16 +340,6 @@ export interface TopicRunHandle {
   readonly signal: AbortSignal;
   /** Frees the topic. A release from a run that was already replaced does nothing. */
   release(): void;
-}
-
-/** The error a write-time AI lock check throws; entries report it with the locked notice, not as a failure. */
-export function aiLockedError(): Error {
-  const error = new Error(t("ui.ai_locked_notice"));
-  error.name = "AiLockedError";
-  return error;
-}
-export function isAiLockedError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AiLockedError";
 }
 
 export class TopicRuns {

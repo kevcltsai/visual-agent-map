@@ -243,6 +243,22 @@ test('inspector: an aria-pressed lock toggle; the card shows a lock button only 
   assert.equal(dom.findAll(aimPanel, i => i.tag === 'button').length + dom.findAll(aimHeader, i => i.tag === 'button').length, 0);
 });
 
+test('34 inspector: the lock button label follows the state like the selection bar (Lock -> Unlock)', async () => {
+  const h = await harness(['A']);
+  const [a] = h.nodes;
+  h.view.setAiLock = async () => {};
+  h.view.enqueue = fn => fn();
+  const panel = dom.element('div');
+  h.view.renderAiLockSection(panel, a);
+  const find = () => dom.findAll(panel, i => i.tag === 'button' && i.attrs['aria-pressed'] !== undefined)[0];
+  assert.equal(find().text, t('ui.ai_lock_toggle'));
+  find().click(); await dom.tick();
+  assert.equal(find().attrs['aria-pressed'], 'true');
+  assert.equal(find().text, t('ui.ai_unlock_selected'), 'locked: button says Unlock');
+  find().click(); await dom.tick();
+  assert.equal(find().text, t('ui.ai_lock_toggle'), 'unlocked again: back to Lock');
+});
+
 test('i18n: the locked notice and the toggle names exist in every language', () => {
   for (const lang of ['en', 'zh-TW', 'zh-CN']) {
     const text = read(`i18n/${lang}.ts`);

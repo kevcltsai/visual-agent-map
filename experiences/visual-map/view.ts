@@ -592,7 +592,14 @@ function aimQuestionStatus(
   return "not_started";
 }
 /** The AI merge that hid its dialog: owned by the view, one per map. It writes nothing until the draft is confirmed. */
+/** A chat reply's undo step, still open to the one AI merge the reply started (it lands later and joins the step). */
+interface ChatReplyStep {
+  entry: TransactionEntry;
+  absorb: (entry: TransactionEntry) => Promise<void>;
+}
 interface MergeTask {
+  /** The reply step this merge may join when it is written (the chat's merge); see {@link ChatReplyStep}. */
+  replyStep?: ChatReplyStep;
   mapPath: string;
   mapId: string;
   mapTitle: string;
@@ -980,6 +987,8 @@ export class VisualAgentMapView extends ItemView {
   private mergeOpen = false;
   /** AI merges that hid their dialog, keyed by map path (one per map). */
   private mergeTasks = new Map<string, MergeTask>();
+  /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
+  private chatReplyStep: ChatReplyStep | undefined;
 
   /**
    * AI actions whose dialog hid itself and whose provider request is not accepted yet, keyed by node path (or
@@ -6016,7 +6025,7 @@ export class VisualAgentMapView extends ItemView {
     },
     started: () => void,
     signal: AbortSignal,
-    options: { keepTitle?: boolean } = {}
+    options: { keepTitle?: boolean; replyStep?: ChatReplyStep } = {}
   ): Promise<boolean> {
     const stillValid = (): boolean => {
       const check = this.mergeCheck(snapshot.sources.map(source => source.id));
@@ -6057,6 +6066,7 @@ export class VisualAgentMapView extends ItemView {
         mapTitle: this.map?.title ?? "",
         title,
         ...(options.keepTitle ? { keepTitle: true } : {}),
+        ...(options.replyStep ? { replyStep: options.replyStep } : {}),
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
@@ -6169,7 +6179,15 @@ export class VisualAgentMapView extends ItemView {
       this.render();
       const previous = this.history.undoEntry;
       await this.confirmMergeDraft(task, result.summary, result.detail);
-      const entry = this.history.undoEntry;
+      let entry = this.history.undoEntry;
+      // A merge the chat reply started joins that reply's step when the reply is still the newest one: one undo, one redo.
+      let folded = false;
+      const step = task.replyStep;
+      if (step && entry && entry !== previous && previous === step.entry && this.history.dropTop(entry)) {
+        await step.absorb(entry);
+        entry = step.entry;
+        folded = true;
+      }
       let done = t("ui.merge_done_0", task.title);
       if (!check.ok) {
         const found = check.missing.length + check.added.length;
@@ -6180,7 +6198,7 @@ export class VisualAgentMapView extends ItemView {
         done = `${done} ${t("ui.merge_check_warning_0", String(found))}`;
       }
       // The Undo button only while this merge is still the newest history step.
-      if (entry && entry !== previous)
+      if (entry && (entry !== previous || folded))
         backgroundResultNotice(
           done,
           {
@@ -17629,10 +17647,11 @@ export class VisualAgentMapView extends ItemView {
       // so undo checks the files instead of writing an old snapshot over them. Another view of the same map keeps no entry
       // that would not know about these writes: its history is cleared, as for any change made outside it.
       const entries = this.history.closeGroup();
+      this.chatReplyStep = undefined;
       if (wrote) {
         try {
           if (!this.closed && this.path === anchor.path)
-            await this.pushChatReplyEntry(
+            this.chatReplyStep = await this.pushChatReplyEntry(
               entries,
               anchor.path,
               run.notes ?? new Set(),
@@ -18323,8 +18342,8 @@ export class VisualAgentMapView extends ItemView {
     noteIds: ReadonlySet<string>,
     files: ReadonlySet<string>,
     parked: ReadonlySet<string> = new Set()
-  ): Promise<void> {
-    if (!entries.length) return;
+  ): Promise<ChatReplyStep | undefined> {
+    if (!entries.length) return undefined;
     const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint();
     const run = async (redo: boolean): Promise<void> => {
@@ -18347,7 +18366,19 @@ export class VisualAgentMapView extends ItemView {
       expected = await fingerprint();
     };
     // Solo: a job that began before the reply ended (an expand) must not fold the reply into its own step.
-    this.history.pushSolo({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
+    const step: TransactionEntry = {
+      undo: () => run(false),
+      redo: () => run(true),
+      label: t("ui.map_chat_undo_label")
+    };
+    this.history.pushSolo(step);
+    return {
+      entry: step,
+      absorb: async (entry: TransactionEntry): Promise<void> => {
+        entries.push(entry);
+        expected = await fingerprint();
+      }
+    };
   }
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);
@@ -18477,7 +18508,8 @@ export class VisualAgentMapView extends ItemView {
         );
         if (hasMergeContent(sourceNotes, isPlaceholder)) {
           const began = await this.startMergeDraft(title, snapshot, () => {}, new AbortController().signal, {
-            keepTitle: true
+            keepTitle: true,
+            ...(this.chatReplyStep ? { replyStep: this.chatReplyStep } : {})
           });
           return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
         }

@@ -1,1 +1,0 @@
-This is the detailed re-send of the same question the user asked earlier. The earlier turns are in the context, and the actions of that turn were already applied. Only explain in more detail: "actions" must be an empty list.

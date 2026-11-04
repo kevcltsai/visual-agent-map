@@ -32,8 +32,10 @@ export interface SceneImage {
   w: number;
   h: number;
   href: string;
-  /** "cover" crops to fill the box (a card cover); anything else stretches to it (a free canvas image). */
-  fit?: "cover" | "fill";
+  /** "contain" shows the whole picture inside the box, centred (a card cover); "cover" crops to fill it; anything else stretches to it (a free canvas image). */
+  fit?: "contain" | "cover" | "fill";
+  /** A masked card cover: x/y/w/h is the whole picture, and only this window of it is drawn (a nested svg, no clipPath). */
+  window?: { x: number; y: number; w: number; h: number };
 }
 export interface SceneEdge {
   d: string;
@@ -137,11 +139,14 @@ function rect(x: unknown, y: unknown, w: unknown, h: unknown): [number, number, 
 function imageElement(image: SceneImage | null | undefined): string {
   if (!image || typeof image.href !== "string" || !DATA_IMAGE.test(image.href)) return "";
   const box = rect(image.x, image.y, image.w, image.h);
-  // An image element clips to its own box, so "slice" crops a cover the way the card's object-fit: cover does.
-  const fit = image.fit === "cover" ? "xMidYMid slice" : "none";
-  return box
-    ? `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>`
-    : "";
+  // "meet" shows the whole picture, like the card cover's object-fit: contain; nothing is cropped.
+  const fit = image.fit === "contain" ? "xMidYMid meet" : image.fit === "cover" ? "xMidYMid slice" : "none";
+  if (!box) return "";
+  const tag = `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>`;
+  const win = image.window ? rect(image.window.x, image.window.y, image.window.w, image.window.h) : null;
+  return win
+    ? `<svg x="${win[0]}" y="${win[1]}" width="${win[2]}" height="${win[3]}" viewBox="${win.join(" ")}">${tag}</svg>`
+    : tag;
 }
 /** A finite number inside [min, max], or undefined (so an absent or odd value draws the default). */
 function numberIn(value: unknown, min: number, max: number): number | undefined {

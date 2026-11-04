@@ -49,16 +49,15 @@ function loadPanelModule(windowValues = {}) {
 function panelFixture(overrides = {}, windowValues = {}) {
   const { MapChatPanel, setUiLanguage } = loadPanelModule(windowValues);
   const p = page(); const overlay = p.attach(p.root.createDiv('vam-canvas-overlay'));
-  const calls = { send: 0, stop: 0, layout: [], more: [], links: [] };
+  const calls = { send: 0, stop: 0, layout: [], links: [] };
   const topics = { a: 'Topic A', b: 'Topic B' };
   let selected = [];
   let visibleNote = null;
-  const prefs = { style: 'concise', model: 'claude:haiku', saved: [], watchers: [] };
+  const prefs = { model: 'claude:haiku', saved: [], watchers: [] };
   const host = {
-    style: () => prefs.style, setStyle: style => { prefs.style = style; prefs.saved.push(['style', style]); },
     modelChoices: () => [{ value: 'claude:haiku', label: 'Haiku' }, { value: 'gpt-6', label: 'GPT 6' }],
     watchModels: changed => { prefs.watchers.push(changed); return () => { prefs.watchers.splice(prefs.watchers.indexOf(changed), 1); }; },
-    model: () => prefs.model, setModel: model => { prefs.model = model; prefs.saved.push(['model', model]); }, moreDetail: origin => { calls.more.push(origin); },
+    model: () => prefs.model, setModel: model => { prefs.model = model; prefs.saved.push(['model', model]); },
     topicTitle: id => topics[id] ?? null, selectedIds: () => selected, send: () => { calls.send++; }, stop: () => { calls.stop++; },
     resolveLink: link => ({ Note: 'Notes/Note.md', Other: 'Notes/Other.md' })[link] ?? null, activeNotePath: () => 'Notes/Active.md', visibleNotePath: () => visibleNote,
     openLink: (href, newLeaf) => { calls.links.push([href, newLeaf]); }, activeElement: () => p.doc.activeElement, layoutChanged: open => calls.layout.push(open), ...overrides
@@ -1267,35 +1266,39 @@ integrationTest('map chat R2 N3: edit_topic_note on a card whose Detail was over
 
 // ---- Packet C1: answer length, "say it in more detail", answer-length switch, chat model ----------------------------------------
 
-const { normalizeMapChatStyle } = load('repository.ts', { obsidian });
-const styleBtn = (f, label) => byLabel(f.panel.el, label);
-
-test('map chat C1: settings default to concise and have no separate chat model (MS-02); an invalid saved style is sanitised', () => {
-  assert.equal(DEFAULT_SETTINGS.mapChatStyle, 'concise'); assert.equal('mapChatModel' in DEFAULT_SETTINGS, false);
-  for (const bad of [undefined, null, 'long', 'DETAILED', 7, {}, '']) assert.equal(normalizeMapChatStyle(bad), 'concise', String(bad));
-  assert.equal(normalizeMapChatStyle('detailed'), 'detailed'); assert.equal(normalizeMapChatStyle('concise'), 'concise');
+test('map chat C1: settings have no answer-length key and no separate chat model (MS-02)', () => {
+  assert.equal('mapChatStyle' in DEFAULT_SETTINGS, false); assert.equal('mapChatModel' in DEFAULT_SETTINGS, false);
 });
 
-test('map chat C1: the answer-length switch is a labelled group of toggle buttons that follows the remembered style', () => {
+test('map chat window tweaks: the panel has no concise/detailed switch and no "Say it in more detail" button, even after a finished answer', () => {
   const f = panelFixture(); f.panel.setOpen(true);
-  const group = find(f.panel.el, i => i.attrs?.role === 'group' && i.attrs['aria-label'] === 'Answer length');
-  assert.ok(group, 'the group has an aria-label');
-  const concise = find(group, i => i.text === 'Concise'), detailed = find(group, i => i.text === 'Detailed');
-  assert.equal(concise.attrs['aria-pressed'], 'true'); assert.equal(detailed.attrs['aria-pressed'], 'false');
-  detailed.click();
-  eq(f.prefs.saved, [['style', 'detailed']], 'the choice is handed to the view to remember');
-  assert.equal(detailed.attrs['aria-pressed'], 'true'); assert.equal(concise.attrs['aria-pressed'], 'false');
+  f.panel.begin('why', { text: 'why', chips: [], selectedIds: ['a'] }); f.panel.finish('Because.', []);
+  assert.equal(find(f.panel.el, i => hasClass(i, 'vam-map-chat-style') || hasClass(i, 'vam-map-chat-length') || hasClass(i, 'vam-map-chat-more')), undefined);
+  const texts = findAll(f.panel.el, i => i.tag === 'button').map(b => b.text);
+  for (const word of ['Concise', 'Detailed', 'Say it in more detail']) assert.equal(texts.includes(word), false, word);
 });
 
-test('map chat C1: the answer-length choice survives a repaint and a brand new panel (reopened view) built from the same settings', () => {
+test('map chat window tweaks: a reply is labelled with the model that was current when its question was sent; a later model change leaves it alone', () => {
   const f = panelFixture(); f.panel.setOpen(true);
-  const option = (panel, text) => find(panel.el, i => i.tag === 'button' && i.text === text);
-  option(f.panel, 'Detailed').click();
-  f.panel.detach(); f.panel.mount(f.overlay);
-  assert.equal(option(f.panel, 'Detailed').attrs['aria-pressed'], 'true', 'after a repaint');
-  const again = panelFixture(); again.prefs.style = 'detailed'; again.panel.detach(); again.panel.mount(again.overlay);
-  assert.equal(option(again.panel, 'Detailed').attrs['aria-pressed'], 'true', 'read back from the settings on mount');
-  assert.equal(option(again.panel, 'Concise').attrs['aria-pressed'], 'false');
+  const roles = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text);
+  f.panel.begin('one'); f.panel.finish('first', []);
+  f.prefs.model = 'gpt-6';
+  f.panel.begin('two'); f.panel.finish('second', []);
+  eq(roles(), ['You', 'Haiku', 'You', 'GPT 6']);
+  f.prefs.model = 'claude:haiku'; f.panel.refreshControls(); f.panel.relabel();
+  eq(roles(), ['You', 'Haiku', 'You', 'GPT 6'], 'the older labels stay');
+});
+
+test('map chat window tweaks: when no model name can be read the reply is labelled "AI", never empty or undefined', () => {
+  const f = panelFixture({ model: () => '' }); f.panel.setOpen(true);
+  f.panel.begin('one'); f.panel.finish('first', []);
+  const labelled = panel => findAll(panel.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text);
+  eq(labelled(f.panel), ['You', 'AI']);
+  const g = panelFixture({ model: () => 'claude:haiku', modelChoices: () => [{ value: 'claude:haiku', label: '   ' }] }); g.panel.setOpen(true);
+  g.panel.begin('one'); g.panel.finish('first', []);
+  eq(labelled(g.panel), ['You', 'AI'], 'a blank name falls back too');
+  g.panel.messages[1].modelLabel = undefined; g.panel.relabel();
+  eq(labelled(g.panel), ['You', 'AI'], 'a message saved without a model keeps the old label');
 });
 
 test('map chat C1: the model list has no follow-default entry, shows the current model, and a change is handed to the view', () => {
@@ -1311,34 +1314,11 @@ test('map chat C1: the model list has no follow-default entry, shows the current
   f.panel.detach(); f.panel.mount(f.overlay); assert.equal(f.panel.modelEl.value, 'gpt-6', 'kept across a repaint');
 });
 
-const moreButtons = f => findAll(f.panel.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-more'));
-test('map chat C1: every finished answer has a "Say it in more detail" button; streaming and failed answers do not', () => {
-  const f = panelFixture(); f.panel.setOpen(true);
-  const origin = { text: 'why', chips: [], selectedIds: ['a'] };
-  f.panel.begin('why', origin); assert.equal(moreButtons(f).length, 0, 'not while the answer streams');
-  f.panel.finish('Because.', []); assert.equal(moreButtons(f).length, 1); assert.equal(moreButtons(f)[0].text, 'Say it in more detail');
-  f.panel.begin('again', origin); f.panel.fail('It broke'); assert.equal(moreButtons(f).length, 1, 'a failed answer has none');
-  f.panel.begin('third', origin); f.panel.finish('Third.', []); assert.equal(moreButtons(f).length, 2, 'one per finished answer');
-});
-
-test('map chat C1: the more-detail button hands the original question and references to the view, and is disabled while a reply is running', () => {
-  const f = panelFixture(); f.panel.setOpen(true);
-  const origin = { text: 'why', chips: [{ kind: 'topic', id: 'a' }], selectedIds: ['b'] };
-  f.panel.begin('why', origin); f.panel.finish('Because.', []);
-  assert.equal(moreButtons(f)[0].disabled, false);
-  moreButtons(f)[0].click(); eq(f.calls.more, [origin]);
-  f.panel.begin('again', origin);
-  assert.equal(moreButtons(f).length, 1);
-  assert.equal(moreButtons(f).every(b => b.disabled), true, 'disabled the moment a reply starts');
-  moreButtons(f)[0].fire('click'); assert.equal(f.calls.more.length, 1, 'a click while busy sends nothing');
-  f.panel.finish('Again.', []); assert.equal(moreButtons(f).every(b => !b.disabled), true, 'enabled again when the reply is done');
-});
-
-integrationTest('map chat C1: a normal send is concise on the current model, and the usage notice is asked for that model', async () => {
+integrationTest('map chat C1: a normal send carries no style or redo field, on the current model, and the usage notice is asked for that model', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
   h.type('hello'); await h.view.sendMapChat();
   const request = h.control.requests[0];
-  assert.equal(request.style, 'concise'); assert.equal(request.model, 'claude:sonnet'); assert.equal(request.redo, undefined);
+  assert.equal('style' in request, false); assert.equal('redo' in request, false); assert.equal(request.model, 'claude:sonnet');
   eq(h.control.models, ['claude:sonnet']);
 });
 
@@ -1353,16 +1333,10 @@ integrationTest('map chat C1: the current model (cliModel) is what is sent and w
   assert.equal(h.view.chatModelChoices().some(c => c.value === '' || /Follow default/.test(c.label)), false);
 });
 
-integrationTest('map chat C1: choosing detailed in the switch is remembered, saved, and sent on the next message; the model pick is saved too', async () => {
+integrationTest('map chat C1: the model pick in the menu is saved as the current model', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  const option = text => find(chat.el, i => i.tag === 'button' && i.text === text);
-  option('Detailed').click();
-  assert.equal(h.plugin.settings.mapChatStyle, 'detailed'); assert.equal(h.control.saves, 1);
-  h.type('explain'); await h.view.sendMapChat();
-  assert.equal(h.control.requests[0].style, 'detailed');
-  h.repaint(); assert.equal(option('Detailed').attrs['aria-pressed'], 'true', 'kept after render()');
   chat.modelEl.value = 'claude:haiku'; chat.modelEl.change();
-  assert.equal(h.plugin.settings.cliModel, 'claude:haiku', 'the menu pick is the current model'); assert.equal(h.control.saves, 2);
+  assert.equal(h.plugin.settings.cliModel, 'claude:haiku', 'the menu pick is the current model'); assert.equal(h.control.saves, 1);
 });
 
 integrationTest('map chat C1: the chat model list is the settings list (no follow-default), and a current model that is gone stays selectable', async () => {
@@ -1372,67 +1346,16 @@ integrationTest('map chat C1: the chat model list is the settings list (no follo
   eq(h.view.chatModelChoices().at(-1), { value: 'claude:gone', label: 'label(claude:gone) (Current model is unavailable)' });
 });
 
-integrationTest('map chat C1: "Say it in more detail" re-sends the same message and references as detailed, with the earlier turn as history, and adds a new answer', async () => {
-  const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  chat.addTopicReference(h.ids.c); h.view.selection.setSelected(h.ids.a);
-  h.control.reply = async request => ({ reply: request.style === 'detailed' ? 'Long answer.' : 'Short.', actions: [], rejected: [] });
-  h.type('what is REM'); await h.view.sendMapChat();
-  chat.removeChip(chat.attachments()[0]); h.view.selection.setSelected(h.ids.b); h.type('half-typed draft');
-  assert.equal(moreButtons({ panel: chat }).length, 1);
-  moreButtons({ panel: chat })[0].click(); await until(() => h.control.requests.length === 2 && !chat.isBusy);
-  const [first, second] = h.control.requests;
-  assert.equal(second.style, 'detailed'); assert.equal(second.redo, true); assert.equal(second.message, first.message);
-  const ctx = request => JSON.parse(request.context.json);
-  eq(ctx(second).selected.map(s => s.id), ctx(first).selected.map(s => s.id), 'the same selection, not the current one');
-  eq(ctx(second).references.map(s => s.id), ctx(first).references.map(s => s.id), 'the same references, though the chip was removed since');
-  assert.equal(ctx(first).references.length, 1);
-  eq(ctx(second).earlierTurns, [{ role: 'user', text: 'what is REM' }, { role: 'assistant', text: 'Short.' }], 'the first turn is the history');
-  eq(h.control.calls, ['confirm', 'chat', 'confirm', 'chat'], 'the usage notice is asked again before the second send');
-  const log = chat.transcript(); assert.equal(log.length, 4); assert.equal(log.at(-1).text, 'Long answer.'); assert.equal(log.at(-2).text, 'Say it in more detail.');
-  assert.equal(chat.draft, 'half-typed draft', 'the draft in the field is left alone');
-});
-
-integrationTest('map chat C1: declining the usage notice on the more-detail re-send sends nothing', async () => {
-  const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  h.type('q'); await h.view.sendMapChat();
-  h.control.decline = true;
-  moreButtons({ panel: chat })[0].click(); await tick(); await tick();
-  assert.equal(h.control.requests.length, 1); assert.equal(chat.transcript().length, 2);
-});
-
-integrationTest('map chat C1: during a reply a direct more-detail call does not start a second request', async () => {
-  const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  h.type('q'); await h.view.sendMapChat();
-  const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'r', actions: [], rejected: [] }; };
-  const origin = chat.messages[0].origin;
-  const sending = h.view.sendMapChat(origin); await requestOut(chat);
-  assert.equal(moreButtons({ panel: chat }).every(b => b.disabled), true);
-  await h.view.sendMapChat(origin); assert.equal(h.control.requests.length, 2, 'only one request at a time');
-  gate.resolve(); await sending;
-});
-
 // ---- Packet C1 review fixes ----------------------------------------------------------------------------------------------------
 
-integrationTest('map chat C1 F1: a "more detail" re-send never applies actions, even when the model lists some', async () => {
-  const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  h.type('what is REM'); await h.view.sendMapChat();
-  const nodes = h.view.map.nodes.length; const researches = []; const realApply = h.view.applyMapChatActions.bind(h.view); h.view.applyMapChatActions = (...args) => { researches.push('apply'); return realApply(...args); };
-  h.control.reply = async () => ({ reply: 'Long answer.', actions: [{ kind: 'add_child', parentId: h.ids.a, title: 'Sneaky', summary: '' }, { kind: 'run_map_action', action: 'expand', nodeIds: [], title: '', goal: '', direction: '' }], rejected: [] });
-  h.control.mutates = 0;
-  moreButtons({ panel: chat })[0].click(); await until(() => h.control.requests.length === 2 && !chat.isBusy);
-  assert.equal(h.control.mutates, 0, 'nothing was written'); assert.equal((await h.saved()).length, nodes, 'no card was added');
-  assert.equal(h.view.map.nodes.length, nodes); eq(researches, []);
-  const last = chat.transcript().at(-1);
-  assert.equal(last.text, 'Long answer.'); eq(last.lines.map(l => l.text), ['Actions are not applied again in a more-detail answer.']);
-  assert.equal(h.contents.has('Agent Workspace/Topics/map-a/Sneaky.md'), false);
-});
-
-test('map chat C1 F1: the redo prompt tells the model that actions must be an empty list', () => {
+test('map chat window tweaks: the prompt has no detailed or redo text, forbids counts in the reply, and the request has no style field (en and zh)', () => {
   const { mapChatStep } = load('core/steps/map-chat/step.ts');
   const context = buildMapChatContext({ mapTitle: 'm', outline: [], selected: [], references: [], snippets: [], files: [], history: [] });
   const base = { message: 'q', context, model: 'm', reasoning: 'low', style: 'detailed', redo: true };
-  assert.match(mapChatStep.render({ ...base, language: 'en' }), /"actions" must be an empty list/);
-  assert.match(mapChatStep.render({ ...base, language: 'zh-TW' }), /"actions" 必須是空清單/);
+  const en = mapChatStep.render({ ...base, language: 'en' }), zh = mapChatStep.render({ ...base, language: 'zh-TW' });
+  for (const text of [en, zh]) { assert.doesNotMatch(text, /detailed|must be an empty list|必須是空清單|詳細/i); assert.match(text, /Answer style: concise|回答風格：精簡/); }
+  assert.match(en, /Never write how many cards or files you will create or change in "reply"/);
+  assert.match(zh, /"reply" 不可寫出將建立或修改的數量/);
 });
 
 test('map chat C1 F2: the panel listens for model changes while built, repaints its model list on a change, and stops on dispose', () => {
@@ -1459,13 +1382,11 @@ integrationTest('map chat C1 F2: model discovery going from idle to ready makes 
   await h.view.onClose(); assert.equal(h.control.listeners.length, 0); assert.equal(h.plugin.currentModelListeners.size, 0, 'both notifications are unsubscribed');
 });
 
-test('map chat C1 F3: loading saved settings sanitises an invalid chat style, keeps a valid one, and never carries a chat model key (MS-02)', () => {
+test('map chat C1 F3: loading saved settings drops an old chat style and never carries a chat model key (MS-02)', () => {
   const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
-  const bad = settingsFromSaved({ mapChatStyle: 'long', mapChatModel: 7 });
-  assert.equal(bad.mapChatStyle, 'concise'); assert.equal('mapChatModel' in bad, false);
-  const good = settingsFromSaved({ mapChatStyle: 'detailed' });
-  assert.equal(good.mapChatStyle, 'detailed');
-  const none = settingsFromSaved(null); assert.equal(none.mapChatStyle, 'concise'); assert.equal('mapChatModel' in none, false);
+  const old = settingsFromSaved({ mapChatStyle: 'detailed', mapChatModel: 7 });
+  assert.equal('mapChatStyle' in old, false); assert.equal('mapChatModel' in old, false);
+  const none = settingsFromSaved(null); assert.equal('mapChatStyle' in none, false); assert.equal('mapChatModel' in none, false);
 });
 
 // ---- MS-02: one current model; the old chat model is migrated once ---------------------------------------------------------
@@ -2137,14 +2058,6 @@ test('map chat E1: a reset, and a new panel, start with no kept rows', () => {
   f.panel.reset(); assert.equal(log.children.length, 0);
   f.panel.begin('q1'); f.panel.finish('one', []);
   assert.equal(log.children.length, 2); assert.ok(old.every(row => !log.children.includes(row)), 'nothing of the old conversation is reused');
-});
-
-test('map chat E1: the "more detail" button of a kept row follows the busy state without rebuilding the row', () => {
-  const f = panelFixture(); f.panel.setOpen(true); const log = f.parts.log();
-  f.panel.begin('q1', { text: 'q1', chips: [], selectedIds: [] }); f.panel.finish('one', []);
-  const row = log.children[1]; const more = find(row, i => hasClass(i, 'vam-map-chat-more')); assert.equal(more.disabled, false);
-  f.panel.begin('q2'); assert.equal(log.children[1], row); assert.equal(more.disabled, true, 'disabled while the next turn runs');
-  f.panel.finish('two', []); assert.equal(log.children[1], row); assert.equal(more.disabled, false);
 });
 
 test('map chat E1: while streaming only the streaming message is laid out, once per frame, and the other rows stay the same objects', () => {
@@ -2872,19 +2785,6 @@ test('UX B3: an open-ended suggestion shows an ellipsis, replaces the draft, and
   buttons()[2].click(); assert.equal(f.parts.input().value, 'Create a new map about ', 'a second pick replaces the first');
 });
 
-test('UX B7: the Concise/Detailed toggle has a visible "Answer length" label and a tooltip on each button that says what it means', () => {
-  const f = panelFixture(); f.panel.setOpen(true);
-  const group = find(f.panel.el, i => hasClass(i, 'vam-map-chat-style')); const box = find(f.panel.el, i => hasClass(i, 'vam-map-chat-length'));
-  const tag = find(box, i => hasClass(i, 'vam-map-chat-style-tag'));
-  assert.equal(tag.text, 'Answer length'); assert.equal(tag.attrs['aria-hidden'], 'true', 'the group label says it to screen readers already');
-  assert.ok(box.children.includes(group), 'the label sits right next to the toggle'); assert.equal(group.attrs['aria-label'], 'Answer length');
-  const [concise, detailed] = findAll(group, i => i.tag === 'button');
-  assert.equal(concise.attrs.title, 'Short answers that get to the point'); assert.equal(detailed.attrs.title, 'Longer answers with more explanation');
-  f.setLanguage('zh-TW'); f.panel.relabel();
-  assert.equal(tag.text, '回答長度'); assert.equal(concise.attrs.title, '簡短、直接的回覆');
-  f.setLanguage('en');
-});
-
 integrationTest('UX B9: an empty map leaves out "Select several topics", the goal control and the gesture hint; a map with topics has them', async () => {
   // The goal control has its own suite (relevance-grade); here it only marks where it is drawn.
   const tools = h => { const box = element('div'); h.view.renderRelevanceGoalControl = parent => { parent.createEl('button', { text: 'Prioritize by goal' }); }; h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
@@ -2945,11 +2845,11 @@ integrationTest('B1 ui: Escape on any control of the window folds it; the view\'
   assert.ok(at > 0 && /closest\("input, textarea, select, \[contenteditable=true\], \.vam-map-chat"\)/.test(source.slice(at, at + 400)), 'the contentEl Escape skips input fields and the chat window (a plain literal, allowlisted in tests/literal-scan/visual-map.json)');
 });
 
-integrationTest('B1 ui: Tab order follows the document: suggestions, then the reference chips, then the message field, then the answer length and Send', async () => {
+integrationTest('B1 ui: Tab order follows the document: suggestions, then the reference chips, then the message field, then Send', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); chat.addTopicReference(h.ids.a);
   const focusable = findAll(chat.bodyEl, i => (i.tag === 'button' || i.tag === 'textarea' || i.tag === 'select') && !i.hidden && i.attrs.tabindex !== '-1');
-  const names = focusable.map(i => hasClass(i, 'vam-map-chat-suggestion') ? 'suggestion' : hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-style-option') ? 'style' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : 'other');
-  const tail = names.slice(names.indexOf('suggestion')).filter(n => n !== 'stop'); eq(tail, ['suggestion', 'suggestion', 'suggestion', 'chip', 'input', 'style', 'style', 'send']);
+  const names = focusable.map(i => hasClass(i, 'vam-map-chat-suggestion') ? 'suggestion' : hasClass(i, 'vam-map-chat-chip-remove') ? 'chip' : i === chat.inputEl ? 'input' : hasClass(i, 'vam-map-chat-send') ? 'send' : hasClass(i, 'vam-map-chat-stop') ? 'stop' : i.tag === 'select' ? 'model' : 'other');
+  const tail = names.slice(names.indexOf('suggestion')).filter(n => n !== 'stop'); eq(tail, ['suggestion', 'suggestion', 'suggestion', 'chip', 'input', 'send']);
   assert.ok(!focusable.some(i => i.attrs.tabindex && Number(i.attrs.tabindex) > 0), 'no positive tabindex');
 });
 
@@ -3140,24 +3040,6 @@ integrationTest('B1 fix 3: while a plan is applied the window says so and offers
   assert.ok(lines.some(l => l.status === 'skipped' && /you stopped it/.test(l.text)), JSON.stringify(lines.slice(-3)));
   assert.equal(chat.stopEl.hidden, true); assert.equal(chat.sendEl.hidden, false); assert.equal(chat.statusEl.text, '');
   assert.equal(h.view.map.nodes.length, 4 + lines.filter(l => l.status === 'done' && /Add subtopic/.test(l.text)).length, 'what was done is kept');
-});
-
-integrationTest('B1 fix 4: a plan that waits has no "say it in more detail" button (it would replace the plan); once settled the button is back and comes after the results', async () => {
-  const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  h.control.reply = async () => ({ reply: 'a plan for you', actions: planActions(h), rejected: [] });
-  h.type('many'); await h.view.sendMapChat();
-  assert.equal(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-more')).length, 0, 'not while the plan waits');
-  planButton(h, 'cancel').click(); await tick();
-  const more = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-more')); assert.equal(more.length, 1, 'back after the plan was settled');
-  const row = more[0].parent; const order = row.children.map(c => c.cls.split(' ')[0]);
-  assert.ok(order.indexOf('vam-map-chat-more') > order.indexOf('vam-map-chat-plan'), JSON.stringify(order));
-});
-
-integrationTest('B1 fix 25: "say it in more detail" comes after the result lines, not between the reply and them', async () => {
-  const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  h.control.reply = async () => ({ reply: 'done', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }], rejected: [] });
-  h.type('rename'); await h.view.sendMapChat(); const row = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-more'))[0].parent; const order = row.children.map(c => c.cls.split(' ')[0]);
-  assert.ok(order.indexOf('vam-map-chat-lines') >= 0 && order.indexOf('vam-map-chat-more') > order.indexOf('vam-map-chat-lines'), JSON.stringify(order));
 });
 
 test('B1 fix 5: a new message, and a pick in any list, end every list of maps shown so far', () => {
@@ -3390,15 +3272,14 @@ integrationTest('B1 fix 21 and 27: a window laid over a narrow pane leaves 160px
   assert.ok(z('.vam-map-chat.is-overlay') > z('.vam-hover-card'), 'the preview is under the laid-over window');
 });
 
-test('B1 fix 17: the suggestions, examples, retry, "more detail" and "show all" each get their own look, with enough weight to beat the base button style', () => {
+test('B1 fix 17: the suggestions, examples, retry and "show all" each get their own look, with enough weight to beat the base button style', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
   // UX B3: suggestions and examples are recognisable buttons (outlined, filled, at least 24px high), not faint text links.
   for (const name of ['suggestion', 'example']) { const r = rule(`.vam-map-chat button.vam-map-chat-${name}`); assert.match(r, /border: 1px solid/, `${name}: outlined`); assert.match(r, /background: var\(--background-secondary\)/, `${name}: filled`); assert.match(r, /min-height: (2[4-9]|[3-9]\d)px/, `${name}: at least 24px high`); }
-  assert.match(rule('.vam-map-chat-style-option'), /min-height: 24px; min-width: 24px/, 'the answer-length toggle is a 24px target');
   assert.match(rule('.vam-map-chat button.vam-map-chat-retry'), /border: 1px solid/, 'retry: a clear secondary button'); assert.match(rule('.vam-map-chat button.vam-map-chat-retry'), /background: var\(--background-primary\)/);
-  assert.match(css, /\.vam-map-chat button\.vam-map-chat-lines-toggle, \.vam-map-chat button\.vam-map-chat-more \{[^}]*background: transparent/);
+  assert.match(css, /\.vam-map-chat button\.vam-map-chat-lines-toggle \{[^}]*background: transparent/);
   assert.match(rule('.vam-map-chat-chip'), /border: 1px solid[^;]*; border-radius: 999px/, 'chips: an outlined pill');
-  for (const bare of ['.vam-map-chat-suggestion', '.vam-map-chat-example', '.vam-map-chat-retry', '.vam-map-chat-more']) assert.equal(css.split('\n').some(line => line.startsWith(`${bare} {`)), false, `${bare} is no longer a bare class that the base style beats`);
+  for (const bare of ['.vam-map-chat-suggestion', '.vam-map-chat-example', '.vam-map-chat-retry']) assert.equal(css.split('\n').some(line => line.startsWith(`${bare} {`)), false, `${bare} is no longer a bare class that the base style beats`);
 });
 
 test('UX B4: the chat title is short in every language and is never cut with an ellipsis (it may wrap instead)', () => {
@@ -4327,8 +4208,8 @@ integrationTest('map chat 16 counter-example: the map is switched while the usag
   assertTakenBack(h, chat, [], base, 'map switched'); assert.equal(chat.draft, 'typed on the new map', 'the new map\'s field is left alone'); assert.equal(h.notices.length, 0);
 });
 
-integrationTest('map chat 16: "say it in more detail" and a retry that fail before sending leave the conversation as it was, with a Notice that needs no draft', async () => {
-  for (const [why, send] of [['more detail', (h, origin) => h.view.sendMapChat(origin)], ['retry', (h, origin) => h.view.sendMapChat(origin, true)]]) {
+integrationTest('map chat 16: a retry that fails before sending leaves the conversation as it was, with a Notice that needs no draft', async () => {
+  for (const [why, send] of [['retry', (h, origin) => h.view.sendMapChat(origin)]]) {
     for (const [label, expected, arrange] of [['declined', 'Not sent. The conversation is unchanged.', h => { h.control.decline = true; }], ['build error', 'boom', h => { h.view.buildChatRequest = async () => { throw new Error('boom'); }; }]]) {
       const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
       h.control.reply = async () => ({ reply: 'first answer', actions: [], rejected: [] }); h.type('question'); await h.view.sendMapChat();
@@ -4348,7 +4229,7 @@ integrationTest('map chat 16: a failure after the request went out still shows t
 });
 
 integrationTest('map chat 16 counter-example: Stop while preparing takes the send back (no request, draft back, not busy) and no usage notice follows', async () => {
-  for (const [why, send] of [['normal', (h) => { h.type('  my draft  '); return h.view.sendMapChat(); }], ['more detail', (h, origin) => h.view.sendMapChat(origin)]]) {
+  for (const [why, send] of [['normal', (h) => { h.type('  my draft  '); return h.view.sendMapChat(); }], ['retry', (h, origin) => h.view.sendMapChat(origin)]]) {
     const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
     h.control.reply = async () => ({ reply: 'first answer', actions: [], rejected: [] }); h.type('earlier'); await h.view.sendMapChat(); h.control.requests.length = 0; h.control.calls.length = 0;
     const before = plain(chat.transcript()); const origin = chat.messages[0].origin; h.notices.length = 0;
@@ -4494,12 +4375,12 @@ integrationTest('map chat 18: the 3-minute timeout still ends a slow turn and cl
   h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined);
 });
 
-integrationTest('map chat 18: "Say it in more detail" keeps its mode through a resend, and a resent answer that needs a plan still shows the plan card', async () => {
+integrationTest('map chat 18: a resend carries no style or redo field, and a resent answer that needs a plan still shows the plan card', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
   h.control.reply = (request) => new Promise(resolve => { attempts.push({ request, resolve }); });
   const origin = { text: 'why', chips: [], selectedIds: [] };
   const detail = h.view.sendMapChat(origin); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2);
-  assert.equal(attempts[0].request.style, 'detailed'); assert.equal(attempts[1].request.style, 'detailed', 'the resend keeps the detailed mode'); assert.equal(attempts[1].request.redo, true); assert.equal(attempts[1].request.message, attempts[0].request.message);
+  for (const attempt of attempts) { assert.equal('style' in attempt.request, false); assert.equal('redo' in attempt.request, false); } assert.equal(attempts[1].request.message, attempts[0].request.message);
   attempts[1].resolve({ reply: 'More detail.', actions: [], rejected: [] }); await detail; assert.equal(chat.transcript().at(-1).text, 'More detail.');
   chat.reset(); attempts.length = 0; h.type('add many'); const planned = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2);
   attempts[1].resolve({ reply: 'sixteen cards', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] }); await planned;
@@ -4813,20 +4694,20 @@ test('bug bash #10: a language change sets the chat window\'s fixed words again,
   assert.equal(chat.stopEl.text, '停止'); assert.equal(chat.inputEl.attrs['aria-label'], '傳給 AI 的訊息');
   assert.equal(chat.bodyEl.attrs['aria-label'], '問 AI');
   assert.equal(chat.toggleEl.attrs['aria-label'], '關閉 AI 對話');
-  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['你', 'AI']);
+  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['你', 'Codex · gpt-5.6-luna']); // the reply keeps its model name; only 你 follows the language
   assert.ok(find(chat.bodyEl, i => hasClass(i, 'vam-map-chat-log-label') && i.text === '對話紀錄'), 'the log label follows');
   assert.equal(chat.draft, 'half-typed'); eq(chat.transcript().map(m => m.text), ['question one', 'answer one']);
   await plugin.changeLanguage('en'); assert.equal(chat.sendEl.text, 'Send');
-  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['You', 'AI']);
+  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['You', 'Codex · gpt-5.6-luna']);
 });
 
-test('bug bash #10: the "say it in more detail" and Retry buttons of an existing row change language too', async () => {
+test('bug bash #10: the Retry button of an existing row changes language too', async () => {
   const { plugin, chat } = await chatLanguageView();
-  chat.begin('q', { text: 'q', chips: [], selectedIds: [] }); chat.finish('a', []);
-  const more = () => find(chat.logEl, i => hasClass(i, 'vam-map-chat-more'));
-  assert.equal(more().text, 'Say it in more detail');
+  chat.begin('q', { text: 'q', chips: [], selectedIds: [] }); chat.fail('boom');
+  const retry = () => find(chat.logEl, i => hasClass(i, 'vam-map-chat-retry'));
+  assert.equal(retry().text, 'Retry');
   await plugin.changeLanguage('zh-TW');
-  assert.equal(more().text, '說詳細一點');
+  assert.equal(retry().text, '重試');
 });
 
 test('bug bash #14: pressing Send leaves the keyboard on Stop, not on the page', () => {

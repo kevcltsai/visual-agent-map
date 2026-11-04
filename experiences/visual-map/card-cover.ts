@@ -14,6 +14,14 @@ export interface CoverCache {
 export type CoverResolve = (linkpath: string) => { path: string } | null | undefined;
 
 export const COVER_KEY = "topic-cover";
+/** `topic-cover-frame: "x y w h"`: the part of the picture a card shows, as 0-1 fractions of the picture. A mask only; the image file is never changed. */
+export const COVER_FRAME_KEY = "topic-cover-frame";
+export interface CoverFrame {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 const IMAGE_EXTENSION = /\.(?:png|jpe?g|gif|webp)$/i;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -54,24 +62,90 @@ export function resolveCover(cache: CoverCache | null | undefined, resolve: Cove
   return null;
 }
 
+const FRAME_NUMBER = /^(?:\d+(?:\.\d*)?|\.\d+)$/;
+const FRAME_EPSILON = 1e-9;
+
+/**
+ * Reads `"x y w h"` (four non-negative decimal numbers separated by spaces). Anything else, or a frame that leaves the
+ * picture (x+w or y+h above 1) or has no area, is null: the card then shows the whole picture.
+ */
+export function parseCoverFrame(raw: unknown): CoverFrame | null {
+  if (typeof raw !== "string") return null;
+  const parts = raw.trim().split(/\s+/);
+  if (parts.length !== 4 || !parts.every(part => FRAME_NUMBER.test(part))) return null;
+  const [x, y, w, h] = parts.map(Number);
+  if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0 || x > 1 || y > 1 || w > 1 || h > 1) return null;
+  if (x + w > 1 + FRAME_EPSILON || y + h > 1 + FRAME_EPSILON) return null;
+  return { x, y, w, h };
+}
+
+const round4 = (value: number): number => Math.round(value * 10000) / 10000;
+/**
+ * The frame as the four-number string written to the note (at most 4 decimals). Edges are rounded, then the sizes are
+ * the difference of rounded edges, so a frame that ends at 1 still ends at exactly 1 after rounding.
+ */
+export function serialiseCoverFrame(frame: CoverFrame): string {
+  const x = round4(frame.x);
+  const y = round4(frame.y);
+  const w = round4(round4(frame.x + frame.w) - x);
+  const h = round4(round4(frame.y + frame.h) - y);
+  return [x, y, w, h].map(String).join(" ");
+}
+
+/** Sets (or, with null, removes) `topic-cover-frame`; every other line and the body stay as written. */
+export function withCoverFrame(content: string, frame: CoverFrame | null): string {
+  return setFrontmatterKeys(content, { [COVER_FRAME_KEY]: frame ? serialiseCoverFrame(frame) : null });
+}
+
+/** `resolveCover` plus the note's valid frame (null: whole picture). Off or no picture stays as `resolveCover` says. */
+export function resolveCoverWithFrame(
+  cache: CoverCache | null | undefined,
+  resolve: CoverResolve
+): { path: string; frame: CoverFrame | null } | { off: true } | null {
+  const cover = resolveCover(cache, resolve);
+  if (!cover || !("path" in cover)) return cover;
+  return { path: cover.path, frame: parseCoverFrame(cache?.frontmatter?.[COVER_FRAME_KEY]) };
+}
+
 /** A link path safe inside `[[...]]` and a YAML double-quoted scalar: no brackets, pipe or line breaks. */
 function safeLink(link: string): string {
   return link.replace(/[[\]|\r\n]/g, " ").trim();
 }
 
-/** Sets `topic-cover: "[[link]]"`; every other line and the body stay as written. */
+/** Sets `topic-cover: "[[link]]"` and drops the old `topic-cover-frame` (it framed another picture); everything else stays as written. */
 export function withCover(content: string, link: string): string {
   const safe = safeLink(link);
-  return safe ? setFrontmatterKeys(content, { [COVER_KEY]: `[[${safe}]]` }) : content;
+  return safe ? setFrontmatterKeys(content, { [COVER_KEY]: `[[${safe}]]`, [COVER_FRAME_KEY]: null }) : content;
 }
 
-/** Writes `topic-cover: "none"` (the topic menu's "turn cover off"). */
+/** The raw `topic-cover` value written in the note's frontmatter, or null when the key is absent. */
+function declaredCover(content: string): string | null {
+  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
+  const line = block ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(block[1]) : null;
+  return line ? line[1].replace(/^["']|["']$/g, "") : null;
+}
+
+/**
+ * Writes `topic-cover: "none"` (the topic menu's "turn cover off"). When `topic-cover` was an explicit link, turning
+ * the cover on again would show the first embedded image instead, so the frame (made for the linked picture) goes in
+ * the same write; when the cover came from the first embed, the frame stays.
+ */
 export function withCoverOff(content: string): string {
-  return setFrontmatterKeys(content, { [COVER_KEY]: "none" });
+  const declared = declaredCover(content);
+  const explicit = declared !== null && declared !== "" && declared.toLowerCase() !== "none";
+  return setFrontmatterKeys(
+    content,
+    explicit ? { [COVER_KEY]: "none", [COVER_FRAME_KEY]: null } : { [COVER_KEY]: "none" }
+  );
 }
 
-/** Removes the `topic-cover` key so the first embedded image is used again. */
+/** Removes the `topic-cover` key and the frame so the first embedded image is used again, whole. */
 export function withoutCover(content: string): string {
+  return setFrontmatterKeys(content, { [COVER_KEY]: null, [COVER_FRAME_KEY]: null });
+}
+
+/** Removes only `topic-cover` (the topic menu's "turn cover on again"): the picture did not change, so its frame stays. */
+export function withCoverOn(content: string): string {
   return setFrontmatterKeys(content, { [COVER_KEY]: null });
 }
 

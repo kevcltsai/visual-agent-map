@@ -378,8 +378,15 @@ test('merge log line: 1 new line stays, 0 gets a summary line (60 code points), 
   const three = merged('2026-01-01　舊紀錄一\n- 2026-11-01　甲\n2026-11-02　乙\n2026-11-03　丙');
   assert.deepEqual(plain(logBody(three.detail)), ['2026-01-01　舊紀錄一', '- 2026-11-01　甲；乙；丙']);
   const placeholder = merged('本次無新增內容。');
-  assert.deepEqual(plain(logBody(placeholder.detail)), [`${TODAY}　摘要`], 'a placeholder is no line');
+  assert.deepEqual(plain(logBody(placeholder.detail)), ['2026-01-01　舊紀錄一', `${TODAY}　摘要`], 'a placeholder is no line; the old line stays');
   for (const result of [one, zero, three]) assert.equal(result.ok, true);
+});
+
+test('S1a counterexample: merge keeps every old log line when the AI wrote only its one new line (2 old + 1 new = 3)', () => {
+  const oldDetail = `${section(names.core, '舊')}\n\n${section(names.log, '2026-01-01　舊紀錄一\n2026-02-01　舊紀錄二')}`;
+  const run = log => W.composeWriteback({ mode: 'merge', oldDetail, aiDetail: `${section(names.core, '新')}\n\n${section(names.log, log)}`, summary: '摘要', template: standard, language: 'zh-TW', now: NOW });
+  assert.deepEqual(plain(logBody(run('2026-11-02　新的一行').detail)), ['2026-01-01　舊紀錄一', '2026-02-01　舊紀錄二', '2026-11-02　新的一行']);
+  assert.deepEqual(plain(logBody(run('').detail)), ['2026-01-01　舊紀錄一', '2026-02-01　舊紀錄二', `${TODAY}　摘要`]);
 });
 
 test('fresh: the old log lines stay in front, the AI log lines go, one line names the backup; log line count is old plus one', () => {

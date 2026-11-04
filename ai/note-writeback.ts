@@ -238,7 +238,8 @@ function mergeLogLines(existing: string[], oldLines: string[], summary: string, 
   const marker = logMarker(oldLines);
   const old = new Set(oldLines.map(line => line.trim()));
   const added = existing.filter(line => !old.has(line.trim()));
-  const kept = existing.filter(line => old.has(line.trim()));
+  // Every old log line stays, in its order, whether or not the AI copied it back.
+  const kept = oldLines;
   if (added.length === 1) return [...kept, added[0]];
   if (added.length === 0) return [...kept, `${marker}${summaryLine(now, summary)}`];
   const [first, ...rest] = added;

@@ -793,3 +793,92 @@ test('K3 (P4): the voice tab lists no retired voice unless a style uses it (then
   const sources = dom.findAll(formOf(root, 'voice'), node => node.tag === 'option').map(node => node.text);
   assert.equal(sources.some(text => /Practical guide|Key-point summary|AI choice/.test(text)), false);
 });
+
+// ---- P1 (note-style settings redesign): copy once, AIM off in the lists, modals in the trigger's window ----
+test('P1 copy once: "Edit" on a built-in part twice (copyPartOnce, and main\'s editNotePart) makes one file; the second call opens that file and says nothing', async () => {
+  const setup = await manageSetup();
+  const first = await setup.store.copyPartOnce('voice', 'builtin:guide');
+  assert.deepEqual(plain(first), { ref: 'file:My Practical guide', created: true });
+  const second = await setup.store.copyPartOnce('voice', 'builtin:guide');
+  assert.deepEqual(plain(second), { ref: 'file:My Practical guide', created: false });
+  assert.equal(setup.v.creates.length, 1);
+  // a file ref is returned as it is and nothing is written
+  assert.deepEqual(plain(await setup.store.copyPartOnce('voice', 'file:My Practical guide')), { ref: 'file:My Practical guide', created: false });
+  assert.equal(setup.v.creates.length, 1);
+  // through the plugin: the same file opens, one notice only for a real copy
+  const before = notices.length;
+  assert.equal(await setup.plugin.editNotePart('structure', 'builtin:standard'), 'file:My Standard six');
+  assert.equal(await setup.plugin.editNotePart('structure', 'builtin:standard'), 'file:My Standard six');
+  assert.equal(setup.v.creates.length, 2);
+  assert.equal(notices.length - before, 1);
+  assert.equal(opened.length, 2);
+  assert.equal(opened[0], opened[1]);
+});
+
+test('P1 copy once: an identical copy that already exists under another name (e.g. with " (2)") is opened, the plain name first; a changed copy does not count, so a fresh copy is made', async () => {
+  const setup = await manageSetup();
+  const text = (await (async () => { const ref = await setup.store.copyPartOnce('format', 'builtin:lean'); return setup.v.files[`${dirOf('en', 'format')}/${ref.ref.slice(5)}.md`]; })());
+  const dir = dirOf('en', 'format');
+  setup.v.files[`${dir}/Lean copy (2).md`] = text;
+  setup.v.files[`${dir}/A copy.md`] = text;
+  await setup.store.refresh();
+  const created = setup.v.creates.length;
+  assert.equal((await setup.store.copyPartOnce('format', 'builtin:lean')).ref, 'file:A copy');
+  assert.equal(setup.v.creates.length, created);
+  // edit every copy: none is identical to the built-in any more, so a new copy is made
+  for (const file of Object.keys(setup.v.files).filter(f => f.startsWith(`${dir}/`))) setup.v.files[file] = `${setup.v.files[file]}\nMine.\n`;
+  await setup.store.refresh();
+  const next = await setup.store.copyPartOnce('format', 'builtin:lean');
+  assert.equal(next.created, true);
+  assert.equal(setup.v.creates.length, created + 1);
+});
+
+test('P1 copy once: the manage window\'s Edit on a built-in voice twice leaves one file', async () => {
+  const setup = await manageSetup();
+  const { root } = await openManage(setup, 'voice');
+  for (let n = 0; n < 2; n++) { editOf(rowFor(root, 'Professional')).click(); await settle(); }
+  const files = Object.keys(setup.v.files).filter(f => f.startsWith(`${dirOf('en', 'tone')}/`));
+  assert.equal(files.length, 1);
+});
+
+test('P1 AIM off: the manage window lists no AIM report and no "AIM conclusion note"; the settings count has no AIM built-in', async () => {
+  const hidden = S.loadHidden('ui/modals/note-style-manage-modal.ts', { obsidian });
+  const hiddenSettings = S.loadHidden('ui/settings-tab.ts', { obsidian });
+  const setup = await manageSetup();
+  const modal = new hidden.NoteStyleManageModal(setup.app, setup.plugin, 'recipe');
+  modal.open();
+  await settle();
+  assert.equal(rowFor(modal.contentEl, 'AIM report'), undefined);
+  assert.ok(rowsOf(modal.contentEl).every(row => !rowTexts(row).some(text => text.includes('AIM'))));
+  const count = tab => {
+    const setting = { name: '', desc: '', setName(v) { this.name = v; return this; }, setDesc(v) { this.desc = v; return this; }, addButton() { return this; } };
+    hiddenSettings.renderNoteCustomSetting(setting, setup.plugin, tab);
+    return setting.desc;
+  };
+  const shown = rowsOf(modal.contentEl).length;
+  assert.equal(count('recipe'), M.translate('en', 'ui.manage_count_0_1', shown, 0));
+  const onSettings = S.load('ui/settings-tab.ts', { obsidian });
+  const on = { desc: '', setName() { return this; }, setDesc(v) { this.desc = v; return this; }, addButton() { return this; } };
+  onSettings.renderNoteCustomSetting(on, setup.plugin, 'recipe');
+  assert.equal(on.desc, M.translate('en', 'ui.manage_count_0_1', shown + 1, 0), 'with AIM on the AIM report counts');
+});
+
+test('P1 popout: a modal opened for a button in another window is moved to that window\'s body; in the same window, or with no anchor, nothing moves', () => {
+  const { openInWindowOf } = S.load('ui/modals/open-in-window.ts');
+  const body = name => ({ name, children: [], appendChild(node) { node.ownerDocument = this.doc; this.children.push(node); return node; } });
+  const main = { body: body('main') }; main.body.doc = main;
+  const popout = { body: body('popout') }; popout.body.doc = popout;
+  const make = () => { const modal = { containerEl: { ownerDocument: main }, opened: 0, open() { this.opened++; } }; return modal; };
+  const modal = make();
+  openInWindowOf(modal, { ownerDocument: popout });
+  assert.equal(modal.opened, 1);
+  assert.equal(modal.containerEl.ownerDocument, popout);
+  assert.equal(popout.body.children[0], modal.containerEl);
+  const same = make();
+  openInWindowOf(same, { ownerDocument: main });
+  assert.equal(main.body.children.length, 0);
+  const none = make();
+  openInWindowOf(none, undefined);
+  assert.equal(none.opened, 1);
+  assert.equal(none.containerEl.ownerDocument, main);
+});

@@ -1063,6 +1063,46 @@ export class NoteStyleStore {
     return name;
   }
 
+  /** The text a copy of `from` starts with (see `createPart`); throws for a missing file or an unknown ref. */
+  private partSourceText(category: PartCategory, from: string | null, language: UiLanguage): string {
+    let text: string;
+    if (from === null) text = category === "structure" ? translate(language, "ui.part_blank_structure") : "";
+    else {
+      const parsed = parseRecipeRef(from, category);
+      if (parsed?.kind === "file") {
+        const held = this.partStore(category).files.get(parsed.name);
+        if (held === undefined) throw new Error(`Part file not found: ${parsed.name}`);
+        text = held;
+      } else if (parsed?.kind === "builtin") {
+        if (category === "format") text = lookupBuiltinFormat(parsed.id, language);
+        else if (category === "voice" && parsed.id === "academic") text = academicToneNote(language);
+        else text = builtinBlockText(category === "structure" ? "template" : "tone", parsed.id, language);
+      } else throw new Error(`Unknown part: ${from}`);
+    }
+    return text;
+  }
+
+  /**
+   * "Edit" of a built-in part: the file that already holds exactly the text a copy would get (a copy made earlier) is
+   * returned, else a new copy is written like `createPart(category, from)` does. A file ref is returned as it is.
+   * `created` tells whether a file was written. Two calls in a row make one file.
+   */
+  copyPartOnce(category: PartCategory, from: string): Promise<{ ref: string; created: boolean }> {
+    return this.serial(async () => {
+      if (parseRecipeRef(from, category)?.kind === "file") return { ref: from, created: false };
+      await this.loadBlocks();
+      const text = this.partSourceText(category, from, this.settings.language);
+      // Several equal copies: the one without a " (n)" suffix first, then by name.
+      const suffixed = (name: string): number => (/ \(\d+\)$/.test(name) ? 1 : 0);
+      const same = [...this.partStore(category).files.entries()]
+        .filter(([, held]) => held === text)
+        .map(([name]) => name)
+        .sort((a, b) => suffixed(a) - suffixed(b) || a.localeCompare(b));
+      if (same.length) return { ref: fileRef(same[0]), created: false };
+      return { ref: await this.createPartLocked(category, from), created: true };
+    });
+  }
+
   /**
    * Writes a new part file of `category` and returns its ref (`file:<name>`); no setting changes. `from` is a built-in ref
    * (its text in the interface language; academic rigor starts from its design note), a file ref (a copy of that file) or
@@ -1070,42 +1110,32 @@ export class NoteStyleStore {
    * and be a safe file name, else this throws and nothing is written.
    */
   createPart(category: PartCategory, from: string | null, name?: string): Promise<string> {
-    return this.serial(async () => {
-      await this.loadBlocks();
-      const language = this.settings.language;
-      let text: string;
-      if (from === null) text = category === "structure" ? translate(language, "ui.part_blank_structure") : "";
-      else {
-        const parsed = parseRecipeRef(from, category);
-        if (parsed?.kind === "file") {
-          const held = this.partStore(category).files.get(parsed.name);
-          if (held === undefined) throw new Error(`Part file not found: ${parsed.name}`);
-          text = held;
-        } else if (parsed?.kind === "builtin") {
-          if (category === "format") text = lookupBuiltinFormat(parsed.id, language);
-          else if (category === "voice" && parsed.id === "academic") text = academicToneNote(language);
-          else text = builtinBlockText(category === "structure" ? "template" : "tone", parsed.id, language);
-        } else throw new Error(`Unknown part: ${from}`);
-      }
-      const { files, dir } = this.partStore(category);
-      let base: string;
-      if (name === undefined) base = this.suggestPartName(category, from);
-      else {
-        base = name;
-        if (
-          !validatePartName(base, category).ok ||
-          cleanBlockName(base) !== base ||
-          files.has(base) ||
-          [...files.keys()].some(key => lower(key) === lower(base))
-        )
-          throw new Error(`Part name not available: ${name}`);
-      }
-      await this.pinFolder();
-      await this.deps.port.createFolder(dir);
-      await this.deps.port.create(`${dir}/${base}.md`, text);
-      files.set(base, text);
-      return fileRef(base);
-    });
+    return this.serial(() => this.createPartLocked(category, from, name));
+  }
+
+  /** `createPart` without the queue (the caller already holds it). */
+  private async createPartLocked(category: PartCategory, from: string | null, name?: string): Promise<string> {
+    await this.loadBlocks();
+    const language = this.settings.language;
+    const text = this.partSourceText(category, from, language);
+    const { files, dir } = this.partStore(category);
+    let base: string;
+    if (name === undefined) base = this.suggestPartName(category, from);
+    else {
+      base = name;
+      if (
+        !validatePartName(base, category).ok ||
+        cleanBlockName(base) !== base ||
+        files.has(base) ||
+        [...files.keys()].some(key => lower(key) === lower(base))
+      )
+        throw new Error(`Part name not available: ${name}`);
+    }
+    await this.pinFolder();
+    await this.deps.port.createFolder(dir);
+    await this.deps.port.create(`${dir}/${base}.md`, text);
+    files.set(base, text);
+    return fileRef(base);
   }
 
   /**

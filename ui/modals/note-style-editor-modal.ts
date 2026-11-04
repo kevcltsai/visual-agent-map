@@ -14,6 +14,7 @@ import {
 } from "../../ai/note-style-recipe";
 import { cleanBlockName } from "../../core/blocks/block-files";
 import { ChoiceModal } from "./choice-modal";
+import { openInWindowOf } from "./open-in-window";
 import { modalActions } from "./action-bar";
 
 const lower = (value: string): string => value.toLocaleLowerCase();
@@ -282,7 +283,7 @@ export class NoteStyleEditorModal extends Modal {
     }
     if (this.asking) return;
     this.asking = true;
-    new ChoiceModal(
+    const ask = new ChoiceModal(
       this.app,
       t("ui.editor_discard_title"),
       t("ui.editor_discard_desc"),
@@ -300,7 +301,8 @@ export class NoteStyleEditorModal extends Modal {
       () => {
         this.asking = false;
       }
-    ).open();
+    );
+    openInWindowOf(ask, this.modalEl);
   }
 
   private isDirty(): boolean {

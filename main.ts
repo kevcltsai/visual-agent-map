@@ -126,6 +126,7 @@ import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
 import { AIM_CREATE_MAP_COMMAND_ID } from "./experiences/aim/legacy-names";
+import { openInWindowOf } from "./ui/modals/open-in-window";
 import { aimEnabled } from "./experiences/aim/availability";
 
 export { buildPreparedTaskContext } from "./ai/context-builder";
@@ -1266,7 +1267,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
   openPromptPreview(trigger?: HTMLElement, styleOf?: () => RunStyle): void {
     const provider = this.runtimeIdFor(this.currentModelChoice().model);
-    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger, styleOf).open();
+    openInWindowOf(
+      new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger, styleOf),
+      trigger
+    );
   }
   /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   currentModelChoice(): ModelChoice {
@@ -1486,11 +1490,9 @@ export default class VisualAgentMapPlugin extends Plugin {
    */
   async editNotePart(category: PartCategory, ref: string): Promise<string | null> {
     try {
-      let target = ref;
-      if (parseRecipeRef(ref, category)?.kind !== "file") {
-        target = await this.noteStyles.createPart(category, ref);
-        new Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
-      }
+      // A built-in is copied once: a file that already holds the same text is opened instead of another copy.
+      const { ref: target, created } = await this.noteStyles.copyPartOnce(category, ref);
+      if (created) new Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
       await this.noteStyles.refresh();
       const path = this.noteStyles.partFilePath(category, target);
       const file = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : null;

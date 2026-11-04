@@ -5,6 +5,7 @@ import type { RecipeListItem } from "../../ai/note-style-store";
 import { UPDATE_MODE_KEYS, type StyleKind } from "../../ai/note-style-recipe";
 import { NoteStyleEditorModal, namePartProblem, suggestRecipeName } from "./note-style-editor-modal";
 import { styleIssueText } from "../../experiences/visual-map/note-style-picker";
+import { openInWindowOf } from "./open-in-window";
 import { aimEnabled } from "../../experiences/aim/availability";
 
 /** The four pages of the manage window, in tab order. */
@@ -280,7 +281,7 @@ export class NoteStyleManageModal extends Modal {
         }
       });
       this.editor = editor;
-      editor.open();
+      openInWindowOf(editor, this.modalEl);
     } finally {
       this.opening = false;
     }

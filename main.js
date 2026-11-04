@@ -29345,6 +29345,41 @@ var NoteStyleStore = class {
     }
     return name2;
   }
+  /** The text a copy of `from` starts with (see `createPart`); throws for a missing file or an unknown ref. */
+  partSourceText(category, from, language2) {
+    let text11;
+    if (from === null) text11 = category === "structure" ? translate(language2, "ui.part_blank_structure") : "";
+    else {
+      const parsed = parseRecipeRef(from, category);
+      if ((parsed == null ? void 0 : parsed.kind) === "file") {
+        const held = this.partStore(category).files.get(parsed.name);
+        if (held === void 0) throw new Error(`Part file not found: ${parsed.name}`);
+        text11 = held;
+      } else if ((parsed == null ? void 0 : parsed.kind) === "builtin") {
+        if (category === "format") text11 = lookupBuiltinFormat(parsed.id, language2);
+        else if (category === "voice" && parsed.id === "academic") text11 = academicToneNote(language2);
+        else text11 = builtinBlockText(category === "structure" ? "template" : "tone", parsed.id, language2);
+      } else throw new Error(`Unknown part: ${from}`);
+    }
+    return text11;
+  }
+  /**
+   * "Edit" of a built-in part: the file that already holds exactly the text a copy would get (a copy made earlier) is
+   * returned, else a new copy is written like `createPart(category, from)` does. A file ref is returned as it is.
+   * `created` tells whether a file was written. Two calls in a row make one file.
+   */
+  copyPartOnce(category, from) {
+    return this.serial(async () => {
+      var _a2;
+      if (((_a2 = parseRecipeRef(from, category)) == null ? void 0 : _a2.kind) === "file") return { ref: from, created: false };
+      await this.loadBlocks();
+      const text11 = this.partSourceText(category, from, this.settings.language);
+      const suffixed = (name2) => / \(\d+\)$/.test(name2) ? 1 : 0;
+      const same = [...this.partStore(category).files.entries()].filter(([, held]) => held === text11).map(([name2]) => name2).sort((a, b) => suffixed(a) - suffixed(b) || a.localeCompare(b));
+      if (same.length) return { ref: fileRef(same[0]), created: false };
+      return { ref: await this.createPartLocked(category, from), created: true };
+    });
+  }
   /**
    * Writes a new part file of `category` and returns its ref (`file:<name>`); no setting changes. `from` is a built-in ref
    * (its text in the interface language; academic rigor starts from its design note), a file ref (a copy of that file) or
@@ -29352,37 +29387,26 @@ var NoteStyleStore = class {
    * and be a safe file name, else this throws and nothing is written.
    */
   createPart(category, from, name2) {
-    return this.serial(async () => {
-      await this.loadBlocks();
-      const language2 = this.settings.language;
-      let text11;
-      if (from === null) text11 = category === "structure" ? translate(language2, "ui.part_blank_structure") : "";
-      else {
-        const parsed = parseRecipeRef(from, category);
-        if ((parsed == null ? void 0 : parsed.kind) === "file") {
-          const held = this.partStore(category).files.get(parsed.name);
-          if (held === void 0) throw new Error(`Part file not found: ${parsed.name}`);
-          text11 = held;
-        } else if ((parsed == null ? void 0 : parsed.kind) === "builtin") {
-          if (category === "format") text11 = lookupBuiltinFormat(parsed.id, language2);
-          else if (category === "voice" && parsed.id === "academic") text11 = academicToneNote(language2);
-          else text11 = builtinBlockText(category === "structure" ? "template" : "tone", parsed.id, language2);
-        } else throw new Error(`Unknown part: ${from}`);
-      }
-      const { files, dir } = this.partStore(category);
-      let base;
-      if (name2 === void 0) base = this.suggestPartName(category, from);
-      else {
-        base = name2;
-        if (!validatePartName(base, category).ok || cleanBlockName(base) !== base || files.has(base) || [...files.keys()].some((key2) => lower3(key2) === lower3(base)))
-          throw new Error(`Part name not available: ${name2}`);
-      }
-      await this.pinFolder();
-      await this.deps.port.createFolder(dir);
-      await this.deps.port.create(`${dir}/${base}.md`, text11);
-      files.set(base, text11);
-      return fileRef(base);
-    });
+    return this.serial(() => this.createPartLocked(category, from, name2));
+  }
+  /** `createPart` without the queue (the caller already holds it). */
+  async createPartLocked(category, from, name2) {
+    await this.loadBlocks();
+    const language2 = this.settings.language;
+    const text11 = this.partSourceText(category, from, language2);
+    const { files, dir } = this.partStore(category);
+    let base;
+    if (name2 === void 0) base = this.suggestPartName(category, from);
+    else {
+      base = name2;
+      if (!validatePartName(base, category).ok || cleanBlockName(base) !== base || files.has(base) || [...files.keys()].some((key2) => lower3(key2) === lower3(base)))
+        throw new Error(`Part name not available: ${name2}`);
+    }
+    await this.pinFolder();
+    await this.deps.port.createFolder(dir);
+    await this.deps.port.create(`${dir}/${base}.md`, text11);
+    files.set(base, text11);
+    return fileRef(base);
   }
   /**
    * Saves a style. A new style (no `original`, or one whose ref is a built-in) is a new file named `name`. An existing
@@ -69072,6 +69096,14 @@ var PromptPreviewModal = class extends import_obsidian35.Modal {
 // ui/settings-tab.ts
 var import_obsidian38 = require("obsidian");
 
+// ui/modals/open-in-window.ts
+function openInWindowOf(modal, anchor) {
+  modal.open();
+  const doc = anchor == null ? void 0 : anchor.ownerDocument;
+  const container = modal.containerEl;
+  if ((doc == null ? void 0 : doc.body) && container && container.ownerDocument !== doc) doc.body.appendChild(container);
+}
+
 // ui/modals/note-style-manage-modal.ts
 var import_obsidian37 = require("obsidian");
 
@@ -69281,7 +69313,7 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
     }
     if (this.asking) return;
     this.asking = true;
-    new ChoiceModal(
+    const ask = new ChoiceModal(
       this.app,
       t("ui.editor_discard_title"),
       t("ui.editor_discard_desc"),
@@ -69299,7 +69331,8 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
       () => {
         this.asking = false;
       }
-    ).open();
+    );
+    openInWindowOf(ask, this.modalEl);
   }
   isDirty() {
     const a = this.draft;
@@ -69736,7 +69769,7 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
         }
       });
       this.editor = editor;
-      editor.open();
+      openInWindowOf(editor, this.modalEl);
     } finally {
       this.opening = false;
     }
@@ -70105,7 +70138,7 @@ function renderNoteCustomSetting(setting, plugin, tab) {
   const name2 = manageTabName(tab);
   setting.setName(name2);
   const describe = () => {
-    const items = tab === "recipe" ? store.listRecipes() : store.listParts(tab);
+    const items = tab === "recipe" ? store.listRecipes().filter((item) => aimEnabled() || !item.aimOnly) : store.listParts(tab);
     const shown = items.filter((item) => !("retired" in item && item.retired === true && item.usedBy.length === 0));
     const builtin = shown.filter((item) => item.kind === "builtin").length;
     setting.setDesc(t("ui.manage_count_0_1", builtin, shown.length - builtin));
@@ -70113,12 +70146,13 @@ function renderNoteCustomSetting(setting, plugin, tab) {
   describe();
   setting.addButton((button) => {
     button.setButtonText(t("ui.manage_button")).onClick(() => {
-      new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, () => {
+      const modal = new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, () => {
         var _a2;
         describe();
         redrawKindRows(plugin);
         (_a2 = locationUpdates.get(plugin)) == null ? void 0 : _a2();
-      }).open();
+      });
+      openInWindowOf(modal, button.buttonEl);
     });
     button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name2));
   });
@@ -78038,7 +78072,10 @@ ${t("ui.organize_link_wait_hint")}`;
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
   openPromptPreview(trigger, styleOf) {
     const provider = this.runtimeIdFor(this.currentModelChoice().model);
-    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger, styleOf).open();
+    openInWindowOf(
+      new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger, styleOf),
+      trigger
+    );
   }
   /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   currentModelChoice() {
@@ -78236,13 +78273,9 @@ ${t("ui.organize_link_wait_hint")}`;
    * could not be done.
    */
   async editNotePart(category, ref) {
-    var _a2;
     try {
-      let target = ref;
-      if (((_a2 = parseRecipeRef(ref, category)) == null ? void 0 : _a2.kind) !== "file") {
-        target = await this.noteStyles.createPart(category, ref);
-        new import_obsidian45.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
-      }
+      const { ref: target, created } = await this.noteStyles.copyPartOnce(category, ref);
+      if (created) new import_obsidian45.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
       await this.noteStyles.refresh();
       const path = this.noteStyles.partFilePath(category, target);
       const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian45.normalizePath)(path)) : null;

@@ -8,6 +8,7 @@ import type { SettingDefinition, SettingDefinitionGroup, SettingDefinitionItem, 
 import type { DropdownComponent } from "obsidian";
 import type { RecipeListItem } from "../ai/note-style-store";
 import { KIND_DEFAULT_RECIPE, STYLE_KINDS, type StyleKind } from "../ai/note-style-recipe";
+import { openInWindowOf } from "./modals/open-in-window";
 import { aimEnabled } from "../experiences/aim/availability";
 import { parseBlockRef } from "../core/blocks/block-files";
 import {
@@ -247,7 +248,9 @@ export function renderNoteCustomSetting(setting: Setting, plugin: VisualAgentMap
   const name = manageTabName(tab);
   setting.setName(name);
   const describe = (): void => {
-    const items = tab === "recipe" ? store.listRecipes() : store.listParts(tab);
+    // The AIM report is counted only while AIM is on.
+    const items =
+      tab === "recipe" ? store.listRecipes().filter(item => aimEnabled() || !item.aimOnly) : store.listParts(tab);
     // A retired built-in counts only while a style still uses it (the manage window lists it the same way).
     const shown = items.filter(item => !("retired" in item && item.retired === true && item.usedBy.length === 0));
     const builtin = shown.filter(item => item.kind === "builtin").length;
@@ -256,13 +259,14 @@ export function renderNoteCustomSetting(setting: Setting, plugin: VisualAgentMap
   describe();
   setting.addButton(button => {
     button.setButtonText(t("ui.manage_button")).onClick(() => {
-      new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, () => {
+      const modal = new NoteStyleManageModal(plugin.app, plugin, tab, button.buttonEl, () => {
         describe();
         // The styles may have changed in the window: the topic-type rows of this page are drawn again.
         redrawKindRows(plugin);
         // ...and the File location row says "no files yet" only while there really are none.
         locationUpdates.get(plugin)?.();
-      }).open();
+      });
+      openInWindowOf(modal, button.buttonEl);
     });
     button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name));
   });

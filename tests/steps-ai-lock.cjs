@@ -676,3 +676,52 @@ test('07 chat context: locked cards are marked only when the map has one; withou
   assert.equal('aiLocked' in locked.outline[1], false);
   assert.match(locked.aiLockedNote, /locked/i);
 });
+
+// ---- ticket 08: editor selection AI and image translate --------------------------------------------------------------
+const { runPanel } = require('./support-selection-ai.cjs');
+const LOCKED_NOTE = '---\ntype: topic\nai-locked: true\n---\n\nSome text to rewrite.\n';
+const OPEN_NOTE = '---\ntype: topic\n---\n\nSome text to rewrite.\n';
+
+test('08 selection AI: a locked note gets no AI call and a locked notice; an unlocked note runs as before', async () => {
+  const notices = [];
+  const locked = await runPanel({ markdown: LOCKED_NOTE, selected: 'text to rewrite', replies: ['Rewritten'], outcome: true, notices });
+  assert.equal(locked.sent.length, 0, 'provider calls: 0');
+  assert.match(locked.status + notices.join('\n'), LOCKED_NOTICE);
+  const open = await runPanel({ markdown: OPEN_NOTE, selected: 'text to rewrite', replies: ['Rewritten'], outcome: true });
+  assert.equal(open.sent.length, 1);
+});
+
+test('08 image translate: a locked note is not written and no image AI runs; an unlocked note is written as before', async () => {
+  class Component { load() {} unload() {} registerDomEvent() {} }
+  class MarkdownView {}
+  const notices = [];
+  const { ImageTranslateAction } = S.load('experiences/markdown-context/image-translate-action.ts', { obsidian: { Component, MarkdownView, Notice: class { constructor(m) { notices.push(m); } }, setIcon() {}, parseYaml: text => require('yaml').parse(text) } });
+  const embed = '![egg](https://x/egg.png)';
+  const write = async text => {
+    let content = text;
+    const app = { workspace: { getLeavesOfType: () => [] }, vault: { process: async (_file, edit) => { content = edit(content); } } };
+    let error;
+    try { await new ImageTranslateAction(app, {}).write({ token: { text: embed, occurrence: 0, count: 1 } }, { path: 'Note.md' }, '![[egg-en.png]]', 'replace'); } catch (e) { error = e; }
+    return { content, error };
+  };
+  const lockedText = `---\nai-locked: true\n---\n\n${embed}\n`;
+  const lockedWrite = await write(lockedText);
+  assert.equal(lockedWrite.content, lockedText, 'the locked note is unchanged');
+  assert.match(lockedWrite.error?.message ?? '', LOCKED_NOTICE);
+  const openText = `---\ntype: topic\n---\n\n${embed}\n`;
+  assert.equal((await write(openText)).content, '---\ntype: topic\n---\n\n![[egg-en.png]]\n');
+  let calls = 0;
+  const action = new ImageTranslateAction({ workspace: { getLeavesOfType: () => [] } }, { model: () => 'm', run: async () => { calls++; return ''; }, saveImage: async () => '' });
+  await action.translate({ view: { editor: { getValue: () => lockedText }, containerEl: {} }, path: 'Note.md', image: {}, token: null }, 'en', 'replace', {}, {});
+  assert.equal(calls, 0, 'provider calls: 0');
+  assert.match(notices.join('\n'), LOCKED_NOTICE);
+});
+
+test('08 note text lock: only a frontmatter `ai-locked: true` counts', () => {
+  const parse = text => require('yaml').parse(text);
+  assert.equal(values.noteTextAiLocked(LOCKED_NOTE, parse), true);
+  assert.equal(values.noteTextAiLocked(OPEN_NOTE, parse), false);
+  assert.equal(values.noteTextAiLocked('Body\nai-locked: true\n', parse), false, 'a body line is not frontmatter');
+  assert.equal(values.noteTextAiLocked('---\nai-locked: "true"\n---\n', parse), false);
+  assert.equal(values.noteTextAiLocked('---\nai-locked: [\n---\n', parse), false, 'broken YAML reads as unlocked');
+});

@@ -224,7 +224,7 @@ test('service: stopping before the call, during it and after it returns all fail
 test('i18n: every new relevance string exists in English and Traditional Chinese with the same placeholders, and the zh strings avoid 節點 and 地圖', () => {
   const source = require('./support.cjs').i18nSource();
   const keys = [...new Set([...source.matchAll(/^\s*"((?:ui\.relevance_(?:goal_set|goal_set_hint|goal_edit_hint|goal_label|goal_placeholder|running|stop|stopped|not_started|failed_0|done_0_1_2|write_failed_0|view_changes|changes_title|changes_none|ungraded|changed_to|history_label|goal_history_label|undo_skipped_0))|error\.relevance_grade_[a-z_]+)":/gm)].map(match => match[1]))];
-  assert.equal(keys.length, 25);
+  assert.equal(keys.length, 26);
   const added = ['goal_level_0_1', 'level_label', 'level_none', 'level_beginner', 'level_intermediate', 'level_familiar', 'context_label', 'context_placeholder', 'grade_button'].map(name => `ui.relevance_${name}`);
   keys.push(...added);
   const placeholders = text => [...text.matchAll(/\{\d+\}/g)].map(match => match[0]).sort().join();
@@ -627,4 +627,42 @@ test('repair-missing prompt: Claude is told to return the result, Codex keeps th
   assert.ok(claude.includes('Return ONE complete result for ALL cards that are not pinned: the cards of your previous reply (change them only if needed) plus every card listed above. Write each id only'));
   assert.doesNotMatch(claude, /Reply with ONE|JSON object|Reply with ONLY/);
   assert.equal(grade.relevanceGradeMissingRepairStep.version, 3);
+});
+
+// Codex enforces the output schema in strict mode: every property must be listed in `required`, or the provider
+// refuses the whole request ("Missing 'anchor'"). Optional values are sent as required + nullable instead.
+const strictViolations = (schema, where = '$') => {
+  if (!schema || typeof schema !== 'object') return [];
+  const found = [];
+  if (schema.properties) {
+    const required = new Set(schema.required ?? []);
+    for (const key of Object.keys(schema.properties)) if (!required.has(key)) found.push(`${where}.${key}`);
+    for (const [key, child] of Object.entries(schema.properties)) found.push(...strictViolations(child, `${where}.${key}`));
+  }
+  if (schema.items) found.push(...strictViolations(schema.items, `${where}[]`));
+  return found;
+};
+
+test('grade and recalibrate response schemas list every property as required (provider strict mode)', () => {
+  assert.deepEqual(strictViolations(grade.RELEVANCE_GRADE_SCHEMA), []);
+  assert.deepEqual(strictViolations(grade.RELEVANCE_RECALIBRATE_SCHEMA), []);
+});
+
+test('grade parser still accepts a reply that carries a null anchor on every item', () => {
+  const result = grade.parseRelevanceGrade(reply(entry('a', { anchor: null }), entry('a1', { tier: 'support', anchor: null }), entry('b', { tier: 'side', anchor: null })), tree, 'en');
+  assert.equal(result.items.length, 3);
+});
+
+test('a failed grade shows plain words, never raw JSON or schema text', () => {
+  const raw = new Error('{"error":{"message":"Invalid schema for response_format \'codex_output_schema\': In context=(\'properties\', \'items\', \'items\'), \'required\' is required to be supplied and to be an array including every key in properties. Missing \'anchor\'.","type":"invalid_request_error"}}');
+  for (const language of ['en', 'zh-TW', 'zh-CN']) {
+    const text = grade.relevanceFailureDetail(raw, language);
+    assert.ok(text.length > 0 && text.length < 160, text);
+    assert.doesNotMatch(text, /[{}]|schema|anchor|required|json|invalid_request/i);
+  }
+  // Errors the step wrote for the learner pass through unchanged.
+  const own = new grade.RelevanceGradeError('invalid', 'Grading stopped.');
+  assert.equal(grade.relevanceFailureDetail(own, 'en'), 'Grading stopped.');
+  // Short plain provider messages (offline, not signed in) stay.
+  assert.equal(grade.relevanceFailureDetail(new Error('Codex is not signed in.'), 'en'), 'Codex is not signed in.');
 });

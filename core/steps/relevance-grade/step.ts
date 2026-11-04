@@ -107,7 +107,9 @@ export const RELEVANCE_GRADE_SCHEMA = {
           tier: { type: "string", enum: [...RELEVANCE_TIERS] },
           anchor: { type: ["string", "null"] }
         },
-        required: ["id", "tier"]
+        // Codex runs the schema in strict mode: every property must be listed here, so `anchor` is required and
+        // nullable. The parser below still accepts a reply that leaves it out (Claude does not enforce strictness).
+        required: ["id", "tier", "anchor"]
       }
     }
   },

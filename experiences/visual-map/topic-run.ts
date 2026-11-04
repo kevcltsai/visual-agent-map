@@ -377,8 +377,35 @@ export class TopicRuns {
         if (this.controllers.get(path) !== controller) return;
         this.controllers.delete(path);
         this.running.delete(path);
+        this.wakeIdleWaiters();
       }
     };
+  }
+
+  /** Callers waiting in {@link whenIdle}; woken whenever a run or chart step ends. */
+  private readonly idleWaiters = new Set<() => void>();
+  private wakeIdleWaiters(): void {
+    for (const wake of [...this.idleWaiters]) wake();
+  }
+
+  /**
+   * Resolves once none of the topics has a run or a background chart step in flight (or `signal` aborts). A run that
+   * reads other topics as its sources calls this first: a child's research writing back during the read-to-save
+   * window would otherwise look like an edit and fail the sources check, though the user touched nothing.
+   */
+  async whenIdle(paths: readonly string[], signal?: AbortSignal): Promise<void> {
+    const busy = (): boolean => paths.some(path => this.running.has(path) || this.charts.has(path));
+    while (busy() && !signal?.aborted && !this.disposed) {
+      await new Promise<void>(resolve => {
+        const wake = (): void => {
+          this.idleWaiters.delete(wake);
+          signal?.removeEventListener("abort", wake);
+          resolve();
+        };
+        this.idleWaiters.add(wake);
+        signal?.addEventListener("abort", wake, { once: true });
+      });
+    }
   }
 
   /**
@@ -1403,6 +1430,7 @@ export class TopicRuns {
       if (path === undefined || key === path) {
         controller.abort();
         this.charts.delete(key);
+        this.wakeIdleWaiters();
         this.endChartProgress(key);
         // A queued job never starts; a running one frees its slot when it settles.
         const queued = this.chartQueue.findIndex(item => item.controller === controller);
@@ -1469,7 +1497,10 @@ export class TopicRuns {
           this.ports.aiTasks().failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
         }
       } finally {
-        if (this.charts.get(job.path) === controller) this.charts.delete(job.path);
+        if (this.charts.get(job.path) === controller) {
+          this.charts.delete(job.path);
+          this.wakeIdleWaiters();
+        }
         if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
         this.chartRunning--;
         this.pumpChartQueue();

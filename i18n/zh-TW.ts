@@ -2340,6 +2340,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "error.relevance_grade_over_budget": "心智圖太大，無法一次分級，沒有任何改變。",
   "error.relevance_grade_stopped": "分級已停止。",
   "error.relevance_grade_invalid": "無法使用 AI 的分級結果：{0}",
+  "error.relevance_grade_unavailable": "AI 目前無法為這張心智圖分級，沒有任何內容被改變，請稍後再試。",
   "error.relevance_grade_hierarchy": "AI 的上下層分級仍不一致，請點「目標」再按 Enter 重試",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "分享的心智圖・唯讀",

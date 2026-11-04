@@ -415,7 +415,11 @@ import type {
   RelevanceGradeResult,
   RelevanceGradeRun
 } from "../../core/relevance-grade-service";
-import { RELEVANCE_GRADE_SCHEMA, RELEVANCE_RECALIBRATE_SCHEMA } from "../../core/relevance-grade-service";
+import {
+  RELEVANCE_GRADE_SCHEMA,
+  RELEVANCE_RECALIBRATE_SCHEMA,
+  relevanceFailureDetail
+} from "../../core/relevance-grade-service";
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
@@ -3356,7 +3360,12 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, graded, { mode, pins, repairs }));
       if (this.paintCount === paintedBefore) this.refreshRelevance();
     } catch (error) {
-      this.finishRelevance(run, mapPath, "failed", t("ui.relevance_failed_0", errorMessage(error)));
+      this.finishRelevance(
+        run,
+        mapPath,
+        "failed",
+        t("ui.relevance_failed_0", relevanceFailureDetail(error, this.plugin.settings.language))
+      );
     }
   }
   /**
@@ -14832,6 +14841,11 @@ export class VisualAgentMapView extends ItemView {
       prepare: async note => {
         if (!children.length && !selectedSources.some(group => group.documents.length))
           return t("ui.choose_another_note_source_first");
+        // Children still being researched write back after this read and would fail the sources check: wait for them.
+        await this.plugin.topicRuns.whenIdle(
+          children.map(child => child.path),
+          options?.signal
+        );
         childSources = await readSources();
         const sourceSnapshot = JSON.stringify(childSources.documents);
         if (!children.length && !selectedSources.some(group => group.documents.length))
@@ -15336,7 +15350,14 @@ export class VisualAgentMapView extends ItemView {
         releaseStarting();
         failed(t("ui.ai_running_ai"));
       },
-      model: async () => (modelChoice = await this.selectionModel(sources)),
+      model: async () => {
+        // Sources still being researched write back after the read and would fail the sources check: wait for them.
+        await this.plugin.topicRuns.whenIdle(
+          sources.map(source => source.path),
+          controller.signal
+        );
+        return (modelChoice = await this.selectionModel(sources));
+      },
       readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
       begin: group => {
         task = {

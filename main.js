@@ -2350,6 +2350,7 @@ var en = {
   "error.relevance_grade_over_budget": "The map is too large to grade at once. Nothing was changed.",
   "error.relevance_grade_stopped": "Grading stopped.",
   "error.relevance_grade_invalid": "The AI grading could not be used: {0}",
+  "error.relevance_grade_unavailable": "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
   "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map \xB7 read-only",
@@ -4847,6 +4848,7 @@ var zhCN = {
   "error.relevance_grade_over_budget": "\u5FC3\u667A\u56FE\u592A\u5927\uFF0C\u65E0\u6CD5\u4E00\u6B21\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u6539\u53D8\u3002",
   "error.relevance_grade_stopped": "\u5206\u7EA7\u5DF2\u505C\u6B62\u3002",
   "error.relevance_grade_invalid": "\u65E0\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7EA7\u7ED3\u679C\uFF1A{0}",
+  "error.relevance_grade_unavailable": "AI \u76EE\u524D\u65E0\u6CD5\u4E3A\u8FD9\u5F20\u5FC3\u667A\u56FE\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u5185\u5BB9\u88AB\u6539\u53D8\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
   "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u70B9\u201C\u76EE\u6807\u201D\u518D\u6309 Enter \u91CD\u8BD5",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5730\u56FE\u30FB\u53EA\u8BFB",
@@ -7344,6 +7346,7 @@ var zhTW = {
   "error.relevance_grade_over_budget": "\u5FC3\u667A\u5716\u592A\u5927\uFF0C\u7121\u6CD5\u4E00\u6B21\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u6539\u8B8A\u3002",
   "error.relevance_grade_stopped": "\u5206\u7D1A\u5DF2\u505C\u6B62\u3002",
   "error.relevance_grade_invalid": "\u7121\u6CD5\u4F7F\u7528 AI \u7684\u5206\u7D1A\u7D50\u679C\uFF1A{0}",
+  "error.relevance_grade_unavailable": "AI \u76EE\u524D\u7121\u6CD5\u70BA\u9019\u5F35\u5FC3\u667A\u5716\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u5167\u5BB9\u88AB\u6539\u8B8A\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
   "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u9EDE\u300C\u76EE\u6A19\u300D\u518D\u6309 Enter \u91CD\u8A66",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5FC3\u667A\u5716\u30FB\u552F\u8B80",
@@ -42283,7 +42286,9 @@ var RELEVANCE_GRADE_SCHEMA = {
           tier: { type: "string", enum: [...RELEVANCE_TIERS2] },
           anchor: { type: ["string", "null"] }
         },
-        required: ["id", "tier"]
+        // Codex runs the schema in strict mode: every property must be listed here, so `anchor` is required and
+        // nullable. The parser below still accepts a reply that leaves it out (Claude does not enforce strictness).
+        required: ["id", "tier", "anchor"]
       }
     }
   },
@@ -42805,6 +42810,16 @@ var relevanceRecalibrateRepairStep = {
 };
 
 // core/relevance-grade-service.ts
+function relevanceFailureDetail(error, language2) {
+  if (error instanceof RelevanceGradeError || (error == null ? void 0 : error.name) === "RelevanceGradeError")
+    return error.message;
+  const message = error == null ? void 0 : error.message;
+  const text11 = (typeof message === "string" ? message : "").trim();
+  const technical = /[{}[\]]|schema|json|required|properties|invalid_request|\$\.|\bat \S+:\d+/i.test(text11);
+  if (!text11 || technical || text11.length > 140)
+    return translate(uiLocale(language2), "error.relevance_grade_unavailable");
+  return text11;
+}
 var TIER_FIELD = /"tier"\s*:\s*"(?:core|support|side)"/g;
 var PROGRESS_INTERVAL_MS = 200;
 function providerRelevanceGradeRunner(aiCalls) {
@@ -52022,7 +52037,12 @@ ${request.requirements}` : preset.text,
       await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, graded, { mode, pins, repairs }));
       if (this.paintCount === paintedBefore) this.refreshRelevance();
     } catch (error) {
-      this.finishRelevance(run, mapPath, "failed", t("ui.relevance_failed_0", errorMessage(error)));
+      this.finishRelevance(
+        run,
+        mapPath,
+        "failed",
+        t("ui.relevance_failed_0", relevanceFailureDetail(error, this.plugin.settings.language))
+      );
     }
   }
   /**
@@ -62601,6 +62621,10 @@ ${request.requirements}` : preset.text,
         var _a3;
         if (!children.length && !selectedSources.some((group) => group.documents.length))
           return t("ui.choose_another_note_source_first");
+        await this.plugin.topicRuns.whenIdle(
+          children.map((child) => child.path),
+          options == null ? void 0 : options.signal
+        );
         childSources = await readSources();
         const sourceSnapshot = JSON.stringify(childSources.documents);
         if (!children.length && !selectedSources.some((group) => group.documents.length))
@@ -63055,7 +63079,13 @@ ${request.requirements}` : preset.text,
         releaseStarting();
         failed(t("ui.ai_running_ai"));
       },
-      model: async () => modelChoice = await this.selectionModel(sources),
+      model: async () => {
+        await this.plugin.topicRuns.whenIdle(
+          sources.map((source) => source.path),
+          controller.signal
+        );
+        return modelChoice = await this.selectionModel(sources);
+      },
       readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
       begin: (group) => {
         task = {
@@ -74013,6 +74043,8 @@ var TopicRuns = class {
     /** Jobs waiting for a free slot, first in first out. */
     __publicField(this, "chartQueue", []);
     __publicField(this, "chartRunning", 0);
+    /** Callers waiting in {@link whenIdle}; woken whenever a run or chart step ends. */
+    __publicField(this, "idleWaiters", /* @__PURE__ */ new Set());
   }
   /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
   get running() {
@@ -74035,8 +74067,31 @@ var TopicRuns = class {
         if (this.controllers.get(path) !== controller) return;
         this.controllers.delete(path);
         this.running.delete(path);
+        this.wakeIdleWaiters();
       }
     };
+  }
+  wakeIdleWaiters() {
+    for (const wake of [...this.idleWaiters]) wake();
+  }
+  /**
+   * Resolves once none of the topics has a run or a background chart step in flight (or `signal` aborts). A run that
+   * reads other topics as its sources calls this first: a child's research writing back during the read-to-save
+   * window would otherwise look like an edit and fail the sources check, though the user touched nothing.
+   */
+  async whenIdle(paths, signal) {
+    const busy = () => paths.some((path) => this.running.has(path) || this.charts.has(path));
+    while (busy() && !(signal == null ? void 0 : signal.aborted) && !this.disposed) {
+      await new Promise((resolve) => {
+        const wake = () => {
+          this.idleWaiters.delete(wake);
+          signal == null ? void 0 : signal.removeEventListener("abort", wake);
+          resolve();
+        };
+        this.idleWaiters.add(wake);
+        signal == null ? void 0 : signal.addEventListener("abort", wake, { once: true });
+      });
+    }
   }
   async start(path, kind, options) {
     if (kind === "synthesizeSelection") return this.runSelection(path, options);
@@ -74925,6 +74980,7 @@ var TopicRuns = class {
       if (path === void 0 || key2 === path) {
         controller.abort();
         this.charts.delete(key2);
+        this.wakeIdleWaiters();
         this.endChartProgress(key2);
         const queued = this.chartQueue.findIndex((item) => item.controller === controller);
         if (queued >= 0) this.chartQueue.splice(queued, 1);
@@ -74987,7 +75043,10 @@ var TopicRuns = class {
           this.ports.aiTasks().failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
         }
       } finally {
-        if (this.charts.get(job.path) === controller) this.charts.delete(job.path);
+        if (this.charts.get(job.path) === controller) {
+          this.charts.delete(job.path);
+          this.wakeIdleWaiters();
+        }
         if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
         this.chartRunning--;
         this.pumpChartQueue();

@@ -748,6 +748,8 @@ export const en = {
   "ui.the_node_to_relink_was_not_found": "The node to relink was not found.",
   "ui.change_saved_refresh_failed": "The change was saved, but the view could not refresh. Reopen the map to see it.",
   "ui.rename_current_mind_map": "Rename current mind map",
+  "ui.duplicate_current_mind_map": "Duplicate current mind map",
+  "ui.duplicate_map_title": "{0} copy",
   "ui.update_the_topic_folder_and_mind_map_name_together": "Update the topic folder and mind map name together.",
   "ui.repair_missing_mind_map": "Repair missing mind map",
   "ui.rebuild_a_missing_map_from_existing_topic_notes": "Rebuild a missing map from existing topic notes.",
@@ -1898,6 +1900,7 @@ export const en = {
   "error.target_exists": "Target file already exists",
   "error.note_in_multiple_maps": "A topic note appears in two mind maps",
   "error.topic_folder_exists": "A topic folder with this name already exists.",
+  "error.duplicate_map_unsupported": "Maps made by AIM research cannot be duplicated yet.",
   "detail.no_conclusion_yet": "No conclusion yet",
   "detail.preview": "Preview",
   "ui.map_file_description":

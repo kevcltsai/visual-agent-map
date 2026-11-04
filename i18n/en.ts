@@ -1181,7 +1181,7 @@ export const en = {
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it":
     "The AI task exceeded 3 minutes. VAM attempts to interrupt it to avoid prolonged resource use. Incomplete results are not applied; try a smaller task.",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and":
-    "Synthesize {0} selected topics. Choose full content or summaries in the next step; the new root topic is created directly and you can undo it.",
+    "Synthesize {0} selected topics. Choose full content or summaries below in this window; the new root topic is created directly and you can undo it.",
   "ui.invalid_merged_contents_0": "Invalid merged contents: {0}",
   "ui.delete_0": "Delete “{0}”",
   "ui.unassigned_0": "Unassigned ({0})",

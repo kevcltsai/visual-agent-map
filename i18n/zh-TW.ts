@@ -1115,7 +1115,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it":
     "AI 任務超過 3 分鐘，為避免長時間佔用資源，VAM 會嘗試中斷。未完成的結果不會套用；請縮小任務範圍後重試。",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and":
-    "整合 {0} 個已選議題。下一步可選完整內容或摘要；AI 完成後會直接建立新根議題，可復原。",
+    "整合 {0} 個已選議題。可在下方選擇完整內容或摘要；AI 完成後會直接建立新根議題，可復原。",
   "ui.invalid_merged_contents_0": "合併內容無效：{0}",
   "ui.delete_0": "刪除「{0}」",
   "ui.unassigned_0": "未歸類（{0}）",

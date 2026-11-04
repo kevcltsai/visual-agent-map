@@ -48,6 +48,8 @@ export function createTestVault({ vault, artifact = root, profile: requested = "
   for (const name of assets) copyFileSync(join(artifact, name), join(plugin, name));
   writeFileSync(join(config, "community-plugins.json"), JSON.stringify(["visual-agent-map"], null, 2));
   writeFileSync(join(config, "app.json"), JSON.stringify({ promptDelete: false }, null, 2));
+  // Native menus are invisible to CDP and need a focused window; Obsidian's own DOM menus work in the background.
+  writeFileSync(join(config, "appearance.json"), JSON.stringify({ nativeMenus: false }, null, 2));
 
   function filesBelow(folder) {
     return readdirSync(folder, { withFileTypes: true }).flatMap(entry => {

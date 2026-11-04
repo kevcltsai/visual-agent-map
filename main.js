@@ -49392,6 +49392,9 @@ function sharedMergeAppearance(notes) {
     ...styles.length ? { addStyles: styles } : {}
   };
 }
+function mergedAiLocked(notes) {
+  return notes.some((note) => (note == null ? void 0 : note.aiLocked) === true);
+}
 function resolveMergeModel(parentModel, workspaceModel) {
   return inheritModel(parentModel, workspaceModel);
 }
@@ -54298,7 +54301,7 @@ ${request.requirements}` : preset.text,
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
   openMerge() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     if (!this.map || this.aimLive() || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     if (this.mergeTasks.has(this.path)) {
       new import_obsidian34.Notice(t("ui.merge_locked"));
@@ -54329,7 +54332,10 @@ ${request.requirements}` : preset.text,
     new MergeTopicsModal(
       this.app,
       snapshot.sources.length,
-      (_b2 = (_a2 = this.notes.get(check.sources[0].id)) == null ? void 0 : _a2.title) != null ? _b2 : "",
+      (_c = (_b2 = this.notes.get(((_a2 = check.sources.find((source) => {
+        var _a3;
+        return (_a3 = this.notes.get(source.id)) == null ? void 0 : _a3.aiLocked;
+      })) != null ? _a2 : check.sources[0]).id)) == null ? void 0 : _b2.title) != null ? _c : "",
       (title) => this.enqueue(async () => {
         try {
           await this.mergeSelected(title, snapshot);
@@ -54341,7 +54347,7 @@ ${request.requirements}` : preset.text,
         this.mergeOpen = false;
       },
       withContent ? { start: (title, started, signal) => this.startMergeDraft(title, snapshot, started, signal) } : void 0,
-      check.targetId ? (_d = (_c = this.notes.get(check.targetId)) == null ? void 0 : _c.title) != null ? _d : "" : void 0
+      check.targetId ? (_e = (_d = this.notes.get(check.targetId)) == null ? void 0 : _d.title) != null ? _e : "" : void 0
     ).open();
   }
   /**
@@ -54670,6 +54676,7 @@ ${request.requirements}` : preset.text,
     try {
       if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (appearance) await repo.writeTopicAppearance(created.path, appearance);
+      if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(created.path, true);
       if (content) {
         const detailTemplate = (await this.mapStyle(language2)).template;
         await repo.updateNote(
@@ -54762,6 +54769,7 @@ ${request.requirements}` : preset.text,
     try {
       const tx = this.beginMapTransaction().rewriteNote(target.path, async (path) => {
         await repo.updateNote(path, patch, { detailTemplate });
+        if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
       });
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
       entry = await tx.editMap(mapPath, (map) => {

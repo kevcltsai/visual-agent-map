@@ -275,6 +275,32 @@ integrationTest('quick explore: a preset select plus levels and size fields, def
   assert.equal(button(h.actions(), 'Expand').hidden, false);
 });
 
+integrationTest('persona-10: the Levels / Most subtopics fields select their text on focus, say so when the value is over the limit, and the summary says "1 level"', () => {
+  const h = quickHarness({ presets: [{ id: 'k', name: 'K' }], generate: async () => [], create: async () => {} });
+  const levels = byLabel(h.modal.contentEl, 'Levels');
+  let selected = 0; levels.select = () => { selected++; };
+  levels.fire('focus');
+  assert.equal(selected, 1, 'focus selects the old value so typing replaces it (no "21")');
+  levels.value = '9'; levels.fire('input');
+  const note = find(h.modal.contentEl, i => hasCls(i, 'vam-field-note') && /at most 6/i.test(i.text ?? ''));
+  assert.ok(note && !note.hidden, 'an over-limit value is told, not silently clamped');
+  levels.change();
+  assert.equal(levels.value, '6'); assert.ok(!note.hidden, 'the note stays after the value is brought back to the limit');
+  levels.value = '1'; levels.fire('input'); levels.change();
+  assert.ok(note.hidden, 'a valid value clears the note');
+  assert.equal(find(h.modal.contentEl, i => i.cls === 'vam-next-summary').text.startsWith('1 level · up to 15'), true, 'singular wording');
+});
+
+integrationTest('persona-10: the reopened outline review shows the levels and size the outline was generated with', async () => {
+  const h = quickHarness({ presets: [{ id: 'k', name: 'K' }], generate: async () => outlineNodes('# Sleep\n## A\n## B'), create: async () => {} });
+  const levels = byLabel(h.modal.contentEl, 'Levels'), topics = byLabel(h.modal.contentEl, 'Most subtopics');
+  levels.value = '1'; levels.change(); topics.value = '5'; topics.change();
+  button(h.actions(), 'Expand').click(); await tick(); await tick();
+  const reopened = h.reopen();
+  assert.equal(byLabel(reopened.contentEl, 'Levels').value, '1'); assert.equal(byLabel(reopened.contentEl, 'Most subtopics').value, '5');
+  assert.equal(find(reopened.contentEl, i => i.cls === 'vam-next-summary').text.startsWith('1 level · up to 5'), true, 'the summary line follows');
+});
+
 integrationTest('quick explore: Generate hides the dialog; the outline is reviewed in a reopened dialog before anything is created', async () => {
   const requests = [], created = [];
   const h = quickHarness({

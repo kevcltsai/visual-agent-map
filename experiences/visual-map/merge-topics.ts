@@ -120,6 +120,11 @@ export function sharedMergeAppearance(
   };
 }
 
+/** The AI lock is protective: a merged card is locked when any source is, so a merge never silently lifts it. */
+export function mergedAiLocked(notes: ({ aiLocked?: boolean } | undefined)[]): boolean {
+  return notes.some(note => note?.aiLocked === true);
+}
+
 /** The merged topic's model: its parent's model when there is a parent (like a new subtopic), else the workspace model. */
 export function resolveMergeModel(parentModel: string | undefined, workspaceModel: string): string {
   return inheritModel(parentModel, workspaceModel);

@@ -481,6 +481,25 @@ test('05 merge: a merge by hand (no AI) of locked topics still works', async () 
   assert.equal(h.view.map.nodes.some(node => node.id === a.id), false, 'the user merge went through');
 });
 
+test('05 merge: a merge by hand keeps the AI lock when any source is locked, and stays unlocked when none is', async () => {
+  const h = await mergeHarness();
+  const [a, b] = h.nodes;
+  await h.view.setAiLock([b], true);
+  await h.view.mergeSelected('Merged locked', snapshotOf(h, [a, b]));
+  const mergedLocked = h.view.map.nodes.find(node => ![a.id, b.id].includes(node.id) && node.parentId === (a.parentId ?? null) && node.path.includes('Merged locked'));
+  assert.ok(mergedLocked, 'the merged topic exists');
+  assert.equal((await h.repo.readNote(mergedLocked.path)).aiLocked, true, 'one locked source: the merged topic is locked');
+});
+
+test('05 merge: a merge by hand of unlocked topics produces an unlocked topic', async () => {
+  const h = await mergeHarness();
+  const [a, b] = h.nodes;
+  await h.view.mergeSelected('Merged plain', snapshotOf(h, [a, b]));
+  const merged = h.view.map.nodes.find(node => ![a.id, b.id].includes(node.id) && node.path.includes('Merged plain'));
+  assert.ok(merged);
+  assert.equal((await h.repo.readNote(merged.path)).aiLocked, undefined);
+});
+
 test('05 merge: the map chat merge of a locked topic is skipped and writes nothing', async () => {
   const h = await mergeHarness();
   const [a, b] = h.nodes;

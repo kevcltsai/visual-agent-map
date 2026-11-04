@@ -410,6 +410,17 @@ integrationTest('one-click dialog: the AI mode switch is a radiogroup with arrow
   const multi = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 1 });
   assert.equal(byLabel(multi.modal.contentEl, 'AI mode').parent.hidden, false);
 });
+integrationTest('persona-10: the AI mode hint follows the chosen mode (Standard no longer shows the Quick text)', () => {
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'idea' } });
+  const group = byLabel(h.modal.contentEl, 'AI mode');
+  const hint = () => findAll(group.parent, i => hasCls(i, 'vam-hint'))[0].text;
+  assert.match(hint(), /^Quick answers from the model's own knowledge/);
+  button(group, 'Standard').click();
+  assert.match(hint(), /^Standard searches the web/);
+  assert.doesNotMatch(hint(), /^Quick answers/);
+  button(group, 'Quick').click();
+  assert.match(hint(), /^Quick answers/);
+});
 integrationTest('one-click dialog: the map\'s remembered mode is the default (Quick when absent) and is written only when a research or expansion starts, never on cancel', async () => {
   const remembered = [];
   const fresh = nextStepHarness({ modelSettings: { topicStatus: 'idea', rememberAiMode: async mode => { remembered.push(mode); } } });

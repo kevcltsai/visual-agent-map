@@ -30,10 +30,11 @@ export function aiModeField(
   const group = element.createDiv("vam-ai-mode");
   group.setAttr("role", "radiogroup");
   group.setAttr("aria-label", t("ui.ai_mode"));
-  element.createEl("p", { cls: "vam-hint", text: t("ui.ai_mode_hint") });
+  const hint = element.createEl("p", { cls: "vam-hint" });
   const buttons = new Map<MapAiMode, HTMLButtonElement>();
   let current: MapAiMode = options.initial ?? DEFAULT_MAP_AI_MODE;
   const paint = (): void => {
+    hint.setText(t(current === "standard" ? "ui.ai_mode_hint_standard" : "ui.ai_mode_hint"));
     for (const [mode, button] of buttons) {
       button.setAttr("aria-checked", String(mode === current));
       button.tabIndex = mode === current ? 0 : -1;

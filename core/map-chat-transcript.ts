@@ -379,3 +379,11 @@ export function transcriptMarkdown(input: TranscriptInput): string {
       .join("") + "\n"
   );
 }
+
+/**
+ * The conversation is kept in memory only (DATA_CONTRACTS, 地圖 AI 對話), so closing the view loses it. True when finished turns
+ * exist beyond the count last written by "save as a note"; the view then tells the user before the conversation is dropped.
+ */
+export function hasUnsavedChat(completedTurns: number, savedTurns: number): boolean {
+  return completedTurns > savedTurns;
+}

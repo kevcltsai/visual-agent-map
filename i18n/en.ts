@@ -1515,6 +1515,7 @@ export const en = {
   "ui.map_chat_saved_0": "Saved the chat as {0}",
   "ui.map_chat_save_failed_0": "Could not save the chat: {0}",
   "ui.map_chat_save_default_name": "Chat",
+  "ui.map_chat_unsaved_on_close": "The map chat is not kept after you close this view. Use \"Save the chat as a note\" first if you want to keep it.",
   "ui.map_chat_note_title": "Map AI chat",
   "ui.map_chat_note_map": "Map",
   "ui.map_chat_note_saved": "Saved at",

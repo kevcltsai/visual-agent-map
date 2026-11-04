@@ -1487,6 +1487,7 @@ var en = {
   "ui.map_chat_saved_0": "Saved the chat as {0}",
   "ui.map_chat_save_failed_0": "Could not save the chat: {0}",
   "ui.map_chat_save_default_name": "Chat",
+  "ui.map_chat_unsaved_on_close": 'The map chat is not kept after you close this view. Use "Save the chat as a note" first if you want to keep it.',
   "ui.map_chat_note_title": "Map AI chat",
   "ui.map_chat_note_map": "Map",
   "ui.map_chat_note_saved": "Saved at",
@@ -3988,6 +3989,7 @@ var zhCN = {
   "ui.map_chat_saved_0": "\u5DF2\u5B58\u6210 {0}",
   "ui.map_chat_save_failed_0": "\u65E0\u6CD5\u5B58\u4E0B\u5BF9\u8BDD\uFF1A{0}",
   "ui.map_chat_save_default_name": "\u5BF9\u8BDD",
+  "ui.map_chat_unsaved_on_close": "\u5173\u95ED\u6B64\u6807\u7B7E\u9875\u540E\u4E0D\u4F1A\u4FDD\u7559\u5730\u56FE\u5BF9\u8BDD\u3002\u60F3\u7559\u4E0B\u8BF7\u5148\u70B9\u201C\u628A\u5BF9\u8BDD\u5B58\u6210\u7B14\u8BB0\u201D\u3002",
   "ui.map_chat_note_title": "\u5FC3\u667A\u56FE AI \u5BF9\u8BDD",
   "ui.map_chat_note_map": "\u5FC3\u667A\u56FE",
   "ui.map_chat_note_saved": "\u5B58\u6863\u65F6\u95F4",
@@ -6489,6 +6491,7 @@ var zhTW = {
   "ui.map_chat_saved_0": "\u5DF2\u5B58\u6210 {0}",
   "ui.map_chat_save_failed_0": "\u7121\u6CD5\u5B58\u4E0B\u5C0D\u8A71\uFF1A{0}",
   "ui.map_chat_save_default_name": "\u5C0D\u8A71",
+  "ui.map_chat_unsaved_on_close": "\u95DC\u9589\u6B64\u5206\u9801\u5F8C\u4E0D\u6703\u4FDD\u7559\u5730\u5716\u5C0D\u8A71\u3002\u60F3\u7559\u4E0B\u8ACB\u5148\u6309\u300C\u628A\u5C0D\u8A71\u5B58\u6210\u7B46\u8A18\u300D\u3002",
   "ui.map_chat_note_title": "\u5FC3\u667A\u5716 AI \u5C0D\u8A71",
   "ui.map_chat_note_map": "\u5FC3\u667A\u5716",
   "ui.map_chat_note_saved": "\u5B58\u6A94\u6642\u9593",
@@ -30923,6 +30926,224 @@ function renderChatMarkdown(parent, text11, overflowNote = "") {
   parent.createEl("p", { cls: "vam-map-chat-plain", text: rest });
 }
 
+// core/map-chat-transcript.ts
+var CHAT_NAME_LIMIT = 40;
+var SENTENCE_END2 = /[。！？!?\n\r]|\.(?=\s|$)/;
+var ZERO_WIDTH = String.fromCharCode(8203);
+function graphemesOf(value) {
+  const Segmenter = Intl.Segmenter;
+  if (Segmenter)
+    return Array.from(new Segmenter(void 0, { granularity: "grapheme" }).segment(value), (part) => part.segment);
+  return Array.from(value);
+}
+var pad2 = (value) => String(value).padStart(2, "0");
+function localDate2(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+function localStamp(date) {
+  return `${localDate2(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+function chatFirstSentence(message) {
+  const text11 = skipBlank(message);
+  const end = text11.search(SENTENCE_END2);
+  const sentence = end >= 0 ? text11.slice(0, end) : text11;
+  let cut = "";
+  let count = 0;
+  for (const part of graphemesOf(sentence)) {
+    if (count === CHAT_NAME_LIMIT) break;
+    cut += part;
+    count++;
+  }
+  return cut.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\p{Cc}/gu, " ").replace(/\s+/g, " ").replace(/^[\s.]+/, "").replace(/[\s.]+$/, "");
+}
+function chatNoteName(message, date, fallback) {
+  return `${localDate2(date)} ${chatFirstSentence(message) || fallback}`;
+}
+var ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/g;
+var isDropped = (code) => code < 32 && code !== 9 && code !== 10 && code !== 13 || code === 127 || code >= 8234 && code <= 8238 || code >= 8294 && code <= 8297;
+var stripControl = (value) => Array.from(value).filter((ch) => {
+  var _a2;
+  return !isDropped((_a2 = ch.codePointAt(0)) != null ? _a2 : 0);
+}).join("");
+function skipBlank(value) {
+  let at = 0;
+  while (at < value.length && (/\s/.test(value[at]) || [8203, 8204, 8205, 65279].includes(value.charCodeAt(at))))
+    at++;
+  return value.slice(at);
+}
+var FRONT_MATTER_KEYS = /agent-map-node|node-id|topic-id/g;
+function escapeText(value) {
+  return stripControl(value).replace(ASCII_PUNCTUATION, "\\$&");
+}
+var escapeLine = (value) => escapeText(value.replace(/\s+/g, " ").trim());
+function escapeMultiline(value) {
+  return value.replace(/\r\n?/g, "\n").split("\n").map((line) => escapeText(line.replace(/^[ \t]+/, "").replace(/[ \t]+$/, ""))).join("\\\n");
+}
+function linkAliasOf(title) {
+  return stripControl(title).replace(/[[\]|`\r\n\\]/g, " ").replace(/%{2,}/g, "%").replace(/\s+/g, " ").trim();
+}
+function wikiTargetOf(value) {
+  return stripControl(value).replace(/\.md$/i, "").replace(/[[\]|`!\\\r\n]/g, " ").replace(/%{2,}/g, "%").replace(/\s+/g, " ").trim();
+}
+function wikiLink(target, label) {
+  const path = wikiTargetOf(target);
+  const alias = linkAliasOf(label);
+  if (!path) return escapeLine(label || target);
+  return alias && alias !== path ? `[[${path}|${alias}]]` : `[[${path}]]`;
+}
+function pageLink(label, url) {
+  const text11 = escapeLine(label) || escapeLine(url);
+  return /^https:\/\/[^\s<>]+$/i.test(url) ? `[${text11}](<${url}>)` : text11;
+}
+function codeSpan(text11) {
+  var _a2;
+  const body = defuseCode(text11.replace(/\r?\n|\r/g, " "));
+  const longest = Math.max(0, ...((_a2 = body.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
+  const fence = "`".repeat(longest + 1);
+  const guarded = /^\s*[=$]/.test(body) ? `${ZERO_WIDTH}${body}` : body;
+  const padded = /^[`\s]|[`\s]$/.test(guarded) ? ` ${guarded} ` : guarded;
+  return `${fence}${padded}${fence}`;
+}
+function defuseCode(text11) {
+  return stripControl(text11).replace(/!(?=\[)/g, `!${ZERO_WIDTH}`);
+}
+function inlineMarkdown(nodes) {
+  let out = "";
+  for (const node of nodes) {
+    switch (node.t) {
+      case "text":
+        out += escapeText(node.text);
+        break;
+      case "br":
+        out += "\\\n";
+        break;
+      case "code":
+        out += codeSpan(node.text);
+        break;
+      case "fmt": {
+        const inner = inlineMarkdown(node.c);
+        const mark = node.tag === "strong" ? "**" : node.tag === "del" ? "~~" : "*";
+        out += inner.trim() ? `${mark}${inner}${mark}` : inner;
+        break;
+      }
+      case "wiki":
+        out += wikiLink(node.target, node.label);
+        break;
+      case "link": {
+        const label = inlineMarkdown(node.c).replace(/\\\n/g, " ");
+        out += /^https?:\/\/[^\s<>]+$/i.test(node.href) ? `[${label || escapeText(node.href)}](<${node.href}>)` : label;
+        break;
+      }
+    }
+  }
+  return out;
+}
+var tidy = (text11) => text11.replace(/^[ \t]+/, "").replace(/\\\n[ \t]+/g, "\\\n");
+var indentOf = (text11, pad, first) => text11.split("\n").map((line, at) => at === 0 ? `${first}${line}` : line ? `${pad}${line}` : line).join("\n");
+function listMarkdown(block) {
+  return block.items.map((item, index) => {
+    const marker5 = block.ordered ? `${index + 1}. ` : "- ";
+    let body = tidy(inlineMarkdown(item.c));
+    if (item.sub) body += `
+${listMarkdown(item.sub)}`;
+    return indentOf(body, " ".repeat(marker5.length), marker5);
+  }).join("\n");
+}
+function blockMarkdown(block) {
+  var _a2;
+  switch (block.t) {
+    case "p":
+      return tidy(inlineMarkdown(block.c));
+    case "h":
+      return `${"#".repeat(Math.min(6, Math.max(1, block.level)))} ${tidy(inlineMarkdown(block.c).replace(/\\\n/g, " "))}`;
+    case "hr":
+      return "---";
+    case "code": {
+      const text11 = defuseCode(block.text);
+      const longest = Math.max(2, ...((_a2 = text11.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
+      const fence = "`".repeat(longest + 1);
+      return `${fence}
+${text11}
+${fence}`;
+    }
+    case "quote":
+      return blocksMarkdown(block.c).split("\n").map((line) => line ? `> ${line}` : ">").join("\n");
+    case "list":
+      return listMarkdown(block);
+  }
+}
+function blocksMarkdown(blocks) {
+  return blocks.map(blockMarkdown).join("\n\n");
+}
+function replyMarkdown(reply) {
+  return blocksMarkdown(parseBlocks(reply.replace(/\r\n?/g, "\n").split("\n")));
+}
+var fill = (template2, value) => escapeLine(template2.replace(/\{0\}/g, () => value));
+function refMarkdown(ref) {
+  if (ref.kind === "topic") return wikiLink(ref.path, ref.title);
+  const link = ref.path ? wikiLink(ref.path, "") : "";
+  if (ref.kind === "file") return link;
+  const quote = ref.text ? escapeLine([...ref.text.replace(/\s+/g, " ")].slice(0, 200).join("")) : "";
+  return [link, quote].filter(Boolean).join(" ");
+}
+function imagesMarkdown(block, labels) {
+  var _a2;
+  const head = `**${fill(labels.images, block.nodeTitle)}**`;
+  if (block.state === "searching") return `${head}
+
+${fill(labels.imagesSearching, block.query)}`;
+  if (block.state === "empty") return `${head}
+
+${escapeLine(labels.imagesNone)}`;
+  if (block.state === "stopped") return `${head}
+
+${escapeLine(labels.imagesStopped)}`;
+  if (block.state === "failed") return `${head}
+
+${fill(labels.imagesFailed, (_a2 = block.reason) != null ? _a2 : "")}`;
+  const rows2 = block.items.map(
+    (item) => `- ${pageLink(item.title, item.source)}${item.inserted ? ` ${fill(labels.inserted, item.inserted)}` : ""}`
+  );
+  return `${head}
+
+${rows2.join("\n")}`;
+}
+function transcriptMarkdown(input2) {
+  const { labels } = input2;
+  const parts = [
+    `# ${escapeLine(labels.title)}`,
+    `${escapeLine(labels.map)}: ${wikiLink(input2.mapPath, input2.mapTitle)}\\
+${escapeLine(labels.saved)}: ${localStamp(input2.savedAt)}`
+  ];
+  input2.turns.forEach((turn, index) => {
+    parts.push("---");
+    parts.push(`## ${index + 1}. ${escapeLine(labels.you)}`);
+    parts.push(escapeMultiline(turn.question));
+    const refs = turn.refs.map(refMarkdown).filter(Boolean);
+    if (refs.length) parts.push(`${escapeLine(labels.references)}: ${refs.join(", ")}`);
+    parts.push(`### ${escapeLine(labels.ai)}`);
+    const answer = replyMarkdown(turn.answer);
+    if (answer.trim()) parts.push(answer);
+    if (turn.lines.length) {
+      parts.push(`**${escapeLine(labels.results)}**`);
+      parts.push(turn.lines.map((line) => `- ${escapeLine(line)}`).join("\n"));
+    }
+    if (turn.plan)
+      parts.push(
+        escapeLine(
+          turn.plan === "pending" ? labels.planPending : turn.plan === "applied" ? labels.planApplied : labels.planCancelled
+        )
+      );
+    for (const block of turn.images) parts.push(imagesMarkdown(block, labels));
+  });
+  return parts.join("\n\n").replace(/!(?=\[)/g, `!${ZERO_WIDTH}`).split(/(\[\[[^\]\n]*\]\])/).map(
+    (part, at) => at % 2 ? part : part.replace(FRONT_MATTER_KEYS, (match) => `${match[0]}${ZERO_WIDTH}${match.slice(1)}`)
+  ).join("") + "\n";
+}
+function hasUnsavedChat(completedTurns, savedTurns) {
+  return completedTurns > savedTurns;
+}
+
 // experiences/visual-map/map-chat.ts
 function usableImageCount(block) {
   return block.items.filter((item) => !item.broken).length;
@@ -30989,6 +31210,8 @@ var MapChatPanel = class {
     this.host = host;
     __publicField(this, "id", `vam-map-chat-${++panelSequence}`);
     __publicField(this, "messages", []);
+    /** Finished turns already written by "save as a note"; reset with the conversation. */
+    __publicField(this, "savedTurnCount", 0);
     __publicField(this, "chips", []);
     /** The user's wish: the side window is open (remembered). Whether it shows also depends on `narrow`. */
     __publicField(this, "open", false);
@@ -31167,6 +31390,10 @@ var MapChatPanel = class {
     return turns;
   }
   /** Finished question and answer pairs, oldest first: what "save as a note" writes (a streaming or failed answer is left out). */
+  /** True when finished turns exist that no "save as a note" has written (the chat is memory-only, so closing the view drops them). */
+  get hasUnsavedTurns() {
+    return hasUnsavedChat(this.completedTurns().length, this.savedTurnCount);
+  }
   completedTurns() {
     const turns = [];
     for (let at = 0; at + 1 < this.messages.length; at += 2) {
@@ -31757,6 +31984,7 @@ ${typed}` : draft;
     this.cancelFrame();
     this.rows = /* @__PURE__ */ new WeakMap();
     this.messages = [];
+    this.savedTurnCount = 0;
     this.spokenLater = [];
     this.chips = [];
     this.dismissedNote = null;
@@ -31999,6 +32227,7 @@ ${typed}` : draft;
     this.refreshSave();
     try {
       const result = await this.host.saveTranscript(turns);
+      if (result.ok) this.savedTurnCount = turns.length;
       this.announceImages(result.ok ? t("ui.map_chat_saved_0", result.path) : result.reason);
     } finally {
       this.saving = false;
@@ -32776,221 +33005,6 @@ function imageMarkdown(candidate) {
   return `![${title}](<${candidate.url}>)
 
 [${title}](<${candidate.source}>)`;
-}
-
-// core/map-chat-transcript.ts
-var CHAT_NAME_LIMIT = 40;
-var SENTENCE_END2 = /[。！？!?\n\r]|\.(?=\s|$)/;
-var ZERO_WIDTH = String.fromCharCode(8203);
-function graphemesOf(value) {
-  const Segmenter = Intl.Segmenter;
-  if (Segmenter)
-    return Array.from(new Segmenter(void 0, { granularity: "grapheme" }).segment(value), (part) => part.segment);
-  return Array.from(value);
-}
-var pad2 = (value) => String(value).padStart(2, "0");
-function localDate2(date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-}
-function localStamp(date) {
-  return `${localDate2(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-function chatFirstSentence(message) {
-  const text11 = skipBlank(message);
-  const end = text11.search(SENTENCE_END2);
-  const sentence = end >= 0 ? text11.slice(0, end) : text11;
-  let cut = "";
-  let count = 0;
-  for (const part of graphemesOf(sentence)) {
-    if (count === CHAT_NAME_LIMIT) break;
-    cut += part;
-    count++;
-  }
-  return cut.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\p{Cc}/gu, " ").replace(/\s+/g, " ").replace(/^[\s.]+/, "").replace(/[\s.]+$/, "");
-}
-function chatNoteName(message, date, fallback) {
-  return `${localDate2(date)} ${chatFirstSentence(message) || fallback}`;
-}
-var ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/g;
-var isDropped = (code) => code < 32 && code !== 9 && code !== 10 && code !== 13 || code === 127 || code >= 8234 && code <= 8238 || code >= 8294 && code <= 8297;
-var stripControl = (value) => Array.from(value).filter((ch) => {
-  var _a2;
-  return !isDropped((_a2 = ch.codePointAt(0)) != null ? _a2 : 0);
-}).join("");
-function skipBlank(value) {
-  let at = 0;
-  while (at < value.length && (/\s/.test(value[at]) || [8203, 8204, 8205, 65279].includes(value.charCodeAt(at))))
-    at++;
-  return value.slice(at);
-}
-var FRONT_MATTER_KEYS = /agent-map-node|node-id|topic-id/g;
-function escapeText(value) {
-  return stripControl(value).replace(ASCII_PUNCTUATION, "\\$&");
-}
-var escapeLine = (value) => escapeText(value.replace(/\s+/g, " ").trim());
-function escapeMultiline(value) {
-  return value.replace(/\r\n?/g, "\n").split("\n").map((line) => escapeText(line.replace(/^[ \t]+/, "").replace(/[ \t]+$/, ""))).join("\\\n");
-}
-function linkAliasOf(title) {
-  return stripControl(title).replace(/[[\]|`\r\n\\]/g, " ").replace(/%{2,}/g, "%").replace(/\s+/g, " ").trim();
-}
-function wikiTargetOf(value) {
-  return stripControl(value).replace(/\.md$/i, "").replace(/[[\]|`!\\\r\n]/g, " ").replace(/%{2,}/g, "%").replace(/\s+/g, " ").trim();
-}
-function wikiLink(target, label) {
-  const path = wikiTargetOf(target);
-  const alias = linkAliasOf(label);
-  if (!path) return escapeLine(label || target);
-  return alias && alias !== path ? `[[${path}|${alias}]]` : `[[${path}]]`;
-}
-function pageLink(label, url) {
-  const text11 = escapeLine(label) || escapeLine(url);
-  return /^https:\/\/[^\s<>]+$/i.test(url) ? `[${text11}](<${url}>)` : text11;
-}
-function codeSpan(text11) {
-  var _a2;
-  const body = defuseCode(text11.replace(/\r?\n|\r/g, " "));
-  const longest = Math.max(0, ...((_a2 = body.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
-  const fence = "`".repeat(longest + 1);
-  const guarded = /^\s*[=$]/.test(body) ? `${ZERO_WIDTH}${body}` : body;
-  const padded = /^[`\s]|[`\s]$/.test(guarded) ? ` ${guarded} ` : guarded;
-  return `${fence}${padded}${fence}`;
-}
-function defuseCode(text11) {
-  return stripControl(text11).replace(/!(?=\[)/g, `!${ZERO_WIDTH}`);
-}
-function inlineMarkdown(nodes) {
-  let out = "";
-  for (const node of nodes) {
-    switch (node.t) {
-      case "text":
-        out += escapeText(node.text);
-        break;
-      case "br":
-        out += "\\\n";
-        break;
-      case "code":
-        out += codeSpan(node.text);
-        break;
-      case "fmt": {
-        const inner = inlineMarkdown(node.c);
-        const mark = node.tag === "strong" ? "**" : node.tag === "del" ? "~~" : "*";
-        out += inner.trim() ? `${mark}${inner}${mark}` : inner;
-        break;
-      }
-      case "wiki":
-        out += wikiLink(node.target, node.label);
-        break;
-      case "link": {
-        const label = inlineMarkdown(node.c).replace(/\\\n/g, " ");
-        out += /^https?:\/\/[^\s<>]+$/i.test(node.href) ? `[${label || escapeText(node.href)}](<${node.href}>)` : label;
-        break;
-      }
-    }
-  }
-  return out;
-}
-var tidy = (text11) => text11.replace(/^[ \t]+/, "").replace(/\\\n[ \t]+/g, "\\\n");
-var indentOf = (text11, pad, first) => text11.split("\n").map((line, at) => at === 0 ? `${first}${line}` : line ? `${pad}${line}` : line).join("\n");
-function listMarkdown(block) {
-  return block.items.map((item, index) => {
-    const marker5 = block.ordered ? `${index + 1}. ` : "- ";
-    let body = tidy(inlineMarkdown(item.c));
-    if (item.sub) body += `
-${listMarkdown(item.sub)}`;
-    return indentOf(body, " ".repeat(marker5.length), marker5);
-  }).join("\n");
-}
-function blockMarkdown(block) {
-  var _a2;
-  switch (block.t) {
-    case "p":
-      return tidy(inlineMarkdown(block.c));
-    case "h":
-      return `${"#".repeat(Math.min(6, Math.max(1, block.level)))} ${tidy(inlineMarkdown(block.c).replace(/\\\n/g, " "))}`;
-    case "hr":
-      return "---";
-    case "code": {
-      const text11 = defuseCode(block.text);
-      const longest = Math.max(2, ...((_a2 = text11.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
-      const fence = "`".repeat(longest + 1);
-      return `${fence}
-${text11}
-${fence}`;
-    }
-    case "quote":
-      return blocksMarkdown(block.c).split("\n").map((line) => line ? `> ${line}` : ">").join("\n");
-    case "list":
-      return listMarkdown(block);
-  }
-}
-function blocksMarkdown(blocks) {
-  return blocks.map(blockMarkdown).join("\n\n");
-}
-function replyMarkdown(reply) {
-  return blocksMarkdown(parseBlocks(reply.replace(/\r\n?/g, "\n").split("\n")));
-}
-var fill = (template2, value) => escapeLine(template2.replace(/\{0\}/g, () => value));
-function refMarkdown(ref) {
-  if (ref.kind === "topic") return wikiLink(ref.path, ref.title);
-  const link = ref.path ? wikiLink(ref.path, "") : "";
-  if (ref.kind === "file") return link;
-  const quote = ref.text ? escapeLine([...ref.text.replace(/\s+/g, " ")].slice(0, 200).join("")) : "";
-  return [link, quote].filter(Boolean).join(" ");
-}
-function imagesMarkdown(block, labels) {
-  var _a2;
-  const head = `**${fill(labels.images, block.nodeTitle)}**`;
-  if (block.state === "searching") return `${head}
-
-${fill(labels.imagesSearching, block.query)}`;
-  if (block.state === "empty") return `${head}
-
-${escapeLine(labels.imagesNone)}`;
-  if (block.state === "stopped") return `${head}
-
-${escapeLine(labels.imagesStopped)}`;
-  if (block.state === "failed") return `${head}
-
-${fill(labels.imagesFailed, (_a2 = block.reason) != null ? _a2 : "")}`;
-  const rows2 = block.items.map(
-    (item) => `- ${pageLink(item.title, item.source)}${item.inserted ? ` ${fill(labels.inserted, item.inserted)}` : ""}`
-  );
-  return `${head}
-
-${rows2.join("\n")}`;
-}
-function transcriptMarkdown(input2) {
-  const { labels } = input2;
-  const parts = [
-    `# ${escapeLine(labels.title)}`,
-    `${escapeLine(labels.map)}: ${wikiLink(input2.mapPath, input2.mapTitle)}\\
-${escapeLine(labels.saved)}: ${localStamp(input2.savedAt)}`
-  ];
-  input2.turns.forEach((turn, index) => {
-    parts.push("---");
-    parts.push(`## ${index + 1}. ${escapeLine(labels.you)}`);
-    parts.push(escapeMultiline(turn.question));
-    const refs = turn.refs.map(refMarkdown).filter(Boolean);
-    if (refs.length) parts.push(`${escapeLine(labels.references)}: ${refs.join(", ")}`);
-    parts.push(`### ${escapeLine(labels.ai)}`);
-    const answer = replyMarkdown(turn.answer);
-    if (answer.trim()) parts.push(answer);
-    if (turn.lines.length) {
-      parts.push(`**${escapeLine(labels.results)}**`);
-      parts.push(turn.lines.map((line) => `- ${escapeLine(line)}`).join("\n"));
-    }
-    if (turn.plan)
-      parts.push(
-        escapeLine(
-          turn.plan === "pending" ? labels.planPending : turn.plan === "applied" ? labels.planApplied : labels.planCancelled
-        )
-      );
-    for (const block of turn.images) parts.push(imagesMarkdown(block, labels));
-  });
-  return parts.join("\n\n").replace(/!(?=\[)/g, `!${ZERO_WIDTH}`).split(/(\[\[[^\]\n]*\]\])/).map(
-    (part, at) => at % 2 ? part : part.replace(FRONT_MATTER_KEYS, (match) => `${match[0]}${ZERO_WIDTH}${match.slice(1)}`)
-  ).join("") + "\n";
 }
 
 // ui/image-candidates.ts
@@ -50666,7 +50680,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     ).open();
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     this.closeTopicLinkMenu();
     this.closed = true;
     this.closeMapSearch(false);
@@ -50695,11 +50709,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
+    if ((_f = this.chat) == null ? void 0 : _f.hasUnsavedTurns) new import_obsidian34.Notice(t("ui.map_chat_unsaved_on_close"));
     this.abortMapChat();
-    (_f = this.chat) == null ? void 0 : _f.dispose();
-    (_g = this.relevancePanelCleanup) == null ? void 0 : _g.call(this);
+    (_g = this.chat) == null ? void 0 : _g.dispose();
+    (_h = this.relevancePanelCleanup) == null ? void 0 : _h.call(this);
     this.relevancePanelCleanup = null;
-    if (this.relevancePanelOpen) (_i = (_h = this.plugin).releaseWarmClaude) == null ? void 0 : _i.call(_h);
+    if (this.relevancePanelOpen) (_j = (_i = this.plugin).releaseWarmClaude) == null ? void 0 : _j.call(_i);
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -50719,8 +50734,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_j = this.hoverCard) == null ? void 0 : _j.remove();
-    (_k = this.dragCleanup) == null ? void 0 : _k.call(this);
+    (_k = this.hoverCard) == null ? void 0 : _k.remove();
+    (_l = this.dragCleanup) == null ? void 0 : _l.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;

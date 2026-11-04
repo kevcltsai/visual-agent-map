@@ -65866,7 +65866,55 @@ ${addition}` : addition });
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
     }
+    if (outcome.result.ok) await this.chatCoverFromPicture(block, item.candidate).catch(() => void 0);
     return outcome.result;
+  }
+  /** The bytes of a picked picture (a seam: it needs the network). */
+  async chatFetchImage(url) {
+    return (await (0, import_obsidian34.requestUrl)({ url, method: "GET", throw: true })).arrayBuffer;
+  }
+  /**
+   * Makes a picked web picture the card's cover: only when the card has no cover and has not turned it off (a cover set by hand,
+   * and `topic-cover: none`, stay as they are). The picture is checked by its bytes ({@link acceptImage}), stored beside the note,
+   * embedded in `## User Notes` and set as `topic-cover`, as one undoable step.
+   */
+  async chatCoverFromPicture(block, candidate) {
+    const sameMap = () => !this.closed && !!this.map && this.path === block.mapPath && this.map.id === block.mapId;
+    const target = () => {
+      var _a2;
+      if (!sameMap() || this.aimLive()) return null;
+      const node2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === block.nodeId);
+      return node2 && this.cardAcceptsImages(node2) && !this.isMerging(node2.id) ? node2 : null;
+    };
+    const hasNoCover = (node2) => {
+      var _a2;
+      const file = this.app.vault.getAbstractFileByPath(node2.path);
+      if (!(file instanceof import_obsidian34.TFile)) return false;
+      const cache = this.app.metadataCache.getFileCache(file);
+      const declared = (_a2 = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _a2["topic-cover"];
+      if (declared !== void 0 && declared !== null) return false;
+      return resolveCoverWithFrame(cache, (link) => this.app.metadataCache.getFirstLinkpathDest(link, node2.path)) === null;
+    };
+    const first = target();
+    if (!first || !hasNoCover(first)) return;
+    const data = await this.chatFetchImage(candidate.url);
+    const node = target();
+    if (!node || !this.map || !hasNoCover(node)) return;
+    const accepted = acceptImage({ mime: "image/*", size: data.byteLength, bytes: data });
+    if (!accepted.ok) return;
+    const name2 = safeImageName(candidate.title, accepted.mime);
+    if (!name2) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().createAttachment("image", { name: name2, data, sourcePath: node.path }).rewriteNote(node.path, async (path, attachment) => {
+      const note = this.app.vault.getAbstractFileByPath(path);
+      if (!(note instanceof import_obsidian34.TFile)) throw new Error(path);
+      const link = attachment("image");
+      await this.app.vault.process(note, (content) => withCover(appendImageEmbed(content, link), link));
+    }).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.topic_cover") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   chatTranscriptTurn(turn) {

@@ -22048,8 +22048,13 @@ function buildMapChatContext(input2) {
       parentId: node.parentId,
       depth: node.depth,
       ...kindFields(node, !!input2.aim),
+      ...node.aiLocked ? { aiLocked: true } : {},
       ...errorFields(node)
     })),
+    // Only when a card is locked, so a map without locks sends exactly what it did before. A hint: the apply side refuses.
+    ...input2.outline.some((node) => node.aiLocked) ? {
+      aiLockedNote: "Cards with aiLocked are locked by the user: read them, but do not rename, edit, move, delete or merge them, add or remove their children, or delete or merge cards related to them. Such actions will be refused."
+    } : {},
     ...relations.length ? { relations } : {},
     selected: input2.selected.map((ref) => topic(ref, true)),
     references: input2.references.map((ref) => topic(ref, false)),
@@ -59723,6 +59728,63 @@ ${request.requirements}` : preset.text,
     const removed = ids.filter((id) => id !== targetId);
     return (_a2 = targetId ? this.aiLockReason("write", [targetId], fresh) : null) != null ? _a2 : this.aiLockReason("remove", removed, fresh);
   }
+  /** The notes of these cards read again from disk (a missing card or note is left out). */
+  async freshNotesOf(ids) {
+    var _a2, _b2;
+    const fresh = /* @__PURE__ */ new Map();
+    for (const id of new Set(ids)) {
+      const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+      if (!node) continue;
+      try {
+        fresh.set(id, await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0));
+      } catch (e) {
+      }
+    }
+    return fresh;
+  }
+  /**
+   * The AI lock of a map chat write, read from disk at apply time (so a lock set after the reply was proposed still
+   * counts): what the tool would change, add under, move or remove. Null when the write may go ahead.
+   */
+  async chatLockSkip(action, real) {
+    var _a2, _b2;
+    const refused = skipped("ui.ai_locked_notice");
+    const check = async (op, ids, to) => {
+      const known = ids.filter((id) => !!id);
+      if (!known.length) return null;
+      const involved = [...known, ...to ? [to] : []];
+      const fresh = op === "remove" || op === "move" ? await this.freshNotes() : await this.freshNotesOf(involved);
+      return this.aiLockReason(op, known, fresh, to === void 0 ? void 0 : { to }) ? refused : null;
+    };
+    switch (action.kind) {
+      case "add_child":
+        return action.parentId ? check("addChild", [real(action.parentId)]) : null;
+      case "set_topic_kind":
+        return check(
+          "write",
+          action.nodeIds.map((id) => real(id))
+        );
+      case "rename_topic":
+      case "update_summary":
+      case "edit_topic_note":
+        return check("write", [action.nodeId]);
+      case "move_topic":
+        return check("move", [action.nodeId], real(action.newParentId));
+      case "delete_topic":
+        return check("remove", [action.nodeId]);
+      case "edit_md_file": {
+        const key2 = normalizeVaultPath(action.path);
+        if (!key2) return null;
+        const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === key2);
+        if (node) return check("write", [node.id]);
+        const file = this.app.vault.getAbstractFileByPath(key2);
+        const frontmatter2 = file instanceof import_obsidian34.TFile ? (_b2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _b2.frontmatter : void 0;
+        return frontmatter2 && readAiLocked(frontmatter2) ? refused : null;
+      }
+      default:
+        return null;
+    }
+  }
   /** Every topic note of the map read again from disk: the write-time fence must not trust the view's copy. */
   async freshNotes() {
     var _a2, _b2, _c;
@@ -62682,6 +62744,7 @@ ${note.detail.trim()}` : "",
       };
     };
     const outline = map.nodes.map((node) => {
+      var _a3;
       const strength = this.hypothesisStrengthOf(node.id);
       return {
         id: node.id,
@@ -62691,6 +62754,7 @@ ${note.detail.trim()}` : "",
         depth: depthOf2(node),
         kind: this.topicKindOf(node.id),
         ...strength ? { strength } : {},
+        ...((_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.aiLocked) ? { aiLocked: true } : {},
         ...failureOf(node.id)
       };
     });
@@ -63605,6 +63669,8 @@ ${note.detail.trim()}` : "",
       var _a3;
       return id.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : id;
     };
+    const locked = await this.chatLockSkip(action, real);
+    if (locked) return locked;
     switch (action.kind) {
       case "add_child": {
         let parent = null;
@@ -63929,6 +63995,15 @@ ${note.detail.trim()}` : "",
     if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");
     const targets = known(action.nodeIds);
     if (action.nodeIds.length && !targets.length) return skipped("ui.map_chat_skip_topic_gone");
+    const lockedOnly = async (ids) => {
+      if (!ids.length) return false;
+      const fresh = await this.freshNotesOf(ids);
+      return ids.every((id) => !!this.aiLockReason("write", [id], fresh));
+    };
+    const writesTargets = action.action === "research_standard" || action.action === "expand" || action.action === "find_images";
+    const lockIds = targets.length ? targets : this.chatSelectionIds();
+    if ((writesTargets || action.action === "synthesize" && lockIds.length === 1) && await lockedOnly(lockIds))
+      return skipped("ui.ai_locked_notice");
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
@@ -63966,7 +64041,7 @@ ${note.detail.trim()}` : "",
         const parents = known(ids).map((id) => {
           var _a3;
           return (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === id);
-        }).filter((node) => !!node);
+        }).filter((node) => !!node && !this.aiLockReason("addChild", [node.id]));
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
         for (const parent of parents)
           launch(
@@ -64135,6 +64210,10 @@ ${note.detail.trim()}` : "",
         }
         try {
           const note = await this.plugin.repo.readNote(again.node.path, (_a2 = this.map) != null ? _a2 : void 0);
+          if (note.aiLocked) {
+            outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
+            return;
+          }
           const before = note.detail.replace(/\s+$/, "");
           const addition = imageMarkdown(item.candidate);
           await this.noteChange(again.node, { detail: before ? `${before}

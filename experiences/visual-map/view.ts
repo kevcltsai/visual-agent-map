@@ -271,6 +271,7 @@ import {
   RELEVANCE_CONTEXT_MAX_LENGTH,
   RELEVANCE_GOAL_MAX_LENGTH,
   HYPOTHESIS_STRENGTHS,
+  readAiLocked,
   TOPIC_KINDS,
   RELEVANCE_LEVELS,
   type HypothesisStrength,
@@ -12998,6 +12999,70 @@ export class VisualAgentMapView extends ItemView {
       (targetId ? this.aiLockReason("write", [targetId], fresh) : null) ?? this.aiLockReason("remove", removed, fresh)
     );
   }
+  /** The notes of these cards read again from disk (a missing card or note is left out). */
+  private async freshNotesOf(ids: readonly string[]): Promise<Map<string, Note>> {
+    const fresh = new Map<string, Note>();
+    for (const id of new Set(ids)) {
+      const node = this.map?.nodes.find(item => item.id === id);
+      if (!node) continue;
+      try {
+        fresh.set(id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
+      } catch {
+        /* A missing note has no lock. */
+      }
+    }
+    return fresh;
+  }
+  /**
+   * The AI lock of a map chat write, read from disk at apply time (so a lock set after the reply was proposed still
+   * counts): what the tool would change, add under, move or remove. Null when the write may go ahead.
+   */
+  private async chatLockSkip(
+    action: Exclude<
+      MapChatAction,
+      { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" | "ask_topic_kind" }
+    >,
+    real: (id: string) => string | null
+  ): Promise<ChatOutcome | null> {
+    const refused: ChatOutcome = skipped("ui.ai_locked_notice");
+    const check = async (op: AiLockOp, ids: (string | null)[], to?: string | null): Promise<ChatOutcome | null> => {
+      const known = ids.filter((id): id is string => !!id);
+      if (!known.length) return null;
+      const involved = [...known, ...(to ? [to] : [])];
+      // The parents, the subtree and the related cards count too, so every card of the map is read when one may be removed.
+      const fresh = op === "remove" || op === "move" ? await this.freshNotes() : await this.freshNotesOf(involved);
+      return this.aiLockReason(op, known, fresh, to === undefined ? undefined : { to }) ? refused : null;
+    };
+    switch (action.kind) {
+      case "add_child":
+        return action.parentId ? check("addChild", [real(action.parentId)]) : null;
+      case "set_topic_kind":
+        return check(
+          "write",
+          action.nodeIds.map(id => real(id))
+        );
+      case "rename_topic":
+      case "update_summary":
+      case "edit_topic_note":
+        return check("write", [action.nodeId]);
+      case "move_topic":
+        return check("move", [action.nodeId], real(action.newParentId));
+      case "delete_topic":
+        return check("remove", [action.nodeId]);
+      case "edit_md_file": {
+        const key = normalizeVaultPath(action.path);
+        if (!key) return null;
+        const node = this.map?.nodes.find(item => item.path === key);
+        if (node) return check("write", [node.id]);
+        // A note that is not a card of this map: its own frontmatter decides.
+        const file = this.app.vault.getAbstractFileByPath(key);
+        const frontmatter = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
+        return frontmatter && readAiLocked(frontmatter) ? refused : null;
+      }
+      default:
+        return null;
+    }
+  }
   /** Every topic note of the map read again from disk: the write-time fence must not trust the view's copy. */
   private async freshNotes(): Promise<Map<string, Note>> {
     const fresh = new Map<string, Note>();
@@ -16152,6 +16217,7 @@ export class VisualAgentMapView extends ItemView {
         depth: depthOf(node),
         kind: this.topicKindOf(node.id),
         ...(strength ? { strength } : {}),
+        ...(this.notes.get(node.id)?.aiLocked ? { aiLocked: true } : {}),
         ...failureOf(node.id)
       };
     });
@@ -17217,6 +17283,9 @@ export class VisualAgentMapView extends ItemView {
     /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
     const real = (id: string): string | null =>
       id.startsWith(MAP_CHAT_NEW_PREFIX) ? (run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) ?? null) : id;
+    // AI lock: the real guard of the chat is here, on apply (a confirmation that comes later is checked again here).
+    const locked = await this.chatLockSkip(action, real);
+    if (locked) return locked;
     switch (action.kind) {
       case "add_child": {
         // An empty parent is a new root card.
@@ -17577,6 +17646,18 @@ export class VisualAgentMapView extends ItemView {
     if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");
     const targets = known(action.nodeIds);
     if (action.nodeIds.length && !targets.length) return skipped("ui.map_chat_skip_topic_gone");
+    // AI lock: the actions that write into their target cards are a tool error when every target is locked (mixed targets
+    // skip the locked ones further on); integrating several cards writes a new topic only.
+    const lockedOnly = async (ids: string[]): Promise<boolean> => {
+      if (!ids.length) return false;
+      const fresh = await this.freshNotesOf(ids);
+      return ids.every(id => !!this.aiLockReason("write", [id], fresh));
+    };
+    const writesTargets =
+      action.action === "research_standard" || action.action === "expand" || action.action === "find_images";
+    const lockIds = targets.length ? targets : this.chatSelectionIds();
+    if ((writesTargets || (action.action === "synthesize" && lockIds.length === 1)) && (await lockedOnly(lockIds)))
+      return skipped("ui.ai_locked_notice");
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
@@ -17615,7 +17696,7 @@ export class VisualAgentMapView extends ItemView {
         const ids = targets.length ? targets : this.chatSelectionIds();
         const parents = known(ids)
           .map(id => this.map?.nodes.find(node => node.id === id))
-          .filter((node): node is MapNode => !!node);
+          .filter((node): node is MapNode => !!node && !this.aiLockReason("addChild", [node.id]));
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
         // The chat request is the confirmation of the changes, not of the AI call: each parent asks for its own model's
         // usage notice first, like the expand button. The subtopics are then added without the review window.
@@ -17801,6 +17882,11 @@ export class VisualAgentMapView extends ItemView {
         // A failure is carried out as a result, not thrown: mutate() would show its own Notice for a throw, and this is the second.
         try {
           const note = await this.plugin.repo.readNote(again.node.path, this.map ?? undefined);
+          // AI lock: the picture the chat found is not put into a locked card.
+          if (note.aiLocked) {
+            outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
+            return;
+          }
           const before = note.detail.replace(/\s+$/, "");
           const addition = imageMarkdown(item.candidate);
           await this.noteChange(again.node, { detail: before ? `${before}\n\n${addition}` : addition });

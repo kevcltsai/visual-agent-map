@@ -36,7 +36,10 @@ export type TopicRunKind =
   "research" | "proposeChildren" | "integrateDirection" | "integrateChildren" | "synthesizeSelection";
 
 /** The i18n key of the Stop button on a card: expanding (proposing subtopics) is not research. */
-export function stopLabelKey(kind: TopicRunKind | undefined, quickExpandPending: boolean): "ui.stop_expand" | "ui.stop_research" {
+export function stopLabelKey(
+  kind: TopicRunKind | undefined,
+  quickExpandPending: boolean
+): "ui.stop_expand" | "ui.stop_research" {
   return quickExpandPending || kind === "proposeChildren" ? "ui.stop_expand" : "ui.stop_research";
 }
 

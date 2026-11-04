@@ -10775,8 +10775,10 @@ export class VisualAgentMapView extends ItemView {
       batch?.status !== "running" &&
       !(ownSynthesis?.state === "running" && ownSynthesis.mapPath === this.path)
     ) {
-      this.button(header, t(stopLabelKey(this.plugin.topicRuns.runKind(node.path), !!this.plugin.quickExpandPending?.has(node.path))), () =>
-        (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
+      this.button(
+        header,
+        t(stopLabelKey(this.plugin.topicRuns.runKind(node.path), !!this.plugin.quickExpandPending?.has(node.path))),
+        () => (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
       );
     }
     if (research?.slow && research.resend)

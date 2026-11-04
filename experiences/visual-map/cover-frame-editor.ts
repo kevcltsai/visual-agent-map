@@ -9,6 +9,8 @@ import {
   type CoverFrame,
   type CoverPosition
 } from "./card-cover";
+import { CARD_WIDTH, CARD_WIDTH_MAX, CARD_WIDTH_MIN, CARD_WIDTH_STEP, clampCardWidth } from "../../map-graph";
+import { titleProblemText } from "../../ui/modals/title-check";
 import { arrangeCover, coverWindow, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 
 /** The smallest a frame side can be, as a fraction of the picture. */
@@ -22,6 +24,8 @@ const ROUND = 1e6;
 export type FrameDragMode = "move" | "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se";
 export const FRAME_HANDLES: readonly FrameDragMode[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
+/** A title is one line: line breaks and runs of spaces become one space. */
+const oneLine = (value: string): string => value.replace(/\s+/g, " ").trim();
 const round = (value: number): number => Math.round(value * ROUND) / ROUND;
 const clamp = (value: number, low: number, high: number): number => Math.min(Math.max(value, low), high);
 
@@ -97,7 +101,16 @@ export interface CardCoverEdit {
   frame: CoverFrame | null;
   size: number;
   position: CoverPosition;
+  /** The card width to write to the map (CARD_WIDTH: the standard width). Present only when the user changed it. */
+  width?: number;
+  /** The new topic title, present only when the user changed it (never empty). Written like the map's rename. */
+  title?: string;
+  /** The new card summary, present only when the user changed it (may be empty). Written like the map's summary edit. */
+  summary?: string;
 }
+
+/** The longest summary the dialog keeps (the map's text-edit limit). */
+export const SUMMARY_LIMIT = 2000;
 
 /** Switching to left or right with a picture wider than this sets it to SIDE_SIZE, so the text keeps room beside it. */
 export const SIDE_SIZE_LIMIT = 0.5;
@@ -122,11 +135,13 @@ export interface CoverFrameModalOptions {
   size?: number;
   /** The note's picture position; top when absent. */
   position?: CoverPosition;
+  /** The topic's card width on the map (absent: the standard width). The dialog's right edge changes it within the map's limits. */
+  width?: number;
   /** The picture's width over height when the map already measured it, so the card has its size before the picture loads. */
   shape?: number | null;
   /**
    * A detached copy of the topic's card as the map draws it (same width, fonts and line wrapping). Its cover is replaced
-   * by the editable one; everything else is shown as it is and does not take input. Without it, a plain card.
+   * by the editable one; its title and summary are typed in place (an empty summary is added when it has none); everything else is shown as it is and does not take input. Without it, a plain card.
    */
   card?: () => HTMLElement;
   /** Called once by Apply with the frame and size to write. Cancel and close never call it. */
@@ -155,6 +170,9 @@ export class CoverFrameModal extends Modal {
   private size: number;
   private position: CoverPosition;
   private cardEl: HTMLElement | null = null;
+  private width: number;
+  private readonly initialWidth: number;
+  private widthHandle: HTMLElement | null = null;
   private sizeSlider: HTMLInputElement | null = null;
   private shape: number | null;
   private drag: CoverDrag | null = null;
@@ -166,6 +184,12 @@ export class CoverFrameModal extends Modal {
   private boxEl: HTMLElement | null = null;
   private statusEl: HTMLElement | null = null;
   private applyButton: HTMLButtonElement | null = null;
+  private titleEl_: HTMLElement | null = null;
+  private summaryEl_: HTMLElement | null = null;
+  private hintEl: HTMLElement | null = null;
+  private loadFailed = false;
+  private initialTitle = "";
+  private initialSummary = "";
   constructor(
     app: App,
     private readonly options: CoverFrameModalOptions
@@ -174,6 +198,7 @@ export class CoverFrameModal extends Modal {
     this.draft = { ...(options.initial ?? WHOLE) };
     this.size = parseCoverSize(options.size ?? COVER_SIZE_DEFAULT);
     this.position = parseCoverPosition(options.position);
+    this.initialWidth = this.width = clampCardWidth(options.width) ?? CARD_WIDTH;
     this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen(): void {
@@ -188,9 +213,12 @@ export class CoverFrameModal extends Modal {
     // A copied side layout is taken apart first, so every text child is a direct child that can be made inert.
     arrangeCover(card, null, "top");
     const cover = this.buildCover(card);
-    // The rest of the card is shown, not edited (ticket 05 adds the text).
-    for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
+    // Title and summary take input (ticket 05); the rest of the card is shown, not edited.
+    this.buildText(card);
+    for (const child of Array.from(card.children))
+      if (child !== cover && child !== this.titleEl_ && child !== this.summaryEl_) child.setAttr("inert", "");
     arrangeCover(card, cover, this.position);
+    this.buildWidthHandle(card);
     // aria-labelledby, not aria-label: Obsidian shows an aria-label as a tooltip, which would cover the picture.
     const labelId = `vam-card-frame-label-${++labelSeq}`;
     this.contentEl.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
@@ -200,6 +228,7 @@ export class CoverFrameModal extends Modal {
       cls: "vam-card-frame-status vam-sr-only",
       attr: { "aria-live": "polite" }
     });
+    this.hintEl = this.contentEl.createDiv({ cls: "vam-card-frame-hint", attr: { role: "alert" } });
     const actions = this.contentEl.createDiv({ cls: "vam-card-frame-actions" });
     const reset = actions.createEl("button", { text: t("ui.topic_cover_frame_reset"), attr: { type: "button" } });
     reset.addEventListener("click", () => this.setDraft({ ...WHOLE }));
@@ -212,7 +241,121 @@ export class CoverFrameModal extends Modal {
     });
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
+    this.checkText();
     cover.focus();
+  }
+  /** Makes the card's title and summary typeable in place (plain text; the card's own wrapping shows live). */
+  private buildText(card: HTMLElement): void {
+    const title = card.querySelector<HTMLElement>(".vam-card-title");
+    if (title) {
+      this.initialTitle = oneLine(title.textContent ?? "");
+      this.titleEl_ = this.makeEditable(title, "ui.card_edit_title_label");
+    }
+    let summary = card.querySelector<HTMLElement>(".vam-card-summary");
+    if (!summary && title) {
+      // A topic without a summary still gets a place to type one, right under the title.
+      summary = card.createEl("p", { cls: "vam-card-summary" });
+      summary.remove();
+      const at = Array.from(card.children).indexOf(title) + 1;
+      card.insertBefore(summary, card.children[at] ?? null);
+    }
+    if (summary) {
+      this.initialSummary = (summary.textContent ?? "").trim();
+      summary.setAttr("data-placeholder", t("ui.card_edit_summary_placeholder"));
+      this.summaryEl_ = this.makeEditable(summary, "ui.card_edit_summary_label");
+    }
+  }
+  private makeEditable(el: HTMLElement, label: TranslationKey): HTMLElement {
+    el.setAttr("contenteditable", "plaintext-only");
+    el.setAttr("role", "textbox");
+    el.setAttr("tabindex", "0");
+    el.setAttr("aria-label", t(label));
+    el.addClass("is-editable");
+    el.addEventListener("input", () => this.checkText());
+    el.addEventListener("keydown", (event: KeyboardEvent) => {
+      // Enter while an input method is composing (picking Chinese characters) only confirms the characters.
+      if (event.key !== "Enter" || event.isComposing) return;
+      // A title and a summary are one paragraph each: Enter applies, it never inserts a line break.
+      event.preventDefault();
+      event.stopPropagation();
+      void this.apply();
+    });
+    return el;
+  }
+  /** The title as it would be written: one line, trimmed. */
+  private titleValue(): string {
+    return oneLine(this.titleEl_?.textContent ?? this.initialTitle);
+  }
+  private summaryValue(): string {
+    return (this.summaryEl_?.textContent ?? this.initialSummary).trim().slice(0, SUMMARY_LIMIT).trim();
+  }
+  /** The reason the title cannot be written (empty, or a fence/brackets), "" when it is fine. Same checks as the rename dialog. */
+  private titleProblem(): string {
+    if (!this.titleEl_) return "";
+    const value = this.titleValue();
+    return !value ? t("ui.name_required") : titleProblemText(value);
+  }
+  /** Shows why Apply is off (an empty title or a title the map would refuse) and keeps Apply off meanwhile. */
+  private checkText(): void {
+    const problem = this.titleProblem();
+    this.hintEl?.setText(problem);
+    this.titleEl_?.setAttr("aria-invalid", problem ? "true" : "false");
+    if (this.applyButton) this.applyButton.disabled = !!problem || this.loadFailed || this.applying;
+  }
+  /** The width splitter on the card's right edge, the same setting and limits as the map's (map-graph.ts). */
+  private buildWidthHandle(card: HTMLElement): void {
+    const handle = card.createSpan({
+      cls: "vam-card-frame-width",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.card_resize_label"),
+        "aria-valuemin": String(CARD_WIDTH_MIN),
+        "aria-valuemax": String(CARD_WIDTH_MAX),
+        tabindex: "0"
+      }
+    });
+    this.widthHandle = handle;
+    // The copied card already has its width; the style is only written when the user changes it.
+    handle.setAttr("aria-valuenow", String(this.width));
+    let drag: { id: number; x: number; from: number } | null = null;
+    handle.addEventListener("pointerdown", (event: PointerEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handle.setPointerCapture?.(event.pointerId);
+      drag = { id: event.pointerId, x: event.clientX, from: this.width };
+    });
+    handle.addEventListener("pointermove", (event: PointerEvent) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      this.setWidth(drag.from + (event.clientX - drag.x));
+    });
+    const end = (event: PointerEvent): void => {
+      if (!drag || event.pointerId !== drag.id) return;
+      handle.releasePointerCapture?.(drag.id);
+      drag = null;
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    // The map's keys: arrows step, Home/End the limits, Enter the standard width.
+    handle.addEventListener("keydown", (event: KeyboardEvent) => {
+      let next: number;
+      if (event.key === "ArrowRight") next = this.width + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = this.width - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = CARD_WIDTH_MIN;
+      else if (event.key === "End") next = CARD_WIDTH_MAX;
+      else if (event.key === "Enter") next = CARD_WIDTH;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.setWidth(next);
+    });
+  }
+  /** Sets the dialog card's width (clamped to the map's limits); wrapping and the cover follow, as they are proportions. */
+  private setWidth(value: number): void {
+    this.width = clampCardWidth(value) ?? this.width;
+    this.cardEl?.style.setProperty("width", `${this.width}px`);
+    this.widthHandle?.setAttr("aria-valuenow", String(this.width));
+    this.setDraft(this.draft);
   }
   /** The tool row above the card: the picture size slider (30-100% of the content width). */
   private buildTools(row: HTMLElement): void {
@@ -315,7 +458,8 @@ export class CoverFrameModal extends Modal {
     const img = this.windowEl.createEl("img", { attr: picture });
     this.imgEl = img;
     img.addEventListener("error", () => {
-      if (this.applyButton) this.applyButton.disabled = true;
+      this.loadFailed = true;
+      this.checkText();
       this.contentEl.createEl("p", { cls: "vam-card-frame-error", text: t("ui.topic_cover_frame_load_failed") });
     });
     img.addEventListener("load", () => {
@@ -352,11 +496,20 @@ export class CoverFrameModal extends Modal {
     return cover;
   }
   private async apply(): Promise<void> {
-    if (this.applying) return;
+    if (this.applying || this.loadFailed) return;
+    // An empty or refused title is never written: the old title stays and the hint says why.
+    if (this.titleProblem()) {
+      this.checkText();
+      return;
+    }
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size, position: this.position });
+      const edit: CardCoverEdit = { frame: frameToWrite(this.draft), size: this.size, position: this.position };
+      if (this.width !== this.initialWidth) edit.width = this.width;
+      if (this.titleEl_ && this.titleValue() !== this.initialTitle) edit.title = this.titleValue();
+      if (this.summaryEl_ && this.summaryValue() !== this.initialSummary) edit.summary = this.summaryValue();
+      await this.options.onApply(edit);
     } finally {
       this.close();
     }

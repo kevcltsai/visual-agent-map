@@ -45,6 +45,8 @@ export interface MapChatOutlineNode {
   markers?: TopicMarker[];
   /** The card's styles, sent as `formats`; none (the default) is not sent. Dropped on an AIM map. */
   styles?: TopicStyle[];
+  /** The user locked this card against AI changes (AI lock); sent only when true. */
+  aiLocked?: boolean;
   /** Set only for a card whose last AI task failed. */
   status?: "error";
   /** Why it failed; only with `status: "error"`. */
@@ -348,8 +350,16 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       depth: node.depth,
       ...kindFields(node, !!input.aim),
       ...appearanceFields(node, !!input.aim),
+      ...(node.aiLocked ? { aiLocked: true } : {}),
       ...errorFields(node)
     })),
+    // Only when a card is locked, so a map without locks sends exactly what it did before. A hint: the apply side refuses.
+    ...(input.outline.some(node => node.aiLocked)
+      ? {
+          aiLockedNote:
+            "Cards with aiLocked are locked by the user: read them, but do not rename, edit, move, delete or merge them, add or remove their children, or delete or merge cards related to them. Such actions will be refused."
+        }
+      : {}),
     ...(relations.length ? { relations } : {}),
     selected: input.selected.map(ref => topic(ref, true)),
     references: input.references.map(ref => topic(ref, false)),

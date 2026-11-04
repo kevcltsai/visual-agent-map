@@ -41,6 +41,8 @@ export interface OutlineImportRequest {
   nodes: OutlineNode[];
   placement?: OutlinePlacement;
   source: OutlineSource;
+  /** The outline came straight from the AI (quick explore, the chat's expand): the AI lock applies to its parent. */
+  aiGenerated?: boolean;
   shallowResearch: boolean;
   /** AI mode of the shallow research (Quick when omitted). */
   aiMode?: MapAiMode;
@@ -135,6 +137,8 @@ export class OutlineImportModal extends Modal {
   private unwatch?: () => void;
   private placement: OutlinePlacement["kind"] = "tree";
   private generation?: AbortController;
+  /** The outline box holds text the AI produced and the user has not typed over since (the AI lock applies to it). */
+  private aiText = false;
   private disarm?: () => void;
 
   constructor(
@@ -176,7 +180,10 @@ export class OutlineImportModal extends Modal {
     this.textarea = source.createEl("textarea", { cls: "vam-task-input vam-outline-text" });
     this.textarea.rows = 8;
     this.textarea.setAttr("aria-label", t("ui.outline_import_text_label"));
-    this.textarea.addEventListener("input", () => this.refresh());
+    this.textarea.addEventListener("input", () => {
+      this.aiText = false;
+      this.refresh();
+    });
     this.preview = source.createDiv("vam-outline-preview");
     this.placementField();
     const research = this.contentEl.createDiv("vam-outline-section");
@@ -457,6 +464,7 @@ export class OutlineImportModal extends Modal {
           if (this.detached) return;
           if (controller.signal.aborted) throw new Error(t("ui.outline_ai_stopped"));
           this.textarea.value = sanitizeOutlineDraft(markdown).trimEnd();
+          this.aiText = true;
           this.refresh();
           status.setText(t("ui.outline_ai_filled", this.nodes.length));
         })
@@ -480,6 +488,7 @@ export class OutlineImportModal extends Modal {
       this.restoreResult = () => {
         if (prefill.markdown !== undefined) {
           this.textarea.value = sanitizeOutlineDraft(prefill.markdown).trimEnd();
+          this.aiText = true;
           this.refresh();
           status.setText(t("ui.outline_ai_filled", this.nodes.length));
         } else if (prefill.message) status.setText(prefill.message);
@@ -534,6 +543,7 @@ export class OutlineImportModal extends Modal {
         nodes: this.nodes,
         placement: this.placementRequest(),
         source: null,
+        ...(this.aiText ? { aiGenerated: true } : {}),
         shallowResearch,
         ...(shallowResearch ? { aiMode: this.mode() } : {}),
         ...(model ? { model } : {}),

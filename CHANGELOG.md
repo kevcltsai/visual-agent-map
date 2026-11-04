@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **AI lock.** Lock a topic (topic panel, card button or selection bar; `ai-locked: true`) and no AI action changes it, its children or its relations; your own edits still work.
+
 ### Cards, links and marks
 
 A card's cover picture now shows the whole picture instead of a 96 px strip cut from the middle. For example, a book cover that used to lose its top and bottom now appears complete.
@@ -12,6 +14,9 @@ A card's cover picture now shows the whole picture instead of a 96 px strip cut 
 - **Edit card.** The cover area is now edited on the card itself (double-click the cover, or choose "Edit card"): hiding a side keeps the rest of the picture in place and at its size, and hiding the top or bottom makes the card shorter.
 - **Picture size.** "Edit card" has a Picture size slider (30–100% of the card width), saved as `topic-cover-size`; the masked part stays the same.
 - **Picture position.** "Edit card" can put the picture at the top, bottom, left or right of the card (`topic-cover-position`); beside the text, the picture's size sets its column width.
+- **Card width.** "Edit card" has a handle on the card's right edge (arrow keys work too) that sets the card width, within the same limits as on the map; Apply saves it with the other changes as one undo step.
+- **Relations in notes.** A topic note's Reference Links now list its relations to other topics (for example "Supports" and "Supported by"), so Obsidian backlinks and graph view see them.
+- **Title and summary.** In "Edit card" you can type the title and summary right on the card; Apply saves them like a rename and a summary edit, together with the other changes as one undo step.
 
 ## [0.29.0] - 2026-11-04
 

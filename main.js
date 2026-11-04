@@ -624,6 +624,9 @@ var en = {
   "ui.topic_cover_frame_reset": "Show whole picture",
   "ui.topic_cover_frame_apply": "Apply",
   "ui.card_edit_picture_size": "Picture size",
+  "ui.card_edit_title_label": "Card title",
+  "ui.card_edit_summary_label": "Card summary",
+  "ui.card_edit_summary_placeholder": "Add a summary",
   "ui.card_edit_picture_position": "Picture position",
   "ui.card_edit_position_top": "Top",
   "ui.card_edit_position_bottom": "Bottom",
@@ -1090,6 +1093,17 @@ var en = {
   "ui.card_menu_add_sibling": "Add sibling topic",
   "ui.card_menu_open_note_tab": "Open note in new tab",
   "ui.ai_running_ai": "AI running\u2026",
+  "ui.ai_locked_notice": "Topic is locked; AI will not change it",
+  "ui.ai_lock": "AI lock",
+  "ui.ai_lock_toggle": "Lock from AI",
+  "ui.ai_lock_hint": "AI research, merge, expand and chat will not change this topic, its children or its relations. Your own edits still work.",
+  "ui.ai_unlock_card": "Unlock: let AI change this topic",
+  "ui.ai_locked_state": "Locked from AI",
+  "ui.ai_locked_skipped_0": "{0} locked topics skipped",
+  "ui.ai_locked_outline_skipped_0": "Topic is locked; AI will not change it. {0} outline topics were not added.",
+  "ui.ai_locked_suggestions_skipped_0": "{0} suggestions touch locked topics and were skipped",
+  "ui.ai_unlock_selected": "Unlock for AI",
+  "ui.ai_locked_some_0_1": "{0} of {1} locked",
   "ui.model_and_advanced_settings": "Model and advanced settings",
   "ui.model": "Model",
   "ui.codex_provider_label": "Codex",
@@ -3089,6 +3103,9 @@ var zhCN = {
   "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5E94\u7528",
   "ui.card_edit_picture_size": "\u56FE\u7247\u5927\u5C0F",
+  "ui.card_edit_title_label": "\u5361\u7247\u6807\u9898",
+  "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
+  "ui.card_edit_summary_placeholder": "\u6DFB\u52A0\u6458\u8981",
   "ui.card_edit_picture_position": "\u56FE\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -3555,6 +3572,17 @@ var zhCN = {
   "ui.card_menu_add_sibling": "\u6DFB\u52A0\u540C\u5C42\u8BAE\u9898",
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u6807\u7B7E\u9875\u6253\u5F00\u7B14\u8BB0",
   "ui.ai_running_ai": "AI \u8FD0\u884C\u4E2D\u2026",
+  "ui.ai_locked_notice": "\u8BAE\u9898\u5DF2\u9501\u5B9A\uFF0CAI \u4E0D\u4F1A\u4FEE\u6539",
+  "ui.ai_lock": "AI \u9501\u5B9A",
+  "ui.ai_lock_toggle": "\u9501\u5B9A\uFF0C\u4E0D\u8BA9 AI \u4FEE\u6539",
+  "ui.ai_lock_hint": "AI \u7814\u7A76\u3001\u5408\u5E76\u3001\u5C55\u5F00\u4E0E\u5BF9\u8BDD\u90FD\u4E0D\u4F1A\u4FEE\u6539\u6B64\u8BAE\u9898\u3001\u5B83\u7684\u5B50\u8BAE\u9898\u6216\u5173\u8054\uFF1B\u4F60\u81EA\u5DF1\u7684\u7F16\u8F91\u4E0D\u53D7\u5F71\u54CD\u3002",
+  "ui.ai_unlock_card": "\u89E3\u9664\u9501\u5B9A\uFF1A\u5141\u8BB8 AI \u4FEE\u6539\u6B64\u8BAE\u9898",
+  "ui.ai_locked_state": "\u5DF2\u9501\u5B9A AI",
+  "ui.ai_locked_skipped_0": "\u5DF2\u8DF3\u8FC7 {0} \u4E2A\u9501\u5B9A\u7684\u8BAE\u9898",
+  "ui.ai_locked_outline_skipped_0": "\u8BAE\u9898\u5DF2\u9501\u5B9A\uFF0CAI \u4E0D\u4F1A\u4FEE\u6539\u3002{0} \u4E2A\u5927\u7EB2\u8BAE\u9898\u672A\u52A0\u5165\u3002",
+  "ui.ai_locked_suggestions_skipped_0": "{0} \u6761\u5EFA\u8BAE\u6D89\u53CA\u9501\u5B9A\u7684\u8BAE\u9898\uFF0C\u5DF2\u8DF3\u8FC7",
+  "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9501\u5B9A",
+  "ui.ai_locked_some_0_1": "{1} \u4E2A\u4E2D\u6709 {0} \u4E2A\u5DF2\u9501\u5B9A",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u4E0E\u9AD8\u7EA7\u8BBE\u7F6E",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
@@ -5554,6 +5582,9 @@ var zhTW = {
   "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5957\u7528",
   "ui.card_edit_picture_size": "\u5716\u7247\u5927\u5C0F",
+  "ui.card_edit_title_label": "\u5361\u7247\u6A19\u984C",
+  "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
+  "ui.card_edit_summary_placeholder": "\u52A0\u4E0A\u6458\u8981",
   "ui.card_edit_picture_position": "\u5716\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -6020,6 +6051,17 @@ var zhTW = {
   "ui.card_menu_add_sibling": "\u65B0\u589E\u540C\u5C64\u8B70\u984C",
   "ui.card_menu_open_note_tab": "\u5728\u65B0\u5206\u9801\u958B\u555F\u7B46\u8A18",
   "ui.ai_running_ai": "AI \u57F7\u884C\u4E2D\u2026",
+  "ui.ai_locked_notice": "\u8B70\u984C\u5DF2\u9396\u5B9A\uFF0CAI \u4E0D\u6703\u4FEE\u6539",
+  "ui.ai_lock": "AI \u9396\u5B9A",
+  "ui.ai_lock_toggle": "\u9396\u5B9A\uFF0C\u4E0D\u8B93 AI \u4FEE\u6539",
+  "ui.ai_lock_hint": "AI \u7814\u7A76\u3001\u5408\u4F75\u3001\u5C55\u958B\u8207\u5C0D\u8A71\u90FD\u4E0D\u6703\u4FEE\u6539\u6B64\u8B70\u984C\u3001\u5B83\u7684\u5B50\u8B70\u984C\u6216\u95DC\u806F\uFF1B\u4F60\u81EA\u5DF1\u7684\u7DE8\u8F2F\u4E0D\u53D7\u5F71\u97FF\u3002",
+  "ui.ai_unlock_card": "\u89E3\u9664\u9396\u5B9A\uFF1A\u5141\u8A31 AI \u4FEE\u6539\u6B64\u8B70\u984C",
+  "ui.ai_locked_state": "\u5DF2\u9396\u5B9A AI",
+  "ui.ai_locked_skipped_0": "\u5DF2\u7565\u904E {0} \u500B\u9396\u5B9A\u7684\u8B70\u984C",
+  "ui.ai_locked_outline_skipped_0": "\u8B70\u984C\u5DF2\u9396\u5B9A\uFF0CAI \u4E0D\u6703\u4FEE\u6539\u3002{0} \u500B\u5927\u7DB1\u8B70\u984C\u672A\u52A0\u5165\u3002",
+  "ui.ai_locked_suggestions_skipped_0": "{0} \u5247\u5EFA\u8B70\u6D89\u53CA\u9396\u5B9A\u7684\u8B70\u984C\uFF0C\u5DF2\u7565\u904E",
+  "ui.ai_unlock_selected": "\u89E3\u9664 AI \u9396\u5B9A",
+  "ui.ai_locked_some_0_1": "{1} \u500B\u4E2D\u6709 {0} \u500B\u5DF2\u9396\u5B9A",
   "ui.model_and_advanced_settings": "\u6A21\u578B\u8207\u9032\u968E\u8A2D\u5B9A",
   "ui.model": "\u4F7F\u7528\u6A21\u578B",
   "ui.codex_provider_label": "Codex",
@@ -22131,8 +22173,13 @@ function buildMapChatContext(input2) {
       depth: node.depth,
       ...kindFields(node, !!input2.aim),
       ...appearanceFields(node, !!input2.aim),
+      ...node.aiLocked ? { aiLocked: true } : {},
       ...errorFields(node)
     })),
+    // Only when a card is locked, so a map without locks sends exactly what it did before. A hint: the apply side refuses.
+    ...input2.outline.some((node) => node.aiLocked) ? {
+      aiLockedNote: "Cards with aiLocked are locked by the user: read them, but do not rename, edit, move, delete or merge them, add or remove their children, or delete or merge cards related to them. Such actions will be refused."
+    } : {},
     ...relations.length ? { relations } : {},
     selected: input2.selected.map((ref) => topic(ref, true)),
     references: input2.references.map((ref) => topic(ref, false)),
@@ -22184,6 +22231,20 @@ function readRelevance(fm) {
   if (typeof tier !== "string" || !RELEVANCE_TIERS.includes(tier)) return void 0;
   if (fm["relevance-manual"] === true) return { tier, manual: true };
   return { tier };
+}
+function readAiLocked(fm) {
+  return fm["ai-locked"] === true;
+}
+function noteTextAiLocked(text11, parse) {
+  var _a2;
+  const block = (_a2 = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text11)) == null ? void 0 : _a2[1];
+  if (block === void 0 || !/ai-locked/.test(block)) return false;
+  try {
+    const fm = parse(block);
+    return !!fm && typeof fm === "object" && readAiLocked(fm);
+  } catch (e) {
+    return false;
+  }
 }
 function readRelevanceGoal(fm) {
   const goal = fm["relevance-goal"];
@@ -22865,7 +22926,15 @@ var REFERENCE_TEXT = {
     archived: "\u5DF2\u5C01\u5B58",
     unassigned: "\u672A\u6B78\u985E",
     colon: "\uFF1A",
-    listSeparator: "\u3001"
+    listSeparator: "\u3001",
+    relations: [
+      ["supports", "\u652F\u6301", "\u88AB\u652F\u6301"],
+      ["contradicts", "\u53CD\u99C1", "\u88AB\u53CD\u99C1"],
+      ["verifies", "\u9A57\u8B49", "\u88AB\u9A57\u8B49"],
+      ["derives_from", "\u63A8\u5C0E\u81EA", "\u63A8\u5C0E\u51FA"],
+      ["prerequisite", "\u662F\u524D\u7F6E\u77E5\u8B58\u65BC", "\u524D\u7F6E\u77E5\u8B58"],
+      ["related", "\u76F8\u95DC", "\u76F8\u95DC"]
+    ]
   },
   en: {
     labels: ENGLISH_REFERENCE_LABELS,
@@ -22873,9 +22942,36 @@ var REFERENCE_TEXT = {
     archived: "Archived",
     unassigned: "Unassigned",
     colon: ": ",
-    listSeparator: ", "
+    listSeparator: ", ",
+    relations: [
+      ["supports", "Supports", "Supported by"],
+      ["contradicts", "Contradicts", "Contradicted by"],
+      ["verifies", "Verifies", "Verified by"],
+      ["derives_from", "Derived from", "Derives"],
+      ["prerequisite", "Prerequisite for", "Prerequisites"],
+      ["related", "Related", "Related"]
+    ]
   }
 };
+function relationReferences(map, nodeId, language2, hasNote) {
+  const ref = REFERENCE_TEXT[language2];
+  const notes = new Map(map.nodes.filter((node) => hasNote(node.path)).map((node) => [node.id, node.path]));
+  if (!notes.has(nodeId)) return [];
+  const lines = [];
+  for (const [kind, start, finish] of ref.relations) {
+    const ends = (side) => {
+      var _a2;
+      return ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => r.kind === kind && r[side] === nodeId).map((r) => notes.get(side === "from" ? r.to : r.from)).filter((path) => path !== void 0);
+    };
+    const groups = start === finish ? [[start, [...ends("from"), ...ends("to")]]] : [[start, ends("from")], [finish, ends("to")]];
+    for (const [label, paths] of groups)
+      if (paths.length)
+        lines.push(
+          `${label}${ref.colon}${[...new Set(paths)].map((path) => `[[${noteLink(path)}]]`).join(ref.listSeparator)}`
+        );
+  }
+  return lines;
+}
 function localizeReference(value, language2) {
   const match = /^(所屬主題|所屬心智圖|母議題|子議題|來源議題|狀態|Topic|Mind map|Parent topic|Child topics|Source topic|Status)[：:]\s*(.*)$/.exec(
     value
@@ -23204,6 +23300,7 @@ var Repository = class {
       ...typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {},
       ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
+      ...readAiLocked(fm) ? { aiLocked: true } : {},
       ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
       ...readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {},
       ...readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {},
@@ -23524,6 +23621,16 @@ ${body}`);
     await this.app.vault.process(
       this.file(path),
       (content) => setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
+    );
+  }
+  /**
+   * Sets (`ai-locked: true`) or removes the AI lock. No other key changes and `updated` is not bumped; a note already in
+   * the asked state is returned as it is, byte for byte.
+   */
+  async writeAiLocked(path, locked) {
+    await this.app.vault.process(
+      this.file(path),
+      (content) => readAiLocked(frontmatter(content)) === locked ? content : setFrontmatterKeys(content, { "ai-locked": locked ? true : null })
     );
   }
   /**
@@ -24145,6 +24252,10 @@ ${body}`);
       );
     }
   }
+  /** True when `path` is an existing Markdown file (a topic note a relation line can link to). */
+  isNoteFile(path) {
+    return path.endsWith(".md") && this.app.vault.getAbstractFileByPath(path) instanceof import_obsidian11.TFile;
+  }
   /** The node note with derived lifecycle fields and references applied, or null when it is not a VAM node note. */
   derivedNoteContent(file, content, ownership2, topics) {
     var _a2;
@@ -24187,7 +24298,8 @@ ${body}`);
         `${topicLabel}${ref.colon}[[${noteLink(owner.mapPath)}|${linkAlias(owner.map.title, aliasFallback(owner.mapPath))}]]`,
         `${mapLabel}${ref.colon}[[${noteLink(owner.mapPath)}]]`,
         `${parentLabel}${ref.colon}${parent ? `[[${noteLink(parent.path)}]]` : ref.none}`,
-        `${childLabel}${ref.colon}${children.length ? children.map((child) => `[[${noteLink(child.path)}]]`).join(ref.listSeparator) : ref.none}`
+        `${childLabel}${ref.colon}${children.length ? children.map((child) => `[[${noteLink(child.path)}]]`).join(ref.listSeparator) : ref.none}`,
+        ...relationReferences(owner.map, owner.node.id, language2, (path) => this.isNoteFile(path))
       ];
       body = withoutReference(body);
     } else if (topic && (state === "unassigned" || state === "archived")) {
@@ -24790,6 +24902,26 @@ ${embed}${tail.includes("\n") ? tail : `${tail}
 // experiences/visual-map/cover-frame-editor.ts
 var import_obsidian12 = require("obsidian");
 
+// core/title-safety.ts
+function titleProblem(text11) {
+  if (text11.includes("```")) return "fence";
+  if (text11.includes("[[") || text11.includes("]]")) return "brackets";
+  return void 0;
+}
+function sanitizeGeneratedTitle(text11) {
+  let out = text11.replace(/`{3,}/g, "");
+  while (out.includes("[[") || out.includes("]]")) out = out.replace(/\[\[/g, "[").replace(/\]\]/g, "]");
+  return out;
+}
+
+// ui/modals/title-check.ts
+function titleProblemText(text11) {
+  const problem = titleProblem(text11);
+  if (problem === "fence") return t("ui.title_problem_fence");
+  if (problem === "brackets") return t("ui.title_problem_brackets");
+  return "";
+}
+
 // experiences/visual-map/cover-layout.ts
 var COVER_MAX_HEIGHT_RATIO = 1.5;
 var WHOLE = { x: 0, y: 0, w: 1, h: 1 };
@@ -24826,7 +24958,14 @@ function sizeCoverBox(frame, size, side = false) {
   if (width >= 1 && !side) frame.style.removeProperty("width");
   else frame.style.setProperty("width", `${width * 100}%`);
 }
-var SIDE_OUTSIDE = ["vam-add-child", "vam-card-resize", "vam-card-resize-y", "vam-card-fade", "vam-card-more"];
+var SIDE_OUTSIDE = [
+  "vam-add-child",
+  "vam-card-resize",
+  "vam-card-resize-y",
+  "vam-card-frame-width",
+  "vam-card-fade",
+  "vam-card-more"
+];
 var POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
 var hasCls = (el, cls) => {
   var _a2, _b2, _c;
@@ -24902,6 +25041,7 @@ var FRAME_KEY_STEP = 0.01;
 var WHOLE_EPSILON = 5e-4;
 var ROUND = 1e6;
 var FRAME_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+var oneLine = (value) => value.replace(/\s+/g, " ").trim();
 var round2 = (value) => Math.round(value * ROUND) / ROUND;
 var clamp = (value, low, high) => Math.min(Math.max(value, low), high);
 function dragCoverFrame(mode, start, dx, dy) {
@@ -24956,6 +25096,7 @@ function nudgeCoverFrameEdge(mode, frame, key2) {
   if (!dx && !dy) return null;
   return dragCoverFrame(mode, frame, dx, dy);
 }
+var SUMMARY_LIMIT2 = 2e3;
 var SIDE_SIZE_LIMIT = 0.5;
 var SIDE_SIZE = 0.45;
 var POSITION_KEY = {
@@ -24968,13 +25109,16 @@ var isSide = (position) => position === "left" || position === "right";
 var SIZE_STEP = 1;
 var CoverFrameModal = class extends import_obsidian12.Modal {
   constructor(app, options) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     super(app);
     this.options = options;
     __publicField(this, "draft");
     __publicField(this, "size");
     __publicField(this, "position");
     __publicField(this, "cardEl", null);
+    __publicField(this, "width");
+    __publicField(this, "initialWidth");
+    __publicField(this, "widthHandle", null);
     __publicField(this, "sizeSlider", null);
     __publicField(this, "shape");
     __publicField(this, "drag", null);
@@ -24986,9 +25130,16 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     __publicField(this, "boxEl", null);
     __publicField(this, "statusEl", null);
     __publicField(this, "applyButton", null);
+    __publicField(this, "titleEl_", null);
+    __publicField(this, "summaryEl_", null);
+    __publicField(this, "hintEl", null);
+    __publicField(this, "loadFailed", false);
+    __publicField(this, "initialTitle", "");
+    __publicField(this, "initialSummary", "");
     this.draft = { ...(_a2 = options.initial) != null ? _a2 : WHOLE2 };
     this.size = parseCoverSize((_b2 = options.size) != null ? _b2 : COVER_SIZE_DEFAULT);
     this.position = parseCoverPosition(options.position);
+    this.initialWidth = this.width = (_c = clampCardWidth(options.width)) != null ? _c : CARD_WIDTH;
     this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen() {
@@ -25002,8 +25153,11 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.cardEl = card;
     arrangeCover(card, null, "top");
     const cover = this.buildCover(card);
-    for (const child of Array.from(card.children)) if (child !== cover) child.setAttr("inert", "");
+    this.buildText(card);
+    for (const child of Array.from(card.children))
+      if (child !== cover && child !== this.titleEl_ && child !== this.summaryEl_) child.setAttr("inert", "");
     arrangeCover(card, cover, this.position);
+    this.buildWidthHandle(card);
     const labelId = `vam-card-frame-label-${++labelSeq}`;
     this.contentEl.createSpan({ cls: "vam-card-frame-label", text: t(HANDLE_KEY.move), attr: { id: labelId } });
     cover.setAttr("aria-labelledby", labelId);
@@ -25011,6 +25165,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
       cls: "vam-card-frame-status vam-sr-only",
       attr: { "aria-live": "polite" }
     });
+    this.hintEl = this.contentEl.createDiv({ cls: "vam-card-frame-hint", attr: { role: "alert" } });
     const actions = this.contentEl.createDiv({ cls: "vam-card-frame-actions" });
     const reset = actions.createEl("button", { text: t("ui.topic_cover_frame_reset"), attr: { type: "button" } });
     reset.addEventListener("click", () => this.setDraft({ ...WHOLE2 }));
@@ -25023,7 +25178,123 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     });
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
+    this.checkText();
     cover.focus();
+  }
+  /** Makes the card's title and summary typeable in place (plain text; the card's own wrapping shows live). */
+  buildText(card) {
+    var _a2, _b2, _c;
+    const title = card.querySelector(".vam-card-title");
+    if (title) {
+      this.initialTitle = oneLine((_a2 = title.textContent) != null ? _a2 : "");
+      this.titleEl_ = this.makeEditable(title, "ui.card_edit_title_label");
+    }
+    let summary = card.querySelector(".vam-card-summary");
+    if (!summary && title) {
+      summary = card.createEl("p", { cls: "vam-card-summary" });
+      summary.remove();
+      const at = Array.from(card.children).indexOf(title) + 1;
+      card.insertBefore(summary, (_b2 = card.children[at]) != null ? _b2 : null);
+    }
+    if (summary) {
+      this.initialSummary = ((_c = summary.textContent) != null ? _c : "").trim();
+      summary.setAttr("data-placeholder", t("ui.card_edit_summary_placeholder"));
+      this.summaryEl_ = this.makeEditable(summary, "ui.card_edit_summary_label");
+    }
+  }
+  makeEditable(el, label) {
+    el.setAttr("contenteditable", "plaintext-only");
+    el.setAttr("role", "textbox");
+    el.setAttr("tabindex", "0");
+    el.setAttr("aria-label", t(label));
+    el.addClass("is-editable");
+    el.addEventListener("input", () => this.checkText());
+    el.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void this.apply();
+    });
+    return el;
+  }
+  /** The title as it would be written: one line, trimmed. */
+  titleValue() {
+    var _a2, _b2;
+    return oneLine((_b2 = (_a2 = this.titleEl_) == null ? void 0 : _a2.textContent) != null ? _b2 : this.initialTitle);
+  }
+  summaryValue() {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = this.summaryEl_) == null ? void 0 : _a2.textContent) != null ? _b2 : this.initialSummary).trim().slice(0, SUMMARY_LIMIT2).trim();
+  }
+  /** The reason the title cannot be written (empty, or a fence/brackets), "" when it is fine. Same checks as the rename dialog. */
+  titleProblem() {
+    if (!this.titleEl_) return "";
+    const value = this.titleValue();
+    return !value ? t("ui.name_required") : titleProblemText(value);
+  }
+  /** Shows why Apply is off (an empty title or a title the map would refuse) and keeps Apply off meanwhile. */
+  checkText() {
+    var _a2, _b2;
+    const problem = this.titleProblem();
+    (_a2 = this.hintEl) == null ? void 0 : _a2.setText(problem);
+    (_b2 = this.titleEl_) == null ? void 0 : _b2.setAttr("aria-invalid", problem ? "true" : "false");
+    if (this.applyButton) this.applyButton.disabled = !!problem || this.loadFailed || this.applying;
+  }
+  /** The width splitter on the card's right edge, the same setting and limits as the map's (map-graph.ts). */
+  buildWidthHandle(card) {
+    const handle = card.createSpan({
+      cls: "vam-card-frame-width",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.card_resize_label"),
+        "aria-valuemin": String(CARD_WIDTH_MIN),
+        "aria-valuemax": String(CARD_WIDTH_MAX),
+        tabindex: "0"
+      }
+    });
+    this.widthHandle = handle;
+    handle.setAttr("aria-valuenow", String(this.width));
+    let drag = null;
+    handle.addEventListener("pointerdown", (event) => {
+      var _a2;
+      event.preventDefault();
+      event.stopPropagation();
+      (_a2 = handle.setPointerCapture) == null ? void 0 : _a2.call(handle, event.pointerId);
+      drag = { id: event.pointerId, x: event.clientX, from: this.width };
+    });
+    handle.addEventListener("pointermove", (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      this.setWidth(drag.from + (event.clientX - drag.x));
+    });
+    const end = (event) => {
+      var _a2;
+      if (!drag || event.pointerId !== drag.id) return;
+      (_a2 = handle.releasePointerCapture) == null ? void 0 : _a2.call(handle, drag.id);
+      drag = null;
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    handle.addEventListener("keydown", (event) => {
+      let next;
+      if (event.key === "ArrowRight") next = this.width + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = this.width - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = CARD_WIDTH_MIN;
+      else if (event.key === "End") next = CARD_WIDTH_MAX;
+      else if (event.key === "Enter") next = CARD_WIDTH;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.setWidth(next);
+    });
+  }
+  /** Sets the dialog card's width (clamped to the map's limits); wrapping and the cover follow, as they are proportions. */
+  setWidth(value) {
+    var _a2, _b2, _c;
+    this.width = (_a2 = clampCardWidth(value)) != null ? _a2 : this.width;
+    (_b2 = this.cardEl) == null ? void 0 : _b2.style.setProperty("width", `${this.width}px`);
+    (_c = this.widthHandle) == null ? void 0 : _c.setAttr("aria-valuenow", String(this.width));
+    this.setDraft(this.draft);
   }
   /** The tool row above the card: the picture size slider (30-100% of the content width). */
   buildTools(row) {
@@ -25118,7 +25389,8 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     const img = this.windowEl.createEl("img", { attr: picture });
     this.imgEl = img;
     img.addEventListener("error", () => {
-      if (this.applyButton) this.applyButton.disabled = true;
+      this.loadFailed = true;
+      this.checkText();
       this.contentEl.createEl("p", { cls: "vam-card-frame-error", text: t("ui.topic_cover_frame_load_failed") });
     });
     img.addEventListener("load", () => {
@@ -25155,11 +25427,19 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     return cover;
   }
   async apply() {
-    if (this.applying) return;
+    if (this.applying || this.loadFailed) return;
+    if (this.titleProblem()) {
+      this.checkText();
+      return;
+    }
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size, position: this.position });
+      const edit = { frame: frameToWrite(this.draft), size: this.size, position: this.position };
+      if (this.width !== this.initialWidth) edit.width = this.width;
+      if (this.titleEl_ && this.titleValue() !== this.initialTitle) edit.title = this.titleValue();
+      if (this.summaryEl_ && this.summaryValue() !== this.initialSummary) edit.summary = this.summaryValue();
+      await this.options.onApply(edit);
     } finally {
       this.close();
     }
@@ -25726,26 +26006,6 @@ function otherProviderModel(failed, available, current) {
 
 // ui/modals/name-modal.ts
 var import_obsidian13 = require("obsidian");
-
-// core/title-safety.ts
-function titleProblem(text11) {
-  if (text11.includes("```")) return "fence";
-  if (text11.includes("[[") || text11.includes("]]")) return "brackets";
-  return void 0;
-}
-function sanitizeGeneratedTitle(text11) {
-  let out = text11.replace(/`{3,}/g, "");
-  while (out.includes("[[") || out.includes("]]")) out = out.replace(/\[\[/g, "[").replace(/\]\]/g, "]");
-  return out;
-}
-
-// ui/modals/title-check.ts
-function titleProblemText(text11) {
-  const problem = titleProblem(text11);
-  if (problem === "fence") return t("ui.title_problem_fence");
-  if (problem === "brackets") return t("ui.title_problem_brackets");
-  return "";
-}
 
 // ui/modals/action-bar.ts
 function modalActions(modal) {
@@ -35523,6 +35783,53 @@ ${value}`).join("\n\n");
   }
 };
 
+// core/ai-lock.ts
+function isAiLocked(notes, id) {
+  var _a2;
+  if (!id) return false;
+  return typeof notes === "function" ? notes(id) : ((_a2 = notes.get(id)) == null ? void 0 : _a2.aiLocked) === true;
+}
+function aiLockBlock(op, targets, map, notes, options = {}) {
+  var _a2, _b2;
+  const nodes = (_a2 = map == null ? void 0 : map.nodes) != null ? _a2 : [];
+  const parentOf = (id) => {
+    var _a3, _b3;
+    return (_b3 = (_a3 = nodes.find((node) => node.id === id)) == null ? void 0 : _a3.parentId) != null ? _b3 : null;
+  };
+  for (const id of targets) {
+    if (isAiLocked(notes, id)) return "locked";
+    if (op === "write" || op === "addChild") continue;
+    if (isAiLocked(notes, parentOf(id))) return "lockedParent";
+    if (op === "move") {
+      if (options.to !== void 0 && isAiLocked(notes, options.to)) return "lockedParent";
+      continue;
+    }
+    const subtree = /* @__PURE__ */ new Set([id]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const node of nodes)
+        if (node.parentId && subtree.has(node.parentId) && !subtree.has(node.id)) {
+          subtree.add(node.id);
+          grew = true;
+        }
+    }
+    for (const member of subtree) if (member !== id && isAiLocked(notes, member)) return "lockedDescendant";
+    for (const relation of (_b2 = map == null ? void 0 : map.topicRelations) != null ? _b2 : []) {
+      const other = subtree.has(relation.from) ? relation.to : subtree.has(relation.to) ? relation.from : null;
+      if (other && !subtree.has(other) && isAiLocked(notes, other)) return "lockedRelation";
+    }
+  }
+  return null;
+}
+function aiLockedError() {
+  const error = new Error("AI lock: the topic is locked");
+  error.name = "AiLockedError";
+  return error;
+}
+function isAiLockedError(error) {
+  return error instanceof Error && error.name === "AiLockedError";
+}
+
 // core/steps/map-chat/language.en.md
 var language_en_default2 = "Write the reply, and every title, summary, note text and new file text you produce, in {{language}}.\n";
 
@@ -37584,6 +37891,8 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
     __publicField(this, "unwatch");
     __publicField(this, "placement", "tree");
     __publicField(this, "generation");
+    /** The outline box holds text the AI produced and the user has not typed over since (the AI lock applies to it). */
+    __publicField(this, "aiText", false);
     __publicField(this, "disarm");
     this.placement = initialPlacement === "under" && target.selected ? "under" : "tree";
   }
@@ -37603,7 +37912,10 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
     this.textarea = source.createEl("textarea", { cls: "vam-task-input vam-outline-text" });
     this.textarea.rows = 8;
     this.textarea.setAttr("aria-label", t("ui.outline_import_text_label"));
-    this.textarea.addEventListener("input", () => this.refresh());
+    this.textarea.addEventListener("input", () => {
+      this.aiText = false;
+      this.refresh();
+    });
     this.preview = source.createDiv("vam-outline-preview");
     this.placementField();
     const research = this.contentEl.createDiv("vam-outline-section");
@@ -37869,6 +38181,7 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
         if (this.detached) return;
         if (controller.signal.aborted) throw new Error(t("ui.outline_ai_stopped"));
         this.textarea.value = sanitizeOutlineDraft(markdown).trimEnd();
+        this.aiText = true;
         this.refresh();
         status.setText(t("ui.outline_ai_filled", this.nodes.length));
       }).catch((error) => {
@@ -37888,6 +38201,7 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
       this.restoreResult = () => {
         if (prefill.markdown !== void 0) {
           this.textarea.value = sanitizeOutlineDraft(prefill.markdown).trimEnd();
+          this.aiText = true;
           this.refresh();
           status.setText(t("ui.outline_ai_filled", this.nodes.length));
         } else if (prefill.message) status.setText(prefill.message);
@@ -37937,6 +38251,7 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
         nodes: this.nodes,
         placement: this.placementRequest(),
         source: null,
+        ...this.aiText ? { aiGenerated: true } : {},
         shallowResearch,
         ...shallowResearch ? { aiMode: this.mode() } : {},
         ...model ? { model } : {},
@@ -41179,7 +41494,7 @@ Tree (JSON array; depth 0 is the root of the reviewed scope, parentId is null fo
 var STRUCTURE_SUGGESTION_KINDS = ["strengthen", "reduce", "move", "merge"];
 var STRUCTURE_REVIEW_MAX_SUGGESTIONS = 12;
 var STRUCTURE_REVIEW_TOKEN_BUDGET = 32e3;
-var SUMMARY_LIMIT2 = 240;
+var SUMMARY_LIMIT3 = 240;
 var TITLE_LIMIT2 = 200;
 var StructureReviewError = class extends Error {
   constructor(code, message) {
@@ -41234,7 +41549,7 @@ function buildStructureReviewNodes(nodes, describe, scopeRootId) {
     result.push({
       id,
       title: clip3((_a3 = info == null ? void 0 : info.title) != null ? _a3 : "", TITLE_LIMIT2),
-      summary: clip3((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT2),
+      summary: clip3((_b3 = info == null ? void 0 : info.summary) != null ? _b3 : "", SUMMARY_LIMIT3),
       status: (_c = info == null ? void 0 : info.status) != null ? _c : "",
       parentId,
       depth
@@ -48812,6 +49127,7 @@ var coverShapes = /* @__PURE__ */ new Map();
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var cardLinkButtons = /* @__PURE__ */ new WeakMap();
+var cardAiLockButtons = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
 var relevancePanelSeq = 0;
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
@@ -50133,6 +50449,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
         new import_obsidian34.Notice(t("ui.ai_running_ai"));
         return;
       }
+      if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
+        new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+        return;
+      }
       await this.plugin.confirmAiUsage(note.model, async () => {
         const outputLanguage2 = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
         await this.runAgent(node, void 0, (message) => new import_obsidian34.Notice(message), {
@@ -50459,12 +50779,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       initialTopic,
       ...prefill ? { prefill } : {},
       generate: async (request, signal, started) => {
-        var _a2, _b2, _c, _d, _e;
+        var _a2, _b2, _c, _d, _e, _f;
         if (((_a2 = this.outlineDraftTask) == null ? void 0 : _a2.state) === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
         const current = this.plugin.currentModelChoice();
         const parent = ((_b2 = request.placement) == null ? void 0 : _b2.kind) === "under" ? (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === request.placement.parentId) : void 0;
-        const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_d = this.map) != null ? _d : void 0) : null;
+        if (parent && this.aiLockReason(
+          "addChild",
+          [parent.id],
+          /* @__PURE__ */ new Map([[parent.id, await this.plugin.repo.readNote(parent.path, (_d = this.map) != null ? _d : void 0)]])
+        )) {
+          new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+          throw new Error(t("ui.ai_locked_notice"));
+        }
+        const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_e = this.map) != null ? _e : void 0) : null;
         const { model, reasoning } = resolveTaskModel({
           runOnce: request.model ? { model: request.model } : null,
           override: (inherited == null ? void 0 : inherited.origin) === "override" ? { model: inherited.model, reasoning: current.reasoning } : null,
@@ -50516,7 +50844,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
         });
         signal.removeEventListener("abort", forward);
         if (!ran || !run.task) throw new Error(t("ui.outline_ai_not_started"));
-        return (_e = run.task.markdown) != null ? _e : "";
+        return (_f = run.task.markdown) != null ? _f : "";
       }
     };
   }
@@ -50601,6 +50929,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       generate: async (request, signal) => {
         var _a2, _b2;
         const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+        if (note.aiLocked) throw new Error(t("ui.ai_locked_notice"));
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
@@ -50624,6 +50953,7 @@ ${request.requirements}` : preset.text,
           nodes,
           placement: { kind: "under", parentId: node.id },
           source: null,
+          aiGenerated: true,
           shallowResearch: !!options.shallowResearch,
           researchEveryTopic: true,
           // The research of the new topics is the short overview in the dialog's AI mode (Quick when it has none).
@@ -50747,10 +51077,12 @@ ${request.requirements}` : preset.text,
               controller.signal
             );
             if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
+            const { kept, skipped: lockedCount } = this.dropAiLockedSuggestions(review);
+            if (lockedCount) new import_obsidian34.Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
             own2.state = "done";
-            own2.result = review;
-            backgroundResultNotice(t("ui.structure_review_ready_0", review.suggestions.length), {
-              label: t("ui.structure_review_view_0", review.suggestions.length),
+            own2.result = kept;
+            backgroundResultNotice(t("ui.structure_review_ready_0", kept.suggestions.length), {
+              label: t("ui.structure_review_view_0", kept.suggestions.length),
               open: () => this.reopenStructureReview(own2)
             });
           } catch (error) {
@@ -51314,6 +51646,10 @@ ${request.requirements}` : preset.text,
           outcome.skipped++;
           continue;
         }
+        if (note.aiLocked) {
+          outcome.skipped++;
+          continue;
+        }
         if ((_b2 = note.relevance) == null ? void 0 : _b2.manual) {
           pinned.add(base.id);
           continue;
@@ -51570,6 +51906,7 @@ ${request.requirements}` : preset.text,
         new import_obsidian34.Notice(t("ui.merge_locked"));
         throw new Error(t("ui.merge_locked"));
       }
+      if (this.structureLockReason(suggestion)) throw new Error(t("ui.ai_locked_notice"));
     };
     const nodeOf = (id) => {
       var _a2;
@@ -51584,6 +51921,7 @@ ${request.requirements}` : preset.text,
     }
     const write = (work) => this.plugin.mutate(async () => {
       guard();
+      if (this.structureLockReason(suggestion, await this.freshNotes())) throw new Error(t("ui.ai_locked_notice"));
       await work();
     });
     if (suggestion.kind === "strengthen")
@@ -51624,6 +51962,25 @@ ${request.requirements}` : preset.text,
         () => resolve(false)
       ).open();
     });
+  }
+  /** Why a structure suggestion may not be applied (AI lock), or null: what it adds, moves or removes, and where. */
+  structureLockReason(suggestion, fresh) {
+    var _a2, _b2;
+    switch (suggestion.kind) {
+      case "strengthen":
+        return this.aiLockReason("addChild", [suggestion.targetId], fresh);
+      case "move":
+        return this.aiLockReason("move", [suggestion.targetId], fresh, { to: (_a2 = suggestion.newParentId) != null ? _a2 : null });
+      case "reduce":
+        return this.aiLockReason("remove", [suggestion.targetId], fresh);
+      default:
+        return (_b2 = this.aiLockReason("remove", [suggestion.targetId], fresh)) != null ? _b2 : suggestion.mergeIntoId ? this.aiLockReason("addChild", [suggestion.mergeIntoId], fresh) : null;
+    }
+  }
+  /** The review without the suggestions that touch a locked topic, and how many were dropped. */
+  dropAiLockedSuggestions(result) {
+    const suggestions = result.suggestions.filter((suggestion) => !this.structureLockReason(suggestion));
+    return { kept: { ...result, suggestions }, skipped: result.suggestions.length - suggestions.length };
   }
   /** Moves one topic and its branch under a new parent, in one undo step. */
   async moveTopic(node, parent) {
@@ -51699,10 +52056,10 @@ ${request.requirements}` : preset.text,
   }
   /**
    * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame`, and with `look` the picture size, in one
-   * undoable step, the same way changeTopicCover writes. The picture file is never touched; undo writes the old note
+   * undoable step, the same way changeTopicCover writes. With `width`, the card width goes into Map.md in that same step. The picture file is never touched; undo writes the old note
    * text back.
    */
-  async changeTopicCoverFrame(node, frame, look = {}) {
+  async changeTopicCoverFrame(node, frame, look = {}, width) {
     if (!this.map || !this.markersEditable(node)) return null;
     const write = { ...look, frame: frameToWrite(frame) };
     const viewport = clone(this.map.viewport);
@@ -51712,6 +52069,11 @@ ${request.requirements}` : preset.text,
       await this.app.vault.process(file, (content) => withCoverLook(content, write));
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
+      const target = width === void 0 ? void 0 : map.nodes.find((item) => item.id === node.id);
+      if (target && width !== void 0) {
+        if (width === CARD_WIDTH) delete target.width;
+        else target.width = clampCardWidth(width);
+      }
     }).commit({ deferRebuild: true, label: t("ui.topic_cover_frame_title") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
@@ -51768,12 +52130,13 @@ ${request.requirements}` : preset.text,
       initial: picture.frame,
       size: picture.size,
       position: picture.position,
+      width: node.width,
       shape: (_a2 = coverShapes.get(picture.path)) != null ? _a2 : null,
       card: () => this.cardForEditor(node),
-      onApply: ({ frame, ...look }) => new Promise(
+      onApply: ({ frame, width, title, summary, ...look }) => new Promise(
         (done) => this.enqueue(async () => {
           try {
-            await this.changeTopicCoverFrame(node, frame, look);
+            await this.applyCardEdit(node, frame, look, width, { title, summary });
           } finally {
             done();
           }
@@ -51784,12 +52147,32 @@ ${request.requirements}` : preset.text,
     return modal;
   }
   /**
+   * Apply of the "Edit card" dialog: the cover/size/position/width write, then a changed title or summary through
+   * noteChange (the same path as the map's rename and a summary write: validation, preview follow, undo bookkeeping).
+   * Everything pushed is folded into ONE undo step.
+   */
+  async applyCardEdit(node, frame, look, width, text11) {
+    var _a2;
+    const mark = this.history.mark();
+    try {
+      const entry = await this.changeTopicCoverFrame(node, frame, look, width);
+      if (!entry) return;
+      const patch = {};
+      if (((_a2 = text11.title) == null ? void 0 : _a2.trim()) && !titleProblemText(text11.title)) patch.title = text11.title.trim();
+      if (text11.summary !== void 0) patch.summary = text11.summary;
+      if (Object.keys(patch).length) await this.noteChange(node, patch);
+    } finally {
+      this.history.collapseSince(mark, t("ui.topic_cover_frame_title"));
+      this.updateHistoryButtons();
+    }
+  }
+  /**
    * A detached copy of the topic's card for the "Edit card" dialog, so the dialog shows the card exactly as the map does
    * (its width, fonts, wrapping, colour and shape). Copies carry no listeners; the tools, handles and the clip parts are
    * dropped, and the card is shown at its natural height (a set height would hide the cover being edited).
    */
   cardForEditor(node) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const live = (_a2 = this.cardEls) == null ? void 0 : _a2.get(node.id);
     if (live && typeof live.cloneNode === "function") {
       const card2 = live.cloneNode(true);
@@ -51798,13 +52181,25 @@ ${request.requirements}` : preset.text,
         if (["id", "tabindex", "role", "data-node-id"].includes(name) || name.startsWith("aria-"))
           card2.removeAttribute(name);
       card2.removeClass(...CARD_EDITOR_STATES);
+      const note2 = (_d = this.notes) == null ? void 0 : _d.get(node.id);
+      const title = card2.querySelector(".vam-card-title");
+      if (note2 && title) title.setText(note2.title);
+      const summary = card2.querySelector(".vam-card-summary");
+      if (note2 && summary) {
+        if (isPlaceholder(note2.summary)) summary.remove();
+        else {
+          summary.removeClass("is-preview");
+          summary.setText(note2.summary);
+          summary.removeAttribute("title");
+        }
+      }
       for (const property of ["left", "top", "height", "transform"]) card2.style.removeProperty(property);
       return card2;
     }
-    const note = (_d = this.notes) == null ? void 0 : _d.get(node.id);
+    const note = (_e = this.notes) == null ? void 0 : _e.get(node.id);
     const card = createDiv({ cls: "vam-node" });
     if (node.width) card.style.width = `${node.width}px`;
-    card.createEl("h3", { cls: "vam-card-title", text: (_e = note == null ? void 0 : note.title) != null ? _e : node.path });
+    card.createEl("h3", { cls: "vam-card-title", text: (_f = note == null ? void 0 : note.title) != null ? _f : node.path });
     if (note && !isPlaceholder(note.summary)) card.createEl("p", { cls: "vam-card-summary", text: note.summary });
     return card;
   }
@@ -52039,6 +52434,12 @@ ${request.requirements}` : preset.text,
           return;
         }
         const { map, path, parent } = current;
+        if (request.aiGenerated && parent && this.aiLockReason("addChild", [parent.id], /* @__PURE__ */ new Map([[parent.id, await repo.readNote(parent.path, map)]]))) {
+          const skippedCount = request.nodes.length;
+          new import_obsidian34.Notice(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          state.rejection = new Error(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          return;
+        }
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         await this.noteStyles.refresh();
@@ -53403,7 +53804,12 @@ ${request.requirements}` : preset.text,
       targetId: check.targetId,
       sources: check.sources.map((source) => ({ id: source.id, path: source.path }))
     };
-    const withContent = hasMergeContent(check.sources.map((source) => this.notes.get(source.id)));
+    const locked = !!this.mergeLockReason(
+      check.sources.map((source) => source.id),
+      check.targetId
+    );
+    if (locked) new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+    const withContent = !locked && hasMergeContent(check.sources.map((source) => this.notes.get(source.id)));
     this.mergeOpen = true;
     new MergeTopicsModal(
       this.app,
@@ -53453,6 +53859,14 @@ ${request.requirements}` : preset.text,
         return ((_a4 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a4.path) === node.path;
       });
     };
+    if (this.mergeLockReason(
+      snapshot.sources.map((source) => source.id),
+      snapshot.targetId,
+      await this.freshNotes()
+    )) {
+      new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+      return false;
+    }
     await this.refreshNoteStyles();
     if (!stillValid()) {
       new import_obsidian34.Notice(t("ui.merge_draft_stale"));
@@ -53606,7 +54020,8 @@ ${request.requirements}` : preset.text,
       if (!this.closed) this.render();
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
-      new import_obsidian34.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
+      if (isAiLockedError(error)) new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+      else new import_obsidian34.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
     } finally {
       progress.end();
     }
@@ -53700,6 +54115,12 @@ ${request.requirements}` : preset.text,
       new import_obsidian34.Notice(t("ui.merge_missing_note"));
       return;
     }
+    if (content && this.mergeLockReason(
+      check.sources.map((source) => source.id),
+      check.targetId,
+      await this.freshNotes()
+    ))
+      throw aiLockedError();
     const sources = check.sources, mapPath = this.path, repo = this.plugin.repo, before = clone(this.map), language2 = this.plugin.settings.language;
     if (content) {
       let latest;
@@ -56466,6 +56887,7 @@ ${request.requirements}` : preset.text,
   queueCharts(job) {
     var _a2;
     const path = job.path;
+    if (job.saved.aiLocked) return;
     const snapshot = this.chartSnapshot(job.saved);
     const map = (_a2 = this.map) != null ? _a2 : void 0;
     this.plugin.addChartsAfterWrite({
@@ -56478,7 +56900,7 @@ ${request.requirements}` : preset.text,
         var _a3;
         if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
-        if (this.chartSnapshot(latest) !== snapshot) return false;
+        if (latest.aiLocked || this.chartSnapshot(latest) !== snapshot) return false;
         const top = job.updateMode === "top";
         if (top && !((_a3 = job.preserve) == null ? void 0 : _a3.call(job, charted))) return false;
         await this.plugin.repo.updateNote(
@@ -57823,6 +58245,7 @@ ${request.requirements}` : preset.text,
     this.paintModelTag(card, header, note);
     this.paintCardColor(card, note, !!node.aimKind);
     this.paintCardStyle(card, note, !!node.aimKind);
+    if (header) this.paintAiLock(card, header, node);
     const errorDetails = [];
     if ((_n = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _n.length) {
       const issue2 = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
@@ -59004,6 +59427,7 @@ ${request.requirements}` : preset.text,
     }
     this.paintCardColor(card, note, !!node.aimKind);
     this.paintCardStyle(card, note, !!node.aimKind);
+    if (header) this.paintAiLock(card, header, node);
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
@@ -59110,6 +59534,10 @@ ${request.requirements}` : preset.text,
     this.enqueue(async () => {
       var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+      if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
+        new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+        return;
+      }
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
       const sources = this.taskSourceSettings(currentLabel, (_b2 = this.map) == null ? void 0 : _b2.id, synthesisLabel);
@@ -59274,6 +59702,7 @@ ${request.requirements}` : preset.text,
     if (note) this.renderColorSection(panel, node);
     if (note) this.renderStyleSection(panel, node);
     if (note) this.renderCoverSection(panel, node);
+    if (note) this.renderAiLockSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
@@ -60170,6 +60599,219 @@ ${request.requirements}` : preset.text,
     await this.refreshAfterSavedChange();
     return result;
   }
+  /**
+   * Why the AI may not do `op` on the topics (AI lock), or null. The rule lives in core/ai-lock.ts; `fresh` notes (just
+   * read from disk) win over the view's.
+   */
+  aiLockReason(op, ids, fresh, options) {
+    return aiLockBlock(op, ids, this.map, (id) => {
+      var _a2, _b2;
+      return ((_b2 = (_a2 = fresh == null ? void 0 : fresh.get(id)) != null ? _a2 : this.notes.get(id)) == null ? void 0 : _b2.aiLocked) === true;
+    }, options);
+  }
+  /**
+   * Why the AI may not merge these topics (AI lock), or null: the sources leave the map (their subtree, their parent's
+   * child list and their semantic relations count), and in parent mode the parent topic is rewritten.
+   */
+  mergeLockReason(ids, targetId, fresh) {
+    var _a2;
+    const removed = ids.filter((id) => id !== targetId);
+    return (_a2 = targetId ? this.aiLockReason("write", [targetId], fresh) : null) != null ? _a2 : this.aiLockReason("remove", removed, fresh);
+  }
+  /** The notes of these cards read again from disk (a missing card or note is left out). */
+  async freshNotesOf(ids) {
+    var _a2, _b2;
+    const fresh = /* @__PURE__ */ new Map();
+    for (const id of new Set(ids)) {
+      const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+      if (!node) continue;
+      try {
+        fresh.set(id, await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0));
+      } catch (e) {
+      }
+    }
+    return fresh;
+  }
+  /**
+   * The AI lock of a map chat write, read from disk at apply time (so a lock set after the reply was proposed still
+   * counts): what the tool would change, add under, move or remove. Null when the write may go ahead.
+   */
+  async chatLockSkip(action, real) {
+    var _a2, _b2;
+    const refused = skipped("ui.ai_locked_notice");
+    const check = async (op, ids, to) => {
+      const known = ids.filter((id) => !!id);
+      if (!known.length) return null;
+      const involved = [...known, ...to ? [to] : []];
+      const fresh = op === "remove" || op === "move" ? await this.freshNotes() : await this.freshNotesOf(involved);
+      return this.aiLockReason(op, known, fresh, to === void 0 ? void 0 : { to }) ? refused : null;
+    };
+    switch (action.kind) {
+      case "add_child":
+        return action.parentId ? check("addChild", [real(action.parentId)]) : null;
+      case "set_topic_kind":
+      case "set_appearance":
+        return check(
+          "write",
+          action.nodeIds.map((id) => real(id))
+        );
+      case "rename_topic":
+      case "update_summary":
+      case "edit_topic_note":
+        return check("write", [action.nodeId]);
+      case "collapse_topic":
+      case "expand_topic":
+        return check("write", [real(action.nodeId)]);
+      case "move_topic":
+        return check("move", [action.nodeId], real(action.newParentId));
+      case "delete_topic":
+        return check("remove", [action.nodeId]);
+      case "edit_md_file": {
+        const key2 = normalizeVaultPath(action.path);
+        if (!key2) return null;
+        const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === key2);
+        if (node) return check("write", [node.id]);
+        const file = this.app.vault.getAbstractFileByPath(key2);
+        const frontmatter2 = file instanceof import_obsidian34.TFile ? (_b2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _b2.frontmatter : void 0;
+        return frontmatter2 && readAiLocked(frontmatter2) ? refused : null;
+      }
+      default:
+        return null;
+    }
+  }
+  /** Every topic note of the map read again from disk: the write-time fence must not trust the view's copy. */
+  async freshNotes() {
+    var _a2, _b2, _c;
+    const fresh = /* @__PURE__ */ new Map();
+    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
+      try {
+        fresh.set(node.id, await this.plugin.repo.readNote(node.path, (_c = this.map) != null ? _c : void 0));
+      } catch (e) {
+      }
+    }
+    return fresh;
+  }
+  /** Stops every AI run on the topic through the same handles its Stop button uses. */
+  stopAiOn(path) {
+    var _a2, _b2;
+    (_a2 = this.startingTasks.get(path)) == null ? void 0 : _a2.abort();
+    (_b2 = this.plugin.topicRuns.taskController(path)) == null ? void 0 : _b2.abort();
+    this.plugin.topicRuns.stop(path);
+    this.plugin.abortChartJobs(path);
+    const synthesis = this.synthesisTasks.get(path);
+    if ((synthesis == null ? void 0 : synthesis.state) === "running") synthesis.controller.abort();
+  }
+  /**
+   * Locks or unlocks the topics for AI (`ai-locked`) in one undoable step: the notes and Map.md (viewport only).
+   * Locking first stops the AI runs on them; their late results are fenced at write time. Not on AIM maps.
+   */
+  async setAiLock(nodes, locked) {
+    if (!this.map || this.map.aim) return;
+    const targets = nodes.filter(
+      (node) => {
+        var _a2;
+        return !node.aimKind && !!this.notes.get(node.id) && ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true !== locked;
+      }
+    );
+    if (!targets.length) return;
+    if (locked) for (const node of targets) this.stopAiOn(node.path);
+    const viewport = clone(this.map.viewport);
+    let transaction = this.beginMapTransaction();
+    for (const target of targets)
+      transaction = transaction.rewriteNote(target.path, (path) => this.plugin.repo.writeAiLocked(path, locked));
+    const entry = await transaction.editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.ai_lock") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /**
+   * The selection bar's AI lock: one button whose `aria-pressed` is true when every selected topic is locked, false when
+   * none is and "mixed" otherwise (the title and name say how many). A click unlocks all when all are locked and locks
+   * the rest otherwise, in one undo step. Not on AIM maps.
+   */
+  renderAiLockSelectionButton(selection) {
+    if (!this.map || this.map.aim) return;
+    const nodes = [...this.selection.state.multiSelected].map((id) => {
+      var _a2;
+      return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === id);
+    }).filter((node) => !!node && !node.aimKind && !!this.notes.get(node.id));
+    const locked = nodes.filter((node) => {
+      var _a2;
+      return ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
+    }).length;
+    const all = nodes.length > 0 && locked === nodes.length;
+    const button = this.button(
+      selection,
+      t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"),
+      () => this.enqueue(() => this.setAiLock(nodes, !all)),
+      !nodes.length
+    );
+    button.setAttr("aria-pressed", all ? "true" : locked ? "mixed" : "false");
+    if (locked && !all) {
+      const state = t("ui.ai_locked_some_0_1", locked, nodes.length);
+      button.setAttr("title", state);
+      button.setAttr("aria-label", `${t("ui.ai_lock_toggle")} (${state})`);
+    }
+  }
+  /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
+  renderAiLockSection(panel, node) {
+    var _a2;
+    if (!this.map || this.map.aim || node.aimKind || this.selection.state.multiSelectMode) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-ai-lock-section");
+    section3.createEl("strong", { text: t("ui.ai_lock"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section3.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.ai_lock"));
+    let locked = ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
+    const paint = (focus = false) => {
+      group.empty();
+      const choice2 = this.button(group, t("ui.ai_lock_toggle"), () => {
+        this.enqueue(async () => {
+          await this.setAiLock([node], !locked);
+          locked = !locked;
+          paint(true);
+        });
+      });
+      choice2.setAttr("aria-pressed", String(locked));
+      if (locked) choice2.addClass("is-pressed");
+      if (focus) choice2.focus();
+    };
+    paint();
+    section3.createEl("p", { cls: "vam-hint vam-ai-lock-hint", text: t("ui.ai_lock_hint") });
+  }
+  /**
+   * A locked card shows a lock button in its header (a click unlocks) and says "locked" in its accessible name. Safe to
+   * call again on the same card: the old button goes first.
+   */
+  paintAiLock(card, header, node) {
+    var _a2, _b2;
+    const old = cardAiLockButtons.get(card);
+    if (old) {
+      old.remove();
+      cardAiLockButtons.delete(card);
+      delete card.dataset.aiLocked;
+    }
+    if (!this.map || this.map.aim || node.aimKind || ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) !== true) return;
+    card.dataset.aiLocked = "true";
+    const button = header.createEl("button", { cls: "vam-card-ai-lock" });
+    cardAiLockButtons.set(card, button);
+    button.type = "button";
+    (0, import_obsidian34.setIcon)(button, "lock");
+    button.tabIndex = -1;
+    button.setAttr("aria-label", t("ui.ai_unlock_card"));
+    button.setAttr("title", t("ui.ai_unlock_card"));
+    button.addEventListener("pointerdown", (event) => event.stopPropagation());
+    button.addEventListener("dblclick", (event) => event.stopPropagation());
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      this.enqueue(() => this.setAiLock([node], false));
+    });
+    const named = (_b2 = cardLabels.get(card)) == null ? void 0 : _b2.textContent;
+    if (named && !named.includes(t("ui.ai_locked_state")))
+      this.labelCard(card, t("ui.topic_card_label_0_1", named, t("ui.ai_locked_state")));
+  }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   async changeTopicMarker(node, id) {
     if (!this.map || !this.markersEditable(node)) return;
@@ -60772,11 +61414,16 @@ ${request.requirements}` : preset.text,
       style: noteStyle,
       kind: "topic"
     })).template;
+    const parentLocked = async () => {
+      var _a3;
+      return (await this.plugin.repo.readNote(parent.path, (_a3 = this.map) != null ? _a3 : void 0)).aiLocked === true;
+    };
     try {
       for (const item of items) {
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
         const owner = item.parentTitle ? createdByTitle.get(item.parentTitle) : parent;
         if (!owner) throw new Error(t("ui.select_the_parent_topic_before_its_child"));
+        if (owner === parent && await parentLocked()) throw new Error(t("ui.ai_locked_notice"));
         await this.addNode(owner, item.title, false, false);
         created++;
         const child = this.map.nodes.at(-1);
@@ -61017,12 +61664,15 @@ ${request.requirements}` : preset.text,
           return;
         }
         const busy = (node) => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.topicRuns.hasTask(node.path);
-        const nodes = selected.filter((node) => !busy(node));
+        const unlocked = selected.filter((node) => !this.aiLockReason("write", [node.id]));
+        if (unlocked.length < selected.length)
+          new import_obsidian34.Notice(t("ui.ai_locked_skipped_0", selected.length - unlocked.length));
+        const nodes = unlocked.filter((node) => !busy(node));
         if (!nodes.length) {
-          new import_obsidian34.Notice(t("ui.multi_research_all_skipped"));
+          if (unlocked.length) new import_obsidian34.Notice(t("ui.multi_research_all_skipped"));
           return;
         }
-        if (nodes.length < selected.length) new import_obsidian34.Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
+        if (nodes.length < unlocked.length) new import_obsidian34.Notice(t("ui.multi_research_skipped", unlocked.length - nodes.length));
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const shared2 = {
@@ -61246,6 +61896,7 @@ ${request.requirements}` : preset.text,
         bracket.setAttr("title", t(check.reason));
       }
     }
+    this.renderAiLockSelectionButton(selection);
     this.button(
       selection,
       t("ui.move_to"),
@@ -62987,7 +63638,7 @@ ${note.detail.trim()}` : "",
       };
     };
     const outline = map.nodes.map((node) => {
-      var _a3, _b2, _c;
+      var _a3, _b2, _c, _d;
       const strength = this.hypothesisStrengthOf(node.id);
       return {
         id: node.id,
@@ -63003,6 +63654,7 @@ ${note.detail.trim()}` : "",
           markers: (_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.markers,
           styles: (_c = this.notes.get(node.id)) == null ? void 0 : _c.style
         },
+        ...((_d = this.notes.get(node.id)) == null ? void 0 : _d.aiLocked) ? { aiLocked: true } : {},
         ...failureOf(node.id)
       };
     });
@@ -63928,6 +64580,8 @@ ${note.detail.trim()}` : "",
       var _a3;
       return id.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : id;
     };
+    const locked = await this.chatLockSkip(action, real);
+    if (locked) return locked;
     switch (action.kind) {
       case "add_child": {
         let parent = null;
@@ -64352,6 +65006,15 @@ ${note.detail.trim()}` : "",
     if (!this.canSelectTopics()) return skipped("ui.map_chat_skip_unavailable");
     const targets = known(action.nodeIds);
     if (action.nodeIds.length && !targets.length) return skipped("ui.map_chat_skip_topic_gone");
+    const lockedOnly = async (ids) => {
+      if (!ids.length) return false;
+      const fresh = await this.freshNotesOf(ids);
+      return ids.every((id) => !!this.aiLockReason("write", [id], fresh));
+    };
+    const writesTargets = action.action === "research_standard" || action.action === "expand" || action.action === "find_images";
+    const lockIds = targets.length ? targets : this.chatSelectionIds();
+    if ((writesTargets || action.action === "synthesize" && lockIds.length === 1) && await lockedOnly(lockIds))
+      return skipped("ui.ai_locked_notice");
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
@@ -64389,7 +65052,7 @@ ${note.detail.trim()}` : "",
         const parents = known(ids).map((id) => {
           var _a3;
           return (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === id);
-        }).filter((node) => !!node);
+        }).filter((node) => !!node && !this.aiLockReason("addChild", [node.id]));
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
         for (const parent of parents)
           launch(
@@ -64412,6 +65075,12 @@ ${note.detail.trim()}` : "",
         if (this.mergeTasks.has(this.path)) return skipped("ui.map_chat_skip_merge_locked");
         const check = this.mergeCheck();
         if (!check.ok) return skipped("ui.map_chat_skip_unavailable");
+        if (this.mergeLockReason(
+          check.sources.map((source) => source.id),
+          check.targetId,
+          await this.freshNotes()
+        ))
+          return skipped("ui.ai_locked_notice");
         const snapshot = {
           path: this.path,
           mapId: map.id,
@@ -64552,6 +65221,10 @@ ${note.detail.trim()}` : "",
         }
         try {
           const note = await this.plugin.repo.readNote(again.node.path, (_a2 = this.map) != null ? _a2 : void 0);
+          if (note.aiLocked) {
+            outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
+            return;
+          }
           const before = note.detail.replace(/\s+$/, "");
           const addition = imageMarkdown(item.candidate);
           await this.noteChange(again.node, { detail: before ? `${before}
@@ -64685,6 +65358,10 @@ ${addition}` : addition });
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
+      if (note.aiLocked) {
+        new import_obsidian34.Notice(t("ui.ai_locked_notice"));
+        return;
+      }
       const outline = this.quickOutline(parent);
       const limits = { levels: CHAT_EXPAND_LEVELS, maxTopics: CHAT_EXPAND_MAX_TOPICS };
       const generated = await outline.generate(
@@ -70275,6 +70952,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-frame-stage { display: flex; justify-content: center; padding: 16px 12px 20px; overflow: auto; max-height: 70vh; }
 .vam-card-frame-stage > .vam-node { position: relative; left: auto; top: auto; flex: 0 0 auto; transform: none; cursor: default; }
 .vam-card-frame-stage .vam-card-cover.is-framed { overflow: visible; touch-action: none; user-select: none; }
+.vam-card-frame-width { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; background: rgba(74, 144, 226, 0.35); touch-action: none; }
+.vam-card-frame-width:hover, .vam-card-frame-width:focus-visible { background: #4a90e2; outline: none; }
 .vam-card-frame-stage .vam-card-cover:focus-visible { outline: 2px solid #4a90e2; outline-offset: 2px; }
 .vam-card-cover img.vam-card-frame-ghost { position: absolute; display: none; height: auto; max-width: none; opacity: 0.3; pointer-events: none; }
 .vam-card-frame-stage .vam-card-cover.is-dragging img.vam-card-frame-ghost { display: block; }
@@ -70291,6 +70970,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-frame-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .vam-card-frame-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
 .vam-card-frame-label { display: none; }
+.vam-card-frame-hint { min-height: 1.2em; margin: 6px 0 0; color: #c0392b; text-align: center; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable { display: block; -webkit-line-clamp: unset; overflow: visible; white-space: pre-wrap; border-radius: 4px; cursor: text; user-select: text; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable:hover, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable:hover { outline: 1px dashed #4a90e2; }
+.vam-card-frame-stage .vam-node .vam-card-title.is-editable:focus, .vam-card-frame-stage .vam-node .vam-card-summary.is-editable:focus { outline: 2px solid #4a90e2; outline-offset: 2px; }
+.vam-card-frame-stage .vam-card-title.is-editable[aria-invalid="true"] { outline: 2px solid #c0392b; outline-offset: 2px; }
 .vam-card-frame-error { margin: 0 0 8px; color: #c0392b; text-align: center; }
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
@@ -72832,6 +73516,10 @@ var TopicRuns = class {
     try {
       const repo = this.ports.repository();
       const note = await repo.readNote(path, options.map);
+      if (note.aiLocked) {
+        fail2(t("ui.ai_locked_notice"), false);
+        return;
+      }
       const used = ((_c = options.runOnce) == null ? void 0 : _c.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
       if (controller.signal.aborted) throw aborted();
       const outputLanguage2 = (_d = options.outputLanguage) != null ? _d : this.ports.settings().language;
@@ -72852,6 +73540,10 @@ var TopicRuns = class {
       }
       const latest = await repo.readNote(path, options.map);
       if (controller.signal.aborted) throw aborted();
+      if (latest.aiLocked) {
+        fail2(t("ui.ai_locked_notice"), false);
+        return;
+      }
       if (latest.thinkingOrigin !== note.thinkingOrigin)
         throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
       const pendingItems = suggestions.map((item) => ({
@@ -72944,6 +73636,10 @@ var TopicRuns = class {
       }
       const repo = this.ports.repository();
       const note = await repo.readNote(path, options.map());
+      if (note.aiLocked) {
+        options.failed(t("ui.ai_locked_notice"));
+        return;
+      }
       const used = await this.modelOf(path, note, options.map(), options.runOnce);
       (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
       const progress = this.startProgress(path, used.model);
@@ -73016,6 +73712,10 @@ var TopicRuns = class {
     };
     const repo = this.ports.repository();
     const note = await repo.readNote(path, options.map());
+    if (note.aiLocked) {
+      fail2(t("ui.ai_locked_notice"));
+      return;
+    }
     const used = await this.modelOf(path, note, options.map(), options.runOnce);
     const noteSnapshot = (item) => JSON.stringify([
       item.title,
@@ -73080,6 +73780,7 @@ var TopicRuns = class {
         if (signal.aborted || prepared.viewChanged()) throw changed();
         if (await prepared.sourcesChanged()) throw changed();
         const latest = await repo.readNote(path, options.map());
+        if (latest.aiLocked) throw aiLockedError();
         if (noteSnapshot(latest) !== snapshot) throw changed();
         const mode = (_a3 = prepared.updateMode) != null ? _a3 : "merge";
         const noteLanguage = noteLanguageOf(outputLanguage2);
@@ -73160,7 +73861,8 @@ var TopicRuns = class {
       try {
         await options.drafted(result, save, result.summary, result.detail, note);
       } catch (error) {
-        if (signal.aborted || error instanceof Error && error.name === "AbortError") {
+        if (isAiLockedError(error)) fail2(t("ui.ai_locked_notice"));
+        else if (signal.aborted || error instanceof Error && error.name === "AbortError") {
           fail2(t("ui.research_stopped_existing_content_was_preserved"));
         } else {
           console.error("VAM synthesis write", error);
@@ -73369,7 +74071,7 @@ var TopicRuns = class {
     return { note, used, context, styleLabel };
   }
   async startResearch(path, kind, options) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if (this.disposed) return null;
     const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};
     const settings = () => this.ports.settings();
@@ -73393,13 +74095,19 @@ var TopicRuns = class {
       return null;
     }
     const { note, used, context, styleLabel } = prelude;
+    if (note.aiLocked) {
+      handle.release();
+      if (options.failed) options.failed(t("ui.ai_locked_notice"));
+      else (_c = options.notify) == null ? void 0 : _c.call(options, t("ui.ai_locked_notice"));
+      return null;
+    }
     const language2 = settings().language;
     this.pendingSuggestions.delete(path);
     this.abortCharts(path);
     const activeTasks = this.ports.activeTasks();
     const abortFromTaskModal = () => controller.abort();
-    if ((_c = overrides.signal) == null ? void 0 : _c.aborted) controller.abort();
-    else (_d = overrides.signal) == null ? void 0 : _d.addEventListener("abort", abortFromTaskModal, { once: true });
+    if ((_d = overrides.signal) == null ? void 0 : _d.aborted) controller.abort();
+    else (_e = overrides.signal) == null ? void 0 : _e.addEventListener("abort", abortFromTaskModal, { once: true });
     activeTasks.set(path, controller);
     const progress = this.ports.progress();
     let progressAttempt = "starting";
@@ -73432,14 +74140,14 @@ var TopicRuns = class {
     let raw = null;
     try {
       startupStatusAttempted = true;
-      const original = await this.readOriginal((_e = context.updateMode) != null ? _e : "merge", path, options);
-      if (((_f = context.updateMode) != null ? _f : "merge") === "fresh" && original === null) {
+      const original = await this.readOriginal((_f = context.updateMode) != null ? _f : "merge", path, options);
+      if (((_g = context.updateMode) != null ? _g : "merge") === "fresh" && original === null) {
         fail2(t("ui.writeback_backup_failed"));
         releaseStartup();
         return null;
       }
       await repo.updateNote(path, { status: "running" });
-      await ((_g = options.onStarted) == null ? void 0 : _g.call(options));
+      await ((_h = options.onStarted) == null ? void 0 : _h.call(options));
       raw = await this.snapshotRaw(original, path, options);
       if (controller.signal.aborted) {
         try {
@@ -73485,18 +74193,20 @@ var TopicRuns = class {
       observer
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h, _i, _j, _k, _l, _m;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-        if (controller.signal.aborted || stale) {
+        const locked = latest.aiLocked === true;
+        if (controller.signal.aborted || stale || locked) {
           await repo.updateNote(path, { status: note.status });
           if (exchangeId)
             (_a3 = exchanges()) == null ? void 0 : _a3.failed(
               exchangeId,
-              t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
+              t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
             );
-          if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          if (locked) fail2(t("ui.ai_locked_notice"));
+          else if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
           return;
         }
         const mode = (_b3 = context.updateMode) != null ? _b3 : "merge";
@@ -73545,7 +74255,7 @@ var TopicRuns = class {
           detail: saved.detail,
           formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_h = context.outputLanguage) != null ? _h : settings().language,
+          language: (_h2 = context.outputLanguage) != null ? _h2 : settings().language,
           template: context.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
@@ -74405,6 +75115,15 @@ var ImageTranslateAction = class extends import_obsidian43.Component {
   async translate(target, language2, placement, status, actions) {
     var _a2, _b2, _c;
     if (this.running) return;
+    let text11 = "";
+    try {
+      text11 = target.view.editor.getValue();
+    } catch (e) {
+    }
+    if (noteTextAiLocked(text11, import_obsidian43.parseYaml)) {
+      new import_obsidian43.Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const controller = new AbortController();
     this.running = controller;
     this.showRunning(status, actions);
@@ -74454,6 +75173,7 @@ var ImageTranslateAction = class extends import_obsidian43.Component {
     let outcome = "ui.image_translate_appended";
     const edit = (text11) => {
       var _a2, _b2, _c, _d;
+      if (noteTextAiLocked(text11, import_obsidian43.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
       const copies = target.token ? occurrences(text11, target.token.text) : [];
       const at = target.token && copies.length === target.token.count ? copies[target.token.occurrence] : copies.length === 1 ? copies[0] : -1;
       const token = (_b2 = (_a2 = target.token) == null ? void 0 : _a2.text) != null ? _b2 : "";
@@ -75090,6 +75810,11 @@ var SelectionAiPanel = class extends import_obsidian44.Component {
   async generate(prompt, label, requestedAction, trigger) {
     var _a2;
     if (this.controller) return;
+    if (this.noteLocked()) {
+      this.status.setText(t("ui.ai_locked_notice"));
+      new import_obsidian44.Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const controller = new AbortController();
     this.controller = controller;
     const output = this.output, status = this.status;
@@ -75261,8 +75986,23 @@ ${caption.trim()}`;
   applyDraft(action) {
     this.applyResult(this.output.value, action, this.status);
   }
+  /** True when the note the panel works on is locked for AI (`ai-locked: true`), read from the editor as it is now. */
+  noteLocked() {
+    const { view, markdown } = this.snapshot;
+    let current = markdown;
+    try {
+      current = view.editor.getValue();
+    } catch (e) {
+    }
+    return noteTextAiLocked(current, import_obsidian44.parseYaml);
+  }
   applyResult(result, action, status) {
     var _a2;
+    if (this.noteLocked()) {
+      status.setText(t("ui.ai_locked_notice"));
+      new import_obsidian44.Notice(t("ui.ai_locked_notice"));
+      return;
+    }
     const { view, path, markdown, text: text11, matchAt } = this.snapshot;
     const viewStillOpen = this.app.workspace.getLeavesOfType("markdown").some((leaf) => leaf.view === view);
     if (!viewStillOpen || ((_a2 = view.file) == null ? void 0 : _a2.path) !== path || view.editor.getValue() !== markdown) {

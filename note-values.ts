@@ -20,6 +20,24 @@ export function readRelevance(fm: Record<string, unknown>): NoteRelevance | unde
   if (fm["relevance-manual"] === true) return { tier: tier as RelevanceTier, manual: true };
   return { tier: tier as RelevanceTier };
 }
+/** The AI lock (`ai-locked: true`): only the boolean true locks; a missing or any other value reads as unlocked. */
+export function readAiLocked(fm: Record<string, unknown>): boolean {
+  return fm["ai-locked"] === true;
+}
+/**
+ * The AI lock of a note given as text (an open editor's content): its frontmatter block is parsed with `parse` (Obsidian's
+ * parseYaml) and read with {@link readAiLocked}. No frontmatter, or one that does not parse, reads as unlocked.
+ */
+export function noteTextAiLocked(text: string, parse: (yaml: string) => unknown): boolean {
+  const block = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)?.[1];
+  if (block === undefined || !/ai-locked/.test(block)) return false;
+  try {
+    const fm = parse(block);
+    return !!fm && typeof fm === "object" && readAiLocked(fm as Record<string, unknown>);
+  } catch {
+    return false;
+  }
+}
 /** The learning goal in the map file's frontmatter (`relevance-goal`); absent or blank reads as none. */
 export function readRelevanceGoal(fm: Record<string, unknown>): string | undefined {
   const goal = fm["relevance-goal"];

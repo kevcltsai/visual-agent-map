@@ -11,10 +11,6 @@ import templateEn from "./prompt.en.md";
 import templateZh from "./prompt.zh.md";
 import conciseEn from "./style.concise.en.md";
 import conciseZh from "./style.concise.zh.md";
-import detailedEn from "./style.detailed.en.md";
-import detailedZh from "./style.detailed.zh.md";
-import redoEn from "./redo.en.md";
-import redoZh from "./redo.zh.md";
 
 export const MAP_CHAT_ACTION_KINDS = [
   "add_child",
@@ -149,15 +145,8 @@ export class MapChatError extends Error {
   }
 }
 
-export type MapChatStyle = "concise" | "detailed";
-export const MAP_CHAT_STYLES: readonly MapChatStyle[] = ["concise", "detailed"];
-
 export interface MapChatRequest {
   message: string;
-  /** Answer length; absent means "concise". */
-  style?: MapChatStyle;
-  /** True when this re-sends a question already answered (the "say it in more detail" button): its actions were already applied. */
-  redo?: boolean;
   context: MapChatContext;
   language: ContentLanguage;
   /** Language of the prompt and model output; defaults to `language`. */
@@ -492,14 +481,12 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 7,
+  version: 9,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";
-    const detailed = request.style === "detailed";
-    const styleText = detailed ? (zh ? detailedZh : detailedEn) : zh ? conciseZh : conciseEn;
     return renderTemplate(zh ? templateZh : templateEn, {
-      styleInstruction: request.redo ? `${styleText}\n${zh ? redoZh : redoEn}` : styleText,
+      styleInstruction: zh ? conciseZh : conciseEn,
       languageInstruction: renderTemplate(
         zh ? languageZh : languageEn,
         languageVariables(language, { language: "region" }, language, undefined, {

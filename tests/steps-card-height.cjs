@@ -355,6 +355,27 @@ test('P4 export: a clipped card keeps its image and text inside its frame; a sce
   assert.ok(!/url\(|clipPath/.test(svg), 'no url() reference: the whitelist is unchanged');
 });
 
+test('cover frame export: a framed cover is drawn as the same region in a nested svg, with the original picture and no clipPath', () => {
+  const ex = load('experiences/visual-map/map-export.ts');
+  const base = { width: 400, height: 300, title: 'Map', theme: { background: '#fff', text: '#111' } };
+  const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+  const cover = { x: -90, y: 20, w: 500, h: 400, href: PNG, fit: 'fill', window: { x: 10, y: 30, w: 100, h: 80 } };
+  const card = { x: 10, y: 20, w: 100, h: 120, title: ['one'], cover };
+  const svg = ex.buildMapSvg({ ...base, cards: [card] });
+  assert.ok(svg.includes('<svg x="10" y="30" width="100" height="80" viewBox="10 30 100 80">'), 'a nested svg the size of the window');
+  const open = svg.indexOf('<svg x="10" y="30"');
+  const inside = svg.slice(open, svg.indexOf('</svg>', open));
+  assert.ok(inside.includes('<image x="-90" y="20" width="500" height="400" preserveAspectRatio="none"'), 'the whole picture, placed so the region fills the window');
+  assert.ok(!/clipPath|url\(/.test(svg));
+  const count = (svg.match(/<image /g) ?? []).length;
+  assert.equal(count, 1);
+  // Counter-example: a bad window is ignored, and no window leaves the image exactly as before.
+  const bad = ex.buildMapSvg({ ...base, cards: [{ ...card, cover: { ...cover, window: { x: 10, y: 30, w: 0, h: 80 } } }] });
+  assert.ok(!bad.includes('viewBox="10 30'));
+  const plainCover = { x: 10, y: 20, w: 100, h: 96, href: PNG, fit: 'contain' };
+  assert.equal(ex.buildMapSvg({ ...base, cards: [{ ...card, cover: plainCover }] }), ex.buildMapSvg({ ...base, cards: [{ ...card, cover: { ...plainCover, window: undefined } }] }));
+});
+
 // ---- P6: shrink order of a clipped card, handles built during a presentation ---------------------------------------------
 const { obsidian } = support;
 const renderedSpans = (setup) => {

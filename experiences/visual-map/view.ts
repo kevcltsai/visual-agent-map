@@ -122,7 +122,16 @@ import {
   type TopicColor,
   type TopicStyle
 } from "../../topic-colors";
-import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
+import {
+  appendImageEmbed,
+  resolveCoverWithFrame,
+  withCover,
+  withCoverOff,
+  withCoverFrame,
+  withCoverOn,
+  type CoverFrame
+} from "./card-cover";
+import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -229,7 +238,6 @@ import {
   isManagedMapPath,
   moveNotePath,
   normalizeReasoningLevel,
-  normalizeMapChatStyle,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
   type Note,
@@ -588,6 +596,43 @@ const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 /** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
 const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement }>();
+/** A card cover is as wide as the card's content and at most this many times as tall; a taller picture is scaled down whole (letterboxed), never cropped. */
+export const COVER_MAX_HEIGHT_RATIO = 1.5;
+/**
+ * Width over height of the card's cover frame for a picture of this size, or of the part of it a cover frame (mask) shows
+ * (a very tall picture or region is held at 1 / COVER_MAX_HEIGHT_RATIO).
+ */
+export function coverFrameRatio(width: number, height: number, frame?: CoverFrame | null): number | null {
+  if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) return null;
+  return Math.max((width * (frame?.w ?? 1)) / (height * (frame?.h ?? 1)), 1 / COVER_MAX_HEIGHT_RATIO);
+}
+/** Picture shapes (width over height) already seen, by image path, so a redraw sizes the frame at once and nothing jumps. */
+const coverShapes = new Map<string, number>();
+/**
+ * Lays a picture into its (already sized) cover frame. Whole picture: nothing to place (CSS contains it). With a mask:
+ * the window is the framed region, as wide as the frame or, when the frame is capped, scaled down whole and centred;
+ * the picture is sized and shifted inside the window so only the region shows. Inline percentages, no CSS variables.
+ */
+function placeCoverFrame(
+  parts: { frame: HTMLElement; window: HTMLElement | null; img: HTMLImageElement },
+  shape: number,
+  mask: CoverFrame | null
+): void {
+  const ratio = coverFrameRatio(shape, 1, mask);
+  if (!ratio) return;
+  parts.frame.style.setProperty("aspect-ratio", String(ratio));
+  parts.frame.addClass("is-sized");
+  if (!mask || !parts.window) return;
+  const region = (shape * mask.w) / mask.h;
+  // The window keeps the region's own shape (CSS: full height, width from this ratio, centred), so a card clipped
+  // short scales the region down whole instead of stretching it.
+  parts.window.style.setProperty("aspect-ratio", String(region));
+  const img = parts.img.style;
+  img.setProperty("width", `${100 / mask.w}%`);
+  img.setProperty("height", `${100 / mask.h}%`);
+  img.setProperty("left", `${(-mask.x / mask.w) * 100}%`);
+  img.setProperty("top", `${(-mask.y / mask.h) * 100}%`);
+}
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -3700,7 +3745,7 @@ export class VisualAgentMapView extends ItemView {
       .rewriteNote(node.path, async path => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await this.app.vault.process(file, content => (off ? withoutCover(content) : withCoverOff(content)));
+        await this.app.vault.process(file, content => (off ? withCoverOn(content) : withCoverOff(content)));
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -3709,6 +3754,66 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     await this.refreshAfterSavedChange();
     return entry;
+  }
+  /**
+   * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame` in one undoable step, the same way
+   * changeTopicCover writes. The picture file is never touched; undo writes the old note text back.
+   */
+  private async changeTopicCoverFrame(node: MapNode, frame: CoverFrame | null): Promise<TransactionEntry | null> {
+    if (!this.map || !this.markersEditable(node)) return null;
+    const write = frameToWrite(frame);
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, async path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) throw new Error(path);
+        await this.app.vault.process(file, content => withCoverFrame(content, write));
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_cover_frame_title") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    return entry;
+  }
+  /** The topic's cover picture (resource path) and its valid frame; null when it has no picture or the cover is off. */
+  private coverPictureOf(node: MapNode): { src: string; frame: CoverFrame | null } | null {
+    try {
+      const file = this.app.vault.getAbstractFileByPath(node.path);
+      if (!(file instanceof TFile)) return null;
+      const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
+        this.app.metadataCache.getFirstLinkpathDest(link, node.path)
+      );
+      if (!cover || !("path" in cover)) return null;
+      const image = this.app.vault.getAbstractFileByPath(cover.path);
+      const src = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
+      return src ? { src, frame: cover.frame } : null;
+    } catch {
+      return null;
+    }
+  }
+  /** Opens the "Adjust area" dialog for the topic's cover picture. Only Apply writes (one undo step); Cancel and close do not. */
+  private openCoverFrameEditor(node: MapNode): CoverFrameModal | null {
+    if (!this.markersEditable(node)) return null;
+    const picture = this.coverPictureOf(node);
+    if (!picture) return null;
+    const modal = new CoverFrameModal(this.app, {
+      src: picture.src,
+      initial: picture.frame,
+      onApply: frame =>
+        new Promise<void>(done =>
+          this.enqueue(async () => {
+            try {
+              await this.changeTopicCoverFrame(node, frame);
+            } finally {
+              done();
+            }
+          })
+        )
+    });
+    modal.open();
+    return modal;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
@@ -8936,13 +9041,13 @@ export class VisualAgentMapView extends ItemView {
     this.showMenuUnder(menu, event);
   }
   /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
-  private exportCoverPath(notePath: string): string | null {
+  private exportCoverPath(notePath: string): { path: string; frame: CoverFrame | null } | null {
     const file = this.app.vault.getAbstractFileByPath(notePath);
     if (!(file instanceof TFile)) return null;
-    const cover = resolveCover(this.app.metadataCache.getFileCache(file), link =>
+    const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
       this.app.metadataCache.getFirstLinkpathDest(link, notePath)
     );
-    return cover && "path" in cover ? cover.path : null;
+    return cover && "path" in cover ? cover : null;
   }
   /**
    * The map as the screen shows it (decision D9): card rectangles and edge paths (the fishbone spine included) are
@@ -9041,19 +9146,42 @@ export class VisualAgentMapView extends ItemView {
         if (Number.isFinite(width) && width > 0) item.strokeWidth = width;
       }
       const frame = card.querySelector<HTMLElement>(".vam-card-cover");
-      const coverPath = frame ? this.exportCoverPath(node.path) : null;
-      if (frame && coverPath) {
-        const href = await imageHref(coverPath);
+      const coverInfo = frame ? this.exportCoverPath(node.path) : null;
+      if (frame && coverInfo) {
+        const href = await imageHref(coverInfo.path);
         if (!isCurrent()) return null;
         if (href === false) return { refuse: "embedded" };
-        if (href)
+        // Only a sized cover has the region's own shape; the lazy 96 px placeholder would stretch the region, so it
+        // exports the whole picture proportionally (meet) instead.
+        const win =
+          coverInfo.frame && frame.classList.contains("is-sized")
+            ? frame.querySelector<HTMLElement>(".vam-card-cover-window")
+            : null;
+        if (href && coverInfo.frame && win && win.offsetWidth > 0 && win.offsetHeight > 0) {
+          // A masked cover: the whole picture is placed so the framed region fills the window; the export clips to the window.
+          const mask = coverInfo.frame;
+          // The window is centred in the frame by CSS (a transform), which offsetLeft does not see.
+          const winX = box.x + frame.offsetLeft + (frame.offsetWidth - win.offsetWidth) / 2;
+          const winY = box.y + frame.offsetTop + win.offsetTop;
+          const w = win.offsetWidth / mask.w;
+          const h = win.offsetHeight / mask.h;
+          item.cover = {
+            x: winX - mask.x * w,
+            y: winY - mask.y * h,
+            w,
+            h,
+            href,
+            fit: "fill",
+            window: { x: winX, y: winY, w: win.offsetWidth, h: win.offsetHeight }
+          };
+        } else if (href)
           item.cover = {
             x: box.x + frame.offsetLeft,
             y: box.y + frame.offsetTop,
             w: frame.offsetWidth,
             h: frame.offsetHeight,
             href,
-            fit: "cover"
+            fit: "contain"
           };
       }
       cards.push(item);
@@ -11028,6 +11156,13 @@ export class VisualAgentMapView extends ItemView {
       ? t("share.viewer_markers_0", markers.map(id => t(markerLabelKey(id))).join(t("ui.list_separator")))
       : "";
   }
+  /** A cover changed the card's height: refit its shape and clip state, and redraw the lines that end on it. */
+  private afterCoverSized(card: HTMLElement): void {
+    const id = card.dataset?.nodeId;
+    if (!id || !this.map) return;
+    this.fitKindShape(card, this.topicKindOf(id));
+    this.drawEdges();
+  }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   private releaseCovers(): void {
     this.coverObserver?.disconnect();
@@ -11046,28 +11181,47 @@ export class VisualAgentMapView extends ItemView {
       cardCovers.delete(card);
     }
     let source: string | undefined;
+    let imagePath = "";
+    let mask: CoverFrame | null = null;
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof TFile)) return;
-      const cover = resolveCover(this.app.metadataCache.getFileCache(file), link =>
+      const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
         this.app.metadataCache.getFirstLinkpathDest(link, notePath)
       );
       if (!cover || !("path" in cover)) return;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
+      imagePath = cover.path;
+      mask = cover.frame;
     } catch {
       return;
     }
     if (!source) return;
     const frame = createDiv({ cls: "vam-card-cover" });
-    const img = frame.createEl("img", {
+    // A frame (mask) puts the picture inside a window that shows only the framed region; the file itself is never changed.
+    const windowEl = mask ? frame.createDiv({ cls: "vam-card-cover-window" }) : null;
+    if (mask) frame.addClass("is-framed");
+    const img = (windowEl ?? frame).createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
+    const parts = { frame, window: windowEl, img };
+    // Until the picture's shape is known the frame keeps its 96 px placeholder (CSS); a known shape sizes it at once.
+    const known = coverShapes.get(imagePath);
+    if (known) placeCoverFrame(parts, known, mask);
     // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
     img.addEventListener("error", () => {
       this.coverObserver?.unobserve(img);
       frame.remove();
       cardCovers.delete(card);
+    });
+    // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
+    img.addEventListener("load", () => {
+      const shape = coverFrameRatio(img.naturalWidth, img.naturalHeight) && img.naturalWidth / img.naturalHeight;
+      if (!shape || frame.hasClass("is-sized")) return;
+      coverShapes.set(imagePath, shape);
+      placeCoverFrame(parts, shape, mask);
+      this.afterCoverSized(card);
     });
     cardCovers.set(card, { frame, img });
     const title = card.querySelector<HTMLElement>(".vam-card-title");
@@ -12723,6 +12877,8 @@ export class VisualAgentMapView extends ItemView {
       choice.setAttr("aria-pressed", String(off));
       if (off) choice.addClass("is-pressed");
       if (focus) choice.focus();
+      if (!off && this.coverPictureOf(node))
+        this.button(group, t("ui.topic_cover_frame_adjust"), () => this.openCoverFrameEditor(node));
     };
     paint();
   }
@@ -15467,11 +15623,6 @@ export class VisualAgentMapView extends ItemView {
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
-      style: () => normalizeMapChatStyle(this.plugin.settings.mapChatStyle),
-      setStyle: style => {
-        this.plugin.settings.mapChatStyle = style;
-        void this.plugin.saveSettings();
-      },
       modelChoices: () => this.chatModelChoices(),
       model: () => this.plugin.settings.cliModel,
       setModel: model => {
@@ -15487,12 +15638,10 @@ export class VisualAgentMapView extends ItemView {
           stopCurrent();
         };
       },
-      moreDetail: origin => {
+      retry: origin => {
         void this.sendMapChat(origin);
       },
-      retry: origin => {
-        void this.sendMapChat(origin, true);
-      },
+      modelName: id => this.plugin.modelLabel(id),
       resolveLink: link => {
         const file = this.app.metadataCache.getFirstLinkpathDest(link, this.sourceMarkdownFile()?.path ?? "");
         return file && file.extension === "md" ? file.path : null;
@@ -15675,12 +15824,7 @@ export class VisualAgentMapView extends ItemView {
       ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {})
     };
   }
-  private async buildChatRequest(
-    message: string,
-    chat: MapChatPanel,
-    origin: MapChatOrigin,
-    redo = false
-  ): Promise<MapChatRequest> {
+  private async buildChatRequest(message: string, chat: MapChatPanel, origin: MapChatOrigin): Promise<MapChatRequest> {
     const map = this.map!;
     const settings = this.plugin.settings;
     const byId = new Map(map.nodes.map(node => [node.id, node]));
@@ -15786,8 +15930,6 @@ export class VisualAgentMapView extends ItemView {
       context,
       language: settings.language,
       contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
-      style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
-      ...(redo ? { redo: true } : {}),
       model: settings.cliModel,
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
@@ -15804,12 +15946,10 @@ export class VisualAgentMapView extends ItemView {
     return { text: t("ui.map_chat_error_failed_0", errorMessage(error)), wrapped: true };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  private async sendMapChat(again?: MapChatOrigin, retry = false): Promise<void> {
+  private async sendMapChat(again?: MapChatOrigin): Promise<void> {
     const chat = this.chat;
     if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
-    // "Say it in more detail" sends the same question with the same references again; a normal send reads the draft. A retry
-    // sends the same question as it was (concise, with its actions applied), after a failure.
-    const redo = Boolean(again) && !retry;
+    // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
     const origin: MapChatOrigin = again ?? {
@@ -15822,9 +15962,9 @@ export class VisualAgentMapView extends ItemView {
     // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
     // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
     const draft = chat.draft;
-    const turn = chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again), "preparing");
+    const turn = chat.begin(message, origin, Boolean(again), "preparing");
     let sent = false;
-    // Takes the turn back and puts the draft into the field again (a "more detail" or retry has no draft to put back). `reason`
+    // Takes the turn back and puts the draft into the field again (a retry has no draft to put back). `reason`
     // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
     const abandon = (reason?: string): void => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
@@ -15837,7 +15977,7 @@ export class VisualAgentMapView extends ItemView {
     const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request: MapChatRequest;
     try {
-      request = await this.buildChatRequest(message, chat, origin, redo);
+      request = await this.buildChatRequest(message, chat, origin);
     } catch (error) {
       abandon(this.closed ? undefined : errorMessage(error));
       return;
@@ -15959,14 +16099,6 @@ export class VisualAgentMapView extends ItemView {
               if (outcome === null) continue;
               if (!alive()) return;
               const result: MapChatResult = outcome;
-              // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
-              if (redo) {
-                const lines = result.actions.length
-                  ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
-                  : [];
-                if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-                return;
-              }
               const plan = result.actions.length
                 ? planFor(result.actions, request.context, {
                     diagrams: this.plugin.settings.addDiagramsAfterResearch,
@@ -16282,7 +16414,7 @@ export class VisualAgentMapView extends ItemView {
     const follow = (key: TranslationKey): void => {
       if (!this.chat || this.chat !== chat || chat.isBusy || this.chatApplying || this.closed) return;
       const known = ids.filter(id => this.map?.nodes.some(node => node.id === id));
-      void this.sendMapChat({ text: t(key, titles(), kindText), chips: [], selectedIds: known }, true);
+      void this.sendMapChat({ text: t(key, titles(), kindText), chips: [], selectedIds: known });
     };
     chat.showChoices({
       prompt: t("ui.map_chat_kind_choice_prompt_0", kindText),

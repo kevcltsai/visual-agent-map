@@ -4,8 +4,8 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __defNormalProp = (obj, key2, value) => key2 in obj ? __defProp(obj, key2, { enumerable: true, configurable: true, writable: true, value }) : obj[key2] = value;
 var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
+  for (var name2 in all)
+    __defProp(target, name2, { get: all[name2], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -1601,6 +1601,10 @@ var en = {
   "detail.evidence_and_sources": "Evidence and sources",
   "detail.tradeoffs_and_limitations": "Tradeoffs and limitations",
   "detail.open_questions": "Open questions",
+  "detail.background_and_mechanism": "Background and mechanism",
+  "detail.disagreements_and_limits": "Disagreements and limits",
+  "detail.open_questions_to_check": "Open questions to check",
+  "detail.sources_heading": "Sources",
   "detail.update_log": "Update log",
   "detail.description_core_conclusions": "Answer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.",
   "detail.description_key_knowledge": "The concepts, data, mechanisms and background needed to understand the conclusions.",
@@ -4084,6 +4088,10 @@ var zhCN = {
   "detail.evidence_and_sources": "\u8BC1\u636E\u4E0E\u6765\u6E90",
   "detail.tradeoffs_and_limitations": "\u53D6\u820D\u4E0E\u9650\u5236",
   "detail.open_questions": "\u5F85\u786E\u8BA4\u4E8B\u9879",
+  "detail.background_and_mechanism": "\u80CC\u666F\u4E0E\u673A\u5236",
+  "detail.disagreements_and_limits": "\u4E0D\u540C\u770B\u6CD5\u4E0E\u9650\u5236",
+  "detail.open_questions_to_check": "\u5F85\u786E\u8BA4\u95EE\u9898",
+  "detail.sources_heading": "\u6765\u6E90",
   "detail.update_log": "\u66F4\u65B0\u8BB0\u5F55",
   "detail.description_core_conclusions": "\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002",
   "detail.description_key_knowledge": "\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002",
@@ -6567,6 +6575,10 @@ var zhTW = {
   "detail.evidence_and_sources": "\u8B49\u64DA\u8207\u4F86\u6E90",
   "detail.tradeoffs_and_limitations": "\u53D6\u6368\u8207\u9650\u5236",
   "detail.open_questions": "\u5F85\u78BA\u8A8D\u4E8B\u9805",
+  "detail.background_and_mechanism": "\u80CC\u666F\u8207\u6A5F\u5236",
+  "detail.disagreements_and_limits": "\u4E0D\u540C\u770B\u6CD5\u8207\u9650\u5236",
+  "detail.open_questions_to_check": "\u5F85\u78BA\u8A8D\u554F\u984C",
+  "detail.sources_heading": "\u4F86\u6E90",
   "detail.update_log": "\u66F4\u65B0\u7D00\u9304",
   "detail.description_core_conclusions": "\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002",
   "detail.description_key_knowledge": "\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002",
@@ -7802,8 +7814,8 @@ function uiLanguageOfHeadings(set) {
   return (_b2 = (_a2 = registry.find((item) => item.noteHeadings === set)) == null ? void 0 : _a2.id) != null ? _b2 : FALLBACK_LANGUAGE;
 }
 var NOTE_LANGUAGES = [...new Set(registry.map((item) => item.note))];
-var SUPPORTED_LANGUAGES = LANGUAGES.map(({ id, label, name }) => ({ id, label, name }));
-var OUTPUT_LANGUAGE_CHOICES = outputRegistry.filter((item) => !item.followsInput).map(({ id, label, name }) => ({ id, label, name }));
+var SUPPORTED_LANGUAGES = LANGUAGES.map(({ id, label, name: name2 }) => ({ id, label, name: name2 }));
+var OUTPUT_LANGUAGE_CHOICES = outputRegistry.filter((item) => !item.followsInput).map(({ id, label, name: name2 }) => ({ id, label, name: name2 }));
 function isFollowInputLanguage(value) {
   return outputRegistry.some((item) => item.id === value && item.followsInput === true);
 }
@@ -7961,15 +7973,15 @@ function cleanStyle(value) {
 }
 function cleanAttributes(node) {
   var _a2;
-  for (const { name, value } of Array.from(node.attributes)) {
-    const lower6 = name.toLowerCase();
-    if (lower6.startsWith("on")) node.removeAttribute(name);
+  for (const { name: name2, value } of Array.from(node.attributes)) {
+    const lower6 = name2.toLowerCase();
+    if (lower6.startsWith("on")) node.removeAttribute(name2);
     else if ((lower6 === "href" || lower6 === "xlink:href" || lower6 === "src") && unsafeUrl(value))
-      node.removeAttribute(name);
+      node.removeAttribute(name2);
     else if (lower6 === "style") {
-      if (HARD_TO_VET.test(value)) node.removeAttribute(name);
-      else if (cleanStyle(value) !== value) (_a2 = node.setAttribute) == null ? void 0 : _a2.call(node, name, cleanStyle(value));
-    } else if (EXTERNAL_URL.test(value) || HARD_TO_VET.test(value)) node.removeAttribute(name);
+      if (HARD_TO_VET.test(value)) node.removeAttribute(name2);
+      else if (cleanStyle(value) !== value) (_a2 = node.setAttribute) == null ? void 0 : _a2.call(node, name2, cleanStyle(value));
+    } else if (EXTERNAL_URL.test(value) || HARD_TO_VET.test(value)) node.removeAttribute(name2);
   }
 }
 function plainLabel(node) {
@@ -7978,13 +7990,13 @@ function plainLabel(node) {
 function clean(node) {
   var _a2, _b2;
   for (const child of Array.from(node.children)) {
-    const name = child.localName.toLowerCase();
-    if (REMOVED.has(name) || name === "foreignobject" && !plainLabel(child)) {
+    const name2 = child.localName.toLowerCase();
+    if (REMOVED.has(name2) || name2 === "foreignobject" && !plainLabel(child)) {
       child.remove();
       continue;
     }
     cleanAttributes(child);
-    if (name === "style")
+    if (name2 === "style")
       child.textContent = HARD_TO_VET.test((_a2 = child.textContent) != null ? _a2 : "") ? "" : cleanStyle((_b2 = child.textContent) != null ? _b2 : "");
     clean(child);
   }
@@ -8434,7 +8446,7 @@ function registerMermaidZoom(plugin) {
     scanCallouts(element);
     scanLinks(element);
     if (scan(plugin.app, element) > 0) return;
-    const mayHoldDiagram = element.matches(".mermaid") || ["mermaid", "block-language-mermaid", "language-mermaid"].some((name) => element.querySelector(`.${name}`));
+    const mayHoldDiagram = element.matches(".mermaid") || ["mermaid", "block-language-mermaid", "language-mermaid"].some((name2) => element.querySelector(`.${name2}`));
     if (!mayHoldDiagram) return;
     const release2 = () => {
       observer.disconnect();
@@ -8895,16 +8907,16 @@ var PLACEHOLDER = /\{\{([^{}]*)\}\}/g;
 function renderTemplate(template2, variables5) {
   const body = template2.endsWith("\n") ? template2.slice(0, -1) : template2;
   const used = /* @__PURE__ */ new Set();
-  const text11 = body.replace(PLACEHOLDER, (_match, name) => {
-    if (!Object.prototype.hasOwnProperty.call(variables5, name))
-      throw new Error(`Prompt template uses unknown placeholder {{${name}}}`);
-    const value = variables5[name];
-    if (typeof value !== "string") throw new Error(`Prompt template variable "${name}" must be a string`);
-    used.add(name);
+  const text11 = body.replace(PLACEHOLDER, (_match, name2) => {
+    if (!Object.prototype.hasOwnProperty.call(variables5, name2))
+      throw new Error(`Prompt template uses unknown placeholder {{${name2}}}`);
+    const value = variables5[name2];
+    if (typeof value !== "string") throw new Error(`Prompt template variable "${name2}" must be a string`);
+    used.add(name2);
     return value;
   });
-  for (const name of Object.keys(variables5))
-    if (!used.has(name)) throw new Error(`Prompt template variable "${name}" is not used by the template`);
+  for (const name2 of Object.keys(variables5))
+    if (!used.has(name2)) throw new Error(`Prompt template variable "${name2}" is not used by the template`);
   return text11;
 }
 var preparedSteps = /* @__PURE__ */ new WeakSet();
@@ -10898,10 +10910,10 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     else if (prefill.method === "ai")
       this.status.setText(this.t("coffee.review_and_edit_this_draft_then_create_the_research_map"));
   }
-  field(label, rows) {
+  field(label, rows2) {
     const id = `ct-handoff-${(0, import_node_crypto2.randomUUID)()}`;
     this.contentEl.createEl("label", { text: label, attr: { for: id } });
-    return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows), "aria-label": label } });
+    return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows2), "aria-label": label } });
   }
   select(parent, label, values, display = (value) => value) {
     const id = `ct-handoff-${(0, import_node_crypto2.randomUUID)()}`;
@@ -11340,13 +11352,13 @@ function validateGuestInvitations(candidates, baseCounts, questions, retryQuesti
   const candidateCounts = { ...activeCounts };
   for (const guest of candidates) {
     if (!CATEGORIES2.includes(guest.category)) return translate(language2, "coffee.choose_a_valid_guest_perspective");
-    const name = clean2(guest.name), description = clean2(guest.description);
-    if (!name || !description) return translate(language2, "coffee.enter_a_name_and_background_or_perspective_for_each");
-    if (name.length > 60 || description.length > 160)
+    const name2 = clean2(guest.name), description = clean2(guest.description);
+    if (!name2 || !description) return translate(language2, "coffee.enter_a_name_and_background_or_perspective_for_each");
+    if (name2.length > 60 || description.length > 160)
       return translate(language2, "coffee.names_are_limited_to_60_characters_and_backgrounds_to");
-    const normalizedName = key(name);
+    const normalizedName = key(name2);
     if (candidateIds.has(guest.id) || candidateNames.has(normalizedName) || activeNames.has(normalizedName))
-      return translate(language2, "coffee.is_already_at_this_table_do_not_invite_them_again", name);
+      return translate(language2, "coffee.is_already_at_this_table_do_not_invite_them_again", name2);
     candidateIds.add(guest.id);
     candidateNames.add(normalizedName);
     candidateCounts[guest.category]++;
@@ -14612,9 +14624,9 @@ function parseSpeeches(markdown) {
   const body = extractSegmentSummary(markdown).markdown.split(/^# (?:觀察者整理|Observer(?:[’']s)? notes)\s*$/m, 1)[0];
   const people = parseGuests(body), roles = new Map(people.map((person) => [person.name, person.role]));
   return [...body.matchAll(/^###\s+([^\n]+)\n([\s\S]*?)(?=^###\s|$(?![\s\S]))/gm)].map((match) => {
-    const [name, explicitRole] = match[1].split(/[｜|]/, 2).map((value) => value.trim());
-    const person = people.find((entry) => entry.name === name);
-    return { name, role: explicitRole || (person == null ? void 0 : person.role) || roles.get(name) || "", text: match[2].trim() };
+    const [name2, explicitRole] = match[1].split(/[｜|]/, 2).map((value) => value.trim());
+    const person = people.find((entry) => entry.name === name2);
+    return { name: name2, role: explicitRole || (person == null ? void 0 : person.role) || roles.get(name2) || "", text: match[2].trim() };
   }).filter((item) => item.text && item.role && !/^(觀察者整理|Observer(?:[’']s)? notes)$/.test(item.name));
 }
 function isCoffeeReference2(value) {
@@ -15299,9 +15311,9 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
     this.button(styleActions, this.t("coffee.save_as_new_style"), async () => {
       const issues = validateCustomization(customization.read(), this.plugin.settings.language);
       if (issues.length) throw new Error(issues.join("\n"));
-      const name = styleNameInput.value.trim();
-      if (!name || !stylePrompt.value.trim()) throw new Error(this.t("coffee.enter_a_style_name_and_prompt_first"));
-      const item = { id: crypto.randomUUID(), name, prompt: stylePrompt.value, customization: customization.read() };
+      const name2 = styleNameInput.value.trim();
+      if (!name2 || !stylePrompt.value.trim()) throw new Error(this.t("coffee.enter_a_style_name_and_prompt_first"));
+      const item = { id: crypto.randomUUID(), name: name2, prompt: stylePrompt.value, customization: customization.read() };
       await this.changeCoffeeStyles(() => {
         var _a3;
         this.plugin.settings.coffeeStyles = [...(_a3 = this.plugin.settings.coffeeStyles) != null ? _a3 : [], item];
@@ -15337,15 +15349,15 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       var _a3;
       const item = (_a3 = this.plugin.settings.coffeeStyles) == null ? void 0 : _a3.find((style) => style.id === styleSelect.value);
       if (!item) throw new Error(this.t("coffee.choose_a_saved_style_first"));
-      const name = await new CoffeeStyleNameModal(this.app, item.name, this.plugin.settings.language).ask();
-      if (!name) return;
+      const name2 = await new CoffeeStyleNameModal(this.app, item.name, this.plugin.settings.language).ask();
+      if (!name2) return;
       await this.changeCoffeeStyles(() => {
         var _a4;
         this.plugin.settings.coffeeStyles = ((_a4 = this.plugin.settings.coffeeStyles) != null ? _a4 : []).map(
-          (style) => style.id === item.id ? { ...style, name } : style
+          (style) => style.id === item.id ? { ...style, name: name2 } : style
         );
       });
-      styleNameInput.value = name;
+      styleNameInput.value = name2;
       refreshStyleChoices(item.id);
       snapshotForm();
     });
@@ -15940,9 +15952,9 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     const roles = new Map(parseGuests(sample.markdown).map((person) => [person.name, person.role]));
     const markdown = sample.markdown.replace(
       /^###\s+([^\n|｜]+)$/gm,
-      (heading, name) => {
+      (heading, name2) => {
         var _a3;
-        return `### ${name}\uFF5C${(_a3 = roles.get(name.trim())) != null ? _a3 : "Guest"}`;
+        return `### ${name2}\uFF5C${(_a3 = roles.get(name2.trim())) != null ? _a3 : "Guest"}`;
       }
     );
     const session = createSession(sample.topic, "Built-in sample", "\u2014", language2);
@@ -16549,10 +16561,10 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     details.open = this.composerValues.get("follow-up-guests-open") === "true";
     details.addEventListener("toggle", () => this.composerValues.set("follow-up-guests-open", String(details.open)));
     details.createEl("summary", { text: this.t("coffee.invite_temporary_guests") });
-    const rows = details.createDiv("ct-follow-up-guest-list");
+    const rows2 = details.createDiv("ct-follow-up-guest-list");
     this.followUpGuests.forEach((guest, index) => {
-      const row = rows.createDiv("ct-follow-up-guest");
-      const name = row.createEl("input", {
+      const row = rows2.createDiv("ct-follow-up-guest");
+      const name2 = row.createEl("input", {
         attr: {
           type: "text",
           maxlength: "60",
@@ -16560,10 +16572,10 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
           "aria-label": this.t("coffee.guest_name")
         }
       });
-      name.disabled = engine.busy;
-      name.value = guest.name;
-      name.addEventListener("input", () => {
-        guest.name = name.value;
+      name2.disabled = engine.busy;
+      name2.value = guest.name;
+      name2.addEventListener("input", () => {
+        guest.name = name2.value;
       });
       const category = row.createEl("select", { attr: { "aria-label": this.t("coffee.guest_perspective") } });
       category.disabled = engine.busy;
@@ -16608,7 +16620,7 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       var _a3, _b3;
       return sum + ((_b3 = (_a3 = question.invitedGuests) == null ? void 0 : _a3.length) != null ? _b3 : 0);
     }, 0);
-    rows.createEl("small", {
+    rows2.createEl("small", {
       cls: "ct-muted",
       text: this.t("coffee.guest_total_and_category_limits", totalGuests)
     });
@@ -16760,8 +16772,8 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       }
     }
   }
-  renderSpeech(name, role, text11, target, anchorKey) {
-    if (name === "\u4F60" || name.toLowerCase() === "you") {
+  renderSpeech(name2, role, text11, target, anchorKey) {
+    if (name2 === "\u4F60" || name2.toLowerCase() === "you") {
       this.renderUserBubble(text11, target);
       return;
     }
@@ -16769,12 +16781,12 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     article.dataset.coffeeSpeech = `ct-speech-${anchorKey != null ? anchorKey : index}`;
     article.dataset.coffeeSpeechText = text11;
     article.createDiv({
-      cls: `ct-avatar ct-color-${avatarColor(name)}`,
-      text: initials(name),
+      cls: `ct-avatar ct-color-${avatarColor(name2)}`,
+      text: initials(name2),
       attr: { "aria-hidden": "true" }
     });
     const content = article.createDiv("ct-message-content");
-    content.createEl("strong", { text: name });
+    content.createEl("strong", { text: name2 });
     content.createSpan({ cls: "ct-role", text: role });
     this.renderMarkdown(text11, content.createDiv("ct-bubble markdown-rendered"));
   }
@@ -16935,12 +16947,12 @@ function observerNotes(markdown) {
   var _a2, _b2;
   return (_b2 = (_a2 = markdown.match(/^# (?:觀察者整理|Observer(?:[’']s)? notes)[\s\S]*$/m)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
 }
-function initials(name) {
-  return [...name.replace(/[^\p{L}\p{N}]/gu, "")].slice(0, 2).join("") || "\u2022";
+function initials(name2) {
+  return [...name2.replace(/[^\p{L}\p{N}]/gu, "")].slice(0, 2).join("") || "\u2022";
 }
-function avatarColor(name) {
+function avatarColor(name2) {
   let hash = 0;
-  for (const char of name) hash = hash * 31 + char.codePointAt(0) | 0;
+  for (const char of name2) hash = hash * 31 + char.codePointAt(0) | 0;
   return Math.abs(hash) % 8;
 }
 
@@ -17038,7 +17050,11 @@ var STANDARD_HEADING_KEYS = [
   "detail.evidence_and_sources",
   "detail.tradeoffs_and_limitations",
   "detail.open_questions",
-  "detail.update_log"
+  "detail.update_log",
+  // The editorial redesign's new names (the distinctive ones; "Sources" alone is too generic to say which language wrote a note).
+  "detail.background_and_mechanism",
+  "detail.disagreements_and_limits",
+  "detail.open_questions_to_check"
 ];
 function noteLanguageFromBody(body) {
   if (!body) return void 0;
@@ -17552,11 +17568,11 @@ function imageFilesFrom(transfer) {
   }
   return out;
 }
-function safeImageName(name, mime) {
+function safeImageName(name2, mime) {
   var _a2;
   const extension = EXTENSION[mime];
   if (!extension) return null;
-  const leaf = (_a2 = String(name != null ? name : "").split(/[\\/]/).pop()) != null ? _a2 : "";
+  const leaf = (_a2 = String(name2 != null ? name2 : "").split(/[\\/]/).pop()) != null ? _a2 : "";
   const dot = leaf.lastIndexOf(".");
   const stem = dot > 0 ? leaf.slice(0, dot) : leaf;
   const cleaned = stem.replace(/[^A-Za-z0-9\-_ .]/g, "_").replace(/\.{2,}/g, ".").replace(/^[ .]+|[ .]+$/g, "").slice(0, NAME_LIMIT).replace(/[ .]+$/g, "");
@@ -19929,9 +19945,9 @@ function release(owner) {
 }
 var heldByOther = (path, owner) => pending.some((item) => item.path === path && item.owner !== owner);
 var extensionOf = (path) => {
-  const name = path.slice(path.lastIndexOf("/") + 1);
-  const dot = name.lastIndexOf(".");
-  return dot < 0 ? "" : name.slice(dot + 1);
+  const name2 = path.slice(path.lastIndexOf("/") + 1);
+  const dot = name2.lastIndexOf(".");
+  return dot < 0 ? "" : name2.slice(dot + 1);
 };
 var sameContent = async (app, file, print) => file.stat.size === print.size && fingerprintOf(await app.vault.readBinary(file)).sha256 === print.sha256;
 async function findSame(app, path, print, owner) {
@@ -20984,6 +21000,12 @@ var custom_detail_rule_min_zh_default = "{{heading}} \u5FC5\u9808\u81F3\u5C11\u6
 // core/steps/task/custom-detail-rule-min.en.md
 var custom_detail_rule_min_en_default = "{{heading}} must have at least {{n}} items (top-level list items, or #### sub-headings).\n";
 
+// core/steps/task/omit-empty-detail-structure.zh.md
+var omit_empty_detail_structure_zh_default = "detail \u5FC5\u9808\u4E14\u53EA\u80FD\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B {{count}} \u500B\u4E09\u7D1A\u6A19\u984C\uFF1A{{headings}}\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u6BB5\u843D\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u4F7F\u7528\u8005\u8981\u6C42\u67D0\u6BB5\u7684\u6578\u91CF\u6642\uFF0C\u9808\u9075\u5B88\u8A72\u6578\u91CF\u3002{{rules}}\n";
+
+// core/steps/task/omit-empty-detail-structure.en.md
+var omit_empty_detail_structure_en_default = "The detail must use exactly these {{count}} level-three headings in order: {{headings}}. Leave out a whole section that has no reliable material (no heading, and never write 'No new content this time'; this rule overrides the later formatting rule that says to write 'No new content this time' in sections with nothing to say). Follow any count the user requests for a section.{{rules}}\n";
+
 // core/steps/task/intro-detail-structure.zh.md
 var intro_detail_structure_zh_default = "detail \u5FC5\u9808\u5148\u5BEB 2\u20134 \u500B\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\u7684\u5C0E\u8B80\u6BB5\u843D\uFF0C\u5C0E\u8B80\u6307\u793A\uFF1A\u300C{{intro}}\u300D\u3002\u5C0E\u8B80\u4E4B\u5F8C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B {{count}} \u500B\u4E09\u7D1A\u6A19\u984C\uFF1A{{headings}}\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u6BB5\u843D\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u4F7F\u7528\u8005\u8981\u6C42\u67D0\u6BB5\u7684\u6578\u91CF\u6642\uFF0C\u9808\u9075\u5B88\u8A72\u6578\u91CF\u3002{{rules}}\n";
 
@@ -21204,6 +21226,13 @@ var CUSTOM_DETAIL_STRUCTURE_TEMPLATE = { zh: custom_detail_structure_zh_default,
 function customDetailStructure(language2, values) {
   return renderTemplate(inLanguage(CUSTOM_DETAIL_STRUCTURE_TEMPLATE, language2), values);
 }
+var OMIT_EMPTY_DETAIL_STRUCTURE_TEMPLATE = {
+  zh: omit_empty_detail_structure_zh_default,
+  en: omit_empty_detail_structure_en_default
+};
+function omitEmptyDetailStructure(language2, values) {
+  return renderTemplate(inLanguage(OMIT_EMPTY_DETAIL_STRUCTURE_TEMPLATE, language2), values);
+}
 var CUSTOM_DETAIL_RULES = {
   log: { zh: custom_detail_rule_log_zh_default, en: custom_detail_rule_log_en_default },
   description: { zh: custom_detail_rule_description_zh_default, en: custom_detail_rule_description_en_default },
@@ -21258,13 +21287,13 @@ function standardTemplate(language2, display = language2) {
     id: STANDARD_TEMPLATE_ID,
     name: translate(display, "ui.detail_template_standard"),
     sections: STANDARD.map(([id, key2, descriptionKey, role]) => {
-      const name = translate(language2, key2);
+      const name2 = translate(language2, key2);
       return {
         id,
-        name,
+        name: name2,
         description: translate(language2, descriptionKey),
         role,
-        aliases: NOTE_LANGUAGES.map((locale) => translate(locale, key2)).filter((alias) => alias !== name)
+        aliases: NOTE_LANGUAGES.map((locale) => translate(locale, key2)).filter((alias) => alias !== name2)
       };
     })
   };
@@ -21310,11 +21339,11 @@ function withoutConflictingAliases(sections) {
 }
 function validateTemplate(template2, others) {
   const issues = [];
-  const name = template2.name.trim();
-  if (!name) issues.push({ key: "ui.detail_template_error_name_required", values: [] });
-  else if (name.length > 40) issues.push({ key: "ui.detail_template_error_name_long", values: [] });
-  else if (others.some((other) => other.id !== template2.id && other.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase()))
-    issues.push({ key: "ui.detail_template_error_name_taken", values: [name] });
+  const name2 = template2.name.trim();
+  if (!name2) issues.push({ key: "ui.detail_template_error_name_required", values: [] });
+  else if (name2.length > 40) issues.push({ key: "ui.detail_template_error_name_long", values: [] });
+  else if (others.some((other) => other.id !== template2.id && other.name.trim().toLocaleLowerCase() === name2.toLocaleLowerCase()))
+    issues.push({ key: "ui.detail_template_error_name_taken", values: [name2] });
   if (template2.sections.length < 1 || template2.sections.length > 12)
     issues.push({ key: "ui.detail_template_error_section_count", values: [] });
   const seen = /* @__PURE__ */ new Set();
@@ -21481,7 +21510,7 @@ function structureText(template2, language2, standardText) {
       rules: rules.length ? `
 ${rules.join("\n")}` : ""
     });
-  return customDetailStructure(language2, {
+  return (template2.omitEmpty ? omitEmptyDetailStructure : customDetailStructure)(language2, {
     count: String(template2.sections.length),
     headings,
     rules: rules.length ? `
@@ -22545,9 +22574,9 @@ function safeName(title) {
 function foldName(value) {
   return value.normalize("NFC").toLowerCase().replace(/ς/g, "\u03C3");
 }
-function foldEntryName(name, isFile) {
-  const dot = isFile ? name.lastIndexOf(".") : -1;
-  return dot > 0 ? `${foldName(name.slice(0, dot))}.${name.slice(dot + 1).toLowerCase()}` : foldName(name);
+function foldEntryName(name2, isFile) {
+  const dot = isFile ? name2.lastIndexOf(".") : -1;
+  return dot > 0 ? `${foldName(name2.slice(0, dot))}.${name2.slice(dot + 1).toLowerCase()}` : foldName(name2);
 }
 function linkAlias(title, fallback) {
   const alias = title.replace(/[[\]|`\r\n]/g, " ").replace(/%{2,}/g, "%").replace(/\s+/g, " ").trim();
@@ -22615,7 +22644,7 @@ var placeholder = (language2) => translate(language2, "detail.no_conclusion_yet"
 var isPlaceholder = (value) => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
 var previewHeading = (language2) => translate(language2, "detail.preview");
 var CANONICAL_HEADINGS = Object.freeze(
-  Object.fromEntries(Object.keys(NOTE_HEADING_SETS[0]).map((name) => [name, name]))
+  Object.fromEntries(Object.keys(NOTE_HEADING_SETS[0]).map((name2) => [name2, name2]))
 );
 var isCanonical = (set) => set.Detail === CANONICAL_HEADINGS.Detail;
 function markerlessHeadingSet(content) {
@@ -23234,8 +23263,8 @@ var Repository = class {
     await this.folder(this.settings.mindMapsFolder);
     if (aimEnabled()) await this.folder(this.settings.aimFolder);
   }
-  unique(folder, name, avoid) {
-    const base = (0, import_obsidian11.normalizePath)(`${folder}/${safeName(name)}`);
+  unique(folder, name2, avoid) {
+    const base = (0, import_obsidian11.normalizePath)(`${folder}/${safeName(name2)}`);
     let path = `${base}.md`, number = 2;
     while ((avoid == null ? void 0 : avoid.has(path)) || this.pathTaken(path)) path = `${base} ${number++}.md`;
     return path;
@@ -23254,8 +23283,8 @@ var Repository = class {
       (child) => child.path !== exclude && foldEntryName(child.name, child instanceof import_obsidian11.TFile) === wanted
     )) != null ? _b2 : null;
   }
-  uniqueFolder(folder, name) {
-    const base = (0, import_obsidian11.normalizePath)(`${folder}/${safeName(name)}`);
+  uniqueFolder(folder, name2) {
+    const base = (0, import_obsidian11.normalizePath)(`${folder}/${safeName(name2)}`);
     let path = base, number = 2;
     while (this.app.vault.getAbstractFileByPath(path) || this.foldedSibling(path, "")) path = `${base} ${number++}`;
     return path;
@@ -23268,7 +23297,7 @@ var Repository = class {
   }
   async ensureTopicFolders(root) {
     await this.folder(root);
-    for (const name of ["Notes", "Unassigned", "Archive"]) await this.folder(`${root}/${name}`);
+    for (const name2 of ["Notes", "Unassigned", "Archive"]) await this.folder(`${root}/${name2}`);
   }
   /**
    * The model a topic actually runs on. The stored `model:` is a creation-time snapshot and is never rewritten:
@@ -25692,6 +25721,95 @@ function shapeInsets(kind, content) {
 var import_node_crypto15 = require("node:crypto");
 var import_obsidian34 = require("obsidian");
 
+// ai/section-aliases.ts
+var name = (zhTW2, en2) => ({ "zh-TW": zhTW2, en: en2 });
+var SECTION_NAME = {
+  // sources role: any one of the three names; a structure uses the one that fits its type
+  sources: name("\u4F86\u6E90", "Sources"),
+  source: name("\u51FA\u8655", "Source"),
+  references: name("\u53C3\u8003\u8CC7\u6599", "References"),
+  // log role (unchanged name)
+  log: name("\u66F4\u65B0\u7D00\u9304", "Update log"),
+  // atomic
+  oneSentence: name("\u4E00\u53E5\u8A71", "In one sentence"),
+  why: name("\u70BA\u4EC0\u9EBC", "Why"),
+  // hypothesis
+  ifTrue: name("\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230", "If true we would see"),
+  evidenceTable: name("\u8B49\u64DA\u5C0D\u7167", "Evidence table"),
+  // evidence
+  summary: name("\u6458\u8981", "Summary"),
+  relatedTopics: name("\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC", "Related topics"),
+  // conclusion
+  confidence: name("\u4FE1\u5FC3", "Confidence"),
+  scope: name("\u9069\u7528\u7BC4\u570D", "Scope"),
+  impact: name("\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65", "Impact and next steps"),
+  // action
+  goalDone: name("\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6", "Goal and done-when"),
+  steps: name("\u6B65\u9A5F", "Steps")
+};
+var NEW_STANDARD_HEADING_KEYS = [
+  "detail.background_and_mechanism",
+  "detail.disagreements_and_limits",
+  "detail.open_questions_to_check",
+  "detail.sources_heading"
+];
+var lowered = (value) => value.trim().toLocaleLowerCase();
+var SPELLINGS = ["zh-TW", "zh-CN", "en"];
+var spellings = (key2) => SPELLINGS.map((locale) => translate(locale, key2));
+var both = (value) => [value["zh-TW"], value.en];
+var rows;
+function sectionAliasRows() {
+  if (rows) return rows;
+  const sourcesNames = [
+    ...both(SECTION_NAME.sources),
+    ...both(SECTION_NAME.source),
+    ...both(SECTION_NAME.references),
+    ...spellings("detail.sources_heading"),
+    "\u51FA\u5904",
+    "\u53C2\u8003\u8D44\u6599"
+  ];
+  const legacySources = spellings("detail.evidence_and_sources");
+  rows = [
+    // role sources: the old standard name, and the three new names for each other
+    { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
+    // standard / textbook
+    { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
+    { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
+    { names: spellings("detail.open_questions_to_check"), aliases: spellings("detail.open_questions") },
+    // atomic
+    { names: both(SECTION_NAME.oneSentence), aliases: ["\u5B9A\u7FA9", "Definition"] },
+    { names: both(SECTION_NAME.why), aliases: ["\u89E3\u91CB", "Explanation"] },
+    // hypothesis: the old support and counterevidence sections both land on the one table
+    { names: both(SECTION_NAME.ifTrue), aliases: ["\u9810\u6E2C", "Prediction"] },
+    { names: both(SECTION_NAME.evidenceTable), aliases: ["\u652F\u6301", "\u53CD\u99C1", "Support", "Counterevidence"] },
+    // evidence
+    { names: both(SECTION_NAME.summary), aliases: ["\u5167\u5BB9", "Content"] },
+    { names: both(SECTION_NAME.relatedTopics), aliases: ["\u652F\u6301\u6216\u53CD\u99C1", "Supports or refutes"] },
+    // conclusion
+    { names: both(SECTION_NAME.confidence), aliases: ["\u4FE1\u5FC3\u7A0B\u5EA6"] },
+    { names: both(SECTION_NAME.scope), aliases: ["\u9069\u7528\u7BC4\u570D\u8207\u9650\u5236", "Scope and limits"] },
+    { names: both(SECTION_NAME.impact), aliases: ["\u5F8C\u7E8C\u884C\u52D5", "Next actions"] },
+    // action
+    { names: both(SECTION_NAME.goalDone), aliases: ["\u76EE\u6A19", "\u5B8C\u6210\u689D\u4EF6", "Goal", "Done when"] },
+    { names: both(SECTION_NAME.steps), aliases: ["\u6AA2\u67E5\u9EDE", "Checkpoints"] }
+  ];
+  return rows;
+}
+function sectionAliasesFor(heading) {
+  const key2 = lowered(heading);
+  const result = [];
+  for (const row of sectionAliasRows())
+    if (row.names.some((entry) => lowered(entry) === key2)) {
+      for (const alias of row.aliases)
+        if (lowered(alias) !== key2 && !result.some((existing) => lowered(existing) === lowered(alias))) result.push(alias);
+    }
+  return result;
+}
+function isNewSourcesHeading(heading) {
+  const key2 = lowered(heading);
+  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key2);
+}
+
 // ai/result-utils.ts
 var SENTENCE_END = /[。！？；!?;]/;
 var WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\u303e\u3040-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{20000}-\u{3fffd}]/u;
@@ -25762,7 +25880,7 @@ function normalizeOutputScriptHeadings(detail, output, template2, context = {}) 
   if (!verbatimHeadingLanguage(output) || template2 && !isBuiltinTemplateId(template2.id)) return detail;
   const note = noteLanguageOf(output);
   const forms = /* @__PURE__ */ new Map();
-  for (const [, key2] of STANDARD) {
+  for (const key2 of [...STANDARD.map(([, standardKey]) => standardKey), ...NEW_STANDARD_HEADING_KEYS]) {
     const canonical = translate(note, key2);
     const written2 = translate(output, key2);
     if (written2 !== canonical) forms.set(written2, canonical);
@@ -25801,7 +25919,7 @@ function canonicalDetail(value, language2 = "zh-TW", template2 = standardTemplat
     }
     (current === null ? leading : sections.get(current)).push(line);
   }
-  if (template2.id === TEXTBOOK_TEMPLATE_ID || template2.layout === "intro")
+  if (template2.id === TEXTBOOK_TEMPLATE_ID || template2.layout === "intro" || template2.omitEmpty)
     return textbookDetail(template2, leading, sections, footnotes, sourcesIndex);
   if (sections.size === 0) sections.set(0, [leading.join("\n").trim()]);
   else if (leading.join("\n").trim()) sections.set(0, [leading.join("\n").trim(), ...(_a2 = sections.get(0)) != null ? _a2 : []]);
@@ -25898,14 +26016,14 @@ function referenceCatalog(groups) {
 }
 function resolveWikilinks(text11, documents) {
   return text11.replace(/\[\[([^\]]+)\]\]/g, (original, target) => {
-    const name = target.split("|")[0].trim();
-    const exact = documents.filter((document2) => document2.path === name);
+    const name2 = target.split("|")[0].trim();
+    const exact = documents.filter((document2) => document2.path === name2);
     const matches = exact.length ? exact : documents.filter((document2) => {
       var _a2;
       const basename2 = (_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path;
-      return basename2 === name || basename2.replace(/\.md$/i, "") === name;
+      return basename2 === name2 || basename2.replace(/\.md$/i, "") === name2;
     });
-    if (matches.length > 1) return tNote("note.source_unconfirmed_0", name);
+    if (matches.length > 1) return tNote("note.source_unconfirmed_0", name2);
     if (matches.length !== 1 || !matches[0].external) return original;
     return tNote("note.external_source_0", matches[0].path);
   });
@@ -26673,7 +26791,7 @@ async function applyCharts(detail, charts, options) {
 var UPDATE_LOG_HEADING = /^(#{1,6})[ \t]+.*(?:更新紀錄|更新记录|Update log)/i;
 var HEADING = /^(#{1,6})[ \t]+\S/;
 function withoutUpdateLog(text11, logHeadings) {
-  const names3 = new Set(logHeadings.map((name) => name.trim().toLocaleLowerCase()).filter(Boolean));
+  const names3 = new Set(logHeadings.map((name2) => name2.trim().toLocaleLowerCase()).filter(Boolean));
   const isLog = (line) => {
     const match = UPDATE_LOG_HEADING.exec(line);
     if (match) return match;
@@ -26787,19 +26905,19 @@ var LEGACY_V1 = byLanguage(
     callouts: "\u65B9\u6846: \u81EA\u52D5",
     count: "\u6578\u91CF: ",
     atLeast: "\u81F3\u5C11 ",
-    comment: (name) => `%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C${name}\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002 %%`
+    comment: (name2) => `%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C${name2}\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002 %%`
   },
   {
     callouts: "\u65B9\u6846: \u81EA\u52A8",
     count: "\u6570\u91CF: ",
     atLeast: "\u81F3\u5C11 ",
-    comment: (name) => `%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C${name}\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002 %%`
+    comment: (name2) => `%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C${name2}\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002 %%`
   },
   {
     callouts: "callouts: auto",
     count: "Count: ",
     atLeast: "at least ",
-    comment: (name) => `%% This file decides how the AI writes notes in the "${name}" style. Save your edits and the next AI update follows them; notes already written do not change. %%`
+    comment: (name2) => `%% This file decides how the AI writes notes in the "${name2}" style. Save your edits and the next AI update follows them; notes already written do not change. %%`
   }
 );
 function serializeLegacyV1(template2, language2) {
@@ -26872,10 +26990,10 @@ function stripNoteStyleComments(text11) {
   return { text: out.join("\n"), ...open !== void 0 ? { unclosed: open } : {} };
 }
 var NAME_LANGUAGES = ["zh-TW", "zh-CN", "en"];
-var lowered = (value) => value.trim().toLocaleLowerCase();
+var lowered2 = (value) => value.trim().toLocaleLowerCase();
 function standardKeyOf(heading) {
-  const key2 = lowered(heading);
-  return STANDARD.findIndex(([, name]) => NAME_LANGUAGES.some((language2) => lowered(translate(language2, name)) === key2));
+  const key2 = lowered2(heading);
+  return STANDARD.findIndex(([, name2]) => NAME_LANGUAGES.some((language2) => lowered2(translate(language2, name2)) === key2));
 }
 function parseCount(line) {
   const head = /^(?:數量|数量|count)\s*[:：]\s*(.*)$/i.exec(line.trim());
@@ -26977,7 +27095,11 @@ function parseNoteStyleFile(text11, options) {
     const { callouts, rest } = parseCallouts(content, sectionCode);
     const standard = standardKeyOf(heading.name);
     const role = standard === 2 ? "sources" : standard === 5 ? "log" : "none";
-    const aliases = standard >= 0 ? NOTE_LANGUAGES.map((locale) => translate(locale, STANDARD[standard][1])).filter((alias) => alias !== heading.name) : [];
+    const standardAliases = standard >= 0 ? NOTE_LANGUAGES.map((locale) => translate(locale, STANDARD[standard][1])).filter((alias) => alias !== heading.name) : [];
+    const aliases = [
+      ...standardAliases,
+      ...sectionAliasesFor(heading.name).filter((alias) => !standardAliases.some((known) => lowered2(known) === lowered2(alias)))
+    ];
     return {
       id: standard >= 0 ? STANDARD[standard][0] : `s${position + 1}`,
       name: heading.name,
@@ -26989,6 +27111,12 @@ function parseNoteStyleFile(text11, options) {
       line
     };
   });
+  if (!sections.some((section3) => section3.role === "sources")) {
+    const firstNew = sections.find((section3) => isNewSourcesHeading(section3.name));
+    if (firstNew) firstNew.role = "sources";
+  }
+  const currentNames = new Set(sections.map((section3) => lowered2(section3.name)));
+  for (const section3 of sections) section3.aliases = section3.aliases.filter((alias) => !currentNames.has(lowered2(alias)));
   if (sections.length) {
     const checked = {
       id: options.id,
@@ -27648,7 +27776,7 @@ function selectionFromContext(context, language2) {
     tone: toneChoiceFromText(context.toneText, language2)
   };
 }
-var headingOf = (name) => `### ${name}`;
+var headingOf = (name2) => `### ${name2}`;
 var descriptionRule = (section3, language2) => ({
   text: section3.description.trim(),
   rule: customDetailRule("description", language2, {
@@ -27676,7 +27804,7 @@ function leadStructure(template2, lead, language2, anchor) {
         })
       );
   }
-  const structure2 = customDetailStructure(language2, {
+  const structure2 = (template2.omitEmpty ? omitEmptyDetailStructure : customDetailStructure)(language2, {
     count: String(template2.sections.length),
     headings: template2.sections.map((section3) => headingOf(section3.name)).join(", "),
     rules: rules.length ? `
@@ -27689,7 +27817,7 @@ ${rules.join("\n")}` : ""
   };
 }
 function templateParts(selection, context, language2, topicAnchor, options) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
   const { id } = selection.template;
   const legacy = ((_a2 = context.detailTemplate) == null ? void 0 : _a2.id) === id;
   const body = (_d = selection.template.body) != null ? _d : (_c = (_b2 = options.blocks) == null ? void 0 : _b2[`template/${id}`]) == null ? void 0 : _c.call(_b2, language2);
@@ -27731,13 +27859,14 @@ function templateParts(selection, context, language2, topicAnchor, options) {
     return { ...fallback, issues, notices: [] };
   }
   const introTemplate = legacy && ((_h = context.detailTemplate) == null ? void 0 : _h.layout) === "intro" ? context.detailTemplate : void 0;
+  const parsedTemplate = legacy && ((_i = context.detailTemplate) == null ? void 0 : _i.omitEmpty) ? { ...parsed.template, omitEmpty: true } : parsed.template;
   if (parsed.lead && !introTemplate)
     return {
-      ...leadStructure(parsed.template, parsed.lead, language2, topicAnchor),
+      ...leadStructure(parsedTemplate, parsed.lead, language2, topicAnchor),
       issues: [],
       notices: parsed.notices
     };
-  const template2 = introTemplate != null ? introTemplate : parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
+  const template2 = introTemplate != null ? introTemplate : parsedTemplate.id === STANDARD_TEMPLATE_ID ? parsedTemplate : { ...parsedTemplate, id: `block-${id}` };
   return {
     sections: structure2(template2),
     owned: describedSections(template2, language2),
@@ -27909,15 +28038,15 @@ var builtinRef = (id) => `builtin:${id}`;
 var fileRef = (base) => `file:${base}`;
 var lower = (value) => value.toLocaleLowerCase();
 var UNSAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
-function cleanBlockName(name) {
-  const cleaned = name.replace(UNSAFE_NAME, " ").replace(/\s+/g, " ").trim();
+function cleanBlockName(name2) {
+  const cleaned = name2.replace(UNSAFE_NAME, " ").replace(/\s+/g, " ").trim();
   return /^\.+$/.test(cleaned) ? "" : cleaned;
 }
 function blockFolderNames(role) {
   return [...new Set(CANONICAL_LANGUAGES.map((language2) => translate(language2, FOLDER_KEYS[role])))];
 }
 function resolveBlockFolder(parent, role, exists, language2) {
-  const found = blockFolderNames(role).find((name) => exists(`${parent}/${name}`));
+  const found = blockFolderNames(role).find((name2) => exists(`${parent}/${name2}`));
   return `${parent}/${found != null ? found : translate(language2, FOLDER_KEYS[role])}`;
 }
 function builtinBlockNames(category, id) {
@@ -27934,9 +28063,9 @@ function isUnmodifiedBlock(category, id, text11) {
   );
 }
 function uniqueBlockName(base, taken) {
-  let name = base;
-  for (let n = 2; taken.has(lower(name)); n++) name = `${base} (${n})`;
-  return name;
+  let name2 = base;
+  for (let n = 2; taken.has(lower(name2)); n++) name2 = `${base} (${n})`;
+  return name2;
 }
 
 // ai/note-style-recipe.ts
@@ -28039,19 +28168,19 @@ function builtinNames(category) {
   return BUILTIN_BLOCKS.filter((block) => block.category === wanted).map(({ id, nameKey }) => ({ id, nameKey }));
 }
 var folded = (text11) => text11.toLocaleLowerCase();
-function builtinPartIdOf(category, name) {
+function builtinPartIdOf(category, name2) {
   var _a2;
-  const key2 = folded(name);
+  const key2 = folded(name2);
   return (_a2 = builtinNames(category).find(
-    ({ id, nameKey }) => id === name || LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key2)
+    ({ id, nameKey }) => id === name2 || LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key2)
   )) == null ? void 0 : _a2.id;
 }
-function validatePartName(name, category) {
-  if (!name) return { ok: false, reason: "empty" };
-  if (name !== name.trim()) return { ok: false, reason: "padded" };
-  if (name.includes("/") || name.includes("\\")) return { ok: false, reason: "separator" };
-  if (name.includes("..")) return { ok: false, reason: "dots" };
-  const key2 = folded(name);
+function validatePartName(name2, category) {
+  if (!name2) return { ok: false, reason: "empty" };
+  if (name2 !== name2.trim()) return { ok: false, reason: "padded" };
+  if (name2.includes("/") || name2.includes("\\")) return { ok: false, reason: "separator" };
+  if (name2.includes("..")) return { ok: false, reason: "dots" };
+  const key2 = folded(name2);
   const taken = builtinNames(category).some(
     ({ nameKey }) => LANGUAGES2.some((language2) => folded(translate(language2, nameKey)) === key2)
   );
@@ -28063,9 +28192,9 @@ function parseRecipeRef(ref, category = "recipe") {
   if (builtin) return { kind: "builtin", id: builtin[1] };
   const file = /^file:(.+)$/.exec(ref);
   if (!file) return void 0;
-  const name = file[1];
-  if (!validatePartName(name, category).ok) return void 0;
-  return { kind: "file", name };
+  const name2 = file[1];
+  if (!validatePartName(name2, category).ok) return void 0;
+  return { kind: "file", name: name2 };
 }
 var KEYS = {
   structure: ["\u6BB5\u843D\u7D50\u69CB", "structure", "\u6BB5\u843D\u7ED3\u6784"],
@@ -28074,9 +28203,9 @@ var KEYS = {
   update: ["\u66F4\u65B0\u65B9\u5F0F", "update"]
 };
 var GENERAL = BUILTIN_RECIPES[0];
-function partRef(category, name) {
-  const id = builtinPartIdOf(category, name);
-  return id !== void 0 ? `builtin:${id}` : `file:${name}`;
+function partRef(category, name2) {
+  const id = builtinPartIdOf(category, name2);
+  return id !== void 0 ? `builtin:${id}` : `file:${name2}`;
 }
 function updateModeOf(value) {
   const key2 = folded(value.trim());
@@ -28115,8 +28244,8 @@ function parseRecipeFile(text11) {
         if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
         const pair6 = /^([^:：]+?)\s*[:：]\s*(.*)$/.exec(raw);
         if (!pair6) continue;
-        const name = pair6[1].trim().toLocaleLowerCase();
-        const slot = Object.keys(KEYS).find((item) => KEYS[item].includes(name));
+        const name2 = pair6[1].trim().toLocaleLowerCase();
+        const slot = Object.keys(KEYS).find((item) => KEYS[item].includes(name2));
         if (!slot) continue;
         let value = pair6[2].trim();
         if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
@@ -28217,7 +28346,7 @@ function updateRecipeFileText(oldText, parts, language2) {
 
 // ai/note-style-migrate.ts
 var lower2 = (value) => value.toLocaleLowerCase();
-var safeName2 = (name) => cleanBlockName(name.replace(/\.{2,}/g, " "));
+var safeName2 = (name2) => cleanBlockName(name2.replace(/\.{2,}/g, " "));
 var Namer = class {
   constructor(category, nameCategory, existing) {
     this.category = category;
@@ -28229,14 +28358,14 @@ var Namer = class {
   place(wanted, fallback, text11) {
     const safe = safeName2(wanted) || safeName2(fallback) || "Style";
     for (let n = 1; ; n++) {
-      const name = n === 1 ? safe : `${safe} (${n})`;
-      if (!validatePartName(name, this.nameCategory).ok) continue;
-      const key2 = lower2(name);
+      const name2 = n === 1 ? safe : `${safe} (${n})`;
+      if (!validatePartName(name2, this.nameCategory).ok) continue;
+      const key2 = lower2(name2);
       const held = this.held.get(key2);
       if (!held) {
-        this.held.set(key2, { base: name, text: text11 });
-        this.planned.push({ category: this.category, base: name, text: text11 });
-        return name;
+        this.held.set(key2, { base: name2, text: text11 });
+        this.planned.push({ category: this.category, base: name2, text: text11 });
+        return name2;
       }
       if (normalizeStyleContent(held.text) === normalizeStyleContent(text11)) return held.base;
     }
@@ -28327,7 +28456,7 @@ function planRecipeMigration(input2) {
 }
 
 // ai/note-style-store.ts
-var stripMd2 = (name) => name.replace(/\.md$/i, "");
+var stripMd2 = (name2) => name2.replace(/\.md$/i, "");
 var lower3 = (value) => value.toLocaleLowerCase();
 function defaultStylesFolderName(language2) {
   return translate(language2, "ui.note_styles_folder_name");
@@ -28393,10 +28522,10 @@ var NoteStyleStore = class {
     } catch (e) {
       names3 = [];
     }
-    for (const name of names3) {
-      if (!/\.md$/i.test(name) || name.includes("/")) continue;
+    for (const name2 of names3) {
+      if (!/\.md$/i.test(name2) || name2.includes("/")) continue;
       try {
-        found.set(stripMd2(name), await this.deps.port.read(`${folder}/${name}`));
+        found.set(stripMd2(name2), await this.deps.port.read(`${folder}/${name2}`));
       } catch (e) {
       }
     }
@@ -28416,8 +28545,8 @@ var NoteStyleStore = class {
   overrideBase(category, id) {
     const block = findBuiltinBlock(category, id);
     const names3 = [translate(this.settings.language, block.nameKey), ...builtinBlockNames(category, id)];
-    for (const name of names3) {
-      const base = [...this.blocks[category].keys()].find((key2) => lower3(key2) === lower3(name));
+    for (const name2 of names3) {
+      const base = [...this.blocks[category].keys()].find((key2) => lower3(key2) === lower3(name2));
       if (base !== void 0) return base;
     }
     return void 0;
@@ -28429,9 +28558,9 @@ var NoteStyleStore = class {
   listBlocks(category) {
     const language2 = this.settings.language;
     const map = this.blocks[category];
-    const issuesOf = (text11, id, name) => {
+    const issuesOf = (text11, id, name2) => {
       if (category !== "template") return [];
-      const parsed = parseTemplateBlock(text11, { id, name });
+      const parsed = parseTemplateBlock(text11, { id, name: name2 });
       return parsed.ok ? [] : parsed.issues;
     };
     const items = [];
@@ -28686,14 +28815,14 @@ var NoteStyleStore = class {
     if (parsed.kind === "builtin") {
       const block = BUILTIN_BLOCKS.find((item) => item.category === "template" && item.id === parsed.id);
       if (!block) return void 0;
-      const name = translate(this.settings.language, block.nameKey);
+      const name2 = translate(this.settings.language, block.nameKey);
       if (isBuiltinTemplateId(block.id)) {
         const template2 = builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === block.id);
-        return { template: template2, name, issues: [], notices: [] };
+        return { template: template2, name: name2, issues: [], notices: [] };
       }
-      const built = parseTemplateBlock(builtinTemplateText(block.id, language2), { id: block.id, name });
+      const built = parseTemplateBlock(builtinTemplateText(block.id, language2), { id: block.id, name: name2 });
       if (!built.ok) throw new Error(`Built-in template ${block.id} does not parse`);
-      return { template: { ...built.template }, name, issues: [], notices: [] };
+      return { template: { ...built.template }, name: name2, issues: [], notices: [] };
     }
     const text11 = this.blocks.template.get(parsed.name);
     if (text11 === void 0) return void 0;
@@ -28957,9 +29086,9 @@ var NoteStyleStore = class {
           message: check.reason === "builtin" ? `"${base}" is a built-in name, so this file is not used. Rename it.` : `"${base}" cannot be used as a style name.`
         });
       const present = {
-        structure: (name) => this.blocks.template.has(name),
-        voice: (name) => this.blocks.tone.has(name),
-        format: (name) => this.formats.has(name)
+        structure: (name2) => this.blocks.template.has(name2),
+        voice: (name2) => this.blocks.tone.has(name2),
+        format: (name2) => this.formats.has(name2)
       };
       for (const category of ["structure", "voice", "format"]) {
         const parsed = parseRecipeRef(file[category], category);
@@ -29021,12 +29150,12 @@ var NoteStyleStore = class {
     }
     base = cleanBlockName(base) || "copy";
     const taken = new Set([...this.partStore(category).files.keys()].map(lower3));
-    let name = base;
-    for (let n = 2; taken.has(lower3(name)) || !validatePartName(name, category).ok; n++) {
+    let name2 = base;
+    for (let n = 2; taken.has(lower3(name2)) || !validatePartName(name2, category).ok; n++) {
       if (n > 999) throw new Error("No free name");
-      name = `${base} (${n})`;
+      name2 = `${base} (${n})`;
     }
-    return name;
+    return name2;
   }
   /**
    * Writes a new part file of `category` and returns its ref (`file:<name>`); no setting changes. `from` is a built-in ref
@@ -29034,7 +29163,7 @@ var NoteStyleStore = class {
    * null (a blank start). Without `name` the file gets `suggestPartName`; with one it must pass `validatePartName`, be free
    * and be a safe file name, else this throws and nothing is written.
    */
-  createPart(category, from, name) {
+  createPart(category, from, name2) {
     return this.serial(async () => {
       await this.loadBlocks();
       const language2 = this.settings.language;
@@ -29054,11 +29183,11 @@ var NoteStyleStore = class {
       }
       const { files, dir } = this.partStore(category);
       let base;
-      if (name === void 0) base = this.suggestPartName(category, from);
+      if (name2 === void 0) base = this.suggestPartName(category, from);
       else {
-        base = name;
+        base = name2;
         if (!validatePartName(base, category).ok || cleanBlockName(base) !== base || files.has(base) || [...files.keys()].some((key2) => lower3(key2) === lower3(base)))
-          throw new Error(`Part name not available: ${name}`);
+          throw new Error(`Part name not available: ${name2}`);
       }
       await this.pinFolder();
       await this.deps.port.createFolder(dir);
@@ -29104,19 +29233,19 @@ var NoteStyleStore = class {
         }
         return { ok: true, ref: fileRef(original.name) };
       }
-      const name = input2.name;
-      if (!validatePartName(name, "recipe").ok || cleanBlockName(name) !== name || [...this.recipes.keys()].some((key2) => lower3(key2) === lower3(name)))
+      const name2 = input2.name;
+      if (!validatePartName(name2, "recipe").ok || cleanBlockName(name2) !== name2 || [...this.recipes.keys()].some((key2) => lower3(key2) === lower3(name2)))
         return { ok: false, reason: "name" };
       try {
         const text11 = recipeFileText(parts, language2);
         await this.pinFolder();
         await port.createFolder(dirs.recipe);
-        await port.create(`${dirs.recipe}/${name}.md`, text11);
-        this.recipes.set(name, text11);
+        await port.create(`${dirs.recipe}/${name2}.md`, text11);
+        this.recipes.set(name2, text11);
       } catch (e) {
         return { ok: false, reason: "write-failed" };
       }
-      return { ok: true, ref: fileRef(name) };
+      return { ok: true, ref: fileRef(name2) };
     });
   }
   /**
@@ -29650,16 +29779,16 @@ async function backupNote(port, input2) {
       await port.createFolder(path2);
     }
     const taken = new Set(
-      exists ? (await port.list(folder)).map((name2) => {
+      exists ? (await port.list(folder)).map((name3) => {
         var _a3;
-        return ((_a3 = name2.split("/").pop()) != null ? _a3 : name2).toLocaleLowerCase();
+        return ((_a3 = name3.split("/").pop()) != null ? _a3 : name3).toLocaleLowerCase();
       }) : []
     );
     const base = ((_a2 = input2.notePath.split("/").pop()) != null ? _a2 : input2.notePath).replace(/\.md$/i, "");
     const stem = `${base} ${formatDate(input2.now)} ${formatTime(input2.now)}`;
-    let name = `${stem}.md`;
-    for (let attempt = 1; taken.has(name.toLocaleLowerCase()); attempt++) name = `${stem} (${attempt}).md`;
-    const path = `${folder}/${name}`;
+    let name2 = `${stem}.md`;
+    for (let attempt = 1; taken.has(name2.toLocaleLowerCase()); attempt++) name2 = `${stem} (${attempt}).md`;
+    const path = `${folder}/${name2}`;
     await port.create(path, input2.content);
     return await port.read(path) === input2.content ? { ok: true, path } : { ok: false };
   } catch (e) {
@@ -29885,15 +30014,15 @@ function firstMarkdownTable(markdown) {
   const lines = markdown.split(/\r?\n/);
   for (let i = 0; i < lines.length - 1; i++) {
     if (!/^\s*\|.+\|\s*$/.test(lines[i]) || !/^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) continue;
-    const rows = [];
+    const rows2 = [];
     for (let j = i; j < lines.length && /^\s*\|.+\|\s*$/.test(lines[j]); j++) {
       if (j === i + 1) continue;
-      rows.push(
+      rows2.push(
         lines[j].trim().slice(1, -1).split("|").map((cell) => cell.trim()).filter(Boolean)
       );
-      if (rows.length >= 4) break;
+      if (rows2.length >= 4) break;
     }
-    return rows.filter((row) => row.length);
+    return rows2.filter((row) => row.length);
   }
   return [];
 }
@@ -30071,10 +30200,10 @@ var RelevanceSummaryModal = class extends import_obsidian19.Modal {
     super(app);
     this.host = host;
   }
-  renderRows(label, rows) {
+  renderRows(label, rows2) {
     const list = this.contentEl.createEl("ul", { cls: "vam-relevance-changes" });
     list.setAttr("aria-label", label);
-    for (const row of rows) {
+    for (const row of rows2) {
       const item = list.createEl("li", { cls: "vam-relevance-change" });
       item.createDiv({ cls: "vam-relevance-change-title", text: row.title });
       const tags = item.createDiv({ cls: "vam-relevance-change-tags" });
@@ -30101,12 +30230,12 @@ var RelevanceSummaryModal = class extends import_obsidian19.Modal {
     }
     if (!this.host.rows.length && !conflicts.length)
       this.contentEl.createEl("p", { cls: "vam-hint", text: t("ui.relevance_changes_none") });
-    for (const [id, rows] of groups) {
+    for (const [id, rows2] of groups) {
       const pin = pinOf.get(id);
       if (!pin) continue;
       const title = t("ui.relevance_anchor_group_0_1", pin.title, t(RELEVANCE_LABEL[pin.tier]));
       this.contentEl.createEl("h4", { cls: "vam-relevance-anchor-title", text: title });
-      this.renderRows(title, rows);
+      this.renderRows(title, rows2);
     }
     if (others.length) {
       if (groups.size)
@@ -30455,7 +30584,7 @@ function parseBlocks(lines, depth = 0, starts, budget) {
       continue;
     }
     if (LIST.test(line)) {
-      const rows = [];
+      const rows2 = [];
       while (at < lines.length) {
         const row = lines[at];
         if (!row.trim()) {
@@ -30471,16 +30600,16 @@ function parseBlocks(lines, depth = 0, starts, budget) {
         if (item) {
           const ordered = /\d/.test(item[2]);
           const level = item[1].length >= 2 ? 1 : 0;
-          if (level === 0 && rows.length && ordered !== rows[0].ordered) break;
-          rows.push({ level, ordered, text: item[3], line: at });
-        } else if (/^\s{2,}\S/.test(row) && rows.length) rows[rows.length - 1].text += `
+          if (level === 0 && rows2.length && ordered !== rows2[0].ordered) break;
+          rows2.push({ level, ordered, text: item[3], line: at });
+        } else if (/^\s{2,}\S/.test(row) && rows2.length) rows2[rows2.length - 1].text += `
 ${row.trim()}`;
         else break;
         at++;
       }
-      const list = { t: "list", ordered: rows[0].ordered, items: [] };
+      const list = { t: "list", ordered: rows2[0].ordered, items: [] };
       const itemLines2 = [];
-      for (const row of rows) {
+      for (const row of rows2) {
         const top = list.items.at(-1);
         if (row.level === 1 && top) {
           (_a2 = top.sub) != null ? _a2 : top.sub = { t: "list", ordered: row.ordered, items: [] };
@@ -31172,8 +31301,8 @@ ${typed}` : draft;
   }
   /** The stage name, with the model that does the work after it; applying a plan is local work and names none. */
   stageLabel(kind) {
-    const name = t(`ui.map_chat_stage_${kind}`);
-    return kind === "applying" || kind === "consent" || !this.stageModel ? name : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
+    const name2 = t(`ui.map_chat_stage_${kind}`);
+    return kind === "applying" || kind === "consent" || !this.stageModel ? name2 : t("ui.progress_stage_with_model_0_1", name2, this.stageModel);
   }
   elapsedText() {
     const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1e3)) : 0;
@@ -31639,8 +31768,8 @@ ${typed}` : draft;
     this.resizerEl.addEventListener("keydown", (event) => this.onResizerKey(event));
     this.resizerEl.addEventListener("pointerdown", (event) => this.startResize(event));
     this.liveEl = this.el.createDiv({ cls: "vam-sr-only", attr: { "aria-live": "polite", "aria-atomic": "true" } });
-    for (const name of ["dragenter", "dragover"])
-      this.el.addEventListener(name, (event) => this.onDragOver(event));
+    for (const name2 of ["dragenter", "dragover"])
+      this.el.addEventListener(name2, (event) => this.onDragOver(event));
     this.el.addEventListener("dragleave", () => this.setDropHighlight(false));
     this.el.addEventListener("drop", (event) => this.onDrop(event));
     this.renderLog();
@@ -32675,12 +32804,12 @@ ${escapeLine(labels.imagesStopped)}`;
   if (block.state === "failed") return `${head}
 
 ${fill(labels.imagesFailed, (_a2 = block.reason) != null ? _a2 : "")}`;
-  const rows = block.items.map(
+  const rows2 = block.items.map(
     (item) => `- ${pageLink(item.title, item.source)}${item.inserted ? ` ${fill(labels.inserted, item.inserted)}` : ""}`
   );
   return `${head}
 
-${rows.join("\n")}`;
+${rows2.join("\n")}`;
 }
 function transcriptMarkdown(input2) {
   const { labels } = input2;
@@ -33904,21 +34033,21 @@ var ClaudeStreamObserver = class {
       }
     }
   }
-  toolStart(id, name) {
+  toolStart(id, name2) {
     var _a2, _b2, _c, _d, _e;
     if (this.tools.has(id)) return;
     const at = this.now();
-    if (name === "WebSearch" || name === "WebFetch") {
+    if (name2 === "WebSearch" || name2 === "WebFetch") {
       const searches = (_b2 = (_a2 = this.milestoneData).searches) != null ? _b2 : _a2.searches = [];
-      const entry = { name };
+      const entry = { name: name2 };
       if (searches.length < LIST_LIMIT) {
-        searches.push({ kind: name === "WebSearch" ? "search" : "openPage", startedAt: at });
+        searches.push({ kind: name2 === "WebSearch" ? "search" : "openPage", startedAt: at });
         entry.search = searches.length - 1;
       }
       this.tools.set(id, entry);
-      this.setStage(name === "WebSearch" ? "searching" : "reading");
-    } else if (name === "StructuredOutput") {
-      this.tools.set(id, { name });
+      this.setStage(name2 === "WebSearch" ? "searching" : "reading");
+    } else if (name2 === "StructuredOutput") {
+      this.tools.set(id, { name: name2 });
       this.facts.structuredStart();
       this.structuredId = id;
       this.milestoneData.structuredCalls = ((_c = this.milestoneData.structuredCalls) != null ? _c : 0) + 1;
@@ -33934,7 +34063,7 @@ var ClaudeStreamObserver = class {
         return (_b3 = (_a3 = this.hooks).onStructuredDelta) == null ? void 0 : _b3.call(_a3, this.preview.snapshot());
       });
       this.setStage("writing");
-    } else this.tools.set(id, { name });
+    } else this.tools.set(id, { name: name2 });
   }
   toolInput(id, input2) {
     var _a2;
@@ -34938,8 +35067,8 @@ function aimContractSchema(contract, base, evidenceLookup) {
 var clean3 = (value) => typeof value === "string" ? value.trim() : "";
 var cleanList = (value) => Array.isArray(value) ? value.map(clean3).filter(Boolean) : [];
 var choice = (title) => ({ title, task: "", contribution: "", parentTitle: "" });
-var marker3 = (name, value) => `<!-- ${name} ${JSON.stringify(value)} -->`;
-var withoutMarker = (detail, name) => detail.replace(new RegExp(`<!--\\s*${name}\\s+[\\s\\S]*?-->\\s*`, "g"), "").trim();
+var marker3 = (name2, value) => `<!-- ${name2} ${JSON.stringify(value)} -->`;
+var withoutMarker = (detail, name2) => detail.replace(new RegExp(`<!--\\s*${name2}\\s+[\\s\\S]*?-->\\s*`, "g"), "").trim();
 var prepend = (head, body) => body ? `${head}
 ${body}` : head;
 function foldPayload(contract, aim, result) {
@@ -35603,13 +35732,13 @@ var AiTaskService = class {
         }
         return true;
       };
-      const stage = (name, query) => {
+      const stage = (name2, query) => {
         var _a3, _b2;
         const stages = (_a3 = extra.stages) != null ? _a3 : extra.stages = [];
-        if (stages.length < 20 && ((_b2 = stages.at(-1)) == null ? void 0 : _b2.stage) !== name) stages.push({ stage: name, at: iso() });
+        if (stages.length < 20 && ((_b2 = stages.at(-1)) == null ? void 0 : _b2.stage) !== name2) stages.push({ stage: name2, at: iso() });
         safe(() => {
           var _a4;
-          return (_a4 = observer.onStage) == null ? void 0 : _a4.call(observer, attemptId, name, query);
+          return (_a4 = observer.onStage) == null ? void 0 : _a4.call(observer, attemptId, name2, query);
         });
       };
       safe(() => {
@@ -35642,10 +35771,10 @@ var AiTaskService = class {
           onFirstEvent: () => {
             seen();
           },
-          onStage: (name, query) => {
+          onStage: (name2, query) => {
             if (seen()) safe(() => {
               var _a3;
-              return (_a3 = observer.onStage) == null ? void 0 : _a3.call(observer, attemptId, name, query);
+              return (_a3 = observer.onStage) == null ? void 0 : _a3.call(observer, attemptId, name2, query);
             });
           },
           onStructuredDelta: (fields) => {
@@ -38185,8 +38314,8 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
     editor.createEl("p", { cls: "vam-hint", text: t("ui.outline_ai_preset_text_hint") });
     const nameLabel = editor.createEl("label", { cls: "vam-field" });
     nameLabel.createSpan({ text: t("ui.outline_ai_preset_name") });
-    const name = nameLabel.createEl("input", { type: "text" });
-    name.setAttr("aria-label", t("ui.outline_ai_preset_name"));
+    const name2 = nameLabel.createEl("input", { type: "text" });
+    name2.setAttr("aria-label", t("ui.outline_ai_preset_name"));
     const editorActions = editor.createDiv("vam-outline-actions");
     const save = editorActions.createEl("button", { text: t("ui.save") });
     const saveAs = editorActions.createEl("button", { text: t("ui.outline_ai_save_as") });
@@ -38205,7 +38334,7 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
       var _a3;
       const preset = current();
       text11.value = (_a3 = preset == null ? void 0 : preset.text) != null ? _a3 : "";
-      name.value = preset ? isBuiltinPreset(preset.id) ? t("ui.outline_ai_copy_name", preset.name) : preset.name : "";
+      name2.value = preset ? isBuiltinPreset(preset.id) ? t("ui.outline_ai_copy_name", preset.name) : preset.name : "";
       const builtin = !preset || isBuiltinPreset(preset.id);
       remove.disabled = builtin;
       save.disabled = builtin;
@@ -38227,9 +38356,9 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
     save.addEventListener("click", () => {
       const preset = current();
       if (!preset || isBuiltinPreset(preset.id)) return;
-      if (!name.value.trim()) return void status.setText(t("ui.preset_name_required"));
+      if (!name2.value.trim()) return void status.setText(t("ui.preset_name_required"));
       void persist(
-        updatePreset(custom(), preset.id, { name: name.value, text: text11.value }),
+        updatePreset(custom(), preset.id, { name: name2.value, text: text11.value }),
         preset.id,
         t("ui.outline_ai_preset_saved")
       );
@@ -38237,7 +38366,7 @@ var OutlineImportModal = class extends import_obsidian21.Modal {
     saveAs.addEventListener("click", () => {
       const { presets: next, created } = createPreset(custom(), {
         kind: "outline",
-        name: name.value,
+        name: name2.value,
         text: text11.value
       });
       if (!created) return void status.setText(t("ui.preset_name_required"));
@@ -38499,12 +38628,12 @@ function tokenize(source) {
     if (source.startsWith("</", pos)) {
       const at = pos;
       pos += 2;
-      const name = readName();
+      const name2 = readName();
       skipSpace3();
       if (source[pos] !== ">") fail2("bad-xml");
       pos++;
       const open = stack.pop();
-      if (!open || open.name !== name) fail2("bad-xml", at);
+      if (!open || open.name !== name2) fail2("bad-xml", at);
       continue;
     }
     const start = pos;
@@ -38525,7 +38654,7 @@ function tokenize(source) {
         break;
       }
       if (pos === before) fail2("bad-xml");
-      const name = readName();
+      const name2 = readName();
       skipSpace3();
       if (source[pos] !== "=") fail2("bad-xml");
       pos++;
@@ -38536,8 +38665,8 @@ function tokenize(source) {
       if (close < 0) fail2("bad-xml");
       const raw = source.slice(pos + 1, close);
       if (raw.includes("<")) fail2("bad-xml");
-      if (element.attrs.has(name) || element.attrs.size >= MAX_ATTRIBUTES) fail2("bad-xml");
-      element.attrs.set(name, decodeEntities(raw.replace(/[\t\r\n]/g, " "), lineOf(pos)));
+      if (element.attrs.has(name2) || element.attrs.size >= MAX_ATTRIBUTES) fail2("bad-xml");
+      element.attrs.set(name2, decodeEntities(raw.replace(/[\t\r\n]/g, " "), lineOf(pos)));
       pos = close + 1;
     }
     if (++total2 > MAX_ELEMENTS) fail2("too-many-elements", start);
@@ -38553,7 +38682,7 @@ function tokenize(source) {
   if (stack.length || !root) fail2("bad-xml", length);
   return root;
 }
-var elementsOf = (element, name) => element.children.filter((child) => typeof child !== "string" && child.name === name);
+var elementsOf = (element, name2) => element.children.filter((child) => typeof child !== "string" && child.name === name2);
 var BLOCK_TAGS = /* @__PURE__ */ new Set([
   "p",
   "li",
@@ -38578,13 +38707,13 @@ function richText(element) {
     if (out && !out.endsWith("\n")) out += "\n";
   };
   const walk = (current) => {
-    const name = current.name.toLowerCase();
-    if (SKIPPED_TAGS.has(name)) return;
-    if (name === "br") {
+    const name2 = current.name.toLowerCase();
+    if (SKIPPED_TAGS.has(name2)) return;
+    if (name2 === "br") {
       out += "\n";
       return;
     }
-    const block = BLOCK_TAGS.has(name);
+    const block = BLOCK_TAGS.has(name2);
     if (block) newline();
     for (const child of current.children) {
       if (typeof child !== "string") {
@@ -38921,9 +39050,9 @@ var MultiResearchModal = class extends import_obsidian23.Modal {
     this.contentEl.createEl("p", { text: t("ui.multi_research_intro", this.names.length), cls: "vam-modal-intro" });
     const topics = this.contentEl.createDiv("vam-integration-sources");
     topics.createEl("strong", { text: t("ui.multi_research_topics") });
-    this.names.forEach((name, index) => {
+    this.names.forEach((name2, index) => {
       const row = topics.createDiv({ cls: "vam-multi-research-topic" });
-      row.createSpan({ text: name });
+      row.createSpan({ text: name2 });
       const mode = this.modes[index];
       if (mode)
         row.createSpan({
@@ -40807,16 +40936,16 @@ var NextStepModal = class extends import_obsidian26.Modal {
     };
     show = (mode) => {
       currentMode = mode;
-      for (const [name, button, panel] of [
+      for (const [name2, button, panel] of [
         ["research", researchCard, research],
         ["expand", expandCard, expandPanel],
         ["synthesize", synthesizeCard, synthesizePanel]
       ]) {
-        button.classList.toggle("is-active", name === mode);
-        button.setAttr("aria-checked", name === mode ? "true" : "false");
-        button.tabIndex = name === mode ? 0 : -1;
-        panel.style.display = name === mode ? "" : "none";
-        adjustFor[name].hidden = name !== mode;
+        button.classList.toggle("is-active", name2 === mode);
+        button.setAttr("aria-checked", name2 === mode ? "true" : "false");
+        button.tabIndex = name2 === mode ? 0 : -1;
+        panel.style.display = name2 === mode ? "" : "none";
+        adjustFor[name2].hidden = name2 !== mode;
       }
       sharedSources == null ? void 0 : sharedSources.forMode(mode);
       warmForMode();
@@ -40955,7 +41084,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     return (_a3 = item.key !== void 0 ? item.parentKey : item.parentTitle) != null ? _a3 : "";
   };
   const review = !!options.apply;
-  const rows = [];
+  const rows2 = [];
   const toolbar = parent.createDiv("vam-proposal-toolbar");
   const counter = toolbar.createSpan({ cls: "vam-proposal-count", attr: { "aria-live": "polite" } });
   const all = toolbar.createEl("button", { cls: "vam-proposal-all" });
@@ -40982,11 +41111,11 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       up = parentOf((_a3 = suggestions.find((other) => keyOf2(other) === up)) != null ? _a3 : { title: "", task: "", contribution: "" });
     return depth;
   };
-  const count = () => rows.filter((row) => row.check.checked).length;
+  const count = () => rows2.filter((row) => row.check.checked).length;
   const update = () => {
     const picked = count();
-    counter.setText(t("ui.selected_0_of_1", picked, rows.length));
-    all.setText(t(picked === rows.length ? "ui.select_none" : "ui.select_all"));
+    counter.setText(t("ui.selected_0_of_1", picked, rows2.length));
+    all.setText(t(picked === rows2.length ? "ui.select_none" : "ui.select_all"));
     changed(picked);
   };
   for (const item of ordered) {
@@ -41023,10 +41152,10 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       contribution.placeholder = t("ui.contribution_to_the_parent_topic");
       contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic"));
     }
-    rows.push({ item, check, title, task, contribution });
+    rows2.push({ item, check, title, task, contribution });
     (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row, head, title });
     check.addEventListener("change", () => {
-      const uncheckChildren = (key2) => rows.forEach((other) => {
+      const uncheckChildren = (key2) => rows2.forEach((other) => {
         if (parentOf(other.item) === key2 && other.check.checked) {
           other.check.checked = false;
           uncheckChildren(keyOf2(other.item));
@@ -41035,7 +41164,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       if (check.checked && parentOf(item)) {
         let parentKey = parentOf(item);
         while (parentKey) {
-          const parent2 = rows.find((other) => keyOf2(other.item) === parentKey);
+          const parent2 = rows2.find((other) => keyOf2(other.item) === parentKey);
           if (!parent2) break;
           parent2.check.checked = true;
           parentKey = parentOf(parent2.item);
@@ -41046,15 +41175,15 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     });
   }
   all.addEventListener("click", () => {
-    const value = count() !== rows.length;
-    rows.forEach((row) => row.check.checked = value);
+    const value = count() !== rows2.length;
+    rows2.forEach((row) => row.check.checked = value);
     update();
   });
   update();
   return {
     count,
     selected: () => {
-      const selected = rows.filter((row) => row.check.checked && row.title.value.trim());
+      const selected = rows2.filter((row) => row.check.checked && row.title.value.trim());
       if (!selected.length) return t("ui.select_at_least_one_subtopic");
       const renamed = new Map(selected.map((row) => [keyOf2(row.item), row.title.value.trim()]));
       const names3 = selected.filter((row) => !parentOf(row.item)).map((row) => row.title.value.trim());
@@ -41109,12 +41238,12 @@ var DraftReviewView = class {
     toolbar.createEl("strong", { text: t("ui.ai_draft") });
     const toggle = toolbar.createEl("button", { text: t("ui.edit_draft"), cls: "vam-draft-toggle" });
     toggle.setAttr("aria-pressed", "false");
-    const section3 = (label, value, rows) => {
+    const section3 = (label, value, rows2) => {
       const wrap = content.createDiv("vam-draft-section");
       wrap.createEl("h4", { text: label });
       const preview = wrap.createDiv("vam-draft-preview markdown-rendered");
       const input2 = wrap.createEl("textarea", { cls: "vam-task-input", text: value });
-      input2.rows = rows;
+      input2.rows = rows2;
       input2.hidden = true;
       input2.setAttr("aria-label", label);
       return { preview, input: input2 };
@@ -42688,7 +42817,7 @@ function renderTopicTree(parent, options) {
     const key2 = node.parentId && ids.has(node.parentId) ? node.parentId : null;
     children.set(key2, [...(_a2 = children.get(key2)) != null ? _a2 : [], node]);
   }
-  const rows = [];
+  const rows2 = [];
   const row = (id, text11, depth, enabled) => {
     const button = tree.createEl("button", { cls: "vam-topic-tree-row", text: text11, attr: { role: "option" } });
     button.style.paddingLeft = `${8 + depth * 16}px`;
@@ -42698,7 +42827,7 @@ function renderTopicTree(parent, options) {
     button.disabled = !enabled;
     button.setAttr("aria-disabled", String(!enabled));
     if (enabled) button.addEventListener("click", () => options.onChoose(id));
-    rows.push(button);
+    rows2.push(button);
   };
   if (options.rootChoice !== void 0) row("", options.rootChoice, 0, true);
   const append = (node, depth, seen2) => {
@@ -42711,7 +42840,7 @@ function renderTopicTree(parent, options) {
   const seen = /* @__PURE__ */ new Set();
   for (const root of (_b2 = children.get(null)) != null ? _b2 : []) append(root, 0, seen);
   const select = (id) => {
-    for (const button of rows) {
+    for (const button of rows2) {
       const selected = button.dataset.id === id;
       button.toggleClass("is-selected", selected);
       button.setAttr("aria-selected", String(selected));
@@ -49045,8 +49174,8 @@ var MERGE_TITLE_MAX = 60;
 function mergeTitleFromResult(result, fallback) {
   var _a2, _b2, _c;
   const raw = sanitizeGeneratedTitle((_c = (_b2 = (_a2 = result.suggestions) == null ? void 0 : _a2[0]) == null ? void 0 : _b2.title) != null ? _c : "").replace(/\s+/g, " ").trim();
-  const name = raw.replace(/^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g, "").trim();
-  return name && name.length <= MERGE_TITLE_MAX ? name : sanitizeGeneratedTitle(fallback);
+  const name2 = raw.replace(/^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g, "").trim();
+  return name2 && name2.length <= MERGE_TITLE_MAX ? name2 : sanitizeGeneratedTitle(fallback);
 }
 var MergeTopicsModal = class extends import_obsidian33.Modal {
   constructor(app, count, value, submit, cancelled2 = () => {
@@ -50305,7 +50434,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       this.app,
       t("ui.rename_topic"),
       current,
-      (name) => this.enqueue(() => this.noteChange(node, { title: name }))
+      (name2) => this.enqueue(() => this.noteChange(node, { title: name2 }))
     ).open();
   }
   async onClose() {
@@ -51061,7 +51190,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
   quickOutline(node) {
     const settings = this.plugin.settings;
     return {
-      presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name }) => ({ id, name })),
+      presets: listPresets(settings.promptPresets, "outline", settings.language).map(({ id, name: name2 }) => ({ id, name: name2 })),
       generate: async (request, signal) => {
         var _a2, _b2;
         const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
@@ -52080,17 +52209,17 @@ ${request.requirements}` : preset.text,
         return;
       }
       const into = nodeOf((_a2 = suggestion.mergeIntoId) != null ? _a2 : "");
-      const name = (item) => {
+      const name2 = (item) => {
         var _a3, _b2;
         return (_b2 = (_a3 = this.describeForReview(item.id)) == null ? void 0 : _a3.title) != null ? _b2 : item.path;
       };
       new ChoiceModal(
         this.app,
-        t("ui.structure_review_merge_title", name(node), name(into)),
-        t("ui.structure_review_merge_desc", name(node), name(into)),
+        t("ui.structure_review_merge_title", name2(node), name2(into)),
+        t("ui.structure_review_merge_desc", name2(node), name2(into)),
         [
           {
-            label: t("ui.structure_review_merge_confirm", name(node)),
+            label: t("ui.structure_review_merge_confirm", name2(node)),
             warning: true,
             action: () => run(() => this.removeToUnassigned(node, false, into.id))
           }
@@ -52329,9 +52458,9 @@ ${request.requirements}` : preset.text,
     if (live && typeof live.cloneNode === "function") {
       const card2 = live.cloneNode(true);
       for (const extra of Array.from(card2.querySelectorAll(CARD_EDITOR_DROP))) extra.remove();
-      for (const name of Array.from((_c = (_b2 = card2.getAttributeNames) == null ? void 0 : _b2.call(card2)) != null ? _c : []))
-        if (["id", "tabindex", "role", "data-node-id"].includes(name) || name.startsWith("aria-"))
-          card2.removeAttribute(name);
+      for (const name2 of Array.from((_c = (_b2 = card2.getAttributeNames) == null ? void 0 : _b2.call(card2)) != null ? _c : []))
+        if (["id", "tabindex", "role", "data-node-id"].includes(name2) || name2.startsWith("aria-"))
+          card2.removeAttribute(name2);
       card2.removeClass(...CARD_EDITOR_STATES);
       const note2 = (_d = this.notes) == null ? void 0 : _d.get(node.id);
       const title = card2.querySelector(".vam-card-title");
@@ -54376,7 +54505,7 @@ ${request.requirements}` : preset.text,
     const [target, ...children] = sources, mapPath = this.path, repo = this.plugin.repo, language2 = this.plugin.settings.language, detailTemplate = (await this.mapStyle(language2)).template;
     const sourceNotes = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
-    const name = title.trim(), sourcePaths = [.../* @__PURE__ */ new Set([...sourceNotes[0].sourcePaths, ...children.map((child) => child.path)])];
+    const name2 = title.trim(), sourcePaths = [.../* @__PURE__ */ new Set([...sourceNotes[0].sourcePaths, ...children.map((child) => child.path)])];
     let patch;
     if (content) {
       const references2 = visualReferencesMarkdown(content.visualReferences, noteLanguageOf(language2));
@@ -54392,7 +54521,7 @@ ${request.requirements}` : preset.text,
       const detail = mergedDetail(sourceNotes.map((note) => ({ title: note.title, detail: note.detail })));
       patch = { detail, status: mergedStatus(detail), sourcePaths };
     }
-    if (name && name !== sourceNotes[0].title) patch.title = name;
+    if (name2 && name2 !== sourceNotes[0].title) patch.title = name2;
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"), viewport = clone((_b2 = (_a2 = this.map) == null ? void 0 : _a2.viewport) != null ? _b2 : before.viewport);
     let entry;
     try {
@@ -54575,7 +54704,7 @@ ${request.requirements}` : preset.text,
     layer == null ? void 0 : layer.setAttr("aria-label", t("ui.canvas_images_group"));
     for (const item of items) {
       if (item.kind !== "image" || !layer) continue;
-      const image = item, name = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = t("ui.canvas_image_label", name), el = layer.createDiv("vam-canvas-image");
+      const image = item, name2 = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = t("ui.canvas_image_label", name2), el = layer.createDiv("vam-canvas-image");
       el.dataset.itemId = image.id;
       el.setAttr("role", "img");
       el.setAttr("aria-label", label);
@@ -54589,7 +54718,7 @@ ${request.requirements}` : preset.text,
       const placeholder2 = () => {
         el.empty();
         el.addClass("is-missing");
-        el.createSpan({ text: name });
+        el.createSpan({ text: name2 });
       };
       if (!source) placeholder2();
       else {
@@ -55732,8 +55861,8 @@ ${request.requirements}` : preset.text,
     viewport.addEventListener("dragend", () => {
       this.internalDrag = false;
     });
-    for (const name of ["pointerdown", "pointermove"])
-      viewport.addEventListener(name, () => {
+    for (const name2 of ["pointerdown", "pointermove"])
+      viewport.addEventListener(name2, () => {
         this.internalDrag = false;
       });
     viewport.addEventListener("contextmenu", (event) => this.onCanvasContextMenu(event));
@@ -55844,13 +55973,13 @@ ${request.requirements}` : preset.text,
         new import_obsidian34.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
         continue;
       }
-      const name = safeImageName(file.name, accepted.mime);
-      if (!name) continue;
+      const name2 = safeImageName(file.name, accepted.mime);
+      if (!name2) continue;
       const setCover = first;
       try {
         if (stale() || !this.map) return;
         const viewport = clone(this.map.viewport);
-        const entry = await this.beginMapTransaction().createAttachment("image", { name, data, sourcePath: node.path }).rewriteNote(node.path, async (target, attachment) => {
+        const entry = await this.beginMapTransaction().createAttachment("image", { name: name2, data, sourcePath: node.path }).rewriteNote(node.path, async (target, attachment) => {
           const note = this.app.vault.getAbstractFileByPath(target);
           if (!(note instanceof import_obsidian34.TFile)) throw new Error(target);
           const link = attachment("image");
@@ -56056,8 +56185,8 @@ ${request.requirements}` : preset.text,
         new import_obsidian34.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
         continue;
       }
-      const name = safeImageName(file.name, accepted.mime);
-      if (!name) continue;
+      const name2 = safeImageName(file.name, accepted.mime);
+      if (!name2) continue;
       const natural = (_a2 = imageSize(data)) != null ? _a2 : { width: 240, height: 160 }, scale = Math.min(1, 320 / Math.max(natural.width, natural.height)), w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)), h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)), id = `img-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, x = point.x + offset, y = point.y + offset;
       try {
         if (stale()) return;
@@ -56069,7 +56198,7 @@ ${request.requirements}` : preset.text,
           },
           false,
           [],
-          { name, data }
+          { name: name2, data }
         );
         offset += 24;
       } catch (error) {
@@ -57205,7 +57334,7 @@ ${request.requirements}` : preset.text,
     const colorOf = (value) => normalizeCssColor(value) || void 0;
     const transient = ["is-selected", "is-cut", "is-drop-target", "is-marquee-hit", "is-marquee-remove"];
     const savedLook = (el) => {
-      const on = transient.filter((name) => el.hasClass(name));
+      const on = transient.filter((name2) => el.hasClass(name2));
       if (on.length) {
         el.addClass("vam-export-measure");
         el.removeClass(...on);
@@ -57418,7 +57547,7 @@ ${request.requirements}` : preset.text,
     if (!cards.length && !images.length) return { refuse: "empty" };
     const margin = 24;
     const root = computed((_q = this.viewportEl) != null ? _q : this.contentEl);
-    const variable = (name) => colorOf(root.getPropertyValue(name));
+    const variable = (name2) => colorOf(root.getPropertyValue(name2));
     const scene = {
       x: bounds.minX - margin,
       y: bounds.minY - margin,
@@ -57443,9 +57572,9 @@ ${request.requirements}` : preset.text,
     return svgToPngBlob(svg, width, height, scale, browserPngEnv(window.URL));
   }
   /** A download through a blob URL; the URL is released shortly after the click. */
-  downloadBlob(blob, name) {
+  downloadBlob(blob, name2) {
     const url = window.URL.createObjectURL(blob);
-    const link = this.contentEl.createEl("a", { cls: "vam-sr-only", attr: { href: url, download: name } });
+    const link = this.contentEl.createEl("a", { cls: "vam-sr-only", attr: { href: url, download: name2 } });
     link.click();
     link.remove();
     window.setTimeout(() => window.URL.revokeObjectURL(url), 1e3);
@@ -57498,14 +57627,14 @@ ${request.requirements}` : preset.text,
           if (!isCurrent()) return;
         }
       }
-      const name = `${exportFileStem(map.title)}.${format}`;
+      const name2 = `${exportFileStem(map.title)}.${format}`;
       if (target === "download") {
-        this.downloadBlob(blob, name);
-        new import_obsidian34.Notice(t("ui.export_downloaded", name));
+        this.downloadBlob(blob, name2);
+        new import_obsidian34.Notice(t("ui.export_downloaded", name2));
         return;
       }
       const data = await blob.arrayBuffer();
-      const destination = await this.app.fileManager.getAvailablePathForAttachment(name, mapPath);
+      const destination = await this.app.fileManager.getAvailablePathForAttachment(name2, mapPath);
       if (!isCurrent()) return;
       await this.app.vault.createBinary(destination, data);
       new import_obsidian34.Notice(t("ui.export_saved", destination));
@@ -59366,9 +59495,9 @@ ${request.requirements}` : preset.text,
       var _a3;
       return (_a3 = note == null ? void 0 : note.style) == null ? void 0 : _a3.includes(id);
     });
-    const flag = (name, value) => {
-      if (value) card.dataset[name] = value;
-      else delete card.dataset[name];
+    const flag = (name2, value) => {
+      if (value) card.dataset[name2] = value;
+      else delete card.dataset[name2];
     };
     flag("topicStyleBold", ids.includes("bold") ? "true" : void 0);
     flag("topicStyleBorder", ids.includes("border-thick") ? "thick" : void 0);
@@ -60182,13 +60311,13 @@ ${request.requirements}` : preset.text,
   }
   /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
   relationRowText(link, selfId) {
-    const name = t(RELATION_NAME_KEY[link.kind]), titleOf = (id) => {
+    const name2 = t(RELATION_NAME_KEY[link.kind]), titleOf = (id) => {
       var _a2, _b2;
       return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
     };
     if (link.kind === "related")
-      return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
-    return link.from === selfId ? t("ui.relation_row_out_0_1", name, titleOf(link.to)) : t("ui.relation_row_in_0_1", titleOf(link.from), name);
+      return t("ui.relation_row_related_0_1", name2, titleOf(link.from === selfId ? link.to : link.from));
+    return link.from === selfId ? t("ui.relation_row_out_0_1", name2, titleOf(link.to)) : t("ui.relation_row_in_0_1", titleOf(link.from), name2);
   }
   /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". With a null `selfId` (the editor) both ends are named by title. */
   relationSentence(link, selfId) {
@@ -60440,7 +60569,7 @@ ${request.requirements}` : preset.text,
       svg.setAttribute("aria-hidden", "true");
       const frame = createSvg("rect");
       frame.addClass("vam-kind-outline");
-      for (const [name, value] of [
+      for (const [name2, value] of [
         ["x", "0"],
         ["y", "0"],
         ["width", "100"],
@@ -60448,7 +60577,7 @@ ${request.requirements}` : preset.text,
         ["rx", TOPIC_KIND_SHAPES[kind].shape === "rect" ? "10" : "30"],
         ["vector-effect", "non-scaling-stroke"]
       ])
-        frame.setAttribute(name, value);
+        frame.setAttribute(name2, value);
       svg.appendChild(frame);
     }
     swatch.insertBefore(svg, null);
@@ -64326,8 +64455,8 @@ ${note.detail.trim()}` : "",
   }
   /** "Hypothesis" or "Hypothesis (Strong)" in the language of the UI. */
   chatKindText(kind, strength) {
-    const name = t(`ui.topic_kind_${kind}`);
-    return kind === "hypothesis" && strength ? t("ui.map_chat_kind_with_strength_0_1", name, t(STRENGTH_LABEL[strength])) : name;
+    const name2 = t(`ui.topic_kind_${kind}`);
+    return kind === "hypothesis" && strength ? t("ui.map_chat_kind_with_strength_0_1", name2, t(STRENGTH_LABEL[strength])) : name2;
   }
   /**
    * An ask_topic_kind of a reply: the three ways to read it are offered under the answer and nothing happens until one is
@@ -64708,14 +64837,14 @@ ${note.detail.trim()}` : "",
   }
   /** create_map: makes the map, opens it (the conversation goes along) and moves the anchor to it. */
   async chatCreateMap(title, anchor, same) {
-    const name = sanitizeGeneratedTitle(title).trim();
-    if (!name) return skipped("ui.map_chat_skip_unavailable");
+    const name2 = sanitizeGeneratedTitle(title).trim();
+    if (!name2) return skipped("ui.map_chat_skip_unavailable");
     let opened = "";
     const made = { created: false };
     try {
       await this.plugin.mutate(async () => {
         if (!same()) return;
-        const mapPath = await this.plugin.repo.createMap(name);
+        const mapPath = await this.plugin.repo.createMap(name2);
         made.created = true;
         opened = await this.chatSwitchTo(mapPath, anchor);
       });
@@ -65522,7 +65651,7 @@ ${addition}` : addition });
     const mapPath = this.path;
     const savedAt = /* @__PURE__ */ new Date();
     const first = turns[0].question;
-    const name = chatNoteName((_b2 = (_a2 = first.origin) == null ? void 0 : _a2.text) != null ? _b2 : first.text, savedAt, t("ui.map_chat_save_default_name"));
+    const name2 = chatNoteName((_b2 = (_a2 = first.origin) == null ? void 0 : _a2.text) != null ? _b2 : first.text, savedAt, t("ui.map_chat_save_default_name"));
     const markdown = transcriptMarkdown({
       mapTitle: map.title,
       mapPath,
@@ -65553,7 +65682,7 @@ ${addition}` : addition });
         try {
           const folder = `${this.plugin.repo.topicRoot(mapPath)}/Chats`;
           await this.plugin.repo.folder(folder);
-          const path = this.plugin.repo.unique(folder, name);
+          const path = this.plugin.repo.unique(folder, name2);
           await this.app.vault.create(path, markdown);
           written2.path = path;
         } catch (error) {
@@ -66717,9 +66846,9 @@ ${addition}` : addition });
   paintRelationLabel(key2, expanded) {
     const label = this.relationLabelEls.get(key2), link = this.relationData.get(key2);
     if (!label || !link) return;
-    const name = t(RELATION_NAME_KEY[link.kind]);
+    const name2 = t(RELATION_NAME_KEY[link.kind]);
     if (!expanded) {
-      label.textContent = name;
+      label.textContent = name2;
       return;
     }
     label.textContent = "";
@@ -66729,7 +66858,7 @@ ${addition}` : addition });
     }, at = this.relationLabelAt.get(key2), head = createSvg("tspan");
     head.textContent = t(
       link.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
-      name,
+      name2,
       titleOf(link.from),
       titleOf(link.to)
     );
@@ -66995,7 +67124,7 @@ ${addition}` : addition });
         const exists = (candidate) => folderAt(candidate) !== null;
         const backups = resolveBlockFolder(this.noteStyles.folder(), "backup", exists, language2);
         const names3 = [...new Set(CANONICAL_LANGUAGES.map((code) => translate(code, "ui.style_folder_backup_notes")))];
-        const notes = (_a2 = names3.find((name) => exists(`${backups}/${name}`))) != null ? _a2 : translate(language2, "ui.style_folder_backup_notes");
+        const notes = (_a2 = names3.find((name2) => exists(`${backups}/${name2}`))) != null ? _a2 : translate(language2, "ui.style_folder_backup_notes");
         return backupNote(
           {
             folderExists: async (candidate) => exists(candidate),
@@ -67310,12 +67439,12 @@ function suggestRecipeName(plugin, from) {
     from === null ? t("ui.recipe_new_name") : t("ui.block_copy_name_0", cleanBlockName(from))
   );
   const taken = takenRecipeNames(plugin);
-  let name = base || "copy";
-  for (let n = 2; taken.has(lower4(name)) || !validatePartName(name, "recipe").ok; n++) {
+  let name2 = base || "copy";
+  for (let n = 2; taken.has(lower4(name2)) || !validatePartName(name2, "recipe").ok; n++) {
     if (n > 999) break;
-    name = `${base || "copy"} (${n})`;
+    name2 = `${base || "copy"} (${n})`;
   }
-  return name;
+  return name2;
 }
 function takenRecipeNames(plugin) {
   return new Set(
@@ -67379,8 +67508,8 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
     const isFile = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
     this.existing = isFile ? { ref: sourceItem.ref, text: (_h = store.recipeText(sourceItem.ref)) != null ? _h : "" } : void 0;
     this.builtinSource = (sourceItem == null ? void 0 : sourceItem.kind) === "builtin" ? sourceItem.ref : void 0;
-    const name = isFile ? sourceItem.name : (_i = options.name) != null ? _i : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
-    this.draft = { name, ...parts };
+    const name2 = isFile ? sourceItem.name : (_i = options.name) != null ? _i : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
+    this.draft = { name: name2, ...parts };
     this.initial = { ...this.draft };
   }
   onOpen() {
@@ -67831,13 +67960,13 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
   }
   selectTab(tab, focus) {
     this.tab = tab;
-    for (const name of MANAGE_TABS) {
-      const el = this.tabEls.get(name);
-      const selected = name === tab;
+    for (const name2 of MANAGE_TABS) {
+      const el = this.tabEls.get(name2);
+      const selected = name2 === tab;
       el.setAttr("aria-selected", String(selected));
       el.setAttr("tabindex", selected ? "0" : "-1");
       el.toggleClass("is-active", selected);
-      const panel = this.panelEls.get(name);
+      const panel = this.panelEls.get(name2);
       panel.hidden = !selected;
       if (!selected) panel.empty();
     }
@@ -67971,8 +68100,8 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
   suggestName(from) {
     var _a2;
     if (this.tab !== "recipe") return this.plugin.noteStyles.suggestPartName(this.tab, from);
-    const name = from === null ? null : (_a2 = this.entries().find((entry) => entry.ref === from)) == null ? void 0 : _a2.name;
-    return this.suggestRecipeName(name != null ? name : null);
+    const name2 = from === null ? null : (_a2 = this.entries().find((entry) => entry.ref === from)) == null ? void 0 : _a2.name;
+    return this.suggestRecipeName(name2 != null ? name2 : null);
   }
   /** Why `value` cannot be the name of a new file in this tab; "" when it can. */
   nameProblem(value) {
@@ -67990,7 +68119,7 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
     form.createEl("legend", { text: t("ui.manage_add_legend") });
     let mode = "from";
     let source = "";
-    let name = "";
+    let name2 = "";
     let touched = false;
     const radios = form.createDiv({ cls: "vam-manage-modes" });
     const radio = (value, label) => {
@@ -68021,7 +68150,7 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
       text11.inputEl.setAttr("aria-describedby", errorId);
       text11.onChange((value) => {
         touched = true;
-        name = value;
+        name2 = value;
         check();
       });
       text11.inputEl.addEventListener("keydown", (event) => {
@@ -68041,11 +68170,11 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
       button.setButtonText(t("ui.manage_add_create")).setCta().onClick(() => void create());
     });
     const setName = (value) => {
-      name = value;
+      name2 = value;
       if (nameInput) nameInput.value = value;
     };
     const check = () => {
-      const problem = this.nameProblem(name);
+      const problem = this.nameProblem(name2);
       error.setText(problem);
       createButton == null ? void 0 : createButton.setDisabled(!!problem);
     };
@@ -68093,12 +68222,12 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
     };
     const create = async () => {
       var _a2;
-      if (this.busy || this.editor || this.opening || this.nameProblem(name)) return;
+      if (this.busy || this.editor || this.opening || this.nameProblem(name2)) return;
       if (tab === "recipe") {
         void this.openEditor(() => ({
           source: null,
           from: mode === "from" ? source : null,
-          name,
+          name: name2,
           trigger: createButton == null ? void 0 : createButton.buttonEl,
           onSaved: (ref) => finish(ref)
         }));
@@ -68109,7 +68238,7 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
         const from = mode === "from" ? source : null;
         let target = null;
         try {
-          target = await this.plugin.noteStyles.createPart(tab, from, name);
+          target = await this.plugin.noteStyles.createPart(tab, from, name2);
         } catch (e) {
           new import_obsidian37.Notice(t("ui.manage_create_failed"));
         }
@@ -68224,10 +68353,10 @@ function missingStyleRef(plugin, kind) {
 }
 var kindRows = /* @__PURE__ */ new WeakMap();
 function redrawKindRows(plugin) {
-  const rows = kindRows.get(plugin);
-  if (!rows) return;
-  for (const row of [...rows]) {
-    if (row.el.isConnected === false) rows.delete(row);
+  const rows2 = kindRows.get(plugin);
+  if (!rows2) return;
+  for (const row of [...rows2]) {
+    if (row.el.isConnected === false) rows2.delete(row);
     else row.redraw();
   }
 }
@@ -68304,14 +68433,14 @@ function renderNoteKindSetting(setting, plugin, kind) {
     () => void 0
   );
   readAgain();
-  const rows = (_a2 = kindRows.get(plugin)) != null ? _a2 : /* @__PURE__ */ new Set();
-  rows.add({ el: setting.settingEl, redraw: readAgain });
-  kindRows.set(plugin, rows);
+  const rows2 = (_a2 = kindRows.get(plugin)) != null ? _a2 : /* @__PURE__ */ new Set();
+  rows2.add({ el: setting.settingEl, redraw: readAgain });
+  kindRows.set(plugin, rows2);
 }
 function renderNoteCustomSetting(setting, plugin, tab) {
   const { noteStyles: store } = plugin;
-  const name = manageTabName(tab);
-  setting.setName(name);
+  const name2 = manageTabName(tab);
+  setting.setName(name2);
   const describe = () => {
     const items = tab === "recipe" ? store.listRecipes() : store.listParts(tab);
     const builtin = items.filter((item) => item.kind === "builtin").length;
@@ -68327,7 +68456,7 @@ function renderNoteCustomSetting(setting, plugin, tab) {
         (_a2 = locationUpdates.get(plugin)) == null ? void 0 : _a2();
       }).open();
     });
-    button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name));
+    button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name2));
   });
   void store.refresh().then(describe, () => void 0);
 }
@@ -68340,8 +68469,8 @@ function bindMapFolderInput(plugin, key2, input2) {
   const apply = () => {
     var _a2;
     if (running) return;
-    const name = input2.getValue().trim().replace(/[\\/]+/g, "/").replace(/^\/+|\/+$/g, "");
-    const target = `${workspace}/${name}`;
+    const name2 = input2.getValue().trim().replace(/[\\/]+/g, "/").replace(/^\/+|\/+$/g, "");
+    const target = `${workspace}/${name2}`;
     if (target === plugin.settings[key2]) return;
     running = true;
     input2.inputEl.disabled = true;
@@ -68811,8 +68940,8 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
     var _a2;
     try {
       const ref = shownStyleRef(this.plugin, "topic");
-      const name = (_a2 = this.plugin.noteStyles.listRecipes().find((item) => item.ref === ref)) == null ? void 0 : _a2.name;
-      if (name) return name;
+      const name2 = (_a2 = this.plugin.noteStyles.listRecipes().find((item) => item.ref === ref)) == null ? void 0 : _a2.name;
+      if (name2) return name2;
       const parsed = parseBlockRef(ref);
       return (parsed == null ? void 0 : parsed.kind) === "file" ? parsed.base : ref;
     } catch (e) {
@@ -68861,11 +68990,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
     };
   }
   /** A button row of the "Advanced" page: name, one-line help and one button. */
-  actionRow(name, desc, label, run) {
+  actionRow(name2, desc, label, run) {
     return {
-      name,
+      name: name2,
       render: (setting) => {
-        setting.setName(name).setDesc(desc).addButton((button) => button.setButtonText(label).onClick(run));
+        setting.setName(name2).setDesc(desc).addButton((button) => button.setButtonText(label).onClick(run));
       }
     };
   }
@@ -68903,10 +69032,10 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
       var _a3, _b3, _c2, _d;
       const item = control.closest(".setting-item");
       const items = Array.from((_a3 = root == null ? void 0 : root.querySelectorAll(".setting-item")) != null ? _a3 : []);
-      const name = (_d = (_c2 = (_b3 = item == null ? void 0 : item.querySelector(".setting-item-name")) == null ? void 0 : _b3.textContent) == null ? void 0 : _c2.trim()) != null ? _d : "";
+      const name2 = (_d = (_c2 = (_b3 = item == null ? void 0 : item.querySelector(".setting-item-name")) == null ? void 0 : _b3.textContent) == null ? void 0 : _c2.trim()) != null ? _d : "";
       const sameName = items.filter((other) => {
         var _a4, _b4;
-        return ((_b4 = (_a4 = other.querySelector(".setting-item-name")) == null ? void 0 : _a4.textContent) == null ? void 0 : _b4.trim()) === name;
+        return ((_b4 = (_a4 = other.querySelector(".setting-item-name")) == null ? void 0 : _a4.textContent) == null ? void 0 : _b4.trim()) === name2;
       });
       const label = (element) => {
         var _a4, _b4;
@@ -68915,7 +69044,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian38.PluginSettingTab 
       const own2 = controls().filter(
         (other) => other.closest(".setting-item") === item && label(other) === label(control)
       );
-      return JSON.stringify([name, sameName.indexOf(item), label(control), own2.indexOf(control)]);
+      return JSON.stringify([name2, sameName.indexOf(item), label(control), own2.indexOf(control)]);
     };
     const active = (_b2 = (_a2 = root == null ? void 0 : root.doc) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
     const wanted = active && (root == null ? void 0 : root.contains(active)) ? identity(active) : null;
@@ -69089,8 +69218,8 @@ var OutlineView = class extends import_obsidian39.ItemView {
   setActive(path) {
     if (path === this.activePath) return;
     this.activePath = path;
-    const rows = Array.from(this.contentEl.querySelectorAll(".vam-outline-note"));
-    for (const row of rows) {
+    const rows2 = Array.from(this.contentEl.querySelectorAll(".vam-outline-note"));
+    for (const row of rows2) {
       const active = !!path && row.getAttribute("data-path") === path;
       row.toggleClass("is-active", active);
       if (active) row.setAttr("aria-current", "true");
@@ -69465,9 +69594,9 @@ function htmlBlockLines(lines) {
     if (open[1] === "!--") {
       while (last < lines.length && !lines[last].includes("-->")) last++;
     } else {
-      const name = ((_a2 = open[2]) != null ? _a2 : "").toLowerCase();
-      const closes = (text11) => text11.toLowerCase().includes(`</${name}`);
-      if (open[1].startsWith("/") || VOID_TAGS.has(name) || closes(line)) {
+      const name2 = ((_a2 = open[2]) != null ? _a2 : "").toLowerCase();
+      const closes = (text11) => text11.toLowerCase().includes(`</${name2}`);
+      if (open[1].startsWith("/") || VOID_TAGS.has(name2) || closes(line)) {
         while (last + 1 < lines.length && lines[last + 1].trim() !== "") last++;
       } else {
         while (last < lines.length && !closes(lines[last])) last++;
@@ -69545,11 +69674,11 @@ function createAssetRegistry() {
     nameFor(ref) {
       const existing = byRef.get(ref);
       if (existing) return existing;
-      const name = `image-${byRef.size + 1}`;
-      byRef.set(ref, name);
-      return name;
+      const name2 = `image-${byRef.size + 1}`;
+      byRef.set(ref, name2);
+      return name2;
     },
-    entries: () => [...byRef].map(([ref, name]) => ({ ref, name }))
+    entries: () => [...byRef].map(([ref, name2]) => ({ ref, name: name2 }))
   };
 }
 var basename = (target) => {
@@ -69575,9 +69704,9 @@ function splitWikilink(inner) {
 function cleanSegment(text11, ctx, out) {
   const attach = (ref) => {
     const decoded2 = decodeRef(ref.trim());
-    const name = ctx.assets.nameFor(decoded2);
-    if (!out.attachments.some((item) => item.name === name)) out.attachments.push({ ref: decoded2, name });
-    return name;
+    const name2 = ctx.assets.nameFor(decoded2);
+    if (!out.attachments.some((item) => item.name === name2)) out.attachments.push({ ref: decoded2, name: name2 });
+    return name2;
   };
   const titleFor = (target) => {
     var _a2;
@@ -69684,7 +69813,7 @@ function forbiddenStringsFor(vault, map, notes = []) {
   add("app-url", "app://");
   add("obsidian-url", "obsidian://");
   add("file-url", "file://");
-  for (const name of INTERNAL_FIELD_NAMES) add("internal-field", name);
+  for (const name2 of INTERNAL_FIELD_NAMES) add("internal-field", name2);
   for (const note of notes) add("model-name", note.model);
   const seen = /* @__PURE__ */ new Set();
   return list.filter((item) => {
@@ -69711,9 +69840,9 @@ function scanPayloadForLeaks(payload, forbidden) {
       scanText(value, codeFree);
     } else if (Array.isArray(value)) for (const item of value) visit(item, key2);
     else if (value && typeof value === "object")
-      for (const [name, item] of Object.entries(value)) {
-        scanText(name, name);
-        visit(item, name);
+      for (const [name2, item] of Object.entries(value)) {
+        scanText(name2, name2);
+        visit(item, name2);
       }
   };
   visit(payload, "");
@@ -69785,14 +69914,14 @@ var URL_ATTRIBUTES = /* @__PURE__ */ new Set([
 var FORBIDDEN_SCHEMES = /(?:app|obsidian|file|capacitor):\/\//i;
 var SAFE_DATA_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp)[;,]/;
 var normalizeUrl = (value) => value.replace(/[\p{Cc}\s]/gu, "").toLowerCase();
-function allowedUrl(tag, name, value) {
+function allowedUrl(tag, name2, value) {
   const url = normalizeUrl(value);
   if (!url) return false;
-  const isLink = name === "href" || name === "xlink:href";
+  const isLink = name2 === "href" || name2 === "xlink:href";
   if (isLink && url.startsWith("#")) return true;
-  if (/^https?:\/\//.test(url)) return name !== "data" && name !== "action" && name !== "formaction";
-  if (name === "href" && tag === "a" && url.startsWith("mailto:")) return true;
-  if (name === "src" && tag === "img") return url.startsWith("vam-asset:") || SAFE_DATA_IMAGE.test(url);
+  if (/^https?:\/\//.test(url)) return name2 !== "data" && name2 !== "action" && name2 !== "formaction";
+  if (name2 === "href" && tag === "a" && url.startsWith("mailto:")) return true;
+  if (name2 === "src" && tag === "img") return url.startsWith("vam-asset:") || SAFE_DATA_IMAGE.test(url);
   return false;
 }
 function cssIsInert(css) {
@@ -69805,9 +69934,9 @@ function cssIsInert(css) {
 }
 function scrubAttributes(element, tag, report) {
   var _a2;
-  for (const name of element.getAttributeNames()) {
-    const lower6 = name.toLowerCase();
-    const value = (_a2 = element.getAttribute(name)) != null ? _a2 : "";
+  for (const name2 of element.getAttributeNames()) {
+    const lower6 = name2.toLowerCase();
+    const value = (_a2 = element.getAttribute(name2)) != null ? _a2 : "";
     let drop = false;
     if (lower6.startsWith("on") || lower6 === "srcdoc") drop = true;
     else if (lower6.startsWith("data-") && !lower6.startsWith("data-callout")) drop = true;
@@ -69815,7 +69944,7 @@ function scrubAttributes(element, tag, report) {
     else if (lower6 === "style") drop = !cssIsInert(value);
     else if (FORBIDDEN_SCHEMES.test(value)) drop = true;
     if (drop) {
-      element.removeAttribute(name);
+      element.removeAttribute(name2);
       report.attributes++;
     }
   }
@@ -69823,7 +69952,7 @@ function scrubAttributes(element, tag, report) {
 function hasChromeClass(element) {
   var _a2;
   const classes = ((_a2 = element.getAttribute("class")) != null ? _a2 : "").split(/\s+/);
-  return classes.some((name) => CHROME_CLASSES.has(name));
+  return classes.some((name2) => CHROME_CLASSES.has(name2));
 }
 var COMMENT_NODE = 8;
 function scrubChildren(parent, options, report) {
@@ -69869,8 +69998,8 @@ function dropRemoteReferences(parent) {
       continue;
     }
     if (tag !== "a") {
-      for (const name of ["href", "xlink:href", "src", "srcset"])
-        if (remote(child.getAttribute(name))) child.removeAttribute(name);
+      for (const name2 of ["href", "xlink:href", "src", "srcset"])
+        if (remote(child.getAttribute(name2))) child.removeAttribute(name2);
     }
     dropRemoteReferences(child);
   }
@@ -70130,7 +70259,7 @@ function hasBlockDescendant(element) {
 function classify(element) {
   const tag = tagOf(element);
   if (SKIP_BLOCK_TAGS.has(tag)) return "skip";
-  if (ATOM_TAGS.has(tag) || element.getAttribute("translate") === "no" || classesOf(element).some((name) => ATOM_CLASSES.has(name)))
+  if (ATOM_TAGS.has(tag) || element.getAttribute("translate") === "no" || classesOf(element).some((name2) => ATOM_CLASSES.has(name2)))
     return "atom";
   if (BLOCK_TAGS2.has(tag) || hasBlockDescendant(element)) return "block";
   return "inline";
@@ -70346,9 +70475,9 @@ function canonicalNode(node) {
 }
 function canonicalElement(element) {
   const tag = element.localName.toLowerCase();
-  const attributes = element.getAttributeNames().sort().map((name) => {
+  const attributes = element.getAttributeNames().sort().map((name2) => {
     var _a2;
-    return ` ${name}="${escapeAttribute((_a2 = element.getAttribute(name)) != null ? _a2 : "")}"`;
+    return ` ${name2}="${escapeAttribute((_a2 = element.getAttribute(name2)) != null ? _a2 : "")}"`;
   }).join("");
   return `<${tag}${attributes}>${canonicalChildren(element)}</${tag}>`;
 }
@@ -70388,7 +70517,7 @@ function normalizeSvgId(translated, originalId) {
     if (node.nodeType === TEXT_NODE2) node.nodeValue = fix((_a2 = node.nodeValue) != null ? _a2 : "");
     else if (node.nodeType === ELEMENT_NODE2) {
       const element = node;
-      for (const name of element.getAttributeNames()) element.setAttribute(name, fix((_b2 = element.getAttribute(name)) != null ? _b2 : ""));
+      for (const name2 of element.getAttributeNames()) element.setAttribute(name2, fix((_b2 = element.getAttribute(name2)) != null ? _b2 : ""));
     }
   }
   return true;
@@ -70409,11 +70538,11 @@ function diffSvg(original, translated) {
       const ey = y;
       if (ex.localName !== ey.localName) return null;
       const changes = {};
-      for (const name of ey.getAttributeNames()) {
-        const value = (_b2 = ey.getAttribute(name)) != null ? _b2 : "";
-        if (ex.getAttribute(name) !== value) changes[name] = value;
+      for (const name2 of ey.getAttributeNames()) {
+        const value = (_b2 = ey.getAttribute(name2)) != null ? _b2 : "";
+        if (ex.getAttribute(name2) !== value) changes[name2] = value;
       }
-      for (const name of ex.getAttributeNames()) if (ey.getAttribute(name) === null) changes[name] = null;
+      for (const name2 of ex.getAttributeNames()) if (ey.getAttribute(name2) === null) changes[name2] = null;
       if (Object.keys(changes).length) patch.push([index, changes]);
     } else return null;
   }
@@ -70432,9 +70561,9 @@ function applySvgPatch(svg, patch) {
       node.nodeValue = change2;
     } else if (change2 && typeof change2 === "object" && !Array.isArray(change2)) {
       if (node.nodeType !== ELEMENT_NODE2) return false;
-      for (const [name, value] of Object.entries(change2)) {
-        if (value === null) node.removeAttribute(name);
-        else if (typeof value === "string") node.setAttribute(name, value);
+      for (const [name2, value] of Object.entries(change2)) {
+        if (value === null) node.removeAttribute(name2);
+        else if (typeof value === "string") node.setAttribute(name2, value);
         else return false;
       }
     } else return false;
@@ -70594,7 +70723,7 @@ function omitAssetImages(html, names3, label) {
   if (names3 && !names3.size) return html;
   return html.replace(
     /<img\b[^>]*?\ssrc="vam-asset:([^"]*)"[^>]*>/g,
-    (all, name) => !names3 || names3.has(name) ? `<span class="vam-image-omitted">${escapeHtml(label)}</span>` : all
+    (all, name2) => !names3 || names3.has(name2) ? `<span class="vam-image-omitted">${escapeHtml(label)}</span>` : all
   );
 }
 function resolveRelative(folder, ref) {
@@ -71661,7 +71790,7 @@ var ShareExporter = class {
       assertCurrent(ticket);
       if (this.disposed) return;
       this.rendered.set(node.id, result);
-      for (const name of result.attachments) if (!this.ownerPath.has(name)) this.ownerPath.set(name, node.path);
+      for (const name2 of result.attachments) if (!this.ownerPath.has(name2)) this.ownerPath.set(name2, node.path);
       done++;
     }
     onProgress({ phase: "render", done: total2, total: total2 });
@@ -71686,7 +71815,7 @@ var ShareExporter = class {
         diagramsUnsourced: finished.unsourced,
         localRefs: finished.localRefs,
         // Only images the final HTML shows: a picture used inside a hidden comment must not travel in the file.
-        attachments: cleaned.attachments.map((item) => item.name).filter((name) => used.has(name)),
+        attachments: cleaned.attachments.map((item) => item.name).filter((name2) => used.has(name2)),
         mermaidUndrawn: finished.undrawn,
         mermaidBlocked: finished.blocked
       };
@@ -71797,10 +71926,10 @@ ${fence}`, host, "", child);
     const unsourced = diagrams.filter((diagram, index) => !diagramSources[index] && finalSvgs.includes(diagram)).length;
     return { html: clean4.innerHTML, undrawn, blocked, localRefs, diagrams: placed, unsourced };
   }
-  resolveImage(name) {
+  resolveImage(name2) {
     var _a2, _b2, _c;
-    const entry = this.registry.entries().find((item) => item.name === name);
-    const fromPath = this.ownerPath.get(name);
+    const entry = this.registry.entries().find((item) => item.name === name2);
+    const fromPath = this.ownerPath.get(name2);
     if (!entry || fromPath === void 0) return null;
     const ext = (_b2 = (_a2 = entry.ref.split("#")[0].split(".").pop()) == null ? void 0 : _a2.toLowerCase()) != null ? _b2 : "";
     const mime = IMAGE_MIME[ext];
@@ -71821,21 +71950,21 @@ ${fence}`, host, "", child);
   /** Converts every vault image the rendered notes use, once. */
   async ensureImages(ticket, onProgress) {
     const names3 = [...new Set([...this.rendered.values()].flatMap((note) => note.attachments))];
-    const todo = names3.filter((name) => !this.images.has(name));
+    const todo = names3.filter((name2) => !this.images.has(name2));
     let done = names3.length - todo.length;
-    for (const name of todo) {
+    for (const name2 of todo) {
       assertCurrent(ticket);
       onProgress({ phase: "images", done, total: names3.length });
       let data = null;
       try {
-        const found = this.resolveImage(name);
+        const found = this.resolveImage(name2);
         if (found) data = await encodeShareImage(await found.bytes, found.mime);
       } catch (e) {
         data = null;
       }
       assertCurrent(ticket);
       if (this.disposed) return;
-      this.images.set(name, data);
+      this.images.set(name2, data);
       done++;
     }
     onProgress({ phase: "images", done: names3.length, total: names3.length });
@@ -71885,7 +72014,7 @@ ${fence}`, host, "", child);
     var _a2, _b2, _c, _d, _e, _f, _g;
     const language2 = this.config.language;
     const omitted = translate(language2, "share.viewer_image_omitted");
-    const failed = new Set([...this.images].filter(([, data]) => data === null).map(([name]) => name));
+    const failed = new Set([...this.images].filter(([, data]) => data === null).map(([name2]) => name2));
     const notesById = {};
     let notesWithContent = 0;
     let undrawn = 0;
@@ -71917,7 +72046,7 @@ ${fence}`, host, "", child);
     }
     const assets = {};
     if (options.includeDetail && options.includeImages) {
-      for (const [name, data] of this.images) if (data) assets[name] = data;
+      for (const [name2, data] of this.images) if (data) assets[name2] = data;
     }
     const payload = buildSharePayload(this.source.map, notesById, {
       includeDetail: options.includeDetail,
@@ -71993,8 +72122,8 @@ function browserSaveEnvironment() {
   const host = window;
   return {
     showSaveFilePicker: typeof host.showSaveFilePicker === "function" ? (options) => host.showSaveFilePicker(options) : void 0,
-    triggerDownload: (url, name) => {
-      const anchor = createEl("a", { attr: { href: url, download: name } });
+    triggerDownload: (url, name2) => {
+      const anchor = createEl("a", { attr: { href: url, download: name2 } });
       activeDocument.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -72646,11 +72775,11 @@ var ShareModal = class extends import_obsidian41.Modal {
     this.warnDroppedOpenLanguage();
     this.saving = true;
     this.render();
-    const name = shareFileName(this.options.source.map.title);
+    const name2 = shareFileName(this.options.source.map.title);
     try {
       const outcome = await saveShareFile(
         html,
-        name,
+        name2,
         // The dialog may have been closed while the system file dialog was open: then nothing is written.
         () => !this.closed && this.result === result,
         this.options.saveEnvironment
@@ -72659,7 +72788,7 @@ var ShareModal = class extends import_obsidian41.Modal {
       if (outcome === "cancelled") this.savedText = "";
       else {
         const size = formatBytes(result.bytes);
-        this.savedText = t(outcome === "saved" ? "share.saved_0_1" : "share.downloaded_0_1", name, size);
+        this.savedText = t(outcome === "saved" ? "share.saved_0_1" : "share.downloaded_0_1", name2, size);
         new import_obsidian41.Notice(this.savedText);
       }
     } catch (e) {
@@ -75365,11 +75494,11 @@ var ImageTranslateAction = class extends import_obsidian43.Component {
     this.showRunning(status, actions);
     this.startHalo(target.image, target.view.containerEl);
     const choices = imageLanguageChoices();
-    const name = (_b2 = (_a2 = [...choices.registry, ...choices.outputOnly].find((item) => item.id === language2)) == null ? void 0 : _a2.name) != null ? _b2 : language2;
+    const name2 = (_b2 = (_a2 = [...choices.registry, ...choices.outputOnly].find((item) => item.id === language2)) == null ? void 0 : _a2.name) != null ? _b2 : language2;
     let saved = null;
     try {
       const dataUrl = await this.options.run(
-        prepareStep(imageTranslateStep, { target: name }),
+        prepareStep(imageTranslateStep, { target: name2 }),
         this.options.model(),
         controller.signal,
         target.image,
@@ -76341,7 +76470,7 @@ function settingsFromSaved(saved, appLocale) {
     ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},
     ...(saved == null ? void 0 : saved.noteStyleFiles) && typeof saved.noteStyleFiles === "object" && !Array.isArray(saved.noteStyleFiles) ? {
       noteStyleFiles: Object.fromEntries(
-        Object.entries(saved.noteStyleFiles).filter(([, name]) => typeof name === "string" && name)
+        Object.entries(saved.noteStyleFiles).filter(([, name2]) => typeof name2 === "string" && name2)
       )
     } : {},
     coffeeStyles: Array.isArray(saved == null ? void 0 : saved.coffeeStyles) ? saved.coffeeStyles.filter(
@@ -76705,7 +76834,7 @@ var VisualAgentMapPlugin = class extends import_obsidian45.Plugin {
       }),
       translateTarget: () => languagePromptName(this.settings.language, "en", "plain"),
       run: (prepared, model, signal, image, webSearch, generateImage) => this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
-      saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)
+      saveImage: (dataUrl, notePath, name2) => this.saveGeneratedImage(dataUrl, notePath, name2)
     });
     this.addChild(markdownSelectionAi);
     this.registerMarkdownPostProcessor((element, context) => {
@@ -77042,7 +77171,7 @@ var VisualAgentMapPlugin = class extends import_obsidian45.Plugin {
         if (styled) found.set(file.path, map.title.trim() || file.name.replace(/\.md$/i, ""));
       }
       const mapsWithStyle = [
-        ...new Set([...found].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, name]) => name))
+        ...new Set([...found].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, name2]) => name2))
       ];
       const result = await this.noteStyles.migrateLegacy({ mapsWithStyle });
       if (result.status === "already" && result.error) {
@@ -77872,11 +78001,11 @@ ${t("ui.organize_link_wait_hint")}`;
     return `data:${mime};base64,${buffer.toString("base64")}`;
   }
   /** Writes a generated image where the vault keeps attachments for `notePath`; returns the new file's path. */
-  async saveGeneratedImage(dataUrl, notePath, name) {
+  async saveGeneratedImage(dataUrl, notePath, name2) {
     const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl);
     if (!match) throw new Error(t("ui.context_ai_image_not_generated"));
     const extension = match[1] === "jpeg" ? "jpg" : match[1];
-    const path = await this.app.fileManager.getAvailablePathForAttachment(`${name}.${extension}`, notePath);
+    const path = await this.app.fileManager.getAvailablePathForAttachment(`${name2}.${extension}`, notePath);
     const bytes = Buffer.from(match[2], "base64");
     await this.app.vault.createBinary(path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     return path;

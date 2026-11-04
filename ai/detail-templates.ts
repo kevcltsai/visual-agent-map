@@ -13,6 +13,7 @@ import {
   customDetailRule,
   customDetailStructure,
   introDetailStructure,
+  omitEmptyDetailStructure,
   textbookDetailStructure
 } from "../core/steps/task/fragments";
 
@@ -47,6 +48,8 @@ export interface DetailTemplate {
   layout?: "intro" | "sections";
   /** Memory only: the lead-in instruction of the "intro" layout. */
   intro?: string;
+  /** Memory only (set by a built-in structure; never saved or parsed from a file): a section with no reliable material is left out whole, with its heading, and the placeholder is never written. */
+  omitEmpty?: boolean;
 }
 export interface TemplateIssue {
   key: TranslationKey;
@@ -385,7 +388,7 @@ function structureText(
       headings,
       rules: rules.length ? `\n${rules.join("\n")}` : ""
     });
-  return customDetailStructure(language, {
+  return (template.omitEmpty ? omitEmptyDetailStructure : customDetailStructure)(language, {
     count: String(template.sections.length),
     headings,
     rules: rules.length ? `\n${rules.join("\n")}` : ""

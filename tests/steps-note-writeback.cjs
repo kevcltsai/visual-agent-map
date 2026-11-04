@@ -116,6 +116,7 @@ test('merge prompt with no updateMode equals updateMode merge', () => {
 const W = loadSource(`
 export { composeWriteback, chartPreserves, verifyInserts, backupNote, formatDate } from "./ai/note-writeback";
 export { standardTemplate } from "./ai/detail-templates";
+export { parseNoteStyleFile } from "./ai/note-style-file";
 `);
 
 const NOW = new Date(2026, 10, 3, 9, 8, 7);
@@ -981,4 +982,94 @@ test('T8 F1 fresh: the old footnote definition is not copied into the new log; m
   assert.deepEqual(plain(logBody(result.detail).slice(0, 2)), ['- 2026-10-02　整理早期文獻回顧。', `- ${TODAY}　已用新研究取代，舊版備份在 B/x.md`]);
   assert.ok(!result.detail.includes('早期文獻回顧，2025'), 'old definition not copied');
   assert.ok(result.detail.trimEnd().endsWith('[^2]: 新來源'));
+});
+
+// ---- note-style-editorial K1: 0.29.0 notes written back under the new section names (top mode keeps old text byte for byte) ----
+const FIXTURE_DIR = require('node:path').join(__dirname, 'fixtures', 'note-style-0.29.0');
+const oldNote = type => require('node:fs').readFileSync(require('node:path').join(FIXTURE_DIR, `${type}.md`), 'utf8').trimEnd();
+const newStyle = names => {
+  const parsed = W.parseNoteStyleFile(names.map(name => `## ${name}\n`).join('\n'), { id: 'style:K', name: 'K' });
+  assert.equal(parsed.ok, true, JSON.stringify(parsed.issues));
+  return parsed.style.template;
+};
+const topOnto = (type, template, sections) =>
+  W.composeWriteback({ mode: 'top', oldDetail: oldNote(type), aiDetail: sections.map(([name, body]) => section(name, body)).join('\n\n'), summary: 'S', template, language: 'zh-TW', now: NOW });
+const underHeading = (detail, heading) => {
+  const lines = detail.split('\n');
+  const start = lines.indexOf(`### ${heading}`);
+  assert.ok(start >= 0, heading);
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex(line => line.startsWith('### '));
+  return (end < 0 ? rest : rest.slice(0, end)).join('\n');
+};
+
+test('K1 top: the 0.29.0 hypothesis note (two stacked 目前判斷 blocks) takes new content under the old names; 支持 and 反駁 both map to 證據對照 and nothing is duplicated or lost', () => {
+  const template = newStyle(['主張', '目前判斷', '如果成立會看到', '什麼會推翻它', '驗證方式', '證據對照', '來源', '更新紀錄']);
+  const old = oldNote('hypothesis');
+  const result = topOnto('hypothesis', template, [
+    ['目前判斷', '偏反駁：新判斷 JUDGE-C'],
+    ['如果成立會看到', '新預測 PREDICT-NEW'],
+    ['證據對照', '| 證據 | 支持／反駁 |\n|---|---|\n| 新實驗 | 反駁 |'],
+    ['反駁', '反駁補充 REFUTE-NEW'],
+    ['來源', '- [[新來源]]']
+  ]);
+  assert.equal(result.ok, true);
+  assert.equal(cutInserts(result), old, 'cutting the inserts gives the old note back');
+  keepsOldLines(old, result.detail);
+  assert.ok(W.verifyInserts(old, result.detail, result.record.inserts));
+  // the new table (and the reply section written under the old name 反駁) is one insert under the first old matching heading, 支持
+  const support = underHeading(result.detail, '支持');
+  assert.equal(count(support, `#### ${TODAY}`), 1);
+  assert.ok(support.includes('新實驗') && support.includes('REFUTE-NEW'));
+  assert.equal(underHeading(result.detail, '反駁'), underHeading(old, '反駁'), 'the second old section is untouched');
+  assert.equal(count(result.detail, '新實驗'), 1);
+  assert.equal(count(result.detail, 'REFUTE-NEW'), 1);
+  for (const token of ['JUDGE-A-0290', 'JUDGE-B-0290', 'SUPPORT-0290', 'REFUTE-0290', 'PREDICT-0290', 'CLAIM-0290']) assert.equal(count(result.detail, token), 1, token);
+  assert.ok(underHeading(result.detail, '預測').includes('PREDICT-NEW'));
+  assert.ok(underHeading(result.detail, '目前判斷').includes('JUDGE-C'));
+  assert.equal(count(result.detail, '### 目前判斷'), 1, 'still one 目前判斷 heading');
+  // the new sources name appends under the old 證據與來源 without a date heading
+  const sources = underHeading(result.detail, '證據與來源');
+  assert.ok(sources.includes('- [[新來源]]') && !sources.includes(`#### ${TODAY}`));
+});
+
+test('K1 top: every 0.29.0 fixture takes new content under its old headings; the old text stays byte for byte, footnotes and tables included', () => {
+  const cases = {
+    standard: [['核心結論', '核心結論'], ['背景與機制', '關鍵知識'], ['不同看法與限制', '取捨與限制'], ['待確認問題', '待確認事項'], ['來源', '證據與來源']],
+    textbook: [['背景與機制', '關鍵知識'], ['不同看法與限制', '取捨與限制'], ['來源', '證據與來源']],
+    atomic: [['一句話', '定義'], ['為什麼', '解釋'], ['出處', '證據與來源']],
+    evidence: [['摘要', '內容'], ['和哪些議題有關', '支持或反駁'], ['出處', '證據與來源']],
+    conclusion: [['信心', '信心程度'], ['適用範圍', '適用範圍與限制'], ['影響與下一步', '後續行動'], ['來源', '證據與來源']],
+    action: [['目標與完成條件', '目標'], ['步驟', '步驟'], ['參考資料', '證據與來源']]
+  };
+  const structures = {
+    standard: ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', '來源', '更新紀錄'],
+    textbook: ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', '來源', '更新紀錄'],
+    atomic: ['一句話', '為什麼', '例子', '出處', '更新紀錄'],
+    evidence: ['摘要', '可信度', '和哪些議題有關', '出處', '更新紀錄'],
+    conclusion: ['結論', '信心', '依據', '適用範圍', '影響與下一步', '來源', '更新紀錄'],
+    action: ['目標與完成條件', '步驟', '參考資料', '更新紀錄']
+  };
+  for (const [type, pairs] of Object.entries(cases)) {
+    const old = oldNote(type);
+    const ai = pairs.map(([now]) => [now, `NEW-${now}`]);
+    const result = topOnto(type, newStyle(structures[type]), ai);
+    assert.equal(result.ok, true, type);
+    assert.equal(cutInserts(result), old, `${type}: old bytes`);
+    keepsOldLines(old, result.detail);
+    pairs.forEach(([now, oldName]) => {
+      const body = underHeading(result.detail, oldName);
+      assert.equal(count(body, `NEW-${now}`), 1, `${type}: ${now} under ${oldName}`);
+    });
+    assert.equal(count(result.detail, '### 更新紀錄'), 1, `${type}: one log section`);
+    assert.equal(logBody(result.detail).length, logBody(old).length + 1, `${type}: one log line added`);
+  }
+});
+
+test('K1 top: a user structure with the old names behaves as before (names win, no alias surprises)', () => {
+  const template = W.standardTemplate('zh-TW');
+  const result = topOnto('standard', template, [['關鍵知識', 'NEW-K'], ['證據與來源', '- [[另一個來源]]']]);
+  assert.equal(result.ok, true);
+  assert.equal(cutInserts(result), oldNote('standard'));
+  assert.ok(underHeading(result.detail, '關鍵知識').includes(`#### ${TODAY}\n\nNEW-K`));
 });

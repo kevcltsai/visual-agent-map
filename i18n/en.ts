@@ -1646,6 +1646,10 @@ export const en = {
   "detail.evidence_and_sources": "Evidence and sources",
   "detail.tradeoffs_and_limitations": "Tradeoffs and limitations",
   "detail.open_questions": "Open questions",
+  "detail.background_and_mechanism": "Background and mechanism",
+  "detail.disagreements_and_limits": "Disagreements and limits",
+  "detail.open_questions_to_check": "Open questions to check",
+  "detail.sources_heading": "Sources",
   "detail.update_log": "Update log",
   "detail.description_core_conclusions":
     "Answer the research question directly, 3–5 points by default; give the conclusion first, then the reason.",

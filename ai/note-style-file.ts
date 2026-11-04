@@ -1,5 +1,6 @@
 import { NOTE_LANGUAGES, translate, type UiLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
+import { isNewSourcesHeading, sectionAliasesFor } from "./section-aliases";
 import { STANDARD, validateTemplate, type DetailSection, type DetailTemplate } from "./detail-templates";
 
 /**
@@ -292,10 +293,15 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
     const { callouts, rest } = parseCallouts(content, sectionCode);
     const standard = standardKeyOf(heading.name);
     const role = standard === 2 ? "sources" : standard === 5 ? "log" : "none";
-    const aliases =
+    const standardAliases =
       standard >= 0
         ? NOTE_LANGUAGES.map(locale => translate(locale, STANDARD[standard][1])).filter(alias => alias !== heading.name)
         : [];
+    // Old names of the editorial redesign (section-aliases.ts) join the aliases of the standard spellings.
+    const aliases = [
+      ...standardAliases,
+      ...sectionAliasesFor(heading.name).filter(alias => !standardAliases.some(known => lowered(known) === lowered(alias)))
+    ];
     return {
       id: standard >= 0 ? STANDARD[standard][0] : `s${position + 1}`,
       name: heading.name,
@@ -307,6 +313,16 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
       line
     };
   });
+
+  // A new sources name (來源, 出處, 參考資料) takes the sources role only when no section has it by the older names, and only the
+  // first one does: a file that already works keeps its roles, and the role-taken rule is never newly broken.
+  if (!sections.some(section => section.role === "sources")) {
+    const firstNew = sections.find(section => isNewSourcesHeading(section.name));
+    if (firstNew) firstNew.role = "sources";
+  }
+  // A current name always wins over another section's alias.
+  const currentNames = new Set(sections.map(section => lowered(section.name)));
+  for (const section of sections) section.aliases = section.aliases.filter(alias => !currentNames.has(lowered(alias)));
 
   if (sections.length) {
     // The shared section rules; descriptions are not capped here (the 8,000-character file limit covers them).

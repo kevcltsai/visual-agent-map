@@ -62,6 +62,7 @@ import {
   LABEL_DETAIL_TOP,
   LABEL_FINDINGS,
   MERGE,
+  omitEmptyDetailStructure,
   outputLanguage,
   SYNTHESIZE,
   SYNTHESIZE_FRESH,
@@ -229,7 +230,7 @@ function leadStructure(
         })
       );
   }
-  const structure = customDetailStructure(language, {
+  const structure = (template.omitEmpty ? omitEmptyDetailStructure : customDetailStructure)(language, {
     count: String(template.sections.length),
     headings: template.sections.map(section => headingOf(section.name)).join(", "),
     rules: rules.length ? `\n${rules.join("\n")}` : ""
@@ -313,9 +314,12 @@ function templateParts(
   // turns a lead-in into a block with a lead), and only tests/prompt-snapshots.cjs reaches it. Whether to keep the hook
   // and re-record those snapshots is the owner's decision at wrap-up.
   const introTemplate = legacy && context.detailTemplate?.layout === "intro" ? context.detailTemplate : undefined;
+  // The request's own template says to omit empty sections (a built-in structure's flag): a body override of it keeps that.
+  const parsedTemplate =
+    legacy && context.detailTemplate?.omitEmpty ? { ...parsed.template, omitEmpty: true } : parsed.template;
   if (parsed.lead && !introTemplate)
     return {
-      ...leadStructure(parsed.template, parsed.lead, language, topicAnchor),
+      ...leadStructure(parsedTemplate, parsed.lead, language, topicAnchor),
       issues: [],
       notices: parsed.notices
     };
@@ -323,7 +327,7 @@ function templateParts(
   // Textbook id's fixed structure text, so a Textbook-named block is put together under a neutral id.
   const template =
     introTemplate ??
-    (parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` });
+    (parsedTemplate.id === STANDARD_TEMPLATE_ID ? parsedTemplate : { ...parsedTemplate, id: `block-${id}` });
   return {
     sections: structure(template),
     owned: describedSections(template, language),

@@ -5,7 +5,10 @@ const { loadSource } = require('./support-replay.cjs');
 
 const S = loadSource(`
 export * from "./ai/note-style-file";
-export { sectionLookup, checkCounts, standardTemplate, textbookTemplate } from "./ai/detail-templates";
+export { sectionLookup, checkCounts, standardTemplate, textbookTemplate, sourcesHeadingKeys, detailStructurePrompt } from "./ai/detail-templates";
+export { canonicalDetail } from "./ai/result-utils";
+export { SECTION_NAME, sectionAliasRows, sectionAliasesFor, isNewSourcesHeading, NEW_STANDARD_HEADING_KEYS } from "./ai/section-aliases";
+export { assembleTaskPrompt, selectionFromContext, promptStepOf } from "./core/steps/task/assemble";
 `);
 const plain = value => structuredClone(value);
 const eq = (actual, expected) => assert.deepEqual(plain(actual), plain(expected));
@@ -213,4 +216,181 @@ test('callout rule keys (counter 18): bad values, empty values, duplicates and c
   assert.equal(ok('---\n語氣: x\n問題方框:\n---\n## A').tone, 'x');
   // the only frontmatter error left is one that never closes
   assert.equal(fail('---\n結論方框: note\n## A', 'frontmatter_unclosed')[0].line, 1);
+});
+
+// ---- note-style-editorial K1: section aliases, role detection, omitEmpty (0.29.0 compatibility) ----
+const fs = require('node:fs');
+const path = require('node:path');
+const FIXTURES = path.join(__dirname, 'fixtures', 'note-style-0.29.0');
+const oldNote = type => fs.readFileSync(path.join(FIXTURES, `${type}.md`), 'utf8').trimEnd();
+const N = S.SECTION_NAME;
+const zh = value => value['zh-TW'];
+// The new structures of the redesign, as style files (section names only; K2 writes the real built-in texts).
+const NEW_STRUCTURES = {
+  standard: ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', zh(N.sources), zh(N.log)],
+  atomic: [zh(N.oneSentence), zh(N.why), '例子', '和誰不同', zh(N.source), zh(N.log)],
+  hypothesis: ['主張', '目前判斷', zh(N.ifTrue), '什麼會推翻它', '驗證方式', zh(N.evidenceTable), zh(N.sources), zh(N.log)],
+  evidence: [zh(N.summary), '原文或數據', '怎麼得到的', '可信度', zh(N.relatedTopics), zh(N.source), zh(N.log)],
+  conclusion: ['結論', zh(N.confidence), '依據', '什麼會改變這個結論', zh(N.scope), zh(N.impact), zh(N.sources), zh(N.log)],
+  action: ['狀態', zh(N.goalDone), '下一步', zh(N.steps), '阻礙與風險', '預期產出', zh(N.references), zh(N.log)]
+};
+const structureFile = names => names.map(name => `## ${name}\n`).join('\n');
+const styleOf = type => ok(structureFile(NEW_STRUCTURES[type]));
+const indexOf = (style, name) => style.sections.findIndex(section => section.name === name);
+const lookupOf = style => S.sectionLookup(style.template);
+
+test('K1 alias table: every old name of every row maps to the new section, in zh-TW, zh-CN spellings of the standard rows and en', () => {
+  const rows = S.sectionAliasRows();
+  assert.ok(rows.length >= 14);
+  for (const row of rows) {
+    for (const current of row.names) {
+      const style = ok(`## ${current}\n\n## 更新紀錄\n`);
+      const lookup = lookupOf(style);
+      for (const alias of row.aliases) assert.equal(lookup.get(alias.toLocaleLowerCase()), 0, `${alias} -> ${current}`);
+    }
+  }
+});
+
+test('K1 alias table: the plan rows, spelled out (old name -> new section)', () => {
+  const expected = [
+    ['standard', '證據與來源', zh(N.sources)], ['standard', '证据与来源', zh(N.sources)], ['standard', 'Evidence and sources', zh(N.sources)],
+    ['standard', '關鍵知識', '背景與機制'], ['standard', '关键知识', '背景與機制'], ['standard', 'Key knowledge', '背景與機制'],
+    ['standard', '取捨與限制', '不同看法與限制'], ['standard', '取舍与限制', '不同看法與限制'], ['standard', 'Tradeoffs and limitations', '不同看法與限制'],
+    ['standard', '待確認事項', '待確認問題'], ['standard', '待确认事项', '待確認問題'], ['standard', 'Open questions', '待確認問題'],
+    ['atomic', '定義', zh(N.oneSentence)], ['atomic', 'Definition', zh(N.oneSentence)], ['atomic', '解釋', zh(N.why)], ['atomic', 'Explanation', zh(N.why)],
+    ['atomic', '證據與來源', zh(N.source)],
+    ['hypothesis', '預測', zh(N.ifTrue)], ['hypothesis', 'Prediction', zh(N.ifTrue)],
+    ['hypothesis', '支持', zh(N.evidenceTable)], ['hypothesis', '反駁', zh(N.evidenceTable)], ['hypothesis', 'Support', zh(N.evidenceTable)], ['hypothesis', 'Counterevidence', zh(N.evidenceTable)],
+    ['evidence', '內容', zh(N.summary)], ['evidence', 'Content', zh(N.summary)], ['evidence', '支持或反駁', zh(N.relatedTopics)], ['evidence', 'Supports or refutes', zh(N.relatedTopics)],
+    ['conclusion', '信心程度', zh(N.confidence)], ['conclusion', '適用範圍與限制', zh(N.scope)], ['conclusion', 'Scope and limits', zh(N.scope)],
+    ['conclusion', '後續行動', zh(N.impact)], ['conclusion', 'Next actions', zh(N.impact)],
+    ['action', '目標', zh(N.goalDone)], ['action', '完成條件', zh(N.goalDone)], ['action', 'Goal', zh(N.goalDone)], ['action', 'Done when', zh(N.goalDone)],
+    ['action', '檢查點', zh(N.steps)], ['action', 'Checkpoints', zh(N.steps)]
+  ];
+  for (const [type, old, now] of expected) {
+    const style = styleOf(type);
+    assert.equal(lookupOf(style).get(old.toLocaleLowerCase()), indexOf(style, now), `${type}: ${old} -> ${now}`);
+  }
+  // The English names of the new sections are constants K2 reuses.
+  assert.equal(N.evidenceTable.en, 'Evidence table');
+  assert.equal(N.confidence.en, 'Confidence');
+  assert.equal(N.steps.en, 'Steps');
+});
+
+test('K1 role detection: every new structure has exactly one sources section and one log section; the new sources names carry the role', () => {
+  for (const type of Object.keys(NEW_STRUCTURES)) {
+    const style = styleOf(type);
+    assert.equal(style.sections.filter(section => section.role === 'sources').length, 1, `${type} sources`);
+    assert.equal(style.sections.filter(section => section.role === 'log').length, 1, `${type} log`);
+    assert.equal(style.sections[style.sections.length - 1].role, 'log');
+  }
+  for (const heading of ['來源', '出處', '參考資料', '来源', '出处', '参考资料', 'Sources', 'Source', 'References', 'references'])
+    assert.equal(ok(`## 摘要\n\n## ${heading}\n`).sections[1].role, 'sources', heading);
+  assert.equal(ok('## 摘要\n\n## 備註\n').sections.some(section => section.role === 'sources'), false);
+  // The sources role finds the old footnote home of an old note: sourcesHeadingKeys knows the old name
+  const keys = S.sourcesHeadingKeys(styleOf('standard').template);
+  for (const heading of ['證據與來源', '证据与来源', 'evidence and sources', '來源', '出處', '參考資料', 'sources']) assert.ok(keys.has(heading.toLocaleLowerCase()), heading);
+});
+
+test('K1 counterexample: an alias equal to another section\'s current name loses to that name', () => {
+  // 證據對照 has the aliases 支持 and 反駁, but this file also has a section named 支持
+  const style = ok(structureFile(['主張', '支持', zh(N.evidenceTable), zh(N.sources), zh(N.log)]));
+  const lookup = lookupOf(style);
+  assert.equal(lookup.get('支持'), indexOf(style, '支持'));
+  assert.equal(lookup.get('反駁'), indexOf(style, zh(N.evidenceTable)));
+  const table = style.sections[indexOf(style, zh(N.evidenceTable))];
+  assert.equal(table.aliases.includes('支持'), false);
+  assert.equal(table.aliases.includes('反駁'), true);
+});
+
+test('K1 counterexample: a file with no new names keeps main\'s roles, aliases and lookup', () => {
+  const style = ok('## 核心結論\n\n## 常見誤解\n\n## 證據與來源\n\n## 更新紀錄\n');
+  eq(style.sections.map(section => section.role), ['none', 'none', 'sources', 'log']);
+  eq(style.sections.map(section => section.id), ['core', 's2', 'sources', 'log']);
+  eq(style.sections.map(section => section.aliases), [['Core conclusions'], [], ['Evidence and sources'], ['Update log']]);
+  const lookup = lookupOf(style);
+  assert.equal(lookup.get('檢查點'), undefined);
+  assert.equal(lookup.get('來源'), undefined);
+  assert.equal(lookup.get('关键知识'), undefined);
+});
+
+test('K1 counterexample: an old sources section keeps the role when a new sources name is also in the file (one sources section only)', () => {
+  const style = ok('## 核心結論\n\n## 參考資料\n\n## 證據與來源\n\n## 更新紀錄\n');
+  eq(style.sections.map(section => section.role), ['none', 'none', 'sources', 'log']);
+  assert.equal(lookupOf(style).get('參考資料'), 1, 'the new name stays a section of its own');
+});
+
+test('K1 canonicalDetail: old-note headings land in the new sections and footnotes go to the sources section', () => {
+  const style = styleOf('standard');
+  const out = S.canonicalDetail(oldNote('standard'), 'zh-TW', style.template);
+  const headings = out.split('\n').filter(line => line.startsWith('### '));
+  eq(headings, style.sections.map(section => `### ${section.name}`));
+  assert.ok(out.includes('### 背景與機制\n\n舊知識 KNOW-0290'));
+  assert.ok(out.includes('### 不同看法與限制\n\n舊取捨 TRADE-0290'));
+  assert.ok(out.includes('### 待確認問題\n\n舊問題 QUESTION-0290'));
+  const sources = out.slice(out.indexOf('### 來源'), out.indexOf('### 更新紀錄'));
+  assert.ok(sources.includes('[^1]: 舊註腳一') && sources.includes('[^src-1]: [[舊來源一]]') && sources.includes('- [[舊來源二]]'));
+  assert.ok(out.includes('| A | 低 | 中 |'), 'the table survives');
+});
+
+test('K1 canonicalDetail: the old hypothesis note keeps both 支持 and 反駁 under one 證據對照 section and loses nothing', () => {
+  const style = styleOf('hypothesis');
+  const out = S.canonicalDetail(oldNote('hypothesis'), 'zh-TW', style.template);
+  const table = out.slice(out.indexOf('### 證據對照'), out.indexOf('### 來源'));
+  assert.ok(table.includes('SUPPORT-0290') && table.includes('REFUTE-0290') && table.includes('| 實驗一 | 高 |'));
+  assert.equal((out.match(/### 證據對照/g) ?? []).length, 1);
+  assert.ok(out.includes('JUDGE-A-0290') && out.includes('JUDGE-B-0290'));
+  assert.ok(out.includes('### 如果成立會看到\n\n舊預測 PREDICT-0290'));
+});
+
+test('K1 canonicalDetail: every 0.29.0 fixture keeps all its content and footnotes under a structure with the new names', () => {
+  for (const type of ['atomic', 'evidence', 'conclusion', 'action', 'hypothesis', 'standard']) {
+    const note = oldNote(type);
+    const out = S.canonicalDetail(note, 'zh-TW', styleOf(type).template);
+    for (const token of note.match(/[A-Z]+(?:-[A-Z])?-0290/g)) assert.ok(out.includes(token), `${type}: ${token}`);
+    assert.ok(out.includes('[^1]: 舊註腳'), `${type} footnote`);
+    assert.ok(out.includes('[^src-1]: [[舊來源'), `${type} source footnote`);
+  }
+});
+
+const OMIT = template => ({ ...template, omitEmpty: true });
+test('K1 omitEmpty: set, empty and placeholder-only sections are left out and nothing is filled; unset, the placeholder is still written', () => {
+  const style = styleOf('atomic');
+  const reply = '### 一句話\n\n回饋迴圈是輸出影響輸入。\n\n### 為什麼\n\n本次無新增內容。\n\n### 出處\n\n本次無新增內容\n\n[^1]: [[來源一]]\n\n### 更新紀錄\n\n2026-11-04　寫入';
+  const omitted = S.canonicalDetail(reply, 'zh-TW', OMIT(style.template));
+  assert.equal(omitted, '### 一句話\n\n回饋迴圈是輸出影響輸入。\n\n### 出處\n\n[^1]: [[來源一]]\n\n### 更新紀錄\n\n2026-11-04　寫入');
+  assert.equal(omitted.includes('本次無新增內容'), false);
+  const filled = S.canonicalDetail(reply, 'zh-TW', style.template);
+  assert.ok(filled.includes('### 例子\n\n本次無新增內容。'));
+  assert.equal((filled.match(/本次無新增內容/g) ?? []).length >= 3, true);
+  // en placeholder wording is omitted as well
+  assert.equal(S.canonicalDetail('### Summary\n\nx\n\n### Source\n\nNo new content this time', 'en', OMIT(ok('## Summary\n\n## Source\n\n## Update log\n').template)), '### Summary\n\nx');
+});
+
+test('K1 omitEmpty: the structure text says to omit a whole empty section and that this beats the later format rule; unset, it does not', () => {
+  const style = styleOf('evidence');
+  const prompt = (template, language) => S.detailStructurePrompt(template, language, headings => `STANDARD ${headings}`);
+  assert.match(prompt(OMIT(style.template), 'zh-TW'), /整段省略[^]*優先於後面格式規則/);
+  assert.match(prompt(OMIT(style.template), 'en'), /Leave out a whole section[^]*overrides the later formatting rule/);
+  assert.match(prompt(OMIT(style.template), 'zh-TW'), /### 摘要, ### 可信度|### 摘要/);
+  assert.doesNotMatch(prompt(style.template, 'zh-TW'), /整段省略/);
+  assert.match(prompt(style.template, 'zh-TW'), /沒有適用內容的段落寫「本次無新增內容」/);
+  // the section rules (log, descriptions, counts) still follow
+  const described = ok('## 摘要\n一到三句。\n\n## 更新紀錄\n一行。\n');
+  const text = prompt(OMIT(described.template), 'en');
+  assert.ok(text.includes('### 摘要') && text.includes('一到三句。') && text.includes('### 更新紀錄'));
+});
+
+test('K1 omitEmpty reaches the lead-in path of the assembler: a template block with a lead and omitEmpty omits empty sections too', () => {
+  const style = ok('## 摘要\n\n## 更新紀錄\n');
+  const base = { title: 'T', summary: 'S', rules: '', detail: '', task: 'X', ancestors: '', workingFindings: '', sourceContext: '', mode: 'task', researchMode: 'local', researchDepth: 'normal', visualMode: 'off', outputLanguage: 'en' };
+  const run = template => {
+    const context = { ...base, detailTemplate: template };
+    const selection = { ...S.selectionFromContext(context, 'en'), template: { id: 'atomic', body: 'LEAD-X sentence.\n\n## Summary\n\nOne to three sentences.\n\n## Update log\n\nOne line.\n' } };
+    return S.assembleTaskPrompt(selection, S.promptStepOf(context), context, 'en').text;
+  };
+  const withFlag = run({ ...OMIT(style.template), id: 'atomic' });
+  const without = run({ ...style.template, id: 'atomic' });
+  assert.match(withFlag, /LEAD-X sentence\.[^]*Leave out a whole section[^]*overrides the later formatting rule/);
+  assert.doesNotMatch(without, /Leave out a whole section/);
 });

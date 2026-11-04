@@ -142,7 +142,11 @@ const STANDARD_HEADING_KEYS: readonly TranslationKey[] = [
   "detail.evidence_and_sources",
   "detail.tradeoffs_and_limitations",
   "detail.open_questions",
-  "detail.update_log"
+  "detail.update_log",
+  // The editorial redesign's new names (the distinctive ones; "Sources" alone is too generic to say which language wrote a note).
+  "detail.background_and_mechanism",
+  "detail.disagreements_and_limits",
+  "detail.open_questions_to_check"
 ];
 
 /**

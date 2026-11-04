@@ -13,6 +13,7 @@ const support = require('./support.cjs');
 const i18n = load('i18n.ts');
 const { LANGUAGES, OUTPUT_LANGUAGES } = load('i18n/languages.ts');
 const content = load('experiences/aim/content-language.ts');
+const result = load('ai/result-utils.ts');
 const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, noteLanguageFromBody, mapChatLanguageSources } = content;
 // The clause without an anchor (nothing to quote), then the anchored one that names and quotes the user's own text (D-2026-10-94).
 const CLAUSE_EN = "the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings)";
@@ -613,4 +614,28 @@ test('ticket 07: a code block or a lone URL first is not the instruction; a blan
 test('ticket 07: the map chat request takes its language from mapChatLanguageSources(message)', () => {
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences', 'visual-map', 'view.ts'), 'utf8');
   assert.ok(view.includes('outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message))'));
+});
+
+test('note-style-editorial K1: the new standard section names are recognised next to the old ones (note language, Simplified heading normalisation)', () => {
+  const heading = (language, key) => i18n.translate(language, key);
+  const body = (language, ...keys) => keys.map(key => `### ${heading(language, key)}\n\ntext`).join('\n\n');
+  // old and new names both say which language wrote the note; "Sources" alone says nothing
+  assert.equal(noteLanguageFromBody(body('zh-TW', 'detail.background_and_mechanism')), 'zh-TW');
+  assert.equal(noteLanguageFromBody(body('en', 'detail.disagreements_and_limits')), 'en');
+  assert.equal(noteLanguageFromBody(body('en', 'detail.open_questions_to_check')), 'en');
+  assert.equal(noteLanguageFromBody(body('en', 'detail.sources_heading')), undefined);
+  assert.equal(noteLanguageFromBody(`${body('zh-TW', 'detail.key_knowledge')}\n\n${body('zh-TW', 'detail.background_and_mechanism')}`), 'zh-TW');
+  // the old keys keep their values
+  assert.equal(heading('zh-TW', 'detail.key_knowledge'), '關鍵知識');
+  assert.equal(heading('zh-TW', 'detail.evidence_and_sources'), '證據與來源');
+  assert.equal(heading('en', 'detail.tradeoffs_and_limitations'), 'Tradeoffs and limitations');
+  assert.equal(heading('zh-TW', 'detail.open_questions'), '待確認事項');
+  // zh-CN output: a Simplified new or old heading is written back in the note language (zh-TW) spelling, in a built-in structure
+  const normalize = detail => result.normalizeOutputScriptHeadings(detail, 'zh-CN', undefined);
+  assert.equal(normalize('### 背景与机制\n\na\n\n### 不同看法与限制\n\nb\n\n### 待确认问题\n\nc\n\n### 来源\n\nd'), '### 背景與機制\n\na\n\n### 不同看法與限制\n\nb\n\n### 待確認問題\n\nc\n\n### 來源\n\nd');
+  assert.equal(normalize('### 关键知识\n\na\n\n### 证据与来源\n\nb'), '### 關鍵知識\n\na\n\n### 證據與來源\n\nb');
+  // a custom structure is left alone
+  assert.equal(result.normalizeOutputScriptHeadings('### 来源\n\nd', 'zh-CN', { id: 'custom-1' }), '### 来源\n\nd');
+  // en output has no differing note language
+  assert.equal(result.normalizeOutputScriptHeadings('### Sources\n\nd', 'en', undefined), '### Sources\n\nd');
 });

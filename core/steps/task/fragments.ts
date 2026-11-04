@@ -15,6 +15,8 @@ import CustomRuleExactZH from "./custom-detail-rule-exact.zh.md";
 import CustomRuleExactEN from "./custom-detail-rule-exact.en.md";
 import CustomRuleMinZH from "./custom-detail-rule-min.zh.md";
 import CustomRuleMinEN from "./custom-detail-rule-min.en.md";
+import OmitEmptyDetailStructureZH from "./omit-empty-detail-structure.zh.md";
+import OmitEmptyDetailStructureEN from "./omit-empty-detail-structure.en.md";
 import IntroDetailStructureZH from "./intro-detail-structure.zh.md";
 import IntroDetailStructureEN from "./intro-detail-structure.en.md";
 import CustomRuleCalloutZH from "./custom-detail-rule-callout.zh.md";
@@ -137,6 +139,17 @@ export function customDetailStructure(
   values: { count: string; headings: string; rules: string }
 ): string {
   return renderTemplate(inLanguage(CUSTOM_DETAIL_STRUCTURE_TEMPLATE, language), values);
+}
+const OMIT_EMPTY_DETAIL_STRUCTURE_TEMPLATE: FragmentPair = {
+  zh: OmitEmptyDetailStructureZH,
+  en: OmitEmptyDetailStructureEN
+};
+/** A structure that omits an empty section (`DetailTemplate.omitEmpty`): the custom structure sentence, with "leave out a whole section" in place of the placeholder sentence. */
+export function omitEmptyDetailStructure(
+  language: ContentLanguage,
+  values: { count: string; headings: string; rules: string }
+): string {
+  return renderTemplate(inLanguage(OMIT_EMPTY_DETAIL_STRUCTURE_TEMPLATE, language), values);
 }
 const CUSTOM_DETAIL_RULES: Record<"log" | "description" | "exact" | "min", FragmentPair> = {
   log: { zh: CustomRuleLogZH, en: CustomRuleLogEN },

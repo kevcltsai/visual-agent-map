@@ -9,6 +9,7 @@ import {
 } from "../i18n";
 import type { AiResult } from "./types";
 import { fencedLines } from "./markdown-blocks";
+import { NEW_STANDARD_HEADING_KEYS } from "./section-aliases";
 import {
   isBuiltinTemplateId,
   sectionLookup,
@@ -134,7 +135,7 @@ export function normalizeOutputScriptHeadings(
   if (!verbatimHeadingLanguage(output) || (template && !isBuiltinTemplateId(template.id))) return detail;
   const note = noteLanguageOf(output);
   const forms = new Map<string, string>();
-  for (const [, key] of STANDARD) {
+  for (const key of [...STANDARD.map(([, standardKey]) => standardKey), ...NEW_STANDARD_HEADING_KEYS]) {
     const canonical = translate(note, key);
     const written = translate(output, key);
     if (written !== canonical) forms.set(written, canonical);
@@ -180,8 +181,8 @@ export function canonicalDetail(
     }
     (current === null ? leading : sections.get(current)!).push(line);
   }
-  // A note style file with a lead-in is written like Textbook: lead-in kept, empty sections omitted.
-  if (template.id === TEXTBOOK_TEMPLATE_ID || template.layout === "intro")
+  // A note style file with a lead-in, or a structure with `omitEmpty`, is written like Textbook: lead-in kept, empty sections omitted.
+  if (template.id === TEXTBOOK_TEMPLATE_ID || template.layout === "intro" || template.omitEmpty)
     return textbookDetail(template, leading, sections, footnotes, sourcesIndex);
   if (sections.size === 0) sections.set(0, [leading.join("\n").trim()]);
   else if (leading.join("\n").trim()) sections.set(0, [leading.join("\n").trim(), ...(sections.get(0) ?? [])]);

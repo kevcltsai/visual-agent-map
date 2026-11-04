@@ -29,7 +29,8 @@
         },
         "required": [
           "id",
-          "tier"
+          "tier",
+          "anchor"
         ]
       }
     }

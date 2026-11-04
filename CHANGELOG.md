@@ -4,6 +4,7 @@
 
 - **AIM is paused in this version.** Its entry points and settings are hidden; a map built with AIM still opens and edits like any other map, except that card resizing and grading by a goal stay off while AIM is paused. Nothing in your vault is deleted.
 - **AI lock.** Lock a topic (topic panel, card button or selection bar; `ai-locked: true`) and no AI action changes it, its children or its relations; your own edits still work.
+- **Grading by goal works again with Codex.** The grade request no longer gets refused for a missing `anchor`, and a grading failure now reads as one plain sentence instead of raw error text.
 
 ### Cards, links and marks
 

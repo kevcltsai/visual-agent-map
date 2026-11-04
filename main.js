@@ -61335,7 +61335,7 @@ ${request.requirements}` : preset.text,
     let locked = ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) === true;
     const paint = (focus = false) => {
       group.empty();
-      const choice2 = this.button(group, t("ui.ai_lock_toggle"), () => {
+      const choice2 = this.button(group, t(locked ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"), () => {
         this.enqueue(async () => {
           await this.setAiLock([node], !locked);
           locked = !locked;

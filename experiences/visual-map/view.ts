@@ -13427,7 +13427,7 @@ export class VisualAgentMapView extends ItemView {
     let locked = this.notes.get(node.id)?.aiLocked === true;
     const paint = (focus = false): void => {
       group.empty();
-      const choice = this.button(group, t("ui.ai_lock_toggle"), () => {
+      const choice = this.button(group, t(locked ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"), () => {
         this.enqueue(async () => {
           await this.setAiLock([node], !locked);
           locked = !locked;

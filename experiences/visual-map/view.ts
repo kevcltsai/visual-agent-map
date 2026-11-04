@@ -127,12 +127,13 @@ import {
   resolveCoverWithFrame,
   withCover,
   withCoverOff,
-  withCoverFrame,
+  withCoverLook,
   withCoverOn,
-  type CoverFrame
+  type CoverFrame,
+  type CoverLook
 } from "./card-cover";
 import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
-import { coverFrameRatio, placeCoverFrame } from "./cover-layout";
+import { coverFrameRatio, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
@@ -3752,18 +3753,23 @@ export class VisualAgentMapView extends ItemView {
     return entry;
   }
   /**
-   * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame` in one undoable step, the same way
-   * changeTopicCover writes. The picture file is never touched; undo writes the old note text back.
+   * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame`, and with `look` the picture size, in one
+   * undoable step, the same way changeTopicCover writes. The picture file is never touched; undo writes the old note
+   * text back.
    */
-  private async changeTopicCoverFrame(node: MapNode, frame: CoverFrame | null): Promise<TransactionEntry | null> {
+  private async changeTopicCoverFrame(
+    node: MapNode,
+    frame: CoverFrame | null,
+    look: Omit<CoverLook, "frame"> = {}
+  ): Promise<TransactionEntry | null> {
     if (!this.map || !this.markersEditable(node)) return null;
-    const write = frameToWrite(frame);
+    const write: CoverLook = { ...look, frame: frameToWrite(frame) };
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
       .rewriteNote(node.path, async path => {
         const file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
-        await this.app.vault.process(file, content => withCoverFrame(content, write));
+        await this.app.vault.process(file, content => withCoverLook(content, write));
       })
       .editMap(this.path, map => {
         map.viewport = clone(viewport);
@@ -3774,7 +3780,7 @@ export class VisualAgentMapView extends ItemView {
     return entry;
   }
   /** The topic's cover picture (resource path) and its valid frame; null when it has no picture or the cover is off. */
-  private coverPictureOf(node: MapNode): { src: string; path: string; frame: CoverFrame | null } | null {
+  private coverPictureOf(node: MapNode): { src: string; path: string; frame: CoverFrame | null; size: number } | null {
     try {
       const file = this.app.vault.getAbstractFileByPath(node.path);
       if (!(file instanceof TFile)) return null;
@@ -3784,7 +3790,7 @@ export class VisualAgentMapView extends ItemView {
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       const src = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
-      return src ? { src, path: cover.path, frame: cover.frame } : null;
+      return src ? { src, path: cover.path, frame: cover.frame, size: cover.size } : null;
     } catch {
       return null;
     }
@@ -3829,13 +3835,14 @@ export class VisualAgentMapView extends ItemView {
     const modal = new CoverFrameModal(this.app, {
       src: picture.src,
       initial: picture.frame,
+      size: picture.size,
       shape: coverShapes.get(picture.path) ?? null,
       card: () => this.cardForEditor(node),
-      onApply: frame =>
+      onApply: ({ frame, ...look }) =>
         new Promise<void>(done =>
           this.enqueue(async () => {
             try {
-              await this.changeTopicCoverFrame(node, frame);
+              await this.changeTopicCoverFrame(node, frame, look);
             } finally {
               done();
             }
@@ -11239,6 +11246,7 @@ export class VisualAgentMapView extends ItemView {
     let source: string | undefined;
     let imagePath = "";
     let mask: CoverFrame | null = null;
+    let size = 1;
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof TFile)) return;
@@ -11250,6 +11258,7 @@ export class VisualAgentMapView extends ItemView {
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
       imagePath = cover.path;
       mask = cover.frame;
+      size = cover.size;
     } catch {
       return;
     }
@@ -11258,6 +11267,8 @@ export class VisualAgentMapView extends ItemView {
     // A frame (mask) puts the picture inside a window that shows only the framed region; the file itself is never changed.
     const windowEl = mask ? frame.createDiv({ cls: "vam-card-cover-window" }) : null;
     if (mask) frame.addClass("is-framed");
+    // The picture size (k) makes the whole box narrower; the mask is the same region of the picture at any size.
+    sizeCoverBox(frame, size);
     const img = (windowEl ?? frame).createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });

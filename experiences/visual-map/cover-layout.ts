@@ -2,7 +2,8 @@
  * Where a card's cover picture and its mask window sit (card editor). Shared by the map card, the "Edit card" dialog and
  * the export, so all three show the same thing. The math is pure; `placeCoverFrame` only writes inline styles.
  *
- * Display rule: the whole picture is shown D wide (D = the card's content width). A mask `x y w h` (fractions of the
+ * Display rule: the whole picture is shown D wide (D = k × the card's content width, k = `topic-cover-size`, 0.3-1;
+ * a smaller picture is centred in the content). A mask `x y w h` (fractions of the
  * picture) is a window `w·D` wide and `h·D·(picture height / picture width)` tall, placed `x·D` from the content's left
  * edge, that shows exactly that region at that scale (no stretching). Hiding the left or right side therefore leaves the
  * rest where it was; hiding the top or bottom makes the window, and the card, shorter. The window always starts at the
@@ -63,6 +64,24 @@ export function coverFrameRatio(width: number, height: number, frame?: CoverFram
   if (!coverWindow(width, height, frame, 1)) return null;
   // Computed from the picture's own numbers (not 1 / window height) so a plain shape stays exact.
   return Math.max(width / (height * (frame?.h ?? 1)), 1 / COVER_MAX_HEIGHT_RATIO);
+}
+
+/**
+ * D for a card whose content is `contentWidth` wide and a picture size `size` (k), and where the D-wide cover box starts
+ * (centred in the content). The size never changes which region a mask shows: it only scales D.
+ */
+export function coverDisplay(contentWidth: number, size: number): { left: number; width: number } {
+  const k = Number.isFinite(size) ? Math.min(1, Math.max(0.3, size)) : 1;
+  const width = contentWidth * k;
+  return { left: (contentWidth - width) / 2, width };
+}
+
+/** Gives the cover box its share of the content width (k), centred by `.is-resized`; the default leaves the full width. */
+export function sizeCoverBox(frame: HTMLElement, size: number): void {
+  const { width } = coverDisplay(1, size);
+  frame.toggleClass("is-resized", width < 1);
+  if (width >= 1) frame.style.removeProperty("width");
+  else frame.style.setProperty("width", `${width * 100}%`);
 }
 
 export interface CoverParts {

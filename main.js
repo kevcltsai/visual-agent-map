@@ -623,6 +623,7 @@ var en = {
   "ui.topic_cover_frame_title": "Edit card",
   "ui.topic_cover_frame_reset": "Show whole picture",
   "ui.topic_cover_frame_apply": "Apply",
+  "ui.card_edit_picture_size": "Picture size",
   "ui.topic_cover_frame_box": "Cover picture. Drag inside to move what the card shows; arrow keys move it, Shift and arrow keys resize it from the bottom right.",
   "ui.topic_cover_frame_status": "Left {0}%, top {1}%, width {2}%, height {3}%",
   "ui.topic_cover_frame_load_failed": "The picture could not be loaded.",
@@ -3073,6 +3074,7 @@ var zhCN = {
   "ui.topic_cover_frame_title": "\u7F16\u8F91\u5361\u7247",
   "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5E94\u7528",
+  "ui.card_edit_picture_size": "\u56FE\u7247\u5927\u5C0F",
   "ui.topic_cover_frame_box": "\u5C01\u9762\u56FE\u7247\u3002\u5728\u91CC\u9762\u62D6\u52A8\u53EF\u79FB\u52A8\u5361\u7247\u663E\u793A\u7684\u90E8\u5206\uFF1B\u65B9\u5411\u952E\u79FB\u52A8\uFF0CShift \u52A0\u65B9\u5411\u952E\u4ECE\u53F3\u4E0B\u89D2\u7F29\u653E\u3002",
   "ui.topic_cover_frame_status": "\u5DE6 {0}%\u3001\u4E0A {1}%\u3001\u5BBD {2}%\u3001\u9AD8 {3}%",
   "ui.topic_cover_frame_load_failed": "\u65E0\u6CD5\u52A0\u8F7D\u56FE\u7247\u3002",
@@ -5523,6 +5525,7 @@ var zhTW = {
   "ui.topic_cover_frame_title": "\u7DE8\u8F2F\u5361\u7247",
   "ui.topic_cover_frame_reset": "\u53D6\u6D88\u906E\u853D",
   "ui.topic_cover_frame_apply": "\u5957\u7528",
+  "ui.card_edit_picture_size": "\u5716\u7247\u5927\u5C0F",
   "ui.topic_cover_frame_box": "\u5C01\u9762\u5716\u7247\u3002\u5728\u88E1\u9762\u62D6\u66F3\u53EF\u79FB\u52D5\u5361\u7247\u986F\u793A\u7684\u90E8\u5206\uFF1B\u65B9\u5411\u9375\u79FB\u52D5\uFF0CShift \u52A0\u65B9\u5411\u9375\u5F9E\u53F3\u4E0B\u89D2\u7E2E\u653E\u3002",
   "ui.topic_cover_frame_status": "\u5DE6 {0}%\u3001\u4E0A {1}%\u3001\u5BEC {2}%\u3001\u9AD8 {3}%",
   "ui.topic_cover_frame_load_failed": "\u7121\u6CD5\u8F09\u5165\u5716\u7247\u3002",
@@ -24502,6 +24505,9 @@ function fishboneEdgePathData(parent, child, depth) {
 // experiences/visual-map/card-cover.ts
 var COVER_KEY = "topic-cover";
 var COVER_FRAME_KEY = "topic-cover-frame";
+var COVER_SIZE_KEY = "topic-cover-size";
+var COVER_SIZE_MIN = 0.3;
+var COVER_SIZE_DEFAULT = 1;
 var IMAGE_EXTENSION2 = /\.(?:png|jpe?g|gif|webp)$/i;
 var SCHEME2 = /^[a-z][a-z0-9+.-]*:/i;
 function linkpathOf(raw) {
@@ -24553,14 +24559,35 @@ function serialiseCoverFrame(frame) {
   const h = round4(round4(frame.y + frame.h) - y);
   return [x, y, w, h].map(String).join(" ");
 }
-function withCoverFrame(content, frame) {
-  return setFrontmatterKeys(content, { [COVER_FRAME_KEY]: frame ? serialiseCoverFrame(frame) : null });
+function parseCoverSize(raw) {
+  const value = typeof raw === "number" ? raw : typeof raw === "string" && FRAME_NUMBER.test(raw.trim()) ? Number(raw) : NaN;
+  if (!Number.isFinite(value) || value < COVER_SIZE_MIN - FRAME_EPSILON || value > 1 + FRAME_EPSILON)
+    return COVER_SIZE_DEFAULT;
+  return Math.min(1, Math.max(COVER_SIZE_MIN, value));
+}
+function serialiseCoverSize(size) {
+  const value = Math.round(parseCoverSize(size) * 100) / 100;
+  return value >= COVER_SIZE_DEFAULT ? null : value;
+}
+function withCoverLook(content, look) {
+  const values = {
+    [COVER_FRAME_KEY]: look.frame ? serialiseCoverFrame(look.frame) : null
+  };
+  if (look.size !== void 0) {
+    const size = serialiseCoverSize(look.size);
+    values[COVER_SIZE_KEY] = size === null ? null : String(size);
+  }
+  return setFrontmatterKeys(content, values);
 }
 function resolveCoverWithFrame(cache, resolve) {
-  var _a2;
   const cover = resolveCover(cache, resolve);
   if (!cover || !("path" in cover)) return cover;
-  return { path: cover.path, frame: parseCoverFrame((_a2 = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _a2[COVER_FRAME_KEY]) };
+  const frontmatter2 = cache == null ? void 0 : cache.frontmatter;
+  return {
+    path: cover.path,
+    frame: parseCoverFrame(frontmatter2 == null ? void 0 : frontmatter2[COVER_FRAME_KEY]),
+    size: parseCoverSize(frontmatter2 == null ? void 0 : frontmatter2[COVER_SIZE_KEY])
+  };
 }
 function safeLink(link) {
   return link.replace(/[[\]|\r\n]/g, " ").trim();
@@ -24634,6 +24661,17 @@ function coverFrameRatio(width, height, frame) {
   var _a2;
   if (!coverWindow(width, height, frame, 1)) return null;
   return Math.max(width / (height * ((_a2 = frame == null ? void 0 : frame.h) != null ? _a2 : 1)), 1 / COVER_MAX_HEIGHT_RATIO);
+}
+function coverDisplay(contentWidth, size) {
+  const k = Number.isFinite(size) ? Math.min(1, Math.max(0.3, size)) : 1;
+  const width = contentWidth * k;
+  return { left: (contentWidth - width) / 2, width };
+}
+function sizeCoverBox(frame, size) {
+  const { width } = coverDisplay(1, size);
+  frame.toggleClass("is-resized", width < 1);
+  if (width >= 1) frame.style.removeProperty("width");
+  else frame.style.setProperty("width", `${width * 100}%`);
 }
 function placeCoverFrame(parts, shape2, mask) {
   const win = coverWindow(shape2, 1, mask, 1);
@@ -24713,12 +24751,14 @@ function nudgeCoverFrameEdge(mode, frame, key2) {
   if (!dx && !dy) return null;
   return dragCoverFrame(mode, frame, dx, dy);
 }
+var SIZE_STEP = 1;
 var CoverFrameModal = class extends import_obsidian12.Modal {
   constructor(app, options) {
-    var _a2;
+    var _a2, _b2;
     super(app);
     this.options = options;
     __publicField(this, "draft");
+    __publicField(this, "size");
     __publicField(this, "shape");
     __publicField(this, "drag", null);
     __publicField(this, "applying", false);
@@ -24730,12 +24770,14 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     __publicField(this, "statusEl", null);
     __publicField(this, "applyButton", null);
     this.draft = { ...(_a2 = options.initial) != null ? _a2 : WHOLE2 };
+    this.size = parseCoverSize((_b2 = options.size) != null ? _b2 : COVER_SIZE_DEFAULT);
     this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen() {
     var _a2, _b2;
     this.modalEl.addClass("vam-card-frame-modal");
     this.titleEl.setText(t("ui.topic_cover_frame_title"));
+    this.buildTools(this.contentEl.createDiv({ cls: "vam-card-frame-tools" }));
     const stage = this.contentEl.createDiv({ cls: "vam-card-frame-stage" });
     const given = (_b2 = (_a2 = this.options).card) == null ? void 0 : _b2.call(_a2);
     const card = given ? stage.appendChild(given) : stage.createDiv({ cls: "vam-node" });
@@ -24761,6 +24803,27 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
     cover.focus();
+  }
+  /** The tool row above the card: the picture size slider (30-100% of the content width). */
+  buildTools(row) {
+    const label = row.createEl("label", { cls: "vam-card-frame-tool" });
+    label.createSpan({ text: t("ui.card_edit_picture_size") });
+    const slider = label.createEl("input", {
+      cls: "vam-card-frame-size",
+      type: "range",
+      attr: { min: String(COVER_SIZE_MIN * 100), max: "100", step: String(SIZE_STEP) }
+    });
+    slider.value = String(Math.round(this.size * 100));
+    const update = () => {
+      const value = Number(slider.value);
+      if (!Number.isFinite(value)) return;
+      this.size = Math.min(1, Math.max(COVER_SIZE_MIN, value / 100));
+      slider.setAttr("aria-valuetext", `${Math.round(this.size * 100)}%`);
+      this.setDraft(this.draft);
+    };
+    slider.setAttr("aria-valuetext", `${Math.round(this.size * 100)}%`);
+    slider.addEventListener("input", update);
+    slider.addEventListener("change", update);
   }
   /** Replaces the card's cover (or adds one before the title) with the editable cover: picture, window, mask box, handles. */
   buildCover(card) {
@@ -24820,7 +24883,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply(frameToWrite(this.draft));
+      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size });
     } finally {
       this.close();
     }
@@ -24839,6 +24902,7 @@ var CoverFrameModal = class extends import_obsidian12.Modal {
     );
     const cover = this.coverEl;
     const box = this.boxEl;
+    if (cover) sizeCoverBox(cover, this.size);
     if (!cover || !box || !this.windowEl || !this.imgEl || !this.ghostEl || !this.shape) return;
     const win = placeCoverFrame({ frame: cover, window: this.windowEl, img: this.imgEl }, this.shape, frame);
     if (!win) return;
@@ -51235,17 +51299,18 @@ ${request.requirements}` : preset.text,
     return entry;
   }
   /**
-   * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame` in one undoable step, the same way
-   * changeTopicCover writes. The picture file is never touched; undo writes the old note text back.
+   * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame`, and with `look` the picture size, in one
+   * undoable step, the same way changeTopicCover writes. The picture file is never touched; undo writes the old note
+   * text back.
    */
-  async changeTopicCoverFrame(node, frame) {
+  async changeTopicCoverFrame(node, frame, look = {}) {
     if (!this.map || !this.markersEditable(node)) return null;
-    const write = frameToWrite(frame);
+    const write = { ...look, frame: frameToWrite(frame) };
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof import_obsidian34.TFile)) throw new Error(path);
-      await this.app.vault.process(file, (content) => withCoverFrame(content, write));
+      await this.app.vault.process(file, (content) => withCoverLook(content, write));
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
     }).commit({ deferRebuild: true, label: t("ui.topic_cover_frame_title") });
@@ -51266,7 +51331,7 @@ ${request.requirements}` : preset.text,
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       const src = image instanceof import_obsidian34.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
-      return src ? { src, path: cover.path, frame: cover.frame } : null;
+      return src ? { src, path: cover.path, frame: cover.frame, size: cover.size } : null;
     } catch (e) {
       return null;
     }
@@ -51302,12 +51367,13 @@ ${request.requirements}` : preset.text,
     const modal = new CoverFrameModal(this.app, {
       src: picture.src,
       initial: picture.frame,
+      size: picture.size,
       shape: (_a2 = coverShapes.get(picture.path)) != null ? _a2 : null,
       card: () => this.cardForEditor(node),
-      onApply: (frame) => new Promise(
+      onApply: ({ frame, ...look }) => new Promise(
         (done) => this.enqueue(async () => {
           try {
-            await this.changeTopicCoverFrame(node, frame);
+            await this.changeTopicCoverFrame(node, frame, look);
           } finally {
             done();
           }
@@ -58108,6 +58174,7 @@ ${request.requirements}` : preset.text,
     let source;
     let imagePath = "";
     let mask = null;
+    let size = 1;
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof import_obsidian34.TFile)) return;
@@ -58120,6 +58187,7 @@ ${request.requirements}` : preset.text,
       source = image instanceof import_obsidian34.TFile ? (_c = (_b2 = this.app.vault).getResourcePath) == null ? void 0 : _c.call(_b2, image) : void 0;
       imagePath = cover.path;
       mask = cover.frame;
+      size = cover.size;
     } catch (e) {
       return;
     }
@@ -58127,6 +58195,7 @@ ${request.requirements}` : preset.text,
     const frame = createDiv({ cls: "vam-card-cover" });
     const windowEl = mask ? frame.createDiv({ cls: "vam-card-cover-window" }) : null;
     if (mask) frame.addClass("is-framed");
+    sizeCoverBox(frame, size);
     const img = (windowEl != null ? windowEl : frame).createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
@@ -69645,12 +69714,15 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
 .vam-card-cover.is-framed { position: relative; }
+.vam-card-cover.is-resized { margin-left: auto; margin-right: auto; }
 .vam-card-cover.is-framed.is-sized { background: transparent; border-radius: 0; }
 .vam-card-cover-window { position: absolute; top: 0; height: auto; overflow: hidden; border-radius: var(--radius-s); }
 .vam-card-cover.is-framed:not(.is-sized) img { visibility: hidden; }
 .vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; }
 .vam-node .vam-card-cover .vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
 .vam-card-frame-modal { width: auto; max-width: min(720px, 96vw); }
+.vam-card-frame-tools { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: center; margin: 0 0 4px; }
+.vam-card-frame-tool { display: inline-flex; gap: 8px; align-items: center; }
 .vam-card-frame-stage { display: flex; justify-content: center; padding: 16px 12px 20px; overflow: auto; max-height: 70vh; }
 .vam-card-frame-stage > .vam-node { position: relative; left: auto; top: auto; flex: 0 0 auto; transform: none; cursor: default; }
 .vam-card-frame-stage .vam-card-cover.is-framed { overflow: visible; touch-action: none; user-select: none; }

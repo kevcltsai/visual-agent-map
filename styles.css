@@ -262,6 +262,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
 .vam-card-cover.is-sized { height: auto; }
 .vam-card-cover.is-framed { position: relative; }
+/* A picture size below 100% (topic-cover-size): the view sets the width; the box stays centred in the card. */
+.vam-card-cover.is-resized { margin-left: auto; margin-right: auto; }
 /* A masked cover: the box is the card's content width and as tall as the window; the part a mask hides at the sides is empty card, not frame colour. */
 .vam-card-cover.is-framed.is-sized { background: transparent; border-radius: 0; }
 /* The window is the masked region at its own scale (cover-layout.ts): left and width are inline percentages of the content width, height follows from its inline aspect-ratio, top is the top of the cover. Never stretched; a card clipped short cuts it from its bottom. */
@@ -272,6 +274,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node .vam-card-cover .vam-card-cover-window img { position: absolute; max-width: none; object-fit: fill; }
 /* "Edit card" dialog: the real card in the middle, edited in place. The mask box sits over the window; its handles show on hover, focus or touch. No CSS variables of its own. */
 .vam-card-frame-modal { width: auto; max-width: min(720px, 96vw); }
+.vam-card-frame-tools { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: center; margin: 0 0 4px; }
+.vam-card-frame-tool { display: inline-flex; gap: 8px; align-items: center; }
 .vam-card-frame-stage { display: flex; justify-content: center; padding: 16px 12px 20px; overflow: auto; max-height: 70vh; }
 .vam-card-frame-stage > .vam-node { position: relative; left: auto; top: auto; flex: 0 0 auto; transform: none; cursor: default; }
 .vam-card-frame-stage .vam-card-cover.is-framed { overflow: visible; touch-action: none; user-select: none; }

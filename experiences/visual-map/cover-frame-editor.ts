@@ -1,7 +1,7 @@
 import { Modal, type App } from "obsidian";
 import { t, type TranslationKey } from "../../i18n";
-import type { CoverFrame } from "./card-cover";
-import { coverWindow, placeCoverFrame } from "./cover-layout";
+import { COVER_SIZE_DEFAULT, COVER_SIZE_MIN, parseCoverSize, type CoverFrame } from "./card-cover";
+import { coverWindow, placeCoverFrame, sizeCoverBox } from "./cover-layout";
 
 /** The smallest a frame side can be, as a fraction of the picture. */
 export const MIN_FRAME_SIDE = 0.08;
@@ -84,11 +84,22 @@ export function nudgeCoverFrameEdge(mode: FrameDragMode, frame: CoverFrame, key:
   return dragCoverFrame(mode, frame, dx, dy);
 }
 
+/** What Apply hands over: the frame to write (null: whole picture, remove the key) and the picture size (k). */
+export interface CardCoverEdit {
+  frame: CoverFrame | null;
+  size: number;
+}
+
+/** The picture-size slider works in whole percents of the card's content width. */
+const SIZE_STEP = 1;
+
 export interface CoverFrameModalOptions {
   /** The picture's resource path; the file itself is shown as it is and never changed. */
   src: string;
   /** The note's frame, or null for the whole picture. */
   initial: CoverFrame | null;
+  /** The note's picture size (k, 0.3-1); the default 1 when absent. */
+  size?: number;
   /** The picture's width over height when the map already measured it, so the card has its size before the picture loads. */
   shape?: number | null;
   /**
@@ -96,8 +107,8 @@ export interface CoverFrameModalOptions {
    * by the editable one; everything else is shown as it is and does not take input. Without it, a plain card.
    */
   card?: () => HTMLElement;
-  /** Called once by Apply with the frame to write (null: whole picture, remove the key). Cancel and close never call it. */
-  onApply: (frame: CoverFrame | null) => Promise<void> | void;
+  /** Called once by Apply with the frame and size to write. Cancel and close never call it. */
+  onApply: (edit: CardCoverEdit) => Promise<void> | void;
 }
 
 interface CoverDrag {
@@ -119,6 +130,7 @@ interface CoverDrag {
  */
 export class CoverFrameModal extends Modal {
   private draft: CoverFrame;
+  private size: number;
   private shape: number | null;
   private drag: CoverDrag | null = null;
   private applying = false;
@@ -135,11 +147,13 @@ export class CoverFrameModal extends Modal {
   ) {
     super(app);
     this.draft = { ...(options.initial ?? WHOLE) };
+    this.size = parseCoverSize(options.size ?? COVER_SIZE_DEFAULT);
     this.shape = options.shape && Number.isFinite(options.shape) && options.shape > 0 ? options.shape : null;
   }
   onOpen(): void {
     this.modalEl.addClass("vam-card-frame-modal");
     this.titleEl.setText(t("ui.topic_cover_frame_title"));
+    this.buildTools(this.contentEl.createDiv({ cls: "vam-card-frame-tools" }));
     const stage = this.contentEl.createDiv({ cls: "vam-card-frame-stage" });
     const given = this.options.card?.();
     // Without the map card, the stylesheet's default card (its width and padding), empty but for the cover.
@@ -169,6 +183,28 @@ export class CoverFrameModal extends Modal {
     this.applyButton.addEventListener("click", () => void this.apply());
     this.setDraft(this.draft);
     cover.focus();
+  }
+  /** The tool row above the card: the picture size slider (30-100% of the content width). */
+  private buildTools(row: HTMLElement): void {
+    const label = row.createEl("label", { cls: "vam-card-frame-tool" });
+    label.createSpan({ text: t("ui.card_edit_picture_size") });
+    const slider = label.createEl("input", {
+      cls: "vam-card-frame-size",
+      type: "range",
+      attr: { min: String(COVER_SIZE_MIN * 100), max: "100", step: String(SIZE_STEP) }
+    });
+    slider.value = String(Math.round(this.size * 100));
+    const update = (): void => {
+      const value = Number(slider.value);
+      if (!Number.isFinite(value)) return;
+      // The range input already holds 30-100; a stray value is clamped to it (never read as "invalid, default").
+      this.size = Math.min(1, Math.max(COVER_SIZE_MIN, value / 100));
+      slider.setAttr("aria-valuetext", `${Math.round(this.size * 100)}%`);
+      this.setDraft(this.draft);
+    };
+    slider.setAttr("aria-valuetext", `${Math.round(this.size * 100)}%`);
+    slider.addEventListener("input", update);
+    slider.addEventListener("change", update);
   }
   /** Replaces the card's cover (or adds one before the title) with the editable cover: picture, window, mask box, handles. */
   private buildCover(card: HTMLElement): HTMLElement {
@@ -228,7 +264,7 @@ export class CoverFrameModal extends Modal {
     this.applying = true;
     if (this.applyButton) this.applyButton.disabled = true;
     try {
-      await this.options.onApply(frameToWrite(this.draft));
+      await this.options.onApply({ frame: frameToWrite(this.draft), size: this.size });
     } finally {
       this.close();
     }
@@ -246,6 +282,7 @@ export class CoverFrameModal extends Modal {
     );
     const cover = this.coverEl;
     const box = this.boxEl;
+    if (cover) sizeCoverBox(cover, this.size);
     if (!cover || !box || !this.windowEl || !this.imgEl || !this.ghostEl || !this.shape) return;
     // The map's own placement, so the dialog card is the map card.
     const win = placeCoverFrame({ frame: cover, window: this.windowEl, img: this.imgEl }, this.shape, frame);

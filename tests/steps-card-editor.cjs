@@ -142,3 +142,61 @@ test('card copy: a topic whose card is not drawn gets a plain card with its widt
   assert.equal(card.style.width, '320px');
   assert.deepEqual(card.children.map(c => [c.tag, c.text]), [['h3', 'Mars'], ['p', 'Red planet']]);
 });
+
+// ---- ticket 02: picture size (`topic-cover-size`, k = 0.3-1 of the content width)
+const cover = S.load('experiences/visual-map/card-cover.ts', { obsidian: { parseYaml: () => ({}), stringifyYaml: () => '', normalizePath: p => p } });
+
+test('size: parse accepts 0.3-1 as a number or a decimal string; anything else is the default 1, no error', () => {
+  assert.equal(cover.COVER_SIZE_KEY, 'topic-cover-size');
+  for (const [raw, k] of [[0.45, 0.45], ['0.45', 0.45], [' 0.3 ', 0.3], [1, 1], ['1', 1], [0.3, 0.3], ['.5', 0.5]]) assert.equal(cover.parseCoverSize(raw), k, JSON.stringify(raw));
+  for (const raw of [undefined, null, '', 'big', 0, 0.29, 1.01, 2, -0.5, NaN, Infinity, '45%', '0.5 0.5', [0.5], { k: 0.5 }, true]) assert.equal(cover.parseCoverSize(raw), 1, JSON.stringify(raw));
+});
+
+test('size: serialise keeps two decimals and removes the key at the default', () => {
+  assert.equal(cover.serialiseCoverSize(0.456), 0.46);
+  assert.equal(cover.serialiseCoverSize(0.3), 0.3);
+  assert.equal(cover.serialiseCoverSize(1), null);
+  assert.equal(cover.serialiseCoverSize(0.999), null, 'rounds to the default');
+  assert.equal(cover.serialiseCoverSize(5), null, 'out of range is the default');
+});
+
+test('size: withCoverLook writes the frame and the size in one write; the defaults remove both keys; other lines stay', () => {
+  const note = '---\ntitle: "T"\ntopic-color: red\n---\n# Body\n';
+  const looked = cover.withCoverLook(note, { frame: { x: 0.1, y: 0.2, w: 0.5, h: 0.5 }, size: 0.45 });
+  assert.equal(looked, '---\ntitle: "T"\ntopic-color: red\ntopic-cover-frame: "0.1 0.2 0.5 0.5"\ntopic-cover-size: "0.45"\n---\n# Body\n');
+  assert.equal(cover.withCoverLook(looked, { frame: null, size: 1 }), note);
+  assert.equal(cover.withCoverLook(looked, { frame: null }), '---\ntitle: "T"\ntopic-color: red\ntopic-cover-size: "0.45"\n---\n# Body\n', 'no size: the size key is left alone');
+  const resolved = cover.resolveCoverWithFrame({ frontmatter: { 'topic-cover-size': '0.45' }, embeds: [{ link: 'a.png' }] }, l => ({ path: l }));
+  assert.equal(resolved.size, 0.45);
+  assert.equal(cover.resolveCoverWithFrame({ frontmatter: { 'topic-cover-size': 7 }, embeds: [{ link: 'a.png' }] }, l => ({ path: l })).size, 1);
+});
+
+test('size: changing the picture or turning the cover off keeps the size (it is not tied to one picture)', () => {
+  const note = '---\ntopic-cover: "[[a.png]]"\ntopic-cover-frame: "0 0 0.5 0.5"\ntopic-cover-size: "0.5"\n---\n';
+  assert.match(cover.withCover(note, 'b.png'), /topic-cover-size: "0\.5"/);
+  assert.match(cover.withCoverOff(note), /topic-cover-size: "0\.5"/);
+});
+
+test('display math with k: D = k × content width, centred; the window scales with D and the mask region never changes', () => {
+  near(layout.coverDisplay(250, 1).width, 250, 'default');
+  nearBox(layout.coverDisplay(250, 0.4), { left: 75, width: 100 }, 'k 40%');
+  nearBox(layout.coverDisplay(250, 0.1), { left: 87.5, width: 75 }, 'below 30% is held at 30%');
+  nearBox(layout.coverDisplay(250, 3), { left: 0, width: 250 }, 'above 100% is held at 100%');
+  const frame = { x: 0.2, y: 0.3, w: 0.4, h: 0.4 };
+  const full = layout.coverWindow(400, 200, frame, layout.coverDisplay(250, 1).width);
+  const half = layout.coverWindow(400, 200, frame, layout.coverDisplay(250, 0.5).width);
+  for (const key of ['left', 'width', 'height']) near(half[key], full[key] / 2, key);
+  // The cap follows D too: a tall picture at k 0.5 is at most 0.75 × the content width tall.
+  near(layout.coverWindow(100, 400, null, layout.coverDisplay(200, 0.5).width).height, 150, 'cap at 1.5 D');
+});
+
+test('sizeCoverBox: a smaller picture narrows and centres the cover box; the default leaves the stylesheet width', () => {
+  const box = dom.element('div');
+  layout.sizeCoverBox(box, 0.45);
+  assert.equal(box.style.width, '45%');
+  assert.ok(box.classes.includes('is-resized'), 'centred by the stylesheet');
+  layout.sizeCoverBox(box, 1);
+  assert.equal(box.style.width, undefined);
+  assert.ok(!box.classes.includes('is-resized'));
+  assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname, '../styles.css'), 'utf8'), /\.vam-card-cover\.is-resized \{ margin-left: auto; margin-right: auto; \}/);
+});

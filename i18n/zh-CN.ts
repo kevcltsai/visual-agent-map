@@ -538,6 +538,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_cover_frame_title": "编辑卡片",
   "ui.topic_cover_frame_reset": "取消遮蔽",
   "ui.topic_cover_frame_apply": "应用",
+  "ui.card_edit_picture_size": "图片大小",
   "ui.topic_cover_frame_box": "封面图片。在里面拖动可移动卡片显示的部分；方向键移动，Shift 加方向键从右下角缩放。",
   "ui.topic_cover_frame_status": "左 {0}%、上 {1}%、宽 {2}%、高 {3}%",
   "ui.topic_cover_frame_load_failed": "无法加载图片。",

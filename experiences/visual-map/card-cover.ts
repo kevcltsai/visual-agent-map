@@ -22,6 +22,10 @@ export interface CoverFrame {
   w: number;
   h: number;
 }
+/** `topic-cover-size`: the whole picture's display width as a share of the card's content width (0.3-1, default 1). */
+export const COVER_SIZE_KEY = "topic-cover-size";
+export const COVER_SIZE_MIN = 0.3;
+export const COVER_SIZE_DEFAULT = 1;
 const IMAGE_EXTENSION = /\.(?:png|jpe?g|gif|webp)$/i;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -97,14 +101,58 @@ export function withCoverFrame(content: string, frame: CoverFrame | null): strin
   return setFrontmatterKeys(content, { [COVER_FRAME_KEY]: frame ? serialiseCoverFrame(frame) : null });
 }
 
-/** `resolveCover` plus the note's valid frame (null: whole picture). Off or no picture stays as `resolveCover` says. */
+/**
+ * Reads `topic-cover-size`: a number (or a plain decimal string) from 0.3 to 1. Anything else, missing or out of range,
+ * is the default 1 (no error).
+ */
+export function parseCoverSize(raw: unknown): number {
+  const value =
+    typeof raw === "number" ? raw : typeof raw === "string" && FRAME_NUMBER.test(raw.trim()) ? Number(raw) : NaN;
+  if (!Number.isFinite(value) || value < COVER_SIZE_MIN - FRAME_EPSILON || value > 1 + FRAME_EPSILON)
+    return COVER_SIZE_DEFAULT;
+  return Math.min(1, Math.max(COVER_SIZE_MIN, value));
+}
+
+/** The size as written to the note (two decimals), or null (no key) for the default. */
+export function serialiseCoverSize(size: number): number | null {
+  const value = Math.round(parseCoverSize(size) * 100) / 100;
+  return value >= COVER_SIZE_DEFAULT ? null : value;
+}
+
+/** What "Edit card" writes in one go: the mask and, when given, the picture size. */
+export interface CoverLook {
+  frame: CoverFrame | null;
+  size?: number;
+}
+
+/**
+ * Sets (or removes, at the defaults) `topic-cover-frame` and, when the look has one, `topic-cover-size`, in one write;
+ * every other line and the body stay as written. The size is written as a quoted decimal, like the frame.
+ */
+export function withCoverLook(content: string, look: CoverLook): string {
+  const values: Record<string, string | null> = {
+    [COVER_FRAME_KEY]: look.frame ? serialiseCoverFrame(look.frame) : null
+  };
+  if (look.size !== undefined) {
+    const size = serialiseCoverSize(look.size);
+    values[COVER_SIZE_KEY] = size === null ? null : String(size);
+  }
+  return setFrontmatterKeys(content, values);
+}
+
+/** `resolveCover` plus the note's valid frame (null: whole picture) and picture size. Off or no picture stays as `resolveCover` says. */
 export function resolveCoverWithFrame(
   cache: CoverCache | null | undefined,
   resolve: CoverResolve
-): { path: string; frame: CoverFrame | null } | { off: true } | null {
+): { path: string; frame: CoverFrame | null; size: number } | { off: true } | null {
   const cover = resolveCover(cache, resolve);
   if (!cover || !("path" in cover)) return cover;
-  return { path: cover.path, frame: parseCoverFrame(cache?.frontmatter?.[COVER_FRAME_KEY]) };
+  const frontmatter = cache?.frontmatter;
+  return {
+    path: cover.path,
+    frame: parseCoverFrame(frontmatter?.[COVER_FRAME_KEY]),
+    size: parseCoverSize(frontmatter?.[COVER_SIZE_KEY])
+  };
 }
 
 /** A link path safe inside `[[...]]` and a YAML double-quoted scalar: no brackets, pipe or line breaks. */

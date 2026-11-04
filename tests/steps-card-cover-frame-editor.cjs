@@ -288,13 +288,14 @@ test('dialog: apply hands over the frame once and closes; a whole-picture draft 
   ui.text('Apply').click();
   await dom.tick();
   assert.equal(ui.applied.length, 1, 'a second click does not write again');
-  nearFrame(ui.applied[0], { x: 0.21, y: 0.3, w: 0.4, h: 0.4 });
+  nearFrame(ui.applied[0].frame, { x: 0.21, y: 0.3, w: 0.4, h: 0.4 });
+  assert.equal(ui.applied[0].size, 1, 'the size is handed over with the frame (default)');
   assert.equal(ui.modal.closeCount, 1);
   const whole = openEditor({ initial: START });
   whole.text('Show whole picture').click();
   whole.text('Apply').click();
   await dom.tick();
-  assert.deepEqual(whole.applied, [null]);
+  assert.deepEqual(whole.applied.map(edit => edit.frame), [null]);
 });
 
 test('dialog: cancel and close write nothing', async () => {
@@ -519,4 +520,78 @@ test('card: the right-click menu has "Edit card" only for an editable topic with
   const locked = await harness(TEXT);
   locked.view.selection.toggleMultiSelect();
   assert.equal(items(locked).includes('Edit card'), false);
+});
+
+// ---- ticket 02: the picture size slider
+test('size slider: in the tool row above the card, 30-100 percent, starts from the note; it narrows the cover and never changes the mask', async () => {
+  const applied = [];
+  const modal = new editor.CoverFrameModal({}, { src: 'app://res/img/a.png', initial: START, size: 0.8, shape: 2, card: plainCard, onApply: async edit => { applied.push(edit); } });
+  modal.open();
+  const el = modal.contentEl;
+  const tools = dom.find(el, i => dom.hasCls(i, 'vam-card-frame-tools'));
+  const stage = dom.find(el, i => dom.hasCls(i, 'vam-card-frame-stage'));
+  assert.ok(el.children.indexOf(tools) < el.children.indexOf(stage), 'the tool row is above the card');
+  const slider = dom.find(tools, i => i.tag === 'input');
+  assert.equal(slider.type, 'range');
+  assert.deepEqual([slider.attrs.min, slider.attrs.max], ['30', '100']);
+  assert.equal(slider.value, '80');
+  assert.ok(dom.findAll(tools, i => i.text === 'Picture size').length, 'labelled "Picture size"');
+  const cover = dom.find(el, i => dom.hasCls(i, 'vam-card-cover'));
+  assert.equal(cover.style.width, '80%');
+  slider.value = '45';
+  slider.input();
+  assert.equal(cover.style.width, '45%', 'the cover follows the slider at once');
+  assert.equal(slider.attrs['aria-valuetext'], '45%');
+  nearFrame(modal.draft, START, 'the mask is the same region');
+  const win = dom.find(el, i => dom.hasCls(i, 'vam-card-cover-window'));
+  near(parseFloat(win.style.left), 20, 'and sits at the same share of D');
+  slider.value = '10';
+  slider.input();
+  assert.equal(cover.style.width, '30%', 'held at the minimum');
+  slider.value = '100';
+  slider.change();
+  assert.equal(cover.style.width, undefined, 'full size: the stylesheet width');
+  slider.value = '45';
+  slider.input();
+  dom.find(el, i => i.tag === 'button' && i.text === 'Apply').click();
+  await dom.tick();
+  assert.equal(applied.length, 1);
+  assert.equal(applied[0].size, 0.45);
+  nearFrame(applied[0].frame, START);
+});
+
+test('size slider: cancel writes nothing; a dialog for a note without a size starts at 100 percent', async () => {
+  const applied = [];
+  const modal = new editor.CoverFrameModal({}, { src: 'x', initial: null, shape: 2, card: plainCard, onApply: async edit => { applied.push(edit); } });
+  modal.open();
+  const slider = dom.find(modal.contentEl, i => i.tag === 'input');
+  assert.equal(slider.value, '100');
+  slider.value = '50';
+  slider.input();
+  modal.close();
+  await dom.tick();
+  assert.deepEqual(applied, []);
+});
+
+test('write: frame and size are one history entry; undo returns the note byte for byte', async () => {
+  const h = await harness(TEXT);
+  const entry = await h.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, START, { size: 0.5 });
+  assert.equal(h.view.history.entries.length, 1, 'exactly one undo entry');
+  assert.match(h.contents.get(NOTE), /topic-cover-frame: "0\.2 0\.3 0\.4 0\.4"\ntopic-cover-size: "0\.5"\n---/);
+  await entry.undo();
+  assert.equal(h.contents.get(NOTE), TEXT);
+  const sized = await harness('---\ntype: topic\ntopic-cover-size: "0.5"\n---\n');
+  await sized.view.changeTopicCoverFrame({ id: 'm', path: NOTE }, null, { size: 1 });
+  assert.equal(sized.contents.get(NOTE), '---\ntype: topic\n---\n', 'the default size removes the key');
+});
+
+test('open: the dialog gets the note size, and Apply sends frame and size to one write', async () => {
+  const h = await harness(TEXT, { cache: { frontmatter: { 'topic-cover-size': '0.6' }, embeds: [{ link: 'img/a.png' }] } });
+  h.view.enqueue = fn => fn();
+  const modal = h.view.openCoverFrameEditor({ id: 'm', path: NOTE });
+  assert.equal(dom.find(modal.contentEl, i => i.tag === 'input').value, '60');
+  dom.find(modal.contentEl, i => i.tag === 'button' && i.text === 'Apply').click();
+  await dom.tick(); await dom.tick();
+  assert.match(h.contents.get(NOTE), /topic-cover-size: "0\.6"/);
+  assert.equal(h.view.history.entries.length, 1);
 });

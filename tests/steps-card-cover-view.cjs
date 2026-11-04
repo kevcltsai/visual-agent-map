@@ -449,3 +449,15 @@ test('counter-example: the window picture rule out-specifies Obsidian core img:n
   const selector = rule.slice(0, rule.indexOf('{')).trim();
   assert.ok(beats(specificity(selector), [0, 2, 1]), `${selector} -> ${specificity(selector)}`);
 });
+
+// Card editor 02: `topic-cover-size` narrows the map card's cover box (centred); the mask stays the same region.
+test('picture size: the map card cover is k of the content width, centred, with or without a mask; invalid is full width', () => {
+  for (const [frontmatter, width] of [[{ 'topic-cover-size': '0.45' }, '45%'], [{ 'topic-cover-size': 0.5, 'topic-cover-frame': '0.1 0.1 0.5 0.5' }, '50%'], [{ 'topic-cover-size': 'huge' }, undefined], [{}, undefined]]) {
+    before();
+    const c = card();
+    relay(framed(frontmatter)).paintCover(c, 'Topics/n.md');
+    const [frame] = frames(c);
+    assert.equal(frame.style.width, width, JSON.stringify(frontmatter));
+    assert.equal(frame.classes.includes('is-resized'), Boolean(width));
+  }
+});

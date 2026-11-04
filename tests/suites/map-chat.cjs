@@ -4904,5 +4904,5 @@ integrationTest('chat 03: the two other choices send a new chat message that say
   eq(sent.map(s => s.origin.selectedIds), [[h.ids.a, h.ids.b], [h.ids.a, h.ids.b]]);
   assert.equal(sent[0].origin.text, 'Split “Body”, “Mind” into topics that each hold one single concept, and give each of them the type Atomic knowledge.');
   assert.equal(sent[1].origin.text, 'Change the type of “Body”, “Mind” to Atomic knowledge, and rewrite each note to fit that type.');
-  assert.equal(sent[0].retry, true, 'sent as a fresh turn, not a detail re-send');
+  assert.equal(sent[0].retry, undefined, 'a plain new turn: sendMapChat has no re-send flag any more');
 });

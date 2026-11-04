@@ -394,3 +394,14 @@ test('K1 omitEmpty reaches the lead-in path of the assembler: a template block w
   assert.match(withFlag, /LEAD-X sentence\.[^]*Leave out a whole section[^]*overrides the later formatting rule/);
   assert.doesNotMatch(without, /Leave out a whole section/);
 });
+
+test('F1 counterexample: 來源 / Sources next to the old sources name does not take a second sources role', () => {
+  for (const text of ['## 核心結論\n\n## 證據與來源\n\n## 來源\n\n## 更新紀錄\n', '## Core conclusions\n\n## Evidence and sources\n\n## Sources\n\n## Update log\n']) {
+    const style = ok(text);
+    eq(style.sections.map(section => section.role), ['none', 'sources', 'none', 'log']);
+  }
+  eq(ok('## 核心結論\n\n## 來源\n\n## 證據與來源\n\n## 更新紀錄\n').sections.map(section => section.role), ['none', 'none', 'sources', 'log']);
+  eq(ok('## Core conclusions\n\n## Sources\n\n## Evidence and sources\n\n## Update log\n').sections.map(section => section.role), ['none', 'none', 'sources', 'log']);
+  const alone = ok('## 核心結論\n\n## 來源\n\n## 更新紀錄\n');
+  eq(alone.sections.map(section => section.role), ['none', 'sources', 'log']);
+});

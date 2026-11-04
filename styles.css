@@ -89,11 +89,13 @@
 .vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }
 .vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }
 .vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }
-/* Frames (map-images P7): a layer behind the image layer (z-index -2 inside the stage's stacking context). The frame is an outline and ignores the pointer; only its label chip takes it. */
-.vam-boundaries { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -2; pointer-events: none; }
-.vam-boundary { position: absolute; box-sizing: border-box; pointer-events: none; border: 2px dashed color-mix(in srgb, var(--text-muted) 60%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--interactive-accent) 4%, transparent); }
-.vam-boundary:focus-visible, .vam-boundary.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
-.vam-boundary-label { position: absolute; left: 10px; top: -12px; max-width: calc(100% - 20px); padding: 1px 8px; overflow: hidden; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-primary); color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; pointer-events: auto; cursor: pointer; user-select: none; }
+/* Frames (map-images P7): the layer and the frame make no stacking context, so the outline (::before, z-index -2 inside the stage's stacking context) sits behind the images and cards while the label chip (z-index 2) is drawn over neighbouring cards instead of under them (ticket 31). The frame is an outline and ignores the pointer; only its label chip takes it. */
+.vam-boundaries { position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; }
+.vam-boundary { position: absolute; box-sizing: border-box; pointer-events: none; }
+.vam-boundary::before { content: ""; position: absolute; z-index: -2; inset: 0; box-sizing: border-box; pointer-events: none; border: 2px dashed color-mix(in srgb, var(--text-muted) 60%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--interactive-accent) 4%, transparent); }
+.vam-boundary:focus-visible, .vam-boundary.is-selected { outline: none; }
+.vam-boundary:focus-visible::before, .vam-boundary.is-selected::before { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-boundary-label { position: absolute; z-index: 2; left: 12px; top: -10px; max-width: calc(100% - 24px); padding: 1px 8px; overflow: hidden; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-primary); color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; pointer-events: auto; cursor: pointer; user-select: none; }
 .vam-boundary-label.is-empty { min-width: 28px; min-height: 12px; }
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }

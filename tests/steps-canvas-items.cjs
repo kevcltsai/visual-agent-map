@@ -76,6 +76,17 @@ test('counter-example 9: bounds only count members that exist', () => {
   assert.equal(ci.boundaryBounds(['gone'], rectOf, 10), null);
 });
 
+test('ticket 31: a frame keeps its padding off a neighbouring non-member card (half the gap), but members and far cards change nothing', () => {
+  const above = { x: 0, y: -50, w: 100, h: 44 };   // bottom -6, gap 6 above n1
+  assert.deepEqual(plain(ci.boundaryBounds(['n1'], rectOf, 16, [above])), { x: -16, y: -3, w: 132, h: 40 + 3 + 16 });
+  const far = { x: 0, y: -500, w: 100, h: 40 };
+  assert.deepEqual(plain(ci.boundaryBounds(['n1'], rectOf, 16, [far])), plain(ci.boundaryBounds(['n1'], rectOf, 16)));
+  const touching = { x: 0, y: -40, w: 100, h: 40 };
+  assert.equal(ci.boundaryBounds(['n1'], rectOf, 16, [touching]).y, 0);
+  const inside = { x: 10, y: 10, w: 20, h: 10 };   // overlaps the members: no side is limited
+  assert.deepEqual(plain(ci.boundaryBounds(['n1'], rectOf, 16, [inside])), plain(ci.boundaryBounds(['n1'], rectOf, 16)));
+});
+
 test('counter-example 8: pruneBoundaries removes a boundary whose members all vanished, keeps partial ones and other items', () => {
   const items = [img(), boundary({ id: 'all-gone', members: ['x', 'y'] }), boundary({ id: 'partial', members: ['n1', 'y'] }), { kind: 'sticky' }];
   const out = plain(ci.pruneBoundaries(items, new Set(['n1'])));

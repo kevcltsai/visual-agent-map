@@ -187,10 +187,6 @@ export function buildMapSvg(scene: MapScene): string {
     out.push(
       `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="12" fill="none" stroke="${stroke}" stroke-dasharray="6 4"/>`
     );
-    if (typeof b.label === "string" && b.label)
-      out.push(
-        `<text x="${box[0] + 8}" y="${box[1] + 16}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml(b.label.slice(0, TEXT_LIMIT))}</text>`
-      );
     out.push("</g>");
   }
   for (const edge of scene.edges ?? []) {
@@ -264,6 +260,21 @@ export function buildMapSvg(scene: MapScene): string {
       );
     });
     out.push("</g>");
+  }
+  // Frame labels last, as a chip on the frame's top edge (as on screen), so no card is drawn over a label.
+  for (const b of scene.boundaries ?? []) {
+    const box = rect(b?.x, b?.y, b?.w, b?.h);
+    if (!box || typeof b.label !== "string" || !b.label) continue;
+    const stroke = color(b.stroke, strokeColor);
+    const label = b.label.slice(0, TEXT_LIMIT);
+    const wide = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/;
+    const textWidth = Array.from(label).reduce((sum, ch) => sum + (wide.test(ch) ? 13 : 7), 0);
+    const chipWidth = Math.max(20, Math.min(box[2] - 24, textWidth + 16));
+    const lines = wrapText(label, Math.max(7, chipWidth - 16));
+    out.push(
+      `<g><rect x="${box[0] + 12}" y="${box[1] - 10}" width="${chipWidth}" height="20" rx="10" fill="${background}" stroke="${stroke}"/>` +
+        `<text x="${box[0] + 20}" y="${box[1] + 4}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml(lines[0] ?? "")}</text></g>`
+    );
   }
   out.push("</svg>");
   return out.filter(Boolean).join("\n");

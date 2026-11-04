@@ -1,4 +1,6 @@
 import { normalizeVaultPath } from "./map-chat-guard";
+import type { HypothesisStrength, TopicKind } from "../note-values";
+import type { TopicRelationKind } from "../map-model";
 
 /**
  * Builds what the model sees in a map chat turn. Pure: the caller reads the map, the selection and the Markdown text; this
@@ -31,12 +33,23 @@ export interface MapChatOutlineNode {
   summary: string;
   parentId: string | null;
   depth: number;
+  /** The card's topic type; "topic" (or absent) is an ordinary topic and is not sent. Dropped on an AIM map. */
+  kind?: TopicKind;
+  /** A hypothesis's strength; sent only next to `kind: "hypothesis"`. Dropped on an AIM map. */
+  strength?: HypothesisStrength;
   /** Set only for a card whose last AI task failed. */
   status?: "error";
   /** Why it failed; only with `status: "error"`. */
   error?: string;
   /** Label of the model on the other provider the failure can be retried with; only for a provider error that has one. */
   retryWith?: string;
+}
+/** A semantic link between two cards, as stored on the map: `from` is A, `to` is B (`related` has no direction). */
+export interface MapChatRelation {
+  kind: TopicRelationKind;
+  from: string;
+  to: string;
+  description?: string;
 }
 export interface MapChatTopicRef {
   id: string;
@@ -102,6 +115,10 @@ export interface MapChatContextInput {
   userTexts?: MapChatUserText[];
   /** The user's summary brackets, read-only; omitted or empty leaves the context exactly as it was. */
   summaries?: MapChatSummary[];
+  /** The map's relations between cards; a relation with an end not in the outline is left out. Omitted or empty sends none. */
+  relations?: MapChatRelation[];
+  /** An AIM map: it has no topic types, strengths or relations, so none of them is sent even when given. */
+  aim?: boolean;
   activeFile?: MapChatFile | null;
   history: MapChatTurn[];
   /** Question and answer rounds to keep; default {@link MAP_CHAT_DEFAULT_TURNS}. */
@@ -122,6 +139,8 @@ export interface MapChatContext {
   selectedCount: number;
   /** The reply must start with `create_map` (see {@link MapChatContextInput.noEditableMap}). */
   noEditableMap: boolean;
+  /** An AIM map: a reply's topic types are skipped (see {@link MapChatContextInput.aim}). */
+  aim: boolean;
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;
   /** Normalised path -> content hash of every Markdown file sent whole in this turn. */
@@ -165,6 +184,12 @@ const clip = (value: string, limit: number): string => {
   const text = value.replace(/\s+/g, " ").trim();
   const characters = [...text];
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}…` : text;
+};
+
+/** `kind` only for a type other than an ordinary topic, `strength` only for a hypothesis; nothing on an AIM map. */
+const kindFields = (node: MapChatOutlineNode, aim: boolean): { kind?: TopicKind; strength?: HypothesisStrength } => {
+  if (aim || !node.kind || node.kind === "topic") return {};
+  return { kind: node.kind, ...(node.kind === "hypothesis" && node.strength ? { strength: node.strength } : {}) };
 };
 
 export function buildMapChatContext(input: MapChatContextInput): MapChatContext {
@@ -248,6 +273,17 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     0,
     MAP_CHAT_MAP_TITLE_LIMIT
   );
+  // Only relations whose two ends are cards in the outline; the description is sent whole (it is one line of at most 200).
+  const relations = input.aim
+    ? []
+    : (input.relations ?? [])
+        .filter(link => byId.has(link.from) && byId.has(link.to))
+        .map(link => ({
+          kind: link.kind,
+          from: link.from,
+          to: link.to,
+          ...(link.description ? { description: link.description } : {})
+        }));
   const turns = Math.max(0, input.maxTurns ?? MAP_CHAT_DEFAULT_TURNS) * 2;
   const history = turns ? input.history.slice(-turns) : [];
   const json = JSON.stringify({
@@ -260,8 +296,10 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       summary: clip(node.summary, SUMMARY_LIMIT),
       parentId: node.parentId,
       depth: node.depth,
+      ...kindFields(node, !!input.aim),
       ...errorFields(node)
     })),
+    ...(relations.length ? { relations } : {}),
     selected: input.selected.map(ref => topic(ref, true)),
     references: input.references.map(ref => topic(ref, false)),
     snippets,
@@ -301,6 +339,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     nodeIds: [...ids],
     selectedCount: input.selected.length,
     noEditableMap: !!input.noEditableMap,
+    aim: !!input.aim,
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
     mdHashes: hashes,
     topicHashes

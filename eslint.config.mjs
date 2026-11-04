@@ -39,6 +39,11 @@ export default defineConfig([
         {
           selector: "TSAsExpression[typeAnnotation.type='TSUnionType'] > ChainExpression > CallExpression",
           message: "Do not assert an optional call to a union (the Obsidian scanner flags it as an unnecessary assertion). Use a generic call such as querySelector?.<HTMLElement>(...)."
+        },
+        {
+          // The 0.29.0 scan flagged `iterator.next().value as T | undefined` (view.ts firstCardId) as unnecessary.
+          selector: "TSAsExpression > MemberExpression[property.name='value'] > CallExpression[callee.property.name='next']",
+          message: "Do not assert an iterator's next().value (the Obsidian scanner flags it as an unnecessary assertion). Use a for...of loop or check .done instead."
         }
       ],
       "obsidianmd/detach-leaves": "error",

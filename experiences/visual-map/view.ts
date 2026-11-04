@@ -797,6 +797,10 @@ interface ChatRun {
   ownershipDirty?: boolean;
   /** True for a held batch (five cards or more): its cards leave the derived data to the one rebuild at the end. */
   deferRebuild?: boolean;
+  /** Cards whose note the reply wrote (or created): their files are part of the reply's undo check. */
+  notes?: Set<string>;
+  /** Markdown files the reply edited or created (vault paths): part of the reply's undo check. */
+  files?: Set<string>;
 }
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
@@ -1958,7 +1962,8 @@ export class VisualAgentMapView extends ItemView {
     return false;
   }
   private firstCardId(): string | undefined {
-    return this.cardEls.keys().next().value as string | undefined;
+    for (const id of this.cardEls.keys()) return id;
+    return undefined;
   }
   private mapFocusLookup(): {
     card: (id: string) => HTMLElement | undefined;
@@ -15875,14 +15880,20 @@ export class VisualAgentMapView extends ItemView {
         ...(target ? { retryWith: this.plugin.modelLabel(target) } : {})
       };
     };
-    const outline: MapChatOutlineNode[] = map.nodes.map(node => ({
-      id: node.id,
-      title: titleOf(node),
-      summary: summaryOf(node.id),
-      parentId: node.parentId,
-      depth: depthOf(node),
-      ...failureOf(node.id)
-    }));
+    // Type and strength come from the same readers the cards use, so an AIM map (and an AIM card) reads as an ordinary topic.
+    const outline: MapChatOutlineNode[] = map.nodes.map(node => {
+      const strength = this.hypothesisStrengthOf(node.id);
+      return {
+        id: node.id,
+        title: titleOf(node),
+        summary: summaryOf(node.id),
+        parentId: node.parentId,
+        depth: depthOf(node),
+        kind: this.topicKindOf(node.id),
+        ...(strength ? { strength } : {}),
+        ...failureOf(node.id)
+      };
+    });
     const ref = (id: string): MapChatTopicRef | null => {
       const node = byId.get(id);
       return node
@@ -15938,6 +15949,8 @@ export class VisualAgentMapView extends ItemView {
       files,
       userTexts: this.chatUserTexts(),
       summaries: this.chatSummaries(),
+      aim: !this.relationsEnabled(),
+      relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns()
     });
@@ -16189,8 +16202,6 @@ export class VisualAgentMapView extends ItemView {
     switch (reason) {
       case "many_actions":
         return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
-      case "delete_branch":
-        return t("ui.map_chat_plan_reason_delete_branch");
       case "many_research":
         // The same count the plan was judged by (a selection made earlier in the reply counts).
         return t("ui.map_chat_plan_reason_many_research_0", researchTargetsOf(result.actions, selectedCount));
@@ -16233,6 +16244,8 @@ export class VisualAgentMapView extends ItemView {
       estimate: plan.estimatedCalls
         ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls)
         : t("ui.map_chat_plan_calls_none"),
+      // Undo takes the plan's changes back; only the AI work it starts is said to stay.
+      aiWork: result.actions.some(action => action.kind === "run_map_action"),
       state: "pending",
       apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor),
       cancel: () => {
@@ -16360,6 +16373,14 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_auto_layout");
       case "focus_topic":
         return t("ui.map_chat_do_focus_0", title(action.nodeId));
+      case "set_topic_kind": {
+        const kind = this.chatKindText(action.topicKind, action.strength);
+        return action.nodeIds.length === 1
+          ? t("ui.map_chat_do_set_kind_0_1", title(action.nodeIds[0]), kind)
+          : t("ui.map_chat_do_set_kind_many_0_1", action.nodeIds.length, kind);
+      }
+      case "ask_topic_kind":
+        return t("ui.map_chat_do_ask_kind_0", this.chatKindText(action.topicKind));
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
@@ -16400,6 +16421,62 @@ export class VisualAgentMapView extends ItemView {
   }
   private currentModelId(): string {
     return this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
+  }
+  /** "Hypothesis" or "Hypothesis (Strong)" in the language of the UI. */
+  private chatKindText(kind: TopicKind, strength?: HypothesisStrength): string {
+    const name = t(`ui.topic_kind_${kind}`);
+    return kind === "hypothesis" && strength
+      ? t("ui.map_chat_kind_with_strength_0_1", name, t(STRENGTH_LABEL[strength]))
+      : name;
+  }
+  /**
+   * An ask_topic_kind of a reply: the three ways to read it are offered under the answer and nothing happens until one is
+   * picked. "Only the type" applies a set_topic_kind; the other two send the user's choice to the chat as a new message, with
+   * the cards selected so their notes are in it.
+   */
+  private offerChatKindChoices(ids: string[], kind: TopicKind): void {
+    const chat = this.chat;
+    if (!chat || !ids.length) return;
+    const kindText = this.chatKindText(kind);
+    const titles = (): string =>
+      ids.map(id => `“${this.chatTopicState(id)?.title ?? id}”`).join(t("ui.map_chat_kind_choice_topics_separator"));
+    const follow = (key: TranslationKey): void => {
+      if (!this.chat || this.chat !== chat || chat.isBusy || this.chatApplying || this.closed) return;
+      const known = ids.filter(id => this.map?.nodes.some(node => node.id === id));
+      void this.sendMapChat({ text: t(key, titles(), kindText), chips: [], selectedIds: known });
+    };
+    chat.showChoices({
+      prompt: t("ui.map_chat_kind_choice_prompt_0", kindText),
+      options: [
+        { label: t("ui.map_chat_kind_choice_type_only"), pick: () => void this.chatPickKind(ids, kind) },
+        {
+          label: t("ui.map_chat_kind_choice_split"),
+          pick: () => follow("ui.map_chat_kind_choice_split_message_0_1")
+        },
+        {
+          label: t("ui.map_chat_kind_choice_rewrite"),
+          pick: () => follow("ui.map_chat_kind_choice_rewrite_message_0_1")
+        }
+      ],
+      picked: false
+    });
+  }
+  /** "Only the type" of an ask_topic_kind: one set_topic_kind, applied like any reply, its result lines added to the answer. */
+  private async chatPickKind(ids: string[], kind: TopicKind): Promise<void> {
+    const chat = this.chat;
+    if (!chat || this.closed || chat.isBusy || this.chatApplying || !this.map) return;
+    this.chatApplying = true;
+    try {
+      const lines = await this.applyMapChatActions(
+        { actions: [{ kind: "set_topic_kind", nodeIds: ids, topicKind: kind }], rejected: [] },
+        { mdHashes: {}, topicHashes: {} }
+      );
+      if (this.chat === chat) chat.appendLines(lines);
+    } catch (error) {
+      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage(error) }]);
+    } finally {
+      this.chatApplying = false;
+    }
   }
   /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
   private chatTargetModels(ids: string[]): string[] {
@@ -16488,7 +16565,9 @@ export class VisualAgentMapView extends ItemView {
   /**
    * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be
    * re-entered, and the task a run action starts uses it too), checked again for staleness inside it and, for Markdown
-   * files, by the write guard. None of it leaves an undo step. A stale or refused action is skipped; the rest go on.
+   * files, by the write guard. The writes leave one undo step together (the same map transactions as the manual edits,
+   * folded, see {@link pushChatReplyEntry}); the AI work a run action starts is not part of it. A stale or refused action is
+   * skipped; the rest go on.
    * Selecting cards, the run actions and `open_map` come after every write, outside any mutate. Resolves with one line per action.
    *
    * `new:<ref>` ids are swapped for the real card ids as the cards are created; a card whose parent was not created is skipped.
@@ -16513,7 +16592,10 @@ export class VisualAgentMapView extends ItemView {
       skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines: MapChatLine[] = [];
     const later: number[] = [];
-    const run: ChatRun = { refs: new Map(), created: [] };
+    const run: ChatRun = { refs: new Map(), created: [], notes: new Set(), files: new Set() };
+    // Every entry the writes push is held back, then pushed as the reply's one undo step (a create_map's map switch clears
+    // the history, and so what was collected for the old map; the new map's writes are collected from there).
+    this.history.openGroup();
     // How many find_images this reply has asked for so far (the first MAP_CHAT_FIND_IMAGES_LIMIT start, the rest are skipped).
     const laterBatch = { imageSearches: 0 };
     // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
@@ -16537,7 +16619,12 @@ export class VisualAgentMapView extends ItemView {
       if (batched) this.holdChatBatch();
       run.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
-        if (action.kind === "select_topics" || action.kind === "run_map_action" || action.kind === "open_map") {
+        if (
+          action.kind === "select_topics" ||
+          action.kind === "run_map_action" ||
+          action.kind === "open_map" ||
+          action.kind === "ask_topic_kind"
+        ) {
           later.push(index);
           continue;
         }
@@ -16630,16 +16717,22 @@ export class VisualAgentMapView extends ItemView {
         }
       }
     } finally {
-      // The chat's own writes are not undoable (the owner's choice). Undo entries hold snapshots of the map from before
-      // the write, so any entry that survived would put the map back out of step with the notes the chat wrote or moved.
-      // Drop the history here and in every other view of the same map, like any other change made outside the view.
+      // Whatever ended the loop (done, stopped, closed, thrown), the derived data, the held repaint and the re-read happen once.
+      await this.settleChatBatch(run);
+      // The writes become one undo step of this view. Each was a map transaction (or a guarded file write) like a manual edit,
+      // so undo checks the files instead of writing an old snapshot over them. Another view of the same map keeps no entry
+      // that would not know about these writes: its history is cleared, as for any change made outside it.
+      const entries = this.history.closeGroup();
       if (wrote) {
-        this.history.clear();
+        try {
+          if (!this.closed && this.path === anchor.path)
+            await this.pushChatReplyEntry(entries, anchor.path, run.notes ?? new Set(), run.files ?? new Set());
+        } catch {
+          // The check could not be read: the writes stay, without an undo step (never a half one).
+        }
         for (const view of this.plugin.views()) if (view !== this && touched.has(view.path)) view.history.clear();
         this.updateHistoryButtons();
       }
-      // Whatever ended the loop (done, stopped, closed, thrown), the derived data, the held repaint and the re-read happen once.
-      await this.settleChatBatch(run);
     }
     for (const index of later) {
       const action = result.actions[index];
@@ -16652,6 +16745,17 @@ export class VisualAgentMapView extends ItemView {
           if (action.kind === "open_map") {
             outcome = await this.chatOpenMap(action.title, anchor, same);
             if (outcome.status === "done") touched.add(anchor.path);
+          } else if (action.kind === "ask_topic_kind") {
+            // Cards this reply made are named by their real ids; one that was never made is left out.
+            const ids = action.nodeIds
+              .map(id => (id.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id))
+              .filter((id): id is string => !!id && !!this.map?.nodes.some(node => node.id === id));
+            if (!ids.length) outcome = skipped("ui.map_chat_skip_topic_gone");
+            else if (!this.relationsEnabled()) outcome = skipped("ui.map_chat_skip_unavailable");
+            else {
+              this.offerChatKindChoices(ids, action.topicKind);
+              outcome = { status: "done" };
+            }
           } else {
             const resolved = this.chatResolveTargets(
               action as Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
@@ -16670,7 +16774,9 @@ export class VisualAgentMapView extends ItemView {
     const all = [...lines];
     if (result.rejected.length)
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
-    if (wrote) all.push({ status: "done", text: t("ui.map_chat_not_undoable") });
+    // Undo takes the reply's writes back; the AI work it started records its own steps, so only then is anything said.
+    if (later.some(index => result.actions[index].kind === "run_map_action" && lines[index]?.status === "done"))
+      all.push({ status: "done", text: t("ui.map_chat_not_undoable") });
     return all;
   }
   /** Places the cards a reply made (and only those): each new branch beside its parent, a new tree below the others. */
@@ -16822,7 +16928,10 @@ export class VisualAgentMapView extends ItemView {
   }
   /** One write action. Runs inside `plugin.mutate`: it must not queue another one. */
   private async applyChatWrite(
-    action: Exclude<MapChatAction, { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" }>,
+    action: Exclude<
+      MapChatAction,
+      { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" | "ask_topic_kind" }
+    >,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
     same: () => boolean,
     run: ChatRun = { refs: new Map(), created: [] }
@@ -16851,14 +16960,26 @@ export class VisualAgentMapView extends ItemView {
         // The derived data (every map is read for it) is rebuilt once, when the reply ends, not after each card; marked first so
         // a card that was written before the action failed is covered too.
         if (run.deferRebuild) run.ownershipDirty = true;
-        await this.addNode(parent, action.title, !run.deferRebuild, false);
+        // The type is written when the note is created, like "+ Topic" of that type (the parser dropped it on an AIM map).
+        await this.addNode(parent, action.title, !run.deferRebuild, false, action.topicKind ?? "topic");
         const created = this.map?.nodes.find(item => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
         run.created.push(created.id);
+        run.notes?.add(created.id);
         if (action.ref) run.refs.set(action.ref, created.id);
         if (action.summary) await this.noteChange(created, { summary: action.summary });
+        // A new hypothesis starts weak; another strength goes into its frontmatter before the reply's undo check is taken.
+        if (
+          action.topicKind === "hypothesis" &&
+          action.strength &&
+          action.strength !== "weak" &&
+          this.relationsEnabled()
+        )
+          await this.plugin.repo.writeHypothesisStrength(created.path, action.strength);
         return done;
       }
+      case "set_topic_kind":
+        return this.chatSetTopicKind(action, real, run);
       case "collapse_topic":
       case "expand_topic": {
         this.flushChatRender();
@@ -16899,6 +17020,7 @@ export class VisualAgentMapView extends ItemView {
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
+        run.notes?.add(node.id);
         await this.noteChange(
           node,
           action.kind === "rename_topic"
@@ -16964,6 +17086,7 @@ export class VisualAgentMapView extends ItemView {
             source.editor.offsetToPos(at),
             source.editor.offsetToPos(at + action.find.length)
           );
+          this.recordChatFileEdit(source.file.path, source.text, next, run);
           return done;
         }
         let raced = false;
@@ -16975,7 +17098,9 @@ export class VisualAgentMapView extends ItemView {
           }
           return next;
         });
-        return raced ? skipped("ui.map_chat_skip_stale") : done;
+        if (raced) return skipped("ui.map_chat_skip_stale");
+        this.recordChatFileEdit(source.file.path, source.text, next, run);
+        return done;
       }
       case "create_md_file": {
         const key = normalizeVaultPath(action.path);
@@ -16994,9 +17119,157 @@ export class VisualAgentMapView extends ItemView {
           if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
         }
         await this.app.vault.create(key, action.content);
+        this.recordChatFileCreate(key, action.content, run);
         return done;
       }
     }
+  }
+  /**
+   * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every
+   * target in one step. Only the note's frontmatter changes: never the title, the body, the id, the parent or a relation. A card
+   * of an AIM map (or an AIM card) has no type and is skipped; a card that already has the type and strength is left alone.
+   */
+  private async chatSetTopicKind(
+    action: Extract<MapChatAction, { kind: "set_topic_kind" }>,
+    real: (id: string) => string | null,
+    run?: ChatRun
+  ): Promise<ChatOutcome> {
+    if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const nodes = action.nodeIds
+      .map(id => real(id))
+      .map(id => (id ? this.map?.nodes.find(node => node.id === id) : undefined))
+      .filter((node): node is MapNode => !!node);
+    if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
+    const typed = nodes.filter(node => !node.aimKind);
+    if (!typed.length) return skipped("ui.map_chat_skip_unavailable");
+    if (typed.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    const kind = action.topicKind;
+    const transaction = this.beginMapTransaction();
+    let changes = 0;
+    for (const node of typed) {
+      const kindChanges = this.topicKindOf(node.id) !== kind;
+      const strength = kind === "hypothesis" ? action.strength : undefined;
+      const strengthChanges = !!strength && this.hypothesisStrengthOf(node.id) !== strength;
+      if (!kindChanges && !strengthChanges) continue;
+      changes++;
+      run?.notes?.add(node.id);
+      transaction.rewriteNote(node.path, async path => {
+        if (kindChanges) await this.plugin.repo.writeTopicKind(path, kind);
+        if (strength && strengthChanges) await this.plugin.repo.writeHypothesisStrength(path, strength);
+      });
+    }
+    if (!changes) return { status: "done" };
+    const viewport = clone(this.map.viewport);
+    const entry = await transaction
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_type") });
+    // Inside a reply this joins the reply's one undo step (see applyMapChatActions).
+    this.history.push(entry);
+    return { status: "done" };
+  }
+  /** The text of a Markdown file as the user sees it (an open editor first), or null when there is no such file. */
+  private async chatFileText(path: string): Promise<string | null> {
+    return (await this.readChatFile(path))?.text ?? null;
+  }
+  /** Writes `text` to the file, through its open editor when there is one, so the editor and the file stay one. */
+  private async chatWriteFile(path: string, text: string): Promise<void> {
+    const source = await this.readChatFile(path);
+    if (!source) throw this.chatUndoRefusal();
+    if (source.editor) source.editor.setValue(text);
+    else await this.app.vault.process(source.file, () => text);
+  }
+  private chatUndoRefusal(): Error {
+    return Object.assign(new Error(t("ui.map_chat_undo_files_changed")), { kind: "stale" as const });
+  }
+  /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
+  private recordChatFileEdit(path: string, before: string, after: string, run: ChatRun): void {
+    run.files?.add(path);
+    const swap = async (expected: string, replacement: string): Promise<void> => {
+      if ((await this.chatFileText(path)) !== expected) throw this.chatUndoRefusal();
+      await this.chatWriteFile(path, replacement);
+    };
+    this.history.push({ undo: () => swap(after, before), redo: () => swap(before, after) });
+  }
+  /** create_md_file as an undo entry: undo moves the file to the trash, redo creates it again, each only when nothing changed. */
+  private recordChatFileCreate(path: string, content: string, run: ChatRun): void {
+    run.files?.add(path);
+    this.history.push({
+      undo: async () => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile) || (await this.chatFileText(path)) !== content) throw this.chatUndoRefusal();
+        await this.app.fileManager.trashFile(file);
+      },
+      redo: async () => {
+        if (this.app.vault.getAbstractFileByPath(path)) throw this.chatUndoRefusal();
+        const folders = path.split("/").slice(0, -1);
+        for (let depth = 1; depth <= folders.length; depth++) {
+          const folder = folders.slice(0, depth).join("/");
+          if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+        }
+        await this.app.vault.create(path, content);
+      }
+    });
+  }
+  /**
+   * What a reply's undo step checks before it touches anything: the structure of Map.md (positions and viewport are layout,
+   * as in every map transaction), the whole text of every note the reply wrote, and of every Markdown file it edited or created.
+   */
+  private async chatReplyFingerprint(
+    mapPath: string,
+    noteIds: ReadonlySet<string>,
+    files: ReadonlySet<string>
+  ): Promise<string> {
+    const map = await this.plugin.repo.readMap(mapPath);
+    const notes: [string, string | null][] = [];
+    for (const node of map.nodes)
+      if (noteIds.has(node.id)) {
+        const file = this.app.vault.getAbstractFileByPath(node.path);
+        notes.push([node.id, file instanceof TFile ? await this.app.vault.read(file) : null]);
+      }
+    const texts: [string, string | null][] = [];
+    for (const path of files) texts.push([path, await this.chatFileText(path)]);
+    return JSON.stringify({
+      map: { ...map, viewport: null, nodes: map.nodes.map(node => ({ ...node, x: null, y: null })) },
+      notes,
+      texts
+    });
+  }
+  /**
+   * Turns the entries a reply pushed into one undo step labelled as the AI chat's. Undo and redo first compare every file the
+   * reply touched with what it left (or what the last undo left): any difference refuses the whole step and nothing is
+   * touched. Then the entries run like one (newest first for undo); a failure part-way puts back what already ran.
+   */
+  private async pushChatReplyEntry(
+    entries: TransactionEntry[],
+    mapPath: string,
+    noteIds: ReadonlySet<string>,
+    files: ReadonlySet<string>
+  ): Promise<void> {
+    if (!entries.length) return;
+    const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files);
+    let expected = await fingerprint();
+    const run = async (redo: boolean): Promise<void> => {
+      if ((await fingerprint()) !== expected) throw this.chatUndoRefusal();
+      const list = redo ? entries : [...entries].reverse();
+      const done: TransactionEntry[] = [];
+      try {
+        for (const entry of list) {
+          await (redo ? entry.redo() : entry.undo());
+          done.push(entry);
+        }
+      } catch (error) {
+        try {
+          for (const entry of done.reverse()) await (redo ? entry.undo() : entry.redo());
+        } catch {
+          // best effort; the original error is what the user sees
+        }
+        throw error;
+      }
+      expected = await fingerprint();
+    };
+    this.history.push({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
   }
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);

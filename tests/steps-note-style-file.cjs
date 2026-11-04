@@ -224,7 +224,7 @@ const path = require('node:path');
 const FIXTURES = path.join(__dirname, 'fixtures', 'note-style-0.29.0');
 const oldNote = type => fs.readFileSync(path.join(FIXTURES, `${type}.md`), 'utf8').trimEnd();
 const N = S.SECTION_NAME;
-const zh = value => value['zh-TW'];
+const zh = value => value.zh;
 // The new structures of the redesign, as style files (section names only; K2 writes the real built-in texts).
 const NEW_STRUCTURES = {
   standard: ['核心結論', '背景與機制', '不同看法與限制', '待確認問題', zh(N.sources), zh(N.log)],

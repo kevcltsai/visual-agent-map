@@ -25722,7 +25722,7 @@ var import_node_crypto15 = require("node:crypto");
 var import_obsidian34 = require("obsidian");
 
 // ai/section-aliases.ts
-var name = (zhTW2, en2) => ({ "zh-TW": zhTW2, en: en2 });
+var name = (zhTW2, en2) => ({ zh: zhTW2, en: en2 });
 var SECTION_NAME = {
   // sources role: any one of the three names; a structure uses the one that fits its type
   sources: name("\u4F86\u6E90", "Sources"),
@@ -25756,7 +25756,7 @@ var NEW_STANDARD_HEADING_KEYS = [
 var lowered = (value) => value.trim().toLocaleLowerCase();
 var SPELLINGS = ["zh-TW", "zh-CN", "en"];
 var spellings = (key2) => SPELLINGS.map((locale) => translate(locale, key2));
-var both = (value) => [value["zh-TW"], value.en];
+var both = (value) => [value.zh, value.en];
 var rows;
 function sectionAliasRows() {
   if (rows) return rows;

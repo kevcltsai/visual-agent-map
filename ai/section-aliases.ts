@@ -9,10 +9,11 @@ import { translate, type TranslationKey } from "../i18n";
  */
 
 export interface SectionName {
-  "zh-TW": string;
+  /** Traditional Chinese (the zh-TW spelling; structure files of the zh-CN interface use it too). */
+  zh: string;
   en: string;
 }
-const name = (zhTW: string, en: string): SectionName => ({ "zh-TW": zhTW, en });
+const name = (zhTW: string, en: string): SectionName => ({ zh: zhTW, en });
 
 /** The names the structures of the editorial redesign use. The structure files and the alias table below both read this. */
 export const SECTION_NAME = {
@@ -58,7 +59,7 @@ interface AliasRow {
 const lowered = (value: string) => value.trim().toLocaleLowerCase();
 const SPELLINGS = ["zh-TW", "zh-CN", "en"] as const;
 const spellings = (key: TranslationKey): string[] => SPELLINGS.map(locale => translate(locale, key));
-const both = (value: SectionName): string[] => [value["zh-TW"], value.en];
+const both = (value: SectionName): string[] => [value.zh, value.en];
 
 let rows: AliasRow[] | undefined;
 

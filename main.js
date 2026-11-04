@@ -59656,7 +59656,7 @@ ${request.requirements}` : preset.text,
       if (focus) choice2.focus();
     };
     paint();
-    section3.createEl("p", { cls: "vam-hint", text: t("ui.ai_lock_hint") });
+    section3.createEl("p", { cls: "vam-hint vam-ai-lock-hint", text: t("ui.ai_lock_hint") });
   }
   /**
    * A locked card shows a lock button in its header (a click unlocks) and says "locked" in its accessible name. Safe to

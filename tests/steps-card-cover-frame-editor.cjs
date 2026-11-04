@@ -353,3 +353,61 @@ test('decision 10: at a whole-picture frame every handle moves inward; away from
   assert.match(css, /\.vam-card-frame-box\.is-at-n[^{]*\{[^}]*margin-top: 9px/);
   assert.match(css, /\.vam-card-frame-box\.is-at-s[^{]*\{[^}]*margin-top: -9px/);
 });
+
+// ---- entries on the card itself (owner 2026-11-04: "I cannot click the picture to frame it")
+const boxEl = (left, top, right, bottom) => ({ getBoundingClientRect: () => ({ left, top, right, bottom }) });
+function dblHarnessView(view) {
+  const calls = { open: [], rename: [] };
+  view.openCoverFrameEditor = node => { calls.open.push(node.id); return {}; };
+  view.renameNode = (node, name) => calls.rename.push(name);
+  const cover = boxEl(0, 0, 200, 150);
+  const title = boxEl(0, 160, 200, 180);
+  const card = { querySelector: sel => (sel === '.vam-card-cover' ? cover : null) };
+  const fire = (x, y, target = card) => {
+    let prevented = false;
+    view.onCardDoubleClick({ clientX: x, clientY: y, target, preventDefault() { prevented = true; } }, card, title, { id: 'm', path: NOTE }, 'M');
+    return prevented;
+  };
+  return { calls, fire, cover, title, card };
+}
+
+test('card: double-clicking the cover picture opens "Adjust cover area"; the title still renames; elsewhere nothing', async () => {
+  const h = await harness(TEXT);
+  const d = dblHarnessView(h.view);
+  assert.equal(d.fire(100, 75), true);
+  assert.deepEqual(d.calls.open, ['m']);
+  assert.deepEqual(d.calls.rename, []);
+  d.fire(50, 170);
+  assert.deepEqual(d.calls.rename, ['M']);
+  d.fire(50, 400);
+  assert.deepEqual([d.calls.open.length, d.calls.rename.length], [1, 1]);
+  const picture = { closest: sel => (sel === '.vam-card-cover' ? d.cover : null) };
+  assert.equal(d.fire(999, 999, picture), true, 'the picture itself as target opens the dialog too');
+  assert.deepEqual(d.calls.open, ['m', 'm']);
+});
+
+test('card: when the dialog cannot open (cover off, not editable) a double-click on the picture does nothing', async () => {
+  const h = await harness(TEXT);
+  const d = dblHarnessView(h.view);
+  h.view.openCoverFrameEditor = () => null;
+  assert.equal(d.fire(100, 75), false);
+  assert.deepEqual(d.calls.rename, []);
+});
+
+test('card: the right-click menu has "Adjust cover area" only for an editable topic with a cover picture', async () => {
+  const items = h => {
+    const titles = [];
+    const menu = { addItem(fn) { const item = { setTitle(x) { titles.push(x); return item; }, setIcon() { return item; }, setWarning() { return item; }, onClick(cb) { item.cb = cb; return item; } }; fn(item); }, addSeparator() {} };
+    h.view.notes = new Map([['m', { title: 'M', summary: 's' }]]);
+    h.view.map = { nodes: [{ id: 'm', path: NOTE }], viewport: { x: 0, y: 0, zoom: 1 } };
+    h.view.canEditText = () => false;
+    h.view.addCardMenuActions(menu, h.view.map.nodes[0]);
+    return titles;
+  };
+  assert.ok(items(await harness(TEXT)).includes('Adjust cover area'));
+  for (const cache of [{ frontmatter: {}, embeds: [] }, { frontmatter: { 'topic-cover': 'none' }, embeds: [{ link: 'img/a.png' }] }])
+    assert.equal(items(await harness(TEXT, { cache })).includes('Adjust cover area'), false);
+  const locked = await harness(TEXT);
+  locked.view.selection.toggleMultiSelect();
+  assert.equal(items(locked).includes('Adjust cover area'), false);
+});

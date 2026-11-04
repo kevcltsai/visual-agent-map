@@ -51023,6 +51023,28 @@ ${request.requirements}` : preset.text,
       return null;
     }
   }
+  /**
+   * A card's double-click: on the cover picture it opens "Adjust cover area", on the title it renames. The point is
+   * checked against both boxes because enableDrag captures the pointer on the card, so the target is often the card.
+   */
+  onCardDoubleClick(event, card, title, node, noteTitle2) {
+    var _a2, _b2;
+    const target = event.target;
+    if ((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "button")) return;
+    const within = (el) => {
+      if (!el) return false;
+      if (target === el) return true;
+      const box = el.getBoundingClientRect();
+      return event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+    };
+    if (((_b2 = target == null ? void 0 : target.closest) == null ? void 0 : _b2.call(target, ".vam-card-cover")) || within(card.querySelector(".vam-card-cover"))) {
+      if (this.openCoverFrameEditor(node)) event.preventDefault();
+      return;
+    }
+    if (target !== title && !within(title)) return;
+    event.preventDefault();
+    this.renameNode(node, noteTitle2);
+  }
   /** Opens the "Adjust area" dialog for the topic's cover picture. Only Apply writes (one undo step); Cancel and close do not. */
   openCoverFrameEditor(node) {
     if (!this.markersEditable(node)) return null;
@@ -54561,6 +54583,8 @@ ${request.requirements}` : preset.text,
         () => this.toggleCollapsed(node)
       );
     if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
+    if (this.markersEditable(node) && this.coverPictureOf(node))
+      add(t("ui.topic_cover_frame_title"), "crop", () => this.openCoverFrameEditor(node));
     menu.addSeparator();
     menu.addItem(
       (item) => item.setTitle(t("ui.open_details_in_right_sidebar")).setIcon("panel-right").onClick(() => this.openDetails(node))
@@ -57245,16 +57269,7 @@ ${request.requirements}` : preset.text,
     title.setAttr("title", (_G = note == null ? void 0 : note.title) != null ? _G : node.path);
     title.setAttr("dir", "auto");
     if (note && !this.selection.state.multiSelectMode && !((_H = this.map) == null ? void 0 : _H.aim))
-      card.addEventListener("dblclick", (event) => {
-        var _a3;
-        const target = event.target;
-        if ((_a3 = target == null ? void 0 : target.closest) == null ? void 0 : _a3.call(target, "button")) return;
-        const box = title.getBoundingClientRect();
-        const inside2 = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
-        if (target !== title && !inside2) return;
-        event.preventDefault();
-        this.renameNode(node, note.title);
-      });
+      card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node, note.title));
     if ((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (!note || !isPlaceholder(note.summary))

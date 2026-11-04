@@ -3793,6 +3793,27 @@ export class VisualAgentMapView extends ItemView {
       return null;
     }
   }
+  /**
+   * A card's double-click: on the cover picture it opens "Adjust cover area", on the title it renames. The point is
+   * checked against both boxes because enableDrag captures the pointer on the card, so the target is often the card.
+   */
+  private onCardDoubleClick(event: MouseEvent, card: HTMLElement, title: HTMLElement, node: MapNode, noteTitle: string): void {
+    const target = event.target as Element | null;
+    if (target?.closest?.("button")) return;
+    const within = (el: Element | null): boolean => {
+      if (!el) return false;
+      if (target === el) return true;
+      const box = el.getBoundingClientRect();
+      return event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+    };
+    if (target?.closest?.(".vam-card-cover") || within(card.querySelector(".vam-card-cover"))) {
+      if (this.openCoverFrameEditor(node)) event.preventDefault();
+      return;
+    }
+    if (target !== title && !within(title)) return;
+    event.preventDefault();
+    this.renameNode(node, noteTitle);
+  }
   /** Opens the "Adjust area" dialog for the topic's cover picture. Only Apply writes (one undo step); Cancel and close do not. */
   private openCoverFrameEditor(node: MapNode): CoverFrameModal | null {
     if (!this.markersEditable(node)) return null;
@@ -7574,6 +7595,9 @@ export class VisualAgentMapView extends ItemView {
         () => this.toggleCollapsed(node)
       );
     if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
+    // The same dialog as the panel's "Adjust area"; only for an editable topic whose cover picture is showing.
+    if (this.markersEditable(node) && this.coverPictureOf(node))
+      add(t("ui.topic_cover_frame_title"), "crop", () => this.openCoverFrameEditor(node));
     menu.addSeparator();
     menu.addItem(item =>
       item
@@ -10582,22 +10606,11 @@ export class VisualAgentMapView extends ItemView {
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     title.setAttr("dir", "auto");
-    // Double-click renames, the same dialog as F2 and the Rename tool. It is handled on the card: enableDrag captures the
-    // pointer on the card, so a real mouse reports the card (not the title) as the dblclick target.
+    // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Adjust cover area".
+    // It is handled on the card: enableDrag captures the pointer on the card, so a real mouse reports the card (not the
+    // title or the picture) as the dblclick target.
     if (note && !this.selection.state.multiSelectMode && !this.map?.aim)
-      card.addEventListener("dblclick", event => {
-        const target = event.target as Element | null;
-        if (target?.closest?.("button")) return;
-        const box = title.getBoundingClientRect();
-        const inside =
-          event.clientX >= box.left &&
-          event.clientX <= box.right &&
-          event.clientY >= box.top &&
-          event.clientY <= box.bottom;
-        if (target !== title && !inside) return;
-        event.preventDefault();
-        this.renameNode(node, note.title);
-      });
+      card.addEventListener("dblclick", event => this.onCardDoubleClick(event, card, title, node, note.title));
     // An unresearched topic's placeholder summary repeats its status, so the frontier card stays quiet.
     // While a run streams its answer, the unsaved summary preview takes the place of the stored summary.
     if (research?.preview?.summary)

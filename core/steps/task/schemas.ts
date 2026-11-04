@@ -1,7 +1,11 @@
 import { aimContractSchema, type AimContract } from "../../../ai/aim-contracts";
 import aimGapAuditSchema from "../../../ai/aim-gap-audit-schema";
 import { SEARCH_STATUSES, type TaskContext } from "../../../ai/types";
-import responseSchema from "../../../response-schema.json";
+import SummaryDescription from "./schema-summary-description.md";
+import DetailDescription from "./schema-detail-description.md";
+import { renderTemplate } from "../../step-runner";
+import baseResponseSchema from "../../../response-schema.json";
+import { instructionLanguageOf, languagePromptName, type ContentLanguage } from "../../../i18n";
 
 /** How a task context is answered: the response schema sent to the model and the flags its parser needs. */
 export interface TaskResponseShape {
@@ -11,7 +15,26 @@ export interface TaskResponseShape {
   contract?: AimContract;
 }
 
-export function taskResponseShape(context: TaskContext): TaskResponseShape {
+/**
+ * The response schema with its two prose field descriptions written for the output language. The descriptions are part of
+ * what the model reads, so the fixed Chinese wording in `response-schema.json` pulled English and other runs into Chinese.
+ * A Chinese-instruction language (zh-TW, zh-CN) keeps the file's wording unchanged; every other language names itself.
+ */
+export function localizedResponseSchema(language: ContentLanguage): typeof baseResponseSchema {
+  if (instructionLanguageOf(language) === "zh") return baseResponseSchema;
+  const variables = { language: languagePromptName(language, "en", "plain") };
+  return {
+    ...baseResponseSchema,
+    properties: {
+      ...baseResponseSchema.properties,
+      summary: { type: "string", description: renderTemplate(SummaryDescription, variables) },
+      detail: { type: "string", description: renderTemplate(DetailDescription, variables) }
+    }
+  };
+}
+
+export function taskResponseShape(context: TaskContext, language: ContentLanguage): TaskResponseShape {
+  const responseSchema = localizedResponseSchema(language);
   const isAimGapAudit =
     context.responseContract === "aim-gap-audit" && context.promptProfile === "aim" && context.researchMode === "local";
   const isDeliveryAcceptance =

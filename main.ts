@@ -81,7 +81,6 @@ import { effectiveReasoningLevel } from "./ai/task-policy";
 import { stepEffort } from "./core/provider-step-runner";
 import type { ReasoningLevel } from "./ai/types";
 import { resolveTaskModel, type ModelChoice } from "./ai/model-resolution";
-import responseSchema from "./response-schema.json";
 import type { AiResult, AiTaskKind, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
 import { fitImageForInput } from "./ui/fit-image-input";
@@ -112,6 +111,7 @@ import { ResearchProgressStore } from "./experiences/visual-map/research-progres
 import { TopicRuns, type ChartJob } from "./experiences/visual-map/topic-run";
 import type { ResearchObserver } from "./ai/research-observer";
 import { AiTaskService } from "./core/ai-task-service";
+import { localizedResponseSchema } from "./core/steps/task/schemas";
 import { announceTestOverrides } from "./experiences/aim/flow-limits";
 import { ReframingService, providerReframeRunner } from "./core/reframing-service";
 import { OutlineGenerationService, providerOutlineRunner } from "./core/outline-generation-service";
@@ -412,6 +412,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The blank map made on first install; finishStartup opens it. Null on every other start. */
   private firstInstallMapPath: string | null = null;
   languageSwitchPending = false;
+  /** The floating "Use AI on selection" button; its text follows the interface language. */
+  private markdownSelectionAi: MarkdownSelectionAi | null = null;
   recordFailure(context: string, error: unknown): string {
     const message = error instanceof Error ? error.message : String(error);
     this.logs.appendLog("error", `${context}：${message}`);
@@ -585,7 +587,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);
-    const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
+    const markdownSelectionAi = (this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",
       modelLabel: model => this.modelLabel(model),
@@ -599,7 +601,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       run: (prepared, model, signal, image, webSearch, generateImage) =>
         this.runConfirmedMarkdownContextAi(prepared, model, signal, image, webSearch, generateImage),
       saveImage: (dataUrl, notePath, name) => this.saveGeneratedImage(dataUrl, notePath, name)
-    });
+    }));
     this.addChild(markdownSelectionAi);
     // Tag reading-view blocks with their source lines so an action on a rendered image finds its embed.
     this.registerMarkdownPostProcessor((element, context) => {
@@ -1582,6 +1584,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   refreshLocalizedEntrypoints(): void {
     this.ribbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_map"));
     this.coffeeRibbonIcon?.setAttribute("aria-label", translate(this.settings.language, "ui.open_coffee_tables"));
+    this.markdownSelectionAi?.refreshLanguage();
     for (const { command, key } of this.localizedCommands)
       command.name = `${this.manifest?.name ?? "Visual Agent Map"}: ${translate(this.settings.language, key)}`;
   }
@@ -2006,7 +2009,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       // synthesis. A long-source task resolves differently and starts cold.
       this.aiCalls.prewarm(model, {
         effort: effectiveReasoningLevel({ mode } as TaskContext, selected),
-        schema: responseSchema,
+        schema: localizedResponseSchema(this.settings.language),
         webSearch
       });
     } catch {

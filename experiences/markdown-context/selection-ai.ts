@@ -138,6 +138,13 @@ export class MarkdownSelectionAi extends Component {
     super();
   }
 
+  /** The interface language changed: the launcher text is set once at load, so set it again. */
+  refreshLanguage(): void {
+    if (!this.launcher) return;
+    this.launcher.setText(t("ui.context_ai_open"));
+    this.launcher.setAttribute("aria-label", t("ui.context_ai_open"));
+  }
+
   onload(): void {
     this.imageAction = this.addChild(new ImageTranslateAction(this.app, this.options));
     this.launcher = this.app.workspace.containerEl.createEl("button", {

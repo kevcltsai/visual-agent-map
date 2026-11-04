@@ -168,6 +168,7 @@ import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materi
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
+import { PLACEHOLDER_MAP_NAMES, isPlaceholderMapTitle, uniqueDefaultName } from "../../core/default-names";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
@@ -1113,6 +1114,12 @@ export class VisualAgentMapView extends ItemView {
   /** Detaches the open bracket editor without saving and returns its draft, so a repaint can reopen it. */
   private suspendSummaryEdit: (() => { id: string; value: string }) | null = null;
   private summaryEditDraft: { id: string; value: string } | null = null;
+  /** The name being typed in place: the map title (id "") or a card title. It outlives a repaint. */
+  private inlineName: { target: "map" | "card"; id: string; draft: string; fresh: boolean; created: boolean } | null =
+    null;
+  /** Ends the live in-place name field without saving (a repaint is about to replace it); the draft stays in `inlineName`. */
+  private suspendInlineName: (() => void) | null = null;
+  private inlineNameInput: HTMLInputElement | null = null;
   private summaryEls = new Map<string, HTMLElement>();
   /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
   private pendingTextEditId: string | null = null;
@@ -1439,12 +1446,27 @@ export class VisualAgentMapView extends ItemView {
    * Mod+Z / Mod+Shift+Z while this view is the active pane, wherever focus is inside it. A text field keeps its own
    * undo (the handler passes the key through), and IME composition is never touched.
    */
+  /**
+   * Undo while a just-made card's name field still holds the default name: the field has nothing of its own to undo, so the
+   * key takes the whole card away (one step). Returns true when it did.
+   */
+  private undoNewCardNow(target: unknown): boolean {
+    const edit = this.inlineName;
+    const field = (target as Element | null)?.closest?.(".vam-card-title-input");
+    if (!field || edit?.target !== "card" || !edit.created || !this.history.canUndo) return false;
+    if (edit.draft !== this.notes.get(edit.id)?.title) return false;
+    this.suspendInlineName?.();
+    this.inlineName = null;
+    this.enqueue(() => this.travel(false));
+    return true;
+  }
   private installUndoScope(): void {
     const scope = new Scope(this.app.scope);
     const seen = new WeakSet<object>();
     const run =
       (redo: boolean) =>
       (event: KeyboardEvent): boolean => {
+        if (!redo && !this.closed && !event.isComposing && this.undoNewCardNow(event.target)) return false;
         if (this.closed || event.isComposing || isEditableTarget(event.target)) return true;
         // A presentation is read-only: undo and redo are swallowed, not passed on to Obsidian.
         if (this.presentation) return false;
@@ -1852,6 +1874,92 @@ export class VisualAgentMapView extends ItemView {
       card ?? (session.returnEl?.isConnected && this.contentEl.contains(session.returnEl) ? session.returnEl : null);
     (back ?? this.contentEl).focus({ preventScroll: true });
     this.announcer?.setText(t("ui.presentation_exited"));
+  }
+  /**
+   * A name field in place of a title. Enter or leaving the field saves, Esc drops what was typed; Enter while an input method is
+   * composing only picks the text. A repaint suspends it (`suspendInlineName`) and the same field is built again from the draft.
+   * `done` gets the typed text, or null for Esc.
+   */
+  private createInlineNameInput(
+    parent: HTMLElement,
+    cls: string,
+    label: string,
+    done: (value: string | null) => void
+  ): HTMLInputElement {
+    const state = this.inlineName!;
+    const input = parent.createEl("input", { cls, attr: { type: "text", "aria-label": label, dir: "auto" } });
+    input.value = state.draft;
+    let live = true;
+    const release = (): void => {
+      live = false;
+      this.suspendInlineName = null;
+    };
+    this.suspendInlineName = () => {
+      if (!live) return;
+      state.draft = input.value;
+      state.fresh = false;
+      release();
+    };
+    const finish = (save: boolean): void => {
+      if (!live) return;
+      const value = input.value;
+      release();
+      this.inlineName = null;
+      this.inlineNameInput = null;
+      done(save ? value : null);
+    };
+    input.addEventListener("input", () => {
+      state.draft = input.value;
+    });
+    input.addEventListener("keydown", event => {
+      // The field owns its keys: shortcuts, arrows and Delete must not reach the canvas.
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        finish(true);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        finish(false);
+      }
+    });
+    input.addEventListener("blur", () => finish(true));
+    this.inlineNameInput = input;
+    return input;
+  }
+  /** After a repaint: the live name field takes focus (all text selected the first time, so typing replaces the default). */
+  private focusInlineName(): void {
+    const input = this.inlineNameInput;
+    if (!input || !input.isConnected || !this.inlineName) return;
+    this.restoringFocus = true;
+    try {
+      input.focus({ preventScroll: true });
+      if (this.inlineName.fresh) {
+        input.select?.();
+        this.inlineName.fresh = false;
+      } else input.setSelectionRange?.(input.value.length, input.value.length);
+    } finally {
+      this.restoringFocus = false;
+    }
+  }
+  /** The map title becomes a field; Enter saves, Esc leaves the name as it was. */
+  private startMapTitleEdit(): void {
+    if (!this.map || this.inlineName || this.presentation) return;
+    if (this.aimActiveForPath(this.path)) {
+      new Notice(t("ui.aim_research_already_running"));
+      return;
+    }
+    this.inlineName = { target: "map", id: "", draft: this.map.title, fresh: true, created: false };
+    this.render();
+  }
+  /** Draws the card title's field in place of the title text. */
+  private paintCardNameEdit(card: HTMLElement, node: MapNode, note: Note): HTMLInputElement {
+    const input = this.createInlineNameInput(card, "vam-card-title-input", t("ui.rename_topic"), value => {
+      const name = sanitizeGeneratedTitle(value ?? "").trim();
+      if (!name || name === note.title) this.render();
+      else this.enqueue(() => this.noteChange(node, { title: name }));
+    });
+    return input;
   }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   private renameNode(node: MapNode, current: string): void {
@@ -3842,6 +3950,31 @@ export class VisualAgentMapView extends ItemView {
     return box.placed;
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
+  /**
+   * The "+" of a card and the toolbar's "+ Topic": a list of what to add (the six topic types and a text block). One pick makes
+   * it; Enter takes the first row, "Topic". Esc closes the list and adds nothing.
+   */
+  private openAddMenu(event: MouseEvent, parent: MapNode | null): void {
+    if (this.presentation) return;
+    const menu = this.newMenu();
+    for (const kind of TOPIC_KINDS)
+      menu.addItem(item =>
+        item
+          .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
+          .setIcon(TOPIC_KIND_ICON[kind])
+          .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(parent, undefined, true, true, kind))))
+      );
+    if (this.canEditText())
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.text_node_add"))
+          .setIcon("text-cursor-input")
+          .onClick(() => this.whenEditing(() => this.addTextNodeUnder(parent)))
+      );
+    menu.showAtMouseEvent(event);
+    // Enter on a freshly opened list takes its first row.
+    (menu as unknown as { select?: (index: number) => void }).select?.(0);
+  }
   private openTopicMenu(event: MouseEvent): void {
     const menu = this.newMenu();
     menu.addItem(item =>
@@ -4489,10 +4622,13 @@ export class VisualAgentMapView extends ItemView {
       )
       .catch(error => errorNotice(error));
   }
+  /** "New map": an untitled empty map opens at once (no name is asked); the first message names it, the title renames it. */
   private openNewMindMapModal(): void {
-    new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
-      this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
-    ).open();
+    this.enqueue(async () => {
+      const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+      const title = uniqueDefaultName(t("ui.untitled_mind_map"), titles);
+      await this.openMapInMutation(await this.plugin.repo.createMap(title));
+    });
   }
   async planAimQuestion(
     parentNodeId: string,
@@ -5188,24 +5324,24 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   private openNewMapMenu(event: MouseEvent): void {
+    // One entry would be a menu with one row: the button itself makes the map.
+    if (!aimEnabled()) {
+      this.openNewMindMapModal();
+      return;
+    }
     const menu = this.newMenu();
     menu.addItem(item =>
       item
         .setTitle(t("ui.new_mind_map"))
         .setIcon("file-plus")
-        .onClick(() =>
-          new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
-            this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
-          ).open()
-        )
+        .onClick(() => this.openNewMindMapModal())
     );
-    if (aimEnabled())
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.aim_create_map"))
-          .setIcon("route")
-          .onClick(() => this.openAimStart())
-      );
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.aim_create_map"))
+        .setIcon("route")
+        .onClick(() => this.openAimStart())
+    );
     menu.showAtMouseEvent(event);
   }
   /** Research coverage is the map's headline fact: how much of the frontier already has a conclusion. */
@@ -9819,34 +9955,36 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, title =>
-      this.enqueue(async () => {
-        if (!this.map) return;
-        if (this.aimActiveForPath(this.path)) {
-          new Notice(t("ui.aim_research_already_running"));
-          return;
-        }
-        if (!isManagedMapPath(this.plugin.settings, this.path)) {
-          new Notice(t("ui.legacy_map_view_only"));
-          return;
-        }
-        const before = clone(this.map),
-          beforeRoot = this.plugin.repo.topicRoot(this.path);
-        this.path = await this.plugin.repo.renameTopic(this.path, title);
-        this.map = await this.plugin.repo.readMap(this.path);
-        const after = clone(this.map),
-          afterRoot = this.plugin.repo.topicRoot(this.path);
-        const restore = async (map: MapDocument, root: string): Promise<void> => {
-          this.path = await this.plugin.repo.renameTopic(this.path, map.title, root);
-          this.map = clone(map);
-          await this.plugin.repo.saveMap(this.path, this.map);
-          await this.plugin.rebuildDerivedData();
-          this.render();
-        };
-        this.history.push({ undo: () => restore(before, beforeRoot), redo: () => restore(after, afterRoot) });
-        this.render();
-        this.app.workspace.requestSaveLayout();
-      })
+      this.enqueue(() => this.renameMapTo(title))
     ).open();
+  }
+  /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
+  private async renameMapTo(title: string): Promise<void> {
+    if (!this.map) return;
+    if (this.aimActiveForPath(this.path)) {
+      new Notice(t("ui.aim_research_already_running"));
+      return;
+    }
+    if (!isManagedMapPath(this.plugin.settings, this.path)) {
+      new Notice(t("ui.legacy_map_view_only"));
+      return;
+    }
+    const before = clone(this.map),
+      beforeRoot = this.plugin.repo.topicRoot(this.path);
+    this.path = await this.plugin.repo.renameTopic(this.path, title);
+    this.map = await this.plugin.repo.readMap(this.path);
+    const after = clone(this.map),
+      afterRoot = this.plugin.repo.topicRoot(this.path);
+    const restore = async (map: MapDocument, root: string): Promise<void> => {
+      this.path = await this.plugin.repo.renameTopic(this.path, map.title, root);
+      this.map = clone(map);
+      await this.plugin.repo.saveMap(this.path, this.map);
+      await this.plugin.rebuildDerivedData();
+      this.render();
+    };
+    this.history.push({ undo: () => restore(before, beforeRoot), redo: () => restore(after, afterRoot) });
+    this.render();
+    this.app.workspace.requestSaveLayout();
   }
   private deleteCurrentMap(): void {
     if (!this.map) return;
@@ -10065,13 +10203,44 @@ export class VisualAgentMapView extends ItemView {
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
+    // A name being typed survives the repaint as its draft; one whose card is gone is dropped.
+    this.suspendInlineName?.();
+    if (this.inlineName?.target === "card" && !this.map?.nodes.some(node => node.id === this.inlineName?.id))
+      this.inlineName = null;
+    if (this.inlineName?.target === "map" && !this.map) this.inlineName = null;
+    this.inlineNameInput = null;
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
-    const switcher = toolbar.createEl("button", { cls: "vam-map-switcher" });
-    switcher.setAttr("aria-label", t("ui.switch_mind_map"));
-    switcher.createSpan({ text: this.map?.title ?? "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
-    setIcon(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
-    switcher.addEventListener("click", () => this.openMapSwitcher());
+    // The title text renames the map in place; the arrows beside it switch maps.
+    const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
+    const mapName = this.map?.title ?? "Visual Agent Map";
+    if (this.map && this.inlineName?.target === "map") {
+      const field = this.createInlineNameInput(switcher, "vam-map-title-input", t("ui.rename_mind_map"), value => {
+        const name = sanitizeGeneratedTitle(value ?? "").trim();
+        if (!name || name === this.map?.title) this.render();
+        else
+          this.enqueue(async () => {
+            try {
+              await this.renameMapTo(name);
+            } catch (error) {
+              errorNotice(error);
+              this.render();
+            }
+          });
+      });
+      field.setAttr("size", String(Math.max(8, Math.min(40, [...field.value].length + 2))));
+    } else {
+      const rename = switcher.createEl("button", { cls: "vam-map-title-button" });
+      rename.setAttr("aria-label", this.map ? t("ui.rename_mind_map") : t("ui.switch_mind_map"));
+      rename.setAttr("title", this.map ? t("ui.rename_mind_map") : t("ui.switch_mind_map"));
+      rename.createSpan({ text: mapName, cls: "vam-map-title", attr: { dir: "auto" } });
+      rename.addEventListener("click", () => (this.map ? this.startMapTitleEdit() : this.openMapSwitcher()));
+    }
+    const switchMap = switcher.createEl("button", { cls: "vam-map-switch-button" });
+    switchMap.setAttr("aria-label", t("ui.switch_mind_map"));
+    switchMap.setAttr("title", t("ui.switch_mind_map"));
+    setIcon(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
+    switchMap.addEventListener("click", () => this.openMapSwitcher());
     if (this.map && !this.aimLive() && this.map.nodes.length) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
@@ -10431,6 +10600,7 @@ export class VisualAgentMapView extends ItemView {
     restoreRelevanceFocus();
     restoreChatFocus();
     keepMapFocus();
+    this.focusInlineName();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
@@ -10482,9 +10652,9 @@ export class VisualAgentMapView extends ItemView {
    */
   private renderMapTools(tools: HTMLElement): void {
     if (!this.map || this.map.aim) return;
-    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
-      "mod-cta"
-    );
+    const addTopic = this.button(tools, t("ui.topic"), () => {});
+    addTopic.addEventListener("click", event => this.openAddMenu(event, null));
+    addTopic.addClass("mod-cta");
     this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
       "vam-topic-more"
     );
@@ -10506,9 +10676,9 @@ export class VisualAgentMapView extends ItemView {
    */
   private renderHiddenAimMapTools(tools: HTMLElement): void {
     if (!this.map) return;
-    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
-      "mod-cta"
-    );
+    const addTopic = this.button(tools, t("ui.topic"), () => {});
+    addTopic.addEventListener("click", event => this.openAddMenu(event, null));
+    addTopic.addClass("mod-cta");
     this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
       "vam-topic-more"
     );
@@ -10937,7 +11107,8 @@ export class VisualAgentMapView extends ItemView {
         "vam-ai-explore"
       );
     if (!this.selection.state.multiSelectMode && !this.aimLive()) {
-      const add = this.button(card, "+", () => this.whenEditing(() => this.enqueue(() => this.addNode(node))));
+      const add = this.button(card, "+", () => {});
+      add.addEventListener("click", event => this.openAddMenu(event, node));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
@@ -10946,6 +11117,11 @@ export class VisualAgentMapView extends ItemView {
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     title.setAttr("dir", "auto");
+    if (note && this.inlineName?.target === "card" && this.inlineName.id === node.id) {
+      // The field takes the heading's place (the heading stays for the card's label and tests that read it, but hidden).
+      title.addClass("vam-sr-only");
+      this.paintCardNameEdit(card, node, note);
+    }
     // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Edit card".
     // It is handled on the card: enableDrag captures the pointer on the card, so a real mouse reports the card (not the
     // title or the picture) as the dblclick target.
@@ -13284,7 +13460,7 @@ export class VisualAgentMapView extends ItemView {
   private async chatLockSkip(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" | "ask_topic_kind" }
+      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
     >,
     real: (id: string) => string | null
   ): Promise<ChatOutcome | null> {
@@ -13813,17 +13989,8 @@ export class VisualAgentMapView extends ItemView {
     const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
-    if (!suggestedTitle?.trim()) {
-      const dialogTitle = typed
-        ? t("ui.add_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey))
-        : parent
-          ? t("ui.new_subtopic")
-          : t("ui.my_core_topic");
-      new NameModal(this.app, dialogTitle, "", title =>
-        this.whenEditing(() => this.enqueue(() => this.addNode(parent, title, true, true, kind, true)))
-      ).open();
-      return;
-    }
+    // No name given (the "+", the toolbar, the keys): the card appears with a default name and its title opens for typing.
+    const interactive = suggestedTitle === undefined;
     // One resolution: a manual ancestor's model is inherited, otherwise the current model.
     const model = parent
       ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
@@ -13832,13 +13999,12 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.legacy_map_view_only"));
       return;
     }
+    const defaultName = uniqueDefaultName(
+      t("ui.new_topic"),
+      this.map.nodes.map(item => this.notes.get(item.id)?.title ?? "")
+    );
     const node = await this.plugin.repo.createNote(
-      sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() ||
-        (typed
-          ? t("ui.new_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey))
-          : parent
-            ? t("ui.new_subtopic")
-            : t("ui.my_core_topic")),
+      sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() || defaultName,
       model,
       this.map,
       this.path,
@@ -13856,33 +14022,48 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
     this.selection.setSelected(node.id);
-    await this.mapChangeSnapshots(
-      map => {
-        map.nodes.push(node);
-        const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
-        if (owner) {
-          owner.collapsed = false;
-          // A new sibling goes after the existing ones (not into a gap above them); collisions are then resolved from there.
-          const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== node.id);
-          const minTop = siblings.length
-            ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
-            : undefined;
-          this.arrangeBranch(map, owner.id, new Set([node.id]), minTop);
-        } else if (!parent) {
-          const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
-          if (roots.length)
-            node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
-        }
-      },
-      rebuildDerivedData,
-      [node.path]
-    );
+    // Set before the repaint that shows the card, so the card is drawn with its title field.
+    if (interactive && focus && !this.inlineName)
+      this.inlineName = {
+        target: "card",
+        id: node.id,
+        draft: this.notes.get(node.id)?.title ?? defaultName,
+        fresh: true,
+        created: true
+      };
+    try {
+      await this.mapChangeSnapshots(
+        map => {
+          map.nodes.push(node);
+          const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
+          if (owner) {
+            owner.collapsed = false;
+            // A new sibling goes after the existing ones (not into a gap above them); collisions are then resolved from there.
+            const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== node.id);
+            const minTop = siblings.length
+              ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
+              : undefined;
+            this.arrangeBranch(map, owner.id, new Set([node.id]), minTop);
+          } else if (!parent) {
+            const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
+            if (roots.length)
+              node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
+          }
+        },
+        rebuildDerivedData,
+        [node.path]
+      );
+    } catch (error) {
+      if (this.inlineName?.id === node.id) this.inlineName = null;
+      throw error;
+    }
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
     this.focusNode(placed);
     // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
-    if (keyboardFocus && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
+    if (keyboardFocus && !this.inlineName && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
+    this.focusInlineName();
   }
   private async proposeChildren(
     parent: MapNode,
@@ -16574,6 +16755,7 @@ export class VisualAgentMapView extends ItemView {
       mapTitle: map.title,
       mapTitles,
       noEditableMap: !isManagedMapPath(settings, this.path),
+      mapNeedsName: isPlaceholderMapTitle(map.title, PLACEHOLDER_MAP_NAMES),
       outline,
       selected: selectedIds.map(ref).filter(notNull),
       references: attached
@@ -17003,6 +17185,8 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_create_map_0", action.title);
       case "open_map":
         return t("ui.map_chat_do_open_map_0", action.title);
+      case "rename_map":
+        return t("ui.map_chat_do_rename_map_0", action.title);
       case "collapse_topic":
         return t("ui.map_chat_do_collapse_0", title(action.nodeId));
       case "expand_topic":
@@ -17300,6 +17484,16 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(label, skipped(noNewMapReason));
           continue;
         }
+        if (action.kind === "rename_map") {
+          // The folder moves with the name, so the reply's anchor follows the map to its new path.
+          const outcome = await this.chatRenameMap(action.title, anchor, same);
+          if (outcome.status === "done") {
+            wrote = true;
+            touched.add(anchor.path);
+          }
+          lines[index] = this.chatLine(label, outcome);
+          continue;
+        }
         if (action.kind === "create_map") {
           // The map switch repaints on its own.
           await this.settleChatBatch(run);
@@ -17533,6 +17727,34 @@ export class VisualAgentMapView extends ItemView {
       ? { status: "skipped", reason: t("ui.map_chat_skip_map_not_opened"), created: true }
       : skipped("ui.map_chat_skip_map_changed");
   }
+  /** rename_map: names the open map (only while it still has its placeholder name) and moves the anchor to the renamed folder. */
+  private async chatRenameMap(
+    title: string,
+    anchor: { path: string; id: string | undefined },
+    same: () => boolean
+  ): Promise<ChatOutcome> {
+    const name = sanitizeGeneratedTitle(title).trim();
+    if (!name) return skipped("ui.map_chat_skip_unavailable");
+    let outcome: ChatOutcome = { status: "done" };
+    try {
+      await this.plugin.mutate(async () => {
+        if (!same() || !this.map) {
+          outcome = skipped("ui.map_chat_skip_map_changed");
+          return;
+        }
+        // A name the user chose stays; only the placeholder is replaced.
+        if (!isPlaceholderMapTitle(this.map.title, PLACEHOLDER_MAP_NAMES)) {
+          outcome = skipped("ui.map_chat_skip_map_named");
+          return;
+        }
+        await this.history.ownWrites(() => this.renameMapTo(name));
+        anchor.path = this.path;
+      });
+    } catch (error) {
+      return { status: "failed", reason: errorMessage(error) };
+    }
+    return outcome;
+  }
   /** open_map: the view names the map, not the model. One match opens it; several are listed to pick from; none is a skip. */
   private async chatOpenMap(
     title: string,
@@ -17609,7 +17831,7 @@ export class VisualAgentMapView extends ItemView {
   private async applyChatWrite(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" | "ask_topic_kind" }
+      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
     >,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
     same: () => boolean,
@@ -18961,7 +19183,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private enableDrag(card: HTMLElement, node: MapNode): void {
     card.addEventListener("pointerdown", event => {
-      if ((event.target as Element).closest("button") || event.button !== 0 || !this.map) return;
+      if ((event.target as Element).closest("button, .vam-card-title-input") || event.button !== 0 || !this.map) return;
       // In selection mode a card cannot be moved and a plain click still toggles it, but it can be dragged onto the chat.
       const selecting = this.selection.state.multiSelectMode;
       this.clearHoverTimer();

@@ -74,7 +74,7 @@ test('click opens the panel; Esc, an outside press and a second click close it a
   assert.equal(h.doc.listeners.keydown.length + h.doc.listeners.pointerdown.length, 0, 'closed: no document listeners are left');
 });
 
-test('panel shows totals, only the actions with usage, no request history, and the footer', async () => {
+test('panel shows totals and the footer; no by-action bars, no request history', async () => {
   const { store } = await newStore([
     { action: 'research', inputTokens: 1000, outputTokens: 200, topic: 'Sleep', durationMs: 18000 },
     { action: 'expand', inputTokens: 300, outputTokens: 100, topic: 'REM', estimated: true, durationMs: 9000 },
@@ -83,10 +83,11 @@ test('panel shows totals, only the actions with usage, no request history, and t
   const h = rig(store);
   h.button().click();
   const all = texts(h.panel());
-  for (const expected of ['Token usage', 'This mind map', 'Today', 'This month', '~1.6k', '~6.6k', 'In 1.3k', 'Out 300', '~400']) assert.ok(all.includes(expected), expected + ' in ' + all.join('|'));
+  for (const expected of ['Token usage', 'This mind map', 'Today', 'This month', '~1.6k', '~6.6k', 'In 1.3k', 'Out 300']) assert.ok(all.includes(expected), expected + ' in ' + all.join('|'));
   for (const gone of ['18 s', '9 s', 'Sleep', 'REM', 'LAST 10 REQUESTS']) assert.ok(!all.includes(gone), gone + ' (history) must not be shown');
-  const shown = findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text);
-  assert.deepEqual(shown, ['Research', 'Expand']);
+  for (const gone of ['THIS MIND MAP · BY ACTION', 'Research', 'Expand', 'Synthesize', 'Write to note', 'Other']) assert.ok(!all.includes(gone), gone + ' (by-action section) must be gone');
+  assert.equal(findAll(h.panel(), i => i.cls === 'vam-usage-bar' || i.cls === 'vam-usage-bars').length, 0, 'no bars');
+  assert.equal(findAll(h.panel(), i => i.cls === 'vam-usage-section').length, 1, 'totals is the only section');
   assert.equal(findAll(h.panel(), i => i.tag === 'tr').length, 0, 'no request-history table');
   assert.ok(all.includes('Counts only AI requests sent by VAM.'));
   assert.ok(all.includes('Values marked ~ are estimates.'));
@@ -113,7 +114,7 @@ test('a render rebuilds the zoom bar: mount puts the button back and keeps an op
   assert.equal(h.button().attrs['aria-expanded'], 'true');
 });
 
-test('no usage yet: zeros and one empty-state sentence, no bars or request table', async () => {
+test('no usage yet: zeros and one empty-state sentence, totals section hidden state unchanged', async () => {
   const { store } = await newStore();
   const h = rig(store);
   assert.equal(h.button().attrs['aria-label'], 'Token usage: today 0');
@@ -121,7 +122,7 @@ test('no usage yet: zeros and one empty-state sentence, no bars or request table
   const empty = find(h.panel(), i => i.cls === 'vam-usage-empty');
   assert.equal(empty.hidden, false);
   const sections = findAll(h.panel(), i => i.cls === 'vam-usage-section');
-  assert.deepEqual(sections.map(s => s.hidden), [false, true]);
+  assert.deepEqual(sections.map(s => s.hidden), [false]);
   assert.equal(find(h.panel(), i => i.tag === 'strong').text, '0');
 });
 
@@ -197,16 +198,15 @@ test('arrow keys move the choice (wrapping) and the focus; other keys do nothing
   assert.equal(press('a'), false); assert.deepEqual(checked(h), ['Codex']);
 });
 
-test('the filter narrows totals and actions; the zoom-bar number stays Total', async () => {
+test('the filter narrows the totals; the zoom-bar number stays Total', async () => {
   const h = rig((await newStore(mixed)).store);
   h.button().click();
   pick(h, 'Claude');
   assert.equal(strongs(h)[0], '1.2k');
-  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text), ['Research']);
   assert.equal(find(h.button(), i => i.cls === 'vam-usage-number').text, '1.7k');
   assert.equal(h.button().attrs['aria-label'], 'Token usage: today 1.7k');
   pick(h, 'Codex');
-  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text), ['Expand']);
+  assert.equal(strongs(h)[0], '~500');
 });
 
 test('counter-example: Codex chosen with no Codex records shows zeros and the empty sentence, no error', async () => {
@@ -216,7 +216,7 @@ test('counter-example: Codex chosen with no Codex records shows zeros and the em
   assert.equal(find(h.panel(), i => i.cls === 'vam-usage-error').hidden, true);
   assert.equal(find(h.panel(), i => i.cls === 'vam-usage-empty').hidden, false);
   assert.deepEqual(strongs(h), ['0', '0', '0']);
-  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-section').map(s => s.hidden), [false, true]);
+  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-section').map(s => s.hidden), [false]);
 });
 
 test('counter-example: Claude chosen, panel closed and opened again: back on Total', async () => {
@@ -240,11 +240,11 @@ test('counter-example: footer line 2 only while a shown number is estimated; lin
   pick(h, 'Codex'); assert.equal(foot(h)[1].hidden, false);
 });
 
-test('estimated sums get the 約 mark (totals, action bars)', async () => {
+test('estimated sums get the 約 mark (totals)', async () => {
   const h = rig((await newStore(mixed)).store);
   h.button().click(); pick(h, 'Codex');
   const all = texts(h.panel());
-  assert.ok(all.includes('~500'), 'totals / bar with an estimated part: ' + all.join('|'));
+  assert.ok(all.includes('~500'), 'totals with an estimated part: ' + all.join('|'));
   pick(h, 'Claude');
   assert.ok(!texts(h.panel()).some(text => text.startsWith('~')));
 });
@@ -262,4 +262,16 @@ test('counter-example: an unreadable store keeps the switch visible, shows the e
   assert.equal(find(h.panel(), i => i.cls === 'vam-usage-error').hidden, false);
   assert.ok(findAll(h.panel(), i => i.cls === 'vam-usage-section').every(s => s.hidden));
   assert.equal(foot(h)[1].hidden, true);
+});
+
+test('counter-example: a map whose usage is only folded away (older months) is not empty', async () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-usage-panel-')), 'ai-usage.json');
+  const store = new AiUsageStore(nodeFsAdapter, file, () => {});
+  await store.load();
+  store.record(row({ at: new Date(Date.now() - 200 * 86_400_000).toISOString(), inputTokens: 400, outputTokens: 100 }));
+  assert.equal(store.recent(MAP, 10).value.length, 0, 'the row really is folded: no detail row left');
+  const h = rig(store);
+  h.button().click();
+  assert.equal(find(h.panel(), i => i.cls === 'vam-usage-empty').hidden, true, 'folded usage is usage: no empty state');
+  assert.equal(strongs(h)[0], '500');
 });

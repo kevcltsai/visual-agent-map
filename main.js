@@ -52380,6 +52380,16 @@ var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
 var CHAT_EXPAND_LEVELS = 2;
 var CHAT_EXPAND_MAX_TOPICS = 15;
+var chatAppearanceChange = (action) => {
+  var _a2, _b2, _c, _d;
+  return {
+    ...action.color ? { color: action.color === "none" ? null : action.color } : {},
+    addMarkers: (_a2 = action.markers) != null ? _a2 : [],
+    removeMarkers: (_b2 = action.removeMarkers) != null ? _b2 : [],
+    addStyles: (_c = action.formats) != null ? _c : [],
+    removeStyles: (_d = action.removeFormats) != null ? _d : []
+  };
+};
 var skipped = (key2) => ({ status: "skipped", reason: t(key2) });
 var GUARD_REASON = {
   outside_vault: "ui.map_chat_guard_outside_vault",
@@ -57282,6 +57292,7 @@ ${request.requirements}` : preset.text,
         title,
         ...options.keepTitle ? { keepTitle: true } : {},
         ...options.replyStep ? { replyStep: options.replyStep } : {},
+        ...options.appearance ? { appearance: options.appearance } : {},
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: (_c = snapshot.targetId) != null ? _c : null,
@@ -57486,7 +57497,8 @@ ${request.requirements}` : preset.text,
           formatIssues: draft.formatIssues,
           sourceContent: task.sourceContent,
           task
-        }
+        },
+        task.appearance
       )
     );
   }
@@ -57494,7 +57506,7 @@ ${request.requirements}` : preset.text,
    * Replaces the selected sibling topics with one new topic: their Details become sections of the new Detail, their
    * notes go to Unassigned, their subtopics move under the new topic. One history step; a failure puts everything back.
    */
-  async mergeSelected(title, snapshot, content) {
+  async mergeSelected(title, snapshot, content, asked) {
     var _a2, _b2, _c, _d, _e;
     const stale = () => {
       throw new Error(t("ui.merge_draft_stale"));
@@ -57536,7 +57548,7 @@ ${request.requirements}` : preset.text,
       }
       if (latest !== content.sourceContent) stale();
     }
-    if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before);
+    if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before, asked);
     let detail = "";
     const sourceNotes = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
@@ -57565,6 +57577,7 @@ ${request.requirements}` : preset.text,
     let entry;
     try {
       if (appearance) await repo.writeTopicAppearance(created.path, appearance);
+      if (asked) await repo.writeTopicAppearance(created.path, asked);
       if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(created.path, true);
       if (content) {
         const detailTemplate = (await this.mapStyle(language2)).template;
@@ -57638,7 +57651,7 @@ ${request.requirements}` : preset.text,
    * Unassigned and their subtopics move under the parent. One history step; a failure puts everything back, including
    * the parent's exact text.
    */
-  async mergeIntoParent(title, sources, content, before) {
+  async mergeIntoParent(title, sources, content, before, asked) {
     var _a2, _b2;
     const [target, ...children] = sources, mapPath = this.path, repo = this.plugin.repo, language2 = this.plugin.settings.language, detailTemplate = (await this.mapStyle(language2)).template;
     const sourceNotes = [];
@@ -57666,6 +57679,7 @@ ${request.requirements}` : preset.text,
       const tx = this.beginMapTransaction().rewriteNote(target.path, async (path) => {
         await repo.updateNote(path, patch, { detailTemplate });
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
+        if (asked) await repo.writeTopicAppearance(path, asked);
       });
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
       entry = await tx.editMap(mapPath, (map) => {
@@ -68130,7 +68144,7 @@ ${note.detail.trim()}` : "",
    * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_c) => (_c = this.map) == null ? void 0 : _c.id)() }) {
-    var _a2, _b2, _c2, _d, _e;
+    var _a2, _b2, _c2, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
     const same = () => {
       var _a3;
@@ -68139,7 +68153,20 @@ ${note.detail.trim()}` : "",
     const lost = () => skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines = [];
     const later = [];
-    const run = { refs: /* @__PURE__ */ new Map(), created: [], notes: /* @__PURE__ */ new Set(), files: /* @__PURE__ */ new Set(), parked: /* @__PURE__ */ new Set() };
+    const run = {
+      refs: /* @__PURE__ */ new Map(),
+      created: [],
+      notes: /* @__PURE__ */ new Set(),
+      files: /* @__PURE__ */ new Set(),
+      parked: /* @__PURE__ */ new Set(),
+      // An appearance asked for a card the same reply merges goes to the merged card (see chatSetAppearance).
+      mergeSourceIds: new Set(
+        result.actions.flatMap(
+          (action) => action.kind === "run_map_action" && action.action === "merge" ? action.nodeIds : []
+        )
+      ),
+      held: []
+    };
     this.history.openGroup();
     const laterBatch = { imageSearches: 0 };
     let laidOutCount = 0;
@@ -68312,7 +68339,33 @@ ${note.detail.trim()}` : "",
               action,
               run
             );
-            outcome = resolved ? await this.runChatSelection(resolved.action, (_e = result.message) != null ? _e : "", laterBatch) : skipped("ui.map_chat_skip_parent_missing");
+            const mergeIds = (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && resolved.action.action === "merge" ? new Set(resolved.action.nodeIds) : void 0;
+            const mine = mergeIds ? ((_e = run.held) != null ? _e : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
+            let asked;
+            for (const entry of mine) {
+              const change2 = chatAppearanceChange(entry.action);
+              asked = {
+                ...asked,
+                ...change2,
+                addMarkers: [...(_f = asked == null ? void 0 : asked.addMarkers) != null ? _f : [], ...(_g = change2.addMarkers) != null ? _g : []],
+                removeMarkers: [...(_h = asked == null ? void 0 : asked.removeMarkers) != null ? _h : [], ...(_i = change2.removeMarkers) != null ? _i : []],
+                addStyles: [...(_j = asked == null ? void 0 : asked.addStyles) != null ? _j : [], ...(_k = change2.addStyles) != null ? _k : []],
+                removeStyles: [...(_l = asked == null ? void 0 : asked.removeStyles) != null ? _l : [], ...(_m = change2.removeStyles) != null ? _m : []]
+              };
+            }
+            outcome = resolved ? await this.runChatSelection(resolved.action, (_n = result.message) != null ? _n : "", laterBatch, asked) : skipped("ui.map_chat_skip_parent_missing");
+            if (outcome.status !== "done" && mine.length && same()) {
+              const merged = new Set(mine.flatMap((entry) => entry.ids));
+              run.mergeSourceIds = new Set([...(_o = run.mergeSourceIds) != null ? _o : []].filter((id) => !merged.has(id)));
+              for (const entry of mine) {
+                const keep = entry.ids;
+                await this.plugin.mutate(async () => {
+                  await this.history.ownWrites(
+                    () => this.chatSetAppearance({ ...entry.action, nodeIds: keep }, (id) => id, run)
+                  );
+                });
+              }
+            }
           }
         } catch (error) {
           outcome = { status: "failed", reason: errorMessage(error) };
@@ -68700,40 +68753,41 @@ ${note.detail.trim()}` : "",
    * really changes are written; Map.md changes only its viewport. A card of an AIM map (or an AIM card) has none and is skipped.
    */
   async chatSetAppearance(action, real, run) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d;
     if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const nodes = action.nodeIds.map((id) => real(id)).map((id) => {
       var _a3;
       return id ? (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === id) : void 0;
     }).filter((node) => !!node);
     if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
-    const editable = nodes.filter((node) => !isAimNode(node) && this.notes.get(node.id));
-    if (!editable.length) return skipped("ui.map_chat_skip_unavailable");
-    if (editable.some((node) => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    const editableAll = nodes.filter((node) => !isAimNode(node) && this.notes.get(node.id));
+    if (!editableAll.length) return skipped("ui.map_chat_skip_unavailable");
+    if (editableAll.some((node) => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    const heldIds = (run == null ? void 0 : run.mergeSourceIds) ? editableAll.filter((node) => {
+      var _a3;
+      return (_a3 = run.mergeSourceIds) == null ? void 0 : _a3.has(node.id);
+    }) : [];
+    if (heldIds.length) (_a2 = run == null ? void 0 : run.held) == null ? void 0 : _a2.push({ action, ids: heldIds.map((node) => node.id) });
+    const editable = editableAll.filter((node) => !heldIds.includes(node));
     const skippedCards = new Set(action.nodeIds.map((id) => {
       var _a3;
       return (_a3 = real(id)) != null ? _a3 : id;
-    })).size - new Set(editable.map((node) => node.id)).size;
+    })).size - new Set(editableAll.map((node) => node.id)).size;
     const done = () => skippedCards > 0 ? { status: "done", skippedCards } : { status: "done" };
-    const change2 = {
-      ...action.color ? { color: action.color === "none" ? null : action.color } : {},
-      addMarkers: (_a2 = action.markers) != null ? _a2 : [],
-      removeMarkers: (_b2 = action.removeMarkers) != null ? _b2 : [],
-      addStyles: (_c = action.formats) != null ? _c : [],
-      removeStyles: (_d = action.removeFormats) != null ? _d : []
-    };
+    const change2 = chatAppearanceChange(action);
+    if (!editable.length) return done();
     const transaction = this.beginMapTransaction();
     let changes = 0;
     for (const node of editable) {
       const note = this.notes.get(node.id);
       const shown = {
         "topic-color": note == null ? void 0 : note.color,
-        "topic-markers": (_e = note == null ? void 0 : note.markers) != null ? _e : [],
-        "topic-style": (_f = note == null ? void 0 : note.style) != null ? _f : []
+        "topic-markers": (_b2 = note == null ? void 0 : note.markers) != null ? _b2 : [],
+        "topic-style": (_c = note == null ? void 0 : note.style) != null ? _c : []
       };
       if (!Object.keys(topicAppearanceValues(shown, change2)).length) continue;
       changes++;
-      (_g = run == null ? void 0 : run.notes) == null ? void 0 : _g.add(node.id);
+      (_d = run == null ? void 0 : run.notes) == null ? void 0 : _d.add(node.id);
       transaction.rewriteNote(node.path, (path) => this.plugin.repo.writeTopicAppearance(path, change2));
     }
     if (!changes) return done();
@@ -68949,7 +69003,7 @@ ${note.detail.trim()}` : "",
     if (!this.closed) this.render();
   }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
-  async runChatSelection(action, message = "", batch = { imageSearches: 0 }) {
+  async runChatSelection(action, message = "", batch = { imageSearches: 0 }, held) {
     var _a2, _b2, _c;
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -69062,11 +69116,12 @@ ${note.detail.trim()}` : "",
           const began = await this.startMergeDraft(title, snapshot, () => {
           }, new AbortController().signal, {
             keepTitle: true,
-            ...this.chatReplyStep ? { replyStep: this.chatReplyStep } : {}
+            ...this.chatReplyStep ? { replyStep: this.chatReplyStep } : {},
+            ...held ? { appearance: held } : {}
           });
           return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
         }
-        await this.plugin.mutate(() => this.mergeSelected(title, snapshot));
+        await this.plugin.mutate(() => this.mergeSelected(title, snapshot, void 0, held));
         return { status: "done" };
       }
       case "find_images":

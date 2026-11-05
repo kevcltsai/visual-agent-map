@@ -618,6 +618,8 @@ interface MergeTask {
   title: string;
   /** The name was given by the user (the map chat's merge): the AI's suggested name does not replace it. */
   keepTitle?: boolean;
+  /** The map chat's "make it red" of the same reply: written to the merged card (the sources go to Unassigned). */
+  appearance?: TopicAppearanceChange;
   sources: { id: string; path: string }[];
   parentId: string | null;
   /** Parent mode: the parent topic that keeps its card (first of `sources`); null when a new topic replaces siblings. */
@@ -862,6 +864,10 @@ interface ChatRun {
   files?: Set<string>;
   /** Where the notes of the cards the reply deleted now are (Unassigned): part of the reply's undo check, as the cards are gone from the map. */
   parked?: Set<string>;
+  /** The cards a merge of this reply takes as sources: an appearance asked for them in the same reply goes to the merged card. */
+  mergeSourceIds?: Set<string>;
+  /** The appearance changes held back for the merged card (not written to the sources, which are parked by the merge). */
+  held?: { action: Extract<MapChatAction, { kind: "set_appearance" }>; ids: string[] }[];
 }
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
@@ -869,6 +875,14 @@ const CHAT_TOOLS_GAP = 12;
 /** The size of a chat expand: the Next Step dialog's defaults (levels below the topic, topics in total). */
 const CHAT_EXPAND_LEVELS = 2;
 const CHAT_EXPAND_MAX_TOPICS = 15;
+/** The appearance change a set_appearance action asks for (the topic panel's change shape). */
+const chatAppearanceChange = (action: Extract<MapChatAction, { kind: "set_appearance" }>): TopicAppearanceChange => ({
+  ...(action.color ? { color: action.color === "none" ? null : action.color } : {}),
+  addMarkers: action.markers ?? [],
+  removeMarkers: action.removeMarkers ?? [],
+  addStyles: action.formats ?? [],
+  removeStyles: action.removeFormats ?? []
+});
 const skipped = (key: TranslationKey): ChatOutcome => ({ status: "skipped", reason: t(key) });
 const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   outside_vault: "ui.map_chat_guard_outside_vault",
@@ -6147,7 +6161,7 @@ export class VisualAgentMapView extends ItemView {
     },
     started: () => void,
     signal: AbortSignal,
-    options: { keepTitle?: boolean; replyStep?: ChatReplyStep } = {}
+    options: { keepTitle?: boolean; replyStep?: ChatReplyStep; appearance?: TopicAppearanceChange } = {}
   ): Promise<boolean> {
     const stillValid = (): boolean => {
       const check = this.mergeCheck(snapshot.sources.map(source => source.id));
@@ -6189,6 +6203,7 @@ export class VisualAgentMapView extends ItemView {
         title,
         ...(options.keepTitle ? { keepTitle: true } : {}),
         ...(options.replyStep ? { replyStep: options.replyStep } : {}),
+        ...(options.appearance ? { appearance: options.appearance } : {}),
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
@@ -6398,7 +6413,8 @@ export class VisualAgentMapView extends ItemView {
           formatIssues: draft.formatIssues,
           sourceContent: task.sourceContent,
           task
-        }
+        },
+        task.appearance
       )
     );
   }
@@ -6416,7 +6432,9 @@ export class VisualAgentMapView extends ItemView {
       formatIssues: AiResult["formatIssues"];
       sourceContent: string;
       task: MergeTask;
-    }
+    },
+    /** What the chat reply asked for the merged card (colour, markers, styles); written on top of what the sources share. */
+    asked?: TopicAppearanceChange
   ): Promise<void> {
     // An AI result that no longer fits fails loudly and writes nothing (the caller forgets the task); the plain merge
     // just does nothing.
@@ -6470,7 +6488,7 @@ export class VisualAgentMapView extends ItemView {
       }
       if (latest !== content.sourceContent) stale();
     }
-    if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before);
+    if (check.targetId) return this.mergeIntoParent(title, check.sources, content, before, asked);
     let detail = "";
     const sourceNotes: Note[] = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
@@ -6505,6 +6523,7 @@ export class VisualAgentMapView extends ItemView {
     let entry: TransactionEntry;
     try {
       if (appearance) await repo.writeTopicAppearance(created.path, appearance);
+      if (asked) await repo.writeTopicAppearance(created.path, asked);
       if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(created.path, true);
       if (content) {
         const detailTemplate = (await this.mapStyle(language)).template;
@@ -6599,7 +6618,8 @@ export class VisualAgentMapView extends ItemView {
           task: MergeTask;
         }
       | undefined,
-    before: MapDocument
+    before: MapDocument,
+    asked?: TopicAppearanceChange
   ): Promise<void> {
     const [target, ...children] = sources,
       mapPath = this.path,
@@ -6633,6 +6653,7 @@ export class VisualAgentMapView extends ItemView {
       const tx = this.beginMapTransaction().rewriteNote(target.path, async path => {
         await repo.updateNote(path, patch, { detailTemplate });
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
+        if (asked) await repo.writeTopicAppearance(path, asked);
       });
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
       entry = await tx
@@ -17977,7 +17998,20 @@ export class VisualAgentMapView extends ItemView {
       skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines: MapChatLine[] = [];
     const later: number[] = [];
-    const run: ChatRun = { refs: new Map(), created: [], notes: new Set(), files: new Set(), parked: new Set() };
+    const run: ChatRun = {
+      refs: new Map(),
+      created: [],
+      notes: new Set(),
+      files: new Set(),
+      parked: new Set(),
+      // An appearance asked for a card the same reply merges goes to the merged card (see chatSetAppearance).
+      mergeSourceIds: new Set(
+        result.actions.flatMap(action =>
+          action.kind === "run_map_action" && action.action === "merge" ? action.nodeIds : []
+        )
+      ),
+      held: []
+    };
     // Every entry the writes push is held back, then pushed as the reply's one undo step (a create_map's map switch clears
     // the history, and so what was collected for the old map; the new map's writes are collected from there).
     this.history.openGroup();
@@ -18195,9 +18229,39 @@ export class VisualAgentMapView extends ItemView {
               action as Extract<MapChatAction, { kind: "select_topics" | "run_map_action" }>,
               run
             );
+            const mergeIds =
+              resolved?.action.kind === "run_map_action" && resolved.action.action === "merge"
+                ? new Set(resolved.action.nodeIds)
+                : undefined;
+            const mine = mergeIds ? (run.held ?? []).filter(entry => entry.ids.some(id => mergeIds.has(id))) : [];
+            let asked: TopicAppearanceChange | undefined;
+            for (const entry of mine) {
+              const change = chatAppearanceChange(entry.action);
+              asked = {
+                ...asked,
+                ...change,
+                addMarkers: [...(asked?.addMarkers ?? []), ...(change.addMarkers ?? [])],
+                removeMarkers: [...(asked?.removeMarkers ?? []), ...(change.removeMarkers ?? [])],
+                addStyles: [...(asked?.addStyles ?? []), ...(change.addStyles ?? [])],
+                removeStyles: [...(asked?.removeStyles ?? []), ...(change.removeStyles ?? [])]
+              };
+            }
             outcome = resolved
-              ? await this.runChatSelection(resolved.action, result.message ?? "", laterBatch)
+              ? await this.runChatSelection(resolved.action, result.message ?? "", laterBatch, asked)
               : skipped("ui.map_chat_skip_parent_missing");
+            // A merge that did not happen leaves the cards where they are: they get the colour after all.
+            if (outcome.status !== "done" && mine.length && same()) {
+              const merged = new Set(mine.flatMap(entry => entry.ids));
+              run.mergeSourceIds = new Set([...(run.mergeSourceIds ?? [])].filter(id => !merged.has(id)));
+              for (const entry of mine) {
+                const keep = entry.ids;
+                await this.plugin.mutate(async () => {
+                  await this.history.ownWrites(() =>
+                    this.chatSetAppearance({ ...entry.action, nodeIds: keep }, id => id, run)
+                  );
+                });
+              }
+            }
           }
         } catch (error) {
           outcome = { status: "failed", reason: errorMessage(error) };
@@ -18633,20 +18697,20 @@ export class VisualAgentMapView extends ItemView {
       .map(id => (id ? this.map?.nodes.find(node => node.id === id) : undefined))
       .filter((node): node is MapNode => !!node);
     if (!nodes.length) return skipped("ui.map_chat_skip_topic_gone");
-    const editable = nodes.filter(node => !isAimNode(node) && this.notes.get(node.id));
-    if (!editable.length) return skipped("ui.map_chat_skip_unavailable");
-    if (editable.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    const editableAll = nodes.filter(node => !isAimNode(node) && this.notes.get(node.id));
+    if (!editableAll.length) return skipped("ui.map_chat_skip_unavailable");
+    if (editableAll.some(node => this.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
+    // A card this reply merges is not coloured itself (the merge moves it to Unassigned): the merge applies the change to the
+    // merged card instead. The ones not merged are written as usual.
+    const heldIds = run?.mergeSourceIds ? editableAll.filter(node => run.mergeSourceIds?.has(node.id)) : [];
+    if (heldIds.length) run?.held?.push({ action, ids: heldIds.map(node => node.id) });
+    const editable = editableAll.filter(node => !heldIds.includes(node));
     // Named cards that are gone, belong to an AIM map or have no note are left out; the line says how many.
     const skippedCards =
-      new Set(action.nodeIds.map(id => real(id) ?? id)).size - new Set(editable.map(node => node.id)).size;
+      new Set(action.nodeIds.map(id => real(id) ?? id)).size - new Set(editableAll.map(node => node.id)).size;
     const done = (): ChatOutcome => (skippedCards > 0 ? { status: "done", skippedCards } : { status: "done" });
-    const change: TopicAppearanceChange = {
-      ...(action.color ? { color: action.color === "none" ? null : action.color } : {}),
-      addMarkers: action.markers ?? [],
-      removeMarkers: action.removeMarkers ?? [],
-      addStyles: action.formats ?? [],
-      removeStyles: action.removeFormats ?? []
-    };
+    const change = chatAppearanceChange(action);
+    if (!editable.length) return done();
     const transaction = this.beginMapTransaction();
     let changes = 0;
     for (const node of editable) {
@@ -18915,7 +18979,9 @@ export class VisualAgentMapView extends ItemView {
     /** The user's message: the direction of an integration. */
     message = "",
     /** What the later actions of this reply have started so far. */
-    batch: { imageSearches: number } = { imageSearches: 0 }
+    batch: { imageSearches: number } = { imageSearches: 0 },
+    /** The appearance the reply asked for the cards this merge takes: it goes to the merged card. */
+    held?: TopicAppearanceChange
   ): Promise<ChatOutcome> {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -19034,11 +19100,12 @@ export class VisualAgentMapView extends ItemView {
         if (hasMergeContent(sourceNotes, isPlaceholder)) {
           const began = await this.startMergeDraft(title, snapshot, () => {}, new AbortController().signal, {
             keepTitle: true,
-            ...(this.chatReplyStep ? { replyStep: this.chatReplyStep } : {})
+            ...(this.chatReplyStep ? { replyStep: this.chatReplyStep } : {}),
+            ...(held ? { appearance: held } : {})
           });
           return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
         }
-        await this.plugin.mutate(() => this.mergeSelected(title, snapshot));
+        await this.plugin.mutate(() => this.mergeSelected(title, snapshot, undefined, held));
         return { status: "done" };
       }
       case "find_images":

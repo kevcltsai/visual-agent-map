@@ -34524,6 +34524,8 @@ ${typed}` : draft;
     last.plan = plan;
     this.renderLog();
     this.renderHint();
+    this.scrollToEnd();
+    this.scrollToEndWhenSettled();
     this.announce(
       `${t("ui.map_chat_live_done_0", clip2(last.text, 160))} ${t(
         "ui.map_chat_live_plan_0",

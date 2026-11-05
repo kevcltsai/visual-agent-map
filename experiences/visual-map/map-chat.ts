@@ -990,6 +990,10 @@ export class MapChatPanel {
     last.plan = plan;
     this.renderLog();
     this.renderHint();
+    // The hint line (and the suggestions) change the log's height after it was laid out, so the end moved: a plan is
+    // something to answer, so the card's buttons are brought into view now and again once the new height is final.
+    this.scrollToEnd();
+    this.scrollToEndWhenSettled();
     // A plan waits for an answer and nothing else tells a screen reader so: say the reply and the plan once.
     this.announce(
       `${t("ui.map_chat_live_done_0", clip(last.text, 160))} ${t(

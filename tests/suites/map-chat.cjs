@@ -5782,3 +5782,18 @@ integrationTest('persona 27b: a card drawn for the first time that covers nothin
   h.view.settleCardHeights(); await until(() => undoSteps(h) === stepsBefore + 1);
   eq(coverAny(h.view.map.nodes.filter(n => n.id !== 'fresh'), id => heights[id] ?? 180), [], 'the card that covered another is laid out again');
 });
+
+// ---- F26: the plan card's Apply / Cancel must be scrolled into view after the hint line changed the log height ----------
+test('F26: showPlan scrolls the log to its end after the hint line is laid out (also for a reader who had scrolled up), and again after the next frame', () => {
+  const clock = frames(); const f = panelFixture({}, clock.window); f.panel.setOpen(true); const log = f.parts.log();
+  f.panel.begin('q'); f.panel.finish('a reply', []);
+  let height = 1000; Object.defineProperty(log, 'scrollHeight', { get() { return height; }, configurable: true });
+  log.clientHeight = 200; log.scrollTop = 100; // scrolled up: the old code only followed the end when already there
+  const hint = f.panel.hintEl; const setText = hint.setText.bind(hint);
+  hint.setText = text => { setText(text); if (text) height = 1040; }; // the hint line appears after the card was built
+  f.panel.showPlan({ reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', apply() {}, cancel() {} });
+  assert.equal(log.scrollTop, 1040, 'the buttons are at the visible end, measured after the hint line');
+  assert.ok(f.panel.logEl.querySelector('.vam-map-chat-plan-apply'), 'Apply is a descendant of the scrolling log');
+  height = 1080; clock.run();
+  assert.equal(log.scrollTop, 1080, 'and again once the final height is known');
+});

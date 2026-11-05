@@ -215,3 +215,13 @@ test('export never throws on odd maps: empty, orphan parent, parent loop, missin
   assert.doesNotThrow(() => mod.toOpml(odd, new Map()));
 });
 const RAW = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff]/;
+
+test('annotated image P6: a map holding an annotated image exports the same OPML and FreeMind as without it', () => {
+  const SECRET = 'ANCHOR-SECRET-123';
+  const withImage = { ...map, canvasItems: [{ id: 'img1', kind: 'annotated-image', path: 'a.png', x: 0, y: 0, w: 10, h: 10, note: SECRET, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 }, note: SECRET }], relations: [{ kind: 'related', from: 'p1', to: 'a', description: SECRET }] }] };
+  for (const make of [mod.toOpml, mod.toFreeMind]) {
+    const text = make(withImage, notes);
+    assert.equal(text, make(map, notes));
+    assert.equal(text.includes(SECRET), false);
+  }
+});

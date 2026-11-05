@@ -681,3 +681,26 @@ test('share exporter covers: a topic-cover picture is collected, counted and emb
   const noImages = exporter.assemble({ includeDetail: true, includeImages: false });
   assert.equal(noImages.counts.images, 0);
 });
+
+// Annotated image P6: the finished share file of a map with an annotated image equals the one without it.
+test('share exporter annotated-image: the finished file and payload carry no image, anchor, anchor note or anchor relation', () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const SECRET = 'ANCHOR-SECRET-123';
+  const nodes = [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }, { id: 'b', path: 'Folder/B.md', parentId: 'a', x: 0, y: 0, collapsed: false }];
+  const image = { id: 'img1', kind: 'annotated-image', path: `Pics/${SECRET}.png`, x: 9, y: 9, w: 100, h: 80, note: SECRET, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 }, note: SECRET }], relations: [{ kind: 'related', from: 'p1', to: 'b', description: SECRET }] };
+  const run = canvasItems => {
+    const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes, ...(canvasItems ? { canvasItems } : {}) };
+    const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '' }], ['b', { title: 'B', summary: 'S', status: 'idea', model: '' }]]);
+    const exporter = new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
+    return exporter.assemble({ includeDetail: false, includeImages: false });
+  };
+  const withImage = run([image]);
+  const without = run(undefined);
+  assert.deepEqual(plain(withImage.leakCategories), []);
+  assert.deepEqual(plain(withImage.payload.nodes), plain(without.payload.nodes));
+  assert.deepEqual(Object.keys(plain(withImage.payload)).sort(), Object.keys(plain(without.payload)).sort());
+  assert.equal(withImage.html.includes(SECRET), false, 'the finished file has no anchor text');
+  assert.equal(JSON.stringify(plain(withImage.payload)).includes('anchors'), false);
+  assert.equal(JSON.stringify(plain(withImage.payload)).includes('canvasItems'), false);
+});

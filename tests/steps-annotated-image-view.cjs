@@ -21,7 +21,7 @@ async function harness(items) {
   await app.vault.create(MAP, core.serializeMap(doc));
   const root = await repo.createNote('Root', 'gpt-6-luna', doc, MAP, 'workspace');
   doc.nodes.push(root);
-  if (items) doc.canvasItems = items;
+  if (items) doc.canvasItems = typeof items === 'function' ? items(root.id) : items;
   await repo.saveMap(MAP, doc);
   await repo.rebuildDerivedData();
   await app.vault.create('attachments/a.png', 'png-bytes');
@@ -38,7 +38,13 @@ async function harness(items) {
   const BaseModal = dom.makeModal();
   class Modal extends BaseModal { constructor(a) { super(a); modals.push(this); } }
   const notices = [];
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Menu, Modal, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment });
+  /** Just enough of Obsidian's Setting for the topic picker: a row with a name and buttons. */
+  class Setting {
+    constructor(parent) { this.el = parent.createDiv('setting-item'); }
+    setName(text) { this.el.createSpan({ text }); return this; } setDesc(text) { this.el.createSpan({ text }); return this; }
+    addButton(cb) { const b = this.el.createEl('button'); cb({ setButtonText(t) { b.text = t; return this; }, onClick(fn) { b.addEventListener('click', fn); return this; } }); return this; }
+  }
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Menu, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment });
   let pending = Promise.resolve();
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -200,7 +206,7 @@ test('counter-example (cancel): Cancel or closing the dialog leaves the map and 
 test('edit note: dialog starts with the current note; Save changes it in one undo step; blank clears it', async () => {
   const h = await harness([annotated({ note: 'old', anchors: [anchor()] })]);
   h.view.render();
-  assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
+  assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
   h.pick(h.contextMenu(), 'Edit note').fn();
   const modal = h.modals.at(-1);
   assert.equal(modal.titleEl.text, 'Edit note');
@@ -319,4 +325,343 @@ test('counter-example (read-only): selection mode and AIM draw the look but give
     assert.equal(h.modals.length, 0, mode);
     assert.equal(h.fileText(), before, mode);
   }
+});
+
+// ---- P3b: anchors (draw, tooltip, place mode, dialog, edit, delete) ----------------------------------------------------
+const anchorsOf = el => findAll(el, i => i.hasClass('vam-anchor'));
+const at = (id, x, y, note) => ({ id, at: { kind: 'image-2d', x, y }, ...(note ? { note } : {}) });
+const key = (el, k, extra = {}) => { let prevented = false; el.fire('keydown', { key: k, preventDefault() { prevented = true; }, ...extra }); return prevented; };
+/** Press a key where the focus is on the image (the place mode listens on the stage). */
+const stageKey = (h, k, extra = {}) => { let prevented = false; h.view.stageEl.fire('keydown', { key: k, target: h.imageEl(), preventDefault() { prevented = true; }, ...extra }); return prevented; };
+const crosshair = h => find(h.imageEl(), i => i.hasClass('vam-anchor-crosshair'));
+const hint = h => find(h.view.contentEl, i => i.hasClass('vam-place-hint'));
+
+test('anchors: 2D anchors are buttons at their percentages in DOM order after the picture; unknown kinds are not drawn', async () => {
+  const h = await harness(root => [annotated({ note: 'n', anchors: [at('a1', 0.25, 0.75, 'cow back'), { id: 'a2', at: { kind: 'model-3d', x: 1 } }, at('a3', 1, 0)], relations: [{ kind: 'supports', from: root, to: 'a1' }] })]);
+  h.view.render();
+  const el = h.imageEl();
+  const list = anchorsOf(el);
+  assert.deepEqual(list.map(a => a.dataset.anchorId), ['a1', 'a3']);
+  const order = el.children.map(c => c.tag + '.' + c.cls.split(' ')[0]);
+  assert.ok(order.indexOf('button.vam-anchor') > order.indexOf('img.'), order.join());
+  assert.equal(list[0].tag, 'button');
+  assert.equal(list[0].tabIndex, 0);
+  assert.match(list[0].style.left, /^\d+(\.\d+)?%$/);
+  assert.equal(list[0].style.left, '25%');
+  assert.equal(list[0].style.top, '75%');
+  assert.ok(list[0].hasClass('is-linked'));
+  assert.ok(!list[1].hasClass('is-linked'));
+  assert.equal(list[0].attrs['aria-label'], 'Anchor: cow back. Linked to 1 topic(s)');
+  assert.equal(list[1].attrs['aria-label'], 'Anchor (no note). Not linked to any topic');
+  const tip = find(list[0], i => i.hasClass('vam-anchor-tip'));
+  assert.equal(list[0].attrs['aria-describedby'], tip.attrs.id);
+  assert.equal(tip.attrs.role, 'tooltip');
+  assert.deepEqual(findAll(tip, i => i.tag === 'span' && i.text).map(i => i.text), ['cow back', 'Linked to 1 topic(s)']);
+  assert.deepEqual(findAll(find(list[1], i => i.hasClass('vam-anchor-tip')), i => i.text).map(i => i.text), ['Not linked to any topic']);
+  assert.equal(findAll(h.view.stageEl, i => i.hasClass('vam-anchor')).length, 2, 'exported scene never sees them: they live only in the item element');
+});
+
+test('counter-example (security): hostile anchor notes are plain text in the label and the tooltip, style is numbers only', async () => {
+  for (const hostile of ['<img src=x onerror=alert(1)>', 'javascript:alert(1)', '{{x}}', 'line one\nline two', 'x'.repeat(300)]) {
+    const h = await harness([annotated({ anchors: [at('a1', 0.5, 0.5, hostile)] })]);
+    h.view.render();
+    const [a] = anchorsOf(h.imageEl());
+    const note = h.view.map.canvasItems[0].anchors[0].note;
+    assert.ok(note.length <= 200 && !note.includes('\n'), hostile);
+    assert.equal(a.attrs['aria-label'], `Anchor: ${note}. Not linked to any topic`);
+    assert.equal(find(a, i => i.hasClass('vam-anchor-tip-note')).text, note);
+    assert.equal(findAll(a, i => i.tag === 'img').length, 0);
+    assert.match(a.style.left + ' ' + a.style.top, /^\d+(\.\d+)?% \d+(\.\d+)?%$/);
+    assert.equal(a.attrs.onerror, undefined);
+  }
+});
+
+test('anchors: pointerdown and click on an anchor do not reach the image (no drag)', async () => {
+  const h = await harness([annotated({ anchors: [at('a1', 0.5, 0.5)] })]);
+  h.view.render();
+  const [a] = anchorsOf(h.imageEl());
+  for (const name of ['pointerdown', 'click']) {
+    let stopped = false;
+    for (const fn of a.listeners[name] ?? []) fn({ stopPropagation() { stopped = true; }, preventDefault() {}, button: 0 });
+    assert.ok(stopped, name);
+  }
+});
+
+test('place mode: menu item starts it with a centred crosshair and the hint bar; arrows move 2%, Shift 10%, clamped to 0-1', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  assert.equal(h.titleOf(h.contextMenu().items[0]), 'Place anchor');
+  h.pick(h.contextMenu(), 'Place anchor').fn();
+  assert.equal(hint(h).attrs.role, 'status');
+  assert.equal(hint(h).text, '← ↑ → ↓ to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse');
+  assert.equal(crosshair(h).style.left, '50%');
+  assert.equal(crosshair(h).style.top, '50%');
+  assert.ok(stageKey(h, 'ArrowRight'));
+  assert.equal(crosshair(h).style.left, '52%');
+  stageKey(h, 'ArrowDown', { shiftKey: true });
+  assert.equal(crosshair(h).style.top, '60%');
+  for (let i = 0; i < 12; i++) stageKey(h, 'ArrowLeft', { shiftKey: true });
+  assert.equal(crosshair(h).style.left, '0%');
+  for (let i = 0; i < 20; i++) stageKey(h, 'ArrowUp', { shiftKey: true });
+  assert.equal(crosshair(h).style.top, '0%');
+  for (let i = 0; i < 20; i++) stageKey(h, 'ArrowRight', { shiftKey: true });
+  assert.equal(crosshair(h).style.left, '100%');
+});
+
+test('place mode: Enter on the focused annotated image enters it; a plain image does nothing', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  assert.ok(key(h.imageEl(), 'Enter'));
+  assert.ok(hint(h));
+  const p = await harness([image()]);
+  p.view.render();
+  key(p.imageEl(), 'Enter');
+  assert.equal(hint(p), undefined);
+});
+
+test('counter-example (cancel): Esc leaves the place mode, the map and the undo stack unchanged', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  const before = h.fileText(), entries = h.view.history.past.length;
+  h.view.startPlacingAnchor('img1');
+  stageKey(h, 'ArrowRight');
+  assert.ok(stageKey(h, 'Escape'));
+  await h.settle();
+  assert.equal(hint(h), undefined);
+  assert.equal(crosshair(h), undefined);
+  assert.equal(h.modals.length, 0);
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+  stageKey(h, 'Enter');
+  assert.equal(h.modals.length, 0, 'mode is over: Enter does nothing');
+});
+
+test('place mode: a mouse click on the image places at the pointer (clamped); a click elsewhere cancels', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  h.imageEl().getBoundingClientRect = () => ({ left: 100, top: 50, width: 200, height: 100 });
+  h.view.startPlacingAnchor('img1');
+  h.view.stageEl.fire('click', { target: h.imageEl(), clientX: 150, clientY: 125 });
+  const modal = h.modals.at(-1);
+  assert.equal(modal.titleEl.text, 'New anchor');
+  assert.equal(hint(h), undefined);
+  dom.button(modal.modalEl, 'Done').click();
+  await h.settle();
+  const [a] = (await h.onDisk())[0].anchors;
+  assert.deepEqual(plain(a.at), { kind: 'image-2d', x: 0.25, y: 0.75 });
+  h.view.render();
+  h.view.startPlacingAnchor('img1');
+  h.view.stageEl.fire('click', { target: element('div') });
+  assert.equal(hint(h), undefined);
+  assert.equal(h.modals.length, 1, 'a click away cancels without a dialog');
+});
+
+test('dialog: new topic is the default; Done writes one anchor, one topic, one related relation in one undo step', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  const nodes = h.view.map.nodes.length, entries = h.view.history.past.length;
+  h.view.startPlacingAnchor('img1');
+  stageKey(h, 'ArrowRight');
+  stageKey(h, 'Enter');
+  const modal = h.modals.at(-1);
+  assert.deepEqual(dom.buttons(modal.modalEl), ['Cancel', 'Done']);
+  const radios = findAll(modal.modalEl, i => i.tag === 'input' && i.type === 'radio');
+  assert.equal(radios.length, 3);
+  assert.equal(radios.filter(r => r.checked).length, 1);
+  assert.ok(radios[0].checked, 'the first choice (new topic) is preselected');
+  assert.deepEqual(findAll(modal.modalEl, i => i.tag === 'span' && i.text).map(i => i.text).slice(0, 3), ['Add a new topic (relation: related)', 'Pick an existing topic…', 'Do not link yet']);
+  const input = find(modal.modalEl, i => i.tag === 'input' && i.type === 'text');
+  assert.equal(input.attrs.maxlength, '200');
+  input.value = 'Cow back';
+  dom.button(modal.modalEl, 'Done').click();
+  await h.settle();
+  assert.equal(h.view.history.past.length, entries + 1);
+  const disk = await h.repo.readMap(MAP);
+  assert.equal(disk.nodes.length, nodes + 1);
+  const created = disk.nodes.at(-1);
+  assert.equal((await h.repo.readNote(created.path, disk)).title, 'Cow back');
+  const [img] = plain(disk.canvasItems);
+  assert.equal(img.anchors.length, 1);
+  assert.equal(img.anchors[0].note, 'Cow back');
+  assert.deepEqual(img.anchors[0].at, { kind: 'image-2d', x: 0.52, y: 0.5 });
+  assert.match(img.anchors[0].id, /^[A-Za-z0-9_-]{1,64}$/);
+  assert.ok(!disk.nodes.some(n => n.id === img.anchors[0].id), 'anchor id never equals a node id');
+  assert.deepEqual(img.relations, [{ kind: 'related', from: img.anchors[0].id, to: created.id }]);
+  assert.equal(created.parentId, disk.nodes.find(n => !n.parentId).id);
+  await h.view.history.undoEntry.undo();
+  const back = await h.repo.readMap(MAP);
+  assert.equal(back.nodes.length, nodes);
+  assert.deepEqual(plain(back.canvasItems), [annotated({ note: 'n' })]);
+});
+
+test('dialog: a blank note gives the default new-topic title; "do not link yet" adds only the anchor', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  h.view.startPlacingAnchor('img1');
+  stageKey(h, 'Enter');
+  dom.button(h.modals.at(-1).modalEl, 'Done').click();
+  await h.settle();
+  const disk = await h.repo.readMap(MAP);
+  assert.equal(disk.nodes.length, 2);
+  assert.equal((await h.repo.readNote(disk.nodes.at(-1).path, disk)).title, 'New topic');
+  assert.equal('note' in plain(disk.canvasItems)[0].anchors[0], false);
+
+  const g = await harness([annotated({ note: 'n' })]);
+  g.view.render();
+  g.view.startPlacingAnchor('img1');
+  stageKey(g, 'Enter');
+  const radios = findAll(g.modals.at(-1).modalEl, i => i.tag === 'input' && i.type === 'radio');
+  radios[2].checked = true; radios[2].change();
+  const entries = g.view.history.past.length;
+  dom.button(g.modals.at(-1).modalEl, 'Done').click();
+  await g.settle();
+  const after = await g.repo.readMap(MAP);
+  assert.equal(after.nodes.length, 1);
+  assert.equal(plain(after.canvasItems)[0].anchors.length, 1);
+  assert.equal(plain(after.canvasItems)[0].relations, undefined);
+  assert.equal(g.view.history.past.length, entries + 1);
+});
+
+test('dialog: an existing topic is chosen with the topic picker; cancelling the picker places nothing', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  const root = h.view.map.nodes[0];
+  h.view.startPlacingAnchor('img1');
+  stageKey(h, 'Enter');
+  const radios = findAll(h.modals.at(-1).modalEl, i => i.tag === 'input' && i.type === 'radio');
+  radios[1].checked = true; radios[1].change();
+  dom.button(h.modals.at(-1).modalEl, 'Done').click();
+  await h.settle();
+  const picker = h.modals.at(-1);
+  assert.ok(dom.button(picker.contentEl, 'Select'), 'the picker lists the map topics');
+  const before = h.fileText();
+  picker.close();
+  await h.settle();
+  assert.equal(h.fileText(), before, 'picker closed without choosing');
+  h.view.startPlacingAnchor('img1');
+  stageKey(h, 'Enter');
+  const again = findAll(h.modals.at(-1).modalEl, i => i.tag === 'input' && i.type === 'radio');
+  again[1].checked = true; again[1].change();
+  dom.button(h.modals.at(-1).modalEl, 'Done').click();
+  await h.settle();
+  dom.button(h.modals.at(-1).contentEl, 'Select').click();
+  await h.settle();
+  const [img] = plain((await h.repo.readMap(MAP)).canvasItems);
+  assert.equal(img.anchors.length, 1);
+  assert.deepEqual(img.relations, [{ kind: 'related', from: img.anchors[0].id, to: root.id }]);
+});
+
+test('counter-example (cancel): the dialog Cancel or closing it places no anchor and no topic', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  const before = h.fileText(), entries = h.view.history.past.length;
+  h.view.startPlacingAnchor('img1');
+  stageKey(h, 'Enter');
+  dom.button(h.modals.at(-1).modalEl, 'Cancel').click();
+  h.view.startPlacingAnchor('img1');
+  stageKey(h, 'Enter');
+  h.modals.at(-1).close();
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+});
+
+test('first anchor on an image without a note: a Notice, once per image', async () => {
+  const h = await harness([annotated()]);
+  h.view.render();
+  const place = async () => {
+    h.view.startPlacingAnchor('img1');
+    stageKey(h, 'Enter');
+    const radios = findAll(h.modals.at(-1).modalEl, i => i.tag === 'input' && i.type === 'radio');
+    radios[2].checked = true; radios[2].change();
+    dom.button(h.modals.at(-1).modalEl, 'Done').click();
+    await h.settle();
+    h.view.render();
+  };
+  await place();
+  assert.deepEqual(h.notices, ['This image has no note yet. The AI cannot see pictures; add one sentence on what it is and what to research.']);
+  await place();
+  assert.equal(h.notices.length, 1, 'only once');
+  const withNote = await harness([annotated({ note: 'has note' })]);
+  withNote.view.render();
+  withNote.view.startPlacingAnchor('img1');
+  stageKey(withNote, 'Enter');
+  dom.button(withNote.modals.at(-1).modalEl, 'Done').click();
+  await withNote.settle();
+  assert.equal(withNote.notices.length, 0);
+});
+
+test('edit: Enter on an anchor opens the dialog with only the note; Save changes it in one undo step', async () => {
+  const h = await harness([annotated({ note: 'n', anchors: [at('a1', 0.5, 0.5, 'old'), at('a2', 0.1, 0.1)] })]);
+  h.view.render();
+  const [a] = anchorsOf(h.imageEl());
+  assert.ok(key(a, 'Enter'));
+  const modal = h.modals.at(-1);
+  assert.equal(modal.titleEl.text, 'Edit anchor');
+  assert.equal(findAll(modal.modalEl, i => i.type === 'radio').length, 0);
+  const input = find(modal.modalEl, i => i.tag === 'input' && i.type === 'text');
+  assert.equal(input.value, 'old');
+  input.value = 'new';
+  const entries = h.view.history.past.length;
+  dom.button(modal.modalEl, 'Save').click();
+  await h.settle();
+  assert.equal(h.view.history.past.length, entries + 1);
+  assert.deepEqual((await h.onDisk())[0].anchors.map(x => x.note), ['new', undefined]);
+  await h.view.history.undoEntry.undo();
+  assert.equal((await h.onDisk())[0].anchors[0].note, 'old');
+});
+
+test('delete: Delete or Backspace on an anchor removes it and its relations only; one undo step; focus returns to the image', async () => {
+  const make = root => [annotated({ note: 'n', anchors: [at('a1', 0.5, 0.5), at('a2', 0.1, 0.1)], relations: [{ kind: 'related', from: 'a1', to: root }, { kind: 'related', from: 'a2', to: root }] })];
+  for (const k of ['Delete', 'Backspace']) {
+    const h = await harness(make);
+    const root = h.view.map.nodes[0].id, items = make(root);
+    h.view.render();
+    const [a] = anchorsOf(h.imageEl());
+    const entries = h.view.history.past.length;
+    let stopped = false;
+    a.fire('keydown', { key: k, preventDefault() {}, stopPropagation() { stopped = true; } });
+    assert.ok(stopped, 'the image is not deleted with it');
+    await h.settle();
+    const [img] = await h.onDisk();
+    assert.deepEqual(img.anchors.map(x => x.id), ['a2'], k);
+    assert.deepEqual(img.relations, [{ kind: 'related', from: 'a2', to: root }], k);
+    assert.equal(h.view.history.past.length, entries + 1, k);
+    assert.equal(h.imageEl().focused, true, k + ': focus returns to the image');
+    await h.view.history.undoEntry.undo();
+    assert.deepEqual((await h.onDisk())[0], items[0], k);
+  }
+});
+
+test('counter-example (read-only): selection mode and AIM draw anchors and tooltips but cannot place, edit or delete', async () => {
+  for (const mode of ['selection', 'aim']) {
+    const h = await harness([annotated({ note: 'n', anchors: [at('a1', 0.5, 0.5, 'x')] })]);
+    if (mode === 'selection') h.view.selection.toggleMultiSelect();
+    else h.view.aimLive = () => true;
+    h.view.render();
+    const [a] = anchorsOf(h.imageEl());
+    assert.ok(a, mode);
+    assert.ok(find(a, i => i.hasClass('vam-anchor-tip')), mode);
+    assert.equal(a.listeners.keydown, undefined, mode);
+    const before = h.fileText();
+    h.view.startPlacingAnchor('img1');
+    assert.equal(hint(h), undefined, mode);
+    await h.view.deleteAnchor('img1', 'a1');
+    assert.equal(h.fileText(), before, mode);
+    assert.equal(h.modals.length, 0, mode);
+  }
+});
+
+test('counter-example (unknown kind): an anchor with an unknown position kind is not drawn, not focusable and survives a save', async () => {
+  const weird = { id: 'w1', at: { kind: 'model-3d', x: 1, y: 2 }, note: 'keep' };
+  const h = await harness([annotated({ note: 'n', anchors: [weird, at('a1', 0.5, 0.5)] })]);
+  h.view.render();
+  assert.deepEqual(anchorsOf(h.imageEl()).map(a => a.dataset.anchorId), ['a1']);
+  h.view.startPlacingAnchor('img1');
+  stageKey(h, 'Enter');
+  const radios = findAll(h.modals.at(-1).modalEl, i => i.tag === 'input' && i.type === 'radio');
+  radios[2].checked = true; radios[2].change();
+  dom.button(h.modals.at(-1).modalEl, 'Done').click();
+  await h.settle();
+  assert.deepEqual((await h.onDisk())[0].anchors[0], weird);
 });

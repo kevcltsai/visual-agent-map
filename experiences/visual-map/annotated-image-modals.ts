@@ -57,3 +57,78 @@ export class ImageNoteModal extends Modal {
     this.contentEl.empty();
   }
 }
+
+/** What a new anchor is linked to when the dialog closes with "Done". */
+export type AnchorTarget = "new" | "pick" | "none";
+
+/** The anchor dialog: "New anchor" (note + what to link) and "Edit anchor" (note only). */
+export class AnchorModal extends Modal {
+  private done = false;
+  constructor(
+    app: App,
+    private readonly mode: "new" | "edit",
+    private readonly value: string,
+    /** Gets the raw note (the data layer cleans it) and, for a new anchor, what to link. */
+    private readonly submit: (note: string, target: AnchorTarget) => void,
+    private readonly cancelled: () => void = () => {}
+  ) {
+    super(app);
+  }
+  onOpen(): void {
+    this.titleEl.setText(t(this.mode === "new" ? "ui.anchor_new_title" : "ui.anchor_edit_title"));
+    const input = this.contentEl.createEl("input", {
+      type: "text",
+      value: this.value,
+      cls: "vam-name-input vam-anchor-note-input"
+    });
+    input.setAttr("aria-label", t("ui.anchor_note_label"));
+    input.setAttr("maxlength", String(NOTE_LIMIT));
+    let target: AnchorTarget = "new";
+    if (this.mode === "new") {
+      const group = this.contentEl.createDiv("vam-anchor-choices");
+      group.setAttr("role", "radiogroup");
+      group.setAttr("aria-label", t("ui.anchor_target_label"));
+      const choices: [AnchorTarget, string][] = [
+        ["new", t("ui.anchor_target_new")],
+        ["pick", t("ui.anchor_target_pick")],
+        ["none", t("ui.anchor_target_none")]
+      ];
+      for (const [value, label] of choices) {
+        const row = group.createEl("label", { cls: "vam-anchor-choice" });
+        const radio = row.createEl("input", { type: "radio", attr: { name: "vam-anchor-target", value } });
+        radio.checked = value === target;
+        radio.addEventListener("change", () => {
+          if (radio.checked) target = value;
+        });
+        row.createSpan({ text: label });
+      }
+    }
+    const actions = modalActions(this);
+    actionStatus(actions);
+    actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
+    const ok = actions.createEl("button", {
+      text: t(this.mode === "new" ? "ui.anchor_done" : "ui.save"),
+      cls: "mod-cta"
+    });
+    const send = (): void => {
+      if (this.done) return;
+      this.done = true;
+      this.submit(input.value, target);
+      this.close();
+    };
+    ok.addEventListener("click", send);
+    input.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      send();
+    });
+    input.focus();
+  }
+  onClose(): void {
+    if (!this.done) {
+      this.done = true;
+      this.cancelled();
+    }
+    this.contentEl.empty();
+  }
+}

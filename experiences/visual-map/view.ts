@@ -32,8 +32,14 @@ import {
   treeTextNodes,
   unlinkTextNode,
   updateTextNode,
+  addAnchor,
+  addAnchorRelation,
+  ANCHOR_LIMIT,
   convertToAnnotatedImage,
   convertToPlainImage,
+  isImage2dAnchor,
+  removeAnchor,
+  updateAnchor,
   findAnnotatedImage,
   isAnnotatedImage,
   setImageNote,
@@ -48,7 +54,7 @@ import {
   type SummaryRefusal,
   type TextItem
 } from "./canvas-items";
-import { ImageNoteModal } from "./annotated-image-modals";
+import { AnchorModal, ImageNoteModal, type AnchorTarget } from "./annotated-image-modals";
 import {
   avoidBracketObstacles,
   bracketGeometry,
@@ -1173,6 +1179,15 @@ export class VisualAgentMapView extends ItemView {
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
   private textEls = new Map<string, HTMLElement>();
+  /** Image element per image id, rebuilt on every render (the place mode finds its image here). */
+  private canvasImageEls = new Map<string, HTMLElement>();
+  /** The anchor place mode: which image, where the crosshair is (0-1) and what to do when a spot is chosen. */
+  private placing: { imageId: string; x: number; y: number; done: (at: { x: number; y: number }) => void } | null =
+    null;
+  private endPlacingListeners: (() => void) | null = null;
+  /** Images that already got the "no note yet" reminder at their first anchor (memory only). */
+  private noteReminded = new Set<string>();
+  private anchorTipSeq = 0;
   /** A summary bracket being created: nothing is written until it has text, so Esc or an empty text leaves no trace (Critical Path). */
   private pendingSummary: { id: string; members: string[] } | null = null;
   private editingSummaryId: string | null = null;
@@ -6854,6 +6869,7 @@ export class VisualAgentMapView extends ItemView {
       items = this.map?.canvasItems ?? [];
     if (!stage || (!items?.length && !this.pendingSummary)) {
       if (this.linkingTextId) this.cancelLinking(false); // the block it was waiting for is gone
+      if (this.placing) this.cancelPlacing(false);
       if (this.suspendSummaryEdit) this.suspendSummaryEdit();
       this.summaryEditDraft = null;
       return;
@@ -6864,6 +6880,7 @@ export class VisualAgentMapView extends ItemView {
       : null;
     layer?.setAttr("role", "group");
     layer?.setAttr("aria-label", t("ui.canvas_images_group"));
+    this.canvasImageEls = new Map();
     for (const item of items) {
       if ((item.kind !== "image" && !isAnnotatedImage(item)) || !layer) continue;
       const image = item as ImageItem | AnnotatedImageItem,
@@ -6873,6 +6890,7 @@ export class VisualAgentMapView extends ItemView {
         label = annotated ? t("ui.annotated_image_label", annotated.note || name) : t("ui.canvas_image_label", name),
         el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
+      this.canvasImageEls.set(image.id, el);
       el.setAttr("role", "img");
       el.setAttr("aria-label", label);
       el.tabIndex = 0;
@@ -6897,6 +6915,7 @@ export class VisualAgentMapView extends ItemView {
         picture = img;
         img.addEventListener("error", placeholder);
       }
+      if (annotated) this.renderAnchors(el, annotated, editable);
       el.addEventListener("focus", () => el.addClass("is-selected"));
       el.addEventListener("blur", () => el.removeClass("is-selected"));
       if (!editable) continue;
@@ -6904,7 +6923,14 @@ export class VisualAgentMapView extends ItemView {
       handle.setAttr("aria-hidden", "true");
       this.enableCanvasItemDrag(el, handle, image);
       el.addEventListener("keydown", event => {
+        if (event.target !== el) return; // keys of an anchor are the anchor's own
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (event.key === "Enter" && annotated) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.startPlacingAnchor(image.id);
+          return;
+        }
         if (event.key !== "Delete" && event.key !== "Backspace") return;
         event.preventDefault();
         event.stopPropagation();
@@ -6915,10 +6941,314 @@ export class VisualAgentMapView extends ItemView {
         el.focus({ preventScroll: true });
       }
     }
+    if (this.placing) {
+      if (editable && this.canvasImageEls.has(this.placing.imageId)) this.bindPlacing(stage);
+      else this.cancelPlacing(false);
+    }
     this.renderTextNodes(stage, items);
     this.renderBoundaries(stage, items, editable);
     this.renderSummaries(stage, items);
     this.focusItemId = null;
+  }
+  /** The anchors of one annotated image. Only anchors with a 2D position are drawn; the others stay in the data untouched. */
+  private renderAnchors(el: HTMLElement, image: AnnotatedImageItem, editable: boolean): void {
+    for (const anchor of image.anchors) {
+      if (!isImage2dAnchor(anchor)) continue;
+      const links = (image.relations ?? []).filter(r => r.from === anchor.id || r.to === anchor.id).length;
+      const dot = el.createEl("button", {
+        cls: links ? "vam-anchor is-linked" : "vam-anchor",
+        attr: { type: "button" }
+      });
+      dot.dataset.anchorId = anchor.id;
+      dot.tabIndex = 0;
+      // Only numbers reach the style: the position is clamped 0-1 by the data layer.
+      dot.style.left = `${Math.round(anchor.at.x * 1e6) / 1e4}%`;
+      dot.style.top = `${Math.round(anchor.at.y * 1e6) / 1e4}%`;
+      const state = links ? t("ui.anchor_links", links) : t("ui.anchor_unlinked");
+      // The note is untrusted: only setAttr / text reach the page.
+      dot.setAttr(
+        "aria-label",
+        `${anchor.note ? t("ui.anchor_label", anchor.note) : t("ui.anchor_label_empty")}. ${state}`
+      );
+      const tip = dot.createSpan("vam-anchor-tip");
+      tip.id = `vam-anchor-tip-${++this.anchorTipSeq}`;
+      tip.setAttr("id", tip.id);
+      tip.setAttr("role", "tooltip");
+      if (anchor.note) tip.createSpan({ text: anchor.note, cls: "vam-anchor-tip-note" });
+      tip.createSpan({ text: state, cls: "vam-anchor-tip-links" });
+      dot.setAttr("aria-describedby", tip.id);
+      // A click on an anchor never selects or drags the image.
+      dot.addEventListener("pointerdown", event => event.stopPropagation());
+      dot.addEventListener("click", event => event.stopPropagation());
+      if (!editable) continue;
+      dot.addEventListener("keydown", event => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.stopPropagation();
+          this.editAnchorDialog(image.id, anchor.id);
+        } else if (event.key === "Delete" || event.key === "Backspace") {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.deleteAnchor(image.id, anchor.id);
+        }
+      });
+    }
+  }
+  /** Deletes an anchor with its relations as one undo step; the focus returns to the image. */
+  private async deleteAnchor(imageId: string, anchorId: string): Promise<void> {
+    if (!this.canEditCanvasItems()) return;
+    this.focusItemId = imageId;
+    await this.plugin.mutate(() => this.changeCanvasItems(imageId, items => removeAnchor(items, imageId, anchorId)));
+  }
+  private editAnchorDialog(imageId: string, anchorId: string): void {
+    if (!this.canEditCanvasItems()) return;
+    const anchor = findAnnotatedImage(this.map?.canvasItems ?? [], imageId)?.anchors.find(a => a.id === anchorId);
+    if (!anchor) return;
+    new AnchorModal(
+      this.app,
+      "edit",
+      anchor.note ?? "",
+      note => {
+        this.focusItemId = imageId;
+        this.enqueue(() => this.changeCanvasItems(imageId, items => updateAnchor(items, imageId, anchorId, { note })));
+      },
+      () => this.canvasImageEls.get(imageId)?.focus?.({ preventScroll: true })
+    ).open();
+  }
+  // ---- Anchor place mode: a crosshair on the image, moved by the arrow keys or the mouse --------------------------------
+  /**
+   * Enters the place mode on an annotated image (menu, Enter on the image, and later a topic's "point on an image").
+   * `done` gets the chosen spot (0-1); the default opens the "New anchor" dialog.
+   */
+  startPlacingAnchor(
+    imageId: string,
+    done: (at: { x: number; y: number }) => void = at => this.newAnchorDialog(imageId, at)
+  ): void {
+    const stage = this.stageEl;
+    if (!stage || !this.canEditCanvasItems() || !this.canvasImageEls.has(imageId)) return;
+    if (!findAnnotatedImage(this.map?.canvasItems ?? [], imageId)) return;
+    this.cancelPlacing(false);
+    this.placing = { imageId, x: 0.5, y: 0.5, done };
+    this.bindPlacing(stage);
+    this.canvasImageEls.get(imageId)?.focus?.({ preventScroll: true });
+  }
+  /** Puts the place-mode listeners and marks on the current stage (a repaint makes a new one). */
+  private bindPlacing(stage: HTMLElement): void {
+    this.endPlacingListeners?.();
+    const placing = this.placing,
+      imageEl = placing ? this.canvasImageEls.get(placing.imageId) : undefined;
+    if (!placing || !imageEl) return;
+    const cross = imageEl.createDiv("vam-anchor-crosshair");
+    cross.setAttr("aria-hidden", "true");
+    const paint = (): void => {
+      cross.style.left = `${Math.round(placing.x * 1e6) / 1e4}%`;
+      cross.style.top = `${Math.round(placing.y * 1e6) / 1e4}%`;
+    };
+    paint();
+    const hint = this.contentEl.createDiv("vam-place-hint");
+    hint.setAttr("role", "status");
+    hint.setText(t("ui.anchor_place_hint"));
+    stage.addClass("is-placing");
+    const inside = (target: EventTarget | null): boolean => target === imageEl || !!imageEl.contains?.(target as Node);
+    const clamp = (v: number): number => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
+    const key = (event: Event): void => {
+      const e = event as KeyboardEvent;
+      if (e.isComposing) return;
+      const step = e.shiftKey ? 0.1 : 0.02,
+        move: Record<string, [number, number]> = {
+          ArrowLeft: [-step, 0],
+          ArrowRight: [step, 0],
+          ArrowUp: [0, -step],
+          ArrowDown: [0, step]
+        };
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.cancelPlacing(true);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.finishPlacing({ x: placing.x, y: placing.y });
+      } else if (move[e.key]) {
+        e.preventDefault();
+        e.stopPropagation();
+        placing.x = clamp(placing.x + move[e.key][0]);
+        placing.y = clamp(placing.y + move[e.key][1]);
+        paint();
+      }
+    };
+    const down = (event: Event): void => {
+      if (inside(event.target)) event.stopPropagation(); // no drag starts in the place mode
+    };
+    const click = (event: Event): void => {
+      const e = event as MouseEvent;
+      if (!inside(e.target)) {
+        this.cancelPlacing(true);
+        return;
+      }
+      const box = imageEl.getBoundingClientRect();
+      e.preventDefault();
+      e.stopPropagation();
+      if (!(box.width > 0) || !(box.height > 0) || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+      this.finishPlacing({
+        x: clamp((e.clientX - box.left) / box.width),
+        y: clamp((e.clientY - box.top) / box.height)
+      });
+    };
+    const viewport = this.viewportEl;
+    const blank = (event: Event): void => {
+      if (event.target === viewport) this.cancelPlacing(true);
+    };
+    viewport?.addEventListener("click", blank, true);
+    stage.addEventListener("pointerdown", down, true);
+    stage.addEventListener("click", click, true);
+    stage.addEventListener("keydown", key, true);
+    this.endPlacingListeners = () => {
+      stage.removeEventListener("pointerdown", down, true);
+      stage.removeEventListener("click", click, true);
+      stage.removeEventListener("keydown", key, true);
+      viewport?.removeEventListener("click", blank, true);
+      stage.removeClass("is-placing");
+      cross.remove();
+      hint.remove();
+      this.endPlacingListeners = null;
+    };
+  }
+  /** Leaves the place mode without writing anything; `announce` tells a screen reader it was cancelled. */
+  private cancelPlacing(announce: boolean): void {
+    const placing = this.placing;
+    this.endPlacingListeners?.();
+    this.placing = null;
+    if (!placing) return;
+    if (announce) this.announcer?.setText(t("ui.anchor_place_cancelled"));
+    this.canvasImageEls.get(placing.imageId)?.focus?.({ preventScroll: true });
+  }
+  private finishPlacing(at: { x: number; y: number }): void {
+    const placing = this.placing;
+    this.endPlacingListeners?.();
+    this.placing = null;
+    placing?.done(at);
+  }
+  /** The "New anchor" dialog after a spot is chosen; Cancel (or closing it) leaves the map exactly as it was. */
+  private newAnchorDialog(imageId: string, at: { x: number; y: number }): void {
+    if (!this.canEditCanvasItems()) return;
+    new AnchorModal(
+      this.app,
+      "new",
+      "",
+      (note, target) => this.submitAnchor(imageId, at, note, target),
+      () => this.canvasImageEls.get(imageId)?.focus?.({ preventScroll: true })
+    ).open();
+  }
+  private submitAnchor(imageId: string, at: { x: number; y: number }, note: string, target: AnchorTarget): void {
+    this.focusItemId = imageId;
+    if (target === "pick") {
+      const parentTitle = (id: string | null): string => (id ? (this.notes.get(id)?.title ?? "") : "");
+      const topics = (this.map?.nodes ?? []).map(node => ({
+        id: node.id,
+        title: this.notes.get(node.id)?.title ?? node.id,
+        mapPath: this.path,
+        root: parentTitle(node.parentId)
+      }));
+      // Closing the picker without choosing places nothing.
+      new TopicPickerModal(this.app, t("ui.anchor_pick_title"), topics, topic =>
+        this.enqueue(() => this.commitAnchor(imageId, at, note, { kind: "existing", topicId: topic.id }))
+      ).open();
+      return;
+    }
+    this.enqueue(() => this.commitAnchor(imageId, at, note, { kind: target === "new" ? "new" : "none" }));
+  }
+  /**
+   * Writes the anchor (and, for a new topic, the topic with a "related" relation anchor -> topic) as one undo step.
+   * The new topic is a child of the map's main topic and takes the note as its title.
+   */
+  private async commitAnchor(
+    imageId: string,
+    at: { x: number; y: number },
+    note: string,
+    target: { kind: "none" } | { kind: "new" } | { kind: "existing"; topicId: string }
+  ): Promise<void> {
+    if (!this.map || !this.canEditCanvasItems()) return;
+    const current = findAnnotatedImage(this.map.canvasItems ?? [], imageId);
+    if (!current) return;
+    if (current.anchors.length >= ANCHOR_LIMIT) {
+      new Notice(t("ui.anchor_limit", ANCHOR_LIMIT));
+      return;
+    }
+    if (target.kind === "existing" && !this.map.nodes.some(node => node.id === target.topicId)) return;
+    const taken = new Set([...this.map.nodes.map(node => node.id), ...current.anchors.map(a => a.id)]);
+    let anchorId: string;
+    do anchorId = `anc-${randomUUID().slice(0, 8)}`;
+    while (taken.has(anchorId));
+    let node: MapNode | null = null;
+    if (target.kind === "new") {
+      node = await this.createAnchorTopic(note);
+      if (!node) return;
+    }
+    const topicId = node?.id ?? (target.kind === "existing" ? target.topicId : null);
+    const parentId = node?.parentId ?? null;
+    const firstWithoutNote = current.anchors.length === 0 && !current.note;
+    const added = node;
+    await this.mapChangeSnapshots(
+      map => {
+        if (added) {
+          map.nodes.push(added);
+          const owner = parentId ? map.nodes.find(n => n.id === parentId) : undefined;
+          if (owner) {
+            owner.collapsed = false;
+            const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== added.id);
+            const minTop = siblings.length
+              ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
+              : undefined;
+            this.arrangeBranch(map, owner.id, new Set([added.id]), minTop);
+          }
+        }
+        let items = addAnchor(map.canvasItems ?? [], imageId, {
+          id: anchorId,
+          at: { kind: "image-2d", x: at.x, y: at.y },
+          ...(note.trim() ? { note } : {})
+        });
+        if (topicId) items = addAnchorRelation(items, imageId, { kind: "related", from: anchorId, to: topicId });
+        map.canvasItems = items;
+      },
+      !!added,
+      added ? [added.path] : []
+    );
+    if (firstWithoutNote && !this.noteReminded.has(imageId)) {
+      this.noteReminded.add(imageId);
+      new Notice(t("ui.anchor_no_note_notice"));
+    }
+  }
+  /** A topic for a new anchor: a child of the main topic, named after the anchor note (or the default new-topic name). */
+  private async createAnchorTopic(note: string): Promise<MapNode | null> {
+    if (!this.map) return null;
+    if (!isManagedMapPath(this.plugin.settings, this.path)) {
+      new Notice(t("ui.legacy_map_view_only"));
+      return null;
+    }
+    const map = this.map,
+      parent = map.nodes.find(n => !n.parentId) ?? null;
+    const model = parent
+      ? (await this.plugin.repo.resolveTopicModel(parent.path, map)).model
+      : this.plugin.currentModelChoice().model;
+    const defaultName = uniqueDefaultName(
+      t("ui.new_topic"),
+      map.nodes.map(item => this.notes.get(item.id)?.title ?? "")
+    );
+    const node = await this.plugin.repo.createNote(
+      sanitizeGeneratedTitle(note.trim()).trim() || defaultName,
+      model,
+      map,
+      this.path,
+      parent ? "inherited" : "workspace",
+      { researchMode: "local" }
+    );
+    node.parentId = parent?.id ?? null;
+    node.x = parent ? parent.x + 340 : 80;
+    node.y = parent?.y ?? 80;
+    this.notes.set(node.id, await this.plugin.repo.readNote(node.path, { ...map, nodes: [...map.nodes, node] }));
+    return node;
   }
   /** The title bar above an annotated image: pill with the map-pin icon, the one-line note, the anchor count. */
   private renderAnnotatedBar(el: HTMLElement, image: AnnotatedImageItem, name: string): void {
@@ -6944,7 +7274,12 @@ export class VisualAgentMapView extends ItemView {
     const menu = this.newMenu(),
       annotated = isAnnotatedImage(image) ? image : null;
     if (annotated) {
-      // P3b: add the "Place anchor" item here, first in the list.
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.annotated_image_place_anchor"))
+          .setIcon("map-pin")
+          .onClick(() => this.startPlacingAnchor(id))
+      );
       menu.addItem(item =>
         item
           .setTitle(t("ui.annotated_image_edit_note"))
@@ -8088,7 +8423,7 @@ export class VisualAgentMapView extends ItemView {
   /** One gesture, one pointerup, one undo step: the image follows the pointer on screen and Map.md is written on release. */
   private enableCanvasItemDrag(el: HTMLElement, handle: HTMLElement, image: ImageItem | AnnotatedImageItem): void {
     const begin = (event: PointerEvent, resize: boolean): void => {
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.placing) return;
       event.stopPropagation();
       event.preventDefault();
       el.focus({ preventScroll: true });

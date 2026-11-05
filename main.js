@@ -907,6 +907,24 @@ var en = {
   "ui.annotated_image_note_label": "Note (optional)",
   "ui.annotated_image_note_hint": "Write what this picture is and what to research. The AI cannot see the picture; it only reads this line and the anchor notes.",
   "ui.annotated_image_convert_button": "Convert",
+  "ui.annotated_image_place_anchor": "Place anchor",
+  "ui.anchor_new_title": "New anchor",
+  "ui.anchor_edit_title": "Edit anchor",
+  "ui.anchor_note_label": "Anchor note (optional)",
+  "ui.anchor_target_label": "Link this anchor to",
+  "ui.anchor_target_new": "Add a new topic (relation: related)",
+  "ui.anchor_target_pick": "Pick an existing topic\u2026",
+  "ui.anchor_target_none": "Do not link yet",
+  "ui.anchor_done": "Done",
+  "ui.anchor_pick_title": "Pick a topic for the anchor",
+  "ui.anchor_label": "Anchor: {0}",
+  "ui.anchor_label_empty": "Anchor (no note)",
+  "ui.anchor_links": "Linked to {0} topic(s)",
+  "ui.anchor_unlinked": "Not linked to any topic",
+  "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse",
+  "ui.anchor_place_cancelled": "Placing cancelled",
+  "ui.anchor_no_note_notice": "This image has no note yet. The AI cannot see pictures; add one sentence on what it is and what to research.",
+  "ui.anchor_limit": "This image already has the most anchors it can hold ({0}).",
   "ui.canvas_boundaries_group": "Frames",
   "ui.canvas_boundary_label": "Frame: {0}",
   "ui.canvas_boundary_default": "Frame",
@@ -3553,6 +3571,24 @@ var zhCN = {
   "ui.annotated_image_note_label": "\u8BF4\u660E\uFF08\u9009\u586B\uFF09",
   "ui.annotated_image_note_hint": "\u5199\u8FD9\u662F\u4EC0\u4E48\u56FE\u3001\u8981\u7814\u7A76\u4EC0\u4E48\u3002AI \u770B\u4E0D\u5230\u56FE\u7247\uFF0C\u53EA\u8BFB\u8FD9\u884C\u5B57\u548C\u951A\u70B9\u8BF4\u660E\u3002",
   "ui.annotated_image_convert_button": "\u8F6C\u6362",
+  "ui.annotated_image_place_anchor": "\u653E\u7F6E\u951A\u70B9",
+  "ui.anchor_new_title": "\u65B0\u951A\u70B9",
+  "ui.anchor_edit_title": "\u7F16\u8F91\u951A\u70B9",
+  "ui.anchor_note_label": "\u951A\u70B9\u8BF4\u660E\uFF08\u9009\u586B\uFF09",
+  "ui.anchor_target_label": "\u8FD9\u4E2A\u951A\u70B9\u8981\u8FDE\u5230",
+  "ui.anchor_target_new": "\u65B0\u589E\u8BAE\u9898\uFF08\u5173\u7CFB\uFF1A\u76F8\u5173\uFF09",
+  "ui.anchor_target_pick": "\u9009\u4E00\u4E2A\u5DF2\u6709\u8BAE\u9898\u2026",
+  "ui.anchor_target_none": "\u5148\u4E0D\u8FDE",
+  "ui.anchor_done": "\u5B8C\u6210",
+  "ui.anchor_pick_title": "\u4E3A\u951A\u70B9\u9009\u4E00\u4E2A\u8BAE\u9898",
+  "ui.anchor_label": "\u951A\u70B9\uFF1A{0}",
+  "ui.anchor_label_empty": "\u951A\u70B9\uFF08\u65E0\u8BF4\u660E\uFF09",
+  "ui.anchor_links": "\u8FDE\u5230 {0} \u4E2A\u8BAE\u9898",
+  "ui.anchor_unlinked": "\u5C1A\u672A\u8FDE\u5230\u8BAE\u9898",
+  "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 \u79FB\u52A8\u3001Shift \u79FB\u52A8\u8F83\u8FDC\u3001Enter \u653E\u4E0B\u3001Esc \u53D6\u6D88\u3001\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u9F20\u6807\u70B9",
+  "ui.anchor_place_cancelled": "\u5DF2\u53D6\u6D88\u653E\u951A\u70B9",
+  "ui.anchor_no_note_notice": "\u8FD9\u5F20\u6807\u6CE8\u56FE\u8FD8\u6CA1\u6709\u8BF4\u660E\u3002AI \u770B\u4E0D\u5230\u56FE\u7247\uFF0C\u5EFA\u8BAE\u8865\u4E00\u53E5\u201C\u8FD9\u662F\u4EC0\u4E48\u56FE\u3001\u8981\u7814\u7A76\u4EC0\u4E48\u201D\u3002",
+  "ui.anchor_limit": "\u8FD9\u5F20\u56FE\u7684\u951A\u70B9\u5DF2\u8FBE\u4E0A\u9650\uFF08{0} \u4E2A\uFF09\u3002",
   "ui.canvas_boundaries_group": "\u5916\u6846",
   "ui.canvas_boundary_label": "\u5916\u6846\uFF1A{0}",
   "ui.canvas_boundary_default": "\u5916\u6846",
@@ -6199,6 +6235,24 @@ var zhTW = {
   "ui.annotated_image_note_label": "\u8AAA\u660E\uFF08\u9078\u586B\uFF09",
   "ui.annotated_image_note_hint": "\u5BEB\u9019\u662F\u4EC0\u9EBC\u5716\u3001\u8981\u7814\u7A76\u4EC0\u9EBC\u3002AI \u770B\u4E0D\u5230\u5716\u7247\uFF0C\u53EA\u8B80\u9019\u884C\u5B57\u548C\u9328\u9EDE\u8AAA\u660E\u3002",
   "ui.annotated_image_convert_button": "\u8F49\u63DB",
+  "ui.annotated_image_place_anchor": "\u653E\u9328\u9EDE",
+  "ui.anchor_new_title": "\u65B0\u9328\u9EDE",
+  "ui.anchor_edit_title": "\u7DE8\u8F2F\u9328\u9EDE",
+  "ui.anchor_note_label": "\u9328\u9EDE\u8AAA\u660E\uFF08\u9078\u586B\uFF09",
+  "ui.anchor_target_label": "\u9019\u500B\u9328\u9EDE\u8981\u9023\u5230",
+  "ui.anchor_target_new": "\u65B0\u589E\u8B70\u984C\uFF08\u95DC\u4FC2\uFF1A\u76F8\u95DC\uFF09",
+  "ui.anchor_target_pick": "\u9078\u4E00\u500B\u65E2\u6709\u8B70\u984C\u2026",
+  "ui.anchor_target_none": "\u5148\u4E0D\u9023",
+  "ui.anchor_done": "\u5B8C\u6210",
+  "ui.anchor_pick_title": "\u70BA\u9328\u9EDE\u9078\u4E00\u500B\u8B70\u984C",
+  "ui.anchor_label": "\u9328\u9EDE\uFF1A{0}",
+  "ui.anchor_label_empty": "\u9328\u9EDE\uFF08\u7121\u8AAA\u660E\uFF09",
+  "ui.anchor_links": "\u9023\u5230 {0} \u500B\u8B70\u984C",
+  "ui.anchor_unlinked": "\u5C1A\u672A\u9023\u5230\u8B70\u984C",
+  "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 \u79FB\u52D5\u3001Shift \u79FB\u52D5\u8F03\u9060\u3001Enter \u653E\u4E0B\u3001Esc \u53D6\u6D88\u3001\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u6ED1\u9F20\u9EDE",
+  "ui.anchor_place_cancelled": "\u5DF2\u53D6\u6D88\u653E\u9328\u9EDE",
+  "ui.anchor_no_note_notice": "\u9019\u5F35\u6A19\u8A3B\u5716\u9084\u6C92\u6709\u8AAA\u660E\u3002AI \u770B\u4E0D\u5230\u5716\u7247\uFF0C\u5EFA\u8B70\u88DC\u4E00\u53E5\u300C\u9019\u662F\u4EC0\u9EBC\u5716\u3001\u8981\u7814\u7A76\u4EC0\u9EBC\u300D\u3002",
+  "ui.anchor_limit": "\u9019\u5F35\u5716\u7684\u9328\u9EDE\u5DF2\u9054\u4E0A\u9650\uFF08{0} \u500B\uFF09\u3002",
   "ui.canvas_boundaries_group": "\u5916\u6846",
   "ui.canvas_boundary_label": "\u5916\u6846\uFF1A{0}",
   "ui.canvas_boundary_default": "\u5916\u6846",
@@ -17843,6 +17897,10 @@ var isAnnotatedImage = (item) => item.kind === "annotated-image";
 function findAnnotatedImage(items, id) {
   return items.find((i) => isAnnotatedImage(i) && i.id === id);
 }
+function anchorIdsOf(image) {
+  return new Set(image.anchors.map((a) => a.id));
+}
+var isImage2dAnchor = (a) => a.at.kind === "image-2d";
 var mapImage = (items, id, change2) => items.map((i) => isAnnotatedImage(i) && i.id === id ? change2(i) : i);
 var withRelations = (image, relations) => {
   const { relations: _old, ...rest } = image;
@@ -17879,6 +17937,61 @@ function setImageNote(items, id, note) {
     const { note: _old, ...rest } = image;
     const clean4 = cleanNote(note);
     return clean4 === void 0 ? rest : { ...rest, note: clean4 };
+  });
+}
+function addAnchor(items, imageId, anchor) {
+  const clean4 = cleanAnchor(anchor);
+  if (!clean4) return [...items];
+  return mapImage(
+    items,
+    imageId,
+    (image) => image.anchors.length >= ANCHOR_LIMIT || image.anchors.some((a) => a.id === clean4.id) ? image : { ...image, anchors: [...image.anchors, clean4] }
+  );
+}
+function updateAnchor(items, imageId, anchorId, patch) {
+  if (patch.at && !(finite(patch.at.x) && finite(patch.at.y))) return [...items];
+  return mapImage(items, imageId, (image) => ({
+    ...image,
+    anchors: image.anchors.map((a) => {
+      if (a.id !== anchorId) return a;
+      let next = a;
+      if (patch.at && isImage2dAnchor(a))
+        next = { ...next, at: { kind: "image-2d", x: clamp01(patch.at.x), y: clamp01(patch.at.y) } };
+      if (patch.note !== void 0) {
+        const { note: _old, ...rest } = next;
+        const clean4 = cleanNote(patch.note);
+        next = clean4 === void 0 ? rest : { ...rest, note: clean4 };
+      }
+      return next;
+    })
+  }));
+}
+function removeAnchor(items, imageId, anchorId) {
+  return mapImage(items, imageId, (image) => {
+    var _a2;
+    if (!image.anchors.some((a) => a.id === anchorId)) return image;
+    const next = { ...image, anchors: image.anchors.filter((a) => a.id !== anchorId) };
+    return withRelations(
+      next,
+      ((_a2 = image.relations) != null ? _a2 : []).filter((r) => r.from !== anchorId && r.to !== anchorId)
+    );
+  });
+}
+function anchorRelationAllowed(image, relation, replacing) {
+  var _a2;
+  const list = (_a2 = image.relations) != null ? _a2 : [];
+  if (!replacing && list.length >= ANCHOR_RELATION_LIMIT) return false;
+  if (!cleanAnchorRelation(relation, anchorIdsOf(image))) return false;
+  const key2 = relationPair(relation);
+  return !list.some((r) => relationPair(r) === key2 && !(replacing && relationPair(replacing) === key2));
+}
+function addAnchorRelation(items, imageId, relation) {
+  const image = findAnnotatedImage(items, imageId);
+  if (!image || !anchorRelationAllowed(image, relation)) return [...items];
+  const clean4 = cleanAnchorRelation(relation, anchorIdsOf(image));
+  return mapImage(items, imageId, (img) => {
+    var _a2;
+    return withRelations(img, [...(_a2 = img.relations) != null ? _a2 : [], clean4]);
   });
 }
 function pruneAnnotatedImages(items, nodeIds) {
@@ -18230,6 +18343,74 @@ var ImageNoteModal = class extends import_obsidian9.Modal {
       if (this.done) return;
       this.done = true;
       this.submit(input2.value);
+      this.close();
+    };
+    ok.addEventListener("click", send);
+    input2.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      send();
+    });
+    input2.focus();
+  }
+  onClose() {
+    if (!this.done) {
+      this.done = true;
+      this.cancelled();
+    }
+    this.contentEl.empty();
+  }
+};
+var AnchorModal = class extends import_obsidian9.Modal {
+  constructor(app, mode, value, submit, cancelled2 = () => {
+  }) {
+    super(app);
+    this.mode = mode;
+    this.value = value;
+    this.submit = submit;
+    this.cancelled = cancelled2;
+    __publicField(this, "done", false);
+  }
+  onOpen() {
+    this.titleEl.setText(t(this.mode === "new" ? "ui.anchor_new_title" : "ui.anchor_edit_title"));
+    const input2 = this.contentEl.createEl("input", {
+      type: "text",
+      value: this.value,
+      cls: "vam-name-input vam-anchor-note-input"
+    });
+    input2.setAttr("aria-label", t("ui.anchor_note_label"));
+    input2.setAttr("maxlength", String(NOTE_LIMIT));
+    let target = "new";
+    if (this.mode === "new") {
+      const group = this.contentEl.createDiv("vam-anchor-choices");
+      group.setAttr("role", "radiogroup");
+      group.setAttr("aria-label", t("ui.anchor_target_label"));
+      const choices = [
+        ["new", t("ui.anchor_target_new")],
+        ["pick", t("ui.anchor_target_pick")],
+        ["none", t("ui.anchor_target_none")]
+      ];
+      for (const [value, label] of choices) {
+        const row = group.createEl("label", { cls: "vam-anchor-choice" });
+        const radio = row.createEl("input", { type: "radio", attr: { name: "vam-anchor-target", value } });
+        radio.checked = value === target;
+        radio.addEventListener("change", () => {
+          if (radio.checked) target = value;
+        });
+        row.createSpan({ text: label });
+      }
+    }
+    const actions = modalActions(this);
+    actionStatus(actions);
+    actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
+    const ok = actions.createEl("button", {
+      text: t(this.mode === "new" ? "ui.anchor_done" : "ui.save"),
+      cls: "mod-cta"
+    });
+    const send = () => {
+      if (this.done) return;
+      this.done = true;
+      this.submit(input2.value, target);
       this.close();
     };
     ok.addEventListener("click", send);
@@ -52952,6 +53133,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
     });
     /** Text node element per id (tree-attached and free), rebuilt on every render. */
     __publicField(this, "textEls", /* @__PURE__ */ new Map());
+    /** Image element per image id, rebuilt on every render (the place mode finds its image here). */
+    __publicField(this, "canvasImageEls", /* @__PURE__ */ new Map());
+    /** The anchor place mode: which image, where the crosshair is (0-1) and what to do when a spot is chosen. */
+    __publicField(this, "placing", null);
+    __publicField(this, "endPlacingListeners", null);
+    /** Images that already got the "no note yet" reminder at their first anchor (memory only). */
+    __publicField(this, "noteReminded", /* @__PURE__ */ new Set());
+    __publicField(this, "anchorTipSeq", 0);
     /** A summary bracket being created: nothing is written until it has text, so Esc or an empty text leaves no trace (Critical Path). */
     __publicField(this, "pendingSummary", null);
     __publicField(this, "editingSummaryId", null);
@@ -58229,6 +58418,7 @@ ${request.requirements}` : preset.text,
     const stage = this.stageEl, items = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [];
     if (!stage || !(items == null ? void 0 : items.length) && !this.pendingSummary) {
       if (this.linkingTextId) this.cancelLinking(false);
+      if (this.placing) this.cancelPlacing(false);
       if (this.suspendSummaryEdit) this.suspendSummaryEdit();
       this.summaryEditDraft = null;
       return;
@@ -58237,10 +58427,12 @@ ${request.requirements}` : preset.text,
     const layer = items.some((item) => item.kind === "image" || isAnnotatedImage(item)) ? stage.createDiv("vam-canvas-items") : null;
     layer == null ? void 0 : layer.setAttr("role", "group");
     layer == null ? void 0 : layer.setAttr("aria-label", t("ui.canvas_images_group"));
+    this.canvasImageEls = /* @__PURE__ */ new Map();
     for (const item of items) {
       if (item.kind !== "image" && !isAnnotatedImage(item) || !layer) continue;
       const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = annotated ? t("ui.annotated_image_label", annotated.note || name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
+      this.canvasImageEls.set(image.id, el);
       el.setAttr("role", "img");
       el.setAttr("aria-label", label);
       el.tabIndex = 0;
@@ -58264,6 +58456,7 @@ ${request.requirements}` : preset.text,
         picture = img;
         img.addEventListener("error", placeholder2);
       }
+      if (annotated) this.renderAnchors(el, annotated, editable);
       el.addEventListener("focus", () => el.addClass("is-selected"));
       el.addEventListener("blur", () => el.removeClass("is-selected"));
       if (!editable) continue;
@@ -58271,7 +58464,14 @@ ${request.requirements}` : preset.text,
       handle.setAttr("aria-hidden", "true");
       this.enableCanvasItemDrag(el, handle, image);
       el.addEventListener("keydown", (event) => {
+        if (event.target !== el) return;
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (event.key === "Enter" && annotated) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.startPlacingAnchor(image.id);
+          return;
+        }
         if (event.key !== "Delete" && event.key !== "Backspace") return;
         event.preventDefault();
         event.stopPropagation();
@@ -58282,10 +58482,330 @@ ${request.requirements}` : preset.text,
         el.focus({ preventScroll: true });
       }
     }
+    if (this.placing) {
+      if (editable && this.canvasImageEls.has(this.placing.imageId)) this.bindPlacing(stage);
+      else this.cancelPlacing(false);
+    }
     this.renderTextNodes(stage, items);
     this.renderBoundaries(stage, items, editable);
     this.renderSummaries(stage, items);
     this.focusItemId = null;
+  }
+  /** The anchors of one annotated image. Only anchors with a 2D position are drawn; the others stay in the data untouched. */
+  renderAnchors(el, image, editable) {
+    var _a2;
+    for (const anchor of image.anchors) {
+      if (!isImage2dAnchor(anchor)) continue;
+      const links = ((_a2 = image.relations) != null ? _a2 : []).filter((r) => r.from === anchor.id || r.to === anchor.id).length;
+      const dot = el.createEl("button", {
+        cls: links ? "vam-anchor is-linked" : "vam-anchor",
+        attr: { type: "button" }
+      });
+      dot.dataset.anchorId = anchor.id;
+      dot.tabIndex = 0;
+      dot.style.left = `${Math.round(anchor.at.x * 1e6) / 1e4}%`;
+      dot.style.top = `${Math.round(anchor.at.y * 1e6) / 1e4}%`;
+      const state = links ? t("ui.anchor_links", links) : t("ui.anchor_unlinked");
+      dot.setAttr(
+        "aria-label",
+        `${anchor.note ? t("ui.anchor_label", anchor.note) : t("ui.anchor_label_empty")}. ${state}`
+      );
+      const tip = dot.createSpan("vam-anchor-tip");
+      tip.id = `vam-anchor-tip-${++this.anchorTipSeq}`;
+      tip.setAttr("id", tip.id);
+      tip.setAttr("role", "tooltip");
+      if (anchor.note) tip.createSpan({ text: anchor.note, cls: "vam-anchor-tip-note" });
+      tip.createSpan({ text: state, cls: "vam-anchor-tip-links" });
+      dot.setAttr("aria-describedby", tip.id);
+      dot.addEventListener("pointerdown", (event) => event.stopPropagation());
+      dot.addEventListener("click", (event) => event.stopPropagation());
+      if (!editable) continue;
+      dot.addEventListener("keydown", (event) => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.stopPropagation();
+          this.editAnchorDialog(image.id, anchor.id);
+        } else if (event.key === "Delete" || event.key === "Backspace") {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.deleteAnchor(image.id, anchor.id);
+        }
+      });
+    }
+  }
+  /** Deletes an anchor with its relations as one undo step; the focus returns to the image. */
+  async deleteAnchor(imageId, anchorId) {
+    if (!this.canEditCanvasItems()) return;
+    this.focusItemId = imageId;
+    await this.plugin.mutate(() => this.changeCanvasItems(imageId, (items) => removeAnchor(items, imageId, anchorId)));
+  }
+  editAnchorDialog(imageId, anchorId) {
+    var _a2, _b2, _c, _d;
+    if (!this.canEditCanvasItems()) return;
+    const anchor = (_c = findAnnotatedImage((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], imageId)) == null ? void 0 : _c.anchors.find((a) => a.id === anchorId);
+    if (!anchor) return;
+    new AnchorModal(
+      this.app,
+      "edit",
+      (_d = anchor.note) != null ? _d : "",
+      (note) => {
+        this.focusItemId = imageId;
+        this.enqueue(() => this.changeCanvasItems(imageId, (items) => updateAnchor(items, imageId, anchorId, { note })));
+      },
+      () => {
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.canvasImageEls.get(imageId)) == null ? void 0 : _a3.focus) == null ? void 0 : _b3.call(_a3, { preventScroll: true });
+      }
+    ).open();
+  }
+  // ---- Anchor place mode: a crosshair on the image, moved by the arrow keys or the mouse --------------------------------
+  /**
+   * Enters the place mode on an annotated image (menu, Enter on the image, and later a topic's "point on an image").
+   * `done` gets the chosen spot (0-1); the default opens the "New anchor" dialog.
+   */
+  startPlacingAnchor(imageId, done = (at) => this.newAnchorDialog(imageId, at)) {
+    var _a2, _b2, _c, _d;
+    const stage = this.stageEl;
+    if (!stage || !this.canEditCanvasItems() || !this.canvasImageEls.has(imageId)) return;
+    if (!findAnnotatedImage((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], imageId)) return;
+    this.cancelPlacing(false);
+    this.placing = { imageId, x: 0.5, y: 0.5, done };
+    this.bindPlacing(stage);
+    (_d = (_c = this.canvasImageEls.get(imageId)) == null ? void 0 : _c.focus) == null ? void 0 : _d.call(_c, { preventScroll: true });
+  }
+  /** Puts the place-mode listeners and marks on the current stage (a repaint makes a new one). */
+  bindPlacing(stage) {
+    var _a2;
+    (_a2 = this.endPlacingListeners) == null ? void 0 : _a2.call(this);
+    const placing = this.placing, imageEl = placing ? this.canvasImageEls.get(placing.imageId) : void 0;
+    if (!placing || !imageEl) return;
+    const cross = imageEl.createDiv("vam-anchor-crosshair");
+    cross.setAttr("aria-hidden", "true");
+    const paint = () => {
+      cross.style.left = `${Math.round(placing.x * 1e6) / 1e4}%`;
+      cross.style.top = `${Math.round(placing.y * 1e6) / 1e4}%`;
+    };
+    paint();
+    const hint = this.contentEl.createDiv("vam-place-hint");
+    hint.setAttr("role", "status");
+    hint.setText(t("ui.anchor_place_hint"));
+    stage.addClass("is-placing");
+    const inside2 = (target) => {
+      var _a3;
+      return target === imageEl || !!((_a3 = imageEl.contains) == null ? void 0 : _a3.call(imageEl, target));
+    };
+    const clamp2 = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1e3) / 1e3;
+    const key2 = (event) => {
+      const e = event;
+      if (e.isComposing) return;
+      const step = e.shiftKey ? 0.1 : 0.02, move = {
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        ArrowDown: [0, step]
+      };
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.cancelPlacing(true);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.finishPlacing({ x: placing.x, y: placing.y });
+      } else if (move[e.key]) {
+        e.preventDefault();
+        e.stopPropagation();
+        placing.x = clamp2(placing.x + move[e.key][0]);
+        placing.y = clamp2(placing.y + move[e.key][1]);
+        paint();
+      }
+    };
+    const down = (event) => {
+      if (inside2(event.target)) event.stopPropagation();
+    };
+    const click = (event) => {
+      const e = event;
+      if (!inside2(e.target)) {
+        this.cancelPlacing(true);
+        return;
+      }
+      const box = imageEl.getBoundingClientRect();
+      e.preventDefault();
+      e.stopPropagation();
+      if (!(box.width > 0) || !(box.height > 0) || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+      this.finishPlacing({
+        x: clamp2((e.clientX - box.left) / box.width),
+        y: clamp2((e.clientY - box.top) / box.height)
+      });
+    };
+    const viewport = this.viewportEl;
+    const blank = (event) => {
+      if (event.target === viewport) this.cancelPlacing(true);
+    };
+    viewport == null ? void 0 : viewport.addEventListener("click", blank, true);
+    stage.addEventListener("pointerdown", down, true);
+    stage.addEventListener("click", click, true);
+    stage.addEventListener("keydown", key2, true);
+    this.endPlacingListeners = () => {
+      stage.removeEventListener("pointerdown", down, true);
+      stage.removeEventListener("click", click, true);
+      stage.removeEventListener("keydown", key2, true);
+      viewport == null ? void 0 : viewport.removeEventListener("click", blank, true);
+      stage.removeClass("is-placing");
+      cross.remove();
+      hint.remove();
+      this.endPlacingListeners = null;
+    };
+  }
+  /** Leaves the place mode without writing anything; `announce` tells a screen reader it was cancelled. */
+  cancelPlacing(announce) {
+    var _a2, _b2, _c, _d;
+    const placing = this.placing;
+    (_a2 = this.endPlacingListeners) == null ? void 0 : _a2.call(this);
+    this.placing = null;
+    if (!placing) return;
+    if (announce) (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.anchor_place_cancelled"));
+    (_d = (_c = this.canvasImageEls.get(placing.imageId)) == null ? void 0 : _c.focus) == null ? void 0 : _d.call(_c, { preventScroll: true });
+  }
+  finishPlacing(at) {
+    var _a2;
+    const placing = this.placing;
+    (_a2 = this.endPlacingListeners) == null ? void 0 : _a2.call(this);
+    this.placing = null;
+    placing == null ? void 0 : placing.done(at);
+  }
+  /** The "New anchor" dialog after a spot is chosen; Cancel (or closing it) leaves the map exactly as it was. */
+  newAnchorDialog(imageId, at) {
+    if (!this.canEditCanvasItems()) return;
+    new AnchorModal(
+      this.app,
+      "new",
+      "",
+      (note, target) => this.submitAnchor(imageId, at, note, target),
+      () => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.canvasImageEls.get(imageId)) == null ? void 0 : _a2.focus) == null ? void 0 : _b2.call(_a2, { preventScroll: true });
+      }
+    ).open();
+  }
+  submitAnchor(imageId, at, note, target) {
+    var _a2, _b2;
+    this.focusItemId = imageId;
+    if (target === "pick") {
+      const parentTitle = (id) => {
+        var _a3, _b3;
+        return id ? (_b3 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title) != null ? _b3 : "" : "";
+      };
+      const topics = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []).map((node) => {
+        var _a3, _b3;
+        return {
+          id: node.id,
+          title: (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : node.id,
+          mapPath: this.path,
+          root: parentTitle(node.parentId)
+        };
+      });
+      new TopicPickerModal(
+        this.app,
+        t("ui.anchor_pick_title"),
+        topics,
+        (topic) => this.enqueue(() => this.commitAnchor(imageId, at, note, { kind: "existing", topicId: topic.id }))
+      ).open();
+      return;
+    }
+    this.enqueue(() => this.commitAnchor(imageId, at, note, { kind: target === "new" ? "new" : "none" }));
+  }
+  /**
+   * Writes the anchor (and, for a new topic, the topic with a "related" relation anchor -> topic) as one undo step.
+   * The new topic is a child of the map's main topic and takes the note as its title.
+   */
+  async commitAnchor(imageId, at, note, target) {
+    var _a2, _b2, _c;
+    if (!this.map || !this.canEditCanvasItems()) return;
+    const current = findAnnotatedImage((_a2 = this.map.canvasItems) != null ? _a2 : [], imageId);
+    if (!current) return;
+    if (current.anchors.length >= ANCHOR_LIMIT) {
+      new import_obsidian35.Notice(t("ui.anchor_limit", ANCHOR_LIMIT));
+      return;
+    }
+    if (target.kind === "existing" && !this.map.nodes.some((node2) => node2.id === target.topicId)) return;
+    const taken = /* @__PURE__ */ new Set([...this.map.nodes.map((node2) => node2.id), ...current.anchors.map((a) => a.id)]);
+    let anchorId;
+    do
+      anchorId = `anc-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`;
+    while (taken.has(anchorId));
+    let node = null;
+    if (target.kind === "new") {
+      node = await this.createAnchorTopic(note);
+      if (!node) return;
+    }
+    const topicId = (_b2 = node == null ? void 0 : node.id) != null ? _b2 : target.kind === "existing" ? target.topicId : null;
+    const parentId = (_c = node == null ? void 0 : node.parentId) != null ? _c : null;
+    const firstWithoutNote = current.anchors.length === 0 && !current.note;
+    const added = node;
+    await this.mapChangeSnapshots(
+      (map) => {
+        var _a3;
+        if (added) {
+          map.nodes.push(added);
+          const owner = parentId ? map.nodes.find((n) => n.id === parentId) : void 0;
+          if (owner) {
+            owner.collapsed = false;
+            const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== added.id);
+            const minTop = siblings.length ? Math.max(...siblings.map((n) => {
+              var _a4;
+              return n.y + ((_a4 = this.cardHeightOf(n.id)) != null ? _a4 : DEFAULT_CARD_HEIGHT);
+            })) + LAYOUT_GAP : void 0;
+            this.arrangeBranch(map, owner.id, /* @__PURE__ */ new Set([added.id]), minTop);
+          }
+        }
+        let items = addAnchor((_a3 = map.canvasItems) != null ? _a3 : [], imageId, {
+          id: anchorId,
+          at: { kind: "image-2d", x: at.x, y: at.y },
+          ...note.trim() ? { note } : {}
+        });
+        if (topicId) items = addAnchorRelation(items, imageId, { kind: "related", from: anchorId, to: topicId });
+        map.canvasItems = items;
+      },
+      !!added,
+      added ? [added.path] : []
+    );
+    if (firstWithoutNote && !this.noteReminded.has(imageId)) {
+      this.noteReminded.add(imageId);
+      new import_obsidian35.Notice(t("ui.anchor_no_note_notice"));
+    }
+  }
+  /** A topic for a new anchor: a child of the main topic, named after the anchor note (or the default new-topic name). */
+  async createAnchorTopic(note) {
+    var _a2, _b2, _c;
+    if (!this.map) return null;
+    if (!isManagedMapPath(this.plugin.settings, this.path)) {
+      new import_obsidian35.Notice(t("ui.legacy_map_view_only"));
+      return null;
+    }
+    const map = this.map, parent = (_a2 = map.nodes.find((n) => !n.parentId)) != null ? _a2 : null;
+    const model = parent ? (await this.plugin.repo.resolveTopicModel(parent.path, map)).model : this.plugin.currentModelChoice().model;
+    const defaultName = uniqueDefaultName(
+      t("ui.new_topic"),
+      map.nodes.map((item) => {
+        var _a3, _b3;
+        return (_b3 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : "";
+      })
+    );
+    const node = await this.plugin.repo.createNote(
+      sanitizeGeneratedTitle(note.trim()).trim() || defaultName,
+      model,
+      map,
+      this.path,
+      parent ? "inherited" : "workspace",
+      { researchMode: "local" }
+    );
+    node.parentId = (_b2 = parent == null ? void 0 : parent.id) != null ? _b2 : null;
+    node.x = parent ? parent.x + 340 : 80;
+    node.y = (_c = parent == null ? void 0 : parent.y) != null ? _c : 80;
+    this.notes.set(node.id, await this.plugin.repo.readNote(node.path, { ...map, nodes: [...map.nodes, node] }));
+    return node;
   }
   /** The title bar above an annotated image: pill with the map-pin icon, the one-line note, the anchor count. */
   renderAnnotatedBar(el, image, name2) {
@@ -58309,6 +58829,9 @@ ${request.requirements}` : preset.text,
     event.preventDefault();
     const menu = this.newMenu(), annotated = isAnnotatedImage(image) ? image : null;
     if (annotated) {
+      menu.addItem(
+        (item) => item.setTitle(t("ui.annotated_image_place_anchor")).setIcon("map-pin").onClick(() => this.startPlacingAnchor(id))
+      );
       menu.addItem(
         (item) => item.setTitle(t("ui.annotated_image_edit_note")).setIcon("pencil").onClick(() => this.editImageNote(annotated))
       );
@@ -59406,7 +59929,7 @@ ${request.requirements}` : preset.text,
   enableCanvasItemDrag(el, handle, image) {
     const begin2 = (event, resize) => {
       var _a2;
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.placing) return;
       event.stopPropagation();
       event.preventDefault();
       el.focus({ preventScroll: true });

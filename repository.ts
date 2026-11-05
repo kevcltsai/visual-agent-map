@@ -66,6 +66,12 @@ import {
   type RelevanceLevel,
   type NoteRelevance
 } from "./note-values";
+import {
+  MAP_SOURCES_KEY,
+  readMapSources,
+  serializeMapSources,
+  type MapSource
+} from "./experiences/visual-map/map-sources";
 import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
 import { aimEnabled } from "./experiences/aim/availability";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
@@ -1916,6 +1922,29 @@ export class Repository {
   /** The map file's `relevance-goal` frontmatter, if any. The map file keeps its frontmatter across saves. */
   async readRelevanceGoal(path: string): Promise<string | undefined> {
     return readRelevanceGoal(frontmatter(await this.app.vault.read(this.file(path))));
+  }
+
+  /** The map file's `map-sources` list, tolerantly read (a missing key or a malformed value gives the valid subset). */
+  async readMapSources(path: string): Promise<MapSource[]> {
+    return readMapSources(frontmatter(await this.app.vault.read(this.file(path))));
+  }
+
+  /**
+   * Sets the map's `map-sources` only, through `vault.process`. An empty list removes the key; a list that already
+   * matches what is stored leaves the file untouched. Nothing else changes and nothing rebuilds.
+   */
+  async writeMapSources(path: string, sources: readonly MapSource[]): Promise<void> {
+    const next = serializeMapSources(sources);
+    await this.app.vault.process(this.file(path), content => {
+      const current = frontmatter(content)[MAP_SOURCES_KEY];
+      if (
+        next.length
+          ? Array.isArray(current) && current.length === next.length && current.every((item, i) => item === next[i])
+          : current === undefined
+      )
+        return content;
+      return setFrontmatterKeys(content, { [MAP_SOURCES_KEY]: next.length ? next : null });
+    });
   }
 
   /** The goal, level and context keys of the map file in one read. */

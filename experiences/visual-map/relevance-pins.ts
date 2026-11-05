@@ -1,10 +1,4 @@
-import {
-  normalizeRelevanceContext,
-  normalizeRelevanceGoal,
-  normalizeRelevanceLevel,
-  type RelevanceLevel,
-  type RelevanceTier
-} from "../../note-values";
+import { normalizeRelevanceContext, normalizeRelevanceGoal, type RelevanceTier } from "../../note-values";
 
 /**
  * Pure rules for pinned (hand-set) relevance tiers: the bounds a pin puts on the cards around it, the parent-child
@@ -194,26 +188,23 @@ export function mergeRelevanceTiers(parts: {
 
 export interface RelevanceSetupDraft {
   goal: string;
-  level: string;
   context: string;
 }
 export interface RelevanceSetupSaved {
   goal?: string;
-  level?: RelevanceLevel;
   context?: string;
 }
 export type RelevanceMode = "recalibrate" | "full";
 
 /**
- * True when the panel's draft equals the saved goal, level and context, compared the way the repository stores them
- * (`writeRelevanceGoal`: whitespace collapsed, trimmed, capped; a blank context or an unknown level is none).
+ * True when the panel's draft equals the saved goal and context, compared the way the repository stores them
+ * (`writeRelevanceGoal`: whitespace collapsed, trimmed, capped; a blank context is none).
  */
 export function relevanceSetupUnchanged(draft: RelevanceSetupDraft, saved: RelevanceSetupSaved): boolean {
   const goal = normalizeRelevanceGoal(draft.goal);
   if (!goal) return false;
   return (
     goal === normalizeRelevanceGoal(saved.goal ?? "") &&
-    normalizeRelevanceLevel(draft.level) === normalizeRelevanceLevel(saved.level) &&
     normalizeRelevanceContext(draft.context) === normalizeRelevanceContext(saved.context ?? "")
   );
 }

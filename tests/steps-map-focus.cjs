@@ -248,7 +248,7 @@ test('#18: the repaint restorers for the chat field, the search field and the re
     const search = h.contentEl.add('input', { cls: 'vam-map-search-input' }); search.setSelectionRange = () => {}; search.selectionStart = 0; search.selectionEnd = 0;
     h.view.mapSearch = { query: '' }; h.view.mapSearchBar = { input: search };
     h.view.mountMapSearch = () => { h.view.mapSearchBar = { input: search }; }; h.view.applySearchMarks = () => {};
-    const bar = h.contentEl.add('div', { cls: 'vam-relevance-statusbar' }); const barButton = bar.add('button'); const goal = h.contentEl.add('div', { cls: 'vam-relevance-goal' });
+    const bar = h.contentEl.add('div', { cls: 'vam-relevance-statusbar' }); const barButton = bar.add('button'); const goal = h.contentEl.add('div', { cls: 'vam-goal-text' });
     for (const [name, element, hold] of [['chat', input, () => h.view.detachMapChat()], ['search', search, () => h.view.holdMapSearch()], ['relevance bar', barButton, () => h.view.keepRelevanceBarFocus()]]) {
       // The repaint: hold, the page is rebuilt (focus drops to the body), then the restorer runs.
       h.view.render = () => { const restore = hold(); h.doc.activeElement = h.doc.body; restore(); };
@@ -440,7 +440,7 @@ test('#11 real order for other menus: the new-map menu counts as closed by the E
   const fs = require('node:fs'), path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal((source.match(/new Menu\(\)/g) ?? []).length, 1, 'only newMenu itself builds a Menu');
-  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 16, 'the other sixteen menus use it (annotated-image P3a added the image right-click menu; ticket 21 added the add-type list; ticket 39 added the card More and selection More menus) (C2 made More mind map actions one; ticket 41 removed openRelationKindMenu, the relation kind is now a select in the card window)');
+  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 15, 'the other fifteen menus use it (goal banner P3 removed the toolbar topic menu; annotated-image P3a added the image right-click menu; ticket 21 added the add-type list; ticket 39 added the card More and selection More menus) (C2 made More mind map actions one; ticket 41 removed openRelationKindMenu, the relation kind is now a select in the card window)');
   const card = source.slice(source.indexOf('private onCanvasContextMenu'), source.indexOf('private openCanvasImagePicker'));
   assert.match(card, /this\.newMenu\(cardId\)/, 'the card right-click menu keeps its card as the focus fallback');
 });
@@ -515,7 +515,6 @@ test('08d: the Organizer, Unassigned and Archive windows (openMapModal) hand foc
 
 // Every menu opener, driven for real: the menu hides before the same Escape reaches the map, the selection stays, and a later Escape clears it.
 const MENU_OPENERS = {
-  openTopicMenu: h => h.view.openTopicMenu({}),
   openKindMenu: h => h.view.openKindMenu({}, () => {}),
   openRelevanceMenu: h => h.view.openRelevanceMenu(h.view.map.nodes[1], 'core', h.card('leaf')),
   openUnlinkMenu: h => {

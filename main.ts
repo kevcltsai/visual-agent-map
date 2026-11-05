@@ -124,6 +124,7 @@ import { announceTestOverrides } from "./experiences/aim/flow-limits";
 import { ReframingService, providerReframeRunner } from "./core/reframing-service";
 import { OutlineGenerationService, providerOutlineRunner } from "./core/outline-generation-service";
 import { StructureReviewService, providerStructureReviewRunner } from "./core/structure-review-service";
+import { GoalTopicSuggestService, providerGoalTopicSuggestRunner } from "./core/goal-topic-suggest-service";
 import { MapChatService, providerMapChatRunner } from "./core/map-chat-service";
 import {
   RelevanceGradeService,
@@ -400,6 +401,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   );
   readonly outlineGeneration = new OutlineGenerationService(providerOutlineRunner(this.aiCalls));
   readonly structureReview = new StructureReviewService(providerStructureReviewRunner(this.aiCalls));
+  readonly goalTopicSuggest = new GoalTopicSuggestService(providerGoalTopicSuggestRunner(this.aiCalls));
   readonly mapChat = new MapChatService(providerMapChatRunner(this.aiCalls));
   readonly relevanceGrade = new RelevanceGradeService(providerRelevanceGradeRunner(this.aiCalls));
   /** Translated share text kept for this Obsidian session only (never written to disk); emptied on unload. */

@@ -91,24 +91,25 @@ test('merge helper: previous grades, then items, then pins on top', () => {
 // ---- pure: mode ----------------------------------------------------------------------------------------------
 
 test('mode: unchanged setup with an AI grade recalibrates; any change, no AI grade or an empty goal grades in full', () => {
-  const saved = { goal: 'Cook a steak', level: 'beginner', context: 'Half a day' };
-  const same = { goal: 'Cook a steak', level: 'beginner', context: 'Half a day' };
+  const saved = { goal: 'Cook a steak', context: 'Half a day' };
+  const same = { goal: 'Cook a steak', context: 'Half a day' };
   assert.equal(pins.relevanceMode(same, saved, true), 'recalibrate');
   assert.equal(pins.relevanceMode(same, saved, false), 'full', 'nothing to recalibrate from');
   assert.equal(pins.relevanceMode({ ...same, goal: 'Cook a roast' }, saved, true), 'full');
-  assert.equal(pins.relevanceMode({ ...same, level: '' }, saved, true), 'full');
+  assert.equal(pins.relevanceMode({ ...same, level: 'familiar' }, saved, true), 'recalibrate', 'a level in the draft is ignored');
   assert.equal(pins.relevanceMode({ ...same, context: 'Other' }, saved, true), 'full');
-  assert.equal(pins.relevanceMode({ goal: '   ', level: '', context: '' }, {}, true), 'full');
+  assert.equal(pins.relevanceMode({ goal: '   ', context: '' }, {}, true), 'full');
   assert.equal(pins.relevanceMode(same, {}, true), 'full', 'no saved goal');
 });
 
-test('mode: the draft is compared the way writeRelevanceGoal stores it (whitespace, caps, unknown level, blank context)', () => {
-  const saved = { goal: 'Cook a steak', level: undefined, context: undefined };
-  assert.equal(pins.relevanceSetupUnchanged({ goal: '  Cook\n a   steak ', level: 'nonsense', context: '  \n ' }, saved), true);
-  assert.equal(pins.relevanceSetupUnchanged({ goal: 'Cook a steak', level: '', context: 'x' }, saved), false);
+test('mode: the draft is compared the way writeRelevanceGoal stores it (whitespace, caps, blank context; a level is ignored)', () => {
+  const saved = { goal: 'Cook a steak', context: undefined };
+  assert.equal(pins.relevanceSetupUnchanged({ goal: '  Cook\n a   steak ', context: '  \n ' }, saved), true);
+  assert.equal(pins.relevanceSetupUnchanged({ goal: 'Cook a steak', context: 'x' }, saved), false);
+  assert.equal(pins.relevanceSetupUnchanged({ goal: 'Cook a steak', level: 'familiar', context: '' }, { goal: 'Cook a steak', level: 'beginner' }), true, 'changing only the old level is not a setup change');
   const long = 'g'.repeat(260);
-  assert.equal(pins.relevanceSetupUnchanged({ goal: long, level: '', context: '' }, { goal: 'g'.repeat(200) }), true, 'the goal is capped at 200 like the stored one');
-  assert.equal(pins.relevanceSetupUnchanged({ goal: 'a', level: '', context: 'c'.repeat(300) }, { goal: 'a', context: 'c'.repeat(200) }), true);
+  assert.equal(pins.relevanceSetupUnchanged({ goal: long, context: '' }, { goal: 'g'.repeat(200) }), true, 'the goal is capped at 200 like the stored one');
+  assert.equal(pins.relevanceSetupUnchanged({ goal: 'a', context: 'c'.repeat(300) }, { goal: 'a', context: 'c'.repeat(200) }), true);
 });
 
 test('mode: after the goal is written the repository setupChanged has the last word', () => {

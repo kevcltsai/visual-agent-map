@@ -51,12 +51,22 @@
 .vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }
 .vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }
-.vam-map-tools .vam-topic-more { margin-left: -2px; }
 /* box-shadow: none above removes Obsidian's own focus ring, so these buttons draw one. */
 .vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }
 .vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-zoom-controls { right: 12px; bottom: 12px; }
+/* The in-app toolbar is one faint icon; it opens into its label on hover or keyboard focus, and stays open while selecting. It floats over the goal bar when open. */
+.vam-map-tools.has-panel { z-index: 4; }
+.vam-tools-mini { z-index: 3; padding: 2px; opacity: .75; }
+.vam-tools-mini:hover, .vam-tools-mini:focus-within, .vam-tools-mini.is-open { opacity: 1; }
+.vam-tools-mini .vam-tools-select { display: inline-flex; align-items: center; gap: 6px; min-width: 30px; height: 30px; padding: 0 6px; color: var(--text-muted); }
+.vam-tools-mini .vam-tools-select:hover, .vam-tools-mini .vam-tools-select.is-active, .vam-tools-mini:focus-within .vam-tools-select { color: var(--text-normal); }
+.vam-tools-select-icon { display: inline-flex; flex: none; }
+.vam-tools-select-icon svg { width: 18px; height: 18px; }
+.vam-tools-select-label { display: none; white-space: nowrap; }
+.vam-tools-mini:hover .vam-tools-select-label, .vam-tools-mini:focus-within .vam-tools-select-label, .vam-tools-mini.is-open .vam-tools-select-label { display: inline; }
+.vam-empty .vam-empty-add { margin-top: 12px; }
 /* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
 .vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
@@ -462,38 +472,43 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-node[data-relevance="side"] { border-style: dashed; }
 .vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }
-/* One toolbar button at the same level as "Select topics"; the goal is cut with an ellipsis so the row never wraps. The sort icon sits in padding reserved on the right. */
-.vam-map-tools .vam-relevance-goal { position: relative; display: inline-block; flex: 0 1 auto; min-width: 0; max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: 0; padding-bottom: 0; line-height: var(--input-height); }
-.vam-map-tools .vam-relevance-goal.is-sorted { padding-right: calc(var(--size-4-3) + 18px); }
-.vam-map-tools .vam-relevance-goal:disabled { cursor: default; }
-.vam-relevance-sort-icon { position: absolute; top: 50%; right: var(--size-4-2); display: inline-flex; color: var(--text-accent); transform: translateY(-50%); pointer-events: none; }
-.vam-relevance-sort-icon .svg-icon { width: 14px; height: 14px; }
-/* The panel opens under that button, inside the overlay, on the same card surface as the toolbar. */
-.vam-relevance-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(360px, calc(100vw - 32px)); max-width: calc(100vw - 32px); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); animation: vam-relevance-panel-in 150ms ease-out; }
+/* The goal bar: a chat-input style bar at the top centre of the canvas. --vam-goal-inset is the width of a laid-over chat window, so the bar centres on the visible canvas. The goal wraps and is never cut off. */
+.vam-goal-bar { position: absolute; z-index: 2; top: 12px; left: calc(50% + var(--vam-goal-inset, 0px) / 2); transform: translateX(-50%); box-sizing: border-box; width: min(460px, calc(100% - 24px - var(--vam-goal-inset, 0px))); display: flex; align-items: center; gap: 12px; padding: 14px 18px; border: 1px solid var(--background-modifier-border); border-radius: 16px; background: var(--background-primary); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
+.vam-goal-bar:hover, .vam-goal-bar:focus-within { border-color: var(--interactive-accent); }
+/* A bar that carries an open panel (edit, suggestions) rises as a whole above the mini tool group (3); the panel's own z-index would only count inside the bar's stacking context. Stays below the selection bar (6), hover card (10) and overlay chat (12). */
+.vam-goal-bar.has-attachment { z-index: 4; }
+.vam-goal-target { display: inline-flex; flex: none; color: var(--interactive-accent); }
+.vam-goal-target svg { width: 26px; height: 26px; }
+.vam-goal-text { flex: 1 1 auto; min-width: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: .01em; line-height: 1.35; padding-block: 3px; color: var(--text-normal); overflow-wrap: anywhere; cursor: default; border-radius: var(--radius-s); }
+.vam-goal-bar.is-empty .vam-goal-text { color: var(--text-muted); font-weight: 600; cursor: text; }
+.vam-goal-text:focus-visible, .vam-goal-icon:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+/* The four icons show only while the pointer is over the bar or the keyboard is inside it. */
+.vam-goal-actions { display: none; flex: none; align-items: center; gap: 2px; margin-left: auto; }
+.vam-goal-bar:hover .vam-goal-actions, .vam-goal-bar:focus-within .vam-goal-actions { display: flex; }
+.vam-goal-icon { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 8px; background: transparent; box-shadow: none; color: var(--text-muted); cursor: pointer; }
+.vam-goal-icon svg { width: 17px; height: 17px; }
+.vam-goal-icon:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); }
+.vam-goal-icon.on { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent); color: var(--text-accent); }
+.vam-goal-icon:disabled { opacity: .4; cursor: default; }
+/* The edit popover opens under the bar, on the same surface. */
+.vam-relevance-panel { position: absolute; top: calc(100% + 6px); left: 0; right: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); max-height: var(--vam-goal-attach-max, none); overflow-y: auto; animation: vam-relevance-panel-in 150ms ease-out; }
 @keyframes vam-relevance-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Suggested new topics: a card under the bar, same width, with one checkable row per suggestion. */
+.vam-goal-suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; display: flex; flex-direction: column; gap: 7px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); max-height: var(--vam-goal-attach-max, none); font-size: var(--font-ui-small); animation: vam-relevance-panel-in 150ms ease-out; }
+.vam-goal-suggest.is-running { flex-direction: row; align-items: center; justify-content: space-between; color: var(--text-muted); }
+.vam-goal-suggest-rows { display: flex; flex-direction: column; gap: 7px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.vam-goal-suggest-foot { flex: none; }
+.vam-goal-suggest-row { display: flex; align-items: flex-start; gap: 8px; margin: 0; cursor: pointer; }
+.vam-goal-suggest-row input[type="checkbox"] { flex: none; margin: 3px 0 0; }
+.vam-goal-suggest-text { display: flex; flex-direction: column; min-width: 0; }
+.vam-goal-suggest-title { color: var(--text-normal); overflow-wrap: anywhere; }
+.vam-goal-suggest-why { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-goal-suggest-foot { display: flex; justify-content: flex-end; gap: 6px; padding-top: 7px; border-top: 1px solid var(--background-modifier-border); }
+.vam-goal-suggest button:focus-visible, .vam-goal-suggest input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-relevance-setup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.vam-relevance-setup-row { display: flex; gap: 8px; min-width: 0; }
 .vam-relevance-goal-input, .vam-relevance-context-input { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; font-size: var(--font-ui-small); }
 .vam-relevance-goal-input::placeholder, .vam-relevance-context-input::placeholder { color: var(--text-muted); opacity: 1; }
-.vam-relevance-setup .vam-relevance-level { flex: 0 0 auto; max-width: 45%; font-size: var(--font-ui-small); }
-.vam-relevance-context-input { flex: 1 1 0; }
-.vam-relevance-goal-input:focus-visible, .vam-relevance-context-input:focus-visible, .vam-relevance-level:focus-visible, .vam-relevance-grade-button:focus-visible, .vam-relevance-sort:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-.vam-relevance-grade-button { align-self: flex-end; font-size: var(--font-ui-small); }
-.vam-relevance-grade-button:active:not(:disabled) { transform: translateY(1px); }
-.vam-relevance-divider { height: 1px; background: var(--background-modifier-border); }
-/* The sort control is a real switch row: label, the explanation as secondary text, and Obsidian's own toggle. */
-.vam-relevance-panel .vam-relevance-sort { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; height: auto; padding: 6px 8px; margin: 0; background: transparent; box-shadow: none; text-align: left; white-space: normal; color: var(--text-normal); font-weight: var(--font-normal); }
-.vam-relevance-panel .vam-relevance-sort:hover { background: var(--background-modifier-hover); }
-.vam-relevance-panel .vam-relevance-sort:active { background: var(--background-modifier-active-hover); }
-.vam-relevance-sort-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.vam-relevance-sort-title { font-size: var(--font-ui-small); }
-.vam-relevance-sort-hint { font-size: var(--font-ui-smaller); color: var(--text-muted); line-height: 1.4; }
-.vam-relevance-switch { flex: none; pointer-events: none; }
-@media (max-width: 420px) {
-  .vam-relevance-setup-row { flex-direction: column; }
-  .vam-relevance-setup .vam-relevance-level { max-width: 100%; }
-  .vam-map-tools .vam-relevance-goal { max-width: 9em; }
-}
+.vam-relevance-goal-input:focus-visible, .vam-relevance-context-input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-relevance-changes { margin: 0; padding: 0; list-style: none; }
 .vam-relevance-change { padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .vam-relevance-change:last-child { border-bottom: 0; }
@@ -509,7 +524,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-relevance-unpin-all { font-size: var(--font-ui-small); }
 .vam-relevance-unpin-all:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) {
-  .vam-relevance-panel { animation: none; }
+  .vam-relevance-panel, .vam-goal-suggest { animation: none; }
   /* Same selector weight as the scan animation rule above, otherwise that rule keeps winning. */
   .vam-status-running::before, .vam-node:not([data-aim-kind])[data-status="running"]::after { animation: none; }
   .vam-node:not([data-aim-kind])[data-status="running"]::after { background: var(--interactive-accent); }
@@ -644,7 +659,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 }
 .vam-integration-sources { display: flex; flex-direction: column; gap: 5px; max-height: 150px; overflow-y: auto; margin: 12px 0; padding: 10px 12px; border-radius: var(--radius-s); background: var(--background-secondary); color: var(--text-muted); }
 .vam-integration-sources strong { color: var(--text-normal); }
-.vam-empty { margin: 60px auto; padding: 24px; max-width: 440px; color: var(--text-muted); text-align: center; line-height: 1.8; pointer-events: none; }
+.vam-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(440px, calc(100% - 24px)); margin: 0; padding: 24px; color: var(--text-muted); text-align: center; line-height: 1.8; pointer-events: none; }
 .vam-empty button { pointer-events: auto; }
 .vam-empty-state { margin: auto; padding: 32px; max-width: 520px; text-align: center; }
 .vam-empty-state p { color: var(--text-muted); line-height: 1.6; }
@@ -730,7 +745,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-toggle { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; color: var(--text-muted); }
 .vam-map-chat-toggle:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
 .vam-map-chat-unread { position: absolute; top: 4px; right: 4px; box-sizing: border-box; width: 10px; height: 10px; border: 2px solid var(--background-secondary); border-radius: 50%; background: var(--interactive-accent); }
-.vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-note-remove:focus-visible, .vam-map-chat-log:focus-visible, .vam-map-chat-suggestion:focus-visible, .vam-map-chat-example:focus-visible, .vam-map-chat-retry:focus-visible, .vam-map-chat-plan-apply:focus-visible, .vam-map-chat-plan-cancel:focus-visible, .vam-map-chat-lines-toggle:focus-visible, .vam-map-chat-plan-group-title:focus-visible, .vam-map-chat-choice:focus-visible, .vam-map-chat-resizer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-note-remove:focus-visible, .vam-map-chat-log:focus-visible, .vam-map-chat-send:focus-visible, .vam-map-chat-stop:focus-visible, .vam-map-chat-retry:focus-visible, .vam-map-chat-plan-apply:focus-visible, .vam-map-chat-plan-cancel:focus-visible, .vam-map-chat-lines-toggle:focus-visible, .vam-map-chat-plan-group-title:focus-visible, .vam-map-chat-choice:focus-visible, .vam-map-chat-resizer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-toggle.is-hidden, .vam-map-chat-body.is-hidden, .vam-map-chat-send.is-hidden, .vam-map-chat-stop.is-hidden, .vam-map-chat-hero-title.is-hidden, .vam-map-chat-resizer.is-hidden { display: none; }
 .vam-map-chat-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 8px; box-sizing: border-box; min-height: 0; padding: 10px 12px 12px; }
 /* The docked chat reaches the window's bottom edge, where Obsidian's status bar floats over its send button. */
@@ -754,15 +769,18 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-log { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px 4px 6px 2px; scrollbar-width: thin; scrollbar-color: var(--background-modifier-border-hover) transparent; }
 .vam-map-chat-log > * { flex-shrink: 0; }
 .vam-map-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); }
-.vam-map-chat-suggest { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
-.vam-map-chat button.vam-map-chat-suggestion { min-height: 28px; min-width: 24px; height: auto; padding: 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-small); text-align: start; white-space: normal; cursor: pointer; }
-.vam-map-chat button.vam-map-chat-suggestion:hover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); }
-.vam-map-chat-suggest.is-examples { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; }
-.vam-map-chat button.vam-map-chat-example { display: block; width: 100%; min-height: 28px; height: auto; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); box-shadow: none; color: var(--text-normal); text-align: start; white-space: normal; cursor: pointer; }
-.vam-map-chat button.vam-map-chat-example:hover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); }
 .vam-map-chat-form { display: flex; flex-direction: column; gap: 6px; }
 .vam-map-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; caret-color: var(--text-accent); }
-.vam-map-chat-side { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vam-map-chat-composer { position: relative; }
+.vam-map-chat-composer .vam-map-chat-input { padding-bottom: 36px; }
+.vam-map-chat-composer button.vam-map-chat-send, .vam-map-chat-composer button.vam-map-chat-stop { position: absolute; right: 6px; bottom: 6px; display: inline-flex; align-items: center; justify-content: center; width: 28px; min-width: 24px; height: 28px; min-height: 24px; padding: 0; border: 0; border-radius: 50%; box-shadow: none; cursor: pointer; }
+.vam-map-chat-composer button.vam-map-chat-send.is-hidden, .vam-map-chat-composer button.vam-map-chat-stop.is-hidden, .vam-map-chat-composer button.vam-map-chat-send[hidden], .vam-map-chat-composer button.vam-map-chat-stop[hidden] { display: none; }
+.vam-map-chat-composer button.vam-map-chat-send { background: transparent; color: var(--text-muted); }
+.vam-map-chat-composer button.vam-map-chat-send:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); }
+.vam-map-chat-composer button.vam-map-chat-stop { background: var(--interactive-accent); color: var(--text-on-accent); }
+.vam-map-chat-composer button.vam-map-chat-stop:hover { background: var(--interactive-accent-hover); }
+.vam-map-chat-composer button.vam-map-chat-send .svg-icon, .vam-map-chat-composer button.vam-map-chat-stop .svg-icon { width: 16px; height: 16px; }
+.vam-map-chat-composer button.vam-map-chat-stop .svg-icon { width: 12px; height: 12px; fill: currentColor; }
 .vam-map-chat-resizer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 1; width: 8px; cursor: col-resize; touch-action: none; }
 .vam-map-chat-resizer::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 2px; background: transparent; transition: background-color 120ms ease-out; }
 .vam-map-chat-resizer:hover::after, .vam-map-chat-resizer:focus-visible::after, .vam-map-chat.is-resizing .vam-map-chat-resizer::after { background: var(--interactive-accent); }
@@ -819,7 +837,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat.is-hero { width: min(560px, 100%); max-height: 100%; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l); box-shadow: var(--shadow-s); pointer-events: auto; animation: vam-chat-hero-in 240ms cubic-bezier(0.16, 1, 0.3, 1); }
 .vam-map-chat.is-hero .vam-map-chat-body { gap: 12px; padding: 16px 20px 20px; }
 .vam-map-chat.is-hero .vam-map-chat-log { display: none; }
-.vam-map-chat.is-hero .vam-map-chat-input { padding: 10px 12px; }
+.vam-map-chat.is-hero .vam-map-chat-input { padding: 10px 12px 36px; }
 @keyframes vam-chat-hero-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .vam-map-chat.is-hero { animation: none; } .vam-map-chat-resizer::after { transition: none; } }
 .has-chat-hero .vam-empty { display: none; }
@@ -891,7 +909,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-sources-button-label { overflow: hidden; text-overflow: ellipsis; }
 .vam-map-sources-warning { display: inline-flex; flex: 0 0 auto; color: var(--text-error); }
 .vam-map-sources-warning .svg-icon { width: 14px; height: 14px; }
-.vam-map-sources-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-width: min(440px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); animation: vam-relevance-panel-in 150ms ease-out; }
+.vam-map-sources-panel { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-width: min(440px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); max-height: var(--vam-sources-max, none); overflow-y: auto; animation: vam-relevance-panel-in 150ms ease-out; }
 .vam-map-sources-title { margin: 0; font-size: var(--font-ui-medium); }
 .vam-map-sources-panel p { margin: 0; }
 .vam-map-sources-drop { display: grid; gap: 4px; justify-items: center; box-sizing: border-box; padding: 18px 12px; border: 2px dashed var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); text-align: center; }

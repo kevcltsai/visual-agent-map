@@ -26,6 +26,7 @@ const suites = [
   'map-structure.cjs',
   'map-transaction.cjs',
   'relevance-grade.cjs',
+  'goal-topic-suggest.cjs',
   'shell-entrances.cjs',
   'coffee-tables-core.cjs',
   'coffee-tables-session.cjs',

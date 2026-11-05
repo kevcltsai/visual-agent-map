@@ -110,7 +110,7 @@ integrationTest('AIM cards hide generic map actions while ordinary map cards ret
   ordinaryResultView.stageEl = makeElement('stage', ordinaryButtonsForResult); ordinaryResultView.map = map([ordinaryResult]); ordinaryResultView.notes = new Map([[ordinaryResult.id, { title: 'Ordinary note', summary: '', status: 'completed' }]]);
   ordinaryResultView.renderNode(ordinaryResult);
   assert.equal(ordinaryButtonsForResult.some(button => button['aria-label'] === 'Generate another question from this research, keeping existing branches'), false, 'ordinary maps do not expose the AIM action');
-  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;[\s\S]{0,700}const integrate = this\.button\(\s*tools/);
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;\s*this\.renderSelectTool\(tools\);/);
 });
 integrationTest('AIM question cards show branch progress instead of note lifecycle status', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -1656,7 +1656,7 @@ test('applyCollapseLevel: collapse all, expand all and expand to level N set the
   const cyclic = [node('x', 'y'), node('y', 'x')]; core.applyCollapseLevel(cyclic, 1);
   assert.equal(cyclic.length, 2, 'a corrupt parent cycle does not hang');
 });
-integrationTest('the New map menu no longer imports outlines; the topic side option and the palette command add to the open map only', () => {
+integrationTest('the New map menu no longer imports outlines; the toolbar has no topic menu; the palette command adds to the open map only', () => {
   const opened = [], menus = [];
   class Modal { constructor(app) { this.app = app; } open() { opened.push(this); } close() {} }
   class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', icon: '', click: null, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } showAtMouseEvent() { return this; } }
@@ -1664,15 +1664,14 @@ integrationTest('the New map menu no longer imports outlines; the topic side opt
   view.openNewMapMenu({});
   assert.deepEqual(menus[0].items.map(item => item.title), ['New mind map', 'New AIM'], 'the menu has no outline import');
   view.path = `${DEFAULT_SETTINGS.topicsFolder}/Topic/Map.md`;
-  view.openTopicMenu({});
-  const paste = menus[1].items[0]; assert.equal(paste.title, 'Paste an outline to add several topics at once');
-  paste.click();
+  assert.equal(menus.length, 1, 'the toolbar has no topic menu any more; the palette command is the way to paste an outline');
   const placement = modal => modal.placementRequest();
+  view.openOutlineImport();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'tree' }, 'no selection: add to the current map');
-  view.selection.setSelected('a'); paste.click();
+  view.selection.setSelected('a'); view.openOutlineImport();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'under', parentId: 'a' }, 'a selected topic: add under it');
   const count = opened.length;
-  view.path = 'elsewhere/Map.md'; view.selection.setSelected(null); paste.click();
+  view.path = 'elsewhere/Map.md'; view.selection.setSelected(null); view.openOutlineImport();
   assert.equal(opened.length, count, 'no editable map open: no import window (a new map starts from + New mind map)');
   view.path = `${DEFAULT_SETTINGS.topicsFolder}/Topic/Map.md`; view.openOutlineImport();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'tree' }, 'the palette command adds to the open map');
@@ -2155,15 +2154,14 @@ const heKindNames = ['Topic', 'Action', 'Atomic knowledge', 'Hypothesis', 'Evide
 const heDialogKindIds = ['topic', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action'];
 const heDialogKindNames = ['Topic', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion', 'Action'];
 const heKindIds = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
-integrationTest('hypothesis-evidence: the toolbar topic menu keeps "paste an outline" first, then lists the six types in order, each creating that type', () => {
+integrationTest('hypothesis-evidence: the add menu for a new top-level topic (empty-map button) lists the six types in order, each creating that type', () => {
   const { view, menus } = heFixture();
   const calls = []; view.addNode = (...args) => calls.push(args); view.enqueue = work => work();
-  view.openTopicMenu({});
+  view.openAddMenu({}, null);
   assert.equal(menus.length, 1);
-  assert.match(menus[0].titles[0], /outline/i, 'paste outline stays the first item');
-  assert.deepEqual(menus[0].titles.slice(1), heKindNames);
+  assert.deepEqual(menus[0].titles.slice(0, heKindNames.length), heKindNames);
   assert.equal(menus[0].titles.some(title => /hypothesis/i.test(title) && title !== 'Hypothesis'), false, 'the old "Add hypothesis" item is gone');
-  menus[0].clicks.slice(1).forEach(click => click());
+  menus[0].clicks.slice(0, heKindNames.length).forEach(click => click());
   assert.deepEqual(calls, heKindIds.map(kind => [null, undefined, true, true, kind]));
 });
 integrationTest('hypothesis-evidence: the panel "Add subtopic…" opens the six-type menu and creates the chosen type under this topic', () => {
@@ -2366,8 +2364,8 @@ integrationTest('hypothesis-evidence: a non-ordinary topic sets data-topic-kind 
 integrationTest('hypothesis-evidence: an AIM map has no type menu, no add-subtopic entry, no type control, and refuse a switch', async () => {
   for (const options of [{ aim: true }]) {
     const { view, menus, writes } = heFixture(options);
-    view.openTopicMenu({});
-    assert.deepEqual(menus.flatMap(m => m.titles).filter(title => heKindNames.includes(title)), [], `toolbar ${JSON.stringify(options)}`);
+    const tools = dom.element('tools'); view.renderMapTools(tools);
+    assert.deepEqual(dom.buttons(tools), [], `toolbar ${JSON.stringify(options)}`);
     const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[2]);
     assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
     view.beginMapTransaction = () => assert.fail('no transaction');
@@ -4584,6 +4582,97 @@ integrationTest('hypothesis-leaning: styles.css dims a disabled choice with not-
   assert.match(block('.vam-topic-modal .vam-choice-group'), /repeat\(3,/, 'the shared group keeps three columns');
 });
 
+// The goal bar floats over the top centre of the canvas, so every fit/focus/initial-viewport path measures it like the toolbar.
+test('goal bar: canvasInset, canvasInsets, floatingControlRects and topsUnderToolbar all include the bar (the tallest of toolbar and bar wins)', () => {
+  const { view, a } = viewportFixture();
+  a.x = 400; a.y = 20; a.width = 280;
+  const rects = { '.vam-map-tools': { left: 12, top: 12, right: 60, bottom: 50 }, '.vam-goal-bar': { left: 220, top: 12, right: 780, bottom: 110 } };
+  const query = hidden => selector => (rects[selector] && selector !== hidden ? { getBoundingClientRect: () => rects[selector] } : null);
+  view.viewportEl = { clientWidth: 1000, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 1000, bottom: 600 }) };
+  view.contentEl = { querySelector: query('') };
+  view.cardEls = new Map([['a', { offsetHeight: 120 }]]);
+  view.canvasNodes = () => [a];
+  view.map.viewport = { x: 1, y: 0, zoom: 1 };
+  const withBar = view.canvasInset();
+  view.contentEl = { querySelector: query('.vam-goal-bar') };
+  const withoutBar = view.canvasInset();
+  assert.ok(withBar > withoutBar, `the bar (${withBar}) is taller than the toolbar alone (${withoutBar})`);
+  view.contentEl = { querySelector: query('') };
+  assert.equal(view.canvasInsets().top, withBar, 'Show all / focus keep the bar clear too');
+  assert.ok(view.floatingControlRects().some(r => r.left === 220 && r.right === 780), 'a card under the bar counts as obscured');
+  assert.deepEqual([...view.topsUnderToolbar(1)], [20], 'a card drawn under the bar (not under the toolbar) is lifted');
+  view.contentEl = { querySelector: query('.vam-goal-bar') };
+  assert.deepEqual([...view.topsUnderToolbar(1)], [], 'without the bar the same card is clear');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /for \(const selector of FLOATING_LAYER_SELECTORS\)/);
+});
+
+test('goal bar: styles keep it above the cards, centred on the visible canvas, wrapping (no ellipsis), icons only on hover or focus, theme variables only', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
+  const bar = rule('.vam-goal-bar');
+  assert.match(bar, /position: absolute;[^}]*top: 12px;[^}]*left: calc\(50% \+ var\(--vam-goal-inset, 0px\) \/ 2\);[^}]*transform: translateX\(-50%\)/, 'centred on the canvas the chat window does not cover');
+  assert.match(bar, /width: min\(460px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\)\)\)/, 'at most 460px, never wider than the visible canvas minus 24px, no side reservation (the tools sit below the bar)');
+  assert.doesNotMatch(bar, /108px/);
+  assert.match(bar, /padding: 14px 18px/); assert.match(bar, /border-radius: 16px/); assert.match(bar, /background: var\(--background-primary\)/); assert.match(bar, /border: 1px solid var\(--background-modifier-border\)/);
+  assert.doesNotMatch(bar, /#[0-9a-f]{3,6}\b/i, 'theme variables, not mock-up hex colours');
+  const text = rule('.vam-goal-text');
+  assert.match(text, /font-size: 1\.2rem;[^}]*font-weight: 800/); assert.match(text, /overflow-wrap: anywhere/); assert.doesNotMatch(text, /text-overflow|ellipsis|white-space: nowrap|overflow: hidden/, 'the goal wraps, never cut');
+  assert.match(rule('.vam-goal-actions'), /display: none/);
+  // Showing the icons must not change the bar height: one text line (1.2rem x 1.35 + 2 x 3px) is already as tall as the 30px icons.
+  assert.match(text, /padding-block: 3px/); assert.match(text, /line-height: 1\.35/);
+  assert.ok(19.2 * 1.35 + 6 >= 30, 'a one-line text box is at least as tall as the icon row, so hover does not grow the bar');
+  assert.match(css, /^\.vam-empty \{[^}]*top: 50%;[^}]*left: 50%;[^}]*translate\(-50%, -50%\)/m, 'the empty-map text and button are centred in the canvas');
+  assert.match(css, /\.vam-goal-bar:hover \.vam-goal-actions, \.vam-goal-bar:focus-within \.vam-goal-actions \{ display: flex; \}/);
+  assert.match(css, /\.vam-goal-bar:hover, \.vam-goal-bar:focus-within \{ border-color: var\(--interactive-accent\); \}/);
+  assert.match(rule('.vam-goal-icon'), /width: 30px; height: 30px/);
+  assert.doesNotMatch(css, /vam-relevance-level|vam-relevance-sort|vam-relevance-grade-button|\.vam-map-tools \.vam-relevance-goal/, 'the old goal pill and panel rules are gone');
+});
+
+test('goal bar: the tool group is placed right below the bar and follows its height; without a bar it keeps the stylesheet top', () => {
+  const { view } = viewportFixture();
+  const tools = { style: {} }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: null };
+  view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
+  view.placeMapTools();
+  assert.equal(tools.style.top, '82px', 'bar bottom (74) + 8px gap');
+  bar.offsetHeight = 140; view.placeMapTools();
+  assert.equal(tools.style.top, '160px', 'a wrapped, taller bar pushes the tools down with it');
+  for (const height of [62, 140]) { bar.offsetHeight = height; view.placeMapTools(); const barBottom = bar.offsetTop + bar.offsetHeight; assert.ok(parseInt(tools.style.top, 10) > barBottom, `tools start below the bar (${height})`); }
+  view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : null) };
+  view.placeMapTools();
+  assert.equal(tools.style.top, '', 'no goal bar (AIM or empty map): today\'s top');
+});
+
+test('goal bar: tools sit below the open suggestion card, and follow canvas, bar and card size changes; the watch is dropped on close', async () => {
+  const { view } = viewportFixture();
+  const watchers = [];
+  class FakeRO { constructor(fn) { this.fn = fn; this.targets = []; this.disconnected = false; watchers.push(this); } observe(el) { this.targets.push(el); } disconnect() { this.disconnected = true; } }
+  const doc = { defaultView: { ResizeObserver: FakeRO } };
+  const tools = { style: {} }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: doc };
+  const canvas = { ownerDocument: doc };
+  view.viewportEl = canvas;
+  view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
+  view.placeMapTools();
+  assert.equal(tools.style.top, '82px');
+  assert.equal(watchers.length, 1); assert.deepEqual([...watchers[0].targets], [bar, tools, canvas], 'the bar, the tools and the canvas are watched');
+  // Canvas resize (sidebar collapsed): the same placement runs again with the new bar height.
+  bar.offsetHeight = 100; watchers[0].fn();
+  assert.equal(tools.style.top, '120px', 'a canvas resize re-places the tools');
+  // The suggestion card hangs 6px under the bar: the tools go below the card and follow its height.
+  const card = { offsetHeight: 200, isConnected: true, hasClass: c => c === 'vam-goal-suggest' };
+  view.relevanceBarEl = { querySelector: () => card }; view.placeMapTools();
+  assert.equal(tools.style.top, String(12 + 100 + 6 + 200 + 8) + 'px', 'below the card, nothing is covered');
+  assert.ok(watchers.at(-1).targets.includes(card) && watchers[0].disconnected, 'the card is watched too (the old watch was dropped)');
+  card.offsetHeight = 320; watchers.at(-1).fn();
+  assert.equal(tools.style.top, String(12 + 100 + 6 + 320 + 8) + 'px', 'a taller card pushes the tools further down');
+  view.relevanceBarEl = { querySelector: () => null }; view.placeMapTools();
+  assert.equal(tools.style.top, '120px', 'card closed: back below the bar');
+  const live = watchers.at(-1); assert.equal(live.disconnected, false);
+  await view.onClose();
+  assert.equal(live.disconnected, true, 'closing the view disconnects the observer');
+  assert.equal(view.goalBarObserved.length, 0);
+});
+
 // ---- Map data sources (P3): toolbar button and panel ----------------------------------------------------------------
 const msTree = () => {
   const { TFile, TFolder } = obsidian;
@@ -4799,7 +4888,7 @@ test('drop zone: the panel does not close when focus or a press moves to a dragg
 
 // The view: button label, ⚠, aria, write path, duplicate no-op, repaint and visibility.
 function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {}) {
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, setTooltip() {} } });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, setTooltip() {} } }, { createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
   const tree = msTree();
   const state = { stored: [...stored], writes: [], notices: [] };
   const plugin = { settings: { ...DEFAULT_SETTINGS }, pendingSuggestions: new Map(), expansionBatches: new Map(), relevanceGrades: new Map(), mutate: async work => work(),
@@ -4813,11 +4902,12 @@ function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {})
 }
 const msButton = tools => dom.find(tools, c => c.tag === 'button' && (c.cls ?? '').includes('vam-sources-button'));
 const msLabel = tools => dom.find(msButton(tools), c => c.cls === 'vam-sources-button-label').text;
-integrationTest('map sources toolbar: the button follows the goal button, reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
+integrationTest('map sources toolbar: the button follows the select icon (the goal now lives in the goal bar), reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
   const none = msViewFixture(); none.draw();
   const buttons = none.tools.children.filter(c => c.tag === 'button');
-  assert.equal(buttons.at(-1), msButton(none.tools), 'right after the goal button');
-  assert.ok(buttons.at(-2).cls.includes('vam-relevance-goal'));
+  assert.equal(buttons.at(-1), msButton(none.tools), 'right after the select icon');
+  assert.ok(buttons.at(-2).cls.includes('vam-tools-select'));
+  assert.equal(buttons.some(b => (b.cls ?? '').includes('vam-relevance-goal')), false, 'no goal button in the toolbar any more');
   assert.equal(msLabel(none.tools), 'Data sources');
   const three = msViewFixture({ stored: [{ kind: 'folder', path: 'Research' }, { kind: 'file', path: 'Notes/interview.md' }, { kind: 'map', path: 'Old plan/Map.md' }] }); three.draw();
   assert.equal(msLabel(three.tools), 'Data sources · 3'); assert.equal(dom.find(msButton(three.tools), c => c.iconName === 'alert-triangle'), undefined);

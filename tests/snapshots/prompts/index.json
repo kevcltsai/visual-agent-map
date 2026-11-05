@@ -1186,6 +1186,36 @@
       "language": "zh-CN",
       "schema": false
     },
+    "goal-topic-suggest-context.en": {
+      "builder": "core/goal-topic-suggest-service.ts buildGoalTopicSuggestPrompt (goal and context, output language ja)",
+      "language": "en",
+      "schema": true
+    },
+    "goal-topic-suggest-context.zh": {
+      "builder": "core/goal-topic-suggest-service.ts buildGoalTopicSuggestPrompt (goal and context, output language ja)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "goal-topic-suggest-context.zh-CN": {
+      "builder": "core/goal-topic-suggest-service.ts buildGoalTopicSuggestPrompt (goal and context, output language ja)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "goal-topic-suggest.en": {
+      "builder": "core/goal-topic-suggest-service.ts buildGoalTopicSuggestPrompt (goal only)",
+      "language": "en",
+      "schema": true
+    },
+    "goal-topic-suggest.zh": {
+      "builder": "core/goal-topic-suggest-service.ts buildGoalTopicSuggestPrompt (goal only)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "goal-topic-suggest.zh-CN": {
+      "builder": "core/goal-topic-suggest-service.ts buildGoalTopicSuggestPrompt (goal only)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "i18n-direct.preset-instructions.en": {
       "builder": "i18n translate() of strings assembled in UI/runtime classes (selection-ai presets, view research task, codex search-budget steer, reference reduce round which needs >18k chars of evidence to trigger); weaker than a builder snapshot",
       "language": "en",

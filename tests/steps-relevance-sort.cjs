@@ -51,8 +51,8 @@ test('display layout with nothing graded matches the map auto layout order of th
 
 test('the toggle is display only: no repository, map or file write in its code path', () => {
   const src = fs.readFileSync(path.resolve(__dirname, '../experiences/visual-map/view.ts'), 'utf8');
-  const start = src.indexOf('// The sort switch: display only');
-  const body = src.slice(start, src.indexOf('let finished = false;', start));
+  const start = src.indexOf('// The sort icon: display only');
+  const body = src.slice(start, src.indexOf('sort.setAttr("aria-pressed"', start));
   assert.ok(start > 0 && body.length > 0);
   for (const forbidden of ['repo.', 'mapChange', 'enqueue', 'vault.', 'saveMap', 'updateNote', 'writeFile', 'process(', 'fit()', 'saveViewport']) assert.ok(!body.includes(forbidden), forbidden);
   const order = fs.readFileSync(path.resolve(__dirname, '../experiences/visual-map/relevance-order.ts'), 'utf8');

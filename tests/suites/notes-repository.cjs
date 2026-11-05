@@ -1793,6 +1793,23 @@ integrationTest('relevance goal writer sets the goal and appends one dated histo
   assert.equal(await repo.readRelevanceGoal(mapPath), undefined); assert.doesNotMatch(contents.get(mapPath), /relevance-goal/);
   await assert.rejects(repo.writeRelevanceGoal(mapPath, ' \n '), /goal/);
 });
+integrationTest('relevance goal writer never reads, writes or removes an old relevance-level key; only the goal or context counts as a setup change', async () => {
+  const { repo, contents, mapPath } = await mapFile();
+  contents.set(mapPath, contents.get(mapPath).replace(/^---\n/, '---\nrelevance-level: "beginner"\n'));
+  assert.deepEqual(plain(await repo.readRelevanceSetup(mapPath)), {}, 'the level is not part of the setup');
+  const first = await repo.writeRelevanceGoal(mapPath, 'Cook a steak', 'on a grill');
+  assert.equal(first.setupChanged, true); assert.equal('level' in first.previous, false); assert.equal('level' in first.next, false);
+  assert.match(contents.get(mapPath), /^relevance-level: "beginner"$/m);
+  contents.set(mapPath, contents.get(mapPath).replace('relevance-level: "beginner"', 'relevance-level: "familiar"'));
+  const same = await repo.writeRelevanceGoal(mapPath, 'Cook a steak', 'on a grill');
+  assert.equal(same.setupChanged, false, 'only the old level differs: no setup change'); assert.equal(same.changed, false);
+  assert.match(contents.get(mapPath), /^relevance-level: "familiar"$/m);
+  await repo.restoreRelevanceGoal(mapPath, first.previous);
+  assert.match(contents.get(mapPath), /^relevance-level: "familiar"$/m, 'restore leaves it');
+  assert.doesNotMatch(contents.get(mapPath), /relevance-(goal|context)/);
+  await repo.restoreRelevanceGoal(mapPath, first.next);
+  assert.match(contents.get(mapPath), /^relevance-level: "familiar"$/m);
+});
 integrationTest('relevance goal keys survive every later map save (writeMapContent keeps the frontmatter)', async () => {
   const { repo, contents, mapPath } = await mapFile();
   await repo.writeRelevanceGoal(mapPath, 'Goal one'); await repo.writeRelevanceGoal(mapPath, 'Goal two');

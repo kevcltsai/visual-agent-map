@@ -60591,8 +60591,8 @@ ${request.requirements}` : preset.text,
     this.focusInlineName();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
-    restoreSearch();
     this.settleCardHeights();
+    restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   emptyCanvasState() {
@@ -61671,7 +61671,7 @@ ${request.requirements}` : preset.text,
    * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
    */
   settleCardHeights() {
-    if (!this.map || this.closed) return;
+    if (!this.map || this.closed || !this.cardEls) return;
     const now = /* @__PURE__ */ new Map();
     for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
     const first = this.heightsSeenMap !== this.map.id;

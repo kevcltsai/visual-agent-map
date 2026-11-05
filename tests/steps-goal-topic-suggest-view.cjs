@@ -114,7 +114,13 @@ test('goal suggest: the spark asks for the usage confirmation, shows "Suggesting
   assert.ok(h.boxes().every(b => b.checked), 'default: every suggestion is checked');
   assert.equal(h.addBtn().text, 'Add 2'); assert.equal(h.skipBtn().text, 'Skip');
   assert.equal(h.boxes()[0].focused, true, 'focus moves into the list');
-  assert.ok(h.icons().filter(b => b.attrs['data-goal-action'] !== 'suggest').every(b => !b.disabled === (b.attrs['aria-label'] !== 'Recalibrate' || true)));
+  const others = h.icons().filter(b => b.attrs['data-goal-action'] !== 'suggest');
+  assert.equal(others.length, 3);
+  for (const label of ['Grade with this', 'Sort by relevance', 'Edit goal']) {
+    const icon = others.find(b => b.attrs['aria-label'] === label);
+    assert.ok(icon, `the ${label} icon exists`); assert.equal(icon.disabled, false, `${label} is enabled while the list is ready`);
+  }
+  assert.equal(h.spark().disabled, false, 'the spark (closes the list) is enabled too');
   assert.deepEqual(await h.titlesOnDisk(), BASE, 'nothing is written by suggesting');
   assert.equal(h.control.suggestCalls[0].request.goal, 'Sleep better');
 });
@@ -164,6 +170,21 @@ test('goal suggest: Add writes only the checked cards under their parents as ONE
   assert.equal(h.control.usageAsks, 2, 'the grade asks for the usage confirmation itself');
   gate.resolve(); await h.settled();
   assert.equal((await h.repo.readNote(created[0].path)).relevance?.tier, 'support', 'the new card got a tier');
+});
+
+test('goal suggest: one undo removes every card the Add step created', async () => {
+  const h = await harness();
+  await h.open();
+  h.control.decline = true; // the follow-up grade is declined, so the only history entry is the add step
+  const past = h.view.history.past.length;
+  h.addBtn().click();
+  await until(() => h.view.history.past.length === past + 1);
+  await until(async () => (await h.repo.readMap(MAP)).nodes.length === 7);
+  assert.deepEqual(await h.titlesOnDisk(), [...BASE, 'Sleep stages', 'Stress habits'].sort(), 'both cards were added');
+  await h.view.travel(false);
+  assert.equal(h.view.history.past.length, past, 'one undo takes the whole step back');
+  assert.deepEqual(await h.titlesOnDisk(), BASE, 'every card the step added is gone');
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, 5);
 });
 
 test('goal suggest: with an AI grade already there the follow-up grade is a recalibrate', async () => {
@@ -272,7 +293,28 @@ test('goal suggest: Skip, Esc and a press outside close the list, write nothing,
     assert.deepEqual(await h.titlesOnDisk(), BASE, how);
     assert.equal(h.control.gradeCalls.length, 0, how);
     if (how !== 'outside') assert.equal(h.spark().focused, true, how);
+    else { await new Promise(r => setTimeout(r, 5)); assert.equal(h.spark().focused, true, 'outside press: focus comes back once the browser has settled'); }
   }
+});
+
+test('goal suggest: Esc anywhere on the canvas closes an open list first; with no list the old Esc handling is untouched; hidden icons send focus to the goal text', async () => {
+  const h = await harness();
+  const esc = () => { const e = { key: 'Escape', target: { closest: () => null }, defaultPrevented: false, prevented: 0, stopped: 0, preventDefault() { this.prevented++; }, stopPropagation() { this.stopped++; } }; return e; };
+  h.view.contentEl.ownerDocument.querySelector = () => null;
+  const realEscape = h.view.selection.escape.bind(h.view.selection); h.view.selection.escape = () => { h.escaped = (h.escaped ?? 0) + 1; return realEscape(); };
+  await h.open();
+  const e = esc(); h.view.onMapKeydown(e);
+  assert.equal(h.panel(), undefined, 'the list is closed by an Esc with focus on the canvas');
+  assert.equal(h.escaped, undefined, 'the selection was not cleared by that Esc'); assert.ok(e.prevented && e.stopped);
+  assert.equal(h.spark().focused, true);
+  // A hidden spark (no hover, icons display:none) cannot take focus: the goal text gets it and shows the icons.
+  await h.open();
+  const query = h.rootEl.querySelector;
+  h.rootEl.querySelector = selector => { const el = query(selector); if (el && selector.includes('data-goal-action="suggest"')) Object.defineProperty(el, 'offsetParent', { value: null, configurable: true }); return el; };
+  const hidden = esc(); h.view.onMapKeydown(hidden);
+  assert.equal(h.panel(), undefined);
+  assert.equal(find(h.rootEl, i => hasCls(i, 'vam-goal-text')).focused, true, 'focus fell back to the goal text');
+  assert.ok(!h.spark().focused, 'not on the hidden spark');
 });
 
 test('goal suggest: starting a grade while the list is open closes the list', async () => {

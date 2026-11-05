@@ -52650,6 +52650,7 @@ function researchWebLines(web) {
 var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
 var GOAL_BAR_TOOLS_GAP = 8;
+var GOAL_SUGGEST_GAP = 6;
 var CHAT_EXPAND_LEVELS = 2;
 var CHAT_EXPAND_MAX_TOPICS = 15;
 var chatAppearanceChange = (action) => {
@@ -52953,7 +52954,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     __publicField(this, "goalBarObserver", null);
-    __publicField(this, "goalBarObserved", null);
+    __publicField(this, "goalBarObserved", []);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
     __publicField(this, "blankMapPaths", /* @__PURE__ */ new Set());
     __publicField(this, "aimStyleNoticed", /* @__PURE__ */ new Set());
@@ -53182,6 +53183,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     if (target == null ? void 0 : target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
     if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
       return;
+    const suggest = this.goalSuggestTask;
+    if (event.key === "Escape" && suggest && (suggest.state === "ready" || suggest.state === "running")) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.endGoalSuggest(suggest, { refocus: true });
+      return;
+    }
     if (event.key === "Escape" && this.menuClosedByKey) {
       event.preventDefault();
       event.stopPropagation();
@@ -53737,6 +53745,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.statusBarObserver = null;
     (_d = this.goalBarObserver) == null ? void 0 : _d.disconnect();
     this.goalBarObserver = null;
+    this.goalBarObserved = [];
     this.statusBarObserved = null;
     this.renderAfterDrag = false;
     (_e = this.announcer) == null ? void 0 : _e.remove();
@@ -54825,7 +54834,7 @@ ${request.requirements}` : preset.text,
   }
   /** Drops the task (aborting its AI call), its listeners and its panel; the late result then fails the fence. */
   endGoalSuggest(task, options) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2;
     if (this.goalSuggestTask !== task) return;
     this.goalSuggestTask = null;
     task.controller.abort();
@@ -54835,8 +54844,25 @@ ${request.requirements}` : preset.text,
     this.goalSuggestPanelEl = null;
     if (this.closed) return;
     if (options.repaint !== false) this.render();
-    if (options.refocus)
-      (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector) == null ? void 0 : _d.call(_c, '.vam-goal-icon[data-goal-action="suggest"]')) == null ? void 0 : _e.focus();
+    else this.placeMapTools();
+    if (options.refocus) this.focusGoalReturn();
+    else if (options.repaint === false) {
+      window.setTimeout(() => {
+        var _a3, _b3;
+        if (this.closed) return;
+        const doc = (_a3 = this.contentEl) == null ? void 0 : _a3.ownerDocument;
+        const active = (_b3 = doc == null ? void 0 : doc.activeElement) != null ? _b3 : null;
+        if (!active || active === (doc == null ? void 0 : doc.body)) this.focusGoalReturn();
+      }, 0);
+    }
+  }
+  /** Focus goes back to the spark icon; while the icons are hidden (no hover) it goes to the goal text, which shows them. */
+  focusGoalReturn() {
+    var _a2, _b2, _c, _d, _e, _f;
+    const spark = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, '.vam-goal-icon[data-goal-action="suggest"]')) != null ? _c : null;
+    const usable = spark && !spark.disabled && spark.offsetParent !== null;
+    if (usable) spark.focus();
+    else (_f = (_e = (_d = this.contentEl) == null ? void 0 : _d.querySelector) == null ? void 0 : _e.call(_d, ".vam-goal-text")) == null ? void 0 : _f.focus();
   }
   /** The spark icon: ask the AI which topics are missing for the goal. Nothing is written until the user adds some. */
   async startGoalSuggest() {
@@ -67830,29 +67856,47 @@ ${note.detail.trim()}` : "",
    * group sits right below the bar (following its real height, also when the goal wraps), so an opened toolbar never covers it.
    */
   placeGoalBar() {
-    var _a2, _b2, _c, _d;
-    const bar = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-goal-bar");
-    this.syncToolsBelowGoalBar(bar != null ? bar : null);
+    var _a2, _b2, _c;
+    const bar = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-goal-bar")) != null ? _b2 : null;
+    this.syncToolsBelowGoalBar(bar);
+    this.watchToolPlacement(bar);
     if (!bar) return;
-    const covered = ((_b2 = this.chat) == null ? void 0 : _b2.isOverlay) ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
+    const covered = ((_c = this.chat) == null ? void 0 : _c.isOverlay) ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
     bar.style.setProperty("--vam-goal-inset", `${covered}px`);
-    if (bar !== this.goalBarObserved) {
-      (_c = this.goalBarObserver) == null ? void 0 : _c.disconnect();
-      this.goalBarObserver = null;
-      this.goalBarObserved = bar;
-      const win = (_d = bar.ownerDocument) == null ? void 0 : _d.defaultView;
-      if (typeof (win == null ? void 0 : win.ResizeObserver) === "function") {
-        this.goalBarObserver = new win.ResizeObserver(() => this.syncToolsBelowGoalBar(bar));
-        this.goalBarObserver.observe(bar);
-      }
-    }
   }
-  /** With a goal bar the tools sit GOAL_BAR_TOOLS_GAP below it; without one they keep the stylesheet's top. */
+  /**
+   * The tools follow the bar's height, the suggestion card's height and the canvas size (a collapsing sidebar changes it
+   * without any chat event), so all three are watched; the watch is dropped when the view closes.
+   */
+  watchToolPlacement(bar) {
+    var _a2, _b2, _c, _d, _e;
+    const panel = this.goalSuggestPanelEl;
+    const targets = [bar, (panel == null ? void 0 : panel.isConnected) === false ? null : panel, this.viewportEl].filter(
+      (el) => !!el
+    );
+    const same = targets.length === this.goalBarObserved.length && targets.every((el, i) => el === this.goalBarObserved[i]);
+    if (same) return;
+    (_a2 = this.goalBarObserver) == null ? void 0 : _a2.disconnect();
+    this.goalBarObserver = null;
+    this.goalBarObserved = targets;
+    const win = (_e = (_d = (_b2 = targets[0]) == null ? void 0 : _b2.ownerDocument) != null ? _d : (_c = this.contentEl) == null ? void 0 : _c.ownerDocument) == null ? void 0 : _e.defaultView;
+    if (!targets.length || this.closed || typeof (win == null ? void 0 : win.ResizeObserver) !== "function") return;
+    this.goalBarObserver = new win.ResizeObserver(() => {
+      if (!this.closed) this.placeMapTools();
+    });
+    for (const el of targets) this.goalBarObserver.observe(el);
+  }
+  /**
+   * With a goal bar the tools sit GOAL_BAR_TOOLS_GAP below it, or below the suggestion card while that is open (it hangs
+   * under the bar exactly where the tools would be); without a bar they keep the stylesheet's top.
+   */
   syncToolsBelowGoalBar(bar) {
     var _a2;
     const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
     if (!(tools == null ? void 0 : tools.style)) return;
-    const bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
+    let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
+    const panel = this.goalSuggestPanelEl;
+    if (bar && panel && panel.isConnected !== false) bottom += GOAL_SUGGEST_GAP + panel.offsetHeight;
     tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
   }
   /** Obsidian calls this when the pane's size changes. */

@@ -4650,3 +4650,33 @@ test('goal bar: the tool group is placed right below the bar and follows its hei
   view.placeGoalBar();
   assert.equal(tools.style.top, '', 'no goal bar (AIM or empty map): today\'s top');
 });
+
+test('goal bar: tools sit below the open suggestion card, and follow canvas, bar and card size changes; the watch is dropped on close', async () => {
+  const { view } = viewportFixture();
+  const watchers = [];
+  class FakeRO { constructor(fn) { this.fn = fn; this.targets = []; this.disconnected = false; watchers.push(this); } observe(el) { this.targets.push(el); } disconnect() { this.disconnected = true; } }
+  const doc = { defaultView: { ResizeObserver: FakeRO } };
+  const tools = { style: {} }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: doc };
+  const canvas = { ownerDocument: doc };
+  view.viewportEl = canvas;
+  view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
+  view.placeMapTools();
+  assert.equal(tools.style.top, '82px');
+  assert.equal(watchers.length, 1); assert.deepEqual([...watchers[0].targets], [bar, canvas], 'the bar and the canvas are watched');
+  // Canvas resize (sidebar collapsed): the same placement runs again with the new bar height.
+  bar.offsetHeight = 100; watchers[0].fn();
+  assert.equal(tools.style.top, '120px', 'a canvas resize re-places the tools');
+  // The suggestion card hangs 6px under the bar: the tools go below the card and follow its height.
+  const card = { offsetHeight: 200, isConnected: true };
+  view.goalSuggestPanelEl = card; view.placeMapTools();
+  assert.equal(tools.style.top, String(12 + 100 + 6 + 200 + 8) + 'px', 'below the card, nothing is covered');
+  assert.ok(watchers.at(-1).targets.includes(card) && watchers[0].disconnected, 'the card is watched too (the old watch was dropped)');
+  card.offsetHeight = 320; watchers.at(-1).fn();
+  assert.equal(tools.style.top, String(12 + 100 + 6 + 320 + 8) + 'px', 'a taller card pushes the tools further down');
+  view.goalSuggestPanelEl = null; view.placeMapTools();
+  assert.equal(tools.style.top, '120px', 'card closed: back below the bar');
+  const live = watchers.at(-1); assert.equal(live.disconnected, false);
+  await view.onClose();
+  assert.equal(live.disconnected, true, 'closing the view disconnects the observer');
+  assert.equal(view.goalBarObserved.length, 0);
+});

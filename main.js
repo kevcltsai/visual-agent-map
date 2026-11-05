@@ -63007,9 +63007,15 @@ ${request.requirements}` : preset.text,
       delete copy.aim;
       copy.nodes = copy.nodes.filter((node) => !superseded.has(node.id)).map((node) => withoutAimFields(node));
     }
+    const covers = /* @__PURE__ */ new Map();
+    for (const node of copy.nodes) {
+      const cover = this.coverPictureOf(node);
+      if (cover) covers.set(node.id, cover.path);
+    }
     return {
       map: copy,
       notes: new Map(this.notes),
+      covers,
       ...this.relevanceGoal ? { goal: this.relevanceGoal } : {},
       mapPath: this.path
     };
@@ -76337,25 +76343,31 @@ var ShareExporter = class {
     }
     return titles;
   }
+  /**
+   * The Markdown a topic renders from: its detail with the cover picture on top (a cover lives in the note's front
+   * matter, not in the detail). A cover the detail already embeds is not shown twice. Empty when there is neither.
+   */
+  renderSource(id) {
+    var _a2, _b2, _c, _d, _e, _f;
+    const detail = ((_b2 = (_a2 = this.source.notes.get(id)) == null ? void 0 : _a2.detail) == null ? void 0 : _b2.trim()) ? (_d = (_c = this.source.notes.get(id)) == null ? void 0 : _c.detail) != null ? _d : "" : "";
+    const cover = (_e = this.source.covers) == null ? void 0 : _e.get(id);
+    if (!cover) return detail;
+    const base = (_f = cover.split("/").pop()) != null ? _f : cover;
+    if (detail.includes(cover) || detail.includes(base)) return detail;
+    return `![[${cover}]]
+
+${detail}`;
+  }
   /** Renders every note's detail once; later builds reuse the result. */
   async ensureRendered(ticket, onProgress) {
-    var _a2, _b2;
-    const nodes = this.source.map.nodes.filter(
-      (node) => {
-        var _a3, _b3;
-        return !this.rendered.has(node.id) && ((_b3 = (_a3 = this.source.notes.get(node.id)) == null ? void 0 : _a3.detail) == null ? void 0 : _b3.trim());
-      }
-    );
-    const total2 = this.source.map.nodes.filter((node) => {
-      var _a3, _b3;
-      return (_b3 = (_a3 = this.source.notes.get(node.id)) == null ? void 0 : _a3.detail) == null ? void 0 : _b3.trim();
-    }).length;
+    const nodes = this.source.map.nodes.filter((node) => !this.rendered.has(node.id) && this.renderSource(node.id));
+    const total2 = this.source.map.nodes.filter((node) => this.renderSource(node.id)).length;
     let done = total2 - nodes.length;
     const titles = this.titles();
     for (const node of nodes) {
       assertCurrent(ticket);
       onProgress({ phase: "render", done, total: total2 });
-      const result = await this.renderOne((_b2 = (_a2 = this.source.notes.get(node.id)) == null ? void 0 : _a2.detail) != null ? _b2 : "", titles, ticket);
+      const result = await this.renderOne(this.renderSource(node.id), titles, ticket);
       assertCurrent(ticket);
       if (this.disposed) return;
       this.rendered.set(node.id, result);

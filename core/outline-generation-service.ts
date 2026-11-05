@@ -24,6 +24,7 @@ export function providerOutlineRunner(aiCalls: AiCalls): OutlineGenerateRunner {
   return providerStepRunner<OutlineGenerateRequest, OutlineGenerateResult>(aiCalls, {
     name: "outline-generate",
     topic: request => `Outline · ${request.topic.trim().slice(0, 80)}`,
+    mapPath: request => request.usageMapPath,
     stopped: () => new OutlineGenerateError("stopped", "Outline generation stopped")
   });
 }

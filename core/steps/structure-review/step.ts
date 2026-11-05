@@ -24,6 +24,8 @@ export interface StructureNode {
   depth: number;
 }
 export interface StructureReviewRequest {
+  /** Trusted: the map file this request belongs to, for token-usage accounting only; never serialized into a prompt. */
+  usageMapPath?: string;
   rootQuestion: string;
   nodes: StructureNode[];
   language: ContentLanguage;

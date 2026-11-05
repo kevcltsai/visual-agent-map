@@ -14,7 +14,12 @@ type Block = {
 export interface ClaudeRecord {
   type?: unknown;
   parent_tool_use_id?: unknown;
-  usage?: { input_tokens?: unknown; output_tokens?: unknown };
+  usage?: {
+    input_tokens?: unknown;
+    output_tokens?: unknown;
+    cache_creation_input_tokens?: unknown;
+    cache_read_input_tokens?: unknown;
+  };
   message?: { content?: Block[] };
   event?: {
     type?: unknown;
@@ -68,7 +73,13 @@ export class ClaudeTranscriptFacts {
     if (!item || typeof item !== "object") return;
     const record = item as ClaudeRecord;
     if (record.type === "result") {
-      const input = record.usage?.input_tokens;
+      // Claude reports cached prompt tokens separately from `input_tokens`; all three are input the call sent.
+      const parts = [
+        record.usage?.input_tokens,
+        record.usage?.cache_creation_input_tokens,
+        record.usage?.cache_read_input_tokens
+      ].filter((value): value is number => typeof value === "number");
+      const input = parts.length ? parts.reduce((total, value) => total + value, 0) : undefined;
       const output = record.usage?.output_tokens;
       if (typeof input === "number" || typeof output === "number")
         this.usage = {

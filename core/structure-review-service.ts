@@ -43,6 +43,7 @@ export function providerStructureReviewRunner(aiCalls: AiCalls): StructureReview
   return providerStepRunner<StructureReviewRequest, StructureReviewResult>(aiCalls, {
     name: "structure-review",
     topic: request => `Structure review · ${request.rootQuestion.trim().slice(0, 80)}`,
+    mapPath: request => request.usageMapPath,
     stopped: () => new StructureReviewError("stopped", "Structure review stopped")
   });
 }

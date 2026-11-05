@@ -9,7 +9,8 @@ const S = require('./support.cjs');
 const { default: Plugin } = S.load('main.ts', { obsidian: S.obsidian });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const KEYS = ['begin', 'sent', 'received', 'milestones', 'parsed', 'completed', 'failed'];
-const CONTROL_FIELDS = ['onRequest', 'onSteer', 'onText', 'searchBudget', 'signal', 'textOnly', 'timeoutMessage', 'timeoutMs'];
+// onMilestones is there to read the usage the token-usage store records; no milestones event is written for Coffee Tables.
+const CONTROL_FIELDS = ['onMilestones', 'onRequest', 'onSteer', 'onText', 'searchBudget', 'signal', 'textOnly', 'timeoutMessage', 'timeoutMs'];
 // Product code tests `instanceof Error`, so the failures the fake runtime throws must be Errors of the main.ts bundle's realm.
 const BundleError = Plugin.prototype.pluginDirectory.constructor('return Error')();
 

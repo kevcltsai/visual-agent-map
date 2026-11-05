@@ -63,6 +63,39 @@
 .vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-layout-button::after { content: "▾" / ""; margin-left: 4px; color: var(--text-muted); }
 .vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+/* Token usage: the button at the left end of the zoom controls and the popover above them. */
+.vam-zoom-controls > .vam-usage-button { width: auto; gap: 4px; padding: 0 6px; font-size: var(--font-ui-small); font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.vam-usage-button[aria-expanded="true"] { background: var(--background-modifier-hover); color: var(--text-normal); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
+.vam-usage-icon { display: inline-flex; }
+.vam-usage-sep { width: 1px; height: 18px; margin: 0 3px; background: var(--background-modifier-border); }
+.vam-usage-panel { position: absolute; right: 12px; bottom: var(--vam-usage-bottom, 56px); width: 340px; max-width: calc(100% - 24px); max-height: calc(100% - var(--vam-usage-bottom, 56px) - 12px); overflow: auto; display: grid; gap: 12px; padding: 12px 14px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); color: var(--text-normal); }
+.vam-usage-panel:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-usage-panel[hidden], .vam-usage-panel [hidden] { display: none; }
+.vam-usage-title { display: flex; justify-content: space-between; align-items: center; margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
+.vam-usage-faint { color: var(--text-faint); font-weight: var(--font-normal); font-size: var(--font-ui-smaller); }
+.vam-usage-muted { color: var(--text-muted); }
+.vam-usage-section { display: grid; gap: 6px; }
+.vam-usage-heading { font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); letter-spacing: 0.06em; color: var(--text-muted); }
+.vam-usage-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.vam-usage-totals > div { padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); min-width: 0; }
+.vam-usage-totals small { display: block; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-usage-totals strong { font-size: var(--font-ui-medium); font-variant-numeric: tabular-nums; }
+.vam-usage-totals em span { display: block; white-space: nowrap; }
+.vam-usage-totals em { display: block; font-style: normal; color: var(--text-faint); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
+.vam-usage-bars { display: grid; gap: 5px; }
+.vam-usage-bar { display: grid; grid-template-columns: 64px 1fr 44px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.vam-usage-bar > span:last-child { text-align: right; }
+.vam-usage-fill-track { height: 8px; }
+.vam-usage-fill { height: 8px; border-radius: 4px; background: var(--interactive-accent); }
+.vam-usage-recent { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.vam-usage-recent td { padding: 4px 0; border-top: 1px solid var(--background-modifier-border); vertical-align: top; }
+.vam-usage-recent td:nth-child(1) { width: 42px; }
+.vam-usage-recent td:nth-child(n+3) { padding-left: 8px; text-align: right; white-space: nowrap; }
+.vam-usage-node { display: block; color: var(--text-faint); font-size: var(--font-ui-smaller); }
+.vam-usage-recent td.is-estimated { color: var(--text-warning, var(--color-orange)); }
+.vam-usage-empty, .vam-usage-error { margin: 0; color: var(--text-muted); }
+.vam-usage-error { color: var(--text-error); }
+.vam-usage-foot { padding-top: 8px; border-top: 1px solid var(--background-modifier-border); color: var(--text-faint); font-size: var(--font-ui-smaller); line-height: 1.5; }
 .vam-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
 /* Note style pickers */
 .vam-note-style-custom:not([hidden]) { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--interactive-accent); }

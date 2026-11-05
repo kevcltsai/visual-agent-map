@@ -21,6 +21,7 @@ const YAML = require('yaml');
 const root = path.resolve(__dirname, '..');
 function load(entry, overrides = {}, windowValues = {}, buildOptions = {}) {
   if (overrides.obsidian && !overrides.obsidian.Component) overrides = { ...overrides, obsidian: { ...overrides.obsidian, Component: class {} } };
+  if (overrides.obsidian && !overrides.obsidian.addIcon) overrides = { ...overrides, obsidian: { ...overrides.obsidian, addIcon() {} } };
   if (overrides.obsidian && !overrides.obsidian.MarkdownRenderChild) overrides = { ...overrides, obsidian: { ...overrides.obsidian, MarkdownRenderChild: class {} } };
   const code = buildSync({ entryPoints: [path.join(root, entry)], external: ['obsidian', 'node:*'], ...buildOptions }).outputFiles[0].text;
   const module = { exports: {} };

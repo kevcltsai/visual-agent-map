@@ -22,6 +22,7 @@ import {
   type ContentLanguage
 } from "./i18n";
 import {
+  addIcon,
   FileSystemAdapter,
   getLanguage,
   loadMermaid,
@@ -37,6 +38,8 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
+import { TOPIC_KINDS } from "./note-values";
+import { kindIconId, kindIconSvg } from "./experiences/visual-map/topic-kind-shape";
 import {
   NoteStyleStore,
   type RunStyle,
@@ -606,6 +609,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
+    for (const kind of TOPIC_KINDS) addIcon(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = (this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,

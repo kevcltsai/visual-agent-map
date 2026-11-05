@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- The "+" and "Add subtopic" lists show each topic type's shape and colour next to its name, the same as the type picker.
+
 ## [0.30.0] - 2026-11-05
 
 ### Start a map with one sentence

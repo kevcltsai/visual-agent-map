@@ -141,6 +141,7 @@ export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
 import {
   TOPIC_KIND_SHAPES,
   hasSvgShape,
+  kindIconId,
   renderShapeBackground,
   shapeInsets,
   showsToResearch
@@ -764,14 +765,6 @@ type AimTargetProgress = {
   startedAt?: number;
 };
 
-const TOPIC_KIND_ICON: Record<TopicKind, string> = {
-  topic: "circle",
-  action: "square-check",
-  atomic: "atom",
-  hypothesis: "lightbulb",
-  evidence: "file-search",
-  conclusion: "flag"
-};
 const RELATION_KINDS: readonly TopicRelationKind[] = [
   "supports",
   "contradicts",
@@ -2267,6 +2260,10 @@ export class VisualAgentMapView extends ItemView {
     const menu = new Menu();
     this.restoreFocusOnMenuHide(menu, nodeId);
     return menu;
+  }
+  /** A menu that lists topic types is drawn by Obsidian, not the system: a native menu shows no icons, and the shapes are the point. */
+  private drawInDom(menu: Menu): void {
+    (menu as Partial<Pick<Menu, "setUseNativeMenu">>).setUseNativeMenu?.(false);
   }
   private restoreFocusOnMenuHide(menu: Menu, nodeId?: string): void {
     (menu as unknown as { onHide?: (callback: () => void) => void }).onHide?.(() => {
@@ -4135,11 +4132,12 @@ export class VisualAgentMapView extends ItemView {
   private openAddMenu(event: MouseEvent, parent: MapNode | null): void {
     if (this.presentation) return;
     const menu = this.newMenu();
+    this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
           .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
-          .setIcon(TOPIC_KIND_ICON[kind])
+          .setIcon(kindIconId(kind))
           .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(parent, undefined, true, true, kind))))
       );
     if (this.canEditText())
@@ -4155,6 +4153,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private openTopicMenu(event: MouseEvent): void {
     const menu = this.newMenu();
+    this.drawInDom(menu);
     menu.addItem(item =>
       item
         .setTitle(t("ui.paste_outline_add_many"))
@@ -4166,7 +4165,7 @@ export class VisualAgentMapView extends ItemView {
         menu.addItem(item =>
           item
             .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
-            .setIcon(TOPIC_KIND_ICON[kind])
+            .setIcon(kindIconId(kind))
             .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind))))
         );
     menu.showAtMouseEvent(event);
@@ -4377,11 +4376,12 @@ export class VisualAgentMapView extends ItemView {
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
     const menu = this.newMenu();
+    this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
           .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
-          .setIcon(TOPIC_KIND_ICON[kind])
+          .setIcon(kindIconId(kind))
           .onClick(() => pick(kind))
       );
     menu.showAtMouseEvent(event);

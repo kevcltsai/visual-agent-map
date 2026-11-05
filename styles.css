@@ -382,6 +382,13 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-kind-shape { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; overflow: visible; pointer-events: none; }
 .vam-kind-shape .vam-kind-outline { fill: var(--vam-kind-fill); stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-dasharray: var(--vam-kind-dash); stroke-linejoin: round; }
 .vam-kind-shape .vam-kind-fold { fill: none; stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-linejoin: round; }
+/* Topic-type shapes as menu icons (registered in main.ts): the same hue, fill and line as the type picker's swatch. */
+.vam-kind-shape.vam-kind-icon { --vam-kind-hue: var(--text-muted); --vam-kind-width: 7; --vam-kind-dash: none; --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 75%, var(--text-normal)); --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 14%, transparent); }
+.vam-kind-shape.vam-kind-icon[data-kind="atomic"] { --vam-kind-hue: var(--color-cyan); }
+.vam-kind-shape.vam-kind-icon[data-kind="hypothesis"] { --vam-kind-hue: var(--color-purple); }
+.vam-kind-shape.vam-kind-icon[data-kind="evidence"] { --vam-kind-hue: var(--color-green); }
+.vam-kind-shape.vam-kind-icon[data-kind="conclusion"] { --vam-kind-hue: var(--color-blue); }
+.vam-kind-shape.vam-kind-icon[data-kind="action"] { --vam-kind-hue: var(--color-orange); }
 /* An atomic title keeps two lines at most; the full text is the title attribute (hover). */
 [data-topic-kind="atomic"] .vam-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 /* A hypothesis diamond grows with its text: its title keeps three lines and the summary of a diamond or an ellipse two (the full text is the title attribute). */

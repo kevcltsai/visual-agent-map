@@ -11,7 +11,7 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
     createEl(name, options) { const child = element(name); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
     createSpan(options) { const child = element('span'); child.text = options?.text; this.children.push(child); return child; },
     setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, toggleClass(name, on) { this.toggled = [name, on]; }, setPointerCapture() {},
-    addEventListener(name, handler) { events.set(`${tag}:${name}`, handler); if (tag === 'button') this.click = handler; }, removeEventListener() {}
+    addEventListener(name, handler) { events.set(`${tag}:${name}`, handler); if (tag === 'button') this.click = handler; }, removeEventListener() {}, querySelector() { return null; }
   });
   const topic = node('parent');
   let detailsShown = false;
@@ -1266,7 +1266,7 @@ integrationTest('select mode toggles cards in place, keeps checkboxes out of the
   assert.equal(again.c.classes.has('is-selected'), true); assert.equal(again.c.attrs['aria-selected'], 'true'); assert.equal(again.a.classes.has('is-selected'), false);
   assert.equal(renders(), 0);
 });
-integrationTest('F2 starts rename, Enter opens details, and the collapse button reports aria-expanded', () => {
+integrationTest('F2 starts the in-place title edit, Enter opens details, and the collapse button reports aria-expanded', () => {
   const dialogs = [];
   class Modal { open() { dialogs.push(this); } close() {} }
   const fixture = selectionView(load, {}, { ...obsidian, Modal });
@@ -1279,8 +1279,8 @@ integrationTest('F2 starts rename, Enter opens details, and the collapse button 
   assert.deepEqual(opened, ['a']); assert.equal(view.selection.state.selected, 'a'); assert.equal(fixture.renders(), 0);
   let renamed = 0;
   cards.a.handlers.get('keydown')({ key: 'F2', target: cards.a, preventDefault() { renamed++; } });
-  assert.equal(renamed, 1, 'F2 is handled as the rename shortcut'); assert.equal(dialogs.length, 1, 'F2 opens the name dialog');
-  assert.equal(fixture.renders(), 0);
+  assert.equal(renamed, 1, 'F2 is handled as the rename shortcut'); assert.equal(dialogs.length, 0, 'F2 opens no name dialog'); assert.equal(view.inlineName?.id, 'a', 'F2 opens the title field of the card');
+  assert.equal(fixture.renders(), 1, 'one repaint draws the field');
   const expanded = [];
   const walk = item => { if (item.attrs && 'aria-expanded' in item.attrs) expanded.push(item.attrs['aria-expanded']); item.children.forEach(walk); };
   walk(cards.root); assert.deepEqual(expanded, [], 'an expanded branch has no floating collapse button: Collapse is in More; only the folded Expand button reports aria-expanded');
@@ -1525,7 +1525,7 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(plugin.outlineMap, null, 'no map left: the outline empties');
 });
-integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card, Rename and Select subtopics', () => {
+integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card and Select subtopics (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until hover, focus or selection, and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; pointer-events: none;[^}]*width: max-content;/m);
@@ -1544,7 +1544,7 @@ integrationTest('card tools: only AI explore, Details and More float; More holds
   };
   const buttons = toolsOf();
   assert.deepEqual(buttons.map(button => button.text), ['AI explore', 'Details', '⋯ More'], 'three floating buttons');
-  assert.deepEqual(buttons.menu, ['Collapse', 'This card', 'Rename', 'Select subtopics'], 'every other action is in More; Add text is only in the + menu');
+  assert.deepEqual(buttons.menu, ['Collapse', 'This card', 'Select subtopics'], 'every other action is in More; Add text is only in the + menu');
   const explore = buttons[0];
   assert.ok(explore.classes.has('vam-ai-explore')); assert.equal(explore.attrs['aria-label'], undefined, 'the visible text is the accessible name (WCAG 2.5.3)');
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
@@ -1552,11 +1552,11 @@ integrationTest('card tools: only AI explore, Details and More float; More holds
   assert.equal(buttons[2].attrs['aria-label'], 'More actions for this topic'); assert.equal(buttons[2].attrs['aria-haspopup'], 'menu');
   // A leaf has no Collapse; select mode keeps Details and a More with only Collapse.
   const leaf = toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); });
-  assert.deepEqual(leaf.map(button => button.text), ['AI explore', 'Details', '⋯ More']); assert.deepEqual(leaf.menu, ['This card', 'Rename']);
+  assert.deepEqual(leaf.map(button => button.text), ['AI explore', 'Details', '⋯ More']); assert.deepEqual(leaf.menu, ['This card']);
   const selecting = toolsOf(({ view }) => { view.selection.toggleMultiSelect(); });
   assert.deepEqual(selecting.map(button => button.text), ['Details', '⋯ More']); assert.deepEqual(selecting.menu, ['Collapse']);
   const { translate } = load('i18n.ts');
-  assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_rename', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '這張卡', '改名', '詳情', 'AI 探索']);
+  assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '這張卡', '詳情', 'AI 探索']);
 });
 integrationTest('status pill: researched topics show "Researched", unresearched ones show none, other states keep theirs and screen readers still hear the status', () => {
   const pills = (status, setup) => {
@@ -4516,7 +4516,7 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   view.enqueue = work => work();
   view.addNode = parent => { calls.push(['add', parent?.id ?? null]); };
   view.openNextStep = node => calls.push(['ai', node.id]);
-  view.renameNode = (node, title) => calls.push(['rename', node.id, title]);
+  view.startCardTitleEdit = node => calls.push(['rename', node.id, view.notes.get(node.id).title]);
   view.openDetails = node => calls.push(['details', node.id]);
   view.fit = () => calls.push(['fit']);
   view.zoomBy = factor => calls.push(['zoom', factor]);

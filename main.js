@@ -633,6 +633,9 @@ var en = {
   "ui.card_edit_title_label": "Card title",
   "ui.card_edit_summary_label": "Card summary",
   "ui.card_edit_summary_placeholder": "Add a summary",
+  "ui.card_summary_add_hint": "Click to add a summary\u2026",
+  "ui.card_edit_title_keys": "Enter or click elsewhere saves \xB7 Esc cancels",
+  "ui.card_edit_summary_keys": "Enter or click elsewhere saves \xB7 Shift+Enter new line \xB7 Esc cancels",
   "ui.card_edit_picture_position": "Picture position",
   "ui.card_edit_position_top": "Top",
   "ui.card_edit_position_bottom": "Bottom",
@@ -1153,7 +1156,6 @@ var en = {
   "ui.open_details_in_right_sidebar": "Open details in right sidebar",
   "ui.collapse": "Collapse",
   "ui.node_tool_links": "This card",
-  "ui.node_tool_rename": "Rename",
   "ui.node_tool_details": "Details",
   "ui.select_subtopics": "Select subtopics",
   "ui.select_subtopics_hint": "Select every direct subtopic of this topic",
@@ -3311,6 +3313,9 @@ var zhCN = {
   "ui.card_edit_title_label": "\u5361\u7247\u6807\u9898",
   "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
   "ui.card_edit_summary_placeholder": "\u6DFB\u52A0\u6458\u8981",
+  "ui.card_summary_add_hint": "\u70B9\u8FD9\u91CC\u52A0\u6458\u8981\u2026",
+  "ui.card_edit_title_keys": "Enter \u6216\u70B9\u522B\u5904\uFF1D\u4FDD\u5B58\u3000Esc\uFF1D\u53D6\u6D88",
+  "ui.card_edit_summary_keys": "Enter \u6216\u70B9\u522B\u5904\uFF1D\u4FDD\u5B58\u3000Shift+Enter\uFF1D\u6362\u884C\u3000Esc\uFF1D\u53D6\u6D88",
   "ui.card_edit_picture_position": "\u56FE\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -3831,7 +3836,6 @@ var zhCN = {
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u4FA7\u680F\u6253\u5F00\u8BE6\u60C5",
   "ui.collapse": "\u6298\u53E0",
   "ui.node_tool_links": "\u8FD9\u5F20\u5361",
-  "ui.node_tool_rename": "\u6539\u540D",
   "ui.node_tool_details": "\u8BE6\u60C5",
   "ui.select_subtopics": "\u9009\u62E9\u5B50\u8BAE\u9898",
   "ui.select_subtopics_hint": "\u9009\u62E9\u8FD9\u4E2A\u8BAE\u9898\u5E95\u4E0B\u6240\u6709\u76F4\u5C5E\u5B50\u8BAE\u9898",
@@ -5989,6 +5993,9 @@ var zhTW = {
   "ui.card_edit_title_label": "\u5361\u7247\u6A19\u984C",
   "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
   "ui.card_edit_summary_placeholder": "\u52A0\u4E0A\u6458\u8981",
+  "ui.card_summary_add_hint": "\u9EDE\u9019\u88E1\u52A0\u6458\u8981\u2026",
+  "ui.card_edit_title_keys": "Enter \u6216\u9EDE\u5225\u8655\uFF1D\u5132\u5B58\u3000Esc\uFF1D\u53D6\u6D88",
+  "ui.card_edit_summary_keys": "Enter \u6216\u9EDE\u5225\u8655\uFF1D\u5132\u5B58\u3000Shift+Enter\uFF1D\u63DB\u884C\u3000Esc\uFF1D\u53D6\u6D88",
   "ui.card_edit_picture_position": "\u5716\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -6509,7 +6516,6 @@ var zhTW = {
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u5074\u6B04\u958B\u555F\u8A73\u60C5",
   "ui.collapse": "\u6536\u5408",
   "ui.node_tool_links": "\u9019\u5F35\u5361",
-  "ui.node_tool_rename": "\u6539\u540D",
   "ui.node_tool_details": "\u8A73\u60C5",
   "ui.select_subtopics": "\u9078\u53D6\u5B50\u8B70\u984C",
   "ui.select_subtopics_hint": "\u9078\u53D6\u9019\u500B\u8B70\u984C\u5E95\u4E0B\u6240\u6709\u76F4\u5C6C\u5B50\u8B70\u984C",
@@ -20042,23 +20048,44 @@ function parentIdsForNode(node) {
   const convergenceParents = node.aimKind === "question" ? [] : (_a2 = node.aimConvergesFromNodeIds) != null ? _a2 : [];
   return [...node.parentId ? [node.parentId] : [], ...convergenceParents.filter((id) => id !== node.parentId)];
 }
-function descendants(nodes, id) {
-  const found = /* @__PURE__ */ new Set();
+function childIndex(nodes) {
+  var _a2;
+  const index = /* @__PURE__ */ new Map();
+  for (const node of nodes) {
+    const key2 = (_a2 = node.parentId) != null ? _a2 : "";
+    const list = index.get(key2);
+    if (list) list.push(node);
+    else index.set(key2, [node]);
+  }
+  return index;
+}
+function walkDescendants(index, id, found) {
+  var _a2;
   const pending2 = [id];
   while (pending2.length) {
     const parent = pending2.pop();
-    for (const node of nodes) {
-      if (node.parentId === parent && node.id !== id && !found.has(node.id)) {
+    for (const node of (_a2 = index.get(parent)) != null ? _a2 : []) {
+      if (node.id !== id && !found.has(node.id)) {
         found.add(node.id);
         pending2.push(node.id);
       }
     }
   }
+}
+function branchSize(index, id) {
+  const found = /* @__PURE__ */ new Set();
+  walkDescendants(index, id, found);
+  return found.size;
+}
+function descendants(nodes, id) {
+  const found = /* @__PURE__ */ new Set();
+  walkDescendants(childIndex(nodes), id, found);
   return found;
 }
 function visibleNodes(nodes) {
+  const index = childIndex(nodes);
   const hidden = /* @__PURE__ */ new Set();
-  for (const node of nodes) if (node.collapsed) for (const id of descendants(nodes, node.id)) hidden.add(id);
+  for (const node of nodes) if (node.collapsed && !hidden.has(node.id)) walkDescendants(index, node.id, hidden);
   return nodes.filter((node) => !hidden.has(node.id));
 }
 function applyCollapseLevel(nodes, shownLevels) {
@@ -27312,6 +27339,8 @@ var SIDE_OUTSIDE = [
   "vam-card-fade",
   "vam-card-more"
 ];
+var SUMMARY_ANCHORS = ["vam-card-summary", "vam-card-summary-input", "vam-card-summary-add"];
+var FIELD_ADJUNCTS = ["vam-card-title-input", "vam-sr-only", "vam-card-edit-hint"];
 var POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
 var hasCls = (el, cls) => {
   var _a2, _b2, _c;
@@ -27346,9 +27375,11 @@ function arrangeCover(card, frame, position) {
   }
   card.addClass(`has-cover-${position}`);
   if (position === "bottom") {
-    const after = (_b2 = childWith(card, "vam-card-summary")) != null ? _b2 : title;
+    const after = (_b2 = SUMMARY_ANCHORS.map((cls) => childWith(card, cls)).find((el) => !!el)) != null ? _b2 : title;
     const kids2 = Array.from(card.children);
-    card.insertBefore(frame, (_c = kids2[kids2.indexOf(after) + 1]) != null ? _c : null);
+    let index = kids2.indexOf(after);
+    while (kids2[index + 1] && FIELD_ADJUNCTS.some((cls) => hasCls(kids2[index + 1], cls))) index++;
+    card.insertBefore(frame, (_c = kids2[index + 1]) != null ? _c : null);
     return;
   }
   const side = card.createDiv({ cls: "vam-card-side" });
@@ -53436,6 +53467,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     __publicField(this, "summaryEditDraft", null);
     /** The name being typed in place: the map title (id "") or a card title. It outlives a repaint. */
     __publicField(this, "inlineName", null);
+    /** The card summary being typed in place. `original` is what the card showed when the edit opened (blank for a placeholder). */
+    __publicField(this, "inlineSummary", null);
+    __publicField(this, "suspendInlineSummary", null);
+    __publicField(this, "inlineSummaryInput", null);
     /** Ends the live in-place name field without saving (a repaint is about to replace it); the draft stays in `inlineName`. */
     __publicField(this, "suspendInlineName", null);
     __publicField(this, "inlineNameInput", null);
@@ -53451,6 +53486,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     __publicField(this, "suspendTextEdit", null);
     /** Draft carried across a repaint; renderTextNodes reopens the editor with it. */
     __publicField(this, "textEditDraft", null);
+    /** The map's child index while a paint draws its cards; null otherwise. */
+    __publicField(this, "paintChildIndex", null);
+    /** Card measurements waiting for the paint to finish building every card; null outside a paint. */
+    __publicField(this, "pendingCardFits", null);
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
     /** Map search (Mod+F): the query, the current match and where Esc returns focus. Null while the search box is closed. */
     __publicField(this, "mapSearch", null);
@@ -53468,6 +53507,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     __publicField(this, "renderingCard", false);
     /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
     __publicField(this, "restoringFocus", false);
+    /** True only while a repaint opens a card title/summary field or hands focus back from one: the tool row must not pan the canvas then. */
+    __publicField(this, "keepCanvasOnFieldRestore", false);
     /** A focus restore was skipped because another window was active; done when this window is focused again. */
     __publicField(this, "focusRestorePending", false);
     /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
@@ -53809,7 +53850,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       const node = entry && ((_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === entry[0]));
       const note = node && this.notes.get(node.id);
       if (!node || !note) return true;
-      this.renameNode(node, note.title);
+      this.startCardTitleEdit(node, { select: true });
       return false;
     });
     const cardKey = (sibling) => (event) => {
@@ -54204,7 +54245,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
    */
   createInlineNameInput(parent, cls, label, done) {
     const state = this.inlineName;
-    const input2 = parent.createEl("input", { cls, attr: { type: "text", "aria-label": label, dir: "auto" } });
+    const input2 = parent.createEl("input", {
+      cls,
+      attr: { type: "text", dir: "auto", ...label ? { "aria-label": label } : {} }
+    });
     input2.value = state.draft;
     let live = true;
     const release2 = () => {
@@ -54227,6 +54271,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     input2.addEventListener("input", () => {
       state.draft = input2.value;
       state.fresh = false;
+      state.caret = void 0;
     });
     input2.addEventListener("mousedown", () => {
       state.fresh = false;
@@ -54248,17 +54293,43 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
   }
   /** After a repaint: the live name field takes focus (all text selected the first time, so typing replaces the default). */
   focusInlineName() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const input2 = this.inlineNameInput;
     if (!input2 || !input2.isConnected || !this.inlineName) return;
     this.restoringFocus = true;
+    this.keepCanvasOnFieldRestore = true;
     try {
       input2.focus({ preventScroll: true });
       if (this.inlineName.fresh) (_a2 = input2.select) == null ? void 0 : _a2.call(input2);
-      else (_b2 = input2.setSelectionRange) == null ? void 0 : _b2.call(input2, input2.value.length, input2.value.length);
+      else {
+        const at = Math.min((_b2 = this.inlineName.caret) != null ? _b2 : input2.value.length, input2.value.length);
+        (_c = input2.setSelectionRange) == null ? void 0 : _c.call(input2, at, at);
+      }
     } finally {
       this.restoringFocus = false;
+      this.keepCanvasOnFieldRestore = false;
     }
+  }
+  /** After a repaint: the live summary field takes focus with the caret where the click was (or at the end). */
+  focusInlineSummary() {
+    var _a2, _b2;
+    const area = this.inlineSummaryInput;
+    if (!area || !area.isConnected || !this.inlineSummary) return;
+    this.restoringFocus = true;
+    this.keepCanvasOnFieldRestore = true;
+    try {
+      area.focus({ preventScroll: true });
+      const at = Math.min((_a2 = this.inlineSummary.caret) != null ? _a2 : area.value.length, area.value.length);
+      (_b2 = area.setSelectionRange) == null ? void 0 : _b2.call(area, at, at);
+      this.growSummaryInput(area);
+    } finally {
+      this.restoringFocus = false;
+      this.keepCanvasOnFieldRestore = false;
+    }
+  }
+  growSummaryInput(area) {
+    area.setCssProps({ "--vam-summary-height": "auto" });
+    area.setCssProps({ "--vam-summary-height": `${area.scrollHeight}px` });
   }
   /** The map title becomes a field; Enter saves, Esc leaves the name as it was. */
   startMapTitleEdit() {
@@ -54270,24 +54341,157 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.inlineName = { target: "map", id: "", draft: this.map.title, fresh: true, created: false };
     this.render();
   }
+  /**
+   * Names an edit field for assistive tech without `aria-label`: Obsidian turns every aria-label into a hover tooltip, and
+   * on a field sitting right over the key hint it would cover the hint. A hidden label element carries the same text.
+   */
+  nameEditField(card, field, id, label) {
+    const text11 = card.createSpan({ cls: "vam-sr-only", text: label });
+    text11.id = id;
+    field.setAttr("aria-labelledby", id);
+  }
   /** Draws the card title's field in place of the title text. */
   paintCardNameEdit(card, node, note) {
-    const input2 = this.createInlineNameInput(card, "vam-card-title-input", t("ui.rename_topic"), (value) => {
+    var _a2;
+    const input2 = this.createInlineNameInput(card, "vam-card-title-input", "", (value) => {
       const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
       if (!name2 || name2 === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name2 }));
     });
+    this.nameEditField(card, input2, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
+    if (!((_a2 = this.inlineName) == null ? void 0 : _a2.created)) card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_title_keys") });
     return input2;
   }
-  /** The rename dialog shared by F2, the title double-click and the Rename tool. */
-  renameNode(node, current) {
-    if (this.presentation) return;
-    new NameModal(
-      this.app,
-      t("ui.rename_topic"),
-      current,
-      (name2) => this.enqueue(() => this.noteChange(node, { title: name2 }))
-    ).open();
+  /** True while a card's title or summary may be typed in place: not presenting, not picking cards, not in a live AIM run. */
+  cardTextEditable() {
+    return !this.closed && !this.presentation && !this.selection.state.multiSelectMode && !this.aimLive();
+  }
+  /** The caret offset inside `el`'s text at a screen point, or null when the browser cannot say. */
+  caretOffsetAt(el, x, y) {
+    var _a2, _b2;
+    const doc = el.ownerDocument;
+    if (!doc || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    try {
+      const position = (_a2 = doc.caretPositionFromPoint) == null ? void 0 : _a2.call(doc, x, y);
+      const node = position == null ? void 0 : position.offsetNode;
+      const offset = (_b2 = position == null ? void 0 : position.offset) != null ? _b2 : 0;
+      if (!node || !el.contains(node)) return null;
+      const measure = doc.createRange();
+      measure.selectNodeContents(el);
+      measure.setEnd(node, offset);
+      return measure.toString().length;
+    } catch (e) {
+      return null;
+    }
+  }
+  /** The card title becomes a field in place (F2, a click on the title, the command). Enter or leaving saves, Esc cancels. */
+  startCardTitleEdit(node, at = {}) {
+    var _a2, _b2;
+    const note = this.notes.get(node.id);
+    if (!note || !this.cardTextEditable() || this.inlineName) return;
+    (_a2 = this.suspendInlineSummary) == null ? void 0 : _a2.call(this);
+    this.inlineSummary = null;
+    this.inlineName = {
+      target: "card",
+      id: node.id,
+      draft: note.title,
+      fresh: !!at.select,
+      created: false,
+      caret: (_b2 = at.caret) != null ? _b2 : null
+    };
+    this.render();
+  }
+  /** The card summary becomes a multi-line field in place, showing the whole text. Enter or leaving saves. */
+  startCardSummaryEdit(node, caret = null) {
+    const note = this.notes.get(node.id);
+    if (!note || !this.cardTextEditable() || this.inlineSummary || this.inlineName) return;
+    const original = isPlaceholder(note.summary) ? "" : note.summary;
+    this.inlineSummary = { id: node.id, draft: original, original, caret };
+    this.render();
+  }
+  /** Draws the card summary's field in place of the summary text. */
+  paintCardSummaryEdit(card, node) {
+    const state = this.inlineSummary;
+    const area = card.createEl("textarea", {
+      cls: "vam-card-summary-input",
+      attr: { dir: "auto", rows: "1" }
+    });
+    this.nameEditField(card, area, `vam-edit-label-${node.id}`, t("ui.card_edit_summary_label"));
+    area.value = state.draft;
+    let live = true;
+    const release2 = () => {
+      live = false;
+      this.suspendInlineSummary = null;
+    };
+    this.suspendInlineSummary = () => {
+      if (!live) return;
+      state.draft = area.value;
+      release2();
+    };
+    const finish = (save, keepFocus = false) => {
+      if (!live) return;
+      const value = area.value.trim();
+      release2();
+      this.inlineSummary = null;
+      this.inlineSummaryInput = null;
+      if (keepFocus) {
+        this.focusNodeId = node.id;
+        this.keepCanvasOnFieldRestore = true;
+      }
+      if (!save || value === state.original.trim()) this.render();
+      else this.enqueue(() => this.noteChange(node, { summary: value }));
+    };
+    area.addEventListener("input", () => {
+      state.draft = area.value;
+      state.caret = void 0;
+      this.growSummaryInput(area);
+    });
+    area.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        finish(true, true);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        finish(false, true);
+      }
+    });
+    area.addEventListener("blur", () => finish(true));
+    this.inlineSummaryInput = area;
+    card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_summary_keys") });
+    return area;
+  }
+  /**
+   * A plain click on a card (no drag, no modifier): a click on the title or the summary text turns it into a field.
+   * The point is checked against the boxes because enableDrag captures the pointer, so the target is often the card.
+   * The add-summary line (faint, shown while the card is selected) only counts when the card was already selected
+   * before this press. Returns true when an editor opened.
+   */
+  openCardTextEditor(point, card, node, wasSelected) {
+    var _a2;
+    if (!this.cardTextEditable() || !this.notes.has(node.id)) return false;
+    const target = point.target;
+    if ((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "button, input, textarea")) return false;
+    const hit = (el) => {
+      var _a3;
+      if (!el || !el.isConnected) return false;
+      if (target === el || ((_a3 = el.contains) == null ? void 0 : _a3.call(el, target))) return true;
+      if (!Number.isFinite(point.clientX) || !Number.isFinite(point.clientY)) return false;
+      const box = el.getBoundingClientRect();
+      return point.clientX >= box.left && point.clientX <= box.right && point.clientY >= box.top && point.clientY <= box.bottom;
+    };
+    const title = card.querySelector(".vam-card-title");
+    const summary = card.querySelector(".vam-card-summary.is-inline-editable");
+    const add = wasSelected ? card.querySelector(".vam-card-summary-add") : null;
+    if (title && hit(title)) {
+      this.startCardTitleEdit(node, { caret: this.caretOffsetAt(title, point.clientX, point.clientY) });
+    } else if (summary && hit(summary)) {
+      this.startCardSummaryEdit(node, this.caretOffsetAt(summary, point.clientX, point.clientY));
+    } else if (add && hit(add)) {
+      this.startCardSummaryEdit(node, 0);
+    } else return false;
+    return true;
   }
   async onClose() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
@@ -56553,10 +56757,10 @@ ${request.requirements}` : preset.text,
     }
   }
   /**
-   * A card's double-click: on the cover picture it opens "Edit card", on the title it renames. The point is
+   * A card's double-click: on the cover picture it opens "Edit card", on the title it edits the title in place. The point is
    * checked against both boxes because enableDrag captures the pointer on the card, so the target is often the card.
    */
-  onCardDoubleClick(event, card, title, node, noteTitle2) {
+  onCardDoubleClick(event, card, title, node) {
     var _a2, _b2;
     const target = event.target;
     if ((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "button")) return;
@@ -56572,7 +56776,7 @@ ${request.requirements}` : preset.text,
     }
     if (target !== title && !within(title)) return;
     event.preventDefault();
-    this.renameNode(node, noteTitle2);
+    this.startCardTitleEdit(node);
   }
   /** Opens the "Edit card" dialog for the topic's card. Only Apply writes (one undo step); Cancel and close do not. */
   openCoverFrameEditor(node) {
@@ -60784,7 +60988,6 @@ ${request.requirements}` : preset.text,
    * Groups: AI and new topics, editing, opening; the summary bracket, note style and remove follow in the caller.
    */
   addCardMenuActions(menu, node) {
-    const note = this.notes.get(node.id);
     const map = this.map;
     if (!map) return;
     const add = (title, icon, action) => {
@@ -60803,7 +61006,6 @@ ${request.requirements}` : preset.text,
       })
     );
     menu.addSeparator();
-    if (note) add(t("ui.node_tool_rename"), "pencil", () => this.renameNode(node, note.title));
     add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
     const hasChildren = map.nodes.some((item) => item.parentId === node.id);
     if (hasChildren && !node.collapsed) add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
@@ -62493,7 +62695,7 @@ ${request.requirements}` : preset.text,
       case "ai-explore":
         return run(editable && !!selected, () => this.openNextStep(selected));
       case "rename":
-        return run(editable && !!note, () => this.renameNode(selected, note.title));
+        return run(editable && !!note, () => this.startCardTitleEdit(selected, { select: true }));
       case "open-details":
         return run(!!selected, () => this.openDetails(selected));
       case "zoom-fit":
@@ -62779,7 +62981,7 @@ ${request.requirements}` : preset.text,
     this.settleCardHeights();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -62839,11 +63041,18 @@ ${request.requirements}` : preset.text,
       this.inlineName = null;
     if (((_m = this.inlineName) == null ? void 0 : _m.target) === "map" && !this.map) this.inlineName = null;
     this.inlineNameInput = null;
+    (_n = this.suspendInlineSummary) == null ? void 0 : _n.call(this);
+    if (this.inlineSummary && !((_o = this.map) == null ? void 0 : _o.nodes.some((node) => {
+      var _a3;
+      return node.id === ((_a3 = this.inlineSummary) == null ? void 0 : _a3.id);
+    })))
+      this.inlineSummary = null;
+    this.inlineSummaryInput = null;
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
-    const mapName = (_o = (_n = this.map) == null ? void 0 : _n.title) != null ? _o : "Visual Agent Map";
-    if (this.map && ((_p = this.inlineName) == null ? void 0 : _p.target) === "map") {
+    const mapName = (_q = (_p = this.map) == null ? void 0 : _p.title) != null ? _q : "Visual Agent Map";
+    if (this.map && ((_r = this.inlineName) == null ? void 0 : _r.target) === "map") {
       const field = this.createInlineNameInput(switcher, "vam-map-title-input", t("ui.rename_mind_map"), (value) => {
         var _a3;
         const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
@@ -62899,8 +63108,8 @@ ${request.requirements}` : preset.text,
         (event) => this.openMapActions(event)
       );
     }
-    const selectedNode = (_q = this.map) == null ? void 0 : _q.nodes.find((node) => node.id === this.selection.state.selected);
-    if (aimEnabled() && ((_r = this.map) == null ? void 0 : _r.aim)) {
+    const selectedNode = (_s = this.map) == null ? void 0 : _s.nodes.find((node) => node.id === this.selection.state.selected);
+    if (aimEnabled() && ((_t = this.map) == null ? void 0 : _t.aim)) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
       const data = this.map.aim;
@@ -62916,19 +63125,19 @@ ${request.requirements}` : preset.text,
       let stateText;
       let stateClass;
       if (this.aimBusy) {
-        const activeTitle = (_u = (_t = this.notes.get((_s = this.aimActiveQuestionNodeId) != null ? _s : "")) == null ? void 0 : _t.title) != null ? _u : this.map.title;
+        const activeTitle = (_w = (_v = this.notes.get((_u = this.aimActiveQuestionNodeId) != null ? _u : "")) == null ? void 0 : _v.title) != null ? _w : this.map.title;
         const planning = this.aimActivityKind === "planning";
         stateText = this.aimActivityKind === "clarifying" ? t("ui.aim_preparing_clarification") : this.aimProgress ? this.aimStageText() : t(planning ? "ui.aim_status_planning_0" : "ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (runningBranch) {
-        const activeTitle = (_w = (_v = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _v.title) != null ? _w : this.map.title;
+        const activeTitle = (_y = (_x = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _x.title) != null ? _y : this.map.title;
         stateText = t("ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (!questions.length) {
         stateText = t("ui.aim_status_ready");
         stateClass = "idea";
       } else if (pendingQuestion) {
-        stateText = t("ui.aim_status_waiting_answer_0", (_y = (_x = this.notes.get(pendingQuestion.id)) == null ? void 0 : _x.title) != null ? _y : "");
+        stateText = t("ui.aim_status_waiting_answer_0", (_A = (_z = this.notes.get(pendingQuestion.id)) == null ? void 0 : _z.title) != null ? _A : "");
         stateClass = "idea";
       } else if (data.branches.some((branch) => branch.results.some((result) => result.kind === "conclusion"))) {
         stateText = t("ui.aim_status_complete");
@@ -62948,7 +63157,7 @@ ${request.requirements}` : preset.text,
           var _a3;
           (_a3 = this.aimController) == null ? void 0 : _a3.abort();
         });
-        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_A = (_z = this.aimProgress) == null ? void 0 : _z.branchId) != null ? _A : null };
+        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_C = (_B = this.aimProgress) == null ? void 0 : _B.branchId) != null ? _C : null };
         const steer = this.button(
           statusbar,
           t("ui.aim_steer"),
@@ -62969,9 +63178,9 @@ ${request.requirements}` : preset.text,
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if (!aimEnabled() && ((_B = this.map) == null ? void 0 : _B.aim))
+    if (!aimEnabled() && ((_D = this.map) == null ? void 0 : _D.aim))
       this.contentEl.createDiv({ cls: "vam-aim-attribution", text: t("ui.aim_paused_notice"), attr: { role: "note" } });
-    if (aimEnabled() && ((_C = this.map) == null ? void 0 : _C.aim)) {
+    if (aimEnabled() && ((_E = this.map) == null ? void 0 : _E.aim)) {
       const data = this.map.aim;
       const isAnswered = (node) => data.branches.some((branch) => branch.questionNodeId === node.id);
       const pending2 = this.map.nodes.find((node) => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -63025,10 +63234,10 @@ ${request.requirements}` : preset.text,
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
     }
-    if ((_D = this.deletedMap) == null ? void 0 : _D.deleted)
+    if ((_F = this.deletedMap) == null ? void 0 : _F.deleted)
       this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
     const startingSelection = this.startingTasks.get(this.selectionTaskKey());
-    if (startingSelection && !(((_E = this.integrationTask) == null ? void 0 : _E.mapPath) === this.path && this.integrationTask.state === "running")) {
+    if (startingSelection && !(((_G = this.integrationTask) == null ? void 0 : _G.mapPath) === this.path && this.integrationTask.state === "running")) {
       const state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
@@ -63079,7 +63288,7 @@ ${request.requirements}` : preset.text,
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
-      if ((_F = this.deletedMap) == null ? void 0 : _F.deleted)
+      if ((_H = this.deletedMap) == null ? void 0 : _H.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
     }
@@ -63090,7 +63299,7 @@ ${request.requirements}` : preset.text,
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    if (((_G = this.map) == null ? void 0 : _G.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
+    if (((_I = this.map) == null ? void 0 : _I.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
@@ -63163,28 +63372,35 @@ ${request.requirements}` : preset.text,
       return { id: node.id, parentId: (_a3 = node.parentId) != null ? _a3 : null };
     }));
     this.renderingCard = true;
+    this.paintChildIndex = this.map ? childIndex(this.map.nodes) : null;
+    const fits = [];
+    this.pendingCardFits = fits;
     try {
       for (const node of shown) this.renderNode(node);
     } finally {
       this.renderingCard = false;
+      this.paintChildIndex = null;
+      this.pendingCardFits = null;
     }
+    for (const fit of fits) fit();
     this.renderAimPendingCards(shown);
     this.renderCanvasItems();
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_H = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _H.focus({ preventScroll: true });
+        (_J = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _J.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
       this.focusNodeId = null;
     }
+    this.keepCanvasOnFieldRestore = false;
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_I = this.stageEl.querySelector(
+        (_K = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _I.focus({ preventScroll: true });
+        )) == null ? void 0 : _K.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -63203,6 +63419,7 @@ ${request.requirements}` : preset.text,
     restoreChatFocus();
     keepMapFocus();
     this.focusInlineName();
+    this.focusInlineSummary();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
@@ -63302,7 +63519,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -63341,17 +63558,18 @@ ${request.requirements}` : preset.text,
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
-    if (shownNode.height) card.style.height = `${shownNode.height}px`;
+    const typingSummary = ((_e = this.inlineSummary) == null ? void 0 : _e.id) === node.id;
+    if (shownNode.height && !typingSummary) card.style.height = `${shownNode.height}px`;
     card.tabIndex = node.id === this.selection.state.tabStopId ? 0 : -1;
     card.addEventListener("dragover", (event) => this.onCardDragOver(event, card, node));
     card.addEventListener("dragleave", (event) => this.onCardDragLeave(event, card));
     card.addEventListener("drop", (event) => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
-    this.labelCard(card, (_e = note == null ? void 0 : note.title) != null ? _e : t("ui.note_missing"));
+    this.labelCard(card, (_f = note == null ? void 0 : note.title) != null ? _f : t("ui.note_missing"));
     if (this.selection.state.multiSelectMode) {
       const select = header.createEl("input", { type: "checkbox" });
       select.checked = this.selection.state.multiSelected.has(node.id);
-      select.setAttr("aria-label", (_f = note == null ? void 0 : note.title) != null ? _f : node.path);
+      select.setAttr("aria-label", (_g = note == null ? void 0 : note.title) != null ? _g : node.path);
       select.tabIndex = -1;
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
@@ -63360,10 +63578,10 @@ ${request.requirements}` : preset.text,
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
-    const research = (_g = this.plugin.researchProgress) == null ? void 0 : _g.get(node.path);
+    const research = (_h = this.plugin.researchProgress) == null ? void 0 : _h.get(node.path);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
-    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_h = this.plugin.quickExpandPending) == null ? void 0 : _h.has(node.path)) || this.startingTasks.has(node.path);
+    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_i = this.plugin.quickExpandPending) == null ? void 0 : _i.has(node.path)) || this.startingTasks.has(node.path);
     const doc = this.map, aimData = doc == null ? void 0 : doc.aim;
     const aimProgress = aimEnabled() && !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
@@ -63396,7 +63614,7 @@ ${request.requirements}` : preset.text,
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== (isAimNode(node) ? "completed" : "idea") || active || queued) {
         const chip = header.createSpan({
-          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_i = note == null ? void 0 : note.status) != null ? _i : "error"}`,
+          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_j = note == null ? void 0 : note.status) != null ? _j : "error"}`,
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
@@ -63407,7 +63625,7 @@ ${request.requirements}` : preset.text,
         else this.labelCard(card, note.title);
       }
     }
-    const relevance = !node.aimKind && !((_j = this.map) == null ? void 0 : _j.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_k = this.map) == null ? void 0 : _k.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -63417,14 +63635,14 @@ ${request.requirements}` : preset.text,
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button) => this.openRelevanceMenu(node, relevance.tier, button),
-        ((_k = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _k.status) === "running"
+        ((_l = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _l.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian36.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_l = cardLabels.get(card)) == null ? void 0 : _l.textContent;
+      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (kind !== "topic") {
@@ -63433,7 +63651,7 @@ ${request.requirements}` : preset.text,
       const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength && leaning) renderHypothesisTag(header, leaning, strength, kindText);
       else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
+      const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header, node.id);
@@ -63443,7 +63661,7 @@ ${request.requirements}` : preset.text,
     this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     const errorDetails = [];
-    if ((_n = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _n.length) {
+    if ((_o = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _o.length) {
       const issue2 = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
@@ -63455,8 +63673,8 @@ ${request.requirements}` : preset.text,
       if (failure.technical) technicalDetails.push(failure.technical);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_o = this.map) == null ? void 0 : _o.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_p = this.notes.get(currentNode.id)) == null ? void 0 : _p.title : void 0;
+      const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -63483,16 +63701,16 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_r = this.plugin.expansionCoordinator) == null ? void 0 : _r.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_s = this.plugin.quickExpandPending) == null ? void 0 : _s.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
+    const parentNode = node.parentId ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.id === node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_s = this.plugin.expansionCoordinator) == null ? void 0 : _s.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
         t(
           stopLabelKey(
             this.plugin.topicRuns.runKind(node.path),
-            !!((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)),
+            !!((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)),
             this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
           )
         ),
@@ -63509,7 +63727,7 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_v = (_u = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _u.length) != null ? _v : 0;
+    const pendingCount = (_w = (_v = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _v.length) != null ? _w : 0;
     if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(
         header,
@@ -63550,7 +63768,7 @@ ${request.requirements}` : preset.text,
       }
     }
     const tools = card.createDiv("vam-node-tools");
-    const count = descendants(this.map.nodes, node.id).size;
+    const count = this.paintChildIndex ? branchSize(this.paintChildIndex, node.id) : descendants(this.map.nodes, node.id).size;
     const more = [];
     if (count) {
       if (node.collapsed) {
@@ -63575,19 +63793,6 @@ ${request.requirements}` : preset.text,
           icon: "git-fork",
           action: () => this.whenEditing(() => this.openNodePanel(node, "structure"))
         });
-        if (note)
-          more.push({
-            title: t("ui.node_tool_rename"),
-            icon: "pencil",
-            action: () => this.whenEditing(
-              () => new NameModal(
-                this.app,
-                t("ui.rename_topic"),
-                note.title,
-                (title2) => this.enqueue(() => this.noteChange(node, { title: title2 }))
-              ).open()
-            )
-          });
         if (!node.collapsed && this.map.nodes.some((item) => item.parentId === node.id))
           more.push({
             title: t("ui.select_subtopics"),
@@ -63595,13 +63800,13 @@ ${request.requirements}` : preset.text,
             action: () => this.whenEditing(() => this.selectSubtopics(node))
           });
       }
-      if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim) && node.aimKind === "question")
+      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "question")
         more.push({
           title: t("ui.remove_from_map"),
           icon: "trash",
           action: () => this.whenEditing(() => this.confirmRemoveNode(node))
         });
-      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -63613,7 +63818,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && assumptions.length) {
+      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -63625,7 +63830,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && node.aimKind === "conclusion") {
+      if (aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -63660,23 +63865,30 @@ ${request.requirements}` : preset.text,
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const title = card.createEl("h3", { text: (_A = note == null ? void 0 : note.title) != null ? _A : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_B = note == null ? void 0 : note.title) != null ? _B : node.path);
+    const title = card.createEl("h3", { text: (_B = note == null ? void 0 : note.title) != null ? _B : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_C = note == null ? void 0 : note.title) != null ? _C : node.path);
     title.setAttr("dir", "auto");
-    if (note && ((_C = this.inlineName) == null ? void 0 : _C.target) === "card" && this.inlineName.id === node.id) {
+    if (note && ((_D = this.inlineName) == null ? void 0 : _D.target) === "card" && this.inlineName.id === node.id) {
       title.addClass("vam-sr-only");
       this.paintCardNameEdit(card, node, note);
     }
     if (note && !this.selection.state.multiSelectMode && !this.aimLive())
-      card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node, note.title));
-    if ((_D = research == null ? void 0 : research.preview) == null ? void 0 : _D.summary)
+      card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node));
+    const textEditable = !!note && this.cardTextEditable();
+    if (textEditable && ((_E = this.inlineSummary) == null ? void 0 : _E.id) === node.id) this.paintCardSummaryEdit(card, node);
+    else if ((_F = research == null ? void 0 : research.preview) == null ? void 0 : _F.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
-    else if (!note || !isPlaceholder(note.summary))
-      card.createEl("p", {
+    else if (!note || !isPlaceholder(note.summary)) {
+      const summaryText2 = card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_E = note == null ? void 0 : note.summary) != null ? _E : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_H = note == null ? void 0 : note.summary) != null ? _H : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
+      if (textEditable) summaryText2.addClass("is-inline-editable");
+    }
+    if (textEditable && !((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary) && ((_J = this.inlineSummary) == null ? void 0 : _J.id) !== node.id && isPlaceholder(note.summary))
+      card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
+    else if (((_K = this.inlineSummary) == null ? void 0 : _K.id) === node.id && !textEditable) this.inlineSummary = null;
     this.paintCardImageRelations(card, node.id);
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
@@ -63691,7 +63903,7 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    if (node.aimKind === "conclusion" && aimEnabled() && ((_G = this.map) == null ? void 0 : _G.aim)) {
+    if (node.aimKind === "conclusion" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -63704,7 +63916,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && aimEnabled() && ((_H = this.map) == null ? void 0 : _H.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -63740,11 +63952,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && aimEnabled() && ((_I = this.map) == null ? void 0 : _I.aim)) {
+    if (node.aimKind === "question" && aimEnabled() && ((_N = this.map) == null ? void 0 : _N.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_K = (_J = node.aimQuestion) == null ? void 0 : _J.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _K : branch.answerSnapshot.selections;
+        const labels = (_P = (_O = node.aimQuestion) == null ? void 0 : _O.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _P : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -63787,11 +63999,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim)) {
+    if (node.aimKind === "answer" && aimEnabled() && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_N = (_M = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _M.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _N : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -63799,8 +64011,8 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    this.enableDrag(card, node);
-    if (!this.selection.state.multiSelectMode && !((_O = this.map) == null ? void 0 : _O.aim) && !node.aimKind) {
+    this.enableDrag(card, node, (point, wasSelected) => this.openCardTextEditor(point, card, node, wasSelected));
+    if (!this.selection.state.multiSelectMode && !((_T = this.map) == null ? void 0 : _T.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -63813,8 +64025,10 @@ ${request.requirements}` : preset.text,
         this.applySelectionChange(this.selection.toggleByClick(node.id));
         return;
       }
+      const wasSelected = this.selection.state.selected === node.id;
       this.selectMapNode(node);
       if (this.plugin.detailsShown()) this.openDetails(node);
+      this.openCardTextEditor(event, card, node, wasSelected);
     });
     card.addEventListener("keydown", (event) => {
       var _a3, _b3, _c2;
@@ -63856,7 +64070,7 @@ ${request.requirements}` : preset.text,
       if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !this.aimLive()) {
         if (event.defaultPrevented) return;
         event.preventDefault();
-        this.renameNode(node, note.title);
+        this.startCardTitleEdit(node, { select: true });
         return;
       }
       if (event.key === "Enter") {
@@ -63895,8 +64109,9 @@ ${request.requirements}` : preset.text,
       this.hideHoverCardSoon();
     });
     this.arrangeCardCover(card);
-    if (shownNode.height) this.ensureClipParts(card);
-    this.fitKindShape(card, kind);
+    if (shownNode.height && !typingSummary) this.ensureClipParts(card);
+    if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, kind));
+    else this.fitKindShape(card, kind);
   }
   /**
    * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
@@ -63920,8 +64135,8 @@ ${request.requirements}` : preset.text,
       return item.id === ((_a3 = card.dataset) == null ? void 0 : _a3.nodeId);
     });
     if (!node) return;
-    if (node.height) this.measureClipped(card);
-    else if (card.offsetHeight)
+    if (node.height && card.style.height !== "") this.measureClipped(card);
+    else if (card.offsetHeight && !node.height)
       (_b2 = card.querySelector(".vam-card-resize-y")) == null ? void 0 : _b2.setAttribute("aria-valuenow", String(clampCardHeight(card.offsetHeight)));
   }
   /**
@@ -64152,7 +64367,7 @@ ${request.requirements}` : preset.text,
     }
     if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
     if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);
-    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport) {
+    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.keepCanvasOnFieldRestore) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,
@@ -64681,6 +64896,7 @@ ${request.requirements}` : preset.text,
   showHoverCard(card, note) {
     var _a2, _b2, _c, _d, _e, _f;
     if (this.presentation) return;
+    if (this.inlineName || this.inlineSummary) return;
     const workspace = this.contentEl.querySelector(".vam-canvas");
     if (!workspace) return;
     (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
@@ -64740,16 +64956,25 @@ ${request.requirements}` : preset.text,
     preview.style.top = `${spot.top}px`;
   }
   refreshCard(node, redrawEdges = true) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const card = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
     if (!card || !note) return;
     const title = card.querySelector(".vam-card-title");
     title == null ? void 0 : title.setAttr("title", note.title);
     title == null ? void 0 : title.setText(note.title);
     let summary = card.querySelector(".vam-card-summary");
-    if (isPlaceholder(note.summary)) summary == null ? void 0 : summary.remove();
-    else {
-      if (!summary && title) {
+    const addLine = card.querySelector(".vam-card-summary-add");
+    const typing = ((_b2 = this.inlineSummary) == null ? void 0 : _b2.id) === node.id;
+    const editable = this.cardTextEditable();
+    if (isPlaceholder(note.summary)) {
+      summary == null ? void 0 : summary.remove();
+      if (!addLine && !typing && editable && title) {
+        const line = card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
+        title.after(line);
+      }
+    } else {
+      addLine == null ? void 0 : addLine.remove();
+      if (!summary && title && !typing) {
         summary = createEl("p", { cls: "vam-card-summary" });
         title.after(summary);
         this.arrangeCardCover(card);
@@ -64757,6 +64982,7 @@ ${request.requirements}` : preset.text,
       summary == null ? void 0 : summary.setText(note.summary);
       summary == null ? void 0 : summary.setAttr("title", note.summary);
       summary == null ? void 0 : summary.removeClass("is-preview");
+      if (editable) summary == null ? void 0 : summary.addClass("is-inline-editable");
     }
     const header = card.querySelector(".vam-node-header");
     const status = card.querySelector(".vam-node-header > .vam-status:not(.vam-aim-question-status)");
@@ -64771,7 +64997,7 @@ ${request.requirements}` : preset.text,
           cls: `vam-status vam-status-${note.status}`,
           text: topicStatusLabel(note.status, this.plugin.settings.language)
         });
-    } else if (!this.isMerging(node.id) && !this.plugin.topicRuns.isBusy(node.path) && !((_b2 = this.plugin.quickExpandPending) == null ? void 0 : _b2.has(node.path)) && !this.isResearchQueued(node)) {
+    } else if (!this.isMerging(node.id) && !this.plugin.topicRuns.isBusy(node.path) && !((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) && !this.isResearchQueued(node)) {
       const label = note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
       if (showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)))
@@ -64789,7 +65015,7 @@ ${request.requirements}` : preset.text,
     const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
       const strength = this.hypothesisStrengthOf(node.id), leaning = this.hypothesisLeaningOf(node.id);
-      const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_c = cardLabels.get(card)) == null ? void 0 : _c.textContent;
+      const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (header) {
@@ -71852,10 +72078,11 @@ ${addition}` : addition });
       this.enqueue(() => this.resizeCard(node.id, change2));
     });
   }
-  enableDrag(card, node) {
+  enableDrag(card, node, onPlainClick) {
     card.addEventListener("pointerdown", (event) => {
       var _a2, _b2, _c;
-      if (event.target.closest("button, .vam-card-title-input") || event.button !== 0 || !this.map) return;
+      if (event.target.closest("button, .vam-card-title-input, .vam-card-summary-input") || event.button !== 0 || !this.map)
+        return;
       const selecting = this.selection.state.multiSelectMode;
       this.clearHoverTimer();
       (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
@@ -71863,6 +72090,7 @@ ${addition}` : addition });
       (_b2 = this.dragCleanup) == null ? void 0 : _b2.call(this);
       const currentNode = this.map.nodes.find((item) => item.id === node.id);
       if (!currentNode) return;
+      const wasSelected = this.selection.state.selected === node.id;
       this.dragging = true;
       this.dragOrigin = { id: this.map.id, path: this.path };
       const start = { x: event.clientX, y: event.clientY }, origin = { x: currentNode.x, y: currentNode.y };
@@ -72076,6 +72304,7 @@ ${addition}` : addition });
           this.applySelectionChange(this.selection.click(node.id));
           if (aimEnabled() && ((_d = this.map) == null ? void 0 : _d.aim) && node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
+          onPlainClick == null ? void 0 : onPlainClick(e, wasSelected);
         }
       };
       this.dragCleanup = settle;
@@ -72324,6 +72553,7 @@ ${addition}` : addition });
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
     const directionOf = branchDirectionResolver(allNodes, mapDirection);
+    const lines = [];
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -72346,7 +72576,7 @@ ${addition}` : addition });
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
         if (!this.map.aim && ((_c = (_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.relevance) == null ? void 0 : _c.tier) === "side") path.addClass("vam-edge-side");
         else if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
-        this.edgesEl.appendChild(path);
+        lines.push(path);
         this.edgeEls.set(`${parentId}\0${node.id}`, path);
       }
     }
@@ -72369,7 +72599,7 @@ ${addition}` : addition });
       );
       path.addClass("vam-edge", "vam-text-edge");
       if (!this.map.aim) path.setAttribute("data-parent-line", "");
-      this.edgesEl.appendChild(path);
+      lines.push(path);
     }
     for (const [textId, textEl] of this.textEls) {
       if (!textEl.classList.contains("is-free")) continue;
@@ -72385,9 +72615,10 @@ ${addition}` : addition });
         path.addClass("vam-text-link");
         path.setAttribute("data-text-id", textId);
         path.setAttribute("data-card-id", cardId);
-        this.edgesEl.appendChild(path);
+        lines.push(path);
       }
     }
+    for (const line of lines) this.edgesEl.appendChild(line);
     if (mapDirection === "fishbone") {
       for (const node of this.canvasNodes()) {
         if (node.parentId || !this.cardEls.has(node.id) || this.spineEls.has(node.id)) continue;
@@ -77649,7 +77880,7 @@ function shareViewerUiExtras(languages) {
 }
 
 // experiences/sharing/viewer-bundle.generated.ts
-var SHARE_VIEWER_JS = '(()=>{function nn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}var ur=80,fr=720;function rn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(fr,Math.max(ur,Math.round(t)))}function on(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(a=>a!==t.parentId)]}function oe(t,o){let r=new Set,a=[o];for(;a.length;){let i=a.pop();for(let c of t)c.parentId===i&&c.id!==o&&!r.has(c.id)&&(r.add(c.id),a.push(c.id))}return r}function we(t,o){let r=new Map(t.map(c=>[c.id,c])),a=c=>{let u=0,d=new Set([c.id]);for(let g=c.parentId;g&&r.has(g)&&!d.has(g);g=r.get(g).parentId)d.add(g),u++;return u},i=new Set(t.map(c=>c.parentId).filter(c=>!!c&&r.has(c)));for(let c of t)i.has(c.id)&&(c.collapsed=o===null?!1:a(c)>=o)}function ve(t){if(t>150)return"right";if(t<-150)return"left"}function sn(t,o,r,a={left:0,right:0}){let i={...a},c=new Map;for(let u of t){let d=i.left<i.right?"left":"right";c.set(u.id,d),i[d]+=o(u)+r}return c}function an(t,o,r,a){let i=t.map(a),c={left:0,right:0};t.forEach((d,g)=>{let y=i[g];y&&(c[y]+=o(d)+r)});let u=sn(t.filter((d,g)=>!i[g]),o,r,c);return new Map(t.map((d,g)=>{var y;return[d.id,(y=i[g])!=null?y:u.get(d.id)]}))}function pr(t){return t==="right"||t==="left"||t==="down"||t==="up"}function ln(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function ie(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return pr(r)?r:void 0}function cn(t){let{width:o,column:r,mapDirection:a,engine:i}=t,c=(u,d)=>{var k,$;let g=[],y=(w,h)=>{for(let x of[...t.kidsOf(w),...t.joinsOf(w)])ie(x)?g.push({node:x,root:h}):y(x,h)};for(let w of u)y(w,w);let p={roots:u,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!g.length)return i(d,p);let b=d==="down"||d==="up",T=g.map(({node:w,root:h})=>{let x=c([w],ie(w)),R=1/0,v=-1/0,f=1/0,B=-1/0,N=new Map,F=L=>{N.set(L.id,L);for(let C of[...t.kidsOf(L),...t.joinsOf(L)])F(C)};F(w);for(let[L,C]of x)R=Math.min(R,C.x),v=Math.max(v,C.x+o),f=Math.min(f,C.y),B=Math.max(B,C.y+t.heightFor(N.get(L)));let A=Math.max(1,Math.ceil((v-R+r-o)/r));return{node:w,root:h,placed:x,minX:R,maxX:v,minY:f,maxY:B,slots:A}}),E=new Map(T.map(w=>[w.node.id,w])),z=w=>{let h=E.get(w.id);return!h||!b?[]:Array.from({length:h.slots},(x,R)=>({id:`${w.id}\\0pad${R}`}))},P=new Set,S=i(d,{roots:u,kidsOf:w=>{if(!E.has(w.id))return t.kidsOf(w);let h=z(w);for(let x of h)P.add(x.id);return h},joinsOf:w=>E.has(w.id)?[]:t.joinsOf(w),heightFor:w=>{if(P.has(w.id))return 0;let h=E.get(w.id);return h&&!b?h.maxY-h.minY:t.heightFor(w)}}),D=new Map;for(let[w,h]of S)!P.has(w)&&!E.has(w)&&D.set(w,h);for(let w of T){let h=S.get(w.node.id),x,R;b?(x=h.x+r/2-(w.minX+w.maxX)/2,R=d==="down"?h.y-w.minY:h.y+t.heightFor(w.node)-w.maxY):(x=d==="right"||d==="balanced"&&h.x>=(($=(k=S.get(w.root.id))==null?void 0:k.x)!=null?$:h.x)?h.x-w.minX:h.x+o-w.maxX,R=h.y-w.minY);for(let[v,f]of w.placed)D.set(v,{x:f.x+x,y:f.y+R})}return D};return c(t.roots,a)}var dn=1/Math.tan(Math.PI/3);function un(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,p=u-c,b=_=>[...r(_),...a(_)],T=o.map(_=>{let S=new Map,D=N=>N.reduce((F,A)=>F+S.get(A.id),0)+Math.max(0,N.length-1)*d,k=N=>{let F=b(N);for(let A of F)k(A);S.set(N.id,Math.max(i(N),D(F)))},$=(N,F,A,L)=>{let C=b(N),Y=A+(S.get(N.id)-D(C))/2,U=C.map(J=>{let q=$(J,F+1,Y,L);return Y+=S.get(J.id)+d,q}),Q=i(N),Z=U.length?(U[0]+U[U.length-1])/2:A+S.get(N.id)/2;return L.push({id:N.id,x:-F*u,centre:Z,height:Q}),Z},w=b(_).map((N,F)=>{let A=F%2===0?1:-1,L=b(N);for(let rt of L)k(rt);let C=[],Y=d;for(let rt of L){let Gt=C.length,Ot=$(rt,0,Y,C)*dn-p;for(let ct=Gt;ct<C.length;ct++)C[ct].x+=Ot-c;Y+=S.get(rt.id)+d}let U=Math.max(u,Y),Q=U*dn,Z=i(N),J=[-c/2,...C.map(rt=>rt.x)],q=[c/2,Q,...C.map(rt=>rt.x+c)];return{topic:N,side:A,length:U,height:Z,cards:C,minX:Math.min(...J),maxX:Math.max(...q)}}),h=i(_),x=[{id:_.id,x:0,y:-h/2,height:h}],R={above:-p,below:-p};for(let N of w){let F=N.side===1?"above":"below",A=R[F]-N.maxX,L=-N.side*N.length;x.push({id:N.topic.id,x:A-c/2,y:L-N.side*(N.height/2)-N.height/2,height:N.height});for(let C of N.cards)x.push({id:C.id,x:A+C.x,y:L+N.side*C.centre-C.height/2,height:C.height});R[F]=A+N.minX-p}let v=Math.min(...x.map(N=>N.x)),f=Math.min(...x.map(N=>N.y)),B=Math.max(...x.map(N=>N.y+N.height));return{out:x,minX:v,minY:f,maxY:B}}),E=new Map,z=g+Math.max(0,...T.map(_=>-_.minX)),P=y;for(let _ of T){for(let S of _.out)E.set(S.id,{x:z+S.x,y:P+S.y-_.minY});P+=_.maxY-_.minY+d}return E}var mr=Math.PI*2,gr=6,hr=60;function yr(t,o,r,a){let i=[...t.values()].sort((u,d)=>u.y-d.y),c=new Set;for(let u=0;u<i.length;u++){let d=i[u];for(let g=u+1;g<i.length;g++){let y=i[g];if(y.y>=d.y+d.height+r)break;a&&a.checks++,Math.abs(d.x-y.x)<o&&d.y<y.y+y.height+r&&c.add(Math.max(d.depth,y.depth))}}return c}function fn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,p=new Map,b=y;for(let T of o){let E=[],z=new Map,P=A=>[...r(A),...a(A)],_=A=>{let L=P(A),C=L.length?L.reduce((Y,U)=>Y+_(U),0):1;return z.set(A.id,C),C};_(T);let S=(A,L,C,Y)=>{E.push({id:A.id,depth:L,angle:(C+Y)/2,height:i(A)});let U=C,Q=(Y-C)/z.get(A.id);for(let Z of P(A)){let J=Q*z.get(Z.id);S(Z,L+1,U,U+J),U+=J}};S(T,0,0,mr);let D=Math.max(...E.map(A=>A.depth)),k=Array.from({length:D+1},(A,L)=>L*u),$=()=>{let A=[];return k.forEach((L,C)=>A.push(C?Math.max(L,A[C-1]+u):0)),new Map(E.map(L=>{let C=A[L.depth];return[L.id,{x:Math.round(C*Math.sin(L.angle)-c/2),y:Math.round(-C*Math.cos(L.angle)-L.height/2),depth:L.depth,height:L.height}]}))},w=u/gr,h=()=>(t.stats&&t.stats.rounds++,yr($(),c,d,t.stats)),x=w,R=h(),v=k.slice();for(let A=0;R.size&&A<hr;A++){v=k.slice();for(let L of R)k[L]+=x;x*=2,R=h()}if(!R.size&&v.some((A,L)=>k[L]-A>w)){let A=k.slice();for(;A.some((L,C)=>L-v[C]>w);){let L=A.map((C,Y)=>(C+v[Y])/2);k.splice(0,k.length,...L),h().size?v=L:A=L}k.splice(0,k.length,...A)}let f=$(),B=Math.min(...[...f.values()].map(A=>A.x)),N=Math.min(...[...f.values()].map(A=>A.y)),F=Math.max(...[...f.values()].map(A=>A.y+A.height));for(let[A,L]of f)p.set(A,{x:Math.round(g)+L.x-B,y:b+L.y-N});b+=F-N+d}return p}function se(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,rowGap:u,flip:d,left:g,top:y}=t,p=new Map,b=new Map,T=v=>v.reduce((f,B)=>f+p.get(B.id),0),E=v=>{let f=r(v),B=a(v);for(let N of[...f,...B])E(N);p.set(v.id,Math.max(c,T(f),T(B))),b.set(v.id,1+Math.max(0,...f.map(N=>b.get(N.id))))},z=new Map,P=new Map,_=(v,f,B)=>{let N=r(v),F=a(v),A=p.get(v.id),L=(Q,Z)=>{let J=B+(A-T(Q))/2;return Q.map(q=>{_(q,Z,J);let rt=z.get(q.id);return J+=p.get(q.id),rt})},C=L(N,f+1),Y=L(F,f+b.get(v.id)),U=C.length?C:Y;P.set(v.id,f),z.set(v.id,U.length?(U[0]+U[U.length-1])/2:B)},S=g,D=[],k=v=>{D.push(v);for(let f of[...r(v),...a(v)])k(f)};for(let v of o)E(v),_(v,0,S),S+=p.get(v.id),k(v);let $=Math.max(0,...P.values()),w=Array.from({length:$+1},()=>0);for(let v of D)w[P.get(v.id)]=Math.max(w[P.get(v.id)],i(v));let h=[],x=y;for(let v=0;v<=$;v++){let f=d?$-v:v;h[f]=x,x+=w[f]+u}let R=new Map;for(let v of D){let f=P.get(v.id),B=d?h[f]+w[f]-i(v):h[f];R.set(v.id,{x:z.get(v.id),y:B})}return R}function pn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,p=new Map,b=y;for(let T of o){let E=new Map,z=k=>{E.set(k.id,i(k));for(let $ of[...r(k),...a(k)])z($)};z(T);let P=[{id:T.id,x:g,y:0}],_=g+u;[...r(T),...a(T)].forEach((k,$)=>{let w=se({roots:[k],kidsOf:r,joinsOf:a,heightFor:i,column:u,rowGap:u-c,flip:$%2===1,left:_,top:0}),h=w.get(k.id).y,x=_;for(let[R,v]of w)P.push({id:R,x:v.x,y:v.y-h}),x=Math.max(x,v.x);_=x+u});let S=Math.min(...P.map(k=>k.y)),D=Math.max(...P.map(k=>k.y+E.get(k.id)));for(let k of P)p.set(k.id,{x:k.x,y:b+k.y-S});b+=D-S+d}return p}var jt=300;function br(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}var xr=24,Mr={compact:{column:330,gap:12},standard:{column:360,gap:xr},spacious:{column:420,gap:48}};function Tr(t){return t==="compact"||t==="spacious"}var wr=180;function vr(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...Mr[Tr(r)?r:"standard"]}}var kr=t=>t==="left"?-1:1;var Sr=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:wr};function Ar(t,o){var g,y;let r=new Map(t.map(p=>[p.id,p])),a=new Map,i=new Map,c=(p,b,T)=>{var E;return p.set(b,[...(E=p.get(b))!=null?E:[],T])};for(let p of t){if(!p.parentId)continue;let b=p.aimKind!=="question"&&((g=p.aimConvergesFromNodeIds)!=null&&g.length)?on(p).map(E=>r.get(E)):[],T=(y=b[0])==null?void 0:y.parentId;T&&r.has(T)&&b.every(E=>E&&E.parentId===T)?c(i,T,p):c(a,p.parentId,p)}return{kidsOf:p=>{var b;return o&&p.collapsed?[]:(b=a.get(p.id))!=null?b:[]},joinsOf:p=>{var b;return o&&p.collapsed?[]:((b=i.get(p.id))!=null?b:[]).filter(T=>{var E;return!(o&&((E=r.get(T.parentId))!=null&&E.collapsed))})}}}function ke(t){var w;let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,gap:u,sign:d,left:g,top:y}=t,p=new Map,b=new Map,T=new Map,E=new Map,z=new Map,P=h=>h.reduce((x,R)=>x+b.get(R.id),0)+Math.max(0,h.length-1)*u,_=h=>{let x=r(h),R=a(h);z.set(h.id,h);for(let v of[...x,...R])_(v);b.set(h.id,Math.max(i(h),P(x),P(R))),T.set(h.id,1+Math.max(0,...x.map(v=>T.get(v.id))))},S=(h,x,R)=>{let v=r(h),f=a(h),B=b.get(h.id),N=(Q,Z)=>{let J=R+(B-P(Q))/2;return Q.map(q=>{let rt=S(q,Z,J);return J+=b.get(q.id)+u,rt})},F=N(v,x+1),A=N(f,x+T.get(h.id)),L=F.length?v:f,C=F.length?F:A,Y=i(h),U=R+(B-Y)/2;if(C.length){let Q=C[0]+i(L[0])/2,Z=C[C.length-1]+i(L[L.length-1])/2;U=(Q+Z)/2-Y/2}return p.set(h.id,{x:0,y:y+U}),E.set(h.id,x),U},D=0;for(let h of o)_(h),S(h,0,D),D+=b.get(h.id)+u;let k=[];for(let[h,x]of E)k[x]=Math.max((w=k[x])!=null?w:0,br(z.get(h)));let $=h=>{var R,v;let x=0;if(d>0)for(let f=0;f<h;f++)x+=(R=k[f])!=null?R:0;else for(let f=1;f<=h;f++)x+=(v=k[f])!=null?v:0;return x};for(let[h,x]of p){let R=E.get(h);x.x=g+d*(R*c+$(R))}return{placed:p,sizes:b}}function Er(t,o,r){let{roots:a,kidsOf:i,joinsOf:c,heightFor:u,gap:d,left:g,top:y}=o,p=ke({...o,sign:1}).sizes,b=new Map(t.map(S=>[S.id,S])),T=a.map(S=>{var w;let D=(w=b.get(S.id))!=null?w:S,k=an(i(S),h=>p.get(h.id),d,h=>{var x;return r?void 0:ve(((x=b.get(h.id))!=null?x:h).x-D.x)}),$=h=>ke({...o,roots:[S],kidsOf:x=>x.id===S.id?i(x).filter(R=>k.get(R.id)===h):i(x),joinsOf:x=>x.id===S.id&&h==="left"?[]:c(x),sign:h==="left"?-1:1,left:0,top:0}).placed;return{root:S,right:$("right"),left:$("left")}}),E=Math.max(0,...T.flatMap(({left:S})=>[...S.values()].map(D=>-D.x))),z=g+E,P=new Map,_=0;for(let{root:S,right:D,left:k}of T){let $=f=>f.get(S.id).y+u(S)/2,w=Math.max($(D),$(k)),h=[];for(let f of[{placed:D,isLeft:!1},{placed:k,isLeft:!0}]){let{placed:B,isLeft:N}=f,F=w-$(B);for(let[A,L]of B)N&&A===S.id||h.push([A,{x:z+L.x,y:L.y+F}])}let x=f=>u(b.get(f)),R=Math.min(...h.map(([,f])=>f.y)),v=Math.max(...h.map(([f,B])=>B.y+x(f)));for(let[f,B]of h)P.set(f,{x:B.x,y:y+_+B.y-R});_+=v-R+d}return P}function Lr(t,o,r,a,i=!1,c,u="right",d=!1){let{direction:g,column:y,gap:p}=vr(u),{kidsOf:b,joinsOf:T}=Ar(t,i),E=_=>Sr(c,_.id),z=(_,S)=>{if(_==="down"||_==="up")return se({...S,column:y,rowGap:y-jt,flip:_==="up",left:r,top:a});let D={...S,column:y,gap:p,left:r,top:a};if(_==="radial")return fn({...D,width:jt});if(_==="timeline")return pn({...D,width:jt});if(_==="fishbone")return un({...D,width:jt});let k={...D,sign:kr(_)};return _==="balanced"?Er(t,k,d):ke(k).placed},P={roots:o,kidsOf:b,joinsOf:T,heightFor:E};return ln(g)&&t.some(_=>ie(_))?cn({...P,width:jt,column:y,mapDirection:g,engine:z}):z(g,P)}function mn(t,o,r,a="right",i={}){let c=o!=null&&o.size?t.filter(g=>!o.has(g.id)):t,u=c.filter(g=>!g.parentId),d=Lr(c,u,80,80,!0,r,a,i.reset===!0);return t.map(g=>({...g,...d.get(g.id)}))}function gn(t){return typeof t=="number"?{top:t,right:0,bottom:0,left:0}:t}function hn(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function yn(t,o,r,a){let i=t.zoom,c=gn(a);return{zoom:i,x:c.left+(r.width-c.left-c.right)/2-o.x*i,y:c.top+(r.height-c.top-c.bottom)/2-o.y*i}}var Nr=.25;function bn(t,o,r,a=1.2){let i=gn(r),c=Math.max(1,o.width-i.left-i.right),u=Math.max(1,o.height-i.top-i.bottom),d=t.maxX-t.minX,g=t.maxY-t.minY,y=Math.max(Nr,Math.min(a,(c-80)/d,(u-80)/g));return{zoom:y,x:i.left+(c-d*y)/2-t.minX*y,y:i.top+(u-g*y)/2-t.minY*y}}var ae={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",linksLabel:"Links: {0}",linkOpen:"Open link: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3","priority-4":"Priority 4","priority-5":"Priority 5","progress-0":"Progress 0%","progress-25":"Progress 25%","progress-50":"Progress 50%","progress-75":"Progress 75%","progress-100":"Progress 100%","flag-red":"Red flag","flag-yellow":"Yellow flag","flag-green":"Green flag","flag-blue":"Blue flag",smile:"Smile",neutral:"Neutral",sad:"Sad",question:"Question"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Se(t){let o=3735928559,r=1103547991;for(let a=0;a<t.length;a++){let i=t.charCodeAt(a);o=Math.imul(o^i,2654435761),r=Math.imul(r^i,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var kt="\\u27E6",St="\\u27E7",Xt=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,Tn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Ae=new Set(["pre","script","style","textarea","template","noscript"]),_r=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),Ir=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),Cr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,Or=/\\p{L}/u,Yt=t=>t.localName.toLowerCase(),wn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},le=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function vn(t){for(let o of le(t))if(Tn.has(Yt(o))||Ae.has(Yt(o))||vn(o))return!0;return!1}function kn(t){let o=Yt(t);return Ae.has(o)?"skip":_r.has(o)||t.getAttribute("translate")==="no"||wn(t).some(r=>Ir.has(r))?"atom":Tn.has(o)||vn(t)?"block":"inline"}function Rr(t,o){return t.replace(Cr,r=>(o.push({literal:r,atom:!0}),`${kt}${o.length}/${St}`))}function Pr(t,o){let r="",a=i=>{var u;if(i.nodeType===3){r+=Rr((u=i.nodeValue)!=null?u:"",o);return}if(i.nodeType!==1){o.push({node:i,atom:!0}),r+=`${kt}${o.length}/${St}`;return}let c=i;if(kn(c)==="inline"){o.push({node:c,atom:!1});let d=o.length;r+=`${kt}${d}${St}`;for(let g of Array.from(c.childNodes))a(g);r+=`${kt}/${d}${St}`;return}o.push({node:c,atom:!0}),r+=`${kt}${o.length}/${St}`};for(let i of t)a(i);return r}function xn(t){return Or.test(t.replace(Xt,""))}function Sn(t){let o=[],r=u=>{let d=u.getAttribute("alt");d&&xn(d)&&o.push({index:o.length,kind:"attribute",text:d.trim(),nodes:[],lead:"",trail:"",parts:[],element:u,attribute:"alt"})},a=u=>{for(let d of le(u)){let g=Yt(d);Ae.has(g)||g==="svg"||(g==="img"?r(d):a(d))}},i=u=>{if(!u.length)return;let d=[],g=Pr(u,d),y=g.trim();if(!y||!xn(y)||g.includes("\\u27E6\\u27E6"))return;let p=g.replace(Xt,"");if(p.includes(kt)||p.includes(St))return;let b=g.slice(0,g.length-g.trimStart().length),T=g.slice(g.trimEnd().length);o.push({index:o.length,kind:"run",text:y,nodes:u,lead:b,trail:T,parts:d})},c=u=>{let d=[];for(let g of Array.from(u.childNodes)){if(g.nodeType===3){d.push(g);continue}if(g.nodeType!==1){i(d),d=[];continue}let y=g,p=kn(y);p==="atom"||p==="inline"?d.push(y):(i(d),d=[],p==="block"&&c(y))}i(d)};return a(t),c(t),{units:o}}var Mn=t=>[...t.matchAll(Xt)].map(o=>o[0]);function Hr(t,o){if(!o.trim())return!1;let r=Mn(t),a=Mn(o);if(r.length!==a.length||r.some((c,u)=>c!==a[u]))return!1;let i=o.replace(Xt,"");return!i.includes(kt)&&!i.includes(St)}function Dr(t,o,r){var g;let a=[],i=[],c=y=>{let p=i[i.length-1];p?p.appendChild(y):a.push(y)},u=y=>{y&&c(r.createTextNode(y))};u(t.lead);let d=0;for(let y of o.matchAll(Xt)){u(o.slice(d,y.index)),d=((g=y.index)!=null?g:0)+y[0].length;let p=t.parts[Number(y[2])-1];if(y[1]==="/")i.pop();else if(y[3]==="/")p.literal!==void 0?u(p.literal):p.node&&c(p.node.cloneNode(!0));else if(p.node){let b=p.node.cloneNode(!1);c(b),i.push(b)}}return u(o.slice(d)),u(t.trail),a}function An(t,o){var i,c,u;let r={applied:0,kept:0},a=[...t.units.filter(d=>d.kind==="attribute"),...t.units.filter(d=>d.kind==="run")];for(let d of a){let g=o(d);if(g===void 0||!Hr(d.text,g)){r.kept++;continue}if(d.kind==="attribute"){(c=d.element)==null||c.setAttribute((i=d.attribute)!=null?i:"alt",g.trim()),r.applied++;continue}let y=d.nodes[0],p=y==null?void 0:y.parentNode,b=y==null?void 0:y.ownerDocument;if(!y||!p||!b){r.kept++;continue}for(let T of Dr(d,g,b))p.insertBefore(T,y);for(let T of d.nodes)(u=T.parentNode)==null||u.removeChild(T);r.applied++}return r}function En(t){let o=[],r=a=>{for(let i of le(a))Yt(i)==="svg"?o.push(i):r(i)};return r(t),o}function Ln(t,o){let r=[],a=i=>{for(let c of le(i))wn(c).includes(o)&&r.push(c),a(c)};return a(t),r}var Nn="vam-mermaid-slot",ce=1,_n=3,In=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},zr=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Br=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function $r(t){var o,r;return t.nodeType===_n?zr((o=t.nodeValue)!=null?o:""):t.nodeType!==ce?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:Cn(t)}function Cn(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(a=>{var i;return` ${a}="${Br((i=t.getAttribute(a))!=null?i:"")}"`}).join("");return`<${o}${r}>${Fr(t)}</${o}>`}function Fr(t){return Array.from(t.childNodes).map($r).join("")}function Kr(t){let o=[],r=a=>{if(o.push(a),a.nodeType===ce)for(let i of Array.from(a.childNodes))r(i)};return r(t),o}function Wr(t,o){var a;let r=En(t);for(let i of r){let c=o();c.setAttribute("class",Nn),(a=i.parentNode)==null||a.replaceChild(c,i)}return{root:t,svgs:r,extraction:Sn(t)}}function Ur(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Se(o)}`}var Vr=t=>Se(Cn(t));function jr(t,o){if(!Array.isArray(o))return!1;let r=Kr(t);for(let a of o){if(!Array.isArray(a)||a.length!==2)return!1;let[i,c]=a;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=r.length)return!1;let u=r[i];if(typeof c=="string"){if(u.nodeType!==_n)return!1;u.nodeValue=c}else if(c&&typeof c=="object"&&!Array.isArray(c)){if(u.nodeType!==ce)return!1;for(let[d,g]of Object.entries(c))if(g===null)u.removeAttribute(d);else if(typeof g=="string")u.setAttribute(d,g);else return!1}else return!1}return!0}function Yr(t,o,r){if(!t||typeof t!="object")return null;let a=t;if(typeof a.svg=="string"){let i=r(a.svg),c=Array.from(i.childNodes).filter(u=>u.nodeType===ce);return c.length===1&&c[0].localName.toLowerCase()==="svg"?c[0]:null}if(typeof a.check=="string"&&a.check===Vr(o)){let i=o.cloneNode(!0);return jr(i,a.patch)?i:null}return null}function On(t,o,r){var g,y;let a={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:c}=Wr(t,r.createSlot),u=o.detailSegments;if(u!==void 0||o.detailCheck!==void 0)if(Array.isArray(u)&&u.length===c.units.length&&o.detailCheck===Ur(c)){let p=An(c,T=>{let E=u[T.index];return typeof E=="string"?E:void 0}),b=u.filter(T=>typeof T!="string").length;if(a.applied=p.applied,a.kept=Math.max(0,p.kept-b),r.afterText&&!r.afterText(t))return a.fallback=!0,a}else a.fallback=!0;let d=Ln(t,Nn);d.length!==i.length&&(a.fallback=!0);for(let[p,b]of d.entries()){let T=i[p];if(!T)break;let E=(g=o.detailDiagrams)==null?void 0:g[p],z=T;if(E){let P=null;try{P=Yr(E,T,r.parse)}catch{P=null}P?z=P:a.diagramsKept++}(y=b.parentNode)==null||y.replaceChild(z,b)}return a}function ut(t,o,r){let a=t.createElement(o);return r&&(a.className=r),a}function Xr(t,o){var u;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),a=(u=r==null?void 0:r[1])!=null?u:t,[i,c=""]=o.imageSource.split("{0}");return[i,a,c]}var Gr=20,Rn=2048,Pn=URL;function qr(t){if(typeof t!="string")return null;let o=t.trim();if(!o||o.length>Rn||/[\\x00-\\x20\\x7f-\\x9f\\u2028\\u2029]/.test(o)||!/^https?:\\/\\//i.test(o))return null;let r;try{r=new Pn(o)}catch{return null}return r.protocol!=="http:"&&r.protocol!=="https:"||!r.hostname||r.username||r.password||r.href.length>Rn?null:r.href}function Qr(t){if(!Array.isArray(t))return[];let o=new Set,r=[];for(let a of t){let i=qr(a);if(!(!i||o.has(i))&&(o.add(i),r.push({href:i,host:new Pn(i).host}),r.length>=Gr))break}return r}function Hn(t,o,r){let a=Qr(o);if(!a.length)return null;let i=ut(t,"div");i.className="vam-inspector-links",i.setAttribute("role","group"),i.setAttribute("aria-label",r.linksLabel.replace("{0}",a.map(c=>c.host).join(", ")));for(let{href:c,host:u}of a){let d=ut(t,"a");d.setAttribute("href",c),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.setAttribute("referrerpolicy","no-referrer"),d.setAttribute("aria-label",r.linkOpen.replace("{0}",u)),d.textContent=u,i.append(d)}return i}function Zr(t,o,r){let[a,i,c]=Xr(o,r),u=ut(t,"span");u.className="vam-image-source";let d=ut(t,"a");return d.setAttribute("href",o),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.textContent=i,u.append(t.createTextNode(a),d,t.createTextNode(c)),u}function Ee(t,o,r,a,i){Dn(t,o,new DOMParser().parseFromString(r,"text/html").body,a,i)}function Dn(t,o,r,a,i){var u,d,g,y;for(let p of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(r.querySelectorAll("*")))for(let b of p.getAttributeNames()){let T=(u=p.getAttribute(b))!=null?u:"",E=b.toLowerCase();(E.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(E)&&/^\\s*(javascript|vbscript):/i.test(T))&&p.removeAttribute(b)}let c=()=>{let p=ut(t,"span");return p.className="vam-image-omitted",p.textContent=i.imageOmitted,p};for(let p of Array.from(r.querySelectorAll("img"))){let b=(d=p.getAttribute("src"))!=null?d:"";if(b.startsWith("vam-asset:")){let T=a[b.slice(10)];typeof T=="string"&&T.startsWith("data:image/")?p.setAttribute("src",T):p.replaceWith(c())}else if(/^https?:\\/\\//i.test(b)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let T=p.closest("a");(T!=null?T:p).after(Zr(t,b,i))}else/^data:image\\//i.test(b)||p.replaceWith(c())}for(let p of Array.from(r.querySelectorAll("a"))){let b=(g=p.getAttribute("href"))!=null?g:"";/^(https?:|mailto:)/i.test(b)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):b.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(r.querySelectorAll("table"))){if((y=p.parentElement)!=null&&y.classList.contains("vam-table-scroll"))continue;let b=ut(t,"div");b.className="vam-table-scroll",p.replaceWith(b),b.append(p)}o.append(...Array.from(r.childNodes).map(p=>t.importNode(p,!0)))}function zn(t,o,r,a,i,c){let u=d=>new DOMParser().parseFromString(d,"text/html").body;try{let d=u(r);On(d,a,{parse:u,createSlot:()=>ut(t,"div")}),Dn(t,o,d,i,c)}catch{o.replaceChildren(),Ee(t,o,r,i,c)}}function de(t,o,r,a){let i=r-t,c=i>=40?i/2:i>=0?60-i:Math.max(60,-i/2);return`M ${t} ${o} C ${t+c} ${o}, ${r-c} ${a}, ${r} ${a}`}var Le=["red","orange","yellow","green","blue","purple"];function $n(t){let o=t["topic-color"];return Le.find(r=>r===o)}var Jr=["bold","text-small","text-large","border-thick","line-thick"],Bn=["text-small","text-large"];function to(t){return Array.isArray(t)?t:typeof t=="string"&&t?[t]:[]}function Fn(t){let o=to(t["topic-style"]),r=o.find(a=>Bn.some(i=>i===a));return Jr.filter(a=>Bn.includes(a)?a===r:o.includes(a))}var eo=["done","warning","star","priority-1","priority-2","priority-3","priority-4","priority-5","progress-0","progress-25","progress-50","progress-75","progress-100","flag-red","flag-yellow","flag-green","flag-blue","smile","neutral","sad","question"],Kn=[{group:"status",single:!1,ids:["done","warning","star"]},{group:"priority",single:!0,ids:["priority-1","priority-2","priority-3","priority-4","priority-5"]},{group:"progress",single:!0,ids:["progress-0","progress-25","progress-50","progress-75","progress-100"]},{group:"flag",single:!1,ids:["flag-red","flag-yellow","flag-green","flag-blue"]},{group:"face",single:!1,ids:["smile","neutral","sad","question"]}];function no(t){return Kn.find(o=>o.ids.includes(t)).group}function ro(t){return Kn.find(o=>o.ids.includes(t)).single}var oo={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3","priority-4":"P4","priority-5":"P5","progress-0":"\\u25CB","progress-25":"\\u25D4","progress-50":"\\u25D1","progress-75":"\\u25D5","progress-100":"\\u25CF","flag-red":"\\u2691R","flag-yellow":"\\u2691Y","flag-green":"\\u2691G","flag-blue":"\\u2691B",smile:"\\u263A",neutral:"-_-",sad:"\\u2639",question:"?"};function Wn(t){let o=t["topic-markers"];if(!Array.isArray(o))return[];let r=new Set;return eo.filter(a=>{if(!o.includes(a))return!1;if(!ro(a))return!0;let i=no(a);return r.has(i)?!1:(r.add(i),!0)})}function Un(t){return oo[t]}var io=(t,o)=>t.toLowerCase()===o.toLowerCase(),ue=(t,o)=>t.find(r=>io(r,o));function so(t,o){if(typeof t!="string"||!t.trim())return;let r=ue(o,t.trim());if(r)return r;let a=t.trim().toLowerCase().split(/[-_]/),i=a[0];if(i==="zh"){let u=a.slice(1).some(d=>d==="hant"||d==="tw"||d==="hk"||d==="mo")?"TW":"CN";return ue(o,`${i}-${u}`)}return o.find(c=>c.toLowerCase().split(/[-_]/)[0]===i)}function Vn(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let a=ue(o,t.stored);if(a)return a}if(typeof t.defaultLanguage=="string"){let a=ue(o,t.defaultLanguage);if(a)return a}for(let a of t.browser){let i=so(a,o);if(i)return i}return r}function jn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var ao="https://github.com/kevcltsai/visual-agent-map?ref=share",lo="und",bt="http://www.w3.org/2000/svg",Yn="vam-share-panel-width",Xn="vam-share-outline-open",co="(max-width: 600px)",uo=300,Ne=240,fo=.25,po=2,mo=4,go={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},ho={core:"target",support:"library",side:"skip"},Gn=t=>t==="core"||t==="support"||t==="side",At=(t,o)=>t.replace("{0}",String(o));function Ce(t,o){var a;let r=(a=t.getElementById(o))==null?void 0:a.textContent;if(r)try{return JSON.parse(r)}catch{return}}function qn(t){let o={...ae};if(t&&typeof t=="object")for(let i of Object.keys(o)){let c=t[i];typeof c=="string"&&(o[i]=c)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...ae.markerNames};for(let i of Object.keys(o.markerNames)){let c=r[i];typeof c=="string"&&c.trim()&&(o.markerNames[i]=c)}}let a=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...ae.colorNames},a&&typeof a=="object")for(let i of Le){let c=a[i];typeof c=="string"&&c.trim()&&(o.colorNames[i]=c)}return o}function yo(t){let o=Ce(t,"vam-ui"),r=new Map,a={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[i,c]of Object.entries(o.uiByLanguage))r.set(i,qn(c));if(o.languageNames&&typeof o.languageNames=="object")for(let[i,c]of Object.entries(o.languageNames))typeof c=="string"&&c&&(a[i]=c)}return{sets:r,names:a}}var ft=t=>typeof t=="string"&&t.trim()!=="";function _e(t){try{return window.localStorage.getItem(t)}catch{return null}}function Ie(t,o){try{window.localStorage.setItem(t,o)}catch{}}function bo(t,o){let r=Math.min(...o.map(x=>x.x)),a=Math.min(...o.map(x=>x.y)),i=Math.max(...o.map(x=>x.x+x.w)),c=Math.max(...o.map(x=>x.y+x.h)),u=14,d=12,g=8,y=t==="down"||t==="up",p=y?r:a,b=y?i:c,T=t==="right"?i+u:t==="left"?r-u:t==="down"?c+u:a-u,E=t==="right"||t==="down"?1:-1,z=(p+b)/2,P=Math.min(d,Math.max(0,(b-p)/4)),_=x=>Math.round(x*100)/100,S=(x,R)=>y?`${_(x)} ${_(R)}`:`${_(R)} ${_(x)}`,D=T,k=T+E*d,$=T+E*2*d,w=[`M ${S(p,D)}`,`Q ${S(p,k)} ${S(p+P,k)}`,`L ${S(z-P,k)}`,`Q ${S(z,k)} ${S(z,$)}`,`Q ${S(z,k)} ${S(z+P,k)}`,`L ${S(b-P,k)}`,`Q ${S(b,k)} ${S(b,D)}`].join(" "),h=$+E*g;return y?{path:w,x:_(z),y:_(h)}:{path:w,x:_(h),y:_(z)}}var mt=()=>window.matchMedia(co).matches;function Qn(t){var Qe,Ze,Je,tn;let o=qn(Ce(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let a=t.getElementById("vam-app"),i=Ce(t,"vam-map");if(!a)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){a.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let c=i.assets&&typeof i.assets=="object"?i.assets:{},u=new Map,d=[];for(let e of i.nodes){if(!e||typeof e.id!="string"||u.has(e.id))continue;u.set(e.id,e);let n=nn(e.width),s=rn(e.height);d.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{},...s!==void 0?{height:s}:{}})}let g=new Map(d.map(e=>[e.id,e]));for(let e of d)e.parentId&&(!g.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let y=[];if(Array.isArray(i.textNodes)){let e=new Set;for(let n of i.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let s=typeof n.parentId=="string"?g.get(n.parentId):void 0;y.push({id:n.id,parentId:s?s.id:null,text:n.text,dx:s?n.x-s.x:n.x,dy:s?n.y-s.y:n.y,links:!s&&Array.isArray(n.links)?Array.from(new Set(n.links.filter(l=>typeof l=="string"&&g.has(l)))):[]})}}let p=e=>e==="right"||e==="left"||e==="down"||e==="up"?e:null,b=[];if(Array.isArray(i.summaries)){let e=new Set;for(let n of i.summaries){let s=p(n==null?void 0:n.side);if(!n||typeof n.id!="string"||e.has(n.id)||!s||typeof n.text!="string"||!n.text.trim()||!Array.isArray(n.members))continue;let l=Array.from(new Set(n.members.filter(m=>typeof m=="string"&&g.has(m))));l.length&&(e.add(n.id),b.push({id:n.id,members:l,side:s,text:n.text}))}}let T=new Map,E=new Map;for(let e of d)e.parentId&&E.set(e.parentId,[...(Qe=E.get(e.parentId))!=null?Qe:[],e]);let z=yo(t),P=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(ft))):[],_=jn((Ze=i.source)==null?void 0:Ze.mapId),S=P.length>=2,D=S?P[0]:"",k=D;if(S){let e=[];try{e=Array.from((Je=window.navigator.languages)!=null?Je:[window.navigator.language]).filter(ft)}catch{}k=Vn({languages:P,stored:_?_e(_):null,defaultLanguage:ft(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let $=e=>{var n;return(n=z.sets.get(e))!=null?n:o},w=S&&D===lo,h=()=>S&&k!==D;S&&(r=$(k),t.documentElement.lang=k);let x=e=>{var s;let n=h()?(s=e.translations)==null?void 0:s[k]:void 0;return!n||typeof n!="object"?e:{title:ft(n.title)?n.title:e.title,summary:ft(n.summary)?n.summary:e.summary,reason:ft(n.reason)?n.reason:e.reason,detailHtml:ft(n.detailHtml)?n.detailHtml:e.detailHtml,...In(n)&&ft(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},R=()=>{var l;let e=h()?(l=i.translations)==null?void 0:l[k]:void 0,n=ft(e==null?void 0:e.title)?e.title:i.title,s=ft(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof s=="string"?s.trim():""}},v=(e,n)=>{var s;try{let l=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(l&&l!==e)return l}catch{}return(s=z.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let f=(e,n,s)=>{let l=ut(t,e);return n&&(l.className=n),s!==void 0&&(l.textContent=s),l},B=e=>{let n=t.createElementNS(bt,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let s of go[e]){let[l,...m]=s.split("|"),M=t.createElementNS(bt,l);for(let I of m)M.setAttribute(I.slice(0,I.indexOf("=")),I.slice(I.indexOf("=")+1));n.append(M)}return n},N=(e,n,s,l)=>{let m=f("button",s,n);return m.type="button",m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},F=(e,n,s,l)=>{let m=f("button");return m.type="button",m.setAttribute("aria-label",s),m.title=s,m.append(B(n)),m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},A=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,L=e=>Wn({"topic-markers":e.markers}),C=()=>/^(zh|ja)/.test(r.lang),Y=(e,n)=>{if(!n.length)return e;let s=n.map(l=>r.markerNames[l]).join(C()?"\\u3001":", ");return`${e}${C()?"\\uFF0C":", "}${At(r.markerLabel,s)}`},U=e=>$n({"topic-color":e.color}),Q=e=>Fn({"topic-style":e.style}),Z=e=>{let n=f("span","vam-markers");for(let s of e){let l=f("span","vam-marker",Un(s));l.dataset.marker=s,l.setAttribute("aria-hidden","true"),n.append(l)}return n},J=(e,n)=>{let s=f("span","vam-relevance-tag");s.dataset.tier=e,n&&(s.title=n);let l=f("span","vam-relevance-icon");return l.append(B(ho[e])),s.append(l,f("span",void 0,A(e))),s};a.className="vam-app";let q=f("div","vam-toolbar"),rt=f("h1","vam-map-switcher"),Gt=f("span","vam-shared");q.append(rt,Gt);let xt=F(q,"list","",()=>_t(tt.hidden,!0));q.prepend(xt),xt.setAttribute("aria-controls","vam-outline");let Ot=f("div","vam-toolbar-actions"),ct=f("select","vam-language");if(S){for(let e of P){let n=f("option",void 0,(tn=z.names[e])!=null?tn:v(e));n.value=e,w&&e===D&&(n.dataset.original="1"),ct.append(n)}ct.value=k,Ot.append(ct)}let Oe=f("span","vam-made-with"),Rt=f("a","vam-install");Rt.href=ao,Rt.target="_blank",Rt.rel="noopener noreferrer",Ot.append(Oe,Rt),q.append(Ot);let Pt=f("div","vam-translate-note");Pt.hidden=!0;let Mt=f("div","vam-workspace"),j=f("div","vam-viewport"),gt=f("div","vam-stage");gt.setAttribute("role","tree");let Tt=t.createElementNS(bt,"svg");Tt.setAttribute("class","vam-edges"),Tt.setAttribute("aria-hidden","true"),gt.append(Tt);let Ht=f("div","vam-summaries");Ht.setAttribute("role","group"),b.length&&gt.append(Ht),j.append(gt);let qt=f("div","vam-canvas-overlay"),Et=f("div","vam-map-tools"),Dt=f("span","vam-goal"),Re=f("span","vam-goal-text");Dt.append(B("target"),Re);let Pe=f("span","vam-canvas-hint"),ht=f("div","vam-zoom-controls"),Zn=F(ht,"minus","",()=>$t(1/1.2)),zt=f("button","vam-zoom","100%");zt.type="button",zt.addEventListener("click",e=>{e.stopPropagation(),$t(1/K.zoom)}),ht.append(zt);let Jn=F(ht,"plus","",()=>$t(1.2)),tr=F(ht,"max","",()=>Ft()),pt=f("button","vam-layout-button");pt.type="button",pt.setAttribute("aria-haspopup","menu"),pt.setAttribute("aria-expanded","false"),ht.append(pt);let st=f("div","vam-layout-menu");st.setAttribute("role","menu"),st.hidden=!0,ht.append(st),qt.append(Et,Pe,ht);let W=f("aside","vam-inspector");W.hidden=!0;let tt=f("nav","vam-outline");tt.id="vam-outline";let Bt=f("div","vam-outline-tree");Bt.setAttribute("role","tree"),tt.append(Bt),Mt.append(tt,j,qt,W),a.replaceChildren(...S?[q,Pt,Mt]:[q,Mt]);let K={x:0,y:0,zoom:1},et=null,fe=!1,Qt=Number(_e(Yn))||uo,V=new Map,er=()=>{let e=new Set,n=(s,l)=>{var m;for(let M of(m=E.get(s.id))!=null?m:[])l&&e.add(M.id),n(M,l||M.collapsed)};for(let s of d)s.parentId||n(s,s.collapsed);return e},He=e=>{var s,l;let n=0;for(let m=e.parentId;m&&!(++n>d.length);m=(l=(s=g.get(m))==null?void 0:s.parentId)!=null?l:null);return n},De=()=>hn(j.getBoundingClientRect().top,Et.hidden?void 0:Et.getBoundingClientRect());function yt(){gt.style.transform=`translate(${K.x}px, ${K.y}px) scale(${K.zoom})`;let e=`${Math.round(K.zoom*100)}%`;zt.textContent=e,zt.setAttribute("aria-label",At(r.zoomReset,e))}function $t(e,n){let s=n!=null?n:{x:j.clientWidth/2,y:j.clientHeight/2},l=Math.min(po,Math.max(fo,K.zoom*e)),m=l/K.zoom;K={x:s.x-(s.x-K.x)*m,y:s.y-(s.y-K.y)*m,zoom:l},yt()}let pe=!1;function Ft(){if(!V.size)return;if(!j.clientWidth||!j.clientHeight){pe=!0;return}let e=1/0,n=1/0,s=-1/0,l=-1/0;for(let m of V.values())e=Math.min(e,m.offsetLeft),n=Math.min(n,m.offsetTop),s=Math.max(s,m.offsetLeft+(m.offsetWidth||280)),l=Math.max(l,m.offsetTop+m.offsetHeight);for(let m of y){let M=m.parentId?void 0:T.get(m.id);M&&(e=Math.min(e,M.offsetLeft),n=Math.min(n,M.offsetTop),s=Math.max(s,M.offsetLeft+(M.offsetWidth||300)),l=Math.max(l,M.offsetTop+(M.offsetHeight||60)))}for(let m of Array.from(Ht.querySelectorAll(".vam-summary"))){let M=m.querySelector(".vam-summary-text");if(!M)continue;let I=parseFloat(M.style.left),H=parseFloat(M.style.top),O=M.offsetWidth,X=M.offsetHeight;if(!Number.isFinite(I)||!Number.isFinite(H))continue;let at=m.classList.contains("is-side-left")?I-O:m.classList.contains("is-side-down")||m.classList.contains("is-side-up")?I-O/2:I,lt=m.classList.contains("is-side-up")?H-X:m.classList.contains("is-side-down")?H:H-X/2;e=Math.min(e,at),n=Math.min(n,lt),s=Math.max(s,at+O),l=Math.max(l,lt+X)}K=bn({minX:e,minY:n,maxX:s,maxY:l},{width:j.clientWidth,height:j.clientHeight},De()),yt()}function ze(e){let n=V.get(e);n&&(K=yn(K,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:j.clientWidth,height:j.clientHeight},De()),yt())}function Lt(){var e;Tt.replaceChildren();for(let n of d){let s=n.parentId?V.get(n.parentId):void 0,l=V.get(n.id);if(!s||!l)continue;let m=t.createElementNS(bt,"path");m.setAttribute("d",de(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class",((e=u.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge");let M=u.get(n.id);M&&Q(M).includes("line-thick")&&m.setAttribute("data-line-thick",""),Tt.append(m)}for(let n of y){let s=n.parentId?V.get(n.parentId):void 0,l=T.get(n.id);if(!s||!l)continue;let m=t.createElementNS(bt,"path");m.setAttribute("d",de(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class","vam-edge vam-text-edge"),Tt.append(m)}for(let n of y){let s=T.get(n.id);if(s)for(let l of n.links){let m=V.get(l);if(!m)continue;let M=s.offsetLeft+s.offsetWidth/2<=m.offsetLeft+m.offsetWidth/2,I=t.createElementNS(bt,"path");I.setAttribute("d",de(M?s.offsetLeft+s.offsetWidth:s.offsetLeft,s.offsetTop+s.offsetHeight/2,M?m.offsetLeft:m.offsetLeft+m.offsetWidth,m.offsetTop+m.offsetHeight/2)),I.setAttribute("class","vam-edge vam-text-link"),Tt.append(I)}}nr()}function nr(){Ht.replaceChildren();for(let e of b){let n=[];for(let H of e.members)for(let O of[H,...oe(d,H)]){let X=V.get(O);X&&n.push({x:X.offsetLeft,y:X.offsetTop,w:X.offsetWidth||280,h:X.offsetHeight})}if(!n.length)continue;let s=bo(e.side,n),l=f("div",`vam-summary is-side-${e.side}`);l.setAttribute("role","note");let m=t.createElementNS(bt,"svg");m.setAttribute("class","vam-summary-brace"),m.setAttribute("aria-hidden","true");let M=t.createElementNS(bt,"path");M.setAttribute("d",s.path),M.setAttribute("fill","none"),m.append(M),l.append(m);let I=f("div","vam-summary-text");I.textContent=e.text,I.style.left=`${s.x}px`,I.style.top=`${s.y}px`,l.append(I),Ht.append(l)}}let me=0,Be=()=>{me||(me=window.requestAnimationFrame(()=>{me=0,Lt()}))},ge=e=>{let n=V.get(e),s=g.get(e);!n||!s||(n.style.left=`${s.x}px`,n.style.top=`${s.y}px`,s.width&&(n.style.width=`${s.width}px`),s.height&&(n.style.height=`${s.height}px`),$e(e))},$e=e=>{let n=g.get(e);if(n)for(let s of y){let l=s.parentId===e?T.get(s.id):void 0;l&&(l.style.left=`${n.x+s.dx}px`,l.style.top=`${n.y+s.dy}px`)}};function rr(){for(let e of T.values())e.remove();T.clear();for(let e of y){let n=e.parentId?g.get(e.parentId):void 0;if(e.parentId&&(!n||!V.has(e.parentId)||n.collapsed))continue;let s=f("div",`vam-text-node${n?"":" is-free"}`);s.setAttribute("role","note"),s.textContent=e.text,n||(s.style.left=`${e.dx}px`,s.style.top=`${e.dy}px`),gt.append(s),T.set(e.id,s),n&&$e(n.id)}}function he(){var n,s;for(let l of V.values())l.remove();V.clear();let e=er();for(let l of d){if(e.has(l.id))continue;let m=u.get(l.id),M=x(m),I=oe(d,l.id).size,H=Gn(m.tier)?m.tier:void 0,O=f("div",`vam-node${l.id===et?" is-selected":""}`);O.dataset.nodeId=l.id,O.dataset.status=m.status==="completed"?"completed":"idea",H&&(O.dataset.relevance=H),O.tabIndex=0,O.setAttribute("role","treeitem"),O.setAttribute("aria-level",String(He(l)+1)),O.setAttribute("aria-selected",String(l.id===et));let X=L(m),at=U(m);at&&(O.dataset.topicColor=at);let lt=Q(m);lt.includes("bold")&&(O.dataset.topicStyleBold="true"),lt.includes("border-thick")&&(O.dataset.topicStyleBorder="thick"),lt.includes("text-small")?O.dataset.topicStyleSize="small":lt.includes("text-large")&&(O.dataset.topicStyleSize="large");let nt=Y(String((n=M.title)!=null?n:""),X);O.setAttribute("aria-label",at?`${nt}${C()?"\\uFF0C":", "}${At(r.colorLabel,r.colorNames[at])}`:nt),I&&O.setAttribute("aria-expanded",String(!l.collapsed));let ot=f("div","vam-node-header");O.append(ot),m.status!=="completed"&&ot.append(f("span","vam-status vam-status-idea",r.toResearch)),H&&ot.append(J(H,typeof M.reason=="string"?M.reason:void 0)),X.length&&ot.append(Z(X));let en=f("div","vam-node-tools");if(O.append(en),I){let it=l.collapsed?At(r.expandCount,I):r.collapse,It=N(ot,it,"vam-collapse-button",()=>{l.collapsed=!l.collapsed,Kt(l.id,!0)});It.setAttribute("aria-expanded",String(!l.collapsed)),It.setAttribute("aria-label",it),It.title=it}if(N(en,r.detailsButton,void 0,()=>Nt(l.id)),O.append(f("h3","vam-card-title",String((s=M.title)!=null?s:""))),typeof M.summary=="string"&&M.summary.trim()&&O.append(f("p","vam-card-summary",M.summary)),l.height){let it=f("span","vam-card-fade"),It=f("span","vam-card-more","\\u2026");it.setAttribute("aria-hidden","true"),It.setAttribute("aria-hidden","true"),O.append(it,It)}O.addEventListener("click",()=>{fe||Nt(l.id)}),O.addEventListener("keydown",it=>{it.target===O&&(it.key==="Enter"||it.key===" "?(it.preventDefault(),Nt(l.id)):I&&it.key===(l.collapsed?"ArrowRight":"ArrowLeft")&&(it.preventDefault(),l.collapsed=!l.collapsed,Kt(l.id)))}),O.addEventListener("pointerdown",it=>or(it,l,O)),gt.append(O),V.set(l.id,O),ge(l.id)}rr(),Fe()}function Fe(){var e;for(let[n,s]of V)(e=g.get(n))!=null&&e.height&&(s.classList.remove("is-clipped"),s.classList.toggle("is-clipped",s.scrollHeight>s.clientHeight+1))}function Zt(){mn(d,void 0,n=>{var s;return(s=V.get(n))==null?void 0:s.offsetHeight}).forEach((n,s)=>{d[s].x=n.x,d[s].y=n.y});for(let n of V.keys())ge(n);Fe()}function Kt(e,n=!1){var m;let s=e?(m=V.get(e))==null?void 0:m.getBoundingClientRect():void 0;he(),Zt(),Lt();let l=e?V.get(e):void 0;if(l){if(s){let I=l.getBoundingClientRect();K={...K,x:K.x+s.left-I.left,y:K.y+s.top-I.top},yt()}let M=n?l.querySelector(".vam-collapse-button"):null;(M!=null?M:l).focus({preventScroll:!0})}}function or(e,n,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let l=e.clientX,m=e.clientY,M=n.x,I=n.y,H=!1,O=at=>{let lt=at.clientX-l,nt=at.clientY-m;if(!H){if(Math.hypot(lt,nt)<=mo)return;H=!0,s.classList.add("is-dragging"),s.setPointerCapture(at.pointerId)}n.x=M+lt/K.zoom,n.y=I+nt/K.zoom,ge(n.id),Be()},X=()=>{s.removeEventListener("pointermove",O),s.removeEventListener("pointerup",X),s.removeEventListener("pointercancel",X),s.classList.remove("is-dragging"),H&&(fe=!0,window.setTimeout(()=>fe=!1,0))};s.addEventListener("pointermove",O),s.addEventListener("pointerup",X),s.addEventListener("pointercancel",X)}let ye=e=>Math.round(Math.min(Math.max(Ne,e),Math.max(Ne,Mt.clientWidth*.7)));function Jt(){let e=mt();if(W.hidden||e){W.style.removeProperty("width"),qt.style.removeProperty("right");return}let n=ye(Qt);W.style.width=`${n}px`,qt.style.right=`${n}px`,G.setAttribute("aria-valuenow",String(n)),G.setAttribute("aria-valuemax",String(ye(1/0)))}let G=f("div","vam-inspector-resizer");G.setAttribute("role","separator"),G.setAttribute("aria-orientation","vertical"),G.setAttribute("aria-label",r.resizePanel),G.setAttribute("aria-valuemin",String(Ne)),G.tabIndex=0;let te=(e,n)=>{Qt=ye(e),Jt(),n&&Ie(Yn,String(Qt))};G.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,s=W.offsetWidth;G.setPointerCapture(e.pointerId),G.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let l=M=>te(s+n-M.clientX,!1),m=()=>{G.removeEventListener("pointermove",l),G.removeEventListener("pointerup",m),G.removeEventListener("pointercancel",m),G.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),te(Qt,!0)};G.addEventListener("pointermove",l),G.addEventListener("pointerup",m),G.addEventListener("pointercancel",m)}),G.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")te(W.offsetWidth+n,!0);else if(e.key==="ArrowRight")te(W.offsetWidth-n,!0);else return;e.preventDefault()});let be=mt();window.addEventListener("resize",()=>{Jt(),yt(),mt()!==be&&(be=mt(),_t(be?!1:Ve(),!1))});function xe(){et=null;for(let e of V.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");W.hidden=!0,Mt.classList.remove("has-inspector"),W.replaceChildren(),Jt(),vt()}function Nt(e){var X,at,lt;let n=g.get(e),s=u.get(e);if(!n||!s)return;let l={...s,...x(s)};et=e;for(let[nt,ot]of V)ot.classList.toggle("is-selected",nt===e),ot.setAttribute("aria-selected",String(nt===e));W.replaceChildren(G);let m=f("div","vam-inspector-heading");m.append(f("strong",void 0,r.topicDetails)),N(m,r.close,void 0,xe),W.append(m,f("h3",void 0,String((X=l.title)!=null?X:"")));let M=Gn(l.tier)?l.tier:void 0;if(M){let nt=f("div","vam-inspector-why");nt.append(J(M));let ot=typeof l.reason=="string"&&l.reason.trim()?l.reason:l.manual?r.manualReason:"";ot&&nt.append(f("span",void 0,ot)),W.append(nt)}typeof l.summary=="string"&&l.summary.trim()&&W.append(f("p","vam-sample-summary",l.summary));let I=Hn(t,l.links,r);I&&W.append(I);let H=f("div","vam-sample-detail");typeof l.detailHtml=="string"&&l.detailHtml.trim()?l.compact?zn(t,H,l.detailHtml,l.compact,c,r):Ee(t,H,l.detailHtml,c,r):H.append(f("p","vam-inspector-empty",r.noContent)),W.append(H);let O=(at=E.get(e))!=null?at:[];if(O.length){let nt=f("div","vam-subtopics");nt.append(f("strong",void 0,r.subtopics));for(let ot of O)N(nt,String((lt=x(u.get(ot.id)).title)!=null?lt:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Kt(n.id)),Nt(ot.id),ze(ot.id)});W.append(nt)}W.hidden=!1,Mt.classList.add("has-inspector"),Jt(),W.scrollTop=0,vt(),je()}let Me=e=>{we(d,e),Kt(),Ft()},Wt=e=>{st.hidden||(st.hidden=!0,pt.setAttribute("aria-expanded","false"),e&&pt.focus())};function ir(){st.replaceChildren();let e=[{label:r.collapseAll,run:()=>Me(0)},{label:r.expandAll,run:()=>Me(null)},...[1,2,3].map(n=>({label:At(r.expandToLevel,n),run:()=>Me(n)})),null,{label:r.autoLayout,run:()=>{Zt(),Lt()}}];for(let n of e){if(!n){st.append(f("hr"));continue}let s=f("button",void 0,n.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",l=>{l.stopPropagation(),Wt(!0),n.run()}),st.append(s)}}let Ke=()=>Array.from(st.querySelectorAll("button"));pt.addEventListener("click",e=>{var n;if(e.stopPropagation(),!st.hidden)return Wt(!0);st.hidden=!1,pt.setAttribute("aria-expanded","true"),(n=Ke()[0])==null||n.focus()}),st.addEventListener("keydown",e=>{let n=Ke(),s=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(s+1)%n.length].focus();else if(e.key==="ArrowUp")n[(s-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Wt(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!st.hidden&&!ht.contains(e.target)&&Wt(!1);let n=e.target;mt()&&!tt.hidden&&!tt.contains(n)&&!xt.contains(n)&&_t(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!st.hidden)Wt(!0);else if(mt()&&!tt.hidden)_t(!1,!1),xt.focus();else if(!W.hidden){let n=et?V.get(et):void 0;xe(),n==null||n.focus({preventScroll:!0})}}});function We(){let e=R();if(t.title=e.title,rt.textContent=e.title,gt.setAttribute("aria-label",e.title),Gt.textContent=r.readOnly,Oe.textContent=r.madeWithVam,Rt.textContent=r.install,ct.setAttribute("aria-label",r.language),ct.title=r.language,w)for(let s of Array.from(ct.options))s.dataset.original&&(s.textContent=r.originalText);e.goal?(Re.textContent=At(r.goal,e.goal),Dt.title=e.goal,Dt.parentElement||Et.append(Dt),Et.hidden=!1):(Dt.remove(),Et.hidden=!0),Pe.textContent=r.hint;let n=(s,l)=>{s.setAttribute("aria-label",l),s.title=l};if(n(Zn,r.zoomOut),n(Jn,r.zoomIn),n(tr,r.showAll),pt.textContent=r.layout,W.setAttribute("aria-label",r.topicDetails),tt.setAttribute("aria-label",r.outline),Bt.setAttribute("aria-label",r.outline),n(xt,r.outline),G.setAttribute("aria-label",r.resizePanel),ir(),h()){let s=w?r.aiTranslatedUnknown:At(r.aiTranslated,v(D,k));Pt.textContent=`${s} ${r.imageTextUntranslated}`,Pt.hidden=!1}else Pt.hidden=!0;yt()}function sr(e){if(e===k||!P.includes(e))return;k=e,r=$(e),_&&Ie(_,e),t.documentElement.lang=e;let n=W.scrollTop;We(),he(),Lt(),Xe(),et!==null&&g.has(et)&&!W.hidden&&(Nt(et),W.scrollTop=n),Be()}ct.addEventListener("change",()=>sr(ct.value));let ee=[],Ue=e=>{var n;ee.push(e);for(let s of(n=E.get(e.id))!=null?n:[])Ue(s)};for(let e of d)e.parentId||Ue(e);let Ut=new Set,wt=new Map,ne=null;function Ve(){return _e(Xn)!=="0"}function _t(e,n){tt.hidden=!e,Mt.classList.toggle("has-outline",e),xt.setAttribute("aria-expanded",String(e)),n&&!mt()&&Ie(Xn,e?"1":"0")}let ar=()=>ee.filter(e=>{var n;return!((n=wt.get(e.id))!=null&&n.hidden)});function vt(){var s,l,m;let e=[];for(let M of ee){let I=wt.get(M.id);if(!I)continue;let H=!1;for(let O=M.parentId;O&&!H;O=(l=(s=g.get(O))==null?void 0:s.parentId)!=null?l:null)H=Ut.has(O);I.hidden=H,H||e.push(M),E.has(M.id)&&I.setAttribute("aria-expanded",String(!Ut.has(M.id))),M.id===et?I.setAttribute("aria-current","true"):I.removeAttribute("aria-current")}let n=(m=e.find(M=>M.id===ne))!=null?m:e[0];for(let[M,I]of wt)I.tabIndex=M===(n==null?void 0:n.id)?0:-1}function je(){let e=et?wt.get(et):void 0;!e||e.hidden||!tt.clientHeight||(e.offsetTop<tt.scrollTop?tt.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>tt.scrollTop+tt.clientHeight&&(tt.scrollTop=e.offsetTop+e.offsetHeight-tt.clientHeight))}function Te(e){Ut.delete(e)||Ut.add(e),vt()}function lr(e){var n;ne=e,vt(),(n=wt.get(e))==null||n.focus()}function cr(){for(let[e,n]of V)n.classList.toggle("is-selected",e===et),n.setAttribute("aria-selected",String(e===et))}function Ye(e){var m,M,I;let n=g.get(e);if(!n)return;let s=!1,l=0;for(let H=n.parentId;H&&l++<=d.length;H=(M=(m=g.get(H))==null?void 0:m.parentId)!=null?M:null){let O=g.get(H);O!=null&&O.collapsed&&(O.collapsed=!1,s=!0)}et=e,s&&Kt(),ze(e),W.hidden?cr():Nt(e),vt(),je(),mt()&&_t(!1,!1),(I=V.get(e))==null||I.focus({preventScroll:!0})}function dr(e,n){var H;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let s=ar(),l=s.indexOf(n),m=(H=E.get(n.id))!=null?H:[],M=Ut.has(n.id),I;switch(e.key){case"ArrowDown":I=s[l+1];break;case"ArrowUp":I=s[l-1];break;case"Home":I=s[0];break;case"End":I=s[s.length-1];break;case"ArrowRight":m.length&&M?Te(n.id):I=m[0];break;case"ArrowLeft":m.length&&!M?Te(n.id):I=n.parentId?g.get(n.parentId):void 0;break;case"Enter":case" ":Ye(n.id);break;default:return}e.preventDefault(),I&&lr(I.id)}function Xe(){var e;Bt.replaceChildren(),wt.clear();for(let n of ee){let s=String((e=x(u.get(n.id)).title)!=null?e:""),l=f("div","vam-outline-item");l.dataset.outlineId=n.id,l.setAttribute("role","treeitem");let m=He(n)+1;l.setAttribute("aria-level",String(m)),l.style.setProperty("--depth",String(m-1));let M=f("span","vam-outline-twist");E.has(n.id)&&(M.append(B("chevron")),M.addEventListener("click",O=>{O.stopPropagation(),Te(n.id)}));let I=f("span","vam-outline-title",s);I.title=s,l.append(M,I);let H=L(u.get(n.id));H.length&&(l.append(Z(H)),l.setAttribute("aria-label",Y(s,H))),l.addEventListener("click",()=>Ye(n.id)),l.addEventListener("keydown",O=>dr(O,n)),l.addEventListener("focus",()=>{ne!==n.id&&(ne=n.id,vt())}),Bt.append(l),wt.set(n.id,l)}vt()}let dt=new Map,Vt=0,re=!1;j.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(j.setPointerCapture(e.pointerId),dt.set(e.pointerId,{x:e.clientX,y:e.clientY}),j.classList.add("is-panning"),dt.size===1&&(re=!1),dt.size===2)){let[n,s]=Array.from(dt.values());Vt=Math.hypot(n.x-s.x,n.y-s.y)}}),j.addEventListener("pointermove",e=>{let n=dt.get(e.pointerId);if(!n)return;if(dt.set(e.pointerId,{x:e.clientX,y:e.clientY}),dt.size===2&&Vt){let[m,M]=Array.from(dt.values()),I=Math.hypot(m.x-M.x,m.y-M.y),H=j.getBoundingClientRect();$t(I/Vt,{x:(m.x+M.x)/2-H.left,y:(m.y+M.y)/2-H.top}),Vt=I,re=!0;return}let s=e.clientX-n.x,l=e.clientY-n.y;re||(re=Math.abs(s)+Math.abs(l)>0),K={...K,x:K.x+s,y:K.y+l},yt()});let Ge=e=>{dt.delete(e.pointerId)&&(dt.size<2&&(Vt=0),dt.size||(j.classList.remove("is-panning"),!re&&e.type==="pointerup"&&!W.hidden&&xe()))};j.addEventListener("pointerup",Ge),j.addEventListener("pointercancel",Ge),j.addEventListener("wheel",e=>{e.preventDefault();let n=j.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?$t(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(K={...K,x:K.x-e.deltaX,y:K.y-e.deltaY},yt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{pe&&(pe=!1,Ft())}).observe(j),We(),Xe(),_t(mt()?!1:Ve(),!1),we(d,1),he(),Zt(),Lt(),Ft();let qe=t.fonts;qe&&qe.ready.then(()=>{et!==null||dt.size||(Zt(),Lt(),Ft())})}Qn(document);})();';
+var SHARE_VIEWER_JS = '(()=>{function nn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}var ur=80,pr=720;function rn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(pr,Math.max(ur,Math.round(t)))}function on(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(a=>a!==t.parentId)]}function fr(t){var r;let o=new Map;for(let a of t){let i=(r=a.parentId)!=null?r:"",c=o.get(i);c?c.push(a):o.set(i,[a])}return o}function mr(t,o,r){var i;let a=[o];for(;a.length;){let c=a.pop();for(let u of(i=t.get(c))!=null?i:[])u.id!==o&&!r.has(u.id)&&(r.add(u.id),a.push(u.id))}}function oe(t,o){let r=new Set;return mr(fr(t),o,r),r}function we(t,o){let r=new Map(t.map(c=>[c.id,c])),a=c=>{let u=0,d=new Set([c.id]);for(let g=c.parentId;g&&r.has(g)&&!d.has(g);g=r.get(g).parentId)d.add(g),u++;return u},i=new Set(t.map(c=>c.parentId).filter(c=>!!c&&r.has(c)));for(let c of t)i.has(c.id)&&(c.collapsed=o===null?!1:a(c)>=o)}function ve(t){if(t>150)return"right";if(t<-150)return"left"}function sn(t,o,r,a={left:0,right:0}){let i={...a},c=new Map;for(let u of t){let d=i.left<i.right?"left":"right";c.set(u.id,d),i[d]+=o(u)+r}return c}function an(t,o,r,a){let i=t.map(a),c={left:0,right:0};t.forEach((d,g)=>{let y=i[g];y&&(c[y]+=o(d)+r)});let u=sn(t.filter((d,g)=>!i[g]),o,r,c);return new Map(t.map((d,g)=>{var y;return[d.id,(y=i[g])!=null?y:u.get(d.id)]}))}function gr(t){return t==="right"||t==="left"||t==="down"||t==="up"}function ln(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function ie(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return gr(r)?r:void 0}function cn(t){let{width:o,column:r,mapDirection:a,engine:i}=t,c=(u,d)=>{var k,$;let g=[],y=(w,h)=>{for(let x of[...t.kidsOf(w),...t.joinsOf(w)])ie(x)?g.push({node:x,root:h}):y(x,h)};for(let w of u)y(w,w);let f={roots:u,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!g.length)return i(d,f);let b=d==="down"||d==="up",T=g.map(({node:w,root:h})=>{let x=c([w],ie(w)),R=1/0,v=-1/0,p=1/0,B=-1/0,N=new Map,F=L=>{N.set(L.id,L);for(let C of[...t.kidsOf(L),...t.joinsOf(L)])F(C)};F(w);for(let[L,C]of x)R=Math.min(R,C.x),v=Math.max(v,C.x+o),p=Math.min(p,C.y),B=Math.max(B,C.y+t.heightFor(N.get(L)));let A=Math.max(1,Math.ceil((v-R+r-o)/r));return{node:w,root:h,placed:x,minX:R,maxX:v,minY:p,maxY:B,slots:A}}),E=new Map(T.map(w=>[w.node.id,w])),z=w=>{let h=E.get(w.id);return!h||!b?[]:Array.from({length:h.slots},(x,R)=>({id:`${w.id}\\0pad${R}`}))},P=new Set,S=i(d,{roots:u,kidsOf:w=>{if(!E.has(w.id))return t.kidsOf(w);let h=z(w);for(let x of h)P.add(x.id);return h},joinsOf:w=>E.has(w.id)?[]:t.joinsOf(w),heightFor:w=>{if(P.has(w.id))return 0;let h=E.get(w.id);return h&&!b?h.maxY-h.minY:t.heightFor(w)}}),D=new Map;for(let[w,h]of S)!P.has(w)&&!E.has(w)&&D.set(w,h);for(let w of T){let h=S.get(w.node.id),x,R;b?(x=h.x+r/2-(w.minX+w.maxX)/2,R=d==="down"?h.y-w.minY:h.y+t.heightFor(w.node)-w.maxY):(x=d==="right"||d==="balanced"&&h.x>=(($=(k=S.get(w.root.id))==null?void 0:k.x)!=null?$:h.x)?h.x-w.minX:h.x+o-w.maxX,R=h.y-w.minY);for(let[v,p]of w.placed)D.set(v,{x:p.x+x,y:p.y+R})}return D};return c(t.roots,a)}var dn=1/Math.tan(Math.PI/3);function un(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,f=u-c,b=I=>[...r(I),...a(I)],T=o.map(I=>{let S=new Map,D=N=>N.reduce((F,A)=>F+S.get(A.id),0)+Math.max(0,N.length-1)*d,k=N=>{let F=b(N);for(let A of F)k(A);S.set(N.id,Math.max(i(N),D(F)))},$=(N,F,A,L)=>{let C=b(N),Y=A+(S.get(N.id)-D(C))/2,U=C.map(J=>{let q=$(J,F+1,Y,L);return Y+=S.get(J.id)+d,q}),Q=i(N),Z=U.length?(U[0]+U[U.length-1])/2:A+S.get(N.id)/2;return L.push({id:N.id,x:-F*u,centre:Z,height:Q}),Z},w=b(I).map((N,F)=>{let A=F%2===0?1:-1,L=b(N);for(let rt of L)k(rt);let C=[],Y=d;for(let rt of L){let Gt=C.length,Ot=$(rt,0,Y,C)*dn-f;for(let ct=Gt;ct<C.length;ct++)C[ct].x+=Ot-c;Y+=S.get(rt.id)+d}let U=Math.max(u,Y),Q=U*dn,Z=i(N),J=[-c/2,...C.map(rt=>rt.x)],q=[c/2,Q,...C.map(rt=>rt.x+c)];return{topic:N,side:A,length:U,height:Z,cards:C,minX:Math.min(...J),maxX:Math.max(...q)}}),h=i(I),x=[{id:I.id,x:0,y:-h/2,height:h}],R={above:-f,below:-f};for(let N of w){let F=N.side===1?"above":"below",A=R[F]-N.maxX,L=-N.side*N.length;x.push({id:N.topic.id,x:A-c/2,y:L-N.side*(N.height/2)-N.height/2,height:N.height});for(let C of N.cards)x.push({id:C.id,x:A+C.x,y:L+N.side*C.centre-C.height/2,height:C.height});R[F]=A+N.minX-f}let v=Math.min(...x.map(N=>N.x)),p=Math.min(...x.map(N=>N.y)),B=Math.max(...x.map(N=>N.y+N.height));return{out:x,minX:v,minY:p,maxY:B}}),E=new Map,z=g+Math.max(0,...T.map(I=>-I.minX)),P=y;for(let I of T){for(let S of I.out)E.set(S.id,{x:z+S.x,y:P+S.y-I.minY});P+=I.maxY-I.minY+d}return E}var hr=Math.PI*2,yr=6,br=60;function xr(t,o,r,a){let i=[...t.values()].sort((u,d)=>u.y-d.y),c=new Set;for(let u=0;u<i.length;u++){let d=i[u];for(let g=u+1;g<i.length;g++){let y=i[g];if(y.y>=d.y+d.height+r)break;a&&a.checks++,Math.abs(d.x-y.x)<o&&d.y<y.y+y.height+r&&c.add(Math.max(d.depth,y.depth))}}return c}function pn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,f=new Map,b=y;for(let T of o){let E=[],z=new Map,P=A=>[...r(A),...a(A)],I=A=>{let L=P(A),C=L.length?L.reduce((Y,U)=>Y+I(U),0):1;return z.set(A.id,C),C};I(T);let S=(A,L,C,Y)=>{E.push({id:A.id,depth:L,angle:(C+Y)/2,height:i(A)});let U=C,Q=(Y-C)/z.get(A.id);for(let Z of P(A)){let J=Q*z.get(Z.id);S(Z,L+1,U,U+J),U+=J}};S(T,0,0,hr);let D=Math.max(...E.map(A=>A.depth)),k=Array.from({length:D+1},(A,L)=>L*u),$=()=>{let A=[];return k.forEach((L,C)=>A.push(C?Math.max(L,A[C-1]+u):0)),new Map(E.map(L=>{let C=A[L.depth];return[L.id,{x:Math.round(C*Math.sin(L.angle)-c/2),y:Math.round(-C*Math.cos(L.angle)-L.height/2),depth:L.depth,height:L.height}]}))},w=u/yr,h=()=>(t.stats&&t.stats.rounds++,xr($(),c,d,t.stats)),x=w,R=h(),v=k.slice();for(let A=0;R.size&&A<br;A++){v=k.slice();for(let L of R)k[L]+=x;x*=2,R=h()}if(!R.size&&v.some((A,L)=>k[L]-A>w)){let A=k.slice();for(;A.some((L,C)=>L-v[C]>w);){let L=A.map((C,Y)=>(C+v[Y])/2);k.splice(0,k.length,...L),h().size?v=L:A=L}k.splice(0,k.length,...A)}let p=$(),B=Math.min(...[...p.values()].map(A=>A.x)),N=Math.min(...[...p.values()].map(A=>A.y)),F=Math.max(...[...p.values()].map(A=>A.y+A.height));for(let[A,L]of p)f.set(A,{x:Math.round(g)+L.x-B,y:b+L.y-N});b+=F-N+d}return f}function se(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,rowGap:u,flip:d,left:g,top:y}=t,f=new Map,b=new Map,T=v=>v.reduce((p,B)=>p+f.get(B.id),0),E=v=>{let p=r(v),B=a(v);for(let N of[...p,...B])E(N);f.set(v.id,Math.max(c,T(p),T(B))),b.set(v.id,1+Math.max(0,...p.map(N=>b.get(N.id))))},z=new Map,P=new Map,I=(v,p,B)=>{let N=r(v),F=a(v),A=f.get(v.id),L=(Q,Z)=>{let J=B+(A-T(Q))/2;return Q.map(q=>{I(q,Z,J);let rt=z.get(q.id);return J+=f.get(q.id),rt})},C=L(N,p+1),Y=L(F,p+b.get(v.id)),U=C.length?C:Y;P.set(v.id,p),z.set(v.id,U.length?(U[0]+U[U.length-1])/2:B)},S=g,D=[],k=v=>{D.push(v);for(let p of[...r(v),...a(v)])k(p)};for(let v of o)E(v),I(v,0,S),S+=f.get(v.id),k(v);let $=Math.max(0,...P.values()),w=Array.from({length:$+1},()=>0);for(let v of D)w[P.get(v.id)]=Math.max(w[P.get(v.id)],i(v));let h=[],x=y;for(let v=0;v<=$;v++){let p=d?$-v:v;h[p]=x,x+=w[p]+u}let R=new Map;for(let v of D){let p=P.get(v.id),B=d?h[p]+w[p]-i(v):h[p];R.set(v.id,{x:z.get(v.id),y:B})}return R}function fn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,f=new Map,b=y;for(let T of o){let E=new Map,z=k=>{E.set(k.id,i(k));for(let $ of[...r(k),...a(k)])z($)};z(T);let P=[{id:T.id,x:g,y:0}],I=g+u;[...r(T),...a(T)].forEach((k,$)=>{let w=se({roots:[k],kidsOf:r,joinsOf:a,heightFor:i,column:u,rowGap:u-c,flip:$%2===1,left:I,top:0}),h=w.get(k.id).y,x=I;for(let[R,v]of w)P.push({id:R,x:v.x,y:v.y-h}),x=Math.max(x,v.x);I=x+u});let S=Math.min(...P.map(k=>k.y)),D=Math.max(...P.map(k=>k.y+E.get(k.id)));for(let k of P)f.set(k.id,{x:k.x,y:b+k.y-S});b+=D-S+d}return f}var jt=300;function Mr(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}var Tr=24,wr={compact:{column:330,gap:12},standard:{column:360,gap:Tr},spacious:{column:420,gap:48}};function vr(t){return t==="compact"||t==="spacious"}var kr=180;function Sr(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...wr[vr(r)?r:"standard"]}}var Ar=t=>t==="left"?-1:1;var Er=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:kr};function Lr(t,o){var g,y;let r=new Map(t.map(f=>[f.id,f])),a=new Map,i=new Map,c=(f,b,T)=>{var E;return f.set(b,[...(E=f.get(b))!=null?E:[],T])};for(let f of t){if(!f.parentId)continue;let b=f.aimKind!=="question"&&((g=f.aimConvergesFromNodeIds)!=null&&g.length)?on(f).map(E=>r.get(E)):[],T=(y=b[0])==null?void 0:y.parentId;T&&r.has(T)&&b.every(E=>E&&E.parentId===T)?c(i,T,f):c(a,f.parentId,f)}return{kidsOf:f=>{var b;return o&&f.collapsed?[]:(b=a.get(f.id))!=null?b:[]},joinsOf:f=>{var b;return o&&f.collapsed?[]:((b=i.get(f.id))!=null?b:[]).filter(T=>{var E;return!(o&&((E=r.get(T.parentId))!=null&&E.collapsed))})}}}function ke(t){var w;let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,gap:u,sign:d,left:g,top:y}=t,f=new Map,b=new Map,T=new Map,E=new Map,z=new Map,P=h=>h.reduce((x,R)=>x+b.get(R.id),0)+Math.max(0,h.length-1)*u,I=h=>{let x=r(h),R=a(h);z.set(h.id,h);for(let v of[...x,...R])I(v);b.set(h.id,Math.max(i(h),P(x),P(R))),T.set(h.id,1+Math.max(0,...x.map(v=>T.get(v.id))))},S=(h,x,R)=>{let v=r(h),p=a(h),B=b.get(h.id),N=(Q,Z)=>{let J=R+(B-P(Q))/2;return Q.map(q=>{let rt=S(q,Z,J);return J+=b.get(q.id)+u,rt})},F=N(v,x+1),A=N(p,x+T.get(h.id)),L=F.length?v:p,C=F.length?F:A,Y=i(h),U=R+(B-Y)/2;if(C.length){let Q=C[0]+i(L[0])/2,Z=C[C.length-1]+i(L[L.length-1])/2;U=(Q+Z)/2-Y/2}return f.set(h.id,{x:0,y:y+U}),E.set(h.id,x),U},D=0;for(let h of o)I(h),S(h,0,D),D+=b.get(h.id)+u;let k=[];for(let[h,x]of E)k[x]=Math.max((w=k[x])!=null?w:0,Mr(z.get(h)));let $=h=>{var R,v;let x=0;if(d>0)for(let p=0;p<h;p++)x+=(R=k[p])!=null?R:0;else for(let p=1;p<=h;p++)x+=(v=k[p])!=null?v:0;return x};for(let[h,x]of f){let R=E.get(h);x.x=g+d*(R*c+$(R))}return{placed:f,sizes:b}}function Nr(t,o,r){let{roots:a,kidsOf:i,joinsOf:c,heightFor:u,gap:d,left:g,top:y}=o,f=ke({...o,sign:1}).sizes,b=new Map(t.map(S=>[S.id,S])),T=a.map(S=>{var w;let D=(w=b.get(S.id))!=null?w:S,k=an(i(S),h=>f.get(h.id),d,h=>{var x;return r?void 0:ve(((x=b.get(h.id))!=null?x:h).x-D.x)}),$=h=>ke({...o,roots:[S],kidsOf:x=>x.id===S.id?i(x).filter(R=>k.get(R.id)===h):i(x),joinsOf:x=>x.id===S.id&&h==="left"?[]:c(x),sign:h==="left"?-1:1,left:0,top:0}).placed;return{root:S,right:$("right"),left:$("left")}}),E=Math.max(0,...T.flatMap(({left:S})=>[...S.values()].map(D=>-D.x))),z=g+E,P=new Map,I=0;for(let{root:S,right:D,left:k}of T){let $=p=>p.get(S.id).y+u(S)/2,w=Math.max($(D),$(k)),h=[];for(let p of[{placed:D,isLeft:!1},{placed:k,isLeft:!0}]){let{placed:B,isLeft:N}=p,F=w-$(B);for(let[A,L]of B)N&&A===S.id||h.push([A,{x:z+L.x,y:L.y+F}])}let x=p=>u(b.get(p)),R=Math.min(...h.map(([,p])=>p.y)),v=Math.max(...h.map(([p,B])=>B.y+x(p)));for(let[p,B]of h)P.set(p,{x:B.x,y:y+I+B.y-R});I+=v-R+d}return P}function Ir(t,o,r,a,i=!1,c,u="right",d=!1){let{direction:g,column:y,gap:f}=Sr(u),{kidsOf:b,joinsOf:T}=Lr(t,i),E=I=>Er(c,I.id),z=(I,S)=>{if(I==="down"||I==="up")return se({...S,column:y,rowGap:y-jt,flip:I==="up",left:r,top:a});let D={...S,column:y,gap:f,left:r,top:a};if(I==="radial")return pn({...D,width:jt});if(I==="timeline")return fn({...D,width:jt});if(I==="fishbone")return un({...D,width:jt});let k={...D,sign:Ar(I)};return I==="balanced"?Nr(t,k,d):ke(k).placed},P={roots:o,kidsOf:b,joinsOf:T,heightFor:E};return ln(g)&&t.some(I=>ie(I))?cn({...P,width:jt,column:y,mapDirection:g,engine:z}):z(g,P)}function mn(t,o,r,a="right",i={}){let c=o!=null&&o.size?t.filter(g=>!o.has(g.id)):t,u=c.filter(g=>!g.parentId),d=Ir(c,u,80,80,!0,r,a,i.reset===!0);return t.map(g=>({...g,...d.get(g.id)}))}function gn(t){return typeof t=="number"?{top:t,right:0,bottom:0,left:0}:t}function hn(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function yn(t,o,r,a){let i=t.zoom,c=gn(a);return{zoom:i,x:c.left+(r.width-c.left-c.right)/2-o.x*i,y:c.top+(r.height-c.top-c.bottom)/2-o.y*i}}var _r=.25;function bn(t,o,r,a=1.2){let i=gn(r),c=Math.max(1,o.width-i.left-i.right),u=Math.max(1,o.height-i.top-i.bottom),d=t.maxX-t.minX,g=t.maxY-t.minY,y=Math.max(_r,Math.min(a,(c-80)/d,(u-80)/g));return{zoom:y,x:i.left+(c-d*y)/2-t.minX*y,y:i.top+(u-g*y)/2-t.minY*y}}var ae={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",linksLabel:"Links: {0}",linkOpen:"Open link: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3","priority-4":"Priority 4","priority-5":"Priority 5","progress-0":"Progress 0%","progress-25":"Progress 25%","progress-50":"Progress 50%","progress-75":"Progress 75%","progress-100":"Progress 100%","flag-red":"Red flag","flag-yellow":"Yellow flag","flag-green":"Green flag","flag-blue":"Blue flag",smile:"Smile",neutral:"Neutral",sad:"Sad",question:"Question"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Se(t){let o=3735928559,r=1103547991;for(let a=0;a<t.length;a++){let i=t.charCodeAt(a);o=Math.imul(o^i,2654435761),r=Math.imul(r^i,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var kt="\\u27E6",St="\\u27E7",Xt=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,Tn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Ae=new Set(["pre","script","style","textarea","template","noscript"]),Cr=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),Or=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),Rr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,Pr=/\\p{L}/u,Yt=t=>t.localName.toLowerCase(),wn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},le=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function vn(t){for(let o of le(t))if(Tn.has(Yt(o))||Ae.has(Yt(o))||vn(o))return!0;return!1}function kn(t){let o=Yt(t);return Ae.has(o)?"skip":Cr.has(o)||t.getAttribute("translate")==="no"||wn(t).some(r=>Or.has(r))?"atom":Tn.has(o)||vn(t)?"block":"inline"}function Hr(t,o){return t.replace(Rr,r=>(o.push({literal:r,atom:!0}),`${kt}${o.length}/${St}`))}function Dr(t,o){let r="",a=i=>{var u;if(i.nodeType===3){r+=Hr((u=i.nodeValue)!=null?u:"",o);return}if(i.nodeType!==1){o.push({node:i,atom:!0}),r+=`${kt}${o.length}/${St}`;return}let c=i;if(kn(c)==="inline"){o.push({node:c,atom:!1});let d=o.length;r+=`${kt}${d}${St}`;for(let g of Array.from(c.childNodes))a(g);r+=`${kt}/${d}${St}`;return}o.push({node:c,atom:!0}),r+=`${kt}${o.length}/${St}`};for(let i of t)a(i);return r}function xn(t){return Pr.test(t.replace(Xt,""))}function Sn(t){let o=[],r=u=>{let d=u.getAttribute("alt");d&&xn(d)&&o.push({index:o.length,kind:"attribute",text:d.trim(),nodes:[],lead:"",trail:"",parts:[],element:u,attribute:"alt"})},a=u=>{for(let d of le(u)){let g=Yt(d);Ae.has(g)||g==="svg"||(g==="img"?r(d):a(d))}},i=u=>{if(!u.length)return;let d=[],g=Dr(u,d),y=g.trim();if(!y||!xn(y)||g.includes("\\u27E6\\u27E6"))return;let f=g.replace(Xt,"");if(f.includes(kt)||f.includes(St))return;let b=g.slice(0,g.length-g.trimStart().length),T=g.slice(g.trimEnd().length);o.push({index:o.length,kind:"run",text:y,nodes:u,lead:b,trail:T,parts:d})},c=u=>{let d=[];for(let g of Array.from(u.childNodes)){if(g.nodeType===3){d.push(g);continue}if(g.nodeType!==1){i(d),d=[];continue}let y=g,f=kn(y);f==="atom"||f==="inline"?d.push(y):(i(d),d=[],f==="block"&&c(y))}i(d)};return a(t),c(t),{units:o}}var Mn=t=>[...t.matchAll(Xt)].map(o=>o[0]);function zr(t,o){if(!o.trim())return!1;let r=Mn(t),a=Mn(o);if(r.length!==a.length||r.some((c,u)=>c!==a[u]))return!1;let i=o.replace(Xt,"");return!i.includes(kt)&&!i.includes(St)}function Br(t,o,r){var g;let a=[],i=[],c=y=>{let f=i[i.length-1];f?f.appendChild(y):a.push(y)},u=y=>{y&&c(r.createTextNode(y))};u(t.lead);let d=0;for(let y of o.matchAll(Xt)){u(o.slice(d,y.index)),d=((g=y.index)!=null?g:0)+y[0].length;let f=t.parts[Number(y[2])-1];if(y[1]==="/")i.pop();else if(y[3]==="/")f.literal!==void 0?u(f.literal):f.node&&c(f.node.cloneNode(!0));else if(f.node){let b=f.node.cloneNode(!1);c(b),i.push(b)}}return u(o.slice(d)),u(t.trail),a}function An(t,o){var i,c,u;let r={applied:0,kept:0},a=[...t.units.filter(d=>d.kind==="attribute"),...t.units.filter(d=>d.kind==="run")];for(let d of a){let g=o(d);if(g===void 0||!zr(d.text,g)){r.kept++;continue}if(d.kind==="attribute"){(c=d.element)==null||c.setAttribute((i=d.attribute)!=null?i:"alt",g.trim()),r.applied++;continue}let y=d.nodes[0],f=y==null?void 0:y.parentNode,b=y==null?void 0:y.ownerDocument;if(!y||!f||!b){r.kept++;continue}for(let T of Br(d,g,b))f.insertBefore(T,y);for(let T of d.nodes)(u=T.parentNode)==null||u.removeChild(T);r.applied++}return r}function En(t){let o=[],r=a=>{for(let i of le(a))Yt(i)==="svg"?o.push(i):r(i)};return r(t),o}function Ln(t,o){let r=[],a=i=>{for(let c of le(i))wn(c).includes(o)&&r.push(c),a(c)};return a(t),r}var Nn="vam-mermaid-slot",ce=1,In=3,_n=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},$r=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Fr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function Kr(t){var o,r;return t.nodeType===In?$r((o=t.nodeValue)!=null?o:""):t.nodeType!==ce?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:Cn(t)}function Cn(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(a=>{var i;return` ${a}="${Fr((i=t.getAttribute(a))!=null?i:"")}"`}).join("");return`<${o}${r}>${Wr(t)}</${o}>`}function Wr(t){return Array.from(t.childNodes).map(Kr).join("")}function Ur(t){let o=[],r=a=>{if(o.push(a),a.nodeType===ce)for(let i of Array.from(a.childNodes))r(i)};return r(t),o}function Vr(t,o){var a;let r=En(t);for(let i of r){let c=o();c.setAttribute("class",Nn),(a=i.parentNode)==null||a.replaceChild(c,i)}return{root:t,svgs:r,extraction:Sn(t)}}function jr(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Se(o)}`}var Yr=t=>Se(Cn(t));function Xr(t,o){if(!Array.isArray(o))return!1;let r=Ur(t);for(let a of o){if(!Array.isArray(a)||a.length!==2)return!1;let[i,c]=a;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=r.length)return!1;let u=r[i];if(typeof c=="string"){if(u.nodeType!==In)return!1;u.nodeValue=c}else if(c&&typeof c=="object"&&!Array.isArray(c)){if(u.nodeType!==ce)return!1;for(let[d,g]of Object.entries(c))if(g===null)u.removeAttribute(d);else if(typeof g=="string")u.setAttribute(d,g);else return!1}else return!1}return!0}function Gr(t,o,r){if(!t||typeof t!="object")return null;let a=t;if(typeof a.svg=="string"){let i=r(a.svg),c=Array.from(i.childNodes).filter(u=>u.nodeType===ce);return c.length===1&&c[0].localName.toLowerCase()==="svg"?c[0]:null}if(typeof a.check=="string"&&a.check===Yr(o)){let i=o.cloneNode(!0);return Xr(i,a.patch)?i:null}return null}function On(t,o,r){var g,y;let a={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:c}=Vr(t,r.createSlot),u=o.detailSegments;if(u!==void 0||o.detailCheck!==void 0)if(Array.isArray(u)&&u.length===c.units.length&&o.detailCheck===jr(c)){let f=An(c,T=>{let E=u[T.index];return typeof E=="string"?E:void 0}),b=u.filter(T=>typeof T!="string").length;if(a.applied=f.applied,a.kept=Math.max(0,f.kept-b),r.afterText&&!r.afterText(t))return a.fallback=!0,a}else a.fallback=!0;let d=Ln(t,Nn);d.length!==i.length&&(a.fallback=!0);for(let[f,b]of d.entries()){let T=i[f];if(!T)break;let E=(g=o.detailDiagrams)==null?void 0:g[f],z=T;if(E){let P=null;try{P=Gr(E,T,r.parse)}catch{P=null}P?z=P:a.diagramsKept++}(y=b.parentNode)==null||y.replaceChild(z,b)}return a}function ut(t,o,r){let a=t.createElement(o);return r&&(a.className=r),a}function qr(t,o){var u;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),a=(u=r==null?void 0:r[1])!=null?u:t,[i,c=""]=o.imageSource.split("{0}");return[i,a,c]}var Qr=20,Rn=2048,Pn=URL;function Zr(t){if(typeof t!="string")return null;let o=t.trim();if(!o||o.length>Rn||/[\\x00-\\x20\\x7f-\\x9f\\u2028\\u2029]/.test(o)||!/^https?:\\/\\//i.test(o))return null;let r;try{r=new Pn(o)}catch{return null}return r.protocol!=="http:"&&r.protocol!=="https:"||!r.hostname||r.username||r.password||r.href.length>Rn?null:r.href}function Jr(t){if(!Array.isArray(t))return[];let o=new Set,r=[];for(let a of t){let i=Zr(a);if(!(!i||o.has(i))&&(o.add(i),r.push({href:i,host:new Pn(i).host}),r.length>=Qr))break}return r}function Hn(t,o,r){let a=Jr(o);if(!a.length)return null;let i=ut(t,"div");i.className="vam-inspector-links",i.setAttribute("role","group"),i.setAttribute("aria-label",r.linksLabel.replace("{0}",a.map(c=>c.host).join(", ")));for(let{href:c,host:u}of a){let d=ut(t,"a");d.setAttribute("href",c),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.setAttribute("referrerpolicy","no-referrer"),d.setAttribute("aria-label",r.linkOpen.replace("{0}",u)),d.textContent=u,i.append(d)}return i}function to(t,o,r){let[a,i,c]=qr(o,r),u=ut(t,"span");u.className="vam-image-source";let d=ut(t,"a");return d.setAttribute("href",o),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.textContent=i,u.append(t.createTextNode(a),d,t.createTextNode(c)),u}function Ee(t,o,r,a,i){Dn(t,o,new DOMParser().parseFromString(r,"text/html").body,a,i)}function Dn(t,o,r,a,i){var u,d,g,y;for(let f of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))f.remove();for(let f of Array.from(r.querySelectorAll("*")))for(let b of f.getAttributeNames()){let T=(u=f.getAttribute(b))!=null?u:"",E=b.toLowerCase();(E.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(E)&&/^\\s*(javascript|vbscript):/i.test(T))&&f.removeAttribute(b)}let c=()=>{let f=ut(t,"span");return f.className="vam-image-omitted",f.textContent=i.imageOmitted,f};for(let f of Array.from(r.querySelectorAll("img"))){let b=(d=f.getAttribute("src"))!=null?d:"";if(b.startsWith("vam-asset:")){let T=a[b.slice(10)];typeof T=="string"&&T.startsWith("data:image/")?f.setAttribute("src",T):f.replaceWith(c())}else if(/^https?:\\/\\//i.test(b)){f.setAttribute("referrerpolicy","no-referrer"),f.setAttribute("loading","lazy");let T=f.closest("a");(T!=null?T:f).after(to(t,b,i))}else/^data:image\\//i.test(b)||f.replaceWith(c())}for(let f of Array.from(r.querySelectorAll("a"))){let b=(g=f.getAttribute("href"))!=null?g:"";/^(https?:|mailto:)/i.test(b)?(f.setAttribute("target","_blank"),f.setAttribute("rel","noopener noreferrer")):b.startsWith("#")||f.removeAttribute("href")}for(let f of Array.from(r.querySelectorAll("table"))){if((y=f.parentElement)!=null&&y.classList.contains("vam-table-scroll"))continue;let b=ut(t,"div");b.className="vam-table-scroll",f.replaceWith(b),b.append(f)}o.append(...Array.from(r.childNodes).map(f=>t.importNode(f,!0)))}function zn(t,o,r,a,i,c){let u=d=>new DOMParser().parseFromString(d,"text/html").body;try{let d=u(r);On(d,a,{parse:u,createSlot:()=>ut(t,"div")}),Dn(t,o,d,i,c)}catch{o.replaceChildren(),Ee(t,o,r,i,c)}}function de(t,o,r,a){let i=r-t,c=i>=40?i/2:i>=0?60-i:Math.max(60,-i/2);return`M ${t} ${o} C ${t+c} ${o}, ${r-c} ${a}, ${r} ${a}`}var Le=["red","orange","yellow","green","blue","purple"];function $n(t){let o=t["topic-color"];return Le.find(r=>r===o)}var eo=["bold","text-small","text-large","border-thick","line-thick"],Bn=["text-small","text-large"];function no(t){return Array.isArray(t)?t:typeof t=="string"&&t?[t]:[]}function Fn(t){let o=no(t["topic-style"]),r=o.find(a=>Bn.some(i=>i===a));return eo.filter(a=>Bn.includes(a)?a===r:o.includes(a))}var ro=["done","warning","star","priority-1","priority-2","priority-3","priority-4","priority-5","progress-0","progress-25","progress-50","progress-75","progress-100","flag-red","flag-yellow","flag-green","flag-blue","smile","neutral","sad","question"],Kn=[{group:"status",single:!1,ids:["done","warning","star"]},{group:"priority",single:!0,ids:["priority-1","priority-2","priority-3","priority-4","priority-5"]},{group:"progress",single:!0,ids:["progress-0","progress-25","progress-50","progress-75","progress-100"]},{group:"flag",single:!1,ids:["flag-red","flag-yellow","flag-green","flag-blue"]},{group:"face",single:!1,ids:["smile","neutral","sad","question"]}];function oo(t){return Kn.find(o=>o.ids.includes(t)).group}function io(t){return Kn.find(o=>o.ids.includes(t)).single}var so={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3","priority-4":"P4","priority-5":"P5","progress-0":"\\u25CB","progress-25":"\\u25D4","progress-50":"\\u25D1","progress-75":"\\u25D5","progress-100":"\\u25CF","flag-red":"\\u2691R","flag-yellow":"\\u2691Y","flag-green":"\\u2691G","flag-blue":"\\u2691B",smile:"\\u263A",neutral:"-_-",sad:"\\u2639",question:"?"};function Wn(t){let o=t["topic-markers"];if(!Array.isArray(o))return[];let r=new Set;return ro.filter(a=>{if(!o.includes(a))return!1;if(!io(a))return!0;let i=oo(a);return r.has(i)?!1:(r.add(i),!0)})}function Un(t){return so[t]}var ao=(t,o)=>t.toLowerCase()===o.toLowerCase(),ue=(t,o)=>t.find(r=>ao(r,o));function lo(t,o){if(typeof t!="string"||!t.trim())return;let r=ue(o,t.trim());if(r)return r;let a=t.trim().toLowerCase().split(/[-_]/),i=a[0];if(i==="zh"){let u=a.slice(1).some(d=>d==="hant"||d==="tw"||d==="hk"||d==="mo")?"TW":"CN";return ue(o,`${i}-${u}`)}return o.find(c=>c.toLowerCase().split(/[-_]/)[0]===i)}function Vn(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let a=ue(o,t.stored);if(a)return a}if(typeof t.defaultLanguage=="string"){let a=ue(o,t.defaultLanguage);if(a)return a}for(let a of t.browser){let i=lo(a,o);if(i)return i}return r}function jn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var co="https://github.com/kevcltsai/visual-agent-map?ref=share",uo="und",bt="http://www.w3.org/2000/svg",Yn="vam-share-panel-width",Xn="vam-share-outline-open",po="(max-width: 600px)",fo=300,Ne=240,mo=.25,go=2,ho=4,yo={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},bo={core:"target",support:"library",side:"skip"},Gn=t=>t==="core"||t==="support"||t==="side",At=(t,o)=>t.replace("{0}",String(o));function Ce(t,o){var a;let r=(a=t.getElementById(o))==null?void 0:a.textContent;if(r)try{return JSON.parse(r)}catch{return}}function qn(t){let o={...ae};if(t&&typeof t=="object")for(let i of Object.keys(o)){let c=t[i];typeof c=="string"&&(o[i]=c)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...ae.markerNames};for(let i of Object.keys(o.markerNames)){let c=r[i];typeof c=="string"&&c.trim()&&(o.markerNames[i]=c)}}let a=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...ae.colorNames},a&&typeof a=="object")for(let i of Le){let c=a[i];typeof c=="string"&&c.trim()&&(o.colorNames[i]=c)}return o}function xo(t){let o=Ce(t,"vam-ui"),r=new Map,a={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[i,c]of Object.entries(o.uiByLanguage))r.set(i,qn(c));if(o.languageNames&&typeof o.languageNames=="object")for(let[i,c]of Object.entries(o.languageNames))typeof c=="string"&&c&&(a[i]=c)}return{sets:r,names:a}}var pt=t=>typeof t=="string"&&t.trim()!=="";function Ie(t){try{return window.localStorage.getItem(t)}catch{return null}}function _e(t,o){try{window.localStorage.setItem(t,o)}catch{}}function Mo(t,o){let r=Math.min(...o.map(x=>x.x)),a=Math.min(...o.map(x=>x.y)),i=Math.max(...o.map(x=>x.x+x.w)),c=Math.max(...o.map(x=>x.y+x.h)),u=14,d=12,g=8,y=t==="down"||t==="up",f=y?r:a,b=y?i:c,T=t==="right"?i+u:t==="left"?r-u:t==="down"?c+u:a-u,E=t==="right"||t==="down"?1:-1,z=(f+b)/2,P=Math.min(d,Math.max(0,(b-f)/4)),I=x=>Math.round(x*100)/100,S=(x,R)=>y?`${I(x)} ${I(R)}`:`${I(R)} ${I(x)}`,D=T,k=T+E*d,$=T+E*2*d,w=[`M ${S(f,D)}`,`Q ${S(f,k)} ${S(f+P,k)}`,`L ${S(z-P,k)}`,`Q ${S(z,k)} ${S(z,$)}`,`Q ${S(z,k)} ${S(z+P,k)}`,`L ${S(b-P,k)}`,`Q ${S(b,k)} ${S(b,D)}`].join(" "),h=$+E*g;return y?{path:w,x:I(z),y:I(h)}:{path:w,x:I(h),y:I(z)}}var mt=()=>window.matchMedia(po).matches;function Qn(t){var Qe,Ze,Je,tn;let o=qn(Ce(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let a=t.getElementById("vam-app"),i=Ce(t,"vam-map");if(!a)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){a.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let c=i.assets&&typeof i.assets=="object"?i.assets:{},u=new Map,d=[];for(let e of i.nodes){if(!e||typeof e.id!="string"||u.has(e.id))continue;u.set(e.id,e);let n=nn(e.width),s=rn(e.height);d.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{},...s!==void 0?{height:s}:{}})}let g=new Map(d.map(e=>[e.id,e]));for(let e of d)e.parentId&&(!g.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let y=[];if(Array.isArray(i.textNodes)){let e=new Set;for(let n of i.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let s=typeof n.parentId=="string"?g.get(n.parentId):void 0;y.push({id:n.id,parentId:s?s.id:null,text:n.text,dx:s?n.x-s.x:n.x,dy:s?n.y-s.y:n.y,links:!s&&Array.isArray(n.links)?Array.from(new Set(n.links.filter(l=>typeof l=="string"&&g.has(l)))):[]})}}let f=e=>e==="right"||e==="left"||e==="down"||e==="up"?e:null,b=[];if(Array.isArray(i.summaries)){let e=new Set;for(let n of i.summaries){let s=f(n==null?void 0:n.side);if(!n||typeof n.id!="string"||e.has(n.id)||!s||typeof n.text!="string"||!n.text.trim()||!Array.isArray(n.members))continue;let l=Array.from(new Set(n.members.filter(m=>typeof m=="string"&&g.has(m))));l.length&&(e.add(n.id),b.push({id:n.id,members:l,side:s,text:n.text}))}}let T=new Map,E=new Map;for(let e of d)e.parentId&&E.set(e.parentId,[...(Qe=E.get(e.parentId))!=null?Qe:[],e]);let z=xo(t),P=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(pt))):[],I=jn((Ze=i.source)==null?void 0:Ze.mapId),S=P.length>=2,D=S?P[0]:"",k=D;if(S){let e=[];try{e=Array.from((Je=window.navigator.languages)!=null?Je:[window.navigator.language]).filter(pt)}catch{}k=Vn({languages:P,stored:I?Ie(I):null,defaultLanguage:pt(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let $=e=>{var n;return(n=z.sets.get(e))!=null?n:o},w=S&&D===uo,h=()=>S&&k!==D;S&&(r=$(k),t.documentElement.lang=k);let x=e=>{var s;let n=h()?(s=e.translations)==null?void 0:s[k]:void 0;return!n||typeof n!="object"?e:{title:pt(n.title)?n.title:e.title,summary:pt(n.summary)?n.summary:e.summary,reason:pt(n.reason)?n.reason:e.reason,detailHtml:pt(n.detailHtml)?n.detailHtml:e.detailHtml,..._n(n)&&pt(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},R=()=>{var l;let e=h()?(l=i.translations)==null?void 0:l[k]:void 0,n=pt(e==null?void 0:e.title)?e.title:i.title,s=pt(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof s=="string"?s.trim():""}},v=(e,n)=>{var s;try{let l=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(l&&l!==e)return l}catch{}return(s=z.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let p=(e,n,s)=>{let l=ut(t,e);return n&&(l.className=n),s!==void 0&&(l.textContent=s),l},B=e=>{let n=t.createElementNS(bt,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let s of yo[e]){let[l,...m]=s.split("|"),M=t.createElementNS(bt,l);for(let _ of m)M.setAttribute(_.slice(0,_.indexOf("=")),_.slice(_.indexOf("=")+1));n.append(M)}return n},N=(e,n,s,l)=>{let m=p("button",s,n);return m.type="button",m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},F=(e,n,s,l)=>{let m=p("button");return m.type="button",m.setAttribute("aria-label",s),m.title=s,m.append(B(n)),m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},A=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,L=e=>Wn({"topic-markers":e.markers}),C=()=>/^(zh|ja)/.test(r.lang),Y=(e,n)=>{if(!n.length)return e;let s=n.map(l=>r.markerNames[l]).join(C()?"\\u3001":", ");return`${e}${C()?"\\uFF0C":", "}${At(r.markerLabel,s)}`},U=e=>$n({"topic-color":e.color}),Q=e=>Fn({"topic-style":e.style}),Z=e=>{let n=p("span","vam-markers");for(let s of e){let l=p("span","vam-marker",Un(s));l.dataset.marker=s,l.setAttribute("aria-hidden","true"),n.append(l)}return n},J=(e,n)=>{let s=p("span","vam-relevance-tag");s.dataset.tier=e,n&&(s.title=n);let l=p("span","vam-relevance-icon");return l.append(B(bo[e])),s.append(l,p("span",void 0,A(e))),s};a.className="vam-app";let q=p("div","vam-toolbar"),rt=p("h1","vam-map-switcher"),Gt=p("span","vam-shared");q.append(rt,Gt);let xt=F(q,"list","",()=>It(tt.hidden,!0));q.prepend(xt),xt.setAttribute("aria-controls","vam-outline");let Ot=p("div","vam-toolbar-actions"),ct=p("select","vam-language");if(S){for(let e of P){let n=p("option",void 0,(tn=z.names[e])!=null?tn:v(e));n.value=e,w&&e===D&&(n.dataset.original="1"),ct.append(n)}ct.value=k,Ot.append(ct)}let Oe=p("span","vam-made-with"),Rt=p("a","vam-install");Rt.href=co,Rt.target="_blank",Rt.rel="noopener noreferrer",Ot.append(Oe,Rt),q.append(Ot);let Pt=p("div","vam-translate-note");Pt.hidden=!0;let Mt=p("div","vam-workspace"),j=p("div","vam-viewport"),gt=p("div","vam-stage");gt.setAttribute("role","tree");let Tt=t.createElementNS(bt,"svg");Tt.setAttribute("class","vam-edges"),Tt.setAttribute("aria-hidden","true"),gt.append(Tt);let Ht=p("div","vam-summaries");Ht.setAttribute("role","group"),b.length&&gt.append(Ht),j.append(gt);let qt=p("div","vam-canvas-overlay"),Et=p("div","vam-map-tools"),Dt=p("span","vam-goal"),Re=p("span","vam-goal-text");Dt.append(B("target"),Re);let Pe=p("span","vam-canvas-hint"),ht=p("div","vam-zoom-controls"),Zn=F(ht,"minus","",()=>$t(1/1.2)),zt=p("button","vam-zoom","100%");zt.type="button",zt.addEventListener("click",e=>{e.stopPropagation(),$t(1/K.zoom)}),ht.append(zt);let Jn=F(ht,"plus","",()=>$t(1.2)),tr=F(ht,"max","",()=>Ft()),ft=p("button","vam-layout-button");ft.type="button",ft.setAttribute("aria-haspopup","menu"),ft.setAttribute("aria-expanded","false"),ht.append(ft);let st=p("div","vam-layout-menu");st.setAttribute("role","menu"),st.hidden=!0,ht.append(st),qt.append(Et,Pe,ht);let W=p("aside","vam-inspector");W.hidden=!0;let tt=p("nav","vam-outline");tt.id="vam-outline";let Bt=p("div","vam-outline-tree");Bt.setAttribute("role","tree"),tt.append(Bt),Mt.append(tt,j,qt,W),a.replaceChildren(...S?[q,Pt,Mt]:[q,Mt]);let K={x:0,y:0,zoom:1},et=null,pe=!1,Qt=Number(Ie(Yn))||fo,V=new Map,er=()=>{let e=new Set,n=(s,l)=>{var m;for(let M of(m=E.get(s.id))!=null?m:[])l&&e.add(M.id),n(M,l||M.collapsed)};for(let s of d)s.parentId||n(s,s.collapsed);return e},He=e=>{var s,l;let n=0;for(let m=e.parentId;m&&!(++n>d.length);m=(l=(s=g.get(m))==null?void 0:s.parentId)!=null?l:null);return n},De=()=>hn(j.getBoundingClientRect().top,Et.hidden?void 0:Et.getBoundingClientRect());function yt(){gt.style.transform=`translate(${K.x}px, ${K.y}px) scale(${K.zoom})`;let e=`${Math.round(K.zoom*100)}%`;zt.textContent=e,zt.setAttribute("aria-label",At(r.zoomReset,e))}function $t(e,n){let s=n!=null?n:{x:j.clientWidth/2,y:j.clientHeight/2},l=Math.min(go,Math.max(mo,K.zoom*e)),m=l/K.zoom;K={x:s.x-(s.x-K.x)*m,y:s.y-(s.y-K.y)*m,zoom:l},yt()}let fe=!1;function Ft(){if(!V.size)return;if(!j.clientWidth||!j.clientHeight){fe=!0;return}let e=1/0,n=1/0,s=-1/0,l=-1/0;for(let m of V.values())e=Math.min(e,m.offsetLeft),n=Math.min(n,m.offsetTop),s=Math.max(s,m.offsetLeft+(m.offsetWidth||280)),l=Math.max(l,m.offsetTop+m.offsetHeight);for(let m of y){let M=m.parentId?void 0:T.get(m.id);M&&(e=Math.min(e,M.offsetLeft),n=Math.min(n,M.offsetTop),s=Math.max(s,M.offsetLeft+(M.offsetWidth||300)),l=Math.max(l,M.offsetTop+(M.offsetHeight||60)))}for(let m of Array.from(Ht.querySelectorAll(".vam-summary"))){let M=m.querySelector(".vam-summary-text");if(!M)continue;let _=parseFloat(M.style.left),H=parseFloat(M.style.top),O=M.offsetWidth,X=M.offsetHeight;if(!Number.isFinite(_)||!Number.isFinite(H))continue;let at=m.classList.contains("is-side-left")?_-O:m.classList.contains("is-side-down")||m.classList.contains("is-side-up")?_-O/2:_,lt=m.classList.contains("is-side-up")?H-X:m.classList.contains("is-side-down")?H:H-X/2;e=Math.min(e,at),n=Math.min(n,lt),s=Math.max(s,at+O),l=Math.max(l,lt+X)}K=bn({minX:e,minY:n,maxX:s,maxY:l},{width:j.clientWidth,height:j.clientHeight},De()),yt()}function ze(e){let n=V.get(e);n&&(K=yn(K,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:j.clientWidth,height:j.clientHeight},De()),yt())}function Lt(){var e;Tt.replaceChildren();for(let n of d){let s=n.parentId?V.get(n.parentId):void 0,l=V.get(n.id);if(!s||!l)continue;let m=t.createElementNS(bt,"path");m.setAttribute("d",de(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class",((e=u.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge");let M=u.get(n.id);M&&Q(M).includes("line-thick")&&m.setAttribute("data-line-thick",""),Tt.append(m)}for(let n of y){let s=n.parentId?V.get(n.parentId):void 0,l=T.get(n.id);if(!s||!l)continue;let m=t.createElementNS(bt,"path");m.setAttribute("d",de(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class","vam-edge vam-text-edge"),Tt.append(m)}for(let n of y){let s=T.get(n.id);if(s)for(let l of n.links){let m=V.get(l);if(!m)continue;let M=s.offsetLeft+s.offsetWidth/2<=m.offsetLeft+m.offsetWidth/2,_=t.createElementNS(bt,"path");_.setAttribute("d",de(M?s.offsetLeft+s.offsetWidth:s.offsetLeft,s.offsetTop+s.offsetHeight/2,M?m.offsetLeft:m.offsetLeft+m.offsetWidth,m.offsetTop+m.offsetHeight/2)),_.setAttribute("class","vam-edge vam-text-link"),Tt.append(_)}}nr()}function nr(){Ht.replaceChildren();for(let e of b){let n=[];for(let H of e.members)for(let O of[H,...oe(d,H)]){let X=V.get(O);X&&n.push({x:X.offsetLeft,y:X.offsetTop,w:X.offsetWidth||280,h:X.offsetHeight})}if(!n.length)continue;let s=Mo(e.side,n),l=p("div",`vam-summary is-side-${e.side}`);l.setAttribute("role","note");let m=t.createElementNS(bt,"svg");m.setAttribute("class","vam-summary-brace"),m.setAttribute("aria-hidden","true");let M=t.createElementNS(bt,"path");M.setAttribute("d",s.path),M.setAttribute("fill","none"),m.append(M),l.append(m);let _=p("div","vam-summary-text");_.textContent=e.text,_.style.left=`${s.x}px`,_.style.top=`${s.y}px`,l.append(_),Ht.append(l)}}let me=0,Be=()=>{me||(me=window.requestAnimationFrame(()=>{me=0,Lt()}))},ge=e=>{let n=V.get(e),s=g.get(e);!n||!s||(n.style.left=`${s.x}px`,n.style.top=`${s.y}px`,s.width&&(n.style.width=`${s.width}px`),s.height&&(n.style.height=`${s.height}px`),$e(e))},$e=e=>{let n=g.get(e);if(n)for(let s of y){let l=s.parentId===e?T.get(s.id):void 0;l&&(l.style.left=`${n.x+s.dx}px`,l.style.top=`${n.y+s.dy}px`)}};function rr(){for(let e of T.values())e.remove();T.clear();for(let e of y){let n=e.parentId?g.get(e.parentId):void 0;if(e.parentId&&(!n||!V.has(e.parentId)||n.collapsed))continue;let s=p("div",`vam-text-node${n?"":" is-free"}`);s.setAttribute("role","note"),s.textContent=e.text,n||(s.style.left=`${e.dx}px`,s.style.top=`${e.dy}px`),gt.append(s),T.set(e.id,s),n&&$e(n.id)}}function he(){var n,s;for(let l of V.values())l.remove();V.clear();let e=er();for(let l of d){if(e.has(l.id))continue;let m=u.get(l.id),M=x(m),_=oe(d,l.id).size,H=Gn(m.tier)?m.tier:void 0,O=p("div",`vam-node${l.id===et?" is-selected":""}`);O.dataset.nodeId=l.id,O.dataset.status=m.status==="completed"?"completed":"idea",H&&(O.dataset.relevance=H),O.tabIndex=0,O.setAttribute("role","treeitem"),O.setAttribute("aria-level",String(He(l)+1)),O.setAttribute("aria-selected",String(l.id===et));let X=L(m),at=U(m);at&&(O.dataset.topicColor=at);let lt=Q(m);lt.includes("bold")&&(O.dataset.topicStyleBold="true"),lt.includes("border-thick")&&(O.dataset.topicStyleBorder="thick"),lt.includes("text-small")?O.dataset.topicStyleSize="small":lt.includes("text-large")&&(O.dataset.topicStyleSize="large");let nt=Y(String((n=M.title)!=null?n:""),X);O.setAttribute("aria-label",at?`${nt}${C()?"\\uFF0C":", "}${At(r.colorLabel,r.colorNames[at])}`:nt),_&&O.setAttribute("aria-expanded",String(!l.collapsed));let ot=p("div","vam-node-header");O.append(ot),m.status!=="completed"&&ot.append(p("span","vam-status vam-status-idea",r.toResearch)),H&&ot.append(J(H,typeof M.reason=="string"?M.reason:void 0)),X.length&&ot.append(Z(X));let en=p("div","vam-node-tools");if(O.append(en),_){let it=l.collapsed?At(r.expandCount,_):r.collapse,_t=N(ot,it,"vam-collapse-button",()=>{l.collapsed=!l.collapsed,Kt(l.id,!0)});_t.setAttribute("aria-expanded",String(!l.collapsed)),_t.setAttribute("aria-label",it),_t.title=it}if(N(en,r.detailsButton,void 0,()=>Nt(l.id)),O.append(p("h3","vam-card-title",String((s=M.title)!=null?s:""))),typeof M.summary=="string"&&M.summary.trim()&&O.append(p("p","vam-card-summary",M.summary)),l.height){let it=p("span","vam-card-fade"),_t=p("span","vam-card-more","\\u2026");it.setAttribute("aria-hidden","true"),_t.setAttribute("aria-hidden","true"),O.append(it,_t)}O.addEventListener("click",()=>{pe||Nt(l.id)}),O.addEventListener("keydown",it=>{it.target===O&&(it.key==="Enter"||it.key===" "?(it.preventDefault(),Nt(l.id)):_&&it.key===(l.collapsed?"ArrowRight":"ArrowLeft")&&(it.preventDefault(),l.collapsed=!l.collapsed,Kt(l.id)))}),O.addEventListener("pointerdown",it=>or(it,l,O)),gt.append(O),V.set(l.id,O),ge(l.id)}rr(),Fe()}function Fe(){var e;for(let[n,s]of V)(e=g.get(n))!=null&&e.height&&(s.classList.remove("is-clipped"),s.classList.toggle("is-clipped",s.scrollHeight>s.clientHeight+1))}function Zt(){mn(d,void 0,n=>{var s;return(s=V.get(n))==null?void 0:s.offsetHeight}).forEach((n,s)=>{d[s].x=n.x,d[s].y=n.y});for(let n of V.keys())ge(n);Fe()}function Kt(e,n=!1){var m;let s=e?(m=V.get(e))==null?void 0:m.getBoundingClientRect():void 0;he(),Zt(),Lt();let l=e?V.get(e):void 0;if(l){if(s){let _=l.getBoundingClientRect();K={...K,x:K.x+s.left-_.left,y:K.y+s.top-_.top},yt()}let M=n?l.querySelector(".vam-collapse-button"):null;(M!=null?M:l).focus({preventScroll:!0})}}function or(e,n,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let l=e.clientX,m=e.clientY,M=n.x,_=n.y,H=!1,O=at=>{let lt=at.clientX-l,nt=at.clientY-m;if(!H){if(Math.hypot(lt,nt)<=ho)return;H=!0,s.classList.add("is-dragging"),s.setPointerCapture(at.pointerId)}n.x=M+lt/K.zoom,n.y=_+nt/K.zoom,ge(n.id),Be()},X=()=>{s.removeEventListener("pointermove",O),s.removeEventListener("pointerup",X),s.removeEventListener("pointercancel",X),s.classList.remove("is-dragging"),H&&(pe=!0,window.setTimeout(()=>pe=!1,0))};s.addEventListener("pointermove",O),s.addEventListener("pointerup",X),s.addEventListener("pointercancel",X)}let ye=e=>Math.round(Math.min(Math.max(Ne,e),Math.max(Ne,Mt.clientWidth*.7)));function Jt(){let e=mt();if(W.hidden||e){W.style.removeProperty("width"),qt.style.removeProperty("right");return}let n=ye(Qt);W.style.width=`${n}px`,qt.style.right=`${n}px`,G.setAttribute("aria-valuenow",String(n)),G.setAttribute("aria-valuemax",String(ye(1/0)))}let G=p("div","vam-inspector-resizer");G.setAttribute("role","separator"),G.setAttribute("aria-orientation","vertical"),G.setAttribute("aria-label",r.resizePanel),G.setAttribute("aria-valuemin",String(Ne)),G.tabIndex=0;let te=(e,n)=>{Qt=ye(e),Jt(),n&&_e(Yn,String(Qt))};G.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,s=W.offsetWidth;G.setPointerCapture(e.pointerId),G.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let l=M=>te(s+n-M.clientX,!1),m=()=>{G.removeEventListener("pointermove",l),G.removeEventListener("pointerup",m),G.removeEventListener("pointercancel",m),G.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),te(Qt,!0)};G.addEventListener("pointermove",l),G.addEventListener("pointerup",m),G.addEventListener("pointercancel",m)}),G.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")te(W.offsetWidth+n,!0);else if(e.key==="ArrowRight")te(W.offsetWidth-n,!0);else return;e.preventDefault()});let be=mt();window.addEventListener("resize",()=>{Jt(),yt(),mt()!==be&&(be=mt(),It(be?!1:Ve(),!1))});function xe(){et=null;for(let e of V.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");W.hidden=!0,Mt.classList.remove("has-inspector"),W.replaceChildren(),Jt(),vt()}function Nt(e){var X,at,lt;let n=g.get(e),s=u.get(e);if(!n||!s)return;let l={...s,...x(s)};et=e;for(let[nt,ot]of V)ot.classList.toggle("is-selected",nt===e),ot.setAttribute("aria-selected",String(nt===e));W.replaceChildren(G);let m=p("div","vam-inspector-heading");m.append(p("strong",void 0,r.topicDetails)),N(m,r.close,void 0,xe),W.append(m,p("h3",void 0,String((X=l.title)!=null?X:"")));let M=Gn(l.tier)?l.tier:void 0;if(M){let nt=p("div","vam-inspector-why");nt.append(J(M));let ot=typeof l.reason=="string"&&l.reason.trim()?l.reason:l.manual?r.manualReason:"";ot&&nt.append(p("span",void 0,ot)),W.append(nt)}typeof l.summary=="string"&&l.summary.trim()&&W.append(p("p","vam-sample-summary",l.summary));let _=Hn(t,l.links,r);_&&W.append(_);let H=p("div","vam-sample-detail");typeof l.detailHtml=="string"&&l.detailHtml.trim()?l.compact?zn(t,H,l.detailHtml,l.compact,c,r):Ee(t,H,l.detailHtml,c,r):H.append(p("p","vam-inspector-empty",r.noContent)),W.append(H);let O=(at=E.get(e))!=null?at:[];if(O.length){let nt=p("div","vam-subtopics");nt.append(p("strong",void 0,r.subtopics));for(let ot of O)N(nt,String((lt=x(u.get(ot.id)).title)!=null?lt:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Kt(n.id)),Nt(ot.id),ze(ot.id)});W.append(nt)}W.hidden=!1,Mt.classList.add("has-inspector"),Jt(),W.scrollTop=0,vt(),je()}let Me=e=>{we(d,e),Kt(),Ft()},Wt=e=>{st.hidden||(st.hidden=!0,ft.setAttribute("aria-expanded","false"),e&&ft.focus())};function ir(){st.replaceChildren();let e=[{label:r.collapseAll,run:()=>Me(0)},{label:r.expandAll,run:()=>Me(null)},...[1,2,3].map(n=>({label:At(r.expandToLevel,n),run:()=>Me(n)})),null,{label:r.autoLayout,run:()=>{Zt(),Lt()}}];for(let n of e){if(!n){st.append(p("hr"));continue}let s=p("button",void 0,n.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",l=>{l.stopPropagation(),Wt(!0),n.run()}),st.append(s)}}let Ke=()=>Array.from(st.querySelectorAll("button"));ft.addEventListener("click",e=>{var n;if(e.stopPropagation(),!st.hidden)return Wt(!0);st.hidden=!1,ft.setAttribute("aria-expanded","true"),(n=Ke()[0])==null||n.focus()}),st.addEventListener("keydown",e=>{let n=Ke(),s=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(s+1)%n.length].focus();else if(e.key==="ArrowUp")n[(s-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Wt(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!st.hidden&&!ht.contains(e.target)&&Wt(!1);let n=e.target;mt()&&!tt.hidden&&!tt.contains(n)&&!xt.contains(n)&&It(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!st.hidden)Wt(!0);else if(mt()&&!tt.hidden)It(!1,!1),xt.focus();else if(!W.hidden){let n=et?V.get(et):void 0;xe(),n==null||n.focus({preventScroll:!0})}}});function We(){let e=R();if(t.title=e.title,rt.textContent=e.title,gt.setAttribute("aria-label",e.title),Gt.textContent=r.readOnly,Oe.textContent=r.madeWithVam,Rt.textContent=r.install,ct.setAttribute("aria-label",r.language),ct.title=r.language,w)for(let s of Array.from(ct.options))s.dataset.original&&(s.textContent=r.originalText);e.goal?(Re.textContent=At(r.goal,e.goal),Dt.title=e.goal,Dt.parentElement||Et.append(Dt),Et.hidden=!1):(Dt.remove(),Et.hidden=!0),Pe.textContent=r.hint;let n=(s,l)=>{s.setAttribute("aria-label",l),s.title=l};if(n(Zn,r.zoomOut),n(Jn,r.zoomIn),n(tr,r.showAll),ft.textContent=r.layout,W.setAttribute("aria-label",r.topicDetails),tt.setAttribute("aria-label",r.outline),Bt.setAttribute("aria-label",r.outline),n(xt,r.outline),G.setAttribute("aria-label",r.resizePanel),ir(),h()){let s=w?r.aiTranslatedUnknown:At(r.aiTranslated,v(D,k));Pt.textContent=`${s} ${r.imageTextUntranslated}`,Pt.hidden=!1}else Pt.hidden=!0;yt()}function sr(e){if(e===k||!P.includes(e))return;k=e,r=$(e),I&&_e(I,e),t.documentElement.lang=e;let n=W.scrollTop;We(),he(),Lt(),Xe(),et!==null&&g.has(et)&&!W.hidden&&(Nt(et),W.scrollTop=n),Be()}ct.addEventListener("change",()=>sr(ct.value));let ee=[],Ue=e=>{var n;ee.push(e);for(let s of(n=E.get(e.id))!=null?n:[])Ue(s)};for(let e of d)e.parentId||Ue(e);let Ut=new Set,wt=new Map,ne=null;function Ve(){return Ie(Xn)!=="0"}function It(e,n){tt.hidden=!e,Mt.classList.toggle("has-outline",e),xt.setAttribute("aria-expanded",String(e)),n&&!mt()&&_e(Xn,e?"1":"0")}let ar=()=>ee.filter(e=>{var n;return!((n=wt.get(e.id))!=null&&n.hidden)});function vt(){var s,l,m;let e=[];for(let M of ee){let _=wt.get(M.id);if(!_)continue;let H=!1;for(let O=M.parentId;O&&!H;O=(l=(s=g.get(O))==null?void 0:s.parentId)!=null?l:null)H=Ut.has(O);_.hidden=H,H||e.push(M),E.has(M.id)&&_.setAttribute("aria-expanded",String(!Ut.has(M.id))),M.id===et?_.setAttribute("aria-current","true"):_.removeAttribute("aria-current")}let n=(m=e.find(M=>M.id===ne))!=null?m:e[0];for(let[M,_]of wt)_.tabIndex=M===(n==null?void 0:n.id)?0:-1}function je(){let e=et?wt.get(et):void 0;!e||e.hidden||!tt.clientHeight||(e.offsetTop<tt.scrollTop?tt.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>tt.scrollTop+tt.clientHeight&&(tt.scrollTop=e.offsetTop+e.offsetHeight-tt.clientHeight))}function Te(e){Ut.delete(e)||Ut.add(e),vt()}function lr(e){var n;ne=e,vt(),(n=wt.get(e))==null||n.focus()}function cr(){for(let[e,n]of V)n.classList.toggle("is-selected",e===et),n.setAttribute("aria-selected",String(e===et))}function Ye(e){var m,M,_;let n=g.get(e);if(!n)return;let s=!1,l=0;for(let H=n.parentId;H&&l++<=d.length;H=(M=(m=g.get(H))==null?void 0:m.parentId)!=null?M:null){let O=g.get(H);O!=null&&O.collapsed&&(O.collapsed=!1,s=!0)}et=e,s&&Kt(),ze(e),W.hidden?cr():Nt(e),vt(),je(),mt()&&It(!1,!1),(_=V.get(e))==null||_.focus({preventScroll:!0})}function dr(e,n){var H;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let s=ar(),l=s.indexOf(n),m=(H=E.get(n.id))!=null?H:[],M=Ut.has(n.id),_;switch(e.key){case"ArrowDown":_=s[l+1];break;case"ArrowUp":_=s[l-1];break;case"Home":_=s[0];break;case"End":_=s[s.length-1];break;case"ArrowRight":m.length&&M?Te(n.id):_=m[0];break;case"ArrowLeft":m.length&&!M?Te(n.id):_=n.parentId?g.get(n.parentId):void 0;break;case"Enter":case" ":Ye(n.id);break;default:return}e.preventDefault(),_&&lr(_.id)}function Xe(){var e;Bt.replaceChildren(),wt.clear();for(let n of ee){let s=String((e=x(u.get(n.id)).title)!=null?e:""),l=p("div","vam-outline-item");l.dataset.outlineId=n.id,l.setAttribute("role","treeitem");let m=He(n)+1;l.setAttribute("aria-level",String(m)),l.style.setProperty("--depth",String(m-1));let M=p("span","vam-outline-twist");E.has(n.id)&&(M.append(B("chevron")),M.addEventListener("click",O=>{O.stopPropagation(),Te(n.id)}));let _=p("span","vam-outline-title",s);_.title=s,l.append(M,_);let H=L(u.get(n.id));H.length&&(l.append(Z(H)),l.setAttribute("aria-label",Y(s,H))),l.addEventListener("click",()=>Ye(n.id)),l.addEventListener("keydown",O=>dr(O,n)),l.addEventListener("focus",()=>{ne!==n.id&&(ne=n.id,vt())}),Bt.append(l),wt.set(n.id,l)}vt()}let dt=new Map,Vt=0,re=!1;j.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(j.setPointerCapture(e.pointerId),dt.set(e.pointerId,{x:e.clientX,y:e.clientY}),j.classList.add("is-panning"),dt.size===1&&(re=!1),dt.size===2)){let[n,s]=Array.from(dt.values());Vt=Math.hypot(n.x-s.x,n.y-s.y)}}),j.addEventListener("pointermove",e=>{let n=dt.get(e.pointerId);if(!n)return;if(dt.set(e.pointerId,{x:e.clientX,y:e.clientY}),dt.size===2&&Vt){let[m,M]=Array.from(dt.values()),_=Math.hypot(m.x-M.x,m.y-M.y),H=j.getBoundingClientRect();$t(_/Vt,{x:(m.x+M.x)/2-H.left,y:(m.y+M.y)/2-H.top}),Vt=_,re=!0;return}let s=e.clientX-n.x,l=e.clientY-n.y;re||(re=Math.abs(s)+Math.abs(l)>0),K={...K,x:K.x+s,y:K.y+l},yt()});let Ge=e=>{dt.delete(e.pointerId)&&(dt.size<2&&(Vt=0),dt.size||(j.classList.remove("is-panning"),!re&&e.type==="pointerup"&&!W.hidden&&xe()))};j.addEventListener("pointerup",Ge),j.addEventListener("pointercancel",Ge),j.addEventListener("wheel",e=>{e.preventDefault();let n=j.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?$t(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(K={...K,x:K.x-e.deltaX,y:K.y-e.deltaY},yt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{fe&&(fe=!1,Ft())}).observe(j),We(),Xe(),It(mt()?!1:Ve(),!1),we(d,1),he(),Zt(),Lt(),Ft();let qe=t.fonts;qe&&qe.ready.then(()=>{et!==null||dt.size||(Zt(),Lt(),Ft())})}Qn(document);})();';
 var SHARE_VIEWER_CSS = `/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */
 :root {
   color-scheme: light;

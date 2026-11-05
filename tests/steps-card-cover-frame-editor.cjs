@@ -564,7 +564,7 @@ const boxEl = (left, top, right, bottom) => ({ getBoundingClientRect: () => ({ l
 function dblHarnessView(view) {
   const calls = { open: [], rename: [] };
   view.openCoverFrameEditor = node => { calls.open.push(node.id); return {}; };
-  view.renameNode = (node, name) => calls.rename.push(name);
+  view.startCardTitleEdit = node => calls.rename.push(node.id);
   const cover = boxEl(0, 0, 200, 150);
   const title = boxEl(0, 160, 200, 180);
   const card = { querySelector: sel => (sel === '.vam-card-cover' ? cover : null) };
@@ -576,14 +576,14 @@ function dblHarnessView(view) {
   return { calls, fire, cover, title, card };
 }
 
-test('card: double-clicking the cover picture opens "Edit card"; the title still renames; elsewhere nothing', async () => {
+test('card: double-clicking the cover picture opens "Edit card"; the title edits in place; elsewhere nothing', async () => {
   const h = await harness(TEXT);
   const d = dblHarnessView(h.view);
   assert.equal(d.fire(100, 75), true);
   assert.deepEqual(d.calls.open, ['m']);
   assert.deepEqual(d.calls.rename, []);
   d.fire(50, 170);
-  assert.deepEqual(d.calls.rename, ['M']);
+  assert.deepEqual(d.calls.rename, ['m']);
   d.fire(50, 400);
   assert.deepEqual([d.calls.open.length, d.calls.rename.length], [1, 1]);
   const picture = { closest: sel => (sel === '.vam-card-cover' ? d.cover : null) };

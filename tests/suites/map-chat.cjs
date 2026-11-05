@@ -4947,27 +4947,6 @@ async function languageView(language) {
   view.app = {};
   return { view, modals, plugin };
 }
-integrationTest('bug bash #27: the Rename tool on a card opens a dialog titled 重新命名 (zh-TW), not the new-topic title', async () => {
-  const h = await harness({ language: 'zh-TW' }); await h.view.hydrate();
-  const { view } = h; const node = view.map.nodes.find(n => n.id === h.ids.a);
-  view.stageEl = element('div'); view.viewportEl = element('div');
-  view.labelCard = () => {}; // the card's accessible-name bookkeeping needs a real DOM; the tools do not
-  view.renderNode(node);
-  const more = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-more-tool')); assert.ok(more, 'the card has a More tool');
-  assert.equal(more.text, '⋯ 更多', 'the tool itself is in zh-TW');
-  const entries = [];
-  view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); entries.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
-  more.click(); const rename = entries.find(e => e.title === '改名'); assert.ok(rename, 'More lists Rename, in zh-TW');
-  rename.fn(); await tick();
-  assert.ok((h.control.modals ?? []).length === 1, 'one dialog opened');
-  assert.equal(h.control.modals[0].titleText, '重新命名');
-});
-test('bug bash #27: Rename opens a dialog titled "Rename", not the new-topic title', async () => {
-  const { view, modals } = await languageView('zh-TW');
-  view.renameNode({ id: 'n1', title: 'Old' }, 'Old');
-  assert.ok(modals.length === 1, 'one dialog opened');
-  assert.equal(modals[0].titleText, '重新命名');
-});
 for (const [language, mark, undo, redo] of [['zh-TW', '標記', '復原：標記', '重做：標記'], ['zh-CN', '标记', '复原：标记', '重做：标记'], ['en', 'Mark', 'Undo: Mark', 'Redo: Mark']]) test(`bug bash #33: the undo and redo labels use the ${language} colon template and keep the bare word without a label`, async () => {
   const { view } = await languageView(language);
   const buttons = { undo: { dataset: { icon: 'x' }, attrs: {}, setAttr(name, value) { this.attrs[name] = value; } }, redo: { dataset: { icon: 'x' }, attrs: {}, setAttr(name, value) { this.attrs[name] = value; } } };

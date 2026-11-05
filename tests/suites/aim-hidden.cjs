@@ -227,7 +227,7 @@ test('aim-hidden: E1 the card of an AIM node has the generic tools and none of t
   assert.equal(shown.includes('AI explore'), false, 'AIM on: generic tools are hidden on an AIM map');
   assert.ok(hidden.includes('Open details in right sidebar'));
   assert.ok(shown.includes('Continue exploring'), 'AIM on: the AIM action is there');
-  for (const label of ['AI explore', 'This card', 'Rename', 'Add subtopic manually']) assert.ok(hidden.includes(label), label);
+  for (const label of ['AI explore', 'This card', 'Add subtopic manually']) assert.ok(hidden.includes(label), label);
   assert.equal(hidden.includes('Continue exploring'), false);
   assert.equal(hidden.some(label => /Steer|Correct|new question|Answer|Retry|Start|Continue|Resume|direction/i.test(label ?? '')), false, 'no AIM action');
 });

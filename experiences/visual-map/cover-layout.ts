@@ -197,8 +197,7 @@ export function arrangeCover(card: HTMLElement, frame: HTMLElement | null, posit
   card.addClass(`has-cover-${position}`);
   if (position === "bottom") {
     // The summary text, its edit field, or the faint add-summary line (a card with none) is the text's end.
-    const after =
-      SUMMARY_ANCHORS.map(cls => childWith(card, cls)).find((el): el is HTMLElement => !!el) ?? title;
+    const after = SUMMARY_ANCHORS.map(cls => childWith(card, cls)).find((el): el is HTMLElement => !!el) ?? title;
     const kids = Array.from(card.children);
     let index = kids.indexOf(after);
     // An open title or summary field brings its hint line; the picture goes below them, not between field and hint.

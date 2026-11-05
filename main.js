@@ -18328,8 +18328,8 @@ function treeTextNodes(items, nodeIds) {
   }
   return { attached, orphans };
 }
-function boundaryBounds(nodeIds, rectOf, pad, others = []) {
-  const margin = finite(pad) && pad > 0 ? pad : 0;
+function boundaryBounds(nodeIds, rectOf, pad3, others = []) {
+  const margin = finite(pad3) && pad3 > 0 ? pad3 : 0;
   let left = Infinity;
   let top = Infinity;
   let right = -Infinity;
@@ -24782,8 +24782,8 @@ function safeName(title) {
 function foldName(value) {
   return value.normalize("NFC").toLowerCase().replace(/ς/g, "\u03C3");
 }
-function foldEntryName(name2, isFile) {
-  const dot = isFile ? name2.lastIndexOf(".") : -1;
+function foldEntryName(name2, isFile2) {
+  const dot = isFile2 ? name2.lastIndexOf(".") : -1;
   return dot > 0 ? `${foldName(name2.slice(0, dot))}.${name2.slice(dot + 1).toLowerCase()}` : foldName(name2);
 }
 function linkAlias(title, fallback) {
@@ -32689,12 +32689,12 @@ var DATE_PREFIX = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}[ \t\u3000:：]*/;
 var FOOTNOTE_REF = /\[\^([^\]\s]+)\]/g;
 var FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:/;
 function formatDate(now) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const pad3 = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad3(now.getMonth() + 1)}-${pad3(now.getDate())}`;
 }
 function formatTime(now) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const pad3 = (value) => String(value).padStart(2, "0");
+  return `${pad3(now.getHours())}${pad3(now.getMinutes())}${pad3(now.getSeconds())}`;
 }
 var placeholderTexts = () => /* @__PURE__ */ new Set([
   ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
@@ -35617,7 +35617,7 @@ function inlineMarkdown(nodes) {
   return out;
 }
 var tidy = (text11) => text11.replace(/^[ \t]+/, "").replace(/\\\n[ \t]+/g, "\\\n");
-var indentOf = (text11, pad, first) => text11.split("\n").map((line, at) => at === 0 ? `${first}${line}` : line ? `${pad}${line}` : line).join("\n");
+var indentOf = (text11, pad3, first) => text11.split("\n").map((line, at) => at === 0 ? `${first}${line}` : line ? `${pad3}${line}` : line).join("\n");
 function listMarkdown(block) {
   return block.items.map((item, index) => {
     const marker5 = block.ordered ? `${index + 1}. ` : "- ";
@@ -36651,10 +36651,10 @@ ${typed}` : draft;
     }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
     if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {
-      const pad = (value) => String(value).padStart(2, "0");
+      const pad3 = (value) => String(value).padStart(2, "0");
       this.restoredText = t(
         "ui.map_chat_restored_0",
-        `${when.getMonth() + 1}/${when.getDate()} ${pad(when.getHours())}:${pad(when.getMinutes())}`
+        `${when.getMonth() + 1}/${when.getDate()} ${pad3(when.getHours())}:${pad3(when.getMinutes())}`
       );
     }
     this.renderLog(true);
@@ -41648,6 +41648,566 @@ var mapChatStep = {
   parse: (raw, request) => parseMapChat(raw, request.context)
 };
 
+// core/map-chat-records.ts
+var RECORD_VERSION = 1;
+var RECORDS_SUBPATH = "Chats/records";
+var RecordPathError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "RecordPathError";
+  }
+};
+var ID_PATTERN2 = /^\d{8}-\d{6}-[0-9a-z]{6}$/;
+var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+var pad = (value, width = 2) => String(value).padStart(width, "0");
+var isRecordId = (id) => typeof id === "string" && ID_PATTERN2.test(id);
+function newRecordId(now = /* @__PURE__ */ new Date(), random = Math.random) {
+  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
+  let suffix = "";
+  for (let i = 0; i < 6; i++) suffix += BASE36[Math.min(35, Math.floor(random() * 36))];
+  return `${stamp}-${suffix}`;
+}
+function recordIdTime(id) {
+  const match = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})-/.exec(id);
+  return match ? `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.000Z` : null;
+}
+function assertRecordRoot(root, configDir) {
+  if (typeof root !== "string" || !root) throw new RecordPathError("Record root is empty");
+  if (root.startsWith("/") || /^[a-zA-Z]:/.test(root) || root.includes("\\") || root.includes("\0"))
+    throw new RecordPathError(`Record root is not a Vault-relative path: ${root}`);
+  const banned = configDir ? configDir.toLowerCase() : null;
+  for (const part of root.split("/")) {
+    if (!part || part === "." || part === "..") throw new RecordPathError(`Record root has an unsafe part: ${root}`);
+    if (part.startsWith(".") || part.toLowerCase() === banned)
+      throw new RecordPathError(`Record root is inside a hidden or config folder: ${root}`);
+  }
+  return root;
+}
+function recordsDir(root, configDir) {
+  return `${assertRecordRoot(root, configDir)}/${RECORDS_SUBPATH}`;
+}
+function recordPath(root, id, configDir) {
+  if (!isRecordId(id)) throw new RecordPathError(`Bad record id: ${String(id)}`);
+  return `${recordsDir(root, configDir)}/${id}.jsonl`;
+}
+function isRecordFilePath(path) {
+  const match = /^(.+)\/Chats\/records\/([^/]+)\.jsonl$/.exec(path);
+  if (!match) return false;
+  try {
+    assertRecordRoot(match[1]);
+  } catch (e) {
+    return false;
+  }
+  return isRecordId(match[2]);
+}
+function recordFilesIn(files) {
+  return files.filter((file) => isRecordFilePath(file.path));
+}
+function serializeLine(line) {
+  const { v: _ignored, ...rest } = line;
+  return `${JSON.stringify({ v: RECORD_VERSION, ...rest })}
+`;
+}
+function parseRecord(text11) {
+  const lines = [];
+  let skipped2 = 0;
+  let unrecoverable = false;
+  for (const part of text11.split("\n")) {
+    const trimmed2 = part.trim();
+    if (!trimmed2) continue;
+    let value;
+    try {
+      value = JSON.parse(trimmed2);
+    } catch (e) {
+      skipped2++;
+      continue;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.type !== "string") {
+      skipped2++;
+      continue;
+    }
+    const version = value.v;
+    if (version === RECORD_VERSION) lines.push(value);
+    else if (version === void 0) skipped2++;
+    else unrecoverable = true;
+  }
+  return { lines, skipped: skipped2, unrecoverable, cleanEnd: text11 === "" || text11.endsWith("\n") };
+}
+var lineTime = (line) => {
+  const value = line.type === "conversation" ? line.startedAt : line.at;
+  return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
+};
+function lastLineAt(lines) {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const at = lineTime(lines[i]);
+    if (at) return at;
+  }
+  return null;
+}
+var timeOf = (iso) => {
+  const time = Date.parse(iso);
+  return Number.isFinite(time) ? time : 0;
+};
+function pickLatest(files) {
+  var _a2, _b2;
+  let best = null;
+  for (const file of files) {
+    if (!isRecordId(file.id)) continue;
+    const parsed = parseRecord(file.text);
+    if (!parsed.lines.length && !parsed.unrecoverable) continue;
+    const lastAt = (_b2 = (_a2 = lastLineAt(parsed.lines)) != null ? _a2 : recordIdTime(file.id)) != null ? _b2 : "";
+    const candidate = { id: file.id, path: file.path, parsed, lastAt };
+    if (!best) {
+      best = candidate;
+      continue;
+    }
+    const a = timeOf(candidate.lastAt);
+    const b = timeOf(best.lastAt);
+    if (a > b || a === b && candidate.id > best.id) best = candidate;
+  }
+  return best;
+}
+function restoreConversation(id, lines) {
+  var _a2, _b2;
+  let mapPath = null;
+  let mapId = null;
+  const starts = /* @__PURE__ */ new Map();
+  const order = [];
+  const ends = /* @__PURE__ */ new Map();
+  const plans = /* @__PURE__ */ new Map();
+  const images = /* @__PURE__ */ new Map();
+  const undone = /* @__PURE__ */ new Map();
+  for (const line of lines) {
+    if (line.type === "conversation") {
+      mapPath = typeof line.mapPath === "string" ? line.mapPath : mapPath;
+      mapId = typeof line.mapId === "string" ? line.mapId : mapId;
+    } else if (line.type === "moved") {
+      if (typeof line.to === "string") mapPath = line.to;
+    } else if (line.type === "turn_start") {
+      if (!starts.has(line.turn)) order.push(line.turn);
+      starts.set(line.turn, line);
+    } else if (line.type === "turn_end") {
+      ends.set(line.turn, line);
+    } else if (line.type === "plan") {
+      plans.set(line.turn, line.state);
+    } else if (line.type === "images") {
+      images.set(line.turn, { state: line.state, items: (_a2 = line.items) != null ? _a2 : [], inserted: (_b2 = line.inserted) != null ? _b2 : [] });
+    } else if (line.type === "event") {
+      if (line.kind === "undo") undone.set(line.turn, true);
+      else if (line.kind === "redo") undone.set(line.turn, false);
+    }
+  }
+  const turns = [];
+  for (const number of order) {
+    const start = starts.get(number);
+    const end = ends.get(number);
+    if (!start || !end || end.status !== "done" && end.status !== "plan") continue;
+    turns.push({
+      turn: number,
+      at: end.at,
+      message: start.message,
+      origin: start.origin,
+      reply: typeof end.reply === "string" ? end.reply : "",
+      lines: Array.isArray(end.lines) ? end.lines : [],
+      modelLabel: typeof end.modelLabel === "string" ? end.modelLabel : "",
+      status: end.status,
+      stalePlan: end.status === "plan",
+      planState: plans.get(number),
+      rejected: end.rejected,
+      images: images.get(number),
+      undone: undone.get(number) === true,
+      backfilled: start.backfilled === true
+    });
+  }
+  return { id, mapPath, mapId, turns, restoredAt: turns.length ? turns[turns.length - 1].at : null };
+}
+
+// experiences/visual-map/map-chat-record-writer.ts
+var isFile = (item) => !!item && !("children" in item);
+var MapChatRecordWriter = class {
+  constructor(deps) {
+    this.deps = deps;
+    __publicField(this, "conv");
+    __publicField(this, "target", null);
+    __publicField(this, "enabled", true);
+    __publicField(this, "closed", false);
+    __publicField(this, "killed", false);
+    __publicField(this, "chain", Promise.resolve());
+    this.conv = this.freshConversation();
+  }
+  /** The current conversation's id (its file name). */
+  get conversationId() {
+    return this.conv.id;
+  }
+  /** The conversation's file exists. */
+  get landed() {
+    return !!this.conv.file || !!this.conv.adapterPath;
+  }
+  /** A write of this conversation failed (and was reported): the chat counts as not saved. */
+  get failed() {
+    return this.conv.failed;
+  }
+  /** The conversation holds lines that only exist in memory, or its writes failed: closing the view should still warn. */
+  get unsaved() {
+    return this.conv.failed || this.conv.held;
+  }
+  setEnabled(on) {
+    this.enabled = on;
+  }
+  /** Where new lines go. A landed conversation keeps its file; use {@link moveTo} to move it. */
+  setTarget(target) {
+    this.target = target;
+  }
+  /** Starts a new conversation (new id, new file at the next line). Work queued for the previous one still goes to the previous file. */
+  newConversation() {
+    this.conv = this.freshConversation();
+  }
+  /**
+   * Continues an existing record (restored on open): later lines are appended to `file`, or, given its path, through the adapter
+   * (a record the Vault index does not list). `cleanEnd` is `parseRecord(text).cleanEnd`.
+   */
+  resume(id, file, target, cleanEnd = true) {
+    this.conv = {
+      ...this.freshConversation(id),
+      file: typeof file === "string" ? null : file,
+      adapterPath: typeof file === "string" ? file : null,
+      root: target.root,
+      mapPath: target.mapPath,
+      mapId: target.mapId,
+      // A cut last line gets a line break first, so the next line is not glued to it.
+      pending: cleanEnd ? [] : ["\n"],
+      ended: /* @__PURE__ */ new Set()
+    };
+    this.target = target;
+  }
+  /** Marks turns as already in the record, so a late line for them is dropped (restored turns). */
+  markEnded(turns) {
+    for (const turn of turns) this.conv.ended.add(turn);
+  }
+  /** Takes one line. Dropped when closed, disposed or off, or when its turn already ended (the turn fence). */
+  write(line) {
+    var _a2;
+    if (this.dead() || this.closed || !this.enabled) return;
+    const conv = this.conv;
+    if (line.type === "turn_start" || line.type === "turn_end") {
+      if (conv.ended.has(line.turn)) return;
+      if (line.type === "turn_end") conv.ended.add(line.turn);
+    }
+    const text11 = serializeLine({ ...line, at: (_a2 = line.at) != null ? _a2 : this.stamp() });
+    const target = this.target;
+    if (!conv.file && !(target == null ? void 0 : target.root)) conv.held = true;
+    void this.enqueue(async () => {
+      conv.pending.push(text11);
+      await this.flush(conv, target);
+    });
+  }
+  /**
+   * The conversation was started with the switch off: writes its finished turns as `turn_start` (`backfilled:true`) plus
+   * `turn_end`, with the visible text only. Turn numbers must not repeat.
+   */
+  backfill(turns) {
+    for (const item of turns) {
+      this.write({ type: "turn_start", turn: item.turn, at: item.at, message: item.message, backfilled: true });
+      this.write({
+        type: "turn_end",
+        turn: item.turn,
+        at: item.at,
+        status: "done",
+        raw: null,
+        reply: item.reply,
+        lines: item.lines,
+        modelLabel: item.modelLabel
+      });
+    }
+  }
+  /**
+   * The conversation's map changed (create_map / open_map). Waits for the lines queued before it, then moves the file to
+   * `<newRoot>/Chats/records` (`vault.rename`) and writes a `moved` line; a conversation with no file yet lands in the new
+   * root. A failure leaves the file where it was and takes the failure path. Resolves true when the file is in the new place.
+   */
+  moveTo(target) {
+    const conv = this.conv;
+    this.target = target;
+    return this.enqueue(async () => {
+      if (!target.root) return false;
+      if (!conv.file && !conv.adapterPath) {
+        conv.mapPath = target.mapPath;
+        conv.mapId = target.mapId;
+        await this.flush(conv, target);
+        return !!conv.file;
+      }
+      if (conv.root === target.root) return true;
+      const from = conv.mapPath;
+      if (!await this.relocate(conv, target.root)) return false;
+      conv.mapPath = target.mapPath;
+      conv.mapId = target.mapId;
+      if (this.dead()) return true;
+      conv.pending.push(serializeLine({ type: "moved", at: this.stamp(), from, to: target.mapPath }));
+      await this.flush(conv, target);
+      return true;
+    }, false);
+  }
+  /** Resolves when everything queued so far has run (also when more was queued meanwhile). */
+  async idle() {
+    let seen;
+    do {
+      seen = this.chain;
+      await seen;
+    } while (seen !== this.chain);
+  }
+  /** The view closed: no new lines; queued ones still run. */
+  close() {
+    this.closed = true;
+  }
+  /** Plugin unload: nothing more is written, queued work included. */
+  dispose() {
+    this.killed = true;
+    this.closed = true;
+  }
+  // ---- internals ----
+  freshConversation(id) {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const now = (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date();
+    return {
+      id: id != null ? id : newRecordId(now, this.deps.random),
+      startedAt: now.toISOString(),
+      file: null,
+      adapterPath: null,
+      root: null,
+      mapPath: (_e = (_d = this.target) == null ? void 0 : _d.mapPath) != null ? _e : "",
+      mapId: (_g = (_f = this.target) == null ? void 0 : _f.mapId) != null ? _g : "",
+      pending: [],
+      held: false,
+      failed: false,
+      notified: false,
+      ended: /* @__PURE__ */ new Set()
+    };
+  }
+  dead() {
+    return this.killed || this.deps.disposed();
+  }
+  stamp() {
+    var _a2, _b2, _c;
+    return ((_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date()).toISOString();
+  }
+  enqueue(task, fallback) {
+    const run = this.chain.then(() => this.dead() ? fallback : task());
+    const safe = run.catch((error) => {
+      this.deps.log("error", `Map chat record: ${errorText(error)}`);
+      return fallback;
+    });
+    this.chain = safe.then(() => void 0);
+    return safe;
+  }
+  /** Writes the pending lines (creating the file, with its `conversation` line, when there is none). Retries once; then reports. */
+  async flush(conv, target) {
+    var _a2, _b2;
+    if (this.dead() || !conv.pending.length) return;
+    const root = (_b2 = (_a2 = conv.root) != null ? _a2 : target == null ? void 0 : target.root) != null ? _b2 : null;
+    if (!root) return;
+    let failure = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await this.writePending(conv, root, target, attempt > 0);
+        failure = null;
+        break;
+      } catch (error) {
+        failure = error;
+      }
+    }
+    if (failure) this.fail(conv, failure);
+    else if (!this.dead() && !conv.pending.length) conv.failed = false;
+  }
+  async writePending(conv, root, target, retry) {
+    var _a2, _b2, _c, _d;
+    const configDir = this.deps.configDir;
+    const vault = this.deps.app.vault;
+    if (!conv.file && conv.adapterPath) {
+      if (this.dead()) return;
+      const count2 = conv.pending.length;
+      await vault.adapter.append(conv.adapterPath, conv.pending.slice(0, count2).join(""));
+      conv.pending.splice(0, count2);
+      conv.held = false;
+      return;
+    }
+    if (conv.file && retry) conv.file = this.resolve(conv, configDir);
+    if (!conv.file) {
+      const path = recordPath(root, conv.id, configDir);
+      const existing = vault.getAbstractFileByPath(path);
+      if (isFile(existing)) conv.file = existing;
+      else {
+        await this.ensureFolders(root);
+        if (this.dead()) return;
+        const header = serializeLine({
+          type: "conversation",
+          id: conv.id,
+          startedAt: conv.startedAt,
+          mapPath: (_a2 = target == null ? void 0 : target.mapPath) != null ? _a2 : conv.mapPath,
+          mapId: (_b2 = target == null ? void 0 : target.mapId) != null ? _b2 : conv.mapId,
+          pluginVersion: this.deps.pluginVersion
+        });
+        conv.mapPath = (_c = target == null ? void 0 : target.mapPath) != null ? _c : conv.mapPath;
+        conv.mapId = (_d = target == null ? void 0 : target.mapId) != null ? _d : conv.mapId;
+        conv.file = await vault.create(path, header + conv.pending.join(""));
+        conv.root = root;
+        conv.pending = [];
+        conv.held = false;
+        return;
+      }
+      conv.root = root;
+    }
+    if (this.dead()) return;
+    const count = conv.pending.length;
+    await vault.append(conv.file, conv.pending.slice(0, count).join(""));
+    conv.pending.splice(0, count);
+    conv.held = false;
+  }
+  /** The conversation's file as the Vault knows it now: by the handle's own path, then by the path this writer made. */
+  resolve(conv, configDir) {
+    const vault = this.deps.app.vault;
+    if (conv.file) {
+      const byHandle = vault.getAbstractFileByPath(conv.file.path);
+      if (isFile(byHandle)) return byHandle;
+    }
+    if (conv.root) {
+      const byPath = vault.getAbstractFileByPath(recordPath(conv.root, conv.id, configDir));
+      if (isFile(byPath)) return byPath;
+    }
+    return null;
+  }
+  async ensureFolders(root) {
+    const configDir = this.deps.configDir;
+    const vault = this.deps.app.vault;
+    const dir = recordsDir(root, configDir);
+    for (const folder of [`${assertRecordRoot(root, configDir)}/Chats`, dir]) {
+      if (vault.getAbstractFileByPath(folder)) continue;
+      try {
+        await vault.createFolder(folder);
+      } catch (error) {
+        if (!vault.getAbstractFileByPath(folder)) throw error;
+      }
+    }
+  }
+  async relocate(conv, root) {
+    var _a2, _b2, _c;
+    const configDir = this.deps.configDir;
+    const vault = this.deps.app.vault;
+    let failure = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (attempt > 0) conv.file = (_a2 = this.resolve(conv, configDir)) != null ? _a2 : conv.file;
+        const dest = recordPath(root, conv.id, configDir);
+        const here = (_c = (_b2 = conv.file) == null ? void 0 : _b2.path) != null ? _c : conv.adapterPath;
+        if (here === dest) {
+          conv.root = root;
+          return true;
+        }
+        await this.ensureFolders(root);
+        if (this.dead() || !here) return false;
+        if (vault.getAbstractFileByPath(dest) || !conv.file && await vault.adapter.exists(dest))
+          throw new Error(`Record already exists: ${dest}`);
+        if (conv.file) await vault.rename(conv.file, dest);
+        else {
+          await vault.adapter.rename(here, dest);
+          conv.adapterPath = dest;
+        }
+        conv.root = root;
+        return true;
+      } catch (error) {
+        failure = error;
+      }
+    }
+    this.fail(conv, failure);
+    return false;
+  }
+  fail(conv, error) {
+    conv.failed = true;
+    if (conv.notified) return;
+    conv.notified = true;
+    this.deps.log("error", `Map chat record write failed: ${errorText(error)}`);
+    try {
+      this.deps.onFailure();
+    } catch (callbackError) {
+      this.deps.log("error", `Map chat record notice failed: ${errorText(callbackError)}`);
+    }
+  }
+};
+var errorText = (error) => error instanceof Error ? error.message : String(error);
+
+// experiences/visual-map/map-chat-turn-record.ts
+var plainLines = (lines) => lines.map((line) => {
+  const settled = settledLine(line);
+  return { status: settled.status, text: settled.text };
+});
+var MapChatTurnRecord = class {
+  constructor(writer, conversationId, turn, answer, log) {
+    this.writer = writer;
+    this.conversationId = conversationId;
+    this.turn = turn;
+    this.answer = answer;
+    this.log = log;
+    /** The model's raw output of the attempt that is current (set by `onRaw`). */
+    __publicField(this, "raw", null);
+    __publicField(this, "ended", false);
+  }
+  /** The turn has not written its end yet. */
+  get isOpen() {
+    return !this.ended;
+  }
+  live() {
+    return this.writer.conversationId === this.conversationId;
+  }
+  /** Writes a line of this turn into its own conversation; a failure to build the line is logged, never thrown into the chat. */
+  write(line) {
+    if (!this.live()) return;
+    try {
+      this.writer.write(line);
+    } catch (error) {
+      this.log(error instanceof Error ? error.message : String(error));
+    }
+  }
+  event(kind) {
+    this.write({ type: "event", turn: this.turn, kind });
+  }
+  /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */
+  end(status, fields = {}) {
+    var _a2, _b2, _c, _d;
+    if (this.ended) return false;
+    this.ended = true;
+    const partial = this.answer.streaming ? this.answer.text : "";
+    this.write({
+      type: "turn_end",
+      turn: this.turn,
+      status,
+      ...fields.reason ? { reason: fields.reason } : {},
+      raw: this.raw,
+      reply: (_a2 = fields.reply) != null ? _a2 : partial,
+      lines: plainLines((_b2 = fields.lines) != null ? _b2 : this.answer.lines),
+      modelLabel: (_c = this.answer.modelLabel) != null ? _c : "",
+      ...((_d = fields.rejected) == null ? void 0 : _d.length) ? { rejected: fields.rejected } : {},
+      ...fields.error ? { error: fields.error } : {}
+    });
+    return true;
+  }
+  /** What became of the plan card of this turn. */
+  plan(state, lines = []) {
+    this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
+  }
+  /** The state of a picture search of this turn (`extraInserted`: the candidate being inserted right now). */
+  images(block, extraInserted) {
+    this.write({
+      type: "images",
+      turn: this.turn,
+      state: block.state,
+      items: block.items.map((item) => {
+        var _a2;
+        return { title: item.candidate.title, sourceUrl: (_a2 = item.candidate.source) != null ? _a2 : "" };
+      }),
+      inserted: block.items.flatMap((item, index) => item.inserted || item === extraInserted ? [index] : [])
+    });
+  }
+};
+
 // core/map-chat-plan.ts
 var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
 var MAP_CHAT_FIND_IMAGES_LIMIT = 3;
@@ -42237,13 +42797,13 @@ function parseOutline(input2) {
     skippedLines
   };
 }
-function errorText(error) {
+function errorText2(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
 function localDate3(now) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const pad3 = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad3(now.getMonth() + 1)}-${pad3(now.getDate())}`;
 }
 function outlineRootDetail(language2, template2, source, now) {
   var _a2;
@@ -42277,7 +42837,7 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
       note.parentId = top ? parentId : created[node.parent].id;
       created.push(note);
     } catch (error) {
-      return { created, failure: errorText(error) };
+      return { created, failure: errorText2(error) };
     }
   }
   return { created };
@@ -42291,7 +42851,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   try {
     map = await repository.readMap(mapPath);
   } catch (error) {
-    throw Object.assign(new Error(errorText(error)), { mapCreated: true });
+    throw Object.assign(new Error(errorText2(error)), { mapCreated: true });
   }
   const rootDetail = outlineRootDetail(language2, detailTemplate, source, now);
   const { created, failure } = await createOutlineNotes(
@@ -42308,7 +42868,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   try {
     await repository.saveMap(mapPath, map);
   } catch (error) {
-    const message = errorText(error);
+    const message = errorText2(error);
     throw Object.assign(
       new Error(
         translate(
@@ -48673,7 +49233,7 @@ var clarificationRequiredRationale = (language2) => language2 ? renderTemplate(i
 // experiences/aim/planner-review.ts
 var AIM_MAX_RESEARCH_TURNS = DEFAULT_AIM_FLOW_LIMITS.maxResearchTurns;
 var GAP_KINDS = ["searchable", "user_only", "not_decisive"];
-var errorText2 = (error) => error instanceof Error ? error.message : String(error);
+var errorText3 = (error) => error instanceof Error ? error.message : String(error);
 var marker4 = /^\s*<!--\s*aim-review\s+(\{[^\n]*\})\s*-->\s*/;
 function readMarker(detail) {
   const match = detail.match(marker4);
@@ -48826,7 +49386,7 @@ async function parseAimPlannerReviewWithRecovery(original, context, recover) {
           originalSummary,
           preservedBody,
           originalSuggestions: JSON.stringify(original.suggestions),
-          formatError: errorText2(formatError)
+          formatError: errorText3(formatError)
         });
         stated = await recover(task2);
         const statedMarker = readMarker(stated.detail);
@@ -48847,7 +49407,7 @@ async function parseAimPlannerReviewWithRecovery(original, context, recover) {
           originalSummary,
           preservedBody,
           originalSuggestions: JSON.stringify(original.suggestions),
-          formatError: errorText2(formatError)
+          formatError: errorText3(formatError)
         });
         const repaired2 = await recover(task2);
         const repairedMarker = readMarker(repaired2.detail);
@@ -48886,7 +49446,7 @@ ${preservedBody}`,
         originalRationale,
         originalSummary,
         originalBody,
-        formatError: errorText2(formatError),
+        formatError: errorText3(formatError),
         originalSuggestions: JSON.stringify(original.suggestions)
       });
       const repaired2 = await recover(task2);
@@ -48908,7 +49468,7 @@ ${preservedBody}`,
     const preserveDecision = !answeredWithoutTarget && isDecision(originalDecision) ? originalDecision : void 0;
     const task = renderGeneralRepair({
       variant: answeredWithoutTarget ? { kind: "answered-without-target" } : preserveDecision ? { kind: "preserve-decision", decision: preserveDecision } : { kind: "no-decision" },
-      formatError: errorText2(formatError),
+      formatError: errorText3(formatError),
       ...preserveDecision ? {} : {
         context: {
           question: context.question,
@@ -54435,6 +54995,24 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
     __publicField(this, "chatReplyStep");
     /**
+     * Conversation records (the settings switch "save map AI conversations"). The writer exists only after the switch was on at a use
+     * (send, open); with the switch off nothing here runs.
+     */
+    __publicField(this, "chatRecords", null);
+    __publicField(this, "chatRecordsUnregister", null);
+    /** The highest turn number used in the conversation's record. */
+    __publicField(this, "chatRecordTurnSeq", 0);
+    /** Finished answers that are in the record (written, restored or backfilled). */
+    __publicField(this, "chatRecordLogged", /* @__PURE__ */ new WeakSet());
+    /** The record of the newest turn (running or finished): plan results, picture candidates and undo / redo of it go to its conversation. */
+    __publicField(this, "chatLastRecord", null);
+    __publicField(this, "chatPlanRecords", /* @__PURE__ */ new WeakMap());
+    __publicField(this, "chatImageRecords", /* @__PURE__ */ new WeakMap());
+    /** Counts the times the conversation left its map or began anew: a restore that read the files meanwhile is dropped. */
+    __publicField(this, "chatRecordEpoch", 0);
+    /** Stop was pressed while a plan was applying: the plan line says so. */
+    __publicField(this, "chatPlanStopped", false);
+    /**
      * AI actions whose dialog hid itself and whose provider request is not accepted yet, keyed by node path (or
      * `selection:<map path>`). The value is the dialog's controller, so a card or bar Stop pressed before acceptance
      * reaches the run and no request is sent; the entry goes away once the run is accepted or ends.
@@ -55641,7 +56219,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
-    if ((_h = this.chat) == null ? void 0 : _h.hasUnsavedTurns) new import_obsidian37.Notice(t("ui.map_chat_unsaved_on_close"));
+    if (((_h = this.chat) == null ? void 0 : _h.hasUnsavedTurns) && !this.chatRecordSaved()) new import_obsidian37.Notice(t("ui.map_chat_unsaved_on_close"));
+    this.endChatRecord("aborted", { reason: "view_closed" });
+    this.closeChatRecords();
     this.abortMapChat();
     (_i = this.chat) == null ? void 0 : _i.dispose();
     (_j = this.relevancePanelCleanup) == null ? void 0 : _j.call(this);
@@ -70698,7 +71278,7 @@ ${note.detail.trim()}` : "",
    * (messages, draft, chips) lives on the view.
    */
   mountMapChat(workspace, overlay) {
-    var _a2;
+    var _a2, _b2;
     this.chatWorkspaceEl = workspace;
     this.chatOverlayEl = overlay;
     if (!this.map) return;
@@ -70710,15 +71290,18 @@ ${note.detail.trim()}` : "",
       if (this.chatCarryOver) {
         this.chatMapId = this.map.id;
       } else {
+        this.endChatRecord("aborted", { reason: "map_switch" });
         this.abortMapChat();
         this.chatPlanToken++;
         this.chat.reset();
         this.chatMapId = this.map.id;
+        this.startChatRecords();
       }
     }
+    (_a2 = this.chatRecords) == null ? void 0 : _a2.setTarget(this.chatRecordTarget());
     this.syncChatNarrow();
     this.placeChatPanel();
-    (_a2 = this.viewportEl) == null ? void 0 : _a2.addEventListener("pointerdown", () => {
+    (_b2 = this.viewportEl) == null ? void 0 : _b2.addEventListener("pointerdown", () => {
       var _a3;
       return (_a3 = this.chat) == null ? void 0 : _a3.collapseOverlay();
     });
@@ -71072,7 +71655,9 @@ ${note.detail.trim()}` : "",
       },
       insertImage: (images, item) => this.chatInsertImage(images, item),
       canSave: () => !this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true },
-      saveTranscript: (turns) => this.saveChatTranscript(turns)
+      saveTranscript: (turns) => this.saveChatTranscript(turns),
+      recordsEnabled: () => this.plugin.settings.mapChatRecords === true,
+      newConversation: () => this.newChatConversation()
     };
   }
   /** The chat's model list: the settings page's list, plus the current model when it has gone from that list. */
@@ -71376,13 +71961,14 @@ ${note.detail.trim()}` : "",
       went = await this.plugin.confirmAiUsage(
         request.model,
         async () => {
-          var _a2, _b2;
+          var _a2, _b2, _c;
           if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
             abandon();
             return;
           }
           sent = true;
           if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+          const record = this.beginChatRecord(chat, turn, request, origin);
           const openAttempt = () => {
             var _a3;
             const controller = new AbortController();
@@ -71423,6 +72009,7 @@ ${note.detail.trim()}` : "",
               if (!alive() || replaced || !watching) return;
               replaced = true;
               stopWatching();
+              record == null ? void 0 : record.event("resend");
               this.releaseChatTask();
               controller.abort();
               attempt = openAttempt();
@@ -71451,7 +72038,11 @@ ${note.detail.trim()}` : "",
                     }
                     if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
                     if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
-                  }
+                  },
+                  // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
+                  record ? (raw) => {
+                    if (alive()) record.raw = raw;
+                  } : void 0
                 ),
                 swapped.then(() => null)
               ]);
@@ -71471,8 +72062,11 @@ ${note.detail.trim()}` : "",
                     plan,
                     request.context,
                     { path: anchor.path, id: anchor.id },
-                    request.message
+                    request.message,
+                    record
                   );
+                  if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
+                    this.chatRecordLogged.add(turn.assistant);
                 }
                 return;
               }
@@ -71483,7 +72077,11 @@ ${note.detail.trim()}` : "",
                 alive,
                 anchor
               );
-              if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+              if (alive() && chat.isBusy) {
+                chat.finish(result.reply, lines);
+                if (record == null ? void 0 : record.end("done", { reply: result.reply, lines, rejected: result.rejected }))
+                  this.chatRecordLogged.add(turn.assistant);
+              }
               return;
             } catch (error) {
               stopWatching();
@@ -71491,6 +72089,12 @@ ${note.detail.trim()}` : "",
               if (alive()) {
                 const failure = this.chatErrorText(error);
                 chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
+                record == null ? void 0 : record.end("failed", {
+                  reason: /time(d)?[\s-]?out/i.test(errorMessage(error)) ? "timeout" : "error",
+                  reply: failure.text,
+                  lines: [],
+                  error: { text: failure.text, technical: (_c = failure.technical) != null ? _c : "" }
+                });
               }
               return;
             } finally {
@@ -71514,10 +72118,13 @@ ${note.detail.trim()}` : "",
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   supersedeChatPlan() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const pending2 = (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.pendingPlan()) != null ? _b2 : null;
     this.chatPlanToken++;
-    if (pending2) (_c = this.chat) == null ? void 0 : _c.settlePlan(pending2, "cancelled");
+    if (pending2) {
+      (_c = this.chat) == null ? void 0 : _c.settlePlan(pending2, "cancelled");
+      (_d = this.chatPlanRecords.get(pending2)) == null ? void 0 : _d.plan("cancelled");
+    }
   }
   planReasonText(reason, result, selectedCount) {
     switch (reason) {
@@ -71530,7 +72137,7 @@ ${note.detail.trim()}` : "",
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
-  offerChatPlan(result, plan, baseline, anchor, message) {
+  offerChatPlan(result, plan, baseline, anchor, message, record = null) {
     const chat = this.chat;
     if (!chat) return;
     const token = ++this.chatPlanToken;
@@ -71557,23 +72164,29 @@ ${note.detail.trim()}` : "",
       state: "pending",
       apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor),
       cancel: () => {
-        var _a2;
+        var _a2, _b2;
         if (token !== this.chatPlanToken) return;
         this.chatPlanToken++;
         (_a2 = this.chat) == null ? void 0 : _a2.settlePlan(card, "cancelled");
+        (_b2 = this.chatPlanRecords.get(card)) == null ? void 0 : _b2.plan("cancelled");
       }
     };
+    if (record) this.chatPlanRecords.set(card, record);
     chat.showPlan(card);
   }
   async applyChatPlan(card, token, result, baseline, anchor) {
+    var _a2, _b2;
     const chat = this.chat;
     if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
     if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
       this.chatPlanToken++;
-      chat.settlePlan(card, "cancelled", [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }]);
+      const skip = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
+      chat.settlePlan(card, "cancelled", skip);
+      (_a2 = this.chatPlanRecords.get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
       return;
     }
     this.chatApplying = true;
+    this.chatPlanStopped = false;
     chat.settlePlan(card, "applied");
     chat.setApplying(true);
     let lines;
@@ -71588,7 +72201,207 @@ ${note.detail.trim()}` : "",
       this.chatApplying = false;
       chat.setApplying(false);
     }
-    if (!this.closed) chat.settlePlan(card, "applied", lines);
+    if (!this.closed) {
+      chat.settlePlan(card, "applied", lines);
+      (_b2 = this.chatPlanRecords.get(card)) == null ? void 0 : _b2.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
+    }
+  }
+  // ---- conversation records (the settings switch "save map AI conversations") -----------------------------------------
+  chatRecordTarget() {
+    var _a2, _b2;
+    const managed = isManagedMapPath(this.plugin.settings, this.path);
+    return {
+      root: managed ? this.plugin.repo.topicRoot(this.path) : null,
+      mapPath: this.path,
+      mapId: (_b2 = (_a2 = this.map) == null ? void 0 : _a2.id) != null ? _b2 : ""
+    };
+  }
+  /** This view's writer, made at the first use while the switch is on (and registered, so the switch reaches it); null while it is off. */
+  ensureChatRecords() {
+    var _a2, _b2;
+    if (this.plugin.settings.mapChatRecords !== true || this.closed) return null;
+    if (!this.chatRecords) {
+      const writer = new MapChatRecordWriter({
+        app: this.plugin.repo.app,
+        log: (level, message) => this.plugin.logs.appendLog(level, message),
+        disposed: () => this.plugin.repo.isDisposed(),
+        // The writer calls this once per conversation; the chat itself goes on.
+        onFailure: () => {
+          new import_obsidian37.Notice(t("ui.map_chat_record_failed"));
+        },
+        pluginVersion: (_b2 = (_a2 = this.plugin.manifest) == null ? void 0 : _a2.version) != null ? _b2 : "0.0.0",
+        configDir: this.app.vault.configDir
+      });
+      writer.setTarget(this.chatRecordTarget());
+      this.chatRecords = writer;
+      this.chatRecordsUnregister = this.plugin.registerMapChatRecordWriter(writer);
+    }
+    return this.chatRecords;
+  }
+  /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn. */
+  chatRecordSaved() {
+    var _a2, _b2;
+    const writer = this.chatRecords;
+    if (!writer || this.plugin.settings.mapChatRecords !== true || writer.unsaved) return false;
+    return (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.completedTurns().every((turn) => this.chatRecordLogged.has(turn.answer))) != null ? _b2 : true;
+  }
+  /** The view closes: the writer takes no new line (what is queued still runs), or none at all once the plugin is unloading. */
+  closeChatRecords() {
+    var _a2;
+    const writer = this.chatRecords;
+    if (!writer) return;
+    (_a2 = this.chatRecordsUnregister) == null ? void 0 : _a2.call(this);
+    this.chatRecordsUnregister = null;
+    if (this.plugin.repo.isDisposed()) writer.dispose();
+    else writer.close();
+  }
+  /** Ends the running turn's record (a no-op when there is none or it already ended). */
+  endChatRecord(status, fields) {
+    const record = this.chatLastRecord;
+    if (record == null ? void 0 : record.isOpen) record.end(status, fields);
+  }
+  /**
+   * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished
+   * turns first). Returns the turn's record, or null with the switch off.
+   */
+  beginChatRecord(chat, turn, request, origin) {
+    const writer = this.ensureChatRecords();
+    if (!writer) return null;
+    try {
+      writer.setTarget(this.chatRecordTarget());
+      const missing = chat.completedTurns().filter((item) => !this.chatRecordLogged.has(item.answer));
+      if (missing.length) {
+        writer.backfill(
+          missing.map((item) => {
+            var _a2;
+            return {
+              turn: ++this.chatRecordTurnSeq,
+              message: item.question.text,
+              reply: item.answer.text,
+              lines: item.answer.lines.map((line) => ({ status: settledLine(line).status, text: settledLine(line).text })),
+              modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : ""
+            };
+          })
+        );
+        for (const item of missing) this.chatRecordLogged.add(item.answer);
+      }
+      chat.conversationId = writer.conversationId;
+      const number = ++this.chatRecordTurnSeq;
+      const record = new MapChatTurnRecord(
+        writer,
+        writer.conversationId,
+        number,
+        turn.assistant,
+        (message) => this.plugin.logs.appendLog("error", `Map chat record: ${message}`)
+      );
+      const chips = origin.chips.map(
+        (chip) => chip.kind === "topic" ? { kind: chip.kind, id: chip.id } : chip.kind === "snippet" ? { kind: chip.kind, path: chip.path, text: chip.text } : { kind: chip.kind, path: chip.path }
+      );
+      record.write({
+        type: "turn_start",
+        turn: number,
+        message: origin.text,
+        origin: { chips, selectedIds: [...origin.selectedIds] },
+        request: {
+          step: { id: mapChatStep.id, version: mapChatStep.version },
+          model: request.model,
+          reasoning: request.reasoning,
+          language: request.language,
+          contentLanguage: request.contentLanguage,
+          message: request.message,
+          context: request.context
+        }
+      });
+      this.chatLastRecord = record;
+      return record;
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+      return null;
+    }
+  }
+  /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
+  startChatRecords() {
+    this.chatRecordEpoch++;
+    this.chatRecordTurnSeq = 0;
+    this.chatLastRecord = null;
+    const writer = this.chatRecords;
+    if (writer) {
+      writer.newConversation();
+      writer.setTarget(this.chatRecordTarget());
+    }
+    if (this.plugin.settings.mapChatRecords === true) void this.restoreChatRecords();
+  }
+  /** "New conversation" (the panel is already empty): the next send starts a new file. */
+  newChatConversation() {
+    this.chatPlanToken++;
+    this.chatRecordEpoch++;
+    this.chatRecordTurnSeq = 0;
+    this.chatLastRecord = null;
+    const writer = this.chatRecords;
+    if (!writer) return;
+    writer.newConversation();
+    writer.setTarget(this.chatRecordTarget());
+  }
+  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
+  async readLatestChatRecord(root) {
+    const adapter = this.plugin.repo.app.vault.adapter;
+    const dir = recordsDir(root, this.app.vault.configDir);
+    if (!await adapter.exists(dir)) return null;
+    const files = [];
+    for (const path of (await adapter.list(dir)).files) {
+      if (!isRecordFilePath(path) || path.slice(0, path.lastIndexOf("/")) !== dir) continue;
+      files.push({
+        id: path.slice(path.lastIndexOf("/") + 1, -".jsonl".length),
+        path,
+        text: await adapter.read(path)
+      });
+    }
+    return pickLatest(files);
+  }
+  /**
+   * Shows the map's latest saved conversation again and goes on writing to its file. Nothing happens when the file's version is
+   * unknown (the next send opens a new file and this one is left as it is), or when the conversation moved on while the files were read.
+   */
+  async restoreChatRecords() {
+    var _a2, _b2, _c;
+    const chat = this.chat;
+    const map = this.map;
+    if (!chat || !map || !isManagedMapPath(this.plugin.settings, this.path)) return;
+    const writer = this.ensureChatRecords();
+    if (!writer) return;
+    const epoch = this.chatRecordEpoch;
+    const mapPath = this.path;
+    let latest;
+    try {
+      latest = await this.readLatestChatRecord(this.plugin.repo.topicRoot(mapPath));
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+      return;
+    }
+    if (!latest || latest.parsed.unrecoverable || this.closed || epoch !== this.chatRecordEpoch || chat !== this.chat || chat.hasMessages || chat.isBusy || this.chatApplying || this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== map.id)
+      return;
+    const restored = restoreConversation(latest.id, latest.parsed.lines);
+    chat.restore(restored);
+    if (chat.conversationId !== restored.id) return;
+    const handle = this.plugin.repo.app.vault.getAbstractFileByPath((_b2 = latest.path) != null ? _b2 : "");
+    writer.resume(
+      latest.id,
+      handle instanceof import_obsidian37.TFile ? handle : (_c = latest.path) != null ? _c : "",
+      this.chatRecordTarget(),
+      latest.parsed.cleanEnd
+    );
+    const numbers = latest.parsed.lines.flatMap(
+      (line) => "turn" in line && typeof line.turn === "number" ? [line.turn] : []
+    );
+    writer.markEnded(numbers);
+    this.chatRecordTurnSeq = Math.max(0, ...numbers);
+    for (const item of chat.completedTurns()) this.chatRecordLogged.add(item.answer);
+    this.relocateMapChat();
+  }
+  settleChatImages(chat, block, patch) {
+    var _a2;
+    chat.settleImages(block, patch);
+    (_a2 = this.chatImageRecords.get(block)) == null ? void 0 : _a2.images(block);
   }
   releaseChatTask() {
     var _a2;
@@ -71601,6 +72414,7 @@ ${note.detail.trim()}` : "",
     var _a2, _b2, _c, _d, _e;
     if (this.chatApplying && !this.chatController) {
       this.chatPlanToken++;
+      this.chatPlanStopped = true;
       (_a2 = this.chat) == null ? void 0 : _a2.focusInput();
       return;
     }
@@ -71612,6 +72426,7 @@ ${note.detail.trim()}` : "",
     }
     this.releaseChatTask();
     controller.abort();
+    this.endChatRecord("stopped");
     (_d = this.chat) == null ? void 0 : _d.markStopped();
     (_e = this.chat) == null ? void 0 : _e.focusInput();
   }
@@ -71894,6 +72709,7 @@ ${note.detail.trim()}` : "",
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)() }) {
     var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
+    const record = this.chatLastRecord;
     const same = () => {
       var _a4;
       return !this.closed && alive() && this.path === anchor.path && ((_a4 = this.map) == null ? void 0 : _a4.id) === anchor.id;
@@ -72050,7 +72866,8 @@ ${note.detail.trim()}` : "",
               anchor.path,
               (_b2 = run.notes) != null ? _b2 : /* @__PURE__ */ new Set(),
               (_c = run.files) != null ? _c : /* @__PURE__ */ new Set(),
-              (_d = run.parked) != null ? _d : /* @__PURE__ */ new Set()
+              (_d = run.parked) != null ? _d : /* @__PURE__ */ new Set(),
+              record
             );
         } catch (e) {
         }
@@ -72278,6 +73095,8 @@ ${note.detail.trim()}` : "",
     this.chatCarryOver = true;
     try {
       await this.openMapInMutation(mapPath);
+      if (!this.closed && this.path === mapPath && this.map && this.chatRecords && this.plugin.settings.mapChatRecords === true)
+        await this.chatRecords.moveTo(this.chatRecordTarget());
     } finally {
       this.chatCarryOver = false;
       if (!this.closed && this.path === mapPath && this.map) {
@@ -72710,12 +73529,15 @@ ${note.detail.trim()}` : "",
    * reply touched with what it left (or what the last undo left): any difference refuses the whole step and nothing is
    * touched. Then the entries run like one (newest first for undo); a failure part-way puts back what already ran.
    */
-  async pushChatReplyEntry(entries, mapPath, noteIds, files, parked = /* @__PURE__ */ new Set()) {
+  async pushChatReplyEntry(entries, mapPath, noteIds, files, parked = /* @__PURE__ */ new Set(), record = null) {
     if (!entries.length) return void 0;
     const fingerprint2 = () => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint2();
     const run = async (redo) => {
-      if (await fingerprint2() !== expected) throw this.chatUndoRefusal();
+      if (await fingerprint2() !== expected) {
+        record == null ? void 0 : record.event("undo_refused");
+        throw this.chatUndoRefusal();
+      }
       const list = redo ? entries : [...entries].reverse();
       const done = [];
       try {
@@ -72731,6 +73553,7 @@ ${note.detail.trim()}` : "",
         throw error;
       }
       expected = await fingerprint2();
+      record == null ? void 0 : record.event(redo ? "redo" : "undo");
     };
     const step = {
       undo: () => run(false),
@@ -72926,10 +73749,11 @@ ${note.detail.trim()}` : "",
             if (this.chatImageSearches.get(key2) !== controller) return;
             this.chatImageSearches.delete(key2);
             controller.abort();
-            chat.settleImages(block, { state: "stopped" });
+            this.settleChatImages(chat, block, { state: "stopped" });
           }
         };
         chat.addImages(block);
+        if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
         settle({ status: "done", images: block });
         try {
           await this.runImageSearch(block, controller, chat, note.model);
@@ -72955,18 +73779,18 @@ ${note.detail.trim()}` : "",
     const current = () => !this.closed && !controller.signal.aborted && this.chat === chat && sameMap();
     const dropped = () => {
       if (this.closed || controller.signal.aborted || this.chat !== chat) return;
-      chat.settleImages(block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
+      this.settleChatImages(chat, block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
     };
     try {
       const found = await this.plugin.searchImages(block.query, model, controller.signal);
       if (!current()) return dropped();
       const loadable = (await this.chatProbeImages(found, controller.signal)).slice(0, 6);
       if (!current()) return dropped();
-      if (!loadable.length) chat.settleImages(block, { state: "empty" });
-      else chat.settleImages(block, { state: "ready", items: loadable.map((candidate) => ({ candidate })) });
+      if (!loadable.length) this.settleChatImages(chat, block, { state: "empty" });
+      else this.settleChatImages(chat, block, { state: "ready", items: loadable.map((candidate) => ({ candidate })) });
     } catch (error) {
       if (!current()) return dropped();
-      chat.settleImages(block, { state: "failed", reason: errorMessage(error) });
+      this.settleChatImages(chat, block, { state: "failed", reason: errorMessage(error) });
     }
   }
   /**
@@ -72976,6 +73800,7 @@ ${note.detail.trim()}` : "",
    * write, where nothing else can change the map.
    */
   async chatInsertImage(block, item) {
+    var _a2;
     const fence = () => {
       if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
         return { reason: "ui.map_chat_images_stale_map" };
@@ -72994,14 +73819,14 @@ ${note.detail.trim()}` : "",
     };
     try {
       await this.plugin.mutate(async () => {
-        var _a2;
+        var _a3;
         const again = fence();
         if ("reason" in again) {
           outcome.result = { ok: false, reason: t(again.reason) };
           return;
         }
         try {
-          const note = await this.plugin.repo.readNote(again.node.path, (_a2 = this.map) != null ? _a2 : void 0);
+          const note = await this.plugin.repo.readNote(again.node.path, (_a3 = this.map) != null ? _a3 : void 0);
           if (note.aiLocked) {
             outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
             return;
@@ -73019,6 +73844,7 @@ ${addition}` : addition });
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
     }
+    if (outcome.result.ok) (_a2 = this.chatImageRecords.get(block)) == null ? void 0 : _a2.images(block, item);
     if (outcome.result.ok) await this.chatCoverFromPicture(block, item.candidate).catch(() => void 0);
     return outcome.result;
   }
@@ -74563,14 +75389,14 @@ ${addition}` : addition });
   noticeTopicStyleMissing(node, note, missing) {
     const messages = [];
     const named = (ref) => `${ref.replace(/^(?:builtin|file|style):/, "")}.md`;
-    const isFile = (ref) => ref.startsWith("style:") || ref.startsWith("file:");
+    const isFile2 = (ref) => ref.startsWith("style:") || ref.startsWith("file:");
     if (note.noteStyle && missing.includes(note.noteStyle))
       messages.push(
-        isFile(note.noteStyle) ? t("ui.note_style_file_missing_0", named(note.noteStyle)) : t("ui.detail_template_missing_0", note.noteStyle)
+        isFile2(note.noteStyle) ? t("ui.note_style_file_missing_0", named(note.noteStyle)) : t("ui.detail_template_missing_0", note.noteStyle)
       );
     if (note.detailTemplateId && missing.includes(note.detailTemplateId))
       messages.push(
-        isFile(note.detailTemplateId) ? t("ui.note_style_file_missing_0", named(note.detailTemplateId)) : t("ui.detail_template_missing_0", note.detailTemplateId)
+        isFile2(note.detailTemplateId) ? t("ui.note_style_file_missing_0", named(note.detailTemplateId)) : t("ui.detail_template_missing_0", note.detailTemplateId)
       );
     if (note.toneId && missing.includes(note.toneId)) messages.push(t("ui.note_style_tone_missing_0", note.toneId));
     if (messages.length)
@@ -74778,43 +75604,6 @@ var import_obsidian49 = require("obsidian");
 
 // ui/modals/map-chat-records-off-modal.ts
 var import_obsidian38 = require("obsidian");
-
-// core/map-chat-records.ts
-var RecordPathError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "RecordPathError";
-  }
-};
-var ID_PATTERN2 = /^\d{8}-\d{6}-[0-9a-z]{6}$/;
-var isRecordId = (id) => typeof id === "string" && ID_PATTERN2.test(id);
-function assertRecordRoot(root, configDir) {
-  if (typeof root !== "string" || !root) throw new RecordPathError("Record root is empty");
-  if (root.startsWith("/") || /^[a-zA-Z]:/.test(root) || root.includes("\\") || root.includes("\0"))
-    throw new RecordPathError(`Record root is not a Vault-relative path: ${root}`);
-  const banned = configDir ? configDir.toLowerCase() : null;
-  for (const part of root.split("/")) {
-    if (!part || part === "." || part === "..") throw new RecordPathError(`Record root has an unsafe part: ${root}`);
-    if (part.startsWith(".") || part.toLowerCase() === banned)
-      throw new RecordPathError(`Record root is inside a hidden or config folder: ${root}`);
-  }
-  return root;
-}
-function isRecordFilePath(path) {
-  const match = /^(.+)\/Chats\/records\/([^/]+)\.jsonl$/.exec(path);
-  if (!match) return false;
-  try {
-    assertRecordRoot(match[1]);
-  } catch (e) {
-    return false;
-  }
-  return isRecordId(match[2]);
-}
-function recordFilesIn(files) {
-  return files.filter((file) => isRecordFilePath(file.path));
-}
-
-// ui/modals/map-chat-records-off-modal.ts
 var MapChatRecordsOffModal = class extends import_obsidian38.Modal {
   constructor(app, count, decide) {
     super(app);
@@ -75238,10 +76027,10 @@ var NoteStyleEditorModal = class extends import_obsidian40.Modal {
     const byRef = (ref) => recipes.find((item) => item.ref === ref);
     const base = (_c = (_b2 = byRef((_a2 = source != null ? source : options.from) != null ? _a2 : void 0)) != null ? _b2 : byRef(KIND_DEFAULT_RECIPE.topic)) != null ? _c : recipes[0];
     const sourceItem = byRef(source);
-    const isFile = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
-    this.existing = isFile ? { ref: sourceItem.ref, text: (_d = store.recipeText(sourceItem.ref)) != null ? _d : "" } : void 0;
+    const isFile2 = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
+    this.existing = isFile2 ? { ref: sourceItem.ref, text: (_d = store.recipeText(sourceItem.ref)) != null ? _d : "" } : void 0;
     this.builtinSource = (sourceItem == null ? void 0 : sourceItem.kind) === "builtin" ? sourceItem.ref : void 0;
-    const name2 = isFile ? sourceItem.name : (_e = options.name) != null ? _e : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
+    const name2 = isFile2 ? sourceItem.name : (_e = options.name) != null ? _e : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
     this.structureRef = (_f = base == null ? void 0 : base.structure.ref) != null ? _f : "builtin:standard";
     const language2 = plugin.settings.language;
     try {
@@ -84028,8 +84817,8 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
     __publicField(this, "markdownSelectionAi", null);
     __publicField(this, "unreadableReported", /* @__PURE__ */ new Map());
     /**
-     * Writers of the open map views, so the settings switch reaches them. TODO(P4): view.ts calls `registerMapChatRecordWriter`
-     * when it makes its writer (and the returned function when it closes), and creates the writer only while `settings.mapChatRecords`.
+     * Writers of the open map views, so the settings switch reaches them. view.ts calls `registerMapChatRecordWriter` when it makes
+     * its writer (and the returned function when it closes), and creates the writer only while `settings.mapChatRecords`.
      * Each registered writer gets `setEnabled(false)` the moment the switch goes off and `setEnabled(true)` when it goes on.
      */
     __publicField(this, "mapChatRecordWriters", /* @__PURE__ */ new Set());

@@ -159,6 +159,8 @@ function fixture(language = 'zh-TW', options = {}) {
     adapter: {
       exists: async p => files.has(p),
       mkdir: async p => { if (files.has(p)) throw new Error(`Folder already exists: ${p}`); const folder = new TFolder(p); files.set(p, folder); attach(folder); },
+      append: async (p, data) => { if (!files.has(p)) throw new Error(`Missing file: ${p}`); contents.set(p, (contents.get(p) ?? '') + data); },
+      rename: async (from, to) => renameTree(from, to),
       list: async p => ({ files: [...files.values()].filter(file => file instanceof TFile && file.parent?.path === p).map(file => file.path), folders: [...files.values()].filter(file => file instanceof TFolder && file.parent?.path === p).map(file => file.path) }),
       read: async p => { if (!contents.has(p)) throw new Error(`Missing file: ${p}`); return contents.get(p); },
       write: async (p, value) => { if (!files.has(p)) { const file = new TFile(p); files.set(p, file); attach(file); } contents.set(p, value); },

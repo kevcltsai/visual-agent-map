@@ -33,6 +33,8 @@ interface Conversation {
   id: string;
   startedAt: string;
   file: TFile | null;
+  /** The record's path when the Vault does not list it (a file type Obsidian is not set to detect): it is written through the adapter. */
+  adapterPath: string | null;
   /** The root the file lives in (set once it has landed). */
   root: string | null;
   mapPath: string;
@@ -76,7 +78,7 @@ export class MapChatRecordWriter {
   }
   /** The conversation's file exists. */
   get landed(): boolean {
-    return !!this.conv.file;
+    return !!this.conv.file || !!this.conv.adapterPath;
   }
   /** A write of this conversation failed (and was reported): the chat counts as not saved. */
   get failed(): boolean {
@@ -98,11 +100,15 @@ export class MapChatRecordWriter {
   newConversation(): void {
     this.conv = this.freshConversation();
   }
-  /** Continues an existing record (restored on open): later lines are appended to `file`. `cleanEnd` is `parseRecord(text).cleanEnd`. */
-  resume(id: string, file: TFile, target: MapChatRecordTarget, cleanEnd = true): void {
+  /**
+   * Continues an existing record (restored on open): later lines are appended to `file`, or, given its path, through the adapter
+   * (a record the Vault index does not list). `cleanEnd` is `parseRecord(text).cleanEnd`.
+   */
+  resume(id: string, file: TFile | string, target: MapChatRecordTarget, cleanEnd = true): void {
     this.conv = {
       ...this.freshConversation(id),
-      file,
+      file: typeof file === "string" ? null : file,
+      adapterPath: typeof file === "string" ? file : null,
       root: target.root,
       mapPath: target.mapPath,
       mapId: target.mapId,
@@ -174,7 +180,7 @@ export class MapChatRecordWriter {
     this.target = target;
     return this.enqueue(async () => {
       if (!target.root) return false;
-      if (!conv.file) {
+      if (!conv.file && !conv.adapterPath) {
         conv.mapPath = target.mapPath;
         conv.mapId = target.mapId;
         await this.flush(conv, target);
@@ -218,6 +224,7 @@ export class MapChatRecordWriter {
       id: id ?? newRecordId(now, this.deps.random),
       startedAt: now.toISOString(),
       file: null,
+      adapterPath: null,
       root: null,
       mapPath: this.target?.mapPath ?? "",
       mapId: this.target?.mapId ?? "",
@@ -271,6 +278,14 @@ export class MapChatRecordWriter {
   ): Promise<void> {
     const configDir = this.deps.configDir;
     const vault = this.deps.app.vault;
+    if (!conv.file && conv.adapterPath) {
+      if (this.dead()) return;
+      const count = conv.pending.length;
+      await vault.adapter.append(conv.adapterPath, conv.pending.slice(0, count).join(""));
+      conv.pending.splice(0, count);
+      conv.held = false;
+      return;
+    }
     if (conv.file && retry) conv.file = this.resolve(conv, configDir);
     if (!conv.file) {
       const path = recordPath(root, conv.id, configDir);
@@ -340,14 +355,20 @@ export class MapChatRecordWriter {
       try {
         if (attempt > 0) conv.file = this.resolve(conv, configDir) ?? conv.file;
         const dest = recordPath(root, conv.id, configDir);
-        if (conv.file && conv.file.path === dest) {
+        const here = conv.file?.path ?? conv.adapterPath;
+        if (here === dest) {
           conv.root = root;
           return true;
         }
         await this.ensureFolders(root);
-        if (this.dead() || !conv.file) return false;
-        if (vault.getAbstractFileByPath(dest)) throw new Error(`Record already exists: ${dest}`);
-        await vault.rename(conv.file, dest);
+        if (this.dead() || !here) return false;
+        if (vault.getAbstractFileByPath(dest) || (!conv.file && (await vault.adapter.exists(dest))))
+          throw new Error(`Record already exists: ${dest}`);
+        if (conv.file) await vault.rename(conv.file, dest);
+        else {
+          await vault.adapter.rename(here, dest);
+          conv.adapterPath = dest;
+        }
         conv.root = root;
         return true;
       } catch (error) {

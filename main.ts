@@ -1707,8 +1707,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     await this.saveData(this.settings);
   }
   /**
-   * Writers of the open map views, so the settings switch reaches them. TODO(P4): view.ts calls `registerMapChatRecordWriter`
-   * when it makes its writer (and the returned function when it closes), and creates the writer only while `settings.mapChatRecords`.
+   * Writers of the open map views, so the settings switch reaches them. view.ts calls `registerMapChatRecordWriter` when it makes
+   * its writer (and the returned function when it closes), and creates the writer only while `settings.mapChatRecords`.
    * Each registered writer gets `setEnabled(false)` the moment the switch goes off and `setEnabled(true)` when it goes on.
    */
   private readonly mapChatRecordWriters = new Set<MapChatRecordsSwitch>();

@@ -299,6 +299,26 @@ test('resume appends to an existing file and a v1 fixture with a cut last line r
   assert.deepEqual(S.plain(after.lines.map(line => `${line.type}${line.turn ?? ''}`)), ['conversation', 'turn_start1', 'turn_end1', 'turn_start2']);
   assert.equal(after.skipped, 1, 'only the cut line is lost');
 });
+test('a record the Vault index does not list is appended and moved through the adapter', async () => {
+  const { writer, fx, state } = setup();
+  const id = records.newRecordId(new Date(T0), () => 0.2);
+  const path = records.recordPath(ROOT, id);
+  for (const folder of [ROOT, `${ROOT}/Chats`, `${ROOT}/Chats/records`]) await fx.app.vault.createFolder(folder);
+  const line = `${JSON.stringify({ v: 1, type: 'conversation', id, startedAt: T0, mapPath: `${ROOT}/Map.md`, mapId: 'map-1', pluginVersion: '1' })}\n`;
+  await fx.app.vault.adapter.write(path, line);
+  fx.app.vault.getAbstractFileByPath = p => (p.endsWith('.jsonl') ? undefined : fx.files.get(p)); // the index hides it
+  writer.resume(id, path, target(), true);
+  assert.equal(writer.landed, true);
+  writer.write(turnStart(1));
+  await writer.moveTo(target('Maps/Moved'));
+  writer.write(turnEnd(1));
+  await writer.idle();
+  const moved = records.recordPath('Maps/Moved', id);
+  assert.equal(fx.contents.has(path), false, 'the old path is gone');
+  assert.deepEqual(S.plain(records.parseRecord(fx.contents.get(moved)).lines.map(item => item.type)), ['conversation', 'turn_start', 'moved', 'turn_end']);
+  assert.equal(writer.failed, false);
+  void state;
+});
 test('the writer never calls plugin.mutate', () => {
   const source = require('node:fs').readFileSync(require('node:path').join(S.root, 'experiences/visual-map/map-chat-record-writer.ts'), 'utf8');
   assert.equal(/mutate/.test(source), false);

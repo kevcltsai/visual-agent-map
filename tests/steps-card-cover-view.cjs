@@ -392,8 +392,8 @@ test('P4b: turning it back on removes the key; undo of that restores the none li
 
 test('P4b: the topic panel offers the cover toggle, aria-pressed while the cover is off; the topic menu no longer has it', async () => {
   const source = read('experiences/visual-map/view.ts');
-  const menu = source.match(/private openTopicMenu\([\s\S]*?\n  }\n/)[0];
-  assert.doesNotMatch(menu, /changeTopicCover|topic_cover/, 'the "+ Topic" menu is for adding topics only');
+  const menu = source.match(/private openAddMenu\([\s\S]*?\n  }\n/)[0];
+  assert.doesNotMatch(menu, /changeTopicCover|topic_cover/, 'the add menu is for adding topics only');
   // Ticket 41: the cover switch lives in the folded "Appearance" group of the card window.
   const appearance = source.match(/const look = this\.renderDisclosure\(panel, t\("ui\.card_group_appearance"\)\);[\s\S]*?\n    }\n/)[0];
   assert.match(appearance, /this\.renderCoverSection\(look, node\);/, 'the cover switch is inside the Appearance group');

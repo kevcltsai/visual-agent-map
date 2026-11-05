@@ -401,7 +401,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const handlers = []; const linkOpens = [];
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView, default: LanguagePlugin } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: (fn, delay) => { ctx.timers.push(fn); const id = ctx.timers.length; ctx.clock.pending.push({ id, fn, at: ctx.clock.now + (delay ?? 0) }); return id; }, clearTimeout: id => { ctx.clock.pending = ctx.clock.pending.filter(entry => entry.id !== id); }, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
+  const { VisualAgentMapView, default: LanguagePlugin } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); }, appendChild(child) { this.children.push(child); return child; } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: (fn, delay) => { ctx.timers.push(fn); const id = ctx.timers.length; ctx.clock.pending.push({ id, fn, at: ctx.clock.now + (delay ?? 0) }); return id; }, clearTimeout: id => { ctx.clock.pending = ctx.clock.pending.filter(entry => entry.id !== id); }, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
   // A real language switch of this bundle (like languageView below), so the view's fixed words follow `language`.
   if (language !== 'en') {
     const switcher = new LanguagePlugin(); switcher.settings = { ...DEFAULT_SETTINGS, language: 'en' }; switcher.saveData = async () => {}; switcher.repo = { settings: switcher.settings };
@@ -2747,14 +2747,64 @@ integrationTest('45 ui: the button turns the opening screen into this map\'s emp
   h.repaint(); assert.equal(chat.isHero, false);
 });
 
-integrationTest('UX B10: "Create an empty mind map" clears the draft typed on the opening screen, and the empty canvas has no second "+ Topic"', async () => {
+integrationTest('UX B10: "Create an empty mind map" clears the draft typed on the opening screen, and the empty canvas has the one "Add first topic" button', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
   h.type('half a question for the AI'); chat.emptyMapEl.click(); await tick();
   assert.equal(chat.isHero, false); assert.equal(chat.draft, '', 'no stale draft waits in the side window');
   const box = element('div'); h.view.fillEmptyMap(box);
-  assert.match(visibleText(box), /This mind map has no topics\. Click “＋ Topic” to create the first node\./); assert.equal(findAll(box, i => i.tag === 'button').length, 0);
+  assert.match(visibleText(box), /This mind map has no topics yet\./); assert.doesNotMatch(visibleText(box), /＋ Topic|\+ Topic/, 'no pointer to the removed toolbar button');
+  const addButtons = findAll(box, i => i.tag === 'button');
+  assert.equal(addButtons.length, 1, 'the empty canvas has exactly one add button'); assert.equal(addButtons[0].text, '+ Add first topic');
+  const opened = []; h.view.openAddMenu = (event, parent) => opened.push([event, parent]);
+  addButtons[0].click(); assert.equal(opened.length, 1); assert.equal(opened[0][1], null, 'the button adds a top-level topic');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /this\.contentEl\.querySelector<HTMLElement>\("\.vam-map-tools \.mod-cta"\)\?\.focus\(\)/, 'the keyboard goes to the toolbar "+ Topic"');
+  assert.match(source, /this\.contentEl\.querySelector<HTMLElement>\("\.vam-empty \.vam-empty-add"\)\?\.focus\(\)/, 'the keyboard goes to the empty canvas "Add first topic"');
+  assert.doesNotMatch(source, /\.vam-map-tools \.mod-cta/, 'the toolbar no longer has a primary add button to focus');
+});
+
+integrationTest('goal banner P3: both toolbar renderers drop "+ Topic" and its chevron; the collapsed icon is a named, Tab-reachable button that opens into "Select several topics" and stays open while selecting', async () => {
+  const draw = (h, method) => { const box = element('div'); h.view[method](box); return box; };
+  for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) {
+    const h = await harness(); await h.view.hydrate();
+    const box = draw(h, method); const bs = findAll(box, i => i.tag === 'button');
+    assert.equal(bs.length, 1, `${method}: one control`); const b = bs[0];
+    assert.equal(findAll(box, i => i.tag === 'button' && (/Topic/.test(i.text) || /More ways/.test(i.attrs['aria-label'] ?? ''))).length, 0, `${method}: no "+ Topic", no chevron`);
+    assert.equal(b.attrs['aria-label'], 'Select several topics', `${method}: the icon button has an accessible name`);
+    assert.equal(b.attrs.tabindex, undefined, `${method}: reachable with Tab`); assert.equal(b.attrs['aria-pressed'], 'false');
+    assert.ok(findAll(b, i => i.tag === 'span' && i.attrs['aria-hidden'] === 'true').length >= 1, `${method}: the icon is decorative`);
+    assert.equal(findAll(b, i => (i.cls ?? '').includes('vam-tools-select-label'))[0].text, 'Select several topics', `${method}: the label that opens on hover/focus`);
+    assert.ok(box.classes.includes('vam-tools-mini')); assert.equal(box.classes.includes('is-open'), false, `${method}: collapsed while idle`);
+    b.click();
+    assert.equal(h.view.selection.state.multiSelectMode, true);
+    const again = draw(h, method); const done = findAll(again, i => i.tag === 'button')[0];
+    assert.ok(again.classes.includes('is-open'), `${method}: stays open while selecting`);
+    assert.equal(done.attrs['aria-label'], 'Done selecting'); assert.equal(done.attrs['aria-pressed'], 'true'); assert.ok(done.classes.includes('is-active'));
+    assert.equal(findAll(done, i => (i.cls ?? '').includes('vam-tools-select-label'))[0].text, 'Done selecting');
+  }
+  const empty = await harness({ empty: true }); await empty.view.hydrate();
+  for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) assert.equal(findAll(draw(empty, method), i => i.tag === 'button').length, 0, `${method}: an empty map has no toolbar control`);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.doesNotMatch(source, /openTopicMenu|ui\.topic"|ui\.topic_more_options|ui\.paste_outline_add_many|vam-topic-more/, 'the removed toolbar entries leave no code behind');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^\.vam-tools-select-label \{ display: none;/m, 'the label is hidden while collapsed');
+  assert.match(css, /\.vam-tools-mini:hover \.vam-tools-select-label, \.vam-tools-mini:focus-within \.vam-tools-select-label, \.vam-tools-mini\.is-open \.vam-tools-select-label \{ display: inline; \}/, 'hover, focus or selecting opens it');
+  assert.match(css, /^\.vam-tools-mini \{[^}]*padding: 2px; opacity: \.75;/m);
+  assert.match(css, /^\.vam-tools-mini \{[^}]*z-index: 3;/m, 'the opened toolbar floats over the goal bar (z-index 2)');
+  const goal = css.split('\n').find(l => l.startsWith('.vam-goal-bar {'));
+  assert.match(goal, /z-index: 2;/); assert.match(goal, /width: min\(560px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\) - 108px\)\)/, 'the goal bar keeps clear of the collapsed icon on both sides');
+  // Collapsed icon: left 12px + 34px wide (30px button + 2*2px padding); the goal bar starts at (W - bar) / 2 (>= 54px) at any width.
+  for (const w of [320, 420, 600, 664, 800, 1060]) { const bar = Math.min(560, w - 24 - 108); assert.ok((w - bar) / 2 >= 12 + 34 + 8, `canvas ${w}px: bar left edge ${(w - bar) / 2} is clear of the icon`); }
+});
+integrationTest('goal banner P3: the empty canvas button opens the add menu and the keyboard goes to it after "Create an empty mind map"', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate();
+  const menu = []; h.view.openAddMenu = (event, parent) => menu.push(parent);
+  const box = element('div'); h.view.fillEmptyMap(box);
+  const add = findAll(box, i => i.tag === 'button')[0];
+  assert.equal(add.attrs.tabindex, undefined, 'Tab reaches it'); assert.ok(add.classes.includes('vam-empty-add'));
+  add.click(); assert.deepEqual(menu, [null]);
+  const aim = await harness({ aim: true }); await aim.view.hydrate();
+  const aimBox = element('div'); aim.view.aimLive = () => true; aim.view.fillEmptyMap(aimBox);
+  assert.equal(findAll(aimBox, i => i.tag === 'button').length, 0, 'a live AIM map keeps its own hint');
 });
 
 integrationTest('B1 ui: many chips scroll inside their own box, so the message field stays in the window', async () => {
@@ -2818,10 +2868,9 @@ integrationTest('UX B9: an empty map leaves out "Select several topics", the goa
   // The goal bar has its own suite (relevance-grade) and is drawn in the overlay, not the toolbar; its guard is pinned from the source below.
   const tools = h => { const box = element('div'); h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
   const empty = await harness({ empty: true }); await empty.view.hydrate();
-  const shown = tools(empty);
-  assert.ok(shown.some(l => /Topic$/.test(l)), '+ Topic stays'); assert.equal(shown.some(l => /Select several topics/.test(l)), false, 'nothing to select: not in the toolbar, so not in the Tab order');
+  eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.ok(all.includes('Select several topics')); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
+  assert.deepEqual(all, ['Select several topics']); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.renderGoalBar\(overlay\);/, 'no goal bar on an empty or AIM map');
@@ -3144,7 +3193,7 @@ integrationTest('B1 fix 12: a blank map outside the managed folders, from the op
 
 integrationTest('B1 fix 15: the empty canvas follows the chat: building while it works, a line while a plan waits, the usual hint again when it ends or is cancelled', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
-  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'UX B10: text only; the toolbar has the one "+ Topic"');
+  const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.equal(findAll(box, i => i.tag === 'button').length, 1, 'the idle empty canvas has the one "Add first topic" button');
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'plan', actions: planActions(h, 16).map(a => ({ ...a, parentId: '' })), rejected: [] }; };
   h.type('Coffee'); const sent = h.view.sendMapChat(); await requestOut(chat);
   assert.match(shown(), /Building the map…/); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 3); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'no manual-create button meanwhile');

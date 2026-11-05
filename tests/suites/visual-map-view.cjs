@@ -110,7 +110,7 @@ integrationTest('AIM cards hide generic map actions while ordinary map cards ret
   ordinaryResultView.stageEl = makeElement('stage', ordinaryButtonsForResult); ordinaryResultView.map = map([ordinaryResult]); ordinaryResultView.notes = new Map([[ordinaryResult.id, { title: 'Ordinary note', summary: '', status: 'completed' }]]);
   ordinaryResultView.renderNode(ordinaryResult);
   assert.equal(ordinaryButtonsForResult.some(button => button['aria-label'] === 'Generate another question from this research, keeping existing branches'), false, 'ordinary maps do not expose the AIM action');
-  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;[\s\S]{0,700}const integrate = this\.button\(\s*tools/);
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;\s*this\.renderSelectTool\(tools\);/);
 });
 integrationTest('AIM question cards show branch progress instead of note lifecycle status', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
@@ -1664,7 +1664,7 @@ test('applyCollapseLevel: collapse all, expand all and expand to level N set the
   const cyclic = [node('x', 'y'), node('y', 'x')]; core.applyCollapseLevel(cyclic, 1);
   assert.equal(cyclic.length, 2, 'a corrupt parent cycle does not hang');
 });
-integrationTest('the New map menu no longer imports outlines; the topic side option and the palette command add to the open map only', () => {
+integrationTest('the New map menu no longer imports outlines; the toolbar has no topic menu; the palette command adds to the open map only', () => {
   const opened = [], menus = [];
   class Modal { constructor(app) { this.app = app; } open() { opened.push(this); } close() {} }
   class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { title: '', icon: '', click: null, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } showAtMouseEvent() { return this; } }
@@ -1672,15 +1672,14 @@ integrationTest('the New map menu no longer imports outlines; the topic side opt
   view.openNewMapMenu({});
   assert.deepEqual(menus[0].items.map(item => item.title), ['New mind map', 'New AIM'], 'the menu has no outline import');
   view.path = `${DEFAULT_SETTINGS.topicsFolder}/Topic/Map.md`;
-  view.openTopicMenu({});
-  const paste = menus[1].items[0]; assert.equal(paste.title, 'Paste an outline to add several topics at once');
-  paste.click();
+  assert.equal(menus.length, 1, 'the toolbar has no topic menu any more; the palette command is the way to paste an outline');
   const placement = modal => modal.placementRequest();
+  view.openOutlineImport();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'tree' }, 'no selection: add to the current map');
-  view.selection.setSelected('a'); paste.click();
+  view.selection.setSelected('a'); view.openOutlineImport();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'under', parentId: 'a' }, 'a selected topic: add under it');
   const count = opened.length;
-  view.path = 'elsewhere/Map.md'; view.selection.setSelected(null); paste.click();
+  view.path = 'elsewhere/Map.md'; view.selection.setSelected(null); view.openOutlineImport();
   assert.equal(opened.length, count, 'no editable map open: no import window (a new map starts from + New mind map)');
   view.path = `${DEFAULT_SETTINGS.topicsFolder}/Topic/Map.md`; view.openOutlineImport();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'tree' }, 'the palette command adds to the open map');
@@ -2163,15 +2162,14 @@ const heKindNames = ['Topic', 'Action', 'Atomic knowledge', 'Hypothesis', 'Evide
 const heDialogKindIds = ['topic', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action'];
 const heDialogKindNames = ['Topic', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion', 'Action'];
 const heKindIds = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
-integrationTest('hypothesis-evidence: the toolbar topic menu keeps "paste an outline" first, then lists the six types in order, each creating that type', () => {
+integrationTest('hypothesis-evidence: the add menu for a new top-level topic (empty-map button) lists the six types in order, each creating that type', () => {
   const { view, menus } = heFixture();
   const calls = []; view.addNode = (...args) => calls.push(args); view.enqueue = work => work();
-  view.openTopicMenu({});
+  view.openAddMenu({}, null);
   assert.equal(menus.length, 1);
-  assert.match(menus[0].titles[0], /outline/i, 'paste outline stays the first item');
-  assert.deepEqual(menus[0].titles.slice(1), heKindNames);
+  assert.deepEqual(menus[0].titles.slice(0, heKindNames.length), heKindNames);
   assert.equal(menus[0].titles.some(title => /hypothesis/i.test(title) && title !== 'Hypothesis'), false, 'the old "Add hypothesis" item is gone');
-  menus[0].clicks.slice(1).forEach(click => click());
+  menus[0].clicks.slice(0, heKindNames.length).forEach(click => click());
   assert.deepEqual(calls, heKindIds.map(kind => [null, undefined, true, true, kind]));
 });
 integrationTest('hypothesis-evidence: the panel "Add subtopic…" opens the six-type menu and creates the chosen type under this topic', () => {
@@ -2374,8 +2372,8 @@ integrationTest('hypothesis-evidence: a non-ordinary topic sets data-topic-kind 
 integrationTest('hypothesis-evidence: an AIM map has no type menu, no add-subtopic entry, no type control, and refuse a switch', async () => {
   for (const options of [{ aim: true }]) {
     const { view, menus, writes } = heFixture(options);
-    view.openTopicMenu({});
-    assert.deepEqual(menus.flatMap(m => m.titles).filter(title => heKindNames.includes(title)), [], `toolbar ${JSON.stringify(options)}`);
+    const tools = dom.element('tools'); view.renderMapTools(tools);
+    assert.deepEqual(dom.buttons(tools), [], `toolbar ${JSON.stringify(options)}`);
     const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[2]);
     assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
     view.beginMapTransaction = () => assert.fail('no transaction');
@@ -4622,7 +4620,7 @@ test('goal bar: styles keep it above the cards, centred on the visible canvas, w
   const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
   const bar = rule('.vam-goal-bar');
   assert.match(bar, /position: absolute;[^}]*top: 12px;[^}]*left: calc\(50% \+ var\(--vam-goal-inset, 0px\) \/ 2\);[^}]*transform: translateX\(-50%\)/, 'centred on the canvas the chat window does not cover');
-  assert.match(bar, /width: min\(560px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\)\)\)/, 'never wider than the visible canvas minus 24px');
+  assert.match(bar, /width: min\(560px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\) - 108px\)\)/, 'never wider than the visible canvas minus 24px and the room the collapsed toolbar icon needs on both sides');
   assert.match(bar, /padding: 14px 18px/); assert.match(bar, /border-radius: 16px/); assert.match(bar, /background: var\(--background-primary\)/); assert.match(bar, /border: 1px solid var\(--background-modifier-border\)/);
   assert.doesNotMatch(bar, /#[0-9a-f]{3,6}\b/i, 'theme variables, not mock-up hex colours');
   const text = rule('.vam-goal-text');

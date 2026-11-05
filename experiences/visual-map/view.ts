@@ -699,7 +699,7 @@ const cardAiLockButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
-type GoalIcon = "target" | "spark" | "refresh" | "sort" | "edit";
+type GoalIcon = "target" | "spark" | "refresh" | "sort" | "edit" | "select";
 /** The goal bar's own inline icons (drawn like the approved mock-up); colour follows `currentColor`. */
 function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
   const svg = createSvg("svg");
@@ -734,7 +734,21 @@ function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
       "stroke-linecap": "round",
       d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
     });
-  else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
+  else if (kind === "select") {
+    // The multi-select icon of the approved mock-up: a ticked box and a dashed one.
+    add("rect", { ...line, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
+    add("rect", {
+      ...line,
+      "stroke-linejoin": "round",
+      "stroke-dasharray": "3 2",
+      x: "13",
+      y: "13",
+      width: "8",
+      height: "8",
+      rx: "1.5"
+    });
+    add("path", { ...line, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
+  } else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
   parent.appendChild(svg);
 }
 /** Maps whose cards are displayed sorted by relevance. Memory only: never written to a note or Map.md. */
@@ -4144,25 +4158,6 @@ export class VisualAgentMapView extends ItemView {
     menu.showAtMouseEvent(event);
     // Enter on a freshly opened list takes its first row.
     (menu as unknown as { select?: (index: number) => void }).select?.(0);
-  }
-  private openTopicMenu(event: MouseEvent): void {
-    const menu = this.newMenu();
-    this.drawInDom(menu);
-    menu.addItem(item =>
-      item
-        .setTitle(t("ui.paste_outline_add_many"))
-        .setIcon("list-tree")
-        .onClick(() => this.openOutlineImport())
-    );
-    if (this.relationsEnabled())
-      for (const kind of TOPIC_KINDS)
-        menu.addItem(item =>
-          item
-            .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
-            .setIcon(kindIconId(kind))
-            .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind))))
-        );
-    menu.showAtMouseEvent(event);
   }
   /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
   private topicCoverOff(node: MapNode): boolean {
@@ -10935,36 +10930,33 @@ export class VisualAgentMapView extends ItemView {
       box.createSpan({ text: t("ui.map_chat_canvas_consent") });
       return;
     }
-    // Text only: the toolbar's "+ Topic" is the one button for it (a second one here broke the sentence and doubled the control).
-    box.createSpan({
-      text: t(
-        this.aimLive() ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first"
-      )
+    if (this.aimLive()) {
+      box.createSpan({ text: t("ui.aim_empty_map_hint") });
+      return;
+    }
+    // The toolbar no longer adds topics, so the empty canvas carries the one button for it, in the middle.
+    box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
+    const add = box.createEl("button", { cls: "mod-cta vam-empty-add", text: t("ui.add_first_topic") });
+    add.addEventListener("click", event => {
+      event.stopPropagation();
+      // The menu opens under the button, also when the click came from the keyboard.
+      const rect = add.getBoundingClientRect?.();
+      const at =
+        rect && typeof MouseEvent === "function"
+          ? new MouseEvent("click", { clientX: rect.left, clientY: rect.bottom })
+          : event;
+      this.openAddMenu(at, null);
     });
   }
   /**
-   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics". An empty
-   * map has nothing to select, so that one is left out rather than disabled: Tab never reaches a control that cannot do
-   * anything yet. An AIM map has none of them. The goal lives in its own bar (renderGoalBar).
+   * The floating tools over the canvas: once the map has topics, one faint "Select several topics" icon that opens into its
+   * label on hover or keyboard focus (and stays open while selecting). Adding a topic is not here: the card "+", the context
+   * menus, the keys and the command palette do it, and an empty map has its own button (fillEmptyMap). An empty map has nothing
+   * to select, so the control is left out rather than disabled. An AIM map has none. The goal lives in its own bar (renderGoalBar).
    */
   private renderMapTools(tools: HTMLElement): void {
     if (!this.map || this.map.aim) return;
-    const addTopic = this.button(tools, t("ui.topic"), () => {});
-    addTopic.addEventListener("click", event => this.openAddMenu(event, null));
-    addTopic.addClass("mod-cta");
-    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
-      "vam-topic-more"
-    );
-    if (!this.map.nodes.length) return;
-    const integrate = this.button(
-      tools,
-      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
-      () => {
-        this.applySelectionChange(this.selection.toggleMultiSelect());
-      }
-    );
-    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
-    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    this.renderSelectTool(tools);
   }
   /**
    * The same tools on an old AIM map while AIM is hidden: it is an ordinary map then. A separate method so renderMapTools keeps
@@ -10972,23 +10964,28 @@ export class VisualAgentMapView extends ItemView {
    */
   private renderHiddenAimMapTools(tools: HTMLElement): void {
     if (!this.map) return;
-    const addTopic = this.button(tools, t("ui.topic"), () => {});
-    addTopic.addEventListener("click", event => this.openAddMenu(event, null));
-    addTopic.addClass("mod-cta");
-    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
-      "vam-topic-more"
-    );
-    if (!this.map.nodes.length) return;
-    const integrate = this.button(
-      tools,
-      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
-      () => {
-        this.applySelectionChange(this.selection.toggleMultiSelect());
-      }
-    );
-    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
-    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    this.renderSelectTool(tools);
     // No goal control: goal grading is off for an AIM map (see renderMapTools).
+  }
+  /** The one toolbar control: a button that is just its icon until the pointer or the keyboard is on the toolbar. */
+  private renderSelectTool(tools: HTMLElement): void {
+    if (!this.map?.nodes.length) return;
+    const selecting = this.selection.state.multiSelectMode;
+    tools.addClass("vam-tools-mini");
+    tools.toggleClass("is-open", selecting);
+    const label = selecting ? t("ui.finish_topic_selection") : t("ui.select_topics");
+    const integrate = tools.createEl("button", { cls: "vam-tools-select" });
+    integrate.setAttr("aria-label", label);
+    integrate.setAttr("aria-pressed", String(selecting));
+    if (selecting) integrate.addClass("is-active");
+    const icon = integrate.createSpan("vam-tools-select-icon");
+    icon.setAttr("aria-hidden", "true");
+    appendGoalSvg(icon, "select");
+    integrate.createSpan({ cls: "vam-tools-select-label", text: label });
+    integrate.addEventListener("click", event => {
+      event.stopPropagation();
+      this.applySelectionChange(this.selection.toggleMultiSelect());
+    });
   }
   /** The chat started or ended something: an empty canvas follows it. */
   private refreshEmptyMap(): void {
@@ -17091,8 +17088,8 @@ export class VisualAgentMapView extends ItemView {
     // A message typed on the opening screen was meant for the AI; starting by hand leaves no stale draft in the chat.
     this.chat?.clearDraft();
     this.render();
-    // The pressed button is gone; the keyboard goes to the toolbar's "+ Topic" (the one way to add a topic by hand).
-    this.contentEl.querySelector<HTMLElement>(".vam-map-tools .mod-cta")?.focus();
+    // The pressed button is gone; the keyboard goes to the empty canvas's "Add first topic" (the one way to add a topic by hand).
+    this.contentEl.querySelector<HTMLElement>(".vam-empty .vam-empty-add")?.focus();
   }
   private chatHost(): MapChatHost {
     return {

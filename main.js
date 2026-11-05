@@ -623,8 +623,6 @@ var en = {
   "ui.codex_app_server_has_not_started": "Codex App Server has not started",
   "ui.new_topic_name": "New topic name",
   "ui.rename_topic": "Rename",
-  "ui.paste_outline_add_many": "Paste an outline to add several topics at once",
-  "ui.topic_more_options": "More ways to add topics",
   "ui.topic_cover": "Topic cover",
   "ui.topic_cover_off": "Turn card cover off",
   "ui.topic_cover_on": "Turn card cover on",
@@ -842,7 +840,6 @@ var en = {
   "ui.redo": "Redo",
   "ui.undo_0": "Undo: {0}",
   "ui.redo_0": "Redo: {0}",
-  "ui.topic": "\uFF0B Topic",
   "ui.organize": "Organize notes and folders",
   "ui.zoom_out": "Zoom out",
   "ui.zoom_in": "Zoom in",
@@ -1095,7 +1092,8 @@ var en = {
   "ui.start_from_this_node_s_question_update_only_this_node": "Results update only this topic.",
   "ui.quick": "Quick",
   "ui.standard": "Standard",
-  "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "This mind map has no topics. Click \u201C\uFF0B Topic\u201D to create the first node.",
+  "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "This mind map has no topics yet.",
+  "ui.add_first_topic": "+ Add first topic",
   "ui.note_missing": "Note missing",
   "ui.open_details_in_right_sidebar": "Open details in right sidebar",
   "ui.collapse": "Collapse",
@@ -3248,8 +3246,6 @@ var zhCN = {
   "ui.codex_app_server_has_not_started": "Codex App Server \u5C1A\u672A\u542F\u52A8",
   "ui.new_topic_name": "\u65B0\u8BAE\u9898\u540D\u79F0",
   "ui.rename_topic": "\u91CD\u547D\u540D",
-  "ui.paste_outline_add_many": "\u7C98\u8D34\u5927\u7EB2\uFF0C\u4E00\u6B21\u6DFB\u52A0\u591A\u4E2A",
-  "ui.topic_more_options": "\u66F4\u591A\u6DFB\u52A0\u8BAE\u9898\u7684\u65B9\u5F0F",
   "ui.topic_cover": "\u8BAE\u9898\u5C01\u9762",
   "ui.topic_cover_off": "\u5173\u95ED\u5361\u7247\u5C01\u9762",
   "ui.topic_cover_on": "\u5F00\u542F\u5361\u7247\u5C01\u9762",
@@ -3467,7 +3463,6 @@ var zhCN = {
   "ui.redo": "\u91CD\u505A",
   "ui.undo_0": "\u590D\u539F\uFF1A{0}",
   "ui.redo_0": "\u91CD\u505A\uFF1A{0}",
-  "ui.topic": "\uFF0B \u8BAE\u9898",
   "ui.organize": "\u6574\u7406\u7B14\u8BB0\u4E0E\u6587\u4EF6\u5939",
   "ui.zoom_out": "\u7F29\u5C0F",
   "ui.zoom_in": "\u653E\u5927",
@@ -3720,7 +3715,8 @@ var zhCN = {
   "ui.start_from_this_node_s_question_update_only_this_node": "\u7ED3\u679C\u53EA\u66F4\u65B0\u8FD9\u4E2A\u8BAE\u9898\u3002",
   "ui.quick": "\u5FEB\u901F",
   "ui.standard": "\u6807\u51C6",
-  "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709\u8BAE\u9898\u3002\u70B9\u201C\uFF0B \u8BAE\u9898\u201D\u521B\u5EFA\u7B2C\u4E00\u4E2A\u8BAE\u9898\u3002",
+  "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709\u8BAE\u9898\u3002",
+  "ui.add_first_topic": "\uFF0B \u6DFB\u52A0\u7B2C\u4E00\u4E2A\u8BAE\u9898",
   "ui.note_missing": "\u7B14\u8BB0\u4E0D\u5B58\u5728",
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u4FA7\u680F\u6253\u5F00\u8BE6\u60C5",
   "ui.collapse": "\u6298\u53E0",
@@ -5873,8 +5869,6 @@ var zhTW = {
   "ui.codex_app_server_has_not_started": "Codex App Server \u5C1A\u672A\u555F\u52D5",
   "ui.new_topic_name": "\u65B0\u8B70\u984C\u540D\u7A31",
   "ui.rename_topic": "\u91CD\u65B0\u547D\u540D",
-  "ui.paste_outline_add_many": "\u8CBC\u4E0A\u5927\u7DB1\uFF0C\u4E00\u6B21\u65B0\u589E\u591A\u500B",
-  "ui.topic_more_options": "\u66F4\u591A\u65B0\u589E\u8B70\u984C\u7684\u65B9\u5F0F",
   "ui.topic_cover": "\u8B70\u984C\u5C01\u9762",
   "ui.topic_cover_off": "\u95DC\u9589\u5361\u7247\u5C01\u9762",
   "ui.topic_cover_on": "\u958B\u555F\u5361\u7247\u5C01\u9762",
@@ -6092,7 +6086,6 @@ var zhTW = {
   "ui.redo": "\u91CD\u505A",
   "ui.undo_0": "\u5FA9\u539F\uFF1A{0}",
   "ui.redo_0": "\u91CD\u505A\uFF1A{0}",
-  "ui.topic": "\uFF0B \u8B70\u984C",
   "ui.organize": "\u6574\u7406\u7B46\u8A18\u8207\u8CC7\u6599\u593E",
   "ui.zoom_out": "\u7E2E\u5C0F",
   "ui.zoom_in": "\u653E\u5927",
@@ -6345,7 +6338,8 @@ var zhTW = {
   "ui.start_from_this_node_s_question_update_only_this_node": "\u7D50\u679C\u53EA\u66F4\u65B0\u9019\u500B\u8B70\u984C\u3002",
   "ui.quick": "\u5FEB\u901F",
   "ui.standard": "\u6A19\u6E96",
-  "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709\u8B70\u984C\u3002\u9EDE\u300C\uFF0B \u8B70\u984C\u300D\u5EFA\u7ACB\u7B2C\u4E00\u500B\u8B70\u984C\u3002",
+  "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709\u8B70\u984C\u3002",
+  "ui.add_first_topic": "\uFF0B \u65B0\u589E\u7B2C\u4E00\u500B\u8B70\u984C",
   "ui.note_missing": "\u7B46\u8A18\u4E0D\u5B58\u5728",
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u5074\u6B04\u958B\u555F\u8A73\u60C5",
   "ui.collapse": "\u6536\u5408",
@@ -52316,7 +52310,20 @@ function appendGoalSvg(parent, kind) {
       "stroke-linecap": "round",
       d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
     });
-  else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
+  else if (kind === "select") {
+    add("rect", { ...line, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
+    add("rect", {
+      ...line,
+      "stroke-linejoin": "round",
+      "stroke-dasharray": "3 2",
+      x: "13",
+      y: "13",
+      width: "8",
+      height: "8",
+      rx: "1.5"
+    });
+    add("path", { ...line, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
+  } else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
   parent.appendChild(svg);
 }
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
@@ -55452,19 +55459,6 @@ ${request.requirements}` : preset.text,
       );
     menu.showAtMouseEvent(event);
     (_a2 = menu.select) == null ? void 0 : _a2.call(menu, 0);
-  }
-  openTopicMenu(event) {
-    const menu = this.newMenu();
-    this.drawInDom(menu);
-    menu.addItem(
-      (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
-    );
-    if (this.relationsEnabled())
-      for (const kind of TOPIC_KINDS)
-        menu.addItem(
-          (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind))))
-        );
-    menu.showAtMouseEvent(event);
   }
   /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
   topicCoverOff(node) {
@@ -61665,36 +61659,29 @@ ${request.requirements}` : preset.text,
       box.createSpan({ text: t("ui.map_chat_canvas_consent") });
       return;
     }
-    box.createSpan({
-      text: t(
-        this.aimLive() ? "ui.aim_empty_map_hint" : "ui.this_mind_map_has_no_topics_click_topic_to_create_the_first"
-      )
+    if (this.aimLive()) {
+      box.createSpan({ text: t("ui.aim_empty_map_hint") });
+      return;
+    }
+    box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
+    const add = box.createEl("button", { cls: "mod-cta vam-empty-add", text: t("ui.add_first_topic") });
+    add.addEventListener("click", (event) => {
+      var _a2;
+      event.stopPropagation();
+      const rect2 = (_a2 = add.getBoundingClientRect) == null ? void 0 : _a2.call(add);
+      const at = rect2 && typeof MouseEvent === "function" ? new MouseEvent("click", { clientX: rect2.left, clientY: rect2.bottom }) : event;
+      this.openAddMenu(at, null);
     });
   }
   /**
-   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics". An empty
-   * map has nothing to select, so that one is left out rather than disabled: Tab never reaches a control that cannot do
-   * anything yet. An AIM map has none of them. The goal lives in its own bar (renderGoalBar).
+   * The floating tools over the canvas: once the map has topics, one faint "Select several topics" icon that opens into its
+   * label on hover or keyboard focus (and stays open while selecting). Adding a topic is not here: the card "+", the context
+   * menus, the keys and the command palette do it, and an empty map has its own button (fillEmptyMap). An empty map has nothing
+   * to select, so the control is left out rather than disabled. An AIM map has none. The goal lives in its own bar (renderGoalBar).
    */
   renderMapTools(tools) {
     if (!this.map || this.map.aim) return;
-    const addTopic = this.button(tools, t("ui.topic"), () => {
-    });
-    addTopic.addEventListener("click", (event) => this.openAddMenu(event, null));
-    addTopic.addClass("mod-cta");
-    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
-      "vam-topic-more"
-    );
-    if (!this.map.nodes.length) return;
-    const integrate = this.button(
-      tools,
-      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
-      () => {
-        this.applySelectionChange(this.selection.toggleMultiSelect());
-      }
-    );
-    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
-    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    this.renderSelectTool(tools);
   }
   /**
    * The same tools on an old AIM map while AIM is hidden: it is an ordinary map then. A separate method so renderMapTools keeps
@@ -61702,23 +61689,28 @@ ${request.requirements}` : preset.text,
    */
   renderHiddenAimMapTools(tools) {
     if (!this.map) return;
-    const addTopic = this.button(tools, t("ui.topic"), () => {
+    this.renderSelectTool(tools);
+  }
+  /** The one toolbar control: a button that is just its icon until the pointer or the keyboard is on the toolbar. */
+  renderSelectTool(tools) {
+    var _a2;
+    if (!((_a2 = this.map) == null ? void 0 : _a2.nodes.length)) return;
+    const selecting = this.selection.state.multiSelectMode;
+    tools.addClass("vam-tools-mini");
+    tools.toggleClass("is-open", selecting);
+    const label = selecting ? t("ui.finish_topic_selection") : t("ui.select_topics");
+    const integrate = tools.createEl("button", { cls: "vam-tools-select" });
+    integrate.setAttr("aria-label", label);
+    integrate.setAttr("aria-pressed", String(selecting));
+    if (selecting) integrate.addClass("is-active");
+    const icon = integrate.createSpan("vam-tools-select-icon");
+    icon.setAttr("aria-hidden", "true");
+    appendGoalSvg(icon, "select");
+    integrate.createSpan({ cls: "vam-tools-select-label", text: label });
+    integrate.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.applySelectionChange(this.selection.toggleMultiSelect());
     });
-    addTopic.addEventListener("click", (event) => this.openAddMenu(event, null));
-    addTopic.addClass("mod-cta");
-    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
-      "vam-topic-more"
-    );
-    if (!this.map.nodes.length) return;
-    const integrate = this.button(
-      tools,
-      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
-      () => {
-        this.applySelectionChange(this.selection.toggleMultiSelect());
-      }
-    );
-    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
-    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
   }
   /** The chat started or ended something: an empty canvas follows it. */
   refreshEmptyMap() {
@@ -67350,7 +67342,7 @@ ${note.detail.trim()}` : "",
     this.blankMapPaths.add(this.path);
     (_a2 = this.chat) == null ? void 0 : _a2.clearDraft();
     this.render();
-    (_b2 = this.contentEl.querySelector(".vam-map-tools .mod-cta")) == null ? void 0 : _b2.focus();
+    (_b2 = this.contentEl.querySelector(".vam-empty .vam-empty-add")) == null ? void 0 : _b2.focus();
   }
   chatHost() {
     return {

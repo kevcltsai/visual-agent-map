@@ -32,9 +32,15 @@ import {
   treeTextNodes,
   unlinkTextNode,
   updateTextNode,
+  convertToAnnotatedImage,
+  convertToPlainImage,
+  findAnnotatedImage,
+  isAnnotatedImage,
+  setImageNote,
   IMAGE_MIN_SIZE,
   LINK_LIMIT,
   TEXT_LIMIT,
+  type AnnotatedImageItem,
   type BoundaryItem,
   type CanvasItem,
   type ImageItem,
@@ -42,6 +48,7 @@ import {
   type SummaryRefusal,
   type TextItem
 } from "./canvas-items";
+import { ImageNoteModal } from "./annotated-image-modals";
 import {
   avoidBracketObstacles,
   bracketGeometry,
@@ -6852,15 +6859,19 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const editable = this.canEditCanvasItems();
-    const layer = items.some(item => item.kind === "image") ? stage.createDiv("vam-canvas-items") : null;
+    const layer = items.some(item => item.kind === "image" || isAnnotatedImage(item))
+      ? stage.createDiv("vam-canvas-items")
+      : null;
     layer?.setAttr("role", "group");
     layer?.setAttr("aria-label", t("ui.canvas_images_group"));
     for (const item of items) {
-      if (item.kind !== "image" || !layer) continue;
-      const image = item as ImageItem,
+      if ((item.kind !== "image" && !isAnnotatedImage(item)) || !layer) continue;
+      const image = item as ImageItem | AnnotatedImageItem,
+        annotated = isAnnotatedImage(image) ? image : null,
         name = image.path.split("/").pop() ?? image.path,
-        label = t("ui.canvas_image_label", name),
-        el = layer.createDiv("vam-canvas-image");
+        // The note and the file name are untrusted: they only ever go in through setText and setAttr.
+        label = annotated ? t("ui.annotated_image_label", annotated.note || name) : t("ui.canvas_image_label", name),
+        el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
       el.setAttr("role", "img");
       el.setAttr("aria-label", label);
@@ -6871,14 +6882,19 @@ export class VisualAgentMapView extends ItemView {
       el.style.height = `${image.h}px`;
       const file = this.app.vault.getAbstractFileByPath(image.path);
       const source = file instanceof TFile ? this.app.vault.getResourcePath?.(file) : undefined;
+      if (annotated) this.renderAnnotatedBar(el, annotated, name);
+      let picture: HTMLElement | null = null;
       const placeholder = (): void => {
-        el.empty();
+        // An annotated image keeps its title bar (and handle) when the picture is missing.
+        if (annotated) picture?.remove();
+        else el.empty();
         el.addClass("is-missing");
         el.createSpan({ text: name });
       };
       if (!source) placeholder();
       else {
         const img = el.createEl("img", { attr: { src: source, alt: "", draggable: "false" } });
+        picture = img;
         img.addEventListener("error", placeholder);
       }
       el.addEventListener("focus", () => el.addClass("is-selected"));
@@ -6903,6 +6919,123 @@ export class VisualAgentMapView extends ItemView {
     this.renderBoundaries(stage, items, editable);
     this.renderSummaries(stage, items);
     this.focusItemId = null;
+  }
+  /** The title bar above an annotated image: pill with the map-pin icon, the one-line note, the anchor count. */
+  private renderAnnotatedBar(el: HTMLElement, image: AnnotatedImageItem, name: string): void {
+    const bar = el.createDiv("vam-annotated-bar");
+    const pill = bar.createSpan("vam-annotated-pill");
+    setIcon(pill.createSpan("vam-annotated-pill-icon"), "map-pin");
+    pill.createSpan({ text: t("ui.annotated_image_pill") });
+    bar.createSpan({ text: image.note || name, cls: "vam-annotated-note" });
+    bar.createSpan({ text: t("ui.annotated_image_anchor_count", image.anchors.length), cls: "vam-annotated-count" });
+  }
+  /**
+   * The right-click / Shift+F10 / Menu-key menu of one image. A plain image offers conversion; an annotated image its own
+   * actions. P3b adds "Place anchor" at the marked spot.
+   */
+  private openImageMenu(event: MouseEvent, el: HTMLElement): void {
+    const id = el.dataset.itemId,
+      image = (this.map?.canvasItems ?? []).find(
+        (item): item is ImageItem | AnnotatedImageItem =>
+          (item.kind === "image" || isAnnotatedImage(item)) && (item as { id?: unknown }).id === id
+      );
+    if (!id || !image) return;
+    event.preventDefault();
+    const menu = this.newMenu(),
+      annotated = isAnnotatedImage(image) ? image : null;
+    if (annotated) {
+      // P3b: add the "Place anchor" item here, first in the list.
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.annotated_image_edit_note"))
+          .setIcon("pencil")
+          .onClick(() => this.editImageNote(annotated))
+      );
+      const anchors = annotated.anchors.length;
+      const make = (window as { createFragment?: typeof createFragment }).createFragment;
+      menu.addItem(item => {
+        // With anchors the entry is disabled and a second, muted line says why.
+        const first = t("ui.annotated_image_convert_back"),
+          why = anchors ? t("ui.annotated_image_convert_back_blocked", anchors) : "";
+        item
+          .setTitle(
+            why && make
+              ? make(frag => {
+                  frag.createSpan({ text: first });
+                  frag.createSpan({ text: why, cls: "vam-menu-subtitle" });
+                })
+              : why
+                ? `${first} (${why})`
+                : first
+          )
+          .setIcon("image")
+          .setDisabled(anchors > 0)
+          .onClick(() => this.enqueue(() => this.convertImageBack(id)));
+      });
+      menu.addSeparator();
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.annotated_image_delete"))
+          .setIcon("trash-2")
+          .setWarning(true)
+          .onClick(() => this.enqueue(() => this.removeCanvasItem(id)))
+      );
+    } else {
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.annotated_image_convert"))
+          .setIcon("map-pin")
+          .onClick(() => this.convertImageDialog(id))
+      );
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.annotated_image_open_original"))
+          .setIcon("external-link")
+          .onClick(() => this.openImageOriginal(image.path))
+      );
+      menu.addSeparator();
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.annotated_image_delete_plain"))
+          .setIcon("trash-2")
+          .setWarning(true)
+          .onClick(() => this.enqueue(() => this.removeCanvasItem(id)))
+      );
+    }
+    // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the image.
+    if (event.clientX === 0 && event.clientY === 0) {
+      const box = el.getBoundingClientRect();
+      menu.showAtPosition({ x: box.left, y: box.bottom });
+    } else menu.showAtMouseEvent(event);
+  }
+  private convertImageDialog(id: string): void {
+    if (!this.canEditCanvasItems()) return;
+    new ImageNoteModal(this.app, "convert", "", note =>
+      this.enqueue(() => this.changeCanvasItems(id, items => convertToAnnotatedImage(items, id, note)))
+    ).open();
+  }
+  private editImageNote(image: AnnotatedImageItem): void {
+    if (!this.canEditCanvasItems()) return;
+    new ImageNoteModal(this.app, "edit", image.note ?? "", note =>
+      this.enqueue(() => this.changeCanvasItems(image.id, items => setImageNote(items, image.id, note)))
+    ).open();
+  }
+  /** Only an annotated image with no anchors goes back; the data layer refuses otherwise and the map stays as it is. */
+  private async convertImageBack(id: string): Promise<void> {
+    const current = findAnnotatedImage(this.map?.canvasItems ?? [], id);
+    if (!current || current.anchors.length) return;
+    await this.changeCanvasItems(id, items => convertToPlainImage(items, id) ?? [...items]);
+  }
+  private openImageOriginal(path: string): void {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) {
+      new Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+      return;
+    }
+    void this.app.workspace
+      .getLeaf("tab")
+      .openFile(file)
+      .catch(error => new Notice(error instanceof Error ? error.message : String(error)));
   }
   /** Text nodes change only on a map the user may edit, and never while presenting. */
   private canEditText(): boolean {
@@ -7953,7 +8086,7 @@ export class VisualAgentMapView extends ItemView {
     ).open();
   }
   /** One gesture, one pointerup, one undo step: the image follows the pointer on screen and Map.md is written on release. */
-  private enableCanvasItemDrag(el: HTMLElement, handle: HTMLElement, image: ImageItem): void {
+  private enableCanvasItemDrag(el: HTMLElement, handle: HTMLElement, image: ImageItem | AnnotatedImageItem): void {
     const begin = (event: PointerEvent, resize: boolean): void => {
       if (event.button !== 0 || !this.map) return;
       event.stopPropagation();
@@ -8330,6 +8463,11 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!this.canEditCanvasItems()) return;
     const target = event.target as Element | null;
+    const imageEl = target?.closest?.<HTMLElement>(".vam-canvas-image");
+    if (imageEl) {
+      this.openImageMenu(event, imageEl);
+      return;
+    }
     if (
       !target?.closest ||
       target.closest(".vam-node") ||
@@ -9922,8 +10060,8 @@ export class VisualAgentMapView extends ItemView {
     }
     const images: SceneImage[] = [];
     for (const item of map.canvasItems ?? []) {
-      if (item.kind !== "image") continue;
-      const image = item as ImageItem;
+      if (item.kind !== "image" && !isAnnotatedImage(item)) continue;
+      const image = item as ImageItem | AnnotatedImageItem;
       const href = await imageHref(image.path);
       if (!isCurrent()) return null;
       if (href === false) return { refuse: "embedded" };

@@ -89,6 +89,17 @@
 .vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }
 .vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }
 .vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }
+.vam-view .vam-canvas-image.is-annotated { border: 2px solid var(--interactive-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 18%, transparent); }
+.vam-view .vam-canvas-image.is-annotated.is-missing { border-style: dashed; overflow: visible; }
+.vam-view .vam-annotated-bar { position: absolute; left: -2px; right: -2px; bottom: 100%; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 2px 4px; font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 4px; }
+.vam-view .vam-annotated-pill { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 8px; border-radius: 999px; font-weight: var(--font-semibold); color: var(--text-on-accent); background: var(--interactive-accent); }
+.vam-view .vam-annotated-pill-icon { display: inline-flex; width: 12px; height: 12px; }
+.vam-view .vam-annotated-pill-icon svg { width: 12px; height: 12px; }
+.vam-view .vam-annotated-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-view .vam-annotated-count { flex: none; color: var(--text-muted); }
+.vam-menu-subtitle { display: block; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-annotated-note-hint { margin: 8px 0 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-annotated-note-input { width: 100%; }
 /* Frames (map-images P7): the layer and the frame make no stacking context, so the outline (::before, z-index -2 inside the stage's stacking context) sits behind the images and cards while the label chip (z-index 2) is drawn over neighbouring cards instead of under them (ticket 31). The frame is an outline and ignores the pointer; only its label chip takes it. */
 .vam-boundaries { position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; }
 .vam-boundary { position: absolute; box-sizing: border-box; pointer-events: none; }

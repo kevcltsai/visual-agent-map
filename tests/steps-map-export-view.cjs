@@ -591,3 +591,16 @@ test('persona 32: latin words are not cut in the middle when the title wraps', (
   assert.deepEqual(JSON.parse(JSON.stringify(ex.wrapText('abcdefghij', 35))), ['abcde', 'fghij'], 'a word wider than a line is still cut');
   assert.deepEqual(JSON.parse(JSON.stringify(ex.wrapText('中文標題很長很長', 39))), ['中文標', '題很長', '很長']);
 });
+
+test('annotated image (P3a): exported as a plain picture, with no title bar, pill, note or anchors', async () => {
+  const h = await harness();
+  h.view.map.canvasItems = [
+    { id: 'ai1', kind: 'annotated-image', path: `${MEDIA}/free.png`, x: 10, y: 400, w: 30, h: 30, note: 'SECRET-NOTE', anchors: [{ id: 'a1', at: { kind: 'image-2d', x: 0.5, y: 0.5 }, note: 'SECRET-ANCHOR' }] }
+  ];
+  const { scene } = await h.view.collectExportScene(() => true);
+  assert.equal(scene.images.length, 1);
+  assert.deepEqual(Object.keys(scene.images[0]).sort(), ['fit', 'h', 'href', 'w', 'x', 'y']);
+  const svg = ex.buildMapSvg(scene);
+  assert.equal([...svg.matchAll(/<image /g)].length, 2, 'cover + the annotated image drawn as a picture');
+  assert.doesNotMatch(svg, /SECRET|Annotated image|map-pin/);
+});

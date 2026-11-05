@@ -1316,6 +1316,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_do_note_0": "改写“{0}”的笔记",
   "ui.map_chat_do_move_0_1": "把“{0}”移到“{1}”底下",
   "ui.map_chat_do_move_before_0_1": "把“{0}”移到“{1}”前面",
+  "ui.map_chat_do_reorder_0_1": "重新排列“{0}”底下的 {1} 个议题顺序",
   "ui.map_chat_skip_not_sibling": "要排在它后面的议题不在那个上层议题底下",
   "ui.map_chat_do_delete_0": "把“{0}”移到未归类",
   "ui.map_chat_do_edit_md_0": "修改 {0}",

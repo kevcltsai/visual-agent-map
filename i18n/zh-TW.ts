@@ -1319,6 +1319,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_do_note_0": "改寫「{0}」的筆記",
   "ui.map_chat_do_move_0_1": "把「{0}」移到「{1}」底下",
   "ui.map_chat_do_move_before_0_1": "把「{0}」移到「{1}」前面",
+  "ui.map_chat_do_reorder_0_1": "重新排列「{0}」底下的 {1} 個議題順序",
   "ui.map_chat_skip_not_sibling": "要排在它後面的議題不在那個上層議題底下",
   "ui.map_chat_do_delete_0": "把「{0}」移到未歸類",
   "ui.map_chat_do_edit_md_0": "修改 {0}",

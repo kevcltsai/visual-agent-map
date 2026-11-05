@@ -43,7 +43,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "add_relation",
   "remove_relation",
   "set_appearance",
-  "rename_map"
+  "rename_map",
+  "reorder_topics"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -88,6 +89,8 @@ export type MapChatAction =
    * parent; without it the card goes under `newParentId` as before.
    */
   | { kind: "move_topic"; nodeId: string; newParentId: string; beforeId?: string }
+  /** Puts the listed children of `parentId` in this order (first to last) among their siblings; the cards stay under `parentId`. */
+  | { kind: "reorder_topics"; parentId: string; nodeIds: string[] }
   | { kind: "delete_topic"; nodeId: string; branch: boolean }
   | { kind: "edit_md_file"; path: string; find: string; replace: string }
   | { kind: "create_md_file"; path: string; content: string }
@@ -177,7 +180,7 @@ export type MapChatRejectCode =
   | "relation_not_allowed"
   /** A remove_relation for two cards that hold no relation. */
   | "unknown_relation"
-  /** A move_topic whose `beforeId` is not a child of the target parent (at that point of the reply). */
+  /** A move_topic whose `beforeId`, or a reorder_topics card, is not a child of the target parent (at that point of the reply). */
   | "not_sibling"
   /** An appearance change on a map whose cards have none to edit (AIM). */
   | "no_appearance";
@@ -487,6 +490,15 @@ export function parseMapChat(
           parents[nodeId] = newParentId;
           break;
         }
+        case "reorder_topics": {
+          const parentId = resolve(text("parentId"), true);
+          const nodeIds = list("nodeIds");
+          if (nodeIds.length < 2) throw new Dropped("missing_field");
+          // Every listed card must already sit under the parent (as the earlier items of this reply left them).
+          if (nodeIds.some(id => parents[id] !== parentId)) throw new Dropped("not_sibling");
+          actions.push({ kind: "reorder_topics", parentId, nodeIds });
+          break;
+        }
         case "delete_topic":
           actions.push({ kind: "delete_topic", nodeId: node("nodeId"), branch: flag("branch") });
           break;
@@ -668,7 +680,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 13,
+  version: 14,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

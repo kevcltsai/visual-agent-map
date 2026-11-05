@@ -1393,6 +1393,7 @@ export const en = {
   "ui.map_chat_do_note_0": "Rewrite the note of “{0}”",
   "ui.map_chat_do_move_0_1": "Move “{0}” under “{1}”",
   "ui.map_chat_do_move_before_0_1": "Move “{0}” in front of “{1}”",
+  "ui.map_chat_do_reorder_0_1": "Put {1} topics under “{0}” in a new order",
   "ui.map_chat_skip_not_sibling": "the topic to go in front of is not under that parent",
   "ui.map_chat_do_delete_0": "Move “{0}” to Unassigned",
   "ui.map_chat_do_edit_md_0": "Edit {0}",

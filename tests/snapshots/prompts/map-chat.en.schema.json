@@ -35,7 +35,8 @@
               "add_relation",
               "remove_relation",
               "set_appearance",
-              "rename_map"
+              "rename_map",
+              "reorder_topics"
             ]
           },
           "nodeId": {

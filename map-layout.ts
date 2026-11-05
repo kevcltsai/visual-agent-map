@@ -636,6 +636,30 @@ export function reorderSiblings<T extends { id: string; parentId?: string | null
   return result;
 }
 /**
+ * Puts the children `orderedIds` of `parentId` in that order. Only the listed cards change places, and only among the places
+ * they hold in the array (the order every arrangement lays siblings out in); an unlisted sibling and every other card keep
+ * their index. An id that is not a child of `parentId`, a repeated id, fewer than two ids, or an order that already holds
+ * returns `nodes` itself.
+ */
+export function orderSiblings<T extends { id: string; parentId?: string | null }>(
+  nodes: T[],
+  parentId: string,
+  orderedIds: readonly string[]
+): T[] {
+  if (orderedIds.length < 2 || new Set(orderedIds).size !== orderedIds.length) return nodes;
+  const slots = nodes.flatMap((node, index) => (node.parentId === parentId ? [index] : []));
+  const listed = new Set(orderedIds);
+  const wanted = orderedIds.map(id => slots.map(index => nodes[index]).find(node => node.id === id));
+  if (wanted.some(node => !node)) return nodes;
+  const places = slots.filter(index => listed.has(nodes[index].id));
+  if (places.every((index, at) => nodes[index] === wanted[at])) return nodes;
+  const result = nodes.slice();
+  places.forEach((index, at) => {
+    result[index] = wanted[at]!;
+  });
+  return result;
+}
+/**
  * Moves `id` one place earlier (`-1`) or later (`1`) among the children of its parent, in the array order every arrangement
  * lays them out in. Only those children change places with each other; every other card keeps its index. An unknown id, a card
  * without a parent or one that is already first (or last) returns `nodes` itself.

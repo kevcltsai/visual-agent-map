@@ -84,7 +84,14 @@ export function arrangeNewBranchWithText(
     return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout), items: [...items] };
   const withNew = new Set(newIds);
   for (const text of texts) if (newIds.has(text.parentId as string)) withNew.add(text.id);
-  const placed = arrangeNewBranch([...nodes, ...texts.map(asLeaf(widthOf))], parentId, withNew, heightOf, minTop, layout);
+  const placed = arrangeNewBranch(
+    [...nodes, ...texts.map(asLeaf(widthOf))],
+    parentId,
+    withNew,
+    heightOf,
+    minTop,
+    layout
+  );
   const real = new Set(nodes.map(node => node.id));
   return {
     nodes: placed.filter(node => real.has(node.id)),

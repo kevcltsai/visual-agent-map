@@ -848,7 +848,18 @@ const TEXT_NODE_HEIGHT = 28;
 const TEXT_NODE_WIDTH = TEXT_AUTO_WIDTH_MAX;
 /** What an automatic block's width will roughly be before it is drawn: its longest line (CJK counts double) plus padding and border, within the automatic limits. */
 function estimateTextWidth(text: string): number {
-  const line = Math.max(0, ...text.split(/\r?\n/).map(part => Array.from(part).reduce((sum, ch) => sum + (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 6.5), 0)));
+  const line = Math.max(
+    0,
+    ...text
+      .split(/\r?\n/)
+      .map(part =>
+        Array.from(part).reduce(
+          (sum, ch) =>
+            sum + (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 6.5),
+          0
+        )
+      )
+  );
   return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
 }
 function depthOf(nodes: MapNode[], id: string): number {
@@ -876,7 +887,10 @@ const BOUNDARY_PAD = 16;
  * the browser's, so the text is widened until it needs no more lines than the screen shows: a fitted one-line block never loses its text.
  */
 function textBlockLines(text: string, boxWidth: number, boxHeight: number, lineHeight: number): string[] {
-  const shown = Math.max(1, Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19)));
+  const shown = Math.max(
+    1,
+    Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19))
+  );
   let room = Math.max(1, boxWidth - 14);
   let lines = wrapText(text, room);
   for (let tries = 0; lines.length > shown && tries < 40; tries++) {
@@ -1339,7 +1353,9 @@ export class VisualAgentMapView extends ItemView {
   private textWidthOf = (id: string): number | undefined => {
     const drawn = this.textEls.get(id)?.offsetWidth;
     if (drawn) return drawn;
-    const item = (this.map?.canvasItems ?? []).find((entry): entry is TextItem => entry.kind === "text" && entry.id === id);
+    const item = (this.map?.canvasItems ?? []).find(
+      (entry): entry is TextItem => entry.kind === "text" && entry.id === id
+    );
     return item ? (item.width ?? estimateTextWidth(item.text)) : undefined;
   };
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
@@ -8481,7 +8497,8 @@ export class VisualAgentMapView extends ItemView {
     });
     handle.tabIndex = 0;
     const storedWidth = (): number | undefined =>
-      (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === text.id)?.width;
+      (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === text.id)
+        ?.width;
     const shownWidth = (): number => storedWidth() ?? (el.offsetWidth || TEXT_NODE_WIDTH);
     const sync = (width: number): void => handle.setAttr("aria-valuenow", String(width));
     sync(shownWidth());
@@ -9005,7 +9022,9 @@ export class VisualAgentMapView extends ItemView {
         // No topic selected: a free block in the middle of the view (canvas-text-node decision #4).
         const center = this.stagePoint(null);
         // The new block shows the placeholder, as wide as that text; centre on that, not on the 300 limit.
-        await this.addFreeText(center && { x: center.x - estimateTextWidth(t("ui.text_node_placeholder")) / 2, y: center.y });
+        await this.addFreeText(
+          center && { x: center.x - estimateTextWidth(t("ui.text_node_placeholder")) / 2, y: center.y }
+        );
         return;
       }
       const id = `txt-${randomUUID().slice(0, 8)}`;
@@ -11495,7 +11514,12 @@ export class VisualAgentMapView extends ItemView {
         y: box.y,
         w: box.width,
         h: box.height,
-        title: textBlockLines(body?.textContent ?? "", box.width, box.height, parseFloat(computed(body ?? el).lineHeight)),
+        title: textBlockLines(
+          body?.textContent ?? "",
+          box.width,
+          box.height,
+          parseFloat(computed(body ?? el).lineHeight)
+        ),
         plain: true,
         textColor: colorOf(computed(body ?? el).color)
       });
@@ -18717,7 +18741,12 @@ export class VisualAgentMapView extends ItemView {
       const text = item as TextItem;
       const el = this.textEls.get(text.id);
       if (!el?.hasClass("is-free")) continue; // attached blocks follow their topic; a folded one is not drawn
-      boxes.push({ x: text.x, y: text.y, w: el.offsetWidth || text.width || TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
+      boxes.push({
+        x: text.x,
+        y: text.y,
+        w: el.offsetWidth || text.width || TEXT_NODE_WIDTH,
+        h: el.offsetHeight || TEXT_NODE_HEIGHT
+      });
     }
     // Summary bracket text (summary-bracket decision #9): it sits beyond the brace tip and would be clipped otherwise.
     for (const el of this.summaryEls.values()) {

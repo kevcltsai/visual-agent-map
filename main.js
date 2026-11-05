@@ -29271,7 +29271,14 @@ function arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minT
     return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout), items: [...items] };
   const withNew = new Set(newIds);
   for (const text11 of texts2) if (newIds.has(text11.parentId)) withNew.add(text11.id);
-  const placed = arrangeNewBranch([...nodes, ...texts2.map(asLeaf(widthOf))], parentId, withNew, heightOf, minTop, layout);
+  const placed = arrangeNewBranch(
+    [...nodes, ...texts2.map(asLeaf(widthOf))],
+    parentId,
+    withNew,
+    heightOf,
+    minTop,
+    layout
+  );
   const real = new Set(nodes.map((node) => node.id));
   return {
     nodes: placed.filter((node) => real.has(node.id)),
@@ -54083,7 +54090,15 @@ var RELATION_LABEL_NOTE_MAX = 60;
 var TEXT_NODE_HEIGHT = 28;
 var TEXT_NODE_WIDTH = TEXT_AUTO_WIDTH_MAX;
 function estimateTextWidth(text11) {
-  const line = Math.max(0, ...text11.split(/\r?\n/).map((part) => Array.from(part).reduce((sum2, ch) => sum2 + (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 6.5), 0)));
+  const line = Math.max(
+    0,
+    ...text11.split(/\r?\n/).map(
+      (part) => Array.from(part).reduce(
+        (sum2, ch) => sum2 + (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 6.5),
+        0
+      )
+    )
+  );
   return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
 }
 function depthOf(nodes, id) {
@@ -54095,7 +54110,10 @@ function depthOf(nodes, id) {
 var anchorLineKey = (imageId, anchorId, topicId) => `anchor:${imageId}:${anchorId}:${topicId}`;
 var BOUNDARY_PAD = 16;
 function textBlockLines(text11, boxWidth, boxHeight, lineHeight) {
-  const shown = Math.max(1, Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19)));
+  const shown = Math.max(
+    1,
+    Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19))
+  );
   let room = Math.max(1, boxWidth - 14);
   let lines = wrapText(text11, room);
   for (let tries = 0; lines.length > shown && tries < 40; tries++) {
@@ -54402,7 +54420,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       var _a2, _b2, _c, _d;
       const drawn = (_a2 = this.textEls.get(id)) == null ? void 0 : _a2.offsetWidth;
       if (drawn) return drawn;
-      const item = ((_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : []).find((entry) => entry.kind === "text" && entry.id === id);
+      const item = ((_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : []).find(
+        (entry) => entry.kind === "text" && entry.id === id
+      );
       return item ? (_d = item.width) != null ? _d : estimateTextWidth(item.text) : void 0;
     });
     /** Text node element per id (tree-attached and free), rebuilt on every render. */
@@ -61649,7 +61669,9 @@ ${request.requirements}` : preset.text,
       const owner = target && this.map.nodes.find((node) => node.id === target.id);
       if (!owner) {
         const center = this.stagePoint(null);
-        await this.addFreeText(center && { x: center.x - estimateTextWidth(t("ui.text_node_placeholder")) / 2, y: center.y });
+        await this.addFreeText(
+          center && { x: center.x - estimateTextWidth(t("ui.text_node_placeholder")) / 2, y: center.y }
+        );
         return;
       }
       const id = `txt-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`;
@@ -63883,7 +63905,12 @@ ${request.requirements}` : preset.text,
         y: box.y,
         w: box.width,
         h: box.height,
-        title: textBlockLines((_g = body == null ? void 0 : body.textContent) != null ? _g : "", box.width, box.height, parseFloat(computed(body != null ? body : el).lineHeight)),
+        title: textBlockLines(
+          (_g = body == null ? void 0 : body.textContent) != null ? _g : "",
+          box.width,
+          box.height,
+          parseFloat(computed(body != null ? body : el).lineHeight)
+        ),
         plain: true,
         textColor: colorOf(computed(body != null ? body : el).color)
       });
@@ -70582,7 +70609,12 @@ ${note.detail.trim()}` : "",
       const text11 = item;
       const el = this.textEls.get(text11.id);
       if (!(el == null ? void 0 : el.hasClass("is-free"))) continue;
-      boxes.push({ x: text11.x, y: text11.y, w: el.offsetWidth || text11.width || TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
+      boxes.push({
+        x: text11.x,
+        y: text11.y,
+        w: el.offsetWidth || text11.width || TEXT_NODE_WIDTH,
+        h: el.offsetHeight || TEXT_NODE_HEIGHT
+      });
     }
     for (const el of this.summaryEls.values()) {
       const text11 = el.querySelector(".vam-summary-text");

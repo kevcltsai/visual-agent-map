@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, fixture, DEFAULT_SETTINGS, obsidian, core, withExpansionCoordinator } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
+const { loadSource } = require('./support-replay.cjs');
 const { element, find, findAll } = dom;
 const plain = value => JSON.parse(JSON.stringify(value));
 const TOPICS = 'Agent Workspace/Topics';
@@ -12,9 +13,9 @@ const image = (over = {}) => ({ id: 'img1', kind: 'image', path: 'attachments/a.
 const annotated = (over = {}) => ({ id: 'img1', kind: 'annotated-image', path: 'attachments/a.png', x: 100, y: 50, w: 200, h: 100, anchors: [], ...over });
 const anchor = (id = 'a1') => ({ id, at: { kind: 'image-2d', x: 0.5, y: 0.5 }, note: 'cow back' });
 
-async function harness(items) {
-  const { repo, app, contents } = fixture('en', { linkIndex: true });
-  const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
+async function harness(items, lang = 'en') {
+  const { repo, app, contents } = fixture(lang, { linkIndex: true });
+  const settings = { ...DEFAULT_SETTINGS, language: lang, cliModel: 'gpt-6-luna' };
   repo.settings = settings;
   const doc = { id: 'map-a', title: 'A', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
   await repo.ensureTopicFolders(`${TOPICS}/map-a`);
@@ -44,7 +45,10 @@ async function harness(items) {
     setName(text) { this.el.createSpan({ text }); return this; } setDesc(text) { this.el.createSpan({ text }); return this; }
     addButton(cb) { const b = this.el.createEl('button'); cb({ setButtonText(t) { b.text = t; return this; }, onClick(fn) { b.addEventListener('click', fn); return this; } }); return this; }
   }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Menu, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment });
+  const { VisualAgentMapView, setUiLanguage } = lang === 'en'
+    ? { ...load('main.ts', { obsidian: { ...obsidian, Menu, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment }), setUiLanguage() {} }
+    : loadSource('export { VisualAgentMapView } from "./main"; export { setUiLanguage } from "./i18n";', { obsidian: { ...obsidian, Menu, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment });
+  setUiLanguage(lang);
   let pending = Promise.resolve();
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -664,4 +668,16 @@ test('counter-example (unknown kind): an anchor with an unknown position kind is
   dom.button(h.modals.at(-1).modalEl, 'Done').click();
   await h.settle();
   assert.deepEqual((await h.onDisk())[0].anchors[0], weird);
+});
+
+test('anchor aria name: the joiner is localised (". " in English, "。" in Chinese)', async () => {
+  for (const [lang, joiner] of [['en', '. '], ['zh-TW', '。'], ['zh-CN', '。']]) {
+    const h = await harness(root => [annotated({ note: 'n', anchors: [at('a1', 0.25, 0.75, 'cow'), at('a2', 0.5, 0.5, '')], relations: [{ kind: 'supports', from: root, to: 'a1' }] })], lang);
+    h.view.render();
+    const [first, second] = anchorsOf(h.imageEl());
+    for (const label of [first.attrs['aria-label'], second.attrs['aria-label']]) {
+      assert.ok(label.includes(joiner), `${lang}: ${label}`);
+      if (lang !== 'en') assert.ok(!label.includes('. '), `${lang} has no ASCII joiner: ${label}`);
+    }
+  }
 });

@@ -7012,7 +7012,7 @@ export class VisualAgentMapView extends ItemView {
       // The note is untrusted: only setAttr / text reach the page.
       dot.setAttr(
         "aria-label",
-        `${anchor.note ? t("ui.anchor_label", anchor.note) : t("ui.anchor_label_empty")}. ${state}`
+        t("ui.anchor_aria_0_1", anchor.note ? t("ui.anchor_label", anchor.note) : t("ui.anchor_label_empty"), state)
       );
       const tip = dot.createSpan("vam-anchor-tip");
       tip.id = `vam-anchor-tip-${++this.anchorTipSeq}`;

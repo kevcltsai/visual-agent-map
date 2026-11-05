@@ -894,6 +894,7 @@ export const en = {
   "ui.anchor_pick_title": "Pick a topic for the anchor",
   "ui.anchor_label": "Anchor: {0}",
   "ui.anchor_label_empty": "Anchor (no note)",
+  "ui.anchor_aria_0_1": "{0}. {1}",
   "ui.anchor_links": "Linked to {0} topic(s)",
   "ui.anchor_unlinked": "Not linked to any topic",
   "ui.anchor_relation_end_0": "Annotated image · {0}",

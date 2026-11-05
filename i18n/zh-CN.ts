@@ -836,6 +836,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.anchor_pick_title": "为锚点选一个议题",
   "ui.anchor_label": "锚点：{0}",
   "ui.anchor_label_empty": "锚点（无说明）",
+  "ui.anchor_aria_0_1": "{0}。{1}",
   "ui.anchor_links": "连到 {0} 个议题",
   "ui.anchor_unlinked": "尚未连到议题",
   "ui.anchor_relation_end_0": "标注图・{0}",

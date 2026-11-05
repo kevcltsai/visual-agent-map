@@ -919,6 +919,7 @@ var en = {
   "ui.anchor_pick_title": "Pick a topic for the anchor",
   "ui.anchor_label": "Anchor: {0}",
   "ui.anchor_label_empty": "Anchor (no note)",
+  "ui.anchor_aria_0_1": "{0}. {1}",
   "ui.anchor_links": "Linked to {0} topic(s)",
   "ui.anchor_unlinked": "Not linked to any topic",
   "ui.anchor_relation_end_0": "Annotated image \xB7 {0}",
@@ -3599,6 +3600,7 @@ var zhCN = {
   "ui.anchor_pick_title": "\u4E3A\u951A\u70B9\u9009\u4E00\u4E2A\u8BAE\u9898",
   "ui.anchor_label": "\u951A\u70B9\uFF1A{0}",
   "ui.anchor_label_empty": "\u951A\u70B9\uFF08\u65E0\u8BF4\u660E\uFF09",
+  "ui.anchor_aria_0_1": "{0}\u3002{1}",
   "ui.anchor_links": "\u8FDE\u5230 {0} \u4E2A\u8BAE\u9898",
   "ui.anchor_unlinked": "\u5C1A\u672A\u8FDE\u5230\u8BAE\u9898",
   "ui.anchor_relation_end_0": "\u6807\u6CE8\u56FE\u30FB{0}",
@@ -6279,6 +6281,7 @@ var zhTW = {
   "ui.anchor_pick_title": "\u70BA\u9328\u9EDE\u9078\u4E00\u500B\u8B70\u984C",
   "ui.anchor_label": "\u9328\u9EDE\uFF1A{0}",
   "ui.anchor_label_empty": "\u9328\u9EDE\uFF08\u7121\u8AAA\u660E\uFF09",
+  "ui.anchor_aria_0_1": "{0}\u3002{1}",
   "ui.anchor_links": "\u9023\u5230 {0} \u500B\u8B70\u984C",
   "ui.anchor_unlinked": "\u5C1A\u672A\u9023\u5230\u8B70\u984C",
   "ui.anchor_relation_end_0": "\u6A19\u8A3B\u5716\u30FB{0}",
@@ -26470,7 +26473,9 @@ function relationLabelPoint(a, b, axis = void 0) {
   const { p1, c1, c2, p2 } = curveOf(a, b, axis);
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
-function pointToBoxCurve(point, box, pointIsFrom) {
+var ANCHOR_LINE_INSET = 8;
+function pointToBoxCurve(original, box, pointIsFrom) {
+  let point = original;
   const horizontal = axisGap(point.x, 0, box.x, box.width), vertical = axisGap(point.y, 0, box.y, box.height);
   const centre = centreOf(box);
   let edge, gap;
@@ -26485,6 +26490,13 @@ function pointToBoxCurve(point, box, pointIsFrom) {
     const below = point.y > centre.y;
     edge = { x: centre.x, y: below ? box.y + box.height : box.y, nx: 0, ny: below ? 1 : -1 };
     gap = vertical;
+  }
+  if (gap > 0) {
+    const toEdge = Math.hypot(edge.x - original.x, edge.y - original.y) || 1, inset = Math.min(ANCHOR_LINE_INSET, toEdge / 2);
+    point = {
+      x: original.x + (edge.x - original.x) / toEdge * inset,
+      y: original.y + (edge.y - original.y) / toEdge * inset
+    };
   }
   const length = gap > 0 ? controlLength(gap) : 0, run = Math.hypot(edge.x - point.x, edge.y - point.y) || 1, near = { x: point.x + (edge.x - point.x) / run * length, y: point.y + (edge.y - point.y) / run * length }, far = { x: edge.x + edge.nx * length, y: edge.y + edge.ny * length };
   return pointIsFrom ? { p1: { x: point.x, y: point.y }, c1: near, c2: far, p2: { x: edge.x, y: edge.y } } : { p1: { x: edge.x, y: edge.y }, c1: far, c2: near, p2: { x: point.x, y: point.y } };
@@ -58764,7 +58776,7 @@ ${request.requirements}` : preset.text,
       const state = links ? t("ui.anchor_links", links) : t("ui.anchor_unlinked");
       dot.setAttr(
         "aria-label",
-        `${anchor.note ? t("ui.anchor_label", anchor.note) : t("ui.anchor_label_empty")}. ${state}`
+        t("ui.anchor_aria_0_1", anchor.note ? t("ui.anchor_label", anchor.note) : t("ui.anchor_label_empty"), state)
       );
       const tip = dot.createSpan("vam-anchor-tip");
       tip.id = `vam-anchor-tip-${++this.anchorTipSeq}`;

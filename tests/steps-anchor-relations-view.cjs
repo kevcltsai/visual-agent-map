@@ -77,7 +77,8 @@ test('anchor relation: one line from the anchor to the nearest card edge, keyed 
     const path = h.pathOf(KEY(`img${i}`, 'p1', 'a'));
     assert.ok(path.hasClass('vam-relation') && path.hasClass(`vam-relation-${kind}`), kind);
     // The anchor centre is (img.x + 0.5 * w, img.y + 0.5 * h) in map units; the line leaves it.
-    assert.match(path.attrs.d, /^M 200 650 C /, kind);
+    const lead = path.attrs.d.match(/^M (\S+) (\S+) C /);
+    assert.ok(lead && Math.hypot(lead[1] - 200, lead[2] - 650) >= 7, `${kind}: the line starts clear of the anchor`);
     assert.equal(path.attrs['marker-end'] === undefined, kind === 'related', `${kind}: related has no arrowhead`);
     assert.equal(h.view.relationGapEls.has(KEY(`img${i}`, 'p1', 'a')), kind === 'derives_from', `${kind}: only derives_from has the second rail`);
     assert.ok(h.view.relationHitEls.has(KEY(`img${i}`, 'p1', 'a')) && h.view.relationLabelEls.has(KEY(`img${i}`, 'p1', 'a')));
@@ -91,8 +92,10 @@ test('direction follows from to: an anchor as the target puts the arrowhead on t
   const h = harness({ relations: [rel('supports', 'a', 'p1'), rel('supports', 'p2', 'b')] });
   h.view.draw();
   const into = h.pathOf(KEY('img1', 'p1', 'a')).attrs.d, out = h.pathOf(KEY('img1', 'p2', 'b')).attrs.d;
-  assert.match(into, / 200 650$/, 'from the card, ends on the anchor');
-  assert.match(out, /^M 150 675 C /, 'from the anchor (0.25, 0.75), ends on the card');
+  const tail = into.match(/ (\S+) (\S+)$/);
+  assert.ok(tail && Math.hypot(tail[1] - 200, tail[2] - 650) >= 7, 'from the card, ends clear of the anchor');
+  const start = out.match(/^M (\S+) (\S+) C /);
+  assert.ok(start && Math.hypot(start[1] - 150, start[2] - 675) >= 7, 'from the anchor (0.25, 0.75), starting clear of it, ends on the card');
   const toCard = geometry.pointToBoxPathData({ x: 150, y: 675 }, { x: 400, y: 200, width: 280, height: 100 }, true);
   assert.equal(out, toCard);
 });
@@ -546,4 +549,20 @@ test('counter-example (read-only P4b): AIM and selection mode show the rows but 
     row.fire('click');
     assert.equal(h.modals.length, 0, mode);
   }
+});
+
+test('geometry: the anchor end starts at least 7px (the anchor radius) from the anchor centre, in every direction', () => {
+  const box = { x: 400, y: 200, width: 280, height: 100 };
+  const points = [{ x: 100, y: 250 }, { x: 900, y: 250 }, { x: 540, y: 600 }, { x: 540, y: 0 }, { x: 380, y: 250 }, { x: 300, y: 80 }, { x: 800, y: 500 }];
+  for (const point of points)
+    for (const pointIsFrom of [true, false]) {
+      const d = geometry.pointToBoxPathData(point, box, pointIsFrom);
+      assert.match(d, /^[MC0-9 .,-]+$/, 'numbers only');
+      const n = d.match(/-?\d+(\.\d+)?/g).map(Number);
+      const end = pointIsFrom ? { x: n[0], y: n[1] } : { x: n[6], y: n[7] };
+      assert.ok(Math.hypot(end.x - point.x, end.y - point.y) >= 7, `clear of the anchor at ${point.x},${point.y} from=${pointIsFrom}: ${d}`);
+      const label = geometry.pointToBoxLabelPoint(point, box, pointIsFrom);
+      assert.ok(Number.isFinite(label.x) && Number.isFinite(label.y));
+    }
+  assert.match(geometry.pointToBoxPathData({ x: 500, y: 250 }, box, true), /^M 500 250 C .* 540 250$/, 'inside the card: as before');
 });

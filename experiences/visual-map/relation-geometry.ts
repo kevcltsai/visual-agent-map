@@ -126,12 +126,17 @@ export function relationLabelPoint(
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
 
+/** An anchor's line starts this far from its centre (px), clear of the 7px anchor radius, so the anchor button stays hoverable and clickable. */
+const ANCHOR_LINE_INSET = 8;
+
 /**
  * The curve between a free point (an anchor on an image, in map coordinates) and the nearest edge midpoint of a card.
  * The card end leaves along the edge's normal; the point end heads straight towards the card. `pointIsFrom` says which
- * end the line starts at (so the arrowhead lands on the right one). A point inside the card joins its centre.
+ * end the line starts at (so the arrowhead lands on the right one). A point inside the card joins its centre. Outside the
+ * card the point end is pulled `ANCHOR_LINE_INSET` px along the line towards the card, so the line never covers the anchor.
  */
-function pointToBoxCurve(point: { x: number; y: number }, box: RelationBox, pointIsFrom: boolean): Curve {
+function pointToBoxCurve(original: { x: number; y: number }, box: RelationBox, pointIsFrom: boolean): Curve {
+  let point = original;
   const horizontal = axisGap(point.x, 0, box.x, box.width),
     vertical = axisGap(point.y, 0, box.y, box.height);
   const centre = centreOf(box);
@@ -147,6 +152,14 @@ function pointToBoxCurve(point: { x: number; y: number }, box: RelationBox, poin
     const below = point.y > centre.y;
     edge = { x: centre.x, y: below ? box.y + box.height : box.y, nx: 0, ny: below ? 1 : -1 };
     gap = vertical;
+  }
+  if (gap > 0) {
+    const toEdge = Math.hypot(edge.x - original.x, edge.y - original.y) || 1,
+      inset = Math.min(ANCHOR_LINE_INSET, toEdge / 2);
+    point = {
+      x: original.x + ((edge.x - original.x) / toEdge) * inset,
+      y: original.y + ((edge.y - original.y) / toEdge) * inset
+    };
   }
   const length = gap > 0 ? controlLength(gap) : 0,
     run = Math.hypot(edge.x - point.x, edge.y - point.y) || 1,

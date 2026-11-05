@@ -837,6 +837,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.anchor_pick_title": "為錨點選一個議題",
   "ui.anchor_label": "錨點：{0}",
   "ui.anchor_label_empty": "錨點（無說明）",
+  "ui.anchor_aria_0_1": "{0}。{1}",
   "ui.anchor_links": "連到 {0} 個議題",
   "ui.anchor_unlinked": "尚未連到議題",
   "ui.anchor_relation_end_0": "標註圖・{0}",

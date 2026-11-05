@@ -32,7 +32,7 @@ function element(tag, options = {}) {
     removeEventListener(name, fn) { this.listeners[name] = (this.listeners[name] ?? []).filter(f => f !== fn); },
     fire(name, event = {}) { let stopped = false; const e = { preventDefault() {}, stopPropagation() { stopped = true; }, target: this, ...event }; for (const fn of this.listeners[name] ?? []) fn(e); if (!stopped && this.parent && ['change', 'input', 'click'].includes(name)) this.parent.fire(name, { ...e, target: e.target }); },
     click() { if (!this.disabled) this.fire('click'); }, change() { this.fire('change'); }, input() { this.fire('input'); }, keydown(event) { this.fire('keydown', event); },
-    focus() { this.focused = true; if (this.root) this.root.activeElement = this; }, select() {}, setSelectionRange() {},
+    focus() { lastFocused = this; this.focused = true; if (this.root) this.root.activeElement = this; }, select() {}, setSelectionRange() {},
     querySelector(selector) { return findAll(this, matcher(selector))[0] ?? null; },
     querySelectorAll(selector) { return findAll(this, matcher(selector)); }
   };
@@ -45,6 +45,9 @@ function matcher(selector) {
   if (selector.startsWith('.')) { const name = selector.slice(1); return item => hasCls(item, name); }
   return item => item.tag === selector;
 }
+/** The element that was focused last (the one that holds the focus now). */
+let lastFocused = null;
+const focusedNow = () => lastFocused;
 function findAll(root, predicate) { return [...(predicate(root) ? [root] : []), ...root.children.flatMap(c => findAll(c, predicate))]; }
 const find = (root, predicate) => findAll(root, predicate)[0];
 const byLabel = (root, label) => find(root, i => i.attrs['aria-label'] === label);
@@ -58,15 +61,19 @@ function makeScope() {
     handlers,
     register(modifiers, key, func) { const handler = { modifiers, key, func }; handlers.push(handler); return handler; },
     unregister(handler) { const at = handlers.indexOf(handler); if (at >= 0) handlers.splice(at, 1); },
-    press(key) { for (const handler of [...handlers].reverse()) if (handler.key === key && handler.func({ key }, {}) === false) return false; return true; }
+    press(key) { for (const handler of [...handlers]) if (handler.key === key && handler.func({ key }, {}) === false) return false; return true; }
   };
 }
 /** A Modal base class whose contentEl lives inside modalEl; `closed` counts close() calls. */
-function makeModal() {
+function makeModal({ focusFirst = false } = {}) {
   return class Modal {
-    constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); this.closeCount = 0; this.scope = makeScope(); }
+    constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); this.closeCount = 0; this.scope = makeScope();
+      // Scope runs handlers in registration order. Like Obsidian's constructor: Escape is bound first, to onEscapeKey (which closes the window unless a subclass overrides it).
+      this.scope.register([], 'Escape', () => { if (this.onEscapeKey) this.onEscapeKey(); else this.close(); return false; });
+    }
     // Like Obsidian's Modal, opening stores the page's text selection on `this.selection`.
-    open() { this.selection = { rangeCount: 0 }; this.onOpen?.(); }
+    // With `focusFirst`, after onOpen it moves the focus to the first focusable control in modalEl, as Obsidian does with a physical keyboard.
+    open() { this.selection = { rangeCount: 0 }; this.onOpen?.(); if (focusFirst) findAll(this.modalEl, i => ['button', 'input', 'textarea', 'select'].includes(i.tag) && i.attrs.tabindex !== '-1')[0]?.focus(); }
     close() { this.closeCount++; this.onClose?.(); }
   };
 }
@@ -88,4 +95,4 @@ function makeNotice(log = []) {
     get actions() { return typeof this.message === 'string' ? [] : findAll(this.message, i => i.tag === 'button'); }
   };
 }
-module.exports = { hasCls, element, find, findAll, byLabel, button, buttons, texts, makeModal, tick, createFragment, makeNotice };
+module.exports = { focusedNow, hasCls, element, find, findAll, byLabel, button, buttons, texts, makeModal, tick, createFragment, makeNotice };

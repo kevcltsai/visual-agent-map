@@ -332,6 +332,15 @@ export class NoteStyleManageModal extends Modal {
     });
   }
 
+  /**
+   * Obsidian's Modal constructor binds Escape to `onEscapeKey` (Obsidian 1.15.0; not in obsidian.d.ts), and the scope runs
+   * that first. With a "..." menu open the key closes only the menu; otherwise it closes the window.
+   */
+  onEscapeKey(): void {
+    if (this.menu) this.menu.close(true);
+    else this.close();
+  }
+
   private openMenu(
     setting: Setting,
     more: HTMLElement,
@@ -352,13 +361,7 @@ export class NoteStyleManageModal extends Modal {
       });
       return button;
     });
-    // Obsidian handles Escape through the window's scope before the page sees the key, so the menu takes it there.
-    const escape = this.scope.register([], "Escape", () => {
-      close(true);
-      return false;
-    });
     const close = (focus: boolean): void => {
-      this.scope.unregister(escape);
       el.remove();
       more.setAttr("aria-expanded", "false");
       if (this.menu?.el === el) this.menu = undefined;
@@ -869,6 +872,7 @@ class RenameDialog extends Modal {
 /** The small window that asks before something is moved to the trash. */
 class ConfirmDialog extends Modal {
   private done = false;
+  private cancelEl?: HTMLElement;
   constructor(
     app: App,
     private opts: {
@@ -881,6 +885,12 @@ class ConfirmDialog extends Modal {
     }
   ) {
     super(app);
+  }
+
+  /** Obsidian's open() moves the focus to the first button (Move to trash) after onOpen; the safe answer takes it back. */
+  open(): void {
+    super.open();
+    this.cancelEl?.focus();
   }
 
   onOpen(): void {
@@ -897,7 +907,8 @@ class ConfirmDialog extends Modal {
       void opts.run().finally(() => this.close());
     });
     cancel.addEventListener("click", () => this.close());
-    // The safe answer has the focus.
+    // The safe answer has the focus (open() repeats this after Obsidian's own focus move).
+    this.cancelEl = cancel;
     cancel.focus();
   }
 

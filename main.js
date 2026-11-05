@@ -70816,6 +70816,14 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
       else this.openMenu(setting, more, items);
     });
   }
+  /**
+   * Obsidian's Modal constructor binds Escape to `onEscapeKey` (Obsidian 1.15.0; not in obsidian.d.ts), and the scope runs
+   * that first. With a "..." menu open the key closes only the menu; otherwise it closes the window.
+   */
+  onEscapeKey() {
+    if (this.menu) this.menu.close(true);
+    else this.close();
+  }
   openMenu(setting, more, items) {
     var _a2;
     (_a2 = this.menu) == null ? void 0 : _a2.close(false);
@@ -70834,13 +70842,8 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
       });
       return button;
     });
-    const escape = this.scope.register([], "Escape", () => {
-      close(true);
-      return false;
-    });
     const close = (focus) => {
       var _a3;
-      this.scope.unregister(escape);
       el.remove();
       more.setAttr("aria-expanded", "false");
       if (((_a3 = this.menu) == null ? void 0 : _a3.el) === el) this.menu = void 0;
@@ -71307,6 +71310,13 @@ var ConfirmDialog = class extends import_obsidian37.Modal {
     super(app);
     this.opts = opts;
     __publicField(this, "done", false);
+    __publicField(this, "cancelEl");
+  }
+  /** Obsidian's open() moves the focus to the first button (Move to trash) after onOpen; the safe answer takes it back. */
+  open() {
+    var _a2;
+    super.open();
+    (_a2 = this.cancelEl) == null ? void 0 : _a2.focus();
   }
   onOpen() {
     const { opts } = this;
@@ -71322,6 +71332,7 @@ var ConfirmDialog = class extends import_obsidian37.Modal {
       void opts.run().finally(() => this.close());
     });
     cancel.addEventListener("click", () => this.close());
+    this.cancelEl = cancel;
     cancel.focus();
   }
   onClose() {

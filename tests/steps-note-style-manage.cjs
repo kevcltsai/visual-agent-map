@@ -397,7 +397,7 @@ class FakeSetting {
   }
 }
 const windows = [];
-const BaseModal = dom.makeModal();
+const BaseModal = dom.makeModal({ focusFirst: true });
 class RecordingModal extends BaseModal { open() { windows.push(this); super.open(); } }
 class FakeComponent { load() {} unload() {} addChild(child) { return child; } removeChild(child) { return child; } }
 const obsidian = { ...S.obsidian, Modal: RecordingModal, Setting: FakeSetting, Notice: dom.makeNotice(notices), Component: FakeComponent, MarkdownRenderer: { render: async () => {} } };
@@ -1195,22 +1195,23 @@ test('P5a built-in rows: "View" then "Copy and edit"; View shows the text or the
   assert.deepEqual(opened, []);
 });
 
-test('Esc with the "..." menu open goes through the window\'s scope: only the menu closes, focus returns to the button, the window stays; the handler is gone once the menu closes (was failing first)', async () => {
+test('Esc reaches the window through its onEscapeKey (what Obsidian binds): with the "..." menu open only the menu closes and focus returns to the button; with it closed the window closes (was failing first)', async () => {
   const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, {});
   const { root, modal } = await openManage(setup, 'recipe');
   const row = rowFor(root, 'Weekly');
   const more = moreOf(row);
-  const before = modal.scope.handlers.length;
   more.click();
-  assert.equal(modal.scope.handlers.length, before + 1, 'one Escape handler while the menu is open');
-  assert.equal(modal.scope.press('Escape'), false, 'the key is handled (not passed on to close the window)');
+  assert.ok(menuOf(row));
+  assert.equal(modal.scope.press('Escape'), false);
   assert.equal(menuOf(row), undefined);
   assert.equal(more.focused, true);
-  assert.equal(modal.closeCount, 0);
-  assert.equal(modal.scope.handlers.length, before, 'unregistered with the menu');
+  assert.equal(modal.closeCount, 0, 'the window stays');
   more.click();
-  menuOf(row).keydown({ key: 'Tab' });
-  assert.equal(modal.scope.handlers.length, before, 'closing another way unregisters too');
+  modal.onEscapeKey();
+  assert.equal(menuOf(row), undefined);
+  assert.equal(modal.closeCount, 0);
+  modal.scope.press('Escape');
+  assert.equal(modal.closeCount, 1, 'no menu: Escape closes the window');
 });
 
 test('P5a own rows: "Edit" and a "..." menu button named for the row; the menu is role=menu with items, opens and closes with the button and Escape (focus back on the button)', async () => {
@@ -1309,12 +1310,11 @@ test('P5a Restore the built-in default removes the keys of the topic types that 
   assert.equal('noteStyleByKind' in setup.settings, false);
 });
 
-test('P5a Delete: the delete question opens with the focus on the safe "Cancel", not on "Move to trash"', async () => {
+test('P5a Delete: the delete question opens with the focus on the safe "Cancel", not on "Move to trash", even though open() moves focus to the first button after onOpen (was failing first)', async () => {
   const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, {});
   const { root } = await openManage(setup, 'recipe');
   await pickMenu(rowFor(root, 'Weekly'), 'Delete (move to trash)');
-  assert.equal(dom.button(windows[1].modalEl, 'Cancel').focused, true);
-  assert.notEqual(dom.button(windows[1].modalEl, 'Move to trash').focused, true);
+  assert.equal(dom.focusedNow(), dom.button(windows[1].modalEl, 'Cancel'), 'the last focus move leaves it on Cancel');
 });
 
 test('P5a Delete asks first and lists where the style is used; Cancel changes nothing; Move to trash uses the trash, frees the topic types (back to built-in) and leaves the topics alone', async () => {

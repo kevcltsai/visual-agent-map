@@ -221,6 +221,7 @@ import {
 import {
   arrangeNewBranch,
   arrangeNewTree,
+  cardsOverlapAny,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
   layoutDirectionFor,
@@ -3942,10 +3943,34 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mergeUnlocked([node.id, parent.id])) return;
     await this.mapChange(map => {
       if (!canParent(map.nodes, node.id, parent.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-      map.nodes.find(item => item.id === node.id)!.parentId = parent.id;
+      const moving = map.nodes.find(item => item.id === node.id)!;
+      const oldParentId = moving.parentId;
+      moving.parentId = parent.id;
       map.nodes.find(item => item.id === parent.id)!.collapsed = false;
+      this.closeGapAt(map, oldParentId, parent.id);
       this.arrangeBranch(map, parent.id, new Set([node.id, ...descendants(map.nodes, node.id)]), undefined);
     });
+  }
+  /**
+   * A card left `oldParentId`: that branch is laid out again so the place it left closes up. Only that branch moves; the rest of
+   * the map, and a branch the card moved within, stay as they are. Nothing when there was no parent, the parent still is the
+   * parent, or its branch is folded.
+   */
+  private closeGapAt(map: MapDocument, oldParentId: string | null, newParentId: string): void {
+    if (!oldParentId || oldParentId === newParentId) return;
+    const old = map.nodes.find(item => item.id === oldParentId);
+    if (!old || old.collapsed) return;
+    this.arrangeBranch(map, oldParentId, new Set(descendants(map.nodes, oldParentId)), undefined);
+  }
+  /**
+   * After a chat reply changed what cards show: cards that grew and now cover another card get the whole map laid out again
+   * (the same layout "Auto layout" does); when nothing overlaps nothing moves, so a position the user set stays. A card that
+   * moved away from a parent had its old branch closed up already, at the move.
+   */
+  private tidyAfterResize(map: MapDocument, resized: ReadonlySet<string>): boolean {
+    if (!resized.size || !cardsOverlapAny(map.nodes, resized, this.cardHeightOf)) return false;
+    this.arrangeAll(map);
+    return true;
   }
   /**
    * `map.nodes` with every parent's children in on-screen order: sorted along the sibling axis of the arrangement they sit in
@@ -3979,10 +4004,12 @@ export class VisualAgentMapView extends ItemView {
       if (!moving || !target || next?.parentId !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
       // The children of the new parent first take the order on screen (what the model was told), so the reorder keeps what was seen.
       map.nodes = this.onScreenSiblingOrder(map);
+      const oldParentId = map.nodes.find(item => item.id === node.id)?.parentId ?? null;
       moving.parentId = parent.id;
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
       box.placed = true;
+      this.closeGapAt(map, oldParentId, parent.id);
       if (!map.aim && layoutOf(map).direction === "timeline" && !target.parentId) this.arrangeAll(map);
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
     });
@@ -17722,6 +17749,8 @@ export class VisualAgentMapView extends ItemView {
     // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
     let laidOutCount = 0;
     let layoutDone = false;
+    /** Cards whose title, summary or note this reply changed: their size may have changed. */
+    const resized = new Set<string>();
     // True once the reply stopped before its end (the user's Stop, or the view going away).
     let stopped = false;
     const refTitles = this.chatRefTitles(result.actions);
@@ -17796,6 +17825,11 @@ export class VisualAgentMapView extends ItemView {
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
         if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
+        if (
+          box.outcome.status === "done" &&
+          (action.kind === "rename_topic" || action.kind === "update_summary" || action.kind === "edit_topic_note")
+        )
+          resized.add(action.nodeId);
         if (action.kind === "auto_layout" && box.outcome.status === "done") {
           laidOutCount = run.created.length;
           layoutDone = true;
@@ -17826,6 +17860,26 @@ export class VisualAgentMapView extends ItemView {
           );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
+        }
+      }
+      // A card that grew (a summary, a longer title) can now cover the one below it: lay out again, only when that happened.
+      if (resized.size && !arranged && !noNewMap && same() && this.map) {
+        // The layout measures the cards, so the held repaint comes first. Looked at before any mutate is taken: a reply whose
+        // cards still fit writes nothing more (one mutate per action).
+        this.flushChatRender();
+        if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf)) {
+          try {
+            await this.plugin.mutate(() =>
+              this.history.ownWrites(async () => {
+                if (!same() || !this.map) return;
+                await this.mapChange(map => {
+                  this.tidyAfterResize(map, resized);
+                }, false);
+              })
+            );
+          } catch {
+            // The writes are done already; only the tidy-up failed, and the user can lay the map out by hand.
+          }
         }
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });

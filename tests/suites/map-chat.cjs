@@ -5451,3 +5451,37 @@ integrationTest('chat 08: Undo takes back every appearance change of one reply i
   await h.view.travel(true);
   assert.equal(await state(), after);
 });
+
+// ---- persona 12: the layout follows a reply that changes card sizes or moves a card away --------------------------------
+const coverAny = (nodes, heightOf) => {
+  const found = [];
+  for (const a of nodes) for (const b of nodes) if (a.id < b.id && Math.abs(a.x - b.x) < 280 && a.y < b.y + heightOf(b.id) && b.y < a.y + heightOf(a.id)) found.push([a.id, b.id]);
+  return found;
+};
+integrationTest('persona 12: a summary that makes a card taller does not leave it covering the card below; with no overlap nothing moves', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const heights = { default: 180 }; h.view.cardHeightOf = id => heights[id] ?? heights.default;
+  const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const quiet = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'short' }]);
+  eq(quiet.map(l => l.status), ['done']);
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), before, 'cards that still fit stay where the user left them');
+  heights[h.ids.a] = 520; // the summary made Body much taller: it now covers Mind
+  assert.ok(coverAny(h.view.map.nodes, id => heights[id] ?? 180).length > 0, 'precondition: the grown card covers another');
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'A long summary '.repeat(40) }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  eq(coverAny(h.view.map.nodes, id => heights[id] ?? 180), [], 'nothing overlaps after the reply');
+  eq(coverAny(await h.saved(), id => heights[id] ?? 180), [], 'and the saved map is the same');
+});
+integrationTest('persona 12: moving a card to another branch closes the place it left, in the old branch only', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.cardHeightOf = () => 180;
+  await apply(h, [{ kind: 'add_child', parentId: h.ids.a, title: 'Second', summary: '' }, { kind: 'add_child', parentId: h.ids.a, title: 'Third', summary: '' }]);
+  const kids = () => h.view.map.nodes.filter(n => n.parentId === h.ids.a).sort((x, y) => x.y - y.y);
+  eq(kids().length, 3);
+  const [first, second, third] = kids();
+  const mind = h.view.map.nodes.find(n => n.id === h.ids.b); const mindAt = [mind.x, mind.y];
+  const lines = await apply(h, [{ kind: 'move_topic', nodeId: second.id, newParentId: h.ids.b }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const left = kids(); eq(left.map(n => n.id), [first.id, third.id]);
+  assert.equal(left[1].y - left[0].y, 180 + 24, 'the two cards that stayed are one gap apart, no hole where the third one moved from');
+});

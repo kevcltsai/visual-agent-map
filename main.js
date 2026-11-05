@@ -52561,7 +52561,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.suspendInlineName = () => {
       if (!live) return;
       state.draft = input2.value;
-      state.fresh = false;
       release2();
     };
     const finish = (save) => {
@@ -52574,6 +52573,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     };
     input2.addEventListener("input", () => {
       state.draft = input2.value;
+      state.fresh = false;
+    });
+    input2.addEventListener("mousedown", () => {
+      state.fresh = false;
     });
     input2.addEventListener("keydown", (event) => {
       event.stopPropagation();
@@ -52598,10 +52601,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.restoringFocus = true;
     try {
       input2.focus({ preventScroll: true });
-      if (this.inlineName.fresh) {
-        (_a2 = input2.select) == null ? void 0 : _a2.call(input2);
-        this.inlineName.fresh = false;
-      } else (_b2 = input2.setSelectionRange) == null ? void 0 : _b2.call(input2, input2.value.length, input2.value.length);
+      if (this.inlineName.fresh) (_a2 = input2.select) == null ? void 0 : _a2.call(input2);
+      else (_b2 = input2.setSelectionRange) == null ? void 0 : _b2.call(input2, input2.value.length, input2.value.length);
     } finally {
       this.restoringFocus = false;
     }

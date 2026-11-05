@@ -222,6 +222,7 @@ import {
 import {
   arrangeNewBranch,
   arrangeNewTree,
+  cardsChangedHeight,
   cardsOverlapAny,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
@@ -10350,6 +10351,8 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     this.paint();
+    // Outside paint(): the paint tail is pinned by the view.ts wiring tests (34, 42).
+    this.settleCardHeights();
   }
   private paint(): void {
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
@@ -12023,6 +12026,35 @@ export class VisualAgentMapView extends ItemView {
     if (!id || !this.map) return;
     this.fitKindShape(card, this.topicKindOf(id));
     this.drawEdges();
+    this.settleCardHeights();
+  }
+  /** Heights (canvas units) the cards had at the last check, and the map they belong to. */
+  private heightsSeen = new Map<string, number>();
+  private heightsSeenMap: string | null = null;
+  private settling = false;
+  /**
+   * A layout runs before a card is drawn at its final size: a cover's picture arrives later, a diamond's padding is fitted after
+   * the card is built. A card that ended up taller than it was and now covers another gets the map laid out again with the real
+   * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
+   */
+  private settleCardHeights(): void {
+    if (!this.map || this.closed || !this.cardEls) return;
+    const now = new Map<string, number>();
+    for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
+    const first = this.heightsSeenMap !== this.map.id;
+    const grew = cardsChangedHeight(first ? new Map() : this.heightsSeen, now);
+    this.heightsSeenMap = this.map.id;
+    this.heightsSeen = now;
+    if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
+    if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+    this.settling = true;
+    void this.mapChange(map => this.tidyAfterResize(map, grew), false)
+      .catch(() => {
+        // Only the tidy-up failed; the user can lay the map out by hand.
+      })
+      .finally(() => {
+        this.settling = false;
+      });
   }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   private releaseCovers(): void {
@@ -17781,6 +17813,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.renderPending || this.closed) return;
     this.renderPending = false;
     this.paint();
+    this.settleCardHeights();
   }
   /**
    * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be

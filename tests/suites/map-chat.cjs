@@ -5485,3 +5485,37 @@ integrationTest('persona 12: moving a card to another branch closes the place it
   const left = kids(); eq(left.map(n => n.id), [first.id, third.id]);
   assert.equal(left[1].y - left[0].y, 180 + 24, 'the two cards that stayed are one gap apart, no hole where the third one moved from');
 });
+
+// ---- persona 27: a card drawn taller than the layout assumed (cover picture, diamond frame) -------------------------------
+const layoutApi = load('map-layout.ts');
+const stack = n => Array.from({ length: n + 1 }, (_, i) => ({ id: 'n' + i, parentId: i ? 'n0' : null, x: i ? 360 : 80, y: 80, width: undefined, collapsed: false }));
+test('persona 27: cards whose drawn height grew past what the layout assumed are found, at tight, standard and loose spacing', () => {
+  // Three diamonds laid out while each was ~70 high (before the shape padding) end up 141 high; with a cover, 96 + 8 more.
+  for (const spacing of ['compact', 'standard', 'spacious']) {
+    const guessed = () => 70;
+    const laid = layoutApi.arrangeMap(stack(3), undefined, guessed, { direction: 'right', spacing });
+    const real = id => (id === 'n0' ? 180 : 141);
+    const seen = new Map(laid.map(n => [n.id, guessed()]));
+    const now = new Map(laid.map(n => [n.id, real(n.id)]));
+    const grew = layoutApi.cardsChangedHeight(seen, now);
+    assert.ok(grew.has('n1') && grew.has('n2') && grew.has('n3'), spacing + ': the grown cards are reported');
+    assert.ok(layoutApi.cardsOverlapAny(laid, grew, real), spacing + ': precondition: they cover each other at the guessed layout');
+    const again = layoutApi.arrangeMap(laid, undefined, real, { direction: 'right', spacing });
+    assert.equal(layoutApi.cardsOverlapAny(again, new Set(again.map(n => n.id)), real), false, spacing + ': laid out with real heights nothing overlaps');
+  }
+  assert.equal(layoutApi.cardsChangedHeight(new Map(), new Map([['a', 300]])).size, 0, 'the first paint of a map reports nothing');
+  assert.equal(layoutApi.cardsChangedHeight(new Map([['a', 300]]), new Map([['a', 200]])).size, 0, 'a card that shrank is not reported');
+});
+integrationTest('persona 27: a card that grows after the layout (cover picture arrived) and now covers another is laid out again; opening moves nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  h.view.cardEls = new Map(h.view.map.nodes.map(n => [n.id, { get offsetHeight() { return heights[n.id]; } }]));
+  const where = () => JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const before = where();
+  h.view.settleCardHeights(); await tick(); await tick();
+  assert.equal(where(), before, 'the first look only records heights');
+  heights[h.ids.a] = 520; // the cover picture arrived
+  assert.ok(coverAny(h.view.map.nodes, id => heights[id]).length > 0, 'precondition: the taller card covers another');
+  h.view.settleCardHeights(); await until(() => coverAny(h.view.map.nodes, id => heights[id]).length === 0);
+  eq(coverAny(await h.saved(), id => heights[id]), [], 'the saved map has no overlap either');
+});

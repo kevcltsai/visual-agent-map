@@ -708,3 +708,19 @@ export function cardsOverlapAny(nodes: MapNode[], ids: ReadonlySet<string>, heig
   }
   return false;
 }
+
+/**
+ * The cards whose drawn height differs from the one last seen (a cover whose picture arrived, a diamond whose padding was
+ * fitted, a card drawn for the first time after the layout guessed its height). `seen` empty means the first paint of a map:
+ * nothing is reported, so opening a map never moves a card. A shrunk card frees room and is not reported.
+ */
+export function cardsChangedHeight(seen: ReadonlyMap<string, number>, now: ReadonlyMap<string, number>): Set<string> {
+  const changed = new Set<string>();
+  if (!seen.size) return changed;
+  for (const [id, height] of now) {
+    const before = seen.get(id);
+    if (!(height > 0)) continue;
+    if (before === undefined || height > before + 1) changed.add(id);
+  }
+  return changed;
+}

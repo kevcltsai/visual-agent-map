@@ -638,3 +638,46 @@ test('hypothesis-leaning: the share scrub drops the front-matter block, so hypot
   assert.deepEqual(plain(root.children.map(c => c.localName)), ['p']);
   assert.ok(!JSON.stringify(plain(tags(root))).includes('hypothesis'));
 });
+
+// Persona G22: a card's cover picture lives in the note's front matter, not in its detail; it must be counted and travel in the file.
+test('share exporter covers: a topic-cover picture is collected, counted and embedded in the shared html; a cover-only card and an already-embedded cover too', async () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const clean = load('experiences/sharing/share-clean.ts');
+  const node = (id, parentId) => ({ id, path: `Folder/${id}.md`, parentId, x: 0, y: 0, collapsed: false });
+  const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [node('a', null), node('b', 'a'), node('c', 'a'), node('d', 'a')] };
+  const note = (title, detail) => ({ title, summary: 'S', status: 'idea', model: '', ...(detail ? { detail } : {}) });
+  const notes = new Map([
+    ['a', note('A', 'Body of A')],
+    ['b', note('B')],
+    ['c', note('C', '![[Pics/own.png]]\n\nBody of C')],
+    ['d', note('D', 'Body of D')]
+  ]);
+  const covers = new Map([['a', 'Pics/cover-a.png'], ['b', 'Pics/cover-b.png'], ['c', 'Pics/own.png']]);
+  const exporter = new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes, covers, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
+  const seen = [];
+  // The Markdown renderer needs Obsidian: stand in for it with a plain image conversion, keep the real cleaning and collecting.
+  exporter.renderOne = async markdown => {
+    seen.push(markdown);
+    const cleaned = clean.cleanShareMarkdown(markdown, { titleOf: () => undefined, assets: exporter.registry });
+    const html = cleaned.markdown.replace(/!\[[^\]]*\]\((vam-asset:[^)]+)\)/g, '<img src="$1">');
+    return { html, diagrams: [], diagramsUnsourced: 0, localRefs: 0, attachments: cleaned.attachments.map(item => item.name), mermaidUndrawn: 0, mermaidBlocked: 0 };
+  };
+  const ticket = { generation: 0, signal: new AbortController().signal, isCurrent: () => true };
+  await exporter.ensureRendered(ticket, () => {});
+  for (const name of ['image-1', 'image-2', 'image-3']) exporter.images.set(name, `data:image/webp;base64,${name}`);
+  const result = exporter.assemble({ includeDetail: true, includeImages: true });
+  assert.deepEqual(plain(result.leakCategories), []);
+  const html = id => result.payload.nodes.find(item => item.id === id).detailHtml;
+  assert.match(html('a'), /<img src="vam-asset:image-\d">/, 'a card with detail shows its cover');
+  assert.match(html('b'), /<img src="vam-asset:image-\d">/, 'a cover-only card still gets its picture');
+  assert.equal((html('c').match(/<img /g) ?? []).length, 1, 'a cover the detail already embeds is not doubled');
+  assert.equal(result.payload.nodes.find(item => item.id === 'd').detailHtml.includes('<img'), false, 'a card without a cover gets no picture');
+  assert.equal(result.counts.images, 3, 'the cover pictures are counted');
+  assert.equal(Object.keys(result.payload.assets).length, 3);
+  assert.ok(result.html.includes('data:image/webp;base64,image-1'), 'the finished file carries the cover picture data');
+  assert.ok(seen.some(markdown => markdown.startsWith('![[Pics/cover-b.png]]')));
+  // Images off: the pictures stay out of the file.
+  const noImages = exporter.assemble({ includeDetail: true, includeImages: false });
+  assert.equal(noImages.counts.images, 0);
+});

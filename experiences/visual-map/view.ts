@@ -437,7 +437,13 @@ import {
   clampMapChatWidth,
   isChatNarrow
 } from "../../core/map-chat-layout";
-import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
+import {
+  floorSuggestedTiers,
+  relevanceMode,
+  relevanceModeAfterWrite,
+  type RelevanceMode,
+  type RelevancePin
+} from "./relevance-pins";
 import { createAimMap } from "../aim/create-map";
 import { aimEnabled } from "../aim/availability";
 import {
@@ -3952,6 +3958,7 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     let added = 0;
     let skipped = 0;
+    const addedIds = new Set<string>();
     try {
       await this.plugin.mutate(async () => {
         if (!this.goalSuggestCurrent(task)) {
@@ -3967,8 +3974,10 @@ export class VisualAgentMapView extends ItemView {
               skipped++;
               continue;
             }
+            const known = new Set(this.map.nodes.map(node => node.id));
             await this.addNode(parent, item.title, false, false);
             added++;
+            for (const node of this.map?.nodes ?? []) if (!known.has(node.id)) addedIds.add(node.id);
           }
           if (added) await this.plugin.rebuildDerivedData();
         } finally {
@@ -3992,7 +4001,8 @@ export class VisualAgentMapView extends ItemView {
       { goal, context: this.relevanceContext },
       this.relevanceAiGrades().length > 0
     );
-    void this.submitRelevanceGoal(goal, context, mode);
+    // The cards just added are the ones the grade may not leave at "side" (a floor for this call only).
+    void this.submitRelevanceGoal(goal, context, mode, addedIds);
   }
   /** True when the suggestion no longer fits the map as it is now. */
   private goalSuggestStale(
@@ -4428,7 +4438,12 @@ export class VisualAgentMapView extends ItemView {
    * whole map is graded and the result is written in one step. Nothing is written when the AI is declined, stopped,
    * fails or returns anything but exactly one valid grade for every card.
    */
-  private async submitRelevanceGoal(raw: string, contextRaw?: string, planned: RelevanceMode = "full"): Promise<void> {
+  private async submitRelevanceGoal(
+    raw: string,
+    contextRaw?: string,
+    planned: RelevanceMode = "full",
+    suggested?: ReadonlySet<string>
+  ): Promise<void> {
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
@@ -4455,6 +4470,7 @@ export class VisualAgentMapView extends ItemView {
     let basis: StructureNode[] = [];
     let mode: RelevanceMode = planned;
     let pins: RelevancePin[] = [];
+    let previousGrades: RelevancePin[] = [];
     const repairs: string[] = [];
     try {
       await this.plugin.mutate(async () => {
@@ -4521,10 +4537,11 @@ export class VisualAgentMapView extends ItemView {
             this.paintRelevanceReceived(run);
           }
         };
+        previousGrades = mode === "recalibrate" ? this.relevanceAiGrades() : [];
         result =
           mode === "recalibrate"
             ? await this.plugin.relevanceGrade.recalibrate(
-                { ...request, previous: this.relevanceAiGrades() },
+                { ...request, previous: previousGrades },
                 run.controller.signal,
                 hooks
               )
@@ -4532,8 +4549,11 @@ export class VisualAgentMapView extends ItemView {
       });
       if (!this.relevanceRunIsCurrent(run, mapPath)) return;
       if (!started) return this.finishRelevance(run, mapPath, "declined", t("ui.relevance_not_started"));
-      const graded = result;
-      if (!graded) return;
+      const answered: RelevanceGradeResult | undefined = result;
+      if (!answered) return;
+      const graded = suggested?.size
+        ? { ...answered, items: floorSuggestedTiers(basis, previousGrades, answered.items, pins, suggested) }
+        : answered;
       // Writing the notes makes the view synchronize, which repaints when a note changed (the run is already "done"
       // by then); repaint here only when it did not, so a run costs one repaint after the write.
       const paintedBefore = this.paintCount;
@@ -12649,6 +12669,9 @@ export class VisualAgentMapView extends ItemView {
       this.openLayoutMenu(event);
     });
     this.stageEl = this.viewportEl.createDiv("vam-stage");
+    // Before any card exists: focus handed back below measures the selected card's tool row, and a card on an untransformed stage
+    // reads at scale 1 with no pan, which would throw the map off the canvas.
+    this.applyStageTransform();
     this.stageEl.setAttr("role", "tree");
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
@@ -18662,12 +18685,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The zoom the selected card's tool row was last fitted at. */
   private toolsZoom: number | null = null;
-  private transform(): void {
+  /** Only puts the viewport on the stage; measures nothing, so it is safe while a repaint is still drawing cards. */
+  private applyStageTransform(): void {
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
     // The stylesheet counter-scales each card's tool row by this, so its buttons stay a tappable size when zoomed out.
     this.stageEl.style.setProperty("--vam-zoom", String(zoom));
+  }
+  private transform(): void {
+    if (!this.map || !this.stageEl) return;
+    this.applyStageTransform();
+    const { zoom } = this.map.viewport;
     if (zoom !== this.toolsZoom) {
       this.toolsZoom = zoom;
       // The open row was fitted at the old zoom: its max-width and shift would linger.

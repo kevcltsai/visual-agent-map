@@ -1152,12 +1152,6 @@ export const en = {
   "ui.usage_this_month": "This month",
   "ui.usage_in_0": "In {0}",
   "ui.usage_out_0": "Out {0}",
-  "ui.usage_by_action": "THIS MIND MAP · BY ACTION",
-  "ui.usage_action_research": "Research",
-  "ui.usage_action_expand": "Expand",
-  "ui.usage_action_synthesize": "Synthesize",
-  "ui.usage_action_writeback": "Write to note",
-  "ui.usage_action_other": "Other",
   "ui.usage_estimated_0": "~{0}",
   "ui.usage_empty": "No AI requests recorded for this mind map yet.",
   "ui.usage_unreadable":

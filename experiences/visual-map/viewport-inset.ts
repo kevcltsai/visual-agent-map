@@ -359,11 +359,18 @@ export function chooseCardToolsSpot(input: {
     if (!hit) break;
     const down = hit.bottom + margin - box.top,
       right = hit.right + margin - box.left;
+    const up = box.bottom - (hit.top - margin),
+      left = box.right - (hit.left - margin);
     const downFits = box.bottom + down <= visible.bottom,
-      rightFits = box.right + right <= visible.right;
+      rightFits = box.right + right <= visible.right,
+      upFits = box.top - up >= visible.top,
+      leftFits = box.left - left >= visible.left;
     if (downFits && (!rightFits || down <= right)) dy += down;
     else if (rightFits) dx += right;
-    else dy += down;
+    else if (upFits) dy -= up;
+    else if (leftFits) dx -= left;
+    // Nowhere clears it: stay under the control, still on the canvas, rather than pushing the card out of sight.
+    else break;
   }
   return {
     side: chosen.side,

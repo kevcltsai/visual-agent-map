@@ -309,6 +309,7 @@ import { hypothesisTagText, LEANING_LABEL, renderHypothesisTag, STRENGTH_LABEL }
 import { relevanceDisplayNodes } from "./relevance-order";
 import {
   bottomInsetFromRects,
+  INSET_GAP,
   cardToolsPlacement,
   chooseCardToolsSpot,
   clearToolbar,
@@ -925,8 +926,6 @@ const CHAT_TOOLS_GAP = 12;
 const GOAL_BAR_TOOLS_GAP = 8;
 /** The suggestion card hangs this far under the goal bar (styles.css: top calc(100% + 6px)). */
 const GOAL_SUGGEST_GAP = 6;
-/** Space kept free between the suggestion card's bottom and the canvas bottom. */
-const GOAL_SUGGEST_BOTTOM_MARGIN = 12;
 /** The size of a chat expand: the Next Step dialog's defaults (levels below the topic, topics in total). */
 const CHAT_EXPAND_LEVELS = 2;
 const CHAT_EXPAND_MAX_TOPICS = 15;
@@ -17419,13 +17418,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * The tools follow the bar's height, the suggestion card's height and the canvas size (a collapsing sidebar changes it
-   * without any chat event), so all three are watched; the watch is dropped when the view closes.
+   * without any chat event), so those, the zoom bar and the hint are watched; the watch is dropped when the view closes.
    */
   private watchToolPlacement(bar: HTMLElement | null): void {
     const panel = this.goalSuggestPanelEl;
-    const targets = [bar, panel?.isConnected === false ? null : panel, this.viewportEl].filter(
-      (el): el is HTMLElement => !!el
-    );
+    const q = (selector: string) => this.contentEl?.querySelector?.<HTMLElement>(selector) ?? null;
+    const targets = [
+      bar,
+      panel?.isConnected === false ? null : panel,
+      this.viewportEl,
+      q(".vam-zoom-controls"),
+      q(".vam-canvas-hint")
+    ].filter((el): el is HTMLElement => !!el);
     const same =
       targets.length === this.goalBarObserved.length && targets.every((el, i) => el === this.goalBarObserved[i]);
     if (same) return;
@@ -17452,15 +17456,37 @@ export class VisualAgentMapView extends ItemView {
     let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
     const panel = this.goalSuggestPanelEl;
     if (bar && panel && panel.isConnected !== false) {
-      // The card must fit the visible canvas: its max-height is what is left under the bar (the rows scroll, the footer stays).
-      const canvasHeight = bar.parentElement?.clientHeight ?? 0;
-      if (canvasHeight > 0 && typeof panel.style?.setProperty === "function") {
-        const room = Math.max(0, canvasHeight - bottom - GOAL_SUGGEST_GAP - GOAL_SUGGEST_BOTTOM_MARGIN);
+      // The card must fit the visible canvas: its max-height is what is left under the bar and above the floating controls
+      // at the bottom (the rows scroll, the footer stays).
+      const room = this.goalSuggestRoom(bar, bottom, tools.offsetHeight);
+      if (room !== null && typeof panel.style?.setProperty === "function") {
         panel.style.setProperty("--vam-goal-suggest-max", `${room}px`);
       }
       bottom += GOAL_SUGGEST_GAP + panel.offsetHeight;
     }
     tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
+  }
+  /**
+   * Height the suggestion card may take under the goal bar: down to the top of the lowest bottom control (zoom bar with the
+   * status-bar clearance, or the canvas hint), kept INSET_GAP clear, minus the tool group that hangs under the card. Measured on screen, so the overlay and the viewport
+   * need not share an origin. Null when the canvas is not laid out.
+   */
+  private goalSuggestRoom(bar: HTMLElement, barBottom: number, toolsHeight: number): number | null {
+    const overlay = bar.parentElement;
+    const canvasHeight = overlay?.clientHeight ?? 0;
+    if (!(canvasHeight > 0)) return null;
+    const overlayRect = overlay?.getBoundingClientRect?.();
+    const canvas = this.viewportEl?.getBoundingClientRect?.();
+    const hint = this.contentEl?.querySelector<HTMLElement>(".vam-canvas-hint")?.getBoundingClientRect?.();
+    const clear = Math.max(
+      this.canvasInsets().bottom,
+      canvas ? bottomInsetFromRects(canvas.bottom, hint) : 0,
+      INSET_GAP
+    );
+    const limit = (canvas ? canvas.bottom : (overlayRect?.bottom ?? canvasHeight)) - clear;
+    const barBottomOnScreen = (overlayRect ? overlayRect.top : canvas ? canvas.top : 0) + barBottom;
+    // The tool group sits under the card, so its height and gap are kept free as well.
+    return Math.max(0, limit - barBottomOnScreen - GOAL_SUGGEST_GAP - GOAL_BAR_TOOLS_GAP - (toolsHeight || 0));
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
@@ -17494,6 +17520,8 @@ export class VisualAgentMapView extends ItemView {
       const clearance = statusBarClearance(el.getBoundingClientRect(), statusRect);
       el.style.setProperty("--vam-status-clearance", `${clearance}px`);
     }
+    // The suggestion card's room ends above the zoom bar and hint, which this clearance moves.
+    this.placeMapTools();
   }
   private chatWidth(): number {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);

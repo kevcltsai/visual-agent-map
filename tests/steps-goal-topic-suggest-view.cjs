@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const INSET_GAP = 8;
 const { test, root, load, DEFAULT_SETTINGS, fixture, withExpansionCoordinator, until, deferred, obsidian } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
 const { hasCls, element, find, findAll, tick } = dom;
@@ -380,12 +381,50 @@ test('goal suggest: the card scrolls its rows inside the canvas height and keeps
   Object.assign(bar, { offsetTop: 12, offsetHeight: 295, parentElement: { clientHeight: 774 } });
   panel.offsetHeight = 300;
   h.view.syncToolsBelowGoalBar(bar);
-  assert.equal(panel.style['--vam-goal-suggest-max'], `${774 - 307 - 6 - 12}px`, 'max-height is the room under the bar minus the margin');
+  assert.equal(panel.style['--vam-goal-suggest-max'], `${774 - 307 - 6 - 8 - 8}px`, 'max-height is the room under the bar minus the card gap, the tools gap and the inset gap (no zoom bar laid out)');
   Object.assign(bar, { offsetHeight: 100, parentElement: { clientHeight: 500 } });
   h.view.syncToolsBelowGoalBar(bar);
-  assert.equal(panel.style['--vam-goal-suggest-max'], `${500 - 112 - 6 - 12}px`, 'follows the canvas size');
+  assert.equal(panel.style['--vam-goal-suggest-max'], `${500 - 112 - 6 - 8 - 8}px`, 'follows the canvas size');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /\.vam-goal-suggest \{[^}]*max-height: var\(--vam-goal-suggest-max/);
   assert.match(css, /\.vam-goal-suggest-rows \{[^}]*overflow-y: auto/);
   assert.match(css, /\.vam-goal-suggest-foot \{ flex: none; \}/);
+});
+
+test('goal suggest: on a narrow canvas the card stops above the zoom bar and the hint; no floating control overlaps another', async () => {
+  const h = await harness();
+  await h.open();
+  const panel = h.panel();
+  const bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar'));
+  const rect = (left, top, right, bottom) => ({ left, top, right, bottom, width: right - left, height: bottom - top });
+  // 360 x 774 canvas at the screen origin; the bar is 12 + 295 tall; zoom bar y 697-737; the status bar adds 0 here.
+  const canvas = rect(0, 0, 360, 774);
+  const tools = element('div'); tools.addClass('vam-map-tools'); h.rootEl.appendChild(tools);
+  const zoom = element('div'); zoom.addClass('vam-zoom-controls'); h.rootEl.appendChild(zoom);
+  const hint = element('div'); hint.addClass('vam-canvas-hint'); h.rootEl.appendChild(hint);
+  zoom.getBoundingClientRect = () => rect(150, 697, 348, 737);
+  hint.getBoundingClientRect = () => rect(12, 640, 180, 700);
+  h.view.viewportEl = { getBoundingClientRect: () => canvas };
+  Object.assign(bar, { offsetTop: 12, offsetHeight: 295, parentElement: { clientHeight: 774, getBoundingClientRect: () => canvas } });
+  bar.getBoundingClientRect = () => rect(12, 12, 348, 307);
+  tools.offsetHeight = 36; panel.offsetHeight = 300;
+  h.view.syncToolsBelowGoalBar(bar);
+  const max = parseInt(panel.style['--vam-goal-suggest-max'], 10);
+  const cardTop = 307 + 6;
+  assert.ok(cardTop + max + 8 + 36 <= 640 - INSET_GAP, `the card's bottom (${cardTop + max}) stays above the hint (top 640) with the gap`);
+  assert.ok(cardTop + max + 8 + 36 <= 697 - INSET_GAP, `the card's bottom stays above the zoom bar (top 697) with the gap`);
+  // Without the hint the zoom bar alone limits it.
+  hint.getBoundingClientRect = () => rect(0, 0, 0, 0);
+  h.view.syncToolsBelowGoalBar(bar);
+  assert.equal(cardTop + parseInt(panel.style['--vam-goal-suggest-max'], 10) + 8 + 36, 697 - INSET_GAP, 'the card, the tools gap and the tools end at the zoom bar minus the gap');
+  // Generic check: the bar, the card at its max height, the tools and every other floating control do not overlap.
+  const cardHeight = parseInt(panel.style['--vam-goal-suggest-max'], 10);
+  panel.offsetHeight = cardHeight;
+  h.view.syncToolsBelowGoalBar(bar);
+  const toolsTop = parseInt(tools.style.top, 10);
+  tools.getBoundingClientRect = () => rect(12, toolsTop, 200, toolsTop + 36);
+  const { rectsIntersect } = load('experiences/visual-map/viewport-inset.ts');
+  const rects = [['card', rect(12, cardTop, 348, cardTop + cardHeight)], ...h.view.floatingControlRects().map((r, n) => ['control ' + n, r])];
+  assert.equal(rects.length, 4, 'tools, bar and zoom bar are counted besides the card (the hint is empty)');
+  for (let a = 0; a < rects.length; a++) for (let b = a + 1; b < rects.length; b++) assert.ok(!rectsIntersect(rects[a][1], rects[b][1]), `${rects[a][0]} overlaps ${rects[b][0]}`);
 });

@@ -52651,7 +52651,6 @@ var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
 var GOAL_BAR_TOOLS_GAP = 8;
 var GOAL_SUGGEST_GAP = 6;
-var GOAL_SUGGEST_BOTTOM_MARGIN = 12;
 var CHAT_EXPAND_LEVELS = 2;
 var CHAT_EXPAND_MAX_TOPICS = 15;
 var chatAppearanceChange = (action) => {
@@ -67868,14 +67867,22 @@ ${note.detail.trim()}` : "",
   }
   /**
    * The tools follow the bar's height, the suggestion card's height and the canvas size (a collapsing sidebar changes it
-   * without any chat event), so all three are watched; the watch is dropped when the view closes.
+   * without any chat event), so those, the zoom bar and the hint are watched; the watch is dropped when the view closes.
    */
   watchToolPlacement(bar) {
     var _a2, _b2, _c, _d, _e;
     const panel = this.goalSuggestPanelEl;
-    const targets = [bar, (panel == null ? void 0 : panel.isConnected) === false ? null : panel, this.viewportEl].filter(
-      (el) => !!el
-    );
+    const q = (selector) => {
+      var _a3, _b3, _c2;
+      return (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, selector)) != null ? _c2 : null;
+    };
+    const targets = [
+      bar,
+      (panel == null ? void 0 : panel.isConnected) === false ? null : panel,
+      this.viewportEl,
+      q(".vam-zoom-controls"),
+      q(".vam-canvas-hint")
+    ].filter((el) => !!el);
     const same = targets.length === this.goalBarObserved.length && targets.every((el, i) => el === this.goalBarObserved[i]);
     if (same) return;
     (_a2 = this.goalBarObserver) == null ? void 0 : _a2.disconnect();
@@ -67893,20 +67900,41 @@ ${note.detail.trim()}` : "",
    * under the bar exactly where the tools would be); without a bar they keep the stylesheet's top.
    */
   syncToolsBelowGoalBar(bar) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2;
     const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
     if (!(tools == null ? void 0 : tools.style)) return;
     let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
     const panel = this.goalSuggestPanelEl;
     if (bar && panel && panel.isConnected !== false) {
-      const canvasHeight = (_c = (_b2 = bar.parentElement) == null ? void 0 : _b2.clientHeight) != null ? _c : 0;
-      if (canvasHeight > 0 && typeof ((_d = panel.style) == null ? void 0 : _d.setProperty) === "function") {
-        const room = Math.max(0, canvasHeight - bottom - GOAL_SUGGEST_GAP - GOAL_SUGGEST_BOTTOM_MARGIN);
+      const room = this.goalSuggestRoom(bar, bottom, tools.offsetHeight);
+      if (room !== null && typeof ((_b2 = panel.style) == null ? void 0 : _b2.setProperty) === "function") {
         panel.style.setProperty("--vam-goal-suggest-max", `${room}px`);
       }
       bottom += GOAL_SUGGEST_GAP + panel.offsetHeight;
     }
     tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
+  }
+  /**
+   * Height the suggestion card may take under the goal bar: down to the top of the lowest bottom control (zoom bar with the
+   * status-bar clearance, or the canvas hint), kept INSET_GAP clear, minus the tool group that hangs under the card. Measured on screen, so the overlay and the viewport
+   * need not share an origin. Null when the canvas is not laid out.
+   */
+  goalSuggestRoom(bar, barBottom, toolsHeight) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    const overlay = bar.parentElement;
+    const canvasHeight = (_a2 = overlay == null ? void 0 : overlay.clientHeight) != null ? _a2 : 0;
+    if (!(canvasHeight > 0)) return null;
+    const overlayRect = (_b2 = overlay == null ? void 0 : overlay.getBoundingClientRect) == null ? void 0 : _b2.call(overlay);
+    const canvas = (_d = (_c = this.viewportEl) == null ? void 0 : _c.getBoundingClientRect) == null ? void 0 : _d.call(_c);
+    const hint = (_g = (_f = (_e = this.contentEl) == null ? void 0 : _e.querySelector(".vam-canvas-hint")) == null ? void 0 : _f.getBoundingClientRect) == null ? void 0 : _g.call(_f);
+    const clear = Math.max(
+      this.canvasInsets().bottom,
+      canvas ? bottomInsetFromRects(canvas.bottom, hint) : 0,
+      INSET_GAP
+    );
+    const limit = (canvas ? canvas.bottom : (_h = overlayRect == null ? void 0 : overlayRect.bottom) != null ? _h : canvasHeight) - clear;
+    const barBottomOnScreen = (overlayRect ? overlayRect.top : canvas ? canvas.top : 0) + barBottom;
+    return Math.max(0, limit - barBottomOnScreen - GOAL_SUGGEST_GAP - GOAL_BAR_TOOLS_GAP - (toolsHeight || 0));
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize() {
@@ -67941,6 +67969,7 @@ ${note.detail.trim()}` : "",
       const clearance = statusBarClearance(el.getBoundingClientRect(), statusRect);
       el.style.setProperty("--vam-status-clearance", `${clearance}px`);
     }
+    this.placeMapTools();
   }
   chatWidth() {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);

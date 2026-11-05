@@ -567,6 +567,7 @@ const NO_SOURCE_SECTION = /vam-next-source-(?:details)|vam-reference-/;
 const assertNoSourceSection = (root, where) => {
   assert.equal(findAll(root, i => NO_SOURCE_SECTION.test(i.cls ?? '')).length, 0, `${where}: no source section`);
   assert.equal(findAll(root, i => /Data sources|資料來源/.test(i.text ?? '')).length, 0, `${where}: no data-source text`);
+  assert.equal(findAll(root, i => /選擇其他筆記|choose other notes|其他筆記來源|note source/i.test(i.text ?? '')).length, 0, `${where}: no hint to pick other notes or a note source`);
 };
 integrationTest('one-click dialog: no step has a data-source section, and the AI mode choice survives switching steps', () => {
   const h = nextStepHarness({ modelSettings: { topicStatus: 'completed' } });
@@ -574,6 +575,11 @@ integrationTest('one-click dialog: no step has a data-source section, and the AI
   const group = byLabel(h.modal.contentEl, 'AI mode');
   button(group, 'Standard').click();
   for (const index of [2, 1, 0]) { cardsOf(h).children[index].click(); assert.equal(button(group, 'Standard').attrs['aria-checked'], 'true', 'the choice is kept'); }
+});
+integrationTest('one-click dialog: a leaf topic synthesize step says only that it has no subtopics, with no note-source hint', () => {
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 0 });
+  for (const index of [0, 1, 2]) { cardsOf(h).children[index].click(); assertNoSourceSection(h.modal.contentEl, `leaf step ${index}`); }
+  assert.ok(findAll(h.modal.contentEl, i => i.text === 'This topic has no direct subtopics yet.').length > 0, 'the neutral first clause is shown');
 });
 integrationTest('one AI-mode widget with one default: the Next Step dialog and the outline import window share it', () => {
   const Modal = dom.makeModal();

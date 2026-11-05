@@ -1089,7 +1089,7 @@ export const en = {
   "ui.confirm_removal": "Confirm removal",
   "ui.choose_a_new_parent_topic": "Choose a new parent topic",
   "ui.how_would_you_like_to_explore_next": "How would you like to explore next?",
-  "ui.choose_another_note_source_first": "Choose another note source first.",
+  "ui.choose_another_note_source_first": "Nothing to synthesize yet.",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi":
     "The selected sources contain no Markdown content to synthesize.",
   "ui.review_ai_suggested_subtopics": "Review AI-suggested subtopics.",
@@ -1723,8 +1723,7 @@ export const en = {
     "AI proposed duplicate first-level names. Generate the proposals again.",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev":
     "Specify an expansion direction or ask AI to suggest one. Preview before creating nodes.",
-  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note":
-    "This topic has no direct subtopics. You can choose other notes to synthesize.",
+  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "This topic has no direct subtopics yet.",
   "ui.review_synthesis_draft": "Review synthesis draft",
   "ui.choose_synthesis_direction": "Choose synthesis direction",
   "ui.discard_synthesis": "Discard",

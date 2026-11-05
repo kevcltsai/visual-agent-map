@@ -4618,13 +4618,13 @@ test('map sources panel: texts, three picker buttons with icons, a row per sourc
   assert.deepEqual(picks.map(b => dom.find(b, c => c.iconName).iconName), ['brain-circuit', 'folder-open', 'file-text']);
   assert.deepEqual(picks.map(b => dom.find(b, c => c.cls === 'vam-map-sources-pick-label').text), ['Select a mind map', 'Select a folder', 'Select Markdown files']);
   const rows = dom.findAll(panel, c => dom.hasCls(c, 'vam-map-sources-row'));
-  assert.deepEqual(rows.map(r => r.children.filter(c => c.cls === 'vam-map-sources-name').map(c => c.text)[0]), ['Research', 'Last year plan', 'interview', 'missing']);
+  assert.deepEqual(rows.map(r => r.children.filter(c => c.cls === 'vam-map-sources-name').map(c => c.text)[0]), ['Research', 'Last year plan', 'interview.md', 'missing.md']);
   assert.deepEqual(rows.map(r => dom.find(r, c => c.iconName)?.iconName), ['folder-open', 'brain-circuit', 'file-text', 'file-text']);
   assert.deepEqual(rows.map(r => dom.find(r, c => c.cls === 'vam-map-sources-meta')?.text), ['(2 files)', '(mind map)', undefined, 'Unreadable; tasks skip it'], 'archived managed notes are not counted; a missing source says so in place of a count');
   assert.ok(rows[3].hasClass('is-unreadable')); assert.ok(!rows[0].hasClass('is-unreadable'));
   const removes = dom.findAll(panel, c => c.tag === 'button' && (c.cls ?? '').includes('vam-map-sources-remove'));
   assert.equal(removes.length, 4, 'the unreadable row keeps its remove button');
-  assert.deepEqual(removes.map(b => b.attrs['aria-label']), ['Remove "Research"', 'Remove "Last year plan"', 'Remove "interview"', 'Remove "missing"']);
+  assert.deepEqual(removes.map(b => b.attrs['aria-label']), ['Remove "Research"', 'Remove "Last year plan"', 'Remove "interview.md"', 'Remove "missing.md"']);
   assert.ok(dom.find(panel, c => c.text === 'Folder selections exclude archived VAM notes. More material takes longer to process. Results cite the source files used.'), 'the hint is the existing reference_time_and_citations_hint');
   removes[1].click(); assert.deepEqual(plain(log.removed), [{ kind: 'map', path: 'Old plan/Map.md' }]);
 });
@@ -4669,7 +4669,7 @@ test('map sources panel: focus after a redraw goes to the picker, to the next ro
   const sources = [{ kind: 'folder', path: 'Research' }, { kind: 'file', path: 'Notes/interview.md' }];
   const { host } = msHost(tree.app, { sources });
   let panel = api.drawMapSourcesPanel(dom.element('tools'), host, { remove: 1 });
-  assert.equal(dom.focusedNow().attrs['aria-label'], 'Remove "interview"');
+  assert.equal(dom.focusedNow().attrs['aria-label'], 'Remove "interview.md"');
   panel = api.drawMapSourcesPanel(dom.element('tools'), host, { remove: 2 });
   assert.equal(dom.focusedNow().children[1].text, 'Select a mind map', 'no next row: the first picker');
   api.drawMapSourcesPanel(dom.element('tools'), host, { picker: 'folder' });
@@ -4718,6 +4718,24 @@ integrationTest('map sources toolbar: an unreadable source puts ⚠ before the l
   fx.view.mapSources = [{ kind: 'folder', path: 'Research' }]; fx.view.paintMapSourcesButton();
   assert.equal(dom.find(button, c => c.iconName === 'alert-triangle'), undefined); assert.equal(button.attrs['aria-description'], undefined);
 });
+// Like a browser: moving focus fires focusout (with relatedTarget) on the element that held it. Applied to every element created later.
+const withRealFocus = el => {
+  const focus = el.focus.bind(el), child = el.child.bind(el);
+  el.focus = () => { const previous = dom.focusedNow(); focus(); if (previous && previous !== el) previous.fire('focusout', { relatedTarget: el }); };
+  el.child = (...args) => withRealFocus(child(...args));
+  return el;
+};
+integrationTest('map sources panel (B1 counterexample): opening by keyboard while the button already has focus keeps it open, expanded, and redrawn by an add', async () => {
+  const fx = msViewFixture(); withRealFocus(fx.tools); fx.draw();
+  const button = () => msButton(fx.tools), panel = () => dom.find(fx.tools, c => c.cls === 'vam-map-sources-panel');
+  withRealFocus(button()); button().focus();
+  button().click();
+  assert.ok(panel(), 'the panel is visible'); assert.equal(button().attrs['aria-expanded'], 'true'); assert.equal(fx.view.mapSourcesOpen, true);
+  const file = { kind: 'file', path: 'Notes/interview.md' };
+  fx.view.changeMapSources('Current/Map.md', 'add', file); await dom.tick();
+  assert.ok(dom.find(panel(), c => c.text === 'interview.md'), 'the add redraws the open list');
+  button().click(); assert.equal(panel(), undefined, 'the next press closes instead of reopening'); assert.equal(button().attrs['aria-expanded'], 'false');
+});
 integrationTest('map sources panel in the view: open, add writes only through the repository, a duplicate add writes nothing, remove updates the label, Esc and the button close it', async () => {
   const fx = msViewFixture(); fx.draw();
   const button = () => msButton(fx.tools), panel = () => dom.find(fx.tools, c => c.cls === 'vam-map-sources-panel');
@@ -4726,11 +4744,11 @@ integrationTest('map sources panel in the view: open, add writes only through th
   const file = { kind: 'file', path: 'Notes/interview.md' };
   fx.view.changeMapSources('Current/Map.md', 'add', file); await dom.tick();
   assert.deepEqual(fx.state.writes, [['Current/Map.md', [file]]]); assert.equal(msLabel(fx.tools), 'Data sources · 1');
-  assert.ok(dom.find(panel(), c => c.text === 'interview'), 'the open panel shows the new row'); assert.equal(fx.view.announcer.text, 'Added interview');
+  assert.ok(dom.find(panel(), c => c.text === 'interview.md'), 'the open panel shows the new row'); assert.equal(fx.view.announcer.text, 'Added interview.md');
   fx.view.changeMapSources('Current/Map.md', 'add', { ...file }); await dom.tick();
-  assert.equal(fx.state.writes.length, 1, 'adding the same kind and path again writes nothing'); assert.equal(fx.view.announcer.text, 'interview is already added');
+  assert.equal(fx.state.writes.length, 1, 'adding the same kind and path again writes nothing'); assert.equal(fx.view.announcer.text, 'interview.md is already added');
   fx.view.changeMapSources('Current/Map.md', 'remove', file); await dom.tick();
-  assert.equal(fx.state.writes.length, 2); assert.deepEqual(fx.state.writes[1], ['Current/Map.md', []]); assert.equal(msLabel(fx.tools), 'Data sources'); assert.equal(fx.view.announcer.text, 'Removed interview');
+  assert.equal(fx.state.writes.length, 2); assert.deepEqual(fx.state.writes[1], ['Current/Map.md', []]); assert.equal(msLabel(fx.tools), 'Data sources'); assert.equal(fx.view.announcer.text, 'Removed interview.md');
   assert.equal(dom.focusedNow().children[1].text, 'Select a mind map', 'removing the last row moves focus to the first picker');
   panel().fire('keydown', { key: 'Escape' }); assert.equal(panel(), undefined); assert.equal(button().attrs['aria-expanded'], 'false'); assert.equal(dom.focusedNow(), button());
   button().click(); assert.ok(panel()); button().click(); assert.equal(panel(), undefined, 'the button toggles it');

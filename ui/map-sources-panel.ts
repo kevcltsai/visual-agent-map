@@ -22,6 +22,8 @@ export interface MapSourcesPanelHost {
   /** The toolbar button, which focus may move to without closing the panel. */
   button(): HTMLElement | null;
   isPickerOpen(): boolean;
+  /** Called with the new panel before focus moves into it, so the host can track it when the old focus target blurs. */
+  panelCreated?(panel: HTMLElement): void;
 }
 
 const ICONS: Record<MapSourceKind, string> = { map: "brain-circuit", folder: "folder-open", file: "file-text" };
@@ -36,10 +38,10 @@ const PICK_LABELS: Record<
 
 const baseName = (path: string): string => path.split("/").at(-1) || path;
 
-/** The name a row shows: a folder's name, a note's name without `.md`, a map's title (else its folder's name). */
+/** The name a row shows: a folder's name, a note's file name with `.md`, a map's title (else its folder's name). */
 export function mapSourceName(app: App, source: MapSource): string {
   if (source.kind === "folder") return baseName(source.path);
-  if (source.kind === "file") return baseName(source.path).replace(/\.md$/i, "");
+  if (source.kind === "file") return baseName(source.path);
   const file = app.vault.getAbstractFileByPath(source.path);
   const heading = file instanceof TFile ? app.metadataCache.getFileCache(file)?.headings?.[0]?.heading : undefined;
   if (heading?.trim()) return heading.trim();
@@ -224,6 +226,7 @@ export function drawMapSourcesPanel(
     host.close(false);
   });
 
+  host.panelCreated?.(panel);
   if (focus) {
     const target = "picker" in focus ? pickers.get(focus.picker) : (removers[focus.remove] ?? pickers.get("map"));
     target?.focus();

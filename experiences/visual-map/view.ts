@@ -3543,7 +3543,10 @@ export class VisualAgentMapView extends ItemView {
           this.mapSourcesPickerOpen = open;
         },
         isPickerOpen: () => this.mapSourcesPickerOpen,
-        button: () => this.mapSourcesButtonEl
+        button: () => this.mapSourcesButtonEl,
+        panelCreated: created => {
+          this.mapSourcesPanelEl = created;
+        }
       },
       focus
     );

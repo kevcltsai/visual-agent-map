@@ -1101,7 +1101,7 @@ var en = {
   "ui.confirm_removal": "Confirm removal",
   "ui.choose_a_new_parent_topic": "Choose a new parent topic",
   "ui.how_would_you_like_to_explore_next": "How would you like to explore next?",
-  "ui.choose_another_note_source_first": "Choose another note source first.",
+  "ui.choose_another_note_source_first": "Nothing to synthesize yet.",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi": "The selected sources contain no Markdown content to synthesize.",
   "ui.review_ai_suggested_subtopics": "Review AI-suggested subtopics.",
   "ui.select_at_least_one_subtopic": "Select at least one subtopic.",
@@ -1675,7 +1675,7 @@ var en = {
   "ui.first_level_topic_names_must_be_unique": "First-level topic names must be unique.",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI proposed duplicate first-level names. Generate the proposals again.",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev": "Specify an expansion direction or ask AI to suggest one. Preview before creating nodes.",
-  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "This topic has no direct subtopics. You can choose other notes to synthesize.",
+  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "This topic has no direct subtopics yet.",
   "ui.review_synthesis_draft": "Review synthesis draft",
   "ui.choose_synthesis_direction": "Choose synthesis direction",
   "ui.discard_synthesis": "Discard",
@@ -3779,7 +3779,7 @@ var zhCN = {
   "ui.confirm_removal": "\u786E\u8BA4\u79FB\u9664",
   "ui.choose_a_new_parent_topic": "\u9009\u62E9\u65B0\u7684\u7236\u8BAE\u9898",
   "ui.how_would_you_like_to_explore_next": "\u63A5\u4E0B\u6765\u60F3\u600E\u4E48\u63A2\u7D22\uFF1F",
-  "ui.choose_another_note_source_first": "\u8BF7\u5148\u9009\u62E9\u5176\u4ED6\u7B14\u8BB0\u6765\u6E90\u3002",
+  "ui.choose_another_note_source_first": "\u76EE\u524D\u6CA1\u6709\u53EF\u6574\u5408\u7684\u5185\u5BB9\u3002",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi": "\u6240\u9009\u6765\u6E90\u6CA1\u6709\u53EF\u6574\u5408\u7684 Markdown \u5185\u5BB9\u3002",
   "ui.review_ai_suggested_subtopics": "\u8BF7\u786E\u8BA4 AI \u5EFA\u8BAE\u7684\u5B50\u8BAE\u9898\u3002",
   "ui.select_at_least_one_subtopic": "\u8BF7\u81F3\u5C11\u9009\u62E9\u4E00\u4E2A\u5B50\u8BAE\u9898\u3002",
@@ -4353,7 +4353,7 @@ var zhCN = {
   "ui.first_level_topic_names_must_be_unique": "\u7B2C\u4E00\u5C42\u5B50\u8BAE\u9898\u540D\u79F0\u4E0D\u80FD\u91CD\u590D\u3002",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI \u63D0\u6848\u7684\u7B2C\u4E00\u5C42\u540D\u79F0\u91CD\u590D\uFF0C\u8BF7\u91CD\u65B0\u4EA7\u751F\u63D0\u6848\u3002",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev": "\u53EF\u6307\u5B9A\u5C55\u5F00\u65B9\u5411\uFF0C\u6216\u8BA9 AI \u5EFA\u8BAE\uFF1B\u7ED3\u679C\u5148\u9884\u89C8\uFF0C\u786E\u8BA4\u540E\u624D\u521B\u5EFA\u8BAE\u9898\u3002",
-  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "\u8FD9\u4E2A\u8BAE\u9898\u5F53\u524D\u6CA1\u6709\u76F4\u5C5E\u5B50\u8BAE\u9898\uFF1B\u53EF\u4EE5\u9009\u62E9\u5176\u4ED6\u7B14\u8BB0\u4F5C\u4E3A\u6574\u5408\u6765\u6E90\u3002",
+  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "\u8FD9\u4E2A\u8BAE\u9898\u76EE\u524D\u6CA1\u6709\u76F4\u5C5E\u5B50\u8BAE\u9898\u3002",
   "ui.review_synthesis_draft": "\u68C0\u9605\u6574\u5408\u8349\u7A3F",
   "ui.choose_synthesis_direction": "\u9009\u62E9\u6574\u5408\u65B9\u5411",
   "ui.discard_synthesis": "\u653E\u5F03",
@@ -6457,7 +6457,7 @@ var zhTW = {
   "ui.confirm_removal": "\u78BA\u8A8D\u79FB\u9664",
   "ui.choose_a_new_parent_topic": "\u9078\u64C7\u65B0\u7684\u6BCD\u8B70\u984C",
   "ui.how_would_you_like_to_explore_next": "\u63A5\u4E0B\u4F86\u60F3\u600E\u9EBC\u63A2\u7D22\uFF1F",
-  "ui.choose_another_note_source_first": "\u8ACB\u5148\u9078\u64C7\u5176\u4ED6\u7B46\u8A18\u4F86\u6E90\u3002",
+  "ui.choose_another_note_source_first": "\u76EE\u524D\u6C92\u6709\u53EF\u6574\u5408\u7684\u5167\u5BB9\u3002",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi": "\u6240\u9078\u4F86\u6E90\u6C92\u6709\u53EF\u6574\u5408\u7684 Markdown \u5167\u5BB9\u3002",
   "ui.review_ai_suggested_subtopics": "\u8ACB\u78BA\u8A8D AI \u5EFA\u8B70\u7684\u5B50\u8B70\u984C\u3002",
   "ui.select_at_least_one_subtopic": "\u8ACB\u81F3\u5C11\u9078\u53D6\u4E00\u500B\u5B50\u8B70\u984C\u3002",
@@ -7031,7 +7031,7 @@ var zhTW = {
   "ui.first_level_topic_names_must_be_unique": "\u7B2C\u4E00\u5C64\u5B50\u8B70\u984C\u540D\u7A31\u4E0D\u80FD\u91CD\u8907\u3002",
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI \u63D0\u6848\u7684\u7B2C\u4E00\u5C64\u540D\u7A31\u91CD\u8907\uFF0C\u8ACB\u91CD\u65B0\u7522\u751F\u63D0\u6848\u3002",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev": "\u53EF\u6307\u5B9A\u5C55\u958B\u65B9\u5411\uFF0C\u6216\u8B93 AI \u5EFA\u8B70\uFF1B\u7D50\u679C\u5148\u9810\u89BD\uFF0C\u78BA\u8A8D\u5F8C\u624D\u5EFA\u7ACB\u8B70\u984C\u3002",
-  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "\u9019\u500B\u8B70\u984C\u76EE\u524D\u6C92\u6709\u76F4\u5C6C\u5B50\u8B70\u984C\uFF1B\u53EF\u4EE5\u9078\u64C7\u5176\u4ED6\u7B46\u8A18\u4F5C\u70BA\u6574\u5408\u4F86\u6E90\u3002",
+  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "\u9019\u500B\u8B70\u984C\u76EE\u524D\u6C92\u6709\u76F4\u5C6C\u5B50\u8B70\u984C\u3002",
   "ui.review_synthesis_draft": "\u6AA2\u95B1\u6574\u5408\u8349\u7A3F",
   "ui.choose_synthesis_direction": "\u9078\u64C7\u6574\u5408\u65B9\u5411",
   "ui.discard_synthesis": "\u6368\u68C4",
@@ -27968,7 +27968,7 @@ var baseName3 = (path) => path.split("/").at(-1) || path;
 function mapSourceName(app, source) {
   var _a2, _b2, _c;
   if (source.kind === "folder") return baseName3(source.path);
-  if (source.kind === "file") return baseName3(source.path).replace(/\.md$/i, "");
+  if (source.kind === "file") return baseName3(source.path);
   const file = app.vault.getAbstractFileByPath(source.path);
   const heading = file instanceof import_obsidian15.TFile ? (_c = (_b2 = (_a2 = app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.headings) == null ? void 0 : _b2[0]) == null ? void 0 : _c.heading : void 0;
   if (heading == null ? void 0 : heading.trim()) return heading.trim();
@@ -28051,7 +28051,7 @@ async function openPicker(host, kind, returnFocus) {
   modal.open();
 }
 function drawMapSourcesPanel(parent, host, focus) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const panel = parent.createDiv({
     cls: "vam-map-sources-panel",
     attr: { id: host.id, role: "dialog", "aria-label": t("ui.map_sources_title") }
@@ -28108,8 +28108,9 @@ function drawMapSourcesPanel(parent, host, focus) {
     if (!next || host.isPickerOpen() || panel.contains(next) || next === host.button()) return;
     host.close(false);
   });
+  (_b2 = host.panelCreated) == null ? void 0 : _b2.call(host, panel);
   if (focus) {
-    const target = "picker" in focus ? pickers.get(focus.picker) : (_b2 = removers[focus.remove]) != null ? _b2 : pickers.get("map");
+    const target = "picker" in focus ? pickers.get(focus.picker) : (_c = removers[focus.remove]) != null ? _c : pickers.get("map");
     target == null ? void 0 : target.focus();
   }
   return panel;
@@ -55657,7 +55658,10 @@ ${request.requirements}` : preset.text,
           this.mapSourcesPickerOpen = open;
         },
         isPickerOpen: () => this.mapSourcesPickerOpen,
-        button: () => this.mapSourcesButtonEl
+        button: () => this.mapSourcesButtonEl,
+        panelCreated: (created) => {
+          this.mapSourcesPanelEl = created;
+        }
       },
       focus
     );

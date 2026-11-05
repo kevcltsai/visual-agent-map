@@ -1024,7 +1024,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.confirm_removal": "确认移除",
   "ui.choose_a_new_parent_topic": "选择新的父议题",
   "ui.how_would_you_like_to_explore_next": "接下来想怎么探索？",
-  "ui.choose_another_note_source_first": "请先选择其他笔记来源。",
+  "ui.choose_another_note_source_first": "目前没有可整合的内容。",
   "ui.the_selected_sources_contain_no_markdown_content_to_synthesi": "所选来源没有可整合的 Markdown 内容。",
   "ui.review_ai_suggested_subtopics": "请确认 AI 建议的子议题。",
   "ui.select_at_least_one_subtopic": "请至少选择一个子议题。",
@@ -1636,8 +1636,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.ai_proposed_duplicate_first_level_names_generate_the_proposa": "AI 提案的第一层名称重复，请重新产生提案。",
   "ui.specify_an_expansion_direction_or_ask_ai_to_suggest_one_prev":
     "可指定展开方向，或让 AI 建议；结果先预览，确认后才创建议题。",
-  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note":
-    "这个议题当前没有直属子议题；可以选择其他笔记作为整合来源。",
+  "ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note": "这个议题目前没有直属子议题。",
   "ui.review_synthesis_draft": "检阅整合草稿",
   "ui.choose_synthesis_direction": "选择整合方向",
   "ui.discard_synthesis": "放弃",

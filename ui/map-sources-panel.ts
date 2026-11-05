@@ -10,8 +10,10 @@ export type MapSourcesPanelFocus = { search: true } | { remove: number } | null;
 export interface MapSourcesSession {
   rejected: string[];
   fresh: string[];
+  /** The success line of the last drop (empty when nothing was added); survives the redraw an add causes. */
+  added: string;
 }
-export const newMapSourcesSession = (): MapSourcesSession => ({ rejected: [], fresh: [] });
+export const newMapSourcesSession = (): MapSourcesSession => ({ rejected: [], fresh: [], added: "" });
 
 export interface MapSourcesPanelHost {
   app: App;
@@ -314,12 +316,18 @@ export function drawMapSourcesPanel(
     );
     dropSub.setText(hover ? hover : t("ui.map_sources_drop_hint"));
   };
+  // While a new drag hovers the zone the last drop's lines are hidden; the new drop replaces them.
   const paintResult = (): void => {
     dropResult.empty();
+    if (hover !== null) return;
+    if (session.added) dropResult.createDiv({ cls: "vam-map-sources-drop-ok", text: session.added });
     for (const line of session.rejected) dropResult.createDiv({ cls: "vam-map-sources-drop-line", text: line });
   };
-  paint();
-  paintResult();
+  const repaint = (): void => {
+    paint();
+    paintResult();
+  };
+  repaint();
 
   /** Sorts a batch into add / refuse; adds what can be added and keeps the reasons for the rest. */
   const commit = async (items: DragEntry[], outside: string[]): Promise<void> => {
@@ -339,8 +347,12 @@ export function drawMapSourcesPanel(
     }
     session.rejected = lines;
     session.fresh = accepted.map(sourceKey);
-    paint();
-    paintResult();
+    session.added = !accepted.length
+      ? ""
+      : accepted.length === 1
+        ? t("ui.map_sources_added_one_0", mapSourceName(host.app, accepted[0]))
+        : t("ui.map_sources_added_many_0", accepted.length);
+    repaint();
     for (const source of accepted) host.add(source);
   };
 
@@ -349,21 +361,21 @@ export function drawMapSourcesPanel(
     if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
     if (hover !== null) return;
     hover = hoverLabel(host.app);
-    paint();
+    repaint();
   };
   zone.addEventListener("dragenter", accept);
   zone.addEventListener("dragover", accept);
   zone.addEventListener("dragleave", (event: DragEvent) => {
     if (event.relatedTarget && zone.contains(event.relatedTarget as Node)) return;
     hover = null;
-    paint();
+    repaint();
   });
   zone.addEventListener("drop", (event: DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
     hover = null;
     const read = readDrag(host.app, event.dataTransfer);
-    if (!read.inside.length && !read.outside.length) return paint();
+    if (!read.inside.length && !read.outside.length) return repaint();
     void commit(read.inside, read.outside);
   });
 
@@ -373,8 +385,8 @@ export function drawMapSourcesPanel(
   search.addEventListener("click", event => {
     event.stopPropagation();
     session.rejected = [];
-    paint();
-    paintResult();
+    session.added = "";
+    repaint();
     void openSearch(host, search, items => void commit(items, []));
   });
 
@@ -409,6 +421,7 @@ export function drawMapSourcesPanel(
     remove.addEventListener("click", event => {
       event.stopPropagation();
       session.rejected = [];
+      session.added = "";
       session.fresh = [];
       host.remove(source);
     });

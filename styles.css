@@ -899,8 +899,10 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-map-sources-drop-sub, .vam-map-sources-drop-line { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-map-sources-drop.is-dragover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); }
 .vam-map-sources-drop.is-dragover .vam-map-sources-drop-main { color: var(--interactive-accent); }
-.vam-map-sources-drop.is-rejected { border-color: var(--text-error); background: var(--background-modifier-error-hover); }
-.vam-map-sources-drop.is-rejected .vam-map-sources-drop-main { color: var(--text-error); }
+.vam-map-sources-drop.is-rejected { border-color: var(--color-orange); background: rgba(var(--color-orange-rgb), 0.12); }
+.vam-map-sources-drop.is-rejected .vam-map-sources-drop-main { color: color-mix(in srgb, var(--color-orange) 50%, var(--text-normal)); }
+.vam-map-sources-drop.is-rejected .vam-map-sources-drop-line { color: var(--text-normal); }
+.vam-map-sources-drop-ok { color: color-mix(in srgb, var(--color-green) 50%, var(--text-normal)); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; padding: 2px 8px; border-radius: var(--radius-s); background: rgba(var(--color-green-rgb), 0.12); }
 .vam-map-sources-drop.is-rejected .vam-map-sources-drop-sub { display: none; }
 .vam-map-sources-search { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: auto; min-height: 30px; padding: 6px 8px; white-space: normal; text-align: center; font-size: var(--font-ui-small); }
 .vam-map-sources-pick-icon, .vam-map-sources-icon { display: inline-flex; flex: 0 0 auto; color: var(--text-muted); }

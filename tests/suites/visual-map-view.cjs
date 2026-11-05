@@ -4628,7 +4628,7 @@ test('map sources panel: texts, a drop zone and one search button (no three pick
   const removes = dom.findAll(panel, c => c.tag === 'button' && (c.cls ?? '').includes('vam-map-sources-remove'));
   assert.equal(removes.length, 4, 'the unreadable row keeps its remove button');
   assert.deepEqual(removes.map(b => b.attrs['aria-label']), ['Remove "Research"', 'Remove "Last year plan"', 'Remove "interview.md"', 'Remove "missing.md"']);
-  assert.ok(dom.find(panel, c => c.text === 'Folder selections exclude archived VAM notes. More material takes longer to process. Results cite the source files used.'), 'the hint is the existing reference_time_and_citations_hint');
+  assert.ok(dom.find(panel, c => c.text === 'When you add a folder, archived VAM notes are excluded. More material takes longer to process. Results cite the source files used.'), 'the hint is the existing reference_time_and_citations_hint');
   removes[1].click(); assert.deepEqual(plain(log.removed), [{ kind: 'map', path: 'Old plan/Map.md' }]);
 });
 test('map sources panel: Esc closes and refocuses the button; focus leaving closes it except while a picker list is open', () => {
@@ -4745,12 +4745,31 @@ test('drop zone negative: one valid and one invalid item together add the valid 
 test('drop zone negative: an already added source is not added again; one dropped twice in a batch is added once', async () => {
   const dz = dzSetup({ sources: [{ kind: 'file', path: 'Notes/interview.md' }] });
   await dz.drop(dz.dragging(dz.single));
-  assert.deepEqual(plain(dz.log.added), []); assert.deepEqual(dz.lines(), ['interview.md is already added']);
+  assert.deepEqual(plain(dz.log.added), []); assert.deepEqual(dz.lines(), ['"interview.md" is already added']);
   await dz.drop(dz.dragging(dz.folder, dz.folder)); assert.deepEqual(plain(dz.log.added), [{ kind: 'folder', path: 'Research' }]);
+});
+test('drop zone: a drop that adds says so in the result area, next to the rejection lines of a mixed drop; a new hover hides both', async () => {
+  const dz = dzSetup();
+  const ok = () => dom.findAll(dz.zone, c => c.cls === 'vam-map-sources-drop-ok').map(c => c.text);
+  await dz.drop(dz.dragging(dz.single)); assert.deepEqual(ok(), ['Added "interview.md"']); assert.ok(!dz.zone.hasClass('is-rejected'));
+  await dz.drop(dz.dragging(dz.single, dz.folder, dz.pdf)); assert.deepEqual(ok(), ['Added 2 items']); assert.deepEqual(dz.lines(), ['"quote.pdf": Only Markdown, folders or mind maps can be added']);
+  assert.equal(dom.find(dz.zone, c => dom.hasCls(c, 'vam-map-sources-drop-result')).attrs['aria-live'], 'polite');
+  dz.zone.fire('dragenter', { dataTransfer: dz.dragging(dz.single) });
+  assert.deepEqual(dz.lines(), [], 'the previous rejection lines are hidden while a new drag hovers'); assert.deepEqual(ok(), []);
+  await dz.drop(dz.dragging(dz.mapFile)); assert.deepEqual(dz.lines(), []); assert.deepEqual(ok(), ['Added "Last year plan"']);
+});
+test('drop zone styles: the rejected zone is a light warning tint, not the error fill, and its headline never uses the fill variable', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => css.match(new RegExp('^' + selector.replace(/[.]/g, '\\.') + ' \\{([^}]*)\\}', 'm'))[1];
+  const zoneRule = rule('.vam-map-sources-drop.is-rejected'), headRule = rule('.vam-map-sources-drop.is-rejected .vam-map-sources-drop-main');
+  assert.doesNotMatch(zoneRule + headRule, /background-modifier-error|--text-error/);
+  assert.match(zoneRule, /background: rgba\(var\(--color-orange-rgb\), 0\.\d+\)/);
+  const fill = zoneRule.match(/background: ([^;]+);/)[1], text = headRule.match(/color: ([^;]+);/)[1];
+  assert.notEqual(fill, text); assert.match(text, /var\(--text-normal\)/, 'the headline is mixed toward the text colour so it stays readable in both themes');
 });
 test('drop zone: added rows come first and flash; the rejection survives the redraw an add causes; the zone and rows are readable', async () => {
   const dz = dzSetup({ sources: [{ kind: 'folder', path: 'Research' }] });
-  const session = { rejected: [], fresh: [] };
+  const session = { rejected: [], fresh: [], added: '' };
   const host = { ...dz.host, session, sources: [{ kind: 'folder', path: 'Research' }], add: s => { dz.host.add(s); host.sources = [...host.sources, s]; } };
   let panel = dz.api.drawMapSourcesPanel(dom.element('tools'), host, null);
   dom.find(panel, c => dom.hasCls(c, 'vam-map-sources-drop')).fire('drop', { dataTransfer: dz.dragging(dz.single, dz.pdf) }); await dom.tick();
@@ -4841,7 +4860,7 @@ integrationTest('map sources panel in the view: open, add writes only through th
   assert.deepEqual(fx.state.writes, [['Current/Map.md', [file]]]); assert.equal(msLabel(fx.tools), 'Data sources · 1');
   assert.ok(dom.find(panel(), c => c.text === 'interview.md'), 'the open panel shows the new row'); assert.equal(fx.view.announcer.text, 'Added interview.md');
   fx.view.changeMapSources('Current/Map.md', 'add', { ...file }); await dom.tick();
-  assert.equal(fx.state.writes.length, 1, 'adding the same kind and path again writes nothing'); assert.equal(fx.view.announcer.text, 'interview.md is already added');
+  assert.equal(fx.state.writes.length, 1, 'adding the same kind and path again writes nothing'); assert.equal(fx.view.announcer.text, '"interview.md" is already added');
   fx.view.changeMapSources('Current/Map.md', 'remove', file); await dom.tick();
   assert.equal(fx.state.writes.length, 2); assert.deepEqual(fx.state.writes[1], ['Current/Map.md', []]); assert.equal(msLabel(fx.tools), 'Data sources'); assert.equal(fx.view.announcer.text, 'Removed interview.md');
   assert.equal(dom.focusedNow().children[1].text, 'Search and add…', 'removing the last row moves focus to the search button');

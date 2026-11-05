@@ -511,7 +511,7 @@ export const en = {
   "ui.requirements_this_task_only": "Only used for this task. Leave blank to proceed with the selected action.",
   "ui.selected_mind_map_notes": "Selected mind map notes",
   "ui.reference_time_and_citations_hint":
-    "Folder selections exclude archived VAM notes. More material takes longer to process. Results cite the source files used.",
+    "When you add a folder, archived VAM notes are excluded. More material takes longer to process. Results cite the source files used.",
   "ui.reference_processing_progress": "Extracting evidence: batch {0} of {1}…",
   "ui.reference_processing_empty_result":
     "A selected source batch returned no readable findings. No partial result was saved.",
@@ -531,7 +531,9 @@ export const en = {
   "ui.map_sources_none": "No data sources yet.",
   "ui.map_sources_added_0": "Added {0}",
   "ui.map_sources_removed_0": "Removed {0}",
-  "ui.map_sources_already_added_0": "{0} is already added",
+  "ui.map_sources_already_added_0": '"{0}" is already added',
+  "ui.map_sources_added_one_0": 'Added "{0}"',
+  "ui.map_sources_added_many_0": "Added {0} items",
   "ui.map_sources_save_failed_0": "Could not save the data sources: {0}",
   "ui.map_sources_kind_file": "Markdown",
   "ui.map_sources_kind_folder": "Folder",

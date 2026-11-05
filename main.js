@@ -556,7 +556,7 @@ var en = {
   "ui.legacy_rules_not_applied": "The note\u2019s old Rules are not applied automatically. Enter any conditions AI must follow for this run in Additional requirements above.",
   "ui.requirements_this_task_only": "Only used for this task. Leave blank to proceed with the selected action.",
   "ui.selected_mind_map_notes": "Selected mind map notes",
-  "ui.reference_time_and_citations_hint": "Folder selections exclude archived VAM notes. More material takes longer to process. Results cite the source files used.",
+  "ui.reference_time_and_citations_hint": "When you add a folder, archived VAM notes are excluded. More material takes longer to process. Results cite the source files used.",
   "ui.reference_processing_progress": "Extracting evidence: batch {0} of {1}\u2026",
   "ui.reference_processing_empty_result": "A selected source batch returned no readable findings. No partial result was saved.",
   "ui.reference_processing_could_not_reduce": "The selected material could not be condensed while preserving traceable evidence. No partial result was saved.",
@@ -573,7 +573,9 @@ var en = {
   "ui.map_sources_none": "No data sources yet.",
   "ui.map_sources_added_0": "Added {0}",
   "ui.map_sources_removed_0": "Removed {0}",
-  "ui.map_sources_already_added_0": "{0} is already added",
+  "ui.map_sources_already_added_0": '"{0}" is already added',
+  "ui.map_sources_added_one_0": 'Added "{0}"',
+  "ui.map_sources_added_many_0": "Added {0} items",
   "ui.map_sources_save_failed_0": "Could not save the data sources: {0}",
   "ui.map_sources_kind_file": "Markdown",
   "ui.map_sources_kind_folder": "Folder",
@@ -3264,7 +3266,7 @@ var zhCN = {
   "ui.legacy_rules_not_applied": "\u7B14\u8BB0\u4E2D\u7684\u65E7 Rules \u4E0D\u4F1A\u81EA\u52A8\u5E94\u7528\u3002\u8FD9\u6B21\u9700\u8981\u9075\u5B88\u7684\u6761\u4EF6\uFF0C\u8BF7\u586B\u5165\u4E0A\u65B9\u9644\u52A0\u8981\u6C42\u3002",
   "ui.requirements_this_task_only": "\u4EC5\u7528\u4E8E\u8FD9\u6B21\u4EFB\u52A1\uFF1B\u7559\u7A7A\u5373\u53EF\u4F9D\u6240\u9009\u529F\u80FD\u8FD0\u884C\u3002",
   "ui.selected_mind_map_notes": "\u6240\u9009\u5FC3\u667A\u56FE\u7684\u8BAE\u9898\u7B14\u8BB0",
-  "ui.reference_time_and_citations_hint": "\u9009\u62E9\u6587\u4EF6\u5939\u65F6\u4F1A\u6392\u9664 VAM \u5F52\u6863\u7B14\u8BB0\u3002\u6570\u636E\u8D8A\u591A\uFF0C\u5904\u7406\u65F6\u95F4\u8D8A\u957F\uFF1B\u7ED3\u679C\u4F1A\u6807\u793A\u5B9E\u9645\u4F7F\u7528\u7684\u6765\u6E90\u6587\u4EF6\u3002",
+  "ui.reference_time_and_citations_hint": "\u653E\u5165\u6587\u4EF6\u5939\u65F6\u4F1A\u6392\u9664 VAM \u5F52\u6863\u7B14\u8BB0\u3002\u6570\u636E\u8D8A\u591A\uFF0C\u5904\u7406\u65F6\u95F4\u8D8A\u957F\uFF1B\u7ED3\u679C\u4F1A\u6807\u793A\u5B9E\u9645\u4F7F\u7528\u7684\u6765\u6E90\u6587\u4EF6\u3002",
   "ui.reference_processing_progress": "\u6B63\u5728\u622A\u53D6\u6570\u636E\uFF1A\u7B2C {0}\uFF0F{1} \u6279\u2026",
   "ui.reference_processing_empty_result": "\u6709\u4E00\u6279\u9009\u62E9\u6570\u636E\u65E0\u6CD5\u4EA7\u751F\u53EF\u8BFB\u5185\u5BB9\uFF0C\u672A\u4FDD\u5B58\u90E8\u5206\u7ED3\u679C\u3002",
   "ui.reference_processing_could_not_reduce": "\u9009\u62E9\u6570\u636E\u91CF\u8FC7\u5927\uFF0C\u65E0\u6CD5\u5728\u4FDD\u7559\u6765\u6E90\u5F15\u7528\u7684\u60C5\u51B5\u4E0B\u6574\u7406\uFF1B\u672A\u4FDD\u5B58\u90E8\u5206\u7ED3\u679C\u3002",
@@ -3281,7 +3283,9 @@ var zhCN = {
   "ui.map_sources_none": "\u8FD8\u6CA1\u6709\u6570\u636E\u6E90\u3002",
   "ui.map_sources_added_0": "\u5DF2\u52A0\u5165 {0}",
   "ui.map_sources_removed_0": "\u5DF2\u79FB\u9664 {0}",
-  "ui.map_sources_already_added_0": "{0} \u5DF2\u7ECF\u52A0\u5165\u8FC7\u4E86",
+  "ui.map_sources_already_added_0": "\u3008{0}\u3009\u5DF2\u7ECF\u52A0\u5165\u8FC7\u4E86",
+  "ui.map_sources_added_one_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
+  "ui.map_sources_added_many_0": "\u5DF2\u52A0\u5165 {0} \u9879",
   "ui.map_sources_save_failed_0": "\u65E0\u6CD5\u4FDD\u5B58\u6570\u636E\u6E90\uFF1A{0}",
   "ui.map_sources_kind_file": "Markdown",
   "ui.map_sources_kind_folder": "\u6587\u4EF6\u5939",
@@ -5972,7 +5976,7 @@ var zhTW = {
   "ui.legacy_rules_not_applied": "\u7B46\u8A18\u4E2D\u7684\u820A Rules \u4E0D\u6703\u81EA\u52D5\u5957\u7528\u3002\u9019\u6B21\u9700\u8981\u9075\u5B88\u7684\u689D\u4EF6\uFF0C\u8ACB\u586B\u5165\u4E0A\u65B9\u9644\u52A0\u8981\u6C42\u3002",
   "ui.requirements_this_task_only": "\u50C5\u7528\u65BC\u9019\u6B21\u4EFB\u52D9\uFF1B\u7559\u7A7A\u5373\u53EF\u4F9D\u6240\u9078\u529F\u80FD\u57F7\u884C\u3002",
   "ui.selected_mind_map_notes": "\u6240\u9078\u5FC3\u667A\u5716\u7684\u8B70\u984C\u7B46\u8A18",
-  "ui.reference_time_and_citations_hint": "\u9078\u53D6\u8CC7\u6599\u593E\u6642\u6703\u6392\u9664 VAM \u5C01\u5B58\u7B46\u8A18\u3002\u8CC7\u6599\u8D8A\u591A\uFF0C\u8655\u7406\u6642\u9593\u8D8A\u9577\uFF1B\u7D50\u679C\u6703\u6A19\u793A\u5BE6\u969B\u4F7F\u7528\u7684\u4F86\u6E90\u6A94\u6848\u3002",
+  "ui.reference_time_and_citations_hint": "\u653E\u5165\u8CC7\u6599\u593E\u6642\u6703\u6392\u9664 VAM \u5C01\u5B58\u7B46\u8A18\u3002\u8CC7\u6599\u8D8A\u591A\uFF0C\u8655\u7406\u6642\u9593\u8D8A\u9577\uFF1B\u7D50\u679C\u6703\u6A19\u793A\u5BE6\u969B\u4F7F\u7528\u7684\u4F86\u6E90\u6A94\u6848\u3002",
   "ui.reference_processing_progress": "\u6B63\u5728\u64F7\u53D6\u8CC7\u6599\uFF1A\u7B2C {0}\uFF0F{1} \u6279\u2026",
   "ui.reference_processing_empty_result": "\u6709\u4E00\u6279\u9078\u53D6\u8CC7\u6599\u7121\u6CD5\u7522\u751F\u53EF\u8B80\u5167\u5BB9\uFF0C\u672A\u5132\u5B58\u90E8\u5206\u7D50\u679C\u3002",
   "ui.reference_processing_could_not_reduce": "\u9078\u53D6\u8CC7\u6599\u91CF\u904E\u5927\uFF0C\u7121\u6CD5\u5728\u4FDD\u7559\u4F86\u6E90\u5F15\u7528\u7684\u60C5\u6CC1\u4E0B\u6574\u7406\uFF1B\u672A\u5132\u5B58\u90E8\u5206\u7D50\u679C\u3002",
@@ -5989,7 +5993,9 @@ var zhTW = {
   "ui.map_sources_none": "\u9084\u6C92\u6709\u8CC7\u6599\u4F86\u6E90\u3002",
   "ui.map_sources_added_0": "\u5DF2\u52A0\u5165 {0}",
   "ui.map_sources_removed_0": "\u5DF2\u79FB\u9664 {0}",
-  "ui.map_sources_already_added_0": "{0} \u5DF2\u7D93\u52A0\u5165\u904E\u4E86",
+  "ui.map_sources_already_added_0": "\u3008{0}\u3009\u5DF2\u7D93\u52A0\u5165\u904E\u4E86",
+  "ui.map_sources_added_one_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
+  "ui.map_sources_added_many_0": "\u5DF2\u52A0\u5165 {0} \u9805",
   "ui.map_sources_save_failed_0": "\u7121\u6CD5\u5132\u5B58\u8CC7\u6599\u4F86\u6E90\uFF1A{0}",
   "ui.map_sources_kind_file": "Markdown",
   "ui.map_sources_kind_folder": "\u8CC7\u6599\u593E",
@@ -28073,7 +28079,7 @@ var import_obsidian37 = require("obsidian");
 
 // ui/map-sources-panel.ts
 var import_obsidian15 = require("obsidian");
-var newMapSourcesSession = () => ({ rejected: [], fresh: [] });
+var newMapSourcesSession = () => ({ rejected: [], fresh: [], added: "" });
 var ICONS = { map: "brain-circuit", folder: "folder-open", file: "file-text" };
 var KIND_LABELS = {
   map: "ui.map_sources_kind_map",
@@ -28268,10 +28274,15 @@ function drawMapSourcesPanel(parent, host, focus) {
   };
   const paintResult = () => {
     dropResult.empty();
+    if (hover !== null) return;
+    if (session.added) dropResult.createDiv({ cls: "vam-map-sources-drop-ok", text: session.added });
     for (const line of session.rejected) dropResult.createDiv({ cls: "vam-map-sources-drop-line", text: line });
   };
-  paint();
-  paintResult();
+  const repaint = () => {
+    paint();
+    paintResult();
+  };
+  repaint();
   const commit = async (items, outside) => {
     const mapPaths = (await host.mapItems().catch(() => [])).map((item) => item.mapPath);
     const lines = outside.map((name2) => t("ui.map_sources_reject_line_0", name2, t("ui.map_sources_reject_outside")));
@@ -28289,8 +28300,8 @@ function drawMapSourcesPanel(parent, host, focus) {
     }
     session.rejected = lines;
     session.fresh = accepted.map(sourceKey);
-    paint();
-    paintResult();
+    session.added = !accepted.length ? "" : accepted.length === 1 ? t("ui.map_sources_added_one_0", mapSourceName(host.app, accepted[0])) : t("ui.map_sources_added_many_0", accepted.length);
+    repaint();
     for (const source of accepted) host.add(source);
   };
   const accept = (event) => {
@@ -28298,21 +28309,21 @@ function drawMapSourcesPanel(parent, host, focus) {
     if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
     if (hover !== null) return;
     hover = hoverLabel(host.app);
-    paint();
+    repaint();
   };
   zone.addEventListener("dragenter", accept);
   zone.addEventListener("dragover", accept);
   zone.addEventListener("dragleave", (event) => {
     if (event.relatedTarget && zone.contains(event.relatedTarget)) return;
     hover = null;
-    paint();
+    repaint();
   });
   zone.addEventListener("drop", (event) => {
     event.preventDefault();
     event.stopPropagation();
     hover = null;
     const read = readDrag(host.app, event.dataTransfer);
-    if (!read.inside.length && !read.outside.length) return paint();
+    if (!read.inside.length && !read.outside.length) return repaint();
     void commit(read.inside, read.outside);
   });
   const search = panel.createEl("button", { cls: "vam-map-sources-search" });
@@ -28321,8 +28332,8 @@ function drawMapSourcesPanel(parent, host, focus) {
   search.addEventListener("click", (event) => {
     event.stopPropagation();
     session.rejected = [];
-    paint();
-    paintResult();
+    session.added = "";
+    repaint();
     void openSearch(host, search, (items) => void commit(items, []));
   });
   const list = panel.createDiv({ cls: "vam-map-sources-list", attr: { role: "list" } });
@@ -28349,6 +28360,7 @@ function drawMapSourcesPanel(parent, host, focus) {
     remove.addEventListener("click", (event) => {
       event.stopPropagation();
       session.rejected = [];
+      session.added = "";
       session.fresh = [];
       host.remove(source);
     });

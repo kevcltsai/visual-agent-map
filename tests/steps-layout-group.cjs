@@ -1520,6 +1520,12 @@ test('B-text: a narrow root-level text block in the left half stays left after a
   assert.ok(by.get('t').x + 60 <= by.get('r').x, `block ${by.get('t').x}+60 stays left of the root at ${by.get('r').x}`);
   assert.deepEqual(snap(placed), [['r', 440, 254], ['b', 80, 80], ['t', 300, 204], ['c', 80, 408]]);
 });
+test('B-text: a left root-level text block that grew past the root edge by typing stays left after a full arrange', () => {
+  // Typing widens the box without moving x: its right edge passes the root's left edge, but it stands clear left by offset.
+  const nodes = [node('r', null, { x: 800 }), node('b', 'r', { x: 440 }), node('t', 'r', { path: '', width: 250, x: 590, y: 50 }), node('c', 'r', { x: 440 })];
+  const by = new Map(layout.arrangeMap(nodes, undefined, rootH, 'balanced').map(item => [item.id, item]));
+  assert.ok(by.get('t').x + 250 <= by.get('r').x, `block ${by.get('t').x}+250 stays left of the root at ${by.get('r').x}`);
+});
 test('B-text: a narrow root-level text block in the right half stays right after a full arrange', () => {
   const nodes = [node('r', null, { x: 800 }), node('b', 'r', { x: 1160 }), node('t', 'r', { path: '', width: 60, x: 961, y: 50 }), node('c', 'r', { x: 1160 })];
   const by = new Map(layout.arrangeMap(nodes, undefined, rootH, 'balanced').map(item => [item.id, item]));

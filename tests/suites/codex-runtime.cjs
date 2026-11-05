@@ -655,3 +655,31 @@ integrationTest('bug bash #32: a Codex turn/completed with status failed or inte
     assert.equal(await messageOf({ status: 'failed', error: { message: 'boom' } }), 'boom');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+integrationTest('Codex reports the thread token usage of a call through onMilestones, once, also when the turn fails', async () => {
+  const { EventEmitter } = require('node:events');
+  for (const status of ['completed', 'failed']) {
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+    const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+    const breakdown = (input, output) => ({ totalTokens: input + output, inputTokens: input, cachedInputTokens: 0, cacheWriteInputTokens: 0, outputTokens: output, reasoningOutputTokens: 0 });
+    child.stdin = { write: line => {
+      const message = JSON.parse(line.trim());
+      if (message.method === 'initialize') emit({ id: message.id, result: {} });
+      else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'usage-thread' } } });
+      else if (message.method === 'turn/start') {
+        emit({ id: message.id, result: { turn: { id: 'usage-turn' } } });
+        emit({ method: 'thread/tokenUsage/updated', params: { threadId: 'usage-thread', turnId: 'usage-turn', tokenUsage: { total: breakdown(40, 10), last: breakdown(40, 10), modelContextWindow: null } } });
+        emit({ method: 'thread/tokenUsage/updated', params: { threadId: 'usage-thread', turnId: 'usage-turn', tokenUsage: { total: breakdown(900, 120), last: breakdown(500, 70), modelContextWindow: null } } });
+        emit({ method: 'item/completed', params: { threadId: 'usage-thread', item: { id: 'a', type: 'agentMessage', text: 'ok' } } });
+        emit({ method: 'turn/completed', params: { threadId: 'usage-thread', turn: { status, error: status === 'failed' ? { message: 'boom' } : null } } });
+      } else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
+    } };
+    const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+    const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+    const reported = [];
+    try {
+      const running = runtime.runTask('prompt', 'model', 'low', undefined, { onMilestones: data => reported.push(plain(data)) });
+      if (status === 'completed') assert.equal(await running, 'ok'); else await assert.rejects(running, /boom/);
+      assert.deepEqual(reported, [{ usage: { inputTokens: 900, outputTokens: 120 } }], status);
+    } finally { runtime.stop(); }
+  }
+});

@@ -36571,6 +36571,404 @@ function isSearchNotPerformed(error) {
   return typeof error === "object" && error !== null && error.name === SEARCH_NOT_PERFORMED;
 }
 
+// store-adapter.ts
+async function readStoreText(adapter, path) {
+  if (await adapter.exists(path)) return adapter.read(path);
+  const temporary = `${path}.tmp`;
+  if (!await adapter.exists(temporary)) return null;
+  const text11 = await adapter.read(temporary);
+  await adapter.rename(temporary, path);
+  return text11;
+}
+async function writeStoreAtomically(adapter, path, text11) {
+  const temporary = `${path}.tmp`;
+  await adapter.write(temporary, text11);
+  if (await adapter.exists(path)) await adapter.remove(path);
+  await adapter.rename(temporary, path);
+}
+
+// ai-exchange-log.ts
+function isRecord2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isUnknownArray(value) {
+  return Array.isArray(value);
+}
+function formatElapsed(durationMs) {
+  if (durationMs < 1e3) return `${durationMs} ms`;
+  if (durationMs < 6e4) return `${(durationMs / 1e3).toFixed(1)} s`;
+  const minutes = Math.floor(durationMs / 6e4);
+  const seconds = Math.floor(durationMs % 6e4 / 1e3);
+  return `${minutes}m ${seconds}s`;
+}
+function promptMetrics(entry) {
+  var _a2, _b2, _c, _d, _e;
+  let prompt = typeof entry.prompt === "string" ? entry.prompt : "";
+  if (!prompt && entry.request) {
+    try {
+      const parsed = JSON.parse(entry.request);
+      const parsedRecord = isRecord2(parsed) ? parsed : void 0;
+      const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
+      const request = isRecord2(requestValue) ? requestValue : void 0;
+      if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
+      else if (request && isUnknownArray(request.input)) {
+        prompt = request.input.map((item) => isRecord2(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
+      }
+    } catch (e) {
+    }
+  }
+  const characters = Array.from(prompt).length;
+  const nonAscii = Array.from(prompt).filter((character) => character.charCodeAt(0) > 127).length;
+  const phase = (_c = (_b2 = upgradeLegacyAimText(prompt).match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _b2[1]) != null ? _c : entry.mode;
+  const repairReason = /repair/i.test(phase) ? (_e = (_d = prompt.match(/(?:Format validation error|Repair reason):\s*([^\r\n]+)/i)) == null ? void 0 : _d[1]) == null ? void 0 : _e.trim() : void 0;
+  return {
+    prompt,
+    phase,
+    ...repairReason ? { repairReason } : {},
+    characters,
+    estimatedTokens: Math.ceil((characters - nonAscii) / 4 + nonAscii)
+  };
+}
+function formatAiExchange(entry) {
+  var _a2, _b2;
+  const metrics = promptMetrics(entry);
+  const step = entry.step ? ` \xB7 step: ${entry.step}` : "";
+  const timing = `Request ID: ${entry.id}${step} \xB7 phase: ${metrics.phase} \xB7 prompt: ${metrics.characters} characters \xB7 approximately ${metrics.estimatedTokens} tokens (estimate, not billed usage) \xB7 sent: ${(_a2 = entry.sentAt) != null ? _a2 : "unavailable"} \xB7 completed: ${(_b2 = entry.completedAt) != null ? _b2 : "unavailable"} \xB7 elapsed: ${entry.durationMs === void 0 ? "unavailable" : formatElapsed(entry.durationMs)}`;
+  const milestones = entry.milestones ? `milestones: ${JSON.stringify(entry.milestones)}` : "";
+  return [
+    `[${entry.startedAt}] ${entry.topic} \xB7 ${entry.mode} \xB7 ${entry.model}/${entry.effort} \xB7 ${entry.status}`,
+    ...milestones ? [timing, milestones] : [timing],
+    `
+${t("log.exchange_full_prompt")}
+`,
+    metrics.prompt || t("log.exchange_legacy_prompt_missing"),
+    `
+${t("log.exchange_request")}
+`,
+    entry.request || t("log.exchange_not_sent"),
+    `
+${t("log.exchange_raw_reply")}
+`,
+    entry.response || t("log.exchange_none"),
+    `
+${t("log.exchange_error")}
+`,
+    entry.error || t("log.exchange_none")
+  ].join("\n");
+}
+var AiExchangeLog = class {
+  constructor(adapter, path, onError, limit = 1e3) {
+    this.adapter = adapter;
+    this.path = path;
+    this.onError = onError;
+    this.limit = limit;
+    __publicField(this, "entries", []);
+    __publicField(this, "loadError", null);
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+    __publicField(this, "writes", Promise.resolve());
+  }
+  async load() {
+    try {
+      const text11 = await readStoreText(this.adapter, this.path);
+      if (text11 === null) return;
+      const parsed = JSON.parse(text11);
+      if (!Array.isArray(parsed)) throw new Error(t("error.exchange_log_invalid"));
+      const entries = parsed.filter((item) => {
+        if (!item || typeof item !== "object") return false;
+        const entry = item;
+        return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
+          (key2) => typeof entry[key2] === "string"
+        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord2(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
+      });
+      if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
+      this.entries = entries.slice(-this.limit);
+      this.loadError = null;
+      this.emit();
+    } catch (error) {
+      this.loadError = error;
+      this.onError(error);
+    }
+  }
+  getEntries() {
+    return this.entries.map((entry) => ({ ...entry }));
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  begin(entry) {
+    this.entries.push({ ...entry, request: "", response: "", status: "preparing", error: "" });
+    this.entries = this.entries.slice(-this.limit);
+    this.changed();
+  }
+  sent(id, request, prompt) {
+    const entry = this.entries.find((item) => item.id === id);
+    if (entry == null ? void 0 : entry.request) {
+      const sentAt = (/* @__PURE__ */ new Date()).toISOString();
+      const followupId = `${id}-${Date.now()}-${this.entries.length}`;
+      this.entries.push({
+        id: followupId,
+        startedAt: sentAt,
+        topic: entry.topic,
+        mode: "steer",
+        model: entry.model,
+        effort: entry.effort,
+        request,
+        sentAt,
+        response: "",
+        status: "sent",
+        error: ""
+      });
+      this.entries = this.entries.slice(-this.limit);
+      this.changed();
+      return;
+    }
+    this.update(id, {
+      request,
+      ...prompt !== void 0 ? { prompt } : {},
+      sentAt: (/* @__PURE__ */ new Date()).toISOString(),
+      status: "sent"
+    });
+  }
+  received(id, response) {
+    this.update(id, { response, status: "received" });
+  }
+  /** Stores the call's milestones; the provider writes them once, when the call ends. */
+  milestones(id, data) {
+    this.update(id, { milestones: data });
+  }
+  parsed(id) {
+    this.finish(id, { status: "parsed" });
+  }
+  completed(id) {
+    this.finish(id, { status: "completed" });
+  }
+  failed(id, error) {
+    this.finish(id, { error, status: "failed" });
+  }
+  clear() {
+    this.entries = [];
+    this.changed();
+  }
+  async flush() {
+    await this.writes;
+  }
+  update(id, patch) {
+    const entry = this.entries.find((item) => item.id === id);
+    if (!entry) return;
+    Object.assign(entry, patch);
+    this.changed();
+  }
+  finish(id, patch) {
+    var _a2;
+    const entry = this.entries.find((item) => item.id === id);
+    if (!entry) return;
+    const completedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const start = (_a2 = entry.sentAt) != null ? _a2 : entry.startedAt;
+    const durationMs = Math.max(0, Date.parse(completedAt) - Date.parse(start));
+    this.update(id, { ...patch, completedAt, durationMs });
+  }
+  emit() {
+    for (const listener of this.listeners) listener();
+  }
+  changed() {
+    this.emit();
+    if (this.loadError) {
+      this.onError(this.loadError);
+      return;
+    }
+    const snapshot = JSON.stringify(this.entries);
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).catch(this.onError);
+  }
+};
+
+// core/ai-usage-store.ts
+var USAGE_ACTIONS = ["research", "expand", "synthesize", "writeback", "other"];
+var USAGE_DETAIL_DAYS = 90;
+var ZERO = () => ({ inputTokens: 0, outputTokens: 0 });
+var isRecord3 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isCount = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+var isTokens = (value) => isRecord3(value) && isCount(value.inputTokens) && isCount(value.outputTokens);
+var isAction = (value) => USAGE_ACTIONS.includes(value);
+function isEntry(value) {
+  if (!isRecord3(value)) return false;
+  return typeof value.at === "string" && !Number.isNaN(Date.parse(value.at)) && isAction(value.action) && (value.mapPath === void 0 || typeof value.mapPath === "string") && (value.topic === void 0 || typeof value.topic === "string") && (value.provider === "claude" || value.provider === "codex") && typeof value.model === "string" && isTokens(value) && typeof value.estimated === "boolean" && (value.durationMs === void 0 || isCount(value.durationMs));
+}
+function isBucket(value) {
+  if (!isRecord3(value) || !isRecord3(value.maps)) return false;
+  return Object.values(value.maps).every(
+    (actions) => isRecord3(actions) && Object.entries(actions).every(([key2, tokens2]) => isAction(key2) && isTokens(tokens2))
+  );
+}
+var monthKey = (time) => {
+  const date = new Date(time);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+var monthStartOf = (key2) => {
+  const [year, month] = key2.split("-").map(Number);
+  return new Date(year, month - 1, 1).getTime();
+};
+function estimateUsageTokens(text11) {
+  return text11 ? promptMetrics({ prompt: text11, request: "", mode: "" }).estimatedTokens : 0;
+}
+var AiUsageStore = class {
+  constructor(adapter, path, onError, now = Date.now) {
+    this.adapter = adapter;
+    this.path = path;
+    this.onError = onError;
+    this.now = now;
+    __publicField(this, "entries", []);
+    __publicField(this, "monthly", {});
+    __publicField(this, "loadError", null);
+    __publicField(this, "disposed", false);
+    __publicField(this, "writes", Promise.resolve());
+    __publicField(this, "writeError", null);
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+  }
+  async load() {
+    try {
+      const text11 = await readStoreText(this.adapter, this.path);
+      if (text11 === null) return;
+      const parsed = JSON.parse(text11);
+      if (!isRecord3(parsed) || parsed.version !== 1 || !Array.isArray(parsed.entries) || !isRecord3(parsed.monthly))
+        throw new Error("ai-usage.json has an unexpected shape.");
+      if (!parsed.entries.every(isEntry) || !Object.values(parsed.monthly).every(isBucket))
+        throw new Error("ai-usage.json has invalid fields.");
+      this.entries = parsed.entries;
+      this.monthly = parsed.monthly;
+      this.loadError = null;
+      this.compact();
+    } catch (error) {
+      this.loadError = error;
+      this.entries = [];
+      this.monthly = {};
+      this.onError(error);
+    }
+    this.emit();
+  }
+  /** "unreadable" after a failed load; persistence stays stopped until the file is repaired and the plugin reloads. */
+  get status() {
+    return this.loadError ? "unreadable" : "ready";
+  }
+  /** Adds one call. Ignored (and reported once through `onError`) while the file is unreadable or after dispose. */
+  record(entry) {
+    var _a2;
+    try {
+      if (this.disposed) return;
+      if (this.loadError) {
+        this.writeError = this.loadError;
+        this.onError(this.loadError);
+        return;
+      }
+      this.entries.push({ ...entry, at: (_a2 = entry.at) != null ? _a2 : new Date(this.now()).toISOString() });
+      this.compact();
+      this.save();
+      this.emit();
+    } catch (error) {
+      this.onError(error);
+    }
+  }
+  /** Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all. */
+  totals(query = {}) {
+    if (this.loadError) return { status: "unreadable" };
+    const sum = ZERO();
+    this.each(query, (_action, tokens2) => {
+      sum.inputTokens += tokens2.inputTokens;
+      sum.outputTokens += tokens2.outputTokens;
+    });
+    return { status: "ready", value: sum };
+  }
+  /** Tokens of one map per action (all five keys present); sums to `totals({ mapPath, since })`. */
+  byAction(mapPath, since) {
+    if (this.loadError) return { status: "unreadable" };
+    const result = Object.fromEntries(USAGE_ACTIONS.map((action) => [action, ZERO()]));
+    this.each({ mapPath, since }, (action, tokens2) => {
+      result[action].inputTokens += tokens2.inputTokens;
+      result[action].outputTokens += tokens2.outputTokens;
+    });
+    return { status: "ready", value: result };
+  }
+  /** The newest `limit` detail rows of one map (all maps when absent), newest first. */
+  recent(mapPath, limit = 10) {
+    if (this.loadError) return { status: "unreadable" };
+    const rows2 = this.entries.filter((entry) => mapPath === void 0 || entry.mapPath === mapPath).sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit).map((entry) => ({ ...entry }));
+    return { status: "ready", value: rows2 };
+  }
+  /** Called after every recorded call and after load (also when load failed). Returns the unsubscribe function. */
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  /** Waits for the pending writes; rejects with the last write error. */
+  async flush() {
+    await this.writes;
+    if (this.writeError)
+      throw this.writeError instanceof Error ? this.writeError : new Error("ai-usage.json was not saved.");
+  }
+  /** Waits for the pending writes, then stops recording and drops listeners (onunload). Never rejects. */
+  async dispose() {
+    this.disposed = true;
+    this.listeners.clear();
+    await this.writes;
+  }
+  each(query, visit) {
+    const { mapPath, since } = query;
+    for (const entry of this.entries) {
+      if (mapPath !== void 0 && entry.mapPath !== mapPath) continue;
+      if (since !== void 0 && Date.parse(entry.at) < since) continue;
+      visit(entry.action, entry);
+    }
+    for (const [key2, bucket] of Object.entries(this.monthly)) {
+      if (since !== void 0 && monthStartOf(key2) < since) continue;
+      for (const [path, actions] of Object.entries(bucket.maps)) {
+        if (mapPath !== void 0 && path !== mapPath) continue;
+        for (const [action, tokens2] of Object.entries(actions)) visit(action, tokens2);
+      }
+    }
+  }
+  /** Folds rows older than the detail window into their month. */
+  compact() {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    const cutoff = this.now() - USAGE_DETAIL_DAYS * 864e5;
+    const keep = [];
+    for (const entry of this.entries) {
+      const time = Date.parse(entry.at);
+      if (time >= cutoff) {
+        keep.push(entry);
+        continue;
+      }
+      const bucket = (_c = (_a2 = this.monthly)[_b2 = monthKey(time)]) != null ? _c : _a2[_b2] = { maps: {} };
+      const actions = (_g = (_e = bucket.maps)[_f = (_d = entry.mapPath) != null ? _d : ""]) != null ? _g : _e[_f] = {};
+      const tokens2 = (_i = actions[_h = entry.action]) != null ? _i : actions[_h] = ZERO();
+      tokens2.inputTokens += entry.inputTokens;
+      tokens2.outputTokens += entry.outputTokens;
+    }
+    this.entries = keep;
+  }
+  save() {
+    const file = { version: 1, entries: this.entries, monthly: this.monthly };
+    const snapshot = JSON.stringify(file);
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).then(
+      () => {
+        this.writeError = null;
+      },
+      (error) => {
+        this.writeError = error;
+        this.onError(error);
+      }
+    );
+  }
+  emit() {
+    for (const listener of [...this.listeners]) {
+      try {
+        listener();
+      } catch (error) {
+        this.onError(error);
+      }
+    }
+  }
+};
+
 // core/ai-calls.ts
 var import_node_crypto7 = require("node:crypto");
 var AiCalls = class {
@@ -36884,7 +37282,7 @@ var CodexAppServerRuntime = class {
     return [...new Map(models.map((model) => [model.model, model])).values()];
   }
   async runTask(prompt, model, effort, outputSchema, controls) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
     if ((_a2 = controls == null ? void 0 : controls.signal) == null ? void 0 : _a2.aborted) throw cancelledError();
     await this.start();
     if ((_b2 = controls == null ? void 0 : controls.signal) == null ? void 0 : _b2.aborted) throw cancelledError();
@@ -37035,10 +37433,14 @@ var CodexAppServerRuntime = class {
     } finally {
       (_o = controls == null ? void 0 : controls.signal) == null ? void 0 : _o.removeEventListener("abort", onAbort);
       try {
+        if (state.usage) (_p = controls == null ? void 0 : controls.onMilestones) == null ? void 0 : _p.call(controls, { usage: state.usage });
+      } catch (e) {
+      }
+      try {
         await this.request("thread/unsubscribe", { threadId }, 5e3);
       } catch (error) {
-        (_q = (_p = this.options).onLog) == null ? void 0 : _q.call(
-          _p,
+        (_r = (_q = this.options).onLog) == null ? void 0 : _r.call(
+          _q,
           "warn",
           t("log.codex_unsubscribe_failed_0", error instanceof Error ? error.message : String(error))
         );
@@ -37116,7 +37518,7 @@ var CodexAppServerRuntime = class {
     }
   }
   handle(message) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if ("id" in message && "method" in message) {
       this.respondToServerRequest(message);
       return;
@@ -37150,6 +37552,12 @@ var CodexAppServerRuntime = class {
       (_b2 = state.onText) == null ? void 0 : _b2.call(state, [...state.visibleMessages.values()].join("\n\n"));
       return;
     }
+    if (message.method === "thread/tokenUsage/updated") {
+      const total2 = (_c = params == null ? void 0 : params.tokenUsage) == null ? void 0 : _c.total;
+      if (typeof (total2 == null ? void 0 : total2.inputTokens) === "number" && typeof total2.outputTokens === "number")
+        state.usage = { inputTokens: total2.inputTokens, outputTokens: total2.outputTokens };
+      return;
+    }
     if (message.method === "item/started") {
       const item = params == null ? void 0 : params.item;
       if ((item == null ? void 0 : item.type) === "webSearch") {
@@ -37166,7 +37574,7 @@ var CodexAppServerRuntime = class {
       }
       if ((item == null ? void 0 : item.type) === "webSearch")
         state.webRetrievals.add(typeof item.id === "string" ? item.id : `web-${state.webRetrievals.size}`);
-      if ((item == null ? void 0 : item.type) === "webSearch" && ((_c = item.action) == null ? void 0 : _c.type) === "search") {
+      if ((item == null ? void 0 : item.type) === "webSearch" && ((_d = item.action) == null ? void 0 : _d.type) === "search") {
         const id = typeof item.id === "string" ? item.id : void 0;
         if (!id || !state.countedSearchIds.has(id)) {
           if (id) state.countedSearchIds.add(id);
@@ -37183,10 +37591,10 @@ var CodexAppServerRuntime = class {
         };
       }
       if ((item == null ? void 0 : item.type) === "agentMessage" && typeof item.text === "string") {
-        const id = typeof item.id === "string" ? item.id : (_d = state.streamItem) != null ? _d : `message-${state.messages.length}`;
+        const id = typeof item.id === "string" ? item.id : (_e = state.streamItem) != null ? _e : `message-${state.messages.length}`;
         state.visibleMessages.set(id, item.text);
         state.messages.push(item.text);
-        (_e = state.onText) == null ? void 0 : _e.call(state, [...state.visibleMessages.values()].join("\n\n"));
+        (_f = state.onText) == null ? void 0 : _f.call(state, [...state.visibleMessages.values()].join("\n\n"));
       }
       return;
     }
@@ -37207,7 +37615,7 @@ var CodexAppServerRuntime = class {
           );
       } else if ((turn == null ? void 0 : turn.status) === "completed")
         state.resolve(
-          state.onText && !state.resolveLast ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "" : ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || ""
+          state.onText && !state.resolveLast ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || "" : ((_h = state.messages.at(-1)) == null ? void 0 : _h.trim()) || ""
         );
       else state.reject(new Error(codexTurnFailureMessage(turn)));
     }
@@ -38967,9 +39375,9 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
   if (strictGapAudit && (!["user_condition", "external_evidence"].includes(parsed.summary) || !parsed.detail.trim() || !Array.isArray(parsed.suggestions) || parsed.suggestions.length !== 0 || !Array.isArray(parsed.visualReferences) || parsed.visualReferences.length !== 0)) {
     throw new Error("AIM research-gap audit returned an invalid structured classification.");
   }
-  const isRecord4 = (value) => typeof value === "object" && value !== null;
+  const isRecord5 = (value) => typeof value === "object" && value !== null;
   const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(
-    (item) => isRecord4(item) && typeof item.title === "string" && typeof item.task === "string"
+    (item) => isRecord5(item) && typeof item.title === "string" && typeof item.task === "string"
   ).map((item) => ({
     title: String(item.title).trim(),
     task: String(item.task).trim(),
@@ -38977,7 +39385,7 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
     parentTitle: typeof item.parentTitle === "string" ? item.parentTitle.trim() : ""
   })).filter((item) => item.title) : [];
   const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter(
-    (item) => isRecord4(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
+    (item) => isRecord5(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
   ).map((item) => ({
     title: typeof item.title === "string" ? item.title.trim() : translateNote(language2, "note.visual_reference"),
     imageUrl: String(item.imageUrl).trim(),
@@ -39094,12 +39502,71 @@ var realClock2 = {
   setTimeout: (callback, ms) => window.setTimeout(callback, ms),
   clearTimeout: (handle) => window.clearTimeout(handle)
 };
+function usageActionOf(context, role) {
+  if (role !== void 0 || context.countRepair || context.promptProfile === "aim") return "other";
+  if (context.mode === "decompose") return "expand";
+  if (context.mode === "synthesize") return "synthesize";
+  if (context.mode === "merge") return "writeback";
+  return context.researchMode === "research" ? "research" : "writeback";
+}
+function promptTextOf(request) {
+  const input2 = request == null ? void 0 : request.input;
+  if (!Array.isArray(input2)) return "";
+  return input2.map(
+    (item) => (item == null ? void 0 : item.type) === "text" && typeof item.text === "string" ? item.text : ""
+  ).join("\n");
+}
 var AiTaskService = class {
   constructor(options) {
     this.options = options;
   }
   async askModel(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer) {
     return this.execute(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer);
+  }
+  /** Starts counting one provider call for the usage store; `end` records it exactly once, on success or failure. */
+  beginUsage(info) {
+    const started = Date.now();
+    let reported;
+    let prompt = "";
+    let ended = false;
+    return {
+      hooks: (own2) => ({
+        onRequest: (request) => {
+          var _a2;
+          (_a2 = own2.onRequest) == null ? void 0 : _a2.call(own2, request);
+          prompt += promptTextOf(request);
+        },
+        onMilestones: (data) => {
+          var _a2, _b2, _c;
+          (_a2 = own2.onMilestones) == null ? void 0 : _a2.call(own2, data);
+          if (data.usage)
+            reported = { inputTokens: (_b2 = data.usage.inputTokens) != null ? _b2 : 0, outputTokens: (_c = data.usage.outputTokens) != null ? _c : 0 };
+        }
+      }),
+      end: (reply) => {
+        var _a2, _b2;
+        if (ended) return;
+        ended = true;
+        try {
+          const store = (_b2 = (_a2 = this.options).usage) == null ? void 0 : _b2.call(_a2);
+          if (!store) return;
+          const tokens2 = reported != null ? reported : info.provider === "codex" && (prompt || reply) ? { inputTokens: estimateUsageTokens(prompt), outputTokens: estimateUsageTokens(reply != null ? reply : "") } : void 0;
+          if (!tokens2 || tokens2.inputTokens === 0 && tokens2.outputTokens === 0) return;
+          store.record({
+            action: info.action,
+            ...info.mapPath ? { mapPath: info.mapPath } : {},
+            ...info.topic ? { topic: info.topic } : {},
+            provider: info.provider,
+            model: info.model,
+            ...tokens2,
+            estimated: !reported,
+            durationMs: Date.now() - started
+          });
+        } catch (error) {
+          console.warn("Visual Agent Map token usage", error);
+        }
+      }
+    };
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
@@ -39188,33 +39655,52 @@ var AiTaskService = class {
       };
       const calls = this.callsIn(pluginDirectory, exchanges);
       const sendOnce = async (setup) => {
+        const usage = this.beginUsage({
+          action: usageActionOf(context, role),
+          topic: context.title,
+          mapPath: context.usageMapPath,
+          provider,
+          model
+        });
+        let reply;
+        try {
+          reply = await sendRaw(setup, usage);
+          return { raw: reply };
+        } finally {
+          usage.end(reply);
+        }
+      };
+      const sendRaw = async (setup, usage) => {
         var _a3, _b3, _c2;
-        return {
-          raw: await calls.run(
-            step,
-            {
-              model,
-              effort,
-              topic: context.title,
-              mode: (_a3 = context.mode) != null ? _a3 : "task",
-              taskName: "ai-task",
-              signal: (_c2 = (_b3 = setup == null ? void 0 : setup.signal) != null ? _b3 : signal) != null ? _c2 : new AbortController().signal,
-              localCodex: context.researchMode === "local",
-              requestLog: "request",
-              // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
-              entryEnd: "caller",
-              stopped: cancelled,
-              task: { ...controls, onWebSearchEvent: webHook, ...setup ? setup.hooks : {} },
-              ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply } : {},
-              onBegin: (id) => {
-                exchangeId = id;
-                setup == null ? void 0 : setup.onExchange(id);
-                onExchange == null ? void 0 : onExchange(id);
-              }
+        return calls.run(
+          step,
+          {
+            model,
+            effort,
+            topic: context.title,
+            mode: (_a3 = context.mode) != null ? _a3 : "task",
+            taskName: "ai-task",
+            signal: (_c2 = (_b3 = setup == null ? void 0 : setup.signal) != null ? _b3 : signal) != null ? _c2 : new AbortController().signal,
+            localCodex: context.researchMode === "local",
+            requestLog: "request",
+            // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
+            entryEnd: "caller",
+            stopped: cancelled,
+            task: {
+              ...controls,
+              onWebSearchEvent: webHook,
+              ...setup ? setup.hooks : {},
+              ...usage.hooks({ onRequest: controls.onRequest })
             },
-            (raw2) => raw2
-          )
-        };
+            ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply } : {},
+            onBegin: (id) => {
+              exchangeId = id;
+              setup == null ? void 0 : setup.onExchange(id);
+              onExchange == null ? void 0 : onExchange(id);
+            }
+          },
+          (raw2) => raw2
+        );
       };
       let raw = "";
       for (let attempt = 1; ; attempt++) {
@@ -39575,6 +40061,14 @@ var AiTaskService = class {
       return detail;
     };
     const calls = this.callsIn(pluginDirectory, exchanges);
+    const usage = this.beginUsage({
+      action: "other",
+      topic: input2.title,
+      mapPath: input2.usageMapPath,
+      provider,
+      model
+    });
+    let reply;
     try {
       return await calls.run(
         step,
@@ -39595,10 +40089,12 @@ var AiTaskService = class {
             timeoutMessage: translate(this.options.language(), "ui.ai_task_exceeded_0_minutes", 3),
             webSearch: false,
             textOnly: true,
-            searchBudget: 0
+            searchBudget: 0,
+            ...usage.hooks({})
           }
         },
         async (raw, exchange) => {
+          reply = raw;
           if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
           const charts = step.parse(raw);
           const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
@@ -39616,6 +40112,8 @@ var AiTaskService = class {
       if (aborted(error)) throw error;
       warn(codeOf(error));
       return detail;
+    } finally {
+      usage.end(reply);
     }
   }
   async extractReferenceFindings(context, model, reasoning, signal, onRequestAccepted) {
@@ -39643,6 +40141,7 @@ var AiTaskService = class {
             researchDepth: "fast",
             visualMode: "off",
             intermediateDetail: true,
+            ...context.usageMapPath ? { usageMapPath: context.usageMapPath } : {},
             // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
             ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
           },
@@ -40984,7 +41483,7 @@ var RELATION_KIND_RECORD = {
   prerequisite: true
 };
 var RELATION_KINDS = Object.keys(RELATION_KIND_RECORD);
-var isRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isRecord4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var own = (record, key2) => Object.prototype.hasOwnProperty.call(record, key2) ? record[key2] : void 0;
 var fail = (reason) => ({ ok: false, reason });
 var startsWithFrontmatter = (body) => /^---[ \t]*(?:\r?\n|$)/.test(body.replace(/^\uFEFF/, ""));
@@ -40998,7 +41497,7 @@ function parseClipboard(raw) {
     } catch (e) {
       return fail("bad-json");
     }
-    if (!isRecord2(data) || own(data, "format") !== CLIPBOARD_FORMAT) return fail("not-vam");
+    if (!isRecord4(data) || own(data, "format") !== CLIPBOARD_FORMAT) return fail("not-vam");
     if (own(data, "version") !== CLIPBOARD_VERSION) return fail("version");
     const clipId = own(data, "clipId");
     if (typeof clipId !== "string" || !CLIP_ID.test(clipId)) return fail("bad-clip-id");
@@ -41008,7 +41507,7 @@ function parseClipboard(raw) {
     const nodes = [];
     const seen = /* @__PURE__ */ new Set();
     for (const item of rawNodes) {
-      if (!isRecord2(item)) return fail("bad-nodes");
+      if (!isRecord4(item)) return fail("bad-nodes");
       const id = own(item, "id");
       if (typeof id !== "string" || !NODE_ID.test(id) || seen.has(id)) return fail("bad-id");
       const parent = own(item, "parent");
@@ -41041,7 +41540,7 @@ function parseClipboard(raw) {
     const pairs = /* @__PURE__ */ new Set();
     let droppedRelations = 0;
     for (const item of list) {
-      if (!isRecord2(item)) {
+      if (!isRecord4(item)) {
         droppedRelations++;
         continue;
       }
@@ -43023,219 +43522,6 @@ var ReferencePicker = class {
 
 // ui/modals/debug-log-modal.ts
 var import_obsidian26 = require("obsidian");
-
-// store-adapter.ts
-async function readStoreText(adapter, path) {
-  if (await adapter.exists(path)) return adapter.read(path);
-  const temporary = `${path}.tmp`;
-  if (!await adapter.exists(temporary)) return null;
-  const text11 = await adapter.read(temporary);
-  await adapter.rename(temporary, path);
-  return text11;
-}
-async function writeStoreAtomically(adapter, path, text11) {
-  const temporary = `${path}.tmp`;
-  await adapter.write(temporary, text11);
-  if (await adapter.exists(path)) await adapter.remove(path);
-  await adapter.rename(temporary, path);
-}
-
-// ai-exchange-log.ts
-function isRecord3(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function isUnknownArray(value) {
-  return Array.isArray(value);
-}
-function formatElapsed(durationMs) {
-  if (durationMs < 1e3) return `${durationMs} ms`;
-  if (durationMs < 6e4) return `${(durationMs / 1e3).toFixed(1)} s`;
-  const minutes = Math.floor(durationMs / 6e4);
-  const seconds = Math.floor(durationMs % 6e4 / 1e3);
-  return `${minutes}m ${seconds}s`;
-}
-function promptMetrics(entry) {
-  var _a2, _b2, _c, _d, _e;
-  let prompt = typeof entry.prompt === "string" ? entry.prompt : "";
-  if (!prompt && entry.request) {
-    try {
-      const parsed = JSON.parse(entry.request);
-      const parsedRecord = isRecord3(parsed) ? parsed : void 0;
-      const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
-      const request = isRecord3(requestValue) ? requestValue : void 0;
-      if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
-      else if (request && isUnknownArray(request.input)) {
-        prompt = request.input.map((item) => isRecord3(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
-      }
-    } catch (e) {
-    }
-  }
-  const characters = Array.from(prompt).length;
-  const nonAscii = Array.from(prompt).filter((character) => character.charCodeAt(0) > 127).length;
-  const phase = (_c = (_b2 = upgradeLegacyAimText(prompt).match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _b2[1]) != null ? _c : entry.mode;
-  const repairReason = /repair/i.test(phase) ? (_e = (_d = prompt.match(/(?:Format validation error|Repair reason):\s*([^\r\n]+)/i)) == null ? void 0 : _d[1]) == null ? void 0 : _e.trim() : void 0;
-  return {
-    prompt,
-    phase,
-    ...repairReason ? { repairReason } : {},
-    characters,
-    estimatedTokens: Math.ceil((characters - nonAscii) / 4 + nonAscii)
-  };
-}
-function formatAiExchange(entry) {
-  var _a2, _b2;
-  const metrics = promptMetrics(entry);
-  const step = entry.step ? ` \xB7 step: ${entry.step}` : "";
-  const timing = `Request ID: ${entry.id}${step} \xB7 phase: ${metrics.phase} \xB7 prompt: ${metrics.characters} characters \xB7 approximately ${metrics.estimatedTokens} tokens (estimate, not billed usage) \xB7 sent: ${(_a2 = entry.sentAt) != null ? _a2 : "unavailable"} \xB7 completed: ${(_b2 = entry.completedAt) != null ? _b2 : "unavailable"} \xB7 elapsed: ${entry.durationMs === void 0 ? "unavailable" : formatElapsed(entry.durationMs)}`;
-  const milestones = entry.milestones ? `milestones: ${JSON.stringify(entry.milestones)}` : "";
-  return [
-    `[${entry.startedAt}] ${entry.topic} \xB7 ${entry.mode} \xB7 ${entry.model}/${entry.effort} \xB7 ${entry.status}`,
-    ...milestones ? [timing, milestones] : [timing],
-    `
-${t("log.exchange_full_prompt")}
-`,
-    metrics.prompt || t("log.exchange_legacy_prompt_missing"),
-    `
-${t("log.exchange_request")}
-`,
-    entry.request || t("log.exchange_not_sent"),
-    `
-${t("log.exchange_raw_reply")}
-`,
-    entry.response || t("log.exchange_none"),
-    `
-${t("log.exchange_error")}
-`,
-    entry.error || t("log.exchange_none")
-  ].join("\n");
-}
-var AiExchangeLog = class {
-  constructor(adapter, path, onError, limit = 1e3) {
-    this.adapter = adapter;
-    this.path = path;
-    this.onError = onError;
-    this.limit = limit;
-    __publicField(this, "entries", []);
-    __publicField(this, "loadError", null);
-    __publicField(this, "listeners", /* @__PURE__ */ new Set());
-    __publicField(this, "writes", Promise.resolve());
-  }
-  async load() {
-    try {
-      const text11 = await readStoreText(this.adapter, this.path);
-      if (text11 === null) return;
-      const parsed = JSON.parse(text11);
-      if (!Array.isArray(parsed)) throw new Error(t("error.exchange_log_invalid"));
-      const entries = parsed.filter((item) => {
-        if (!item || typeof item !== "object") return false;
-        const entry = item;
-        return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
-          (key2) => typeof entry[key2] === "string"
-        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord3(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
-      });
-      if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
-      this.entries = entries.slice(-this.limit);
-      this.loadError = null;
-      this.emit();
-    } catch (error) {
-      this.loadError = error;
-      this.onError(error);
-    }
-  }
-  getEntries() {
-    return this.entries.map((entry) => ({ ...entry }));
-  }
-  subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-  begin(entry) {
-    this.entries.push({ ...entry, request: "", response: "", status: "preparing", error: "" });
-    this.entries = this.entries.slice(-this.limit);
-    this.changed();
-  }
-  sent(id, request, prompt) {
-    const entry = this.entries.find((item) => item.id === id);
-    if (entry == null ? void 0 : entry.request) {
-      const sentAt = (/* @__PURE__ */ new Date()).toISOString();
-      const followupId = `${id}-${Date.now()}-${this.entries.length}`;
-      this.entries.push({
-        id: followupId,
-        startedAt: sentAt,
-        topic: entry.topic,
-        mode: "steer",
-        model: entry.model,
-        effort: entry.effort,
-        request,
-        sentAt,
-        response: "",
-        status: "sent",
-        error: ""
-      });
-      this.entries = this.entries.slice(-this.limit);
-      this.changed();
-      return;
-    }
-    this.update(id, {
-      request,
-      ...prompt !== void 0 ? { prompt } : {},
-      sentAt: (/* @__PURE__ */ new Date()).toISOString(),
-      status: "sent"
-    });
-  }
-  received(id, response) {
-    this.update(id, { response, status: "received" });
-  }
-  /** Stores the call's milestones; the provider writes them once, when the call ends. */
-  milestones(id, data) {
-    this.update(id, { milestones: data });
-  }
-  parsed(id) {
-    this.finish(id, { status: "parsed" });
-  }
-  completed(id) {
-    this.finish(id, { status: "completed" });
-  }
-  failed(id, error) {
-    this.finish(id, { error, status: "failed" });
-  }
-  clear() {
-    this.entries = [];
-    this.changed();
-  }
-  async flush() {
-    await this.writes;
-  }
-  update(id, patch) {
-    const entry = this.entries.find((item) => item.id === id);
-    if (!entry) return;
-    Object.assign(entry, patch);
-    this.changed();
-  }
-  finish(id, patch) {
-    var _a2;
-    const entry = this.entries.find((item) => item.id === id);
-    if (!entry) return;
-    const completedAt = (/* @__PURE__ */ new Date()).toISOString();
-    const start = (_a2 = entry.sentAt) != null ? _a2 : entry.startedAt;
-    const durationMs = Math.max(0, Date.parse(completedAt) - Date.parse(start));
-    this.update(id, { ...patch, completedAt, durationMs });
-  }
-  emit() {
-    for (const listener of this.listeners) listener();
-  }
-  changed() {
-    this.emit();
-    if (this.loadError) {
-      this.onError(this.loadError);
-      return;
-    }
-    const snapshot = JSON.stringify(this.entries);
-    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).catch(this.onError);
-  }
-};
-
-// ui/modals/debug-log-modal.ts
 var DebugLogModal = class extends import_obsidian26.Modal {
   constructor(app, logs, exchanges, exchangeEnabled, setExchangeEnabled) {
     super(app);
@@ -82065,6 +82351,7 @@ var VisualAgentMapPlugin = class extends import_obsidian46.Plugin {
       defaultReasoning: () => this.settings.cliReasoning,
       exchangeLoggingEnabled: () => this.settings.aiExchangeLoggingEnabled,
       exchanges: () => this.exchanges,
+      usage: () => this.usage,
       diagramsEnabled: () => this.settings.addDiagramsAfterResearch,
       codexRuntime: (directory, local) => this.runtime(directory, local),
       claudeRuntime: (directory) => this.claudeCli(directory),
@@ -82095,6 +82382,8 @@ var VisualAgentMapPlugin = class extends import_obsidian46.Plugin {
     /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
     __publicField(this, "relevanceGrades", /* @__PURE__ */ new Map());
     __publicField(this, "exchanges", null);
+    /** Token usage of every provider call (`ai-usage.json`); null until onload has the plugin folder. Views query and subscribe to it. */
+    __publicField(this, "usage", null);
     __publicField(this, "currentModelListeners", /* @__PURE__ */ new Set());
     __publicField(this, "modelDiscovery", new ModelDiscovery(
       () => this.codexDiagnostic().installed,
@@ -82348,6 +82637,12 @@ var VisualAgentMapPlugin = class extends import_obsidian46.Plugin {
         )
       );
       await this.exchanges.load();
+      this.usage = new AiUsageStore(
+        adapter,
+        (0, import_obsidian46.normalizePath)(`${this.manifest.dir}/ai-usage.json`),
+        (error) => this.logs.appendLog("error", `ai-usage.json: ${error instanceof Error ? error.message : String(error)}`)
+      );
+      await this.usage.load();
       this.pendingSuggestions = new PendingSuggestions(
         adapter,
         (0, import_obsidian46.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
@@ -83064,7 +83359,7 @@ ${t("ui.organize_link_wait_hint")}`;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     this.topicRuns.dispose();
     (_a2 = this.repo) == null ? void 0 : _a2.dispose();
     void ((_b2 = this.coffeeManager) == null ? void 0 : _b2.stop());
@@ -83077,6 +83372,7 @@ ${t("ui.organize_link_wait_hint")}`;
     this.resetCodexRuntime();
     this.unloaded = true;
     this.aiRuntime.dispose();
+    void ((_c = this.usage) == null ? void 0 : _c.dispose());
   }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   noteStylePort() {

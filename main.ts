@@ -93,6 +93,7 @@ import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
 import { fitImageForInput } from "./ui/fit-image-input";
 import { debugLog, LogManager } from "./log-manager";
 import { AiExchangeLog } from "./ai-exchange-log";
+import { AiUsageStore } from "./core/ai-usage-store";
 import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
 import { chooseAndImportExchange } from "./experiences/visual-map/outline-exchange-io";
@@ -374,6 +375,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     defaultReasoning: () => this.settings.cliReasoning,
     exchangeLoggingEnabled: () => this.settings.aiExchangeLoggingEnabled,
     exchanges: () => this.exchanges,
+    usage: () => this.usage,
     diagramsEnabled: () => this.settings.addDiagramsAfterResearch,
     codexRuntime: (directory: string, local: boolean) => this.runtime(directory, local),
     claudeRuntime: (directory: string) => this.claudeCli(directory),
@@ -405,6 +407,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
   readonly relevanceGrades = new Map<string, RelevanceGradeRun>();
   exchanges: AiExchangeLog | null = null;
+  /** Token usage of every provider call (`ai-usage.json`); null until onload has the plugin folder. Views query and subscribe to it. */
+  usage: AiUsageStore | null = null;
   private readonly currentModelListeners = new Set<(model: string) => void>();
   readonly modelDiscovery = new ModelDiscovery(
     () => this.codexDiagnostic().installed,
@@ -653,6 +657,10 @@ export default class VisualAgentMapPlugin extends Plugin {
         )
       );
       await this.exchanges.load();
+      this.usage = new AiUsageStore(adapter, normalizePath(`${this.manifest.dir}/ai-usage.json`), error =>
+        this.logs.appendLog("error", `ai-usage.json: ${error instanceof Error ? error.message : String(error)}`)
+      );
+      await this.usage.load();
       this.pendingSuggestions = new PendingSuggestions(
         adapter,
         normalizePath(`${this.manifest.dir}/pending-suggestions.json`),
@@ -1437,6 +1445,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     // After this no late dialog event can start a pre-warmed process.
     this.unloaded = true;
     this.aiRuntime.dispose();
+    // Pending usage writes finish; later calls are no longer recorded.
+    void this.usage?.dispose();
   }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   private noteStylePort(): StyleFilePort {

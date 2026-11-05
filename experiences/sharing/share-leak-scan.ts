@@ -39,6 +39,7 @@ export const INTERNAL_FIELD_NAMES = [
   "relevance-goal",
   "relevance-level",
   "relevance-context",
+  "map-sources",
   "content-language"
 ] as const;
 

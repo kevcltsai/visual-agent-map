@@ -877,10 +877,10 @@ integrationTest('synthesis can use selected notes when a topic has no children',
   const empty = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
   let failure = '';
   await view.proposeIntegrationDirections(parent, empty, () => assert.fail('missing sources'), message => { failure = message; });
-  assert.match(failure, /Choose another note source first/);
+  assert.match(failure, /Nothing to synthesize yet/);
   assert.equal(contexts.length, 0);
   await view.proposeIntegrationDirections(parent, { ...empty, referenceGroups: [{ id: 'empty', name: 'Empty', location: '', documents: [] }] }, () => assert.fail('empty source'), message => { failure = message; });
-  assert.match(failure, /Choose another note source first/);
+  assert.match(failure, /Nothing to synthesize yet/);
   assert.equal(contexts.length, 0);
   let draft, save;
   const selectedGroup = { id: 'selected', name: 'Selected', location: '/refs', documents: [{ path: '/refs/selected.md', content: 'Selected note content', external: true }] };

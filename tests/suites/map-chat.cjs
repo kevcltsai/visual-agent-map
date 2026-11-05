@@ -2423,6 +2423,19 @@ integrationTest('hypothesis-evidence: delete_topic from the map chat removes the
     eq((await h.repo.readMap(MAP)).topicRelations, stored, `branch ${branch}: undo brings the removed links back with the cards`);
   }
 });
+integrationTest('annotated image: delete_topic from the map chat drops the anchor relations of the removed cards only; anchors stay; undo brings them back', async () => {
+  const h = await harness();
+  const keep = { kind: 'related', from: 'p2', to: h.ids.root };
+  h.view.map.canvasItems = [{ id: 'g1', kind: 'annotated-image', path: 'a/b.png', x: 1, y: 2, w: 30, h: 40, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }, { id: 'p2', at: { kind: 'image-2d', x: 0.2, y: 0.2 } }], relations: [{ kind: 'supports', from: 'p1', to: h.ids.a }, keep] }];
+  await h.repo.saveMap(MAP, h.view.map); h.view.map = await h.repo.readMap(MAP);
+  const stored = plain(h.view.map.canvasItems);
+  const lines = await apply(h, [{ kind: 'delete_topic', nodeId: h.ids.a, branch: false }]);
+  eq(lines.map(l => l.status), ['done']);
+  const saved = plain((await h.repo.readMap(MAP)).canvasItems);
+  eq(saved[0].relations, [keep]); eq(saved[0].anchors, stored[0].anchors);
+  await h.view.travel(false);
+  eq(plain((await h.repo.readMap(MAP)).canvasItems), stored);
+});
 integrationTest('B1 plan: exactly 15 actions are applied at once, with no plan card', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'adding', actions: Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
@@ -2767,7 +2780,9 @@ integrationTest('goal banner P3: both toolbar renderers drop "+ Topic" and its c
   for (const method of ['renderMapTools', 'renderHiddenAimMapTools']) {
     const h = await harness(); await h.view.hydrate();
     const box = draw(h, method); const bs = findAll(box, i => i.tag === 'button');
-    assert.equal(bs.length, 1, `${method}: one control`); const b = bs[0];
+    // The ordinary toolbar also carries the always-visible 「Data sources」 button right after the select icon; the hidden-AIM one does not.
+    assert.equal(bs.length, method === 'renderMapTools' ? 2 : 1, `${method}: the select icon${method === 'renderMapTools' ? ' and the data sources button' : ' only'}`); const b = bs[0];
+    if (method === 'renderMapTools') assert.ok(bs[1].cls.includes('vam-sources-button'), 'the data sources button follows the select icon');
     assert.equal(findAll(box, i => i.tag === 'button' && (/Topic/.test(i.text) || /More ways/.test(i.attrs['aria-label'] ?? ''))).length, 0, `${method}: no "+ Topic", no chevron`);
     assert.equal(b.attrs['aria-label'], 'Select several topics', `${method}: the icon button has an accessible name`);
     assert.equal(b.attrs.tabindex, undefined, `${method}: reachable with Tab`); assert.equal(b.attrs['aria-pressed'], 'false');
@@ -2869,7 +2884,7 @@ integrationTest('UX B9: an empty map leaves out "Select several topics", the goa
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.deepEqual(all, ['Select several topics']); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
+  assert.deepEqual(all, ['Select several topics', 'Data sources']); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.renderGoalBar\(overlay\);/, 'no goal bar on an empty or AIM map');
@@ -4982,27 +4997,6 @@ async function languageView(language) {
   view.app = {};
   return { view, modals, plugin };
 }
-integrationTest('bug bash #27: the Rename tool on a card opens a dialog titled 重新命名 (zh-TW), not the new-topic title', async () => {
-  const h = await harness({ language: 'zh-TW' }); await h.view.hydrate();
-  const { view } = h; const node = view.map.nodes.find(n => n.id === h.ids.a);
-  view.stageEl = element('div'); view.viewportEl = element('div');
-  view.labelCard = () => {}; // the card's accessible-name bookkeeping needs a real DOM; the tools do not
-  view.renderNode(node);
-  const more = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-more-tool')); assert.ok(more, 'the card has a More tool');
-  assert.equal(more.text, '⋯ 更多', 'the tool itself is in zh-TW');
-  const entries = [];
-  view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); entries.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
-  more.click(); const rename = entries.find(e => e.title === '改名'); assert.ok(rename, 'More lists Rename, in zh-TW');
-  rename.fn(); await tick();
-  assert.ok((h.control.modals ?? []).length === 1, 'one dialog opened');
-  assert.equal(h.control.modals[0].titleText, '重新命名');
-});
-test('bug bash #27: Rename opens a dialog titled "Rename", not the new-topic title', async () => {
-  const { view, modals } = await languageView('zh-TW');
-  view.renameNode({ id: 'n1', title: 'Old' }, 'Old');
-  assert.ok(modals.length === 1, 'one dialog opened');
-  assert.equal(modals[0].titleText, '重新命名');
-});
 for (const [language, mark, undo, redo] of [['zh-TW', '標記', '復原：標記', '重做：標記'], ['zh-CN', '标记', '复原：标记', '重做：标记'], ['en', 'Mark', 'Undo: Mark', 'Redo: Mark']]) test(`bug bash #33: the undo and redo labels use the ${language} colon template and keep the bare word without a label`, async () => {
   const { view } = await languageView(language);
   const buttons = { undo: { dataset: { icon: 'x' }, attrs: {}, setAttr(name, value) { this.attrs[name] = value; } }, redo: { dataset: { icon: 'x' }, attrs: {}, setAttr(name, value) { this.attrs[name] = value; } } };

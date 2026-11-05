@@ -31,11 +31,13 @@ export function buildPreparedTaskContext(
   }
   // A fresh write-back never shows the old Detail to the model.
   if (input.updateMode === "fresh") context.detail = "";
-  const optional: ("sourceContext" | "workingFindings" | "detail" | "ancestors")[] = [
+  // anchorContext is cut last: it is small (the data layer limits it) and it is what the user marked on purpose.
+  const optional: ("sourceContext" | "workingFindings" | "detail" | "ancestors" | "anchorContext")[] = [
     "detail",
     "workingFindings",
     "ancestors",
-    "sourceContext"
+    "sourceContext",
+    "anchorContext"
   ];
   const used = (): number =>
     [
@@ -46,7 +48,8 @@ export function buildPreparedTaskContext(
       context.task,
       context.ancestors,
       context.workingFindings,
-      context.sourceContext
+      context.sourceContext,
+      context.anchorContext
     ].reduce((sum, value) => sum + estimateTokens(value), 0);
   for (const key of optional)
     if (used() > budget && context[key])
@@ -61,7 +64,8 @@ export function buildPreparedTaskContext(
     effectiveRules: estimateTokens(context.rules),
     ancestors: estimateTokens(context.ancestors),
     workingFindings: estimateTokens(context.workingFindings),
-    sourceContext: estimateTokens(context.sourceContext)
+    sourceContext: estimateTokens(context.sourceContext),
+    anchorContext: estimateTokens(context.anchorContext)
   };
   const estimatedInputTokens = [
     contextBreakdown.task,
@@ -70,7 +74,8 @@ export function buildPreparedTaskContext(
     contextBreakdown.effectiveRules,
     contextBreakdown.ancestors,
     contextBreakdown.workingFindings,
-    contextBreakdown.sourceContext
+    contextBreakdown.sourceContext,
+    contextBreakdown.anchorContext
   ].reduce((sum, count) => sum + count, 0);
   return {
     context,

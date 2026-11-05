@@ -126,6 +126,66 @@ export function relationLabelPoint(
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
 
+/** An anchor's line starts this far from its centre (px), clear of the 7px anchor radius, so the anchor button stays hoverable and clickable. */
+const ANCHOR_LINE_INSET = 8;
+
+/**
+ * The curve between a free point (an anchor on an image, in map coordinates) and the nearest edge midpoint of a card.
+ * The card end leaves along the edge's normal; the point end heads straight towards the card. `pointIsFrom` says which
+ * end the line starts at (so the arrowhead lands on the right one). A point inside the card joins its centre. Outside the
+ * card the point end is pulled `ANCHOR_LINE_INSET` px along the line towards the card, so the line never covers the anchor.
+ */
+function pointToBoxCurve(original: { x: number; y: number }, box: RelationBox, pointIsFrom: boolean): Curve {
+  let point = original;
+  const horizontal = axisGap(point.x, 0, box.x, box.width),
+    vertical = axisGap(point.y, 0, box.y, box.height);
+  const centre = centreOf(box);
+  let edge: RelationAnchor, gap: number;
+  if (horizontal <= 0 && vertical <= 0) {
+    edge = { ...centre, nx: 0, ny: 0 };
+    gap = 0;
+  } else if (horizontal >= vertical) {
+    const rightOf = point.x > centre.x;
+    edge = { x: rightOf ? box.x + box.width : box.x, y: centre.y, nx: rightOf ? 1 : -1, ny: 0 };
+    gap = horizontal;
+  } else {
+    const below = point.y > centre.y;
+    edge = { x: centre.x, y: below ? box.y + box.height : box.y, nx: 0, ny: below ? 1 : -1 };
+    gap = vertical;
+  }
+  if (gap > 0) {
+    const toEdge = Math.hypot(edge.x - original.x, edge.y - original.y) || 1,
+      inset = Math.min(ANCHOR_LINE_INSET, toEdge / 2);
+    point = {
+      x: original.x + ((edge.x - original.x) / toEdge) * inset,
+      y: original.y + ((edge.y - original.y) / toEdge) * inset
+    };
+  }
+  const length = gap > 0 ? controlLength(gap) : 0,
+    run = Math.hypot(edge.x - point.x, edge.y - point.y) || 1,
+    near = { x: point.x + ((edge.x - point.x) / run) * length, y: point.y + ((edge.y - point.y) / run) * length },
+    far = { x: edge.x + edge.nx * length, y: edge.y + edge.ny * length };
+  return pointIsFrom
+    ? { p1: { x: point.x, y: point.y }, c1: near, c2: far, p2: { x: edge.x, y: edge.y } }
+    : { p1: { x: edge.x, y: edge.y }, c1: far, c2: near, p2: { x: point.x, y: point.y } };
+}
+
+/** Cubic Bezier between an anchor point and the nearest edge of a topic card (see `pointToBoxCurve`). */
+export function pointToBoxPathData(point: { x: number; y: number }, box: RelationBox, pointIsFrom: boolean): string {
+  const { p1, c1, c2, p2 } = pointToBoxCurve(point, box, pointIsFrom);
+  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+}
+
+/** Where the label of an anchor line sits: the midpoint of the curve (t = 0.5). */
+export function pointToBoxLabelPoint(
+  point: { x: number; y: number },
+  box: RelationBox,
+  pointIsFrom: boolean
+): { x: number; y: number } {
+  const { p1, c1, c2, p2 } = pointToBoxCurve(point, box, pointIsFrom);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}
+
 /**
  * The curve from a parent card to its child in a tree laid out in `direction`. "right" runs from the parent's right edge
  * to the child's left edge, exactly as `edgePathData` in view.ts; "left" mirrors it, from the parent's left edge to the

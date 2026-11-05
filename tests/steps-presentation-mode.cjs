@@ -217,7 +217,7 @@ test('42: keys in a text field or the chat are left alone; composition is ignore
 test('42: Mod+Z, Mod+Shift+Z, F2, Mod+Enter, Shift+Enter and Mod+F on the view scope are swallowed while presenting', async () => {
   const h = await harness();
   let travelled = 0, renamed = 0;
-  h.view.travel = async () => { travelled++; }; h.view.renameNode = () => { renamed++; };
+  h.view.travel = async () => { travelled++; }; h.view.startCardTitleEdit = () => { renamed++; };
   const scopeKey = (key, mods) => h.view.scope.keys.find(k => k.key === key && k.modifiers.length === mods.length && mods.every(m => k.modifiers.includes(m)));
   const fire = (key, mods) => scopeKey(key, mods).func({ key, isComposing: false, defaultPrevented: false, target: element('div') }, {});
   h.view.selection.setSelected(null); h.doc.activeElement = h.card('alpha');
@@ -229,7 +229,7 @@ test('42: Mod+Z, Mod+Shift+Z, F2, Mod+Enter, Shift+Enter and Mod+F on the view s
   assert.equal(renamed, 0); assert.equal(h.view.mapSearch, null, 'Mod+F opens no search box');
   h.view.exitPresentation();
   h.doc.activeElement = h.card('alpha');
-  assert.equal(fire('F2', []), false); assert.equal(renamed, 1, 'after leaving F2 renames again');
+  assert.equal(fire('F2', []), false); assert.equal(renamed, 1, 'after leaving F2 edits the title again');
 });
 
 test('42: a render that removes the current topic moves to the neighbour instead of throwing; an emptied map ends the presentation', async () => {
@@ -379,9 +379,9 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   const tools = [byClass('root', 'vam-add-child'), byClass('root', 'vam-ai-explore'), byClass('root', 'vam-more-tool')];
   assert.ok(tools.every(Boolean), 'every tool exists on the card');
   for (const el of tools) click(el);
-  // The "More" menu holds fold, structure, rename and add text: each entry does nothing while presenting.
+  // The "More" menu holds fold, structure and add text: each entry does nothing while presenting.
   assert.equal(menus.length, 1, 'only More opens a list; the "+" does not');
-  assert.ok(menus[0].items.length >= 4, 'More lists the other tools');
+  assert.ok(menus[0].items.length >= 3, 'More lists the other tools');
   for (const item of menus[0].items) item.fn();
   await h.settle();
   assert.deepEqual(h.modals, [], 'no dialog opens');
@@ -462,7 +462,7 @@ test('bug bash #04: the preview a keyboard focus opens clears the card and its t
   assert.deepEqual(preview(), byFocus, 'the pointer opens it in the same place');
 });
 
-test('bug bash #05: during a presentation double-clicking a card title does not open the rename dialog or write anything', async () => {
+test('bug bash #05: during a presentation double-clicking a card title does not open the title field or write anything', async () => {
   const h = await harness();
   h.recordModalsOnly();
   const find = (root, pred) => { const out = []; const walk = n => { if (pred(n)) out.push(n); (n.children ?? []).forEach(walk); }; walk(root); return out; };
@@ -471,10 +471,10 @@ test('bug bash #05: during a presentation double-clicking a card title does not 
   const before = h.contents.get(MAP), note = h.contents.get(h.view.map.nodes[0].path);
   h.view.selection.setSelected(h.ids.root);
   h.view.startPresentation();
-  dbl(); h.view.renameNode(h.view.map.nodes[0], 'Root'); await h.settle();
-  assert.deepEqual(h.modals, [], 'no rename dialog');
+  dbl(); h.view.startCardTitleEdit(h.view.map.nodes[0]); await h.settle();
+  assert.deepEqual(h.modals, [], 'no rename dialog'); assert.equal(h.view.inlineName, null, 'no title field');
   assert.equal(h.contents.get(MAP), before); assert.equal(h.contents.get(h.view.map.nodes[0].path), note);
   h.view.exitPresentation();
   dbl(); await h.settle();
-  assert.equal(h.modals.length, 1, 'after leaving, the double-click renames again');
+  assert.deepEqual(h.modals, [], 'still no dialog'); assert.equal(h.view.inlineName?.id, h.ids.root, 'after leaving, the double-click opens the title field');
 });

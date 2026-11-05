@@ -42,11 +42,39 @@ export interface SummaryItem {
   members: string[];
   text: string;
 }
+/** A point on an annotated image. `at` is the position kind plus relative coordinates; unknown kinds are kept as written (never drawn or selectable). */
+export interface ImageAnchor {
+  id: string;
+  at: { kind: "image-2d"; x: number; y: number } | { kind: string; [key: string]: unknown };
+  note?: string;
+}
+/** A relation between one anchor of the image and one topic (either direction). Same kinds as topic relations. */
+export interface AnchorRelation {
+  kind: AnchorRelationKind;
+  from: string;
+  to: string;
+  description?: string;
+}
+export type AnchorRelationKind = "supports" | "contradicts" | "verifies" | "derives_from" | "related" | "prerequisite";
+/** An image the user turned into an annotated image: it carries anchors (relative 0-1 coordinates) and anchor relations. */
+export interface AnnotatedImageItem {
+  id: string;
+  kind: "annotated-image";
+  path: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** What the picture is / what to research, one line, at most {@link NOTE_LIMIT} characters. */
+  note?: string;
+  anchors: ImageAnchor[];
+  relations?: AnchorRelation[];
+}
 export interface UnknownItem {
   kind: string;
   [key: string]: unknown;
 }
-export type CanvasItem = ImageItem | BoundaryItem | TextItem | SummaryItem | UnknownItem;
+export type CanvasItem = ImageItem | BoundaryItem | TextItem | SummaryItem | AnnotatedImageItem | UnknownItem;
 export interface Rect {
   x: number;
   y: number;
@@ -68,6 +96,18 @@ export const TEXT_LIMIT = 2000;
 const PARENT_ID_LIMIT = 200;
 export const LINK_LIMIT = 20;
 export const SUMMARY_MEMBER_LIMIT = 50;
+export const NOTE_LIMIT = 200;
+export const ANCHOR_LIMIT = 200;
+export const ANCHOR_RELATION_LIMIT = 2000;
+/** Same list as `TOPIC_RELATION_KINDS` in map-model.ts, kept here so this file imports nothing (a test compares the two). */
+export const ANCHOR_RELATION_KINDS: readonly AnchorRelationKind[] = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -86,6 +126,102 @@ function cleanImage(raw: Record<string, unknown>): ImageItem | null {
   if (typeof id !== "string" || !ID.test(id) || !isSafeImagePath(path)) return null;
   if (!finite(x) || !finite(y) || !finite(w) || !finite(h) || w <= 0 || h <= 0) return null;
   return { id, kind: "image", path, x, y, w, h };
+}
+
+/** One line of at most NOTE_LIMIT characters (control characters become spaces); undefined when nothing is left or it is not a string. */
+function cleanNote(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const flat = value.replace(CONTROL_ALL, " ").trim().slice(0, NOTE_LIMIT).trim();
+  return flat ? flat : undefined;
+}
+
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
+
+function cleanAnchor(raw: unknown): ImageAnchor | null {
+  if (!isRecord(raw)) return null;
+  const { id, at } = raw;
+  if (typeof id !== "string" || !ID.test(id) || !isRecord(at) || typeof at.kind !== "string") return null;
+  let clean: ImageAnchor["at"];
+  if (at.kind === "image-2d") {
+    if (!finite(at.x) || !finite(at.y)) return null;
+    clean = { kind: "image-2d", x: clamp01(at.x), y: clamp01(at.y) };
+  } else clean = at as ImageAnchor["at"];
+  const anchor: ImageAnchor = { id, at: clean };
+  const note = cleanNote(raw.note);
+  if (note !== undefined) anchor.note = note;
+  return anchor;
+}
+
+const relationPair = (r: { from: string; to: string }): string =>
+  r.from > r.to ? `${r.to}\0${r.from}` : `${r.from}\0${r.to}`;
+
+/** Kind whitelisted, exactly one end an anchor of this image, the other end a well-formed id; description kept when a string. */
+function cleanAnchorRelation(raw: unknown, anchorIds: ReadonlySet<string>): AnchorRelation | null {
+  if (!isRecord(raw)) return null;
+  const { kind, from, to, description } = raw;
+  if (typeof kind !== "string" || !(ANCHOR_RELATION_KINDS as readonly string[]).includes(kind)) return null;
+  if (typeof from !== "string" || typeof to !== "string" || !ID.test(from) || !ID.test(to)) return null;
+  if (anchorIds.has(from) === anchorIds.has(to)) return null;
+  const out: AnchorRelation = { kind: kind as AnchorRelationKind, from, to };
+  if (typeof description === "string") out.description = description;
+  return out;
+}
+
+/** Counts what was dropped while one list is read, so the warning carries a number and never content. */
+interface Tally {
+  dropped: number;
+}
+const warnDropped = (tally: Tally): void => {
+  if (!tally.dropped) return;
+  console.warn(
+    `Dropped ${tally.dropped} invalid annotated-image entr${tally.dropped === 1 ? "y" : "ies"} while reading the map.`
+  );
+};
+
+function cleanAnnotatedImage(raw: Record<string, unknown>, tally: Tally): AnnotatedImageItem | null {
+  const base = cleanImage({ ...raw, kind: "image" });
+  if (!base) return null;
+  const item: AnnotatedImageItem = {
+    id: base.id,
+    kind: "annotated-image",
+    path: base.path,
+    x: base.x,
+    y: base.y,
+    w: base.w,
+    h: base.h,
+    anchors: []
+  };
+  const note = cleanNote(raw.note);
+  if (note !== undefined) item.note = note;
+  const anchors: ImageAnchor[] = [];
+  const anchorIds = new Set<string>();
+  const rawAnchors = Array.isArray(raw.anchors) ? (raw.anchors as unknown[]) : [];
+  if (raw.anchors !== undefined && !Array.isArray(raw.anchors)) tally.dropped++;
+  for (const entry of rawAnchors) {
+    const anchor = anchors.length >= ANCHOR_LIMIT ? null : cleanAnchor(entry);
+    if (!anchor || anchorIds.has(anchor.id)) {
+      tally.dropped++;
+      continue;
+    }
+    anchorIds.add(anchor.id);
+    anchors.push(anchor);
+  }
+  item.anchors = anchors;
+  const relations: AnchorRelation[] = [];
+  const pairs = new Set<string>();
+  const rawRelations = Array.isArray(raw.relations) ? (raw.relations as unknown[]) : [];
+  if (raw.relations !== undefined && !Array.isArray(raw.relations)) tally.dropped++;
+  for (const entry of rawRelations) {
+    const relation = relations.length >= ANCHOR_RELATION_LIMIT ? null : cleanAnchorRelation(entry, anchorIds);
+    if (!relation || pairs.has(relationPair(relation))) {
+      tally.dropped++;
+      continue;
+    }
+    pairs.add(relationPair(relation));
+    relations.push(relation);
+  }
+  if (relations.length) item.relations = relations;
+  return item;
 }
 
 function cleanBoundary(raw: Record<string, unknown>): BoundaryItem | null {
@@ -146,6 +282,7 @@ export function sanitizeCanvasItems(raw: unknown): CanvasItem[] {
   if (!Array.isArray(raw)) return [];
   const out: CanvasItem[] = [];
   const seen = new Set<string>();
+  const tally: Tally = { dropped: 0 };
   for (const entry of raw) {
     if (!isRecord(entry) || typeof entry.kind !== "string") continue;
     let item: CanvasItem | null;
@@ -153,15 +290,25 @@ export function sanitizeCanvasItems(raw: unknown): CanvasItem[] {
     else if (entry.kind === "boundary") item = cleanBoundary(entry);
     else if (entry.kind === "text") item = cleanTextItem(entry);
     else if (entry.kind === "summary") item = cleanSummary(entry);
-    else item = entry as UnknownItem;
+    else if (entry.kind === "annotated-image") {
+      item = cleanAnnotatedImage(entry, tally);
+      if (!item) tally.dropped++;
+    } else item = entry as UnknownItem;
     if (!item) continue;
-    if (item.kind === "image" || item.kind === "boundary" || item.kind === "text" || item.kind === "summary") {
-      const id = (item as ImageItem | BoundaryItem | TextItem | SummaryItem).id;
+    if (
+      item.kind === "image" ||
+      item.kind === "boundary" ||
+      item.kind === "text" ||
+      item.kind === "summary" ||
+      item.kind === "annotated-image"
+    ) {
+      const id = (item as ImageItem | BoundaryItem | TextItem | SummaryItem | AnnotatedImageItem).id;
       if (seen.has(id)) continue;
       seen.add(id);
     }
     out.push(item);
   }
+  warnDropped(tally);
   return out;
 }
 
@@ -171,8 +318,8 @@ export function addImage(items: readonly CanvasItem[], image: Omit<ImageItem, "k
   return [...items, clean];
 }
 
-const isImage = (item: CanvasItem, id: string): item is ImageItem =>
-  item.kind === "image" && (item as ImageItem).id === id;
+const isImage = (item: CanvasItem, id: string): item is ImageItem | AnnotatedImageItem =>
+  (item.kind === "image" || item.kind === "annotated-image") && (item as ImageItem).id === id;
 
 export function moveItem(items: readonly CanvasItem[], id: string, dx: number, dy: number): CanvasItem[] {
   if (!finite(dx) || !finite(dy)) return [...items];
@@ -195,6 +342,287 @@ export function removeItem(items: readonly CanvasItem[], id: string): CanvasItem
 }
 
 const isText = (item: CanvasItem): item is TextItem => item.kind === "text";
+
+/* ---- Annotated images (anchors and anchor relations). All pure: a bad request returns the list unchanged. ---- */
+
+export const isAnnotatedImage = (item: CanvasItem): item is AnnotatedImageItem => item.kind === "annotated-image";
+
+/** The annotated image with this id, or undefined. */
+export function findAnnotatedImage(items: readonly CanvasItem[], id: string): AnnotatedImageItem | undefined {
+  return items.find((i): i is AnnotatedImageItem => isAnnotatedImage(i) && i.id === id);
+}
+
+/** Every anchor id of one annotated image (unknown position kinds included). */
+export function anchorIdsOf(image: Pick<AnnotatedImageItem, "anchors">): Set<string> {
+  return new Set(image.anchors.map(a => a.id));
+}
+
+/** A 2D anchor with its coordinates; anchors with an unknown position kind are not selectable and not drawn. */
+export const isImage2dAnchor = (
+  a: ImageAnchor
+): a is ImageAnchor & { at: { kind: "image-2d"; x: number; y: number } } => a.at.kind === "image-2d";
+
+const mapImage = (
+  items: readonly CanvasItem[],
+  id: string,
+  change: (image: AnnotatedImageItem) => AnnotatedImageItem
+): CanvasItem[] => items.map(i => (isAnnotatedImage(i) && i.id === id ? change(i) : i));
+
+const withRelations = (image: AnnotatedImageItem, relations: AnchorRelation[]): AnnotatedImageItem => {
+  const { relations: _old, ...rest } = image;
+  void _old;
+  return relations.length ? { ...rest, relations } : rest;
+};
+
+/** Turns a plain image into an annotated image with no anchors. `note` is cleaned (one line, 200 characters); blank means none. */
+export function convertToAnnotatedImage(items: readonly CanvasItem[], id: string, note?: string): CanvasItem[] {
+  return items.map(i => {
+    if (i.kind !== "image" || (i as ImageItem).id !== id) return i;
+    const image = i as ImageItem;
+    const out: AnnotatedImageItem = {
+      id: image.id,
+      kind: "annotated-image",
+      path: image.path,
+      x: image.x,
+      y: image.y,
+      w: image.w,
+      h: image.h,
+      anchors: []
+    };
+    const clean = cleanNote(note);
+    if (clean !== undefined) out.note = clean;
+    return out;
+  });
+}
+
+/** Turns an annotated image back into a plain image. Only allowed with no anchors; otherwise (or when it is not one) returns null. */
+export function convertToPlainImage(items: readonly CanvasItem[], id: string): CanvasItem[] | null {
+  const image = findAnnotatedImage(items, id);
+  if (!image || image.anchors.length > 0) return null;
+  return items.map(i =>
+    i === image ? { id: image.id, kind: "image", path: image.path, x: image.x, y: image.y, w: image.w, h: image.h } : i
+  );
+}
+
+/** Sets or clears (blank) the image's own note. */
+export function setImageNote(items: readonly CanvasItem[], id: string, note: string): CanvasItem[] {
+  return mapImage(items, id, image => {
+    const { note: _old, ...rest } = image;
+    void _old;
+    const clean = cleanNote(note);
+    return clean === undefined ? rest : { ...rest, note: clean };
+  });
+}
+
+/** Adds an anchor (id must be new on this image; at most {@link ANCHOR_LIMIT}). Coordinates are clamped to 0-1. */
+export function addAnchor(items: readonly CanvasItem[], imageId: string, anchor: ImageAnchor): CanvasItem[] {
+  const clean = cleanAnchor(anchor);
+  if (!clean) return [...items];
+  return mapImage(items, imageId, image =>
+    image.anchors.length >= ANCHOR_LIMIT || image.anchors.some(a => a.id === clean.id)
+      ? image
+      : { ...image, anchors: [...image.anchors, clean] }
+  );
+}
+
+/** Changes an anchor's note (blank clears it) and/or its 2D position. The id never changes. Unknown position kinds keep `at`. */
+export function updateAnchor(
+  items: readonly CanvasItem[],
+  imageId: string,
+  anchorId: string,
+  patch: { note?: string; at?: { x: number; y: number } }
+): CanvasItem[] {
+  if (patch.at && !(finite(patch.at.x) && finite(patch.at.y))) return [...items];
+  return mapImage(items, imageId, image => ({
+    ...image,
+    anchors: image.anchors.map(a => {
+      if (a.id !== anchorId) return a;
+      let next: ImageAnchor = a;
+      if (patch.at && isImage2dAnchor(a))
+        next = { ...next, at: { kind: "image-2d", x: clamp01(patch.at.x), y: clamp01(patch.at.y) } };
+      if (patch.note !== undefined) {
+        const { note: _old, ...rest } = next;
+        void _old;
+        const clean = cleanNote(patch.note);
+        next = clean === undefined ? rest : { ...rest, note: clean };
+      }
+      return next;
+    })
+  }));
+}
+
+/** Removes an anchor and every relation that ends at it. */
+export function removeAnchor(items: readonly CanvasItem[], imageId: string, anchorId: string): CanvasItem[] {
+  return mapImage(items, imageId, image => {
+    if (!image.anchors.some(a => a.id === anchorId)) return image;
+    const next = { ...image, anchors: image.anchors.filter(a => a.id !== anchorId) };
+    return withRelations(
+      next,
+      (image.relations ?? []).filter(r => r.from !== anchorId && r.to !== anchorId)
+    );
+  });
+}
+
+/**
+ * Whether `relation` may be added to this image: exactly one end is an anchor of it, the other end is a well-formed id that
+ * is not one of its anchors, the kind is known, the list is below the limit and the pair holds no relation yet (any kind,
+ * either direction). `replacing` is the existing relation left out of the pair check (when changing or reversing it).
+ */
+export function anchorRelationAllowed(
+  image: AnnotatedImageItem,
+  relation: Pick<AnchorRelation, "kind" | "from" | "to">,
+  replacing?: Pick<AnchorRelation, "from" | "to">
+): boolean {
+  const list = image.relations ?? [];
+  if (!replacing && list.length >= ANCHOR_RELATION_LIMIT) return false;
+  if (!cleanAnchorRelation(relation, anchorIdsOf(image))) return false;
+  const key = relationPair(relation);
+  return !list.some(r => relationPair(r) === key && !(replacing && relationPair(replacing) === key));
+}
+
+/** Adds an anchor relation when {@link anchorRelationAllowed}; otherwise returns the list unchanged. */
+export function addAnchorRelation(
+  items: readonly CanvasItem[],
+  imageId: string,
+  relation: AnchorRelation
+): CanvasItem[] {
+  const image = findAnnotatedImage(items, imageId);
+  if (!image || !anchorRelationAllowed(image, relation)) return [...items];
+  const clean = cleanAnchorRelation(relation, anchorIdsOf(image)) as AnchorRelation;
+  return mapImage(items, imageId, img => withRelations(img, [...(img.relations ?? []), clean]));
+}
+
+/** Removes the relation between an anchor and a topic (either direction). The anchor stays. */
+export function removeAnchorRelation(
+  items: readonly CanvasItem[],
+  imageId: string,
+  anchorId: string,
+  topicId: string
+): CanvasItem[] {
+  const key = relationPair({ from: anchorId, to: topicId });
+  return mapImage(items, imageId, image => {
+    const list = image.relations ?? [];
+    const rest = list.filter(r => relationPair(r) !== key);
+    return rest.length === list.length ? image : withRelations(image, rest);
+  });
+}
+
+/** Replaces the relation between an anchor and a topic with `next` (new kind, reversed direction, description). Refused changes return the list unchanged. */
+export function updateAnchorRelation(
+  items: readonly CanvasItem[],
+  imageId: string,
+  anchorId: string,
+  topicId: string,
+  next: AnchorRelation
+): CanvasItem[] {
+  const image = findAnnotatedImage(items, imageId);
+  if (!image) return [...items];
+  const key = relationPair({ from: anchorId, to: topicId });
+  const index = (image.relations ?? []).findIndex(r => relationPair(r) === key);
+  if (index < 0 || relationPair(next) !== key) return [...items];
+  const old = (image.relations as AnchorRelation[])[index];
+  if (!anchorRelationAllowed(image, next, old)) return [...items];
+  const clean = cleanAnchorRelation(next, anchorIdsOf(image)) as AnchorRelation;
+  return mapImage(items, imageId, img =>
+    withRelations(
+      img,
+      (img.relations as AnchorRelation[]).map((r, i) => (i === index ? clean : r))
+    )
+  );
+}
+
+/** Every anchor relation that touches `topicId`, with the image and anchor it belongs to. Unknown-position anchors are included. */
+export function anchorRelationsForTopic(
+  items: readonly CanvasItem[],
+  topicId: string
+): { imageId: string; anchorId: string; relation: AnchorRelation }[] {
+  const out: { imageId: string; anchorId: string; relation: AnchorRelation }[] = [];
+  for (const item of items) {
+    if (!isAnnotatedImage(item)) continue;
+    const anchors = anchorIdsOf(item);
+    for (const relation of item.relations ?? []) {
+      if (relation.from !== topicId && relation.to !== topicId) continue;
+      out.push({ imageId: item.id, anchorId: anchors.has(relation.from) ? relation.from : relation.to, relation });
+    }
+  }
+  return out;
+}
+
+/**
+ * Cleanup that needs the topic ids (sanitizeCanvasItems reads canvasItems before the nodes are checked): removes anchors whose
+ * id equals a topic id (with their relations) and relations whose topic end does not exist. Returns the same array when
+ * nothing changes, so a map without annotated images (or with clean ones) stays byte for byte.
+ */
+export function pruneAnnotatedImages(
+  items: readonly CanvasItem[],
+  nodeIds: ReadonlySet<string>
+): { items: CanvasItem[]; dropped: number } {
+  let dropped = 0;
+  const out = items.map(item => {
+    if (!isAnnotatedImage(item)) return item;
+    const anchors = item.anchors.filter(a => !nodeIds.has(a.id));
+    const anchorIds = new Set(anchors.map(a => a.id));
+    const relations = (item.relations ?? []).filter(r => {
+      const topic = anchorIds.has(r.from) ? r.to : anchorIds.has(r.to) ? r.from : null;
+      return topic !== null && nodeIds.has(topic);
+    });
+    const lost = item.anchors.length - anchors.length + (item.relations ?? []).length - relations.length;
+    if (!lost) return item;
+    dropped += lost;
+    return withRelations({ ...item, anchors }, relations);
+  });
+  return dropped ? { items: out, dropped } : { items: [...items], dropped: 0 };
+}
+
+/** Drops every anchor relation that touches one of `topicIds`. Returns the new list and how many were dropped (same array contents when 0). */
+export function removeAnchorRelationsForTopics(
+  items: readonly CanvasItem[],
+  topicIds: ReadonlySet<string>
+): { items: CanvasItem[]; dropped: number } {
+  let dropped = 0;
+  const out = items.map(item => {
+    if (!isAnnotatedImage(item) || !item.relations) return item;
+    const rest = item.relations.filter(r => !topicIds.has(r.from) && !topicIds.has(r.to));
+    if (rest.length === item.relations.length) return item;
+    dropped += item.relations.length - rest.length;
+    return withRelations(item, rest);
+  });
+  return { items: out, dropped };
+}
+
+/**
+ * Points the topic end of every anchor relation at `fromIds` to `toId` (a merge). When several relations of one image land on
+ * the same pair (anchor + topic) only the first in list order stays; the rest are counted in `droppedSamePair`.
+ */
+export function retargetAnchorRelations(
+  items: readonly CanvasItem[],
+  fromIds: ReadonlySet<string>,
+  toId: string
+): { items: CanvasItem[]; droppedSamePair: number } {
+  let droppedSamePair = 0;
+  const out = items.map(item => {
+    if (!isAnnotatedImage(item) || !item.relations) return item;
+    if (!item.relations.some(r => fromIds.has(r.from) || fromIds.has(r.to))) return item;
+    const seen = new Set<string>();
+    const next: AnchorRelation[] = [];
+    for (const r of item.relations) {
+      const moved: AnchorRelation = {
+        ...r,
+        from: fromIds.has(r.from) ? toId : r.from,
+        to: fromIds.has(r.to) ? toId : r.to
+      };
+      const key = relationPair(moved);
+      if (seen.has(key)) {
+        droppedSamePair++;
+        continue;
+      }
+      seen.add(key);
+      next.push(moved);
+    }
+    return withRelations(item, next);
+  });
+  return { items: out, droppedSamePair };
+}
 
 /** Adds a text node; a bad or duplicate one (any item with that id) leaves the list unchanged. */
 export function addTextNode(items: readonly CanvasItem[], text: Omit<TextItem, "kind">): CanvasItem[] {

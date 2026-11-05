@@ -4,7 +4,13 @@ import { aimEnabled } from "./experiences/aim/availability";
 import type { AiResult } from "./ai/types";
 import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
-import { sanitizeCanvasItems, type CanvasItem } from "./experiences/visual-map/canvas-items";
+import {
+  pruneAnnotatedImages,
+  removeAnchorRelationsForTopics,
+  retargetAnchorRelations,
+  sanitizeCanvasItems,
+  type CanvasItem
+} from "./experiences/visual-map/canvas-items";
 import { cleanBranchLayouts } from "./layouts/compose";
 import { isLayoutKind, isStoredLayoutSpacing, type MapLayout } from "./map-layout";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
@@ -14,13 +20,15 @@ import {
   CARD_WIDTH,
   clampCardHeight,
   clampCardWidth,
+  branchSize,
+  childIndex,
   descendants,
   parentIdsForNode,
   visibleNodes,
   type AimNodeKind,
   type MapNode
 } from "./map-graph";
-export { applyCollapseLevel, descendants, parentIdsForNode, visibleNodes };
+export { applyCollapseLevel, branchSize, childIndex, descendants, parentIdsForNode, visibleNodes };
 export type { AimNodeKind, MapNode };
 export interface MapDocument {
   version: 1;
@@ -255,6 +263,38 @@ export function retargetTopicRelations(
     map,
     kept.map(k => k.r)
   );
+  return result;
+}
+/**
+ * `removeTopicRelationsFor` plus the anchor relations of every annotated image that touch one of `topicIds`. Mutates the map like
+ * the function it wraps. Returns how many anchor relations were dropped (for a Notice).
+ */
+export function removeRelationsForTopics(
+  map: MapDocument,
+  topicIds: Iterable<string>
+): { droppedAnchorRelations: number } {
+  const ids = new Set(topicIds);
+  removeTopicRelationsFor(map, ids);
+  if (!map.canvasItems) return { droppedAnchorRelations: 0 };
+  const result = removeAnchorRelationsForTopics(map.canvasItems, ids);
+  if (result.dropped) map.canvasItems = result.items;
+  return { droppedAnchorRelations: result.dropped };
+}
+/**
+ * `retargetTopicRelations` plus the anchor relations of every annotated image (their topic end moves to `toId`). Same result
+ * shape; same-pair drops of anchor relations are added to `droppedSamePair`, so the existing Notice counts them.
+ */
+export function retargetRelationsToTopic(
+  map: MapDocument,
+  fromIds: Iterable<string>,
+  toId: string
+): { droppedCycles: number; droppedSamePair: number } {
+  const merged = new Set(fromIds);
+  const result = retargetTopicRelations(map, merged, toId);
+  if (!map.canvasItems) return result;
+  const anchors = retargetAnchorRelations(map.canvasItems, merged, toId);
+  map.canvasItems = anchors.items;
+  result.droppedSamePair += anchors.droppedSamePair;
   return result;
 }
 export function clearQuestionConvergenceEdges(map: MapDocument): boolean {
@@ -707,6 +747,16 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
     map.viewport = { x: 40, y: 40, zoom: 1 };
   map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
   sanitizeTopicRelations(map, log);
+  if (map.canvasItems) {
+    const pruned = pruneAnnotatedImages(map.canvasItems, ids);
+    if (pruned.dropped) {
+      map.canvasItems = pruned.items;
+      (log ?? ((l, m) => debugLog.appendLog(l, m)))(
+        "warn",
+        `Dropped ${pruned.dropped} dangling annotated-image anchor${pruned.dropped === 1 ? "" : "s"} or relation${pruned.dropped === 1 ? "" : "s"} while reading the map.`
+      );
+    }
+  }
   return map;
 }
 function validateAimMap(map: MapDocument): void {

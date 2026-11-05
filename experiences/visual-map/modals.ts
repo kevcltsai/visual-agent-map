@@ -12,7 +12,6 @@ import {
   type TranslationKey
 } from "../../i18n";
 import { App, Component, MarkdownRenderer, Modal, Notice, Setting, TFile } from "obsidian";
-import { ReferencePicker, type ReferenceTopic } from "../../ui/reference-picker";
 import { type ReferenceGroup } from "../../ai/reference-materials";
 import { DebugLogModal } from "../../ui/modals/debug-log-modal";
 import { actionStatus, armDiscard, modalActions } from "../../ui/modals/action-bar";
@@ -284,15 +283,8 @@ export interface AgentTaskHandle {
   finished: Promise<void>;
 }
 export interface TaskSourceSettings {
-  topics: () => Promise<ReferenceTopic[]>;
-  readTopic: (
-    topic: ReferenceTopic,
-    signal: AbortSignal,
-    progress: (message: string) => void
-  ) => Promise<{ path: string; content: string }[]>;
-  currentTopicId: string;
-  currentLabel: string;
-  synthesisLabel?: string;
+  /** The map's saved sources resolved to reference groups when a task starts; rejects when the signal aborts. */
+  mapSources: (signal: AbortSignal) => Promise<ReferenceGroup[]>;
   synthesisTopics?: string[];
 }
 export { defaultOutputLanguage };
@@ -360,40 +352,14 @@ export class NextStepModal extends Modal {
   private taskSignal?: AbortSignal;
   private taskController?: AbortController;
   private unsubscribeModels?: () => void;
-  /** One data-source picker shared by every step, so choices survive switching steps. */
-  private addReferencePicker(panel: HTMLElement):
-    | {
-        picker: ReferencePicker;
-        disclosure: HTMLElement;
-        forMode: (mode: "research" | "expand" | "synthesize") => void;
-      }
-    | undefined {
-    const sources = this.info?.sources;
-    if (!sources) return undefined;
-    const disclosure = panel.createEl("details", { cls: "vam-next-source-details" });
-    disclosure.open = false;
-    const summary = disclosure.createEl("summary");
-    const summaryRow = summary.createSpan({ cls: "vam-next-source-summary-row" });
-    summaryRow.createEl("strong", { text: t("ui.data_sources") });
-    const selection = summaryRow.createSpan({ cls: "vam-next-source-summary" });
-    const pickerContent = disclosure.createDiv();
-    const picker = new ReferencePicker(
-      this.app,
-      pickerContent,
-      sources.topics,
-      sources.readTopic,
-      sources.currentTopicId,
-      sources.currentLabel
-    );
-    const updateSelection = (): void => selection.setText(picker.describe());
-    pickerContent.addEventListener("change", updateSelection);
-    updateSelection();
-    const forMode = (mode: "research" | "expand" | "synthesize"): void => {
-      const synthesize = mode === "synthesize";
-      picker.setCurrentLabel(synthesize ? (sources.synthesisLabel ?? sources.currentLabel) : sources.currentLabel);
-      updateSelection();
-    };
-    return { picker, disclosure, forMode };
+  /**
+   * The map's saved data sources, read under the task signal when a run starts. Sources that cannot be read are
+   * skipped: the run goes on with the rest and the dialog shows nothing about them.
+   */
+  private async mapSourceGroups(signal: AbortSignal | undefined): Promise<ReferenceGroup[]> {
+    const groups = (await this.info?.sources?.mapSources?.(signal ?? new AbortController().signal)) ?? [];
+    if (signal?.aborted) throw Object.assign(new Error("Aborted"), { name: "AbortError" });
+    return groups;
   }
   private requirementsInput?: HTMLTextAreaElement;
   private renderRequirements(parent: HTMLElement): void {
@@ -1120,11 +1086,11 @@ export class NextStepModal extends Modal {
     confirm.addEventListener("click", () => {
       void this.run(research, confirm, async () => {
         const controller = this.taskController;
-        const selected = await sharedSources?.picker.ready();
+        const referenceGroups = controller ? await this.mapSourceGroups(controller.signal) : [];
         if (!controller || this.dead(controller)) return;
         const mode = aiMode.value();
         const options: TaskOptions = {
-          referenceGroups: selected?.groups ?? [],
+          referenceGroups,
           outputLanguage: languageSelect.value as ContentLanguage,
           ...aiModeOptions(mode, "research"),
           requirements: this.requirements(),
@@ -1302,8 +1268,8 @@ export class NextStepModal extends Modal {
         expandPanel,
         reviewButton,
         async () => {
-          const selected = await sharedSources?.picker.ready();
-          const options: TaskOptions = { ...expandOptions(this.taskSignal), referenceGroups: selected?.groups ?? [] };
+          const referenceGroups = await this.mapSourceGroups(this.taskSignal);
+          const options: TaskOptions = { ...expandOptions(this.taskSignal), referenceGroups };
           await this.expand(
             options,
             "",
@@ -1330,12 +1296,12 @@ export class NextStepModal extends Modal {
     expandButton.addEventListener("click", () => {
       void this.run(expandPanel, expandButton, async () => {
         if (!quickOutline) return;
-        const selected = await sharedSources?.picker.ready();
         const signal = this.taskSignal;
         const controller = this.taskController;
         if (!signal || !controller) return;
+        const referenceGroups = await this.mapSourceGroups(signal);
         const mode = aiMode.value();
-        const options: TaskOptions = { ...expandOptions(signal), referenceGroups: selected?.groups ?? [] };
+        const options: TaskOptions = { ...expandOptions(signal), referenceGroups };
         const bounds = { levels: quickLevels(), maxTopics: quickTopics() };
         const request = {
           presetId: presetSelect.value,
@@ -1411,7 +1377,6 @@ export class NextStepModal extends Modal {
       draftButton.hidden = !here || !locked;
       adjustFor.synthesize.toggleClass("is-fixed", locked);
       stageTwoHint.hidden = !locked;
-      if (sharedSources) sharedSources.disclosure.hidden = here && locked;
       output.hidden = here && locked;
       titleField?.toggleClass("is-hidden", locked);
     };
@@ -1459,10 +1424,10 @@ export class NextStepModal extends Modal {
     const setupOptions = async (signal: AbortSignal): Promise<TaskOptions> => {
       const content: SynthesisContent = synthesisContentSelect?.value === "summary" ? "summary" : "full";
       if (synthesisContentSelect) synthesisContentSelect.disabled = true;
-      const selected = await sharedSources?.picker.ready();
+      const referenceGroups = await this.mapSourceGroups(signal);
       const options: TaskOptions = {
         synthesisContent: content,
-        referenceGroups: selected?.groups ?? [],
+        referenceGroups,
         outputLanguage: languageSelect.value as ContentLanguage,
         requirements: this.requirements(),
         ...this.runOnceOptions(),
@@ -1524,7 +1489,6 @@ export class NextStepModal extends Modal {
       )
     );
     // --- Shared options, all under Adjust.
-    const sharedSources = this.addReferencePicker(adjustBody);
     // The research step runs with the web tools of the chosen AI mode (Standard searches, Quick does not). Expansion
     // pre-starts one process only when subtopics are researched afterwards; children run in parallel, so only the first
     // one finds it waiting. A synthesis never uses the web.
@@ -1547,7 +1511,6 @@ export class NextStepModal extends Modal {
         panel.style.display = name === mode ? "" : "none";
         adjustFor[name].hidden = name !== mode;
       }
-      sharedSources?.forMode(mode);
       warmForMode();
       confirm.hidden = mode !== "research";
       expandButton.hidden = mode !== "expand";

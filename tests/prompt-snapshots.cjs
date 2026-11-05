@@ -37,6 +37,10 @@ const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', 
 // upgrade module and are frozen in tests/fixtures/note-style-frozen (see its README); the snapshot files stay what they were
 // (the old file and its switches produced exactly this prompt). A missing key throws; nothing is recomputed.
 const FROZEN_SELECTIONS = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'note-style-frozen', 'upgraded-selections.json'), 'utf8')).entries;
+// Annotated image P5a fixed case: image note, anchor "back" related to the topic (note "marbling"), anchor "leg" supports it (both relations run from the anchor to the topic).
+const caseImage = (image, back, leg, marbling) => ({ id: 'g1', kind: 'annotated-image', path: 'cuts.png', x: 0, y: 0, w: 10, h: 10, note: image, anchors: [{ id: 'a1', at: { kind: 'image-2d', x: 0.4, y: 0.2 }, note: back }, { id: 'a2', at: { kind: 'image-2d', x: 0.7, y: 0.8 }, note: leg }], relations: [{ kind: 'related', from: 'a1', to: 'rib', description: marbling }, { kind: 'supports', from: 'a2', to: 'rib' }] });
+const ANCHOR_CASE_ITEMS = { zh: [caseImage('牛的分切部位圖，研究各部位適合的料理', '牛的背部', '腿', '油花多')], en: [caseImage('Beef cut chart; research which dishes suit each cut', 'Back of the cow', 'Leg', 'Heavy marbling')] };
+
 function upgradedSelection(text, language) {
   const key = `${crypto.createHash('sha256').update(text).digest('hex')}:${language}`;
   const frozen = FROZEN_SELECTIONS[key];
@@ -57,6 +61,10 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
     await recordContext(`service.decompose-deep.${tag}`, 'AiTaskService instructions: mode decompose, deep research', language, { ...ctx, mode: 'decompose', researchDepth: 'deep' });
     await recordContext(`service.synthesize-local.${tag}`, 'AiTaskService instructions: mode synthesize, local, visual off', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off' });
     await recordContext(`service.synthesize-summary-direction.${tag}`, 'AiTaskService instructions: mode synthesize with summary-bracket conclusion directions (summary-bracket P1, read-only)', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off', summaryDirections: language === 'en' ? '- B; C\n  Both point to excessive cost; recommend postponing' : '- B；C\n  兩者都指向成本過高，結論應建議延後' });
+    // Annotated image P5a: the fixed beef-cut case (plan Validation); research and expand (decompose) tasks carry the anchor section, read-only.
+    const anchorContext = loadModule('experiences/visual-map/anchor-context.ts').anchorContextFor(ANCHOR_CASE_ITEMS[language === 'en' ? 'en' : 'zh'], 'rib', id => (language === 'en' ? 'Ribeye' : '肋眼'), language);
+    await recordContext(`service.research-anchor-context.${tag}`, 'AiTaskService instructions: mode task, web research with an annotated-image anchorContext (two anchors, read-only data, not a source)', language, { ...ctx, anchorContext });
+    await recordContext(`service.decompose-anchor-context.${tag}`, 'AiTaskService instructions: mode decompose (expand) with an annotated-image anchorContext', language, { ...ctx, mode: 'decompose', researchDepth: 'deep', anchorContext });
     // Note style recipe T4: the top and fresh write-backs have their own mode text and no conflict rule.
     for (const updateMode of ['top', 'fresh']) {
       await recordContext(`service.task-${updateMode}.${tag}`, `AiTaskService instructions: mode task, web research, update mode ${updateMode}`, language, { ...ctx, updateMode });

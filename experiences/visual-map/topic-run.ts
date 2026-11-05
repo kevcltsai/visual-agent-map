@@ -188,6 +188,8 @@ export interface ResearchStart extends WritebackHooks {
   resolveStyle?: (language: ContentLanguage) => Promise<RunStyle>;
   ancestors?: (language: ContentLanguage) => Promise<string>;
   userTexts?: () => string;
+  /** The anchors of annotated images that relate to this topic, as a read-only block; "" adds nothing (annotated-image P5b). */
+  anchorContext?: (language: ContentLanguage) => string;
   /** Runs after the status was set to running (the view reloads and redraws). */
   onStarted?: () => Promise<void>;
   /** The note before and after the write, for the starting view's undo. */
@@ -1076,6 +1078,7 @@ export class TopicRuns {
         ? await options.resolveStyle(outputLanguage)
         : this.ports.runStyle({ note, outputLanguage }));
     const detailTemplate = runStyle.template;
+    const anchorText = options.anchorContext?.(outputLanguage) || undefined;
     const context: TaskContext = withThinkingOrigin(
       {
         title: note.title,
@@ -1085,6 +1088,8 @@ export class TopicRuns {
         task: note.prompt,
         ancestors: (await options.ancestors?.(outputLanguage)) ?? "",
         userTexts: options.userTexts?.() ?? "",
+        // Only when there is text: a topic without anchors keeps the exact request it had before.
+        ...(anchorText ? { anchorContext: anchorText } : {}),
         workingFindings: note.newFindings,
         sourceContext: "",
         mode: "task",

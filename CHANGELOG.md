@@ -4,6 +4,14 @@
 
 - The "+" and "Add subtopic" lists show each topic type's shape and colour next to its name, the same as the type picker.
 
+### Mark points on a picture
+
+Turn a picture on the canvas into an annotated image, drop anchors on it such as "the cow's back", and link each anchor to a topic.
+
+- Right-click a picture and choose "Convert to annotated image…", then "Place anchor" and write a note for each point. An anchor links to topics by any of the six relation kinds, from the picture or from a topic with "Point on an image…".
+- Research and expansion read the image note, anchor notes and relations as text, because the AI cannot see the picture. A card shows "N image relations" at its bottom.
+- Sharing and OPML or FreeMind export leave anchors out.
+
 ## [0.30.0] - 2026-11-05
 
 ### Start a map with one sentence

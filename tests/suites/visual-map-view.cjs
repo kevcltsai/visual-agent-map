@@ -11,7 +11,7 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
     createEl(name, options) { const child = element(name); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
     createSpan(options) { const child = element('span'); child.text = options?.text; this.children.push(child); return child; },
     setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, toggleClass(name, on) { this.toggled = [name, on]; }, setPointerCapture() {},
-    addEventListener(name, handler) { events.set(`${tag}:${name}`, handler); if (tag === 'button') this.click = handler; }, removeEventListener() {}
+    addEventListener(name, handler) { events.set(`${tag}:${name}`, handler); if (tag === 'button') this.click = handler; }, removeEventListener() {}, querySelector() { return null; }
   });
   const topic = node('parent');
   let detailsShown = false;
@@ -210,7 +210,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
   const checkedModels = [];
   const modelState = provider => ({ provider, status: 'ready', models: provider === 'codex' ? ['gpt-test'] : [] });
-  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', synthesisTopics: ['Child A', 'Child B'], topics: async () => [], readTopic: async () => [] } };
+  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { mapSources: async () => [], synthesisTopics: ['Child A', 'Child B'] } };
   const modelSettings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources };
   const modal = new NextStepModal({}, 'Parent', 1, 1, plugin,
     async (options, _focus, _done, _failed, accepted) => { researchOptions = options; accepted(); },
@@ -253,11 +253,8 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(all(modal.contentEl, item => item.tag === 'fieldset').length, 0, 'the research-depth fieldset is gone; the AI mode switch replaces it');
   const summaryLine = find(modal.contentEl, item => item.cls === 'vam-next-summary');
   assert.equal(summaryLine.text, 'Quick mode · Same language as my text');
-  const sourceDisclosures = all(modal.contentEl, item => item.cls.includes('vam-next-source-details'));
-  assert.equal(sourceDisclosures.length, 1, 'one data-source picker serves every step');
-  const [sources] = sourceDisclosures;
-  assert.equal(sources.open, false);
-  assert.ok(sources.children[0].children[0].children[1].text.includes('0 Markdown files'));
+  assert.equal(all(modal.contentEl, item => /vam-next-source-(?:details)|vam-reference-/.test(item.cls ?? '')).length, 0, 'the task dialog has no data-source section (the map owns its sources)');
+  assert.equal(find(modal.contentEl, item => /Data sources/.test(item.text ?? '')), undefined);
   const outputLanguage = find(modal.contentEl, item => item['aria-label'] === 'Answer language for this task');
   assert.equal(outputLanguage.value, 'same-as-input');
   outputLanguage.value = 'zh-TW';
@@ -267,10 +264,6 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(all(modal.contentEl, item => item.tag === 'textarea').length, 1);
   assert.equal(button(modal.contentEl, 'Save instructions'), undefined);
   requirements.value = 'Only this run';
-  // The data sources keep only local files: no web or image choice (the AI mode decides both).
-  assert.equal(all(sources, item => item.tag === 'input' && item.type === 'checkbox').length, 0);
-  assert.equal(find(sources, item => item.text === 'Search for image references'), undefined);
-  assert.equal(find(sources, item => item.text === 'Allow web search'), undefined);
   assert.ok(find(modal.contentEl, item => /Use Standard once the structure is settled, or when the topic is new or obscure/.test(item.text ?? '')), 'one line says when to use Standard');
   // The expansion's subtopic research is one option; its hint follows the AI mode and never claims the web for Quick.
   const expandChecks = all(expandAdjust, item => item.tag === 'input' && item.type === 'checkbox');
@@ -285,7 +278,6 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   button(find(modal.contentEl, item => item['aria-label'] === 'AI mode'), 'Quick').click();
   assert.match(shallowHint().text, /without the web/);
   assert.equal(load('i18n.ts').translate('zh-TW', 'ui.shallow_research_for_expanded_subtopics_0', load('i18n.ts').translate('zh-TW', 'ui.ai_mode_quick_desc')).includes('快速'), false, 'the zh hint does not repeat the mode name');
-  assert.equal(all(sources, item => item.tag === 'input' && item.type === 'file').length, 2);
   assert.ok(find(synthesize, item => /run a Standard research on the topic first/.test(item.text ?? '')));
   assert.equal(find(synthesize, item => item.text === 'Does not copy full subtopic notes'), undefined);
   cards.children[1].click();
@@ -707,7 +699,7 @@ integrationTest('Next Step modal: the style choice goes into research, expansion
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl.children.push(this.contentEl); } close() { this.onClose?.(); } }
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class {} } });
   const modelState = provider => ({ provider, status: 'ready', models: [] });
-  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async () => true, confirmAiUsage: async (_m, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current', synthesisLabel: 'Current and children', synthesisTopics: ['Child'], topics: async () => [], readTopic: async () => [] } };
+  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async () => true, confirmAiUsage: async (_m, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { mapSources: async () => [], synthesisTopics: ['Child'] } };
   const templates = [{ id: 'standard', name: 'Standard' }, { id: 'A', name: 'Alpha template' }];
   const settings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources, currentStyle: 'Standard' };
   const seen = {};
@@ -889,7 +881,7 @@ integrationTest('merge dialog (the shared synthesis dialog) names the topic afte
   class Component { load() {} unload() {} addChild(child) { return child; } removeChild() {} }
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer: { render: async () => {} }, setIcon: () => {} } });
   const plugin = { settings: { language: 'en', cliModel: 'gpt-test', codexUsageNoticeSeen: true }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { await run(); return true; }, activeTasks: new Map() };
-  const sources = { currentTopicId: 'map', currentLabel: 'Selected topics included', topics: async () => [], readTopic: async () => [] };
+  const sources = { mapSources: async () => [] };
   const open = (names, title, calls) => {
     const modal = new NextStepModal({}, '', 0, 0, plugin, async () => {}, async () => {}, async (options, direction, _failed, accepted) => { calls.push({ options, direction }); accepted(); },
       undefined, { names, initialTitle: title, defaultDirection: 'Find shared conclusions', fields: { sources, templates: [], tones: [] } });
@@ -1274,7 +1266,7 @@ integrationTest('select mode toggles cards in place, keeps checkboxes out of the
   assert.equal(again.c.classes.has('is-selected'), true); assert.equal(again.c.attrs['aria-selected'], 'true'); assert.equal(again.a.classes.has('is-selected'), false);
   assert.equal(renders(), 0);
 });
-integrationTest('F2 starts rename, Enter opens details, and the collapse button reports aria-expanded', () => {
+integrationTest('F2 starts the in-place title edit, Enter opens details, and the collapse button reports aria-expanded', () => {
   const dialogs = [];
   class Modal { open() { dialogs.push(this); } close() {} }
   const fixture = selectionView(load, {}, { ...obsidian, Modal });
@@ -1287,8 +1279,8 @@ integrationTest('F2 starts rename, Enter opens details, and the collapse button 
   assert.deepEqual(opened, ['a']); assert.equal(view.selection.state.selected, 'a'); assert.equal(fixture.renders(), 0);
   let renamed = 0;
   cards.a.handlers.get('keydown')({ key: 'F2', target: cards.a, preventDefault() { renamed++; } });
-  assert.equal(renamed, 1, 'F2 is handled as the rename shortcut'); assert.equal(dialogs.length, 1, 'F2 opens the name dialog');
-  assert.equal(fixture.renders(), 0);
+  assert.equal(renamed, 1, 'F2 is handled as the rename shortcut'); assert.equal(dialogs.length, 0, 'F2 opens no name dialog'); assert.equal(view.inlineName?.id, 'a', 'F2 opens the title field of the card');
+  assert.equal(fixture.renders(), 1, 'one repaint draws the field');
   const expanded = [];
   const walk = item => { if (item.attrs && 'aria-expanded' in item.attrs) expanded.push(item.attrs['aria-expanded']); item.children.forEach(walk); };
   walk(cards.root); assert.deepEqual(expanded, [], 'an expanded branch has no floating collapse button: Collapse is in More; only the folded Expand button reports aria-expanded');
@@ -1533,7 +1525,7 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(plugin.outlineMap, null, 'no map left: the outline empties');
 });
-integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card, Rename and Select subtopics', () => {
+integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card and Select subtopics (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until hover, focus or selection, and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; pointer-events: none;[^}]*width: max-content;/m);
@@ -1552,7 +1544,7 @@ integrationTest('card tools: only AI explore, Details and More float; More holds
   };
   const buttons = toolsOf();
   assert.deepEqual(buttons.map(button => button.text), ['AI explore', 'Details', '⋯ More'], 'three floating buttons');
-  assert.deepEqual(buttons.menu, ['Collapse', 'This card', 'Rename', 'Select subtopics'], 'every other action is in More; Add text is only in the + menu');
+  assert.deepEqual(buttons.menu, ['Collapse', 'This card', 'Select subtopics'], 'every other action is in More; Add text is only in the + menu');
   const explore = buttons[0];
   assert.ok(explore.classes.has('vam-ai-explore')); assert.equal(explore.attrs['aria-label'], undefined, 'the visible text is the accessible name (WCAG 2.5.3)');
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
@@ -1560,11 +1552,11 @@ integrationTest('card tools: only AI explore, Details and More float; More holds
   assert.equal(buttons[2].attrs['aria-label'], 'More actions for this topic'); assert.equal(buttons[2].attrs['aria-haspopup'], 'menu');
   // A leaf has no Collapse; select mode keeps Details and a More with only Collapse.
   const leaf = toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); });
-  assert.deepEqual(leaf.map(button => button.text), ['AI explore', 'Details', '⋯ More']); assert.deepEqual(leaf.menu, ['This card', 'Rename']);
+  assert.deepEqual(leaf.map(button => button.text), ['AI explore', 'Details', '⋯ More']); assert.deepEqual(leaf.menu, ['This card']);
   const selecting = toolsOf(({ view }) => { view.selection.toggleMultiSelect(); });
   assert.deepEqual(selecting.map(button => button.text), ['Details', '⋯ More']); assert.deepEqual(selecting.menu, ['Collapse']);
   const { translate } = load('i18n.ts');
-  assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_rename', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '這張卡', '改名', '詳情', 'AI 探索']);
+  assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '這張卡', '詳情', 'AI 探索']);
 });
 integrationTest('status pill: researched topics show "Researched", unresearched ones show none, other states keep theirs and screen readers still hear the status', () => {
   const pills = (status, setup) => {
@@ -3643,7 +3635,7 @@ integrationTest('hypothesis-evidence: a merge that drops same-pair relations sho
 });
 integrationTest('hypothesis-evidence: every merge path hands the retarget result to the notice, and the same-pair sentence exists in all three languages (decision #37)', () => {
   const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.equal((view.match(/this\.takeRetargetDrops\(retargetTopicRelations\(/g) ?? []).length, 3, 'merge, merge into a target and remove-with-adopter all record both counts');
+  assert.equal((view.match(/this\.takeRetargetDrops\(retargetRelationsToTopic\(/g) ?? []).length, 3, 'merge, merge into a target and remove-with-adopter all record both counts');
   assert.doesNotMatch(view, /lastDroppedCycles = retargetTopicRelations/);
   const texts = { en: 'Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)', 'zh-TW': '已移除 {0} 條重複的關係（同一對議題只保留一條）', 'zh-CN': '已移除 {0} 条重复的关系（同一对议题只保留一条）' };
   for (const [lang, text] of Object.entries(texts)) assert.equal(load('i18n.ts').translate(lang, 'ui.merge_dropped_same_pair_0', '3'), text.replace('{0}', '3'), lang);
@@ -4522,7 +4514,7 @@ integrationTest('C5: the map commands apply only to an active map view (topic on
   view.enqueue = work => work();
   view.addNode = parent => { calls.push(['add', parent?.id ?? null]); };
   view.openNextStep = node => calls.push(['ai', node.id]);
-  view.renameNode = (node, title) => calls.push(['rename', node.id, title]);
+  view.startCardTitleEdit = node => calls.push(['rename', node.id, view.notes.get(node.id).title]);
   view.openDetails = node => calls.push(['details', node.id]);
   view.fit = () => calls.push(['fit']);
   view.zoomBy = factor => calls.push(['zoom', factor]);
@@ -4679,4 +4671,197 @@ test('goal bar: tools sit below the open suggestion card, and follow canvas, bar
   await view.onClose();
   assert.equal(live.disconnected, true, 'closing the view disconnects the observer');
   assert.equal(view.goalBarObserved.length, 0);
+});
+
+// ---- Map data sources (P3): toolbar button and panel ----------------------------------------------------------------
+const msTree = () => {
+  const { TFile, TFolder } = obsidian;
+  const folder = new TFolder('Research'), noteA = new TFile('Research/a.md'), noteB = new TFile('Research/b.md'), archived = new TFile('Research/old.md');
+  folder.children = [noteA, noteB, archived];
+  const other = new TFolder('Other'), single = new TFile('Notes/interview.md'), mapFile = new TFile('Old plan/Map.md');
+  const items = new Map([[folder.path, folder], [other.path, other], [single.path, single], [mapFile.path, mapFile]]);
+  const frontmatter = new Map([[archived.path, { 'agent-map-node': true, 'topic-state': 'archived' }]]);
+  const app = {
+    vault: { getAbstractFileByPath: p => items.get(p) ?? null, getAllLoadedFiles: () => [{ path: '/' }, folder, other, single], getMarkdownFiles: () => [noteA, noteB, single], on() { return {}; } },
+    metadataCache: { getFileCache: file => (file.path === mapFile.path ? { headings: [{ heading: 'Last year plan' }] } : { frontmatter: frontmatter.get(file.path) }) }
+  };
+  return { app, items, folder, single, mapFile };
+};
+const msObsidian = (modals) => ({ ...obsidian, FuzzySuggestModal: class { constructor(app) { this.app = app; modals.push(this); } setPlaceholder(text) { this.placeholder = text; } open() { this.opened = true; } close() { this.onClose?.(); } } });
+const msHost = (app, extra = {}) => {
+  const log = { added: [], removed: [], closed: [], picker: [] };
+  const button = dom.element('button');
+  let pickerOpen = false;
+  return { log, button, host: { app, id: 'panel-1', sources: [], currentMapPath: 'Current/Map.md', mapItems: async () => [], add: s => log.added.push(s), remove: s => log.removed.push(s), close: r => log.closed.push(r),
+    setPickerOpen: open => { pickerOpen = open; log.picker.push(open); }, isPickerOpen: () => pickerOpen, button: () => button, ...extra } };
+};
+
+test('map sources panel: texts, three picker buttons with icons, a row per source, unreadable row, remove label and unchanged hint', () => {
+  const modals = [], api = load('ui/map-sources-panel.ts', { obsidian: msObsidian(modals) });
+  const tree = msTree();
+  const { host, log } = msHost(tree.app, { sources: [{ kind: 'folder', path: 'Research' }, { kind: 'map', path: 'Old plan/Map.md' }, { kind: 'file', path: 'Notes/interview.md' }, { kind: 'file', path: 'Gone/missing.md' }] });
+  const parent = dom.element('tools');
+  const panel = api.drawMapSourcesPanel(parent, host, null);
+  assert.equal(panel.attrs.role, 'dialog'); assert.equal(panel.attrs.id, 'panel-1'); assert.equal(panel.attrs['aria-label'], 'Data sources for this mind map');
+  const picks = dom.findAll(panel, c => c.tag === 'button' && (c.cls ?? '').includes('vam-map-sources-pick'));
+  assert.deepEqual(picks.map(b => dom.find(b, c => c.iconName).iconName), ['brain-circuit', 'folder-open', 'file-text']);
+  assert.deepEqual(picks.map(b => dom.find(b, c => c.cls === 'vam-map-sources-pick-label').text), ['Select a mind map', 'Select a folder', 'Select Markdown files']);
+  const rows = dom.findAll(panel, c => dom.hasCls(c, 'vam-map-sources-row'));
+  assert.deepEqual(rows.map(r => r.children.filter(c => c.cls === 'vam-map-sources-name').map(c => c.text)[0]), ['Research', 'Last year plan', 'interview.md', 'missing.md']);
+  assert.deepEqual(rows.map(r => dom.find(r, c => c.iconName)?.iconName), ['folder-open', 'brain-circuit', 'file-text', 'file-text']);
+  assert.deepEqual(rows.map(r => dom.find(r, c => c.cls === 'vam-map-sources-meta')?.text), ['(2 files)', '(mind map)', undefined, 'Unreadable; tasks skip it'], 'archived managed notes are not counted; a missing source says so in place of a count');
+  assert.ok(rows[3].hasClass('is-unreadable')); assert.ok(!rows[0].hasClass('is-unreadable'));
+  const removes = dom.findAll(panel, c => c.tag === 'button' && (c.cls ?? '').includes('vam-map-sources-remove'));
+  assert.equal(removes.length, 4, 'the unreadable row keeps its remove button');
+  assert.deepEqual(removes.map(b => b.attrs['aria-label']), ['Remove "Research"', 'Remove "Last year plan"', 'Remove "interview.md"', 'Remove "missing.md"']);
+  assert.ok(dom.find(panel, c => c.text === 'Folder selections exclude archived VAM notes. More material takes longer to process. Results cite the source files used.'), 'the hint is the existing reference_time_and_citations_hint');
+  removes[1].click(); assert.deepEqual(plain(log.removed), [{ kind: 'map', path: 'Old plan/Map.md' }]);
+});
+test('map sources panel: Esc closes and refocuses the button; focus leaving closes it except while a picker list is open', () => {
+  const api = load('ui/map-sources-panel.ts', { obsidian: msObsidian([]) });
+  const { host, log } = msHost(msTree().app);
+  const panel = api.drawMapSourcesPanel(dom.element('tools'), host, null);
+  const stopped = []; panel.fire('keydown', { key: 'Escape', preventDefault() {}, stopPropagation() { stopped.push(1); } });
+  assert.deepEqual(log.closed, [true]); assert.equal(stopped.length, 1);
+  panel.fire('keydown', { key: 'a' }); assert.deepEqual(log.closed, [true]);
+  const inside = dom.find(panel, c => c.tag === 'button');
+  panel.fire('focusout', { relatedTarget: inside }); panel.fire('focusout', { relatedTarget: null }); panel.fire('focusout', { relatedTarget: host.button() });
+  assert.deepEqual(log.closed, [true], 'moving inside, to the button, or to nowhere (a repaint) does not close');
+  const outside = dom.element('canvas');
+  panel.fire('focusout', { relatedTarget: outside }); assert.deepEqual(log.closed, [true, false], 'focus to an outside element closes it');
+  host.setPickerOpen(true); panel.fire('focusout', { relatedTarget: outside }); assert.deepEqual(log.closed, [true, false], 'a picker list that is open does not close it');
+});
+test('map sources panel: pickers are in-vault lists; the map list never has the current map; choosing hands the path back; closing the list returns focus to its button', async () => {
+  const modals = [], api = load('ui/map-sources-panel.ts', { obsidian: msObsidian(modals) });
+  const tree = msTree();
+  const items = [{ title: 'Current', mapPath: 'Current/Map.md', topicCount: 2, modified: 5, folder: '' }, { title: 'Last year plan', mapPath: 'Old plan/Map.md', topicCount: 3, modified: 9, folder: 'Old' }, { title: 'Newer', mapPath: 'Newer/Map.md', topicCount: 1, modified: 20, folder: '' }];
+  const { host, log } = msHost(tree.app, { mapItems: async () => items });
+  const panel = api.drawMapSourcesPanel(dom.element('tools'), host, null);
+  const [pickMap, pickFolder, pickFile] = dom.findAll(panel, c => c.tag === 'button' && (c.cls ?? '').includes('vam-map-sources-pick'));
+  pickMap.click(); await dom.tick();
+  const mapModal = modals.at(-1);
+  assert.ok(mapModal.opened); assert.deepEqual(plain(mapModal.getItems().map(i => i.mapPath)), ['Newer/Map.md', 'Old plan/Map.md'], 'the current map is not listed');
+  assert.equal(mapModal.placeholder, 'Type a mind map name…'); assert.deepEqual(log.picker, [true]);
+  mapModal.close(); assert.deepEqual(log.picker, [true, false]); assert.equal(dom.focusedNow(), pickMap, 'focus returns to the button that opened the list');
+  mapModal.onChooseItem(mapModal.getItems()[1]); assert.deepEqual(plain(log.added), [{ kind: 'map', path: 'Old plan/Map.md' }]);
+  pickFolder.click(); await dom.tick();
+  const folderModal = modals.at(-1); assert.deepEqual(plain(folderModal.getItems()), ['Other', 'Research'], 'vault folders only, not the vault root');
+  folderModal.onChooseItem('Research'); assert.deepEqual(plain(log.added.at(-1)), { kind: 'folder', path: 'Research' });
+  pickFile.click(); await dom.tick();
+  const fileModal = modals.at(-1); assert.deepEqual(plain(fileModal.getItems()), ['Notes/interview.md', 'Research/a.md', 'Research/b.md'], 'Markdown files of this vault');
+  fileModal.onChooseItem('Notes/interview.md'); assert.deepEqual(plain(log.added.at(-1)), { kind: 'file', path: 'Notes/interview.md' });
+  assert.equal(dom.findAll(panel, c => c.tag === 'input' && c.type === 'file').length, 0, 'no operating-system file dialog');
+});
+test('map sources panel: focus after a redraw goes to the picker, to the next row, or to the first picker when no row is left', () => {
+  const api = load('ui/map-sources-panel.ts', { obsidian: msObsidian([]) });
+  const tree = msTree();
+  const sources = [{ kind: 'folder', path: 'Research' }, { kind: 'file', path: 'Notes/interview.md' }];
+  const { host } = msHost(tree.app, { sources });
+  let panel = api.drawMapSourcesPanel(dom.element('tools'), host, { remove: 1 });
+  assert.equal(dom.focusedNow().attrs['aria-label'], 'Remove "interview.md"');
+  panel = api.drawMapSourcesPanel(dom.element('tools'), host, { remove: 2 });
+  assert.equal(dom.focusedNow().children[1].text, 'Select a mind map', 'no next row: the first picker');
+  api.drawMapSourcesPanel(dom.element('tools'), host, { picker: 'folder' });
+  assert.equal(dom.focusedNow().children[1].text, 'Select a folder');
+});
+
+// The view: button label, ⚠, aria, write path, duplicate no-op, repaint and visibility.
+function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {}) {
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, setTooltip() {} } }, { createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
+  const tree = msTree();
+  const state = { stored: [...stored], writes: [], notices: [] };
+  const plugin = { settings: { ...DEFAULT_SETTINGS }, pendingSuggestions: new Map(), expansionBatches: new Map(), relevanceGrades: new Map(), mutate: async work => work(),
+    repo: { readMapSources: async () => state.stored.map(s => ({ ...s })), writeMapSources: async (p, next) => { state.writes.push([p, plain(next)]); state.stored = plain(next); }, mapSwitcherItems: async () => items } };
+  const view = new VisualAgentMapView({ app: tree.app }, plugin);
+  view.path = 'Current/Map.md'; view.map = map(Array.from({ length: nodes }, (_, i) => node(`n${i}`))); if (aim) view.map.aim = { runs: [] };
+  view.mapSources = plain(stored); view.announcer = dom.element('status');
+  const tools = dom.element('tools');
+  const draw = () => { tools.children = []; view.renderMapTools(tools); return tools; };
+  return { view, tree, state, tools, draw, plugin };
+}
+const msButton = tools => dom.find(tools, c => c.tag === 'button' && (c.cls ?? '').includes('vam-sources-button'));
+const msLabel = tools => dom.find(msButton(tools), c => c.cls === 'vam-sources-button-label').text;
+integrationTest('map sources toolbar: the button follows the select icon (the goal now lives in the goal bar), reads 資料來源 with and without a count, and is absent on AIM and empty maps', () => {
+  const none = msViewFixture(); none.draw();
+  const buttons = none.tools.children.filter(c => c.tag === 'button');
+  assert.equal(buttons.at(-1), msButton(none.tools), 'right after the select icon');
+  assert.ok(buttons.at(-2).cls.includes('vam-tools-select'));
+  assert.equal(buttons.some(b => (b.cls ?? '').includes('vam-relevance-goal')), false, 'no goal button in the toolbar any more');
+  assert.equal(msLabel(none.tools), 'Data sources');
+  const three = msViewFixture({ stored: [{ kind: 'folder', path: 'Research' }, { kind: 'file', path: 'Notes/interview.md' }, { kind: 'map', path: 'Old plan/Map.md' }] }); three.draw();
+  assert.equal(msLabel(three.tools), 'Data sources · 3'); assert.equal(dom.find(msButton(three.tools), c => c.iconName === 'alert-triangle'), undefined);
+  assert.equal(msButton(three.tools).attrs['aria-haspopup'], 'dialog'); assert.equal(msButton(three.tools).attrs['aria-expanded'], 'false'); assert.ok(msButton(three.tools).attrs['aria-controls']);
+  assert.equal(msViewFixture({ aim: true }).draw().children.length, 0, 'no tools at all on an AIM map');
+  const empty = msViewFixture({ nodes: 0 }).draw();
+  assert.equal(msButton(empty), undefined, 'an empty map has no data sources button');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;/);
+  const hidden = source.slice(source.indexOf('private renderHiddenAimMapTools'), source.indexOf('private renderHiddenAimMapTools') + 1500);
+  assert.equal(hidden.includes('renderMapSourcesControl'), false, 'the hidden-AIM tools do not draw it');
+});
+integrationTest('map sources toolbar: an unreadable source puts ⚠ before the label and an aria-description, keeping the count', () => {
+  const fx = msViewFixture({ stored: [{ kind: 'folder', path: 'Research' }, { kind: 'file', path: 'Gone/missing.md' }, { kind: 'file', path: 'Gone/two.md' }] }); fx.draw();
+  const button = msButton(fx.tools);
+  assert.equal(button.children[0].children.length === 0 && button.children[0].iconName, 'alert-triangle'); assert.equal(button.children[1].text, 'Data sources · 3', 'the warning comes before the label; the count is unchanged');
+  assert.equal(button.attrs['aria-description'], '2 unreadable'); assert.ok(button.hasClass('has-unreadable'));
+  button.removeAttribute = name => { delete button.attrs[name]; };
+  fx.view.mapSources = [{ kind: 'folder', path: 'Research' }]; fx.view.paintMapSourcesButton();
+  assert.equal(dom.find(button, c => c.iconName === 'alert-triangle'), undefined); assert.equal(button.attrs['aria-description'], undefined);
+});
+// Like a browser: moving focus fires focusout (with relatedTarget) on the element that held it. Applied to every element created later.
+const withRealFocus = el => {
+  const focus = el.focus.bind(el), child = el.child.bind(el);
+  el.focus = () => { const previous = dom.focusedNow(); focus(); if (previous && previous !== el) previous.fire('focusout', { relatedTarget: el }); };
+  el.child = (...args) => withRealFocus(child(...args));
+  return el;
+};
+integrationTest('map sources panel (B1 counterexample): opening by keyboard while the button already has focus keeps it open, expanded, and redrawn by an add', async () => {
+  const fx = msViewFixture(); withRealFocus(fx.tools); fx.draw();
+  const button = () => msButton(fx.tools), panel = () => dom.find(fx.tools, c => c.cls === 'vam-map-sources-panel');
+  withRealFocus(button()); button().focus();
+  button().click();
+  assert.ok(panel(), 'the panel is visible'); assert.equal(button().attrs['aria-expanded'], 'true'); assert.equal(fx.view.mapSourcesOpen, true);
+  const file = { kind: 'file', path: 'Notes/interview.md' };
+  fx.view.changeMapSources('Current/Map.md', 'add', file); await dom.tick();
+  assert.ok(dom.find(panel(), c => c.text === 'interview.md'), 'the add redraws the open list');
+  button().click(); assert.equal(panel(), undefined, 'the next press closes instead of reopening'); assert.equal(button().attrs['aria-expanded'], 'false');
+});
+integrationTest('map sources panel in the view: open, add writes only through the repository, a duplicate add writes nothing, remove updates the label, Esc and the button close it', async () => {
+  const fx = msViewFixture(); fx.draw();
+  const button = () => msButton(fx.tools), panel = () => dom.find(fx.tools, c => c.cls === 'vam-map-sources-panel');
+  assert.equal(panel(), undefined);
+  button().click(); assert.ok(panel()); assert.equal(button().attrs['aria-expanded'], 'true'); assert.equal(panel().attrs.id, button().attrs['aria-controls']);
+  const file = { kind: 'file', path: 'Notes/interview.md' };
+  fx.view.changeMapSources('Current/Map.md', 'add', file); await dom.tick();
+  assert.deepEqual(fx.state.writes, [['Current/Map.md', [file]]]); assert.equal(msLabel(fx.tools), 'Data sources · 1');
+  assert.ok(dom.find(panel(), c => c.text === 'interview.md'), 'the open panel shows the new row'); assert.equal(fx.view.announcer.text, 'Added interview.md');
+  fx.view.changeMapSources('Current/Map.md', 'add', { ...file }); await dom.tick();
+  assert.equal(fx.state.writes.length, 1, 'adding the same kind and path again writes nothing'); assert.equal(fx.view.announcer.text, 'interview.md is already added');
+  fx.view.changeMapSources('Current/Map.md', 'remove', file); await dom.tick();
+  assert.equal(fx.state.writes.length, 2); assert.deepEqual(fx.state.writes[1], ['Current/Map.md', []]); assert.equal(msLabel(fx.tools), 'Data sources'); assert.equal(fx.view.announcer.text, 'Removed interview.md');
+  assert.equal(dom.focusedNow().children[1].text, 'Select a mind map', 'removing the last row moves focus to the first picker');
+  panel().fire('keydown', { key: 'Escape' }); assert.equal(panel(), undefined); assert.equal(button().attrs['aria-expanded'], 'false'); assert.equal(dom.focusedNow(), button());
+  button().click(); assert.ok(panel()); button().click(); assert.equal(panel(), undefined, 'the button toggles it');
+  button().click(); fx.draw(); assert.ok(panel(), 'a repaint keeps an open panel');
+  button().fire('focusout', { relatedTarget: dom.element('canvas') }); assert.equal(panel(), undefined, 'focus leaving the button for an outside element closes it');
+  fx.view.changeMapSources('Other/Map.md', 'add', file); fx.view.path = 'Other/Map.md'; await dom.tick(); assert.equal(fx.state.writes.length, 2, 'a change for a map that is no longer open is dropped');
+});
+integrationTest('map sources in the view: deleting a source note repaints the button with ⚠ and the panel row as unreadable', () => {
+  const fx = msViewFixture({ stored: [{ kind: 'file', path: 'Notes/interview.md' }] }); fx.draw();
+  msButton(fx.tools).click();
+  assert.equal(dom.find(fx.tools, c => c.cls === 'vam-map-sources-meta'), undefined);
+  fx.tree.items.delete('Notes/interview.md'); fx.view.refreshMapSourcesUi();
+  assert.ok(dom.find(msButton(fx.tools), c => c.iconName === 'alert-triangle')); assert.equal(dom.find(fx.tools, c => c.cls === 'vam-map-sources-meta').text, 'Unreadable; tasks skip it');
+  assert.ok(dom.find(fx.tools, c => (c.cls ?? '').includes('vam-map-sources-remove')), 'the unreadable row keeps Remove');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.registerEvent\(vault\.on\("delete"[\s\S]*this\.registerEvent\(vault\.on\("rename"/);
+});
+test('map sources: the removed task-dialog picker, its styles and its dead keys are gone', () => {
+  assert.equal(fs.existsSync(path.join(root, 'ui', ['reference', 'picker'].join('-') + '.ts')), false);
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.equal(/\.vam-reference-(picker|actions|action|group-row|feedback|cancel|remove)\b/.test(css), false);
+  assert.match(css, /\.vam-map-sources-panel \{[^}]*max-width: min\(440px/); assert.match(css, /\.vam-map-sources-actions \{[^}]*flex-wrap: wrap/);
+  const zh = fs.readFileSync(path.join(root, 'i18n/zh-TW.ts'), 'utf8');
+  assert.match(zh, /"ui\.map_sources_title": "這張心智圖的資料來源"/); assert.match(zh, /"ui\.map_sources_unreadable_description_0": "\{0\} 份讀不到"/);
+  assert.equal(/"ui\.map_sources_[^"]*": "[^"]*地圖/.test(zh), false);
 });

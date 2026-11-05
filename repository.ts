@@ -64,6 +64,12 @@ import {
   readRelevanceContext,
   type NoteRelevance
 } from "./note-values";
+import {
+  MAP_SOURCES_KEY,
+  readMapSources,
+  serializeMapSources,
+  type MapSource
+} from "./experiences/visual-map/map-sources";
 import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
 import { aimEnabled } from "./experiences/aim/availability";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
@@ -1914,6 +1920,29 @@ export class Repository {
     return readRelevanceGoal(frontmatter(await this.app.vault.read(this.file(path))));
   }
 
+  /** The map file's `map-sources` list, tolerantly read (a missing key or a malformed value gives the valid subset). */
+  async readMapSources(path: string): Promise<MapSource[]> {
+    return readMapSources(frontmatter(await this.app.vault.read(this.file(path))));
+  }
+
+  /**
+   * Sets the map's `map-sources` only, through `vault.process`. An empty list removes the key; a list that already
+   * matches what is stored leaves the file untouched. Nothing else changes and nothing rebuilds.
+   */
+  async writeMapSources(path: string, sources: readonly MapSource[]): Promise<void> {
+    const next = serializeMapSources(sources);
+    await this.app.vault.process(this.file(path), content => {
+      const current = frontmatter(content)[MAP_SOURCES_KEY];
+      if (
+        next.length
+          ? Array.isArray(current) && current.length === next.length && current.every((item, i) => item === next[i])
+          : current === undefined
+      )
+        return content;
+      return setFrontmatterKeys(content, { [MAP_SOURCES_KEY]: next.length ? next : null });
+    });
+  }
+
   /** The goal and context keys of the map file in one read (an old `relevance-level` key is ignored). */
   async readRelevanceSetup(path: string): Promise<RelevanceSetup> {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
@@ -2885,6 +2914,17 @@ export class Repository {
           if (typeof next.parentId === "string") next.parentId = fresh(next.parentId);
           if (Array.isArray(next.members)) next.members = freshIds(next.members as string[]);
           if (Array.isArray(next.links)) next.links = freshIds(next.links as string[]);
+          // An annotated image's anchor relations: the topic end is the copied topic, the anchor id stays.
+          if (next.kind === "annotated-image" && Array.isArray(next.relations)) {
+            const anchors = new Set(
+              (Array.isArray(next.anchors) ? (next.anchors as Array<{ id?: unknown }>) : []).map(anchor => anchor.id)
+            );
+            next.relations = (next.relations as Array<{ from: string; to: string }>).map(relation => ({
+              ...relation,
+              from: anchors.has(relation.from) ? relation.from : fresh(relation.from),
+              to: anchors.has(relation.to) ? relation.to : fresh(relation.to)
+            }));
+          }
           return next as unknown as CanvasItem;
         });
     });

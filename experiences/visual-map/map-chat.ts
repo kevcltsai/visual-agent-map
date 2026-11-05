@@ -155,10 +155,18 @@ export interface MapChatTurnHandle {
   readonly retired: MapChatChoices[];
 }
 
+/** A follow-up the user typed while the reply was being made: "live" went into the running turn, "queued" waits for the turn to end. */
+export interface MapChatSteer {
+  text: string;
+  state: "live" | "queued";
+}
+
 export interface MapChatMessage {
   role: "user" | "assistant";
   /** On a user message: the question and references it was sent with. */
   origin?: MapChatOrigin;
+  /** On a user message: the follow-ups typed while its reply was being made, oldest first (shown under the question). */
+  steers?: MapChatSteer[];
   text: string;
   /** One line per applied, skipped or failed action. */
   lines: MapChatLine[];
@@ -186,6 +194,8 @@ export interface MapChatHost {
   send(): void;
   /** The panel asks to stop the running request. */
   stop(): void;
+  /** Enter with text while a turn works: the text in the field is a follow-up for the running turn (the view reads the draft). */
+  steer?(): void;
   /** The opening screen's secondary button: a new empty map through the name box, no AI. Absent: no button. */
   createEmptyMap?(): void;
   /** The clock the stage seconds are counted on (tests); the real time when absent. */
@@ -318,6 +328,7 @@ export class MapChatPanel {
   /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
   private modelTagEl!: HTMLElement;
   private stopEl!: HTMLButtonElement;
+  private steerHintEl!: HTMLElement;
   private saveEl!: HTMLButtonElement;
   /** The note is being written; a second press does nothing. */
   private saving = false;
@@ -686,6 +697,9 @@ export class MapChatPanel {
     if (!this.hasTurn(turn)) return false;
     this.messages = this.messages.filter(message => message !== turn.user && message !== turn.assistant);
     for (const choices of turn.retired) choices.picked = false;
+    // Follow-ups typed while the request was still being prepared go back to the field after the question.
+    const steered = (turn.user.steers ?? []).map(steer => steer.text);
+    if (steered.length) draft = [draft, ...steered].filter(Boolean).join("\n");
     this.cancelFrame();
     this.busy = false;
     this.clearStage();
@@ -702,6 +716,52 @@ export class MapChatPanel {
     this.renderHint();
     this.host.stateChanged?.();
     return true;
+  }
+  /** The latest question: where follow-ups attach. */
+  private lastQuestion(): MapChatMessage | null {
+    for (let at = this.messages.length - 1; at >= 0; at--)
+      if (this.messages[at].role === "user") return this.messages[at];
+    return null;
+  }
+  /** A follow-up typed while the turn works: it joins the latest question (under it, above the answer) and the field empties. */
+  addSteer(text: string, state: MapChatSteer["state"]): MapChatSteer | null {
+    const question = this.lastQuestion();
+    if (!question || !text.trim()) return null;
+    const steer: MapChatSteer = { text, state };
+    (question.steers ??= []).push(steer);
+    if (this.built) this.inputEl.value = "";
+    this.renderLog(true);
+    this.renderBusy();
+    this.announce(t(state === "live" ? "ui.map_chat_steer_sent" : "ui.map_chat_steer_queued_announce"));
+    return steer;
+  }
+  /** A follow-up that could not go into the running turn waits for the turn to end (`speak` false: no announcement). */
+  setSteerState(steer: MapChatSteer, state: MapChatSteer["state"], speak = true): void {
+    if (steer.state === state) return;
+    steer.state = state;
+    this.renderLog();
+    if (speak && state === "queued") this.announce(t("ui.map_chat_steer_queued_announce"));
+  }
+  /** Removes the queued follow-ups of the latest question and returns their texts, oldest first. */
+  takeQueued(): string[] {
+    const question = this.lastQuestion();
+    if (!question?.steers?.some(steer => steer.state === "queued")) return [];
+    const taken = question.steers.filter(steer => steer.state === "queued");
+    question.steers = question.steers.filter(steer => steer.state !== "queued");
+    if (!question.steers.length) delete question.steers;
+    this.renderLog();
+    return taken.map(steer => steer.text);
+  }
+  /** The texts of the follow-ups of the latest question that went into the turn, oldest first. */
+  takeSteerTexts(): string[] {
+    return (this.lastQuestion()?.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text);
+  }
+  /** Puts texts back into the field, in front of what was typed meanwhile. */
+  restoreDraft(texts: string[]): void {
+    if (!this.built || !texts.length) return;
+    const typed = this.inputEl.value;
+    this.inputEl.value = [...texts, ...(typed.trim() ? [typed] : [])].join("\n");
+    this.renderHint();
   }
   private clockNow(): number {
     return this.host.now?.() ?? Date.now();
@@ -1179,6 +1239,8 @@ export class MapChatPanel {
       cls: "vam-map-chat-input",
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
+    this.steerHintEl = box.createSpan({ cls: "vam-map-chat-steer-hint", attr: { id: "vam-map-chat-steer-hint" } });
+    this.steerHintEl.hidden = true;
     this.sendEl = box.createEl("button", {
       cls: "vam-map-chat-send",
       attr: { type: "button", "aria-label": t("ui.map_chat_send") }
@@ -1198,6 +1260,7 @@ export class MapChatPanel {
       this.composing = false;
     });
     this.inputEl.addEventListener("keydown", event => this.onKey(event));
+    this.inputEl.addEventListener("input", () => this.renderSteerHint());
     // The visible note can change without any event the view hears (a collapsed sidebar, say); focusing the field is the last look before typing.
     this.inputEl.addEventListener("focus", () => this.refreshNote());
     // Escape on any other control of the window folds it too (the message field handles its own, above).
@@ -1273,7 +1336,7 @@ export class MapChatPanel {
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
-    this.inputEl.setAttr("placeholder", t("ui.map_chat_input_placeholder"));
+    this.renderPlaceholder();
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
@@ -1328,6 +1391,11 @@ export class MapChatPanel {
     // Enter sends, Shift+Enter breaks the line, and a key that confirms an IME candidate does neither.
     if (event.key !== "Enter" || event.shiftKey || event.isComposing || this.composing) return;
     event.preventDefault();
+    // While a turn works, Enter with text is a follow-up for it; without text it does nothing.
+    if (this.working) {
+      if (this.draft.trim()) this.host.steer?.();
+      return;
+    }
     this.host.send();
   }
 
@@ -1545,7 +1613,7 @@ export class MapChatPanel {
     this.heroTitleEl.hidden = !hero;
     this.heroTitleEl.toggleClass("is-hidden", !hero);
     // The opening screen asks for a topic; the side window talks about the map in front of it.
-    this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
+    this.renderPlaceholder();
     this.applyWidth();
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
@@ -1666,6 +1734,9 @@ export class MapChatPanel {
       this.stageMessage() === message ? "p" : "",
       this.canRetry(message, asked) ? "r" : "",
       message.linesOpen ? "o" : "",
+      (message.steers ?? []).map(steer => `${steer.state}:${steer.text}`).join("\n"),
+      t("ui.map_chat_steer_tag_live"),
+      t("ui.map_chat_steer_tag_queued"),
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
       t("ui.map_chat_plan_summary_0", ""),
@@ -1748,6 +1819,7 @@ export class MapChatPanel {
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    for (const steer of message.steers ?? []) this.buildSteer(row, steer);
     if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     if (message.plan) this.buildPlan(row, message.plan);
@@ -1770,6 +1842,16 @@ export class MapChatPanel {
       });
     }
     return { row, body, more };
+  }
+
+  /** A follow-up under the question: its own small bubble, tagged in words (the tag is text, never colour alone). */
+  private buildSteer(row: HTMLElement, steer: MapChatSteer): void {
+    const bubble = row.createDiv({ cls: `vam-map-chat-steer is-${steer.state}` });
+    bubble.createEl("small", {
+      cls: "vam-map-chat-steer-tag",
+      text: t(steer.state === "live" ? "ui.map_chat_steer_tag_live" : "ui.map_chat_steer_tag_queued")
+    });
+    bubble.createSpan({ cls: "vam-map-chat-steer-text", text: steer.text });
   }
 
   /** The raw error of a failed turn: folded away, selectable and copyable. */
@@ -2060,8 +2142,32 @@ export class MapChatPanel {
     }
   }
 
+  /** The field's hint: a follow-up while a turn works, the opening screen's ask, or the ordinary one. */
+  private renderPlaceholder(): void {
+    if (!this.built) return;
+    const key = this.working
+      ? "ui.map_chat_steer_placeholder"
+      : this.hero
+        ? "ui.map_chat_hero_placeholder"
+        : "ui.map_chat_input_placeholder";
+    this.inputEl.setAttr("placeholder", t(key));
+  }
+  /** "Enter 補充" beside the stop key while a turn works and the field has text. */
+  private renderSteerHint(): void {
+    if (!this.built) return;
+    const show = this.working && this.inputEl.value.trim().length > 0;
+    this.steerHintEl.setText(show ? t("ui.map_chat_steer_hint") : "");
+    this.steerHintEl.hidden = !show;
+    this.steerHintEl.toggleClass("is-hidden", !show);
+    if (this.working) this.inputEl.setAttr("aria-keyshortcuts", "Enter");
+    else this.inputEl.removeAttribute?.("aria-keyshortcuts");
+    if (show) this.inputEl.setAttr("aria-describedby", "vam-map-chat-steer-hint");
+    else this.inputEl.removeAttribute?.("aria-describedby");
+  }
   private renderBusy(): void {
     if (!this.built) return;
+    this.renderPlaceholder();
+    this.renderSteerHint();
     // The turn's own progress is in the AI bubble; this line only says that a plan is being applied.
     this.statusEl.setText(this.applying ? t("ui.map_chat_applying") : "");
     this.el.toggleClass("is-busy", this.working);

@@ -393,7 +393,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
     // The real confirmAiUsage asks this first; a test that stubs it to false gets the real not-ready path of the send.
     aiReadyForModel: async () => true,
     confirmAiUsage: async (model, run) => { control.usageAsks++; control.models.push(model); control.calls.push('confirm'); if (!(await plugin.aiReadyForModel(model))) return false; if (control.decline) return false; await run(); return true; },
-    mapChat: { chat: async (request, signal, onReply, onProgress) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply, onProgress); } },
+    mapChat: { chat: async (request, signal, onReply, onProgress, onSteer) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply, onProgress, onSteer); } },
     // B3: the web image search of the Markdown quick action; the thumbnail check is stubbed on the view below.
     searchImages: async (query, model, signal) => { control.calls.push('search'); control.searches.push({ query, model, signal }); return control.search(query, model, signal); }
   });
@@ -5840,4 +5840,201 @@ integrationTest('persona G12: moving a card with its own branch up under another
   assert.ok(dropped, 'the moved card is under its new parent');
   const crowd = h.view.map.nodes.filter(n => n.id !== moving.id && n.parentId !== moving.id && Math.abs(n.x - dropped.x) < 280 && n.y < dropped.y + 145 && dropped.y < n.y + 145);
   eq(crowd.map(title), [], 'nothing overlaps the moved card');
+});
+
+
+// ---- steer: a follow-up typed while the AI works (packet B2) ---------------------------------------------------------------
+
+const steerBubbles = chat => findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-steer'));
+const steerTags = chat => steerBubbles(chat).map(b => visibleText(b.children.find(c => hasClass(c, 'vam-map-chat-steer-tag'))));
+const steerTexts = chat => steerBubbles(chat).map(b => visibleText(b.children.find(c => hasClass(c, 'vam-map-chat-steer-text'))));
+const pressEnter = chat => key(chat.inputEl, { key: 'Enter' });
+/** A turn that gives out its steer handler and waits; `handled` collects the texts the handler took, `reject` makes it refuse. */
+function steerReply(h, { reject = false, result } = {}) {
+  const gate = deferred(); const s = { gate, handled: [], handlers: [], reject, onReply: null, progress: null };
+  h.control.reply = async (_request, _signal, onReply, onProgress, onSteer) => {
+    s.onReply = onReply; s.progress = onProgress;
+    onSteer?.(async text => { if (s.reject) throw new Error('already ended'); s.handled.push(text); });
+    s.handlers.push(onSteer);
+    await gate.promise; if (s.fail) throw new Error('boom'); return result ?? { reply: 'done', actions: [], rejected: [] };
+  };
+  return s;
+}
+
+test('map chat steer N1/N2: Enter with no text, Shift+Enter and an IME confirmation while a turn works send nothing; Enter with text asks for a steer, not a send', () => {
+  let steered = 0; const f = panelFixture({ steer: () => { steered++; } }); f.panel.setOpen(true); f.panel.begin('q');
+  const input = f.parts.input();
+  input.value = '   '; assert.equal(key(input, { key: 'Enter' }), true); assert.equal(steered, 0, 'N1: blank text'); input.value = '';
+  input.value = 'more'; key(input, { key: 'Enter', shiftKey: true }); key(input, { key: 'Enter', isComposing: true }); assert.equal(steered, 0, 'N2: Shift+Enter and IME');
+  input.fire('compositionstart'); key(input, { key: 'Enter' }); input.fire('compositionend'); assert.equal(steered, 0, 'N2: composing');
+  key(input, { key: 'Enter' }); assert.equal(steered, 1); assert.equal(f.calls.send, 0, 'a working turn is never sent again');
+});
+
+test('map chat steer: while working the field says what to type, shows "Enter to add" only with text, and names the key; the stop key is the only button', () => {
+  const f = panelFixture({ steer() {} }); f.panel.setOpen(true); const input = f.parts.input();
+  const hint = () => find(f.panel.el, i => hasClass(i, 'vam-map-chat-steer-hint'));
+  assert.equal(input.attrs.placeholder.startsWith('Ask a question'), true); assert.equal(hint().hidden, true);
+  f.panel.begin('q');
+  assert.equal(input.attrs.placeholder, 'What do you want to add? The AI reads it midway through this reply.');
+  assert.equal(hint().hidden, true, 'no text, no hint'); assert.equal(input.attrs['aria-describedby'], undefined);
+  input.value = 'x'; input.fire('input');
+  assert.equal(hint().hidden, false); assert.equal(hint().text, 'Enter to add'); assert.equal(input.attrs['aria-describedby'], hint().attrs.id); assert.equal(input.attrs['aria-keyshortcuts'], 'Enter');
+  assert.equal(f.parts.send().hidden, true, 'no second button'); assert.equal(f.parts.stop().hidden, false);
+  f.panel.markStopped(); assert.equal(input.attrs.placeholder.startsWith('Ask a question'), true, 'the ordinary hint comes back'); assert.equal(hint().hidden, true); assert.equal(input.attrs['aria-keyshortcuts'], undefined);
+});
+
+test('map chat steer: a follow-up is a bubble under the question and above the answer, tagged in words; queued says so; the field empties and the live region says it once', () => {
+  const f = panelFixture({ steer() {} }); f.panel.setOpen(true); f.panel.begin('question'); f.parts.input().value = 'also this';
+  const live = f.panel.addSteer('also this', 'live');
+  assert.equal(f.parts.input().value, ''); assert.equal(f.panel.liveEl.text, 'Added to this reply.');
+  const rows = findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-msg'));
+  assert.ok(findAll(rows[0], i => hasClass(i, 'vam-map-chat-steer')).length === 1 && findAll(rows[1], i => hasClass(i, 'vam-map-chat-steer')).length === 0, 'in the question row, not the answer');
+  eq(steerTags(f.panel), ['Added midway']); eq(steerTexts(f.panel), ['also this']);
+  f.panel.setSteerState(live, 'queued'); eq(steerTags(f.panel), ['Sends after this reply ends']); assert.equal(f.panel.liveEl.text, 'Will send after this reply ends.');
+  f.panel.addSteer('second', 'live'); eq(f.panel.takeSteerTexts(), ['second']); eq(f.panel.takeQueued(), ['also this']); eq(steerTexts(f.panel), ['second']);
+  eq(f.panel.takeQueued(), [], 'taken once');
+});
+
+test('map chat steer N4: a send taken back while preparing puts the question and the follow-ups into the field, in order; the three languages have every steer word', () => {
+  const f = panelFixture({ steer() {} }); f.panel.setOpen(true); const turn = f.panel.begin('q', undefined, false, 'preparing');
+  f.panel.addSteer('one', 'live'); f.panel.addSteer('two', 'live'); f.parts.input().value = 'typing';
+  f.panel.retract(turn, 'q'); assert.equal(f.panel.draft, 'q\none\ntwo\ntyping'); assert.equal(f.panel.transcript().length, 0);
+  for (const language of ['zh-TW', 'zh-CN']) { f.setLanguage(language); f.panel.begin('q'); assert.match(f.parts.input().attrs.placeholder, /^要补充什么|^要補充什麼/); f.panel.markStopped(); }
+});
+
+integrationTest('map chat steer: Enter while the AI writes hands the text to the running turn, shows a bubble, and the plan and actions carry it (Acceptance 1, 2)', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h, { result: { reply: 'Two cards.', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Renamed' }], rejected: [] } });
+  const applied = []; const rawApply = h.view.applyMapChatActions.bind(h.view); h.view.applyMapChatActions = (result, ...rest) => { applied.push(result.message); return rawApply(result, ...rest); };
+  h.type('add 3 children'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  h.type('make it 2'); assert.equal(pressEnter(chat), true); await tick(); await tick();
+  eq(s.handled, ['make it 2']); eq(steerTexts(chat), ['make it 2']); eq(steerTags(chat), ['Added midway']); assert.equal(chat.draft, '');
+  eq(chat.transcript().map(m => m.role), ['user', 'assistant']);
+  s.gate.resolve(); await sending;
+  eq(applied, ['add 3 children\n\nmake it 2'], 'the actions are applied for the question and the follow-up'); assert.equal(h.control.requests.length, 1, 'no extra message');
+  assert.equal(chat.transcript().at(-1).text, 'Two cards.'); eq(steerTags(chat), ['Added midway'], 'the bubble stays');
+});
+
+integrationTest('map chat steer N10: several Enters in one turn make one bubble each and go in as typed', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h);
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  for (const text of ['a', 'b', 'c']) { h.type(text); pressEnter(chat); }
+  s.gate.resolve(); await sending;
+  eq(s.handled, ['a', 'b', 'c']); eq(steerTexts(chat), ['a', 'b', 'c']); assert.equal(h.control.requests.length, 1);
+});
+
+integrationTest('map chat steer N3/Acceptance 3: a handler that refuses (the turn already ended) queues the follow-up; after the reply it is sent once as the next message', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); let n = 0; const s = steerReply(h, { reject: true });
+  const raw = h.control.reply; h.control.reply = async (...args) => { n++; if (n === 2) return { reply: 'second', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Late' }], rejected: [] }; return raw(...args); };
+  h.type('first'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  h.type('late one'); pressEnter(chat); await tick(); await tick();
+  eq(steerTags(chat), ['Sends after this reply ends']); eq(s.handled, []);
+  s.gate.resolve(); await sending; await until(() => h.control.requests.length === 2 && !chat.isBusy);
+  assert.equal(h.control.requests.length, 2); assert.equal(h.control.requests[1].message, 'late one', 'sent once, as its own message');
+  eq(chat.transcript().map(m => m.text).filter(Boolean).slice(0, 3), ['first', 'done', 'late one']); eq(steerBubbles(chat), [], 'the queued bubble became a message');
+  assert.equal((await h.note('a')).title, 'Late');
+});
+
+integrationTest('map chat steer N4: Enter before the request goes out waits; the usage notice declined gives the question and the follow-up back in the field and sends nothing; a handler that comes later takes the waiting text', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); const raw = h.plugin.confirmAiUsage;
+  h.plugin.confirmAiUsage = async (...args) => { await gate.promise; return raw(...args); };
+  h.control.decline = true; h.type('question'); const sending = h.view.sendMapChat(); await until(() => chat.isBusy);
+  h.type('extra'); pressEnter(chat); eq(steerTexts(chat), ['extra']);
+  gate.resolve(); await sending;
+  assert.equal(chat.draft, 'question\nextra'); eq(chat.transcript(), []); eq(h.control.requests, []);
+  // The handler arrives after the follow-up was typed: it is handed over then.
+  h.control.decline = false; const s = steerReply(h); h.plugin.confirmAiUsage = async (...args) => { await gate2.promise; return raw(...args); }; const gate2 = deferred();
+  h.type('again'); const second = h.view.sendMapChat(); await until(() => chat.isBusy); h.type('early'); pressEnter(chat); gate2.resolve();
+  await until(() => s.handlers.length === 1); await tick(); await tick(); eq(s.handled, ['early']); s.gate.resolve(); await second;
+});
+
+integrationTest('map chat steer N5/C9: "Resend" on the slow notice hands the follow-up that went to the old attempt to the new one once, with one bubble', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = async (_request, signal, _onReply, onProgress, onSteer) => {
+    const attempt = { handled: [] }; attempts.push(attempt); onProgress({ kind: 'stream-mode', mode: 'stream-json' });
+    onSteer(async text => { attempt.handled.push(text); });
+    if (attempts.length === 1) await new Promise(resolve => signal.addEventListener('abort', resolve)); else await attempt.gate?.promise;
+    return { reply: 'ok', actions: [], rejected: [] };
+  };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick(); eq(attempts[0].handled, ['extra']);
+  h.clock.advance(20_000); resendButton(chat).click(); await sending;
+  eq(attempts[1].handled, ['extra'], 'the new attempt got it once'); eq(steerTexts(chat), ['extra']); assert.equal(h.control.requests.length, 2);
+});
+
+integrationTest('map chat steer N6/C7/C8: Stop and a failure leave the follow-ups that did not go in in the field, send nothing, keep the ones that did, and Retry asks with them', async () => {
+  for (const how of ['stop', 'fail']) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); let n = 0; const raw = h.control.reply;
+    h.control.reply = async (...args) => { n++; if (n === 2) return { reply: 'retried', actions: [], rejected: [] }; return raw(...args); };
+    h.type('first'); const sending = h.view.sendMapChat(); await requestOut(chat);
+    h.type('went in'); pressEnter(chat); await tick(); await tick(); s.reject = true; h.type('too late'); pressEnter(chat); await tick(); await tick();
+    eq(steerTags(chat), ['Added midway', 'Sends after this reply ends']);
+    if (how === 'stop') { h.view.stopMapChat(); s.gate.resolve(); } else { s.fail = true; s.gate.resolve(); }
+    await sending.catch(() => {}); await tick();
+    assert.equal(chat.draft, 'too late', `${how}: back in the field`); eq(steerTexts(chat), ['went in']); assert.equal(h.control.requests.length, 1, `${how}: nothing auto-sent`);
+    h.type(''); const retry = findAll(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry'))[0]; assert.ok(retry, `${how}: retry offered`);
+    retry.click(); await until(() => h.control.requests.length === 2 && !chat.isBusy);
+    assert.equal(h.control.requests[1].message, 'first\n\nwent in', `${how}: the retry includes the follow-up that went in`);
+  }
+});
+
+integrationTest('map chat steer N7: switching maps or closing the view drops the follow-ups; a late handler or reply changes nothing', async () => {
+  for (const how of ['switch', 'close']) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h);
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat);
+    if (how === 'switch') { h.view.map.id = 'another-map'; h.repaint(); } else await h.view.onClose();
+    if (how === 'switch') eq(chat.transcript(), [], 'the conversation and its follow-ups are gone');
+    const before = plain(chat.transcript()); const bubbles = steerBubbles(chat).length;
+    s.gate.resolve(); await sending; await tick(); await tick();
+    eq(chat.transcript(), before, `${how}: nothing comes back`); assert.equal(steerBubbles(chat).length, bubbles); assert.equal(h.control.requests.length, 1);
+  }
+});
+
+integrationTest('map chat steer N8/C5: Enter while the reply is applied waits and is sent once afterwards; Enter while a confirmed plan is applied does the same; Stop of the plan returns it to the field', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h, { result: { reply: 'r', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'X' }], rejected: [] } });
+  const applyGate = deferred(); const raw = h.view.applyMapChatActions.bind(h.view); let applies = 0; let n = 0;
+  h.view.applyMapChatActions = async (...args) => { applies++; await applyGate.promise; return raw(...args); };
+  const first = h.control.reply; h.control.reply = async (...args) => { n++; return n === 1 ? first(...args) : { reply: 'later', actions: [], rejected: [] }; };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); s.gate.resolve(); await until(() => chat.stageKind === 'applying');
+  h.type('during apply'); pressEnter(chat); await tick(); eq(s.handled, [], 'not handed to the finished request'); eq(steerTags(chat), ['Sends after this reply ends']);
+  applyGate.resolve(); await sending; await until(() => h.control.requests.length === 2 && !chat.isBusy);
+  assert.equal(h.control.requests[1].message, 'during apply'); assert.equal(h.control.requests.length, 2, 'sent once');
+});
+
+integrationTest('map chat steer N8 (plan): Enter while a confirmed plan is applied is sent once after it; Stop of the plan puts it back in the field', async () => {
+  for (const stop of [false, true]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const applyGate = deferred();
+    const manyChildren = Array.from({ length: 30 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.a, title: `C${i}`, summary: '' }));
+    let n = 0; h.control.reply = async () => { n++; return n === 1 ? { reply: 'plan', actions: manyChildren, rejected: [] } : { reply: 'next', actions: [], rejected: [] }; };
+    h.type('big'); await h.view.sendMapChat(); const card = chat.pendingPlan(); assert.ok(card, 'a plan waits');
+    const raw = h.view.applyMapChatActions.bind(h.view); h.view.applyMapChatActions = async (...args) => { await applyGate.promise; return raw(...args); };
+    card.apply(); await until(() => h.view.chatApplying);
+    h.type('while applying'); pressEnter(chat); eq(steerTags(chat), ['Sends after this reply ends']); assert.equal(h.control.requests.length, 1);
+    if (stop) h.view.stopMapChat(); applyGate.resolve(); await until(() => !h.view.chatApplying); await tick(); await tick();
+    if (stop) { assert.equal(chat.draft, 'while applying'); assert.equal(h.control.requests.length, 1, 'Stop: not sent'); }
+    else { await until(() => h.control.requests.length === 2); assert.equal(h.control.requests[1].message, 'while applying'); }
+  }
+});
+
+integrationTest('map chat steer N9: a plan card waiting for the answer is not busy, so Enter is an ordinary send and the plan is cancelled (unchanged)', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const manyChildren = Array.from({ length: 30 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.a, title: `C${i}`, summary: '' }));
+  let n = 0; h.control.reply = async () => { n++; return n === 1 ? { reply: 'plan', actions: manyChildren, rejected: [] } : { reply: 'next', actions: [], rejected: [] }; };
+  h.type('big'); await h.view.sendMapChat(); const card = chat.pendingPlan(); assert.ok(card); assert.equal(chat.isBusy, false);
+  h.type('something else'); const sendCalls = []; const rawSend = chat.host.send; chat.host.send = () => { sendCalls.push(1); rawSend(); };
+  pressEnter(chat); await until(() => h.control.requests.length === 2 && !chat.isBusy);
+  assert.equal(h.control.requests[1].message, 'something else'); assert.equal(card.state, 'cancelled'); eq(steerBubbles(chat), []); assert.equal(sendCalls.length, 1);
+});
+
+integrationTest('map chat steer: a mode that cannot take a follow-up as it runs (Claude json) queues at once and never calls the handler; the follow-up is sent after the reply', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); let n = 0; const raw = h.control.reply;
+  h.control.reply = async (...args) => { n++; if (n === 2) return { reply: 'second', actions: [], rejected: [] }; args[3]({ kind: 'stream-mode', mode: 'json' }); return raw(...args); };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick();
+  eq(steerTags(chat), ['Sends after this reply ends']); eq(s.handled, []); s.gate.resolve(); await sending; await until(() => h.control.requests.length === 2 && !chat.isBusy);
+  assert.equal(h.control.requests[1].message, 'extra');
+});
+
+integrationTest('map chat steer: a reply with a plan keeps the waiting follow-up in the field instead of cancelling the plan', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const manyChildren = Array.from({ length: 30 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.a, title: `C${i}`, summary: '' }));
+  const s = steerReply(h, { reject: true, result: { reply: 'plan', actions: manyChildren, rejected: [] } });
+  h.type('big'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('late'); pressEnter(chat); await tick(); await tick(); s.gate.resolve(); await sending;
+  assert.ok(chat.pendingPlan(), 'the plan still waits'); assert.equal(chat.draft, 'late'); assert.equal(h.control.requests.length, 1);
 });

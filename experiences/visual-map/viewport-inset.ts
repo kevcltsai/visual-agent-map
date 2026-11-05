@@ -82,6 +82,28 @@ export function fitIsClamped(
   return Math.min((availableWidth - 80) / w, (availableHeight - 80) / h) < FIT_MIN_ZOOM;
 }
 
+/**
+ * True when some box would be (even partly) outside the real canvas after the viewport is applied. Judged against the
+ * whole canvas, not the area left inside the toolbar insets: a card behind a floating toolbar is still on screen.
+ */
+export function anyBoxOffscreen(
+  boxes: { x: number; y: number; w: number; h: number }[],
+  viewport: MapViewport,
+  size: { width: number; height: number }
+): boolean {
+  const eps = 1;
+  return boxes.some(b => {
+    const left = b.x * viewport.zoom + viewport.x,
+      top = b.y * viewport.zoom + viewport.y;
+    return (
+      left < -eps ||
+      top < -eps ||
+      left + b.w * viewport.zoom > size.width + eps ||
+      top + b.h * viewport.zoom > size.height + eps
+    );
+  });
+}
+
 /** Show-all viewport: the bounds are fitted and centred in the area left inside the inset. */
 export function fitViewport(
   bounds: { minX: number; minY: number; maxX: number; maxY: number },
@@ -185,4 +207,141 @@ export function statusBarClearance(
   if (!status || !(status.right > status.left) || !(status.bottom > status.top)) return 0;
   if (status.left >= target.right || status.right <= target.left) return 0;
   return status.top < target.bottom ? Math.max(0, Math.ceil(target.bottom - status.top)) : 0;
+}
+
+export type CardToolsSide = "top" | "bottom" | "left" | "right";
+
+export interface CardToolsSpot {
+  side: CardToolsSide;
+  /** Screen pixels the row reaches into its own card (top and bottom sides), on top of the usual edge overlap. */
+  inset: number;
+  /** Screen pixels the row slides sideways from its fitted place (top and bottom sides). */
+  slide: number;
+  /** The row's rectangle after `pan` is applied. */
+  rect: ScreenRect;
+  /** Screen area shared with other cards, before `pan` (panning moves every card alike, so it does not change). */
+  overlap: number;
+  /** How far the canvas must move so the row (and its card) clear the floating controls and the canvas edge. */
+  pan: { dx: number; dy: number };
+}
+
+function overlapArea(a: ScreenRect, b: ScreenRect): number {
+  const width = Math.min(a.right, b.right) - Math.max(a.left, b.left),
+    height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return width > 0 && height > 0 ? width * height : 0;
+}
+
+/**
+ * Where a selected card's tool row goes so it does not cover another card: above or below first (it may reach a little
+ * into its own card, which is what clears a narrow gap), then beside. `row` is the row's horizontal extent as already
+ * fitted for the top and bottom sides, `size` its size. A side that covers no other card, no floating control and lies
+ * inside the canvas wins; otherwise the first side that covers no other card (the canvas then pans), otherwise the side
+ * that covers the least. All numbers are screen pixels.
+ */
+export function chooseCardToolsSpot(input: {
+  card: ScreenRect;
+  row: { left: number; right: number };
+  size: { width: number; height: number };
+  others: ScreenRect[];
+  controls: ScreenRect[];
+  visible: ScreenRect;
+  edge?: number;
+  maxInset?: number;
+}): CardToolsSpot {
+  const { card, row, size, others, controls, visible } = input;
+  const edge = input.edge ?? 6,
+    maxInset = input.maxInset ?? 14,
+    margin = 8;
+  const candidates: Array<{ side: CardToolsSide; inset: number; slide: number; rect: ScreenRect }> = [];
+  // The row may slide sideways (preferred spot first, then alternately left and right) to clear a neighbour.
+  const slides = [0];
+  for (let step = 8; step <= 120; step += 8) slides.push(-step, step);
+  for (let inset = 0; inset <= maxInset; inset += 4) {
+    for (const slide of slides) {
+      const bottom = card.top + edge + inset;
+      candidates.push({
+        side: "top",
+        inset,
+        slide,
+        rect: { left: row.left + slide, right: row.right + slide, top: bottom - size.height, bottom }
+      });
+    }
+  }
+  for (let inset = 0; inset <= maxInset; inset += 4) {
+    for (const slide of slides) {
+      const top = card.bottom - edge - inset;
+      candidates.push({
+        side: "bottom",
+        inset,
+        slide,
+        rect: { left: row.left + slide, right: row.right + slide, top, bottom: top + size.height }
+      });
+    }
+  }
+  const sideTop = card.top + edge;
+  candidates.push({
+    side: "right",
+    inset: 0,
+    slide: 0,
+    rect: { left: card.right + 4, right: card.right + 4 + size.width, top: sideTop, bottom: sideTop + size.height }
+  });
+  candidates.push({
+    side: "left",
+    inset: 0,
+    slide: 0,
+    rect: { left: card.left - 4 - size.width, right: card.left - 4, top: sideTop, bottom: sideTop + size.height }
+  });
+  const scored = candidates.map(candidate => ({
+    ...candidate,
+    overlap: others.reduce((total, other) => total + overlapArea(candidate.rect, other), 0),
+    blocked:
+      controls.some(control => rectsIntersect(candidate.rect, control)) ||
+      candidate.rect.left < visible.left ||
+      candidate.rect.right > visible.right ||
+      candidate.rect.top < visible.top ||
+      candidate.rect.bottom > visible.bottom
+  }));
+  const chosen =
+    scored.find(item => item.overlap === 0 && !item.blocked) ??
+    scored.find(item => item.overlap === 0) ??
+    scored.reduce((best, item) => (item.overlap < best.overlap ? item : best));
+  // Pan: first so the row is inside the canvas, then so the row and its card clear the floating controls.
+  let dx = 0,
+    dy = 0;
+  const row2 = chosen.rect;
+  if (row2.left < visible.left + margin) dx = visible.left + margin - row2.left;
+  else if (row2.right > visible.right - margin) dx = visible.right - margin - row2.right;
+  if (row2.top < visible.top + margin) dy = visible.top + margin - row2.top;
+  else if (row2.bottom > visible.bottom - margin) dy = visible.bottom - margin - row2.bottom;
+  const union = () => ({
+    left: Math.min(card.left, row2.left) + dx,
+    right: Math.max(card.right, row2.right) + dx,
+    top: Math.min(card.top, row2.top) + dy,
+    bottom: Math.max(card.bottom, row2.bottom) + dy
+  });
+  for (let round = 0; round < controls.length + 1; round++) {
+    const box = union(),
+      hit = controls.find(control => rectsIntersect(box, control));
+    if (!hit) break;
+    const down = hit.bottom + margin - box.top,
+      right = hit.right + margin - box.left;
+    const downFits = box.bottom + down <= visible.bottom,
+      rightFits = box.right + right <= visible.right;
+    if (downFits && (!rightFits || down <= right)) dy += down;
+    else if (rightFits) dx += right;
+    else dy += down;
+  }
+  return {
+    side: chosen.side,
+    inset: chosen.inset,
+    slide: chosen.slide,
+    overlap: chosen.overlap,
+    rect: {
+      left: row2.left + dx,
+      right: row2.right + dx,
+      top: row2.top + dy,
+      bottom: row2.bottom + dy
+    },
+    pan: { dx, dy }
+  };
 }

@@ -14,7 +14,7 @@ Writing baseline (applies to every voice): do not use filler transitions or wrap
 
 Synthesize mode: summary is a high-quality integrated conclusion within 160 characters. Detail integrates complete source knowledge, removes duplication, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions. If the UI offers draft review, write only after confirmation.
 
-When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the "Open questions to check" section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
+When the new sources settle an earlier statement that said no source was provided or that the point was not verified, delete that statement instead of keeping both. When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the "Open questions to check" section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: …".
 
 The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.
 

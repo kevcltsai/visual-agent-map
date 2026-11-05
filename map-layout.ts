@@ -4,7 +4,7 @@ import { fishbonePositions } from "./layouts/fishbone";
 import { radialPositions } from "./layouts/radial";
 import { timelinePositions } from "./layouts/timeline";
 import { verticalPositions } from "./layouts/vertical";
-import { CARD_WIDTH, parentIdsForNode, type MapNode } from "./map-graph";
+import { CARD_WIDTH, parentIdsForNode, visibleNodes, type MapNode } from "./map-graph";
 
 const WIDTH = 300;
 
@@ -707,4 +707,28 @@ export function reorderTopLevel<T extends { id: string; parentId?: string | null
     result[index] = order[place];
   });
   return result;
+}
+
+/**
+ * True when a shown card of `ids` covers another shown card (rectangles of the card width and the given heights). Used after a
+ * card grew: only the cards that changed are checked, so an overlap that was already there is left for the user to tidy.
+ */
+export function cardsOverlapAny(nodes: MapNode[], ids: ReadonlySet<string>, heightOf?: HeightOf): boolean {
+  const shown = visibleNodes(nodes);
+  const box = (node: MapNode) => ({
+    left: node.x,
+    right: node.x + (node.width ?? CARD_WIDTH),
+    top: node.y,
+    bottom: node.y + cardHeight(heightOf, node.id)
+  });
+  for (const node of shown) {
+    if (!ids.has(node.id)) continue;
+    const a = box(node);
+    for (const other of shown) {
+      if (other.id === node.id) continue;
+      const b = box(other);
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) return true;
+    }
+  }
+  return false;
 }

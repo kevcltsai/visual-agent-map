@@ -172,7 +172,7 @@ test('FG20-06: Copy to... lays the copies out clear of the target\'s children; o
   assert.deepEqual(h.overlaps(), []);
 });
 
-test('FG20-07: Structure and links > choosing a parent re-lays out the moved subtree at once; one undo restores it (decision 40)', async () => {
+test('FG20-07: This card > choosing a parent re-lays out the moved subtree at once; one undo restores it (decision 40)', async () => {
   const spec = [['R1', null, 80, 80]];
   for (let i = 1; i <= 7; i++) spec.push([`L${i}`, i === 1 ? 'R1' : `L${i - 1}`, 80 + 340 * i, 80]);
   spec.push(['R2', null, 80, 600], ['R2kid', 'R2', 420, 600]);

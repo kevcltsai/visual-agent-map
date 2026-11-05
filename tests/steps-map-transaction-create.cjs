@@ -149,7 +149,8 @@ test('R2-N3: after the conflict window keeps the file version, the viewport on s
 test('R2-N4: a synthesis topic whose rebuild fails keeps the synthesis label on its history entry', async () => {
   const h = await harness();
   const view = h.view;
-  view.plugin.rebuildDerivedData = async () => { throw new Error('injected rebuild'); };
+  // Only the full rebuild fails; the per-note refresh of a relation's ends (the new topic derives from its source) still works.
+  view.plugin.rebuildDerivedData = async paths => { if (!paths) throw new Error('injected rebuild'); };
   const sources = [h.root];
   const task = {
     state: 'applying', controller: new AbortController(), mapPath: MAP, mapId: view.map.id,
@@ -164,4 +165,27 @@ test('R2-N4: a synthesis topic whose rebuild fails keeps the synthesis label on 
   const entry = view.history.undoEntry;
   assert.ok(entry, 'the entry is in history');
   assert.equal(entry.label, 'Create synthesis topic');
+});
+
+test('persona-03: a synthesis topic is a conclusion and derives from every source', async () => {
+  const h = await harness();
+  const view = h.view;
+  await view.addNode(h.root, 'Second');
+  await view.hydrate();
+  const sources = view.map.nodes.slice();
+  assert.equal(sources.length, 2);
+  const task = {
+    state: 'applying', controller: new AbortController(), mapPath: MAP, mapId: view.map.id,
+    options: { synthesisContent: 'strong' }, directions: [], sourceContent: ''
+  };
+  view.integrationTask = task;
+  task.sourceContent = JSON.stringify((await view.topicReferenceGroup(sources, 'strong', {})).documents);
+  const result = { summary: 's', detail: 'd', visualReferences: [], formatIssues: [] };
+  await view.saveIntegratedNode('Synth', sources, 'goal', '', 'gpt-6-luna', result, 'en', task, {});
+  const made = view.map.nodes.find(n => !sources.some(s => s.id === n.id));
+  assert.ok(made, 'the synthesis topic is saved');
+  assert.equal((await h.repo.readNote(made.path)).topicKind, 'conclusion');
+  const links = (await h.repo.readMap(MAP)).topicRelations ?? [];
+  for (const source of sources)
+    assert.ok(links.some(r => r.kind === 'derives_from' && r.from === made.id && r.to === source.id), `links back to ${source.id}`);
 });

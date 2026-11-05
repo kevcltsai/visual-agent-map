@@ -12,6 +12,7 @@ export const nodeTestFiles = [
   "tests/css-support.mjs",
   "tests/changelog-section.mjs",
   "tests/prompt-snapshots.cjs",
+  "tests/card-status-consistent.cjs",
   "tests/replay.cjs",
   "tests/markdown-selection-auto-open.cjs",
   "tests/step-runner.cjs",

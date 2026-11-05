@@ -178,7 +178,7 @@ const element = (tag, buttons = []) => ({ tag, children: [], dataset: {}, style:
   createDiv(options) { const child = element('div', buttons); child.cls = options?.cls ?? options; this.children.push(child); return child; },
   createEl(name, options) { const child = element(name, buttons); child.text = options?.text; this.children.push(child); if (name === 'button') buttons.push(child); return child; },
   createSpan(options) { const child = element('span', buttons); child.text = options?.text; child.cls = options?.cls; this.children.push(child); return child; },
-  setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, toggleClass() {}, setPointerCapture() {}, addEventListener() {}, removeEventListener() {}, appendChild(child) { this.children.push(child); return child; }
+  setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, toggleClass() {}, setPointerCapture() {}, addEventListener(name, fn) { if (name === 'click') this.click = fn; }, removeEventListener() {}, appendChild(child) { this.children.push(child); return child; }
 });
 const aimDoc = () => {
   const topic = node('topic'); topic.aimKind = 'topic';
@@ -216,14 +216,18 @@ test('aim-hidden: E1 the card of an AIM node has the generic tools and none of t
     const buttons = [], view = viewOf(loader, doc);
     view.stageEl = element('stage', buttons);
     view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed', detail: '' }]));
+    const listed = [];
+    view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick() { return chain; } }; build(chain); listed.push(it.title); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
     view.renderNode(conclusion);
-    return buttons.map(button => button['aria-label'] ?? button.text);
+    // The Structure, Rename and similar tools sit in the card's More menu: open it and count its entries as the card's tools.
+    buttons.find(button => button.text === '⋯ More')?.click({ stopPropagation() {} });
+    return [...buttons.map(button => button['aria-label'] ?? button.text), ...listed];
   };
   const shown = render(load), hidden = render(loadHidden);
   assert.equal(shown.includes('AI explore'), false, 'AIM on: generic tools are hidden on an AIM map');
   assert.ok(hidden.includes('Open details in right sidebar'));
   assert.ok(shown.includes('Continue exploring'), 'AIM on: the AIM action is there');
-  for (const label of ['AI explore', 'Structure and links', 'Rename', 'Add subtopic manually']) assert.ok(hidden.includes(label), label);
+  for (const label of ['AI explore', 'This card', 'Rename', 'Add subtopic manually']) assert.ok(hidden.includes(label), label);
   assert.equal(hidden.includes('Continue exploring'), false);
   assert.equal(hidden.some(label => /Steer|Correct|new question|Answer|Retry|Start|Continue|Resume|direction/i.test(label ?? '')), false, 'no AIM action');
 });

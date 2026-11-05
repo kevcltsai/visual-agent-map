@@ -1375,3 +1375,20 @@ test('persona 23: both prompts offer reorder_topics for sorting cards under one 
   assert.match(render('zh-TW'), /reorder_topics：parentId/);
   assert.doesNotMatch(render('en'), /take the card that should end up last/);
 });
+test('add_child summary turns a plain source path of a shown note into a wikilink (persona 04)', () => {
+  const ctx = context({ activeFile: { path: 'Reading/Notes on onboarding research.md', content: 'body' }, files: [{ path: 'Other/File.md', content: 'x' }] });
+  assert.deepEqual(plain(ctx.sourcePaths), ['Other/File.md', 'Reading/Notes on onboarding research.md']);
+  const result = parse(reply(
+    item('add_child', { title: 'A', summary: 'One idea. source: Reading/Notes on onboarding research.md' }),
+    item('add_child', { title: 'B', summary: 'Two. `Other/File.md` and [[Reading/Notes on onboarding research]]' }),
+    item('add_child', { title: 'C', summary: 'Unrelated Elsewhere/Thing.md stays' })
+  ), ctx);
+  assert.equal(result.actions[0].summary, 'One idea. source: [[Reading/Notes on onboarding research]]');
+  assert.equal(result.actions[1].summary, 'Two. [[Other/File]] and [[Reading/Notes on onboarding research]]');
+  assert.equal(result.actions[2].summary, 'Unrelated Elsewhere/Thing.md stays');
+});
+
+test('add_child summary is untouched when no note was shown', () => {
+  const result = parse(reply(item('add_child', { title: 'A', summary: 'source: Reading/X.md' })));
+  assert.equal(result.actions[0].summary, 'source: Reading/X.md');
+});

@@ -440,7 +440,7 @@ test('#11 real order for other menus: the new-map menu counts as closed by the E
   const fs = require('node:fs'), path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal((source.match(/new Menu\(\)/g) ?? []).length, 1, 'only newMenu itself builds a Menu');
-  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 14, 'the other fourteen menus use it (ticket 21 added the add-type list) (C2 made More mind map actions one)');
+  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 15, 'the other fifteen menus use it (ticket 21 added the add-type list; ticket 39 added the card More and selection More menus) (C2 made More mind map actions one; ticket 41 removed openRelationKindMenu, the relation kind is now a select in the card window)');
   const card = source.slice(source.indexOf('private onCanvasContextMenu'), source.indexOf('private openCanvasImagePicker'));
   assert.match(card, /this\.newMenu\(cardId\)/, 'the card right-click menu keeps its card as the focus fallback');
 });
@@ -523,7 +523,6 @@ const MENU_OPENERS = {
     h.view.openUnlinkMenu('t1', h.card('leaf'));
   },
   openExportMenu: h => h.view.openExportMenu({}),
-  openRelationKindMenu: h => h.view.openRelationKindMenu({}, () => {}),
   openNewMapMenu: h => h.view.openNewMapMenu({ stopPropagation() {} }),
   openMapActions: h => h.view.openMapActions({}),
   openLayoutMenu: h => h.view.openLayoutMenu({}),
@@ -567,3 +566,52 @@ for (const [name, open] of Object.entries(MENU_OPENERS)) {
     assert.equal(h.view.selection.state.selected, null, 'a later Escape clears it');
   });
 }
+
+test('#18-keyboard: the research dialog (next step) closing after a repaint sends focus back to the map, not the body', async () => {
+  const h = await harness();
+  const card = h.card('leaf'); card.focus();
+  h.view.openNextStep(h.view.map.nodes[1]);
+  await timers(50);
+  const dialog = h.modals.at(-1);
+  assert.ok(dialog, 'the next-step dialog opened');
+  const field = h.doc.body.add('div', { cls: 'modal' }).add('button', { text: 'Start' });
+  field.focus();
+  h.view.render(); // research progress / completion repaints the map while the dialog has focus
+  dialog.close(); h.doc.activeElement = h.doc.body; // Obsidian restores focus to the opener card, which the repaint removed
+  await timers(180);
+  assert.equal(h.inMap(), true, 'focus is inside the map so the arrow keys and Esc reach it');
+  assert.notEqual(h.active(), h.doc.body);
+});
+
+test('#18-keyboard: the outline search box jumps to the first topic whose own title matches on Enter', () => {
+  const { OutlineView } = load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class { constructor() { this.contentEl = dom.element('div'); } }, Notice: class {} } });
+  const opened = [];
+  const view = new OutlineView({ app: {} }, async path => { opened.push(path); });
+  view.setActive = () => {}; // the DOM stand-in has no getAttribute; the in-place row marker is covered elsewhere
+  const doc = { activeElement: null };
+  view.contentEl.root = doc; view.contentEl.ownerDocument = doc;
+  view.setMap({ title: 'M', nodes: [{ id: 'a', parentId: null, path: 'a.md' }, { id: 'b', parentId: 'a', path: 'b.md' }, { id: 'c', parentId: 'a', path: 'c.md' }] }, new Map([['a', 'Alpha'], ['b', 'Beta'], ['c', 'Gamma beta']]));
+  const input = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-search'))[0];
+  const enter = (extra = {}) => { const e = { prevented: false }; input.fire('keydown', { key: 'Enter', isComposing: false, preventDefault() { e.prevented = true; }, ...extra }); return e; };
+  enter();
+  assert.deepEqual(opened, [], 'no search text: Enter does nothing');
+  input.value = 'beta'; input.fire('input', {});
+  enter({ isComposing: true });
+  assert.deepEqual(opened, [], 'an IME confirmation is not a jump');
+  const e = enter();
+  assert.deepEqual(opened, ['b.md'], 'the first title match in outline order (not the parent that only has a matching child)');
+  assert.equal(e.prevented, true);
+  input.value = 'zzz'; input.fire('input', {});
+  enter();
+  assert.deepEqual(opened, ['b.md'], 'no match: nothing opens');
+});
+
+test('#18-keyboard: the shortcuts window lists copy, cut and paste in every language', () => {
+  const { MAP_KEYBOARD_SHORTCUTS } = load('ui/modals/keyboard-shortcuts-modal.ts', { obsidian: { ...obsidian, Platform: { isMacOS: false } } });
+  const { translate } = load('i18n.ts');
+  for (const key of ['Mod+C', 'Mod+X', 'Mod+V']) {
+    const entry = MAP_KEYBOARD_SHORTCUTS.find(item => item.keys.includes(key));
+    assert.ok(entry, key);
+    for (const language of ['en', 'zh-TW', 'zh-CN']) assert.notEqual(translate(language, entry.action), entry.action);
+  }
+});

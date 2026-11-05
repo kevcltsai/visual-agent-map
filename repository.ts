@@ -31,6 +31,7 @@ import {
   type TranslationKey,
   type UiLanguage
 } from "./i18n";
+import type { CanvasItem } from "./experiences/visual-map/canvas-items";
 import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord, type TopicRelationKind } from "./map-model";
 import type { CoffeeStyle } from "./experiences/coffee-tables/types";
 import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
@@ -1234,6 +1235,8 @@ export function coordinatePrint(map: MapDocument): string {
   return JSON.stringify(nodes.map(node => [node.id, node.x, node.y]));
 }
 
+const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
 export class Repository {
   readonly app: App;
   /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
@@ -1356,6 +1359,12 @@ export class Repository {
       number = 2;
     while (avoid?.has(path) || this.pathTaken(path)) path = `${base} ${number++}.md`;
     return path;
+  }
+
+  /** `folder/<title>.md` when that exact name is free (no number added), else null. */
+  exactFreePath(folder: string, title: string): string | null {
+    const path = normalizePath(`${folder}/${safeName(title)}.md`);
+    return this.pathTaken(path) ? null : path;
   }
 
   /** Taken when the path exists, or when a sibling has the same name once case and Unicode form are folded. */
@@ -2772,6 +2781,60 @@ export class Repository {
     // Persist the request identity before adding subfolders so a partial setup can be found and resumed.
     if (aim?.creationId) await this.ensureTopicFolders(root);
     return path;
+  }
+
+  /**
+   * Copies a (non-AIM) map, notes included, to a new map named `title` next to it. The copy is independent: its own
+   * map id, its own note files (new node ids, same titles, body links between the copied notes pointing at the copies)
+   * and its own Map.md. The source is only read. Returns the new Map.md path.
+   */
+  async duplicateMap(sourcePath: string, title: string): Promise<string> {
+    const source = await this.readMap(sourcePath);
+    if (source.aim) throw new Error(this.message("error.duplicate_map_unsupported"));
+    const nodes = new Set(source.nodes.map(node => node.id));
+    const copies = new Map<string, MapNode>(),
+      pairs: Array<{ from: string; to: string }> = [];
+    const mapPath = await this.createMap(title);
+    const target = await this.readMap(mapPath);
+    for (const node of source.nodes) {
+      const copy = await this.duplicateNote(node.path, target, mapPath, { keepTitle: true });
+      copies.set(node.id, copy);
+      pairs.push({ from: node.path, to: copy.path });
+    }
+    await this.rewriteCopiedNoteLinks(pairs);
+    const fresh = (id: string): string => copies.get(id)?.id ?? id;
+    const freshIds = (ids: string[]): string[] => ids.map(fresh);
+    await this.updateMap(mapPath, map => {
+      map.nodes = source.nodes.map(node => {
+        const copy = copies.get(node.id)!;
+        return {
+          ...cloneJson(node),
+          id: copy.id,
+          path: copy.path,
+          parentId: node.parentId && nodes.has(node.parentId) ? fresh(node.parentId) : null
+        };
+      });
+      map.viewport = { ...source.viewport };
+      for (const key of ["outputLanguage", "aiMode", "layout", "detailTemplateId", "toneId"] as const)
+        if (source[key] !== undefined) (map as unknown as Record<string, unknown>)[key] = cloneJson(source[key]);
+      if (source.topicRelations)
+        map.topicRelations = source.topicRelations.map(relation => ({
+          ...relation,
+          from: fresh(relation.from),
+          to: fresh(relation.to)
+        }));
+      if (source.canvasItems)
+        map.canvasItems = source.canvasItems.map(item => {
+          const next = cloneJson(item) as Record<string, unknown>;
+          // Boundaries, summaries and text notes name topics by id; a copy of them names the copied topics.
+          if (typeof next.parentId === "string") next.parentId = fresh(next.parentId);
+          if (Array.isArray(next.members)) next.members = freshIds(next.members as string[]);
+          if (Array.isArray(next.links)) next.links = freshIds(next.links as string[]);
+          return next as unknown as CanvasItem;
+        });
+    });
+    await this.rebuildDerivedData({ roots: [this.topicRoot(mapPath)] });
+    return mapPath;
   }
 
   /** Why `path` cannot be a Mind Maps/AIM folder, or null: empty, inside/around the legacy Topics folder, or clashing with the other one. */

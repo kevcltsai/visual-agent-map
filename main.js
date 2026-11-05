@@ -862,6 +862,7 @@ var en = {
   "ui.text_node_label": "Text node: {0}",
   "ui.text_nodes_group": "Text nodes",
   "ui.text_node_edit_label": "Edit text node",
+  "ui.text_resize_label": "Text block width",
   "ui.text_node_added": "Text node added.",
   "ui.text_node_removed": "Text node removed.",
   "ui.text_node_promote": "To card",
@@ -3575,6 +3576,7 @@ var zhCN = {
   "ui.text_node_label": "\u6587\u5B57\u8282\u70B9\uFF1A{0}",
   "ui.text_nodes_group": "\u6587\u5B57\u8282\u70B9",
   "ui.text_node_edit_label": "\u7F16\u8F91\u6587\u5B57\u8282\u70B9",
+  "ui.text_resize_label": "\u6587\u5B57\u5757\u5BBD\u5EA6",
   "ui.text_node_added": "\u5DF2\u6DFB\u52A0\u6587\u5B57\u8282\u70B9\u3002",
   "ui.text_node_removed": "\u5DF2\u5220\u9664\u6587\u5B57\u8282\u70B9\u3002",
   "ui.text_node_promote": "\u8F6C\u6210\u8BAE\u9898\u5361",
@@ -6288,6 +6290,7 @@ var zhTW = {
   "ui.text_node_label": "\u6587\u5B57\u5340\u584A\uFF1A{0}",
   "ui.text_nodes_group": "\u6587\u5B57\u5340\u584A",
   "ui.text_node_edit_label": "\u7DE8\u8F2F\u6587\u5B57\u5340\u584A",
+  "ui.text_resize_label": "\u6587\u5B57\u5340\u584A\u5BEC\u5EA6",
   "ui.text_node_added": "\u5DF2\u65B0\u589E\u6587\u5B57\u5340\u584A\u3002",
   "ui.text_node_removed": "\u5DF2\u522A\u9664\u6587\u5B57\u5340\u584A\u3002",
   "ui.text_node_promote": "\u8F49\u6210\u8B70\u984C\u5361",
@@ -17864,6 +17867,13 @@ var CONTROL_ALL = /[\u0000-\u001f\u007f]/g;
 var LABEL_LIMIT = 200;
 var MEMBER_LIMIT = 500;
 var TEXT_LIMIT = 2e3;
+var TEXT_WIDTH_MIN = 32;
+var TEXT_AUTO_WIDTH_MAX = 300;
+var TEXT_WIDTH_MAX = 560;
+function clampTextWidth(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
+  return Math.min(TEXT_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.round(value)));
+}
 var PARENT_ID_LIMIT = 200;
 var LINK_LIMIT = 20;
 var SUMMARY_MEMBER_LIMIT = 50;
@@ -18008,6 +18018,8 @@ function cleanTextItem(raw) {
     if (typeof parentId !== "string" || !parentId || parentId.length > PARENT_ID_LIMIT) return null;
     item.parentId = parentId;
   }
+  const width = clampTextWidth(raw.width);
+  if (width !== void 0) item.width = width;
   const links = cleanLinks(raw.links, id);
   if (links.length) item.links = links;
   return item;
@@ -18340,6 +18352,14 @@ var withLinks = (item, links) => {
 };
 function addFreeTextNode(items, node) {
   return addTextNode(items, { id: node.id, text: node.text, x: node.x, y: node.y });
+}
+function setTextNodeWidth(items, id, width) {
+  return items.map((item) => {
+    if (!isText(item) || item.id !== id) return item;
+    const { width: _old, ...rest } = item;
+    const next = clampTextWidth(width);
+    return next === void 0 ? rest : { ...rest, width: next };
+  });
 }
 function moveTextNode(items, id, dx, dy) {
   if (!finite(dx) || !finite(dy)) return [...items];
@@ -54033,7 +54053,7 @@ var KIND_PICKER_ORDER = ["topic", "atomic", "hypothesis", "evidence", "conclusio
 var RELATION_LABEL_MIN_ZOOM = 0.6;
 var RELATION_LABEL_NOTE_MAX = 60;
 var TEXT_NODE_HEIGHT = 28;
-var TEXT_NODE_WIDTH = 300;
+var TEXT_NODE_WIDTH = TEXT_AUTO_WIDTH_MAX;
 function depthOf(nodes, id) {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   let depth = 0;
@@ -54337,6 +54357,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     });
     /** Text node element per id (tree-attached and free), rebuilt on every render. */
     __publicField(this, "textEls", /* @__PURE__ */ new Map());
+    /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
+    __publicField(this, "focusTextResizeId", null);
     /** Image element per image id, rebuilt on every render (the place mode finds its image here). */
     __publicField(this, "canvasImageEls", /* @__PURE__ */ new Map());
     /** The anchor place mode: which image, where the crosshair is (0-1) and what to do when a spot is chosen. */
@@ -60917,7 +60939,7 @@ ${request.requirements}` : preset.text,
    * textarea, so nothing the user writes is ever parsed as markup.
    */
   renderTextNodes(stage, items) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     if (this.suspendTextEdit) this.textEditDraft = this.suspendTextEdit();
     if (!this.map) return;
     const { attached } = treeTextNodes(
@@ -60952,12 +60974,16 @@ ${request.requirements}` : preset.text,
       el.tabIndex = 0;
       el.style.left = `${text11.x}px`;
       el.style.top = `${text11.y}px`;
-      el.style.width = `${TEXT_NODE_WIDTH}px`;
+      if (text11.width !== void 0) {
+        el.style.width = `${text11.width}px`;
+        el.addClass("has-width");
+      }
       el.createDiv({ cls: "vam-text-node-body", text: text11.text });
       this.textEls.set(text11.id, el);
       el.addEventListener("focus", () => el.addClass("is-selected"));
       el.addEventListener("blur", () => el.removeClass("is-selected"));
       if (!editable) continue;
+      this.attachTextResizeHandle(el, text11);
       el.addEventListener("dblclick", (event) => {
         event.stopPropagation();
         this.startTextEdit(text11.id);
@@ -61020,6 +61046,117 @@ ${request.requirements}` : preset.text,
       this.focusItemId = null;
       if (this.mapWindowIsActive()) (_b2 = this.textEls.get(wanted)) == null ? void 0 : _b2.focus({ preventScroll: true });
     }
+    const resizeId = this.focusTextResizeId;
+    this.focusTextResizeId = null;
+    if (resizeId && this.mapWindowIsActive())
+      (_d = (_c = this.textEls.get(resizeId)) == null ? void 0 : _c.querySelector(".vam-text-resize")) == null ? void 0 : _d.focus({ preventScroll: true });
+  }
+  /**
+   * The width handle on a text block's right edge (same behaviour as the card's): drag, arrows (CARD_WIDTH_STEP), Home/End,
+   * Enter or double click back to automatic width. Dragging shows the width and the lines live; release writes once.
+   */
+  attachTextResizeHandle(el, text11) {
+    const handle = el.createSpan({
+      cls: "vam-text-resize",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.text_resize_label"),
+        "aria-valuemin": String(TEXT_WIDTH_MIN),
+        "aria-valuemax": String(TEXT_WIDTH_MAX)
+      }
+    });
+    handle.tabIndex = 0;
+    const storedWidth = () => {
+      var _a2, _b2, _c;
+      return (_c = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find((item) => item.kind === "text" && item.id === text11.id)) == null ? void 0 : _c.width;
+    };
+    const shownWidth = () => {
+      var _a2;
+      return (_a2 = storedWidth()) != null ? _a2 : el.offsetWidth || TEXT_NODE_WIDTH;
+    };
+    const sync = (width) => handle.setAttr("aria-valuenow", String(width));
+    sync(shownWidth());
+    const commit = (width) => {
+      this.focusTextResizeId = text11.id;
+      this.enqueue(() => this.changeCanvasItems(text11.id, (items) => setTextNodeWidth(items, text11.id, width)));
+    };
+    handle.addEventListener("pointerdown", (event) => {
+      var _a2;
+      if (event.button !== 0 || !this.map || this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      const startX = event.clientX, zoom = this.map.viewport.zoom || 1, from = shownWidth(), before = storedWidth();
+      let width = from, done = false;
+      (_a2 = handle.setPointerCapture) == null ? void 0 : _a2.call(handle, event.pointerId);
+      const move = (e) => {
+        var _a3;
+        width = (_a3 = clampTextWidth(from + (e.clientX - startX) / zoom)) != null ? _a3 : from;
+        el.style.width = `${width}px`;
+        el.addClass("has-width");
+        sync(width);
+        this.drawEdges();
+      };
+      const settle = () => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = () => {
+        if (before === void 0) {
+          el.style.removeProperty("width");
+          el.removeClass("has-width");
+        } else el.style.width = `${before}px`;
+        sync(from);
+        this.drawEdges();
+      };
+      const up = () => {
+        if (done) return;
+        settle();
+        if (width === from) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        commit(width);
+      };
+      const cancel = () => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", (event) => event.stopPropagation());
+    handle.addEventListener("dblclick", (event) => {
+      if (this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      if (storedWidth() !== void 0) commit(void 0);
+    });
+    handle.addEventListener("keydown", (event) => {
+      var _a2;
+      if (this.presentation) return;
+      const current = shownWidth();
+      let next = null;
+      if (event.key === "ArrowRight") next = current + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = current - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = TEXT_WIDTH_MIN;
+      else if (event.key === "End") next = TEXT_WIDTH_MAX;
+      else if (event.key === "Enter") next = void 0;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (next === void 0) {
+        if (storedWidth() !== void 0) commit(void 0);
+        return;
+      }
+      const width = (_a2 = clampTextWidth(next)) != null ? _a2 : current;
+      if (width === storedWidth() || storedWidth() === void 0 && width === current) return;
+      commit(width);
+    });
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
   liveLinks(text11) {
@@ -61260,7 +61397,18 @@ ${request.requirements}` : preset.text,
       attr: { rows: "1", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
     });
     input2.value = draft != null ? draft : text11.text;
+    const grows = text11.width === void 0;
+    const measure = grows ? el.createSpan({ cls: "vam-text-node-measure", attr: { "aria-hidden": "true" } }) : null;
+    const fitWidth = () => {
+      if (!measure) return;
+      measure.setText(`${input2.value}\u200B`);
+      const chrome = el.offsetWidth - input2.offsetWidth;
+      const want = (measure.offsetWidth || 0) + (Number.isFinite(chrome) ? chrome : 14) + 2;
+      el.style.width = `${Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(want)))}px`;
+      el.addClass("has-width");
+    };
     const fitHeight = () => {
+      fitWidth();
       input2.style.removeProperty("height");
       input2.style.height = `${input2.scrollHeight}px`;
       this.drawEdges();
@@ -61273,6 +61421,11 @@ ${request.requirements}` : preset.text,
       this.editingTextId = null;
       this.suspendTextEdit = null;
       input2.remove();
+      if (measure) {
+        measure.remove();
+        el.style.removeProperty("width");
+        el.removeClass("has-width");
+      }
       body == null ? void 0 : body.removeClass("vam-sr-only");
       this.drawEdges();
     };
@@ -70378,7 +70531,7 @@ ${note.detail.trim()}` : "",
       const text11 = item;
       const el = this.textEls.get(text11.id);
       if (!(el == null ? void 0 : el.hasClass("is-free"))) continue;
-      boxes.push({ x: text11.x, y: text11.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
+      boxes.push({ x: text11.x, y: text11.y, w: el.offsetWidth || text11.width || TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
     }
     for (const el of this.summaryEls.values()) {
       const text11 = el.querySelector(".vam-summary-text");

@@ -834,6 +834,7 @@ export const en = {
   "ui.text_node_label": "Text node: {0}",
   "ui.text_nodes_group": "Text nodes",
   "ui.text_node_edit_label": "Edit text node",
+  "ui.text_resize_label": "Text block width",
   "ui.text_node_added": "Text node added.",
   "ui.text_node_removed": "Text node removed.",
   "ui.text_node_promote": "To card",

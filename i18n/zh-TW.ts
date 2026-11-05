@@ -779,6 +779,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.text_node_label": "文字區塊：{0}",
   "ui.text_nodes_group": "文字區塊",
   "ui.text_node_edit_label": "編輯文字區塊",
+  "ui.text_resize_label": "文字區塊寬度",
   "ui.text_node_added": "已新增文字區塊。",
   "ui.text_node_removed": "已刪除文字區塊。",
   "ui.text_node_promote": "轉成議題卡",

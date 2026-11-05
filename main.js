@@ -2808,15 +2808,15 @@ var en = {
   "ui.settings_map_chat_records_name": "Save map AI conversations",
   "ui.settings_map_chat_records_desc": "Saved in each mind map's folder so you can pick up where you left off, and kept for later analysis. The content includes your notes; VAM does not upload it, but if you sync your vault, the records sync with it.",
   "ui.map_chat_records_off_title": "Also delete the saved conversations?",
-  "ui.map_chat_records_off_body_0": "{0} conversations are saved. If you keep them, you can pick them up again after turning this back on.",
+  "ui.map_chat_records_off_body_0": "Saved conversations: {0}. If you keep them, you can pick them up again after turning this back on.",
   "ui.map_chat_records_keep": "Keep",
-  "ui.map_chat_records_delete_0": "Delete {0} conversations",
+  "ui.map_chat_records_delete_0": "Delete conversations ({0})",
   "ui.map_chat_record_failed": "Could not save the conversation record, so this conversation will not be saved for now.",
   "ui.map_chat_new_conversation": "New conversation",
   "ui.map_chat_restored_0": "Restored the conversation from {0}",
   "ui.map_chat_record_stale": "No longer valid: this cannot be applied after reopening. Ask again if you still need it.",
   "ui.map_chat_record_stale_short": "No longer valid",
-  "ui.map_chat_records_delete_failed_0": "{0} conversations could not be deleted.",
+  "ui.map_chat_records_delete_failed_0": "Some conversations could not be deleted ({0}).",
   "ui.settings_diagrams_desc": "Adds up to three Mermaid diagrams after writing.",
   "ui.settings_preview_size_desc": "Size of the preview card when you hover a topic.",
   "ui.settings_map_folder_desc_0": "Inside {0}/. Renaming moves existing files too.",
@@ -35837,6 +35837,13 @@ var MapChatPanel = class {
     __publicField(this, "modelTagEl");
     __publicField(this, "stopEl");
     __publicField(this, "saveEl");
+    /** "New conversation": built only while the host says records are on. */
+    __publicField(this, "newEl", null);
+    /** The "restored <time>" line above the log; null when the panel was not restored. */
+    __publicField(this, "restoredEl");
+    __publicField(this, "restoredText", "");
+    /** The record the conversation is saved in (set by the view); cleared by {@link reset}. */
+    __publicField(this, "conversationId", null);
     /** The note is being written; a second press does nothing. */
     __publicField(this, "saving", false);
     /** The save button reads as disabled (it stays reachable by keyboard, so its title can be read). */
@@ -36566,6 +36573,8 @@ ${typed}` : draft;
     this.rows = /* @__PURE__ */ new WeakMap();
     this.messages = [];
     this.savedTurnCount = 0;
+    this.conversationId = null;
+    this.restoredText = "";
     this.spokenLater = [];
     this.chips = [];
     this.dismissedNote = null;
@@ -36585,6 +36594,80 @@ ${typed}` : draft;
   }
   focusInput() {
     if (this.built) this.inputEl.focus();
+  }
+  /**
+   * Shows a saved conversation again: its finished turns (their words go through the same reply renderer as live ones), with a
+   * line on top saying when it was. Plan cards, picture candidates, retry and option lists are shown as no longer valid.
+   */
+  restore(conversation) {
+    var _a2, _b2, _c;
+    if (this.working) return;
+    this.reset();
+    this.conversationId = conversation.id;
+    for (const turn of conversation.turns) {
+      this.messages.push({ role: "user", text: turn.message, lines: [] });
+      const answer = {
+        role: "assistant",
+        text: turn.reply,
+        lines: turn.lines.map((line) => ({
+          status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
+          text: line.text
+        })),
+        modelLabel: turn.modelLabel || void 0,
+        stale: true
+      };
+      if (turn.stalePlan)
+        answer.plan = {
+          reasons: [],
+          items: [],
+          estimate: "",
+          state: "cancelled",
+          stale: true,
+          apply() {
+          },
+          cancel() {
+          }
+        };
+      if (turn.images) {
+        const states = ["ready", "empty", "failed", "stopped"];
+        const state = (_a2 = states.find((name2) => name2 === turn.images.state)) != null ? _a2 : "stopped";
+        answer.images = [
+          {
+            query: "",
+            nodeId: "",
+            nodeTitle: "",
+            mapPath: "",
+            mapId: "",
+            state,
+            stale: true,
+            items: turn.images.items.map((item, index) => ({
+              candidate: { title: item.title, url: "", source: item.sourceUrl },
+              inserted: turn.images.inserted.includes(index) ? item.title : void 0
+            }))
+          }
+        ];
+      }
+      this.messages.push(answer);
+    }
+    const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
+    if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {
+      const pad = (value) => String(value).padStart(2, "0");
+      this.restoredText = t(
+        "ui.map_chat_restored_0",
+        `${when.getMonth() + 1}/${when.getDate()} ${pad(when.getHours())}:${pad(when.getMinutes())}`
+      );
+    }
+    this.renderLog(true);
+    this.renderHint();
+    (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
+  }
+  /** "New conversation": clears the panel and tells the view to start a new record. Nothing happens while a turn runs (Stop first). */
+  startNewConversation() {
+    var _a2, _b2;
+    if (this.working) return;
+    this.reset();
+    (_b2 = (_a2 = this.host).newConversation) == null ? void 0 : _b2.call(_a2);
+    this.focusInput();
   }
   // ---- DOM ------------------------------------------------------------------------------------------------------
   build(parent) {
@@ -36635,6 +36718,8 @@ ${typed}` : draft;
       attr: { role: "heading", "aria-level": "2" }
     });
     this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
+    this.restoredEl = this.bodyEl.createDiv({ cls: "vam-map-chat-restored" });
+    this.restoredEl.hidden = true;
     const logLabelId = `${this.id}-log-label`;
     this.logLabelEl = this.bodyEl.createSpan({
       cls: "vam-map-chat-log-label",
@@ -36738,11 +36823,39 @@ ${typed}` : draft;
    * The save button: hidden on the opening screen, and "disabled" (still reachable by keyboard, so its title can be read) while
    * there is no finished turn or the map has no folder to save into.
    */
+  /** "New conversation" exists only while records are on; it waits (aria-disabled) while a turn runs. */
+  refreshNewButton() {
+    var _a2, _b2, _c;
+    const on = ((_b2 = (_a2 = this.host).recordsEnabled) == null ? void 0 : _b2.call(_a2)) === true;
+    if (!on) {
+      (_c = this.newEl) == null ? void 0 : _c.remove();
+      this.newEl = null;
+      return;
+    }
+    if (!this.newEl) {
+      const label = t("ui.map_chat_new_conversation");
+      const button = this.newEl = this.headEl.createEl("button", {
+        cls: "vam-map-chat-new clickable-icon",
+        attr: { type: "button", "aria-label": label, title: label }
+      });
+      (0, import_obsidian24.setIcon)(button, "square-pen");
+      button.addEventListener("click", () => this.startNewConversation());
+      button.remove();
+      this.headEl.insertBefore(button, this.saveEl);
+    }
+    this.newEl.hidden = this.hero;
+    this.newEl.toggleClass("is-hidden", this.hero);
+    this.newEl.setAttr("aria-disabled", String(this.working));
+    this.newEl.toggleClass("is-disabled", this.working);
+    this.newEl.setAttr("aria-label", t("ui.map_chat_new_conversation"));
+    this.newEl.setAttr("title", t("ui.map_chat_new_conversation"));
+  }
   refreshSave() {
     var _a2, _b2;
     if (!this.built || !this.saveEl) return;
     this.saveEl.hidden = this.hero;
     this.saveEl.toggleClass("is-hidden", this.hero);
+    this.refreshNewButton();
     let why = "";
     if (!this.completedTurns().length) why = t("ui.map_chat_save_empty");
     else if (!this.host.saveTranscript) why = t("ui.map_chat_save_unavailable");
@@ -37105,6 +37218,10 @@ ${typed}` : draft;
     this.guideEl.toggleClass("is-hidden", !empty);
     this.logEl.hidden = empty;
     this.logEl.toggleClass("is-hidden", empty);
+    const restored = !empty && !!this.restoredText;
+    this.restoredEl.setText(restored ? this.restoredText : "");
+    this.restoredEl.hidden = !restored;
+    this.restoredEl.toggleClass("is-hidden", !restored);
   }
   /** Puts the model list back in step with what the view remembers. */
   refreshControls() {
@@ -37176,6 +37293,9 @@ ${shown}` : t("ui.map_chat_model_label"));
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
+      message.stale ? "x" : "",
+      t("ui.map_chat_record_stale"),
+      t("ui.map_chat_record_stale_short"),
       message.error ? "e" : "",
       (_a2 = message.technical) != null ? _a2 : "",
       t("ui.technical_details"),
@@ -37197,12 +37317,12 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_d = (_c = message.plan.groups) == null ? void 0 : _c.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _d : ""}` : "",
-      message.choices ? `choices:${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
+      message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_d = (_c = message.plan.groups) == null ? void 0 : _c.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _d : ""}` : "",
+      message.choices ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
       ((_e = message.images) != null ? _e : []).map(
         (block) => {
           var _a3, _b3;
-          return `images:${block.state}:${(_a3 = block.reason) != null ? _a3 : ""}:${(_b3 = block.notice) != null ? _b3 : ""}:${block.items.map((item) => {
+          return `images:${block.stale ? "stale:" : ""}${block.state}:${(_a3 = block.reason) != null ? _a3 : ""}:${(_b3 = block.notice) != null ? _b3 : ""}:${block.items.map((item) => {
             var _a4;
             return [item.candidate.url, (_a4 = item.inserted) != null ? _a4 : "", item.broken ? 1 : 0, item.busy ? 1 : 0].join("~");
           }).join(",")}`;
@@ -37272,14 +37392,29 @@ ${shown}` : t("ui.map_chat_model_label"));
         attr: { type: "button" }
       });
       more.disabled = this.working;
-      more.addEventListener("click", () => {
-        if (!this.working) this.handOffFocus(() => {
-          var _a3, _b2;
-          return (_b2 = (_a3 = this.host).retry) == null ? void 0 : _b2.call(_a3, origin);
+      if (message.stale) this.makeInert(more);
+      else
+        more.addEventListener("click", () => {
+          if (!this.working) this.handOffFocus(() => {
+            var _a3, _b2;
+            return (_b2 = (_a3 = this.host).retry) == null ? void 0 : _b2.call(_a3, origin);
+          });
         });
-      });
     }
     return { row, body, more };
+  }
+  /**
+   * A control of a restored conversation: it says it is no longer valid (aria-disabled, the stale class) and does nothing, with
+   * mouse or keyboard. It stays reachable by Tab so its explanation can be read.
+   */
+  makeInert(control) {
+    control.setAttr("aria-disabled", "true");
+    control.addClass("is-stale");
+    control.setAttr("title", t("ui.map_chat_record_stale"));
+    control.addEventListener("click", (event) => event.preventDefault());
+    control.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") event.preventDefault();
+    });
   }
   /** The raw error of a failed turn: folded away, selectable and copyable. */
   buildTechnical(row, raw) {
@@ -37340,6 +37475,15 @@ ${shown}` : t("ui.map_chat_model_label"));
     );
     card.setAttr("role", "group");
     card.setAttr("aria-label", title);
+    if (plan.stale) {
+      card.addClass("is-stale");
+      card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
+      card.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      const dead = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
+      for (const text11 of [t("ui.map_chat_plan_apply"), t("ui.map_chat_plan_cancel")])
+        this.makeInert(dead.createEl("button", { text: text11, attr: { type: "button" } }));
+      return;
+    }
     card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
     card.createDiv({
       cls: "vam-map-chat-plan-sentence",
@@ -37405,6 +37549,23 @@ ${shown}` : t("ui.map_chat_model_label"));
       var _a2;
       return block.state === "searching" ? t("ui.map_chat_images_searching_0", clip2(block.query, 80)) : block.state === "ready" ? usableImageCount(block) ? t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip2(block.nodeTitle)) : t("ui.map_chat_images_none") : block.state === "empty" ? t("ui.map_chat_images_none") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip2((_a2 = block.reason) != null ? _a2 : "", 160)) : t("ui.map_chat_images_stopped");
     };
+    if (block.stale) {
+      box.addClass("is-stale");
+      box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
+      for (const item of block.items) {
+        const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
+        const pick = cell.createEl("button", { cls: "vam-map-chat-images-pick", attr: { type: "button" } });
+        pick.createSpan({ cls: "vam-map-chat-images-title", text: clip2(item.candidate.title, 80) });
+        if (item.inserted)
+          pick.createSpan({
+            cls: "vam-map-chat-images-state is-inserted",
+            text: t("ui.map_chat_images_inserted_0", clip2(item.inserted))
+          });
+        this.makeInert(pick);
+      }
+      return;
+    }
     box.createDiv({ cls: "vam-map-chat-images-status", text: statusText() });
     if (block.state === "searching" && block.stop) {
       const stop = box.createEl("button", {
@@ -37538,6 +37699,15 @@ ${shown}` : t("ui.map_chat_model_label"));
     box.setAttr("role", "group");
     box.setAttr("aria-label", choices.prompt);
     box.createDiv({ cls: "vam-map-chat-choices-prompt", text: choices.prompt });
+    if (choices.stale) {
+      box.addClass("is-stale");
+      box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      for (const option of choices.options)
+        this.makeInert(
+          box.createEl("button", { cls: "vam-map-chat-choice", text: option.label, attr: { type: "button" } })
+        );
+      return;
+    }
     const buttons = [];
     for (const option of choices.options) {
       const button = box.createEl("button", {
@@ -37562,6 +37732,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (!this.built) return;
     this.statusEl.setText(this.applying ? t("ui.map_chat_applying") : "");
     this.el.toggleClass("is-busy", this.working);
+    this.refreshNewButton();
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
     const stoppable = this.working && !this.awaitingConsent;

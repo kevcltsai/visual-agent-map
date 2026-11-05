@@ -92,6 +92,8 @@ export interface MapChatPlanCard {
   /** The plan starts AI work (research, expand, …): undo does not take that part back, and the card says so. */
   aiWork?: boolean;
   state: "pending" | "applied" | "cancelled";
+  /** Restored from a saved conversation: the card shows as no longer valid and its buttons do nothing. */
+  stale?: boolean;
   apply(): void;
   cancel(): void;
 }
@@ -100,6 +102,8 @@ export interface MapChatChoices {
   prompt: string;
   options: { label: string; pick(): void }[];
   picked: boolean;
+  /** Restored from a saved conversation: the options show as no longer valid and do nothing. */
+  stale?: boolean;
 }
 
 /** One picture candidate of a search, and what became of it. */
@@ -132,6 +136,8 @@ export interface MapChatImages {
   /** Why the last insertion was refused, in words. */
   notice?: string;
   items: MapChatImageItem[];
+  /** Restored from a saved conversation: shown without thumbnails or links, and no candidate can be picked. */
+  stale?: boolean;
   /** Stops the search (only while it is running). */
   stop?(): void;
 }
@@ -179,6 +185,23 @@ export interface MapChatMessage {
   images?: MapChatImages[];
   /** On an assistant message: the name of the model that was current when its question was sent; it never changes afterwards. */
   modelLabel?: string;
+  /** Restored from a saved conversation: Retry (if it ever shows) is no longer valid. */
+  stale?: boolean;
+}
+
+/** A saved conversation as {@link MapChatPanel.restore} takes it (core `restoreConversation` returns this shape). */
+export interface MapChatRestoredConversation {
+  id: string;
+  /** The time of the last finished turn (ISO); the "restored" line shows it in local time. Null with no turn. */
+  restoredAt: string | null;
+  turns: {
+    message: string;
+    reply: string;
+    lines: { status: string; text: string }[];
+    modelLabel: string;
+    stalePlan: boolean;
+    images?: { state: string; items: { title: string; sourceUrl: string }[]; inserted: number[] };
+  }[];
 }
 
 /** What the panel needs from the view that owns it. */
@@ -235,6 +258,10 @@ export interface MapChatHost {
   canSave?(): { ok: true } | { ok: false; reason: string };
   /** Saves the finished turns as a note; resolves with the new note's path, or why it could not be saved. */
   saveTranscript?(turns: MapChatSavedTurn[]): Promise<{ ok: true; path: string } | { ok: false; reason: string }>;
+  /** Conversation records are on: the title row shows "New conversation". Absent or false: no button, the panel works as before. */
+  recordsEnabled?(): boolean;
+  /** The panel was cleared by "New conversation": the next turn goes into a new record file. */
+  newConversation?(): void;
 }
 
 const LABEL_LIMIT = 40;
@@ -329,6 +356,13 @@ export class MapChatPanel {
   private modelTagEl!: HTMLElement;
   private stopEl!: HTMLButtonElement;
   private saveEl!: HTMLButtonElement;
+  /** "New conversation": built only while the host says records are on. */
+  private newEl: HTMLButtonElement | null = null;
+  /** The "restored <time>" line above the log; null when the panel was not restored. */
+  private restoredEl!: HTMLElement;
+  private restoredText = "";
+  /** The record the conversation is saved in (set by the view); cleared by {@link reset}. */
+  conversationId: string | null = null;
   /** The note is being written; a second press does nothing. */
   private saving = false;
   /** The save button reads as disabled (it stays reachable by keyboard, so its title can be read). */
@@ -1067,6 +1101,8 @@ export class MapChatPanel {
     this.rows = new WeakMap();
     this.messages = [];
     this.savedTurnCount = 0;
+    this.conversationId = null;
+    this.restoredText = "";
     this.spokenLater = [];
     this.chips = [];
     this.dismissedNote = null;
@@ -1087,6 +1123,76 @@ export class MapChatPanel {
   }
   focusInput(): void {
     if (this.built) this.inputEl.focus();
+  }
+  /**
+   * Shows a saved conversation again: its finished turns (their words go through the same reply renderer as live ones), with a
+   * line on top saying when it was. Plan cards, picture candidates, retry and option lists are shown as no longer valid.
+   */
+  restore(conversation: MapChatRestoredConversation): void {
+    if (this.working) return;
+    this.reset();
+    this.conversationId = conversation.id;
+    for (const turn of conversation.turns) {
+      this.messages.push({ role: "user", text: turn.message, lines: [] });
+      const answer: MapChatMessage = {
+        role: "assistant",
+        text: turn.reply,
+        lines: turn.lines.map(line => ({
+          status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
+          text: line.text
+        })),
+        modelLabel: turn.modelLabel || undefined,
+        stale: true
+      };
+      if (turn.stalePlan)
+        answer.plan = {
+          reasons: [],
+          items: [],
+          estimate: "",
+          state: "cancelled",
+          stale: true,
+          apply() {},
+          cancel() {}
+        };
+      if (turn.images) {
+        const states = ["ready", "empty", "failed", "stopped"] as const;
+        const state = states.find(name => name === turn.images!.state) ?? "stopped";
+        answer.images = [
+          {
+            query: "",
+            nodeId: "",
+            nodeTitle: "",
+            mapPath: "",
+            mapId: "",
+            state,
+            stale: true,
+            items: turn.images.items.map((item, index) => ({
+              candidate: { title: item.title, url: "", source: item.sourceUrl },
+              inserted: turn.images!.inserted.includes(index) ? item.title : undefined
+            }))
+          }
+        ];
+      }
+      this.messages.push(answer);
+    }
+    const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
+    if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {
+      const pad = (value: number): string => String(value).padStart(2, "0");
+      this.restoredText = t(
+        "ui.map_chat_restored_0",
+        `${when.getMonth() + 1}/${when.getDate()} ${pad(when.getHours())}:${pad(when.getMinutes())}`
+      );
+    }
+    this.renderLog(true);
+    this.renderHint();
+    this.host.stateChanged?.();
+  }
+  /** "New conversation": clears the panel and tells the view to start a new record. Nothing happens while a turn runs (Stop first). */
+  private startNewConversation(): void {
+    if (this.working) return;
+    this.reset();
+    this.host.newConversation?.();
+    this.focusInput();
   }
 
   // ---- DOM ------------------------------------------------------------------------------------------------------
@@ -1142,6 +1248,8 @@ export class MapChatPanel {
     });
     // A map that has content opens the window onto an empty log: one line says what it is for.
     this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
+    this.restoredEl = this.bodyEl.createDiv({ cls: "vam-map-chat-restored" });
+    this.restoredEl.hidden = true;
     // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says each progress stage name once as it changes, then the whole turn once when it ends.
     // Not `aria-label`: Obsidian shows an aria-label as a hover tooltip, and this one would cover the suggestions below the log.
     const logLabelId = `${this.id}-log-label`;
@@ -1250,10 +1358,37 @@ export class MapChatPanel {
    * The save button: hidden on the opening screen, and "disabled" (still reachable by keyboard, so its title can be read) while
    * there is no finished turn or the map has no folder to save into.
    */
+  /** "New conversation" exists only while records are on; it waits (aria-disabled) while a turn runs. */
+  private refreshNewButton(): void {
+    const on = this.host.recordsEnabled?.() === true;
+    if (!on) {
+      this.newEl?.remove();
+      this.newEl = null;
+      return;
+    }
+    if (!this.newEl) {
+      const label = t("ui.map_chat_new_conversation");
+      const button = (this.newEl = this.headEl.createEl("button", {
+        cls: "vam-map-chat-new clickable-icon",
+        attr: { type: "button", "aria-label": label, title: label }
+      }));
+      setIcon(button, "square-pen");
+      button.addEventListener("click", () => this.startNewConversation());
+      button.remove();
+      this.headEl.insertBefore(button, this.saveEl);
+    }
+    this.newEl.hidden = this.hero;
+    this.newEl.toggleClass("is-hidden", this.hero);
+    this.newEl.setAttr("aria-disabled", String(this.working));
+    this.newEl.toggleClass("is-disabled", this.working);
+    this.newEl.setAttr("aria-label", t("ui.map_chat_new_conversation"));
+    this.newEl.setAttr("title", t("ui.map_chat_new_conversation"));
+  }
   private refreshSave(): void {
     if (!this.built || !this.saveEl) return;
     this.saveEl.hidden = this.hero;
     this.saveEl.toggleClass("is-hidden", this.hero);
+    this.refreshNewButton();
     let why = "";
     if (!this.completedTurns().length) why = t("ui.map_chat_save_empty");
     else if (!this.host.saveTranscript) why = t("ui.map_chat_save_unavailable");
@@ -1647,6 +1782,10 @@ export class MapChatPanel {
     this.guideEl.toggleClass("is-hidden", !empty);
     this.logEl.hidden = empty;
     this.logEl.toggleClass("is-hidden", empty);
+    const restored = !empty && !!this.restoredText;
+    this.restoredEl.setText(restored ? this.restoredText : "");
+    this.restoredEl.hidden = !restored;
+    this.restoredEl.toggleClass("is-hidden", !restored);
   }
 
   /** Puts the model list back in step with what the view remembers. */
@@ -1720,6 +1859,9 @@ export class MapChatPanel {
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
+      message.stale ? "x" : "",
+      t("ui.map_chat_record_stale"),
+      t("ui.map_chat_record_stale_short"),
       message.error ? "e" : "",
       message.technical ?? "",
       t("ui.technical_details"),
@@ -1745,13 +1887,15 @@ export class MapChatPanel {
         .map(line => `${line.status}:${line.text}`)
         .join("\n"),
       message.plan
-        ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => `${group.label}${group.danger ? "!" : ""}`).join("|") ?? ""}`
+        ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${message.plan.groups?.map(group => `${group.label}${group.danger ? "!" : ""}`).join("|") ?? ""}`
         : "",
-      message.choices ? `choices:${message.choices.picked}:${message.choices.options.map(o => o.label).join("|")}` : "",
+      message.choices
+        ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map(o => o.label).join("|")}`
+        : "",
       (message.images ?? [])
         .map(
           block =>
-            `images:${block.state}:${block.reason ?? ""}:${block.notice ?? ""}:${block.items
+            `images:${block.stale ? "stale:" : ""}${block.state}:${block.reason ?? ""}:${block.notice ?? ""}:${block.items
               .map(item => [item.candidate.url, item.inserted ?? "", item.broken ? 1 : 0, item.busy ? 1 : 0].join("~"))
               .join(",")}`
         )
@@ -1828,11 +1972,27 @@ export class MapChatPanel {
         attr: { type: "button" }
       });
       more.disabled = this.working;
-      more.addEventListener("click", () => {
-        if (!this.working) this.handOffFocus(() => this.host.retry?.(origin));
-      });
+      if (message.stale) this.makeInert(more);
+      else
+        more.addEventListener("click", () => {
+          if (!this.working) this.handOffFocus(() => this.host.retry?.(origin));
+        });
     }
     return { row, body, more };
+  }
+
+  /**
+   * A control of a restored conversation: it says it is no longer valid (aria-disabled, the stale class) and does nothing, with
+   * mouse or keyboard. It stays reachable by Tab so its explanation can be read.
+   */
+  private makeInert(control: HTMLElement): void {
+    control.setAttr("aria-disabled", "true");
+    control.addClass("is-stale");
+    control.setAttr("title", t("ui.map_chat_record_stale"));
+    control.addEventListener("click", event => event.preventDefault());
+    control.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") event.preventDefault();
+    });
   }
 
   /** The raw error of a failed turn: folded away, selectable and copyable. */
@@ -1898,6 +2058,15 @@ export class MapChatPanel {
     );
     card.setAttr("role", "group");
     card.setAttr("aria-label", title);
+    if (plan.stale) {
+      card.addClass("is-stale");
+      card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
+      card.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      const dead = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
+      for (const text of [t("ui.map_chat_plan_apply"), t("ui.map_chat_plan_cancel")])
+        this.makeInert(dead.createEl("button", { text, attr: { type: "button" } }));
+      return;
+    }
     card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
     card.createDiv({
       cls: "vam-map-chat-plan-sentence",
@@ -1981,6 +2150,23 @@ export class MapChatPanel {
             : block.state === "failed"
               ? t("ui.map_chat_images_failed_0", clip(block.reason ?? "", 160))
               : t("ui.map_chat_images_stopped");
+    if (block.stale) {
+      box.addClass("is-stale");
+      box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
+      for (const item of block.items) {
+        const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
+        const pick = cell.createEl("button", { cls: "vam-map-chat-images-pick", attr: { type: "button" } });
+        pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(item.candidate.title, 80) });
+        if (item.inserted)
+          pick.createSpan({
+            cls: "vam-map-chat-images-state is-inserted",
+            text: t("ui.map_chat_images_inserted_0", clip(item.inserted))
+          });
+        this.makeInert(pick);
+      }
+      return;
+    }
     box.createDiv({ cls: "vam-map-chat-images-status", text: statusText() });
     if (block.state === "searching" && block.stop) {
       const stop = box.createEl("button", {
@@ -2102,6 +2288,15 @@ export class MapChatPanel {
     box.setAttr("role", "group");
     box.setAttr("aria-label", choices.prompt);
     box.createDiv({ cls: "vam-map-chat-choices-prompt", text: choices.prompt });
+    if (choices.stale) {
+      box.addClass("is-stale");
+      box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      for (const option of choices.options)
+        this.makeInert(
+          box.createEl("button", { cls: "vam-map-chat-choice", text: option.label, attr: { type: "button" } })
+        );
+      return;
+    }
     const buttons: HTMLButtonElement[] = [];
     for (const option of choices.options) {
       const button = box.createEl("button", {
@@ -2128,6 +2323,7 @@ export class MapChatPanel {
     // The turn's own progress is in the AI bubble; this line only says that a plan is being applied.
     this.statusEl.setText(this.applying ? t("ui.map_chat_applying") : "");
     this.el.toggleClass("is-busy", this.working);
+    this.refreshNewButton();
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
     // While the usage notice is open, its own Cancel is the way out: no Stop beside it.

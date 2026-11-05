@@ -2999,9 +2999,9 @@ export const en = {
     "Saved in each mind map's folder so you can pick up where you left off, and kept for later analysis. The content includes your notes; VAM does not upload it, but if you sync your vault, the records sync with it.",
   "ui.map_chat_records_off_title": "Also delete the saved conversations?",
   "ui.map_chat_records_off_body_0":
-    "{0} conversations are saved. If you keep them, you can pick them up again after turning this back on.",
+    "Saved conversations: {0}. If you keep them, you can pick them up again after turning this back on.",
   "ui.map_chat_records_keep": "Keep",
-  "ui.map_chat_records_delete_0": "Delete {0} conversations",
+  "ui.map_chat_records_delete_0": "Delete conversations ({0})",
   "ui.map_chat_record_failed":
     "Could not save the conversation record, so this conversation will not be saved for now.",
   "ui.map_chat_new_conversation": "New conversation",
@@ -3009,7 +3009,7 @@ export const en = {
   "ui.map_chat_record_stale":
     "No longer valid: this cannot be applied after reopening. Ask again if you still need it.",
   "ui.map_chat_record_stale_short": "No longer valid",
-  "ui.map_chat_records_delete_failed_0": "{0} conversations could not be deleted.",
+  "ui.map_chat_records_delete_failed_0": "Some conversations could not be deleted ({0}).",
   "ui.settings_diagrams_desc": "Adds up to three Mermaid diagrams after writing.",
   "ui.settings_preview_size_desc": "Size of the preview card when you hover a topic.",
   "ui.settings_map_folder_desc_0": "Inside {0}/. Renaming moves existing files too.",

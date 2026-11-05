@@ -5881,3 +5881,109 @@ integrationTest('persona G12: moving a card with its own branch up under another
   const crowd = h.view.map.nodes.filter(n => n.id !== moving.id && n.parentId !== moving.id && Math.abs(n.x - dropped.x) < 280 && n.y < dropped.y + 145 && dropped.y < n.y + 145);
   eq(crowd.map(title), [], 'nothing overlaps the moved card');
 });
+
+// ---- map chat records: the panel side (new conversation, restore, inert controls) ----------------------------------
+const restoredConversation = (extra = {}) => ({
+  id: '20261105-134000-abcdef', restoredAt: new Date(2026, 10, 5, 21, 40).toISOString(),
+  turns: [
+    { message: 'split pricing', reply: 'Done **now**.', lines: [{ status: 'done', text: 'Added A' }], modelLabel: 'Claude Sonnet', stalePlan: false },
+    { message: 'research all', reply: 'Plan ready.', lines: [], modelLabel: 'Claude Sonnet', stalePlan: true,
+      images: { state: 'ready', items: [{ title: 'Pic one', sourceUrl: 'https://example.com/1' }, { title: 'Pic two', sourceUrl: 'https://example.com/2' }], inserted: [1] } }
+  ], ...extra
+});
+const newButton = f => find(f.panel.headEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-new'));
+const stalePress = (el, calls) => { el.click(); key(el, { key: 'Enter' }); key(el, { key: ' ' }); return calls; };
+
+test('map chat records: the New conversation button exists only while records are on, and the title row is unchanged otherwise', () => {
+  const off = panelFixture(); off.panel.setOpen(true);
+  assert.equal(newButton(off), undefined);
+  eq(off.panel.headEl.children.map(c => c.cls.split(' ')[0]), ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-save', 'vam-map-chat-close']);
+  const falsy = panelFixture({ recordsEnabled: () => false, newConversation() {} }); falsy.panel.setOpen(true);
+  assert.equal(newButton(falsy), undefined);
+  let on = true; const calls = [];
+  const f = panelFixture({ recordsEnabled: () => on, newConversation: () => calls.push('new') }); f.panel.setOpen(true);
+  const button = newButton(f);
+  assert.ok(button); assert.equal(button.attrs['aria-label'], 'New conversation'); assert.equal(button.attrs.title, 'New conversation');
+  assert.equal(button.attrs.type, 'button', 'a real button: Tab, Enter and Space work');
+  eq(f.panel.headEl.children.map(c => c.cls.split(' ')[0]), ['vam-map-chat-title', 'vam-map-chat-model-tag', 'vam-map-chat-model', 'vam-map-chat-new', 'vam-map-chat-save', 'vam-map-chat-close']);
+  on = false; f.panel.refreshNote(); f.panel.begin('q'); f.panel.finish('a', []);
+  assert.equal(newButton(f), undefined, 'switching records off removes the button');
+});
+
+test('map chat records: new conversation clears the panel and starts a new file', () => {
+  const calls = [];
+  const f = panelFixture({ recordsEnabled: () => true, newConversation: () => calls.push('new') }); f.panel.setOpen(true);
+  f.panel.begin('first'); f.panel.finish('answer', []);
+  f.panel.conversationId = '20261105-134000-abcdef';
+  assert.equal(f.panel.hasMessages, true);
+  newButton(f).click();
+  assert.equal(f.panel.hasMessages, false); eq(f.panel.turns(), []); assert.equal(f.panel.conversationId, null);
+  eq(calls, ['new'], 'the host is told once, after the panel was cleared');
+  assert.equal(f.page.doc.activeElement, f.parts.input(), 'the keyboard goes to the message field');
+  // While a turn runs it waits (Stop first): no state is lost.
+  f.panel.begin('running');
+  assert.equal(newButton(f).attrs['aria-disabled'], 'true');
+  newButton(f).click();
+  assert.equal(f.panel.hasMessages, true); eq(calls, ['new']);
+  f.panel.finish('done', []);
+  assert.equal(newButton(f).attrs['aria-disabled'], 'false');
+});
+
+test('map chat records: restore shows the finished turns, the restored line, and feeds the next request', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  f.panel.restore(restoredConversation());
+  assert.equal(f.panel.conversationId, '20261105-134000-abcdef');
+  assert.equal(f.panel.restoredEl.text, 'Restored the conversation from 11/5 21:40');
+  assert.equal(f.panel.restoredEl.hidden, false);
+  eq(f.panel.turns(), [{ role: 'user', text: 'split pricing' }, { role: 'assistant', text: 'Done **now**.' }, { role: 'user', text: 'research all' }, { role: 'assistant', text: 'Plan ready.' }]);
+  assert.match(visibleText(f.parts.log()), /Added A/);
+  assert.equal(f.panel.pendingPlan(), null, 'a restored plan never waits for an answer');
+  assert.equal(f.panel.hintEl.hidden, true);
+  f.panel.restore({ id: '20261105-134000-abcdef', restoredAt: new Date(2026, 0, 3, 4, 5).toISOString(), turns: restoredConversation().turns });
+  assert.equal(f.panel.restoredEl.text, 'Restored the conversation from 1/3 04:05', 'M/D HH:mm in local time, hours and minutes padded');
+  newButton(f).click();
+  assert.equal(f.panel.restoredEl.hidden, true, 'a new conversation drops the line');
+});
+
+test('map chat records: restored plan, images, retry and choices are inert', () => {
+  const calls = []; const f = panelFixture({ recordsEnabled: () => true, newConversation() {}, retry: () => calls.push('retry'), insertImage: async () => { calls.push('insert'); return { ok: true }; }, send: () => calls.push('send') });
+  f.panel.setOpen(true); f.panel.restore(restoredConversation());
+  const log = f.parts.log();
+  const plan = find(log, i => hasClass(i, 'vam-map-chat-plan'));
+  assert.ok(plan); assert.ok(hasClass(plan, 'is-stale'));
+  assert.ok(visibleText(plan).includes('No longer valid'), 'the stale explanation is in the card');
+  const planButtons = findAll(plan, i => i.tag === 'button');
+  eq(planButtons.map(b => b.text), ['Apply', 'Cancel']);
+  const picks = findAll(log, i => hasClass(i, 'vam-map-chat-images-pick'));
+  assert.equal(picks.length, 2); assert.equal(findAll(log, i => i.tag === 'img').length, 0, 'no thumbnail is fetched for a restored candidate');
+  assert.equal(findAll(log, i => i.tag === 'a').length, 0, 'no source link from the record');
+  // restored choices (the shape a live one has) are inert too
+  f.panel.showChoices({ prompt: 'Pick', options: [{ label: 'Map A', pick: () => calls.push('pick-a') }, { label: 'Type X', pick: () => calls.push('pick-x') }], picked: false, stale: true });
+  const choices = findAll(log, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-choice'));
+  assert.equal(choices.length, 2);
+  for (const control of [...planButtons, ...picks, ...choices]) {
+    assert.equal(control.attrs['aria-disabled'], 'true', `${control.text} is aria-disabled`);
+    assert.ok(hasClass(control, 'is-stale'));
+  }
+  const rowControls = () => [...findAll(log, i => i.tag === 'button' && (hasClass(i, 'vam-map-chat-plan-apply') || hasClass(i, 'vam-map-chat-choice') || hasClass(i, 'vam-map-chat-images-pick') || hasClass(i, 'vam-map-chat-retry')))];
+  assert.equal(findAll(log, i => hasClass(i, 'vam-map-chat-plan-apply')).length, 0, 'no live Apply button exists');
+  for (const control of [...planButtons, ...picks, ...choices]) stalePress(control, calls);
+  eq(calls, [], 'click, Enter and Space call no apply, insert, retry, pick or send');
+  assert.ok(rowControls().every(c => c.attrs['aria-disabled'] === 'true'));
+  // a stale message keeps Retry inert even if one is built for it
+  const keyDown = key(planButtons[0], { key: 'Enter' });
+  assert.equal(keyDown, true, 'Enter on an inert control is consumed, so the browser makes no click');
+  // an undone reply still shows
+  const undone = restoredConversation(); undone.turns[0].reply = 'Undone reply stays';
+  f.panel.restore(undone);
+  assert.match(visibleText(f.parts.log()), /Undone reply stays/);
+});
+
+test('map chat records: record text with HTML restores as plain text', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  const evil = '<img src=x onerror=alert(1)> and <script>alert(2)</script>';
+  f.panel.restore({ id: '20261105-134000-abcdef', restoredAt: new Date().toISOString(), turns: [{ message: evil, reply: evil, lines: [{ status: 'done', text: evil }], modelLabel: evil, stalePlan: false }] });
+  const log = f.parts.log();
+  assert.equal(findAll(log, i => i.tag === 'img' || i.tag === 'script').length, 0, 'no img or script element');
+  assert.match(visibleText(log), /<img src=x onerror=alert\(1\)>/, 'the markup is shown as text');
+});

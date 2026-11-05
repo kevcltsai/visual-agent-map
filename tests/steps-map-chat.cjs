@@ -329,6 +329,20 @@ test('service stop: an aborted signal throws MapChatError stopped before and aft
   const failing = new MapChatService(async () => { crash.abort(); throw new Error('killed'); });
   await assert.rejects(failing.chat(request(), crash.signal), error => error.code === 'stopped');
 });
+test('service onRaw gets the raw output before parsing, also when the reply is invalid, and never after a stop', async () => {
+  const seen = [];
+  const good = reply();
+  const ok = new MapChatService(async () => good);
+  await ok.chat(request(), new AbortController().signal, undefined, undefined, raw => seen.push(raw));
+  const bad = new MapChatService(async () => 'not json {');
+  await assert.rejects(bad.chat(request(), new AbortController().signal, undefined, undefined, raw => seen.push(raw)), error => error.name === 'MapChatError');
+  assert.deepEqual(seen, [good, 'not json {']);
+  const live = new AbortController();
+  const late = new MapChatService(async () => { live.abort(); return good; });
+  await assert.rejects(late.chat(request(), live.signal, undefined, undefined, () => assert.fail('no late raw')), error => error.code === 'stopped');
+  const throwing = new MapChatService(async () => good);
+  assert.equal((await throwing.chat(request(), new AbortController().signal, undefined, undefined, () => { throw new Error('observer'); })).reply, 'ok');
+});
 
 // ---- History.discardSince ----
 const entry = label => ({ label, undo: async () => {}, redo: async () => {} });

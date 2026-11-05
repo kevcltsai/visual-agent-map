@@ -168,12 +168,14 @@ export class MapChatService {
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
    * `rejected`. Claude streams the StructuredOutput JSON; Codex streams its message text (only growing). Other providers never call `onReply`.
    * `onProgress` gets the runtime's model events (never after a stop); it only drives a display.
+   * `onRaw` gets the model's raw output right before it is parsed, so it is called for a reply that then fails to parse too (never after a stop); it only feeds the chat record and cannot break the turn.
    */
   async chat(
     request: MapChatRequest,
     signal: AbortSignal,
     onReply?: (reply: string) => void,
-    onProgress?: (event: MapChatProgressEvent) => void
+    onProgress?: (event: MapChatProgressEvent) => void,
+    onRaw?: (raw: string) => void
   ): Promise<MapChatResult> {
     const stopped = (): MapChatError => new MapChatError("stopped", "Map chat stopped");
     if (signal.aborted) throw stopped();
@@ -226,6 +228,11 @@ export class MapChatService {
       throw error;
     }
     if (signal.aborted) throw stopped();
+    try {
+      onRaw?.(raw);
+    } catch {
+      /* a record observer must never break the turn */
+    }
     return prepared.parse(raw);
   }
 }

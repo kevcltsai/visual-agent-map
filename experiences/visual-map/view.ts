@@ -309,7 +309,7 @@ import {
   chooseCardToolsSpot,
   clearToolbar,
   type CanvasInsets,
-  fitIsClamped,
+  anyBoxOffscreen,
   fitViewport,
   focusViewport,
   initialViewport,
@@ -16441,6 +16441,7 @@ export class VisualAgentMapView extends ItemView {
     this.transform();
     if (persist) this.saveViewport();
   }
+  private fitNotice: Notice | null = null;
   private fit(): void {
     if (!this.map || !this.viewportEl) return;
     const nodes = this.canvasNodes();
@@ -16479,10 +16480,12 @@ export class VisualAgentMapView extends ItemView {
     this.transform();
     this.saveViewport();
     // The zoom floor keeps text readable; when it holds some cards off screen, say so instead of hiding them silently.
-    if (fitIsClamped(fitBounds, fitSize, fitInset)) {
+    // Judged against the real canvas (not the area inside the toolbar insets), and one notice at a time.
+    if (anyBoxOffscreen(boxes, this.map.viewport, fitSize)) {
       const hint = t("ui.fit_clamped");
       this.announcer?.setText(hint);
-      new Notice(hint);
+      this.fitNotice?.hide();
+      this.fitNotice = new Notice(hint);
     }
   }
   private setupPan(): void {

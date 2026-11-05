@@ -892,6 +892,9 @@ var en = {
   "ui.annotated_image_pill": "Annotated image",
   "ui.annotated_image_label": "Annotated image: {0}",
   "ui.annotated_image_anchor_count": "{0} anchor(s)",
+  "ui.annotated_image_anchor_count_preview_0_1": "{0} anchor(s) \xB7 {1} in preview",
+  "ui.annotated_image_label_preview_0_1": "{0}. {1} anchor(s) in the plan preview.",
+  "ui.annotated_image_preview_note": "Dashed dots are where the plan would put anchors. They are only placed when you press Apply.",
   "ui.annotated_image_convert": "Convert to annotated image\u2026",
   "ui.annotated_image_open_original": "Open original file",
   "ui.annotated_image_delete_plain": "Delete image",
@@ -3625,6 +3628,9 @@ var zhCN = {
   "ui.annotated_image_pill": "\u6807\u6CE8\u56FE",
   "ui.annotated_image_label": "\u6807\u6CE8\u56FE\uFF1A{0}",
   "ui.annotated_image_anchor_count": "{0} \u4E2A\u951A\u70B9",
+  "ui.annotated_image_anchor_count_preview_0_1": "{0} \u4E2A\u951A\u70B9\u30FB\u9884\u89C8 {1} \u4E2A",
+  "ui.annotated_image_label_preview_0_1": "{0}\u3002\u8BA1\u5212\u9884\u89C8\u4E2D\u6709 {1} \u4E2A\u951A\u70B9\u3002",
+  "ui.annotated_image_preview_note": "\u865A\u7EBF\u70B9 = \u8BA1\u5212\u91CC\u7684\u951A\u70B9\u4F4D\u7F6E\uFF0C\u6309\u201C\u5957\u7528\u201D\u540E\u624D\u4F1A\u771F\u7684\u653E\u4E0A\u53BB",
   "ui.annotated_image_convert": "\u8F6C\u6210\u6807\u6CE8\u56FE\u2026",
   "ui.annotated_image_open_original": "\u6253\u5F00\u539F\u59CB\u6587\u4EF6",
   "ui.annotated_image_delete_plain": "\u5220\u9664\u56FE\u7247",
@@ -6358,6 +6364,9 @@ var zhTW = {
   "ui.annotated_image_pill": "\u6A19\u8A3B\u5716",
   "ui.annotated_image_label": "\u6A19\u8A3B\u5716\uFF1A{0}",
   "ui.annotated_image_anchor_count": "{0} \u500B\u9328\u9EDE",
+  "ui.annotated_image_anchor_count_preview_0_1": "{0} \u500B\u9328\u9EDE\u30FB\u9810\u89BD {1} \u500B",
+  "ui.annotated_image_label_preview_0_1": "{0}\u3002\u8A08\u756B\u9810\u89BD\u4E2D\u6709 {1} \u500B\u9328\u9EDE\u3002",
+  "ui.annotated_image_preview_note": "\u865B\u7DDA\u9EDE = \u8A08\u756B\u88E1\u7684\u9328\u9EDE\u4F4D\u7F6E\uFF0C\u6309\u300C\u5957\u7528\u300D\u5F8C\u624D\u6703\u771F\u7684\u653E\u4E0A\u53BB",
   "ui.annotated_image_convert": "\u8F49\u6210\u6A19\u8A3B\u5716\u2026",
   "ui.annotated_image_open_original": "\u958B\u555F\u539F\u59CB\u6A94",
   "ui.annotated_image_delete_plain": "\u522A\u9664\u5716\u7247",
@@ -54531,6 +54540,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "chatTaskKey", null);
     /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
     __publicField(this, "chatPlanToken", 0);
+    /** The anchors the pending plan would place, drawn as dashed dots; it only counts while its token is the plan's current one. */
+    __publicField(this, "chatPreview", null);
     /**
      * The canvas image the next chat message is about: the last one focused or clicked (D7). Cleared by choosing a card, a click on
      * the empty canvas, Esc, deleting the image and opening another map. Only the id is kept; the picture is read when a message is sent.
@@ -60672,7 +60683,7 @@ ${request.requirements}` : preset.text,
     this.canvasImageEls = /* @__PURE__ */ new Map();
     for (const item of items) {
       if (item.kind !== "image" && !isAnnotatedImage(item) || !layer) continue;
-      const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = annotated ? t("ui.annotated_image_label", annotated.note || name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
+      const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = annotated ? this.annotatedLabel(annotated, name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
       this.canvasImageEls.set(image.id, el);
       el.setAttr("role", annotated ? "group" : "img");
@@ -60738,7 +60749,7 @@ ${request.requirements}` : preset.text,
   }
   /** The anchors of one annotated image. Only anchors with a 2D position are drawn; the others stay in the data untouched. */
   renderAnchors(el, image, editable) {
-    var _a2;
+    var _a2, _b2;
     for (const anchor of image.anchors) {
       if (!isImage2dAnchor(anchor)) continue;
       const links = ((_a2 = image.relations) != null ? _a2 : []).filter((r) => r.from === anchor.id || r.to === anchor.id).length;
@@ -60792,6 +60803,58 @@ ${request.requirements}` : preset.text,
         }
       });
     }
+    this.paintAnchorPreview(el, image, image.note || ((_b2 = image.path.split("/").pop()) != null ? _b2 : image.path));
+  }
+  /** The anchors the pending plan would place on this image (none once the plan is settled or replaced). */
+  previewAnchorsOf(imageId) {
+    const preview = this.chatPreview;
+    if (!preview || preview.token !== this.chatPlanToken) return [];
+    return preview.anchors.filter((a) => a.imageId === imageId && Number.isFinite(a.x) && Number.isFinite(a.y));
+  }
+  annotatedLabel(image, name2) {
+    const previewed = this.previewAnchorsOf(image.id).length;
+    const base = t("ui.annotated_image_label", image.note || name2);
+    return previewed ? t("ui.annotated_image_label_preview_0_1", base, previewed) : base;
+  }
+  annotatedCountText(image) {
+    const previewed = this.previewAnchorsOf(image.id).length;
+    return previewed ? t("ui.annotated_image_anchor_count_preview_0_1", image.anchors.length, previewed) : t("ui.annotated_image_anchor_count", image.anchors.length);
+  }
+  /**
+   * Draws the plan's anchors as dashed dots on one annotated image, replacing what was drawn before. The dots are fixed spans
+   * placed by numbers only; the note is untrusted and never reaches the page (the plan card shows it as text).
+   */
+  paintAnchorPreview(el, image, name2) {
+    var _a2;
+    for (const old of Array.from(el.querySelectorAll(".is-preview"))) old.remove();
+    for (const old of Array.from(el.querySelectorAll(".vam-anchor-preview-note"))) old.remove();
+    const preview = this.previewAnchorsOf(image.id);
+    (_a2 = el.querySelector(".vam-annotated-count")) == null ? void 0 : _a2.setText(this.annotatedCountText(image));
+    el.setAttr("aria-label", this.annotatedLabel(image, name2));
+    if (!preview.length) return;
+    for (const point of preview) {
+      const dot = el.createSpan("vam-anchor is-preview");
+      dot.setAttr("aria-hidden", "true");
+      dot.style.left = `${Math.round(Math.min(1, Math.max(0, point.x)) * 1e6) / 1e4}%`;
+      dot.style.top = `${Math.round(Math.min(1, Math.max(0, point.y)) * 1e6) / 1e4}%`;
+    }
+    const note = el.createDiv("vam-anchor-preview-note");
+    note.setAttr("aria-hidden", "true");
+    note.setText(t("ui.annotated_image_preview_note"));
+  }
+  /** Brings the dashed dots on the canvas in line with the pending plan, without a full render (so the focus stays put). */
+  syncAnchorPreview() {
+    var _a2, _b2, _c;
+    for (const [id, el] of this.canvasImageEls) {
+      const image = findAnnotatedImage((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], id);
+      if (image) this.paintAnchorPreview(el, image, (_c = image.path.split("/").pop()) != null ? _c : image.path);
+    }
+  }
+  /** Forgets the plan's preview (the plan was applied, cancelled, replaced or its map left) and takes the dots off the canvas. */
+  clearChatPreview() {
+    if (!this.chatPreview) return;
+    this.chatPreview = null;
+    this.syncAnchorPreview();
   }
   /** Deletes an anchor with its relations as one undo step; the focus returns to the image. */
   async deleteAnchor(imageId, anchorId) {
@@ -61163,7 +61226,7 @@ ${request.requirements}` : preset.text,
     (0, import_obsidian37.setIcon)(pill.createSpan("vam-annotated-pill-icon"), "map-pin");
     pill.createSpan({ text: t("ui.annotated_image_pill") });
     bar.createSpan({ text: image.note || name2, cls: "vam-annotated-note" });
-    bar.createSpan({ text: t("ui.annotated_image_anchor_count", image.anchors.length), cls: "vam-annotated-count" });
+    bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
   }
   /**
    * The right-click / Shift+F10 / Menu-key menu of one image. A plain image offers conversion; an annotated image its own
@@ -70856,11 +70919,13 @@ ${note.detail.trim()}` : "",
     }
     if (this.chatMapId !== this.map.id) {
       this.clearChatImage();
+      this.clearChatPreview();
       if (this.chatCarryOver) {
         this.chatMapId = this.map.id;
       } else {
         this.abortMapChat();
         this.chatPlanToken++;
+        this.clearChatPreview();
         this.chat.reset();
         this.chatMapId = this.map.id;
       }
@@ -71393,11 +71458,13 @@ ${note.detail.trim()}` : "",
   setChatImage(id) {
     if (this.chatImageId === id) return;
     this.chatImageId = id;
+    this.clearChatPreview();
     for (const listener of [...this.chatImageListeners]) listener();
   }
   clearChatImage() {
     if (this.chatImageId === null) return;
     this.chatImageId = null;
+    this.clearChatPreview();
     for (const listener of [...this.chatImageListeners]) listener();
   }
   /** The undo step of the reply applied last (undefined when it wrote nothing): the chat's "undo this reply" button acts on it. */
@@ -71817,6 +71884,7 @@ ${note.detail.trim()}` : "",
     var _a2, _b2, _c;
     const pending2 = (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.pendingPlan()) != null ? _b2 : null;
     this.chatPlanToken++;
+    this.clearChatPreview();
     if (pending2) (_c = this.chat) == null ? void 0 : _c.settlePlan(pending2, "cancelled");
   }
   planReasonText(reason, result, selectedCount) {
@@ -71838,6 +71906,12 @@ ${note.detail.trim()}` : "",
     const chat = this.chat;
     if (!chat) return;
     const token = ++this.chatPlanToken;
+    this.chatPreview = null;
+    const anchorsToPlace = result.actions.flatMap(
+      (action) => action.kind === "add_anchor" ? [{ imageId: action.imageId, x: action.x, y: action.y, note: action.note }] : []
+    );
+    if (anchorsToPlace.length) this.chatPreview = { token, anchors: anchorsToPlace };
+    this.syncAnchorPreview();
     const refTitles = this.chatRefTitles(result.actions);
     const items = result.actions.map((action) => this.chatActionLabel(action, refTitles));
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
@@ -71864,6 +71938,7 @@ ${note.detail.trim()}` : "",
         var _a2;
         if (token !== this.chatPlanToken) return;
         this.chatPlanToken++;
+        this.clearChatPreview();
         (_a2 = this.chat) == null ? void 0 : _a2.settlePlan(card, "cancelled");
       }
     };
@@ -71874,10 +71949,12 @@ ${note.detail.trim()}` : "",
     if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
     if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
       this.chatPlanToken++;
+      this.clearChatPreview();
       chat.settlePlan(card, "cancelled", [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }]);
       return;
     }
     this.chatApplying = true;
+    this.clearChatPreview();
     chat.settlePlan(card, "applied");
     chat.setApplying(true);
     let lines;
@@ -71922,6 +71999,7 @@ ${note.detail.trim()}` : "",
   /** Closing the view or leaving the map: abort without touching the window. */
   abortMapChat() {
     this.chatPlanToken++;
+    this.clearChatPreview();
     const controller = this.chatController;
     this.releaseChatTask();
     controller == null ? void 0 : controller.abort();

@@ -1109,6 +1109,9 @@ export class VisualAgentMapView extends ItemView {
   private chatTaskKey: string | null = null;
   /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
   private chatPlanToken = 0;
+  /** The anchors the pending plan would place, drawn as dashed dots; it only counts while its token is the plan's current one. */
+  private chatPreview: { token: number; anchors: { imageId: string; x: number; y: number; note: string }[] } | null =
+    null;
   /**
    * The canvas image the next chat message is about: the last one focused or clicked (D7). Cleared by choosing a card, a click on
    * the empty canvas, Esc, deleting the image and opening another map. Only the id is kept; the picture is read when a message is sent.
@@ -7721,7 +7724,7 @@ export class VisualAgentMapView extends ItemView {
         annotated = isAnnotatedImage(image) ? image : null,
         name = image.path.split("/").pop() ?? image.path,
         // The note and the file name are untrusted: they only ever go in through setText and setAttr.
-        label = annotated ? t("ui.annotated_image_label", annotated.note || name) : t("ui.canvas_image_label", name),
+        label = annotated ? this.annotatedLabel(annotated, name) : t("ui.canvas_image_label", name),
         el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
       this.canvasImageEls.set(image.id, el);
@@ -7847,6 +7850,58 @@ export class VisualAgentMapView extends ItemView {
         }
       });
     }
+    this.paintAnchorPreview(el, image, image.note || (image.path.split("/").pop() ?? image.path));
+  }
+  /** The anchors the pending plan would place on this image (none once the plan is settled or replaced). */
+  private previewAnchorsOf(imageId: string): { x: number; y: number; note: string }[] {
+    const preview = this.chatPreview;
+    if (!preview || preview.token !== this.chatPlanToken) return [];
+    return preview.anchors.filter(a => a.imageId === imageId && Number.isFinite(a.x) && Number.isFinite(a.y));
+  }
+  private annotatedLabel(image: AnnotatedImageItem, name: string): string {
+    const previewed = this.previewAnchorsOf(image.id).length;
+    const base = t("ui.annotated_image_label", image.note || name);
+    return previewed ? t("ui.annotated_image_label_preview_0_1", base, previewed) : base;
+  }
+  private annotatedCountText(image: AnnotatedImageItem): string {
+    const previewed = this.previewAnchorsOf(image.id).length;
+    return previewed
+      ? t("ui.annotated_image_anchor_count_preview_0_1", image.anchors.length, previewed)
+      : t("ui.annotated_image_anchor_count", image.anchors.length);
+  }
+  /**
+   * Draws the plan's anchors as dashed dots on one annotated image, replacing what was drawn before. The dots are fixed spans
+   * placed by numbers only; the note is untrusted and never reaches the page (the plan card shows it as text).
+   */
+  private paintAnchorPreview(el: HTMLElement, image: AnnotatedImageItem, name: string): void {
+    for (const old of Array.from(el.querySelectorAll(".is-preview"))) old.remove();
+    for (const old of Array.from(el.querySelectorAll(".vam-anchor-preview-note"))) old.remove();
+    const preview = this.previewAnchorsOf(image.id);
+    el.querySelector(".vam-annotated-count")?.setText(this.annotatedCountText(image));
+    el.setAttr("aria-label", this.annotatedLabel(image, name));
+    if (!preview.length) return;
+    for (const point of preview) {
+      const dot = el.createSpan("vam-anchor is-preview");
+      dot.setAttr("aria-hidden", "true");
+      dot.style.left = `${Math.round(Math.min(1, Math.max(0, point.x)) * 1e6) / 1e4}%`;
+      dot.style.top = `${Math.round(Math.min(1, Math.max(0, point.y)) * 1e6) / 1e4}%`;
+    }
+    const note = el.createDiv("vam-anchor-preview-note");
+    note.setAttr("aria-hidden", "true");
+    note.setText(t("ui.annotated_image_preview_note"));
+  }
+  /** Brings the dashed dots on the canvas in line with the pending plan, without a full render (so the focus stays put). */
+  private syncAnchorPreview(): void {
+    for (const [id, el] of this.canvasImageEls) {
+      const image = findAnnotatedImage(this.map?.canvasItems ?? [], id);
+      if (image) this.paintAnchorPreview(el, image, image.path.split("/").pop() ?? image.path);
+    }
+  }
+  /** Forgets the plan's preview (the plan was applied, cancelled, replaced or its map left) and takes the dots off the canvas. */
+  private clearChatPreview(): void {
+    if (!this.chatPreview) return;
+    this.chatPreview = null;
+    this.syncAnchorPreview();
   }
   /** Deletes an anchor with its relations as one undo step; the focus returns to the image. */
   private async deleteAnchor(imageId: string, anchorId: string): Promise<void> {
@@ -8196,7 +8251,7 @@ export class VisualAgentMapView extends ItemView {
     setIcon(pill.createSpan("vam-annotated-pill-icon"), "map-pin");
     pill.createSpan({ text: t("ui.annotated_image_pill") });
     bar.createSpan({ text: image.note || name, cls: "vam-annotated-note" });
-    bar.createSpan({ text: t("ui.annotated_image_anchor_count", image.anchors.length), cls: "vam-annotated-count" });
+    bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
   }
   /**
    * The right-click / Shift+F10 / Menu-key menu of one image. A plain image offers conversion; an annotated image its own
@@ -18720,6 +18775,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.chatMapId !== this.map.id) {
       // The picture the chat was about belongs to the map it was on.
       this.clearChatImage();
+      this.clearChatPreview();
       if (this.chatCarryOver) {
         // The conversation opened this map itself (create_map, open_map): it goes along and its running turn goes on.
         this.chatMapId = this.map.id;
@@ -18727,6 +18783,7 @@ export class VisualAgentMapView extends ItemView {
         // Another map opened some other way: the conversation belongs to the one it was about.
         this.abortMapChat();
         this.chatPlanToken++;
+        this.clearChatPreview();
         this.chat.reset();
         this.chatMapId = this.map.id;
       }
@@ -19258,11 +19315,13 @@ export class VisualAgentMapView extends ItemView {
   private setChatImage(id: string): void {
     if (this.chatImageId === id) return;
     this.chatImageId = id;
+    this.clearChatPreview();
     for (const listener of [...this.chatImageListeners]) listener();
   }
   private clearChatImage(): void {
     if (this.chatImageId === null) return;
     this.chatImageId = null;
+    this.clearChatPreview();
     for (const listener of [...this.chatImageListeners]) listener();
   }
   /** The undo step of the reply applied last (undefined when it wrote nothing): the chat's "undo this reply" button acts on it. */
@@ -19736,6 +19795,7 @@ export class VisualAgentMapView extends ItemView {
   private supersedeChatPlan(): void {
     const pending = this.chat?.pendingPlan() ?? null;
     this.chatPlanToken++;
+    this.clearChatPreview();
     if (pending) this.chat?.settlePlan(pending, "cancelled");
   }
   private planReasonText(
@@ -19769,6 +19829,12 @@ export class VisualAgentMapView extends ItemView {
     const chat = this.chat;
     if (!chat) return;
     const token = ++this.chatPlanToken;
+    this.chatPreview = null;
+    const anchorsToPlace = result.actions.flatMap(action =>
+      action.kind === "add_anchor" ? [{ imageId: action.imageId, x: action.x, y: action.y, note: action.note }] : []
+    );
+    if (anchorsToPlace.length) this.chatPreview = { token, anchors: anchorsToPlace };
+    this.syncAnchorPreview();
     const refTitles = this.chatRefTitles(result.actions);
     const items = result.actions.map(action => this.chatActionLabel(action, refTitles));
     // The same lines by kind of work, so a 100-action plan reads as five folded lists.
@@ -19799,6 +19865,7 @@ export class VisualAgentMapView extends ItemView {
       cancel: () => {
         if (token !== this.chatPlanToken) return;
         this.chatPlanToken++;
+        this.clearChatPreview();
         this.chat?.settlePlan(card, "cancelled");
       }
     };
@@ -19816,10 +19883,13 @@ export class VisualAgentMapView extends ItemView {
     // The map the plan was made for is not the one open any more: nothing is written.
     if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
       this.chatPlanToken++;
+      this.clearChatPreview();
       chat.settlePlan(card, "cancelled", [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }]);
       return;
     }
     this.chatApplying = true;
+    // The dashed dots give way to the real anchors the writes make.
+    this.clearChatPreview();
     chat.settlePlan(card, "applied");
     // The window shows that it is working, and Stop ends the rest of the plan.
     chat.setApplying(true);
@@ -19864,6 +19934,7 @@ export class VisualAgentMapView extends ItemView {
   /** Closing the view or leaving the map: abort without touching the window. */
   private abortMapChat(): void {
     this.chatPlanToken++;
+    this.clearChatPreview();
     const controller = this.chatController;
     this.releaseChatTask();
     controller?.abort();

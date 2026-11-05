@@ -456,3 +456,102 @@ test('P4a undo (counter-example): the button undoes one step only while the repl
   assert.equal(host.replyUndoState(token), 'top', 'redo brings the button back');
   assert.equal((await h.image()).anchors.length, 2);
 });
+
+// ---- P4b: the dashed preview dots on the canvas ------------------------------------------------------------------------
+/** Draws the canvas into a stage the test can read (the harness stubs render), and returns the annotated picture's element. */
+function canvas(h) {
+  h.view.stageEl = dom.element('div'); h.app.vault.getResourcePath = () => 'app://x';
+  h.view.renderCanvasItems();
+  return () => dom.find(h.view.stageEl, i => i.hasClass('vam-canvas-image') && i.dataset.itemId === 'img1');
+}
+const dots = el => dom.findAll(el, i => i.hasClass('is-preview'));
+const solid = el => dom.findAll(el, i => i.hasClass('vam-anchor') && !i.hasClass('is-preview'));
+const countText = el => dom.find(el, i => i.hasClass('vam-annotated-count')).text;
+const threeAnchors = [addAnchor('p1', 0.1, 0.2, 'A'), addAnchor('p2', 0.5, 0.5, 'B'), addAnchor('p3', 1, 0, 'C')];
+async function planned(actions = threeAnchors) {
+  const h = await harness(); const el = canvas(h); h.select('img1');
+  h.control.reply = async () => ({ reply: 'Plan', actions, rejected: [] });
+  await h.send('place');
+  return { h, el, card: h.chat.plans[0] };
+}
+
+test('P4b preview: one dashed dot per add_anchor, drawn without changing the map or the undo stack; the bar and the group name say how many', async () => {
+  const { h, el, card } = await planned();
+  assert.equal(h.chat.plans.length, 1);
+  assert.equal(dots(el()).length, 3, 'one dot per add_anchor');
+  assert.equal(solid(el()).length, 1, 'the real anchor is still the only solid one');
+  assert.equal(countText(el()), '1 anchor(s) · 3 in preview');
+  assert.equal(el().attrs['aria-label'], 'Annotated image: Cow cuts. 3 anchor(s) in the plan preview.');
+  for (const dot of dots(el())) { assert.equal(dot.tag, 'span'); assert.equal(dot.attrs['aria-hidden'], 'true'); assert.equal(dot.children.length, 0, 'a fixed span: nothing inside'); assert.match(dot.style.left, /^[\d.]+%$/); assert.match(dot.style.top, /^[\d.]+%$/); }
+  assert.deepEqual(plain(dots(el()).map(d => [d.style.left, d.style.top])), [['10%', '20%'], ['50%', '50%'], ['100%', '0%']]);
+  assert.ok(dom.find(el(), i => i.hasClass('vam-anchor-preview-note')), 'the ghost note is there');
+  assert.equal((await h.image()).anchors.length, 1, 'the map is untouched');
+  assert.equal(h.view.history.undoEntry, undefined, 'and nothing went on the undo stack');
+  h.view.stageEl = dom.element('div'); h.view.renderCanvasItems();
+  assert.equal(dots(dom.find(h.view.stageEl, i => i.hasClass('is-annotated'))).length, 3, 'a full redraw keeps the preview');
+  assert.deepEqual(plain(card.groups ?? []).map(g => g.label), ['Add or create (3)']);
+});
+
+test('P4b preview: no add_anchor in the plan, no dots; another picture gets none of the dots', async () => {
+  const h = await harness(); const el = canvas(h); h.select('img1');
+  h.control.reply = async () => ({ reply: 'Plan', actions: [{ kind: 'add_child', parentId: h.ids.root, title: 'T', ref: 'n1' }], rejected: [] });
+  await h.send('x');
+  assert.equal(dots(el()).length, 0); assert.equal(countText(el()), '1 anchor(s)');
+  const o = await planned([addAnchor('p1', 0.3, 0.3, 'Z', 'img2')]);
+  assert.equal(dots(o.el()).length, 0, 'an ordinary picture has no anchors to preview on');
+});
+
+test('P4b preview (counter-example): Apply, Cancel, the next message, abort, a picture change and a map switch each take every dot away', async () => {
+  // Apply: the dots give way to solid anchors.
+  let o = await planned();
+  o.card.apply(); await until(() => o.h.chat.calls.filter(c => c[0] === 'settle').length >= 2);
+  assert.equal(dots(o.el()).length, 0, 'applied'); assert.equal((await o.h.image()).anchors.length, 4);
+  o.h.view.stageEl = dom.element('div'); o.h.view.renderCanvasItems();
+  assert.equal(solid(dom.find(o.h.view.stageEl, i => i.hasClass('is-annotated'))).length, 4); assert.equal(countText(dom.find(o.h.view.stageEl, i => i.hasClass('is-annotated'))), '4 anchor(s)');
+  // Cancel.
+  o = await planned(); o.card.cancel();
+  assert.equal(dots(o.el()).length, 0, 'cancelled'); assert.equal(countText(o.el()), '1 anchor(s)'); assert.equal(o.el().attrs['aria-label'], 'Annotated image: Cow cuts');
+  assert.equal((await o.h.image()).anchors.length, 1);
+  // Superseded by the next message.
+  o = await planned(); o.h.chat.isBusy = false;
+  o.h.control.reply = async () => ({ reply: 'No change', actions: [], rejected: [] });
+  await o.h.send('and then?');
+  assert.equal(dots(o.el()).length, 0, 'superseded');
+  // Abort (view closing).
+  o = await planned(); o.h.view.abortMapChat();
+  assert.equal(dots(o.el()).length, 0, 'aborted');
+  // Another picture is chosen.
+  o = await planned(); o.h.view.setChatImage('img2');
+  assert.equal(dots(o.el()).length, 0, 'picture changed');
+  // A late Apply of an old plan does not bring the dots back.
+  o.card.apply(); await until(() => true);
+  assert.equal(dots(o.el()).length, 0);
+  // Map switch: the chat of another map starts empty.
+  o = await planned();
+  o.h.view.map = { ...o.h.view.map, id: 'map-b' }; o.h.view.placeChatPanel = () => {}; o.h.view.syncChatNarrow = () => {};
+  o.h.view.mountMapChat(dom.element('div'), dom.element('div'));
+  assert.equal(dots(o.el()).length, 0, 'map switched');
+  assert.equal(o.h.view.chatPreview, null, 'no orphan state');
+});
+
+test('P4b preview (counter-example): the plan has priority over the dots: a stale preview whose plan is gone is never drawn', async () => {
+  const { h, el } = await planned();
+  h.view.chatPlanToken++;
+  h.view.stageEl = dom.element('div'); h.view.renderCanvasItems();
+  assert.equal(dots(dom.find(h.view.stageEl, i => i.hasClass('is-annotated'))).length, 0);
+  void el;
+});
+
+test('P4b preview whitelist (counter-example): a note of <img onerror> is no element and no attribute on the canvas; positions are numbers in 0-100%', async () => {
+  const evil = '<img src=x onerror=alert(1)>"><script>';
+  const { h, el } = await planned([addAnchor('p1', 0, 1, evil), addAnchor('p2', 0.5, 0.5, evil)]);
+  const all = dom.findAll(el(), () => true);
+  assert.equal(all.filter(i => i.tag === 'img' || i.tag === 'script').length <= 1, true, 'at most the picture itself');
+  for (const node of all) { if (node.hasClass('is-preview') || node.hasClass('vam-anchor-preview-note')) { assert.equal(JSON.stringify([node.text, node.attrs, node.style.left, node.style.top]).includes('onerror'), false); } }
+  assert.equal(JSON.stringify([el().attrs, countText(el())]).includes('onerror'), false);
+  // Extreme or broken numbers still stay inside the picture; non-numbers are not drawn.
+  h.view.chatPreview = { token: h.view.chatPlanToken, anchors: [{ imageId: 'img1', x: 5, y: -3, note: '' }, { imageId: 'img1', x: Number.NaN, y: 0.5, note: '' }, { imageId: 'img1', x: Infinity, y: 0, note: '' }] };
+  h.view.syncAnchorPreview();
+  assert.equal(dots(el()).length, 1, 'only the finite one is drawn');
+  assert.deepEqual(plain([dots(el())[0].style.left, dots(el())[0].style.top]), ['100%', '0%'], 'clamped to 0-100%');
+});

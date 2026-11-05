@@ -6,6 +6,7 @@ import {
   MapChatError,
   mapChatStep,
   parseMapChat,
+  renderMapChatSteer,
   MAP_CHAT_SCHEMA,
   type MapChatRequest,
   type MapChatResult
@@ -168,6 +169,9 @@ export class MapChatService {
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
    * `rejected`. Claude streams the StructuredOutput JSON; Codex streams its message text (only growing). Other providers never call `onReply`.
    * `onProgress` gets the runtime's model events (never after a stop); it only drives a display.
+   * `onSteer` receives a function that adds the user's follow-up text to the running turn (the text is wrapped in the steer
+   * template here); it rejects when the turn can no longer take one or after a stop. A steer restarts the reply, so the reply
+   * shown so far is forgotten and a shorter new reply replaces it.
    * `onRaw` gets the model's raw output right before it is parsed, so it is called for a reply that then fails to parse too (never after a stop); it only feeds the chat record and cannot break the turn.
    */
   async chat(
@@ -175,6 +179,7 @@ export class MapChatService {
     signal: AbortSignal,
     onReply?: (reply: string) => void,
     onProgress?: (event: MapChatProgressEvent) => void,
+    onSteer?: (steer: (text: string) => Promise<void>) => void,
     onRaw?: (raw: string) => void
   ): Promise<MapChatResult> {
     const stopped = (): MapChatError => new MapChatError("stopped", "Map chat stopped");
@@ -201,9 +206,20 @@ export class MapChatService {
         }
       : undefined;
     const hooks: ProviderStepHooks | undefined =
-      onProgress || onText
+      onProgress || onText || onSteer
         ? {
             ...(onText ? { onText } : {}),
+            ...(onSteer
+              ? {
+                  onSteer: (steer: (text: string) => Promise<void>): void =>
+                    onSteer(async text => {
+                      if (signal.aborted) throw stopped();
+                      // The new reply starts over, so it may be shorter than the one shown before the steer.
+                      shown = "";
+                      await steer(renderMapChatSteer(text));
+                    })
+                }
+              : {}),
             ...(onProgress
               ? {
                   onFirstEvent: () => {

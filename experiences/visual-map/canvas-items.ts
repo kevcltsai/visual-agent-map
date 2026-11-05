@@ -28,6 +28,8 @@ export interface TextItem {
   y: number;
   /** Topic ids this note is drawn a dashed line to (decision #1); deduped, at most {@link LINK_LIMIT}; omitted when empty. */
   links?: string[];
+  /** Width the user set with the right-edge handle (px); omitted = as wide as the text (up to {@link TEXT_AUTO_WIDTH_MAX}). */
+  width?: number;
 }
 /**
  * A summary bracket (summary-bracket P1): groups neighbouring children of one topic and carries the user's conclusion text.
@@ -93,6 +95,15 @@ const CONTROL_ALL = /[\u0000-\u001f\u007f]/g;
 const LABEL_LIMIT = 200;
 const MEMBER_LIMIT = 500;
 export const TEXT_LIMIT = 2000;
+/** Text block width limits (px): the narrowest (about two characters), the widest an automatic block grows, the widest a set width. */
+export const TEXT_WIDTH_MIN = 32;
+export const TEXT_AUTO_WIDTH_MAX = 300;
+export const TEXT_WIDTH_MAX = 560;
+/** A whole-pixel width inside the limits; undefined when the value is not a finite number. */
+export function clampTextWidth(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.min(TEXT_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.round(value)));
+}
 const PARENT_ID_LIMIT = 200;
 export const LINK_LIMIT = 20;
 export const SUMMARY_MEMBER_LIMIT = 50;
@@ -262,6 +273,8 @@ function cleanTextItem(raw: Record<string, unknown>): TextItem | null {
     if (typeof parentId !== "string" || !parentId || parentId.length > PARENT_ID_LIMIT) return null;
     item.parentId = parentId;
   }
+  const width = clampTextWidth(raw.width);
+  if (width !== undefined) item.width = width;
   const links = cleanLinks(raw.links, id);
   if (links.length) item.links = links;
   return item;
@@ -729,6 +742,17 @@ export function addFreeTextNode(
   node: { id: string; text: string; x: number; y: number }
 ): CanvasItem[] {
   return addTextNode(items, { id: node.id, text: node.text, x: node.x, y: node.y });
+}
+
+/** Sets one text node's width (clamped), or with undefined removes it (automatic width). An unknown id changes nothing. */
+export function setTextNodeWidth(items: readonly CanvasItem[], id: string, width: number | undefined): CanvasItem[] {
+  return items.map(item => {
+    if (!isText(item) || item.id !== id) return item;
+    const { width: _old, ...rest } = item;
+    void _old;
+    const next = clampTextWidth(width);
+    return next === undefined ? rest : { ...rest, width: next };
+  });
 }
 
 /** Moves one text node by (dx, dy); a non-finite delta or an unknown id changes nothing. */

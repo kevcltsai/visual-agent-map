@@ -81,31 +81,28 @@
 .vam-usage-panel { position: absolute; right: 12px; bottom: var(--vam-usage-bottom, 56px); width: 340px; max-width: calc(100% - 24px); max-height: calc(100% - var(--vam-usage-bottom, 56px) - 12px); overflow: auto; display: grid; gap: 12px; padding: 12px 14px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); color: var(--text-normal); }
 .vam-usage-panel:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-usage-panel[hidden], .vam-usage-panel [hidden] { display: none; }
-.vam-usage-title { display: flex; justify-content: space-between; align-items: center; margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
-.vam-usage-faint { color: var(--text-faint); font-weight: var(--font-normal); font-size: var(--font-ui-smaller); }
+.vam-usage-title { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
+.vam-usage-filter { display: inline-flex; padding: 2px; border-radius: var(--radius-s); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); }
+.vam-usage-filter-option { all: unset; box-sizing: border-box; padding: 2px 9px; border-radius: 4px; font-size: max(11px, var(--font-ui-smaller)); font-weight: var(--font-medium); color: var(--text-muted); cursor: pointer; }
+.vam-usage-filter-option.is-selected { background: var(--background-primary); color: var(--interactive-accent); font-weight: var(--font-bold); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
+.vam-usage-filter-option:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-usage-muted { color: var(--text-muted); }
 .vam-usage-section { display: grid; gap: 6px; }
-.vam-usage-heading { font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); letter-spacing: 0.06em; color: var(--text-muted); }
-.vam-usage-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.vam-usage-heading { font-size: max(11px, var(--font-ui-smaller)); font-weight: var(--font-semibold); letter-spacing: 0.06em; color: var(--text-muted); }
+.vam-usage-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 6px; }
 .vam-usage-totals > div { padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); min-width: 0; }
-.vam-usage-totals small { display: block; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-usage-totals small { display: block; color: var(--text-muted); font-size: max(11px, var(--font-ui-smaller)); }
 .vam-usage-totals strong { font-size: var(--font-ui-medium); font-variant-numeric: tabular-nums; }
 .vam-usage-totals em span { display: block; white-space: nowrap; }
-.vam-usage-totals em { display: block; font-style: normal; color: var(--text-faint); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
+.vam-usage-totals em { display: block; font-style: normal; color: var(--text-faint); font-size: max(11px, var(--font-ui-smaller)); font-variant-numeric: tabular-nums; }
 .vam-usage-bars { display: grid; gap: 5px; }
 .vam-usage-bar { display: grid; grid-template-columns: 64px 1fr 44px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .vam-usage-bar > span:last-child { text-align: right; }
 .vam-usage-fill-track { height: 8px; }
 .vam-usage-fill { height: 8px; border-radius: 4px; background: var(--interactive-accent); }
-.vam-usage-recent { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.vam-usage-recent td { padding: 4px 0; border-top: 1px solid var(--background-modifier-border); vertical-align: top; }
-.vam-usage-recent td:nth-child(1) { width: 42px; }
-.vam-usage-recent td:nth-child(n+3) { padding-left: 8px; text-align: right; white-space: nowrap; }
-.vam-usage-node { display: block; color: var(--text-faint); font-size: var(--font-ui-smaller); }
-.vam-usage-recent td.is-estimated { color: var(--text-warning, var(--color-orange)); }
 .vam-usage-empty, .vam-usage-error { margin: 0; color: var(--text-muted); }
 .vam-usage-error { color: var(--text-error); }
-.vam-usage-foot { padding-top: 8px; border-top: 1px solid var(--background-modifier-border); color: var(--text-faint); font-size: var(--font-ui-smaller); line-height: 1.5; }
+.vam-usage-foot { padding-top: 8px; border-top: 1px solid var(--background-modifier-border); color: var(--text-faint); font-size: max(11px, var(--font-ui-smaller)); line-height: 1.5; }
 .vam-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
 /* Note style pickers */
 .vam-note-style-custom:not([hidden]) { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--interactive-accent); }
@@ -745,7 +742,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-toggle { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-s); background: transparent; box-shadow: none; color: var(--text-muted); }
 .vam-map-chat-toggle:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
 .vam-map-chat-unread { position: absolute; top: 4px; right: 4px; box-sizing: border-box; width: 10px; height: 10px; border: 2px solid var(--background-secondary); border-radius: 50%; background: var(--interactive-accent); }
-.vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-note-remove:focus-visible, .vam-map-chat-log:focus-visible, .vam-map-chat-suggestion:focus-visible, .vam-map-chat-example:focus-visible, .vam-map-chat-retry:focus-visible, .vam-map-chat-plan-apply:focus-visible, .vam-map-chat-plan-cancel:focus-visible, .vam-map-chat-lines-toggle:focus-visible, .vam-map-chat-plan-group-title:focus-visible, .vam-map-chat-choice:focus-visible, .vam-map-chat-resizer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-note-remove:focus-visible, .vam-map-chat-log:focus-visible, .vam-map-chat-send:focus-visible, .vam-map-chat-stop:focus-visible, .vam-map-chat-retry:focus-visible, .vam-map-chat-plan-apply:focus-visible, .vam-map-chat-plan-cancel:focus-visible, .vam-map-chat-lines-toggle:focus-visible, .vam-map-chat-plan-group-title:focus-visible, .vam-map-chat-choice:focus-visible, .vam-map-chat-resizer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-toggle.is-hidden, .vam-map-chat-body.is-hidden, .vam-map-chat-send.is-hidden, .vam-map-chat-stop.is-hidden, .vam-map-chat-hero-title.is-hidden, .vam-map-chat-resizer.is-hidden { display: none; }
 .vam-map-chat-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 8px; box-sizing: border-box; min-height: 0; padding: 10px 12px 12px; }
 /* The docked chat reaches the window's bottom edge, where Obsidian's status bar floats over its send button. */
@@ -782,15 +779,18 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-log { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px 4px 6px 2px; scrollbar-width: thin; scrollbar-color: var(--background-modifier-border-hover) transparent; }
 .vam-map-chat-log > * { flex-shrink: 0; }
 .vam-map-chat-msg { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); }
-.vam-map-chat-suggest { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; }
-.vam-map-chat button.vam-map-chat-suggestion { min-height: 28px; min-width: 24px; height: auto; padding: 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-small); text-align: start; white-space: normal; cursor: pointer; }
-.vam-map-chat button.vam-map-chat-suggestion:hover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); }
-.vam-map-chat-suggest.is-examples { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; }
-.vam-map-chat button.vam-map-chat-example { display: block; width: 100%; min-height: 28px; height: auto; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); box-shadow: none; color: var(--text-normal); text-align: start; white-space: normal; cursor: pointer; }
-.vam-map-chat button.vam-map-chat-example:hover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); }
 .vam-map-chat-form { display: flex; flex-direction: column; gap: 6px; }
 .vam-map-chat-input { box-sizing: border-box; width: 100%; min-width: 0; resize: none; caret-color: var(--text-accent); }
-.vam-map-chat-side { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vam-map-chat-composer { position: relative; }
+.vam-map-chat-composer .vam-map-chat-input { padding-bottom: 36px; }
+.vam-map-chat-composer button.vam-map-chat-send, .vam-map-chat-composer button.vam-map-chat-stop { position: absolute; right: 6px; bottom: 6px; display: inline-flex; align-items: center; justify-content: center; width: 28px; min-width: 24px; height: 28px; min-height: 24px; padding: 0; border: 0; border-radius: 50%; box-shadow: none; cursor: pointer; }
+.vam-map-chat-composer button.vam-map-chat-send.is-hidden, .vam-map-chat-composer button.vam-map-chat-stop.is-hidden, .vam-map-chat-composer button.vam-map-chat-send[hidden], .vam-map-chat-composer button.vam-map-chat-stop[hidden] { display: none; }
+.vam-map-chat-composer button.vam-map-chat-send { background: transparent; color: var(--text-muted); }
+.vam-map-chat-composer button.vam-map-chat-send:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); }
+.vam-map-chat-composer button.vam-map-chat-stop { background: var(--interactive-accent); color: var(--text-on-accent); }
+.vam-map-chat-composer button.vam-map-chat-stop:hover { background: var(--interactive-accent-hover); }
+.vam-map-chat-composer button.vam-map-chat-send .svg-icon, .vam-map-chat-composer button.vam-map-chat-stop .svg-icon { width: 16px; height: 16px; }
+.vam-map-chat-composer button.vam-map-chat-stop .svg-icon { width: 12px; height: 12px; fill: currentColor; }
 .vam-map-chat-resizer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 1; width: 8px; cursor: col-resize; touch-action: none; }
 .vam-map-chat-resizer::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 2px; background: transparent; transition: background-color 120ms ease-out; }
 .vam-map-chat-resizer:hover::after, .vam-map-chat-resizer:focus-visible::after, .vam-map-chat.is-resizing .vam-map-chat-resizer::after { background: var(--interactive-accent); }
@@ -847,7 +847,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat.is-hero { width: min(560px, 100%); max-height: 100%; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l); box-shadow: var(--shadow-s); pointer-events: auto; animation: vam-chat-hero-in 240ms cubic-bezier(0.16, 1, 0.3, 1); }
 .vam-map-chat.is-hero .vam-map-chat-body { gap: 12px; padding: 16px 20px 20px; }
 .vam-map-chat.is-hero .vam-map-chat-log { display: none; }
-.vam-map-chat.is-hero .vam-map-chat-input { padding: 10px 12px; }
+.vam-map-chat.is-hero .vam-map-chat-input { padding: 10px 12px 36px; }
 @keyframes vam-chat-hero-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .vam-map-chat.is-hero { animation: none; } .vam-map-chat-resizer::after { transition: none; } }
 .has-chat-hero .vam-empty { display: none; }
@@ -855,6 +855,13 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-chat-skeleton { display: flex; gap: 12px; }
 .vam-chat-skeleton-card { width: 120px; height: 56px; border: 1px dashed var(--background-modifier-border); border-radius: var(--radius-m); }
 .vam-map-chat-msg.is-user { background: var(--background-modifier-hover); }
+.vam-map-chat-steer { align-self: flex-end; display: flex; flex-direction: column; gap: 1px; max-width: 85%; margin-top: 4px; padding: 4px 8px; border-radius: var(--radius-s); background: var(--background-modifier-hover); border: 1px solid var(--background-modifier-border); }
+.vam-map-chat-steer-tag { font-size: var(--font-ui-smaller); color: var(--text-accent); }
+.vam-map-chat-steer.is-queued { border-style: dashed; }
+.vam-map-chat-steer.is-queued .vam-map-chat-steer-tag { color: var(--text-muted); }
+.vam-map-chat-steer-text { overflow-wrap: anywhere; white-space: pre-wrap; }
+.vam-map-chat-composer .vam-map-chat-steer-hint { position: absolute; right: 40px; bottom: 12px; font-size: var(--font-ui-smaller); color: var(--text-muted); pointer-events: none; }
+.vam-map-chat-composer .vam-map-chat-steer-hint.is-hidden, .vam-map-chat-composer .vam-map-chat-steer-hint[hidden] { display: none; }
 .vam-map-chat-msg.is-error .vam-map-chat-text { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-map-chat-role { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
@@ -922,8 +929,17 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-map-sources-panel { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-width: min(440px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); max-height: var(--vam-sources-max, none); overflow-y: auto; animation: vam-relevance-panel-in 150ms ease-out; }
 .vam-map-sources-title { margin: 0; font-size: var(--font-ui-medium); }
 .vam-map-sources-panel p { margin: 0; }
-.vam-map-sources-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.vam-map-sources-pick { display: inline-flex; flex: 1 1 8em; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: auto; min-height: 30px; padding: 6px 8px; white-space: normal; text-align: center; font-size: var(--font-ui-small); }
+.vam-map-sources-drop { display: grid; gap: 4px; justify-items: center; box-sizing: border-box; padding: 18px 12px; border: 2px dashed var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); text-align: center; }
+.vam-map-sources-drop-main { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: var(--font-semibold); overflow-wrap: anywhere; }
+.vam-map-sources-drop-sub, .vam-map-sources-drop-line { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-map-sources-drop.is-dragover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); }
+.vam-map-sources-drop.is-dragover .vam-map-sources-drop-main { color: var(--interactive-accent); }
+.vam-map-sources-drop.is-rejected { border-color: var(--color-orange); background: rgba(var(--color-orange-rgb), 0.12); }
+.vam-map-sources-drop.is-rejected .vam-map-sources-drop-main { color: color-mix(in srgb, var(--color-orange) 50%, var(--text-normal)); }
+.vam-map-sources-drop.is-rejected .vam-map-sources-drop-line { color: var(--text-normal); }
+.vam-map-sources-drop-ok { color: color-mix(in srgb, var(--color-green) 50%, var(--text-normal)); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; padding: 2px 8px; border-radius: var(--radius-s); background: rgba(var(--color-green-rgb), 0.12); }
+.vam-map-sources-drop.is-rejected .vam-map-sources-drop-sub { display: none; }
+.vam-map-sources-search { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: auto; min-height: 30px; padding: 6px 8px; white-space: normal; text-align: center; font-size: var(--font-ui-small); }
 .vam-map-sources-pick-icon, .vam-map-sources-icon { display: inline-flex; flex: 0 0 auto; color: var(--text-muted); }
 .vam-map-sources-pick-icon svg, .vam-map-sources-icon svg { width: 16px; height: 16px; }
 .vam-map-sources-pick-label { min-width: 0; overflow-wrap: anywhere; }
@@ -931,11 +947,14 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-map-sources-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; padding: 4px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .vam-map-sources-name { flex: 1 1 8em; min-width: 0; overflow-wrap: anywhere; }
 .vam-map-sources-meta { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-sources-row.is-new { animation: vam-map-sources-new 2s ease-out; }
+@keyframes vam-map-sources-new { from { background: var(--background-modifier-hover); } to { background: transparent; } }
+.vam-map-sources-kind { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-sources-row.is-unreadable .vam-map-sources-meta, .vam-map-sources-row.is-unreadable .vam-map-sources-icon { color: var(--text-error); }
 .vam-map-sources-remove { flex: 0 0 auto; height: auto; min-height: 26px; padding: 2px 8px; white-space: nowrap; }
-.vam-map-sources-pick:focus-visible, .vam-map-sources-remove:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-sources-search:focus-visible, .vam-map-sources-remove:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-sources-empty, .vam-map-sources-hint { font-size: var(--font-ui-smaller); }
-@media (prefers-reduced-motion: reduce) { .vam-map-sources-panel { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .vam-map-sources-panel, .vam-map-sources-row.is-new { animation: none; } }
 
 /* Coffee Tables uses Obsidian theme tokens in both light and dark rooms. */
 .workspace-leaf-content[data-type="coffee-tables-view"] .ct-view { padding: 0; height: 100%; overflow: hidden; }
@@ -1851,7 +1870,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-node.is-reparent-target { outline: 3px dashed var(--interactive-accent); outline-offset: 3px; background-color: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary)); }
 /* Text nodes (tree-text-node). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-text-nodes { position: absolute; left: 0; top: 0; width: 1px; height: 1px; }
-.vam-view .vam-text-node { position: absolute; box-sizing: border-box; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text-normal); font-size: var(--font-ui-small); line-height: 1.45; cursor: text; user-select: none; }
+.vam-view .vam-text-node { position: absolute; box-sizing: border-box; width: max-content; min-width: 32px; max-width: 300px; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text-normal); font-size: var(--font-ui-small); line-height: 1.45; cursor: text; user-select: none; }
+.vam-view .vam-text-node.has-width { max-width: none; }
+.vam-view .vam-text-node-measure { position: absolute; left: 0; top: 0; visibility: hidden; white-space: pre; pointer-events: none; font: inherit; line-height: inherit; }
+.vam-view .vam-text-resize { position: absolute; top: 3px; right: -5px; bottom: 3px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
+.vam-view .vam-text-node:hover > .vam-text-resize, .vam-view .vam-text-node:focus-within > .vam-text-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
+.vam-view .vam-text-resize:hover, .vam-view .vam-text-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
+.vam-view .vam-stage[data-presenting] .vam-text-resize { display: none; }
 .vam-view .vam-text-node:hover { border-color: var(--background-modifier-border); }
 .vam-view .vam-text-node-body { white-space: pre-wrap; overflow-wrap: anywhere; }
 .vam-view .vam-text-node:focus-visible, .vam-view .vam-text-node.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
@@ -1904,7 +1929,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-node .vam-card-summary-add { opacity: 0; pointer-events: none; margin: 0; color: var(--text-faint); font-size: var(--font-ui-small); font-style: italic; line-height: 1.55; cursor: text; }
 .vam-view .vam-node.is-selected .vam-card-summary-add { opacity: 1; pointer-events: auto; }
 .vam-view .vam-stage[data-presenting] .vam-card-summary-add { opacity: 0; pointer-events: none; }
-.vam-view .vam-node .vam-card-edit-hint { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-view .vam-anchor { position: absolute; z-index: 1; box-sizing: border-box; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0; border: 2px solid var(--interactive-accent); border-radius: 50%; background: transparent; box-shadow: 0 0 0 1px var(--background-primary); cursor: pointer; transition: transform 0.1s ease; }
 .vam-view .vam-anchor.is-linked { border-color: var(--background-primary); background: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); }
 .vam-view .vam-anchor:hover, .vam-view .vam-anchor:focus-visible { transform: scale(1.35); outline: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 35%, transparent); }

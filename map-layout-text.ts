@@ -12,14 +12,24 @@ function visibleTexts(nodes: MapNode[], items: readonly CanvasItem[], hidden?: S
   });
 }
 
-const asLeaf = (text: TextItem): MapNode => ({
-  id: text.id,
-  path: "",
-  parentId: text.parentId as string,
-  x: text.x,
-  y: text.y,
-  collapsed: false
-});
+/** The width a text block really has (drawn width, else its stored width); undefined while unknown, which lays it out as a card. */
+export type TextWidthOf = (id: string) => number | undefined;
+
+/** A text block is a leaf as wide as it is drawn: the layout aligns it to the topic and keeps its neighbours clear of it. */
+const asLeaf =
+  (widthOf?: TextWidthOf) =>
+  (text: TextItem): MapNode => {
+    const width = widthOf?.(text.id) ?? text.width;
+    return {
+      id: text.id,
+      path: "",
+      parentId: text.parentId as string,
+      x: text.x,
+      y: text.y,
+      collapsed: false,
+      ...(width !== undefined ? { width } : {})
+    };
+  };
 
 /** Writes the positions of the laid-out text leaves back into the item list; every other item stays the same object. */
 function withTextPositions(items: readonly CanvasItem[], texts: TextItem[], placed: MapNode[]): CanvasItem[] {
@@ -39,11 +49,11 @@ export function arrangeMapWithText(
   hidden?: Set<string>,
   heightOf?: HeightOf,
   layout: LayoutKind | MapLayout = "right",
-  options: { reset?: boolean } = {}
+  options: { reset?: boolean; widthOf?: TextWidthOf } = {}
 ): { nodes: MapNode[]; items: CanvasItem[] } {
   const texts = visibleTexts(nodes, items, hidden);
   if (!texts.length) return { nodes: arrangeMap(nodes, hidden, heightOf, layout, options), items: [...items] };
-  const placed = arrangeMap([...nodes, ...texts.map(asLeaf)], hidden, heightOf, layout, options);
+  const placed = arrangeMap([...nodes, ...texts.map(asLeaf(options.widthOf))], hidden, heightOf, layout, options);
   const real = new Set(nodes.map(node => node.id));
   return {
     nodes: placed.filter(node => real.has(node.id)),
@@ -66,14 +76,22 @@ export function arrangeNewBranchWithText(
   newIds: Set<string>,
   heightOf?: HeightOf,
   minTop?: number,
-  layout: LayoutKind | MapLayout = "right"
+  layout: LayoutKind | MapLayout = "right",
+  widthOf?: TextWidthOf
 ): { nodes: MapNode[]; items: CanvasItem[] } {
   const texts = visibleTexts(nodes, items);
   if (!texts.length)
     return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout), items: [...items] };
   const withNew = new Set(newIds);
   for (const text of texts) if (newIds.has(text.parentId as string)) withNew.add(text.id);
-  const placed = arrangeNewBranch([...nodes, ...texts.map(asLeaf)], parentId, withNew, heightOf, minTop, layout);
+  const placed = arrangeNewBranch(
+    [...nodes, ...texts.map(asLeaf(widthOf))],
+    parentId,
+    withNew,
+    heightOf,
+    minTop,
+    layout
+  );
   const real = new Set(nodes.map(node => node.id));
   return {
     nodes: placed.filter(node => real.has(node.id)),

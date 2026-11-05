@@ -104,3 +104,19 @@ test('annotated-image: sits beside the other kinds without changing them; move a
   assert.deepEqual(plain(ci.resizeKeepRatio(items, 'g1', 200))[2], { ...ann, w: 200, h: 100 });
   assert.deepEqual(plain(ci.removeItem(items, 'g1')), [img(), boundary()]);
 });
+
+test('text-node-width: width is kept when valid, clamped to 32..560, dropped when not a finite number; none means no key', () => {
+  const t = over => ({ id: 't1', kind: 'text', text: 'x', x: 1, y: 2, ...over });
+  assert.equal(sanitize([t({ width: 200 })])[0].width, 200);
+  assert.equal(sanitize([t({ width: 5 })])[0].width, 32);
+  assert.equal(sanitize([t({ width: 9999 })])[0].width, 560);
+  assert.equal(sanitize([t({ width: 120.6 })])[0].width, 121);
+  for (const bad of ['200', NaN, Infinity, null, {}]) assert.equal('width' in sanitize([t({ width: bad })])[0], false, String(bad));
+  assert.equal(JSON.stringify(sanitize([t()])), JSON.stringify([t()]), 'no width: bytes unchanged');
+  const set = plain(ci.setTextNodeWidth([t()], 't1', 90));
+  assert.equal(set[0].width, 90);
+  assert.equal('width' in plain(ci.setTextNodeWidth(set, 't1', undefined))[0], false);
+  assert.equal(plain(ci.setTextNodeWidth(set, 'nope', 40))[0].width, 90);
+  assert.equal(plain(ci.moveTextNode(set, 't1', 5, 5))[0].width, 90, 'a move keeps the width');
+  assert.equal(plain(ci.updateTextNode(set, 't1', 'y'))[0].width, 90, 'an edit keeps the width');
+});

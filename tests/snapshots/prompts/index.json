@@ -1246,6 +1246,11 @@
       "language": "zh-CN",
       "schema": true
     },
+    "map-chat-steer.en": {
+      "builder": "core/steps/map-chat/step.ts renderMapChatSteer",
+      "language": "en",
+      "schema": false
+    },
     "map-chat.en": {
       "builder": "core/map-chat-service.ts buildMapChatPrompt",
       "language": "en",

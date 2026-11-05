@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
 const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 const { estimateTokens } = load('ai/context-builder.ts');
-const { MAP_CHAT_TOKEN_BUDGET, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
+const { MAP_CHAT_TOKEN_BUDGET, renderMapChatSteer, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
 const { planFor, matchMapTitle, chatResearchRequest, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_FIND_IMAGES_LIMIT } = load('core/map-chat-plan.ts');
@@ -333,13 +333,13 @@ test('service onRaw gets the raw output before parsing, also when the reply is i
   const seen = [];
   const good = reply();
   const ok = new MapChatService(async () => good);
-  await ok.chat(request(), new AbortController().signal, undefined, undefined, raw => seen.push(raw));
+  await ok.chat(request(), new AbortController().signal, undefined, undefined, undefined, raw => seen.push(raw));
   const bad = new MapChatService(async () => 'not json {');
-  await assert.rejects(bad.chat(request(), new AbortController().signal, undefined, undefined, raw => seen.push(raw)), error => error.name === 'MapChatError');
+  await assert.rejects(bad.chat(request(), new AbortController().signal, undefined, undefined, undefined, raw => seen.push(raw)), error => error.name === 'MapChatError');
   assert.deepEqual(seen, [good, 'not json {']);
   const live = new AbortController();
   const late = new MapChatService(async () => { live.abort(); return good; });
-  await assert.rejects(late.chat(request(), live.signal, undefined, undefined, () => assert.fail('no late raw')), error => error.code === 'stopped');
+  await assert.rejects(late.chat(request(), live.signal, undefined, undefined, undefined, () => assert.fail('no late raw')), error => error.code === 'stopped');
   const throwing = new MapChatService(async () => good);
   assert.equal((await throwing.chat(request(), new AbortController().signal, undefined, undefined, () => { throw new Error('observer'); })).reply, 'ok');
 });
@@ -1494,4 +1494,58 @@ test('hypothesis-leaning: S21 the step version is 15, and a step-13 or step-14 r
     { kind: 'set_topic_kind', nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' },
     { kind: 'add_child', parentId: 'a', title: 'Old', summary: '', topicKind: 'hypothesis' }
   ]);
+});
+
+// ---- Steer (B1): a user message added to the turn that is already running ----
+test('steer template embeds the text as a JSON string and says the reply covers both messages', () => {
+  const text = 'make it 2\nand "hypotheses" ![[x]]';
+  const rendered = renderMapChatSteer(text);
+  assert.ok(rendered.includes(JSON.stringify(text)), 'embedded with JSON.stringify');
+  assert.ok(!rendered.includes('{{'), 'no unfilled placeholder');
+  assert.match(rendered, /same request/); assert.match(rendered, /original message/); assert.match(rendered, /replaces it/);
+});
+test('steer: the service wraps the text in the steer template, resets the shown reply, and a shorter Codex reply then replaces it', async () => {
+  const sent = []; const seen = []; let steerHandler;
+  const service = new MapChatService(async (_request, _signal, _prepared, _onJson, hooks) => {
+    hooks.onSteer(async text => { sent.push(text); });
+    hooks.onText('{"reply":"A long first answer here","actions":[]}');
+    await steerHandler('make it short');
+    hooks.onText('{"reply":"Short","actions":[]}');
+    return JSON.stringify({ reply: 'Short', actions: [] });
+  });
+  const result = await service.chat(request({ model: 'gpt-6-luna' }), new AbortController().signal, text => seen.push(text), undefined, handler => { steerHandler = handler; });
+  assert.deepEqual(seen, ['A long first answer here', 'Short'], 'the shorter reply after a steer replaces the longer one');
+  assert.equal(sent.length, 1); assert.equal(sent[0], renderMapChatSteer('make it short'));
+  assert.equal(result.reply, 'Short');
+});
+test('steer: without a steer a shorter Codex text still never replaces the shown one (unchanged)', async () => {
+  const seen = [];
+  const service = new MapChatService(async (_request, _signal, _prepared, _onJson, hooks) => {
+    hooks.onText('{"reply":"A long first answer here","actions":[]}'); hooks.onText('{"reply":"Short","actions":[]}');
+    return JSON.stringify({ reply: 'x', actions: [] });
+  });
+  await service.chat(request({ model: 'gpt-6-luna' }), new AbortController().signal, text => seen.push(text));
+  assert.deepEqual(seen, ['A long first answer here']);
+});
+test('steer: after a stop the handler rejects with stopped and sends nothing; no onSteer means no hook', async () => {
+  const controller = new AbortController(); const sent = []; let hooksSeen; let handler;
+  const service = new MapChatService(async (_request, _signal, _prepared, _onJson, hooks) => { hooksSeen = hooks; hooks.onSteer(async text => sent.push(text)); controller.abort(); return reply(); });
+  await assert.rejects(service.chat(request(), controller.signal, undefined, undefined, h => { handler = h; }), error => error.code === 'stopped');
+  await assert.rejects(handler('late'), error => error.code === 'stopped'); assert.deepEqual(sent, []);
+  let plainHooks = 'unset';
+  await new MapChatService(async (_request, _signal, _prepared, _onJson, hooks) => { plainHooks = hooks; return reply(); }).chat(request(), new AbortController().signal);
+  assert.equal(plainHooks, undefined);
+});
+test('steer: the provider runner hands onSteer to both Claude and Codex runtimes, and only when asked', async () => {
+  const seen = [];
+  const runtime = { runTask: async (...args) => { seen.push(args[4]); args[4].onSteer?.(async () => {}); return JSON.stringify({ reply: 'ok', actions: [] }); } };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  const service = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map())));
+  for (const model of ['gpt-6-luna', 'claude:sonnet']) {
+    let given = 0;
+    await service.chat(request({ model }), new AbortController().signal, undefined, undefined, () => { given++; });
+    assert.equal(given, 1, `${model}: handler reached the caller`);
+    await service.chat(request({ model }), new AbortController().signal);
+  }
+  assert.deepEqual(seen.map(controls => typeof controls.onSteer), ['function', 'undefined', 'function', 'undefined']);
 });

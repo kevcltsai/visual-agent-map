@@ -27,6 +27,11 @@ import {
   removeTextNode,
   resizeKeepRatio,
   setSummaryMembers,
+  setTextNodeWidth,
+  clampTextWidth,
+  TEXT_WIDTH_MIN,
+  TEXT_WIDTH_MAX,
+  TEXT_AUTO_WIDTH_MAX,
   setSummaryText,
   summaryDirectionContext,
   treeTextNodes,
@@ -203,6 +208,9 @@ import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
   drawMapSourcesPanel,
+  isDragSourceTarget,
+  newMapSourcesSession,
+  type MapSourcesSession,
   mapSourceName,
   mapSourcesButtonLabel,
   unreadableMapSources,
@@ -276,6 +284,7 @@ import {
 } from "../../map-layout";
 import { arrangeMapWithText, arrangeNewBranchWithText } from "../../map-layout-text";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
+import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
@@ -378,6 +387,7 @@ import {
   type MapChatOrigin,
   type MapChatPlanCard,
   type MapChatSavedTurn,
+  type MapChatSteer,
   type MapChatTurnHandle,
   settledLine
 } from "./map-chat";
@@ -834,6 +844,29 @@ function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: s
   };
   return id => resolve(id, new Set());
 }
+/**
+ * A text block's x after its width changed from `from` to `to`: the edge or center facing its topic stays where it was
+ * (left: right edge; up/down: horizontal center). Right layouts and free blocks keep x.
+ */
+function textXAfterWidth(direction: string | undefined, x: number, from: number, to: number): number {
+  if (direction === "left") return x + from - to;
+  if (direction === "up" || direction === "down") return x + (from - to) / 2;
+  return x;
+}
+/**
+ * A text block's width as fitted to its text: measured with the inline width and `has-width` taken off for a moment, so a
+ * drag in progress (which sets both) cannot change the answer.
+ */
+function fittedTextWidth(el: HTMLElement): number {
+  const inline = el.style.width,
+    had = el.hasClass("has-width");
+  el.style.removeProperty("width");
+  el.removeClass("has-width");
+  const fitted = el.offsetWidth || TEXT_NODE_WIDTH;
+  if (inline) el.style.width = inline;
+  if (had) el.addClass("has-width");
+  return fitted;
+}
 function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
   const run = x2 - x1;
   const bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
@@ -852,7 +885,24 @@ const RELATION_LABEL_NOTE_MAX = 60;
 /** A card's distance from its root (a root is 0); only the fishbone edge reads it. */
 /** A one-line plain text node as drawn (padding + one line); a node not drawn yet takes this so the layout leaves no gap. */
 const TEXT_NODE_HEIGHT = 28;
-const TEXT_NODE_WIDTH = 300;
+/** Width guess for a text block that is not drawn yet (an automatic block is as wide as its text, at most this). */
+const TEXT_NODE_WIDTH = TEXT_AUTO_WIDTH_MAX;
+/** What an automatic block's width will roughly be before it is drawn: its longest line (CJK counts double) plus padding and border, within the automatic limits. */
+function estimateTextWidth(text: string): number {
+  const line = Math.max(
+    0,
+    ...text
+      .split(/\r?\n/)
+      .map(part =>
+        Array.from(part).reduce(
+          (sum, ch) =>
+            sum + (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 6.5),
+          0
+        )
+      )
+  );
+  return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
+}
 function depthOf(nodes: MapNode[], id: string): number {
   const byId = new Map(nodes.map(node => [node.id, node]));
   let depth = 0;
@@ -873,6 +923,23 @@ interface AnchorLine {
 const anchorLineKey = (imageId: string, anchorId: string, topicId: string): string =>
   `anchor:${imageId}:${anchorId}:${topicId}`;
 const BOUNDARY_PAD = 16;
+/**
+ * The lines of an exported text block. The block's real horizontal padding + border is 14, and the exporter's width guess runs wider than
+ * the browser's, so the text is widened until it needs no more lines than the screen shows: a fitted one-line block never loses its text.
+ */
+function textBlockLines(text: string, boxWidth: number, boxHeight: number, lineHeight: number): string[] {
+  const shown = Math.max(
+    1,
+    Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19))
+  );
+  let room = Math.max(1, boxWidth - 14);
+  let lines = wrapText(text, room);
+  for (let tries = 0; lines.length > shown && tries < 40; tries++) {
+    room *= 1.1;
+    lines = wrapText(text, room);
+  }
+  return lines;
+}
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -1058,6 +1125,31 @@ interface GoalSuggestTask {
   focus: "stop" | "list" | null;
 }
 
+/** One follow-up typed while a map-chat turn works, and where it is: not yet handed over, being handed over, taken in, or waiting. */
+interface ChatSteerEntry {
+  text: string;
+  steer: MapChatSteer;
+  status: "pending" | "sending" | "delivered" | "queued";
+}
+/** What one running turn knows about its follow-ups. Every list is the one `entries`, so a follow-up is in exactly one state. */
+interface ChatSteerState {
+  turn: MapChatTurnHandle;
+  /** The question as first asked and the origin a retry would send; delivered follow-ups are added to it. */
+  question: string;
+  origin: MapChatOrigin;
+  /** Hands text to the running attempt; null until that attempt gives one. */
+  handler: ((text: string) => Promise<void>) | null;
+  /** Counts handlers: an answer from an earlier attempt's handler changes nothing. */
+  gen: number;
+  entries: ChatSteerEntry[];
+  /** Hand-overs run one after the other, so follow-ups go in as typed. */
+  chain: Promise<void>;
+  /** The attempt cannot take a follow-up as it runs (Claude json): everything waits for the end. */
+  noLive: boolean;
+  /** The reply is in: later follow-ups wait for the next message. */
+  closed: boolean;
+}
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -1102,6 +1194,7 @@ export class VisualAgentMapView extends ItemView {
   private readonly mapSourcesPanelId = `vam-map-sources-panel-${++relevancePanelSeq}`;
   private mapSourcesOpen = false;
   private mapSourcesPickerOpen = false;
+  private mapSourcesSession: MapSourcesSession = newMapSourcesSession();
   private mapSourcesToolsEl: HTMLElement | null = null;
   private mapSourcesButtonEl: HTMLButtonElement | null = null;
   private mapSourcesPanelEl: HTMLElement | null = null;
@@ -1121,6 +1214,8 @@ export class VisualAgentMapView extends ItemView {
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
+  /** The follow-ups of the turn that is running (or ran last). */
+  private chatSteer: ChatSteerState | null = null;
   /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
   private chatImageSearches = new Map<number, AbortController>();
   private chatImageSequence = 0;
@@ -1341,8 +1436,19 @@ export class VisualAgentMapView extends ItemView {
     (this.isTextId(id)
       ? this.textEls.get(id)?.offsetHeight || TEXT_NODE_HEIGHT
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
+  /** A text block's width for the layout: as drawn, else the stored one, else a guess from its text (a block not drawn yet). */
+  private textWidthOf = (id: string): number | undefined => {
+    const drawn = this.textEls.get(id)?.offsetWidth;
+    if (drawn) return drawn;
+    const item = (this.map?.canvasItems ?? []).find(
+      (entry): entry is TextItem => entry.kind === "text" && entry.id === id
+    );
+    return item ? (item.width ?? estimateTextWidth(item.text)) : undefined;
+  };
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
   private textEls = new Map<string, HTMLElement>();
+  /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
+  private focusTextResizeId: string | null = null;
   /** Image element per image id, rebuilt on every render (the place mode finds its image here). */
   private canvasImageEls = new Map<string, HTMLElement>();
   /** The anchor place mode: which image, where the crosshair is (0-1) and what to do when a spot is chosen. */
@@ -1418,7 +1524,7 @@ export class VisualAgentMapView extends ItemView {
       supersededAimNodeIds(map),
       this.cardHeightOf,
       layoutOf(map),
-      options
+      { ...options, widthOf: this.textWidthOf }
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -1432,7 +1538,8 @@ export class VisualAgentMapView extends ItemView {
       newIds,
       this.cardHeightOf,
       minTop,
-      layoutOf(map)
+      layoutOf(map),
+      this.textWidthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -2287,8 +2394,6 @@ export class VisualAgentMapView extends ItemView {
       else this.enqueue(() => this.noteChange(node, { title: name }));
     });
     this.nameEditField(card, input, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
-    // A new card's name field is covered by its own flow; the hint is for editing an existing title.
-    if (!this.inlineName?.created) card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_title_keys") });
     return input;
   }
   /** True while a card's title or summary may be typed in place: not presenting, not picking cards, not in a live AIM run. */
@@ -2392,7 +2497,6 @@ export class VisualAgentMapView extends ItemView {
     });
     area.addEventListener("blur", () => finish(true));
     this.inlineSummaryInput = area;
-    card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_summary_keys") });
     return area;
   }
   /**
@@ -4112,7 +4216,7 @@ export class VisualAgentMapView extends ItemView {
     button.addEventListener("focusout", (event: FocusEvent) => {
       if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button || this.mapSourcesPickerOpen) return;
       const next = event.relatedTarget as Node | null;
-      if (next && (next === button || this.mapSourcesPanelEl?.contains(next))) return;
+      if (next && (next === button || this.mapSourcesPanelEl?.contains(next) || isDragSourceTarget(next))) return;
       this.closeMapSourcesPanel(false);
     });
     button.addEventListener("keydown", event => {
@@ -4148,7 +4252,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mapSourcesToolsEl) return;
     this.mapSourcesOpen = true;
     this.mapSourcesButtonEl?.setAttr("aria-expanded", "true");
-    this.drawMapSourcesPanelEl({ picker: "map" });
+    this.mapSourcesSession = newMapSourcesSession();
+    this.drawMapSourcesPanelEl({ search: true });
   }
   private closeMapSourcesPanel(refocus: boolean): void {
     this.mapSourcesPanelCleanup?.();
@@ -4156,6 +4261,7 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesPanelEl?.remove();
     this.mapSourcesPanelEl = null;
     this.mapSourcesOpen = false;
+    this.mapSourcesSession = newMapSourcesSession();
     this.mapSourcesPickerOpen = false;
     this.mapSourcesButtonEl?.setAttr("aria-expanded", "false");
     this.placeMapTools();
@@ -4168,6 +4274,7 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesPanelCleanup = null;
     this.mapSourcesPanelEl?.remove();
     const mapPath = this.path;
+    const panelCleanups: Array<() => void> = [];
     const panel = drawMapSourcesPanel(
       tools,
       {
@@ -4176,7 +4283,14 @@ export class VisualAgentMapView extends ItemView {
         sources: this.mapSources,
         currentMapPath: mapPath,
         mapItems: () => this.plugin.repo.mapSwitcherItems(),
-        add: source => this.changeMapSources(mapPath, "add", source),
+        add: (source, quiet) => this.changeMapSources(mapPath, "add", source, quiet),
+        announce: text => this.announcer?.setText(text),
+        onDragEnd: handler => {
+          const doc = this.contentEl?.ownerDocument;
+          if (!doc?.addEventListener) return;
+          doc.addEventListener("dragend", handler, true);
+          panelCleanups.push(() => doc.removeEventListener("dragend", handler, true));
+        },
         remove: source => this.changeMapSources(mapPath, "remove", source),
         close: refocus => this.closeMapSourcesPanel(refocus),
         setPickerOpen: open => {
@@ -4184,6 +4298,7 @@ export class VisualAgentMapView extends ItemView {
         },
         isPickerOpen: () => this.mapSourcesPickerOpen,
         button: () => this.mapSourcesButtonEl,
+        session: this.mapSourcesSession,
         panelCreated: created => {
           this.mapSourcesPanelEl = created;
         }
@@ -4197,12 +4312,18 @@ export class VisualAgentMapView extends ItemView {
       const outside = (event: Event): void => {
         if (this.mapSourcesPickerOpen) return;
         const target = event.target as Node | null;
-        if (target && (panel.contains(target) || this.mapSourcesButtonEl?.contains(target))) return;
+        // A press on a draggable row (the file explorer's) starts a drag to the drop zone; it must not close the panel.
+        if (
+          target &&
+          (panel.contains(target) || this.mapSourcesButtonEl?.contains(target) || isDragSourceTarget(target))
+        )
+          return;
         this.closeMapSourcesPanel(false);
       };
       doc.addEventListener("pointerdown", outside, true);
-      this.mapSourcesPanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
+      panelCleanups.push(() => doc.removeEventListener("pointerdown", outside, true));
     }
+    this.mapSourcesPanelCleanup = () => panelCleanups.forEach(clean => clean());
     this.placeMapTools();
   }
   /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
@@ -4222,16 +4343,16 @@ export class VisualAgentMapView extends ItemView {
    * Adds or removes one source through the view mutation queue. The list is re-read inside the queue, so a repeated
    * add (same kind and path) writes nothing, and the write only touches `map-sources`.
    */
-  private changeMapSources(mapPath: string, change: "add" | "remove", source: MapSource): void {
+  private changeMapSources(mapPath: string, change: "add" | "remove", source: MapSource, quiet = false): void {
     const name = mapSourceName(this.app, source);
     this.enqueue(async () => {
       if (this.closed || this.path !== mapPath) return;
-      let focus: MapSourcesPanelFocus = { picker: source.kind };
+      let focus: MapSourcesPanelFocus = { search: true };
       try {
         const current = await this.plugin.repo.readMapSources(mapPath);
         const at = current.findIndex(item => sameMapSource(item, source));
         if (change === "add" && at >= 0) {
-          this.announcer?.setText(t("ui.map_sources_already_added_0", name));
+          if (!quiet) this.announcer?.setText(t("ui.map_sources_already_added_0", name));
         } else if (change === "remove" && at < 0) {
           this.mapSources = current;
         } else {
@@ -4239,7 +4360,8 @@ export class VisualAgentMapView extends ItemView {
           await this.plugin.repo.writeMapSources(mapPath, next);
           this.mapSources = next;
           if (change === "remove") focus = { remove: at };
-          this.announcer?.setText(t(change === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name));
+          if (!quiet || change === "remove")
+            this.announcer?.setText(t(change === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name));
         }
       } catch (error) {
         new Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));
@@ -8377,12 +8499,17 @@ export class VisualAgentMapView extends ItemView {
       el.tabIndex = 0;
       el.style.left = `${text.x}px`;
       el.style.top = `${text.y}px`;
-      el.style.width = `${TEXT_NODE_WIDTH}px`;
+      // No stored width: the block is as wide as its text (CSS max-content, capped); a stored one is fixed and the text wraps.
+      if (text.width !== undefined) {
+        el.style.width = `${text.width}px`;
+        el.addClass("has-width");
+      }
       el.createDiv({ cls: "vam-text-node-body", text: text.text });
       this.textEls.set(text.id, el);
       el.addEventListener("focus", () => el.addClass("is-selected"));
       el.addEventListener("blur", () => el.removeClass("is-selected"));
       if (!editable) continue;
+      this.attachTextResizeHandle(el, text);
       el.addEventListener("dblclick", event => {
         event.stopPropagation();
         this.startTextEdit(text.id);
@@ -8453,6 +8580,160 @@ export class VisualAgentMapView extends ItemView {
       this.focusItemId = null;
       if (this.mapWindowIsActive()) this.textEls.get(wanted)?.focus({ preventScroll: true });
     }
+    const resizeId = this.focusTextResizeId;
+    this.focusTextResizeId = null;
+    if (resizeId && this.mapWindowIsActive())
+      this.textEls.get(resizeId)?.querySelector<HTMLElement>(".vam-text-resize")?.focus({ preventScroll: true });
+  }
+  /**
+   * The width handle on a text block's right edge (same behaviour as the card's): drag, arrows (CARD_WIDTH_STEP), Home/End,
+   * Enter or double click back to automatic width. Dragging shows the width and the lines live; release writes once.
+   */
+  private attachTextResizeHandle(el: HTMLElement, text: TextItem): void {
+    const handle = el.createSpan({
+      cls: "vam-text-resize",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.text_resize_label"),
+        "aria-valuemin": String(TEXT_WIDTH_MIN),
+        "aria-valuemax": String(TEXT_WIDTH_MAX)
+      }
+    });
+    handle.tabIndex = 0;
+    const storedWidth = (): number | undefined =>
+      (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === text.id)
+        ?.width;
+    const shownWidth = (): number => storedWidth() ?? fittedTextWidth(el);
+    const sync = (width: number): void => handle.setAttr("aria-valuenow", String(width));
+    sync(shownWidth());
+    /** `from` is the width before this change, read before anything touched the element (a drag sets the inline width). */
+    const commit = (width: number | undefined, from: number): void => {
+      this.focusTextResizeId = text.id;
+      this.enqueue(() => this.resizeText(text.id, width, from));
+    };
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || !this.map || this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      const startX = event.clientX,
+        zoom = this.map.viewport.zoom || 1,
+        from = shownWidth(),
+        before = storedWidth();
+      let width = from,
+        done = false;
+      handle.setPointerCapture?.(event.pointerId);
+      const move = (e: PointerEvent): void => {
+        width = clampTextWidth(from + (e.clientX - startX) / zoom) ?? from;
+        el.style.width = `${width}px`;
+        el.addClass("has-width");
+        // The edge or center facing the topic stays; the commit asks the same helper with the same `from`.
+        el.style.left = `${this.textAnchoredX(text.id, from, width)}px`;
+        sync(width);
+        this.drawEdges();
+      };
+      const settle = (): void => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = (): void => {
+        if (before === undefined) {
+          el.style.removeProperty("width");
+          el.removeClass("has-width");
+        } else el.style.width = `${before}px`;
+        el.style.left = `${this.textAnchoredX(text.id, from, from)}px`;
+        sync(from);
+        this.drawEdges();
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        if (width === from) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        commit(width, from);
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", event => event.stopPropagation());
+    handle.addEventListener("dblclick", event => {
+      if (this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      if (storedWidth() !== undefined) commit(undefined, shownWidth());
+    });
+    handle.addEventListener("keydown", event => {
+      if (this.presentation) return;
+      const current = shownWidth();
+      let next: number | undefined | null = null;
+      if (event.key === "ArrowRight") next = current + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = current - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = TEXT_WIDTH_MIN;
+      else if (event.key === "End") next = TEXT_WIDTH_MAX;
+      else if (event.key === "Enter") next = undefined;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (next === undefined) {
+        if (storedWidth() !== undefined) commit(undefined, current);
+        return;
+      }
+      const width = clampTextWidth(next) ?? current;
+      if (width === storedWidth() || (storedWidth() === undefined && width === current)) return;
+      commit(width, current);
+    });
+  }
+  /**
+   * The x a text block takes when its width goes from `from` to `to`: the edge or center facing its topic stays (left: right
+   * edge; up/down: center; right and free blocks keep x). The one source for the live drag, cancel and the committed write.
+   * In a balanced map the side is that of the block's first-level topic against the root (`sideFromOffset`, the rule the
+   * layouts use); a topic too close to the root to have a side keeps x.
+   */
+  private textAnchoredX(id: string, from: number, to: number): number {
+    const item = (this.map?.canvasItems ?? []).find(
+      (entry): entry is TextItem => entry.kind === "text" && entry.id === id
+    );
+    if (!item) return 0;
+    if (!this.map || !item.parentId || this.textEls.get(id)?.hasClass("is-free")) return item.x;
+    let direction: string | undefined = branchDirectionResolver(
+      this.map.nodes,
+      layoutOf(this.map).direction
+    )(item.parentId);
+    if (direction === "balanced") {
+      const byId = new Map(this.map.nodes.map(node => [node.id, node]));
+      let topic = byId.get(item.parentId);
+      // Hanging on the root itself: the side is that of the block's own box against the root card (same rule as the layout).
+      if (topic && !topic.parentId) return textXAfterWidth(sideFromTextBox(item.x, from, topic.x), item.x, from, to);
+      for (let guard = 0; topic?.parentId && byId.get(topic.parentId)?.parentId && guard < 10000; guard++)
+        topic = byId.get(topic.parentId);
+      const root = topic?.parentId ? byId.get(topic.parentId) : undefined;
+      direction = topic && root ? sideFromOffset(topic.x - root.x) : undefined;
+    }
+    return textXAfterWidth(direction, item.x, from, to);
+  }
+  /**
+   * Sets (or clears) a text block's width and, in the same undo step, moves only this block (see `textAnchoredX`).
+   * `from` is the width before the change; resetting to automatic measures the fitted width for `to`.
+   */
+  private async resizeText(id: string, width: number | undefined, from: number): Promise<void> {
+    const el = this.textEls.get(id);
+    const to = width ?? (el ? fittedTextWidth(el) : from);
+    const x = this.textAnchoredX(id, from, to);
+    await this.changeCanvasItems(id, items =>
+      setTextNodeWidth(items, id, width).map(entry =>
+        entry.kind === "text" && (entry as TextItem).id === id ? { ...(entry as TextItem), x } : entry
+      )
+    );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
   private liveLinks(text: TextItem): string[] {
@@ -8696,7 +8977,19 @@ export class VisualAgentMapView extends ItemView {
     });
     input.value = draft ?? text.text;
     // The field is as tall as its text, so the block keeps its place and its line stays on its middle while typing.
+    // Without a set width the field also grows with the text (same limits as the drawn block); a set width stays as it is.
+    const grows = text.width === undefined;
+    const measure = grows ? el.createSpan({ cls: "vam-text-node-measure", attr: { "aria-hidden": "true" } }) : null;
+    const fitWidth = (): void => {
+      if (!measure) return;
+      measure.setText(`${input.value}\u200b`);
+      const chrome = el.offsetWidth - input.offsetWidth;
+      const want = (measure.offsetWidth || 0) + (Number.isFinite(chrome) ? chrome : 14) + 2;
+      el.style.width = `${Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(want)))}px`;
+      el.addClass("has-width");
+    };
     const fitHeight = (): void => {
+      fitWidth();
       input.style.removeProperty("height");
       input.style.height = `${input.scrollHeight}px`;
       this.drawEdges();
@@ -8709,6 +9002,11 @@ export class VisualAgentMapView extends ItemView {
       this.editingTextId = null;
       this.suspendTextEdit = null;
       input.remove();
+      if (measure) {
+        measure.remove();
+        el.style.removeProperty("width");
+        el.removeClass("has-width");
+      }
       body?.removeClass("vam-sr-only");
       // Back to its text's height: the line to its topic follows (an unchanged text writes nothing, so no repaint does it).
       this.drawEdges();
@@ -8874,7 +9172,10 @@ export class VisualAgentMapView extends ItemView {
       if (!owner) {
         // No topic selected: a free block in the middle of the view (canvas-text-node decision #4).
         const center = this.stagePoint(null);
-        await this.addFreeText(center && { x: center.x - TEXT_NODE_WIDTH / 2, y: center.y });
+        // The new block shows the placeholder, as wide as that text; centre on that, not on the 300 limit.
+        await this.addFreeText(
+          center && { x: center.x - estimateTextWidth(t("ui.text_node_placeholder")) / 2, y: center.y }
+        );
         return;
       }
       const id = `txt-${randomUUID().slice(0, 8)}`;
@@ -11364,7 +11665,12 @@ export class VisualAgentMapView extends ItemView {
         y: box.y,
         w: box.width,
         h: box.height,
-        title: wrapText(body?.textContent ?? "", box.width - 28),
+        title: textBlockLines(
+          body?.textContent ?? "",
+          box.width,
+          box.height,
+          parseFloat(computed(body ?? el).lineHeight)
+        ),
         plain: true,
         textColor: colorOf(computed(body ?? el).color)
       });
@@ -18586,7 +18892,12 @@ export class VisualAgentMapView extends ItemView {
       const text = item as TextItem;
       const el = this.textEls.get(text.id);
       if (!el?.hasClass("is-free")) continue; // attached blocks follow their topic; a folded one is not drawn
-      boxes.push({ x: text.x, y: text.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
+      boxes.push({
+        x: text.x,
+        y: text.y,
+        w: el.offsetWidth || text.width || TEXT_NODE_WIDTH,
+        h: el.offsetHeight || TEXT_NODE_HEIGHT
+      });
     }
     // Summary bracket text (summary-bracket decision #9): it sits beyond the brace tip and would be clipped otherwise.
     for (const el of this.summaryEls.values()) {
@@ -19032,6 +19343,7 @@ export class VisualAgentMapView extends ItemView {
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
+      steer: () => this.steerMapChat(),
       modelChoices: () => this.chatModelChoices(),
       model: () => this.plugin.settings.cliModel,
       setModel: model => {
@@ -19081,10 +19393,6 @@ export class VisualAgentMapView extends ItemView {
         // The width decides whether the pane has room for the window beside the canvas.
         this.syncChatNarrow();
       },
-      suggestions: () => ({
-        selected: this.chatSelectionIds().length,
-        hasTopics: (this.map?.nodes.length ?? 0) > 0
-      }),
       insertImage: (images, item) => this.chatInsertImage(images, item),
       canSave: () => (!this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true }),
       saveTranscript: turns => this.saveChatTranscript(turns),
@@ -19374,17 +19682,25 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  private async sendMapChat(again?: MapChatOrigin): Promise<void> {
+  private async sendMapChat(again?: MapChatOrigin, restore?: string): Promise<void> {
     const chat = this.chat;
+    // A message typed while a plan or a choice is being applied waits for it like a follow-up (it is sent when that ends).
+    if (chat && !again && this.chatApplying && !chat.isBusy && !this.closed && chat.draft.trim()) {
+      this.steerMapChat();
+      return;
+    }
     if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
     // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
-    const origin: MapChatOrigin = again ?? {
-      text: message,
-      chips: chat.attachments(),
-      selectedIds: this.chatSelectionIds()
-    };
+    // The turn has its own copy: follow-ups that go in are added to it, and a copy keeps the earlier turn's retry as it was.
+    const origin: MapChatOrigin = again
+      ? { ...again }
+      : {
+          text: message,
+          chips: chat.attachments(),
+          selectedIds: this.chatSelectionIds()
+        };
     // Where this turn is anchored. A create_map / open_map of the turn itself moves it (see applyMapChatActions).
     const anchor = { path: this.path, id: this.map.id as string | undefined };
     // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
@@ -19396,12 +19712,24 @@ export class VisualAgentMapView extends ItemView {
     // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
     const abandon = (reason?: string): void => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-      if (!chat.retract(turn, again ? undefined : draft)) return;
+      if (!chat.retract(turn, again ? restore : draft)) return;
       if (reason !== undefined) new Notice(reason);
     };
     // Stop while preparing is the user's own act: the send is taken back like any early end, without a Notice.
     const stopPreparing = (): void => abandon();
     this.chatPrepAbandon = stopPreparing;
+    const steerState: ChatSteerState = {
+      turn,
+      question: message,
+      origin,
+      handler: null,
+      gen: 0,
+      entries: [],
+      chain: Promise.resolve(),
+      noLive: false,
+      closed: false
+    };
+    this.chatSteer = steerState;
     const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request: MapChatRequest;
     try {
@@ -19492,6 +19820,8 @@ export class VisualAgentMapView extends ItemView {
               record?.event("resend");
               this.releaseChatTask();
               controller.abort();
+              // Follow-ups typed before the new attempt hands out its handler wait for it; they are not for the old one.
+              steerState.handler = null;
               attempt = openAttempt();
               chat.restartWaiting();
               wake();
@@ -19514,6 +19844,7 @@ export class VisualAgentMapView extends ItemView {
                     if (!alive()) return;
                     if (event.kind === "stream-mode") {
                       if (event.mode !== "stream-json") stopWatching();
+                      this.setSteerLive(steerState, event.mode === "stream-json");
                       return;
                     }
                     // Claude's first event, and Codex's searching / reading / writing, are model events. Codex's `started` is not: the
@@ -19522,6 +19853,10 @@ export class VisualAgentMapView extends ItemView {
                     if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
                     // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
                     if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                  },
+                  handler => {
+                    // A handler from a replaced or stopped attempt is not taken.
+                    if (alive()) this.bindSteerHandler(steerState, handler);
                   },
                   // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
                   record
@@ -19536,6 +19871,11 @@ export class VisualAgentMapView extends ItemView {
               if (outcome === null) continue;
               if (!alive()) return;
               const result: MapChatResult = outcome;
+              // Follow-ups still being handed over settle first; later ones wait for the next message. The ones that went in are
+              // part of the message the plan and the actions are applied for.
+              await this.closeSteers(steerState);
+              if (!alive()) return;
+              const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
               const plan = result.actions.length
                 ? planFor(result.actions, request.context, {
                     diagrams: this.plugin.settings.addDiagramsAfterResearch,
@@ -19551,18 +19891,20 @@ export class VisualAgentMapView extends ItemView {
                     plan,
                     request.context,
                     { path: anchor.path, id: anchor.id },
-                    request.message,
+                    fullMessage,
                     record
                   );
                   if (record?.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
                     this.chatRecordLogged.add(turn.assistant);
+                  // The plan waits for the user's yes: a message sent now would cancel it, so waiting follow-ups go back to the field.
+                  this.flushSteers(false);
                 }
                 return;
               }
               // A pure answer has nothing to apply: the reader is not told "applying" for it.
               if (result.actions.length) chat.setStage("applying");
               const lines = await this.applyMapChatActions(
-                { ...result, message: request.message },
+                { ...result, message: fullMessage },
                 request.context,
                 alive,
                 anchor
@@ -19571,6 +19913,8 @@ export class VisualAgentMapView extends ItemView {
                 chat.finish(result.reply, lines);
                 if (record?.end("done", { reply: result.reply, lines, rejected: result.rejected }))
                   this.chatRecordLogged.add(turn.assistant);
+                // Waiting follow-ups are the next message, sent once.
+                this.flushSteers(true);
               }
               return;
             } catch (error) {
@@ -19586,6 +19930,7 @@ export class VisualAgentMapView extends ItemView {
                   lines: [],
                   error: { text: failure.text, technical: failure.technical ?? "" }
                 });
+                this.returnSteers(steerState);
               }
               return;
             } finally {
@@ -19608,6 +19953,121 @@ export class VisualAgentMapView extends ItemView {
     }
     // The AI is not ready (it said why itself) or the usage notice was declined.
     if (!went && !sent) abandon(this.closed ? undefined : notSent());
+  }
+  /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
+  private steerMapChat(): void {
+    const chat = this.chat;
+    if (!chat || this.closed) return;
+    const text = chat.draft.trim();
+    if (!text) return;
+    const state = this.chatSteer;
+    if (state && !state.closed && chat.isBusy && chat.hasTurn(state.turn)) {
+      const waits = state.noLive;
+      const steer = chat.addSteer(text, waits ? "queued" : "live");
+      if (!steer) return;
+      state.entries.push({ text, steer, status: waits ? "queued" : "pending" });
+      this.pumpSteers(state);
+      return;
+    }
+    // The reply is in and its actions (or a plan, a choice) are being applied: the follow-up is the next message.
+    if (chat.isBusy || this.chatApplying) chat.addSteer(text, "queued");
+  }
+  private steerAlive(state: ChatSteerState): boolean {
+    return !this.closed && this.chatSteer === state && !!this.chat?.hasTurn(state.turn);
+  }
+  /** The attempt can (or cannot) take a follow-up as it runs; when it cannot, the ones waiting for it wait for the end. */
+  private setSteerLive(state: ChatSteerState, live: boolean): void {
+    if (!this.steerAlive(state)) return;
+    state.noLive = !live;
+    if (live) return;
+    // json-fallback: the first process (which may already have taken a follow-up) is gone and the rerun never asks for one again,
+    // so what was handed over or is being handed over waits for the end like the rest.
+    state.handler = null;
+    for (const entry of state.entries) {
+      if (entry.status !== "pending" && entry.status !== "sending" && entry.status !== "delivered") continue;
+      entry.status = "queued";
+      this.chat?.setSteerState(entry.steer, "queued");
+    }
+    // What is no longer delivered must not ride along with a retry of the question.
+    this.syncSteerOrigin(state);
+  }
+  /** A retry after a failure asks the question with the follow-ups that went in, and only those. */
+  private syncSteerOrigin(state: ChatSteerState): void {
+    state.origin.text = [state.question, ...state.entries.filter(e => e.status === "delivered").map(e => e.text)].join(
+      "\n\n"
+    );
+  }
+  /** A new attempt has a new way in: what the earlier one took is handed over again, once, and what waited for it goes in. */
+  private bindSteerHandler(state: ChatSteerState, handler: (text: string) => Promise<void>): void {
+    if (!this.steerAlive(state) || state.closed) return;
+    state.gen++;
+    state.handler = handler;
+    state.chain = Promise.resolve();
+    for (const entry of state.entries)
+      if (entry.status === "sending" || entry.status === "delivered") entry.status = "pending";
+    this.pumpSteers(state);
+  }
+  /** Hands every pending follow-up to the attempt, in the order typed. A refusal (the turn already ended) leaves it waiting. */
+  private pumpSteers(state: ChatSteerState): void {
+    const handler = state.handler;
+    if (!handler || state.noLive) return;
+    const gen = state.gen;
+    for (const entry of state.entries) {
+      if (entry.status !== "pending") continue;
+      entry.status = "sending";
+      state.chain = state.chain.then(async () => {
+        const current = (): boolean => gen === state.gen && entry.status === "sending" && this.steerAlive(state);
+        if (!current()) return;
+        try {
+          await handler(entry.text);
+        } catch {
+          if (!current()) return;
+          entry.status = "queued";
+          this.chat?.setSteerState(entry.steer, "queued");
+          return;
+        }
+        if (!current()) return;
+        entry.status = "delivered";
+        this.syncSteerOrigin(state);
+      });
+    }
+  }
+  /** The reply is in: hand-overs still running settle, and what has not gone in waits for the next message. */
+  private async closeSteers(state: ChatSteerState): Promise<void> {
+    await state.chain;
+    state.closed = true;
+    for (const entry of state.entries) {
+      if (entry.status === "delivered" || entry.status === "queued") continue;
+      entry.status = "queued";
+      this.chat?.setSteerState(entry.steer, "queued");
+    }
+  }
+  /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
+  private returnSteers(state: ChatSteerState): void {
+    state.closed = true;
+    const chat = this.chat;
+    if (!chat) return;
+    for (const entry of state.entries) {
+      if (entry.status === "delivered") continue;
+      entry.status = "queued";
+      chat.setSteerState(entry.steer, "queued", false);
+    }
+    chat.restoreDraft(chat.takeQueued());
+  }
+  /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
+  private flushSteers(send: boolean): void {
+    const chat = this.chat;
+    if (!chat) return;
+    const texts = chat.takeQueued();
+    if (!texts.length) return;
+    if (!send || this.closed || chat.isBusy || this.chatApplying || !this.map) {
+      chat.restoreDraft(texts);
+      return;
+    }
+    void this.sendMapChat(
+      { text: texts.join("\n\n"), chips: [], selectedIds: this.chatSelectionIds() },
+      texts.join("\n")
+    );
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   private supersedeChatPlan(): void {
@@ -19706,6 +20166,7 @@ export class VisualAgentMapView extends ItemView {
     chat.settlePlan(card, "applied");
     // The window shows that it is working, and Stop ends the rest of the plan.
     chat.setApplying(true);
+    const stopped = (): boolean => token !== this.chatPlanToken;
     let lines: MapChatLine[];
     try {
       lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, {
@@ -19721,6 +20182,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.closed) {
       chat.settlePlan(card, "applied", lines);
       this.chatPlanRecords.get(card)?.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
+      // Follow-ups typed while the plan was applied: sent once, unless Stop ended it.
+      this.flushSteers(!stopped());
     }
   }
   // ---- conversation records (the settings switch "save map AI conversations") -----------------------------------------
@@ -19965,6 +20428,8 @@ export class VisualAgentMapView extends ItemView {
     // Before the panel marks the answer stopped: the record keeps the text that had streamed in.
     this.endChatRecord("stopped");
     this.chat?.markStopped();
+    // Follow-ups that did not go in are not sent after a stop: they are in the field again.
+    if (this.chatSteer) this.returnSteers(this.chatSteer);
     this.chat?.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
@@ -20153,6 +20618,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.chatApplying = false;
     }
+    if (!this.closed) this.flushSteers(true);
   }
   /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
   private chatTargetModels(ids: string[]): string[] {
@@ -20724,6 +21190,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.chatApplying = false;
     }
+    if (!this.closed) this.flushSteers(true);
   }
   /**
    * Opens a map for the conversation (inside a mutate) and moves `anchor`, the map the turn belongs to, along with it; returns
@@ -21644,6 +22111,7 @@ export class VisualAgentMapView extends ItemView {
     for (const id of question.origin?.selectedIds ?? []) topic(id);
     return {
       question: question.text,
+      steers: (question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text),
       refs,
       answer: answer.text,
       lines: answer.lines.map(line => settledLine(line).text),
@@ -21684,6 +22152,7 @@ export class VisualAgentMapView extends ItemView {
         map: t("ui.map_chat_note_map"),
         saved: t("ui.map_chat_note_saved"),
         you: t("ui.map_chat_role_you"),
+        steer: t("ui.map_chat_note_steer"),
         ai: t("ui.map_chat_role_ai"),
         references: t("ui.map_chat_note_references"),
         results: t("ui.map_chat_note_results"),

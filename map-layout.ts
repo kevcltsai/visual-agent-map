@@ -1,4 +1,4 @@
-import { assignSides, greedySides, sideFromOffset, type BalancedSide } from "./layouts/balanced";
+import { assignSides, greedySides, sideFromOffset, sideFromTextBox, type BalancedSide } from "./layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, composePositions, layoutDirectionFor } from "./layouts/compose";
 import { fishbonePositions } from "./layouts/fishbone";
 import { radialPositions } from "./layouts/radial";
@@ -11,6 +11,14 @@ const WIDTH = 300;
 /** How far a card sticks out past the standard width; cards at or under the standard width add nothing. */
 function widthExcess(node: MapNode): number {
   return Math.max(0, (node.width ?? CARD_WIDTH) - CARD_WIDTH);
+}
+/** A text block laid out as a leaf (empty path) has its own drawn width; a card keeps the standard width in the engines that read this. */
+function textBlockWidth(node: MapNode): number {
+  return node.path === "" ? (node.width ?? CARD_WIDTH) : CARD_WIDTH;
+}
+/** The side a first-level topic stands on now: a text block by its own box, a card by its x against the root's. */
+function knownSide(topic: MapNode, root: MapNode): BalancedSide | undefined {
+  return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
 }
 /** Vertical space kept between two stacked cards at the standard spacing, in canvas units. */
 export const LAYOUT_GAP = 24;
@@ -214,7 +222,9 @@ function horizontalPositions(input: HorizontalInput): {
   };
   for (const [id, point] of result) {
     const depth = depths.get(id)!;
-    point.x = left + sign * (depth * COLUMN + shiftAt(depth));
+    // Growing left, a text block narrower than a card keeps its right edge where a card's would be (next to its topic).
+    const narrow = sign < 0 ? Math.max(0, CARD_WIDTH - textBlockWidth(byId.get(id)!)) : 0;
+    point.x = left + sign * (depth * COLUMN + shiftAt(depth)) + narrow;
   }
   return { placed: result, sizes };
 }
@@ -238,7 +248,7 @@ function balancedPositions(
       kidsOf(root),
       topic => sizes.get(topic.id)!,
       gap,
-      topic => (reset ? undefined : sideFromOffset((byId.get(topic.id) ?? topic).x - rootNode.x))
+      topic => (reset ? undefined : knownSide(byId.get(topic.id) ?? topic, rootNode))
     );
     const half = (side: BalancedSide) =>
       horizontalPositions({
@@ -300,7 +310,15 @@ function positions(
   /** One arrangement for the given tree; branches with their own layout call this once per direction. */
   const engine = (kind: string, tree: Tree): Map<string, { x: number; y: number }> => {
     if (kind === "down" || kind === "up")
-      return verticalPositions({ ...tree, column: COLUMN, rowGap: COLUMN - WIDTH, flip: kind === "up", left, top });
+      return verticalPositions({
+        ...tree,
+        column: COLUMN,
+        rowGap: COLUMN - WIDTH,
+        flip: kind === "up",
+        left,
+        top,
+        widthFor: textBlockWidth
+      });
     const flat = { ...tree, column: COLUMN, gap: LAYOUT_GAP, left, top };
     if (kind === "radial") return radialPositions({ ...flat, width: WIDTH });
     if (kind === "timeline") return timelinePositions({ ...flat, width: WIDTH });
@@ -438,7 +456,7 @@ function arrangeBalancedBranch(
   });
   const loads = { left: 0, right: 0 };
   for (const kid of kidsOf(parent)) {
-    const side = sideFromOffset(kid.x - parent.x);
+    const side = knownSide(kid, parent);
     if (side) loads[side] += sizes.get(kid.id)! + gap;
   }
   const { sizes: freshSizes } = horizontalPositions({

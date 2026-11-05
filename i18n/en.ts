@@ -908,7 +908,6 @@ export const en = {
     "This point was not linked: it already has a relation with this topic, or the image has too many relations.",
   "ui.anchor_relation_row_in_0_1": "{0} ← {1}",
   "ui.anchor_relation_row_out_0_1": "{0} → {1}",
-  "ui.anchor_relation_row_related_0_1": "{0} — {1}",
   "ui.anchor_pick_entry_0_1": "{0} · {1}",
   "ui.anchor_pick_mode_hint": "Pick mode: only annotated images can be clicked",
   "ui.anchor_pick_mode_esc": "Esc to cancel",

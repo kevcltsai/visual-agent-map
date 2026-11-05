@@ -14034,7 +14034,7 @@ export class VisualAgentMapView extends ItemView {
   private anchorRelationRowText(ref: { imageId: string; anchorId: string; relation: AnchorRelation }): string {
     const name = t(RELATION_NAME_KEY[ref.relation.kind]),
       end = this.anchorEndText(ref.imageId, ref.anchorId);
-    if (ref.relation.kind === "related") return t("ui.anchor_relation_row_related_0_1", name, end);
+    // The owner-approved design shows the stored direction for every kind, "related" included ("Related ← Annotated image · x").
     return t(
       ref.relation.from === ref.anchorId ? "ui.anchor_relation_row_in_0_1" : "ui.anchor_relation_row_out_0_1",
       name,

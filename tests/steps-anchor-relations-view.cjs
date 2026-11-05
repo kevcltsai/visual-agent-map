@@ -351,7 +351,7 @@ test('P4b rows: the panel lists anchor relations as "kind <- Annotated image · 
   assert.deepEqual(rowTexts(host), [
     'Supports ← Annotated image · cow back. strong',
     'Contradicts → Annotated image · anchor',
-    'Related — Annotated image · hind'
+    'Related ← Annotated image · hind'
   ]);
   assert.equal(findAll(host, i => i.hasClass('vam-relation-empty')).length, 0, 'the empty hint is gone when only image relations exist');
   const first = h.rows(host)[0];
@@ -539,7 +539,7 @@ test('counter-example (read-only P4b): AIM and selection mode show the rows but 
     else h.view.aimLive = () => true;
     const host = h.panel();
     if (mode === 'aim') { assert.deepEqual(rowTexts(host), [], mode + ': AIM shows no relation section at all'); continue; }
-    assert.deepEqual(rowTexts(host), ['Related — Annotated image · x'], mode);
+    assert.deepEqual(rowTexts(host), ['Related ← Annotated image · x'], mode);
     assert.equal(findAll(host, i => i.hasClass('vam-relation-add-anchor')).length, 0, mode);
     assert.equal(findAll(host, i => i.tag === 'button' && /Edit relation|Remove relation/.test(i.attrs['aria-label'] ?? '')).length, 0, mode);
     const row = h.rows(host)[0];

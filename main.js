@@ -932,7 +932,6 @@ var en = {
   "ui.anchor_relation_not_added": "This point was not linked: it already has a relation with this topic, or the image has too many relations.",
   "ui.anchor_relation_row_in_0_1": "{0} \u2190 {1}",
   "ui.anchor_relation_row_out_0_1": "{0} \u2192 {1}",
-  "ui.anchor_relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.anchor_pick_entry_0_1": "{0} \xB7 {1}",
   "ui.anchor_pick_mode_hint": "Pick mode: only annotated images can be clicked",
   "ui.anchor_pick_mode_esc": "Esc to cancel",
@@ -3613,7 +3612,6 @@ var zhCN = {
   "ui.anchor_relation_not_added": "\u8FD9\u4E2A\u70B9\u6CA1\u6709\u8FDE\u4E0A\uFF1A\u5B83\u5DF2\u548C\u8FD9\u4E2A\u8BAE\u9898\u6709\u5173\u7CFB\uFF0C\u6216\u8FD9\u5F20\u56FE\u7684\u5173\u7CFB\u592A\u591A\u3002",
   "ui.anchor_relation_row_in_0_1": "{0} \u2190 {1}",
   "ui.anchor_relation_row_out_0_1": "{0} \u2192 {1}",
-  "ui.anchor_relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.anchor_pick_entry_0_1": "{0}\u30FB{1}",
   "ui.anchor_pick_mode_hint": "\u70B9\u9009\u6A21\u5F0F\uFF1A\u53EA\u6709\u6807\u6CE8\u56FE\u53EF\u4EE5\u70B9",
   "ui.anchor_pick_mode_esc": "Esc \u53D6\u6D88",
@@ -6294,7 +6292,6 @@ var zhTW = {
   "ui.anchor_relation_not_added": "\u9019\u500B\u9EDE\u6C92\u6709\u9023\u4E0A\uFF1A\u5B83\u5DF2\u548C\u9019\u500B\u8B70\u984C\u6709\u95DC\u4FC2\uFF0C\u6216\u9019\u5F35\u5716\u7684\u95DC\u4FC2\u592A\u591A\u3002",
   "ui.anchor_relation_row_in_0_1": "{0} \u2190 {1}",
   "ui.anchor_relation_row_out_0_1": "{0} \u2192 {1}",
-  "ui.anchor_relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.anchor_pick_entry_0_1": "{0}\u30FB{1}",
   "ui.anchor_pick_mode_hint": "\u9EDE\u9078\u6A21\u5F0F\uFF1A\u53EA\u6709\u6A19\u8A3B\u5716\u53EF\u4EE5\u9EDE",
   "ui.anchor_pick_mode_esc": "Esc \u53D6\u6D88",
@@ -65257,7 +65254,6 @@ ${request.requirements}` : preset.text,
   /** A panel row of an anchor relation: "Kind ← Annotated image · note" (the anchor is the source), "→" (it is the target), "—" for related. */
   anchorRelationRowText(ref) {
     const name2 = t(RELATION_NAME_KEY[ref.relation.kind]), end = this.anchorEndText(ref.imageId, ref.anchorId);
-    if (ref.relation.kind === "related") return t("ui.anchor_relation_row_related_0_1", name2, end);
     return t(
       ref.relation.from === ref.anchorId ? "ui.anchor_relation_row_in_0_1" : "ui.anchor_relation_row_out_0_1",
       name2,

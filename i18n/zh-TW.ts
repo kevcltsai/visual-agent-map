@@ -850,7 +850,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.anchor_relation_not_added": "這個點沒有連上：它已和這個議題有關係，或這張圖的關係太多。",
   "ui.anchor_relation_row_in_0_1": "{0} ← {1}",
   "ui.anchor_relation_row_out_0_1": "{0} → {1}",
-  "ui.anchor_relation_row_related_0_1": "{0} — {1}",
   "ui.anchor_pick_entry_0_1": "{0}・{1}",
   "ui.anchor_pick_mode_hint": "點選模式：只有標註圖可以點",
   "ui.anchor_pick_mode_esc": "Esc 取消",

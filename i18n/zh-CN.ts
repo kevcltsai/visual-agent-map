@@ -849,7 +849,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.anchor_relation_not_added": "这个点没有连上：它已和这个议题有关系，或这张图的关系太多。",
   "ui.anchor_relation_row_in_0_1": "{0} ← {1}",
   "ui.anchor_relation_row_out_0_1": "{0} → {1}",
-  "ui.anchor_relation_row_related_0_1": "{0} — {1}",
   "ui.anchor_pick_entry_0_1": "{0}・{1}",
   "ui.anchor_pick_mode_hint": "点选模式：只有标注图可以点",
   "ui.anchor_pick_mode_esc": "Esc 取消",

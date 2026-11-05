@@ -19763,6 +19763,9 @@ export class VisualAgentMapView extends ItemView {
           if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
           // Conversation record (switch on): the turn is written from here, not before (a send taken back leaves no trace).
           const record = this.beginChatRecord(chat, turn, request, origin);
+          // The follow-ups that went into this turn are written with its end (queued ones become the next turn).
+          if (record)
+            record.steerTexts = () => steerState.entries.filter(e => e.status === "delivered").map(e => e.text);
           // One attempt is one request to the model. "Resend" (the slow notice) replaces it with another attempt of the same
           // question: a reply that arrives from a replaced attempt changes nothing, like one that arrives after Stop.
           const openAttempt = (): { controller: AbortController; alive: () => boolean } => {

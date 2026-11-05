@@ -27,6 +27,8 @@ const plainLines = (lines: MapChatLine[]): { status: string; text: string }[] =>
 export class MapChatTurnRecord {
   /** The model's raw output of the attempt that is current (set by `onRaw`). */
   raw: string | null = null;
+  /** The follow-ups that went into the turn (the view sets it; read when the turn ends, so only the delivered ones count). */
+  steerTexts: () => string[] = () => [];
   private ended = false;
   constructor(
     private readonly writer: MapChatRecordWriter,
@@ -60,6 +62,7 @@ export class MapChatTurnRecord {
     if (this.ended) return false;
     this.ended = true;
     const partial = this.answer.streaming ? this.answer.text : "";
+    const steers = this.steerTexts();
     this.write({
       type: "turn_end",
       turn: this.turn,
@@ -70,6 +73,7 @@ export class MapChatTurnRecord {
       lines: plainLines(fields.lines ?? this.answer.lines),
       modelLabel: this.answer.modelLabel ?? "",
       ...(fields.rejected?.length ? { rejected: fields.rejected } : {}),
+      ...(steers.length ? { steers } : {}),
       ...(fields.error ? { error: fields.error } : {})
     });
     return true;

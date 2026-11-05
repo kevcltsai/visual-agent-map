@@ -36892,7 +36892,7 @@ ${typed}` : draft;
    * line on top saying when it was. Plan cards, picture candidates, retry and option lists are shown as no longer valid.
    */
   restore(conversation) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     if (this.working) return;
     this.cancelFrame();
     this.rows = /* @__PURE__ */ new WeakMap();
@@ -36903,7 +36903,9 @@ ${typed}` : draft;
     this.unread = false;
     this.conversationId = conversation.id;
     for (const turn of conversation.turns) {
-      this.messages.push({ role: "user", text: turn.message, lines: [] });
+      const question = { role: "user", text: turn.message, lines: [] };
+      if ((_a2 = turn.steers) == null ? void 0 : _a2.length) question.steers = turn.steers.map((text11) => ({ text: text11, state: "live" }));
+      this.messages.push(question);
       const answer = {
         role: "assistant",
         text: turn.reply,
@@ -36915,7 +36917,7 @@ ${typed}` : draft;
         stale: true
       };
       if (turn.stalePlan) {
-        if (turn.planState && turn.planState !== "cancelled" && ((_a2 = turn.planLines) == null ? void 0 : _a2.length))
+        if (turn.planState && turn.planState !== "cancelled" && ((_b2 = turn.planLines) == null ? void 0 : _b2.length))
           answer.lines = [
             ...answer.lines,
             ...turn.planLines.map((line) => ({
@@ -36937,7 +36939,7 @@ ${typed}` : draft;
       }
       if (turn.images) {
         const states = ["ready", "empty", "failed", "stopped"];
-        const state = (_b2 = states.find((name2) => name2 === turn.images.state)) != null ? _b2 : "stopped";
+        const state = (_c = states.find((name2) => name2 === turn.images.state)) != null ? _c : "stopped";
         answer.images = [
           {
             query: "",
@@ -36967,7 +36969,7 @@ ${typed}` : draft;
     this.renderLog(true);
     this.refreshNote();
     this.renderHint();
-    (_d = (_c = this.host).stateChanged) == null ? void 0 : _d.call(_c);
+    (_e = (_d = this.host).stateChanged) == null ? void 0 : _e.call(_d);
   }
   /** "New conversation": clears the panel and tells the view to start a new record. Nothing happens while a turn runs (Stop first). */
   startNewConversation() {
@@ -42028,6 +42030,13 @@ function serializeLine(line) {
   return `${JSON.stringify({ v: RECORD_VERSION, ...rest })}
 `;
 }
+function withValidSteers(line) {
+  if (line.type !== "turn_end" || !("steers" in line)) return line;
+  const steers = line.steers;
+  if (Array.isArray(steers) && steers.every((item) => typeof item === "string")) return line;
+  const { steers: _dropped, ...rest } = line;
+  return rest;
+}
 function parseRecord(text11) {
   const lines = [];
   let skipped2 = 0;
@@ -42049,7 +42058,7 @@ function parseRecord(text11) {
     const version = value.v;
     if (version !== void 0 && version !== RECORD_VERSION) unrecoverable = true;
     else if (version === RECORD_VERSION && typeof value.type === "string")
-      lines.push(value);
+      lines.push(withValidSteers(value));
     else skipped2++;
   }
   return { lines, skipped: skipped2, unrecoverable, cleanEnd: text11 === "" || text11.endsWith("\n") };
@@ -42136,6 +42145,7 @@ function restoreConversation(id, lines) {
       planState: (_c = plans.get(number)) == null ? void 0 : _c.state,
       planLines: (_d = plans.get(number)) == null ? void 0 : _d.lines,
       rejected: end.rejected,
+      steers: Array.isArray(end.steers) ? end.steers.filter((item) => typeof item === "string") : [],
       images: images.get(number),
       undone: undone.get(number) === true,
       backfilled: start.backfilled === true
@@ -42471,6 +42481,8 @@ var MapChatTurnRecord = class {
     this.log = log;
     /** The model's raw output of the attempt that is current (set by `onRaw`). */
     __publicField(this, "raw", null);
+    /** The follow-ups that went into the turn (the view sets it; read when the turn ends, so only the delivered ones count). */
+    __publicField(this, "steerTexts", () => []);
     __publicField(this, "ended", false);
   }
   /** The turn has not written its end yet. */
@@ -42498,6 +42510,7 @@ var MapChatTurnRecord = class {
     if (this.ended) return false;
     this.ended = true;
     const partial = this.answer.streaming ? this.answer.text : "";
+    const steers = this.steerTexts();
     this.write({
       type: "turn_end",
       turn: this.turn,
@@ -42508,6 +42521,7 @@ var MapChatTurnRecord = class {
       lines: plainLines((_b2 = fields.lines) != null ? _b2 : this.answer.lines),
       modelLabel: (_c = this.answer.modelLabel) != null ? _c : "",
       ...((_d = fields.rejected) == null ? void 0 : _d.length) ? { rejected: fields.rejected } : {},
+      ...steers.length ? { steers } : {},
       ...fields.error ? { error: fields.error } : {}
     });
     return true;
@@ -72561,6 +72575,8 @@ ${note.detail.trim()}` : "",
           sent = true;
           if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
           const record = this.beginChatRecord(chat, turn, request, origin);
+          if (record)
+            record.steerTexts = () => steerState.entries.filter((e) => e.status === "delivered").map((e) => e.text);
           const openAttempt = () => {
             var _a3;
             const controller = new AbortController();

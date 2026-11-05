@@ -94,6 +94,28 @@ test('restoring keeps only done and plan turns; a plan is stale; an undone reply
   assert.equal(restored.restoredAt, at(4));
 });
 
+test('steers: a turn_end with steers is written and read back; a line with none (the old shape) restores with an empty list; a wrong type drops only that field', async () => {
+  const { writer, recordFiles, lines, fx } = setup();
+  writer.write(turnStart(1)); writer.write(turnEnd(1, { steers: ['also this', 'and that'] }));
+  writer.write(turnStart(2)); writer.write(turnEnd(2));
+  await writer.idle();
+  const [path] = recordFiles();
+  const written = lines(path).filter(line => line.type === 'turn_end');
+  assert.deepEqual(written[0].steers, ['also this', 'and that']);
+  assert.equal('steers' in written[1], false, 'no field when there were none');
+  const restored = records.restoreConversation('id', records.parseRecord(fx.contents.get(path)).lines);
+  assert.deepEqual(S.plain(restored.turns.map(turn => turn.steers)), [['also this', 'and that'], []]);
+  const bad = n => ({ v: 1, type: 'turn_end', turn: n, at: '2026-11-06T10:00:00.000Z', status: 'done', raw: null, reply: 'r', lines: [], modelLabel: '' });
+  const text = [
+    { v: 1, type: 'turn_start', turn: 1, message: 'a' }, { ...bad(1), steers: 'oops' },
+    { v: 1, type: 'turn_start', turn: 2, message: 'b' }, { ...bad(2), steers: ['ok', 3] },
+    { v: 1, type: 'turn_start', turn: 3, message: 'c' }, { ...bad(3), steers: ['fine'] }
+  ].map(line => JSON.stringify(line)).join('\n') + '\n';
+  const parsed = records.parseRecord(text);
+  assert.equal(parsed.skipped, 0); assert.equal(parsed.unrecoverable, false);
+  assert.deepEqual(S.plain(records.restoreConversation('id', parsed.lines).turns.map(turn => [turn.message, turn.reply, turn.steers])), [['a', 'r', []], ['b', 'r', []], ['c', 'r', ['fine']]]);
+});
+
 // ---- writer ----
 test('turn lines carry request, step id/version, model, raw output and visible rows', async () => {
   const { writer, recordFiles, lines, fx } = setup();

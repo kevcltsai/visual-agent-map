@@ -6577,3 +6577,57 @@ integrationTest('map chat steer: a reply with a plan keeps the waiting follow-up
   h.type('big'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('late'); pressEnter(chat); await tick(); await tick(); s.gate.resolve(); await sending;
   assert.ok(chat.pendingPlan(), 'the plan still waits'); assert.equal(chat.draft, 'late'); assert.equal(h.control.requests.length, 1);
 });
+
+// ---- records: the follow-ups of a turn (decision #5) ------------------------------------------------------------------------
+
+integrationTest('map chat records: a turn with a follow-up records it in steers and restores it into the next request\'s earlierTurns', async () => {
+  const first = await harness({ records: true }); await first.view.hydrate(); const chat = first.open(); const s = steerReply(first);
+  first.type('go'); const sending = first.view.sendMapChat(); await requestOut(chat);
+  first.type('extra'); pressEnter(chat); await tick(); await tick(); eq(s.handled, ['extra']);
+  first.type('and more'); pressEnter(chat); await tick(); await tick(); eq(s.handled, ['extra', 'and more']);
+  s.gate.resolve(); await sending; await recordIdle(first);
+  const [file] = recordFiles(first); const lines = recordLines(first, file);
+  eq(lines.filter(l => l.type === 'turn_start').map(l => l.message), ['go'], 'the turn start keeps the bare question');
+  eq(lines.find(l => l.type === 'turn_end').steers, ['extra', 'and more']);
+  const h = await harness({ records: true }); await h.view.hydrate();
+  await seedRecord(h, lines.map(l => ({ ...l })), file.split('/').at(-1).replace('.jsonl', ''));
+  const again = h.open(); await until(() => again.hasMessages);
+  eq(steerTags(again), ['Added midway', 'Added midway']); eq(steerTexts(again), ['extra', 'and more']);
+  await sendOne(h, 'next', 'ok');
+  eq(JSON.parse(h.control.requests[0].context.json).earlierTurns, [{ role: 'user', text: 'go\n\nextra\n\nand more' }, { role: 'assistant', text: 'done' }]);
+});
+
+integrationTest('map chat records: a queued follow-up is not in steers and becomes its own turn', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h, { reject: true });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  h.type('late one'); pressEnter(chat); await tick(); await tick(); eq(steerTags(chat), ['Sends after this reply ends']);
+  s.gate.resolve(); await sending; await until(() => h.control.requests.length === 2 && !chat.isBusy); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]);
+  const ends = lines.filter(l => l.type === 'turn_end');
+  eq(ends.length, 2); assert.equal('steers' in ends[0], false, 'no steers field when none went in');
+  eq(lines.filter(l => l.type === 'turn_start').map(l => l.message), ['go', 'late one']);
+});
+
+integrationTest('map chat records: json-fallback requeue leaves a re-delivered steer once', async () => {
+  // json-fallback: the delivered steer is queued again, so it is the next turn's message and not in the first turn's steers.
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); let n = 0; const raw = h.control.reply;
+  h.control.reply = async (...args) => { n++; if (n === 2) return { reply: 'second', actions: [], rejected: [] }; args[3]({ kind: 'stream-mode', mode: 'stream-json' }); return raw(...args); };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick();
+  eq(s.handled, ['extra']); s.progress({ kind: 'stream-mode', mode: 'json-fallback' }); await tick();
+  s.gate.resolve(); await sending; await until(() => h.control.requests.length === 2 && !chat.isBusy); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]);
+  const ends = lines.filter(l => l.type === 'turn_end');
+  assert.equal('steers' in ends[0], false); eq(lines.filter(l => l.type === 'turn_start').map(l => l.message), ['go', 'extra']);
+  eq(lines.flatMap(l => [l.message, ...(l.steers ?? [])]).filter(text => text === 'extra').length, 1, 'the text is a message or a steer once');
+  // "Resend": the new attempt gets the steer again, still one steer in the end line.
+  const r = await harness({ records: true }); await r.view.hydrate(); const rc = r.open(); const attempts = [];
+  r.control.reply = async (_request, signal, _onReply, onProgress, onSteer) => {
+    const attempt = { handled: [] }; attempts.push(attempt); onProgress({ kind: 'stream-mode', mode: 'stream-json' });
+    onSteer(async text => { attempt.handled.push(text); });
+    if (attempts.length === 1) await new Promise(resolve => signal.addEventListener('abort', resolve));
+    return { reply: 'ok', actions: [], rejected: [] };
+  };
+  r.type('go'); const again = r.view.sendMapChat(); await requestOut(rc); r.type('extra'); pressEnter(rc); await tick(); await tick();
+  r.clock.advance(20_000); resendButton(rc).click(); await again; await recordIdle(r);
+  eq(recordLines(r, recordFiles(r)[0]).filter(l => l.type === 'turn_end').map(l => l.steers), [['extra']]);
+});

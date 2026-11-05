@@ -58,6 +58,8 @@ export interface RecordTurnEndLine extends RecordLineBase {
   lines: RecordLineItem[];
   modelLabel: string;
   rejected?: unknown[];
+  /** The follow-up messages that went into the running turn (live), in order; left out when there were none. */
+  steers?: string[];
   error?: { text: string; technical: string };
 }
 export interface RecordPlanLine extends RecordLineBase {
@@ -194,6 +196,16 @@ export interface ParsedRecord {
   cleanEnd: boolean;
 }
 
+/** A `turn_end` whose `steers` is not a list of strings keeps the line and loses that field. */
+function withValidSteers(line: RecordLine): RecordLine {
+  if (line.type !== "turn_end" || !("steers" in line)) return line;
+  const steers = (line as { steers?: unknown }).steers;
+  if (Array.isArray(steers) && steers.every(item => typeof item === "string")) return line;
+  const { steers: _dropped, ...rest } = line;
+  void _dropped;
+  return rest;
+}
+
 /** Reads a file's text. A cut or broken line is skipped; a line with another `v` makes the file unrecoverable. */
 export function parseRecord(text: string): ParsedRecord {
   const lines: RecordLine[] = [];
@@ -217,7 +229,7 @@ export function parseRecord(text: string): ParsedRecord {
     const version = (value as { v?: unknown }).v;
     if (version !== undefined && version !== RECORD_VERSION) unrecoverable = true;
     else if (version === RECORD_VERSION && typeof (value as { type?: unknown }).type === "string")
-      lines.push(value as RecordLine);
+      lines.push(withValidSteers(value as RecordLine));
     else skipped++;
   }
   return { lines, skipped, unrecoverable, cleanEnd: text === "" || text.endsWith("\n") };
@@ -299,6 +311,8 @@ export interface RestoredTurn {
   /** The result lines of the applied plan. */
   planLines?: RecordLineItem[];
   rejected?: unknown[];
+  /** The follow-ups that went into the turn, in order (empty when there were none). */
+  steers: string[];
   images?: RestoredImages;
   /** The reply was undone and not redone (it still shows, like it does in memory). */
   undone: boolean;
@@ -361,6 +375,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       planState: plans.get(number)?.state,
       planLines: plans.get(number)?.lines,
       rejected: end.rejected,
+      steers: Array.isArray(end.steers) ? end.steers.filter((item): item is string => typeof item === "string") : [],
       images: images.get(number),
       undone: undone.get(number) === true,
       backfilled: start.backfilled === true

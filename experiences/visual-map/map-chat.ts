@@ -203,6 +203,8 @@ export interface MapChatRestoredConversation {
     lines: { status: string; text: string }[];
     modelLabel: string;
     stalePlan: boolean;
+    /** The follow-ups that went into the turn (shown as live ones, so the next request carries them too). */
+    steers?: string[];
     /** What became of the plan card: no line (undefined) = it was still waiting; stopped counts as applied. */
     planState?: "applied" | "cancelled" | "stopped";
     /** The result lines the applied plan wrote. */
@@ -1198,7 +1200,9 @@ export class MapChatPanel {
     this.unread = false;
     this.conversationId = conversation.id;
     for (const turn of conversation.turns) {
-      this.messages.push({ role: "user", text: turn.message, lines: [] });
+      const question: MapChatMessage = { role: "user", text: turn.message, lines: [] };
+      if (turn.steers?.length) question.steers = turn.steers.map((text): MapChatSteer => ({ text, state: "live" }));
+      this.messages.push(question);
       const answer: MapChatMessage = {
         role: "assistant",
         text: turn.reply,

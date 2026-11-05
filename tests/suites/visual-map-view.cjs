@@ -1528,8 +1528,8 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
 integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card and Select subtopics (the title is edited in place, so no Rename)', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until hover, focus or selection, and take no space.
-  assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; pointer-events: none;[^}]*width: max-content;/m);
-  assert.match(css, /\.vam-node:hover > \.vam-node-tools, \.vam-node:focus-within > \.vam-node-tools, \.vam-viewport:not\(\.is-selecting\) \.vam-node\.is-selected > \.vam-node-tools \{ opacity: 1; pointer-events: auto;/);
+  assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; visibility: hidden;[^}]*width: max-content;/m);
+  assert.match(css, /\.vam-node:hover > \.vam-node-tools, \.vam-node:focus-within > \.vam-node-tools, \.vam-viewport:not\(\.is-selecting\) \.vam-node\.is-selected > \.vam-node-tools \{ opacity: 1; visibility: visible;/);
   assert.equal(/vam-ai-slot|vam-ai-tool/.test(css), false, 'no selected-only swap remains');
   assert.match(css, /\.vam-node-tools > \.vam-ai-explore::before \{ content: "✦" \/ "";/, 'the sparkle is decoration, not part of the name');
   const toolsOf = (setup = () => {}) => {

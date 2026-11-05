@@ -1,11 +1,9 @@
 import { setIcon } from "obsidian";
 import { t } from "../../i18n";
 import {
-  USAGE_ACTIONS,
   localDayStart,
   localMonthStart,
   type AiUsageStore,
-  type UsageAction,
   type UsageProvider,
   type UsageSum,
   type UsageTokens
@@ -22,7 +20,6 @@ export function formatTokens(count: number): string {
   return `${Math.round(n / 1000)}k`;
 }
 
-const actionLabel = (action: UsageAction): string => t(`ui.usage_action_${action}`);
 const sum = (tokens: UsageTokens): number => tokens.inputTokens + tokens.outputTokens;
 /** A count, with the "approximately" mark when any estimated value went into it. */
 const mark = (count: number, estimated: boolean | undefined): string =>
@@ -39,20 +36,12 @@ interface TotalCell {
   input: HTMLElement;
   output: HTMLElement;
 }
-interface BarRow {
-  row: HTMLElement;
-  name: HTMLElement;
-  fill: HTMLElement;
-  value: HTMLElement;
-}
 interface PanelParts {
   root: HTMLElement;
   sections: HTMLElement[];
   empty: HTMLElement;
   error: HTMLElement;
   cells: { map: TotalCell; today: TotalCell; month: TotalCell };
-  bars: Map<UsageAction, BarRow>;
-  barsBox: HTMLElement;
   filters: Map<UsageFilter, HTMLElement>;
   footEstimates: HTMLElement;
 }
@@ -259,19 +248,6 @@ export class UsageControl {
     const empty = root.createEl("p", { cls: "vam-usage-empty", text: t("ui.usage_empty") });
     empty.hidden = true;
 
-    const barsSection = root.createDiv({ cls: "vam-usage-section" });
-    barsSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_by_action") });
-    const barsBox = barsSection.createDiv({ cls: "vam-usage-bars" });
-    const bars = new Map<UsageAction, BarRow>();
-    for (const action of USAGE_ACTIONS) {
-      const row = barsBox.createDiv({ cls: "vam-usage-bar" });
-      const fill = row.createDiv({ cls: "vam-usage-fill-track" }).createDiv({ cls: "vam-usage-fill" });
-      const name = row.createSpan({ text: actionLabel(action) });
-      row.insertBefore(name, row.firstChild);
-      bars.set(action, { row, name, fill, value: row.createSpan({ cls: "vam-usage-muted" }) });
-      row.hidden = true;
-    }
-
     const foot = root.createDiv({ cls: "vam-usage-foot" });
     foot.createDiv({ text: t("ui.usage_footer_scope") });
     const footEstimates = foot.createDiv({ text: t("ui.usage_footer_estimates") });
@@ -279,12 +255,10 @@ export class UsageControl {
     this.markFilters(filters);
     return {
       root,
-      sections: [totalsSection, barsSection],
+      sections: [totalsSection],
       empty,
       error,
       cells,
-      bars,
-      barsBox,
       filters,
       footEstimates
     };
@@ -315,13 +289,7 @@ export class UsageControl {
     const map = this.store.totals({ mapPath: path, provider });
     const today = this.store.totals({ since: localDayStart(), provider });
     const month = this.store.totals({ since: localMonthStart(), provider });
-    const actions = this.store.byAction(path, undefined, provider);
-    if (
-      map.status === "unreadable" ||
-      today.status === "unreadable" ||
-      month.status === "unreadable" ||
-      actions.status === "unreadable"
-    ) {
+    if (map.status === "unreadable" || today.status === "unreadable" || month.status === "unreadable") {
       parts.error.hidden = false;
       parts.empty.hidden = true;
       parts.footEstimates.hidden = true;
@@ -343,17 +311,7 @@ export class UsageControl {
 
     const noUsage = sum(map.value) === 0;
     parts.empty.hidden = !noUsage;
-    parts.sections[1].hidden = noUsage;
-    let anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
-    const biggest = Math.max(0, ...USAGE_ACTIONS.map(action => sum(actions.value[action])));
-    for (const action of USAGE_ACTIONS) {
-      const used = sum(actions.value[action]);
-      const bar = parts.bars.get(action)!;
-      bar.row.hidden = used === 0;
-      bar.fill.style.setProperty("width", `${biggest ? Math.max(2, Math.round((used / biggest) * 100)) : 0}%`);
-      bar.value.setText(mark(used, actions.value[action].estimated));
-      if (!noUsage && used > 0 && actions.value[action].estimated) anyEstimate = true;
-    }
+    const anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
     parts.footEstimates.hidden = !anyEstimate;
     this.place();
   }

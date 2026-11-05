@@ -299,6 +299,7 @@ import {
   moveNotePath,
   normalizeReasoningLevel,
   normalizeMapChatOpen,
+  normalizeMapChatImageMode,
   rebaseMapNotePaths,
   type Note,
   type NotePatch,
@@ -11076,6 +11077,8 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private updateHistoryButtons(): void {
+    // A reply's "Undo this reply" button follows redo / undo done by hand too.
+    this.chat?.refreshReplyUndo();
     const undo = this.contentEl?.querySelector<HTMLButtonElement>("[data-history=undo]"),
       redo = this.contentEl?.querySelector<HTMLButtonElement>("[data-history=redo]");
     const label = (button: HTMLButtonElement, text: string): void => {
@@ -19062,6 +19065,16 @@ export class VisualAgentMapView extends ItemView {
       width: () => this.chatWidth(),
       widths: setWidth => this.chatWidths(setWidth),
       stateChanged: () => this.refreshEmptyMap(),
+      image: () => this.chatImage(),
+      watchImage: changed => this.watchChatImage(changed),
+      imageMode: () => this.chatImageMode(),
+      setImageMode: mode => {
+        if (this.plugin.settings.mapChatImageMode === mode) return;
+        this.plugin.settings.mapChatImageMode = mode;
+        void this.plugin.saveSettings();
+      },
+      replyUndoState: token => this.chatReplyUndoState(token as TransactionEntry),
+      undoReply: token => this.undoChatReply(token as TransactionEntry),
       setWidth: (width, commit) => {
         if (!commit) return;
         this.plugin.settings.mapChatWidth = clampMapChatWidth(width);
@@ -19260,9 +19273,35 @@ export class VisualAgentMapView extends ItemView {
   isNewestUndoStep(entry: TransactionEntry): boolean {
     return (this.history.undoEntry as unknown) === entry;
   }
-  /** "AI changes to a picture: show me first" or "apply at once". Until the setting exists (the chat panel's switch) it is always "preview". */
+  /** "AI changes to a picture: show me first" or "apply at once": the chat panel's switch, remembered in the settings. */
   private chatImageMode(): MapChatImageMode {
-    return "preview";
+    return normalizeMapChatImageMode(this.plugin.settings.mapChatImageMode);
+  }
+  /** Where the undo step of a written reply is now (see the chat's "Undo this reply" button). */
+  private chatReplyUndoState(entry: TransactionEntry): "top" | "undone" | "other" {
+    if (this.isNewestUndoStep(entry)) return "top";
+    return (this.history.redoEntry as unknown) === entry ? "undone" : "other";
+  }
+  /** Undoes exactly the reply when it is the newest undo step; otherwise nothing changes and the Notice says how to undo in order. */
+  private async undoChatReply(entry: TransactionEntry): Promise<"undone" | "later"> {
+    if (this.chatApplying || !this.isNewestUndoStep(entry)) {
+      if (this.chatReplyUndoState(entry) !== "undone") new Notice(t("ui.map_chat_undo_reply_later"));
+      return "later";
+    }
+    await this.travel(false);
+    return "undone";
+  }
+  /** What the finished turn tells the panel: the picture it sent ("AI looked at this picture") and, when applied directly, the undo step. */
+  private markChatTurn(origin: MapChatOrigin, request: { imageDataUrl?: string }, written?: TransactionEntry): void {
+    if (!request.imageDataUrl) return;
+    const picture = this.chatSelectedImage(origin.imageId);
+    const note = picture?.selected.kind === "annotated" ? (picture.selected.note ?? "").trim() : "";
+    const name = picture ? (picture.path.split("/").pop() ?? picture.path) : "";
+    const entry = this.chatImageMode() === "direct" ? written : undefined;
+    this.chat?.markTurn({
+      seenImage: { note: note || name },
+      ...(entry ? { replyUndo: { token: entry } } : {})
+    });
   }
   /** The selected picture for the context, as the file is now. A picture that is gone from the map is simply not selected. */
   private chatSelectedImage(
@@ -19637,6 +19676,7 @@ export class VisualAgentMapView extends ItemView {
                 // Nothing is touched until the user applies the plan.
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
+                  this.markChatTurn(origin, request);
                   this.offerChatPlan(
                     result,
                     plan,
@@ -19655,7 +19695,12 @@ export class VisualAgentMapView extends ItemView {
                 alive,
                 anchor
               );
-              if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+              if (alive() && chat.isBusy) {
+                // Read at once: the next reply's step replaces `chatReplyEntry`.
+                const entry = this.chatReplyEntry();
+                chat.finish(result.reply, lines);
+                this.markChatTurn(origin, request, entry);
+              }
               return;
             } catch (error) {
               stopWatching();

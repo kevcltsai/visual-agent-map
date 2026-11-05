@@ -181,7 +181,21 @@ export interface MapChatMessage {
   images?: MapChatImages[];
   /** On an assistant message: the name of the model that was current when its question was sent; it never changes afterwards. */
   modelLabel?: string;
+  /** This turn sent a picture to the AI; `note` is the text shown after "AI looked at this picture" (untrusted, setText only). In memory only. */
+  seenImage?: { note: string };
+  /** "Apply directly" wrote this reply: the token of its undo step, for the "Undo this reply" button. In memory only, never saved. */
+  replyUndo?: { token: object };
 }
+
+/** The picture the chat is about (a canvas image chosen by the user); `note` is untrusted text. */
+export interface MapChatImageInfo {
+  id: string;
+  kind: "annotated" | "plain";
+  note: string;
+  name: string;
+}
+/** Where the undo step of a reply is now: the newest step (one undo takes the reply back), undone (it waits for redo), or buried under later steps. */
+export type MapChatReplyUndoState = "top" | "undone" | "other";
 
 /** What the panel needs from the view that owns it. */
 export interface MapChatHost {
@@ -233,6 +247,18 @@ export interface MapChatHost {
   stateChanged?(): void;
   /** Inserts a picture candidate into the card it was found for; resolves with why it was refused, if it was. */
   insertImage?(images: MapChatImages, item: MapChatImageItem): Promise<MapChatInsertResult>;
+  /** The picture the chat is about now, or null (none chosen). */
+  image?(): MapChatImageInfo | null;
+  /** Calls `changed` whenever the chosen picture changes; the returned function stops listening. */
+  watchImage?(changed: () => void): () => void;
+  /** "AI changes to a picture": show a preview first, or apply at once (remembered). */
+  imageMode?(): "preview" | "direct";
+  /** The user switched it; the view remembers it at once. */
+  setImageMode?(mode: "preview" | "direct"): void;
+  /** Where the undo step of a written reply is now. */
+  replyUndoState?(token: object): MapChatReplyUndoState;
+  /** The "Undo this reply" button: undoes exactly that reply when it is the newest step, otherwise changes nothing and says how to undo in order. */
+  undoReply?(token: object): Promise<"undone" | "later">;
   /** Whether the conversation can be saved next to this map; `reason` says why not. */
   canSave?(): { ok: true } | { ok: false; reason: string };
   /** Saves the finished turns as a note; resolves with the new note's path, or why it could not be saved. */
@@ -342,6 +368,9 @@ export class MapChatPanel {
   private sourceEls = new WeakMap<MapChatImageItem, HTMLElement>();
   private built = false;
   private stopWatching: (() => void) | null = null;
+  private stopWatchingImage: (() => void) | null = null;
+  private imageModeEl!: HTMLElement;
+  private imageModeButtons: Record<"preview" | "direct", HTMLButtonElement> | null = null;
   private messageEls: HTMLElement[] = [];
   private bodyEls: HTMLElement[] = [];
   /** The laid-out row of each message with the state it was built from; a message that has not changed keeps its row. */
@@ -519,6 +548,8 @@ export class MapChatPanel {
   dispose(): void {
     this.stopWatching?.();
     this.stopWatching = null;
+    this.stopWatchingImage?.();
+    this.stopWatchingImage = null;
     this.stopResizing?.();
     this.cancelFrame();
     this.clearStage();
@@ -1185,6 +1216,8 @@ export class MapChatPanel {
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
     });
+    this.imageModeEl = this.bodyEl.createDiv({ cls: "vam-map-chat-image-mode" });
+    this.imageModeEl.hidden = true;
     this.hintEl = this.bodyEl.createDiv({ cls: "vam-map-chat-plan-hint" });
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
@@ -1246,6 +1279,8 @@ export class MapChatPanel {
     this.renderLog();
     this.renderBusy();
     this.stopWatching = this.host.watchModels(() => this.refreshControls());
+    this.stopWatchingImage = this.host.watchImage?.(() => this.refreshImage()) ?? null;
+    this.renderImageMode();
   }
 
   /**
@@ -1677,10 +1712,85 @@ export class MapChatPanel {
     return chip.path ? t("ui.map_chat_ref_snippet_0", clip(baseName(chip.path))) : t("ui.map_chat_ref_text");
   }
 
+  /** The picture selection changed: the chip and the switch follow. */
+  private refreshImage(): void {
+    this.renderChips();
+    this.renderImageMode();
+  }
+
+  /** "Before AI edits the picture" [Show me first | Apply directly]: only while a picture is chosen. */
+  private renderImageMode(): void {
+    if (!this.built) return;
+    const shown = !!this.host.image?.() && !!this.host.setImageMode;
+    this.imageModeEl.hidden = !shown;
+    if (!shown) return;
+    if (!this.imageModeButtons) {
+      this.imageModeEl.createSpan({ cls: "vam-map-chat-image-mode-label", text: t("ui.map_chat_image_mode_label") });
+      const group = this.imageModeEl.createSpan({
+        cls: "vam-map-chat-image-mode-group",
+        attr: { role: "group", "aria-label": t("ui.map_chat_image_mode_label") }
+      });
+      const make = (mode: "preview" | "direct"): HTMLButtonElement => {
+        const button = group.createEl("button", {
+          cls: "vam-map-chat-image-mode-button",
+          text: t(`ui.map_chat_image_mode_${mode}`),
+          attr: { type: "button", "aria-pressed": "false" }
+        });
+        button.addEventListener("click", () => {
+          if ((this.host.imageMode?.() ?? "preview") === mode) return;
+          this.host.setImageMode?.(mode);
+          this.renderImageMode();
+        });
+        return button;
+      };
+      this.imageModeButtons = { preview: make("preview"), direct: make("direct") };
+    }
+    const current = this.host.imageMode?.() ?? "preview";
+    for (const mode of ["preview", "direct"] as const) {
+      const button = this.imageModeButtons[mode];
+      button.setAttr("aria-pressed", String(mode === current));
+      button.toggleClass("is-active", mode === current);
+    }
+  }
+
+  /** The turn that was just finished sent a picture and/or wrote an undo step: its row says so. */
+  markTurn(extra: { seenImage?: { note: string }; replyUndo?: { token: object } }): void {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    if (extra.seenImage) last.seenImage = { note: extra.seenImage.note };
+    if (extra.replyUndo) last.replyUndo = { token: extra.replyUndo.token };
+    this.renderLog();
+  }
+
+  /** The undo step of a reply moved (undone, redone, buried): its button follows. */
+  refreshReplyUndo(): void {
+    if (!this.built) return;
+    for (const message of this.messages) {
+      const button = message.replyUndo
+        ? this.rows.get(message)?.row.querySelector<HTMLButtonElement>(".vam-map-chat-undo-reply")
+        : null;
+      if (button && message.replyUndo)
+        button.disabled = this.host.replyUndoState?.(message.replyUndo.token) === "undone";
+    }
+  }
+
   private renderChips(): void {
     if (!this.built) return;
     this.chipsEl.empty();
     const dragged = new Set(this.chips.filter(chip => chip.kind === "topic").map(chip => (chip as { id: string }).id));
+    const picture = this.host.image?.() ?? null;
+    if (picture) {
+      // The note is the user's or the AI's text: only setText ever shows it. No ×: the chip follows the selection on the canvas.
+      const name = picture.note.trim() || picture.name;
+      const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto is-image" });
+      chip.createSpan({
+        cls: "vam-map-chat-chip-label",
+        text: t(
+          picture.kind === "annotated" ? "ui.map_chat_ref_image_annotated_0" : "ui.map_chat_ref_image_plain_0",
+          clip(picture.kind === "annotated" ? name : picture.name)
+        )
+      });
+    }
     for (const id of this.host.selectedIds()) {
       if (dragged.has(id)) continue;
       const title = this.host.topicTitle(id);
@@ -1731,6 +1841,10 @@ export class MapChatPanel {
       this.stageMessage() === message ? "p" : "",
       this.canRetry(message, asked) ? "r" : "",
       message.linesOpen ? "o" : "",
+      message.seenImage ? `seen:${message.seenImage.note}` : "",
+      message.replyUndo ? "undo" : "",
+      t("ui.map_chat_seen_image_0", ""),
+      t("ui.map_chat_undo_reply"),
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
       t("ui.map_chat_plan_summary_0", ""),
@@ -1819,6 +1933,12 @@ export class MapChatPanel {
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
     for (const block of message.images ?? []) this.buildImages(row, block);
+    if (message.seenImage)
+      row.createDiv({
+        cls: "vam-map-chat-seen",
+        text: t("ui.map_chat_seen_image_0", clip(message.seenImage.note, 80))
+      });
+    if (message.replyUndo) this.buildReplyUndo(row, message.replyUndo.token);
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more: HTMLButtonElement | null = null;
@@ -1835,6 +1955,20 @@ export class MapChatPanel {
       });
     }
     return { row, body, more };
+  }
+
+  /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
+  private buildReplyUndo(row: HTMLElement, token: object): void {
+    const button = row.createEl("button", {
+      cls: "vam-map-chat-undo-reply",
+      text: t("ui.map_chat_undo_reply"),
+      attr: { type: "button" }
+    });
+    button.disabled = this.host.replyUndoState?.(token) === "undone";
+    button.addEventListener("click", () => {
+      if (button.disabled || !this.host.undoReply) return;
+      void this.host.undoReply(token).then(() => this.refreshReplyUndo());
+    });
   }
 
   /** The raw error of a failed turn: folded away, selectable and copyable. */

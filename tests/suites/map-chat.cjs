@@ -5881,3 +5881,105 @@ integrationTest('persona G12: moving a card with its own branch up under another
   const crowd = h.view.map.nodes.filter(n => n.id !== moving.id && n.parentId !== moving.id && Math.abs(n.x - dropped.x) < 280 && n.y < dropped.y + 145 && dropped.y < n.y + 145);
   eq(crowd.map(title), [], 'nothing overlaps the moved card');
 });
+
+// ---- P4a: picture chip, "before AI edits the picture" switch, "AI looked at this picture", "Undo this reply" ---------------------
+const imageHostFixture = (start = { id: 'i1', kind: 'annotated', note: 'Cow cuts', name: 'a.png' }) => {
+  const state = { image: start, mode: 'preview', listeners: [], sets: [], undo: new Map(), undone: [], later: 0 };
+  const token = { label: 'reply' };
+  const f = panelFixture({
+    image: () => state.image, imageMode: () => state.mode,
+    watchImage: changed => { state.listeners.push(changed); return () => { state.listeners.splice(state.listeners.indexOf(changed), 1); }; },
+    setImageMode: mode => { state.sets.push(mode); state.mode = mode; },
+    replyUndoState: t2 => state.undo.get(t2) ?? 'top',
+    undoReply: async t2 => { if ((state.undo.get(t2) ?? 'top') !== 'top') { state.later++; return 'later'; } state.undo.set(t2, 'undone'); state.undone.push(t2); return 'undone'; }
+  });
+  f.panel.setOpen(true);
+  const set = image => { state.image = image; state.listeners.forEach(fn => fn()); };
+  const group = () => find(f.panel.bodyEl, i => i.attrs?.role === 'group' && hasClass(i, 'vam-map-chat-image-mode-group'));
+  const buttons = () => group() ? findAll(group(), i => i.tag === 'button') : [];
+  return { ...f, state, token, set, group, buttons, modeEl: () => f.panel.imageModeEl };
+};
+
+test('P4a settings: mapChatImageMode is "preview" by default, takes only "preview" or "direct", and an old data file gets the default', () => {
+  const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  assert.equal(DEFAULT_SETTINGS.mapChatImageMode, 'preview');
+  assert.equal(settingsFromSaved(null).mapChatImageMode, 'preview');
+  assert.equal(settingsFromSaved({ mapChatWidth: 300 }).mapChatImageMode, 'preview', 'old file without the key');
+  assert.equal(settingsFromSaved({ mapChatImageMode: 'direct' }).mapChatImageMode, 'direct');
+  assert.equal(settingsFromSaved({ mapChatImageMode: 'preview' }).mapChatImageMode, 'preview');
+  for (const bad of ['Direct', 'ask', '', true, 1, null, {}, ['direct']]) assert.equal(settingsFromSaved({ mapChatImageMode: bad }).mapChatImageMode, 'preview', JSON.stringify(bad));
+});
+
+test('P4a chip: an annotated picture reads "Selected: annotated image · words" (file name when there are none), an ordinary one "Selected: image · file name"; no × button; it follows the selection', () => {
+  const f = imageHostFixture(); const chipTexts = () => f.parts.chipTexts();
+  f.panel.refreshSelection();
+  assert.deepEqual(chipTexts(), ['Selected: annotated image · Cow cuts']);
+  assert.equal(findAll(f.panel.chipsEl, i => i.tag === 'button').length, 0, 'the chip has no × button');
+  f.set({ id: 'i1', kind: 'annotated', note: '   ', name: 'a.png' }); assert.deepEqual(chipTexts(), ['Selected: annotated image · a.png']);
+  f.set({ id: 'i2', kind: 'plain', note: '', name: 'b.png' }); assert.deepEqual(chipTexts(), ['Selected: image · b.png']);
+  f.set(null); assert.deepEqual(chipTexts(), []);
+  f.panel.dispose(); assert.equal(f.state.listeners.length, 0, 'the panel stops listening when the view closes');
+});
+
+test('P4a switch: a named group of two aria-pressed buttons, only while a picture is chosen; clicking switches, remembers through the host, and a second click on the same button changes nothing', () => {
+  const f = imageHostFixture(null);
+  assert.equal(f.modeEl().hidden, true, 'no picture: no switch');
+  f.set({ id: 'i1', kind: 'annotated', note: 'x', name: 'a.png' });
+  assert.equal(f.modeEl().hidden, false);
+  assert.equal(f.group().attrs['aria-label'], 'Before AI edits the picture');
+  const [show, direct] = f.buttons();
+  assert.deepEqual([show.text, direct.text], ['Show me first', 'Apply directly']);
+  assert.deepEqual([show, direct].map(b => b.tag), ['button', 'button'], 'native buttons: Tab, Space and Enter work without a script');
+  assert.deepEqual([show, direct].map(b => b.attrs.type), ['button', 'button']);
+  assert.equal(show.attrs.tabindex, undefined);
+  assert.deepEqual([show, direct].map(b => b.attrs['aria-pressed']), ['true', 'false']);
+  direct.click();
+  assert.deepEqual(f.state.sets, ['direct']); assert.deepEqual([show, direct].map(b => b.attrs['aria-pressed']), ['false', 'true']);
+  direct.click(); assert.deepEqual(f.state.sets, ['direct'], 'same choice twice: nothing new to remember');
+  show.click(); assert.deepEqual(f.state.sets, ['direct', 'preview']);
+  // The choice is remembered: the switch hides with the picture and comes back showing the same choice.
+  direct.click(); f.set(null); assert.equal(f.modeEl().hidden, true);
+  f.set({ id: 'i2', kind: 'plain', note: '', name: 'b.png' }); assert.deepEqual(f.buttons().map(b => b.attrs['aria-pressed']), ['false', 'true']);
+});
+
+test('P4a seen: "AI looked at this picture" shows only under a turn that was marked as having sent one; its words are plain text, never markup', () => {
+  const f = imageHostFixture(); const seen = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-seen'));
+  f.panel.begin('first'); f.panel.finish('no picture here', []);
+  assert.equal(seen().length, 0);
+  const hostile = '<img src=x onerror=alert(1)><script>x</script>';
+  f.panel.begin('second'); f.panel.finish('with picture', []); f.panel.markTurn({ seenImage: { note: hostile } });
+  assert.equal(seen().length, 1);
+  assert.equal(seen()[0].text, `AI looked at this picture: ${hostile}`);
+  assert.equal(seen()[0].children.length, 0, 'text only: no child elements');
+  assert.equal(findAll(f.panel.logEl, i => i.tag === 'img' || i.tag === 'script').length, 0);
+  // The hostile words are also only text in the chip.
+  f.set({ id: 'i1', kind: 'annotated', note: hostile, name: 'a.png' });
+  assert.ok(f.parts.chipTexts()[0].startsWith('Selected: annotated image · <img src=x onerror=alert(1)>'), 'shown as the characters it is');
+  assert.equal(findAll(f.panel.chipsEl, i => i.tag === 'img' || i.tag === 'script').length, 0);
+  assert.equal(findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-chip-label')).every(i => i.children.length === 0), true, 'text only');
+});
+
+test('P4a undo button: shown only under a reply marked with an undo step; a press asks the host once; the button stays out of the saved transcript', async () => {
+  const f = imageHostFixture(); const buttons = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-undo-reply'));
+  f.panel.begin('plain'); f.panel.finish('answer', [{ status: 'done', text: 'Done: x' }]);
+  assert.equal(buttons().length, 0, 'preview mode or no write: no button');
+  f.panel.begin('direct'); f.panel.finish('placed', [{ status: 'done', text: 'Done: y' }]); f.panel.markTurn({ seenImage: { note: 'n' }, replyUndo: { token: f.token } });
+  assert.equal(buttons().length, 1); assert.equal(buttons()[0].text, 'Undo this reply'); assert.equal(buttons()[0].tag, 'button');
+  assert.equal(buttons()[0].disabled, false);
+  buttons()[0].click(); await tick(); await tick();
+  assert.deepEqual(f.state.undone, [f.token]);
+  assert.equal(buttons()[0].disabled, true, 'undone: disabled');
+  buttons()[0].click(); await tick(); assert.equal(f.state.undone.length, 1, 'a disabled button does nothing');
+  // Redo by hand: the host says the step is back on top; the view tells the panel to look again.
+  f.state.undo.set(f.token, 'top'); f.panel.refreshReplyUndo(); assert.equal(buttons()[0].disabled, false);
+  assert.equal(JSON.stringify(f.panel.turns?.() ?? []).includes('Undo this reply'), false);
+});
+
+test('P4a undo button (counter-example): a reply buried under later steps leaves its button pressable, the host refuses and nothing is undone', async () => {
+  const f = imageHostFixture(); const buttons = () => findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-undo-reply'));
+  f.panel.begin('direct'); f.panel.finish('placed', []); f.panel.markTurn({ replyUndo: { token: f.token } });
+  f.state.undo.set(f.token, 'other'); f.panel.refreshReplyUndo();
+  assert.equal(buttons()[0].disabled, false, 'still pressable: pressing it explains what to do');
+  buttons()[0].click(); await tick();
+  assert.equal(f.state.later, 1); assert.deepEqual(f.state.undone, []);
+});

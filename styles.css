@@ -791,6 +791,17 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat button.vam-map-chat-retry { align-self: flex-start; height: auto; margin-top: 6px; padding: 3px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-small); }
 .vam-map-chat button.vam-map-chat-retry:hover { background: var(--background-modifier-hover); }
 .vam-map-chat button.vam-map-chat-retry:disabled { color: var(--text-faint); cursor: default; }
+.vam-view .vam-map-chat-image-mode { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-view .vam-map-chat-image-mode[hidden] { display: none; }
+.vam-view .vam-map-chat-image-mode-group { display: inline-flex; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; }
+.vam-view .vam-map-chat button.vam-map-chat-image-mode-button { height: auto; padding: 3px 8px; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-smaller); }
+.vam-view .vam-map-chat button.vam-map-chat-image-mode-button:hover { background: var(--background-modifier-hover); }
+.vam-view .vam-map-chat button.vam-map-chat-image-mode-button[aria-pressed="true"] { background: var(--interactive-accent); color: var(--text-on-accent); font-weight: var(--font-semibold); }
+.vam-view .vam-map-chat button.vam-map-chat-image-mode-button:focus-visible, .vam-view .vam-map-chat button.vam-map-chat-undo-reply:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-view .vam-map-chat-seen { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-view .vam-map-chat button.vam-map-chat-undo-reply { align-self: flex-start; height: auto; margin-top: 6px; padding: 3px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-small); }
+.vam-view .vam-map-chat button.vam-map-chat-undo-reply:hover { background: var(--background-modifier-hover); }
+.vam-view .vam-map-chat button.vam-map-chat-undo-reply:disabled { color: var(--text-faint); cursor: default; }
 .vam-map-chat-plan { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); }
 .vam-map-chat-plan-title { font-weight: var(--font-semibold); }
 .vam-map-chat-plan-group-title { cursor: pointer; font-size: var(--font-ui-small); }

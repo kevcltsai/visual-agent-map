@@ -17,7 +17,7 @@ const PLAIN = (over = {}) => ({ id: 'img2', kind: 'image', path: 'attachments/b.
 /** A fake chat panel: the calls the send makes, recorded, with the busy state a real turn has. */
 function fakeChat(control) {
   const chat = {
-    draft: '', isBusy: false, calls: [], turnsList: [], plans: [], lines: [], transcript: [],
+    draft: '', isBusy: false, marks: [], calls: [], turnsList: [], plans: [], lines: [], transcript: [],
     attachments: () => [], currentNote: () => null, turns: () => [], pendingPlan: () => chat.plans.find(p => p.state === 'pending') ?? null,
     begin(message, origin, again, stage) { chat.isBusy = true; const turn = { message, origin }; chat.turnsList.push(turn); chat.transcript.push({ role: 'user', text: message, origin }); chat.calls.push(['begin', message, stage]); return turn; },
     hasTurn: turn => chat.turnsList.includes(turn),
@@ -28,6 +28,7 @@ function fakeChat(control) {
     markStopped() { chat.isBusy = false; chat.calls.push(['stopped']); },
     showPlan(card) { chat.plans.push(card); chat.calls.push(['plan']); },
     settlePlan(card, state, lines) { card.state = state; chat.calls.push(['settle', state]); if (lines) chat.lines.push(lines); },
+    markTurn(extra) { chat.marks.push(extra); }, refreshReplyUndo() {},
     setApplying() {}, focusInput() {}, reset() {}
   };
   return chat;
@@ -382,4 +383,76 @@ test('D7 selection: a picture that is gone when the message is sent is simply no
   await h.edit(items => items.filter(i => i.id !== 'img1'));
   await h.send('hello');
   assert.equal(h.control.reads, 0); assert.equal(h.control.requests[0].context.selectedImage, undefined);
+});
+
+// ---- P4a: the chat panel's switch, "AI looked at this picture" and "Undo this reply" (the view side) ----------------------------
+const placeAnchor = [addAnchor('p1', 0.6, 0.6, 'Brisket')];
+
+test('P4a mode: chatImageMode reads the setting (preview unless "direct"); the host switch remembers it at once', async () => {
+  const h = await harness();
+  let saves = 0; h.plugin.saveSettings = async () => { saves++; };
+  const host = h.view.chatHost();
+  assert.equal(host.imageMode(), 'preview');
+  host.setImageMode('direct');
+  assert.equal(h.plugin.settings.mapChatImageMode, 'direct'); assert.equal(saves, 1, 'saved right after the switch');
+  assert.equal(host.imageMode(), 'direct');
+  host.setImageMode('direct'); assert.equal(saves, 1, 'no change, no save');
+  h.plugin.settings.mapChatImageMode = 'rubbish'; assert.equal(host.imageMode(), 'preview', 'an unknown value reads as the default');
+  h.select('img1'); assert.equal(host.image().id, 'img1');
+});
+
+test('P4a seen: only a turn that really sent a picture is marked "seen", with the words (or the file name when there are none); the next turn without a picture is not', async () => {
+  const h = await harness();
+  h.control.reply = async () => ({ reply: 'No change', actions: [], rejected: [] });
+  h.select('img1'); await h.send('look');
+  assert.deepEqual(plain(h.chat.marks), [{ seenImage: { note: 'Cow cuts' } }], 'preview mode: seen only, no undo button');
+  await h.edit(items => items.map(i => i.id === 'img1' ? { ...i, note: '' } : i));
+  await h.send('look again');
+  assert.deepEqual(plain(h.chat.marks.at(-1)), { seenImage: { note: 'a.png' } });
+  h.select('img2'); await h.send('ordinary'); // an ordinary picture is never sent as a picture
+  h.view.clearChatImage(); await h.send('no picture');
+  assert.equal(h.chat.marks.length, 2, 'ordinary picture and no picture: no seen line');
+});
+
+test('P4a undo: "apply at once" gives the turn the undo step of its reply; "show me first" never does, nor does a reply that wrote nothing', async () => {
+  const h = await harness();
+  h.plugin.settings.mapChatImageMode = 'direct'; h.select('img1');
+  h.control.reply = async () => ({ reply: 'Placed', actions: placeAnchor, rejected: [] });
+  await h.send('place');
+  const mark = h.chat.marks.at(-1);
+  assert.equal(mark.replyUndo.token, h.view.history.undoEntry, 'the token is the reply step');
+  assert.equal(h.view.chatHost().replyUndoState(mark.replyUndo.token), 'top');
+  h.control.reply = async () => ({ reply: 'Nothing to do', actions: [], rejected: [] });
+  await h.send('again');
+  assert.equal(h.chat.marks.at(-1).replyUndo, undefined, 'a reply that wrote nothing has no button');
+  const p = await harness(); p.select('img1');
+  p.control.reply = async () => ({ reply: 'Placed', actions: placeAnchor, rejected: [] });
+  await p.send('place');
+  assert.equal(p.chat.plans.length, 1); assert.equal(p.chat.marks.every(m => m.replyUndo === undefined), true, 'preview mode: no button');
+  assert.equal(p.view.history.undoEntry, undefined);
+});
+
+test('P4a undo (counter-example): the button undoes one step only while the reply is the newest step; otherwise nothing changes and a Notice says how', async () => {
+  const h = await harness();
+  h.plugin.settings.mapChatImageMode = 'direct'; h.select('img1');
+  h.control.reply = async () => ({ reply: 'Placed', actions: placeAnchor, rejected: [] });
+  await h.send('place');
+  const host = h.view.chatHost(); const token = h.chat.marks.at(-1).replyUndo.token;
+  const placed = plain(await h.saved());
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'later edit' });
+  assert.equal(host.replyUndoState(token), 'other');
+  assert.equal(await host.undoReply(token), 'later');
+  assert.deepEqual(plain(await h.saved()), placed, 'data is unchanged');
+  assert.equal(h.view.history.undoEntry.label, 'later edit', 'no undo step was taken');
+  assert.deepEqual(plain(h.notices), ['Other changes came after this reply. Press Cmd/Ctrl+Z to undo them in order.']);
+  // The later step goes away by hand: now the reply is on top and the button works.
+  await h.view.travel(false);
+  assert.equal(host.replyUndoState(token), 'top');
+  assert.equal(await host.undoReply(token), 'undone');
+  assert.equal((await h.image()).anchors.length, 1, 'the anchor of the reply is gone');
+  assert.equal(host.replyUndoState(token), 'undone', 'undone: the button is disabled');
+  assert.equal(await host.undoReply(token), 'later'); assert.equal(h.notices.length, 1, 'a second press does nothing and says nothing more');
+  await h.view.travel(true);
+  assert.equal(host.replyUndoState(token), 'top', 'redo brings the button back');
+  assert.equal((await h.image()).anchors.length, 2);
 });

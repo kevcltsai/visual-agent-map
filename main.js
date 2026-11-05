@@ -1386,6 +1386,14 @@ var en = {
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
   "ui.map_chat_ref_topic_0": "Topic: {0}",
   "ui.map_chat_ref_selected_0": "Selected: {0}",
+  "ui.map_chat_ref_image_annotated_0": "Selected: annotated image \xB7 {0}",
+  "ui.map_chat_ref_image_plain_0": "Selected: image \xB7 {0}",
+  "ui.map_chat_image_mode_label": "Before AI edits the picture",
+  "ui.map_chat_image_mode_preview": "Show me first",
+  "ui.map_chat_image_mode_direct": "Apply directly",
+  "ui.map_chat_seen_image_0": "AI looked at this picture: {0}",
+  "ui.map_chat_undo_reply": "Undo this reply",
+  "ui.map_chat_undo_reply_later": "Other changes came after this reply. Press Cmd/Ctrl+Z to undo them in order.",
   "ui.map_chat_ref_note_0": "Current note: {0}",
   "ui.map_chat_ref_snippet_0": "Text from {0}",
   "ui.map_chat_ref_text": "Dropped text",
@@ -4111,6 +4119,14 @@ var zhCN = {
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
   "ui.map_chat_ref_topic_0": "\u8BAE\u9898\uFF1A{0}",
   "ui.map_chat_ref_selected_0": "\u5DF2\u9009\u53D6\uFF1A{0}",
+  "ui.map_chat_ref_image_annotated_0": "\u5DF2\u9009\u53D6\uFF1A\u6807\u6CE8\u56FE\u30FB{0}",
+  "ui.map_chat_ref_image_plain_0": "\u5DF2\u9009\u53D6\uFF1A\u56FE\u7247\u30FB{0}",
+  "ui.map_chat_image_mode_label": "AI \u6539\u56FE\u524D",
+  "ui.map_chat_image_mode_preview": "\u5148\u7ED9\u6211\u770B",
+  "ui.map_chat_image_mode_direct": "\u76F4\u63A5\u6539",
+  "ui.map_chat_seen_image_0": "AI \u770B\u4E86\u8FD9\u5F20\u56FE\uFF1A{0}",
+  "ui.map_chat_undo_reply": "\u590D\u539F\u8FD9\u6761\u56DE\u590D",
+  "ui.map_chat_undo_reply_later": "\u8FD9\u6761\u56DE\u590D\u4E4B\u540E\u8FD8\u6709\u5176\u4ED6\u4FEE\u6539\uFF0C\u8BF7\u6309 Cmd\uFF0FCtrl+Z \u4F9D\u5E8F\u590D\u539F\u3002",
   "ui.map_chat_ref_note_0": "\u5F53\u524D\u7B14\u8BB0\uFF1A{0}",
   "ui.map_chat_ref_snippet_0": "{0} \u7684\u6587\u5B57",
   "ui.map_chat_ref_text": "\u62D6\u5165\u7684\u6587\u5B57",
@@ -6836,6 +6852,14 @@ var zhTW = {
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
   "ui.map_chat_ref_topic_0": "\u8B70\u984C\uFF1A{0}",
   "ui.map_chat_ref_selected_0": "\u5DF2\u9078\u53D6\uFF1A{0}",
+  "ui.map_chat_ref_image_annotated_0": "\u5DF2\u9078\u53D6\uFF1A\u6A19\u8A3B\u5716\u30FB{0}",
+  "ui.map_chat_ref_image_plain_0": "\u5DF2\u9078\u53D6\uFF1A\u5716\u7247\u30FB{0}",
+  "ui.map_chat_image_mode_label": "AI \u6539\u5716\u524D",
+  "ui.map_chat_image_mode_preview": "\u5148\u7D66\u6211\u770B",
+  "ui.map_chat_image_mode_direct": "\u76F4\u63A5\u6539",
+  "ui.map_chat_seen_image_0": "AI \u770B\u4E86\u9019\u5F35\u5716\uFF1A{0}",
+  "ui.map_chat_undo_reply": "\u5FA9\u539F\u9019\u5247\u56DE\u8986",
+  "ui.map_chat_undo_reply_later": "\u9019\u5247\u56DE\u8986\u4E4B\u5F8C\u9084\u6709\u5176\u4ED6\u4FEE\u6539\uFF0C\u8ACB\u6309 Cmd\uFF0FCtrl+Z \u4F9D\u5E8F\u5FA9\u539F\u3002",
   "ui.map_chat_ref_note_0": "\u76EE\u524D\u7B46\u8A18\uFF1A{0}",
   "ui.map_chat_ref_snippet_0": "{0} \u7684\u6587\u5B57",
   "ui.map_chat_ref_text": "\u62D6\u5165\u7684\u6587\u5B57",
@@ -24661,6 +24685,9 @@ function normalizeMapChatWidth(value) {
 function normalizeMapChatOpen(value) {
   return value !== false;
 }
+function normalizeMapChatImageMode(value) {
+  return value === "direct" ? "direct" : "preview";
+}
 function resolveMapFolders(saved) {
   const workspace = (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder;
   return {
@@ -24694,6 +24721,7 @@ var DEFAULT_SETTINGS = {
   cliModel: FALLBACK_MODEL,
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
   mapChatOpen: true,
+  mapChatImageMode: "preview",
   cliReasoning: "low",
   previewScale: 120,
   models: "",
@@ -35926,6 +35954,9 @@ var MapChatPanel = class {
     __publicField(this, "sourceEls", /* @__PURE__ */ new WeakMap());
     __publicField(this, "built", false);
     __publicField(this, "stopWatching", null);
+    __publicField(this, "stopWatchingImage", null);
+    __publicField(this, "imageModeEl");
+    __publicField(this, "imageModeButtons", null);
     __publicField(this, "messageEls", []);
     __publicField(this, "bodyEls", []);
     /** The laid-out row of each message with the state it was built from; a message that has not changed keeps its row. */
@@ -36095,10 +36126,12 @@ var MapChatPanel = class {
   }
   /** The view is closing: stop listening for model changes and let go of a resize in progress. */
   dispose() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     (_a2 = this.stopWatching) == null ? void 0 : _a2.call(this);
     this.stopWatching = null;
-    (_b2 = this.stopResizing) == null ? void 0 : _b2.call(this);
+    (_b2 = this.stopWatchingImage) == null ? void 0 : _b2.call(this);
+    this.stopWatchingImage = null;
+    (_c = this.stopResizing) == null ? void 0 : _c.call(this);
     this.cancelFrame();
     this.clearStage();
     this.rows = /* @__PURE__ */ new WeakMap();
@@ -36666,6 +36699,7 @@ ${typed}` : draft;
   }
   // ---- DOM ------------------------------------------------------------------------------------------------------
   build(parent) {
+    var _a2, _b2, _c;
     this.built = true;
     this.el = parent.createDiv({ cls: "vam-map-chat" });
     this.toggleEl = this.el.createEl("button", {
@@ -36724,9 +36758,9 @@ ${typed}` : draft;
       attr: { role: "group", "aria-labelledby": logLabelId, tabindex: "0" }
     });
     const openInternal = (event, from) => {
-      var _a2;
+      var _a3;
       const target = from;
-      const anchor = (_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "a");
+      const anchor = (_a3 = target == null ? void 0 : target.closest) == null ? void 0 : _a3.call(target, "a");
       if (!(anchor == null ? void 0 : anchor.classList.contains("internal-link"))) return;
       const href = anchor.getAttribute("data-href");
       if (!href) return;
@@ -36745,13 +36779,15 @@ ${typed}` : draft;
     });
     this.emptyMapEl.hidden = true;
     this.emptyMapEl.addEventListener("click", () => {
-      var _a2, _b2;
-      return (_b2 = (_a2 = this.host).createEmptyMap) == null ? void 0 : _b2.call(_a2);
+      var _a3, _b3;
+      return (_b3 = (_a3 = this.host).createEmptyMap) == null ? void 0 : _b3.call(_a3);
     });
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
     });
+    this.imageModeEl = this.bodyEl.createDiv({ cls: "vam-map-chat-image-mode" });
+    this.imageModeEl.hidden = true;
     this.hintEl = this.bodyEl.createDiv({ cls: "vam-map-chat-plan-hint" });
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
@@ -36811,6 +36847,8 @@ ${typed}` : draft;
     this.renderLog();
     this.renderBusy();
     this.stopWatching = this.host.watchModels(() => this.refreshControls());
+    this.stopWatchingImage = (_c = (_b2 = (_a2 = this.host).watchImage) == null ? void 0 : _b2.call(_a2, () => this.refreshImage())) != null ? _c : null;
+    this.renderImageMode();
   }
   /**
    * The save button: hidden on the opening screen, and "disabled" (still reachable by keyboard, so its title can be read) while
@@ -37209,10 +37247,82 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (chip.kind === "file") return t("ui.map_chat_ref_file_0", clip2(baseName4(chip.path)));
     return chip.path ? t("ui.map_chat_ref_snippet_0", clip2(baseName4(chip.path))) : t("ui.map_chat_ref_text");
   }
+  /** The picture selection changed: the chip and the switch follow. */
+  refreshImage() {
+    this.renderChips();
+    this.renderImageMode();
+  }
+  /** "Before AI edits the picture" [Show me first | Apply directly]: only while a picture is chosen. */
+  renderImageMode() {
+    var _a2, _b2, _c, _d, _e;
+    if (!this.built) return;
+    const shown = !!((_b2 = (_a2 = this.host).image) == null ? void 0 : _b2.call(_a2)) && !!this.host.setImageMode;
+    this.imageModeEl.hidden = !shown;
+    if (!shown) return;
+    if (!this.imageModeButtons) {
+      this.imageModeEl.createSpan({ cls: "vam-map-chat-image-mode-label", text: t("ui.map_chat_image_mode_label") });
+      const group = this.imageModeEl.createSpan({
+        cls: "vam-map-chat-image-mode-group",
+        attr: { role: "group", "aria-label": t("ui.map_chat_image_mode_label") }
+      });
+      const make = (mode) => {
+        const button = group.createEl("button", {
+          cls: "vam-map-chat-image-mode-button",
+          text: t(`ui.map_chat_image_mode_${mode}`),
+          attr: { type: "button", "aria-pressed": "false" }
+        });
+        button.addEventListener("click", () => {
+          var _a3, _b3, _c2, _d2, _e2;
+          if (((_c2 = (_b3 = (_a3 = this.host).imageMode) == null ? void 0 : _b3.call(_a3)) != null ? _c2 : "preview") === mode) return;
+          (_e2 = (_d2 = this.host).setImageMode) == null ? void 0 : _e2.call(_d2, mode);
+          this.renderImageMode();
+        });
+        return button;
+      };
+      this.imageModeButtons = { preview: make("preview"), direct: make("direct") };
+    }
+    const current = (_e = (_d = (_c = this.host).imageMode) == null ? void 0 : _d.call(_c)) != null ? _e : "preview";
+    for (const mode of ["preview", "direct"]) {
+      const button = this.imageModeButtons[mode];
+      button.setAttr("aria-pressed", String(mode === current));
+      button.toggleClass("is-active", mode === current);
+    }
+  }
+  /** The turn that was just finished sent a picture and/or wrote an undo step: its row says so. */
+  markTurn(extra) {
+    const last = this.messages.at(-1);
+    if (!last || last.role !== "assistant") return;
+    if (extra.seenImage) last.seenImage = { note: extra.seenImage.note };
+    if (extra.replyUndo) last.replyUndo = { token: extra.replyUndo.token };
+    this.renderLog();
+  }
+  /** The undo step of a reply moved (undone, redone, buried): its button follows. */
+  refreshReplyUndo() {
+    var _a2, _b2, _c;
+    if (!this.built) return;
+    for (const message of this.messages) {
+      const button = message.replyUndo ? (_a2 = this.rows.get(message)) == null ? void 0 : _a2.row.querySelector(".vam-map-chat-undo-reply") : null;
+      if (button && message.replyUndo)
+        button.disabled = ((_c = (_b2 = this.host).replyUndoState) == null ? void 0 : _c.call(_b2, message.replyUndo.token)) === "undone";
+    }
+  }
   renderChips() {
+    var _a2, _b2, _c;
     if (!this.built) return;
     this.chipsEl.empty();
     const dragged = new Set(this.chips.filter((chip) => chip.kind === "topic").map((chip) => chip.id));
+    const picture = (_c = (_b2 = (_a2 = this.host).image) == null ? void 0 : _b2.call(_a2)) != null ? _c : null;
+    if (picture) {
+      const name2 = picture.note.trim() || picture.name;
+      const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto is-image" });
+      chip.createSpan({
+        cls: "vam-map-chat-chip-label",
+        text: t(
+          picture.kind === "annotated" ? "ui.map_chat_ref_image_annotated_0" : "ui.map_chat_ref_image_plain_0",
+          clip2(picture.kind === "annotated" ? name2 : picture.name)
+        )
+      });
+    }
     for (const id of this.host.selectedIds()) {
       if (dragged.has(id)) continue;
       const title = this.host.topicTitle(id);
@@ -37263,6 +37373,10 @@ ${shown}` : t("ui.map_chat_model_label"));
       this.stageMessage() === message ? "p" : "",
       this.canRetry(message, asked) ? "r" : "",
       message.linesOpen ? "o" : "",
+      message.seenImage ? `seen:${message.seenImage.note}` : "",
+      message.replyUndo ? "undo" : "",
+      t("ui.map_chat_seen_image_0", ""),
+      t("ui.map_chat_undo_reply"),
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
       t("ui.map_chat_plan_summary_0", ""),
@@ -37340,6 +37454,12 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
     for (const block of (_a2 = message.images) != null ? _a2 : []) this.buildImages(row, block);
+    if (message.seenImage)
+      row.createDiv({
+        cls: "vam-map-chat-seen",
+        text: t("ui.map_chat_seen_image_0", clip2(message.seenImage.note, 80))
+      });
+    if (message.replyUndo) this.buildReplyUndo(row, message.replyUndo.token);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
     if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
@@ -37358,6 +37478,20 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     }
     return { row, body, more };
+  }
+  /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
+  buildReplyUndo(row, token) {
+    var _a2, _b2;
+    const button = row.createEl("button", {
+      cls: "vam-map-chat-undo-reply",
+      text: t("ui.map_chat_undo_reply"),
+      attr: { type: "button" }
+    });
+    button.disabled = ((_b2 = (_a2 = this.host).replyUndoState) == null ? void 0 : _b2.call(_a2, token)) === "undone";
+    button.addEventListener("click", () => {
+      if (button.disabled || !this.host.undoReply) return;
+      void this.host.undoReply(token).then(() => this.refreshReplyUndo());
+    });
   }
   /** The raw error of a failed turn: folded away, selectable and copyable. */
   buildTechnical(row, raw) {
@@ -63655,19 +63789,20 @@ ${request.requirements}` : preset.text,
     }
   }
   updateHistoryButtons() {
-    var _a2, _b2, _c, _d;
-    const undo = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector("[data-history=undo]"), redo = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector("[data-history=redo]");
+    var _a2, _b2, _c, _d, _e;
+    (_a2 = this.chat) == null ? void 0 : _a2.refreshReplyUndo();
+    const undo = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector("[data-history=undo]"), redo = (_c = this.contentEl) == null ? void 0 : _c.querySelector("[data-history=redo]");
     const label = (button, text11) => {
       if (button.dataset.icon) button.setAttr("aria-label", text11);
       else button.setText(text11);
     };
     if (undo) {
       undo.disabled = !this.history.canUndo;
-      label(undo, ((_c = this.history.undoEntry) == null ? void 0 : _c.label) ? t("ui.undo_0", this.history.undoEntry.label) : t("ui.undo"));
+      label(undo, ((_d = this.history.undoEntry) == null ? void 0 : _d.label) ? t("ui.undo_0", this.history.undoEntry.label) : t("ui.undo"));
     }
     if (redo) {
       redo.disabled = !this.history.canRedo;
-      label(redo, ((_d = this.history.redoEntry) == null ? void 0 : _d.label) ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
+      label(redo, ((_e = this.history.redoEntry) == null ? void 0 : _e.label) ? t("ui.redo_0", this.history.redoEntry.label) : t("ui.redo"));
     }
   }
   async synchronize() {
@@ -71071,6 +71206,16 @@ ${note.detail.trim()}` : "",
       width: () => this.chatWidth(),
       widths: (setWidth) => this.chatWidths(setWidth),
       stateChanged: () => this.refreshEmptyMap(),
+      image: () => this.chatImage(),
+      watchImage: (changed) => this.watchChatImage(changed),
+      imageMode: () => this.chatImageMode(),
+      setImageMode: (mode) => {
+        if (this.plugin.settings.mapChatImageMode === mode) return;
+        this.plugin.settings.mapChatImageMode = mode;
+        void this.plugin.saveSettings();
+      },
+      replyUndoState: (token) => this.chatReplyUndoState(token),
+      undoReply: (token) => this.undoChatReply(token),
       setWidth: (width, commit) => {
         if (!commit) return;
         this.plugin.settings.mapChatWidth = clampMapChatWidth(width);
@@ -71264,9 +71409,36 @@ ${note.detail.trim()}` : "",
   isNewestUndoStep(entry) {
     return this.history.undoEntry === entry;
   }
-  /** "AI changes to a picture: show me first" or "apply at once". Until the setting exists (the chat panel's switch) it is always "preview". */
+  /** "AI changes to a picture: show me first" or "apply at once": the chat panel's switch, remembered in the settings. */
   chatImageMode() {
-    return "preview";
+    return normalizeMapChatImageMode(this.plugin.settings.mapChatImageMode);
+  }
+  /** Where the undo step of a written reply is now (see the chat's "Undo this reply" button). */
+  chatReplyUndoState(entry) {
+    if (this.isNewestUndoStep(entry)) return "top";
+    return this.history.redoEntry === entry ? "undone" : "other";
+  }
+  /** Undoes exactly the reply when it is the newest undo step; otherwise nothing changes and the Notice says how to undo in order. */
+  async undoChatReply(entry) {
+    if (this.chatApplying || !this.isNewestUndoStep(entry)) {
+      if (this.chatReplyUndoState(entry) !== "undone") new import_obsidian37.Notice(t("ui.map_chat_undo_reply_later"));
+      return "later";
+    }
+    await this.travel(false);
+    return "undone";
+  }
+  /** What the finished turn tells the panel: the picture it sent ("AI looked at this picture") and, when applied directly, the undo step. */
+  markChatTurn(origin, request, written2) {
+    var _a2, _b2, _c;
+    if (!request.imageDataUrl) return;
+    const picture = this.chatSelectedImage(origin.imageId);
+    const note = (picture == null ? void 0 : picture.selected.kind) === "annotated" ? ((_a2 = picture.selected.note) != null ? _a2 : "").trim() : "";
+    const name2 = picture ? (_b2 = picture.path.split("/").pop()) != null ? _b2 : picture.path : "";
+    const entry = this.chatImageMode() === "direct" ? written2 : void 0;
+    (_c = this.chat) == null ? void 0 : _c.markTurn({
+      seenImage: { note: note || name2 },
+      ...entry ? { replyUndo: { token: entry } } : {}
+    });
   }
   /** The selected picture for the context, as the file is now. A picture that is gone from the map is simply not selected. */
   chatSelectedImage(imageId) {
@@ -71589,6 +71761,7 @@ ${note.detail.trim()}` : "",
               if (plan) {
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
+                  this.markChatTurn(origin, request);
                   this.offerChatPlan(
                     result,
                     plan,
@@ -71606,7 +71779,11 @@ ${note.detail.trim()}` : "",
                 alive,
                 anchor
               );
-              if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+              if (alive() && chat.isBusy) {
+                const entry = this.chatReplyEntry();
+                chat.finish(result.reply, lines);
+                this.markChatTurn(origin, request, entry);
+              }
               return;
             } catch (error) {
               stopWatching();
@@ -83923,6 +84100,7 @@ function settingsFromSaved(saved, appLocale) {
     cliModel: migratedChatModel(saved) || (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel,
     mapChatWidth: normalizeMapChatWidth(saved == null ? void 0 : saved.mapChatWidth),
     mapChatOpen: normalizeMapChatOpen(saved == null ? void 0 : saved.mapChatOpen),
+    mapChatImageMode: normalizeMapChatImageMode(saved == null ? void 0 : saved.mapChatImageMode),
     cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning),
     previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize),
     models: "",

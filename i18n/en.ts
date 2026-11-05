@@ -2995,15 +2995,19 @@ export const en = {
   "ui.settings_selection_ai_name": "Show AI button on selected text",
   "ui.settings_selection_ai_desc": "Still available from the command palette when off.",
   "ui.settings_map_chat_records_name": "Save map AI conversations",
-  "ui.settings_map_chat_records_desc": "Saved in each mind map's folder so you can pick up where you left off, and kept for later analysis. The content includes your notes; VAM does not upload it, but if you sync your vault, the records sync with it.",
+  "ui.settings_map_chat_records_desc":
+    "Saved in each mind map's folder so you can pick up where you left off, and kept for later analysis. The content includes your notes; VAM does not upload it, but if you sync your vault, the records sync with it.",
   "ui.map_chat_records_off_title": "Also delete the saved conversations?",
-  "ui.map_chat_records_off_body_0": "{0} conversations are saved. If you keep them, you can pick them up again after turning this back on.",
+  "ui.map_chat_records_off_body_0":
+    "{0} conversations are saved. If you keep them, you can pick them up again after turning this back on.",
   "ui.map_chat_records_keep": "Keep",
   "ui.map_chat_records_delete_0": "Delete {0} conversations",
-  "ui.map_chat_record_failed": "Could not save the conversation record, so this conversation will not be saved for now.",
+  "ui.map_chat_record_failed":
+    "Could not save the conversation record, so this conversation will not be saved for now.",
   "ui.map_chat_new_conversation": "New conversation",
   "ui.map_chat_restored_0": "Restored the conversation from {0}",
-  "ui.map_chat_record_stale": "No longer valid: this cannot be applied after reopening. Ask again if you still need it.",
+  "ui.map_chat_record_stale":
+    "No longer valid: this cannot be applied after reopening. Ask again if you still need it.",
   "ui.map_chat_record_stale_short": "No longer valid",
   "ui.map_chat_records_delete_failed_0": "{0} conversations could not be deleted.",
   "ui.settings_diagrams_desc": "Adds up to three Mermaid diagrams after writing.",

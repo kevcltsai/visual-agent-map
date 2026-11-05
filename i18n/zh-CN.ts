@@ -2800,7 +2800,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.settings_selection_ai_name": "选中文字时显示 AI 按钮",
   "ui.settings_selection_ai_desc": "关闭后仍可从命令面板使用。",
   "ui.settings_map_chat_records_name": "保存思维导图 AI 对话",
-  "ui.settings_map_chat_records_desc": "存放在每张思维导图的文件夹里，重新打开后可以接着聊，也留作日后分析。内容包含你的笔记；VAM 不会上传，但如果你同步了库，记录会跟着同步。",
+  "ui.settings_map_chat_records_desc":
+    "存放在每张思维导图的文件夹里，重新打开后可以接着聊，也留作日后分析。内容包含你的笔记；VAM 不会上传，但如果你同步了库，记录会跟着同步。",
   "ui.map_chat_records_off_title": "也要删除已保存的对话吗？",
   "ui.map_chat_records_off_body_0": "当前保存了 {0} 段对话。选“保留”的话，之后再打开开关，还能接着聊。",
   "ui.map_chat_records_keep": "保留",

@@ -32,7 +32,10 @@ export class MapChatRecordsOffModal extends Modal {
     this.contentEl.createEl("p", { text: t("ui.map_chat_records_off_body_0", this.count), cls: "vam-modal-intro" });
     const actions = modalActions(this);
     const keep = actions.createEl("button", { text: t("ui.map_chat_records_keep"), cls: "mod-cta" });
-    const remove = actions.createEl("button", { text: t("ui.map_chat_records_delete_0", this.count), cls: "mod-warning" });
+    const remove = actions.createEl("button", {
+      text: t("ui.map_chat_records_delete_0", this.count),
+      cls: "mod-warning"
+    });
     keep.addEventListener("click", () => {
       this.finish(false);
       this.close();

@@ -2801,7 +2801,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.settings_selection_ai_name": "選取文字時顯示 AI 按鈕",
   "ui.settings_selection_ai_desc": "關閉後仍可從命令面板使用。",
   "ui.settings_map_chat_records_name": "保存心智圖 AI 對話",
-  "ui.settings_map_chat_records_desc": "存在每張心智圖的資料夾裡，重新開啟後可以接著聊，也留作日後分析。內容包含你的筆記；VAM 不會上傳，但如果你有同步 Vault，紀錄會跟著同步。",
+  "ui.settings_map_chat_records_desc":
+    "存在每張心智圖的資料夾裡，重新開啟後可以接著聊，也留作日後分析。內容包含你的筆記；VAM 不會上傳，但如果你有同步 Vault，紀錄會跟著同步。",
   "ui.map_chat_records_off_title": "也要刪除已保存的對話嗎？",
   "ui.map_chat_records_off_body_0": "目前保存了 {0} 段對話。選「保留」的話，之後再打開開關，還能接著聊。",
   "ui.map_chat_records_keep": "保留",

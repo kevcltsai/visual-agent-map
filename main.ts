@@ -1728,7 +1728,9 @@ export default class VisualAgentMapPlugin extends Plugin {
       for (const writer of this.mapChatRecordWriters) writer.setEnabled(true);
       return;
     }
-    await turnMapChatRecordsOff({ app: this.app, writers: this.mapChatRecordWriters,
+    await turnMapChatRecordsOff({
+      app: this.app,
+      writers: this.mapChatRecordWriters,
       stillOff: () => !this.settings.mapChatRecords
     });
   }

@@ -12426,7 +12426,10 @@ export class VisualAgentMapView extends ItemView {
   }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot():
-    { map: MapDocument; notes: Map<string, Note>; goal?: string; mapPath: string } | "none" | "aim" | "empty" {
+    | { map: MapDocument; notes: Map<string, Note>; covers: Map<string, string>; goal?: string; mapPath: string }
+    | "none"
+    | "aim"
+    | "empty" {
     if (!this.map || !this.path) return "none";
     if (aimEnabled() && (this.map.aim || this.map.nodes.some(node => node.aimKind !== undefined))) return "aim";
     if (!this.map.nodes.length) return "empty";
@@ -12437,9 +12440,15 @@ export class VisualAgentMapView extends ItemView {
       delete copy.aim;
       copy.nodes = copy.nodes.filter(node => !superseded.has(node.id)).map(node => withoutAimFields(node));
     }
+    const covers = new Map<string, string>();
+    for (const node of copy.nodes) {
+      const cover = this.coverPictureOf(node);
+      if (cover) covers.set(node.id, cover.path);
+    }
     return {
       map: copy,
       notes: new Map(this.notes),
+      covers,
       ...(this.relevanceGoal ? { goal: this.relevanceGoal } : {}),
       mapPath: this.path
     };

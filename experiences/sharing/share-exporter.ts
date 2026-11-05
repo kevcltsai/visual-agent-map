@@ -60,6 +60,8 @@ export interface ShareSource {
   map: MapDocument;
   notes: ReadonlyMap<string, Note>;
   goal?: string;
+  /** topic id -> vault path of the card's cover picture (`topic-cover` or its first embed); the cover is part of what the card shows, so it travels with the note. */
+  covers?: ReadonlyMap<string, string>;
   /** Vault path of the map file (only used to build the leak scan's forbidden strings; never written out). */
   mapPath: string;
 }
@@ -379,18 +381,29 @@ export class ShareExporter {
     return titles;
   }
 
+  /**
+   * The Markdown a topic renders from: its detail with the cover picture on top (a cover lives in the note's front
+   * matter, not in the detail). A cover the detail already embeds is not shown twice. Empty when there is neither.
+   */
+  private renderSource(id: string): string {
+    const detail = this.source.notes.get(id)?.detail?.trim() ? (this.source.notes.get(id)?.detail ?? "") : "";
+    const cover = this.source.covers?.get(id);
+    if (!cover) return detail;
+    const base = cover.split("/").pop() ?? cover;
+    if (detail.includes(cover) || detail.includes(base)) return detail;
+    return `![[${cover}]]\n\n${detail}`;
+  }
+
   /** Renders every note's detail once; later builds reuse the result. */
   async ensureRendered(ticket: BuildTicket, onProgress: (progress: ShareProgress) => void): Promise<void> {
-    const nodes = this.source.map.nodes.filter(
-      node => !this.rendered.has(node.id) && this.source.notes.get(node.id)?.detail?.trim()
-    );
-    const total = this.source.map.nodes.filter(node => this.source.notes.get(node.id)?.detail?.trim()).length;
+    const nodes = this.source.map.nodes.filter(node => !this.rendered.has(node.id) && this.renderSource(node.id));
+    const total = this.source.map.nodes.filter(node => this.renderSource(node.id)).length;
     let done = total - nodes.length;
     const titles = this.titles();
     for (const node of nodes) {
       assertCurrent(ticket);
       onProgress({ phase: "render", done, total });
-      const result = await this.renderOne(this.source.notes.get(node.id)?.detail ?? "", titles, ticket);
+      const result = await this.renderOne(this.renderSource(node.id), titles, ticket);
       assertCurrent(ticket);
       if (this.disposed) return;
       this.rendered.set(node.id, result);

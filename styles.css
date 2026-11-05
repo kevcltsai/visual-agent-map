@@ -82,7 +82,6 @@
 .vam-usage-panel:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-usage-panel[hidden], .vam-usage-panel [hidden] { display: none; }
 .vam-usage-title { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
-.vam-usage-faint { color: var(--text-faint); font-weight: var(--font-normal); font-size: var(--font-ui-smaller); }
 .vam-usage-filter { display: inline-flex; padding: 2px; border-radius: var(--radius-s); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); }
 .vam-usage-filter-option { all: unset; box-sizing: border-box; padding: 2px 9px; border-radius: 4px; font-size: max(11px, var(--font-ui-smaller)); font-weight: var(--font-medium); color: var(--text-muted); cursor: pointer; }
 .vam-usage-filter-option.is-selected { background: var(--background-primary); color: var(--interactive-accent); font-weight: var(--font-bold); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
@@ -101,12 +100,6 @@
 .vam-usage-bar > span:last-child { text-align: right; }
 .vam-usage-fill-track { height: 8px; }
 .vam-usage-fill { height: 8px; border-radius: 4px; background: var(--interactive-accent); }
-.vam-usage-recent { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.vam-usage-recent td { padding: 4px 0; border-top: 1px solid var(--background-modifier-border); vertical-align: top; }
-.vam-usage-recent td:nth-child(1) { width: 42px; }
-.vam-usage-recent td:nth-child(n+3) { padding-left: 8px; text-align: right; white-space: nowrap; }
-.vam-usage-node { display: block; color: var(--text-faint); font-size: max(11px, var(--font-ui-smaller)); }
-.vam-usage-recent td.is-estimated { color: var(--text-warning, var(--color-orange)); }
 .vam-usage-empty, .vam-usage-error { margin: 0; color: var(--text-muted); }
 .vam-usage-error { color: var(--text-error); }
 .vam-usage-foot { padding-top: 8px; border-top: 1px solid var(--background-modifier-border); color: var(--text-faint); font-size: max(11px, var(--font-ui-smaller)); line-height: 1.5; }
@@ -1940,7 +1933,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-node .vam-card-summary-add { opacity: 0; pointer-events: none; margin: 0; color: var(--text-faint); font-size: var(--font-ui-small); font-style: italic; line-height: 1.55; cursor: text; }
 .vam-view .vam-node.is-selected .vam-card-summary-add { opacity: 1; pointer-events: auto; }
 .vam-view .vam-stage[data-presenting] .vam-card-summary-add { opacity: 0; pointer-events: none; }
-.vam-view .vam-node .vam-card-edit-hint { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-view .vam-anchor { position: absolute; z-index: 1; box-sizing: border-box; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0; border: 2px solid var(--interactive-accent); border-radius: 50%; background: transparent; box-shadow: 0 0 0 1px var(--background-primary); cursor: pointer; transition: transform 0.1s ease; }
 .vam-view .vam-anchor.is-preview { border-style: dashed; border-color: var(--interactive-accent); background: color-mix(in srgb, var(--background-primary) 55%, transparent); pointer-events: none; cursor: default; }
 .vam-view .vam-anchor-preview-note { position: absolute; left: 0; top: 100%; margin-top: 6px; font-size: var(--font-ui-smaller); color: var(--text-muted); pointer-events: none; }

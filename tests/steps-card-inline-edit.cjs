@@ -119,6 +119,20 @@ test('click on the title opens the title field in place with the caret at the en
   assert.equal(nothingOpen(h, 'leaf'), true);
 });
 
+test('no key hint line under either field: the card holds only the field, and the hint strings are gone from every language', async () => {
+  const h = await harness(); place(h, 'leaf');
+  press(h, 'leaf', centre(TITLE));
+  assert.ok(titleField(h, 'leaf'), 'title field open');
+  assert.equal(part(h, 'leaf', 'vam-card-edit-hint'), undefined, 'no hint under the title field');
+  keys(titleField(h, 'leaf'), 'Escape'); await tick(); await tick();
+  await withSummary(h, 'leaf', 'Some summary'); place(h, 'leaf');
+  press(h, 'leaf', centre(SUMMARY));
+  assert.ok(summaryField(h, 'leaf'), 'summary field open');
+  assert.equal(part(h, 'leaf', 'vam-card-edit-hint'), undefined, 'no hint under the summary field');
+  const { translate } = load('i18n.ts');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) for (const key of ['ui.card_edit_title_keys', 'ui.card_edit_summary_keys']) assert.equal(translate(lang, key), key, `${lang} ${key} no longer defined`);
+});
+
 test('click on the summary opens a textarea with the whole summary; Enter saves it to the note; Shift+Enter is a new line and saves nothing', async () => {
   const h = await harness(); const long = '第一行很長的摘要。'.repeat(12);
   await withSummary(h, 'leaf', long); place(h, 'leaf');
@@ -261,7 +275,7 @@ const jam = h => {
   const tools = { style: { removeProperty() {}, setProperty() {} }, getBoundingClientRect: () => ({ width: 170, height: 34, left: 0, top: 0, right: 170, bottom: 34 }), toggleClass() {} };
   const search = card.querySelector.bind(card); card.matches = () => false;
   card.querySelector = selector => (selector === ':scope > .vam-node-tools' ? tools : search(selector));
-  // The card sits where the viewport puts it: panning moves it, so a placement settles after a pan or two, as in the app. Each repaint (the field adds its hint line, so the card changes height) also changes where the row fits.
+  // The card sits where the viewport puts it: panning moves it, so a placement settles after a pan or two, as in the app. Each repaint also changes where the row fits.
   card.getBoundingClientRect = () => { const dy = view.map.viewport.y + 290 - 10 * h.renders(); return { left: 5, right: 990, top: 20 + dy, bottom: 790 + dy }; };
   for (const other of h.stage.children) if (other !== card) other.getBoundingClientRect = () => ({ left: 2000, right: 2010, top: 0, bottom: 10 });
   view.viewportEl = { getBoundingClientRect: () => ({ left: 0, right: 1000, top: 0, bottom: 800 }) };

@@ -11,6 +11,15 @@ export function sideFromOffset(dx: number): BalancedSide | undefined {
   return undefined;
 }
 
+/**
+ * The side of a root a text block hanging on it is on. A clear offset decides, as for a card, so a block that grew by
+ * typing keeps its side. Inside the deadband, where a narrow block often sits, its own box decides: left when its right
+ * edge is at or left of the root card's left edge, else right. The layout and the width anchor both use this.
+ */
+export function sideFromTextBox(blockX: number, blockWidth: number, rootX: number): BalancedSide {
+  return sideFromOffset(blockX - rootX) ?? (blockX + blockWidth <= rootX ? "left" : "right");
+}
+
 /** Adds each topic, in order, to the side with the smaller total height so far (the right side wins a tie). */
 export function greedySides<T extends { id: string }>(
   topics: T[],

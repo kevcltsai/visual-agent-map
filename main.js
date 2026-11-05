@@ -52651,6 +52651,7 @@ var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
 var GOAL_BAR_TOOLS_GAP = 8;
 var GOAL_SUGGEST_GAP = 6;
+var GOAL_SUGGEST_BOTTOM_MARGIN = 12;
 var CHAT_EXPAND_LEVELS = 2;
 var CHAT_EXPAND_MAX_TOPICS = 15;
 var chatAppearanceChange = (action) => {
@@ -54996,9 +54997,10 @@ ${request.requirements}` : preset.text,
     panel.setAttr("role", "group");
     panel.setAttr("aria-label", t("ui.goal_suggest_list_label"));
     const boxes = [];
+    const rows2 = panel.createDiv("vam-goal-suggest-rows");
     task.suggestions.forEach((item, index) => {
       var _a3, _b3;
-      const row = panel.createEl("label", { cls: "vam-goal-suggest-row" });
+      const row = rows2.createEl("label", { cls: "vam-goal-suggest-row" });
       const box = row.createEl("input", { type: "checkbox" });
       box.checked = task.checked.has(index);
       box.disabled = applying;
@@ -67891,12 +67893,19 @@ ${note.detail.trim()}` : "",
    * under the bar exactly where the tools would be); without a bar they keep the stylesheet's top.
    */
   syncToolsBelowGoalBar(bar) {
-    var _a2;
+    var _a2, _b2, _c, _d;
     const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
     if (!(tools == null ? void 0 : tools.style)) return;
     let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
     const panel = this.goalSuggestPanelEl;
-    if (bar && panel && panel.isConnected !== false) bottom += GOAL_SUGGEST_GAP + panel.offsetHeight;
+    if (bar && panel && panel.isConnected !== false) {
+      const canvasHeight = (_c = (_b2 = bar.parentElement) == null ? void 0 : _b2.clientHeight) != null ? _c : 0;
+      if (canvasHeight > 0 && typeof ((_d = panel.style) == null ? void 0 : _d.setProperty) === "function") {
+        const room = Math.max(0, canvasHeight - bottom - GOAL_SUGGEST_GAP - GOAL_SUGGEST_BOTTOM_MARGIN);
+        panel.style.setProperty("--vam-goal-suggest-max", `${room}px`);
+      }
+      bottom += GOAL_SUGGEST_GAP + panel.offsetHeight;
+    }
     tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
   }
   /** Obsidian calls this when the pane's size changes. */

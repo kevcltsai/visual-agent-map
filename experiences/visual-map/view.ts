@@ -925,6 +925,8 @@ const CHAT_TOOLS_GAP = 12;
 const GOAL_BAR_TOOLS_GAP = 8;
 /** The suggestion card hangs this far under the goal bar (styles.css: top calc(100% + 6px)). */
 const GOAL_SUGGEST_GAP = 6;
+/** Space kept free between the suggestion card's bottom and the canvas bottom. */
+const GOAL_SUGGEST_BOTTOM_MARGIN = 12;
 /** The size of a chat expand: the Next Step dialog's defaults (levels below the topic, topics in total). */
 const CHAT_EXPAND_LEVELS = 2;
 const CHAT_EXPAND_MAX_TOPICS = 15;
@@ -3444,8 +3446,10 @@ export class VisualAgentMapView extends ItemView {
     panel.setAttr("role", "group");
     panel.setAttr("aria-label", t("ui.goal_suggest_list_label"));
     const boxes: HTMLInputElement[] = [];
+    // The rows scroll inside the card; the footer below stays in view (the card's max-height follows the canvas).
+    const rows = panel.createDiv("vam-goal-suggest-rows");
     task.suggestions.forEach((item, index) => {
-      const row = panel.createEl("label", { cls: "vam-goal-suggest-row" });
+      const row = rows.createEl("label", { cls: "vam-goal-suggest-row" });
       const box = row.createEl("input", { type: "checkbox" });
       box.checked = task.checked.has(index);
       box.disabled = applying;
@@ -17447,7 +17451,15 @@ export class VisualAgentMapView extends ItemView {
     if (!tools?.style) return;
     let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
     const panel = this.goalSuggestPanelEl;
-    if (bar && panel && panel.isConnected !== false) bottom += GOAL_SUGGEST_GAP + panel.offsetHeight;
+    if (bar && panel && panel.isConnected !== false) {
+      // The card must fit the visible canvas: its max-height is what is left under the bar (the rows scroll, the footer stays).
+      const canvasHeight = bar.parentElement?.clientHeight ?? 0;
+      if (canvasHeight > 0 && typeof panel.style?.setProperty === "function") {
+        const room = Math.max(0, canvasHeight - bottom - GOAL_SUGGEST_GAP - GOAL_SUGGEST_BOTTOM_MARGIN);
+        panel.style.setProperty("--vam-goal-suggest-max", `${room}px`);
+      }
+      bottom += GOAL_SUGGEST_GAP + panel.offsetHeight;
+    }
     tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
   }
   /** Obsidian calls this when the pane's size changes. */

@@ -365,3 +365,27 @@ test('goal suggest: zh-TW and zh-CN strings use the product wording (the view re
   assert.equal(translate('zh-CN', 'ui.goal_suggest_add_0', 2), '加入 2 个');
   for (const locale of ['zh-TW', 'zh-CN']) for (const key of ['ui.goal_suggest_list_label', 'ui.goal_suggest_unusable_0', 'ui.goal_suggest_skipped_0', 'ui.goal_suggest_added_0', 'ui.goal_suggest_history_label', 'error.plain_goal_suggest_context']) assert.doesNotMatch(translate(locale, key, 1), /地圖|地图/, key);
 });
+
+test('goal suggest: the card scrolls its rows inside the canvas height and keeps the footer outside the scroll area', async () => {
+  const h = await harness();
+  await h.open();
+  const panel = h.panel();
+  const rowsEl = find(panel, i => hasCls(i, 'vam-goal-suggest-rows'));
+  assert.ok(rowsEl, 'the rows have their own container');
+  assert.equal(h.rows().length, 2); assert.ok(h.rows().every(r => find(rowsEl, i => i === r)), 'every row is inside the scroll container');
+  assert.ok(!find(rowsEl, i => hasCls(i, 'vam-goal-suggest-foot')) && !find(rowsEl, i => i === h.addBtn()) && !find(rowsEl, i => i === h.skipBtn()), 'the footer buttons are outside the scroll container');
+  const bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar'));
+  const tools = element('div'); tools.addClass('vam-map-tools'); h.rootEl.appendChild(tools);
+  // A tall bar (long goal, narrow canvas): 12 + 295 tall in a 774px canvas.
+  Object.assign(bar, { offsetTop: 12, offsetHeight: 295, parentElement: { clientHeight: 774 } });
+  panel.offsetHeight = 300;
+  h.view.syncToolsBelowGoalBar(bar);
+  assert.equal(panel.style['--vam-goal-suggest-max'], `${774 - 307 - 6 - 12}px`, 'max-height is the room under the bar minus the margin');
+  Object.assign(bar, { offsetHeight: 100, parentElement: { clientHeight: 500 } });
+  h.view.syncToolsBelowGoalBar(bar);
+  assert.equal(panel.style['--vam-goal-suggest-max'], `${500 - 112 - 6 - 12}px`, 'follows the canvas size');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-goal-suggest \{[^}]*max-height: var\(--vam-goal-suggest-max/);
+  assert.match(css, /\.vam-goal-suggest-rows \{[^}]*overflow-y: auto/);
+  assert.match(css, /\.vam-goal-suggest-foot \{ flex: none; \}/);
+});

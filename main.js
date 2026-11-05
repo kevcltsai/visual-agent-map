@@ -26578,6 +26578,18 @@ var FOLD_Y = 24;
 var FOLDED = `${EDGE},${EDGE} ${FOLD_X},${EDGE} ${FAR},${FOLD_Y} ${FAR},${FAR} ${EDGE},${FAR}`;
 var FOLD_LINE = `${FOLD_X},${EDGE} ${FOLD_X},${FOLD_Y} ${FAR},${FOLD_Y}`;
 var DIAMOND = `50,${EDGE} ${FAR},50 50,${FAR} ${EDGE},50`;
+function kindIconId(kind) {
+  return `vam-kind-icon-${kind}`;
+}
+function kindIconSvg(kind) {
+  const tag = (name2, attributes, cls = "vam-kind-outline") => `<${name2} class="${cls}" ${Object.entries(attributes).map(([key2, value]) => `${key2}="${value}"`).join(" ")}/>`;
+  const inset = (points) => points.split(" ").map(
+    (pair6) => pair6.split(",").map((value) => String(10 + Number(value) * 0.8)).join(",")
+  ).join(" ");
+  const shape2 = TOPIC_KIND_SHAPES[kind].shape;
+  const drawn = shape2 === "rounded" || shape2 === "rect" ? tag("rect", { x: 10, y: 14, width: 80, height: 72, rx: shape2 === "rect" ? 6 : 20 }) : shape2 === "ellipse" ? tag("circle", { cx: 50, cy: 50, r: 40 }) : shape2 === "diamond" ? tag("polygon", { points: inset(DIAMOND) }) : shape2 === "hexagon" ? tag("polygon", { points: inset(HEXAGON) }) : tag("polygon", { points: inset(FOLDED) }) + tag("polyline", { points: inset(FOLD_LINE) }, "vam-kind-fold");
+  return `<g class="vam-kind-shape vam-kind-icon" data-kind="${kind}">${drawn}</g>`;
+}
 function hasSvgShape(kind) {
   const shape2 = TOPIC_KIND_SHAPES[kind].shape;
   return shape2 !== "rounded" && shape2 !== "rect";
@@ -52345,14 +52357,6 @@ var boxOf = (card) => ({
   width: card.offsetWidth,
   height: card.offsetHeight
 });
-var TOPIC_KIND_ICON = {
-  topic: "circle",
-  action: "square-check",
-  atomic: "atom",
-  hypothesis: "lightbulb",
-  evidence: "file-search",
-  conclusion: "flag"
-};
 var RELATION_KINDS2 = [
   "supports",
   "contradicts",
@@ -53690,6 +53694,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     const menu = new import_obsidian34.Menu();
     this.restoreFocusOnMenuHide(menu, nodeId);
     return menu;
+  }
+  /** A menu that lists topic types is drawn by Obsidian, not the system: a native menu shows no icons, and the shapes are the point. */
+  drawInDom(menu) {
+    var _a2;
+    (_a2 = menu.setUseNativeMenu) == null ? void 0 : _a2.call(menu, false);
   }
   restoreFocusOnMenuHide(menu, nodeId) {
     var _a2;
@@ -55456,9 +55465,10 @@ ${request.requirements}` : preset.text,
     var _a2;
     if (this.presentation) return;
     const menu = this.newMenu();
+    this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
       menu.addItem(
-        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(parent, void 0, true, true, kind))))
+        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(parent, void 0, true, true, kind))))
       );
     if (this.canEditText())
       menu.addItem(
@@ -55469,13 +55479,14 @@ ${request.requirements}` : preset.text,
   }
   openTopicMenu(event) {
     const menu = this.newMenu();
+    this.drawInDom(menu);
     menu.addItem(
       (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
     );
     if (this.relationsEnabled())
       for (const kind of TOPIC_KINDS)
         menu.addItem(
-          (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind))))
+          (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind))))
         );
     menu.showAtMouseEvent(event);
   }
@@ -55657,9 +55668,10 @@ ${request.requirements}` : preset.text,
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   openKindMenu(event, pick) {
     const menu = this.newMenu();
+    this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
       menu.addItem(
-        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => pick(kind))
+        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(kindIconId(kind)).onClick(() => pick(kind))
       );
     menu.showAtMouseEvent(event);
   }
@@ -80343,6 +80355,7 @@ var VisualAgentMapPlugin = class extends import_obsidian45.Plugin {
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
+    for (const kind of TOPIC_KINDS) (0, import_obsidian45.addIcon)(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,

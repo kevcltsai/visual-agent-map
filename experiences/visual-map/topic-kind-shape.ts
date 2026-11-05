@@ -30,6 +30,46 @@ const FOLDED = `${EDGE},${EDGE} ${FOLD_X},${EDGE} ${FAR},${FOLD_Y} ${FAR},${FAR}
 const FOLD_LINE = `${FOLD_X},${EDGE} ${FOLD_X},${FOLD_Y} ${FAR},${FOLD_Y}`;
 const DIAMOND = `50,${EDGE} ${FAR},50 50,${FAR} ${EDGE},50`;
 
+/** The icon id a menu row uses for a type; main.ts registers each one with `addIcon(kindIconId(kind), kindIconSvg(kind))`. */
+export function kindIconId(kind: TopicKind): string {
+  return `vam-kind-icon-${kind}`;
+}
+
+/**
+ * The type's shape as icon markup (Obsidian's 100 x 100 icon box), so a menu row shows the same shape and colour as the card
+ * and the type picker. The shape sits a little inside the box so its stroke is not cut off; styles.css colours it with the card's shape rules.
+ */
+export function kindIconSvg(kind: TopicKind): string {
+  const tag = (name: string, attributes: Record<string, string | number>, cls = "vam-kind-outline") =>
+    `<${name} class="${cls}" ${Object.entries(attributes)
+      .map(([key, value]) => `${key}="${value}"`)
+      .join(" ")}/>`;
+  const inset = (points: string) =>
+    points
+      .split(" ")
+      .map(pair =>
+        pair
+          .split(",")
+          .map(value => String(10 + Number(value) * 0.8))
+          .join(",")
+      )
+      .join(" ");
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  const drawn =
+    shape === "rounded" || shape === "rect"
+      ? tag("rect", { x: 10, y: 14, width: 80, height: 72, rx: shape === "rect" ? 6 : 20 })
+      : shape === "ellipse"
+        ? tag("circle", { cx: 50, cy: 50, r: 40 })
+        : shape === "diamond"
+          ? tag("polygon", { points: inset(DIAMOND) })
+          : shape === "hexagon"
+            ? tag("polygon", { points: inset(HEXAGON) })
+            : tag("polygon", { points: inset(FOLDED) }) +
+              tag("polyline", { points: inset(FOLD_LINE) }, "vam-kind-fold");
+  // The group carries vam-kind-shape, so the card's shape rules draw it (and the share viewer, which skips those, does not).
+  return `<g class="vam-kind-shape vam-kind-icon" data-kind="${kind}">${drawn}</g>`;
+}
+
 /** Whether a type is drawn as an SVG (its card frame and shadow are hidden). */
 export function hasSvgShape(kind: TopicKind): boolean {
   const shape = TOPIC_KIND_SHAPES[kind].shape;

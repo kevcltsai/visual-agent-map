@@ -954,6 +954,7 @@ export const en = {
   "ui.topic_card_label_0_1": "{0}, {1}",
   "ui.researching_0": "Researching {0}",
   "ui.research_progress_0_of_1": "Researched {0} / {1}",
+  "ui.marked_progress_0": "Marked progress {0}%",
   "ui.preview_card_size": "Hover preview size",
   "ui.preview_card_size_desc": "Scale of the note preview shown when you hover a topic on the map.",
   "ui.drag_to_select_topics_hint":

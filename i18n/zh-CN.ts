@@ -897,6 +897,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_card_label_0_1": "{0}，{1}",
   "ui.researching_0": "研究中 {0}",
   "ui.research_progress_0_of_1": "已研究 {0} / {1}",
+  "ui.marked_progress_0": "标记进度 {0}%",
   "ui.preview_card_size": "悬停预览大小",
   "ui.preview_card_size_desc": "在心智图上把鼠标移到议题时，笔记预览卡的缩放比例。",
   "ui.drag_to_select_topics_hint": "拖动框选 · 按住 Option 拖动减选 · 按住空白键拖动或用中键平移 · 点议题加入或移除",

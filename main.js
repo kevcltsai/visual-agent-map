@@ -51898,6 +51898,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     }
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
+      if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
       this.applySelectionChange(this.selection.escape());
       event.preventDefault();
       event.stopPropagation();

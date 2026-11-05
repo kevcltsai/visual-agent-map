@@ -288,6 +288,19 @@ test('arrangeCover: top, bottom, left and right place the cover; calling again o
   assert.ok(!c.classes.some(cls => cls.startsWith('has-cover-')));
 });
 
+test('arrangeCover: a bottom picture goes after the open summary field (and its hint), the add-summary line, or the text when a title field is open', () => {
+  const cardWith = build => { const c = dom.element('div', { cls: 'vam-node' }); const frame = c.createDiv('vam-card-cover'); c.createEl('h3', { cls: 'vam-card-title' }); build(c); c.createDiv('vam-add-child'); return { c, frame }; };
+  const summaryEdit = cardWith(c => { c.createEl('textarea', { cls: 'vam-card-summary-input' }); c.createDiv('vam-card-edit-hint'); });
+  layout.arrangeCover(summaryEdit.c, summaryEdit.frame, 'bottom');
+  assert.deepEqual(order(summaryEdit.c), ['vam-card-title', 'vam-card-summary-input', 'vam-card-edit-hint', 'vam-card-cover', 'vam-add-child'], 'below the field and its hint');
+  const addLine = cardWith(c => c.createEl('p', { cls: 'vam-card-summary-add' }));
+  layout.arrangeCover(addLine.c, addLine.frame, 'bottom');
+  assert.deepEqual(order(addLine.c), ['vam-card-title', 'vam-card-summary-add', 'vam-card-cover', 'vam-add-child'], 'below the add-summary line');
+  const titleEdit = cardWith(c => { c.createEl('input', { cls: 'vam-card-title-input' }); c.createDiv('vam-card-edit-hint'); c.createEl('p', { cls: 'vam-card-summary' }); });
+  layout.arrangeCover(titleEdit.c, titleEdit.frame, 'bottom');
+  assert.deepEqual(order(titleEdit.c), ['vam-card-title', 'vam-card-title-input', 'vam-card-edit-hint', 'vam-card-summary', 'vam-card-cover', 'vam-add-child'], 'a title edit keeps the picture under the summary');
+});
+
 test('arrangeCover: without a summary bottom follows the title; without a cover a side row is taken apart; an unbuilt card just gets the cover', () => {
   const { c, frame } = builtCard();
   c.children = c.children.filter(child => !child.cls.includes('vam-card-summary'));

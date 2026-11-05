@@ -1953,7 +1953,10 @@ export class VisualAgentMapView extends ItemView {
     done: (value: string | null) => void
   ): HTMLInputElement {
     const state = this.inlineName!;
-    const input = parent.createEl("input", { cls, attr: { type: "text", "aria-label": label, dir: "auto" } });
+    const input = parent.createEl("input", {
+      cls,
+      attr: { type: "text", dir: "auto", ...(label ? { "aria-label": label } : {}) }
+    });
     input.value = state.draft;
     let live = true;
     const release = (): void => {
@@ -2044,13 +2047,23 @@ export class VisualAgentMapView extends ItemView {
     this.inlineName = { target: "map", id: "", draft: this.map.title, fresh: true, created: false };
     this.render();
   }
+  /**
+   * Names an edit field for assistive tech without `aria-label`: Obsidian turns every aria-label into a hover tooltip, and
+   * on a field sitting right over the key hint it would cover the hint. A hidden label element carries the same text.
+   */
+  private nameEditField(card: HTMLElement, field: HTMLElement, id: string, label: string): void {
+    const text = card.createSpan({ cls: "vam-sr-only", text: label });
+    text.id = id;
+    field.setAttr("aria-labelledby", id);
+  }
   /** Draws the card title's field in place of the title text. */
   private paintCardNameEdit(card: HTMLElement, node: MapNode, note: Note): HTMLInputElement {
-    const input = this.createInlineNameInput(card, "vam-card-title-input", t("ui.rename_topic"), value => {
+    const input = this.createInlineNameInput(card, "vam-card-title-input", "", value => {
       const name = sanitizeGeneratedTitle(value ?? "").trim();
       if (!name || name === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name }));
     });
+    this.nameEditField(card, input, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
     // A new card's name field is covered by its own flow; the hint is for editing an existing title.
     if (!this.inlineName?.created) card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_title_keys") });
     return input;
@@ -2109,8 +2122,9 @@ export class VisualAgentMapView extends ItemView {
     const state = this.inlineSummary!;
     const area = card.createEl("textarea", {
       cls: "vam-card-summary-input",
-      attr: { "aria-label": t("ui.card_edit_summary_label"), dir: "auto", rows: "1" }
+      attr: { dir: "auto", rows: "1" }
     });
+    this.nameEditField(card, area, `vam-edit-label-${node.id}`, t("ui.card_edit_summary_label"));
     area.value = state.draft;
     let live = true;
     const release = (): void => {
@@ -2122,12 +2136,14 @@ export class VisualAgentMapView extends ItemView {
       state.draft = area.value;
       release();
     };
-    const finish = (save: boolean): void => {
+    const finish = (save: boolean, keepFocus = false): void => {
       if (!live) return;
       const value = area.value.trim();
       release();
       this.inlineSummary = null;
       this.inlineSummaryInput = null;
+      // Enter or Esc hands the keyboard back to the card (leaving by click or Tab goes where the user went).
+      if (keepFocus) this.focusNodeId = node.id;
       if (!save || value === state.original.trim()) this.render();
       else this.enqueue(() => this.noteChange(node, { summary: value }));
     };
@@ -2142,10 +2158,10 @@ export class VisualAgentMapView extends ItemView {
       if (event.isComposing) return;
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        finish(true);
+        finish(true, true);
       } else if (event.key === "Escape") {
         event.preventDefault();
-        finish(false);
+        finish(false, true);
       }
     });
     area.addEventListener("blur", () => finish(true));
@@ -11208,7 +11224,9 @@ export class VisualAgentMapView extends ItemView {
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
-    if (shownNode.height) card.style.height = `${shownNode.height}px`;
+    // A fixed-height card grows while its summary is being typed (otherwise the field would cut the text); saving or Esc repaints it at its height.
+    const typingSummary = this.inlineSummary?.id === node.id;
+    if (shownNode.height && !typingSummary) card.style.height = `${shownNode.height}px`;
     card.tabIndex = node.id === this.selection.state.tabStopId ? 0 : -1;
     card.addEventListener("dragover", event => this.onCardDragOver(event, card, node));
     card.addEventListener("dragleave", event => this.onCardDragLeave(event, card));
@@ -11597,7 +11615,7 @@ export class VisualAgentMapView extends ItemView {
       title.addClass("vam-sr-only");
       this.paintCardNameEdit(card, node, note);
     }
-    // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Edit card".
+    // Double-click on the title opens the inline title field, as F2 does; on the cover picture it opens "Edit card".
     // It is handled on the card: enableDrag captures the pointer on the card, so a real mouse reports the card (not the
     // title or the picture) as the dblclick target.
     if (note && !this.selection.state.multiSelectMode && !this.aimLive())
@@ -11881,7 +11899,7 @@ export class VisualAgentMapView extends ItemView {
     });
     // Bottom, left and right need the whole card (the summary, the text column), so the cover is placed once it is built.
     this.arrangeCardCover(card);
-    if (shownNode.height) this.ensureClipParts(card);
+    if (shownNode.height && !typingSummary) this.ensureClipParts(card);
     this.fitKindShape(card, kind);
   }
   /**
@@ -11903,8 +11921,8 @@ export class VisualAgentMapView extends ItemView {
     const node = this.map?.nodes.find(item => item.id === card.dataset?.nodeId);
     if (!node) return;
     // A card that loses its height is rebuilt by the repaint, so only a set height has a state to refresh here.
-    if (node.height) this.measureClipped(card);
-    else if (card.offsetHeight)
+    if (node.height && card.style.height !== "") this.measureClipped(card);
+    else if (card.offsetHeight && !node.height)
       card
         .querySelector<HTMLElement>(".vam-card-resize-y")
         ?.setAttribute("aria-valuenow", String(clampCardHeight(card.offsetHeight)));
@@ -12163,7 +12181,9 @@ export class VisualAgentMapView extends ItemView {
     // `translate` moves the row in card units before the counter-scale, so it does not disturb the reveal transform.
     if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);
     // A framing action (Show all) is mid-way: its viewport is the answer, so the row stays where it fits instead of moving the canvas.
-    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport) {
+    // Likewise a repaint putting focus back (opening or closing a card's title/summary field redraws the card, which is taller
+    // or shorter by the field and its hint): the user did not navigate, so the canvas must stay where it is.
+    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.restoringFocus) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,
@@ -12678,6 +12698,8 @@ export class VisualAgentMapView extends ItemView {
   }
   private showHoverCard(card: HTMLElement, note: Note): void {
     if (this.presentation) return;
+    // A card being typed in has no preview: it would float over the neighbours and the field's own hint.
+    if (this.inlineName || this.inlineSummary) return;
     // The card is placed against the canvas, not the whole row: the chat window beside it is not part of the map.
     const workspace = this.contentEl.querySelector<HTMLElement>(".vam-canvas");
     if (!workspace) return;

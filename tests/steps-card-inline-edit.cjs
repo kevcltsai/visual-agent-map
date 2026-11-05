@@ -13,13 +13,13 @@ const setSelection = (view, mode, ids = [...view.selection.state.multiSelected])
 };
 const { element, tick } = dom;
 // A card-sized DOM stand-in (one handler per event name, like the view's own selection tests).
-const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, attrs: {}, handlers: new Map(), classes: new Set(String(init.cls ?? '').split(' ').filter(Boolean)), text: init.text, tabIndex: init.tabIndex, checked: false, focused: 0, isConnected: true, closest() { return null; }, setCssProps(props) { Object.assign(this.style, props); }, classList: { add() {}, remove() {}, contains() { return false; } }, offsetLeft: 1e9, offsetTop: 1e9, offsetWidth: 1, offsetHeight: 1,
+const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, attrs: { ...(init.attr ?? {}) }, handlers: new Map(), classes: new Set(String(init.cls ?? '').split(' ').filter(Boolean)), text: init.text, tabIndex: init.tabIndex, checked: false, focused: 0, isConnected: true, closest() { return null; }, setCssProps(props) { Object.assign(this.style, props); }, classList: { add() {}, remove() {}, contains() { return false; } }, offsetLeft: 1e9, offsetTop: 1e9, offsetWidth: 1, offsetHeight: 1,
   createDiv(value) { return this.createEl('div', typeof value === 'string' ? { cls: value } : value); },
   createSpan(value) { return this.createEl('span', typeof value === 'string' ? { cls: value } : value); },
   createEl(name, value = {}) { const child = make(name, value); child.parent = this; this.children.push(child); return child; },
   setAttr(name, value) { this.attrs[name] = value; }, addClass(...names) { names.forEach(name => this.classes.add(name)); }, removeClass(name) { this.classes.delete(name); },
   toggleClass(name, on) { if (on) this.classes.add(name); else this.classes.delete(name); }, addEventListener(name, handler) { this.handlers.set(name, handler); }, removeEventListener() {},
-  setPointerCapture() {}, focus() { this.focused++; make.last = this; },
+  setPointerCapture() {}, focus() { this.focused++; make.last = this; make.onFocus?.(this); },
   select() { this.selectionStart = 0; this.selectionEnd = String(this.value ?? '').length; }, setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
   querySelector(selector) { if (!['.vam-card-title', '.vam-card-summary.is-inline-editable', '.vam-card-summary-add'].includes(selector)) return null; const wanted = selector.split('.').filter(Boolean); return findAll(this, i => i !== this && wanted.every(c => i.classes.has(c)))[0] ?? null; }, querySelectorAll() { return []; }, replaceWith() {}, after() {} });
 const findAll = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(c => findAll(c, predicate))];
@@ -51,7 +51,13 @@ async function harness({ language = 'en' } = {}) {
   const Base = dom.makeModal();
   class Modal extends Base { open() { modals.push(this); super.open(); } }
   const Notice = dom.makeNotice(notices);
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Setting, setTooltip() {} } }, { createFragment: dom.createFragment, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const { default: Plugin, VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Setting, setTooltip() {} } }, { createFragment: dom.createFragment, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  if (language !== 'en') {
+    // This bundle has its own UI language; switch it the way a language change does.
+    const lp = new Plugin(); lp.settings = { ...DEFAULT_SETTINGS, language: 'en' }; lp.saveData = async () => {}; lp.repo = { settings: lp.settings };
+    lp.views = () => []; lp.coffeeViews = () => []; lp.refreshLocalizedEntrypoints = () => {}; lp.settingTab = { update() {}, refreshAfterLanguageChange() {} };
+    await lp.changeLanguage(language);
+  }
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
@@ -228,4 +234,96 @@ test('the card right-click menu and the "More" tool menu no longer list Rename',
   let more = null; h.view.openCardMoreMenu = (_event, _node, entries) => { more = entries; };
   const tool = findAll(h.card('leaf'), i => i.classes.has('vam-more-tool'))[0]; tool.handlers.get('click')({ stopPropagation() {} });
   assert.ok(more && more.length > 0 && !more.some(m => m.title === 'Rename'), 'More has no Rename');
+});
+
+// Accessible name of an edit field: aria-label, or the text of the element aria-labelledby points to.
+const accessibleName = (h, key, field) => field.attrs['aria-label'] ?? findAll(h.card(key), i => i.id && i.id === field.attrs['aria-labelledby'])[0]?.text;
+
+test('bug bash #27 (moved from map-chat): the existing card\'s title field is named 重新命名 (zh-TW) by ui.rename_topic, not the new-topic label; the summary field has its own name; neither uses aria-label (no hover tooltip over the hint)', async () => {
+  const h = await harness({ language: 'zh-TW' }); const { translate } = load('i18n.ts'); place(h, 'leaf');
+  h.view.startCardTitleEdit(h.view.map.nodes.find(n => n.id === h.ids.leaf), { select: true });
+  const title = titleField(h, 'leaf'); assert.ok(title, 'the title field is open');
+  assert.equal(accessibleName(h, 'leaf', title), '重新命名'); assert.equal(accessibleName(h, 'leaf', title), translate('zh-TW', 'ui.rename_topic'));
+  assert.notEqual(accessibleName(h, 'leaf', title), translate('zh-TW', 'ui.new_topic'), 'not the new-topic label');
+  assert.equal(title.attrs['aria-label'], undefined, 'no aria-label: Obsidian would show it as a tooltip over the key hint');
+  keys(title, 'Escape');
+  h.view.startCardSummaryEdit(h.view.map.nodes.find(n => n.id === h.ids.leaf));
+  const area = summaryField(h, 'leaf'); assert.equal(accessibleName(h, 'leaf', area), translate('zh-TW', 'ui.card_edit_summary_label')); assert.equal(area.attrs['aria-label'], undefined);
+});
+
+// A stand-in for the geometry the tool row is placed by: a card jammed in a corner of the canvas, where no spot fits, so a real placement pans.
+const jam = h => {
+  const view = h.view, card = h.card('leaf');
+  const tools = { style: { removeProperty() {}, setProperty() {} }, getBoundingClientRect: () => ({ width: 170, height: 34, left: 0, top: 0, right: 170, bottom: 34 }), toggleClass() {} };
+  const search = card.querySelector.bind(card); card.matches = () => false;
+  card.querySelector = selector => (selector === ':scope > .vam-node-tools' ? tools : search(selector));
+  // The card sits where the viewport puts it: panning moves it, so a placement settles after a pan or two, as in the app. Each repaint (the field adds its hint line, so the card changes height) also changes where the row fits.
+  card.getBoundingClientRect = () => { const dy = view.map.viewport.y + 290 - 10 * h.renders(); return { left: 5, right: 990, top: 20 + dy, bottom: 790 + dy }; };
+  for (const other of h.stage.children) if (other !== card) other.getBoundingClientRect = () => ({ left: 2000, right: 2010, top: 0, bottom: 10 });
+  view.viewportEl = { getBoundingClientRect: () => ({ left: 0, right: 1000, top: 0, bottom: 800 }) };
+  view.floatingControlRects = () => [];
+  view.map.viewport = { x: -197, y: -290, zoom: 0.62 };
+  view.transform = () => {};
+  // The browser focuses the field inside the card -> the card's focusin handler measures the tool row (the pan the UI test saw).
+  make.onFocus = el => { if (el.tag === 'input' || el.tag === 'textarea') card.handlers.get('focusin')({ target: el }); };
+  return card;
+};
+
+test('F1 regression: opening and closing the title or summary field (Esc, Enter, blur) does not move the canvas', async () => {
+  const h = await harness(); await withSummary(h, 'leaf', 'some summary'); place(h, 'leaf'); const card = jam(h);
+  try {
+    const at = () => JSON.stringify(h.view.map.viewport);
+    const start = at();
+    // The control: the user selecting this card pans the canvas (twice here) until the tool row fits; then it is stable.
+    for (let i = 0; i < 4; i++) card.handlers.get('focusin')({ target: card });
+    const before = at(); assert.notEqual(before, start, 'the jammed card pans when the user selects it'); card.handlers.get('focusin')({ target: card }); assert.equal(at(), before, 'and then it is settled');
+    press(h, 'leaf', centre(TITLE)); assert.ok(titleField(h, 'leaf'), 'title field open'); assert.equal(at(), before, 'opening the title field');
+    keys(titleField(h, 'leaf'), 'Escape'); assert.equal(at(), before, 'Esc on the title');
+    place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); assert.ok(summaryField(h, 'leaf'), 'summary field open'); assert.equal(at(), before, 'opening the summary field');
+    keys(summaryField(h, 'leaf'), 'Escape'); assert.equal(at(), before, 'Esc on the summary');
+    place(h, 'leaf'); press(h, 'leaf', centre(TITLE)); const input = titleField(h, 'leaf'); input.value = 'Leaf 2'; keys(input, 'Enter'); await tick(); await tick();
+    assert.equal(at(), before, 'Enter on the title (saved)');
+    place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); const area = summaryField(h, 'leaf'); area.value = 'changed'; keys(area, 'Enter'); await tick(); await tick();
+    assert.equal(at(), before, 'Enter on the summary (saved)');
+    place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); summaryField(h, 'leaf').handlers.get('blur')(); await tick(); await tick(); assert.equal(at(), before, 'blur');
+  } finally { make.onFocus = null; }
+});
+
+test('a fixed-height card is not clipped while its summary is being typed: no height, no fade; saving or Esc brings the height back', async () => {
+  const h = await harness(); await withSummary(h, 'leaf', 'some summary'); place(h, 'leaf');
+  const node = h.view.map.nodes.find(n => n.id === h.ids.leaf); node.height = 120; h.build();
+  assert.equal(h.card('leaf').style.height, '120px', 'the set height shows normally'); assert.ok(findAll(h.card('leaf'), i => i.classes.has('vam-card-fade')).length, 'with its fade');
+  place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); assert.ok(summaryField(h, 'leaf'), 'editing');
+  assert.equal(h.card('leaf').style.height, undefined, 'the card grows with the field'); assert.equal(findAll(h.card('leaf'), i => i.classes.has('vam-card-fade')).length, 0, 'no fade over the text');
+  keys(summaryField(h, 'leaf'), 'Escape'); assert.equal(h.card('leaf').style.height, '120px', 'height is back after Esc');
+  place(h, 'leaf'); press(h, 'leaf', centre(TITLE)); assert.equal(h.card('leaf').style.height, '120px', 'a title edit leaves the height alone');
+});
+
+test('while a card is being edited its hover preview is not shown (it would float over the neighbours)', async () => {
+  const h = await harness(); place(h, 'leaf'); let shown = 0;
+  h.view.contentEl = { querySelector: () => { shown++; return null; } };
+  const note = h.view.notes.get(h.ids.leaf);
+  h.view.showHoverCard(h.card('leaf'), note); assert.equal(shown, 1, 'without an edit the preview looks for its canvas');
+  h.view.startCardTitleEdit(h.view.map.nodes.find(n => n.id === h.ids.leaf)); h.view.showHoverCard(h.card('leaf'), note); assert.equal(shown, 1, 'title edit: no preview');
+  keys(titleField(h, 'leaf'), 'Escape'); h.view.startCardSummaryEdit(h.view.map.nodes.find(n => n.id === h.ids.leaf)); h.view.showHoverCard(h.card('leaf'), note); assert.equal(shown, 1, 'summary edit: no preview');
+});
+
+test('Enter or Esc in the summary field hands focus back to the card; leaving by blur does not claim it', async () => {
+  const h = await harness(); place(h, 'leaf');
+  for (const [how, expected] of [['Escape', h.ids.leaf], ['Enter', h.ids.leaf], ['blur', null]]) {
+    h.view.focusNodeId = null; place(h, 'leaf'); press(h, 'leaf', centre(HINT)); press(h, 'leaf', centre(HINT));
+    const area = summaryField(h, 'leaf'); assert.ok(area, `editing before ${how}`); h.view.focusNodeId = null;
+    let seen; const render = h.view.render; h.view.render = function () { seen = h.view.focusNodeId; return render.call(this); };
+    if (how === 'blur') area.handlers.get('blur')(); else keys(area, how);
+    await tick(); await tick(); h.view.render = render;
+    assert.equal(seen ?? null, expected, `focus target at the repaint after ${how}`);
+  }
+});
+
+test('the summary field reads like the summary text: same font size and line height (no jump when editing starts)', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '../styles.css'), 'utf8');
+  const rule = selector => css.split('\n').find(line => line.startsWith(selector)) ?? '';
+  const field = rule('.vam-view .vam-node .vam-card-summary-input'), text = rule('.vam-card-summary {');
+  for (const decl of ['font-size: var(--font-ui-small)', 'line-height: 1.55']) { assert.ok(text.includes(decl), `summary has ${decl}`); assert.ok(field.includes(decl), `field has ${decl}`); }
+  assert.ok(!/font:\s*inherit/.test(field), 'not the editor font');
 });

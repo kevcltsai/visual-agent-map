@@ -26013,6 +26013,8 @@ var SIDE_OUTSIDE = [
   "vam-card-fade",
   "vam-card-more"
 ];
+var SUMMARY_ANCHORS = ["vam-card-summary", "vam-card-summary-input", "vam-card-summary-add"];
+var FIELD_ADJUNCTS = ["vam-card-title-input", "vam-sr-only", "vam-card-edit-hint"];
 var POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
 var hasCls = (el, cls) => {
   var _a2, _b2, _c;
@@ -26047,9 +26049,11 @@ function arrangeCover(card, frame, position) {
   }
   card.addClass(`has-cover-${position}`);
   if (position === "bottom") {
-    const after = (_b2 = childWith(card, "vam-card-summary")) != null ? _b2 : title;
+    const after = (_b2 = SUMMARY_ANCHORS.map((cls) => childWith(card, cls)).find((el) => !!el)) != null ? _b2 : title;
     const kids2 = Array.from(card.children);
-    card.insertBefore(frame, (_c = kids2[kids2.indexOf(after) + 1]) != null ? _c : null);
+    let index = kids2.indexOf(after);
+    while (kids2[index + 1] && FIELD_ADJUNCTS.some((cls) => hasCls(kids2[index + 1], cls))) index++;
+    card.insertBefore(frame, (_c = kids2[index + 1]) != null ? _c : null);
     return;
   }
   const side = card.createDiv({ cls: "vam-card-side" });
@@ -53405,7 +53409,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
    */
   createInlineNameInput(parent, cls, label, done) {
     const state = this.inlineName;
-    const input2 = parent.createEl("input", { cls, attr: { type: "text", "aria-label": label, dir: "auto" } });
+    const input2 = parent.createEl("input", {
+      cls,
+      attr: { type: "text", dir: "auto", ...label ? { "aria-label": label } : {} }
+    });
     input2.value = state.draft;
     let live = true;
     const release2 = () => {
@@ -53494,14 +53501,24 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.inlineName = { target: "map", id: "", draft: this.map.title, fresh: true, created: false };
     this.render();
   }
+  /**
+   * Names an edit field for assistive tech without `aria-label`: Obsidian turns every aria-label into a hover tooltip, and
+   * on a field sitting right over the key hint it would cover the hint. A hidden label element carries the same text.
+   */
+  nameEditField(card, field, id, label) {
+    const text11 = card.createSpan({ cls: "vam-sr-only", text: label });
+    text11.id = id;
+    field.setAttr("aria-labelledby", id);
+  }
   /** Draws the card title's field in place of the title text. */
   paintCardNameEdit(card, node, note) {
     var _a2;
-    const input2 = this.createInlineNameInput(card, "vam-card-title-input", t("ui.rename_topic"), (value) => {
+    const input2 = this.createInlineNameInput(card, "vam-card-title-input", "", (value) => {
       const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
       if (!name2 || name2 === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name2 }));
     });
+    this.nameEditField(card, input2, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
     if (!((_a2 = this.inlineName) == null ? void 0 : _a2.created)) card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_title_keys") });
     return input2;
   }
@@ -53557,8 +53574,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     const state = this.inlineSummary;
     const area = card.createEl("textarea", {
       cls: "vam-card-summary-input",
-      attr: { "aria-label": t("ui.card_edit_summary_label"), dir: "auto", rows: "1" }
+      attr: { dir: "auto", rows: "1" }
     });
+    this.nameEditField(card, area, `vam-edit-label-${node.id}`, t("ui.card_edit_summary_label"));
     area.value = state.draft;
     let live = true;
     const release2 = () => {
@@ -53570,12 +53588,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       state.draft = area.value;
       release2();
     };
-    const finish = (save) => {
+    const finish = (save, keepFocus = false) => {
       if (!live) return;
       const value = area.value.trim();
       release2();
       this.inlineSummary = null;
       this.inlineSummaryInput = null;
+      if (keepFocus) this.focusNodeId = node.id;
       if (!save || value === state.original.trim()) this.render();
       else this.enqueue(() => this.noteChange(node, { summary: value }));
     };
@@ -53589,10 +53608,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       if (event.isComposing) return;
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        finish(true);
+        finish(true, true);
       } else if (event.key === "Escape") {
         event.preventDefault();
-        finish(false);
+        finish(false, true);
       }
     });
     area.addEventListener("blur", () => finish(true));
@@ -61901,7 +61920,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -61940,17 +61959,18 @@ ${request.requirements}` : preset.text,
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
-    if (shownNode.height) card.style.height = `${shownNode.height}px`;
+    const typingSummary = ((_e = this.inlineSummary) == null ? void 0 : _e.id) === node.id;
+    if (shownNode.height && !typingSummary) card.style.height = `${shownNode.height}px`;
     card.tabIndex = node.id === this.selection.state.tabStopId ? 0 : -1;
     card.addEventListener("dragover", (event) => this.onCardDragOver(event, card, node));
     card.addEventListener("dragleave", (event) => this.onCardDragLeave(event, card));
     card.addEventListener("drop", (event) => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
-    this.labelCard(card, (_e = note == null ? void 0 : note.title) != null ? _e : t("ui.note_missing"));
+    this.labelCard(card, (_f = note == null ? void 0 : note.title) != null ? _f : t("ui.note_missing"));
     if (this.selection.state.multiSelectMode) {
       const select = header.createEl("input", { type: "checkbox" });
       select.checked = this.selection.state.multiSelected.has(node.id);
-      select.setAttr("aria-label", (_f = note == null ? void 0 : note.title) != null ? _f : node.path);
+      select.setAttr("aria-label", (_g = note == null ? void 0 : note.title) != null ? _g : node.path);
       select.tabIndex = -1;
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
@@ -61959,10 +61979,10 @@ ${request.requirements}` : preset.text,
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
-    const research = (_g = this.plugin.researchProgress) == null ? void 0 : _g.get(node.path);
+    const research = (_h = this.plugin.researchProgress) == null ? void 0 : _h.get(node.path);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
-    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_h = this.plugin.quickExpandPending) == null ? void 0 : _h.has(node.path)) || this.startingTasks.has(node.path);
+    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_i = this.plugin.quickExpandPending) == null ? void 0 : _i.has(node.path)) || this.startingTasks.has(node.path);
     const doc = this.map, aimData = doc == null ? void 0 : doc.aim;
     const aimProgress = aimEnabled() && !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
@@ -61995,7 +62015,7 @@ ${request.requirements}` : preset.text,
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== (isAimNode(node) ? "completed" : "idea") || active || queued) {
         const chip = header.createSpan({
-          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_i = note == null ? void 0 : note.status) != null ? _i : "error"}`,
+          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_j = note == null ? void 0 : note.status) != null ? _j : "error"}`,
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
@@ -62006,7 +62026,7 @@ ${request.requirements}` : preset.text,
         else this.labelCard(card, note.title);
       }
     }
-    const relevance = !node.aimKind && !((_j = this.map) == null ? void 0 : _j.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_k = this.map) == null ? void 0 : _k.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -62016,14 +62036,14 @@ ${request.requirements}` : preset.text,
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button) => this.openRelevanceMenu(node, relevance.tier, button),
-        ((_k = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _k.status) === "running"
+        ((_l = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _l.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian34.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_l = cardLabels.get(card)) == null ? void 0 : _l.textContent;
+      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (kind !== "topic") {
@@ -62032,7 +62052,7 @@ ${request.requirements}` : preset.text,
       const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength && leaning) renderHypothesisTag(header, leaning, strength, kindText);
       else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
+      const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header, node.id);
@@ -62042,7 +62062,7 @@ ${request.requirements}` : preset.text,
     this.paintCardStyle(card, note, isAimNode(node));
     if (header) this.paintAiLock(card, header, node);
     const errorDetails = [];
-    if ((_n = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _n.length) {
+    if ((_o = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _o.length) {
       const issue2 = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
@@ -62054,8 +62074,8 @@ ${request.requirements}` : preset.text,
       if (failure.technical) technicalDetails.push(failure.technical);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_o = this.map) == null ? void 0 : _o.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_p = this.notes.get(currentNode.id)) == null ? void 0 : _p.title : void 0;
+      const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -62082,16 +62102,16 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_r = this.plugin.expansionCoordinator) == null ? void 0 : _r.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_s = this.plugin.quickExpandPending) == null ? void 0 : _s.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
+    const parentNode = node.parentId ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.id === node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_s = this.plugin.expansionCoordinator) == null ? void 0 : _s.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
         t(
           stopLabelKey(
             this.plugin.topicRuns.runKind(node.path),
-            !!((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)),
+            !!((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)),
             this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
           )
         ),
@@ -62108,7 +62128,7 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_v = (_u = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _u.length) != null ? _v : 0;
+    const pendingCount = (_w = (_v = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _v.length) != null ? _w : 0;
     if (pendingCount && !this.selection.state.multiSelectMode && !this.aimLive())
       this.button(
         header,
@@ -62181,13 +62201,13 @@ ${request.requirements}` : preset.text,
             action: () => this.whenEditing(() => this.selectSubtopics(node))
           });
       }
-      if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim) && node.aimKind === "question")
+      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "question")
         more.push({
           title: t("ui.remove_from_map"),
           icon: "trash",
           action: () => this.whenEditing(() => this.confirmRemoveNode(node))
         });
-      if (aimEnabled() && ((_x = this.map) == null ? void 0 : _x.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -62199,7 +62219,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (aimEnabled() && ((_y = this.map) == null ? void 0 : _y.aim) && assumptions.length) {
+      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -62211,7 +62231,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (aimEnabled() && ((_z = this.map) == null ? void 0 : _z.aim) && node.aimKind === "conclusion") {
+      if (aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -62246,30 +62266,30 @@ ${request.requirements}` : preset.text,
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const title = card.createEl("h3", { text: (_A = note == null ? void 0 : note.title) != null ? _A : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_B = note == null ? void 0 : note.title) != null ? _B : node.path);
+    const title = card.createEl("h3", { text: (_B = note == null ? void 0 : note.title) != null ? _B : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_C = note == null ? void 0 : note.title) != null ? _C : node.path);
     title.setAttr("dir", "auto");
-    if (note && ((_C = this.inlineName) == null ? void 0 : _C.target) === "card" && this.inlineName.id === node.id) {
+    if (note && ((_D = this.inlineName) == null ? void 0 : _D.target) === "card" && this.inlineName.id === node.id) {
       title.addClass("vam-sr-only");
       this.paintCardNameEdit(card, node, note);
     }
     if (note && !this.selection.state.multiSelectMode && !this.aimLive())
       card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node));
     const textEditable = !!note && this.cardTextEditable();
-    if (textEditable && ((_D = this.inlineSummary) == null ? void 0 : _D.id) === node.id) this.paintCardSummaryEdit(card, node);
-    else if ((_E = research == null ? void 0 : research.preview) == null ? void 0 : _E.summary)
+    if (textEditable && ((_E = this.inlineSummary) == null ? void 0 : _E.id) === node.id) this.paintCardSummaryEdit(card, node);
+    else if ((_F = research == null ? void 0 : research.preview) == null ? void 0 : _F.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (!note || !isPlaceholder(note.summary)) {
       const summaryText2 = card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_H = note == null ? void 0 : note.summary) != null ? _H : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
       if (textEditable) summaryText2.addClass("is-inline-editable");
     }
-    if (textEditable && !((_H = research == null ? void 0 : research.preview) == null ? void 0 : _H.summary) && ((_I = this.inlineSummary) == null ? void 0 : _I.id) !== node.id && isPlaceholder(note.summary))
+    if (textEditable && !((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary) && ((_J = this.inlineSummary) == null ? void 0 : _J.id) !== node.id && isPlaceholder(note.summary))
       card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
-    else if (((_J = this.inlineSummary) == null ? void 0 : _J.id) === node.id && !textEditable) this.inlineSummary = null;
+    else if (((_K = this.inlineSummary) == null ? void 0 : _K.id) === node.id && !textEditable) this.inlineSummary = null;
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
@@ -62283,7 +62303,7 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    if (node.aimKind === "conclusion" && aimEnabled() && ((_K = this.map) == null ? void 0 : _K.aim)) {
+    if (node.aimKind === "conclusion" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -62296,7 +62316,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -62332,11 +62352,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim)) {
+    if (node.aimKind === "question" && aimEnabled() && ((_N = this.map) == null ? void 0 : _N.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_O = (_N = node.aimQuestion) == null ? void 0 : _N.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _O : branch.answerSnapshot.selections;
+        const labels = (_P = (_O = node.aimQuestion) == null ? void 0 : _O.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _P : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -62379,11 +62399,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && aimEnabled() && ((_P = this.map) == null ? void 0 : _P.aim)) {
+    if (node.aimKind === "answer" && aimEnabled() && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_R = (_Q = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _Q.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _R : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -62392,7 +62412,7 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node, (point, wasSelected) => this.openCardTextEditor(point, card, node, wasSelected));
-    if (!this.selection.state.multiSelectMode && !((_S = this.map) == null ? void 0 : _S.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_T = this.map) == null ? void 0 : _T.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -62489,7 +62509,7 @@ ${request.requirements}` : preset.text,
       this.hideHoverCardSoon();
     });
     this.arrangeCardCover(card);
-    if (shownNode.height) this.ensureClipParts(card);
+    if (shownNode.height && !typingSummary) this.ensureClipParts(card);
     this.fitKindShape(card, kind);
   }
   /**
@@ -62514,8 +62534,8 @@ ${request.requirements}` : preset.text,
       return item.id === ((_a3 = card.dataset) == null ? void 0 : _a3.nodeId);
     });
     if (!node) return;
-    if (node.height) this.measureClipped(card);
-    else if (card.offsetHeight)
+    if (node.height && card.style.height !== "") this.measureClipped(card);
+    else if (card.offsetHeight && !node.height)
       (_b2 = card.querySelector(".vam-card-resize-y")) == null ? void 0 : _b2.setAttribute("aria-valuenow", String(clampCardHeight(card.offsetHeight)));
   }
   /**
@@ -62746,7 +62766,7 @@ ${request.requirements}` : preset.text,
     }
     if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
     if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);
-    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport) {
+    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.restoringFocus) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,
@@ -63256,6 +63276,7 @@ ${request.requirements}` : preset.text,
   showHoverCard(card, note) {
     var _a2, _b2, _c, _d, _e, _f;
     if (this.presentation) return;
+    if (this.inlineName || this.inlineSummary) return;
     const workspace = this.contentEl.querySelector(".vam-canvas");
     if (!workspace) return;
     (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();

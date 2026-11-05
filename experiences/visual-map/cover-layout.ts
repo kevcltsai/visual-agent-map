@@ -150,6 +150,10 @@ const SIDE_OUTSIDE = [
   "vam-card-fade",
   "vam-card-more"
 ];
+/** What ends a card's text, first match wins: the summary, the open summary field, the add-summary line. */
+const SUMMARY_ANCHORS = ["vam-card-summary", "vam-card-summary-input", "vam-card-summary-add"];
+/** Siblings that belong to the field just before them while a title or summary is being edited. */
+const FIELD_ADJUNCTS = ["vam-card-title-input", "vam-sr-only", "vam-card-edit-hint"];
 const POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
 
 // Only classList and children are read, so lighter stand-in elements (and cards without a cover) are left alone.
@@ -192,9 +196,14 @@ export function arrangeCover(card: HTMLElement, frame: HTMLElement | null, posit
   }
   card.addClass(`has-cover-${position}`);
   if (position === "bottom") {
-    const after = childWith(card, "vam-card-summary") ?? title;
+    // The summary text, its edit field, or the faint add-summary line (a card with none) is the text's end.
+    const after =
+      SUMMARY_ANCHORS.map(cls => childWith(card, cls)).find((el): el is HTMLElement => !!el) ?? title;
     const kids = Array.from(card.children);
-    card.insertBefore(frame, kids[kids.indexOf(after) + 1] ?? null);
+    let index = kids.indexOf(after);
+    // An open title or summary field brings its hint line; the picture goes below them, not between field and hint.
+    while (kids[index + 1] && FIELD_ADJUNCTS.some(cls => hasCls(kids[index + 1], cls))) index++;
+    card.insertBefore(frame, kids[index + 1] ?? null);
     return;
   }
   const side = card.createDiv({ cls: "vam-card-side" });

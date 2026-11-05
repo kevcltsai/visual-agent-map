@@ -40877,7 +40877,7 @@ var language_en_default2 = "Write the reply, and every title, summary, note text
 var language_zh_default2 = "\u56DE\u8986\uFF0C\u4EE5\u53CA\u4F60\u7522\u751F\u7684\u6240\u6709\u6A19\u984C\u3001\u6458\u8981\u3001\u7B46\u8A18\u6587\u5B57\u8207\u65B0\u6A94\u6848\u6587\u5B57\uFF0C\u8ACB\u4EE5{{language}}\u64B0\u5BEB\u3002\n";
 
 // core/steps/map-chat/steer.en.md
-var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message together with this addition. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
+var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
 
 // core/steps/map-chat/prompt.en.md
 var prompt_en_default6 = `You are the assistant inside a research mind map. The user is talking to you about the map. Answer the user's message in "reply", and, only when the user asked for a change or an action, list actions in "actions". Actions are applied for the user after your reply, in the order you list them: the user's message is the confirmation, except that a long list, a new map or research on many cards is first shown to the user as a plan to approve. Never ask the user in "reply" to approve, confirm or apply anything: the app shows its own Apply and Cancel buttons when a plan is needed, and otherwise the actions simply run. Never say a change has already been made: "reply" only says what you are going to do; the result list the user sees afterwards says what was done. Use future or intention wording ("I'll add ...", "Here is what I will do: ..."), not "I added" or "done". When the user only asks a question, return an empty "actions" list.
@@ -71244,6 +71244,7 @@ ${note.detail.trim()}` : "",
               stopWatching();
               this.releaseChatTask();
               controller.abort();
+              steerState.handler = null;
               attempt = openAttempt();
               chat.restartWaiting();
               wake();
@@ -71364,8 +71365,9 @@ ${note.detail.trim()}` : "",
     if (!this.steerAlive(state)) return;
     state.noLive = !live;
     if (live) return;
+    state.handler = null;
     for (const entry of state.entries) {
-      if (entry.status !== "pending") continue;
+      if (entry.status !== "pending" && entry.status !== "sending" && entry.status !== "delivered") continue;
       entry.status = "queued";
       (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
     }

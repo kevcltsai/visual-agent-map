@@ -652,7 +652,9 @@ test('steer: a call that cannot take one (json, json-fallback, no schema without
   const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
   const runtime = new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn });
   await runtime.runTask('p', 'sonnet', 'low', { type: 'object' }, { stream: true, onSteer: () => { called++; } });
-  assert.equal(called, 1, 'only the first stream-json attempt hands out a steer; the json-fallback rerun does not');
+  // Expected but superseded: the first stream-json attempt hands out a steer handler, then fails; the json-fallback rerun never does.
+  // A steer taken by that first process is lost with it, so the view moves delivered steers back to the queue on the json-fallback event (map-chat suite, B-1).
+  assert.equal(called, 1, 'only the first (superseded) stream-json attempt hands out a steer; the json-fallback rerun does not');
   assert.ok(!children[1].args.includes('--input-format'), 'the json-fallback rerun has no stream-json input');
   assert.equal(runtime.streamUnsupported, true);
 });

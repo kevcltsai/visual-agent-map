@@ -5969,6 +5969,35 @@ integrationTest('map chat steer N5/C9: "Resend" on the slow notice hands the fol
   eq(attempts[1].handled, ['extra'], 'the new attempt got it once'); eq(steerTexts(chat), ['extra']); assert.equal(h.control.requests.length, 2);
 });
 
+integrationTest('map chat steer C9 (resend): a follow-up typed after "Resend" and before the new attempt hands out its handler waits as pending and goes to the new attempt, not to the queue', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = async (_request, signal, _onReply, onProgress, onSteer) => {
+    const attempt = { handled: [], gate: deferred() }; attempts.push(attempt); onProgress({ kind: 'stream-mode', mode: 'stream-json' });
+    if (attempts.length === 1) { onSteer(async text => { attempt.handled.push(text); }); await new Promise(resolve => signal.addEventListener('abort', resolve)); return { reply: 'old', actions: [], rejected: [] }; }
+    attempt.late = () => onSteer(async text => { attempt.handled.push(text); });
+    await attempt.gate.promise; return { reply: 'ok', actions: [], rejected: [] };
+  };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click();
+  await until(() => attempts.length === 2);
+  h.type('typed in between'); pressEnter(chat); await tick(); await tick();
+  eq(attempts[0].handled, [], 'the replaced attempt got nothing'); eq(steerTags(chat), ['Added midway'], 'still live, not queued');
+  attempts[1].late(); await tick(); await tick(); eq(attempts[1].handled, ['typed in between'], 'the new attempt got it once');
+  attempts[1].gate.resolve(); await sending; assert.equal(h.control.requests.length, 2, 'nothing was sent as a separate message');
+});
+
+integrationTest('map chat steer B-1: the CLI rejects the stream flags after a steer was delivered (json-fallback): the steer is queued again, kept out of the history while queued, and sent once after the reply', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); let n = 0; const raw = h.control.reply;
+  h.control.reply = async (...args) => { n++; if (n === 2) return { reply: 'second', actions: [], rejected: [] }; args[3]({ kind: 'stream-mode', mode: 'stream-json' }); return raw(...args); };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick();
+  eq(s.handled, ['extra']); eq(steerTags(chat), ['Added midway']);
+  s.progress({ kind: 'stream-mode', mode: 'json-fallback' }); await tick();
+  eq(steerTags(chat), ['Sends after this reply ends'], 'the delivered steer was lost with the first process, so it waits for the end');
+  s.gate.resolve(); await until(() => h.control.requests.length === 2 && !chat.isBusy);
+  assert.equal(h.control.requests[1].message, 'extra', 'sent once, as its own message'); assert.equal(h.control.requests.length, 2);
+  assert.ok(!/extra/.test(h.control.requests[0].message), 'not part of the first request');
+  assert.equal(chat.transcript().map(m => m.text).filter(m => m === 'extra').length, 1, 'one message, no duplicate bubble');
+});
+
 integrationTest('map chat steer N6/C7/C8: Stop and a failure leave the follow-ups that did not go in in the field, send nothing, keep the ones that did, and Retry asks with them', async () => {
   for (const how of ['stop', 'fail']) {
     const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); let n = 0; const raw = h.control.reply;

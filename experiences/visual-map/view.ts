@@ -19495,6 +19495,8 @@ export class VisualAgentMapView extends ItemView {
               stopWatching();
               this.releaseChatTask();
               controller.abort();
+              // Follow-ups typed before the new attempt hands out its handler wait for it; they are not for the old one.
+              steerState.handler = null;
               attempt = openAttempt();
               chat.restartWaiting();
               wake();
@@ -19630,8 +19632,11 @@ export class VisualAgentMapView extends ItemView {
     if (!this.steerAlive(state)) return;
     state.noLive = !live;
     if (live) return;
+    // json-fallback: the first process (which may already have taken a follow-up) is gone and the rerun never asks for one again,
+    // so what was handed over or is being handed over waits for the end like the rest.
+    state.handler = null;
     for (const entry of state.entries) {
-      if (entry.status !== "pending") continue;
+      if (entry.status !== "pending" && entry.status !== "sending" && entry.status !== "delivered") continue;
       entry.status = "queued";
       this.chat?.setSteerState(entry.steer, "queued");
     }

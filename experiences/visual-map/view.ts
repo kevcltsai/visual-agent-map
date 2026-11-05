@@ -19043,10 +19043,6 @@ export class VisualAgentMapView extends ItemView {
         // The width decides whether the pane has room for the window beside the canvas.
         this.syncChatNarrow();
       },
-      suggestions: () => ({
-        selected: this.chatSelectionIds().length,
-        hasTopics: (this.map?.nodes.length ?? 0) > 0
-      }),
       insertImage: (images, item) => this.chatInsertImage(images, item),
       canSave: () => (!this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true }),
       saveTranscript: turns => this.saveChatTranscript(turns)

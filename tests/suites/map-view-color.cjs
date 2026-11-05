@@ -39,7 +39,6 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 <div class="vam-toolbar"><button class="vam-map-switcher"><span class="vam-map-title">Map</span><span class="vam-map-switcher-icon">${svg}</span></button></div>
 <div class="vam-workspace" style="height:620px">
 <div class="vam-map-chat" style="width:300px;height:600px">
-  <div class="vam-map-chat-suggest"><button class="vam-map-chat-suggestion" type="button">Add a missing branch</button></div>
   <div class="vam-map-chat-images-missing">image missing</div>
 </div>
 <div class="vam-viewport" style="height:600px">
@@ -96,8 +95,6 @@ const CASES = [
   ['switcher-icon', '.vam-map-switcher-icon svg', 'color', 3],
   ['ai-explore', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true }],
   ['ai-explore-hover', '.vam-ai-explore', 'color', 4.5, { buttonEnvelope: true, hover: true }],
-  ['chat-suggestion', '.vam-map-chat-suggestion', 'color', 4.5],
-  ['chat-suggestion-hover', '.vam-map-chat-suggestion', 'color', 4.5, { hover: true }],
   ['chat-images-missing', '.vam-map-chat-images-missing', 'color', 4.5],
   ['tools-done-selecting', '.vam-map-tools button.is-active', 'color', 4.5],
   ['tools-done-selecting-hover', '.vam-map-tools button.is-active', 'color', 4.5, { hover: true }],

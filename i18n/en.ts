@@ -2562,6 +2562,9 @@ export const en = {
   "error.plain_next_signin": "Sign in again in Settings, then try again; a try uses 1 AI call.",
   "error.plain_next_quota": "Wait for the limit to reset or switch provider; a new try uses 1 AI call.",
   "error.plain_card_context": "This card's AI step did not finish",
+  "error.plain_chat_context": "The AI chat did not finish",
+  "error.plain_outline_context": "The outline draft did not finish",
+  "error.plain_review_context": "The structure review did not finish",
   "ui.technical_details": "Technical details",
   "ui.copy_technical_details": "Copy technical details",
   "error.relevance_grade_unavailable":

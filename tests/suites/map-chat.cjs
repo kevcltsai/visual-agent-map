@@ -998,8 +998,24 @@ integrationTest('map chat: service errors become readable chat text and unlock t
   assert.match(await fail(named('over_budget', 'big')), /too large to send/);
   assert.match(await fail(named('invalid', 'bad')), /could not be read/);
   assert.equal(await fail(named('stopped', 'stopped')), 'Stopped.');
-  assert.equal(await fail(new Error('network down')), 'The AI chat failed: network down');
+  assert.match(await fail(new Error('network down')), /^The AI chat did not finish: .*Your map was not changed\./);
   assert.equal(chat.isBusy, false); assert.equal(h.plugin.activeTasks.size, 0);
+});
+
+integrationTest('F40: a failed map chat turn reads as three plain sentences and keeps the raw error only under copyable Technical details', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const raw = '{"type":"error","error":{"type":"invalid_request_error","message":"schema 400"}}';
+  h.control.reply = async () => { throw new Error(raw); }; h.type('go'); await h.view.sendMapChat();
+  const text = chat.transcript().at(-1).text;
+  assert.doesNotMatch(text, /[{}]|invalid_request|schema|400/, 'raw JSON is not in the main message');
+  assert.match(text, /^The AI chat did not finish\. Your map was not changed\. Try again .*1 more AI call/);
+  const details = findAll(chat.el, i => hasClass(i, 'vam-map-chat-error-details'));
+  assert.equal(details.length, 1, 'one folded Technical details block');
+  const parts = findAll(details[0], () => true);
+  assert.ok(parts.some(i => i.text === 'Technical details'), 'summary');
+  assert.ok(parts.some(i => i.text === raw), 'the raw error is kept in it');
+  assert.ok(parts.some(i => i.text === 'Copy technical details'), 'and can be copied');
+  assert.ok(findAll(chat.el, i => hasClass(i, 'vam-map-chat-retry')).length, 'Retry stays');
 });
 
 integrationTest('map chat: a repaint keeps messages, draft and chips, restores focus and caret, and makes room for the panel', async () => {
@@ -3240,7 +3256,7 @@ test('B1 fix 18: a failure is announced once: a text that already says the chat 
 });
 integrationTest('B1 fix 18: the view announces a service failure once', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); h.control.reply = async () => { throw new Error('boom'); };
-  h.type('hi'); await h.view.sendMapChat(); const live = findAll(chat.el, i => hasClass(i, 'vam-sr-only'))[0].text; assert.equal(live, 'The AI chat failed: boom'); assert.equal((live.match(/AI chat failed/g) ?? []).length, 1);
+  h.type('hi'); await h.view.sendMapChat(); const live = findAll(chat.el, i => hasClass(i, 'vam-sr-only'))[0].text; assert.match(live, /^The AI chat did not finish: boom\. Your map was not changed\./); assert.equal((live.match(/did not finish/g) ?? []).length, 1);
 });
 
 integrationTest('B1 fix 20 and 24: the opening screen asks for a topic and hides the old empty hint; a map with content opens the window onto one line of guidance, not a blank log', async () => {

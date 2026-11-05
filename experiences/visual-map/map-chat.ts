@@ -168,6 +168,8 @@ export interface MapChatMessage {
   /** One line per applied, skipped or failed action. */
   lines: MapChatLine[];
   error?: boolean;
+  /** On a failed turn: the raw error text, shown only under a folded "Technical details". */
+  technical?: string;
   streaming?: boolean;
   plan?: MapChatPlanCard;
   choices?: MapChatChoices;
@@ -951,11 +953,12 @@ export class MapChatPanel {
     this.markUnread();
   }
   /** The turn ended without an answer. */
-  fail(text: string, announce?: string): void {
+  fail(text: string, announce?: string, technical?: string): void {
     const last = this.messages.at(-1);
     if (last?.streaming) {
       last.text = text;
       last.error = true;
+      last.technical = technical || undefined;
       last.streaming = false;
     }
     this.busy = false;
@@ -1718,6 +1721,9 @@ export class MapChatPanel {
     return [
       message.role,
       message.error ? "e" : "",
+      message.technical ?? "",
+      t("ui.technical_details"),
+      t("ui.copy_technical_details"),
       message.streaming ? "s" : "",
       // Only whether the stage line is there (its words and seconds change in place, never the row).
       this.stageMessage() === message ? "p" : "",
@@ -1805,6 +1811,7 @@ export class MapChatPanel {
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
@@ -1826,6 +1833,15 @@ export class MapChatPanel {
       });
     }
     return { row, body, more };
+  }
+
+  /** The raw error of a failed turn: folded away, selectable and copyable. */
+  private buildTechnical(row: HTMLElement, raw: string): void {
+    const more = row.createEl("details", { cls: "vam-map-chat-error-details" });
+    more.createEl("summary", { text: t("ui.technical_details") });
+    more.createEl("pre", { text: raw });
+    const copy = more.createEl("button", { text: t("ui.copy_technical_details"), attr: { type: "button" } });
+    copy.addEventListener("click", () => void navigator.clipboard?.writeText(raw));
   }
 
   /** The stage line of the running turn: the stage name, then the seconds (hidden from screen readers; they tick). */

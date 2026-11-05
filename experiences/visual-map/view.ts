@@ -173,7 +173,7 @@ import {
   setTooltip
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
-import { cardFailure } from "../../ai/plain-error";
+import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
@@ -2739,7 +2739,7 @@ export class VisualAgentMapView extends ItemView {
           } catch (error) {
             if (controller.signal.aborted || this.outlineDraftTask !== own || this.closed) return;
             own.state = "failed";
-            own.message = errorMessage(error);
+            own.message = plainFailure(t("error.plain_outline_context"), error);
             new Notice(own.message);
           }
           if (!this.closed) this.render();
@@ -3008,7 +3008,7 @@ export class VisualAgentMapView extends ItemView {
           } catch (error) {
             if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
             own.state = "failed";
-            own.message = errorMessage(error);
+            own.message = plainFailure(t("error.plain_review_context"), error);
             new Notice(own.message);
           }
           if (!this.closed) this.render();
@@ -17360,7 +17360,7 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** The text of a failed turn; `wrapped` when it already says that the chat failed (so a reader is not told twice). */
-  private chatErrorText(error: unknown): { text: string; wrapped: boolean } {
+  private chatErrorText(error: unknown): { text: string; wrapped: boolean; technical?: string } {
     const code =
       (error as { name?: unknown; code?: unknown } | null)?.name === "MapChatError"
         ? (error as { code?: unknown }).code
@@ -17368,7 +17368,12 @@ export class VisualAgentMapView extends ItemView {
     if (code === "over_budget") return { text: t("ui.map_chat_error_over_budget"), wrapped: false };
     if (code === "invalid") return { text: t("ui.map_chat_error_invalid"), wrapped: false };
     if (code === "stopped") return { text: t("ui.map_chat_stopped"), wrapped: false };
-    return { text: t("ui.map_chat_error_failed_0", errorMessage(error)), wrapped: true };
+    // Three plain sentences (what did not finish, the map is unchanged, what next); the raw text only under "Technical details".
+    return {
+      text: plainFailure(t("error.plain_chat_context"), error),
+      wrapped: true,
+      technical: rawErrorText(error) || errorMessage(error)
+    };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
   private async sendMapChat(again?: MapChatOrigin): Promise<void> {
@@ -17560,7 +17565,7 @@ export class VisualAgentMapView extends ItemView {
               if (replaced) continue;
               if (alive()) {
                 const failure = this.chatErrorText(error);
-                chat.fail(failure.text, failure.wrapped ? failure.text : undefined);
+                chat.fail(failure.text, failure.wrapped ? failure.text : undefined, failure.technical);
               }
               return;
             } finally {

@@ -858,7 +858,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.relevance_side": "可跳过",
   "ui.relevance_description_0_1": "{0}：{1}",
   "ui.relevance_goal_0": "目标：{0}",
-  "ui.relevance_goal_set": "依目标排优先",
   "ui.relevance_sort": "依重要度排序",
   "ui.relevance_sorted_suffix": "（已依重要度排序）",
   "ui.relevance_sort_hint":
@@ -866,6 +865,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.relevance_goal_set_hint": "输入目标，AI 替每张卡标必学／需要时学／可跳过",
   "ui.relevance_goal_edit_hint": "修改目标并重新分级",
   "ui.relevance_goal_label": "心智图目标",
+  "ui.goal_suggest_topics": "依目标建议新议题",
+  "ui.goal_edit": "编辑目标",
   "ui.relevance_panel_label": "目标",
   "ui.relevance_goal_placeholder": "你想用这张图达成什么？",
   "ui.relevance_context_label": "补充说明",

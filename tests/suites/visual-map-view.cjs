@@ -4591,3 +4591,45 @@ integrationTest('hypothesis-leaning: styles.css dims a disabled choice with not-
   assert.match(block('.vam-topic-modal .vam-choice-group.vam-hypothesis-strengths'), /repeat\(4,/);
   assert.match(block('.vam-topic-modal .vam-choice-group'), /repeat\(3,/, 'the shared group keeps three columns');
 });
+
+// The goal bar floats over the top centre of the canvas, so every fit/focus/initial-viewport path measures it like the toolbar.
+test('goal bar: canvasInset, canvasInsets, floatingControlRects and topsUnderToolbar all include the bar (the tallest of toolbar and bar wins)', () => {
+  const { view, a } = viewportFixture();
+  a.x = 400; a.y = 20; a.width = 280;
+  const rects = { '.vam-map-tools': { left: 12, top: 12, right: 60, bottom: 50 }, '.vam-goal-bar': { left: 220, top: 12, right: 780, bottom: 110 } };
+  const query = hidden => selector => (rects[selector] && selector !== hidden ? { getBoundingClientRect: () => rects[selector] } : null);
+  view.viewportEl = { clientWidth: 1000, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 1000, bottom: 600 }) };
+  view.contentEl = { querySelector: query('') };
+  view.cardEls = new Map([['a', { offsetHeight: 120 }]]);
+  view.canvasNodes = () => [a];
+  view.map.viewport = { x: 1, y: 0, zoom: 1 };
+  const withBar = view.canvasInset();
+  view.contentEl = { querySelector: query('.vam-goal-bar') };
+  const withoutBar = view.canvasInset();
+  assert.ok(withBar > withoutBar, `the bar (${withBar}) is taller than the toolbar alone (${withoutBar})`);
+  view.contentEl = { querySelector: query('') };
+  assert.equal(view.canvasInsets().top, withBar, 'Show all / focus keep the bar clear too');
+  assert.ok(view.floatingControlRects().some(r => r.left === 220 && r.right === 780), 'a card under the bar counts as obscured');
+  assert.deepEqual([...view.topsUnderToolbar(1)], [20], 'a card drawn under the bar (not under the toolbar) is lifted');
+  view.contentEl = { querySelector: query('.vam-goal-bar') };
+  assert.deepEqual([...view.topsUnderToolbar(1)], [], 'without the bar the same card is clear');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /for \(const selector of \["\.vam-map-tools", "\.vam-goal-bar", "\.vam-zoom-controls", "\.vam-canvas-hint"\]\)/);
+});
+
+test('goal bar: styles keep it above the cards, centred on the visible canvas, wrapping (no ellipsis), icons only on hover or focus, theme variables only', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
+  const bar = rule('.vam-goal-bar');
+  assert.match(bar, /position: absolute;[^}]*top: 12px;[^}]*left: calc\(50% \+ var\(--vam-goal-inset, 0px\) \/ 2\);[^}]*transform: translateX\(-50%\)/, 'centred on the canvas the chat window does not cover');
+  assert.match(bar, /width: min\(560px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\)\)\)/, 'never wider than the visible canvas minus 24px');
+  assert.match(bar, /padding: 14px 18px/); assert.match(bar, /border-radius: 16px/); assert.match(bar, /background: var\(--background-primary\)/); assert.match(bar, /border: 1px solid var\(--background-modifier-border\)/);
+  assert.doesNotMatch(bar, /#[0-9a-f]{3,6}\b/i, 'theme variables, not mock-up hex colours');
+  const text = rule('.vam-goal-text');
+  assert.match(text, /font-size: 1\.2rem;[^}]*font-weight: 800/); assert.match(text, /overflow-wrap: anywhere/); assert.doesNotMatch(text, /text-overflow|ellipsis|white-space: nowrap|overflow: hidden/, 'the goal wraps, never cut');
+  assert.match(rule('.vam-goal-actions'), /display: none/);
+  assert.match(css, /\.vam-goal-bar:hover \.vam-goal-actions, \.vam-goal-bar:focus-within \.vam-goal-actions \{ display: flex; \}/);
+  assert.match(css, /\.vam-goal-bar:hover, \.vam-goal-bar:focus-within \{ border-color: var\(--interactive-accent\); \}/);
+  assert.match(rule('.vam-goal-icon'), /width: 30px; height: 30px/);
+  assert.doesNotMatch(css, /vam-relevance-level|vam-relevance-sort|vam-relevance-grade-button|\.vam-map-tools \.vam-relevance-goal/, 'the old goal pill and panel rules are gone');
+});

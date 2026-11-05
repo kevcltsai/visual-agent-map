@@ -699,6 +699,44 @@ const cardAiLockButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
+type GoalIcon = "target" | "spark" | "refresh" | "sort" | "edit";
+/** The goal bar's own inline icons (drawn like the approved mock-up); colour follows `currentColor`. */
+function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
+  const svg = createSvg("svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const add = (tag: string, attrs: Record<string, string>): void => {
+    const el = createSvg(tag as "path");
+    for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, value);
+    svg.appendChild(el);
+  };
+  const line = { fill: "none", stroke: "currentColor", "stroke-width": "2" };
+  if (kind === "target") {
+    add("circle", { ...line, cx: "12", cy: "12", r: "9" });
+    add("circle", { ...line, cx: "12", cy: "12", r: "5" });
+    add("circle", { ...line, cx: "12", cy: "12", r: "1.5", fill: "currentColor" });
+  } else if (kind === "spark")
+    add("path", {
+      fill: "currentColor",
+      d: [
+        "M12 2l1.8 6.2L20 10l-6.2 1.8L12 18",
+        "l-1.8-6.2L4 10l6.2-1.8z",
+        "M19 15l.9 2.1L22 18l-2.1.9L19 21",
+        "l-.9-2.1L16 18l2.1-.9z"
+      ].join("")
+    });
+  else if (kind === "refresh")
+    add("path", { ...line, "stroke-linecap": "round", d: "M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" });
+  else if (kind === "sort")
+    add("path", {
+      ...line,
+      "stroke-linecap": "round",
+      d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
+    });
+  else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
+  parent.appendChild(svg);
+}
 /** Maps whose cards are displayed sorted by relevance. Memory only: never written to a note or Map.md. */
 const relevanceSortedMaps = new Set<string>();
 /** Path data for the curve from a parent card's right edge to a child card's left edge. */
@@ -940,8 +978,8 @@ export class VisualAgentMapView extends ItemView {
   private readonly relevancePanelId = `vam-relevance-panel-${++relevancePanelSeq}`;
   private relevancePanelOpen = false;
   private relevanceDraft: { goal: string; context: string } | null = null;
-  private relevanceToolsEl: HTMLElement | null = null;
-  private relevanceButtonEl: HTMLButtonElement | null = null;
+  private relevanceBarEl: HTMLElement | null = null;
+  private relevanceButtonEl: HTMLElement | null = null;
   private relevancePanelEl: HTMLElement | null = null;
   private relevancePanelGen = 0;
   private relevancePanelCleanup: (() => void) | null = null;
@@ -3037,17 +3075,22 @@ export class VisualAgentMapView extends ItemView {
     return !!this.map && !this.map.aim && !!this.path;
   }
   /**
-   * One toolbar button, the same level as "Select topics": it shows the goal and opens a panel under it with the goal,
-   * context, a "Grade with this" button and the display-only sort switch.
+   * The goal bar: a chat-input style bar at the top centre of the canvas (not in the toolbar). It shows the goal, big and
+   * wrapped, never cut off; the four icons (suggest topics, recalibrate, sort, edit) show on hover or keyboard focus.
+   * Editing opens a popover under the bar with the goal and the extra context.
    */
-  private renderRelevanceGoalControl(parent: HTMLElement): void {
+  private renderGoalBar(overlay: HTMLElement): void {
     // A repaint drops the old DOM: stop its listeners and make sure its late focus events cannot close the new panel.
     this.relevancePanelGen++;
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
-    this.relevanceToolsEl = parent;
-    this.drawRelevanceButton(parent);
+    const bar = overlay.createDiv({
+      cls: "vam-goal-bar",
+      attr: { role: "group", "aria-label": t("ui.relevance_goal_label") }
+    });
+    this.relevanceBarEl = bar;
+    this.drawGoalBar(bar);
     if (!this.relevancePanelOpen) return;
     if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
       this.relevancePanelOpen = false;
@@ -3061,51 +3104,93 @@ export class VisualAgentMapView extends ItemView {
   private relevanceSortOn(): boolean {
     return this.relevanceGradeable() && relevanceSortedMaps.has(this.path);
   }
-  private drawRelevanceButton(parent: HTMLElement): void {
+  private drawGoalBar(bar: HTMLElement): void {
     const goal = this.relevanceGoal;
     const sorted = this.relevanceSortOn();
-    const label = goal
-      ? t("ui.relevance_goal_0", goal)
-      : t("ui.relevance_goal_set");
-    const button = this.button(parent, label, () => {
+    const running = this.plugin.relevanceGrades.get(this.path)?.status === "running";
+    bar.toggleClass("is-empty", !goal);
+    const target = bar.createSpan("vam-goal-target");
+    target.setAttr("aria-hidden", "true");
+    appendGoalSvg(target, "target");
+    // The text is the bar's one tab stop (always visible, so focus can always return to it). Enter or a click opens the
+    // editor (as the pencil does); pressing it again closes it.
+    const text = bar.createDiv({ cls: "vam-goal-text", attr: { role: "button", tabindex: "0" } });
+    text.setText(goal ?? t("ui.relevance_goal_placeholder"));
+    const label = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_placeholder");
+    text.setAttr("aria-label", sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label);
+    text.setAttr("aria-haspopup", "dialog");
+    text.setAttr("aria-expanded", String(this.relevancePanelOpen));
+    text.setAttr("aria-controls", this.relevancePanelId);
+    text.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
+    const toggleEditor = (): void => {
       if (this.relevancePanelOpen && this.relevancePanelEl) this.closeRelevancePanel(true);
       else this.editRelevanceGoal();
+    };
+    text.addEventListener("click", toggleEditor);
+    text.addEventListener("keydown", event => {
+      if (event.key === "Escape" && this.relevancePanelOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeRelevancePanel(true);
+      } else if ((event.key === "Enter" || event.key === " ") && !event.isComposing) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleEditor();
+      }
     });
-    button.addClass("vam-relevance-goal");
-    button.toggleClass("is-empty", !goal);
-    button.toggleClass("is-sorted", sorted);
-    button.setAttr("aria-haspopup", "dialog");
-    button.setAttr("aria-expanded", String(this.relevancePanelOpen));
-    button.setAttr("aria-controls", this.relevancePanelId);
-    button.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
-    setTooltip(
-      button,
-      goal ? [label, this.relevanceContext].filter(Boolean).join("\n") : t("ui.relevance_goal_set_hint")
-    );
-    // The tooltip helper makes the goal alone the accessible name; keep the "Goal:" label a screen reader needs.
-    button.setAttr("aria-label", sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label);
-    button.disabled = this.plugin.relevanceGrades.get(this.path)?.status === "running";
-    // Pressing the button must not move focus out of an open panel (that would count as leaving it).
-    button.addEventListener("mousedown", event => event.preventDefault());
-    // Focus leaving the button (Shift+Tab off it, or a click elsewhere) to outside the panel closes the panel too.
-    button.addEventListener("focusout", (event: FocusEvent) => {
-      if (!this.relevancePanelOpen || this.relevanceButtonEl !== button) return;
+    // Pressing the text must not move focus out of an open panel (that would count as leaving it).
+    text.addEventListener("mousedown", event => event.preventDefault());
+    // Focus leaving the text (Shift+Tab off it, or a click elsewhere) to outside the panel closes the panel too.
+    text.addEventListener("focusout", (event: FocusEvent) => {
+      if (!this.relevancePanelOpen || this.relevanceButtonEl !== text) return;
       const next = event.relatedTarget as Node | null;
-      if (next && (next === button || this.relevancePanelEl?.contains(next))) return;
+      if (next && (next === text || this.relevancePanelEl?.contains(next))) return;
       this.closeRelevancePanel(false);
     });
-    button.addEventListener("keydown", event => {
-      if (event.key !== "Escape" || !this.relevancePanelOpen || this.relevanceButtonEl !== button) return;
-      event.preventDefault();
-      event.stopPropagation();
-      this.closeRelevancePanel(true);
-    });
-    if (sorted) {
-      const icon = button.createSpan("vam-relevance-sort-icon");
-      icon.setAttr("aria-hidden", "true");
-      setIcon(icon, "arrow-down-wide-narrow");
-    }
-    this.relevanceButtonEl = button;
+    this.relevanceButtonEl = text;
+    const actions = bar.createDiv({ cls: "vam-goal-actions" });
+    const icon = (kind: GoalIcon, name: string, run: () => void, disabled: boolean): HTMLButtonElement => {
+      const button = actions.createEl("button", { cls: "vam-goal-icon" });
+      appendGoalSvg(button, kind);
+      setTooltip(button, name);
+      // The tooltip helper may replace the accessible name; keep the full action name for screen readers.
+      button.setAttr("aria-label", name);
+      button.disabled = disabled;
+      button.addEventListener("click", event => {
+        event.stopPropagation();
+        run();
+      });
+      return button;
+    };
+    // TODO(goal-banner P5): enable and wire this to the suggest-topics flow; until then it stays disabled.
+    icon("spark", t("ui.goal_suggest_topics"), () => {}, true);
+    const mode: RelevanceMode = relevanceMode(
+      { goal: goal ?? "", context: this.relevanceContext ?? "" },
+      { goal, context: this.relevanceContext },
+      this.relevanceAiGrades().length > 0
+    );
+    icon(
+      "refresh",
+      t(mode === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button"),
+      () => {
+        if (goal) void this.submitRelevanceGoal(goal, this.relevanceContext ?? "", mode);
+      },
+      running || !goal
+    );
+    const sort = icon(
+      "sort",
+      t("ui.relevance_sort"),
+      () => {
+        // The sort icon: display only, an in-memory Set, no file write and no refit (a refit saves the viewport into Map.md).
+        if (sorted) relevanceSortedMaps.delete(this.path);
+        else relevanceSortedMaps.add(this.path);
+        this.renderPreservingFocus();
+      },
+      running
+    );
+    sort.setAttr("aria-pressed", String(sorted));
+    sort.toggleClass("on", sorted);
+    icon("edit", t("ui.goal_edit"), () => toggleEditor(), running);
   }
   /**
    * Starts the Claude CLI for the grade the open panel would run (no model call; a Codex model starts nothing). The
@@ -3130,7 +3215,7 @@ export class VisualAgentMapView extends ItemView {
     this.relevancePanelOpen = false;
     this.relevanceDraft = null;
     this.relevanceButtonEl?.setAttr("aria-expanded", "false");
-    if (refocus && !this.relevanceButtonEl?.disabled) this.relevanceButtonEl?.focus();
+    if (refocus) this.relevanceButtonEl?.focus();
   }
   /** Open the goal panel under the toolbar button (no-op while a grading run is going). */
   private editRelevanceGoal(): void {
@@ -3138,7 +3223,7 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
     }
-    if (!this.relevanceToolsEl) {
+    if (!this.relevanceBarEl) {
       new Notice(t("ui.relevance_goal_unavailable_toolbar"));
       return;
     }
@@ -3151,12 +3236,12 @@ export class VisualAgentMapView extends ItemView {
     this.drawRelevancePanel(true);
   }
   /**
-   * The panel holds one group: goal, context and a "Grade with this" button, then the sort switch. Enter in a
-   * text field or the button confirms; Esc, a press outside, or focus leaving the panel closes it without submitting.
-   * Tab inside the panel does not. The sort switch does not close it.
+   * The popover under the goal bar holds exactly two fields: the goal and the extra context (plus "hand all back to AI"
+   * while the user has pinned grades). Enter in a field saves the goal and grades; Esc, a press outside, or focus
+   * leaving the panel closes it without submitting. Tab inside the panel does not.
    */
   private drawRelevancePanel(focus: boolean): void {
-    const tools = this.relevanceToolsEl;
+    const tools = this.relevanceBarEl;
     if (!tools) return;
     this.relevancePanelEl?.remove();
     const gen = ++this.relevancePanelGen;
@@ -3178,13 +3263,12 @@ export class VisualAgentMapView extends ItemView {
     input.maxLength = RELEVANCE_GOAL_MAX_LENGTH;
     input.setAttr("aria-label", t("ui.relevance_goal_label"));
     input.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
-    const row = group.createDiv("vam-relevance-setup-row");
-    const context = row.createEl("input", { cls: "vam-relevance-context-input", type: "text" });
+    const context = group.createEl("input", { cls: "vam-relevance-context-input", type: "text" });
     context.value = draft.context;
     context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
     context.setAttr("aria-label", t("ui.relevance_context_label"));
     context.setAttr("placeholder", t("ui.relevance_context_placeholder"));
-    // One button; its words follow the mode the click would run in (the same pure check the click uses).
+    // The mode Enter would run in (the same pure check the run uses): it only decides which CLI schema to pre-start.
     const pinCount = this.relevancePinList().length;
     const planMode = (): RelevanceMode =>
       relevanceMode(
@@ -3192,17 +3276,12 @@ export class VisualAgentMapView extends ItemView {
         { goal: this.relevanceGoal, context: this.relevanceContext },
         this.relevanceAiGrades().length > 0
       );
-    const submitButton = group.createEl("button", {
-      cls: "vam-relevance-grade-button mod-cta",
-      text: t(planMode() === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button")
-    });
     // Opening the panel pre-starts the CLI for the grade it would run; changing the mode (full or recalibrate) changes
     // the schema, so the process is started again for the new mode.
     let warmedMode = planMode();
     if (focus && this.relevanceGradeable()) this.prewarmRelevance(warmedMode);
     const showMode = (): void => {
       const mode = planMode();
-      submitButton.setText(t(mode === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button"));
       if (mode !== warmedMode) {
         warmedMode = mode;
         if (this.relevanceGradeable()) this.prewarmRelevance(mode);
@@ -3225,23 +3304,6 @@ export class VisualAgentMapView extends ItemView {
         text: t("ui.relevance_unpin_all")
       });
     }
-    // The sort switch: display only, an in-memory Set, no file write and no refit. It never closes the panel.
-    panel.createDiv("vam-relevance-divider");
-    const on = this.relevanceSortOn();
-    const sort = panel.createEl("button", { cls: "vam-relevance-sort" });
-    sort.setAttr("aria-pressed", String(on));
-    const copy = sort.createSpan("vam-relevance-sort-copy");
-    copy.createSpan({ cls: "vam-relevance-sort-title", text: t("ui.relevance_sort") });
-    copy.createSpan({ cls: "vam-relevance-sort-hint", text: t("ui.relevance_sort_hint") });
-    const knob = sort.createSpan({ cls: `checkbox-container vam-relevance-switch${on ? " is-enabled" : ""}` });
-    knob.setAttr("aria-hidden", "true");
-    sort.addEventListener("click", event => {
-      event.stopPropagation();
-      if (on) relevanceSortedMaps.delete(this.path);
-      else relevanceSortedMaps.add(this.path);
-      // Do not refit the view here: that saves the viewport into Map.md, and this toggle must write nothing.
-      this.renderPreservingFocus();
-    });
     let finished = false;
     const alive = (): boolean => !finished && gen === this.relevancePanelGen;
     // Confirm, Esc and leaving the panel close it; an empty goal never reaches the AI.
@@ -3269,35 +3331,20 @@ export class VisualAgentMapView extends ItemView {
     };
     input.addEventListener("keydown", event => keys(event, true));
     context.addEventListener("keydown", event => keys(event, true));
-    submitButton.addEventListener("keydown", event => keys(event, false));
     unpinAllButton?.addEventListener("keydown", event => keys(event, false));
-    sort.addEventListener("keydown", event => keys(event, false));
-    submitButton.addEventListener("click", event => {
-      event.stopPropagation();
-      confirm();
-    });
     unpinAllButton?.addEventListener("click", event => {
       event.stopPropagation();
       finish(false, true);
       this.unpinAllRelevance();
     });
     unpinAllButton?.addEventListener("mousedown", event => event.preventDefault());
-    // Keep focus where it is while the button is pressed, so the pointer press cannot count as leaving the panel.
-    submitButton.addEventListener("mousedown", event => event.preventDefault());
-    sort.addEventListener("mousedown", event => event.preventDefault());
-    for (const control of [
-      input,
-      context,
-      submitButton,
-      ...(unpinAllButton ? [unpinAllButton] : []),
-      sort
-    ])
+    for (const control of [input, context, ...(unpinAllButton ? [unpinAllButton] : [])])
       control.addEventListener("focusout", (event: FocusEvent) => {
         // Only focus moving to a real element outside the panel closes it; null (a repaint, a dialog closing) does not.
         const next = event.relatedTarget as Node | null;
         if (next && !panel.contains(next) && next !== this.relevanceButtonEl) finish(false, false);
       });
-    // A press anywhere else (the canvas, another card) closes it too; the toolbar button toggles it itself.
+    // A press anywhere else (the canvas, another card, a bar icon) closes it too; the bar's text toggles it itself.
     const doc = this.contentEl?.ownerDocument;
     if (doc?.addEventListener) {
       const outside = (event: Event): void => {
@@ -3308,24 +3355,10 @@ export class VisualAgentMapView extends ItemView {
       doc.addEventListener("pointerdown", outside, true);
       this.relevancePanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
     }
-    this.placeRelevancePanel(panel);
     if (focus) {
       input.focus();
       input.select();
     }
-  }
-  /** Keep the panel inside the map overlay: left-aligned under the button, shifted left when it would overflow. */
-  private placeRelevancePanel(panel: HTMLElement): void {
-    const button = this.relevanceButtonEl;
-    const tools = this.relevanceToolsEl;
-    const overlay = tools?.parentElement;
-    if (!button?.getBoundingClientRect || !tools?.getBoundingClientRect || !overlay?.getBoundingClientRect) return;
-    const bounds = overlay.getBoundingClientRect();
-    const width = Math.max(0, Math.min(360, bounds.width - 32));
-    const from = button.getBoundingClientRect().left;
-    const left = Math.min(Math.max(from, bounds.left + 16), bounds.left + bounds.width - 16 - width);
-    panel.style.width = `${width}px`;
-    panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
   }
   private relevanceRunIsCurrent(run: RelevanceGradeRun, mapPath: string): boolean {
     return (
@@ -3369,7 +3402,7 @@ export class VisualAgentMapView extends ItemView {
       if (!this.mapWindowIsActive()) return;
       const target =
         this.contentEl?.querySelector?.(".vam-relevance-statusbar")?.querySelector?.<HTMLElement>("button") ??
-        this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-goal");
+        this.contentEl?.querySelector?.<HTMLElement>(".vam-goal-text");
       target?.focus();
     };
   }
@@ -3386,11 +3419,7 @@ export class VisualAgentMapView extends ItemView {
    * whole map is graded and the result is written in one step. Nothing is written when the AI is declined, stopped,
    * fails or returns anything but exactly one valid grade for every card.
    */
-  private async submitRelevanceGoal(
-    raw: string,
-    contextRaw?: string,
-    planned: RelevanceMode = "full"
-  ): Promise<void> {
+  private async submitRelevanceGoal(raw: string, contextRaw?: string, planned: RelevanceMode = "full"): Promise<void> {
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
@@ -3418,11 +3447,7 @@ export class VisualAgentMapView extends ItemView {
     const repairs: string[] = [];
     try {
       await this.plugin.mutate(async () => {
-        const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(
-          mapPath,
-          goal,
-          context
-        );
+        const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(mapPath, goal, context);
         if (this.path !== mapPath) return;
         this.relevanceGoal = goal;
         this.relevanceContext = context;
@@ -3806,7 +3831,7 @@ export class VisualAgentMapView extends ItemView {
     this.iconButton(bar, "x", t("ui.dismiss"), () => {
       this.plugin.relevanceGrades.delete(this.path);
       this.render();
-      this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-goal")?.focus();
+      this.contentEl?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
     });
   }
   /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
@@ -10752,8 +10777,20 @@ export class VisualAgentMapView extends ItemView {
     canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
+    // The goal bar floats at the top centre of the canvas, above cards and edges. A mind map only, and only once it has
+    // topics: an empty map cannot be graded or sorted, so it shows no bar.
+    if (this.relevanceGradeable() && this.map.nodes.length) this.renderGoalBar(overlay);
+    else {
+      this.relevanceBarEl = null;
+      this.relevanceButtonEl = null;
+      if (this.relevancePanelOpen) {
+        this.relevancePanelOpen = false;
+        this.relevanceDraft = null;
+        this.plugin.releaseWarmClaude?.();
+      }
+    }
     this.mountMapChat(workspace, overlay);
-    if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
+    this.placeGoalBar();
     // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
     // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
     // An empty map shows no gesture hint either: there is nothing to pan to or open yet.
@@ -10906,9 +10943,9 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   /**
-   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics" and the
-   * goal control. An empty map has nothing to select or prioritise, so those two are left out rather than disabled: Tab never
-   * reaches a control that cannot do anything yet. An AIM map has none of them.
+   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics". An empty
+   * map has nothing to select, so that one is left out rather than disabled: Tab never reaches a control that cannot do
+   * anything yet. An AIM map has none of them. The goal lives in its own bar (renderGoalBar).
    */
   private renderMapTools(tools: HTMLElement): void {
     if (!this.map || this.map.aim) return;
@@ -10928,7 +10965,6 @@ export class VisualAgentMapView extends ItemView {
     );
     integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
     if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
-    this.renderRelevanceGoalControl(tools);
   }
   /**
    * The same tools on an old AIM map while AIM is hidden: it is an ordinary map then. A separate method so renderMapTools keeps
@@ -11841,7 +11877,7 @@ export class VisualAgentMapView extends ItemView {
   /** Screen rectangles of the floating controls that cover part of the canvas (toolbar, zoom controls, hint). */
   private floatingControlRects(): { left: number; top: number; right: number; bottom: number }[] {
     const rects = [];
-    for (const selector of [".vam-map-tools", ".vam-zoom-controls", ".vam-canvas-hint"]) {
+    for (const selector of [".vam-map-tools", ".vam-goal-bar", ".vam-zoom-controls", ".vam-canvas-hint"]) {
       const rect = this.contentEl?.querySelector?.<HTMLElement>(selector)?.getBoundingClientRect?.();
       if (rect && rect.right > rect.left && rect.bottom > rect.top) rects.push(rect);
     }
@@ -16635,8 +16671,18 @@ export class VisualAgentMapView extends ItemView {
   /** Safe area under the floating toolbar, measured so a wrapped toolbar is covered too. */
   private canvasInset(): number {
     const canvas = this.viewportEl?.getBoundingClientRect?.();
-    const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools")?.getBoundingClientRect?.();
-    return canvas ? insetFromRects(canvas.top, tools) : 0;
+    return canvas
+      ? Math.max(
+          insetFromRects(
+            canvas.top,
+            this.contentEl?.querySelector<HTMLElement>(".vam-map-tools")?.getBoundingClientRect?.()
+          ),
+          insetFromRects(
+            canvas.top,
+            this.contentEl?.querySelector<HTMLElement>(".vam-goal-bar")?.getBoundingClientRect?.()
+          )
+        )
+      : 0;
   }
   /**
    * The four sides a programmatic viewport (Show all, focus) keeps clear: the toolbar above, the zoom bar below, and an
@@ -16648,7 +16694,10 @@ export class VisualAgentMapView extends ItemView {
     const rectOf = (selector: string) =>
       this.contentEl?.querySelector<HTMLElement>(selector)?.getBoundingClientRect?.();
     return {
-      top: insetFromRects(canvas.top, rectOf(".vam-map-tools")),
+      top: Math.max(
+        insetFromRects(canvas.top, rectOf(".vam-map-tools")),
+        insetFromRects(canvas.top, rectOf(".vam-goal-bar"))
+      ),
       right: 0,
       bottom: bottomInsetFromRects(canvas.bottom, rectOf(".vam-zoom-controls")),
       left: leftInsetFromRects(canvas.left, rectOf(".vam-map-chat.is-overlay"))
@@ -16675,14 +16724,22 @@ export class VisualAgentMapView extends ItemView {
    */
   private topsUnderToolbar(zoomHint: number): number[] {
     const canvas = this.viewportEl?.getBoundingClientRect?.();
-    const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools")?.getBoundingClientRect?.();
-    if (!this.map || !canvas || !tools || !(tools.bottom > tools.top)) return [];
-    const bar = {
-      left: tools.left - canvas.left,
-      right: tools.right - canvas.left,
-      top: tools.top - canvas.top,
-      bottom: tools.bottom - canvas.top
-    };
+    if (!this.map || !canvas) return [];
+    // The toolbar and the goal bar both float over the canvas top.
+    const bars = [".vam-map-tools", ".vam-goal-bar"].flatMap(selector => {
+      const rect = this.contentEl?.querySelector<HTMLElement>(selector)?.getBoundingClientRect?.();
+      return rect && rect.bottom > rect.top
+        ? [
+            {
+              left: rect.left - canvas.left,
+              right: rect.right - canvas.left,
+              top: rect.top - canvas.top,
+              bottom: rect.bottom - canvas.top
+            }
+          ]
+        : [];
+    });
+    if (!bars.length) return [];
     const v = initialViewport(this.map.viewport, this.canvasInset());
     const zoom = v.zoom || zoomHint;
     const tops: number[] = [];
@@ -16691,7 +16748,7 @@ export class VisualAgentMapView extends ItemView {
         top = node.y * zoom + v.y;
       const height = this.cardEls.get(node.id)?.offsetHeight || 180;
       const rect = { left, top, right: left + (node.width ?? CARD_WIDTH) * zoom, bottom: top + height * zoom };
-      if (rectsIntersect(rect, bar)) tops.push(top);
+      if (bars.some(bar => rectsIntersect(rect, bar))) tops.push(top);
     }
     return tops;
   }
@@ -16970,11 +17027,19 @@ export class VisualAgentMapView extends ItemView {
    * so it moves to the window's right edge, as it sits beside a docked window.
    */
   private placeMapTools(): void {
+    this.placeGoalBar();
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
     if (!tools) return;
     // The canvas starts after the 44px edge the laid-over window leaves in place.
     const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
     tools.style.left = left > 0 ? `${left}px` : "";
+  }
+  /** The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. */
+  private placeGoalBar(): void {
+    const bar = this.contentEl?.querySelector<HTMLElement>(".vam-goal-bar");
+    if (!bar) return;
+    const covered = this.chat?.isOverlay ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
+    bar.style.setProperty("--vam-goal-inset", `${covered}px`);
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {

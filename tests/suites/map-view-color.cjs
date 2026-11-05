@@ -54,7 +54,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
     ${card('data-presenting-dim="1"', 700, 60, '<h3 class="vam-card-title">Other topic</h3>')}
     <div class="vam-node is-presenting" style="left:700px;top:260px"><h3 class="vam-card-title">Current topic</h3><p class="vam-card-summary">Current summary</p></div>
   </div>
-  <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button><button class="vam-relevance-goal">Prioritise by goal</button></div><div class="vam-view"><div class="vam-map-search"><input class="vam-map-search-input" type="search" aria-label="Search topics"><span class="vam-map-search-count">3/7</span><button class="vam-map-search-close" aria-label="Close search">x</button></div><div class="vam-node is-search-match" style="position:static;width:120px;height:20px"></div><div class="vam-node is-search-current" style="position:static;width:120px;height:20px"></div><div class="vam-presentation-bar"><span class="vam-presentation-count">3/12</span><button class="vam-presentation-exit">Exit presentation (Esc)</button></div></div></div>
+  <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button></div><div class="vam-goal-bar"><span class="vam-goal-target"></span><div class="vam-goal-text">Learn the basics</div></div><div class="vam-goal-bar is-empty"><div class="vam-goal-text">What do you want to achieve?</div></div><div class="vam-view"><div class="vam-map-search"><input class="vam-map-search-input" type="search" aria-label="Search topics"><span class="vam-map-search-count">3/7</span><button class="vam-map-search-close" aria-label="Close search">x</button></div><div class="vam-node is-search-match" style="position:static;width:120px;height:20px"></div><div class="vam-node is-search-current" style="position:static;width:120px;height:20px"></div><div class="vam-presentation-bar"><span class="vam-presentation-count">3/12</span><button class="vam-presentation-exit">Exit presentation (Esc)</button></div></div></div>
 </div>
 </div>
 <div class="modal vam-next-modal" style="background:var(--background-primary);width:400px"><div class="modal-content"><div class="vam-next-actions"><button class="vam-discard">Remove from map</button></div><div class="vam-share-note vam-share-warning">3 images could not be read</div><div class="vam-share-note vam-share-error">Share failed</div><div class="vam-share-error">Save failed</div>
@@ -101,7 +101,8 @@ const CASES = [
   ['chat-images-missing', '.vam-map-chat-images-missing', 'color', 4.5],
   ['tools-done-selecting', '.vam-map-tools button.is-active', 'color', 4.5],
   ['tools-done-selecting-hover', '.vam-map-tools button.is-active', 'color', 4.5, { hover: true }],
-  ['tools-by-goal', '.vam-map-tools .vam-relevance-goal', 'color', 4.5],
+  ['goal-bar-text', '.vam-goal-bar:not(.is-empty) .vam-goal-text', 'color', 4.5],
+  ['goal-bar-placeholder', '.vam-goal-bar.is-empty .vam-goal-text', 'color', 4.5],
   ['map-search-count', '.vam-map-search-count', 'color', 4.5],
   ['map-search-close', '.vam-map-search-close', 'color', 4.5],
   ['map-search-match-outline', '.vam-view .vam-node.is-search-match', 'outline', 3],

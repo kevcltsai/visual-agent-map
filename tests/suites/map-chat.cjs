@@ -2814,17 +2814,17 @@ test('UX B3: an open-ended suggestion shows an ellipsis, replaces the draft, and
   buttons()[2].click(); assert.equal(f.parts.input().value, 'Create a new map about ', 'a second pick replaces the first');
 });
 
-integrationTest('UX B9: an empty map leaves out "Select several topics", the goal control and the gesture hint; a map with topics has them', async () => {
-  // The goal control has its own suite (relevance-grade); here it only marks where it is drawn.
-  const tools = h => { const box = element('div'); h.view.renderRelevanceGoalControl = parent => { parent.createEl('button', { text: 'Prioritize by goal' }); }; h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
+integrationTest('UX B9: an empty map leaves out "Select several topics", the goal bar and the gesture hint; a map with topics has them', async () => {
+  // The goal bar has its own suite (relevance-grade) and is drawn in the overlay, not the toolbar; its guard is pinned from the source below.
+  const tools = h => { const box = element('div'); h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
   const empty = await harness({ empty: true }); await empty.view.hydrate();
   const shown = tools(empty);
   assert.ok(shown.some(l => /Topic$/.test(l)), '+ Topic stays'); assert.equal(shown.some(l => /Select several topics/.test(l)), false, 'nothing to select: not in the toolbar, so not in the Tab order');
-  assert.equal(shown.some(l => /Prioritize by goal/.test(l)), false, 'nothing to prioritise');
   const full = await harness(); await full.view.hydrate(); const all = tools(full);
-  assert.ok(all.includes('Select several topics')); assert.ok(all.some(l => /Prioritize by goal/.test(l)));
+  assert.ok(all.includes('Select several topics')); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
   const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.renderGoalBar\(overlay\);/, 'no goal bar on an empty or AIM map');
   assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
 });
 

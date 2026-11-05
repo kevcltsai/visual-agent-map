@@ -941,13 +941,14 @@ var en = {
   "ui.relevance_side": "Skippable",
   "ui.relevance_description_0_1": "{0}: {1}",
   "ui.relevance_goal_0": "Goal: {0}",
-  "ui.relevance_goal_set": "Prioritize by goal",
   "ui.relevance_sort": "Sort by relevance",
   "ui.relevance_sorted_suffix": " (sorted by relevance)",
   "ui.relevance_sort_hint": "Within each group, show Must learn first, then Learn when needed, then Skippable. Display only: nothing is saved or moved in your files. Dragging cards is paused while this is on.",
   "ui.relevance_goal_set_hint": "Enter a goal; AI marks each card Must learn, Learn when needed or Skippable",
   "ui.relevance_goal_edit_hint": "Change the goal and grade again",
   "ui.relevance_goal_label": "Map goal",
+  "ui.goal_suggest_topics": "Suggest new topics for this goal",
+  "ui.goal_edit": "Edit goal",
   "ui.relevance_panel_label": "Goal",
   "ui.relevance_goal_placeholder": "What do you want to achieve with this map?",
   "ui.relevance_context_label": "Extra context",
@@ -3565,13 +3566,14 @@ var zhCN = {
   "ui.relevance_side": "\u53EF\u8DF3\u8FC7",
   "ui.relevance_description_0_1": "{0}\uFF1A{1}",
   "ui.relevance_goal_0": "\u76EE\u6807\uFF1A{0}",
-  "ui.relevance_goal_set": "\u4F9D\u76EE\u6807\u6392\u4F18\u5148",
   "ui.relevance_sort": "\u4F9D\u91CD\u8981\u5EA6\u6392\u5E8F",
   "ui.relevance_sorted_suffix": "\uFF08\u5DF2\u4F9D\u91CD\u8981\u5EA6\u6392\u5E8F\uFF09",
   "ui.relevance_sort_hint": "\u6BCF\u4E00\u7EC4\u5185\u4F9D\u5FC5\u5B66\u3001\u9700\u8981\u65F6\u5B66\u3001\u53EF\u8DF3\u8FC7\u7684\u987A\u5E8F\u663E\u793A\u3002\u53EA\u6539\u753B\u9762\uFF0C\u4E0D\u4F1A\u4FDD\u5B58\u6216\u66F4\u52A8\u4F60\u7684\u6587\u4EF6\u3002\u6253\u5F00\u65F6\u6682\u505C\u62D6\u52A8\u5361\u7247\u3002",
   "ui.relevance_goal_set_hint": "\u8F93\u5165\u76EE\u6807\uFF0CAI \u66FF\u6BCF\u5F20\u5361\u6807\u5FC5\u5B66\uFF0F\u9700\u8981\u65F6\u5B66\uFF0F\u53EF\u8DF3\u8FC7",
   "ui.relevance_goal_edit_hint": "\u4FEE\u6539\u76EE\u6807\u5E76\u91CD\u65B0\u5206\u7EA7",
   "ui.relevance_goal_label": "\u5FC3\u667A\u56FE\u76EE\u6807",
+  "ui.goal_suggest_topics": "\u4F9D\u76EE\u6807\u5EFA\u8BAE\u65B0\u8BAE\u9898",
+  "ui.goal_edit": "\u7F16\u8F91\u76EE\u6807",
   "ui.relevance_panel_label": "\u76EE\u6807",
   "ui.relevance_goal_placeholder": "\u4F60\u60F3\u7528\u8FD9\u5F20\u56FE\u8FBE\u6210\u4EC0\u4E48\uFF1F",
   "ui.relevance_context_label": "\u8865\u5145\u8BF4\u660E",
@@ -6189,13 +6191,14 @@ var zhTW = {
   "ui.relevance_side": "\u53EF\u8DF3\u904E",
   "ui.relevance_description_0_1": "{0}\uFF1A{1}",
   "ui.relevance_goal_0": "\u76EE\u6A19\uFF1A{0}",
-  "ui.relevance_goal_set": "\u4F9D\u76EE\u6A19\u6392\u512A\u5148",
   "ui.relevance_sort": "\u4F9D\u91CD\u8981\u5EA6\u6392\u5E8F",
   "ui.relevance_sorted_suffix": "\uFF08\u5DF2\u4F9D\u91CD\u8981\u5EA6\u6392\u5E8F\uFF09",
   "ui.relevance_sort_hint": "\u6BCF\u4E00\u7D44\u5167\u4F9D\u5FC5\u5B78\u3001\u9700\u8981\u6642\u5B78\u3001\u53EF\u8DF3\u904E\u7684\u9806\u5E8F\u986F\u793A\u3002\u53EA\u6539\u756B\u9762\uFF0C\u4E0D\u6703\u5132\u5B58\u6216\u66F4\u52D5\u4F60\u7684\u6A94\u6848\u3002\u958B\u555F\u6642\u66AB\u505C\u62D6\u66F3\u5361\u7247\u3002",
   "ui.relevance_goal_set_hint": "\u8F38\u5165\u76EE\u6A19\uFF0CAI \u66FF\u6BCF\u5F35\u5361\u6A19\u5FC5\u5B78\uFF0F\u9700\u8981\u6642\u5B78\uFF0F\u53EF\u8DF3\u904E",
   "ui.relevance_goal_edit_hint": "\u4FEE\u6539\u76EE\u6A19\u4E26\u91CD\u65B0\u5206\u7D1A",
   "ui.relevance_goal_label": "\u5FC3\u667A\u5716\u76EE\u6A19",
+  "ui.goal_suggest_topics": "\u4F9D\u76EE\u6A19\u5EFA\u8B70\u65B0\u8B70\u984C",
+  "ui.goal_edit": "\u7DE8\u8F2F\u76EE\u6A19",
   "ui.relevance_panel_label": "\u76EE\u6A19",
   "ui.relevance_goal_placeholder": "\u4F60\u60F3\u7528\u9019\u5F35\u5716\u9054\u6210\u4EC0\u9EBC\uFF1F",
   "ui.relevance_context_label": "\u88DC\u5145\u8AAA\u660E",
@@ -52280,6 +52283,42 @@ var cardLinkButtons = /* @__PURE__ */ new WeakMap();
 var cardAiLockButtons = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
 var relevancePanelSeq = 0;
+function appendGoalSvg(parent, kind) {
+  const svg = createSvg("svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const add = (tag, attrs) => {
+    const el = createSvg(tag);
+    for (const [name2, value] of Object.entries(attrs)) el.setAttribute(name2, value);
+    svg.appendChild(el);
+  };
+  const line = { fill: "none", stroke: "currentColor", "stroke-width": "2" };
+  if (kind === "target") {
+    add("circle", { ...line, cx: "12", cy: "12", r: "9" });
+    add("circle", { ...line, cx: "12", cy: "12", r: "5" });
+    add("circle", { ...line, cx: "12", cy: "12", r: "1.5", fill: "currentColor" });
+  } else if (kind === "spark")
+    add("path", {
+      fill: "currentColor",
+      d: [
+        "M12 2l1.8 6.2L20 10l-6.2 1.8L12 18",
+        "l-1.8-6.2L4 10l6.2-1.8z",
+        "M19 15l.9 2.1L22 18l-2.1.9L19 21",
+        "l-.9-2.1L16 18l2.1-.9z"
+      ].join("")
+    });
+  else if (kind === "refresh")
+    add("path", { ...line, "stroke-linecap": "round", d: "M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" });
+  else if (kind === "sort")
+    add("path", {
+      ...line,
+      "stroke-linecap": "round",
+      d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
+    });
+  else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
+  parent.appendChild(svg);
+}
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
 function branchDirectionResolver(nodes, mapDirection) {
   if (!allowsBranchLayout(mapDirection)) return () => mapDirection;
@@ -52440,7 +52479,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "relevancePanelId", `vam-relevance-panel-${++relevancePanelSeq}`);
     __publicField(this, "relevancePanelOpen", false);
     __publicField(this, "relevanceDraft", null);
-    __publicField(this, "relevanceToolsEl", null);
+    __publicField(this, "relevanceBarEl", null);
     __publicField(this, "relevanceButtonEl", null);
     __publicField(this, "relevancePanelEl", null);
     __publicField(this, "relevancePanelGen", 0);
@@ -54404,17 +54443,22 @@ ${request.requirements}` : preset.text,
     return !!this.map && !this.map.aim && !!this.path;
   }
   /**
-   * One toolbar button, the same level as "Select topics": it shows the goal and opens a panel under it with the goal,
-   * context, a "Grade with this" button and the display-only sort switch.
+   * The goal bar: a chat-input style bar at the top centre of the canvas (not in the toolbar). It shows the goal, big and
+   * wrapped, never cut off; the four icons (suggest topics, recalibrate, sort, edit) show on hover or keyboard focus.
+   * Editing opens a popover under the bar with the goal and the extra context.
    */
-  renderRelevanceGoalControl(parent) {
+  renderGoalBar(overlay) {
     var _a2, _b2, _c;
     this.relevancePanelGen++;
     (_a2 = this.relevancePanelCleanup) == null ? void 0 : _a2.call(this);
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
-    this.relevanceToolsEl = parent;
-    this.drawRelevanceButton(parent);
+    const bar = overlay.createDiv({
+      cls: "vam-goal-bar",
+      attr: { role: "group", "aria-label": t("ui.relevance_goal_label") }
+    });
+    this.relevanceBarEl = bar;
+    this.drawGoalBar(bar);
     if (!this.relevancePanelOpen) return;
     if (((_b2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _b2.status) === "running") {
       this.relevancePanelOpen = false;
@@ -54428,48 +54472,90 @@ ${request.requirements}` : preset.text,
   relevanceSortOn() {
     return this.relevanceGradeable() && relevanceSortedMaps.has(this.path);
   }
-  drawRelevanceButton(parent) {
-    var _a2;
+  drawGoalBar(bar) {
+    var _a2, _b2;
     const goal = this.relevanceGoal;
     const sorted = this.relevanceSortOn();
-    const label = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_set");
-    const button = this.button(parent, label, () => {
+    const running = ((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running";
+    bar.toggleClass("is-empty", !goal);
+    const target = bar.createSpan("vam-goal-target");
+    target.setAttr("aria-hidden", "true");
+    appendGoalSvg(target, "target");
+    const text11 = bar.createDiv({ cls: "vam-goal-text", attr: { role: "button", tabindex: "0" } });
+    text11.setText(goal != null ? goal : t("ui.relevance_goal_placeholder"));
+    const label = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_placeholder");
+    text11.setAttr("aria-label", sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label);
+    text11.setAttr("aria-haspopup", "dialog");
+    text11.setAttr("aria-expanded", String(this.relevancePanelOpen));
+    text11.setAttr("aria-controls", this.relevancePanelId);
+    text11.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
+    const toggleEditor = () => {
       if (this.relevancePanelOpen && this.relevancePanelEl) this.closeRelevancePanel(true);
       else this.editRelevanceGoal();
+    };
+    text11.addEventListener("click", toggleEditor);
+    text11.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && this.relevancePanelOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeRelevancePanel(true);
+      } else if ((event.key === "Enter" || event.key === " ") && !event.isComposing) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleEditor();
+      }
     });
-    button.addClass("vam-relevance-goal");
-    button.toggleClass("is-empty", !goal);
-    button.toggleClass("is-sorted", sorted);
-    button.setAttr("aria-haspopup", "dialog");
-    button.setAttr("aria-expanded", String(this.relevancePanelOpen));
-    button.setAttr("aria-controls", this.relevancePanelId);
-    button.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
-    (0, import_obsidian34.setTooltip)(
-      button,
-      goal ? [label, this.relevanceContext].filter(Boolean).join("\n") : t("ui.relevance_goal_set_hint")
-    );
-    button.setAttr("aria-label", sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label);
-    button.disabled = ((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running";
-    button.addEventListener("mousedown", (event) => event.preventDefault());
-    button.addEventListener("focusout", (event) => {
+    text11.addEventListener("mousedown", (event) => event.preventDefault());
+    text11.addEventListener("focusout", (event) => {
       var _a3;
-      if (!this.relevancePanelOpen || this.relevanceButtonEl !== button) return;
+      if (!this.relevancePanelOpen || this.relevanceButtonEl !== text11) return;
       const next = event.relatedTarget;
-      if (next && (next === button || ((_a3 = this.relevancePanelEl) == null ? void 0 : _a3.contains(next)))) return;
+      if (next && (next === text11 || ((_a3 = this.relevancePanelEl) == null ? void 0 : _a3.contains(next)))) return;
       this.closeRelevancePanel(false);
     });
-    button.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || !this.relevancePanelOpen || this.relevanceButtonEl !== button) return;
-      event.preventDefault();
-      event.stopPropagation();
-      this.closeRelevancePanel(true);
-    });
-    if (sorted) {
-      const icon = button.createSpan("vam-relevance-sort-icon");
-      icon.setAttr("aria-hidden", "true");
-      (0, import_obsidian34.setIcon)(icon, "arrow-down-wide-narrow");
-    }
-    this.relevanceButtonEl = button;
+    this.relevanceButtonEl = text11;
+    const actions = bar.createDiv({ cls: "vam-goal-actions" });
+    const icon = (kind, name2, run, disabled) => {
+      const button = actions.createEl("button", { cls: "vam-goal-icon" });
+      appendGoalSvg(button, kind);
+      (0, import_obsidian34.setTooltip)(button, name2);
+      button.setAttr("aria-label", name2);
+      button.disabled = disabled;
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        run();
+      });
+      return button;
+    };
+    icon("spark", t("ui.goal_suggest_topics"), () => {
+    }, true);
+    const mode = relevanceMode(
+      { goal: goal != null ? goal : "", context: (_b2 = this.relevanceContext) != null ? _b2 : "" },
+      { goal, context: this.relevanceContext },
+      this.relevanceAiGrades().length > 0
+    );
+    icon(
+      "refresh",
+      t(mode === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button"),
+      () => {
+        var _a3;
+        if (goal) void this.submitRelevanceGoal(goal, (_a3 = this.relevanceContext) != null ? _a3 : "", mode);
+      },
+      running || !goal
+    );
+    const sort = icon(
+      "sort",
+      t("ui.relevance_sort"),
+      () => {
+        if (sorted) relevanceSortedMaps.delete(this.path);
+        else relevanceSortedMaps.add(this.path);
+        this.renderPreservingFocus();
+      },
+      running
+    );
+    sort.setAttr("aria-pressed", String(sorted));
+    sort.toggleClass("on", sorted);
+    icon("edit", t("ui.goal_edit"), () => toggleEditor(), running);
   }
   /**
    * Starts the Claude CLI for the grade the open panel would run (no model call; a Codex model starts nothing). The
@@ -54487,7 +54573,7 @@ ${request.requirements}` : preset.text,
   }
   /** `keepWarm`: the panel closes to send, so the pre-started process stays for that run; otherwise it is killed. */
   closeRelevancePanel(refocus, keepWarm = false) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f;
     if (!keepWarm) (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
     this.relevancePanelGen++;
     (_c = this.relevancePanelCleanup) == null ? void 0 : _c.call(this);
@@ -54497,7 +54583,7 @@ ${request.requirements}` : preset.text,
     this.relevancePanelOpen = false;
     this.relevanceDraft = null;
     (_e = this.relevanceButtonEl) == null ? void 0 : _e.setAttr("aria-expanded", "false");
-    if (refocus && !((_f = this.relevanceButtonEl) == null ? void 0 : _f.disabled)) (_g = this.relevanceButtonEl) == null ? void 0 : _g.focus();
+    if (refocus) (_f = this.relevanceButtonEl) == null ? void 0 : _f.focus();
   }
   /** Open the goal panel under the toolbar button (no-op while a grading run is going). */
   editRelevanceGoal() {
@@ -54506,7 +54592,7 @@ ${request.requirements}` : preset.text,
       new import_obsidian34.Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
     }
-    if (!this.relevanceToolsEl) {
+    if (!this.relevanceBarEl) {
       new import_obsidian34.Notice(t("ui.relevance_goal_unavailable_toolbar"));
       return;
     }
@@ -54519,13 +54605,13 @@ ${request.requirements}` : preset.text,
     this.drawRelevancePanel(true);
   }
   /**
-   * The panel holds one group: goal, context and a "Grade with this" button, then the sort switch. Enter in a
-   * text field or the button confirms; Esc, a press outside, or focus leaving the panel closes it without submitting.
-   * Tab inside the panel does not. The sort switch does not close it.
+   * The popover under the goal bar holds exactly two fields: the goal and the extra context (plus "hand all back to AI"
+   * while the user has pinned grades). Enter in a field saves the goal and grades; Esc, a press outside, or focus
+   * leaving the panel closes it without submitting. Tab inside the panel does not.
    */
   drawRelevancePanel(focus) {
     var _a2, _b2, _c, _d, _e;
-    const tools = this.relevanceToolsEl;
+    const tools = this.relevanceBarEl;
     if (!tools) return;
     (_a2 = this.relevancePanelEl) == null ? void 0 : _a2.remove();
     const gen = ++this.relevancePanelGen;
@@ -54547,8 +54633,7 @@ ${request.requirements}` : preset.text,
     input2.maxLength = RELEVANCE_GOAL_MAX_LENGTH;
     input2.setAttr("aria-label", t("ui.relevance_goal_label"));
     input2.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
-    const row = group.createDiv("vam-relevance-setup-row");
-    const context = row.createEl("input", { cls: "vam-relevance-context-input", type: "text" });
+    const context = group.createEl("input", { cls: "vam-relevance-context-input", type: "text" });
     context.value = draft.context;
     context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
     context.setAttr("aria-label", t("ui.relevance_context_label"));
@@ -54559,15 +54644,10 @@ ${request.requirements}` : preset.text,
       { goal: this.relevanceGoal, context: this.relevanceContext },
       this.relevanceAiGrades().length > 0
     );
-    const submitButton = group.createEl("button", {
-      cls: "vam-relevance-grade-button mod-cta",
-      text: t(planMode() === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button")
-    });
     let warmedMode = planMode();
     if (focus && this.relevanceGradeable()) this.prewarmRelevance(warmedMode);
     const showMode = () => {
       const mode = planMode();
-      submitButton.setText(t(mode === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button"));
       if (mode !== warmedMode) {
         warmedMode = mode;
         if (this.relevanceGradeable()) this.prewarmRelevance(mode);
@@ -54590,21 +54670,6 @@ ${request.requirements}` : preset.text,
         text: t("ui.relevance_unpin_all")
       });
     }
-    panel.createDiv("vam-relevance-divider");
-    const on = this.relevanceSortOn();
-    const sort = panel.createEl("button", { cls: "vam-relevance-sort" });
-    sort.setAttr("aria-pressed", String(on));
-    const copy = sort.createSpan("vam-relevance-sort-copy");
-    copy.createSpan({ cls: "vam-relevance-sort-title", text: t("ui.relevance_sort") });
-    copy.createSpan({ cls: "vam-relevance-sort-hint", text: t("ui.relevance_sort_hint") });
-    const knob = sort.createSpan({ cls: `checkbox-container vam-relevance-switch${on ? " is-enabled" : ""}` });
-    knob.setAttr("aria-hidden", "true");
-    sort.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (on) relevanceSortedMaps.delete(this.path);
-      else relevanceSortedMaps.add(this.path);
-      this.renderPreservingFocus();
-    });
     let finished = false;
     const alive = () => !finished && gen === this.relevancePanelGen;
     const finish = (submit, refocus) => {
@@ -54630,28 +54695,14 @@ ${request.requirements}` : preset.text,
     };
     input2.addEventListener("keydown", (event) => keys(event, true));
     context.addEventListener("keydown", (event) => keys(event, true));
-    submitButton.addEventListener("keydown", (event) => keys(event, false));
     unpinAllButton == null ? void 0 : unpinAllButton.addEventListener("keydown", (event) => keys(event, false));
-    sort.addEventListener("keydown", (event) => keys(event, false));
-    submitButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      confirm();
-    });
     unpinAllButton == null ? void 0 : unpinAllButton.addEventListener("click", (event) => {
       event.stopPropagation();
       finish(false, true);
       this.unpinAllRelevance();
     });
     unpinAllButton == null ? void 0 : unpinAllButton.addEventListener("mousedown", (event) => event.preventDefault());
-    submitButton.addEventListener("mousedown", (event) => event.preventDefault());
-    sort.addEventListener("mousedown", (event) => event.preventDefault());
-    for (const control of [
-      input2,
-      context,
-      submitButton,
-      ...unpinAllButton ? [unpinAllButton] : [],
-      sort
-    ])
+    for (const control of [input2, context, ...unpinAllButton ? [unpinAllButton] : []])
       control.addEventListener("focusout", (event) => {
         const next = event.relatedTarget;
         if (next && !panel.contains(next) && next !== this.relevanceButtonEl) finish(false, false);
@@ -54667,24 +54718,10 @@ ${request.requirements}` : preset.text,
       doc.addEventListener("pointerdown", outside, true);
       this.relevancePanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
     }
-    this.placeRelevancePanel(panel);
     if (focus) {
       input2.focus();
       input2.select();
     }
-  }
-  /** Keep the panel inside the map overlay: left-aligned under the button, shifted left when it would overflow. */
-  placeRelevancePanel(panel) {
-    const button = this.relevanceButtonEl;
-    const tools = this.relevanceToolsEl;
-    const overlay = tools == null ? void 0 : tools.parentElement;
-    if (!(button == null ? void 0 : button.getBoundingClientRect) || !(tools == null ? void 0 : tools.getBoundingClientRect) || !(overlay == null ? void 0 : overlay.getBoundingClientRect)) return;
-    const bounds = overlay.getBoundingClientRect();
-    const width = Math.max(0, Math.min(360, bounds.width - 32));
-    const from = button.getBoundingClientRect().left;
-    const left = Math.min(Math.max(from, bounds.left + 16), bounds.left + bounds.width - 16 - width);
-    panel.style.width = `${width}px`;
-    panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
   }
   relevanceRunIsCurrent(run, mapPath) {
     return !this.closed && this.path === mapPath && this.plugin.relevanceGrades.get(mapPath) === run && run.status === "running" && !run.controller.signal.aborted;
@@ -54719,7 +54756,7 @@ ${request.requirements}` : preset.text,
     return () => {
       var _a3, _b3, _c2, _d2, _e2, _f2, _g;
       if (!this.mapWindowIsActive()) return;
-      const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.contentEl) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-relevance-goal");
+      const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.contentEl) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-goal-text");
       target == null ? void 0 : target.focus();
     };
   }
@@ -54768,11 +54805,7 @@ ${request.requirements}` : preset.text,
     try {
       await this.plugin.mutate(async () => {
         var _a3, _b3;
-        const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(
-          mapPath,
-          goal,
-          context
-        );
+        const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(mapPath, goal, context);
         if (this.path !== mapPath) return;
         this.relevanceGoal = goal;
         this.relevanceContext = context;
@@ -55122,7 +55155,7 @@ ${request.requirements}` : preset.text,
       var _a3, _b3, _c;
       this.plugin.relevanceGrades.delete(this.path);
       this.render();
-      (_c = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-goal")) == null ? void 0 : _c.focus();
+      (_c = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-goal-text")) == null ? void 0 : _c.focus();
     });
   }
   /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
@@ -61168,7 +61201,7 @@ ${request.requirements}` : preset.text,
     this.settleCardHeights();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -61486,8 +61519,18 @@ ${request.requirements}` : preset.text,
     canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
+    if (this.relevanceGradeable() && this.map.nodes.length) this.renderGoalBar(overlay);
+    else {
+      this.relevanceBarEl = null;
+      this.relevanceButtonEl = null;
+      if (this.relevancePanelOpen) {
+        this.relevancePanelOpen = false;
+        this.relevanceDraft = null;
+        (_H = (_G = this.plugin).releaseWarmClaude) == null ? void 0 : _H.call(_G);
+      }
+    }
     this.mountMapChat(workspace, overlay);
-    if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
+    this.placeGoalBar();
     this.hintEl = this.map.nodes.length > 0 && !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
       cls: "vam-hint vam-canvas-hint",
       text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
@@ -61559,7 +61602,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_G = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _G.focus({ preventScroll: true });
+        (_I = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _I.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -61568,9 +61611,9 @@ ${request.requirements}` : preset.text,
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_H = this.stageEl.querySelector(
+        (_J = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _H.focus({ preventScroll: true });
+        )) == null ? void 0 : _J.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -61629,9 +61672,9 @@ ${request.requirements}` : preset.text,
     });
   }
   /**
-   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics" and the
-   * goal control. An empty map has nothing to select or prioritise, so those two are left out rather than disabled: Tab never
-   * reaches a control that cannot do anything yet. An AIM map has none of them.
+   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics". An empty
+   * map has nothing to select, so that one is left out rather than disabled: Tab never reaches a control that cannot do
+   * anything yet. An AIM map has none of them. The goal lives in its own bar (renderGoalBar).
    */
   renderMapTools(tools) {
     if (!this.map || this.map.aim) return;
@@ -61652,7 +61695,6 @@ ${request.requirements}` : preset.text,
     );
     integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
     if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
-    this.renderRelevanceGoalControl(tools);
   }
   /**
    * The same tools on an old AIM map while AIM is hidden: it is an ordinary map then. A separate method so renderMapTools keeps
@@ -62435,7 +62477,7 @@ ${request.requirements}` : preset.text,
   floatingControlRects() {
     var _a2, _b2, _c, _d;
     const rects = [];
-    for (const selector of [".vam-map-tools", ".vam-zoom-controls", ".vam-canvas-hint"]) {
+    for (const selector of [".vam-map-tools", ".vam-goal-bar", ".vam-zoom-controls", ".vam-canvas-hint"]) {
       const rect2 = (_d = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, selector)) == null ? void 0 : _c.getBoundingClientRect) == null ? void 0 : _d.call(_c);
       if (rect2 && rect2.right > rect2.left && rect2.bottom > rect2.top) rects.push(rect2);
     }
@@ -66909,10 +66951,18 @@ ${note.detail.trim()}` : "",
   }
   /** Safe area under the floating toolbar, measured so a wrapped toolbar is covered too. */
   canvasInset() {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const canvas = (_b2 = (_a2 = this.viewportEl) == null ? void 0 : _a2.getBoundingClientRect) == null ? void 0 : _b2.call(_a2);
-    const tools = (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector(".vam-map-tools")) == null ? void 0 : _d.getBoundingClientRect) == null ? void 0 : _e.call(_d);
-    return canvas ? insetFromRects(canvas.top, tools) : 0;
+    return canvas ? Math.max(
+      insetFromRects(
+        canvas.top,
+        (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector(".vam-map-tools")) == null ? void 0 : _d.getBoundingClientRect) == null ? void 0 : _e.call(_d)
+      ),
+      insetFromRects(
+        canvas.top,
+        (_h = (_g = (_f = this.contentEl) == null ? void 0 : _f.querySelector(".vam-goal-bar")) == null ? void 0 : _g.getBoundingClientRect) == null ? void 0 : _h.call(_g)
+      )
+    ) : 0;
   }
   /**
    * The four sides a programmatic viewport (Show all, focus) keeps clear: the toolbar above, the zoom bar below, and an
@@ -66927,7 +66977,10 @@ ${note.detail.trim()}` : "",
       return (_c = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector(selector)) == null ? void 0 : _b3.getBoundingClientRect) == null ? void 0 : _c.call(_b3);
     };
     return {
-      top: insetFromRects(canvas.top, rectOf(".vam-map-tools")),
+      top: Math.max(
+        insetFromRects(canvas.top, rectOf(".vam-map-tools")),
+        insetFromRects(canvas.top, rectOf(".vam-goal-bar"))
+      ),
       right: 0,
       bottom: bottomInsetFromRects(canvas.bottom, rectOf(".vam-zoom-controls")),
       left: leftInsetFromRects(canvas.left, rectOf(".vam-map-chat.is-overlay"))
@@ -66950,24 +67003,30 @@ ${note.detail.trim()}` : "",
    * saved positions, as the stage is not transformed yet when this runs; a card's height is its laid-out height.
    */
   topsUnderToolbar(zoomHint) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d;
     const canvas = (_b2 = (_a2 = this.viewportEl) == null ? void 0 : _a2.getBoundingClientRect) == null ? void 0 : _b2.call(_a2);
-    const tools = (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector(".vam-map-tools")) == null ? void 0 : _d.getBoundingClientRect) == null ? void 0 : _e.call(_d);
-    if (!this.map || !canvas || !tools || !(tools.bottom > tools.top)) return [];
-    const bar = {
-      left: tools.left - canvas.left,
-      right: tools.right - canvas.left,
-      top: tools.top - canvas.top,
-      bottom: tools.bottom - canvas.top
-    };
+    if (!this.map || !canvas) return [];
+    const bars = [".vam-map-tools", ".vam-goal-bar"].flatMap((selector) => {
+      var _a3, _b3, _c2;
+      const rect2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector(selector)) == null ? void 0 : _b3.getBoundingClientRect) == null ? void 0 : _c2.call(_b3);
+      return rect2 && rect2.bottom > rect2.top ? [
+        {
+          left: rect2.left - canvas.left,
+          right: rect2.right - canvas.left,
+          top: rect2.top - canvas.top,
+          bottom: rect2.bottom - canvas.top
+        }
+      ] : [];
+    });
+    if (!bars.length) return [];
     const v = initialViewport(this.map.viewport, this.canvasInset());
     const zoom = v.zoom || zoomHint;
     const tops = [];
     for (const node of this.canvasNodes()) {
       const left = node.x * zoom + v.x, top = node.y * zoom + v.y;
-      const height = ((_f = this.cardEls.get(node.id)) == null ? void 0 : _f.offsetHeight) || 180;
-      const rect2 = { left, top, right: left + ((_g = node.width) != null ? _g : CARD_WIDTH) * zoom, bottom: top + height * zoom };
-      if (rectsIntersect(rect2, bar)) tops.push(top);
+      const height = ((_c = this.cardEls.get(node.id)) == null ? void 0 : _c.offsetHeight) || 180;
+      const rect2 = { left, top, right: left + ((_d = node.width) != null ? _d : CARD_WIDTH) * zoom, bottom: top + height * zoom };
+      if (bars.some((bar) => rectsIntersect(rect2, bar))) tops.push(top);
     }
     return tops;
   }
@@ -67228,10 +67287,19 @@ ${note.detail.trim()}` : "",
    */
   placeMapTools() {
     var _a2, _b2;
+    this.placeGoalBar();
     const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
     if (!tools) return;
     const left = ((_b2 = this.chat) == null ? void 0 : _b2.isOverlay) ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
     tools.style.left = left > 0 ? `${left}px` : "";
+  }
+  /** The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. */
+  placeGoalBar() {
+    var _a2, _b2;
+    const bar = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-goal-bar");
+    if (!bar) return;
+    const covered = ((_b2 = this.chat) == null ? void 0 : _b2.isOverlay) ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
+    bar.style.setProperty("--vam-goal-inset", `${covered}px`);
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize() {

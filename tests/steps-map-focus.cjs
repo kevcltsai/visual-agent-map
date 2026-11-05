@@ -248,7 +248,7 @@ test('#18: the repaint restorers for the chat field, the search field and the re
     const search = h.contentEl.add('input', { cls: 'vam-map-search-input' }); search.setSelectionRange = () => {}; search.selectionStart = 0; search.selectionEnd = 0;
     h.view.mapSearch = { query: '' }; h.view.mapSearchBar = { input: search };
     h.view.mountMapSearch = () => { h.view.mapSearchBar = { input: search }; }; h.view.applySearchMarks = () => {};
-    const bar = h.contentEl.add('div', { cls: 'vam-relevance-statusbar' }); const barButton = bar.add('button'); const goal = h.contentEl.add('div', { cls: 'vam-relevance-goal' });
+    const bar = h.contentEl.add('div', { cls: 'vam-relevance-statusbar' }); const barButton = bar.add('button'); const goal = h.contentEl.add('div', { cls: 'vam-goal-text' });
     for (const [name, element, hold] of [['chat', input, () => h.view.detachMapChat()], ['search', search, () => h.view.holdMapSearch()], ['relevance bar', barButton, () => h.view.keepRelevanceBarFocus()]]) {
       // The repaint: hold, the page is rebuilt (focus drops to the body), then the restorer runs.
       h.view.render = () => { const restore = hold(); h.doc.activeElement = h.doc.body; restore(); };

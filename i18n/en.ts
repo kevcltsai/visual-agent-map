@@ -915,7 +915,6 @@ export const en = {
   "ui.relevance_side": "Skippable",
   "ui.relevance_description_0_1": "{0}: {1}",
   "ui.relevance_goal_0": "Goal: {0}",
-  "ui.relevance_goal_set": "Prioritize by goal",
   "ui.relevance_sort": "Sort by relevance",
   "ui.relevance_sorted_suffix": " (sorted by relevance)",
   "ui.relevance_sort_hint":
@@ -923,6 +922,8 @@ export const en = {
   "ui.relevance_goal_set_hint": "Enter a goal; AI marks each card Must learn, Learn when needed or Skippable",
   "ui.relevance_goal_edit_hint": "Change the goal and grade again",
   "ui.relevance_goal_label": "Map goal",
+  "ui.goal_suggest_topics": "Suggest new topics for this goal",
+  "ui.goal_edit": "Edit goal",
   "ui.relevance_panel_label": "Goal",
   "ui.relevance_goal_placeholder": "What do you want to achieve with this map?",
   "ui.relevance_context_label": "Extra context",

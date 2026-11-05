@@ -17,7 +17,7 @@ const dirOf = (language, role) => `${ROOT}/${M.translate(language, `ui.style_fol
 
 /** An in-memory vault that records every write; `create` never overwrites, `modify` needs an existing file. */
 function vault(files = {}) {
-  const state = { files: { ...files }, folders: new Set(), creates: [], modifies: [], folderCalls: 0, trashes: 0 };
+  const state = { files: { ...files }, folders: new Set(), creates: [], modifies: [], folderCalls: 0, trashes: 0, renames: [] };
   const under = folder => Object.keys(state.files).filter(file => file.startsWith(`${folder}/`) && !file.slice(folder.length + 1).includes('/'));
   state.port = {
     list: async folder => under(folder).map(file => file.slice(folder.length + 1)).filter(name => name.endsWith('.md')),
@@ -29,7 +29,12 @@ function vault(files = {}) {
       state.files[file] = content; state.creates.push(file);
     },
     modify: async (file, content) => { if (!(file in state.files)) throw new Error(file); state.files[file] = content; state.modifies.push(file); },
-    trash: async file => { state.trashes++; delete state.files[file]; }
+    trash: async file => { state.trashes++; delete state.files[file]; },
+    rename: async (from, to) => {
+      if (!(from in state.files)) throw new Error(from);
+      if (Object.keys(state.files).some(existing => existing.toLowerCase() === to.toLowerCase() && existing !== from)) throw new Error(`exists: ${to}`);
+      state.files[to] = state.files[from]; delete state.files[from]; state.renames.push([from, to]);
+    }
   };
   return state;
 }
@@ -41,7 +46,7 @@ async function makeStore(files = {}, settingsPatch = {}) {
   await store.refresh();
   return { store, v, settings, saves: () => saves };
 }
-const writes = v => v.creates.length + v.modifies.length + v.folderCalls + v.trashes;
+const writes = v => v.creates.length + v.modifies.length + v.folderCalls + v.trashes + v.renames.length;
 const STD = { structure: 'builtin:standard', voice: 'builtin:academic', format: 'builtin:standard', update: 'merge' };
 
 // ---- the pure text functions ----
@@ -402,23 +407,37 @@ const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: do
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const settle = async () => { for (let n = 0; n < 6; n++) await flush(); };
 
-/** A plugin over a real store: editNotePart and saveNoteRecipe are main's own methods; opening a file is recorded. */
-async function manageSetup(files = {}, settingsPatch = {}) {
+/** A plugin over a real store: editNotePart and saveNoteRecipe are main's own methods; opening a file is recorded. `topics` are the notes (path -> text) that may carry `note-style`; `failTopics` are paths whose write throws. */
+async function manageSetup(files = {}, settingsPatch = {}, extra = {}) {
   const made = await makeStore(files, settingsPatch);
   const { store, v, settings } = made;
   notices.length = 0;
   opened.length = 0;
+  const topics = { ...(extra.topics ?? {}) };
+  const failTopics = new Set(extra.failTopics ?? []);
+  made.topics = topics;
+  made.topicWrites = [];
+  const known = path => path in v.files || path in topics;
+  const noteStyleOf = path => /^note-style:\s*"?([^"\r\n]*)"?\s*$/m.exec(/^---\r?\n([\s\S]*?)\r?\n---/.exec(topics[path] ?? '')?.[1] ?? '')?.[1];
   const app = {
-    vault: { getAbstractFileByPath: path => (path in v.files ? new S.TFile(path) : null) },
+    vault: {
+      getAbstractFileByPath: path => (known(path) ? new S.TFile(path) : null),
+      getMarkdownFiles: () => Object.keys(topics).map(path => new S.TFile(path)),
+      process: async (file, change) => { if (failTopics.has(file.path)) throw new Error('locked'); topics[file.path] = change(topics[file.path]); made.topicWrites.push(file.path); return topics[file.path]; }
+    },
+    metadataCache: { getFileCache: file => ({ frontmatter: noteStyleOf(file.path) === undefined ? {} : { 'note-style': noteStyleOf(file.path) } }) },
     workspace: { getLeaf: () => ({ openFile: async file => { opened.push(file.path); } }) }
   };
   const plugin = { app, settings, noteStyles: store, saveSettings: async () => { made.settingSaves = (made.settingSaves ?? 0) + 1; } };
-  plugin.editNotePart = (...args) => Plugin.prototype.editNotePart.apply(plugin, args);
-  plugin.saveNoteRecipe = (...args) => Plugin.prototype.saveNoteRecipe.apply(plugin, args);
-  plugin.setKindStyle = (...args) => Plugin.prototype.setKindStyle.apply(plugin, args);
+  plugin.repo = { renameNoteStyleRef: (...args) => S.Repository.prototype.renameNoteStyleRef.apply({ app, file: path => new S.TFile(path) }, args) };
+  for (const name of ['editNotePart', 'saveNoteRecipe', 'setKindStyle', 'topicNoteStyleRefs', 'renameNoteStyle', 'deleteNoteStyle', 'clearKindStyles'])
+    plugin[name] = (...args) => Plugin.prototype[name].apply(plugin, args);
   plugin.openPromptPreview = () => {};
   windows.length = 0;
-  return { ...made, plugin, app };
+  const setup = { ...made, plugin, app };
+  // `made` is copied above, so the save count is read through it.
+  Object.defineProperty(setup, 'settingSaves', { get: () => made.settingSaves });
+  return setup;
 }
 async function openManage(setup, tab = 'recipe') {
   const trigger = dom.element('button');
@@ -433,7 +452,8 @@ const rowsOf = root => dom.findAll(root, node => node.hasClass('setting-item') &
 const rowName = row => row.children[0].text;
 const rowFor = (root, name) => rowsOf(root).find(row => rowName(row) === name);
 const rowTexts = row => row.children[1].children.map(child => child.text);
-const editOf = row => dom.find(row, node => node.tag === 'button');
+// P5a: a built-in row's edit button is "Copy and edit" (and "View" comes first); a user's row has "Edit" then the "..." menu.
+const editOf = row => dom.find(row, node => node.tag === 'button' && (node.text === 'Edit' || node.text === 'Copy and edit'));
 const formOf = (root, tab) => dom.find(root, node => node.attrs.id === `vam-manage-form-${tab}`);
 const nameInputOf = form => dom.find(form, node => node.tag === 'input' && node.type === 'text');
 const errorOf = form => dom.find(form, node => node.hasClass('vam-manage-error'));
@@ -945,4 +965,400 @@ test('P3 unused copies: nothing to report for a store with no files, and the cal
   const { store, v } = await makeStore();
   same(store.listUnusedCopies(), []);
   assert.equal(writes(v), 0);
+});
+
+// ---- P5a (note-style settings redesign): rename that follows, delete to the trash, restore to built-in, duplicate, clean-up and undo ----
+const RECIPES = dirOf('en', 'recipe');
+const STRUCTURES = dirOf('en', 'template');
+const VOICES = dirOf('en', 'tone');
+const topicText = (ref, extra = '') => `---\ntitle: "T"\nnote-style: "${ref}"\ntags:\n  - a\n  - b\n---\n\nBody about ${ref}.\n${extra}`;
+const snapshot = setup => JSON.stringify([setup.settings, setup.v.files, setup.topics, setup.v.renames, setup.v.trashes]);
+const moreOf = row => dom.find(row, node => node.tag === 'button' && /^More actions/.test(node.attrs['aria-label'] ?? ''));
+const menuOf = row => dom.find(row, node => node.attrs.role === 'menu');
+const itemOf = (row, text) => dom.find(row, node => node.attrs.role === 'menuitem' && node.text === text);
+async function pickMenu(row, text) { moreOf(row).click(); itemOf(row, text).click(); await settle(); }
+const WEEKLY = M.recipeFileText({ ...STD, update: 'top' }, 'en');
+
+test('P5a rename a style: the file, noteStyleByKind, the topics that chose it and nothing else change; other frontmatter lines and the body keep their bytes; legacy is left alone', async () => {
+  const topics = { 'Maps/a.md': topicText('file:Weekly'), 'Maps/b.md': topicText('file:Other'), 'Maps/c.md': topicText('file:Weekly', '%% more %%\n'), 'Maps/d.md': '---\ntitle: "D"\n---\nNo style.\n' };
+  const legacy = { templates: { t1: 'file:Mine' }, tones: { x: 'file:Calm' } };
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY, [`${RECIPES}/Other.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly', action: 'file:Weekly', atomic: 'file:Other' }, noteStyleRecipe: { migrated: 1, legacy } }, { topics });
+  const result = await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Monthly');
+  assert.equal(result.ok, true);
+  assert.equal(result.ref, 'file:Monthly');
+  assert.deepEqual(setup.v.renames, [[`${RECIPES}/Weekly.md`, `${RECIPES}/Monthly.md`]]);
+  assert.equal(setup.v.files[`${RECIPES}/Monthly.md`], WEEKLY, 'the content is the same bytes');
+  assert.equal(`${RECIPES}/Weekly.md` in setup.v.files, false);
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { hypothesis: 'file:Monthly', action: 'file:Monthly', atomic: 'file:Other' });
+  assert.deepEqual(plain(setup.settings.noteStyleRecipe.legacy), legacy);
+  assert.equal(setup.topics['Maps/a.md'], topics['Maps/a.md'].replace('file:Weekly"\ntags', 'file:Monthly"\ntags').replace('about file:Weekly', 'about file:Weekly'));
+  assert.ok(setup.topics['Maps/a.md'].includes('note-style: "file:Monthly"') && setup.topics['Maps/a.md'].includes('Body about file:Weekly.'), 'only the frontmatter value changed, not the body');
+  assert.equal(setup.topics['Maps/c.md'], topics['Maps/c.md'].replace('note-style: "file:Weekly"', 'note-style: "file:Monthly"'));
+  assert.equal(setup.topics['Maps/b.md'], topics['Maps/b.md']);
+  assert.equal(setup.topics['Maps/d.md'], topics['Maps/d.md']);
+  assert.deepEqual(setup.topicWrites.sort(), ['Maps/a.md', 'Maps/c.md']);
+  assert.equal(setup.settingSaves, 1);
+  assert.deepEqual(plain(setup.v.modifies), [], 'no style file is rewritten');
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0], M.translate('en', 'ui.manage_rename_done_0_1_2', 'Monthly', 2, 0));
+});
+
+test('P5a rename a part: the file, the style files that name it (only that key\'s value), the legacy table and the global setting follow; the other categories and other bytes stay', async () => {
+  const alpha = '---\r\ntags: [x]\r\nstructure: "Mine"\r\nupdate: merge\r\n---\r\nAlpha body  \r\n';
+  const beta = '---\n# the structure key\n段落結構: Mine\nvoice: Mine\n---\nBeta\n';
+  const gamma = '---\nstructure: Elsewhere\n---\n';
+  const files = { [`${STRUCTURES}/Mine.md`]: '## A\nx\n', [`${VOICES}/Mine.md`]: 'talk', [`${RECIPES}/Alpha.md`]: alpha, [`${RECIPES}/Beta.md`]: beta, [`${RECIPES}/Gamma.md`]: gamma };
+  const legacy = { templates: { t1: 'file:Mine', t2: 'file:Z' }, tones: { x: 'file:Mine' } };
+  const setup = await manageSetup(files, { noteStyleRecipe: { migrated: 1, legacy }, noteStyleDefaults: { voice: 'file:Mine' } });
+  const result = await setup.plugin.renameNoteStyle('structure', 'file:Mine', 'Plan');
+  assert.equal(result.ok, true);
+  assert.equal(setup.v.files[`${STRUCTURES}/Plan.md`], '## A\nx\n');
+  assert.equal(setup.v.files[`${VOICES}/Mine.md`], 'talk', 'the voice of the same name is another file');
+  assert.equal(setup.v.files[`${RECIPES}/Alpha.md`], alpha.replace('structure: "Mine"', 'structure: "Plan"'));
+  assert.equal(setup.v.files[`${RECIPES}/Beta.md`], beta.replace('段落結構: Mine', '段落結構: Plan'), 'the voice line of the same value is not touched');
+  assert.equal(setup.v.files[`${RECIPES}/Gamma.md`], gamma);
+  assert.deepEqual(plain(setup.settings.noteStyleRecipe.legacy), { templates: { t1: 'file:Plan', t2: 'file:Z' }, tones: { x: 'file:Mine' } });
+  assert.deepEqual(plain(setup.settings.noteStyleDefaults), { voice: 'file:Mine' }, 'a structure rename does not touch the global voice');
+  assert.equal(notices[0], M.translate('en', 'ui.manage_rename_done_0_1_2', 'Plan', 0, 2));
+  // a voice rename follows the global voice and the tones table
+  const voice = await setup.plugin.renameNoteStyle('voice', 'file:Mine', 'Calm');
+  assert.equal(voice.ok, true);
+  assert.deepEqual(plain(setup.settings.noteStyleDefaults), { voice: 'file:Calm' });
+  assert.deepEqual(plain(setup.settings.noteStyleRecipe.legacy.tones), { x: 'file:Calm' });
+  assert.equal(setup.v.files[`${RECIPES}/Beta.md`].includes('voice: Calm'), true);
+  assert.equal(M.parseRecipeFile(setup.v.files[`${RECIPES}/Beta.md`]).structure, 'file:Plan');
+});
+
+test('P5a rename refused (counter): a taken name (any case), a built-in name, an empty, padded, separator, dots or unsafe name, or a missing file changes nothing: data.json, topics, style files and the vault stay byte for byte', async () => {
+  const files = { [`${RECIPES}/Weekly.md`]: WEEKLY, [`${RECIPES}/Other.md`]: WEEKLY, [`${STRUCTURES}/Mine.md`]: '## A\nx\n', [`${STRUCTURES}/Other part.md`]: '## B\ny\n', [`${RECIPES}/User.md`]: '---\nstructure: Mine\n---\n' };
+  const setup = await manageSetup(files, { noteStyleByKind: { hypothesis: 'file:Weekly' }, noteStyleRecipe: { migrated: 1, legacy: { templates: { t: 'file:Mine' }, tones: {} } } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  const before = snapshot(setup);
+  for (const [category, ref, name, reason] of [
+    ['recipe', 'file:Weekly', 'Other', 'taken'], ['recipe', 'file:Weekly', 'oTHER', 'taken'], ['recipe', 'file:Weekly', 'Hypothesis test', 'name'], ['recipe', 'file:Weekly', '一般研究', 'name'],
+    ['recipe', 'file:Weekly', '', 'name'], ['recipe', 'file:Weekly', ' x', 'name'], ['recipe', 'file:Weekly', 'a/b', 'name'], ['recipe', 'file:Weekly', 'a..b', 'name'], ['recipe', 'file:Weekly', 'a:b', 'name'],
+    ['structure', 'file:Mine', 'Other part', 'taken'], ['structure', 'file:Mine', 'Standard six', 'name'], ['structure', 'file:Mine', 'x\\y', 'name'],
+    ['recipe', 'file:Gone', 'Fresh', 'missing'], ['recipe', 'builtin:general', 'Fresh', 'missing']
+  ]) {
+    const result = await setup.plugin.renameNoteStyle(category, ref, name);
+    assert.equal(result.ok, false, `${ref} -> ${JSON.stringify(name)}`);
+    assert.equal(result.reason, reason, `${ref} -> ${JSON.stringify(name)}`);
+    assert.equal(snapshot(setup), before, `${ref} -> ${JSON.stringify(name)}`);
+  }
+  assert.equal(setup.settingSaves ?? 0, 0);
+  assert.equal(setup.v.modifies.length, 0);
+  // the same name is a no-op, not an error
+  const same = await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Weekly');
+  assert.equal(same.ok, true);
+  assert.equal(same.unchanged, true);
+  assert.equal(snapshot(setup), before);
+});
+
+test('P5a rename: one topic that cannot be written does not stop the others; the Notice names it; data.json and the written topics agree on the new name', async () => {
+  const topics = { 'Maps/a.md': topicText('file:Weekly'), 'Maps/b.md': topicText('file:Weekly'), 'Maps/c.md': topicText('file:Weekly') };
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics, failTopics: ['Maps/b.md'] });
+  const result = await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Monthly');
+  assert.equal(result.ok, true);
+  assert.deepEqual(plain(result.failed), ['Maps/b.md']);
+  assert.ok(setup.topics['Maps/a.md'].includes('"file:Monthly"') && setup.topics['Maps/c.md'].includes('"file:Monthly"'));
+  assert.equal(setup.topics['Maps/b.md'], topics['Maps/b.md'], 'the failed one is as it was');
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { hypothesis: 'file:Monthly' });
+  assert.equal(notices.length, 1 + 1);
+  assert.equal(notices[0], M.translate('en', 'ui.manage_rename_done_0_1_2', 'Monthly', 2, 0));
+  assert.equal(notices[1], M.translate('en', 'ui.manage_rename_failed_0', 'Maps/b.md'));
+  // a topic changed by someone since it was read is not overwritten with the old guess
+  const raced = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, {}, { topics: { 'Maps/r.md': topicText('file:Weekly') } });
+  raced.topics['Maps/r.md'] = topicText('file:Elsewhere');
+  const noted = raced.plugin.topicNoteStyleRefs();
+  assert.deepEqual(plain(noted), [{ path: 'Maps/r.md', ref: 'file:Elsewhere' }]);
+});
+
+test('P5a topicNoteStyleRefs reads the metadata cache only: it lists the topics that name a style and writes nothing', async () => {
+  const setup = await manageSetup({}, {}, { topics: { 'Maps/a.md': topicText('file:A'), 'Maps/b.md': '---\ntitle: x\n---\n', 'Maps/c.md': topicText('builtin:action') } });
+  assert.deepEqual(plain(setup.plugin.topicNoteStyleRefs()), [{ path: 'Maps/a.md', ref: 'file:A' }, { path: 'Maps/c.md', ref: 'builtin:action' }]);
+  assert.equal(writes(setup.v) + setup.topicWrites.length, 0);
+});
+
+test('P5a repository.renameNoteStyleRef: only the note-style value changes (other lines, line endings, body); it writes nothing when the note no longer names the old style', async () => {
+  const crlf = '---\r\ntitle: "T"\r\nnote-style: "file:Weekly"\r\ntags: [a]\r\n---\r\nBody\r\n';
+  const app = { vault: { getAbstractFileByPath: path => new S.TFile(path), process: async (file, change) => { texts[file.path] = change(texts[file.path]); } } };
+  const texts = { 'a.md': crlf, 'b.md': topicText('file:Other') };
+  const repo = { app, file: path => new S.TFile(path) };
+  assert.equal(await S.Repository.prototype.renameNoteStyleRef.call(repo, 'a.md', 'file:Weekly', 'file:Monthly'), true);
+  assert.equal(texts['a.md'], crlf.replace('file:Weekly', 'file:Monthly'));
+  const other = texts['b.md'];
+  assert.equal(await S.Repository.prototype.renameNoteStyleRef.call(repo, 'b.md', 'file:Weekly', 'file:Monthly'), false);
+  assert.equal(texts['b.md'], other);
+});
+
+test('P5a store: renameFile / duplicateFile / trashFile / restoreTrashed are serial, never overwrite, and trash goes through the port (recoverable)', async () => {
+  const { store, v } = await makeStore({ [`${VOICES}/Calm.md`]: 'soft', [`${VOICES}/Calm (2).md`]: 'soft' });
+  assert.equal(await store.duplicateFile('voice', 'file:Calm'), 'file:Calm (3)');
+  assert.equal(v.files[`${VOICES}/Calm (3).md`], 'soft');
+  assert.equal(await store.duplicateFile('voice', 'file:Calm'), 'file:Calm (4)');
+  await assert.rejects(store.duplicateFile('voice', 'file:Gone'));
+  assert.equal(await store.duplicateFile('voice', 'builtin:guide').catch(() => 'refused'), 'refused', 'a built-in is copied by createPart, not duplicated');
+  const gone = await store.trashFile('voice', 'file:Calm (4)');
+  assert.deepEqual(plain(gone), { category: 'voice', name: 'Calm (4)', text: 'soft' });
+  assert.equal(v.trashes, 1);
+  assert.equal(`${VOICES}/Calm (4).md` in v.files, false);
+  assert.equal(store.listParts('voice').some(item => item.name === 'Calm (4)'), false);
+  // restore: the old name when free, " (n)" when someone took it meanwhile
+  v.files[`${VOICES}/Calm (4).md`] = 'taken meanwhile';
+  await store.refresh();
+  const restored = await store.restoreTrashed([gone]);
+  assert.deepEqual(plain(restored), { restored: ['file:Calm (4) (2)'], failed: [] });
+  assert.equal(v.files[`${VOICES}/Calm (4).md`], 'taken meanwhile');
+  assert.equal(v.files[`${VOICES}/Calm (4) (2).md`], 'soft');
+});
+
+test('P5a clean-up: unused copies move to the trash at once and Undo brings them back (with " (n)" when the name is taken); a style a topic names is not a copy; the count on the settings row uses the same rule', async () => {
+  const dup = { [`${VOICES}/Calm.md`]: 'soft', [`${VOICES}/Calm (2).md`]: 'soft', [`${RECIPES}/Like general.md`]: '---\n---\n', [`${RECIPES}/Like general (2).md`]: '---\n---\n' };
+  const setup = await manageSetup(dup, {}, { topics: { 'Maps/a.md': topicText('file:Like general') } });
+  const { root, modal } = await openManage(setup, 'recipe');
+  const banner = dom.find(root, node => node.hasClass('vam-manage-banner'));
+  assert.ok(banner, 'a banner offers the clean-up');
+  assert.match(dom.texts(banner).join('|'), /Calm \(2\)/);
+  assert.match(dom.texts(banner).join('|'), /Like general \(2\)/);
+  assert.equal(dom.texts(banner).join('|').includes('|Like general|'), false, 'the style the topic names is kept');
+  assert.equal(writes(setup.v), 0, 'opening the window and showing the banner write nothing');
+  // the settings row counts the same
+  const setting = { name: '', descEl: dom.element('div'), setName(value) { this.name = value; return this; }, addButton() { return this; } };
+  S.load('ui/settings-tab.ts', { obsidian }).renderMyStylesSetting(setting, setup.plugin);
+  assert.equal(dom.texts(setting.descEl)[0], M.translate('en', 'ui.my_styles_unused_0', 2));
+  dom.button(banner, 'Move to trash').click();
+  await settle();
+  assert.equal(setup.v.trashes, 2);
+  assert.equal(`${VOICES}/Calm (2).md` in setup.v.files, false);
+  assert.equal(`${RECIPES}/Like general (2).md` in setup.v.files, false);
+  assert.ok(setup.v.files[`${VOICES}/Calm.md`] && setup.v.files[`${RECIPES}/Like general.md`], 'the ones that stay are still there');
+  const done = dom.find(root, node => node.hasClass('vam-manage-banner'));
+  assert.match(dom.texts(done).join('|'), /Obsidian trash/);
+  assert.equal(rowFor(root, 'Like general (2)'), undefined, 'the list is drawn again');
+  setup.v.files[`${VOICES}/Calm (2).md`] = 'someone made this';
+  dom.button(done, 'Undo').click();
+  await settle();
+  assert.equal(setup.v.files[`${VOICES}/Calm (2).md`], 'someone made this', 'a name taken meanwhile is not overwritten');
+  assert.equal(setup.v.files[`${VOICES}/Calm (2) (2).md`], 'soft');
+  assert.equal(setup.v.files[`${RECIPES}/Like general (2).md`], '---\n---\n');
+  assert.ok(rowFor(root, 'Like general (2)'), 'the list shows the restored file');
+  modal.close();
+});
+
+test('P5a clean-up never trashes a part a style, the global setting or the legacy table uses (stylesUsing counts the global voice and format)', async () => {
+  const files = { [`${VOICES}/Calm.md`]: 'soft', [`${VOICES}/Calm (2).md`]: 'soft', [`${STRUCTURES}/Old.md`]: '## A\nx\n', [`${STRUCTURES}/Old (2).md`]: '## A\nx\n' };
+  const setup = await manageSetup(files, { noteStyleDefaults: { voice: 'file:Calm (2)' }, noteStyleRecipe: { migrated: 1, legacy: { templates: { t: 'file:Old (2)' }, tones: {} } } });
+  assert.deepEqual(plain(setup.store.listUnusedCopies().map(copy => copy.name)), ['Old', 'Calm'], 'the used one is kept and its twin is the copy');
+  assert.ok(setup.store.listParts('voice').find(item => item.ref === 'file:Calm (2)').usedBy.includes('General research'), 'a style that follows the global voice uses it');
+  const plainVoice = setup.store.listParts('voice').find(item => item.ref === 'builtin:academic');
+  assert.equal(plainVoice.usedBy.includes('General research'), false, 'the built-in default is not used by a style that follows another global voice');
+});
+
+test('P5a built-in rows: "View" then "Copy and edit"; View shows the text or the four settings in a read-only window and writes nothing; the AIM report has neither', async () => {
+  const setup = await manageSetup();
+  const { root } = await openManage(setup, 'recipe');
+  const row = rowFor(root, 'Hypothesis test');
+  assert.deepEqual(dom.findAll(row, node => node.tag === 'button').map(node => node.text), ['View', 'Copy and edit']);
+  assert.equal(moreOf(row), undefined, 'a built-in has no menu');
+  assert.equal(dom.findAll(rowFor(root, 'AIM report'), node => node.tag === 'button').length, 0);
+  dom.button(row, 'View').click();
+  await settle();
+  assert.equal(windows.length, 2);
+  assert.equal(writes(setup.v), 0);
+  assert.ok(dom.findAll(windows[1].contentEl, node => node.tag === 'input' || node.tag === 'textarea').every(node => node.attrs.readonly === 'readonly' || node.disabled), 'nothing in it can be typed');
+  assert.match(dom.texts(windows[1].contentEl).join('|'), /Claim to verdict/);
+  assert.ok(dom.button(windows[1].modalEl, 'Close'));
+  dom.button(row, 'View').click();
+  await settle();
+  assert.equal(windows.length, 2, 'one small window at a time');
+  dom.button(windows[1].modalEl, 'Close').click();
+  assert.equal(windows[1].closeCount, 1);
+  tabsOf(root)[1].click();
+  await settle();
+  dom.button(rowFor(root, 'Standard six'), 'View').click();
+  await settle();
+  assert.match(dom.texts(windows[2].contentEl).join('\n'), /## /);
+  assert.equal(writes(setup.v), 0, 'viewing never copies');
+  assert.deepEqual(opened, []);
+});
+
+test('P5a own rows: "Edit" and a "..." menu button named for the row; the menu is role=menu with items, opens and closes with the button and Escape (focus back on the button)', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY, [`${RECIPES}/Used.md`]: WEEKLY }, { noteStyleByKind: { action: 'file:Used' } });
+  const { root } = await openManage(setup, 'recipe');
+  const row = rowFor(root, 'Weekly');
+  assert.ok(editOf(row));
+  const more = moreOf(row);
+  assert.equal(more.attrs['aria-label'], 'More actions: Weekly');
+  assert.equal(more.attrs['aria-expanded'], 'false');
+  assert.equal(menuOf(row), undefined, 'closed at first');
+  more.click();
+  assert.equal(more.attrs['aria-expanded'], 'true');
+  assert.equal(menuOf(row).attrs.role, 'menu');
+  assert.deepEqual(dom.findAll(menuOf(row), node => node.attrs.role === 'menuitem').map(node => node.text), ['Rename…', 'Duplicate', 'Delete (move to trash)'], 'no "restore" for a style no topic type uses');
+  menuOf(row).keydown({ key: 'Escape' });
+  assert.equal(menuOf(row), undefined);
+  assert.equal(more.attrs['aria-expanded'], 'false');
+  assert.equal(more.focused, true);
+  more.click();
+  more.click();
+  assert.equal(menuOf(row), undefined, 'the button toggles');
+  // a style a topic type uses has the restore item
+  const used = rowFor(root, 'Used');
+  moreOf(used).click();
+  assert.deepEqual(dom.findAll(menuOf(used), node => node.attrs.role === 'menuitem').map(node => node.text), ['Rename…', 'Duplicate', 'Restore the built-in default', 'Delete (move to trash)']);
+  moreOf(row).click();
+  assert.equal(menuOf(used), undefined, 'one menu at a time');
+  assert.equal(writes(setup.v), 0);
+});
+
+test('P5a Rename… opens a small window in the same window as the manage one (name field prefilled, error live, Rename disabled for a bad or taken name); Cancel changes nothing; Rename follows through and puts the focus on the row', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY, [`${RECIPES}/Other.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  const { root } = await openManage(setup, 'recipe');
+  const before = snapshot(setup);
+  await pickMenu(rowFor(root, 'Weekly'), 'Rename…');
+  assert.equal(windows.length, 2);
+  const dialog = windows[1];
+  const input = dom.byLabel(dialog.contentEl, 'Name');
+  assert.equal(input.value, 'Weekly');
+  const rename = dom.button(dialog.modalEl, 'Rename');
+  const error = dom.find(dialog.contentEl, node => node.hasClass('vam-manage-error'));
+  assert.equal(error.attrs['aria-live'], 'polite');
+  for (const [value, pattern] of [['Other', /already exists/], ['', /Enter a name/], ['Hypothesis test', /built-in/], ['a/b', /cannot contain \//]]) {
+    input.value = value; input.fire('input');
+    assert.match(error.text, pattern, value);
+    assert.equal(rename.disabled, true, value);
+  }
+  rename.click();
+  await settle();
+  assert.equal(snapshot(setup), before);
+  input.value = 'Weekly'; input.fire('input');
+  assert.equal(rename.disabled, true, 'the old name is not a rename');
+  dom.button(dialog.modalEl, 'Cancel').click();
+  await settle();
+  assert.equal(dialog.closeCount, 1);
+  assert.equal(snapshot(setup), before);
+  await pickMenu(rowFor(root, 'Weekly'), 'Rename…');
+  const second = windows[2];
+  const field = dom.byLabel(second.contentEl, 'Name');
+  field.value = 'Monthly'; field.fire('input');
+  assert.equal(dom.find(second.contentEl, node => node.hasClass('vam-manage-error')).text, '');
+  dom.button(second.modalEl, 'Rename').click();
+  await settle();
+  assert.equal(second.closeCount, 1);
+  assert.ok(rowFor(root, 'Monthly') && !rowFor(root, 'Weekly'));
+  assert.equal(editOf(rowFor(root, 'Monthly')).focused, true);
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { hypothesis: 'file:Monthly' });
+  assert.ok(setup.topics['Maps/a.md'].includes('"file:Monthly"'));
+});
+
+test('P5a Duplicate makes a " (n)" copy of the file and puts the focus on it; the copy is a plain file nothing uses', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY });
+  const { root } = await openManage(setup, 'recipe');
+  await pickMenu(rowFor(root, 'Weekly'), 'Duplicate');
+  assert.equal(setup.v.files[`${RECIPES}/Weekly (2).md`], WEEKLY);
+  assert.equal(editOf(rowFor(root, 'Weekly (2)')).focused, true);
+  await pickMenu(rowFor(root, 'Weekly'), 'Duplicate');
+  assert.equal(setup.v.files[`${RECIPES}/Weekly (3).md`], WEEKLY);
+  assert.equal(setup.settingSaves ?? 0, 0);
+});
+
+test('P5a Restore the built-in default removes the keys of the topic types that use the style (one save); the file stays; topics are not touched', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY, [`${RECIPES}/Other.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly', action: 'file:Weekly', atomic: 'file:Other' } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  const { root } = await openManage(setup, 'recipe');
+  await pickMenu(rowFor(root, 'Weekly'), 'Restore the built-in default');
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { atomic: 'file:Other' });
+  assert.equal(setup.settingSaves, 1);
+  assert.equal(setup.v.trashes, 0);
+  assert.equal(setup.v.files[`${RECIPES}/Weekly.md`], WEEKLY);
+  assert.equal(setup.topics['Maps/a.md'], topicText('file:Weekly'));
+  assert.ok(rowFor(root, 'Weekly'));
+  assert.match(rowTexts(rowFor(root, 'Weekly'))[0], /No topic type uses it now/);
+  // the last key goes: the whole object goes
+  await pickMenu(rowFor(root, 'Other'), 'Restore the built-in default');
+  assert.equal('noteStyleByKind' in setup.settings, false);
+});
+
+test('P5a Delete asks first and lists where the style is used; Cancel changes nothing; Move to trash uses the trash, frees the topic types (back to built-in) and leaves the topics alone', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly', action: 'file:Weekly' } }, { topics: { 'Maps/a.md': topicText('file:Weekly'), 'Maps/b.md': topicText('file:Weekly') } });
+  const { root } = await openManage(setup, 'recipe');
+  const before = snapshot(setup);
+  await pickMenu(rowFor(root, 'Weekly'), 'Delete (move to trash)');
+  assert.equal(windows.length, 2);
+  assert.equal(setup.v.trashes, 0, 'nothing is trashed before the answer');
+  const text = dom.texts(windows[1].contentEl).join('\n');
+  assert.match(windows[1].titleEl.text, /Weekly/);
+  assert.match(text, /Hypothesis, Action/);
+  assert.match(text, /2 topics/);
+  dom.button(windows[1].modalEl, 'Cancel').click();
+  await settle();
+  assert.equal(snapshot(setup), before, 'Cancel changes nothing');
+  assert.equal(setup.settingSaves ?? 0, 0);
+  await pickMenu(rowFor(root, 'Weekly'), 'Delete (move to trash)');
+  dom.button(windows[2].modalEl, 'Move to trash').click();
+  await settle();
+  assert.equal(setup.v.trashes, 1);
+  assert.equal(`${RECIPES}/Weekly.md` in setup.v.files, false);
+  assert.equal('noteStyleByKind' in setup.settings, false, 'the keys of the types that used it are gone');
+  assert.equal(setup.topics['Maps/a.md'], topicText('file:Weekly'));
+  assert.equal(setup.topicWrites.length, 0);
+  assert.equal(rowFor(root, 'Weekly'), undefined);
+  // the topic that still names it falls back with the existing "not found" path
+  const run = setup.store.runStyle({ topic: { style: 'file:Weekly' }, kind: 'hypothesis', outputLanguage: 'en' });
+  assert.deepEqual(plain(run.issues.missing), ['file:Weekly'], 'the existing "not found" path reports the missing style');
+  assert.equal(run.recipe.ref, 'builtin:hypothesis', 'and the type\'s built-in style is used');
+});
+
+test('P5a Delete of an unused style says so and still asks; Delete of a part lists the styles that name it, trashes it and leaves their files as they are (they fall back with a problem)', async () => {
+  const user = '---\nstructure: Mine\n---\nbody\n';
+  const setup = await manageSetup({ [`${RECIPES}/User.md`]: user, [`${STRUCTURES}/Mine.md`]: '## A\nx\n', [`${STRUCTURES}/Free.md`]: '## B\ny\n' }, { noteStyleDefaults: { voice: 'file:Calm' } });
+  const { root } = await openManage(setup, 'structure');
+  await pickMenu(rowFor(root, 'Free'), 'Delete (move to trash)');
+  assert.match(dom.texts(windows[1].contentEl).join('\n'), /Nothing uses it/);
+  dom.button(windows[1].modalEl, 'Cancel').click();
+  await pickMenu(rowFor(root, 'Mine'), 'Delete (move to trash)');
+  assert.match(dom.texts(windows[2].contentEl).join('\n'), /User/);
+  assert.equal(setup.v.trashes, 0);
+  dom.button(windows[2].modalEl, 'Move to trash').click();
+  await settle();
+  assert.equal(setup.v.trashes, 1);
+  assert.equal(setup.v.files[`${RECIPES}/User.md`], user);
+  const item = setup.store.listRecipes().find(entry => entry.ref === 'file:User');
+  assert.ok(item.issues.some(issue => issue.code === 'part_missing'), 'the style shows the problem');
+  assert.equal(item.structure.name, 'Mine');
+  assert.deepEqual(plain(setup.settings.noteStyleDefaults), { voice: 'file:Calm' }, 'a structure delete leaves the global voice');
+});
+
+test('P5a opening the window, the menus, View and the dialogs\' Cancel write nothing: no create, modify, rename, trash, settings save or topic write', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY, [`${STRUCTURES}/Mine.md`]: '## A\nx\n' }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  const before = snapshot(setup);
+  const { root, modal } = await openManage(setup, 'recipe');
+  for (const tab of tabsOf(root)) { tab.click(); await settle(); }
+  tabsOf(root)[0].click();
+  await settle();
+  moreOf(rowFor(root, 'Weekly')).click();
+  moreOf(rowFor(root, 'Weekly')).click();
+  dom.button(rowFor(root, 'Textbook'), 'View').click();
+  await settle();
+  dom.button(windows.at(-1).modalEl, 'Close').click();
+  await pickMenu(rowFor(root, 'Weekly'), 'Rename…');
+  dom.button(windows.at(-1).modalEl, 'Cancel').click();
+  await pickMenu(rowFor(root, 'Weekly'), 'Delete (move to trash)');
+  dom.button(windows.at(-1).modalEl, 'Cancel').click();
+  await settle();
+  modal.close();
+  assert.equal(snapshot(setup), before);
+  assert.equal(setup.settingSaves ?? 0, 0);
+  assert.equal(setup.topicWrites.length, 0);
+});
+
+test('P5a "Used in" for a part counts the global voice and format (a style that follows the global one uses it), and the AIM report stays out of every list when AIM is off', async () => {
+  const hidden = S.loadHidden('ui/modals/note-style-manage-modal.ts', { obsidian });
+  const setup = await manageSetup({ [`${VOICES}/Calm.md`]: 'soft' }, { noteStyleDefaults: { voice: 'file:Calm' } });
+  const modal = new hidden.NoteStyleManageModal(setup.app, setup.plugin, 'voice');
+  modal.open();
+  await settle();
+  const calm = rowFor(modal.contentEl, 'Calm');
+  assert.match(rowTexts(calm)[0], /^Used in: .*General research/);
+  assert.equal(rowTexts(calm)[0].includes('AIM'), false);
+  const academic = rowFor(modal.contentEl, 'Academic rigor') ?? rowFor(modal.contentEl, 'Professional');
+  assert.equal(rowTexts(academic)[0].includes('General research'), false, 'the built-in default no longer lists a style that follows another global voice');
 });

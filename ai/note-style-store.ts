@@ -40,6 +40,7 @@ import {
   parseRecipeRef,
   partNameOfRef,
   recipeFileText,
+  renamePartInRecipeText,
   STYLE_KINDS,
   updateRecipeFileText,
   type RecipeFileInput,
@@ -74,6 +75,8 @@ export interface StyleFilePort {
   modify(path: string, content: string): Promise<void>;
   /** Moves the file to the user's trash (recoverable). */
   trash(path: string): Promise<void>;
+  /** Renames a file to a free path in the same folder; throws when it cannot. Links to it are updated by the vault. */
+  rename(from: string, to: string): Promise<void>;
 }
 
 export interface NoteStyleSettings {
@@ -238,6 +241,19 @@ export interface UnusedCopy {
   /** The built-in or file it equals. */
   sameAs: string;
 }
+
+/** A file in the manage window: a style (`recipe`) or a part. */
+export type StyleCategory = "recipe" | PartCategory;
+
+/** A user's file moved to the trash, with the text it held so it can be put back. */
+export interface TrashedFile {
+  category: StyleCategory;
+  name: string;
+  text: string;
+}
+
+export type RenameFileResult =
+  { ok: true; ref: string; unchanged?: true } | { ok: false; reason: "missing" | "name" | "taken" | "failed" };
 
 export interface SaveRecipeInput extends Pick<RecipeFileParts, "structure" | "update"> {
   /** The name of a new style file; ignored when `original` is a user's file (its name stays). */
@@ -985,16 +1001,27 @@ export class NoteStyleStore {
     return { files: this.formats, dir: dirs.format };
   }
 
-  /** The styles (built-in and the user's files) that use `ref` as their part of `category`, by name. */
+  /**
+   * The styles (built-in and the user's files) that use `ref` as their part of `category`, by name. A style that follows the
+   * global voice or format uses the global one, so a part the global setting names is used by those styles.
+   */
   private stylesUsing(category: PartCategory, ref: string): string[] {
     const names: string[] = [];
+    const global = category === "structure" ? undefined : this.globalPartRef(category);
     for (const recipe of BUILTIN_RECIPES) {
-      const own =
-        recipe.structure === AIM_DELIVERY_STRUCTURE && category === "structure" ? undefined : recipe[category];
-      if (own !== undefined && `builtin:${own}` === ref) names.push(translate(this.settings.language, recipe.nameKey));
+      let own: string | undefined;
+      if (category === "structure")
+        own = recipe.structure === AIM_DELIVERY_STRUCTURE ? undefined : builtinRef(recipe.structure);
+      else if (category === "voice" ? recipe.followsVoice : recipe.followsFormat) own = global;
+      else own = builtinRef(recipe[category]);
+      if (own === ref) names.push(translate(this.settings.language, recipe.nameKey));
     }
-    for (const [base, text] of [...this.recipes].sort(([a], [b]) => a.localeCompare(b)))
-      if (parseRecipeFile(text)[category] === ref) names.push(base);
+    for (const [base, text] of [...this.recipes].sort(([a], [b]) => a.localeCompare(b))) {
+      const file = parseRecipeFile(text);
+      const own =
+        category === "structure" || (category === "voice" ? file.voiceSet : file.formatSet) ? file[category] : global;
+      if (own === ref) names.push(base);
+    }
     return names;
   }
 
@@ -1180,7 +1207,11 @@ export class NoteStyleStore {
       }
       const entries = items
         .filter(item => item.kind === "file" && files.has(item.name))
-        .map(item => ({ name: item.name, key: files.get(item.name)!, used: item.usedBy.length > 0 }));
+        .map(item => ({
+          name: item.name,
+          key: files.get(item.name)!,
+          used: item.usedBy.length > 0 || this.legacyRefs(category).has(item.ref)
+        }));
       sweep(category, entries, builtinKeys);
     }
     const recipes = this.listRecipes();
@@ -1211,6 +1242,176 @@ export class NoteStyleStore {
     }));
     sweep("recipe", recipeEntries, builtinKeys);
     return copies;
+  }
+
+  /** The part refs the 0.28.0 conversion table maps old ids to (structures from templates, voices from tones): topics may still use them. */
+  private legacyRefs(category: PartCategory): Set<string> {
+    const legacy = this.settings.noteStyleRecipe?.legacy;
+    const table = category === "structure" ? legacy?.templates : category === "voice" ? legacy?.tones : undefined;
+    return new Set(Object.values(table ?? {}));
+  }
+
+  // ---- changing the user's own files from the manage window (each is one user action; nothing is overwritten) ----
+
+  /** The cache and the folder of the files of a style or part category. */
+  private filesOf(category: StyleCategory): { files: Map<string, string>; dir: string } {
+    return category === "recipe"
+      ? { files: this.recipes, dir: this.blockDirectories().recipe }
+      : this.partStore(category);
+  }
+
+  /** The base name behind `file:<name>` when that file is in the cache. The name rules are not applied: a file with a bad name can still be renamed. */
+  private fileNameOf(category: StyleCategory, ref: string): string | undefined {
+    const name = /^file:(.+)$/.exec(ref)?.[1];
+    return name !== undefined && this.filesOf(category).files.has(name) ? name : undefined;
+  }
+
+  /**
+   * Whether `name` can be the new name of the file behind `ref`, and renames it. Nothing else changes: the caller moves the
+   * settings, the topics and the styles that name it. The name rules are those of a new file (`validatePartName`, a safe file
+   * name, not taken in any letter case by another file); the same name is a no-op. Never overwrites.
+   */
+  renameFile(category: StyleCategory, ref: string, name: string): Promise<RenameFileResult> {
+    return this.serial(async (): Promise<RenameFileResult> => {
+      await this.loadBlocks();
+      const old = this.fileNameOf(category, ref);
+      if (old === undefined) return { ok: false, reason: "missing" };
+      if (name === old) return { ok: true, ref, unchanged: true };
+      const { files, dir } = this.filesOf(category);
+      if (!validatePartName(name, category).ok || cleanBlockName(name) !== name) return { ok: false, reason: "name" };
+      if ([...files.keys()].some(key => key !== old && lower(key) === lower(name)))
+        return { ok: false, reason: "taken" };
+      try {
+        await this.deps.port.rename(`${dir}/${old}.md`, `${dir}/${name}.md`);
+      } catch {
+        return { ok: false, reason: "failed" };
+      }
+      const text = files.get(old)!;
+      files.delete(old);
+      files.set(name, text);
+      return { ok: true, ref: fileRef(name) };
+    });
+  }
+
+  /**
+   * After the part file `oldName` of `category` was renamed: the style files that name it as that part now name `newName`
+   * (only that key's value changes). A file that cannot be read or written is listed in `failed` and the others go on.
+   */
+  rewritePartRefs(
+    category: PartCategory,
+    oldName: string,
+    newName: string
+  ): Promise<{ changed: string[]; failed: string[] }> {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const changed: string[] = [];
+      const failed: string[] = [];
+      const dir = this.blockDirectories().recipe;
+      for (const base of [...this.recipes.keys()].sort((a, b) => a.localeCompare(b))) {
+        try {
+          const live = await this.deps.port.read(`${dir}/${base}.md`);
+          const next = renamePartInRecipeText(live, category, oldName, newName);
+          if (next === live) continue;
+          await this.deps.port.modify(`${dir}/${base}.md`, next);
+          this.recipes.set(base, next);
+          changed.push(base);
+        } catch {
+          failed.push(base);
+        }
+      }
+      return { changed, failed };
+    });
+  }
+
+  /** A copy of a user's file named "<name> (2)", "(3)" ... (the first free one); returns its ref. Throws for a built-in or a missing file. */
+  duplicateFile(category: StyleCategory, ref: string): Promise<string> {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const old = this.fileNameOf(category, ref);
+      if (old === undefined) throw new Error(`Not a file: ${ref}`);
+      const { files, dir } = this.filesOf(category);
+      const taken = new Set([...files.keys()].map(lower));
+      let name = old;
+      for (let n = 2; taken.has(lower(name)) || !validatePartName(name, category).ok; n++) {
+        if (n > 999) throw new Error("No free name");
+        name = `${old} (${n})`;
+      }
+      const text = files.get(old)!;
+      await this.pinFolder();
+      await this.deps.port.createFolder(dir);
+      await this.deps.port.create(`${dir}/${name}.md`, text);
+      files.set(name, text);
+      return fileRef(name);
+    });
+  }
+
+  /** Moves a user's file to the trash and returns what it held, so `restoreTrashed` can put it back. Throws for a built-in or a missing file. */
+  trashFile(category: StyleCategory, ref: string): Promise<TrashedFile> {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      return this.trashLocked(category, ref);
+    });
+  }
+
+  private async trashLocked(category: StyleCategory, ref: string): Promise<TrashedFile> {
+    const name = this.fileNameOf(category, ref);
+    if (name === undefined) throw new Error(`Not a file: ${ref}`);
+    const { files, dir } = this.filesOf(category);
+    const text = files.get(name)!;
+    await this.deps.port.trash(`${dir}/${name}.md`);
+    files.delete(name);
+    return { category, name, text };
+  }
+
+  /** Moves the given unused copies (see `listUnusedCopies`) to the trash one by one; one that cannot be moved is listed in `failed`. */
+  trashFiles(items: readonly { category: StyleCategory; ref: string; name: string }[]): Promise<{
+    trashed: TrashedFile[];
+    failed: string[];
+  }> {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const trashed: TrashedFile[] = [];
+      const failed: string[] = [];
+      for (const item of items) {
+        try {
+          trashed.push(await this.trashLocked(item.category, item.ref));
+        } catch {
+          failed.push(item.name);
+        }
+      }
+      return { trashed, failed };
+    });
+  }
+
+  /**
+   * Puts trashed files back from the text they held, under their old name, or " (2)", " (3)" ... when that name is taken now.
+   * Nothing is overwritten; a file that cannot be written is listed in `failed`.
+   */
+  restoreTrashed(files: readonly TrashedFile[]): Promise<{ restored: string[]; failed: string[] }> {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const restored: string[] = [];
+      const failed: string[] = [];
+      for (const item of files) {
+        try {
+          const { files: held, dir } = this.filesOf(item.category);
+          const taken = new Set([...held.keys()].map(lower));
+          let name = item.name;
+          for (let n = 2; taken.has(lower(name)); n++) {
+            if (n > 999) throw new Error("No free name");
+            name = `${item.name} (${n})`;
+          }
+          await this.pinFolder();
+          await this.deps.port.createFolder(dir);
+          await this.deps.port.create(`${dir}/${name}.md`, item.text);
+          held.set(name, item.text);
+          restored.push(fileRef(name));
+        } catch {
+          failed.push(item.name);
+        }
+      }
+      return { restored, failed };
+    });
   }
 
   /** The text of a user's style file as the last `refresh()` or write left it (what the editor compares before it saves). */
@@ -1602,7 +1803,8 @@ export function emptyNoteStyleStore(settings: () => NoteStyleSettings): NoteStyl
       createFolder: async () => undefined,
       create: async () => undefined,
       modify: async () => undefined,
-      trash: async () => undefined
+      trash: async () => undefined,
+      rename: async () => undefined
     },
     save: async () => undefined
   });

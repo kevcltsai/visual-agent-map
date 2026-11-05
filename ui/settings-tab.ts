@@ -368,7 +368,8 @@ export function renderMyStylesSetting(setting: Setting, plugin: VisualAgentMapPl
       0
     );
     setting.setName(t("ui.my_styles_count_0_1", styles, parts));
-    const unused = store.listUnusedCopies().length;
+    // A style a topic names is not an unused copy: the store cannot see the topics, so they are read from the metadata cache.
+    const unused = store.listUnusedCopies(new Set(plugin.topicNoteStyleRefs().map(item => item.ref))).length;
     setting.descEl.empty();
     if (unused) setting.descEl.createDiv({ text: t("ui.my_styles_unused_0", unused), cls: "vam-style-unused" });
     const line = setting.descEl.createDiv({ text: `${t("ui.my_styles_path_desc")} ` });

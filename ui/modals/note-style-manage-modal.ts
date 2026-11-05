@@ -1,7 +1,7 @@
 import { App, Modal, Notice, Setting } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
 import { t, type TranslationKey } from "../../i18n";
-import type { RecipeListItem } from "../../ai/note-style-store";
+import type { RecipeListItem, StyleCategory, TrashedFile } from "../../ai/note-style-store";
 import { UPDATE_MODE_KEYS, type StyleKind } from "../../ai/note-style-recipe";
 import { NoteStyleEditorModal, namePartProblem, suggestRecipeName } from "./note-style-editor-modal";
 import { styleIssueText } from "../../experiences/visual-map/note-style-picker";
@@ -64,6 +64,8 @@ interface Entry {
   aimOnly: boolean;
   /** A retired built-in a style still uses: listed marked, but not a copy source. */
   retired?: boolean;
+  /** The topic types that use a style (as saved, or its built-in default); empty for a part. */
+  kinds: StyleKind[];
 }
 
 const lower = (value: string): string => value.toLocaleLowerCase();
@@ -87,6 +89,14 @@ export class NoteStyleManageModal extends Modal {
   private editor?: NoteStyleEditorModal;
   /** The files are being read before the editor opens. */
   private opening = false;
+  /** The small window on top of this one (rename, delete, view); one at a time. */
+  private dialog?: Modal;
+  /** The open "..." menu of a row. */
+  private menu?: { more: HTMLElement; el: HTMLElement; close: (focus: boolean) => void };
+  /** Where the clean-up banner of the open panel is drawn. */
+  private bannerEl?: HTMLElement;
+  /** What the last clean-up moved to the trash, kept in memory for "Undo". */
+  private trashed?: TrashedFile[];
 
   constructor(
     app: App,
@@ -132,6 +142,11 @@ export class NoteStyleManageModal extends Modal {
         })
       );
     }
+    this.contentEl.addEventListener("click", (event: Event) => {
+      const open = this.menu;
+      const target = event.target as Node | null;
+      if (open && target && target !== open.more && !open.el.contains(target)) open.close(false);
+    });
     this.selectTab(this.tab, true);
     // The first picture comes from what was read last; the files are read again right away.
     void this.plugin.noteStyles.refresh().then(
@@ -146,6 +161,8 @@ export class NoteStyleManageModal extends Modal {
 
   onClose(): void {
     this.closed = true;
+    this.menu?.close(false);
+    this.dialog?.close();
     this.contentEl.empty();
     this.trigger?.focus();
     this.onClosed?.();
@@ -181,6 +198,7 @@ export class NoteStyleManageModal extends Modal {
           name: item.name,
           issues: item.issues,
           used: item.usedByKinds.filter(kind => kind !== "aim" || aimEnabled()).map(styleKindName),
+          kinds: item.usedByKinds.filter(kind => kind !== "aim" || aimEnabled()),
           tags: styleTags(item),
           aimOnly: item.aimOnly === true
         }));
@@ -193,6 +211,7 @@ export class NoteStyleManageModal extends Modal {
         name: item.retired ? t("ui.note_style_retired_option_0", item.name) : item.name,
         issues: item.issues,
         used: item.usedBy,
+        kinds: [],
         aimOnly: false,
         ...(item.retired ? { retired: true } : {})
       }));
@@ -201,6 +220,8 @@ export class NoteStyleManageModal extends Modal {
   private buildPanel(panel: HTMLElement): void {
     panel.empty();
     this.editButtons.clear();
+    this.menu = undefined;
+    this.bannerEl = panel.createDiv({ cls: "vam-manage-banners" });
     this.listEl = panel.createDiv({ cls: "vam-manage-list" });
     this.renderList();
     this.buildAddForm(panel);
@@ -227,12 +248,26 @@ export class NoteStyleManageModal extends Modal {
           cls: "vam-block-status-error"
         });
       if (entry.aimOnly) continue;
+      if (entry.builtin) {
+        setting.addButton(button => {
+          button.setButtonText(t("ui.manage_view")).onClick(() => this.view(entry, button.buttonEl));
+          button.buttonEl.setAttr("aria-label", t("ui.manage_view_aria_0", entry.name));
+        });
+        setting.addButton(button => {
+          button.setButtonText(t("ui.manage_copy_edit")).onClick(() => void this.edit(entry));
+          button.buttonEl.setAttr("aria-label", t("ui.manage_copy_edit_aria_0", entry.name));
+          this.editButtons.set(entry.ref, button.buttonEl);
+        });
+        continue;
+      }
       setting.addButton(button => {
         button.setButtonText(t("ui.manage_edit")).onClick(() => void this.edit(entry));
         button.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", entry.name));
         this.editButtons.set(entry.ref, button.buttonEl);
       });
+      this.addMenu(setting, entry);
     }
+    this.renderBanner();
   }
 
   focusRow(ref: string | null): void {
@@ -259,6 +294,265 @@ export class NoteStyleManageModal extends Modal {
       this.renderList();
       this.refreshForm?.();
       this.focusRow(target);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  // ---- the "..." menu of a user's row: rename, duplicate, restore the built-in default, delete ----
+
+  private get category(): StyleCategory {
+    return this.tab;
+  }
+
+  private addMenu(setting: Setting, entry: Entry): void {
+    const more = setting.controlEl.createEl("button", {
+      text: "⋯",
+      cls: "vam-manage-more",
+      attr: {
+        "aria-label": t("ui.manage_more_aria_0", entry.name),
+        "aria-haspopup": "menu",
+        "aria-expanded": "false"
+      }
+    });
+    const items: { text: string; desc?: string; danger?: boolean; run: () => void }[] = [
+      { text: t("ui.manage_menu_rename"), desc: t("ui.manage_menu_rename_desc"), run: () => this.rename(entry, more) },
+      { text: t("ui.manage_menu_duplicate"), run: () => void this.duplicate(entry) }
+    ];
+    if (this.tab === "recipe" && entry.kinds.length)
+      items.push({
+        text: t("ui.manage_menu_restore"),
+        desc: t("ui.manage_menu_restore_desc_0", entry.used.join(t("ui.manage_list_separator"))),
+        run: () => void this.restoreDefault(entry)
+      });
+    items.push({ text: t("ui.manage_menu_delete"), danger: true, run: () => this.confirmDelete(entry, more) });
+    more.addEventListener("click", () => {
+      if (this.menu?.more === more) this.menu.close(false);
+      else this.openMenu(setting, more, items);
+    });
+  }
+
+  private openMenu(
+    setting: Setting,
+    more: HTMLElement,
+    items: { text: string; desc?: string; danger?: boolean; run: () => void }[]
+  ): void {
+    this.menu?.close(false);
+    const el = setting.settingEl.createDiv({ cls: "vam-manage-menu", attr: { role: "menu" } });
+    const buttons = items.map(item => {
+      const button = el.createEl("button", {
+        text: item.text,
+        cls: item.danger ? "vam-manage-menu-item is-danger" : "vam-manage-menu-item",
+        attr: { role: "menuitem", tabindex: "-1" }
+      });
+      if (item.desc) button.createSpan({ text: item.desc, cls: "vam-manage-menu-desc" });
+      button.addEventListener("click", () => {
+        this.menu?.close(false);
+        item.run();
+      });
+      return button;
+    });
+    const close = (focus: boolean): void => {
+      el.remove();
+      more.setAttr("aria-expanded", "false");
+      if (this.menu?.el === el) this.menu = undefined;
+      if (focus) more.focus();
+    };
+    el.addEventListener("keydown", (event: KeyboardEvent) => {
+      const at = buttons.findIndex(button => button === event.target);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        close(true);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        buttons[(at + step + buttons.length) % buttons.length].focus();
+      } else if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        buttons[event.key === "Home" ? 0 : buttons.length - 1].focus();
+      } else if (event.key === "Tab") close(false);
+    });
+    more.setAttr("aria-expanded", "true");
+    this.menu = { more, el, close };
+    buttons[0].focus();
+  }
+
+  /** Opens one small window on top of this one (not while another is open). */
+  private openDialog(dialog: Modal): void {
+    if (this.dialog || this.closed) return;
+    this.dialog = dialog;
+    openInWindowOf(dialog, this.modalEl);
+  }
+
+  private dialogClosed(): void {
+    this.dialog = undefined;
+  }
+
+  /** The list is read again and drawn, then the focus goes to `ref`'s row (or the open tab). */
+  private async redraw(ref: string | null): Promise<void> {
+    await this.plugin.noteStyles.refresh().catch(() => undefined);
+    if (this.closed) return;
+    this.renderList();
+    this.refreshForm?.();
+    if (ref) this.focusRow(ref);
+    else this.tabEls.get(this.tab)?.focus();
+  }
+
+  private rename(entry: Entry, trigger: HTMLElement): void {
+    const taken = this.takenNames();
+    taken.delete(lower(entry.name));
+    const category = this.category;
+    this.openDialog(
+      new RenameDialog(this.app, {
+        name: entry.name,
+        trigger,
+        problem: value => namePartProblem(value, category, taken),
+        submit: async value => {
+          const result = await this.plugin.renameNoteStyle(category, entry.ref, value);
+          if (!result.ok) return false;
+          await this.redraw(result.ref);
+          return true;
+        },
+        onClosed: () => this.dialogClosed()
+      })
+    );
+  }
+
+  private async duplicate(entry: Entry): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      let ref: string | null = null;
+      try {
+        ref = await this.plugin.noteStyles.duplicateFile(this.category, entry.ref);
+      } catch {
+        new Notice(t("ui.manage_create_failed"));
+      }
+      await this.redraw(ref ?? entry.ref);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  /** "Restore the built-in default": the topic types that use this style go back to their built-in style; the file stays. */
+  private async restoreDefault(entry: Entry): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      await this.plugin.clearKindStyles(entry.ref);
+      await this.redraw(entry.ref);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private confirmDelete(entry: Entry, trigger: HTMLElement): void {
+    const lines: string[] = [];
+    const sep = t("ui.manage_list_separator");
+    if (this.tab === "recipe") {
+      const topics = this.plugin.topicNoteStyleRefs().filter(item => item.ref === entry.ref).length;
+      if (entry.used.length) lines.push(t("ui.manage_delete_kinds_0", entry.used.join(sep)));
+      if (topics) lines.push(t("ui.manage_delete_topics_0", topics));
+      if (!lines.length) lines.push(t("ui.manage_delete_unused"));
+    } else
+      lines.push(
+        entry.used.length ? t("ui.manage_delete_styles_0", entry.used.join(sep)) : t("ui.manage_delete_unused")
+      );
+    lines.push(t("ui.manage_delete_note"));
+    const category = this.category;
+    this.openDialog(
+      new ConfirmDialog(this.app, {
+        title: t("ui.manage_delete_title_0", entry.name),
+        lines,
+        confirm: t("ui.manage_delete_confirm"),
+        trigger,
+        run: async () => {
+          if (await this.plugin.deleteNoteStyle(category, entry.ref)) await this.redraw(null);
+        },
+        onClosed: () => this.dialogClosed()
+      })
+    );
+  }
+
+  /** "View" of a built-in: its text (a part) or its four settings (a style) in a window that cannot be edited. Writes nothing. */
+  private view(entry: Entry, trigger: HTMLElement): void {
+    const store = this.plugin.noteStyles;
+    let body: { lines?: string[]; text?: string };
+    if (this.tab === "recipe") {
+      const item = store.listRecipes().find(recipe => recipe.ref === entry.ref);
+      body = {
+        lines: item
+          ? [
+              `${manageTabName("structure")}: ${item.structure.name}`,
+              `${manageTabName("voice")}: ${item.voice.name}`,
+              `${manageTabName("format")}: ${item.format.name}`,
+              ...(item.aimOnly ? [] : [t(UPDATE_MODE_KEYS[item.update])])
+            ]
+          : []
+      };
+    } else {
+      try {
+        body = { text: store.partSourceText(this.tab, entry.ref, this.plugin.settings.language) };
+      } catch {
+        body = { lines: [] };
+      }
+    }
+    this.openDialog(
+      new ViewDialog(this.app, { title: entry.name, ...body, trigger, onClosed: () => this.dialogClosed() })
+    );
+  }
+
+  // ---- the clean-up of unused copies ----
+
+  private unusedCopies(): ReturnType<VisualAgentMapPlugin["noteStyles"]["listUnusedCopies"]> {
+    return this.plugin.noteStyles.listUnusedCopies(new Set(this.plugin.topicNoteStyleRefs().map(item => item.ref)));
+  }
+
+  private renderBanner(): void {
+    const holder = this.bannerEl;
+    if (!holder) return;
+    holder.empty();
+    if (this.trashed?.length) {
+      const banner = holder.createDiv({ cls: "vam-manage-banner is-done", attr: { role: "status" } });
+      banner.createEl("p", { text: t("ui.manage_trashed_banner") });
+      banner.createEl("button", { text: t("ui.manage_undo") }).addEventListener("click", () => void this.undoTrash());
+      return;
+    }
+    const copies = this.unusedCopies();
+    if (!copies.length) return;
+    const names = copies.slice(0, 5).map(copy => copy.name);
+    const list = names.join(t("ui.manage_list_separator")) + (copies.length > names.length ? "…" : "");
+    const banner = holder.createDiv({ cls: "vam-manage-banner" });
+    banner.createEl("p", { text: t("ui.manage_unused_banner_0_1", copies.length, list) });
+    banner
+      .createEl("button", { text: t("ui.manage_unused_trash") })
+      .addEventListener("click", () => void this.trashCopies());
+  }
+
+  private async trashCopies(): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      const result = await this.plugin.noteStyles.trashFiles(this.unusedCopies());
+      if (result.failed.length)
+        new Notice(t("ui.manage_trash_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+      this.trashed = result.trashed.length ? result.trashed : undefined;
+      await this.redraw(null);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private async undoTrash(): Promise<void> {
+    if (this.busy || !this.trashed) return;
+    this.busy = true;
+    try {
+      const result = await this.plugin.noteStyles.restoreTrashed(this.trashed);
+      if (result.failed.length)
+        new Notice(t("ui.manage_undo_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+      this.trashed = undefined;
+      await this.redraw(null);
     } finally {
       this.busy = false;
     }
@@ -486,5 +780,152 @@ export class NoteStyleManageModal extends Modal {
     fillSources();
     setName(this.suggestName(source || null));
     check();
+  }
+}
+
+/** The small window of "Rename...": a name field with the live error, Rename and Cancel. */
+class RenameDialog extends Modal {
+  private done = false;
+  constructor(
+    app: App,
+    private opts: {
+      name: string;
+      trigger: HTMLElement;
+      problem: (value: string) => string;
+      /** Renames; true closes the window, false keeps it open (the Notice has said why). */
+      submit: (value: string) => Promise<boolean>;
+      onClosed: () => void;
+    }
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { opts } = this;
+    this.titleEl.setText(t("ui.manage_rename_title_0", opts.name));
+    this.contentEl.createEl("p", { text: t("ui.manage_rename_note"), cls: "vam-manage-dialog-note" });
+    const errorId = "vam-manage-rename-error";
+    const input = this.contentEl.createEl("input", {
+      type: "text",
+      cls: "vam-manage-rename-input",
+      attr: { "aria-label": t("ui.manage_add_name"), "aria-describedby": errorId }
+    });
+    input.value = opts.name;
+    const error = this.contentEl.createDiv({
+      cls: "vam-block-status-error vam-manage-error",
+      attr: { id: errorId, "aria-live": "polite" }
+    });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const rename = row.createEl("button", { text: t("ui.manage_rename_button"), cls: "mod-cta" });
+    const cancel = row.createEl("button", { text: t("ui.cancel") });
+    let busy = false;
+    const check = (): string => {
+      const problem = input.value === opts.name ? "" : opts.problem(input.value);
+      error.setText(problem);
+      rename.disabled = !!problem || input.value === opts.name || busy;
+      return problem;
+    };
+    const submit = async (): Promise<void> => {
+      if (busy || rename.disabled) return;
+      busy = true;
+      rename.disabled = true;
+      try {
+        if (await opts.submit(input.value)) {
+          this.done = true;
+          this.close();
+        }
+      } finally {
+        busy = false;
+        check();
+      }
+    };
+    input.addEventListener("input", check);
+    input.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void submit();
+    });
+    rename.addEventListener("click", () => void submit());
+    cancel.addEventListener("click", () => this.close());
+    check();
+    input.focus();
+    input.select();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    this.opts.onClosed();
+    if (!this.done) this.opts.trigger.focus();
+  }
+}
+
+/** The small window that asks before something is moved to the trash. */
+class ConfirmDialog extends Modal {
+  private done = false;
+  constructor(
+    app: App,
+    private opts: {
+      title: string;
+      lines: string[];
+      confirm: string;
+      trigger: HTMLElement;
+      run: () => Promise<void>;
+      onClosed: () => void;
+    }
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { opts } = this;
+    this.titleEl.setText(opts.title);
+    for (const line of opts.lines) this.contentEl.createEl("p", { text: line });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const confirm = row.createEl("button", { text: opts.confirm, cls: "mod-warning" });
+    const cancel = row.createEl("button", { text: t("ui.cancel") });
+    confirm.addEventListener("click", () => {
+      if (confirm.disabled) return;
+      confirm.disabled = true;
+      this.done = true;
+      void opts.run().finally(() => this.close());
+    });
+    cancel.addEventListener("click", () => this.close());
+    // The safe answer has the focus.
+    cancel.focus();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    this.opts.onClosed();
+    if (!this.done) this.opts.trigger.focus();
+  }
+}
+
+/** A built-in's text or settings, shown as they are; nothing in it can be typed. */
+class ViewDialog extends Modal {
+  constructor(
+    app: App,
+    private opts: { title: string; lines?: string[]; text?: string; trigger: HTMLElement; onClosed: () => void }
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { opts } = this;
+    this.titleEl.setText(opts.title);
+    this.contentEl.createEl("p", { text: t("ui.manage_view_readonly"), cls: "vam-manage-dialog-note" });
+    for (const line of opts.lines ?? []) this.contentEl.createEl("p", { text: line });
+    if (opts.text !== undefined) this.contentEl.createEl("pre", { text: opts.text, cls: "vam-manage-view-text" });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const close = row.createEl("button", { text: t("ui.close") });
+    close.addEventListener("click", () => this.close());
+    close.focus();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    this.opts.onClosed();
+    this.opts.trigger.focus();
   }
 }

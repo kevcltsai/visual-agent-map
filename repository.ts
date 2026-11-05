@@ -1920,6 +1920,21 @@ export class Repository {
   }
 
   /**
+   * Renames the style a note names: `note-style: <from>` becomes `<to>`, and only when the note still names `from` when the
+   * file is processed (a note changed meanwhile is left alone and false is returned). Other lines and the body keep their
+   * bytes, `updated` is not bumped, nothing rebuilds.
+   */
+  async renameNoteStyleRef(path: string, from: string, to: string): Promise<boolean> {
+    let wrote = false;
+    await this.app.vault.process(this.file(path), content => {
+      if (frontmatter(content)["note-style"] !== from) return content;
+      wrote = true;
+      return setFrontmatterKeys(content, { "note-style": to });
+    });
+    return wrote;
+  }
+
+  /**
    * Toggles one marker in `topic-markers`, reading the current list inside the same `vault.process` call. Values this
    * version does not know are kept, an emptied list removes the key, and `updated` is not bumped.
    */

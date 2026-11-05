@@ -1647,11 +1647,23 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-manage-tabs { display: flex; flex-wrap: wrap; gap: var(--size-4-1); margin-bottom: var(--size-4-3); border-bottom: 1px solid var(--background-modifier-border); }
 .vam-manage-tab { background: transparent; box-shadow: none; border-radius: var(--radius-s) var(--radius-s) 0 0; color: var(--text-muted); }
 .vam-manage-tab.is-active { color: var(--text-normal); background: var(--background-modifier-hover); border-bottom: 2px solid var(--interactive-accent); }
-.vam-manage-row { flex-wrap: wrap; gap: var(--size-4-2); }
+.vam-manage-row { flex-wrap: wrap; gap: var(--size-4-2); position: relative; }
 .vam-manage-row > .setting-item-info { flex: 1 1 14em; min-width: 0; }
 .vam-manage-row > .setting-item-control { flex-wrap: wrap; justify-content: flex-end; }
 .vam-manage-badge { margin-inline-start: var(--size-4-2); padding: 0 var(--size-4-1); border-radius: var(--radius-s); background: var(--background-modifier-hover); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-manage-row .vam-block-status-error, .vam-manage-error { color: var(--text-error); }
+.vam-manage-more { min-width: 2.5em; min-height: 2.5em; }
+.vam-manage-menu { position: absolute; inset-inline-end: 0; top: 100%; z-index: 2; min-width: 15em; max-width: 22em; padding: var(--size-4-1) 0; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); box-shadow: var(--shadow-s); }
+.vam-manage-menu-item { display: block; width: 100%; min-height: 2.5em; text-align: start; background: transparent; box-shadow: none; border-radius: 0; }
+.vam-manage-menu-item:hover, .vam-manage-menu-item:focus-visible { background: var(--background-modifier-hover); }
+.vam-manage-menu-item.is-danger { color: var(--text-error); }
+.vam-manage-menu-desc { display: block; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-manage-banner { display: flex; align-items: center; justify-content: space-between; gap: var(--size-4-3); margin-bottom: var(--size-4-3); padding: var(--size-4-2) var(--size-4-3); border-radius: var(--radius-m); background: var(--background-modifier-hover); }
+.vam-manage-banner p { margin: 0; }
+.vam-manage-banner.is-done { border-inline-start: 3px solid var(--color-green); }
+.vam-manage-dialog-buttons { display: flex; justify-content: flex-end; gap: var(--size-4-2); margin-top: var(--size-4-3); }
+.vam-manage-rename-input { width: 100%; }
+.vam-manage-view-text { max-height: 50vh; overflow: auto; white-space: pre-wrap; }
 .vam-manage-add { margin-top: var(--size-4-3); }
 .vam-manage-form { margin-top: var(--size-4-2); padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
 .vam-manage-mode { display: flex; align-items: center; gap: var(--size-4-2); }

@@ -2576,6 +2576,39 @@ var en = {
   "ui.manage_name_unsafe": 'The name cannot contain any of : # ^ [ ] * ? " < > |.',
   "ui.manage_name_taken": "A file with this name already exists.",
   "ui.manage_create_failed": "Cannot create this file. Nothing was overwritten.",
+  "ui.manage_more_aria_0": "More actions: {0}",
+  "ui.manage_menu_rename": "Rename\u2026",
+  "ui.manage_menu_rename_desc": "Settings and topics that use it follow",
+  "ui.manage_menu_duplicate": "Duplicate",
+  "ui.manage_menu_restore": "Restore the built-in default",
+  "ui.manage_menu_restore_desc_0": "{0} go back to their built-in styles",
+  "ui.manage_menu_delete": "Delete (move to trash)",
+  "ui.manage_view": "View",
+  "ui.manage_view_aria_0": "View {0}",
+  "ui.manage_copy_edit": "Copy and edit",
+  "ui.manage_copy_edit_aria_0": "Copy {0} and edit",
+  "ui.manage_view_readonly": "Built-in, read only. Use Copy and edit to change a copy.",
+  "ui.manage_rename_title_0": "Rename {0}",
+  "ui.manage_rename_note": "The settings and the topics that use it follow the new name.",
+  "ui.manage_rename_button": "Rename",
+  "ui.manage_rename_done_0_1_2": "Renamed to \u201C{0}\u201D. Updated {1} topics and {2} styles.",
+  "ui.manage_rename_failed_0": "Could not update: {0}. They fall back until renamed back.",
+  "ui.manage_rename_refused": "Nothing was renamed: the name is taken, not allowed, or the file is gone.",
+  "ui.manage_rename_settings": "the settings",
+  "ui.manage_delete_title_0": "Move \u201C{0}\u201D to the trash?",
+  "ui.manage_delete_unused": "Nothing uses it.",
+  "ui.manage_delete_kinds_0": "Topic types that use it: {0}. They go back to their built-in styles.",
+  "ui.manage_delete_topics_0": "{0} topics chose it. They are not changed; they find no style and fall back with a notice.",
+  "ui.manage_delete_styles_0": "Styles that use it: {0}. They fall back to the built-in part and show a problem.",
+  "ui.manage_delete_note": "It goes to the Obsidian trash, where you can get it back.",
+  "ui.manage_delete_confirm": "Move to trash",
+  "ui.manage_delete_failed": "Could not move the file to the trash. Nothing was changed.",
+  "ui.manage_unused_banner_0_1": "{0} unused copies: {1}.",
+  "ui.manage_unused_trash": "Move to trash",
+  "ui.manage_trashed_banner": "Moved to the Obsidian trash. You can get them back from there too.",
+  "ui.manage_trash_failed_0": "Could not move: {0}.",
+  "ui.manage_undo": "Undo",
+  "ui.manage_undo_failed_0": "Could not restore: {0}.",
   "ui.recipe_new_name": "New style",
   "ui.editor_title_edit": "Edit note style",
   "ui.editor_title_new": "New note style",
@@ -5118,6 +5151,39 @@ var zhCN = {
   "ui.manage_name_unsafe": '\u540D\u79F0\u4E0D\u80FD\u542B : # ^ [ ] * ? " < > | \u5176\u4E2D\u4EFB\u4F55\u4E00\u4E2A\u3002',
   "ui.manage_name_taken": "\u5DF2\u7ECF\u6709\u540C\u540D\u7684\u6587\u4EF6\u3002",
   "ui.manage_create_failed": "\u65E0\u6CD5\u521B\u5EFA\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u6CA1\u6709\u8986\u76D6\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.manage_more_aria_0": "\u66F4\u591A\u64CD\u4F5C\uFF1A{0}",
+  "ui.manage_menu_rename": "\u6539\u540D\u2026",
+  "ui.manage_menu_rename_desc": "\u8BBE\u7F6E\u548C\u7528\u5230\u7684\u8BAE\u9898\u4E00\u8D77\u66F4\u65B0",
+  "ui.manage_menu_duplicate": "\u590D\u5236\u4E00\u4EFD",
+  "ui.manage_menu_restore": "\u6062\u590D\u6210\u5185\u7F6E",
+  "ui.manage_menu_restore_desc_0": "{0}\u6539\u56DE\u5185\u7F6E\u98CE\u683C",
+  "ui.manage_menu_delete": "\u5220\u9664\uFF08\u79FB\u5230\u56DE\u6536\u7AD9\uFF09",
+  "ui.manage_view": "\u67E5\u770B",
+  "ui.manage_view_aria_0": "\u67E5\u770B {0}",
+  "ui.manage_copy_edit": "\u590D\u5236\u5E76\u4FEE\u6539",
+  "ui.manage_copy_edit_aria_0": "\u590D\u5236 {0} \u5E76\u4FEE\u6539",
+  "ui.manage_view_readonly": "\u5185\u7F6E\u7684\uFF0C\u53EA\u80FD\u770B\u3002\u8981\u6539\u8BF7\u7528\u201C\u590D\u5236\u5E76\u4FEE\u6539\u201D\u3002",
+  "ui.manage_rename_title_0": "\u6539\u540D\uFF1A{0}",
+  "ui.manage_rename_note": "\u8BBE\u7F6E\u548C\u7528\u5230\u5B83\u7684\u8BAE\u9898\u4F1A\u8DDF\u7740\u65B0\u540D\u79F0\u3002",
+  "ui.manage_rename_button": "\u6539\u540D",
+  "ui.manage_rename_done_0_1_2": "\u5DF2\u6539\u540D\u4E3A\u201C{0}\u201D\uFF0C\u66F4\u65B0\u4E86 {1} \u4E2A\u8BAE\u9898\u548C {2} \u4E2A\u98CE\u683C\u3002",
+  "ui.manage_rename_failed_0": "\u8FD9\u4E9B\u6CA1\u80FD\u66F4\u65B0\uFF1A{0}\u3002\u6539\u56DE\u539F\u540D\u4E4B\u524D\u4F1A\u9000\u56DE\u5176\u4ED6\u98CE\u683C\u3002",
+  "ui.manage_rename_refused": "\u6CA1\u6709\u6539\u540D\uFF1A\u540D\u79F0\u5DF2\u88AB\u7528\u3001\u4E0D\u80FD\u7528\uFF0C\u6216\u6587\u4EF6\u4E0D\u89C1\u4E86\u3002",
+  "ui.manage_rename_settings": "\u8BBE\u7F6E",
+  "ui.manage_delete_title_0": "\u628A\u201C{0}\u201D\u79FB\u5230\u56DE\u6536\u7AD9\uFF1F",
+  "ui.manage_delete_unused": "\u76EE\u524D\u6CA1\u6709\u5730\u65B9\u5728\u7528\u3002",
+  "ui.manage_delete_kinds_0": "\u7528\u5230\u5B83\u7684\u8BAE\u9898\u7C7B\u578B\uFF1A{0}\u3002\u5B83\u4EEC\u4F1A\u6539\u56DE\u5185\u7F6E\u98CE\u683C\u3002",
+  "ui.manage_delete_topics_0": "\u6709 {0} \u4E2A\u8BAE\u9898\u9009\u4E86\u5B83\u3002\u8BAE\u9898\u4E0D\u4F1A\u88AB\u6539\uFF0C\u4E4B\u540E\u627E\u4E0D\u5230\u98CE\u683C\u65F6\u4F1A\u9000\u56DE\u5E76\u63D0\u793A\u3002",
+  "ui.manage_delete_styles_0": "\u7528\u5230\u5B83\u7684\u98CE\u683C\uFF1A{0}\u3002\u5B83\u4EEC\u4F1A\u9000\u56DE\u5185\u7F6E\u7684\u90E8\u5206\u5E76\u663E\u793A\u201C\u6709\u95EE\u9898\u201D\u3002",
+  "ui.manage_delete_note": "\u4F1A\u79FB\u5230 Obsidian \u56DE\u6536\u7AD9\uFF0C\u53EF\u4EE5\u4ECE\u90A3\u91CC\u6551\u56DE\u3002",
+  "ui.manage_delete_confirm": "\u79FB\u5230\u56DE\u6536\u7AD9",
+  "ui.manage_delete_failed": "\u65E0\u6CD5\u628A\u6587\u4EF6\u79FB\u5230\u56DE\u6536\u7AD9\uFF0C\u6CA1\u6709\u6539\u4EFB\u4F55\u4E1C\u897F\u3002",
+  "ui.manage_unused_banner_0_1": "\u6709 {0} \u4EFD\u6CA1\u5728\u7528\u7684\u526F\u672C\uFF1A{1}\u3002",
+  "ui.manage_unused_trash": "\u79FB\u5230\u56DE\u6536\u7AD9",
+  "ui.manage_trashed_banner": "\u5DF2\u79FB\u5230 Obsidian \u56DE\u6536\u7AD9\uFF0C\u53EF\u4EE5\u4ECE\u90A3\u91CC\u6551\u56DE\u3002",
+  "ui.manage_trash_failed_0": "\u6CA1\u80FD\u79FB\u8D70\uFF1A{0}\u3002",
+  "ui.manage_undo": "\u64A4\u9500",
+  "ui.manage_undo_failed_0": "\u6CA1\u80FD\u8FD8\u539F\uFF1A{0}\u3002",
   "ui.recipe_new_name": "\u65B0\u98CE\u683C",
   "ui.editor_title_edit": "\u7F16\u8F91\u7B14\u8BB0\u98CE\u683C",
   "ui.editor_title_new": "\u65B0\u589E\u7B14\u8BB0\u98CE\u683C",
@@ -7660,6 +7726,39 @@ var zhTW = {
   "ui.manage_name_unsafe": '\u540D\u7A31\u4E0D\u80FD\u542B : # ^ [ ] * ? " < > | \u5176\u4E2D\u4EFB\u4F55\u4E00\u500B\u3002',
   "ui.manage_name_taken": "\u5DF2\u7D93\u6709\u540C\u540D\u7684\u6A94\u6848\u3002",
   "ui.manage_create_failed": "\u7121\u6CD5\u5EFA\u7ACB\u9019\u500B\u6A94\u6848\uFF0C\u6C92\u6709\u8986\u5BEB\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.manage_more_aria_0": "\u66F4\u591A\u52D5\u4F5C\uFF1A{0}",
+  "ui.manage_menu_rename": "\u6539\u540D\u2026",
+  "ui.manage_menu_rename_desc": "\u8A2D\u5B9A\u548C\u7528\u5230\u7684\u8B70\u984C\u4E00\u8D77\u66F4\u65B0",
+  "ui.manage_menu_duplicate": "\u8907\u88FD\u4E00\u4EFD",
+  "ui.manage_menu_restore": "\u6062\u5FA9\u6210\u5167\u5EFA",
+  "ui.manage_menu_restore_desc_0": "{0}\u6539\u56DE\u5167\u5EFA\u98A8\u683C",
+  "ui.manage_menu_delete": "\u522A\u9664\uFF08\u79FB\u5230\u5783\u573E\u6876\uFF09",
+  "ui.manage_view": "\u6AA2\u8996",
+  "ui.manage_view_aria_0": "\u6AA2\u8996 {0}",
+  "ui.manage_copy_edit": "\u8907\u88FD\u4E26\u4FEE\u6539",
+  "ui.manage_copy_edit_aria_0": "\u8907\u88FD {0} \u4E26\u4FEE\u6539",
+  "ui.manage_view_readonly": "\u5167\u5EFA\u7684\uFF0C\u53EA\u80FD\u770B\u3002\u8981\u6539\u8ACB\u7528\u300C\u8907\u88FD\u4E26\u4FEE\u6539\u300D\u3002",
+  "ui.manage_rename_title_0": "\u6539\u540D\uFF1A{0}",
+  "ui.manage_rename_note": "\u8A2D\u5B9A\u548C\u7528\u5230\u5B83\u7684\u8B70\u984C\u6703\u8DDF\u8457\u65B0\u540D\u7A31\u3002",
+  "ui.manage_rename_button": "\u6539\u540D",
+  "ui.manage_rename_done_0_1_2": "\u5DF2\u6539\u540D\u70BA\u300C{0}\u300D\uFF0C\u66F4\u65B0\u4E86 {1} \u500B\u8B70\u984C\u548C {2} \u500B\u98A8\u683C\u3002",
+  "ui.manage_rename_failed_0": "\u9019\u4E9B\u6C92\u80FD\u66F4\u65B0\uFF1A{0}\u3002\u6539\u56DE\u539F\u540D\u4E4B\u524D\u6703\u9000\u56DE\u5176\u4ED6\u98A8\u683C\u3002",
+  "ui.manage_rename_refused": "\u6C92\u6709\u6539\u540D\uFF1A\u540D\u7A31\u5DF2\u88AB\u7528\u3001\u4E0D\u80FD\u7528\uFF0C\u6216\u6A94\u6848\u4E0D\u898B\u4E86\u3002",
+  "ui.manage_rename_settings": "\u8A2D\u5B9A",
+  "ui.manage_delete_title_0": "\u628A\u300C{0}\u300D\u79FB\u5230\u5783\u573E\u6876\uFF1F",
+  "ui.manage_delete_unused": "\u76EE\u524D\u6C92\u6709\u5730\u65B9\u5728\u7528\u3002",
+  "ui.manage_delete_kinds_0": "\u7528\u5230\u5B83\u7684\u8B70\u984C\u985E\u578B\uFF1A{0}\u3002\u5B83\u5011\u6703\u6539\u56DE\u5167\u5EFA\u98A8\u683C\u3002",
+  "ui.manage_delete_topics_0": "\u6709 {0} \u500B\u8B70\u984C\u9078\u4E86\u5B83\u3002\u8B70\u984C\u4E0D\u6703\u88AB\u6539\uFF0C\u4E4B\u5F8C\u627E\u4E0D\u5230\u98A8\u683C\u6642\u6703\u9000\u56DE\u4E26\u63D0\u793A\u3002",
+  "ui.manage_delete_styles_0": "\u7528\u5230\u5B83\u7684\u98A8\u683C\uFF1A{0}\u3002\u5B83\u5011\u6703\u9000\u56DE\u5167\u5EFA\u7684\u90E8\u5206\u4E26\u986F\u793A\u300C\u6709\u554F\u984C\u300D\u3002",
+  "ui.manage_delete_note": "\u6703\u79FB\u5230 Obsidian \u5783\u573E\u6876\uFF0C\u53EF\u4EE5\u5F9E\u90A3\u88E1\u6551\u56DE\u3002",
+  "ui.manage_delete_confirm": "\u79FB\u5230\u5783\u573E\u6876",
+  "ui.manage_delete_failed": "\u7121\u6CD5\u628A\u6A94\u6848\u79FB\u5230\u5783\u573E\u6876\uFF0C\u6C92\u6709\u6539\u4EFB\u4F55\u6771\u897F\u3002",
+  "ui.manage_unused_banner_0_1": "\u6709 {0} \u4EFD\u6C92\u5728\u7528\u7684\u8907\u672C\uFF1A{1}\u3002",
+  "ui.manage_unused_trash": "\u79FB\u5230\u5783\u573E\u6876",
+  "ui.manage_trashed_banner": "\u5DF2\u79FB\u5230 Obsidian \u5783\u573E\u6876\uFF0C\u53EF\u4EE5\u5F9E\u90A3\u88E1\u6551\u56DE\u3002",
+  "ui.manage_trash_failed_0": "\u6C92\u80FD\u79FB\u8D70\uFF1A{0}\u3002",
+  "ui.manage_undo": "\u5FA9\u539F",
+  "ui.manage_undo_failed_0": "\u6C92\u80FD\u5FA9\u539F\uFF1A{0}\u3002",
   "ui.recipe_new_name": "\u65B0\u98A8\u683C",
   "ui.editor_title_edit": "\u7DE8\u8F2F\u7B46\u8A18\u98A8\u683C",
   "ui.editor_title_new": "\u65B0\u589E\u7B46\u8A18\u98A8\u683C",
@@ -24024,6 +24123,20 @@ ${body}`);
     );
   }
   /**
+   * Renames the style a note names: `note-style: <from>` becomes `<to>`, and only when the note still names `from` when the
+   * file is processed (a note changed meanwhile is left alone and false is returned). Other lines and the body keep their
+   * bytes, `updated` is not bumped, nothing rebuilds.
+   */
+  async renameNoteStyleRef(path, from, to) {
+    let wrote = false;
+    await this.app.vault.process(this.file(path), (content) => {
+      if (frontmatter(content)["note-style"] !== from) return content;
+      wrote = true;
+      return setFrontmatterKeys(content, { "note-style": to });
+    });
+    return wrote;
+  }
+  /**
    * Toggles one marker in `topic-markers`, reading the current list inside the same `vault.process` call. Values this
    * version does not know are kept, an emptied list removes the key, and `updated` is not bumped.
    */
@@ -28675,6 +28788,26 @@ function updateRecipeFileText(oldText, parts, language2) {
   lines.splice(closing, 0, ...added);
   return `${bom}${lines.filter((_, index) => !removed.has(index)).join("\n")}`;
 }
+function renamePartInRecipeText(oldText, category, oldName, newName) {
+  const lines = oldText.split("\n");
+  const bare = (line) => line.replace(/\r$/, "");
+  const first = lines[0].replace(/^\uFEFF/, "");
+  if (bare(first).trimEnd() !== "---") return oldText;
+  const closing = lines.findIndex((line, index) => index > 0 && bare(line).trimEnd() === "---");
+  if (closing < 0) return oldText;
+  for (let index = 1; index < closing; index++) {
+    const raw = bare(lines[index]);
+    if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
+    const pair6 = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
+    if (!pair6 || !KEYS[category].includes(pair6[2].trim().toLocaleLowerCase())) continue;
+    const value = pair6[3].trim();
+    const quote = value.length >= 2 && /^(["']).*\1$/.test(value) ? value[0] : "";
+    const bareValue = quote ? value.slice(1, -1).trim() : value;
+    if (bareValue !== oldName || builtinPartIdOf(category, bareValue) !== void 0) continue;
+    lines[index] = `${pair6[1]}${quote}${newName}${quote}${lines[index].endsWith("\r") ? "\r" : ""}`;
+  }
+  return lines.join("\n");
+}
 function globalPartRef(defaults2, category) {
   const saved = defaults2 == null ? void 0 : defaults2[category];
   return typeof saved === "string" && parseRecipeRef(saved, category) ? saved : GLOBAL_PART_DEFAULT[category];
@@ -29397,15 +29530,26 @@ var NoteStyleStore = class {
     if (category === "voice") return { files: this.blocks.tone, dir: dirs.tone };
     return { files: this.formats, dir: dirs.format };
   }
-  /** The styles (built-in and the user's files) that use `ref` as their part of `category`, by name. */
+  /**
+   * The styles (built-in and the user's files) that use `ref` as their part of `category`, by name. A style that follows the
+   * global voice or format uses the global one, so a part the global setting names is used by those styles.
+   */
   stylesUsing(category, ref) {
     const names3 = [];
+    const global = category === "structure" ? void 0 : this.globalPartRef(category);
     for (const recipe of BUILTIN_RECIPES) {
-      const own2 = recipe.structure === AIM_DELIVERY_STRUCTURE && category === "structure" ? void 0 : recipe[category];
-      if (own2 !== void 0 && `builtin:${own2}` === ref) names3.push(translate(this.settings.language, recipe.nameKey));
+      let own2;
+      if (category === "structure")
+        own2 = recipe.structure === AIM_DELIVERY_STRUCTURE ? void 0 : builtinRef(recipe.structure);
+      else if (category === "voice" ? recipe.followsVoice : recipe.followsFormat) own2 = global;
+      else own2 = builtinRef(recipe[category]);
+      if (own2 === ref) names3.push(translate(this.settings.language, recipe.nameKey));
     }
-    for (const [base, text11] of [...this.recipes].sort(([a], [b]) => a.localeCompare(b)))
-      if (parseRecipeFile(text11)[category] === ref) names3.push(base);
+    for (const [base, text11] of [...this.recipes].sort(([a], [b]) => a.localeCompare(b))) {
+      const file = parseRecipeFile(text11);
+      const own2 = category === "structure" || (category === "voice" ? file.voiceSet : file.formatSet) ? file[category] : global;
+      if (own2 === ref) names3.push(base);
+    }
     return names3;
   }
   /**
@@ -29570,7 +29714,11 @@ var NoteStyleStore = class {
         } catch (e) {
         }
       }
-      const entries = items.filter((item) => item.kind === "file" && files.has(item.name)).map((item) => ({ name: item.name, key: files.get(item.name), used: item.usedBy.length > 0 }));
+      const entries = items.filter((item) => item.kind === "file" && files.has(item.name)).map((item) => ({
+        name: item.name,
+        key: files.get(item.name),
+        used: item.usedBy.length > 0 || this.legacyRefs(category).has(item.ref)
+      }));
       sweep(category, entries, builtinKeys2);
     }
     const recipes = this.listRecipes();
@@ -29600,6 +29748,158 @@ var NoteStyleStore = class {
     }));
     sweep("recipe", recipeEntries, builtinKeys);
     return copies;
+  }
+  /** The part refs the 0.28.0 conversion table maps old ids to (structures from templates, voices from tones): topics may still use them. */
+  legacyRefs(category) {
+    var _a2;
+    const legacy = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy;
+    const table = category === "structure" ? legacy == null ? void 0 : legacy.templates : category === "voice" ? legacy == null ? void 0 : legacy.tones : void 0;
+    return new Set(Object.values(table != null ? table : {}));
+  }
+  // ---- changing the user's own files from the manage window (each is one user action; nothing is overwritten) ----
+  /** The cache and the folder of the files of a style or part category. */
+  filesOf(category) {
+    return category === "recipe" ? { files: this.recipes, dir: this.blockDirectories().recipe } : this.partStore(category);
+  }
+  /** The base name behind `file:<name>` when that file is in the cache. The name rules are not applied: a file with a bad name can still be renamed. */
+  fileNameOf(category, ref) {
+    var _a2;
+    const name2 = (_a2 = /^file:(.+)$/.exec(ref)) == null ? void 0 : _a2[1];
+    return name2 !== void 0 && this.filesOf(category).files.has(name2) ? name2 : void 0;
+  }
+  /**
+   * Whether `name` can be the new name of the file behind `ref`, and renames it. Nothing else changes: the caller moves the
+   * settings, the topics and the styles that name it. The name rules are those of a new file (`validatePartName`, a safe file
+   * name, not taken in any letter case by another file); the same name is a no-op. Never overwrites.
+   */
+  renameFile(category, ref, name2) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const old = this.fileNameOf(category, ref);
+      if (old === void 0) return { ok: false, reason: "missing" };
+      if (name2 === old) return { ok: true, ref, unchanged: true };
+      const { files, dir } = this.filesOf(category);
+      if (!validatePartName(name2, category).ok || cleanBlockName(name2) !== name2) return { ok: false, reason: "name" };
+      if ([...files.keys()].some((key2) => key2 !== old && lower3(key2) === lower3(name2)))
+        return { ok: false, reason: "taken" };
+      try {
+        await this.deps.port.rename(`${dir}/${old}.md`, `${dir}/${name2}.md`);
+      } catch (e) {
+        return { ok: false, reason: "failed" };
+      }
+      const text11 = files.get(old);
+      files.delete(old);
+      files.set(name2, text11);
+      return { ok: true, ref: fileRef(name2) };
+    });
+  }
+  /**
+   * After the part file `oldName` of `category` was renamed: the style files that name it as that part now name `newName`
+   * (only that key's value changes). A file that cannot be read or written is listed in `failed` and the others go on.
+   */
+  rewritePartRefs(category, oldName, newName) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const changed = [];
+      const failed = [];
+      const dir = this.blockDirectories().recipe;
+      for (const base of [...this.recipes.keys()].sort((a, b) => a.localeCompare(b))) {
+        try {
+          const live = await this.deps.port.read(`${dir}/${base}.md`);
+          const next = renamePartInRecipeText(live, category, oldName, newName);
+          if (next === live) continue;
+          await this.deps.port.modify(`${dir}/${base}.md`, next);
+          this.recipes.set(base, next);
+          changed.push(base);
+        } catch (e) {
+          failed.push(base);
+        }
+      }
+      return { changed, failed };
+    });
+  }
+  /** A copy of a user's file named "<name> (2)", "(3)" ... (the first free one); returns its ref. Throws for a built-in or a missing file. */
+  duplicateFile(category, ref) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const old = this.fileNameOf(category, ref);
+      if (old === void 0) throw new Error(`Not a file: ${ref}`);
+      const { files, dir } = this.filesOf(category);
+      const taken = new Set([...files.keys()].map(lower3));
+      let name2 = old;
+      for (let n = 2; taken.has(lower3(name2)) || !validatePartName(name2, category).ok; n++) {
+        if (n > 999) throw new Error("No free name");
+        name2 = `${old} (${n})`;
+      }
+      const text11 = files.get(old);
+      await this.pinFolder();
+      await this.deps.port.createFolder(dir);
+      await this.deps.port.create(`${dir}/${name2}.md`, text11);
+      files.set(name2, text11);
+      return fileRef(name2);
+    });
+  }
+  /** Moves a user's file to the trash and returns what it held, so `restoreTrashed` can put it back. Throws for a built-in or a missing file. */
+  trashFile(category, ref) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      return this.trashLocked(category, ref);
+    });
+  }
+  async trashLocked(category, ref) {
+    const name2 = this.fileNameOf(category, ref);
+    if (name2 === void 0) throw new Error(`Not a file: ${ref}`);
+    const { files, dir } = this.filesOf(category);
+    const text11 = files.get(name2);
+    await this.deps.port.trash(`${dir}/${name2}.md`);
+    files.delete(name2);
+    return { category, name: name2, text: text11 };
+  }
+  /** Moves the given unused copies (see `listUnusedCopies`) to the trash one by one; one that cannot be moved is listed in `failed`. */
+  trashFiles(items) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const trashed = [];
+      const failed = [];
+      for (const item of items) {
+        try {
+          trashed.push(await this.trashLocked(item.category, item.ref));
+        } catch (e) {
+          failed.push(item.name);
+        }
+      }
+      return { trashed, failed };
+    });
+  }
+  /**
+   * Puts trashed files back from the text they held, under their old name, or " (2)", " (3)" ... when that name is taken now.
+   * Nothing is overwritten; a file that cannot be written is listed in `failed`.
+   */
+  restoreTrashed(files) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const restored = [];
+      const failed = [];
+      for (const item of files) {
+        try {
+          const { files: held, dir } = this.filesOf(item.category);
+          const taken = new Set([...held.keys()].map(lower3));
+          let name2 = item.name;
+          for (let n = 2; taken.has(lower3(name2)); n++) {
+            if (n > 999) throw new Error("No free name");
+            name2 = `${item.name} (${n})`;
+          }
+          await this.pinFolder();
+          await this.deps.port.createFolder(dir);
+          await this.deps.port.create(`${dir}/${name2}.md`, item.text);
+          held.set(name2, item.text);
+          restored.push(fileRef(name2));
+        } catch (e) {
+          failed.push(item.name);
+        }
+      }
+      return { restored, failed };
+    });
   }
   /** The text of a user's style file as the last `refresh()` or write left it (what the editor compares before it saves). */
   recipeText(ref) {
@@ -29928,7 +30228,8 @@ function emptyNoteStyleStore(settings) {
       createFolder: async () => void 0,
       create: async () => void 0,
       modify: async () => void 0,
-      trash: async () => void 0
+      trash: async () => void 0,
+      rename: async () => void 0
     },
     save: async () => void 0
   });
@@ -70180,6 +70481,14 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
     __publicField(this, "editor");
     /** The files are being read before the editor opens. */
     __publicField(this, "opening", false);
+    /** The small window on top of this one (rename, delete, view); one at a time. */
+    __publicField(this, "dialog");
+    /** The open "..." menu of a row. */
+    __publicField(this, "menu");
+    /** Where the clean-up banner of the open panel is drawn. */
+    __publicField(this, "bannerEl");
+    /** What the last clean-up moved to the trash, kept in memory for "Undo". */
+    __publicField(this, "trashed");
     this.tab = initialTab;
   }
   onOpen() {
@@ -70215,6 +70524,11 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
         })
       );
     }
+    this.contentEl.addEventListener("click", (event) => {
+      const open = this.menu;
+      const target = event.target;
+      if (open && target && target !== open.more && !open.el.contains(target)) open.close(false);
+    });
     this.selectTab(this.tab, true);
     void this.plugin.noteStyles.refresh().then(
       () => {
@@ -70227,11 +70541,13 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
     );
   }
   onClose() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     this.closed = true;
+    (_a2 = this.menu) == null ? void 0 : _a2.close(false);
+    (_b2 = this.dialog) == null ? void 0 : _b2.close();
     this.contentEl.empty();
-    (_a2 = this.trigger) == null ? void 0 : _a2.focus();
-    (_b2 = this.onClosed) == null ? void 0 : _b2.call(this);
+    (_c = this.trigger) == null ? void 0 : _c.focus();
+    (_d = this.onClosed) == null ? void 0 : _d.call(this);
   }
   selectTab(tab, focus) {
     this.tab = tab;
@@ -70258,6 +70574,7 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
         name: item.name,
         issues: item.issues,
         used: item.usedByKinds.filter((kind) => kind !== "aim" || aimEnabled()).map(styleKindName),
+        kinds: item.usedByKinds.filter((kind) => kind !== "aim" || aimEnabled()),
         tags: styleTags(item),
         aimOnly: item.aimOnly === true
       }));
@@ -70267,6 +70584,7 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
       name: item.retired ? t("ui.note_style_retired_option_0", item.name) : item.name,
       issues: item.issues,
       used: item.usedBy,
+      kinds: [],
       aimOnly: false,
       ...item.retired ? { retired: true } : {}
     }));
@@ -70274,6 +70592,8 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
   buildPanel(panel) {
     panel.empty();
     this.editButtons.clear();
+    this.menu = void 0;
+    this.bannerEl = panel.createDiv({ cls: "vam-manage-banners" });
     this.listEl = panel.createDiv({ cls: "vam-manage-list" });
     this.renderList();
     this.buildAddForm(panel);
@@ -70297,12 +70617,26 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
           cls: "vam-block-status-error"
         });
       if (entry.aimOnly) continue;
+      if (entry.builtin) {
+        setting.addButton((button) => {
+          button.setButtonText(t("ui.manage_view")).onClick(() => this.view(entry, button.buttonEl));
+          button.buttonEl.setAttr("aria-label", t("ui.manage_view_aria_0", entry.name));
+        });
+        setting.addButton((button) => {
+          button.setButtonText(t("ui.manage_copy_edit")).onClick(() => void this.edit(entry));
+          button.buttonEl.setAttr("aria-label", t("ui.manage_copy_edit_aria_0", entry.name));
+          this.editButtons.set(entry.ref, button.buttonEl);
+        });
+        continue;
+      }
       setting.addButton((button) => {
         button.setButtonText(t("ui.manage_edit")).onClick(() => void this.edit(entry));
         button.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", entry.name));
         this.editButtons.set(entry.ref, button.buttonEl);
       });
+      this.addMenu(setting, entry);
     }
+    this.renderBanner();
   }
   focusRow(ref) {
     var _a2;
@@ -70328,6 +70662,246 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
       this.renderList();
       (_a2 = this.refreshForm) == null ? void 0 : _a2.call(this);
       this.focusRow(target);
+    } finally {
+      this.busy = false;
+    }
+  }
+  // ---- the "..." menu of a user's row: rename, duplicate, restore the built-in default, delete ----
+  get category() {
+    return this.tab;
+  }
+  addMenu(setting, entry) {
+    const more = setting.controlEl.createEl("button", {
+      text: "\u22EF",
+      cls: "vam-manage-more",
+      attr: {
+        "aria-label": t("ui.manage_more_aria_0", entry.name),
+        "aria-haspopup": "menu",
+        "aria-expanded": "false"
+      }
+    });
+    const items = [
+      { text: t("ui.manage_menu_rename"), desc: t("ui.manage_menu_rename_desc"), run: () => this.rename(entry, more) },
+      { text: t("ui.manage_menu_duplicate"), run: () => void this.duplicate(entry) }
+    ];
+    if (this.tab === "recipe" && entry.kinds.length)
+      items.push({
+        text: t("ui.manage_menu_restore"),
+        desc: t("ui.manage_menu_restore_desc_0", entry.used.join(t("ui.manage_list_separator"))),
+        run: () => void this.restoreDefault(entry)
+      });
+    items.push({ text: t("ui.manage_menu_delete"), danger: true, run: () => this.confirmDelete(entry, more) });
+    more.addEventListener("click", () => {
+      var _a2;
+      if (((_a2 = this.menu) == null ? void 0 : _a2.more) === more) this.menu.close(false);
+      else this.openMenu(setting, more, items);
+    });
+  }
+  openMenu(setting, more, items) {
+    var _a2;
+    (_a2 = this.menu) == null ? void 0 : _a2.close(false);
+    const el = setting.settingEl.createDiv({ cls: "vam-manage-menu", attr: { role: "menu" } });
+    const buttons = items.map((item) => {
+      const button = el.createEl("button", {
+        text: item.text,
+        cls: item.danger ? "vam-manage-menu-item is-danger" : "vam-manage-menu-item",
+        attr: { role: "menuitem", tabindex: "-1" }
+      });
+      if (item.desc) button.createSpan({ text: item.desc, cls: "vam-manage-menu-desc" });
+      button.addEventListener("click", () => {
+        var _a3;
+        (_a3 = this.menu) == null ? void 0 : _a3.close(false);
+        item.run();
+      });
+      return button;
+    });
+    const close = (focus) => {
+      var _a3;
+      el.remove();
+      more.setAttr("aria-expanded", "false");
+      if (((_a3 = this.menu) == null ? void 0 : _a3.el) === el) this.menu = void 0;
+      if (focus) more.focus();
+    };
+    el.addEventListener("keydown", (event) => {
+      const at = buttons.findIndex((button) => button === event.target);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        close(true);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        buttons[(at + step + buttons.length) % buttons.length].focus();
+      } else if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        buttons[event.key === "Home" ? 0 : buttons.length - 1].focus();
+      } else if (event.key === "Tab") close(false);
+    });
+    more.setAttr("aria-expanded", "true");
+    this.menu = { more, el, close };
+    buttons[0].focus();
+  }
+  /** Opens one small window on top of this one (not while another is open). */
+  openDialog(dialog) {
+    if (this.dialog || this.closed) return;
+    this.dialog = dialog;
+    openInWindowOf(dialog, this.modalEl);
+  }
+  dialogClosed() {
+    this.dialog = void 0;
+  }
+  /** The list is read again and drawn, then the focus goes to `ref`'s row (or the open tab). */
+  async redraw(ref) {
+    var _a2, _b2;
+    await this.plugin.noteStyles.refresh().catch(() => void 0);
+    if (this.closed) return;
+    this.renderList();
+    (_a2 = this.refreshForm) == null ? void 0 : _a2.call(this);
+    if (ref) this.focusRow(ref);
+    else (_b2 = this.tabEls.get(this.tab)) == null ? void 0 : _b2.focus();
+  }
+  rename(entry, trigger) {
+    const taken = this.takenNames();
+    taken.delete(lower5(entry.name));
+    const category = this.category;
+    this.openDialog(
+      new RenameDialog(this.app, {
+        name: entry.name,
+        trigger,
+        problem: (value) => namePartProblem(value, category, taken),
+        submit: async (value) => {
+          const result = await this.plugin.renameNoteStyle(category, entry.ref, value);
+          if (!result.ok) return false;
+          await this.redraw(result.ref);
+          return true;
+        },
+        onClosed: () => this.dialogClosed()
+      })
+    );
+  }
+  async duplicate(entry) {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      let ref = null;
+      try {
+        ref = await this.plugin.noteStyles.duplicateFile(this.category, entry.ref);
+      } catch (e) {
+        new import_obsidian37.Notice(t("ui.manage_create_failed"));
+      }
+      await this.redraw(ref != null ? ref : entry.ref);
+    } finally {
+      this.busy = false;
+    }
+  }
+  /** "Restore the built-in default": the topic types that use this style go back to their built-in style; the file stays. */
+  async restoreDefault(entry) {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      await this.plugin.clearKindStyles(entry.ref);
+      await this.redraw(entry.ref);
+    } finally {
+      this.busy = false;
+    }
+  }
+  confirmDelete(entry, trigger) {
+    const lines = [];
+    const sep = t("ui.manage_list_separator");
+    if (this.tab === "recipe") {
+      const topics = this.plugin.topicNoteStyleRefs().filter((item) => item.ref === entry.ref).length;
+      if (entry.used.length) lines.push(t("ui.manage_delete_kinds_0", entry.used.join(sep)));
+      if (topics) lines.push(t("ui.manage_delete_topics_0", topics));
+      if (!lines.length) lines.push(t("ui.manage_delete_unused"));
+    } else
+      lines.push(
+        entry.used.length ? t("ui.manage_delete_styles_0", entry.used.join(sep)) : t("ui.manage_delete_unused")
+      );
+    lines.push(t("ui.manage_delete_note"));
+    const category = this.category;
+    this.openDialog(
+      new ConfirmDialog(this.app, {
+        title: t("ui.manage_delete_title_0", entry.name),
+        lines,
+        confirm: t("ui.manage_delete_confirm"),
+        trigger,
+        run: async () => {
+          if (await this.plugin.deleteNoteStyle(category, entry.ref)) await this.redraw(null);
+        },
+        onClosed: () => this.dialogClosed()
+      })
+    );
+  }
+  /** "View" of a built-in: its text (a part) or its four settings (a style) in a window that cannot be edited. Writes nothing. */
+  view(entry, trigger) {
+    const store = this.plugin.noteStyles;
+    let body;
+    if (this.tab === "recipe") {
+      const item = store.listRecipes().find((recipe) => recipe.ref === entry.ref);
+      body = {
+        lines: item ? [
+          `${manageTabName("structure")}: ${item.structure.name}`,
+          `${manageTabName("voice")}: ${item.voice.name}`,
+          `${manageTabName("format")}: ${item.format.name}`,
+          ...item.aimOnly ? [] : [t(UPDATE_MODE_KEYS[item.update])]
+        ] : []
+      };
+    } else {
+      try {
+        body = { text: store.partSourceText(this.tab, entry.ref, this.plugin.settings.language) };
+      } catch (e) {
+        body = { lines: [] };
+      }
+    }
+    this.openDialog(
+      new ViewDialog(this.app, { title: entry.name, ...body, trigger, onClosed: () => this.dialogClosed() })
+    );
+  }
+  // ---- the clean-up of unused copies ----
+  unusedCopies() {
+    return this.plugin.noteStyles.listUnusedCopies(new Set(this.plugin.topicNoteStyleRefs().map((item) => item.ref)));
+  }
+  renderBanner() {
+    var _a2;
+    const holder = this.bannerEl;
+    if (!holder) return;
+    holder.empty();
+    if ((_a2 = this.trashed) == null ? void 0 : _a2.length) {
+      const banner2 = holder.createDiv({ cls: "vam-manage-banner is-done", attr: { role: "status" } });
+      banner2.createEl("p", { text: t("ui.manage_trashed_banner") });
+      banner2.createEl("button", { text: t("ui.manage_undo") }).addEventListener("click", () => void this.undoTrash());
+      return;
+    }
+    const copies = this.unusedCopies();
+    if (!copies.length) return;
+    const names3 = copies.slice(0, 5).map((copy) => copy.name);
+    const list = names3.join(t("ui.manage_list_separator")) + (copies.length > names3.length ? "\u2026" : "");
+    const banner = holder.createDiv({ cls: "vam-manage-banner" });
+    banner.createEl("p", { text: t("ui.manage_unused_banner_0_1", copies.length, list) });
+    banner.createEl("button", { text: t("ui.manage_unused_trash") }).addEventListener("click", () => void this.trashCopies());
+  }
+  async trashCopies() {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      const result = await this.plugin.noteStyles.trashFiles(this.unusedCopies());
+      if (result.failed.length)
+        new import_obsidian37.Notice(t("ui.manage_trash_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+      this.trashed = result.trashed.length ? result.trashed : void 0;
+      await this.redraw(null);
+    } finally {
+      this.busy = false;
+    }
+  }
+  async undoTrash() {
+    if (this.busy || !this.trashed) return;
+    this.busy = true;
+    try {
+      const result = await this.plugin.noteStyles.restoreTrashed(this.trashed);
+      if (result.failed.length)
+        new import_obsidian37.Notice(t("ui.manage_undo_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+      this.trashed = void 0;
+      await this.redraw(null);
     } finally {
       this.busy = false;
     }
@@ -70538,6 +71112,121 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
     fillSources();
     setName(this.suggestName(source || null));
     check();
+  }
+};
+var RenameDialog = class extends import_obsidian37.Modal {
+  constructor(app, opts) {
+    super(app);
+    this.opts = opts;
+    __publicField(this, "done", false);
+  }
+  onOpen() {
+    const { opts } = this;
+    this.titleEl.setText(t("ui.manage_rename_title_0", opts.name));
+    this.contentEl.createEl("p", { text: t("ui.manage_rename_note"), cls: "vam-manage-dialog-note" });
+    const errorId = "vam-manage-rename-error";
+    const input2 = this.contentEl.createEl("input", {
+      type: "text",
+      cls: "vam-manage-rename-input",
+      attr: { "aria-label": t("ui.manage_add_name"), "aria-describedby": errorId }
+    });
+    input2.value = opts.name;
+    const error = this.contentEl.createDiv({
+      cls: "vam-block-status-error vam-manage-error",
+      attr: { id: errorId, "aria-live": "polite" }
+    });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const rename = row.createEl("button", { text: t("ui.manage_rename_button"), cls: "mod-cta" });
+    const cancel = row.createEl("button", { text: t("ui.cancel") });
+    let busy = false;
+    const check = () => {
+      const problem = input2.value === opts.name ? "" : opts.problem(input2.value);
+      error.setText(problem);
+      rename.disabled = !!problem || input2.value === opts.name || busy;
+      return problem;
+    };
+    const submit = async () => {
+      if (busy || rename.disabled) return;
+      busy = true;
+      rename.disabled = true;
+      try {
+        if (await opts.submit(input2.value)) {
+          this.done = true;
+          this.close();
+        }
+      } finally {
+        busy = false;
+        check();
+      }
+    };
+    input2.addEventListener("input", check);
+    input2.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void submit();
+    });
+    rename.addEventListener("click", () => void submit());
+    cancel.addEventListener("click", () => this.close());
+    check();
+    input2.focus();
+    input2.select();
+  }
+  onClose() {
+    this.contentEl.empty();
+    this.opts.onClosed();
+    if (!this.done) this.opts.trigger.focus();
+  }
+};
+var ConfirmDialog = class extends import_obsidian37.Modal {
+  constructor(app, opts) {
+    super(app);
+    this.opts = opts;
+    __publicField(this, "done", false);
+  }
+  onOpen() {
+    const { opts } = this;
+    this.titleEl.setText(opts.title);
+    for (const line of opts.lines) this.contentEl.createEl("p", { text: line });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const confirm = row.createEl("button", { text: opts.confirm, cls: "mod-warning" });
+    const cancel = row.createEl("button", { text: t("ui.cancel") });
+    confirm.addEventListener("click", () => {
+      if (confirm.disabled) return;
+      confirm.disabled = true;
+      this.done = true;
+      void opts.run().finally(() => this.close());
+    });
+    cancel.addEventListener("click", () => this.close());
+    cancel.focus();
+  }
+  onClose() {
+    this.contentEl.empty();
+    this.opts.onClosed();
+    if (!this.done) this.opts.trigger.focus();
+  }
+};
+var ViewDialog = class extends import_obsidian37.Modal {
+  constructor(app, opts) {
+    super(app);
+    this.opts = opts;
+  }
+  onOpen() {
+    var _a2;
+    const { opts } = this;
+    this.titleEl.setText(opts.title);
+    this.contentEl.createEl("p", { text: t("ui.manage_view_readonly"), cls: "vam-manage-dialog-note" });
+    for (const line of (_a2 = opts.lines) != null ? _a2 : []) this.contentEl.createEl("p", { text: line });
+    if (opts.text !== void 0) this.contentEl.createEl("pre", { text: opts.text, cls: "vam-manage-view-text" });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const close = row.createEl("button", { text: t("ui.close") });
+    close.addEventListener("click", () => this.close());
+    close.focus();
+  }
+  onClose() {
+    this.contentEl.empty();
+    this.opts.onClosed();
+    this.opts.trigger.focus();
   }
 };
 
@@ -70812,7 +71501,7 @@ function renderMyStylesSetting(setting, plugin) {
       0
     );
     setting.setName(t("ui.my_styles_count_0_1", styles, parts));
-    const unused = store.listUnusedCopies().length;
+    const unused = store.listUnusedCopies(new Set(plugin.topicNoteStyleRefs().map((item) => item.ref))).length;
     setting.descEl.empty();
     if (unused) setting.descEl.createDiv({ text: t("ui.my_styles_unused_0", unused), cls: "vam-style-unused" });
     const line = setting.descEl.createDiv({ text: `${t("ui.my_styles_path_desc")} ` });
@@ -78926,6 +79615,12 @@ ${t("ui.organize_link_wait_hint")}`;
       trash: async (path) => {
         const file = this.app.vault.getAbstractFileByPath((0, import_obsidian45.normalizePath)(path));
         if (file instanceof import_obsidian45.TFile) await this.app.fileManager.trashFile(file);
+      },
+      // FileManager.renameFile (not Vault.rename): it also updates links to the file; it rejects when the target exists.
+      rename: async (from, to) => {
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian45.normalizePath)(from));
+        if (!(file instanceof import_obsidian45.TFile)) throw new Error(from);
+        await this.app.fileManager.renameFile(file, (0, import_obsidian45.normalizePath)(to));
       }
     };
   }
@@ -78977,6 +79672,118 @@ ${t("ui.organize_link_wait_hint")}`;
       new import_obsidian45.Notice(t("ui.block_notice_open_failed"));
       return null;
     }
+  }
+  /**
+   * The topics (notes) that name a style in their `note-style` frontmatter, read from the metadata cache. Read only: the
+   * clean-up of unused copies and the delete and rename confirmations need the styles the topics choose, which the store
+   * cannot see.
+   */
+  topicNoteStyleRefs() {
+    var _a2, _b2;
+    const found = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const ref = (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["note-style"];
+      if (typeof ref === "string" && ref) found.push({ path: file.path, ref });
+    }
+    return found;
+  }
+  /**
+   * Renames a style or part file from the manage window and follows it (settings-redesign decision 1): `noteStyleByKind`,
+   * the topics' `note-style`, and for a part the style files that name it, the `legacy` table and the global voice or
+   * format. A refused name changes nothing. A topic or style file that cannot be written does not stop the others; one
+   * Notice says what was updated and one lists what was not. There is no undo: renaming back follows the same way.
+   */
+  async renameNoteStyle(category, ref, name2) {
+    var _a2;
+    const topics = category === "recipe" ? this.topicNoteStyleRefs().filter((item) => item.ref === ref) : [];
+    const oldName = ref.slice("file:".length);
+    const renamed = await this.noteStyles.renameFile(category, ref, name2);
+    if (!renamed.ok) {
+      new import_obsidian45.Notice(t("ui.manage_rename_refused"));
+      return renamed;
+    }
+    if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
+    const failed = [];
+    const next = renamed.ref;
+    const swap = (table) => table && Object.values(table).includes(ref) ? Object.fromEntries(Object.entries(table).map(([key2, value]) => [key2, value === ref ? next : value])) : void 0;
+    let settingsChanged = false;
+    const byKind = category === "recipe" ? swap(this.settings.noteStyleByKind) : void 0;
+    if (byKind) {
+      this.settings.noteStyleByKind = byKind;
+      settingsChanged = true;
+    }
+    if (category !== "recipe") {
+      const legacy = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy;
+      const table = category === "structure" ? "templates" : category === "voice" ? "tones" : void 0;
+      const swapped = table ? swap(legacy == null ? void 0 : legacy[table]) : void 0;
+      if (legacy && table && swapped) {
+        this.settings.noteStyleRecipe = {
+          ...this.settings.noteStyleRecipe,
+          legacy: { ...legacy, [table]: swapped }
+        };
+        settingsChanged = true;
+      }
+      const defaults2 = this.settings.noteStyleDefaults;
+      if (category !== "structure" && (defaults2 == null ? void 0 : defaults2[category]) === ref) {
+        this.settings.noteStyleDefaults = { ...defaults2, [category]: next };
+        settingsChanged = true;
+      }
+    }
+    if (settingsChanged) {
+      try {
+        await this.saveSettings();
+      } catch (e) {
+        failed.push(t("ui.manage_rename_settings"));
+      }
+    }
+    let styles = 0;
+    if (category !== "recipe") {
+      const written2 = await this.noteStyles.rewritePartRefs(category, oldName, next.slice("file:".length));
+      styles = written2.changed.length;
+      failed.push(...written2.failed);
+    }
+    let changedTopics = 0;
+    for (const topic of topics) {
+      try {
+        if (await this.repo.renameNoteStyleRef(topic.path, ref, next)) changedTopics++;
+      } catch (e) {
+        failed.push(topic.path);
+      }
+    }
+    new import_obsidian45.Notice(t("ui.manage_rename_done_0_1_2", name2, changedTopics, styles));
+    if (failed.length) new import_obsidian45.Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
+    return { ok: true, ref: next, topics: changedTopics, styles, failed };
+  }
+  /** Removes the entries of `noteStyleByKind` that name `ref` (those topic types go back to their built-in style); one save. Returns the kinds. */
+  async clearKindStyles(ref) {
+    const stored = this.settings.noteStyleByKind;
+    const kinds = stored ? Object.keys(stored).filter((kind) => stored[kind] === ref) : [];
+    if (!kinds.length) return kinds;
+    const next = { ...stored };
+    for (const kind of kinds) delete next[kind];
+    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
+    else delete this.settings.noteStyleByKind;
+    await this.saveSettings();
+    return kinds;
+  }
+  /**
+   * Moves a style or part file to the Obsidian trash (recoverable). A style: the topic types that used it go back to their
+   * built-in style, the topics are not changed (they find no style and fall back with a notice, as for any missing file). A
+   * part: the styles that name it fall back to the built-in part and show a problem; the global voice or format that named
+   * it goes back to the default. Returns false (with a Notice) when the file could not be moved; nothing else is changed then.
+   */
+  async deleteNoteStyle(category, ref) {
+    var _a2;
+    try {
+      await this.noteStyles.trashFile(category, ref);
+    } catch (e) {
+      new import_obsidian45.Notice(t("ui.manage_delete_failed"));
+      return false;
+    }
+    if (category === "recipe") await this.clearKindStyles(ref);
+    else if (category !== "structure" && ((_a2 = this.settings.noteStyleDefaults) == null ? void 0 : _a2[category]) === ref)
+      await this.setGlobalPart(category, GLOBAL_PART_DEFAULT[category]);
+    return true;
   }
   /** Sets the style a kind uses. Choosing the kind's own built-in style removes the entry (a kind with no entry uses it). */
   async setKindStyle(kind, ref) {

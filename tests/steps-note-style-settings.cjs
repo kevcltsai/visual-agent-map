@@ -81,7 +81,7 @@ function row({ exists = true, folder = 'WS/Styles', settings = {}, items = [], r
     settings: settingsObject, saveSettings: async () => { log.saved++; }, openNoteStylesFolder: async () => { log.opened++; },
     openPromptPreview: trigger => { log.previewed.push(trigger); },
     setGlobalPart: (...args) => Plugin.prototype.setGlobalPart.apply(plugin, args),
-    noteStyles: { folderExists: () => exists, folder: () => settingsObject.noteStylesFolder ?? folder, refresh: async () => {}, listBlocks: () => items, listRecipes: () => recipes, listParts: category => (category === 'format' ? formats : []), listUnusedCopies: () => [] }
+    topicNoteStyleRefs: () => [], noteStyles: { folderExists: () => exists, folder: () => settingsObject.noteStylesFolder ?? folder, refresh: async () => {}, listBlocks: () => items, listRecipes: () => recipes, listParts: category => (category === 'format' ? formats : []), listUnusedCopies: () => [] }
   };
   return { setting, view, log, plugin, settings: settingsObject };
 }
@@ -516,7 +516,7 @@ function mineRow({ recipes = RECIPES(), parts = {}, unused = [], folder = 'WS/St
   const log = { refreshes: 0, opened: 0, writes: 0 };
   const plugin = {
     app: { marker: 'app' }, settings: { language: 'en' }, openNoteStylesFolder: async () => { log.opened++; },
-    noteStyles: { refresh: async () => { log.refreshes++; }, folder: () => folder, listRecipes: () => recipes, listParts: category => parts[category] ?? [], listUnusedCopies: () => unused }
+    topicNoteStyleRefs: () => [], noteStyles: { refresh: async () => { log.refreshes++; }, folder: () => folder, listRecipes: () => recipes, listParts: category => parts[category] ?? [], listUnusedCopies: () => unused }
   };
   renderMyStylesSetting(setting, plugin);
   return { view, plugin, log };
@@ -576,7 +576,7 @@ test('F1 R6 (was failing first): when the manage window closes, the seven topic-
   openedModals.length = 0;
   const recipes = RECIPES();
   const settings = { language: 'en' };
-  const plugin = { app: {}, settings, saveSettings: async () => {}, noteStyles: { refresh: async () => {}, folder: () => 'WS/Styles', listRecipes: () => recipes, listParts: () => [], listUnusedCopies: () => [] } };
+  const plugin = { app: {}, settings, saveSettings: async () => {}, topicNoteStyleRefs: () => [], noteStyles: { refresh: async () => {}, folder: () => 'WS/Styles', listRecipes: () => recipes, listParts: () => [], listUnusedCopies: () => [] } };
   plugin.setKindStyle = (...args) => Plugin.prototype.setKindStyle.apply(plugin, args);
   const rows = KIND_ORDER.map(kind => { const { setting, view } = fakeSetting(); renderNoteKindSetting(setting, plugin, kind); return { kind, view }; });
   const manage = fakeSetting();
@@ -666,7 +666,7 @@ test('P3 page: opening the Note style page writes nothing, at the card, the rows
   const writes = [];
   const recipes = RECIPES();
   const settings = { language: 'en' };
-  const plugin = { app: {}, settings, saveSettings: async () => { writes.push('save'); }, openNoteStylesFolder: async () => { writes.push('folder'); }, noteStyles: { refresh: async () => {}, folder: () => 'WS/S', listRecipes: () => recipes, listParts: () => [], listUnusedCopies: () => [] } };
+  const plugin = { app: {}, settings, saveSettings: async () => { writes.push('save'); }, openNoteStylesFolder: async () => { writes.push('folder'); }, topicNoteStyleRefs: () => [], noteStyles: { refresh: async () => {}, folder: () => 'WS/S', listRecipes: () => recipes, listParts: () => [], listUnusedCopies: () => [] } };
   plugin.setKindStyle = (...args) => Plugin.prototype.setKindStyle.apply(plugin, args);
   const before = JSON.stringify(settings);
   renderNoteStyleCard(fakeSetting().setting, plugin);

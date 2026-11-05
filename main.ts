@@ -41,9 +41,11 @@ import {
   type RunStyle,
   type SaveRecipeInput,
   type SaveRecipeResult,
+  type StyleCategory,
   type StyleFilePort
 } from "./ai/note-style-store";
 import {
+  GLOBAL_PART_DEFAULT,
   KIND_DEFAULT_RECIPE,
   parseRecipeRef,
   STYLE_KINDS,
@@ -1465,6 +1467,12 @@ export default class VisualAgentMapPlugin extends Plugin {
       trash: async path => {
         const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
         if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+      },
+      // FileManager.renameFile (not Vault.rename): it also updates links to the file; it rejects when the target exists.
+      rename: async (from, to) => {
+        const file = this.app.vault.getAbstractFileByPath(normalizePath(from));
+        if (!(file instanceof TFile)) throw new Error(from);
+        await this.app.fileManager.renameFile(file, normalizePath(to));
       }
     };
   }
@@ -1518,6 +1526,125 @@ export default class VisualAgentMapPlugin extends Plugin {
       new Notice(t("ui.block_notice_open_failed"));
       return null;
     }
+  }
+  /**
+   * The topics (notes) that name a style in their `note-style` frontmatter, read from the metadata cache. Read only: the
+   * clean-up of unused copies and the delete and rename confirmations need the styles the topics choose, which the store
+   * cannot see.
+   */
+  topicNoteStyleRefs(): { path: string; ref: string }[] {
+    const found: { path: string; ref: string }[] = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const ref: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.["note-style"];
+      if (typeof ref === "string" && ref) found.push({ path: file.path, ref });
+    }
+    return found;
+  }
+  /**
+   * Renames a style or part file from the manage window and follows it (settings-redesign decision 1): `noteStyleByKind`,
+   * the topics' `note-style`, and for a part the style files that name it, the `legacy` table and the global voice or
+   * format. A refused name changes nothing. A topic or style file that cannot be written does not stop the others; one
+   * Notice says what was updated and one lists what was not. There is no undo: renaming back follows the same way.
+   */
+  async renameNoteStyle(
+    category: StyleCategory,
+    ref: string,
+    name: string
+  ): Promise<
+    | { ok: true; ref: string; unchanged?: true; topics: number; styles: number; failed: string[] }
+    | { ok: false; reason: "missing" | "name" | "taken" | "failed" }
+  > {
+    const topics = category === "recipe" ? this.topicNoteStyleRefs().filter(item => item.ref === ref) : [];
+    const oldName = ref.slice("file:".length);
+    const renamed = await this.noteStyles.renameFile(category, ref, name);
+    if (!renamed.ok) {
+      new Notice(t("ui.manage_rename_refused"));
+      return renamed;
+    }
+    if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
+    const failed: string[] = [];
+    const next = renamed.ref;
+    const swap = <T extends Record<string, string>>(table: T | undefined): T | undefined =>
+      table && Object.values(table).includes(ref)
+        ? (Object.fromEntries(Object.entries(table).map(([key, value]) => [key, value === ref ? next : value])) as T)
+        : undefined;
+    let settingsChanged = false;
+    const byKind = category === "recipe" ? swap(this.settings.noteStyleByKind) : undefined;
+    if (byKind) {
+      this.settings.noteStyleByKind = byKind;
+      settingsChanged = true;
+    }
+    if (category !== "recipe") {
+      const legacy = this.settings.noteStyleRecipe?.legacy;
+      const table = category === "structure" ? "templates" : category === "voice" ? "tones" : undefined;
+      const swapped = table ? swap(legacy?.[table]) : undefined;
+      if (legacy && table && swapped) {
+        this.settings.noteStyleRecipe = {
+          ...this.settings.noteStyleRecipe!,
+          legacy: { ...legacy, [table]: swapped }
+        };
+        settingsChanged = true;
+      }
+      const defaults = this.settings.noteStyleDefaults;
+      if (category !== "structure" && defaults?.[category] === ref) {
+        this.settings.noteStyleDefaults = { ...defaults, [category]: next };
+        settingsChanged = true;
+      }
+    }
+    if (settingsChanged) {
+      try {
+        await this.saveSettings();
+      } catch {
+        failed.push(t("ui.manage_rename_settings"));
+      }
+    }
+    let styles = 0;
+    if (category !== "recipe") {
+      const written = await this.noteStyles.rewritePartRefs(category, oldName, next.slice("file:".length));
+      styles = written.changed.length;
+      failed.push(...written.failed);
+    }
+    let changedTopics = 0;
+    for (const topic of topics) {
+      try {
+        if (await this.repo.renameNoteStyleRef(topic.path, ref, next)) changedTopics++;
+      } catch {
+        failed.push(topic.path);
+      }
+    }
+    new Notice(t("ui.manage_rename_done_0_1_2", name, changedTopics, styles));
+    if (failed.length) new Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
+    return { ok: true, ref: next, topics: changedTopics, styles, failed };
+  }
+  /** Removes the entries of `noteStyleByKind` that name `ref` (those topic types go back to their built-in style); one save. Returns the kinds. */
+  async clearKindStyles(ref: string): Promise<StyleKind[]> {
+    const stored = this.settings.noteStyleByKind;
+    const kinds = stored ? (Object.keys(stored) as StyleKind[]).filter(kind => stored[kind] === ref) : [];
+    if (!kinds.length) return kinds;
+    const next = { ...stored };
+    for (const kind of kinds) delete next[kind];
+    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
+    else delete this.settings.noteStyleByKind;
+    await this.saveSettings();
+    return kinds;
+  }
+  /**
+   * Moves a style or part file to the Obsidian trash (recoverable). A style: the topic types that used it go back to their
+   * built-in style, the topics are not changed (they find no style and fall back with a notice, as for any missing file). A
+   * part: the styles that name it fall back to the built-in part and show a problem; the global voice or format that named
+   * it goes back to the default. Returns false (with a Notice) when the file could not be moved; nothing else is changed then.
+   */
+  async deleteNoteStyle(category: StyleCategory, ref: string): Promise<boolean> {
+    try {
+      await this.noteStyles.trashFile(category, ref);
+    } catch {
+      new Notice(t("ui.manage_delete_failed"));
+      return false;
+    }
+    if (category === "recipe") await this.clearKindStyles(ref);
+    else if (category !== "structure" && this.settings.noteStyleDefaults?.[category] === ref)
+      await this.setGlobalPart(category, GLOBAL_PART_DEFAULT[category]);
+    return true;
   }
   /** Sets the style a kind uses. Choosing the kind's own built-in style removes the entry (a kind with no entry uses it). */
   async setKindStyle(kind: StyleKind, ref: string): Promise<void> {

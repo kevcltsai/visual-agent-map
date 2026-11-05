@@ -457,6 +457,37 @@ export function updateRecipeFileText(oldText: string, parts: RecipeFileInput, la
   return `${bom}${lines.filter((_, index) => !removed.has(index)).join("\n")}`;
 }
 
+/**
+ * The text of a style file after the part file `oldName` of `category` was renamed to `newName`: the value of the key of that
+ * category (any language, quotes kept) is replaced when it names `oldName` as a file. Every other byte stays; the same text
+ * comes back when the style does not use that file.
+ */
+export function renamePartInRecipeText(
+  oldText: string,
+  category: PartCategory,
+  oldName: string,
+  newName: string
+): string {
+  const lines = oldText.split("\n");
+  const bare = (line: string): string => line.replace(/\r$/, "");
+  const first = lines[0].replace(/^\uFEFF/, "");
+  if (bare(first).trimEnd() !== "---") return oldText;
+  const closing = lines.findIndex((line, index) => index > 0 && bare(line).trimEnd() === "---");
+  if (closing < 0) return oldText;
+  for (let index = 1; index < closing; index++) {
+    const raw = bare(lines[index]);
+    if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
+    const pair = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
+    if (!pair || !KEYS[category].includes(pair[2].trim().toLocaleLowerCase())) continue;
+    const value = pair[3].trim();
+    const quote = value.length >= 2 && /^(["']).*\1$/.test(value) ? value[0] : "";
+    const bareValue = quote ? value.slice(1, -1).trim() : value;
+    if (bareValue !== oldName || builtinPartIdOf(category, bareValue) !== undefined) continue;
+    lines[index] = `${pair[1]}${quote}${newName}${quote}${lines[index].endsWith("\r") ? "\r" : ""}`;
+  }
+  return lines.join("\n");
+}
+
 /** The global voice or format ref: the saved one when it is a part ref of that category, else the built-in default. */
 export function globalPartRef(defaults: NoteStyleDefaults | undefined, category: "voice" | "format"): string {
   const saved = defaults?.[category];

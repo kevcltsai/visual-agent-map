@@ -199,7 +199,15 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
-import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
+import { type ReferenceGroup } from "../../ai/reference-materials";
+import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
+import {
+  drawMapSourcesPanel,
+  mapSourceName,
+  mapSourcesButtonLabel,
+  unreadableMapSources,
+  type MapSourcesPanelFocus
+} from "../../ui/map-sources-panel";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { UsageControl } from "./usage-panel";
@@ -994,6 +1002,15 @@ export class VisualAgentMapView extends ItemView {
   private relevancePanelEl: HTMLElement | null = null;
   private relevancePanelGen = 0;
   private relevancePanelCleanup: (() => void) | null = null;
+  /** This map's saved data sources (`map-sources`), loaded with the map; the toolbar button and its panel draw from it. */
+  private mapSources: MapSource[] = [];
+  private readonly mapSourcesPanelId = `vam-map-sources-panel-${++relevancePanelSeq}`;
+  private mapSourcesOpen = false;
+  private mapSourcesPickerOpen = false;
+  private mapSourcesToolsEl: HTMLElement | null = null;
+  private mapSourcesButtonEl: HTMLButtonElement | null = null;
+  private mapSourcesPanelEl: HTMLElement | null = null;
+  private mapSourcesPanelCleanup: (() => void) | null = null;
   private history = new History<Action>();
   /** The AI chat window. It lives on the view, so a repaint keeps its messages, draft and chips. */
   private chat: MapChatPanel | null = null;
@@ -1475,6 +1492,12 @@ export class VisualAgentMapView extends ItemView {
     );
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
     this.registerEvent(workspace.on("resize", () => this.chat?.refreshNote()));
+    // A deleted or renamed source note, folder or map changes what the data-sources button and panel say.
+    const vault = this.app.vault;
+    if (typeof vault?.on === "function") {
+      this.registerEvent(vault.on("delete", () => this.refreshMapSourcesUi()));
+      this.registerEvent(vault.on("rename", () => this.refreshMapSourcesUi()));
+    }
     // A note whose image or `topic-cover` just changed redraws only its own cover.
     const cache = this.app.metadataCache;
     if (typeof cache?.on === "function")
@@ -2328,6 +2351,8 @@ export class VisualAgentMapView extends ItemView {
     this.chat?.dispose();
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
+    this.mapSourcesPanelCleanup?.();
+    this.mapSourcesPanelCleanup = null;
     // An open panel pre-started the CLI for a grade that will never be sent.
     if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
     this.abortRelevanceGrade();
@@ -2617,11 +2642,17 @@ export class VisualAgentMapView extends ItemView {
     let goal: string | undefined;
     let level: RelevanceLevel | undefined;
     let context: string | undefined;
+    let sources: MapSource[] = [];
     if (this.path && !this.map?.aim) {
       try {
         ({ goal, level, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch {
         /* An unreadable goal is simply not shown. */
+      }
+      try {
+        sources = await this.plugin.repo.readMapSources(this.path);
+      } catch {
+        /* Unreadable sources are simply not shown. */
       }
     }
     const loaded = new Map<string, Note>();
@@ -2638,6 +2669,7 @@ export class VisualAgentMapView extends ItemView {
     this.relevanceGoal = goal;
     this.relevanceLevel = level;
     this.relevanceContext = context;
+    this.mapSources = sources;
     await this.hydrateFailedReportTargets(isCurrent);
   }
   private async hydrateFailedReportTargets(isCurrent: () => boolean): Promise<void> {
@@ -2695,6 +2727,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (path !== this.path) {
       this.stopAimProgress();
+      this.mapSourcesOpen = false;
       if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
       this.abortRelevanceGrade();
     }
@@ -3621,6 +3654,176 @@ export class VisualAgentMapView extends ItemView {
     const left = Math.min(Math.max(from, bounds.left + 16), bounds.left + bounds.width - 16 - width);
     panel.style.width = `${width}px`;
     panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
+  }
+  // ---- Map data sources: toolbar button and panel ---------------------------------------------------------------
+  /**
+   * One toolbar button right after the goal button: 「資料來源 · N 份」, with ⚠ in front when a source cannot be read.
+   * It opens a panel (same open/close, focus and Esc rules as the goal panel) to add and remove this map's sources.
+   */
+  private renderMapSourcesControl(parent: HTMLElement): void {
+    this.mapSourcesPanelCleanup?.();
+    this.mapSourcesPanelCleanup = null;
+    this.mapSourcesPanelEl = null;
+    this.mapSourcesToolsEl = parent;
+    this.drawMapSourcesButton(parent);
+    if (this.mapSourcesOpen) this.drawMapSourcesPanelEl(null);
+  }
+  private drawMapSourcesButton(parent: HTMLElement): void {
+    const button = this.button(parent, "", () => {
+      if (this.mapSourcesOpen && this.mapSourcesPanelEl) this.closeMapSourcesPanel(true);
+      else this.openMapSourcesPanel();
+    });
+    button.addClass("vam-sources-button");
+    button.setAttr("aria-haspopup", "dialog");
+    button.setAttr("aria-controls", this.mapSourcesPanelId);
+    // Pressing the button must not move focus out of an open panel (that would count as leaving it).
+    button.addEventListener("mousedown", event => event.preventDefault());
+    button.addEventListener("focusout", (event: FocusEvent) => {
+      if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button || this.mapSourcesPickerOpen) return;
+      const next = event.relatedTarget as Node | null;
+      if (next && (next === button || this.mapSourcesPanelEl?.contains(next))) return;
+      this.closeMapSourcesPanel(false);
+    });
+    button.addEventListener("keydown", event => {
+      if (event.key !== "Escape" || !this.mapSourcesOpen || this.mapSourcesButtonEl !== button) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeMapSourcesPanel(true);
+    });
+    this.mapSourcesButtonEl = button;
+    this.paintMapSourcesButton();
+  }
+  /** Label, ⚠ and accessible text from the current sources; also run when a vault event changes what is readable. */
+  private paintMapSourcesButton(): void {
+    const button = this.mapSourcesButtonEl;
+    if (!button) return;
+    const label = mapSourcesButtonLabel(this.mapSources.length);
+    const unreadable = unreadableMapSources(this.app, this.mapSources);
+    button.empty();
+    if (unreadable) {
+      const warn = button.createSpan({ cls: "vam-map-sources-warning" });
+      warn.setAttr("aria-hidden", "true");
+      setIcon(warn, "alert-triangle");
+    }
+    button.createSpan({ cls: "vam-sources-button-label", text: label });
+    button.setAttr("aria-label", label);
+    button.setAttr("aria-expanded", String(this.mapSourcesOpen));
+    if (unreadable) button.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
+    else button.removeAttribute?.("aria-description");
+    button.toggleClass("has-unreadable", unreadable > 0);
+    button.toggleClass("is-empty", !this.mapSources.length);
+  }
+  private openMapSourcesPanel(): void {
+    if (!this.mapSourcesToolsEl) return;
+    this.mapSourcesOpen = true;
+    this.mapSourcesButtonEl?.setAttr("aria-expanded", "true");
+    this.drawMapSourcesPanelEl({ picker: "map" });
+  }
+  private closeMapSourcesPanel(refocus: boolean): void {
+    this.mapSourcesPanelCleanup?.();
+    this.mapSourcesPanelCleanup = null;
+    this.mapSourcesPanelEl?.remove();
+    this.mapSourcesPanelEl = null;
+    this.mapSourcesOpen = false;
+    this.mapSourcesPickerOpen = false;
+    this.mapSourcesButtonEl?.setAttr("aria-expanded", "false");
+    if (refocus) this.mapSourcesButtonEl?.focus();
+  }
+  private drawMapSourcesPanelEl(focus: MapSourcesPanelFocus): void {
+    const tools = this.mapSourcesToolsEl;
+    if (!tools) return;
+    this.mapSourcesPanelCleanup?.();
+    this.mapSourcesPanelCleanup = null;
+    this.mapSourcesPanelEl?.remove();
+    const mapPath = this.path;
+    const panel = drawMapSourcesPanel(
+      tools,
+      {
+        app: this.app,
+        id: this.mapSourcesPanelId,
+        sources: this.mapSources,
+        currentMapPath: mapPath,
+        mapItems: () => this.plugin.repo.mapSwitcherItems(),
+        add: source => this.changeMapSources(mapPath, "add", source),
+        remove: source => this.changeMapSources(mapPath, "remove", source),
+        close: refocus => this.closeMapSourcesPanel(refocus),
+        setPickerOpen: open => {
+          this.mapSourcesPickerOpen = open;
+        },
+        isPickerOpen: () => this.mapSourcesPickerOpen,
+        button: () => this.mapSourcesButtonEl,
+        panelCreated: created => {
+          this.mapSourcesPanelEl = created;
+        }
+      },
+      focus
+    );
+    this.mapSourcesPanelEl = panel;
+    // A press anywhere else (the canvas, another card) closes it too, except inside the picker list that is open.
+    const doc = this.contentEl?.ownerDocument;
+    if (doc?.addEventListener) {
+      const outside = (event: Event): void => {
+        if (this.mapSourcesPickerOpen) return;
+        const target = event.target as Node | null;
+        if (target && (panel.contains(target) || this.mapSourcesButtonEl?.contains(target))) return;
+        this.closeMapSourcesPanel(false);
+      };
+      doc.addEventListener("pointerdown", outside, true);
+      this.mapSourcesPanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
+    }
+    this.placeMapSourcesPanel(panel);
+  }
+  /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
+  private placeMapSourcesPanel(panel: HTMLElement): void {
+    const button = this.mapSourcesButtonEl;
+    const tools = this.mapSourcesToolsEl;
+    const overlay = tools?.parentElement;
+    if (!button?.getBoundingClientRect || !tools?.getBoundingClientRect || !overlay?.getBoundingClientRect) return;
+    const bounds = overlay.getBoundingClientRect();
+    const width = Math.max(0, Math.min(440, bounds.width - 32));
+    const from = button.getBoundingClientRect().left;
+    const left = Math.min(Math.max(from, bounds.left + 16), bounds.left + bounds.width - 16 - width);
+    panel.style.width = `${width}px`;
+    panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
+  }
+  /**
+   * Adds or removes one source through the view mutation queue. The list is re-read inside the queue, so a repeated
+   * add (same kind and path) writes nothing, and the write only touches `map-sources`.
+   */
+  private changeMapSources(mapPath: string, change: "add" | "remove", source: MapSource): void {
+    const name = mapSourceName(this.app, source);
+    this.enqueue(async () => {
+      if (this.closed || this.path !== mapPath) return;
+      let focus: MapSourcesPanelFocus = { picker: source.kind };
+      try {
+        const current = await this.plugin.repo.readMapSources(mapPath);
+        const at = current.findIndex(item => sameMapSource(item, source));
+        if (change === "add" && at >= 0) {
+          this.announcer?.setText(t("ui.map_sources_already_added_0", name));
+        } else if (change === "remove" && at < 0) {
+          this.mapSources = current;
+        } else {
+          const next = change === "add" ? [...current, source] : current.filter((_, index) => index !== at);
+          await this.plugin.repo.writeMapSources(mapPath, next);
+          this.mapSources = next;
+          if (change === "remove") focus = { remove: at };
+          this.announcer?.setText(t(change === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name));
+        }
+      } catch (error) {
+        new Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));
+        return;
+      }
+      if (this.closed || this.path !== mapPath) return;
+      this.paintMapSourcesButton();
+      if (this.mapSourcesOpen) this.drawMapSourcesPanelEl(focus);
+    });
+  }
+  /** A vault delete or rename: repaint the button and an open panel (a source may have become unreadable). */
+  private refreshMapSourcesUi(): void {
+    if (this.closed || !this.mapSources.length || !this.mapSourcesButtonEl) return;
+    this.paintMapSourcesButton();
+    // A panel with a picker list open stays as it is; it is redrawn with the next change.
+    if (this.mapSourcesOpen && !this.mapSourcesPickerOpen) this.drawMapSourcesPanelEl(null);
   }
   private relevanceRunIsCurrent(run: RelevanceGradeRun, mapPath: string): boolean {
     return (
@@ -11332,6 +11535,9 @@ export class VisualAgentMapView extends ItemView {
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
+    this.mapSourcesPanelCleanup?.();
+    this.mapSourcesPanelCleanup = null;
+    this.mapSourcesPanelEl = null;
     // A name being typed survives the repaint as its draft; one whose card is gone is dropped.
     this.suspendInlineName?.();
     if (this.inlineName?.target === "card" && !this.map?.nodes.some(node => node.id === this.inlineName?.id))
@@ -11813,6 +12019,7 @@ export class VisualAgentMapView extends ItemView {
     integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
     if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
     this.renderRelevanceGoalControl(tools);
+    this.renderMapSourcesControl(tools);
   }
   /**
    * The same tools on an old AIM map while AIM is hidden: it is an ordinary map then. A separate method so renderMapTools keeps
@@ -13553,46 +13760,21 @@ export class VisualAgentMapView extends ItemView {
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
-  private taskSourceSettings(
-    currentLabel: string,
-    currentTopicId = this.map?.id ?? "",
-    synthesisLabel?: string
-  ): TaskSourceSettings {
+  /** The map's saved sources, read from the map the dialog opened on (not the one open when the task starts). */
+  private taskSourceSettings(): TaskSourceSettings {
+    const mapPath = this.path;
     return {
-      currentTopicId,
-      currentLabel,
-      topics: async () =>
-        Promise.all(
-          (await this.plugin.repo.topics()).map(async topic => {
-            const map = await this.plugin.repo.readMap(topic.mapPath);
-            return {
-              id: topic.id,
-              title: topic.title,
-              mapPath: topic.mapPath,
-              nodePaths: map.nodes.map(node => node.path)
-            };
-          })
-        ),
-      readTopic: async (topic, signal, progress) => {
-        const map = await this.plugin.repo.readMap(topic.mapPath);
-        const files = map.nodes.map(node => {
-          const file = this.app.vault.getAbstractFileByPath(node.path);
-          if (!(file instanceof TFile) || file.extension.toLowerCase() !== "md")
-            throw new Error(t("ui.reference_map_note_unavailable", node.path));
-          return file;
-        });
-        const documents: { path: string; content: string }[] = [];
-        for (let index = 0; index < files.length; index += 20) {
-          if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-          progress(t("ui.reference_read_progress", Math.min(index + 20, files.length), files.length));
-          documents.push(
-            ...(await Promise.all(files.slice(index, index + 20).map(file => readMarkdownFile(this.app, file))))
-          );
-        }
-        if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-        return documents;
-      },
-      synthesisLabel
+      mapSources: async signal => {
+        const sources = await this.plugin.repo.readMapSources(mapPath);
+        if (!sources.length) return [];
+        const { groups } = await resolveMapSources(
+          { app: this.app, readMap: path => this.plugin.repo.readMap(path) },
+          sources,
+          mapPath,
+          signal
+        );
+        return groups;
+      }
     };
   }
   /**
@@ -13670,9 +13852,7 @@ export class VisualAgentMapView extends ItemView {
         new Notice(t("ui.ai_locked_notice"));
         return;
       }
-      const currentLabel = t("ui.reference_current_topic_included", note.title);
-      const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
-      const sources = this.taskSourceSettings(currentLabel, this.map?.id, synthesisLabel);
+      const sources = this.taskSourceSettings();
       // Read the styles again first (#38): a style file made since the last run is what `note-style` may point at.
       await this.refreshNoteStyles();
       const current = this.topicStyle(note);
@@ -17132,8 +17312,7 @@ export class VisualAgentMapView extends ItemView {
         .map(id => this.map!.nodes.find(node => node.id === id))
         .filter((node): node is MapNode => !!node);
     const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
-    const selectedLabel = t("ui.reference_selected_topics_included", names.join(", "));
-    const sources = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
+    const sources = this.taskSourceSettings();
     const settings = this.plugin.settings;
     // The styles are read again first (#38), so the line shows a style file made since the last run.
     this.enqueue(async () => {

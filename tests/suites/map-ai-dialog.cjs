@@ -170,7 +170,7 @@ function nextStepHarness({ settings = {}, modelSettings = {}, topic = 'Parent', 
   const Modal = dom.makeModal();
   const { NextStepModal, NoteStyleFileError } = load('tests/support-main-entry.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } hide() {} } } }, { createFragment: dom.createFragment });
   const modelState = provider => ({ provider, status: 'ready', models: provider === 'codex' ? ['gpt-test'] : [] });
-  const sources = { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', synthesisTopics: ['Child A', 'Child B'], topics: async () => [], readTopic: async () => [] };
+  const sources = { mapSources: async () => [], synthesisTopics: ['Child A', 'Child B'] };
   const saved = [];
   const plugin = { settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliModel: 'gpt-test', cliReasoning: 'low', language, ...settings },
     aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test', 'gpt-other'], modelLabel: model => model,
@@ -562,15 +562,24 @@ integrationTest('one-click dialog: model and effort are saved once when a run st
   assert.equal(failing.calls.research.length, 0);
   assert.ok(findAll(failing.modal.contentEl, i => hasCls(i, 'vam-next-status')).some(i => /disk full/.test(i.text)));
 });
-integrationTest('one-click dialog: the data sources have no web or image choice, and the AI mode choice survives switching steps', () => {
+// The sources belong to the map (toolbar panel); the task dialog has no data-source section, hint or text in any step.
+const NO_SOURCE_SECTION = /vam-next-source-(?:details)|vam-reference-/;
+const assertNoSourceSection = (root, where) => {
+  assert.equal(findAll(root, i => NO_SOURCE_SECTION.test(i.cls ?? '')).length, 0, `${where}: no source section`);
+  assert.equal(findAll(root, i => /Data sources|資料來源/.test(i.text ?? '')).length, 0, `${where}: no data-source text`);
+  assert.equal(findAll(root, i => /選擇其他筆記|choose other notes|其他筆記來源|note source/i.test(i.text ?? '')).length, 0, `${where}: no hint to pick other notes or a note source`);
+};
+integrationTest('one-click dialog: no step has a data-source section, and the AI mode choice survives switching steps', () => {
   const h = nextStepHarness({ modelSettings: { topicStatus: 'completed' } });
-  const sources = find(h.modal.contentEl, i => hasCls(i, 'vam-next-source-details'));
-  assert.deepEqual(findAll(sources, i => i.tag === 'input' && i.type === 'checkbox').map(i => i.text), [], 'no checkbox for web search or images');
-  assert.equal(findAll(sources, i => /web search|image references/i.test(i.text)).length, 0, 'no web or image wording in the sources');
-  assert.match(sources.children[0].text + findAll(sources, i => hasCls(i, 'vam-next-source-summary')).map(i => i.text).join(''), /0 Markdown files$/);
+  for (const index of [0, 1, 2]) { cardsOf(h).children[index].click(); assertNoSourceSection(h.modal.contentEl, `step ${index}`); }
   const group = byLabel(h.modal.contentEl, 'AI mode');
   button(group, 'Standard').click();
   for (const index of [2, 1, 0]) { cardsOf(h).children[index].click(); assert.equal(button(group, 'Standard').attrs['aria-checked'], 'true', 'the choice is kept'); }
+});
+integrationTest('one-click dialog: a leaf topic synthesize step says only that it has no subtopics, with no note-source hint', () => {
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'completed' }, children: 0 });
+  for (const index of [0, 1, 2]) { cardsOf(h).children[index].click(); assertNoSourceSection(h.modal.contentEl, `leaf step ${index}`); }
+  assert.ok(findAll(h.modal.contentEl, i => i.text === 'This topic has no direct subtopics yet.').length > 0, 'the neutral first clause is shown');
 });
 integrationTest('one AI-mode widget with one default: the Next Step dialog and the outline import window share it', () => {
   const Modal = dom.makeModal();
@@ -690,8 +699,7 @@ integrationTest('synthesis: pressing hides the dialog; directions return by one 
   const modal = await h.openSingle();
   assert.equal(h.modals.length, 1);
   const setupOutput = find(modal.contentEl, i => hasCls(i, 'vam-next-output'));
-  const setupSources = find(modal.contentEl, i => hasCls(i, 'vam-next-source-details'));
-  assert.equal(setupOutput.hidden, false); assert.equal(setupSources.hidden, false);
+  assert.equal(setupOutput.hidden, false); assertNoSourceSection(modal.contentEl, 'synthesis stage 1');
   visibleBar(modal, 'Get synthesis suggestions first').click();
   await until(() => h.view.synthesisTasks.get(h.parent.path)?.state === 'directions');
   assert.equal(h.calls.length, 1); assert.equal(h.calls[0].directions, true);
@@ -705,7 +713,7 @@ integrationTest('synthesis: pressing hides the dialog; directions return by one 
   const again = h.modals[1];
   // Stage 2 in the reopened dialog: the directions are listed; inputs the draft step ignores are hidden.
   assert.deepEqual(findAll(again.contentEl, i => hasCls(i, 'vam-next-angle')).map(a => find(a, x => x.tag === 'strong').text), ['Common ground', 'Differences']);
-  assert.equal(find(again.contentEl, i => hasCls(i, 'vam-next-output')).hidden, true); assert.equal(find(again.contentEl, i => hasCls(i, 'vam-next-source-details')).hidden, true);
+  assert.equal(find(again.contentEl, i => hasCls(i, 'vam-next-output')).hidden, true); assertNoSourceSection(again.contentEl, 'synthesis stage 2');
   assert.equal(visibleBar(again, 'Get synthesis suggestions first'), undefined); assert.equal(visibleBar(again, 'Skip suggestions and synthesize now'), undefined);
   assert.ok(find(again.contentEl, i => hasCls(i, 'vam-next-synth-fixed') && !i.hidden), 'the dialog says what is fixed now');
   assert.ok(find(again.contentEl, i => hasCls(i, 'vam-next-requirements')), 'requirements remain');
@@ -1371,4 +1379,98 @@ integrationTest('Next Step: a bad style file found after the dialog hid shows Op
   const open = findAll(shown, i => i.tag === 'button')[0];
   assert.equal(open.text, 'Open this file'); open.click(); assert.equal(opened, 1);
   assert.equal(askModel, 0, 'no provider call');
+});
+
+// ---- map-level data sources: AI provenance (C1-C6). The sources live in Map.md; every run reads them at its start. ----
+const refs = load('ai/reference-materials.ts', { obsidian });
+const SRC = { 'Solo/x.md': '# X\nunique-fact-file', 'Src/one.md': '# One\nunique-fact-one', 'Src/two.md': '# Two\nunique-fact-two',
+  'Src/Archive/old.md': '---\nagent-map-node: true\n---\nunique-fact-archived', 'Other/a.md': '# A\nunique-fact-map-a', 'Other/b.md': '# B\nunique-fact-map-b' };
+async function seedSources(h, list) {
+  for (const folder of ['Solo', 'Src', 'Src/Archive', 'Other']) await h.app.vault.createFolder(folder);
+  for (const [path, text] of Object.entries(SRC)) await h.app.vault.create(path, text);
+  const nodes = ['Other/a.md', 'Other/b.md'].map((path, i) => ({ id: `o${i}`, parentId: null, path, x: 0, y: 0, collapsed: false }));
+  await h.app.vault.create('Other/Map.md', core.serializeMap({ id: 'other-id', title: 'Other', version: 1, nodes, viewport: { x: 0, y: 0, zoom: 1 } }));
+  await h.repo.writeMapSources(h.mapPath, list);
+}
+const ALL = [{ kind: 'file', path: 'Solo/x.md' }, { kind: 'folder', path: 'Src' }, { kind: 'map', path: 'Other/Map.md' }];
+const doc = path => ({ path, content: SRC[path], external: false, key: path });
+// What the old picker produced for the same picks: group ids, vault-relative documents, external false.
+const OLD_PICKER = () => [
+  { id: 'files:Solo/x.md', name: 'x.md', location: 'Solo/x.md', documents: [doc('Solo/x.md')] },
+  { id: 'folder:Src', name: 'Src', location: 'Src', documents: [doc('Src/one.md'), doc('Src/two.md')] },
+  { id: 'map:other-id', name: 'Other', location: 'Other/Map.md', documents: [doc('Other/a.md'), doc('Other/b.md')] }];
+const sentText = call => JSON.stringify(call.context);
+const startStage1 = async (h, modal) => { visibleBar(modal, 'Get synthesis suggestions first').click(); await until(() => h.calls.length === 1); return h.calls[0]; };
+const MARKERS = ['unique-fact-file', 'unique-fact-one', 'unique-fact-two', 'unique-fact-map-a', 'unique-fact-map-b'];
+
+integrationTest('C1/C5: a topic synthesis on a map with a file, a folder (with an archived managed note) and a map sends those 5 documents, as the old picker did', async () => {
+  const h = await synthesisHarness();
+  await seedSources(h, ALL);
+  const modal = await h.openSingle();
+  const groups = await h.view.taskSourceSettings().mapSources(new AbortController().signal);
+  assert.equal(groups.flatMap(g => g.documents).length, 5);
+  assert.ok(groups.flatMap(g => g.documents).every(d => d.external === false && !d.path.startsWith('/')));
+  assert.deepEqual(plain(refs.referenceBatches(groups)), plain(refs.referenceBatches(OLD_PICKER())), 'referenceBatches equal the old picker baseline');
+  assert.equal(refs.referenceCatalog(groups), refs.referenceCatalog(OLD_PICKER()));
+  const call = await startStage1(h, modal);
+  for (const marker of MARKERS) assert.ok(sentText(call).includes(marker), `${marker} reaches the request`);
+  assert.equal(sentText(call).includes('unique-fact-archived'), false, 'the archived managed note is left out');
+});
+
+integrationTest('C5: a selection synthesis (merge) on the same map gets the same sources', async () => {
+  const h = await synthesisHarness();
+  await seedSources(h, ALL);
+  const modal = await h.openSelection();
+  const call = await startStage1(h, modal);
+  for (const marker of MARKERS) assert.ok(sentText(call).includes(marker), `${marker} reaches the merge request`);
+});
+
+integrationTest('C2: a deleted source is skipped and the task still runs on the rest, with no dialog text about it', async () => {
+  const h = await synthesisHarness();
+  await seedSources(h, [...ALL, { kind: 'file', path: 'Gone/missing.md' }]);
+  const modal = await h.openSingle();
+  const call = await startStage1(h, modal);
+  for (const marker of MARKERS) assert.ok(sentText(call).includes(marker));
+  assert.equal(findAll(modal.contentEl, i => /read|unreadable|missing|skipped|讀不到/i.test(i.text ?? '') && hasCls(i, 'vam-next-status')).length, 0);
+  assertNoSourceSection(modal.contentEl, 'unreadable source');
+});
+
+integrationTest('C2/C6: all sources unreadable, or no map-sources key, behaves like no sources: the run still starts with no source text', async () => {
+  for (const list of [[{ kind: 'file', path: 'Gone/a.md' }, { kind: 'folder', path: 'Gone' }, { kind: 'map', path: 'Gone/Map.md' }], []]) {
+    const h = await synthesisHarness();
+    await h.repo.writeMapSources(h.mapPath, list);
+    const groups = await h.view.taskSourceSettings().mapSources(new AbortController().signal);
+    assert.deepEqual(plain(groups), []);
+    const modal = await h.openSingle();
+    const call = await startStage1(h, modal);
+    assert.equal(MARKERS.some(m => sentText(call).includes(m)), false);
+  }
+});
+
+integrationTest('C3: a map source equal to the current map is not sent', async () => {
+  const h = await synthesisHarness();
+  await seedSources(h, [{ kind: 'map', path: h.mapPath }, { kind: 'file', path: 'Solo/x.md' }]);
+  const groups = await h.view.taskSourceSettings().mapSources(new AbortController().signal);
+  assert.deepEqual(plain(groups.map(g => g.id)), ['files:Solo/x.md']);
+});
+
+integrationTest('C4: the sources are read once per press and the same groups reach the expansion (and so each child short research)', async () => {
+  let reads = 0; const snapshot = [{ id: 'files:a.md', name: 'a.md', location: 'a.md', documents: [doc('Solo/x.md')] }];
+  const h = nextStepHarness({ pending: 1, modelSettings: { topicStatus: 'completed', sources: { mapSources: async () => { reads++; return snapshot; }, synthesisTopics: [] } } });
+  cardsOf(h).children[1].click();
+  button(h.modal.modalEl, 'Review AI subtopic suggestions (1)').click(); await tick(); await tick(); await tick();
+  assert.equal(reads, 1, 'read once, at the press');
+  assert.equal(h.calls.expand[0].referenceGroups, snapshot, 'the expansion gets the snapshot that its children reuse');
+});
+
+integrationTest('aborting while the sources are being read sends no request (research and expand)', async () => {
+  for (const step of [0, 1]) {
+    let release; const gate = new Promise(resolve => { release = resolve; });
+    const h = nextStepHarness({ pending: 1, modelSettings: { topicStatus: 'completed', sources: { mapSources: async () => { await gate; return []; }, synthesisTopics: [] } } });
+    cardsOf(h).children[step].click();
+    button(h.modal.modalEl, step === 0 ? 'Confirm research task' : 'Review AI subtopic suggestions (1)').click(); await tick();
+    assert.ok(h.modal.taskController, 'a run is waiting for its sources'); h.modal.taskController.abort(); // what the Cancel button does
+    release(); await tick(); await tick(); await tick();
+    assert.equal(h.calls.research.length + h.calls.expand.length, 0, `no request was sent after Cancel (step ${step})`);
+  }
 });

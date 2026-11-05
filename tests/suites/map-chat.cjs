@@ -5358,6 +5358,32 @@ integrationTest('chat 07: in a timeline map a first-level topic is reordered alo
   assert.equal(h.contents.get(MAP), before);
 });
 
+integrationTest('persona 23: one reorder_topics action sorts the five siblings, Map.md and the layout follow, and Undo takes it back in one step', async () => {
+  const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
+  const before = h.contents.get(MAP);
+  const order = ['Dusk', 'Noon', 'Mind', 'Dawn', 'Body'];
+  const lines = await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: order.map(title => ids[title]) }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  assert.equal(lines[0].text, 'Done: Put 5 topics under “Sleep” in a new order');
+  eq(await kidsOf(h, h.ids.root), order);
+  const ys = (await h.saved()).filter(n => n.parentId === h.ids.root).sort((l, r) => l.y - r.y).map(n => h.view.notes.get(n.id)?.title);
+  eq(ys, order);
+  await h.view.travel(false);
+  eq(await kidsOf(h, h.ids.root), ['Body', 'Mind', 'Dawn', 'Noon', 'Dusk']);
+  assert.equal(h.contents.get(MAP), before, 'Map.md is back byte for byte');
+  assert.equal(h.view.history.canUndo, false, 'one step');
+});
+integrationTest('persona 23: reorder_topics of some siblings keeps the others in their places, and a card that moved away since is skipped without a write', async () => {
+  const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
+  eq((await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: [ids.Noon, ids.Body] }])).map(l => l.status), ['done']);
+  eq(await kidsOf(h, h.ids.root), ['Noon', 'Mind', 'Dawn', 'Body', 'Dusk']);
+  await apply(h, [{ kind: 'move_topic', nodeId: ids.Dusk, newParentId: h.ids.a }]);
+  const before = h.contents.get(MAP);
+  const lines = await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: [ids.Dusk, ids.Mind] }]);
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(MAP), before);
+});
+
 // ---- chat 08: the AI chat sets the appearance ------------------------------------------------------------------------------
 const lookAct = (nodeIds, fields = {}) => ({ kind: 'set_appearance', nodeIds, ...fields });
 const looksOf = async (h, key) => { const note = await h.note(key); return { color: note.color ?? null, markers: note.markers ?? [], style: note.style ?? [] }; };
@@ -5580,4 +5606,72 @@ integrationTest('hypothesis-leaning: S25 the result row names the leaning and st
     'Done: Set the type of “REM” to Hypothesis (Strong)',
     'Done: Set the type of “Sleep” to Hypothesis'
   ], JSON.stringify(lines.map(l => l.text)));
+});
+
+// ---- persona 12: the layout follows a reply that changes card sizes or moves a card away --------------------------------
+const coverAny = (nodes, heightOf) => {
+  const found = [];
+  for (const a of nodes) for (const b of nodes) if (a.id < b.id && Math.abs(a.x - b.x) < 280 && a.y < b.y + heightOf(b.id) && b.y < a.y + heightOf(a.id)) found.push([a.id, b.id]);
+  return found;
+};
+integrationTest('persona 12: a summary that makes a card taller does not leave it covering the card below; with no overlap nothing moves', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const heights = { default: 180 }; h.view.cardHeightOf = id => heights[id] ?? heights.default;
+  const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const quiet = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'short' }]);
+  eq(quiet.map(l => l.status), ['done']);
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), before, 'cards that still fit stay where the user left them');
+  heights[h.ids.a] = 520; // the summary made Body much taller: it now covers Mind
+  assert.ok(coverAny(h.view.map.nodes, id => heights[id] ?? 180).length > 0, 'precondition: the grown card covers another');
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'A long summary '.repeat(40) }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  eq(coverAny(h.view.map.nodes, id => heights[id] ?? 180), [], 'nothing overlaps after the reply');
+  eq(coverAny(await h.saved(), id => heights[id] ?? 180), [], 'and the saved map is the same');
+});
+integrationTest('persona 12: moving a card to another branch closes the place it left, in the old branch only', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.cardHeightOf = () => 180;
+  await apply(h, [{ kind: 'add_child', parentId: h.ids.a, title: 'Second', summary: '' }, { kind: 'add_child', parentId: h.ids.a, title: 'Third', summary: '' }]);
+  const kids = () => h.view.map.nodes.filter(n => n.parentId === h.ids.a).sort((x, y) => x.y - y.y);
+  eq(kids().length, 3);
+  const [first, second, third] = kids();
+  const mind = h.view.map.nodes.find(n => n.id === h.ids.b); const mindAt = [mind.x, mind.y];
+  const lines = await apply(h, [{ kind: 'move_topic', nodeId: second.id, newParentId: h.ids.b }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const left = kids(); eq(left.map(n => n.id), [first.id, third.id]);
+  assert.equal(left[1].y - left[0].y, 180 + 24, 'the two cards that stayed are one gap apart, no hole where the third one moved from');
+});
+
+// ---- persona 27: a card drawn taller than the layout assumed (cover picture, diamond frame) -------------------------------
+const layoutApi = load('map-layout.ts');
+const stack = n => Array.from({ length: n + 1 }, (_, i) => ({ id: 'n' + i, parentId: i ? 'n0' : null, x: i ? 360 : 80, y: 80, width: undefined, collapsed: false }));
+test('persona 27: cards whose drawn height grew past what the layout assumed are found, at tight, standard and loose spacing', () => {
+  // Three diamonds laid out while each was ~70 high (before the shape padding) end up 141 high; with a cover, 96 + 8 more.
+  for (const spacing of ['compact', 'standard', 'spacious']) {
+    const guessed = () => 70;
+    const laid = layoutApi.arrangeMap(stack(3), undefined, guessed, { direction: 'right', spacing });
+    const real = id => (id === 'n0' ? 180 : 141);
+    const seen = new Map(laid.map(n => [n.id, guessed()]));
+    const now = new Map(laid.map(n => [n.id, real(n.id)]));
+    const grew = layoutApi.cardsChangedHeight(seen, now);
+    assert.ok(grew.has('n1') && grew.has('n2') && grew.has('n3'), spacing + ': the grown cards are reported');
+    assert.ok(layoutApi.cardsOverlapAny(laid, grew, real), spacing + ': precondition: they cover each other at the guessed layout');
+    const again = layoutApi.arrangeMap(laid, undefined, real, { direction: 'right', spacing });
+    assert.equal(layoutApi.cardsOverlapAny(again, new Set(again.map(n => n.id)), real), false, spacing + ': laid out with real heights nothing overlaps');
+  }
+  assert.equal(layoutApi.cardsChangedHeight(new Map(), new Map([['a', 300]])).size, 0, 'the first paint of a map reports nothing');
+  assert.equal(layoutApi.cardsChangedHeight(new Map([['a', 300]]), new Map([['a', 200]])).size, 0, 'a card that shrank is not reported');
+});
+integrationTest('persona 27: a card that grows after the layout (cover picture arrived) and now covers another is laid out again; opening moves nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  h.view.cardEls = new Map(h.view.map.nodes.map(n => [n.id, { get offsetHeight() { return heights[n.id]; } }]));
+  const where = () => JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const before = where();
+  h.view.settleCardHeights(); await tick(); await tick();
+  assert.equal(where(), before, 'the first look only records heights');
+  heights[h.ids.a] = 520; // the cover picture arrived
+  assert.ok(coverAny(h.view.map.nodes, id => heights[id]).length > 0, 'precondition: the taller card covers another');
+  h.view.settleCardHeights(); await until(() => coverAny(h.view.map.nodes, id => heights[id]).length === 0);
+  eq(coverAny(await h.saved(), id => heights[id]), [], 'the saved map has no overlap either');
 });

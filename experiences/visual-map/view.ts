@@ -110,6 +110,7 @@ import {
   markerLabelKey,
   readTopicMarkers,
   markerSymbol,
+  markedProgressPercent,
   type TopicMarker
 } from "../../topic-markers";
 import { normalizeTopicLink, readTopicLinks, TOPIC_LINKS_MAX, type AddTopicLinkResult } from "../../topic-links";
@@ -221,6 +222,8 @@ import {
 import {
   arrangeNewBranch,
   arrangeNewTree,
+  cardsChangedHeight,
+  cardsOverlapAny,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
   layoutDirectionFor,
@@ -228,6 +231,7 @@ import {
   medianHeight,
   reorderSiblings,
   reorderTopLevel,
+  orderSiblings,
   shiftSibling,
   type LayoutKind,
   type LayoutSpacing
@@ -311,7 +315,7 @@ import {
   chooseCardToolsSpot,
   clearToolbar,
   type CanvasInsets,
-  fitIsClamped,
+  anyBoxOffscreen,
   fitViewport,
   focusViewport,
   initialViewport,
@@ -1010,6 +1014,7 @@ export class VisualAgentMapView extends ItemView {
    * reaches the run and no request is sent; the entry goes away once the run is accepted or ends.
    */
   private startingTasks = new Map<string, AbortController>();
+  private disclosureSeq = 0;
   /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
   private quickOutlines = new Map<
     string,
@@ -1472,6 +1477,8 @@ export class VisualAgentMapView extends ItemView {
     }
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
+      // A pending cut ends with this Esc as well; the selection is cleared exactly as before.
+      if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
       this.applySelectionChange(this.selection.escape());
       // Claimed here: unhandled, Obsidian answers Esc by activating another leaf and the next key edits that note.
       event.preventDefault();
@@ -3943,10 +3950,34 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mergeUnlocked([node.id, parent.id])) return;
     await this.mapChange(map => {
       if (!canParent(map.nodes, node.id, parent.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-      map.nodes.find(item => item.id === node.id)!.parentId = parent.id;
+      const moving = map.nodes.find(item => item.id === node.id)!;
+      const oldParentId = moving.parentId;
+      moving.parentId = parent.id;
       map.nodes.find(item => item.id === parent.id)!.collapsed = false;
+      this.closeGapAt(map, oldParentId, parent.id);
       this.arrangeBranch(map, parent.id, new Set([node.id, ...descendants(map.nodes, node.id)]), undefined);
     });
+  }
+  /**
+   * A card left `oldParentId`: that branch is laid out again so the place it left closes up. Only that branch moves; the rest of
+   * the map, and a branch the card moved within, stay as they are. Nothing when there was no parent, the parent still is the
+   * parent, or its branch is folded.
+   */
+  private closeGapAt(map: MapDocument, oldParentId: string | null, newParentId: string): void {
+    if (!oldParentId || oldParentId === newParentId) return;
+    const old = map.nodes.find(item => item.id === oldParentId);
+    if (!old || old.collapsed) return;
+    this.arrangeBranch(map, oldParentId, new Set(descendants(map.nodes, oldParentId)), undefined);
+  }
+  /**
+   * After a chat reply changed what cards show: cards that grew and now cover another card get the whole map laid out again
+   * (the same layout "Auto layout" does); when nothing overlaps nothing moves, so a position the user set stays. A card that
+   * moved away from a parent had its old branch closed up already, at the move.
+   */
+  private tidyAfterResize(map: MapDocument, resized: ReadonlySet<string>): boolean {
+    if (!resized.size || !cardsOverlapAny(map.nodes, resized, this.cardHeightOf)) return false;
+    this.arrangeAll(map);
+    return true;
   }
   /**
    * `map.nodes` with every parent's children in on-screen order: sorted along the sibling axis of the arrangement they sit in
@@ -3980,14 +4011,32 @@ export class VisualAgentMapView extends ItemView {
       if (!moving || !target || next?.parentId !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
       // The children of the new parent first take the order on screen (what the model was told), so the reorder keeps what was seen.
       map.nodes = this.onScreenSiblingOrder(map);
+      const oldParentId = map.nodes.find(item => item.id === node.id)?.parentId ?? null;
       moving.parentId = parent.id;
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
       box.placed = true;
+      this.closeGapAt(map, oldParentId, parent.id);
       if (!map.aim && layoutOf(map).direction === "timeline" && !target.parentId) this.arrangeAll(map);
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
     });
     return box.placed;
+  }
+  /**
+   * reorder_topics: the listed children of `parent` take the given order among their siblings, in one undoable Map.md change,
+   * then the branch is laid out again in that order (a first-level topic of a timeline map: the whole map, as a drag does).
+   * Nothing is written when they already are in that order.
+   */
+  private async chatReorderChildren(parent: MapNode, ids: string[]): Promise<void> {
+    await this.mapChange(map => {
+      // The children first take the order on screen (what the model was told), so the reorder keeps what was seen.
+      const aligned = this.onScreenSiblingOrder(map);
+      const next = orderSiblings(aligned, parent.id, ids);
+      if (next === aligned) return;
+      map.nodes = next;
+      if (!map.aim && layoutOf(map).direction === "timeline" && !parent.parentId) this.arrangeAll(map);
+      else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
+    });
   }
   /**
    * A card dropped on empty canvas takes the place it was dropped at. The arrangements lay siblings out in array order, so it
@@ -5826,6 +5875,10 @@ export class VisualAgentMapView extends ItemView {
       node => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending?.has(node.path)
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
+    // Marked progress is shown beside the research count (the bar itself stays research-only): the average of the marked topics.
+    const marked = markedProgressPercent(nodes.map(node => this.markersOf(node.id)));
+    if (marked !== null)
+      progress.createSpan({ cls: "vam-research-progress-marked", text: t("ui.marked_progress_0", marked) });
   }
   /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
   private whenEditing(action: () => void): void {
@@ -10332,6 +10385,8 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     this.paint();
+    // Outside paint(): the paint tail is pinned by the view.ts wiring tests (34, 42).
+    this.settleCardHeights();
   }
   private paint(): void {
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
@@ -11029,7 +11084,7 @@ export class VisualAgentMapView extends ItemView {
         if (active) chip.setAttr("role", "status");
       }
       if (note) {
-        if (showsToResearch(kind, note.status))
+        if (showsToResearch(kind, note.status, this.progressDone(node.id)))
           this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
         else this.labelCard(card, note.title);
       }
@@ -11994,6 +12049,10 @@ export class VisualAgentMapView extends ItemView {
     const raw = this.notes.get(id)?.markers;
     return raw ? readTopicMarkers({ "topic-markers": raw }) : [];
   }
+  /** True when the user marked this topic 100% progress. */
+  private progressDone(id: string): boolean {
+    return this.markersOf(id).includes("progress-100");
+  }
   /** "Markers: Done, Star" in the language of the UI, or "" when the topic has none. */
   private markersText(markers: readonly TopicMarker[]): string {
     return markers.length
@@ -12006,6 +12065,35 @@ export class VisualAgentMapView extends ItemView {
     if (!id || !this.map) return;
     this.fitKindShape(card, this.topicKindOf(id));
     this.drawEdges();
+    this.settleCardHeights();
+  }
+  /** Heights (canvas units) the cards had at the last check, and the map they belong to. */
+  private heightsSeen = new Map<string, number>();
+  private heightsSeenMap: string | null = null;
+  private settling = false;
+  /**
+   * A layout runs before a card is drawn at its final size: a cover's picture arrives later, a diamond's padding is fitted after
+   * the card is built. A card that ended up taller than it was and now covers another gets the map laid out again with the real
+   * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
+   */
+  private settleCardHeights(): void {
+    if (!this.map || this.closed || !this.cardEls) return;
+    const now = new Map<string, number>();
+    for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
+    const first = this.heightsSeenMap !== this.map.id;
+    const grew = cardsChangedHeight(first ? new Map() : this.heightsSeen, now);
+    this.heightsSeenMap = this.map.id;
+    this.heightsSeen = now;
+    if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
+    if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+    this.settling = true;
+    void this.mapChange(map => this.tidyAfterResize(map, grew), false)
+      .catch(() => {
+        // Only the tidy-up failed; the user can lay the map out by hand.
+      })
+      .finally(() => {
+        this.settling = false;
+      });
   }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   private releaseCovers(): void {
@@ -12451,7 +12539,7 @@ export class VisualAgentMapView extends ItemView {
       const label =
         note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
-      if (showsToResearch(this.topicKindOf(node.id), note.status))
+      if (showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)))
         this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
       else this.labelCard(card, note.title);
       if (note.status === "idea") status?.remove();
@@ -12690,7 +12778,9 @@ export class VisualAgentMapView extends ItemView {
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
-          ...(showsToResearch(this.topicKindOf(node.id), note.status) ? { topicStatus: note.status } : {}),
+          ...(showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id))
+            ? { topicStatus: note.status }
+            : {}),
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
               .length ?? 0,
@@ -12730,7 +12820,12 @@ export class VisualAgentMapView extends ItemView {
     heading.createEl("strong", {
       text: mode === "structure" ? t("ui.structure_and_links") : t("ui.expansion_suggestions")
     });
-    if (note) panel.createEl("p", { cls: "vam-inspector-topic", text: t("ui.topic_0", note.title) });
+    // The card settings dialog is titled "This card" and the subtitle is just the card's name.
+    if (note)
+      panel.createEl("p", {
+        cls: "vam-inspector-topic",
+        text: mode === "structure" ? note.title : t("ui.topic_0", note.title)
+      });
     if (note) {
       if (mode === "proposals") this.renderPendingProposals(panel, node, note, close, host);
       if (mode === "structure") {
@@ -12771,16 +12866,20 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
-    // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
+    // Order (ticket 41): what it is (type), how far to trust it (strength), who it relates to; then the folded
+    // "Appearance" and "Layout" groups; then the AI lock; then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
-    if (note) this.renderMarkerSection(panel, node);
-    if (note) this.renderLinkSection(panel, node);
-    if (note) this.renderColorSection(panel, node);
-    if (note) this.renderStyleSection(panel, node);
-    if (note) this.renderCoverSection(panel, node);
-    if (note) this.renderAiLockSection(panel, node);
-    this.renderBranchLayoutSection(panel, node);
-    const relationship = panel.createDiv("vam-inspector-section");
+    if (note) {
+      const look = this.renderDisclosure(panel, t("ui.card_group_appearance"));
+      this.renderMarkerSection(look, node);
+      this.renderLinkSection(look, node);
+      this.renderColorSection(look, node);
+      this.renderStyleSection(look, node);
+      this.renderCoverSection(look, node);
+    }
+    const layout = this.renderDisclosure(panel, t("ui.card_group_layout"));
+    this.renderBranchLayoutSection(layout, node);
+    const relationship = layout.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
       cls: "vam-topic-tree-heading vam-section-heading"
@@ -12801,6 +12900,7 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
+    if (note) this.renderAiLockSection(panel, node);
     const actions = (host ?? panel).createDiv("vam-next-actions");
     if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
@@ -12839,6 +12939,25 @@ export class VisualAgentMapView extends ItemView {
         });
       });
     };
+  }
+  /** A folded group: a button with `aria-expanded` that shows or hides its body. Every control inside stays in the DOM. Returns the body. */
+  private renderDisclosure(parent: HTMLElement, label: string): HTMLElement {
+    const group = parent.createDiv("vam-disclosure");
+    const toggle = group.createEl("button", { text: label, cls: "vam-disclosure-toggle" });
+    toggle.type = "button";
+    const body = group.createDiv("vam-disclosure-body");
+    body.id = `vam-disclosure-${++this.disclosureSeq}`;
+    body.hidden = true;
+    toggle.setAttr("aria-expanded", "false");
+    toggle.setAttr("aria-controls", body.id);
+    let open = false;
+    toggle.addEventListener("click", () => {
+      open = !open;
+      toggle.setAttr("aria-expanded", String(open));
+      toggle.toggleClass("is-open", open);
+      body.hidden = !open;
+    });
+    return body;
   }
   private renderPendingProposals(
     panel: HTMLElement,
@@ -13055,39 +13174,61 @@ export class VisualAgentMapView extends ItemView {
       );
     }, false);
   }
-  /** The six relation kinds as a menu; `pick` gets the chosen one. */
-  private openRelationKindMenu(event: MouseEvent, pick: (kind: TopicRelationKind) => void): void {
-    const menu = this.newMenu();
-    for (const kind of RELATION_KINDS)
-      menu.addItem(item =>
-        item
-          .setTitle(t(RELATION_NAME_KEY[kind]))
-          .setIcon("link")
-          .onClick(() => pick(kind))
-      );
-    menu.showAtMouseEvent(event);
-  }
-  /** Opens the picker for the other end (B) of a `kind` relation that starts at `node` (A); with no legal target it only says so. */
-  private chooseRelationTarget(node: MapNode, kind: TopicRelationKind, onAdded?: () => void): void {
-    if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalRelationTargets(this.map, kind, node.id));
-    if (!legal.size) {
-      new Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
-      return;
-    }
-    new TopicTreeModal(
-      this.app,
-      t("ui.add_relation_title_0", t(RELATION_NAME_KEY[kind])),
-      t("ui.add_relation_description"),
-      this.map.nodes,
-      target => this.notes.get(target.id)?.title ?? target.path,
-      target => legal.has(target.id),
-      target =>
-        this.enqueue(async () => {
-          await this.addRelation(node.id, target.id, kind);
-          onAdded?.();
-        })
-    ).open();
+  /**
+   * "This card [relation ▾] → [another card ▾] [Add]": one sentence adds a relation A -> B. The card list holds only
+   * legal targets (never this card itself, never a card already linked to it, never a cycle), so it is refilled when
+   * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
+   */
+  private renderRelationAddRow(
+    parent: HTMLElement,
+    node: MapNode,
+    onAdded: () => void,
+    exposeFirst: (control: HTMLElement) => void
+  ): void {
+    const row = parent.createDiv("vam-relation-add");
+    row.setAttr("role", "group");
+    row.setAttr("aria-label", t("ui.relation_add_row"));
+    row.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
+    const kindSelect = row.createEl("select", { cls: "dropdown vam-relation-add-kind" });
+    kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+    for (const kind of RELATION_KINDS) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+    exposeFirst(kindSelect);
+    row.createSpan({ text: "→", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
+    const targetSelect = row.createEl("select", { cls: "dropdown vam-relation-add-target" });
+    targetSelect.setAttr("aria-label", t("ui.relation_target_label"));
+    const add = row.createEl("button", { text: t("ui.relation_add_submit"), cls: "mod-cta" });
+    add.type = "button";
+    const currentKind = (): TopicRelationKind => (kindSelect.value as TopicRelationKind) || RELATION_KINDS[0];
+    const fill = (): void => {
+      targetSelect.empty();
+      const legal = this.map ? new Set(legalRelationTargets(this.map, currentKind(), node.id)) : new Set<string>();
+      const targets = (this.map?.nodes ?? []).filter(item => item.id !== node.id && legal.has(item.id));
+      targetSelect.createEl("option", {
+        text: targets.length
+          ? t("ui.relation_pick_card")
+          : t("ui.no_relation_target_0", t(RELATION_NAME_KEY[currentKind()])),
+        value: ""
+      });
+      for (const target of targets)
+        targetSelect.createEl("option", { text: this.notes.get(target.id)?.title ?? target.path, value: target.id });
+      targetSelect.value = "";
+      targetSelect.disabled = !targets.length;
+      add.disabled = true;
+    };
+    fill();
+    kindSelect.addEventListener("change", fill);
+    targetSelect.addEventListener("change", () => {
+      add.disabled = !targetSelect.value;
+    });
+    add.addEventListener("click", () => {
+      const toId = targetSelect.value;
+      if (!toId) return;
+      const kind = currentKind();
+      this.enqueue(async () => {
+        await this.addRelation(node.id, toId, kind);
+        onAdded();
+      });
+    });
   }
   /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
   private relationRowText(link: TopicRelation, selfId: string): string {
@@ -13817,6 +13958,12 @@ export class VisualAgentMapView extends ItemView {
         return check("write", [real(action.nodeId)]);
       case "move_topic":
         return check("move", [action.nodeId], real(action.newParentId));
+      case "reorder_topics":
+        return check(
+          "move",
+          action.nodeIds.map(id => real(id)),
+          real(action.parentId)
+        );
       // A relation writes both end notes' lines and Map.md: a locked end refuses it (the end cards can be ones of this reply).
       case "add_relation":
       case "remove_relation":
@@ -13902,6 +14049,12 @@ export class VisualAgentMapView extends ItemView {
       });
       choice.setAttr("aria-pressed", String(locked));
       if (locked) choice.addClass("is-pressed");
+      // The row says the state it is in now, not only what the button would do.
+      group.createSpan({
+        cls: "vam-ai-lock-state",
+        text: t(locked ? "ui.ai_lock_state_on" : "ui.ai_lock_state_off"),
+        attr: { role: "status", "aria-live": "polite" }
+      });
       if (focus) choice.focus();
     };
     paint();
@@ -14175,7 +14328,7 @@ export class VisualAgentMapView extends ItemView {
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
     const editByPair = new Map<string, HTMLElement>();
-    let addRelationButton: HTMLElement | null = null;
+    let addRelationControl: HTMLElement | null = null;
     const paint = (
       focusStrength = false,
       focusKind = false,
@@ -14285,7 +14438,7 @@ export class VisualAgentMapView extends ItemView {
           // After the editor closes, focus goes to this pair's edit button as last painted (a pair has one relation),
           // or to "Add relation…" when the relation was deleted.
           const edit = this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
-            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationButton)?.focus())
+            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationControl)?.focus())
           );
           editByPair.set(pair, edit);
           this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
@@ -14296,16 +14449,16 @@ export class VisualAgentMapView extends ItemView {
           );
         }
       } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
-      const addRelation = body.createEl("button", { text: t("ui.add_relation") });
-      addRelationButton = addRelation;
-      addRelation.addEventListener("click", event => {
-        event.stopPropagation();
-        this.openRelationKindMenu(event, kind =>
-          this.chooseRelationTarget(node, kind, () => paint(false, false, true))
-        );
-      });
-      // Repainting replaced the button that started the flow; a keyboard user lands back on its replacement.
-      if (focusAdd) addRelation.focus();
+      this.renderRelationAddRow(
+        body,
+        node,
+        () => paint(false, false, true),
+        kindControl => {
+          addRelationControl = kindControl;
+        }
+      );
+      // Repainting replaced the control that started the flow; a keyboard user lands back on its replacement.
+      if (focusAdd) addRelationControl?.focus();
     };
     paint();
   }
@@ -16495,6 +16648,7 @@ export class VisualAgentMapView extends ItemView {
     this.transform();
     if (persist) this.saveViewport();
   }
+  private fitNotice: Notice | null = null;
   private fit(): void {
     if (!this.map || !this.viewportEl) return;
     const nodes = this.canvasNodes();
@@ -16533,10 +16687,12 @@ export class VisualAgentMapView extends ItemView {
     this.transform();
     this.saveViewport();
     // The zoom floor keeps text readable; when it holds some cards off screen, say so instead of hiding them silently.
-    if (fitIsClamped(fitBounds, fitSize, fitInset)) {
+    // Judged against the real canvas (not the area inside the toolbar insets), and one notice at a time.
+    if (anyBoxOffscreen(boxes, this.map.viewport, fitSize)) {
       const hint = t("ui.fit_clamped");
       this.announcer?.setText(hint);
-      new Notice(hint);
+      this.fitNotice?.hide();
+      this.fitNotice = new Notice(hint);
     }
   }
   private setupPan(): void {
@@ -17531,6 +17687,8 @@ export class VisualAgentMapView extends ItemView {
         return action.beforeId
           ? t("ui.map_chat_do_move_before_0_1", title(action.nodeId), title(action.beforeId))
           : t("ui.map_chat_do_move_0_1", title(action.nodeId), title(action.newParentId));
+      case "reorder_topics":
+        return t("ui.map_chat_do_reorder_0_1", title(action.parentId), action.nodeIds.length);
       case "delete_topic":
         return t("ui.map_chat_do_delete_0", title(action.nodeId));
       case "edit_md_file":
@@ -17768,6 +17926,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.renderPending || this.closed) return;
     this.renderPending = false;
     this.paint();
+    this.settleCardHeights();
   }
   /**
    * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be
@@ -17808,6 +17967,8 @@ export class VisualAgentMapView extends ItemView {
     // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
     let laidOutCount = 0;
     let layoutDone = false;
+    /** Cards whose title, summary or note this reply changed: their size may have changed. */
+    const resized = new Set<string>();
     // True once the reply stopped before its end (the user's Stop, or the view going away).
     let stopped = false;
     const refTitles = this.chatRefTitles(result.actions);
@@ -17882,6 +18043,11 @@ export class VisualAgentMapView extends ItemView {
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
         if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
+        if (
+          box.outcome.status === "done" &&
+          (action.kind === "rename_topic" || action.kind === "update_summary" || action.kind === "edit_topic_note")
+        )
+          resized.add(action.nodeId);
         if (action.kind === "auto_layout" && box.outcome.status === "done") {
           laidOutCount = run.created.length;
           layoutDone = true;
@@ -17912,6 +18078,26 @@ export class VisualAgentMapView extends ItemView {
           );
         } catch {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
+        }
+      }
+      // A card that grew (a summary, a longer title) can now cover the one below it: lay out again, only when that happened.
+      if (resized.size && !arranged && !noNewMap && same() && this.map) {
+        // The layout measures the cards, so the held repaint comes first. Looked at before any mutate is taken: a reply whose
+        // cards still fit writes nothing more (one mutate per action).
+        this.flushChatRender();
+        if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf)) {
+          try {
+            await this.plugin.mutate(() =>
+              this.history.ownWrites(async () => {
+                if (!same() || !this.map) return;
+                await this.mapChange(map => {
+                  this.tidyAfterResize(map, resized);
+                }, false);
+              })
+            );
+          } catch {
+            // The writes are done already; only the tidy-up failed, and the user can lay the map out by hand.
+          }
         }
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
@@ -18318,6 +18504,19 @@ export class VisualAgentMapView extends ItemView {
           if (!(await this.chatMoveBefore(node, parent, before))) return skipped("ui.map_chat_skip_not_sibling");
         } else await this.moveTopic(node, parent);
         await this.chatTopicAccept(node.id, baseline.topicHashes);
+        return done;
+      }
+      case "reorder_topics": {
+        const parentId = real(action.parentId);
+        const ids = action.nodeIds.map(id => real(id));
+        if (parentId === null || ids.some(id => id === null)) return skipped("ui.map_chat_skip_parent_missing");
+        const parent = nodeOf(parentId);
+        const kids = ids.map(id => nodeOf(id!));
+        if (!parent || kids.some(kid => !kid)) return gone;
+        if (this.isMerging(parent.id) || kids.some(kid => this.isMerging(kid!.id)))
+          return skipped("ui.map_chat_skip_merge_locked");
+        if (kids.some(kid => kid!.parentId !== parent.id)) return skipped("ui.map_chat_skip_not_sibling");
+        await this.chatReorderChildren(parent, ids as string[]);
         return done;
       }
       case "delete_topic": {

@@ -5,7 +5,8 @@
 - rename_topic：nodeId、title（新標題）。
 - update_summary：nodeId、summary（完整的新摘要）。
 - edit_topic_note：nodeId、detail（該議題完整的新筆記本文，取代舊本文）。只能用在 "selected" 或 "references" 裡、且已提供目前 "detail" 的議題；只出現在大綱裡的議題不可使用。以提供的 detail 為底，使用者沒要求改的部分要保留。
-- move_topic：nodeId、newParentId（既有議題 id 或 "new:<ref>"）、beforeId（選填：已經是 newParentId 子議題的一張議題，移動的議題會放在它正前方；空字串表示照舊放到 newParentId 底下）。不可把議題移到自己或自己的子孫底下。要調整同一個上層議題底下的順序時，newParentId 填它們原本的上層議題並設定 beforeId；要把多張排成新順序時，先選定應該排在最後的那張，再依想要的順序由前到後，把其他每一張都移到那張最後的議題前面。
+- move_topic：nodeId、newParentId（既有議題 id 或 "new:<ref>"）、beforeId（選填：已經是 newParentId 子議題的一張議題，移動的議題會放在它正前方；空字串表示照舊放到 newParentId 底下）。不可把議題移到自己或自己的子孫底下。要把一張議題放到同層的特定位置時，newParentId 填它原本的上層議題並設定 beforeId；要把同一個上層議題底下的多張議題排成新順序（排序、依重要性排名）時，改用 reorder_topics。
+- reorder_topics：parentId（既有議題 id 或 "new:<ref>"）、nodeIds（兩張以上，都已經是 parentId 的子議題，依想要的順序由前到後列出）。只調整列出的這幾張在同層的先後；它們仍在 parentId 底下，沒列出的同層議題位置不變。一個動作就排好全部，不要用 move_topic 做這件事。
 - delete_topic：nodeId、branch（true 表示整個分支一起處理）。議題是移到「未歸類」，不是真的刪除。
 - edit_md_file：path、find、replace。把 "path" 指向的 Markdown 檔中「恰好一處」的 "find" 換成 "replace"。"find" 在下方提供的檔案內容中必須剛好出現一次，請多複製一些前後文使它唯一。只有 "files" 或 "snippets" 裡帶有內容雜湊的檔案可以編輯。
 - create_md_file：path（Vault 內尚不存在的 .md 相對路徑）、content（整份檔案內容）。
@@ -32,7 +33,7 @@
 
 大綱依樹狀順序列出議題：每張議題後面接著它的子議題，同一個上層議題底下的議題依目前順序由前到後列出。
 
-整理結構（重新編排、重新分組、調整順序、合併重複內容）：只用 move_topic、run_map_action 的 merge、rename_topic 與 delete_topic。優先用合併與移動；delete_topic 只用在使用者要求，或該議題內容已併入其他議題的情況。不要提到任何結構建議視窗。
+整理結構（重新編排、重新分組、調整順序、合併重複內容）：只用 move_topic、run_map_action 的 merge、rename_topic 與 delete_topic。優先用合併與移動；只要調整同一個上層議題底下的順序時用 reorder_topics；delete_topic 只用在使用者要求，或該議題內容已併入其他議題的情況。不要提到任何結構建議視窗。
 
 絕不用標題表達議題類型：不可為了讓議題變成假設、證據或其他類型而改名，也不可把類型名稱寫進標題或摘要。改類型只能用 set_topic_kind（或 add_child 的 topicKind）。AIM 心智圖沒有議題類型：不要送 set_topic_kind、ask_topic_kind 或 topicKind。AIM 心智圖也沒有關係：不要送 add_relation 或 remove_relation。
 

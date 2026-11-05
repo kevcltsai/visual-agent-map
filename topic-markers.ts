@@ -166,3 +166,15 @@ export function changeTopicMarkers(
   const list: unknown[] = Array.isArray(current) ? current : typeof current === "string" && current ? [current] : [];
   return list.length ? (list as string[]) : null;
 }
+
+/** The progress percent a marker list carries (0, 25, 50, 75 or 100), or null when it has no progress marker. */
+export function progressPercentOf(markers: readonly TopicMarker[]): number | null {
+  const id = markers.find(m => m.startsWith("progress-"));
+  return id ? Number(id.slice("progress-".length)) : null;
+}
+
+/** The average progress of the topics that carry a progress marker, rounded; null when none does. */
+export function markedProgressPercent(lists: readonly (readonly TopicMarker[])[]): number | null {
+  const values = lists.map(progressPercentOf).filter((v): v is number => v !== null);
+  return values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null;
+}

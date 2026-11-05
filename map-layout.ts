@@ -4,7 +4,7 @@ import { fishbonePositions } from "./layouts/fishbone";
 import { radialPositions } from "./layouts/radial";
 import { timelinePositions } from "./layouts/timeline";
 import { verticalPositions } from "./layouts/vertical";
-import { CARD_WIDTH, parentIdsForNode, type MapNode } from "./map-graph";
+import { CARD_WIDTH, parentIdsForNode, visibleNodes, type MapNode } from "./map-graph";
 
 const WIDTH = 300;
 
@@ -636,6 +636,30 @@ export function reorderSiblings<T extends { id: string; parentId?: string | null
   return result;
 }
 /**
+ * Puts the children `orderedIds` of `parentId` in that order. Only the listed cards change places, and only among the places
+ * they hold in the array (the order every arrangement lays siblings out in); an unlisted sibling and every other card keep
+ * their index. An id that is not a child of `parentId`, a repeated id, fewer than two ids, or an order that already holds
+ * returns `nodes` itself.
+ */
+export function orderSiblings<T extends { id: string; parentId?: string | null }>(
+  nodes: T[],
+  parentId: string,
+  orderedIds: readonly string[]
+): T[] {
+  if (orderedIds.length < 2 || new Set(orderedIds).size !== orderedIds.length) return nodes;
+  const slots = nodes.flatMap((node, index) => (node.parentId === parentId ? [index] : []));
+  const listed = new Set(orderedIds);
+  const wanted = orderedIds.map(id => slots.map(index => nodes[index]).find(node => node.id === id));
+  if (wanted.some(node => !node)) return nodes;
+  const places = slots.filter(index => listed.has(nodes[index].id));
+  if (places.every((index, at) => nodes[index] === wanted[at])) return nodes;
+  const result = nodes.slice();
+  places.forEach((index, at) => {
+    result[index] = wanted[at]!;
+  });
+  return result;
+}
+/**
  * Moves `id` one place earlier (`-1`) or later (`1`) among the children of its parent, in the array order every arrangement
  * lays them out in. Only those children change places with each other; every other card keeps its index. An unknown id, a card
  * without a parent or one that is already first (or last) returns `nodes` itself.
@@ -683,4 +707,44 @@ export function reorderTopLevel<T extends { id: string; parentId?: string | null
     result[index] = order[place];
   });
   return result;
+}
+
+/**
+ * True when a shown card of `ids` covers another shown card (rectangles of the card width and the given heights). Used after a
+ * card grew: only the cards that changed are checked, so an overlap that was already there is left for the user to tidy.
+ */
+export function cardsOverlapAny(nodes: MapNode[], ids: ReadonlySet<string>, heightOf?: HeightOf): boolean {
+  const shown = visibleNodes(nodes);
+  const box = (node: MapNode) => ({
+    left: node.x,
+    right: node.x + (node.width ?? CARD_WIDTH),
+    top: node.y,
+    bottom: node.y + cardHeight(heightOf, node.id)
+  });
+  for (const node of shown) {
+    if (!ids.has(node.id)) continue;
+    const a = box(node);
+    for (const other of shown) {
+      if (other.id === node.id) continue;
+      const b = box(other);
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The cards whose drawn height differs from the one last seen (a cover whose picture arrived, a diamond whose padding was
+ * fitted, a card drawn for the first time after the layout guessed its height). `seen` empty means the first paint of a map:
+ * nothing is reported, so opening a map never moves a card. A shrunk card frees room and is not reported.
+ */
+export function cardsChangedHeight(seen: ReadonlyMap<string, number>, now: ReadonlyMap<string, number>): Set<string> {
+  const changed = new Set<string>();
+  if (!seen.size) return changed;
+  for (const [id, height] of now) {
+    const before = seen.get(id);
+    if (!(height > 0)) continue;
+    if (before === undefined || height > before + 1) changed.add(id);
+  }
+  return changed;
 }

@@ -172,7 +172,7 @@ test('FG20-06: Copy to... lays the copies out clear of the target\'s children; o
   assert.deepEqual(h.overlaps(), []);
 });
 
-test('FG20-07: Structure and links > choosing a parent re-lays out the moved subtree at once; one undo restores it (decision 40)', async () => {
+test('FG20-07: This card > choosing a parent re-lays out the moved subtree at once; one undo restores it (decision 40)', async () => {
   const spec = [['R1', null, 80, 80]];
   for (let i = 1; i <= 7; i++) spec.push([`L${i}`, i === 1 ? 'R1' : `L${i - 1}`, 80 + 340 * i, 80]);
   spec.push(['R2', null, 80, 600], ['R2kid', 'R2', 420, 600]);
@@ -404,4 +404,12 @@ test('persona 11: shiftSibling moves only siblings and returns the same array wh
   assert.deepEqual(shiftSibling(nodes, 'c', -1).map(n => n.id), ['r', 'a', 'x', 'c', 'b']);
   assert.deepEqual(shiftSibling(nodes, 'a', 1).map(n => n.id), ['r', 'b', 'x', 'a', 'c']);
   for (const [id, offset] of [['a', -1], ['c', 1], ['r', 1], ['zz', 1]]) assert.equal(shiftSibling(nodes, id, offset), nodes);
+});
+
+test('persona 23: orderSiblings puts the listed children in the given order among the places they hold, and returns the same array when nothing changes', () => {
+  const { orderSiblings } = load('map-layout.ts');
+  const nodes = [{ id: 'r', parentId: null }, { id: 'a', parentId: 'r' }, { id: 'x', parentId: 'a' }, { id: 'b', parentId: 'r' }, { id: 'y', parentId: 'q' }, { id: 'c', parentId: 'r' }, { id: 'd', parentId: 'r' }];
+  assert.deepEqual(orderSiblings(nodes, 'r', ['d', 'c', 'b', 'a']).map(n => n.id), ['r', 'd', 'x', 'c', 'y', 'b', 'a']);
+  assert.deepEqual(orderSiblings(nodes, 'r', ['c', 'a']).map(n => n.id), ['r', 'c', 'x', 'b', 'y', 'a', 'd'], 'a subset trades only its own places');
+  for (const ids of [['a', 'b', 'c', 'd'], ['a', 'c'], ['a'], ['a', 'x'], ['a', 'a'], ['a', 'zz']]) assert.equal(orderSiblings(nodes, 'r', ids), nodes, ids.join());
 });

@@ -1554,7 +1554,7 @@ export const en = {
   "ui.map_chat_plan_group_view_0": "Map and view ({0})",
   "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
   "ui.map_chat_empty_log":
-    "No messages yet. The AI can build or extend this map, research its topics, or rearrange it. Try one of these, or type your own:",
+    "No messages yet. The AI can build or extend this map, research its topics, or rearrange it.",
   "ui.map_chat_canvas_building": "Building the map…",
   "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
   "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",

@@ -306,7 +306,8 @@ export const MAP_CHAT_SCHEMA = {
           imageId: STRING,
           anchorId: STRING,
           x: { type: "number" },
-          y: { type: "number" }
+          y: { type: "number" },
+          note: STRING
         },
         required: [
           "kind",
@@ -346,7 +347,8 @@ export const MAP_CHAT_SCHEMA = {
           "imageId",
           "anchorId",
           "x",
-          "y"
+          "y",
+          "note"
         ]
       }
     }

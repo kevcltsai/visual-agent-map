@@ -33,6 +33,7 @@ export const CLAUDE_CAPABILITIES: AiRuntimeCapabilities = {
 export const CODEX_CAPABILITIES: AiRuntimeCapabilities = {
   id: "codex",
   imageGeneration: true,
+  imageInput: { maxEdgePx: 1568, maxBytes: 5 * 1024 * 1024 },
   webSearch: true,
   prewarm: false
 };

@@ -35,7 +35,10 @@ export type ProviderStepRunner<Request, Output> = (
   hooks?: ProviderStepHooks
 ) => Promise<string>;
 
-export function providerStepRunner<Request extends { model: string; reasoning: ReasoningLevel }, Output>(
+export function providerStepRunner<
+  Request extends { model: string; reasoning: ReasoningLevel; imageDataUrl?: string },
+  Output
+>(
   aiCalls: AiCalls,
   config: {
     name: string;
@@ -68,6 +71,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
         task: {
           textOnly: true,
           searchBudget: 0,
+          ...(request.imageDataUrl ? { imageDataUrl: request.imageDataUrl } : {}),
           ...(config.stream ? { stream: true } : {}),
           ...(config.lastMessageOnly ? { resolveLast: true } : {}),
           ...(config.stream && onStructuredJson ? { onStructuredJson } : {}),

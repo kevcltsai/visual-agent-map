@@ -83,6 +83,10 @@
 .vam-usage-panel[hidden], .vam-usage-panel [hidden] { display: none; }
 .vam-usage-title { display: flex; justify-content: space-between; align-items: center; margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
 .vam-usage-faint { color: var(--text-faint); font-weight: var(--font-normal); font-size: var(--font-ui-smaller); }
+.vam-usage-filter { display: inline-flex; padding: 2px; border-radius: var(--radius-s); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); }
+.vam-usage-filter-option { all: unset; box-sizing: border-box; padding: 2px 9px; border-radius: 4px; font-size: max(11px, var(--font-ui-smaller)); font-weight: var(--font-medium); color: var(--text-muted); cursor: pointer; }
+.vam-usage-filter-option.is-selected { background: var(--background-primary); color: var(--interactive-accent); font-weight: var(--font-bold); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
+.vam-usage-filter-option:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-usage-muted { color: var(--text-muted); }
 .vam-usage-section { display: grid; gap: 6px; }
 .vam-usage-heading { font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); letter-spacing: 0.06em; color: var(--text-muted); }
@@ -91,7 +95,7 @@
 .vam-usage-totals small { display: block; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-usage-totals strong { font-size: var(--font-ui-medium); font-variant-numeric: tabular-nums; }
 .vam-usage-totals em span { display: block; white-space: nowrap; }
-.vam-usage-totals em { display: block; font-style: normal; color: var(--text-faint); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
+.vam-usage-totals em { display: block; font-style: normal; color: var(--text-faint); font-size: max(11px, var(--font-ui-smaller)); font-variant-numeric: tabular-nums; }
 .vam-usage-bars { display: grid; gap: 5px; }
 .vam-usage-bar { display: grid; grid-template-columns: 64px 1fr 44px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .vam-usage-bar > span:last-child { text-align: right; }
@@ -105,7 +109,7 @@
 .vam-usage-recent td.is-estimated { color: var(--text-warning, var(--color-orange)); }
 .vam-usage-empty, .vam-usage-error { margin: 0; color: var(--text-muted); }
 .vam-usage-error { color: var(--text-error); }
-.vam-usage-foot { padding-top: 8px; border-top: 1px solid var(--background-modifier-border); color: var(--text-faint); font-size: var(--font-ui-smaller); line-height: 1.5; }
+.vam-usage-foot { padding-top: 8px; border-top: 1px solid var(--background-modifier-border); color: var(--text-faint); font-size: max(11px, var(--font-ui-smaller)); line-height: 1.5; }
 .vam-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
 /* Note style pickers */
 .vam-note-style-custom:not([hidden]) { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--interactive-accent); }

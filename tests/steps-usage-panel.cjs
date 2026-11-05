@@ -84,11 +84,12 @@ test('panel shows totals, only the actions with usage, the recent rows with 約 
   const h = rig(store);
   h.button().click();
   const all = texts(h.panel());
-  for (const expected of ['Token usage', 'This mind map', 'Today', 'This month', '1.6k', '6.6k', 'In 1.3k', 'Out 300', '~400', '18 s', '9 s', 'Sleep', 'REM']) assert.ok(all.includes(expected), expected + ' in ' + all.join('|'));
+  for (const expected of ['Token usage', 'This mind map', 'Today', 'This month', '~1.6k', '~6.6k', 'In 1.3k', 'Out 300', '~400', '18 s', '9 s', 'Sleep', 'REM']) assert.ok(all.includes(expected), expected + ' in ' + all.join('|'));
   const shown = findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text);
   assert.deepEqual(shown, ['Research', 'Expand']);
   assert.equal(findAll(h.panel(), i => i.tag === 'tr' && !i.hidden).length, 2, 'only this map\'s two requests');
-  assert.ok(all.some(text => text.includes('subscription plans')));
+  assert.ok(all.includes('Counts only AI requests sent by VAM.'));
+  assert.ok(all.includes('Values marked ~ are estimates.'));
 });
 
 test('a store change rewrites the numbers in the same elements: nothing is rebuilt', async () => {
@@ -156,4 +157,116 @@ test('wiring: the map view builds the control only when the plugin has a usage s
   assert.match(view, /this\.usageControl\?\.mount\(zoom, controls\);\s+\/\/ The hint/);
   assert.match(view, /this\.usageControl\?\.stop\(\);\s+this\.usageControl = null;/);
   assert.doesNotMatch(fs.readFileSync(path.join(root, 'experiences/sharing/viewer/main.ts'), 'utf8'), /usage/i);
+});
+
+// ---- provider split (Total | Claude | Codex) and the two-line footer ----
+const radios = h => findAll(h.panel(), i => i.attrs.role === 'radio');
+const checked = h => radios(h).filter(r => r.attrs['aria-checked'] === 'true').map(r => r.text);
+const pick = (h, label) => radios(h).find(r => r.text === label).click();
+const foot = h => find(h.panel(), i => i.cls === 'vam-usage-foot').children;
+const strongs = h => findAll(h.panel(), i => i.tag === 'strong').map(i => i.text);
+const shownRows = h => findAll(h.panel(), i => i.tag === 'tr' && !i.hidden).length;
+const mixed = [
+  { provider: 'claude', inputTokens: 1000, outputTokens: 200, topic: 'C1' },
+  { provider: 'codex', model: 'codex:x', action: 'expand', inputTokens: 300, outputTokens: 100, topic: 'X1', estimated: true },
+  { provider: 'codex', model: 'codex:x', action: 'expand', inputTokens: 50, outputTokens: 50, topic: 'X2' }
+];
+
+test('three-way radiogroup Total|Claude|Codex: default Total, exactly one aria-checked, only one tab stop', async () => {
+  const h = rig((await newStore(mixed)).store);
+  h.button().click();
+  const group = find(h.panel(), i => i.attrs.role === 'radiogroup');
+  assert.ok(group);
+  assert.deepEqual(radios(h).map(r => r.text), ['Total', 'Claude', 'Codex']);
+  assert.deepEqual(checked(h), ['Total']);
+  assert.deepEqual(radios(h).map(r => r.attrs.tabindex), ['0', '-1', '-1']);
+  pick(h, 'Codex');
+  assert.deepEqual(checked(h), ['Codex']);
+  assert.ok(radios(h)[2].classes.includes('is-selected'));
+  assert.ok(!radios(h)[0].classes.includes('is-selected'));
+});
+
+test('arrow keys move the choice (wrapping) and the focus; other keys do nothing', async () => {
+  const h = rig((await newStore(mixed)).store);
+  h.button().click();
+  const group = find(h.panel(), i => i.attrs.role === 'radiogroup');
+  const press = key => { let prevented = false; group.fire('keydown', { key, target: radios(h)[0], preventDefault() { prevented = true; } }); return prevented; };
+  assert.equal(press('ArrowRight'), true); assert.deepEqual(checked(h), ['Claude']); assert.equal(dom.focusedNow(), radios(h)[1]);
+  press('ArrowRight'); assert.deepEqual(checked(h), ['Codex']);
+  press('ArrowRight'); assert.deepEqual(checked(h), ['Total'], 'wraps');
+  press('ArrowLeft'); assert.deepEqual(checked(h), ['Codex'], 'wraps back');
+  assert.equal(press('a'), false); assert.deepEqual(checked(h), ['Codex']);
+});
+
+test('the filter narrows totals, actions and recent rows; the zoom-bar number stays Total', async () => {
+  const h = rig((await newStore(mixed)).store);
+  h.button().click();
+  assert.equal(shownRows(h), 3);
+  pick(h, 'Claude');
+  assert.equal(strongs(h)[0], '1.2k');
+  assert.equal(shownRows(h), 1);
+  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text), ['Research']);
+  assert.equal(find(h.button(), i => i.cls === 'vam-usage-number').text, '1.7k');
+  assert.equal(h.button().attrs['aria-label'], 'Token usage: today 1.7k');
+  pick(h, 'Codex');
+  assert.equal(shownRows(h), 2);
+  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text), ['Expand']);
+});
+
+test('counter-example: Codex chosen with no Codex records shows zeros and the empty sentence, no error', async () => {
+  const h = rig((await newStore([{ inputTokens: 100, outputTokens: 0 }])).store);
+  h.button().click();
+  pick(h, 'Codex');
+  assert.equal(find(h.panel(), i => i.cls === 'vam-usage-error').hidden, true);
+  assert.equal(find(h.panel(), i => i.cls === 'vam-usage-empty').hidden, false);
+  assert.deepEqual(strongs(h), ['0', '0', '0']);
+  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-section').map(s => s.hidden), [false, true, true]);
+});
+
+test('counter-example: Claude chosen, panel closed and opened again: back on Total', async () => {
+  const h = rig((await newStore(mixed)).store);
+  h.button().click(); pick(h, 'Claude'); assert.deepEqual(checked(h), ['Claude']);
+  h.button().click(); h.button().click();
+  assert.deepEqual(checked(h), ['Total']);
+  assert.equal(shownRows(h), 3);
+});
+
+test('counter-example: footer line 2 only while a shown number is estimated; line 1 always', async () => {
+  const none = rig((await newStore([{ inputTokens: 10 }, { provider: 'codex', model: 'codex:x', inputTokens: 5 }])).store);
+  none.button().click();
+  assert.equal(foot(none).length, 2);
+  assert.equal(foot(none)[0].text, 'Counts only AI requests sent by VAM.'); assert.equal(foot(none)[0].hidden, false);
+  assert.equal(foot(none)[1].text, 'Values marked ~ are estimates.'); assert.equal(foot(none)[1].hidden, true, 'all real values: no second line');
+  const h = rig((await newStore(mixed)).store);
+  h.button().click();
+  assert.equal(foot(h)[1].hidden, false, 'Total includes the estimated Codex row');
+  pick(h, 'Claude'); assert.equal(foot(h)[1].hidden, true, 'a provider without estimates hides it again');
+  assert.equal(foot(h)[0].hidden, false);
+  pick(h, 'Codex'); assert.equal(foot(h)[1].hidden, false);
+});
+
+test('estimated sums get the 約 mark (totals, action bars) and so do estimated recent rows', async () => {
+  const h = rig((await newStore(mixed)).store);
+  h.button().click(); pick(h, 'Codex');
+  const all = texts(h.panel());
+  assert.ok(all.includes('~500'), 'totals / bar with an estimated part: ' + all.join('|'));
+  assert.ok(all.includes('~400'), 'estimated recent row');
+  assert.ok(all.includes('100'), 'real recent row stays plain');
+  pick(h, 'Claude');
+  assert.ok(!texts(h.panel()).some(text => text.startsWith('~')));
+});
+
+test('counter-example: an unreadable store keeps the switch visible, shows the error, no zeros, no second footer line', async () => {
+  const { store, file } = await newStore();
+  fs.writeFileSync(file, '{ not json');
+  const broken = new AiUsageStore(nodeFsAdapter, file, () => {});
+  await broken.load();
+  const h = rig(broken);
+  h.button().click();
+  assert.deepEqual(radios(h).map(r => r.text), ['Total', 'Claude', 'Codex']);
+  pick(h, 'Codex');
+  assert.deepEqual(checked(h), ['Codex']);
+  assert.equal(find(h.panel(), i => i.cls === 'vam-usage-error').hidden, false);
+  assert.ok(findAll(h.panel(), i => i.cls === 'vam-usage-section').every(s => s.hidden));
+  assert.equal(foot(h)[1].hidden, true);
 });

@@ -379,3 +379,36 @@ test('an unreadable usage store reports its error once, not on every record', as
   store.record(row()); store.record(row()); store.record(row());
   assert.equal(errors.length, 2, 'one for the load, one for the first dropped call');
 });
+
+test('usage store provider filter: totals, byAction and recent narrow to one provider; no filter keeps every row', async () => {
+  const store = newStore(tempFile());
+  store.record(row({ provider: 'claude', inputTokens: 100, outputTokens: 10 }));
+  store.record(row({ provider: 'codex', model: 'codex:x', action: 'expand', inputTokens: 40, outputTokens: 4, estimated: true }));
+  store.record(row({ provider: 'codex', model: 'codex:x', action: 'expand', inputTokens: 1, outputTokens: 1 }));
+  same(ok(store.totals()), { inputTokens: 141, outputTokens: 15, estimated: true });
+  same(ok(store.totals({ provider: 'claude' })), { inputTokens: 100, outputTokens: 10 }, 'no estimate: the flag is absent');
+  same(ok(store.totals({ provider: 'codex' })), { inputTokens: 41, outputTokens: 5, estimated: true });
+  same(ok(store.totals({ provider: 'codex', mapPath: 'B/none' })), { inputTokens: 0, outputTokens: 0 }, 'nothing matches: zero, ready');
+  const by = ok(store.byAction('A/map.vam', undefined, 'codex'));
+  same(by.expand, { inputTokens: 41, outputTokens: 5, estimated: true });
+  same(by.research, { inputTokens: 0, outputTokens: 0 });
+  same(ok(store.byAction('A/map.vam', undefined, 'claude')).expand, { inputTokens: 0, outputTokens: 0 });
+  assert.equal(ok(store.byAction('A/map.vam')).expand.estimated, true);
+  same(ok(store.recent('A/map.vam', 10, 'codex')).map(e => e.provider), ['codex', 'codex']);
+  assert.equal(ok(store.recent('A/map.vam', 10)).length, 3);
+  assert.equal(ok(store.recent('A/map.vam', 10, 'claude')).length, 1);
+});
+
+test('usage store provider filter: folded months have no provider, so a filter leaves them out; unreadable stays unreadable', async () => {
+  const file = tempFile();
+  const store = newStore(file);
+  const now = Date.now();
+  store.record(row({ at: new Date(now - 200 * 86_400_000).toISOString(), inputTokens: 500, outputTokens: 50 }));
+  store.record(row({ inputTokens: 10, outputTokens: 5 }));
+  same(ok(store.totals()), { inputTokens: 510, outputTokens: 55 });
+  same(ok(store.totals({ provider: 'claude' })), { inputTokens: 10, outputTokens: 5 });
+  fs.writeFileSync(file, '{ not json');
+  const broken = newStore(file);
+  await broken.load();
+  for (const result of [broken.totals({ provider: 'codex' }), broken.byAction('A/map.vam', undefined, 'codex'), broken.recent('A/map.vam', 10, 'codex')]) same(result, { status: 'unreadable' });
+});

@@ -42194,6 +42194,7 @@ var MapChatRecordWriter = class {
    * `turn_end`, with the visible text only. Turn numbers must not repeat.
    */
   backfill(turns) {
+    var _a2;
     for (const item of turns) {
       this.write({ type: "turn_start", turn: item.turn, at: item.at, message: item.message, backfilled: true });
       this.write({
@@ -42204,7 +42205,8 @@ var MapChatRecordWriter = class {
         raw: null,
         reply: item.reply,
         lines: item.lines,
-        modelLabel: item.modelLabel
+        modelLabel: item.modelLabel,
+        ...((_a2 = item.steers) == null ? void 0 : _a2.length) ? { steers: item.steers } : {}
       });
     }
   }
@@ -47108,7 +47110,9 @@ function providerStepRunner(aiCalls, config) {
         }
       },
       (raw, exchange) => {
+        var _a3;
         if (exchange.signal.aborted) throw config.stopped();
+        (_a3 = hooks == null ? void 0 : hooks.onRaw) == null ? void 0 : _a3.call(hooks, raw);
         prepared.parse(raw);
         exchange.parsed();
         return raw;
@@ -72970,13 +72974,14 @@ ${note.detail.trim()}` : "",
       if (missing.length) {
         writer.backfill(
           missing.map((item) => {
-            var _a2;
+            var _a2, _b2;
             return {
               turn: ++this.chatRecordTurnSeq,
               message: item.question.text,
               reply: item.answer.text,
               lines: item.answer.lines.map((line) => ({ status: settledLine(line).status, text: settledLine(line).text })),
-              modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : ""
+              modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : "",
+              steers: ((_b2 = item.question.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text)
             };
           })
         );
@@ -84010,7 +84015,7 @@ var MapChatService = class {
    * `onSteer` receives a function that adds the user's follow-up text to the running turn (the text is wrapped in the steer
    * template here); it rejects when the turn can no longer take one or after a stop. A steer restarts the reply, so the reply
    * shown so far is forgotten and a shorter new reply replaces it.
-   * `onRaw` gets the model's raw output right before it is parsed, so it is called for a reply that then fails to parse too (never after a stop); it only feeds the chat record and cannot break the turn.
+   * `onRaw` is handed to the runner through the hooks and gets the model's raw output right before the runner parses it, once per output (a steer restart or json fallback calls it again, so the last call is the final output), also for a reply that then fails to parse (never after a stop); it only feeds the chat record and cannot break the turn. A runner that does not call `hooks.onRaw` records nothing.
    */
   async chat(request, signal, onReply, onProgress, onSteer, onRaw) {
     const stopped = () => new MapChatError("stopped", "Map chat stopped");
@@ -84031,8 +84036,16 @@ var MapChatService = class {
       shown = text11;
       onReply(text11);
     } : void 0;
-    const hooks = onProgress || onText || onSteer ? {
+    const hooks = onProgress || onText || onSteer || onRaw ? {
       ...onText ? { onText } : {},
+      ...onRaw ? {
+        onRaw: (output) => {
+          try {
+            onRaw(output);
+          } catch (e) {
+          }
+        }
+      } : {},
       ...onSteer ? {
         onSteer: (steer) => onSteer(async (text11) => {
           if (signal.aborted) throw stopped();
@@ -84061,10 +84074,6 @@ var MapChatService = class {
       throw error;
     }
     if (signal.aborted) throw stopped();
-    try {
-      onRaw == null ? void 0 : onRaw(raw);
-    } catch (e) {
-    }
     return prepared.parse(raw);
   }
 };

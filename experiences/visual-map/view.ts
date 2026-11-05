@@ -20268,7 +20268,8 @@ export class VisualAgentMapView extends ItemView {
             message: item.question.text,
             reply: item.answer.text,
             lines: item.answer.lines.map(line => ({ status: settledLine(line).status, text: settledLine(line).text })),
-            modelLabel: item.answer.modelLabel ?? ""
+            modelLabel: item.answer.modelLabel ?? "",
+            steers: (item.question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text)
           }))
         );
         for (const item of missing) this.chatRecordLogged.add(item.answer);

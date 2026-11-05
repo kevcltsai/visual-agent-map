@@ -153,6 +153,8 @@ export class MapChatRecordWriter {
       reply: string;
       lines: { status: string; text: string }[];
       modelLabel: string;
+      /** The follow-up messages that went into this turn (live ones only). */
+      steers?: string[];
     }[]
   ): void {
     for (const item of turns) {
@@ -165,7 +167,8 @@ export class MapChatRecordWriter {
         raw: null,
         reply: item.reply,
         lines: item.lines,
-        modelLabel: item.modelLabel
+        modelLabel: item.modelLabel,
+        ...(item.steers?.length ? { steers: item.steers } : {})
       });
     }
   }

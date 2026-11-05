@@ -172,7 +172,7 @@ export class MapChatService {
    * `onSteer` receives a function that adds the user's follow-up text to the running turn (the text is wrapped in the steer
    * template here); it rejects when the turn can no longer take one or after a stop. A steer restarts the reply, so the reply
    * shown so far is forgotten and a shorter new reply replaces it.
-   * `onRaw` gets the model's raw output right before it is parsed, so it is called for a reply that then fails to parse too (never after a stop); it only feeds the chat record and cannot break the turn.
+   * `onRaw` is handed to the runner through the hooks and gets the model's raw output right before the runner parses it, once per output (a steer restart or json fallback calls it again, so the last call is the final output), also for a reply that then fails to parse (never after a stop); it only feeds the chat record and cannot break the turn. A runner that does not call `hooks.onRaw` records nothing.
    */
   async chat(
     request: MapChatRequest,
@@ -206,9 +206,20 @@ export class MapChatService {
         }
       : undefined;
     const hooks: ProviderStepHooks | undefined =
-      onProgress || onText || onSteer
+      onProgress || onText || onSteer || onRaw
         ? {
             ...(onText ? { onText } : {}),
+            ...(onRaw
+              ? {
+                  onRaw: (output: string): void => {
+                    try {
+                      onRaw(output);
+                    } catch {
+                      /* a record observer must never break the turn */
+                    }
+                  }
+                }
+              : {}),
             ...(onSteer
               ? {
                   onSteer: (steer: (text: string) => Promise<void>): void =>
@@ -244,11 +255,6 @@ export class MapChatService {
       throw error;
     }
     if (signal.aborted) throw stopped();
-    try {
-      onRaw?.(raw);
-    } catch {
-      /* a record observer must never break the turn */
-    }
     return prepared.parse(raw);
   }
 }

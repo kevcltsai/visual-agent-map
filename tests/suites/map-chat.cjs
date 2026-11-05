@@ -406,7 +406,9 @@ async function harness({ aim = false, document = false, empty = false, realRende
     aiReadyForModel: async () => true,
     confirmAiUsage: async (model, run) => { control.usageAsks++; control.models.push(model); control.calls.push('confirm'); if (!(await plugin.aiReadyForModel(model))) return false; if (control.decline) return false; await run(); return true; },
     // Like the real service: the raw output goes to `onRaw` right before the reply is used, and never after a stop (unless a test asks for it).
-    mapChat: { chat: async (request, signal, onReply, onProgress, onSteer, onRaw) => { control.calls.push('chat'); control.requests.push(request); const result = await control.reply(request, signal, onReply, onProgress, onSteer); if (!signal.aborted || control.rawAlways) onRaw?.(control.raw ?? JSON.stringify(result)); return result; } },
+    mapChat: { chat: async (request, signal, onReply, onProgress, onSteer, onRaw) => { control.calls.push('chat'); control.requests.push(request); if (control.invalidRaw !== undefined) { // Like the real runner: it hands the output to onRaw, then its parse throws before the service returns.
+        if (!signal.aborted) onRaw?.(control.invalidRaw); throw Object.assign(new Error('Map chat reply is not valid'), { name: 'MapChatError', code: 'invalid' }); }
+      const result = await control.reply(request, signal, onReply, onProgress, onSteer); if (!signal.aborted || control.rawAlways) onRaw?.(control.raw ?? JSON.stringify(result)); return result; } },
     manifest: { version: '9.9.9' },
     // The switch reaches the writers a view registered (main.ts keeps the set; this stand-in keeps a list).
     registerMapChatRecordWriter: writer => { control.writers.push(writer); writer.setEnabled(settings.mapChatRecords); return () => { control.writers.splice(control.writers.indexOf(writer), 1); }; },
@@ -6595,6 +6597,31 @@ integrationTest('map chat records: a turn with a follow-up records it in steers 
   eq(steerTags(again), ['Added midway', 'Added midway']); eq(steerTexts(again), ['extra', 'and more']);
   await sendOne(h, 'next', 'ok');
   eq(JSON.parse(h.control.requests[0].context.json).earlierTurns, [{ role: 'user', text: 'go\n\nextra\n\nand more' }, { role: 'assistant', text: 'done' }]);
+});
+
+integrationTest('map chat records: B1 an invalid reply ends the turn as failed and keeps the raw string', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); h.open();
+  h.control.invalidRaw = 'not json {'; h.type('go'); await h.view.sendMapChat(); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]); eq(lineKinds(lines), ['conversation', 'turn_start', 'end:failed']);
+  assert.equal(lines.at(-1).raw, 'not json {'); assert.equal(lines.at(-1).status, 'failed');
+});
+
+integrationTest('map chat records: M2 a follow-up received while the switch is off is backfilled into steers and restored into earlierTurns', async () => {
+  const first = await harness(); await first.view.hydrate(); const chat = first.open(); const s = steerReply(first);
+  first.type('go'); const sending = first.view.sendMapChat(); await requestOut(chat);
+  first.type('extra'); pressEnter(chat); await tick(); await tick(); eq(s.handled, ['extra']);
+  s.gate.resolve(); await sending; eq(allRecordFiles(first), []);
+  first.plugin.settings.mapChatRecords = true;
+  await sendOne(first, 'after the switch', 'answer two');
+  const [file] = recordFiles(first); const lines = recordLines(first, file);
+  eq(lineKinds(lines), ['conversation', 'turn_start', 'end:done', 'turn_start', 'end:done']);
+  assert.equal(lines[1].backfilled, true); eq(lines[2].steers, ['extra']); assert.equal(lines[4].steers, undefined);
+  const h = await harness({ records: true }); await h.view.hydrate();
+  await seedRecord(h, lines.map(l => ({ ...l })), file.split('/').at(-1).replace('.jsonl', ''));
+  const again = h.open(); await until(() => again.hasMessages);
+  eq(steerTexts(again), ['extra']);
+  await sendOne(h, 'next', 'ok');
+  eq(JSON.parse(h.control.requests[0].context.json).earlierTurns.slice(0, 2), [{ role: 'user', text: 'go\n\nextra' }, { role: 'assistant', text: 'done' }]);
 });
 
 integrationTest('map chat records: a queued follow-up is not in steers and becomes its own turn', async () => {

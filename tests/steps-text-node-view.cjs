@@ -43,6 +43,11 @@ async function harness(build) {
     view.stageEl.children = []; view.cardEls.clear(); view.textEls.clear();
     for (const n of view.map.nodes) view.cardEls.set(n.id, view.stageEl.child('div', 'vam-node'));
     view.renderCanvasItems();
+    // A browser's offsetWidth follows the inline width; only with none set is it the fitted width (set by a test, else undefined).
+    for (const el of view.textEls.values()) {
+      let fitted;
+      Object.defineProperty(el, 'offsetWidth', { configurable: true, get() { return this.style.width ? parseFloat(this.style.width) : fitted; }, set(v) { fitted = v; } });
+    }
   };
   view.render();
   const settle = async () => { await pending; await dom.tick(); await pending; };
@@ -786,3 +791,100 @@ test('text-node-width: reset to automatic uses the fitted width, so the anchored
   assert.equal(after.x + 180, before.x + 100, 'right edge holds against the fitted width');
   assert.equal(el.style.width, '100px', 'measuring did not leave the inline width changed');
 });
+
+// One source for the width anchor: {auto, stored} x {drag, End, reset} x {left, up, down, balanced left half, balanced right half, right}.
+test('text-node-width: offsetWidth follows the inline width in the test DOM, and the fitted width only without one', async () => {
+  const h = await harness(() => [txt({ text: 'a' }), free({ width: 180 })]);
+  const auto = h.textEl('t1'), fixed = h.textEl('f1');
+  auto.offsetWidth = 77;
+  assert.equal(auto.offsetWidth, 77);
+  auto.style.width = '120px';
+  assert.equal(auto.offsetWidth, 120, 'inline width wins');
+  auto.style.removeProperty('width');
+  assert.equal(auto.offsetWidth, 77);
+  assert.equal(fixed.offsetWidth, 180);
+});
+
+const ANCHOR_CASES = {
+  left: { rule: 'right edge', expected: (x, from, to) => x + from - to },
+  balancedLeft: { rule: 'right edge', expected: (x, from, to) => x + from - to },
+  up: { rule: 'center', expected: (x, from, to) => x + (from - to) / 2 },
+  down: { rule: 'center', expected: (x, from, to) => x + (from - to) / 2 },
+  right: { rule: 'x', expected: x => x },
+  balancedRight: { rule: 'x', expected: x => x }
+};
+async function anchorSetup(kind, stored) {
+  const width = stored ? { width: 100 } : {};
+  if (kind.startsWith('balanced')) {
+    const h = await harness(({ child }) => [txt({ parentId: child.id, text: WIDE, x: kind === 'balancedLeft' ? 200 : 1350, y: 400, ...width })]);
+    h.view.map.layout = { direction: 'balanced' };
+    Object.assign(h.view.map.nodes[0], { x: 800, y: 100 });
+    Object.assign(h.view.map.nodes[1], { x: kind === 'balancedLeft' ? 400 : 1200, y: 400 });
+    await h.repo.saveMap(MAP, h.view.map);
+    h.view.map = await h.repo.readMap(MAP);
+    await h.view.hydrate();
+    h.view.render();
+    return h;
+  }
+  const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, x: 0, y: 0, ...width })]);
+  await withLayout(h, kind);
+  return h;
+}
+for (const kind of Object.keys(ANCHOR_CASES)) {
+  for (const stored of [false, true]) {
+    const label = `${kind}, ${stored ? 'stored' : 'auto'} width`;
+    const { expected, rule } = ANCHOR_CASES[kind];
+    test(`text-node-width: anchoring matrix, drag: ${label}`, async () => {
+      const h = await anchorSetup(kind, stored);
+      const before = await textOnDisk(h);
+      const el = h.textEl('t1');
+      el.offsetWidth = 100; // the fitted width of an automatic block (a stored 100 shows as the inline width)
+      const handle = handleOf(h)('t1');
+      pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 200);
+      assert.equal(el.style.width, '300px');
+      const live = parseFloat(el.style.left);
+      assert.equal(live, expected(before.x, 100, 300), `live: ${rule} holds`);
+      pointer(handle, 'pointerup', 200);
+      await h.settle();
+      const after = await textOnDisk(h);
+      assert.equal(after.width, 300);
+      assert.equal(after.x, live, 'committed x equals the x shown during the drag');
+      assert.equal(after.x, expected(before.x, 100, 300), `${rule} holds after release`);
+      await h.view.travel(false);
+      const undone = await textOnDisk(h);
+      assert.equal(undone.width, stored ? 100 : undefined);
+      assert.equal(undone.x, before.x, 'one undo restores x');
+    });
+    test(`text-node-width: anchoring matrix, End key: ${label}`, async () => {
+      const h = await anchorSetup(kind, stored);
+      const before = await textOnDisk(h);
+      h.textEl('t1').offsetWidth = 100;
+      const past = h.view.history.past.length;
+      handleOf(h)('t1').fire('keydown', { key: 'End' });
+      await h.settle();
+      const after = await textOnDisk(h);
+      assert.equal(after.width, 560);
+      assert.equal(after.x, expected(before.x, 100, 560), `${rule} holds`);
+      assert.equal(h.view.history.past.length, past + 1);
+      await h.view.travel(false);
+      assert.equal((await textOnDisk(h)).x, before.x, 'one undo restores x');
+    });
+    test(`text-node-width: anchoring matrix, reset to auto: ${label}`, async () => {
+      const h = await anchorSetup(kind, stored);
+      const before = await textOnDisk(h);
+      h.textEl('t1').offsetWidth = 180; // fitted width differs from the stored 100
+      const past = h.view.history.past.length;
+      handleOf(h)('t1').fire('keydown', { key: 'Enter' });
+      await h.settle();
+      const after = await textOnDisk(h);
+      assert.equal(after.width, undefined);
+      if (!stored) {
+        assert.equal(h.view.history.past.length, past, 'already automatic: nothing written');
+        assert.equal(after.x, before.x);
+        return;
+      }
+      assert.equal(after.x, expected(before.x, 100, 180), `${rule} holds against the fitted width`);
+      assert.equal(h.textEl('t1').style.width, undefined);
+    });
+  }
+}

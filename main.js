@@ -54243,6 +54243,15 @@ function textXAfterWidth(direction, x, from, to) {
   if (direction === "up" || direction === "down") return x + (from - to) / 2;
   return x;
 }
+function fittedTextWidth(el) {
+  const inline = el.style.width, had = el.hasClass("has-width");
+  el.style.removeProperty("width");
+  el.removeClass("has-width");
+  const fitted = el.offsetWidth || TEXT_NODE_WIDTH;
+  if (inline) el.style.width = inline;
+  if (had) el.addClass("has-width");
+  return fitted;
+}
 function edgePathData(x1, y1, x2, y2) {
   const run = x2 - x1;
   const bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
@@ -61329,29 +61338,28 @@ ${request.requirements}` : preset.text,
     };
     const shownWidth = () => {
       var _a2;
-      return (_a2 = storedWidth()) != null ? _a2 : el.offsetWidth || TEXT_NODE_WIDTH;
+      return (_a2 = storedWidth()) != null ? _a2 : fittedTextWidth(el);
     };
     const sync = (width) => handle.setAttr("aria-valuenow", String(width));
     sync(shownWidth());
-    const commit = (width) => {
+    const commit = (width, from) => {
       this.focusTextResizeId = text11.id;
-      this.enqueue(() => this.resizeText(text11.id, width));
+      this.enqueue(() => this.resizeText(text11.id, width, from));
     };
     handle.addEventListener("pointerdown", (event) => {
-      var _a2, _b2;
+      var _a2;
       if (event.button !== 0 || !this.map || this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       const startX = event.clientX, zoom = this.map.viewport.zoom || 1, from = shownWidth(), before = storedWidth();
-      const direction = el.hasClass("is-free") ? void 0 : branchDirectionResolver(this.map.nodes, layoutOf(this.map).direction)((_a2 = text11.parentId) != null ? _a2 : "");
       let width = from, done = false;
-      (_b2 = handle.setPointerCapture) == null ? void 0 : _b2.call(handle, event.pointerId);
+      (_a2 = handle.setPointerCapture) == null ? void 0 : _a2.call(handle, event.pointerId);
       const move = (e) => {
         var _a3;
         width = (_a3 = clampTextWidth(from + (e.clientX - startX) / zoom)) != null ? _a3 : from;
         el.style.width = `${width}px`;
         el.addClass("has-width");
-        el.style.left = `${textXAfterWidth(direction, text11.x, from, width)}px`;
+        el.style.left = `${this.textAnchoredX(text11.id, from, width)}px`;
         sync(width);
         this.drawEdges();
       };
@@ -61367,7 +61375,7 @@ ${request.requirements}` : preset.text,
           el.style.removeProperty("width");
           el.removeClass("has-width");
         } else el.style.width = `${before}px`;
-        el.style.left = `${text11.x}px`;
+        el.style.left = `${this.textAnchoredX(text11.id, from, from)}px`;
         sync(from);
         this.drawEdges();
       };
@@ -61376,7 +61384,7 @@ ${request.requirements}` : preset.text,
         settle();
         if (width === from) return restore();
         this.suppressClickUntil = Date.now() + 250;
-        commit(width);
+        commit(width, from);
       };
       const cancel = () => {
         if (done) return;
@@ -61393,7 +61401,7 @@ ${request.requirements}` : preset.text,
       if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
-      if (storedWidth() !== void 0) commit(void 0);
+      if (storedWidth() !== void 0) commit(void 0, shownWidth());
     });
     handle.addEventListener("keydown", (event) => {
       var _a2;
@@ -61409,43 +61417,53 @@ ${request.requirements}` : preset.text,
       event.preventDefault();
       event.stopPropagation();
       if (next === void 0) {
-        if (storedWidth() !== void 0) commit(void 0);
+        if (storedWidth() !== void 0) commit(void 0, current);
         return;
       }
       const width = (_a2 = clampTextWidth(next)) != null ? _a2 : current;
       if (width === storedWidth() || storedWidth() === void 0 && width === current) return;
-      commit(width);
+      commit(width, current);
     });
   }
   /**
-   * Sets (or clears) a text block's width and, in the same undo step, moves only this block so the edge or center
-   * facing its topic stays (same rule as the live drag). Resetting to automatic measures the fitted width first.
+   * The x a text block takes when its width goes from `from` to `to`: the edge or center facing its topic stays (left: right
+   * edge; up/down: center; right and free blocks keep x). The one source for the live drag, cancel and the committed write.
+   * In a balanced map the side is that of the block's first-level topic against the root (`sideFromOffset`, the rule the
+   * layouts use); a topic too close to the root to have a side keeps x.
    */
-  async resizeText(id, width) {
+  textAnchoredX(id, from, to) {
     var _a2, _b2, _c, _d;
-    const el = this.textEls.get(id);
     const item = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
       (entry) => entry.kind === "text" && entry.id === id
     );
-    let x;
-    if (el && item && this.map && !el.hasClass("is-free")) {
-      const from = (_c = item.width) != null ? _c : el.offsetWidth || TEXT_NODE_WIDTH;
-      let to = width;
-      if (to === void 0) {
-        const inline = el.style.width, had = el.hasClass("has-width");
-        el.style.removeProperty("width");
-        el.removeClass("has-width");
-        to = el.offsetWidth || from;
-        if (inline) el.style.width = inline;
-        if (had) el.addClass("has-width");
-      }
-      const direction = branchDirectionResolver(this.map.nodes, layoutOf(this.map).direction)((_d = item.parentId) != null ? _d : "");
-      x = textXAfterWidth(direction, item.x, from, to);
+    if (!item) return 0;
+    if (!this.map || !item.parentId || ((_c = this.textEls.get(id)) == null ? void 0 : _c.hasClass("is-free"))) return item.x;
+    let direction = branchDirectionResolver(
+      this.map.nodes,
+      layoutOf(this.map).direction
+    )(item.parentId);
+    if (direction === "balanced") {
+      const byId = new Map(this.map.nodes.map((node) => [node.id, node]));
+      let topic = byId.get(item.parentId);
+      for (let guard = 0; (topic == null ? void 0 : topic.parentId) && ((_d = byId.get(topic.parentId)) == null ? void 0 : _d.parentId) && guard < 1e4; guard++)
+        topic = byId.get(topic.parentId);
+      const root = (topic == null ? void 0 : topic.parentId) ? byId.get(topic.parentId) : void 0;
+      direction = topic && root ? sideFromOffset(topic.x - root.x) : void 0;
     }
+    return textXAfterWidth(direction, item.x, from, to);
+  }
+  /**
+   * Sets (or clears) a text block's width and, in the same undo step, moves only this block (see `textAnchoredX`).
+   * `from` is the width before the change; resetting to automatic measures the fitted width for `to`.
+   */
+  async resizeText(id, width, from) {
+    const el = this.textEls.get(id);
+    const to = width != null ? width : el ? fittedTextWidth(el) : from;
+    const x = this.textAnchoredX(id, from, to);
     await this.changeCanvasItems(
       id,
       (items) => setTextNodeWidth(items, id, width).map(
-        (entry) => x !== void 0 && entry.kind === "text" && entry.id === id ? { ...entry, x } : entry
+        (entry) => entry.kind === "text" && entry.id === id ? { ...entry, x } : entry
       )
     );
   }

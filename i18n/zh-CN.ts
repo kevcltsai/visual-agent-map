@@ -1523,6 +1523,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_line_images_failed_0_1": "失败：为“{0}”找图（{1}）",
   "ui.map_chat_line_images_stopped_0": "已停止：为“{0}”找图",
   "ui.map_chat_images_label_0": "“{0}”的候选图",
+  "ui.map_chat_images_label": "候选图",
   "ui.map_chat_images_searching_0": "正在找图：{0}",
   "ui.map_chat_images_stop": "停止找图",
   "ui.map_chat_images_ready_0_1": "找到 {0} 张可用的图，可选一张插入“{1}”。",

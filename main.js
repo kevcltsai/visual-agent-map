@@ -1573,6 +1573,7 @@ var en = {
   "ui.map_chat_line_images_failed_0_1": "Failed: picture search for \u201C{0}\u201D ({1})",
   "ui.map_chat_line_images_stopped_0": "Stopped: picture search for \u201C{0}\u201D",
   "ui.map_chat_images_label_0": "Picture candidates for \u201C{0}\u201D",
+  "ui.map_chat_images_label": "Picture candidates",
   "ui.map_chat_images_searching_0": "Looking for pictures: {0}",
   "ui.map_chat_images_stop": "Stop searching",
   "ui.map_chat_images_ready_0_1": "Found {0} usable pictures. Pick one to insert into \u201C{1}\u201D.",
@@ -4298,6 +4299,7 @@ var zhCN = {
   "ui.map_chat_line_images_failed_0_1": "\u5931\u8D25\uFF1A\u4E3A\u201C{0}\u201D\u627E\u56FE\uFF08{1}\uFF09",
   "ui.map_chat_line_images_stopped_0": "\u5DF2\u505C\u6B62\uFF1A\u4E3A\u201C{0}\u201D\u627E\u56FE",
   "ui.map_chat_images_label_0": "\u201C{0}\u201D\u7684\u5019\u9009\u56FE",
+  "ui.map_chat_images_label": "\u5019\u9009\u56FE",
   "ui.map_chat_images_searching_0": "\u6B63\u5728\u627E\u56FE\uFF1A{0}",
   "ui.map_chat_images_stop": "\u505C\u6B62\u627E\u56FE",
   "ui.map_chat_images_ready_0_1": "\u627E\u5230 {0} \u5F20\u53EF\u7528\u7684\u56FE\uFF0C\u53EF\u9009\u4E00\u5F20\u63D2\u5165\u201C{1}\u201D\u3002",
@@ -7023,6 +7025,7 @@ var zhTW = {
   "ui.map_chat_line_images_failed_0_1": "\u5931\u6557\uFF1A\u70BA\u300C{0}\u300D\u627E\u5716\uFF08{1}\uFF09",
   "ui.map_chat_line_images_stopped_0": "\u5DF2\u505C\u6B62\uFF1A\u70BA\u300C{0}\u300D\u627E\u5716",
   "ui.map_chat_images_label_0": "\u300C{0}\u300D\u7684\u5019\u9078\u5716",
+  "ui.map_chat_images_label": "\u5019\u9078\u5716",
   "ui.map_chat_images_searching_0": "\u6B63\u5728\u627E\u5716\uFF1A{0}",
   "ui.map_chat_images_stop": "\u505C\u6B62\u627E\u5716",
   "ui.map_chat_images_ready_0_1": "\u627E\u5230 {0} \u5F35\u53EF\u7528\u7684\u5716\uFF0C\u53EF\u9078\u4E00\u5F35\u63D2\u5165\u300C{1}\u300D\u3002",
@@ -37560,7 +37563,11 @@ ${shown}` : t("ui.map_chat_model_label"));
   buildImages(row, block) {
     const box = row.createDiv({
       cls: `vam-map-chat-images is-${block.state}`,
-      attr: { role: "group", "aria-label": t("ui.map_chat_images_label_0", clip2(block.nodeTitle)) }
+      attr: {
+        role: "group",
+        // A restored block has no card title: the generic name, not "Picture candidates for “”".
+        "aria-label": block.nodeTitle ? t("ui.map_chat_images_label_0", clip2(block.nodeTitle)) : t("ui.map_chat_images_label")
+      }
     });
     const statusText = () => {
       var _a2;
@@ -41739,14 +41746,15 @@ function parseRecord(text11) {
       skipped2++;
       continue;
     }
-    if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.type !== "string") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
       skipped2++;
       continue;
     }
     const version = value.v;
-    if (version === RECORD_VERSION) lines.push(value);
-    else if (version === void 0) skipped2++;
-    else unrecoverable = true;
+    if (version !== void 0 && version !== RECORD_VERSION) unrecoverable = true;
+    else if (version === RECORD_VERSION && typeof value.type === "string")
+      lines.push(value);
+    else skipped2++;
   }
   return { lines, skipped: skipped2, unrecoverable, cleanEnd: text11 === "" || text11.endsWith("\n") };
 }

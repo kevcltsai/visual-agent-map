@@ -1604,6 +1604,7 @@ export const en = {
   "ui.map_chat_line_images_failed_0_1": "Failed: picture search for “{0}” ({1})",
   "ui.map_chat_line_images_stopped_0": "Stopped: picture search for “{0}”",
   "ui.map_chat_images_label_0": "Picture candidates for “{0}”",
+  "ui.map_chat_images_label": "Picture candidates",
   "ui.map_chat_images_searching_0": "Looking for pictures: {0}",
   "ui.map_chat_images_stop": "Stop searching",
   "ui.map_chat_images_ready_0_1": "Found {0} usable pictures. Pick one to insert into “{1}”.",

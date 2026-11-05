@@ -1525,6 +1525,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_line_images_failed_0_1": "失敗：為「{0}」找圖（{1}）",
   "ui.map_chat_line_images_stopped_0": "已停止：為「{0}」找圖",
   "ui.map_chat_images_label_0": "「{0}」的候選圖",
+  "ui.map_chat_images_label": "候選圖",
   "ui.map_chat_images_searching_0": "正在找圖：{0}",
   "ui.map_chat_images_stop": "停止找圖",
   "ui.map_chat_images_ready_0_1": "找到 {0} 張可用的圖，可選一張插入「{1}」。",

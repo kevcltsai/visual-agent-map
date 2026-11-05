@@ -60,6 +60,13 @@ test('reading: a cut last line is skipped, the rest restores; a v:2 line makes t
   const future = records.parseRecord(`${full}\n${JSON.stringify({ v: 2, type: 'turn_start', turn: 2 })}`);
   assert.equal(future.unrecoverable, true);
 });
+test('reading: a v:2 line with no type still makes the file unrecoverable; a typeless v:1 line is only skipped', () => {
+  const head = JSON.stringify({ v: 1, type: 'conversation', id: 'x', startedAt: T0, mapPath: 'M', mapId: 'm' });
+  const future = records.parseRecord(`${head}\n${JSON.stringify({ v: 2, turn: 1 })}`);
+  assert.equal(future.unrecoverable, true);
+  const odd = records.parseRecord(`${head}\n${JSON.stringify({ v: 1, turn: 1 })}\n${JSON.stringify({ turn: 2 })}`);
+  assert.equal(odd.unrecoverable, false); assert.equal(odd.skipped, 2); assert.equal(odd.lines.length, 1);
+});
 test('latest conversation: greatest last-line time wins, ties compare the id, a v:2 latest is reported not skipped', () => {
   const line = at => `${JSON.stringify({ v: 1, type: 'event', turn: 1, at, kind: 'resend' })}\n`;
   const id = (n, s) => `2026110${n}-100000-${s}`;

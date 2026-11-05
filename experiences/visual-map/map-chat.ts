@@ -2162,7 +2162,13 @@ export class MapChatPanel {
   private buildImages(row: HTMLElement, block: MapChatImages): void {
     const box = row.createDiv({
       cls: `vam-map-chat-images is-${block.state}`,
-      attr: { role: "group", "aria-label": t("ui.map_chat_images_label_0", clip(block.nodeTitle)) }
+      attr: {
+        role: "group",
+        // A restored block has no card title: the generic name, not "Picture candidates for “”".
+        "aria-label": block.nodeTitle
+          ? t("ui.map_chat_images_label_0", clip(block.nodeTitle))
+          : t("ui.map_chat_images_label")
+      }
     });
     const statusText = (): string =>
       block.state === "searching"

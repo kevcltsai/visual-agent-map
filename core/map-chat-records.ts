@@ -209,19 +209,16 @@ export function parseRecord(text: string): ParsedRecord {
       skipped++;
       continue;
     }
-    if (
-      !value ||
-      typeof value !== "object" ||
-      Array.isArray(value) ||
-      typeof (value as { type?: unknown }).type !== "string"
-    ) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
       skipped++;
       continue;
     }
+    // The version comes first: a line of another version is a file this plugin cannot read, whatever else it lacks.
     const version = (value as { v?: unknown }).v;
-    if (version === RECORD_VERSION) lines.push(value as RecordLine);
-    else if (version === undefined) skipped++;
-    else unrecoverable = true;
+    if (version !== undefined && version !== RECORD_VERSION) unrecoverable = true;
+    else if (version === RECORD_VERSION && typeof (value as { type?: unknown }).type === "string")
+      lines.push(value as RecordLine);
+    else skipped++;
   }
   return { lines, skipped, unrecoverable, cleanEnd: text === "" || text.endsWith("\n") };
 }

@@ -6028,6 +6028,14 @@ integrationTest('map chat records: F3 a draft typed and a reference added while 
   assert.equal(JSON.parse(h.control.requests.at(-1).context.json).references.length, 1, 'the reference reaches the request');
 });
 
+test('map chat records: L1 a restored picture block is named without an empty card title', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  f.panel.restore(restoredConversation());
+  const box = find(f.parts.log(), i => hasClass(i, 'vam-map-chat-images'));
+  assert.equal(box.attrs['aria-label'], 'Picture candidates');
+  assert.doesNotMatch(box.attrs['aria-label'], /“”/);
+});
+
 test('map chat records: record text with HTML restores as plain text', () => {
   const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
   const evil = '<img src=x onerror=alert(1)> and <script>alert(2)</script>';

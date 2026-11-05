@@ -19,6 +19,8 @@ import topicLineEn from "./topic-line.en.md";
 import topicLineZh from "./topic-line.zh.md";
 
 export interface OutlineGenerateRequest {
+  /** Trusted: the map file this request belongs to, for token-usage accounting only; never serialized into a prompt. */
+  usageMapPath?: string;
   topic: string;
   /** The preset's instruction text; may contain a topic placeholder. */
   presetText: string;

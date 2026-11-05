@@ -166,6 +166,7 @@ export function providerRelevanceGradeRunner(aiCalls: AiCalls): RelevanceGradeRu
     name: "relevance-grade",
     topic: request =>
       `Relevance ${"previous" in request ? "recalibrate" : "grade"} · ${request.goal.trim().slice(0, 80)}`,
+    mapPath: request => request.usageMapPath,
     stopped: () => new RelevanceGradeError("stopped", "Relevance grading stopped"),
     stream: true
   });

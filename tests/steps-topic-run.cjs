@@ -254,6 +254,15 @@ test('research: a normal run registers, asks the note model, writes in one updat
   assert.equal(h.log.refreshed, 1); assert.deepEqual(h.log.failed, []);
 });
 
+test('research: a mind-map research carries its map path as usageMapPath; without one the request has none', async () => {
+  const h = researchRuns();
+  await (await h.runs.start('A.md', 'research', h.options({ usageMapPath: 'Maps/Plan.vam' }))).finished;
+  assert.equal(h.log.asks[0].context.usageMapPath, 'Maps/Plan.vam');
+  const bare = researchRuns();
+  await (await bare.runs.start('A.md', 'research', bare.options())).finished;
+  assert.equal('usageMapPath' in bare.log.asks[0].context, false);
+});
+
 test('research: the registered run is stoppable through the plugin activeTasks map and running is set while it waits', async () => {
   let release; const gate = new Promise(r => { release = r; });
   const h = researchRuns({ ask: async (_c, _m, _r, signal, onExchange, accepted) => { onExchange('ex'); accepted(); await gate; if (signal.aborted) throw new DOMException('Aborted', 'AbortError'); return {}; } });

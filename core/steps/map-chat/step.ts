@@ -219,6 +219,8 @@ export class MapChatError extends Error {
 }
 
 export interface MapChatRequest {
+  /** Trusted: the map file this request belongs to, for token-usage accounting only; never serialized into a prompt. */
+  usageMapPath?: string;
   message: string;
   context: MapChatContext;
   language: ContentLanguage;

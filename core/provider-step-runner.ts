@@ -45,6 +45,8 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
     stream?: boolean;
     /** Codex only: the result is the last message item even while `onText` streams, for a reply that is parsed strictly. */
     lastMessageOnly?: boolean;
+    /** The mind map this request works on, for token-usage accounting. Absent: not filed under a map. */
+    mapPath?: (request: Request) => string | undefined;
   }
 ): ProviderStepRunner<Request, Output> {
   return (request, signal, prepared, onStructuredJson, hooks) =>
@@ -57,6 +59,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
         taskName: config.name,
         signal,
         localCodex: true,
+        usage: { mapPath: config.mapPath?.(request) },
         stopped: config.stopped,
         validate: runtime => {
           if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model))

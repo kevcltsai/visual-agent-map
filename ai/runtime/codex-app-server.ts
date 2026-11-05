@@ -1,4 +1,5 @@
 import type { WebSearchEvent } from "../types";
+import type { AiMilestones } from "../../ai-exchange-log";
 import { spawn as nodeSpawn } from "node:child_process";
 import { createUtf8StreamDecoder } from "./utf8-stream";
 import { t } from "../../i18n";
@@ -103,6 +104,8 @@ interface TurnState {
   /** Image generation turn: the generated image (base64 or a saved file), or why it failed. */
   generateImage?: boolean;
   generatedImage?: { result?: string; savedPath?: string; failure?: string };
+  /** The thread's cumulative token usage from the latest `thread/tokenUsage/updated` (each call uses a fresh thread, so this is the call's own). */
+  usage?: { inputTokens: number; outputTokens: number };
 }
 
 const CONTROL_TIMEOUT_MS = 30_000;
@@ -260,6 +263,8 @@ export class CodexAppServerRuntime {
       /** Progress for the research card: the first event, then searching, reading and writing. */
       onActivity?: (activity: CodexActivity) => void;
       onSteer?: (steer: (text: string) => Promise<void>) => void;
+      /** Receives `{ usage }` once when the call ends, if the app server reported token usage. */
+      onMilestones?: (data: AiMilestones) => void;
       timeoutMs?: number;
       timeoutMessage?: string;
     }
@@ -422,6 +427,12 @@ export class CodexAppServerRuntime {
       throw error;
     } finally {
       controls?.signal?.removeEventListener("abort", onAbort);
+      // Best effort: usage facts never fail the task.
+      try {
+        if (state.usage) controls?.onMilestones?.({ usage: state.usage });
+      } catch {
+        /* Diagnostics are best effort. */
+      }
       try {
         await this.request("thread/unsubscribe", { threadId }, 5_000);
       } catch (error) {
@@ -539,6 +550,15 @@ export class CodexAppServerRuntime {
       state.streamText = (state.streamText ?? "") + params.delta;
       if (typeof params.itemId === "string") state.visibleMessages.set(params.itemId, state.streamText);
       state.onText?.([...state.visibleMessages.values()].join("\n\n"));
+      return;
+    }
+    if (message.method === "thread/tokenUsage/updated") {
+      // Protocol: ThreadTokenUsageUpdatedNotification { threadId, turnId, tokenUsage: { total, last, modelContextWindow } }.
+      const total = (
+        params as { tokenUsage?: { total?: { inputTokens?: unknown; outputTokens?: unknown } } } | undefined
+      )?.tokenUsage?.total;
+      if (typeof total?.inputTokens === "number" && typeof total.outputTokens === "number")
+        state.usage = { inputTokens: total.inputTokens, outputTokens: total.outputTokens };
       return;
     }
     if (message.method === "item/started") {

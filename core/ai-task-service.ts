@@ -18,6 +18,7 @@ import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
+import type { AiUsageStore, UsageAction } from "./ai-usage-store";
 import type { ResearchObserver, ResearchStageName } from "../ai/research-observer";
 import type { AiRuntimeId, RuntimeTaskControls } from "./ai-runtime";
 import { prepareStep } from "./step-runner";
@@ -77,12 +78,22 @@ export interface AiTaskServiceOptions {
   defaultReasoning: () => ReasoningLevel;
   exchangeLoggingEnabled: () => boolean;
   exchanges: () => AiExchangeLog | null;
+  /** Where each provider call's token usage is recorded (always on, unlike the exchange log). Absent or null: not recorded. */
+  usage?: () => Pick<AiUsageStore, "record"> | null;
   codexRuntime: (directory: string, local: boolean) => CodexAppServerRuntime;
   claudeRuntime: (directory: string) => ClaudeCodeCliRuntime;
   /** True when Obsidian's mermaid parses the diagram. Absent: the chart step skips the parse check. */
   mermaidParses?: (code: string) => Promise<boolean>;
   /** The "Add diagrams after research" setting. Absent: diagrams are on. */
   diagramsEnabled?: () => boolean;
+}
+
+/** The usage action of a request: every task (quick or standard) is research, merge is a kind of synthesis; reference rounds, count repairs and AIM are "other"; chart calls name their own. */
+function usageActionOf(context: TaskContext, role?: TaskStepRole): UsageAction {
+  if (role !== undefined || context.countRepair || context.promptProfile === "aim") return "other";
+  if (context.mode === "decompose") return "expand";
+  if (context.mode === "synthesize" || context.mode === "merge") return "synthesize";
+  return "research";
 }
 
 export class AiTaskService {
@@ -233,8 +244,9 @@ export class AiTaskService {
         }
       };
       const calls = this.callsIn(pluginDirectory, exchanges);
-      const sendOnce = async (setup?: AttemptSetup): Promise<{ raw: string }> => ({
-        raw: await calls.run(
+      const sendOnce = async (setup?: AttemptSetup): Promise<{ raw: string }> => ({ raw: await sendRaw(setup) });
+      const sendRaw = async (setup: AttemptSetup | undefined): Promise<string> =>
+        calls.run(
           step,
           {
             model,
@@ -244,11 +256,16 @@ export class AiTaskService {
             taskName: "ai-task",
             signal: setup?.signal ?? signal ?? new AbortController().signal,
             localCodex: context.researchMode === "local",
+            usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
             requestLog: "request",
             // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
             entryEnd: "caller",
             stopped: cancelled,
-            task: { ...controls, onWebSearchEvent: webHook, ...(setup ? setup.hooks : {}) },
+            task: {
+              ...controls,
+              onWebSearchEvent: webHook,
+              ...(setup ? setup.hooks : {})
+            },
             ...(setup
               ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply }
               : {}),
@@ -259,8 +276,7 @@ export class AiTaskService {
             }
           },
           raw => raw
-        )
-      });
+        );
       // Only the main call of a research request is observed (not reference extraction, a count repair or the chart step).
       let raw = "";
       for (let attempt = 1; ; attempt++) {
@@ -579,6 +595,7 @@ export class AiTaskService {
           claude: () => this.options.claudeRuntime(pluginDirectory),
           codex: local => this.options.codexRuntime(pluginDirectory, local)
         }),
+      ...(this.options.usage ? { usage: this.options.usage } : {}),
       exchanges: () => (exchanges && this.options.exchangeLoggingEnabled() ? exchanges : null)
     });
   }
@@ -676,6 +693,7 @@ export class AiTaskService {
           taskName: "chart",
           signal: signal ?? new AbortController().signal,
           localCodex: true,
+          usage: { action: "other", mapPath: input.usageMapPath },
           requestLog: "request",
           stopped: () => new DOMException("Aborted", "AbortError"),
           failMessage: error =>
@@ -740,6 +758,7 @@ export class AiTaskService {
             researchDepth: "fast",
             visualMode: "off",
             intermediateDetail: true,
+            ...(context.usageMapPath ? { usageMapPath: context.usageMapPath } : {}),
             // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
             ...(context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {})
           },

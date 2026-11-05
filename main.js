@@ -1139,6 +1139,29 @@ var en = {
   "ui.layout_spacing_spacious": "Spacious spacing",
   "ui.auto_layout": "Auto layout",
   "ui.layout": "Layout",
+  "ui.usage_button_today_0": "Token usage: today {0}",
+  "ui.usage_button_unavailable": "Token usage: unavailable",
+  "ui.usage_panel_title": "Token usage",
+  "ui.usage_panel_providers": "Claude \xB7 Codex",
+  "ui.usage_totals": "TOTALS",
+  "ui.usage_this_map": "This mind map",
+  "ui.usage_today": "Today",
+  "ui.usage_this_month": "This month",
+  "ui.usage_in_0": "In {0}",
+  "ui.usage_out_0": "Out {0}",
+  "ui.usage_by_action": "THIS MIND MAP \xB7 BY ACTION",
+  "ui.usage_action_research": "Research",
+  "ui.usage_action_expand": "Expand",
+  "ui.usage_action_synthesize": "Synthesize",
+  "ui.usage_action_writeback": "Write to note",
+  "ui.usage_action_other": "Other",
+  "ui.usage_recent": "LAST 10 REQUESTS",
+  "ui.usage_estimated_0": "~{0}",
+  "ui.usage_seconds_0": "{0} s",
+  "ui.usage_minutes_seconds_01": "{0} min {1} s",
+  "ui.usage_empty": "No AI requests recorded for this mind map yet.",
+  "ui.usage_unreadable": "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
+  "ui.usage_footer": "Numbers are reported by the AI service. Values marked ~ are estimates, shown only when the AI service did not report usage. No money amounts are shown, because subscription plans are not charged per request.",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "The map or parent topic changed while AI was running. No subtopics were created.",
   "ui.create_subtopics_after_confirmation_without_running_research": "Create subtopics after confirmation without running research",
@@ -3829,6 +3852,29 @@ var zhCN = {
   "ui.layout_spacing_spacious": "\u5BBD\u677E\u95F4\u8DDD",
   "ui.auto_layout": "\u81EA\u52A8\u6392\u7248",
   "ui.layout": "\u6392\u7248",
+  "ui.usage_button_today_0": "Token \u7528\u91CF\uFF1A\u4ECA\u5929 {0}",
+  "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u65E0\u6CD5\u8BFB\u53D6",
+  "ui.usage_panel_title": "Token \u7528\u91CF",
+  "ui.usage_panel_providers": "Claude\u30FBCodex",
+  "ui.usage_totals": "\u603B\u91CF",
+  "ui.usage_this_map": "\u8FD9\u5F20\u5FC3\u667A\u56FE",
+  "ui.usage_today": "\u4ECA\u5929",
+  "ui.usage_this_month": "\u672C\u6708",
+  "ui.usage_in_0": "\u8F93\u5165 {0}",
+  "ui.usage_out_0": "\u8F93\u51FA {0}",
+  "ui.usage_by_action": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u30FB\u6309\u52A8\u4F5C",
+  "ui.usage_action_research": "\u7814\u7A76",
+  "ui.usage_action_expand": "\u5C55\u5F00",
+  "ui.usage_action_synthesize": "\u6574\u5408",
+  "ui.usage_action_writeback": "\u5199\u56DE\u7B14\u8BB0",
+  "ui.usage_action_other": "\u5176\u4ED6",
+  "ui.usage_recent": "\u6700\u8FD1 10 \u6B21\u8BF7\u6C42",
+  "ui.usage_estimated_0": "\u7EA6 {0}",
+  "ui.usage_seconds_0": "{0} \u79D2",
+  "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
+  "ui.usage_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709 AI \u8BF7\u6C42\u8BB0\u5F55\u3002",
+  "ui.usage_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u7528\u91CF\u6570\u636E\uFF0C\u6240\u4EE5\u4E0D\u663E\u793A\u6570\u5B57\u3002\u63D2\u4EF6\u6587\u4EF6\u5939\u91CC\u7684 ai-usage.json \u5DF2\u539F\u6837\u4FDD\u7559\u3002",
+  "ui.usage_footer": "\u6570\u5B57\u7531 AI \u670D\u52A1\u56DE\u62A5\u3002\u6807\u201C\u7EA6\u201D\u7684\u662F AI \u670D\u52A1\u6CA1\u6709\u56DE\u62A5\u7528\u91CF\u65F6\u7684\u4F30\u8BA1\u503C\u3002\u4E0D\u663E\u793A\u91D1\u989D\uFF0C\u56E0\u4E3A\u8BA2\u9605\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8BF7\u6C42\u6536\u8D39\u3002",
   "ui.expansion_failed": "\u5C55\u5F00\u5931\u8D25",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u56FE\u6216\u7236\u8BAE\u9898\u5728 AI \u8FD0\u884C\u671F\u95F4\u5DF2\u53D8\u66F4\uFF0C\u672A\u521B\u5EFA\u5B50\u8BAE\u9898\u3002",
   "ui.create_subtopics_after_confirmation_without_running_research": "\u786E\u8BA4\u540E\u53EA\u521B\u5EFA\u5B50\u8BAE\u9898\uFF0C\u4E0D\u8FD0\u884C\u7814\u7A76",
@@ -6519,6 +6565,29 @@ var zhTW = {
   "ui.layout_spacing_spacious": "\u5BEC\u9B06\u9593\u8DDD",
   "ui.auto_layout": "\u81EA\u52D5\u6392\u7248",
   "ui.layout": "\u6392\u7248",
+  "ui.usage_button_today_0": "Token \u7528\u91CF\uFF1A\u4ECA\u5929 {0}",
+  "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u7121\u6CD5\u8B80\u53D6",
+  "ui.usage_panel_title": "Token \u7528\u91CF",
+  "ui.usage_panel_providers": "Claude\u30FBCodex",
+  "ui.usage_totals": "\u7E3D\u91CF",
+  "ui.usage_this_map": "\u9019\u5F35\u5FC3\u667A\u5716",
+  "ui.usage_today": "\u4ECA\u5929",
+  "ui.usage_this_month": "\u672C\u6708",
+  "ui.usage_in_0": "\u8F38\u5165 {0}",
+  "ui.usage_out_0": "\u8F38\u51FA {0}",
+  "ui.usage_by_action": "\u9019\u5F35\u5FC3\u667A\u5716\u30FB\u4F9D\u52D5\u4F5C",
+  "ui.usage_action_research": "\u7814\u7A76",
+  "ui.usage_action_expand": "\u5C55\u958B",
+  "ui.usage_action_synthesize": "\u6574\u5408",
+  "ui.usage_action_writeback": "\u5BEB\u56DE\u7B46\u8A18",
+  "ui.usage_action_other": "\u5176\u4ED6",
+  "ui.usage_recent": "\u6700\u8FD1 10 \u6B21\u8ACB\u6C42",
+  "ui.usage_estimated_0": "\u7D04 {0}",
+  "ui.usage_seconds_0": "{0} \u79D2",
+  "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
+  "ui.usage_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709 AI \u8ACB\u6C42\u7D00\u9304\u3002",
+  "ui.usage_unreadable": "\u7121\u6CD5\u8B80\u53D6\u7528\u91CF\u8CC7\u6599\uFF0C\u6240\u4EE5\u4E0D\u986F\u793A\u6578\u5B57\u3002\u5916\u639B\u8CC7\u6599\u593E\u88E1\u7684 ai-usage.json \u5DF2\u539F\u6A23\u4FDD\u7559\u3002",
+  "ui.usage_footer": "\u6578\u5B57\u7531 AI \u670D\u52D9\u56DE\u5831\u3002\u6A19\u300C\u7D04\u300D\u7684\u662F AI \u670D\u52D9\u6C92\u6709\u56DE\u5831\u7528\u91CF\u6642\u7684\u4F30\u8A08\u503C\u3002\u4E0D\u986F\u793A\u91D1\u984D\uFF0C\u56E0\u70BA\u8A02\u95B1\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8ACB\u6C42\u6536\u8CBB\u3002",
   "ui.expansion_failed": "\u5C55\u958B\u5931\u6557",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u5716\u6216\u6BCD\u8B70\u984C\u5728 AI \u57F7\u884C\u671F\u9593\u5DF2\u8B8A\u66F4\uFF0C\u672A\u5EFA\u7ACB\u5B50\u8B70\u984C\u3002",
   "ui.create_subtopics_after_confirmation_without_running_research": "\u78BA\u8A8D\u5F8C\u53EA\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u4E0D\u57F7\u884C\u7814\u7A76",
@@ -13341,7 +13410,7 @@ function parseSession(raw) {
       if (item.status === "complete") invitedTotal++;
     }
   }
-  const total2 = Object.values((_c = (_b2 = session.guests) == null ? void 0 : _b2.counts) != null ? _c : {}).reduce((sum, value2) => sum + value2, 0);
+  const total2 = Object.values((_c = (_b2 = session.guests) == null ? void 0 : _b2.counts) != null ? _c : {}).reduce((sum2, value2) => sum2 + value2, 0);
   if (session.guests && (total2 < 1 || total2 + invitedTotal > 12 || Object.values(session.guests.counts).some((value2) => !Number.isInteger(value2) || value2 < 0 || value2 > 8) || !Number.isInteger(session.guests.hostCount) || session.guests.hostCount < 1 || session.guests.hostCount > 4 || session.guests.guests.some(
     (guest) => session.guests.guests.filter((item) => item.category === guest.category).length > session.guests.counts[guest.category]
   )))
@@ -15277,7 +15346,7 @@ function defaults() {
   return { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
 }
 function total(counts) {
-  return Object.values(counts).reduce((sum, count) => sum + count, 0);
+  return Object.values(counts).reduce((sum2, count) => sum2 + count, 0);
 }
 var CoffeeTablesView = class extends import_obsidian8.ItemView {
   constructor(leaf, plugin) {
@@ -15684,7 +15753,7 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     const countInputs = /* @__PURE__ */ new Map();
     const updateAdvancedSummary = () => {
       const selectedModel = model.value ? this.plugin.modelLabel(model.value) : this.t("coffee.select_a_model");
-      const guests = [...countInputs.values()].reduce((sum, input2) => sum + (Number(input2.value) || 0), 0);
+      const guests = [...countInputs.values()].reduce((sum2, input2) => sum2 + (Number(input2.value) || 0), 0);
       advancedSummary.setText(
         `${this.t("coffee.adjust_this_table")} \xB7 ${selectedModel} \xB7 ${hostCount.value} ${this.t("coffee.host_count_unit")} + ${guests} ${this.t("coffee.guest_count_unit")}`
       );
@@ -17257,9 +17326,9 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       },
       engine.busy
     );
-    const totalGuests = Object.values((_b2 = (_a2 = engine.session.guests) == null ? void 0 : _a2.counts) != null ? _b2 : defaults()).reduce((sum, value) => sum + value, 0) + ((_c = engine.session.questions) != null ? _c : []).filter((question) => question.status === "complete").reduce((sum, question) => {
+    const totalGuests = Object.values((_b2 = (_a2 = engine.session.guests) == null ? void 0 : _a2.counts) != null ? _b2 : defaults()).reduce((sum2, value) => sum2 + value, 0) + ((_c = engine.session.questions) != null ? _c : []).filter((question) => question.status === "complete").reduce((sum2, question) => {
       var _a3, _b3;
-      return sum + ((_b3 = (_a3 = question.invitedGuests) == null ? void 0 : _a3.length) != null ? _b3 : 0);
+      return sum2 + ((_b3 = (_a3 = question.invitedGuests) == null ? void 0 : _a3.length) != null ? _b3 : 0);
     }, 0);
     rows2.createEl("small", {
       cls: "ct-muted",
@@ -18928,18 +18997,18 @@ function buildMapSvg(scene) {
         `<text x="${left}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize != null ? titleSize : 13}"${titleWeight === void 0 ? "" : ` font-weight="${titleWeight}"`} fill="${fill2}">${escapeXml(line)}</text>`
       );
     });
-    const sum = card.summary;
-    const sumX = num(sum == null ? void 0 : sum.x);
-    const sumY = num(sum == null ? void 0 : sum.y);
-    if (sum && sumX !== null && sumY !== null) {
-      const sumSize = (_m = numberIn(sum.size, 8, 40)) != null ? _m : 12;
+    const sum2 = card.summary;
+    const sumX = num(sum2 == null ? void 0 : sum2.x);
+    const sumY = num(sum2 == null ? void 0 : sum2.y);
+    if (sum2 && sumX !== null && sumY !== null) {
+      const sumSize = (_m = numberIn(sum2.size, 8, 40)) != null ? _m : 12;
       const sumStep = Math.max(14, Math.round(sumSize * 1.5));
-      const sumLines = textLines(sum.lines).filter((line) => line.length > 0);
+      const sumLines = textLines(sum2.lines).filter((line) => line.length > 0);
       const room = Math.max(0, Math.floor((box[1] + box[3] - 8 - sumY) / sumStep));
       sumLines.slice(0, room).forEach((line, i, drawn) => {
         const cut = i === drawn.length - 1 && drawn.length < sumLines.length ? "\u2026" : "";
         out.push(
-          `<text x="${sumX}" y="${sumY + sumSize + i * sumStep}" font-family="${FONT}" font-size="${sumSize}" fill="${color(sum.textColor, fill2)}">${escapeXml(line + cut)}</text>`
+          `<text x="${sumX}" y="${sumY + sumSize + i * sumStep}" font-family="${FONT}" font-size="${sumSize}" fill="${color(sum2.textColor, fill2)}">${escapeXml(line + cut)}</text>`
         );
       });
     }
@@ -18972,7 +19041,7 @@ function buildMapSvg(scene) {
     const stroke = color(b.stroke, strokeColor);
     const label = b.label.slice(0, TEXT_LIMIT2);
     const wide = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/;
-    const textWidth = Array.from(label).reduce((sum, ch) => sum + (wide.test(ch) ? 13 : 7), 0);
+    const textWidth = Array.from(label).reduce((sum2, ch) => sum2 + (wide.test(ch) ? 13 : 7), 0);
     const chipWidth = Math.max(20, Math.min(box[2] - 24, textWidth + 16));
     const lines = wrapText(label, Math.max(7, chipWidth - 16));
     out.push(
@@ -18987,7 +19056,7 @@ function wrapText(text11, maxWidth) {
   const WIDE = "\u1100-\u11FF\u2E80-\uA4CF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF";
   const wide = new RegExp(`[${WIDE}]`);
   const tokens2 = new RegExp(`[${WIDE}]|\\s+|[^\\s${WIDE}]+`, "gu");
-  const widthOf = (token) => Array.from(token).reduce((sum, ch) => sum + (wide.test(ch) ? 13 : 7), 0);
+  const widthOf = (token) => Array.from(token).reduce((sum2, ch) => sum2 + (wide.test(ch) ? 13 : 7), 0);
   const lines = [];
   for (const paragraph of String(text11 != null ? text11 : "").split(/\r?\n/)) {
     let line = "";
@@ -19099,7 +19168,7 @@ function exportLimits(scene) {
   const height = num(scene == null ? void 0 : scene.height);
   if (width === null || height === null || width <= 0 || height <= 0) return { action: "refuse", reason: "size" };
   const images = [...(_a2 = scene.images) != null ? _a2 : [], ...((_b2 = scene.cards) != null ? _b2 : []).map((card) => card == null ? void 0 : card.cover)];
-  const bytes = images.reduce((sum, image) => sum + embeddedBytes(image == null ? void 0 : image.href), 0);
+  const bytes = images.reduce((sum2, image) => sum2 + embeddedBytes(image == null ? void 0 : image.href), 0);
   if (bytes > EXPORT_MAX_EMBEDDED_BYTES) return { action: "refuse", reason: "embedded" };
   if (width * height > EXPORT_MAX_PIXELS) return { action: "refuse", reason: "pixels" };
   const longest = Math.max(width, height);
@@ -19879,7 +19948,7 @@ function radialPositions(input2) {
     const childrenOf = (node) => [...kidsOf(node), ...joinsOf(node)];
     const count = (node) => {
       const kids = childrenOf(node);
-      const total2 = kids.length ? kids.reduce((sum, kid) => sum + count(kid), 0) : 1;
+      const total2 = kids.length ? kids.reduce((sum2, kid) => sum2 + count(kid), 0) : 1;
       leaves.set(node.id, total2);
       return total2;
     };
@@ -23969,7 +24038,7 @@ function truncateSummary(value, limit = 80) {
   var _a2;
   const characters = Array.from(value.trim());
   const widths = characters.map(characterWidth);
-  const total2 = widths.reduce((sum, width) => sum + width, 0);
+  const total2 = widths.reduce((sum2, width) => sum2 + width, 0);
   if (total2 <= limit) return characters.join("");
   const prefix = [0];
   for (const width of widths) prefix.push(prefix[prefix.length - 1] + width);
@@ -28001,7 +28070,7 @@ function showsToResearch(kind, status, progressDone = false) {
 
 // experiences/visual-map/view.ts
 var import_node_crypto15 = require("node:crypto");
-var import_obsidian36 = require("obsidian");
+var import_obsidian37 = require("obsidian");
 
 // ui/map-sources-panel.ts
 var import_obsidian15 = require("obsidian");
@@ -28221,9 +28290,700 @@ function cardFailure(raw, locale) {
   return { text: text11, technical: isTechnicalErrorText(raw) || classifyProviderError(raw) || NETWORK.test(raw) ? raw : null };
 }
 
-// ui/modals/name-modal.ts
+// experiences/visual-map/usage-panel.ts
 var import_obsidian16 = require("obsidian");
-var NameModal = class extends import_obsidian16.Modal {
+
+// store-adapter.ts
+async function readStoreText(adapter, path) {
+  if (await adapter.exists(path)) return adapter.read(path);
+  const temporary = `${path}.tmp`;
+  if (!await adapter.exists(temporary)) return null;
+  const text11 = await adapter.read(temporary);
+  await adapter.rename(temporary, path);
+  return text11;
+}
+async function writeStoreAtomically(adapter, path, text11) {
+  const temporary = `${path}.tmp`;
+  await adapter.write(temporary, text11);
+  if (await adapter.exists(path)) await adapter.remove(path);
+  await adapter.rename(temporary, path);
+}
+
+// ai-exchange-log.ts
+function isRecord2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isUnknownArray(value) {
+  return Array.isArray(value);
+}
+function formatElapsed(durationMs) {
+  if (durationMs < 1e3) return `${durationMs} ms`;
+  if (durationMs < 6e4) return `${(durationMs / 1e3).toFixed(1)} s`;
+  const minutes = Math.floor(durationMs / 6e4);
+  const seconds = Math.floor(durationMs % 6e4 / 1e3);
+  return `${minutes}m ${seconds}s`;
+}
+function promptMetrics(entry) {
+  var _a2, _b2, _c, _d, _e;
+  let prompt = typeof entry.prompt === "string" ? entry.prompt : "";
+  if (!prompt && entry.request) {
+    try {
+      const parsed = JSON.parse(entry.request);
+      const parsedRecord = isRecord2(parsed) ? parsed : void 0;
+      const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
+      const request = isRecord2(requestValue) ? requestValue : void 0;
+      if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
+      else if (request && isUnknownArray(request.input)) {
+        prompt = request.input.map((item) => isRecord2(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
+      }
+    } catch (e) {
+    }
+  }
+  const characters = Array.from(prompt).length;
+  const nonAscii = Array.from(prompt).filter((character) => character.charCodeAt(0) > 127).length;
+  const phase = (_c = (_b2 = upgradeLegacyAimText(prompt).match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _b2[1]) != null ? _c : entry.mode;
+  const repairReason = /repair/i.test(phase) ? (_e = (_d = prompt.match(/(?:Format validation error|Repair reason):\s*([^\r\n]+)/i)) == null ? void 0 : _d[1]) == null ? void 0 : _e.trim() : void 0;
+  return {
+    prompt,
+    phase,
+    ...repairReason ? { repairReason } : {},
+    characters,
+    estimatedTokens: Math.ceil((characters - nonAscii) / 4 + nonAscii)
+  };
+}
+function formatAiExchange(entry) {
+  var _a2, _b2;
+  const metrics = promptMetrics(entry);
+  const step = entry.step ? ` \xB7 step: ${entry.step}` : "";
+  const timing = `Request ID: ${entry.id}${step} \xB7 phase: ${metrics.phase} \xB7 prompt: ${metrics.characters} characters \xB7 approximately ${metrics.estimatedTokens} tokens (estimate, not billed usage) \xB7 sent: ${(_a2 = entry.sentAt) != null ? _a2 : "unavailable"} \xB7 completed: ${(_b2 = entry.completedAt) != null ? _b2 : "unavailable"} \xB7 elapsed: ${entry.durationMs === void 0 ? "unavailable" : formatElapsed(entry.durationMs)}`;
+  const milestones = entry.milestones ? `milestones: ${JSON.stringify(entry.milestones)}` : "";
+  return [
+    `[${entry.startedAt}] ${entry.topic} \xB7 ${entry.mode} \xB7 ${entry.model}/${entry.effort} \xB7 ${entry.status}`,
+    ...milestones ? [timing, milestones] : [timing],
+    `
+${t("log.exchange_full_prompt")}
+`,
+    metrics.prompt || t("log.exchange_legacy_prompt_missing"),
+    `
+${t("log.exchange_request")}
+`,
+    entry.request || t("log.exchange_not_sent"),
+    `
+${t("log.exchange_raw_reply")}
+`,
+    entry.response || t("log.exchange_none"),
+    `
+${t("log.exchange_error")}
+`,
+    entry.error || t("log.exchange_none")
+  ].join("\n");
+}
+var AiExchangeLog = class {
+  constructor(adapter, path, onError, limit = 1e3) {
+    this.adapter = adapter;
+    this.path = path;
+    this.onError = onError;
+    this.limit = limit;
+    __publicField(this, "entries", []);
+    __publicField(this, "loadError", null);
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+    __publicField(this, "writes", Promise.resolve());
+  }
+  async load() {
+    try {
+      const text11 = await readStoreText(this.adapter, this.path);
+      if (text11 === null) return;
+      const parsed = JSON.parse(text11);
+      if (!Array.isArray(parsed)) throw new Error(t("error.exchange_log_invalid"));
+      const entries = parsed.filter((item) => {
+        if (!item || typeof item !== "object") return false;
+        const entry = item;
+        return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
+          (key2) => typeof entry[key2] === "string"
+        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord2(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
+      });
+      if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
+      this.entries = entries.slice(-this.limit);
+      this.loadError = null;
+      this.emit();
+    } catch (error) {
+      this.loadError = error;
+      this.onError(error);
+    }
+  }
+  getEntries() {
+    return this.entries.map((entry) => ({ ...entry }));
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  begin(entry) {
+    this.entries.push({ ...entry, request: "", response: "", status: "preparing", error: "" });
+    this.entries = this.entries.slice(-this.limit);
+    this.changed();
+  }
+  sent(id, request, prompt) {
+    const entry = this.entries.find((item) => item.id === id);
+    if (entry == null ? void 0 : entry.request) {
+      const sentAt = (/* @__PURE__ */ new Date()).toISOString();
+      const followupId = `${id}-${Date.now()}-${this.entries.length}`;
+      this.entries.push({
+        id: followupId,
+        startedAt: sentAt,
+        topic: entry.topic,
+        mode: "steer",
+        model: entry.model,
+        effort: entry.effort,
+        request,
+        sentAt,
+        response: "",
+        status: "sent",
+        error: ""
+      });
+      this.entries = this.entries.slice(-this.limit);
+      this.changed();
+      return;
+    }
+    this.update(id, {
+      request,
+      ...prompt !== void 0 ? { prompt } : {},
+      sentAt: (/* @__PURE__ */ new Date()).toISOString(),
+      status: "sent"
+    });
+  }
+  received(id, response) {
+    this.update(id, { response, status: "received" });
+  }
+  /** Stores the call's milestones; the provider writes them once, when the call ends. */
+  milestones(id, data) {
+    this.update(id, { milestones: data });
+  }
+  parsed(id) {
+    this.finish(id, { status: "parsed" });
+  }
+  completed(id) {
+    this.finish(id, { status: "completed" });
+  }
+  failed(id, error) {
+    this.finish(id, { error, status: "failed" });
+  }
+  clear() {
+    this.entries = [];
+    this.changed();
+  }
+  async flush() {
+    await this.writes;
+  }
+  update(id, patch) {
+    const entry = this.entries.find((item) => item.id === id);
+    if (!entry) return;
+    Object.assign(entry, patch);
+    this.changed();
+  }
+  finish(id, patch) {
+    var _a2;
+    const entry = this.entries.find((item) => item.id === id);
+    if (!entry) return;
+    const completedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const start = (_a2 = entry.sentAt) != null ? _a2 : entry.startedAt;
+    const durationMs = Math.max(0, Date.parse(completedAt) - Date.parse(start));
+    this.update(id, { ...patch, completedAt, durationMs });
+  }
+  emit() {
+    for (const listener of this.listeners) listener();
+  }
+  changed() {
+    this.emit();
+    if (this.loadError) {
+      this.onError(this.loadError);
+      return;
+    }
+    const snapshot = JSON.stringify(this.entries);
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).catch(this.onError);
+  }
+};
+
+// core/ai-usage-store.ts
+var USAGE_ACTIONS = ["research", "expand", "synthesize", "writeback", "other"];
+var USAGE_DETAIL_DAYS = 90;
+var ZERO = () => ({ inputTokens: 0, outputTokens: 0 });
+var isRecord3 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isCount = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+var isTokens = (value) => isRecord3(value) && isCount(value.inputTokens) && isCount(value.outputTokens);
+var isAction = (value) => USAGE_ACTIONS.includes(value);
+function isEntry(value) {
+  if (!isRecord3(value)) return false;
+  return typeof value.at === "string" && !Number.isNaN(Date.parse(value.at)) && isAction(value.action) && (value.mapPath === void 0 || typeof value.mapPath === "string") && (value.topic === void 0 || typeof value.topic === "string") && (value.provider === "claude" || value.provider === "codex") && typeof value.model === "string" && isTokens(value) && typeof value.estimated === "boolean" && (value.durationMs === void 0 || isCount(value.durationMs));
+}
+function isBucket(value) {
+  if (!isRecord3(value) || !isRecord3(value.maps)) return false;
+  return Object.values(value.maps).every(
+    (actions) => isRecord3(actions) && Object.entries(actions).every(([key2, tokens2]) => isAction(key2) && isTokens(tokens2))
+  );
+}
+function localDayStart(now = Date.now()) {
+  const date = new Date(now);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+function localMonthStart(now = Date.now()) {
+  const date = new Date(now);
+  return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+}
+var monthKey = (time) => {
+  const date = new Date(time);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+var monthStartOf = (key2) => {
+  const [year, month] = key2.split("-").map(Number);
+  return new Date(year, month - 1, 1).getTime();
+};
+function estimateUsageTokens(text11) {
+  return text11 ? promptMetrics({ prompt: text11, request: "", mode: "" }).estimatedTokens : 0;
+}
+var AiUsageStore = class {
+  constructor(adapter, path, onError, now = Date.now) {
+    this.adapter = adapter;
+    this.path = path;
+    this.onError = onError;
+    this.now = now;
+    __publicField(this, "entries", []);
+    __publicField(this, "monthly", {});
+    __publicField(this, "loadError", null);
+    __publicField(this, "disposed", false);
+    __publicField(this, "writes", Promise.resolve());
+    __publicField(this, "writeError", null);
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+  }
+  async load() {
+    try {
+      const text11 = await readStoreText(this.adapter, this.path);
+      if (text11 === null) return;
+      const parsed = JSON.parse(text11);
+      if (!isRecord3(parsed) || parsed.version !== 1 || !Array.isArray(parsed.entries) || !isRecord3(parsed.monthly))
+        throw new Error("ai-usage.json has an unexpected shape.");
+      if (!parsed.entries.every(isEntry) || !Object.values(parsed.monthly).every(isBucket))
+        throw new Error("ai-usage.json has invalid fields.");
+      this.entries = parsed.entries;
+      this.monthly = parsed.monthly;
+      this.loadError = null;
+      this.compact();
+    } catch (error) {
+      this.loadError = error;
+      this.entries = [];
+      this.monthly = {};
+      this.onError(error);
+    }
+    this.emit();
+  }
+  /** "unreadable" after a failed load; persistence stays stopped until the file is repaired and the plugin reloads. */
+  get status() {
+    return this.loadError ? "unreadable" : "ready";
+  }
+  /** Adds one call. Ignored (and reported once through `onError`) while the file is unreadable or after dispose. */
+  record(entry) {
+    var _a2;
+    try {
+      if (this.disposed) return;
+      if (this.loadError) {
+        if (!this.writeError) {
+          this.writeError = this.loadError;
+          this.onError(this.loadError);
+        }
+        return;
+      }
+      this.entries.push({ ...entry, at: (_a2 = entry.at) != null ? _a2 : new Date(this.now()).toISOString() });
+      this.compact();
+      this.save();
+      this.emit();
+    } catch (error) {
+      this.onError(error);
+    }
+  }
+  /** Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all. */
+  totals(query = {}) {
+    if (this.loadError) return { status: "unreadable" };
+    const sum2 = ZERO();
+    this.each(query, (_action, tokens2) => {
+      sum2.inputTokens += tokens2.inputTokens;
+      sum2.outputTokens += tokens2.outputTokens;
+    });
+    return { status: "ready", value: sum2 };
+  }
+  /** Tokens of one map per action (all five keys present); sums to `totals({ mapPath, since })`. */
+  byAction(mapPath, since) {
+    if (this.loadError) return { status: "unreadable" };
+    const result = Object.fromEntries(USAGE_ACTIONS.map((action) => [action, ZERO()]));
+    this.each({ mapPath, since }, (action, tokens2) => {
+      result[action].inputTokens += tokens2.inputTokens;
+      result[action].outputTokens += tokens2.outputTokens;
+    });
+    return { status: "ready", value: result };
+  }
+  /** The newest `limit` detail rows of one map (all maps when absent), newest first. */
+  recent(mapPath, limit = 10) {
+    if (this.loadError) return { status: "unreadable" };
+    const rows2 = this.entries.filter((entry) => mapPath === void 0 || entry.mapPath === mapPath).sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit).map((entry) => ({ ...entry }));
+    return { status: "ready", value: rows2 };
+  }
+  /** Called after every recorded call and after load (also when load failed). Returns the unsubscribe function. */
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  /** Waits for the pending writes; rejects with the last write error. */
+  async flush() {
+    await this.writes;
+    if (this.writeError)
+      throw this.writeError instanceof Error ? this.writeError : new Error("ai-usage.json was not saved.");
+  }
+  /** Waits for the pending writes, then stops recording and drops listeners (onunload). Never rejects. */
+  async dispose() {
+    this.disposed = true;
+    this.listeners.clear();
+    await this.writes;
+  }
+  each(query, visit) {
+    const { mapPath, since } = query;
+    for (const entry of this.entries) {
+      if (mapPath !== void 0 && entry.mapPath !== mapPath) continue;
+      if (since !== void 0 && Date.parse(entry.at) < since) continue;
+      visit(entry.action, entry);
+    }
+    for (const [key2, bucket] of Object.entries(this.monthly)) {
+      if (since !== void 0 && monthStartOf(key2) < since) continue;
+      for (const [path, actions] of Object.entries(bucket.maps)) {
+        if (mapPath !== void 0 && path !== mapPath) continue;
+        for (const [action, tokens2] of Object.entries(actions)) visit(action, tokens2);
+      }
+    }
+  }
+  /** Folds rows older than the detail window into their month. */
+  compact() {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    const cutoff = this.now() - USAGE_DETAIL_DAYS * 864e5;
+    const keep = [];
+    for (const entry of this.entries) {
+      const time = Date.parse(entry.at);
+      if (time >= cutoff) {
+        keep.push(entry);
+        continue;
+      }
+      const bucket = (_c = (_a2 = this.monthly)[_b2 = monthKey(time)]) != null ? _c : _a2[_b2] = { maps: {} };
+      const actions = (_g = (_e = bucket.maps)[_f = (_d = entry.mapPath) != null ? _d : ""]) != null ? _g : _e[_f] = {};
+      const tokens2 = (_i = actions[_h = entry.action]) != null ? _i : actions[_h] = ZERO();
+      tokens2.inputTokens += entry.inputTokens;
+      tokens2.outputTokens += entry.outputTokens;
+    }
+    this.entries = keep;
+  }
+  save() {
+    const file = { version: 1, entries: this.entries, monthly: this.monthly };
+    const snapshot = JSON.stringify(file);
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).then(
+      () => {
+        this.writeError = null;
+      },
+      (error) => {
+        this.writeError = error;
+        this.onError(error);
+      }
+    );
+  }
+  emit() {
+    for (const listener of [...this.listeners]) {
+      try {
+        listener();
+      } catch (error) {
+        this.onError(error);
+      }
+    }
+  }
+};
+
+// experiences/visual-map/usage-panel.ts
+var RECENT_ROWS = 10;
+var PANEL_GAP = 8;
+function formatTokens(count) {
+  const n = Math.max(0, Math.round(Number.isFinite(count) ? count : 0));
+  if (n < 1e3) return String(n);
+  if (n < 1e5) return `${(Math.floor(n / 100) / 10).toFixed(1)}k`;
+  return `${Math.round(n / 1e3)}k`;
+}
+function formatDuration(ms) {
+  if (ms === void 0 || !Number.isFinite(ms) || ms < 0) return "\u2013";
+  const seconds = Math.max(1, Math.round(ms / 1e3));
+  if (seconds < 60) return t("ui.usage_seconds_0", String(seconds));
+  return t("ui.usage_minutes_seconds_01", String(Math.floor(seconds / 60)), String(seconds % 60));
+}
+var clock = (iso) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "\u2013";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+};
+var actionLabel = (action) => t(`ui.usage_action_${action}`);
+var sum = (tokens2) => tokens2.inputTokens + tokens2.outputTokens;
+var UsageControl = class {
+  constructor(store, mapPath) {
+    this.store = store;
+    this.mapPath = mapPath;
+    __publicField(this, "unsubscribe", null);
+    __publicField(this, "button", null);
+    __publicField(this, "numberEl", null);
+    __publicField(this, "overlay", null);
+    __publicField(this, "bar", null);
+    __publicField(this, "parts", null);
+    __publicField(this, "doc", null);
+    __publicField(this, "isOpen", false);
+    __publicField(this, "onKey", (event) => {
+      var _a2;
+      if (event.key !== "Escape" || !this.isOpen) return;
+      const inside2 = (node) => {
+        var _a3, _b2;
+        return !!node && !!(((_a3 = this.parts) == null ? void 0 : _a3.root.contains(node)) || ((_b2 = this.button) == null ? void 0 : _b2.contains(node)));
+      };
+      if (!inside2(event.target) && !inside2((_a2 = this.doc) == null ? void 0 : _a2.activeElement)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.close(true);
+    });
+    __publicField(this, "onPointer", (event) => {
+      var _a2, _b2;
+      const target = event.target;
+      if (!this.isOpen || !target) return;
+      if (((_a2 = this.parts) == null ? void 0 : _a2.root.contains(target)) || ((_b2 = this.button) == null ? void 0 : _b2.contains(target))) return;
+      this.close(false);
+    });
+  }
+  /** Starts following the store (view open). */
+  start() {
+    var _a2;
+    (_a2 = this.unsubscribe) == null ? void 0 : _a2.call(this);
+    this.unsubscribe = this.store.subscribe(() => this.refresh());
+  }
+  /** Stops following the store and closes the panel (view close). */
+  stop() {
+    var _a2;
+    (_a2 = this.unsubscribe) == null ? void 0 : _a2.call(this);
+    this.unsubscribe = null;
+    this.detachPanel();
+    this.isOpen = false;
+    this.button = this.numberEl = this.overlay = this.bar = null;
+  }
+  get open() {
+    return this.isOpen;
+  }
+  /** Puts the button first in the freshly built zoom bar and, when the panel was open, opens it again in the new overlay. */
+  mount(zoomBar, overlay) {
+    this.detachPanel();
+    this.bar = zoomBar;
+    this.overlay = overlay;
+    const button = zoomBar.createEl("button", { cls: "clickable-icon vam-icon-button vam-usage-button" });
+    button.setAttr("aria-haspopup", "dialog");
+    button.setAttr("aria-expanded", String(this.isOpen));
+    const icon = button.createSpan({ cls: "vam-usage-icon" });
+    (0, import_obsidian16.setIcon)(icon, "gauge");
+    this.numberEl = button.createSpan({ cls: "vam-usage-number" });
+    zoomBar.createSpan({ cls: "vam-usage-sep" }).setAttr("aria-hidden", "true");
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (this.isOpen) this.close(true);
+      else this.openPanel();
+    });
+    this.button = button;
+    if (this.isOpen) this.attachPanel();
+    this.refresh();
+  }
+  openPanel() {
+    var _a2;
+    if (!this.overlay || this.isOpen) return;
+    this.isOpen = true;
+    (_a2 = this.button) == null ? void 0 : _a2.setAttr("aria-expanded", "true");
+    this.attachPanel();
+    this.refresh();
+  }
+  /** Closes the panel; the focus goes back to the button when asked or when it was inside the panel. */
+  close(returnFocus = false) {
+    var _a2, _b2, _c, _d, _e;
+    if (!this.isOpen) return;
+    const active = (_b2 = (_a2 = this.doc) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
+    const insideNow = !!(active && ((_c = this.parts) == null ? void 0 : _c.root.contains(active)));
+    this.isOpen = false;
+    this.detachPanel();
+    (_d = this.button) == null ? void 0 : _d.setAttr("aria-expanded", "false");
+    if (returnFocus || insideNow) (_e = this.button) == null ? void 0 : _e.focus();
+  }
+  /** Rewrites the numbers in place (store change, new mount). Nothing is rebuilt. */
+  refresh() {
+    const button = this.button;
+    if (!button || !this.numberEl) return;
+    const today = this.store.totals({ since: localDayStart() });
+    if (today.status === "unreadable") {
+      this.numberEl.setText("\u2013");
+      button.setAttr("aria-label", t("ui.usage_button_unavailable"));
+    } else {
+      const label = formatTokens(sum(today.value));
+      this.numberEl.setText(label);
+      button.setAttr("aria-label", t("ui.usage_button_today_0", label));
+    }
+    if (this.isOpen && this.parts) this.fillPanel(this.parts);
+  }
+  attachPanel() {
+    var _a2;
+    if (!this.overlay) return;
+    const parts = this.buildPanel(this.overlay);
+    this.parts = parts;
+    const doc = (_a2 = this.overlay.ownerDocument) != null ? _a2 : typeof document === "undefined" ? null : document;
+    this.doc = doc;
+    doc == null ? void 0 : doc.addEventListener("keydown", this.onKey, true);
+    doc == null ? void 0 : doc.addEventListener("pointerdown", this.onPointer, true);
+    this.place();
+  }
+  detachPanel() {
+    var _a2, _b2, _c;
+    (_a2 = this.doc) == null ? void 0 : _a2.removeEventListener("keydown", this.onKey, true);
+    (_b2 = this.doc) == null ? void 0 : _b2.removeEventListener("pointerdown", this.onPointer, true);
+    (_c = this.parts) == null ? void 0 : _c.root.remove();
+    this.parts = null;
+  }
+  /** Floats the panel right above the zoom bar, whatever height the bar wraps to. */
+  place() {
+    var _a2, _b2, _c, _d, _e;
+    const root = (_a2 = this.parts) == null ? void 0 : _a2.root;
+    if (!root || !this.overlay || !this.bar) return;
+    const overlayBox = (_c = (_b2 = this.overlay).getBoundingClientRect) == null ? void 0 : _c.call(_b2);
+    const barBox = (_e = (_d = this.bar).getBoundingClientRect) == null ? void 0 : _e.call(_d);
+    if (!overlayBox || !barBox) return;
+    root.style.setProperty(
+      "--vam-usage-bottom",
+      `${Math.max(0, Math.round(overlayBox.bottom - barBox.top + PANEL_GAP))}px`
+    );
+  }
+  buildPanel(overlay) {
+    const root = overlay.createDiv({ cls: "vam-usage-panel" });
+    root.setAttr("role", "dialog");
+    root.setAttr("aria-label", t("ui.usage_panel_title"));
+    root.setAttr("tabindex", "0");
+    const head = root.createEl("h3", { cls: "vam-usage-title" });
+    head.createSpan({ text: t("ui.usage_panel_title") });
+    head.createSpan({ cls: "vam-usage-faint", text: t("ui.usage_panel_providers") });
+    const error = root.createEl("p", { cls: "vam-usage-error", text: t("ui.usage_unreadable") });
+    error.setAttr("role", "status");
+    error.hidden = true;
+    const totalsSection = root.createDiv({ cls: "vam-usage-section" });
+    totalsSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_totals") });
+    const grid = totalsSection.createDiv({ cls: "vam-usage-totals" });
+    const cell = (label) => {
+      const box = grid.createDiv();
+      box.createEl("small", { text: label });
+      const strong = box.createEl("strong");
+      const detail = box.createEl("em");
+      return { strong, input: detail.createSpan(), output: detail.createSpan() };
+    };
+    const cells = {
+      map: cell(t("ui.usage_this_map")),
+      today: cell(t("ui.usage_today")),
+      month: cell(t("ui.usage_this_month"))
+    };
+    const empty = root.createEl("p", { cls: "vam-usage-empty", text: t("ui.usage_empty") });
+    empty.hidden = true;
+    const barsSection = root.createDiv({ cls: "vam-usage-section" });
+    barsSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_by_action") });
+    const barsBox = barsSection.createDiv({ cls: "vam-usage-bars" });
+    const bars = /* @__PURE__ */ new Map();
+    for (const action of USAGE_ACTIONS) {
+      const row = barsBox.createDiv({ cls: "vam-usage-bar" });
+      const fill2 = row.createDiv({ cls: "vam-usage-fill-track" }).createDiv({ cls: "vam-usage-fill" });
+      const name2 = row.createSpan({ text: actionLabel(action) });
+      row.insertBefore(name2, row.firstChild);
+      bars.set(action, { row, name: name2, fill: fill2, value: row.createSpan({ cls: "vam-usage-muted" }) });
+      row.hidden = true;
+    }
+    const recentSection = root.createDiv({ cls: "vam-usage-section" });
+    recentSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_recent") });
+    const recentBox = recentSection.createEl("table", { cls: "vam-usage-recent" });
+    const rows2 = [];
+    for (let index = 0; index < RECENT_ROWS; index++) {
+      const row = recentBox.createEl("tr");
+      const time = row.createEl("td", { cls: "vam-usage-faint" });
+      const what = row.createEl("td");
+      const action = what.createSpan();
+      const node = what.createSpan({ cls: "vam-usage-node" });
+      const tokens2 = row.createEl("td", { cls: "vam-usage-muted" });
+      const duration = row.createEl("td", { cls: "vam-usage-muted" });
+      row.hidden = true;
+      rows2.push({ row, time, action, node, tokens: tokens2, duration });
+    }
+    root.createDiv({ cls: "vam-usage-foot", text: t("ui.usage_footer") });
+    return {
+      root,
+      sections: [totalsSection, barsSection, recentSection],
+      empty,
+      error,
+      cells,
+      bars,
+      barsBox,
+      rows: rows2,
+      recentBox
+    };
+  }
+  fillPanel(parts) {
+    const path = this.mapPath();
+    const map = this.store.totals({ mapPath: path });
+    const today = this.store.totals({ since: localDayStart() });
+    const month = this.store.totals({ since: localMonthStart() });
+    const actions = this.store.byAction(path);
+    const recent = this.store.recent(path, RECENT_ROWS);
+    if (map.status === "unreadable" || today.status === "unreadable" || month.status === "unreadable" || actions.status === "unreadable" || recent.status === "unreadable") {
+      parts.error.hidden = false;
+      parts.empty.hidden = true;
+      for (const section3 of parts.sections) section3.hidden = true;
+      this.place();
+      return;
+    }
+    parts.error.hidden = true;
+    for (const section3 of parts.sections) section3.hidden = false;
+    const total2 = (cell, tokens2) => {
+      cell.strong.setText(formatTokens(sum(tokens2)));
+      cell.input.setText(t("ui.usage_in_0", formatTokens(tokens2.inputTokens)));
+      cell.output.setText(t("ui.usage_out_0", formatTokens(tokens2.outputTokens)));
+    };
+    total2(parts.cells.map, map.value);
+    total2(parts.cells.today, today.value);
+    total2(parts.cells.month, month.value);
+    const noUsage = sum(map.value) === 0 && recent.value.length === 0;
+    parts.empty.hidden = !noUsage;
+    parts.sections[1].hidden = noUsage;
+    parts.sections[2].hidden = noUsage;
+    const biggest = Math.max(0, ...USAGE_ACTIONS.map((action) => sum(actions.value[action])));
+    for (const action of USAGE_ACTIONS) {
+      const used = sum(actions.value[action]);
+      const bar = parts.bars.get(action);
+      bar.row.hidden = used === 0;
+      bar.fill.style.setProperty("width", `${biggest ? Math.max(2, Math.round(used / biggest * 100)) : 0}%`);
+      bar.value.setText(formatTokens(used));
+    }
+    parts.rows.forEach((slot, index) => this.fillRow(slot, recent.value[index]));
+    this.place();
+  }
+  fillRow(slot, entry) {
+    var _a2;
+    slot.row.hidden = !entry;
+    if (!entry) return;
+    const count = formatTokens(entry.inputTokens + entry.outputTokens);
+    slot.time.setText(clock(entry.at));
+    slot.action.setText(actionLabel(entry.action));
+    slot.node.setText((_a2 = entry.topic) != null ? _a2 : "");
+    slot.node.hidden = !entry.topic;
+    slot.tokens.setText(entry.estimated ? t("ui.usage_estimated_0", count) : count);
+    slot.tokens.toggleClass("is-estimated", entry.estimated);
+    slot.duration.setText(formatDuration(entry.durationMs));
+  }
+};
+
+// ui/modals/name-modal.ts
+var import_obsidian17 = require("obsidian");
+var NameModal = class extends import_obsidian17.Modal {
   constructor(app, titleText, value, submit, options = {}) {
     super(app);
     this.titleText = titleText;
@@ -28271,8 +29031,8 @@ var NameModal = class extends import_obsidian16.Modal {
 };
 
 // ui/modals/choice-modal.ts
-var import_obsidian17 = require("obsidian");
-var ChoiceModal = class extends import_obsidian17.Modal {
+var import_obsidian18 = require("obsidian");
+var ChoiceModal = class extends import_obsidian18.Modal {
   constructor(app, titleText, description, choices, dismissed) {
     super(app);
     this.titleText = titleText;
@@ -28291,7 +29051,7 @@ var ChoiceModal = class extends import_obsidian17.Modal {
     this.titleEl.setText(this.titleText);
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
     for (const choice2 of this.choices) {
-      const setting = new import_obsidian17.Setting(this.contentEl);
+      const setting = new import_obsidian18.Setting(this.contentEl);
       const run = () => {
         this.chosen = true;
         this.close();
@@ -28317,7 +29077,7 @@ var ChoiceModal = class extends import_obsidian17.Modal {
 };
 
 // ui/modals/map-switcher-modal.ts
-var import_obsidian18 = require("obsidian");
+var import_obsidian19 = require("obsidian");
 function mapSwitcherDetail(item, showFolder, now = Date.now()) {
   const count = item.topicCount === 1 ? t("ui.map_switcher_one_topic") : t("ui.map_switcher_topics_0", item.topicCount);
   const parts = [count];
@@ -28335,7 +29095,7 @@ function editedText(modified, now) {
     return date.toISOString().slice(0, 10);
   }
 }
-var MapSwitcherModal = class extends import_obsidian18.FuzzySuggestModal {
+var MapSwitcherModal = class extends import_obsidian19.FuzzySuggestModal {
   constructor(app, items, currentPath, choose) {
     super(app);
     this.items = items;
@@ -28372,7 +29132,7 @@ var MapSwitcherModal = class extends import_obsidian18.FuzzySuggestModal {
 };
 
 // ui/modals/keyboard-shortcuts-modal.ts
-var import_obsidian19 = require("obsidian");
+var import_obsidian20 = require("obsidian");
 var MAP_KEYBOARD_SHORTCUTS = [
   { keys: ["\u2191", "\u2193", "\u2190", "\u2192"], action: "ui.shortcut_move_between_cards" },
   { keys: ["Enter"], action: "ui.shortcut_open_details" },
@@ -28391,10 +29151,10 @@ var MAP_KEYBOARD_SHORTCUTS = [
   { keys: ["Mod+V"], action: "ui.shortcut_paste" },
   { keys: ["Esc"], action: "ui.shortcut_clear_selection" }
 ];
-function shortcutLabel(keys, mac = import_obsidian19.Platform.isMacOS) {
+function shortcutLabel(keys, mac = import_obsidian20.Platform.isMacOS) {
   return keys.replace(/Mod/g, mac ? "\u2318" : "Ctrl").replace(/Shift/g, mac ? "\u21E7" : "Shift").replace(/Alt/g, mac ? "\u2325" : "Alt");
 }
-var KeyboardShortcutsModal = class extends import_obsidian19.Modal {
+var KeyboardShortcutsModal = class extends import_obsidian20.Modal {
   constructor(app) {
     super(app);
   }
@@ -33097,6 +33857,7 @@ var TopicRuns = class {
         researchDepth: "normal",
         visualMode: note.visualMode,
         ...runStyle.toneText ? { toneText: runStyle.toneText } : {},
+        ...options.usageMapPath ? { usageMapPath: options.usageMapPath } : {},
         ...overrides,
         detailTemplate,
         ...runStyle.contextFields,
@@ -33493,7 +34254,7 @@ var TopicRuns = class {
 };
 
 // experiences/visual-map/note-style-picker.ts
-var import_obsidian20 = require("obsidian");
+var import_obsidian21 = require("obsidian");
 
 // ui/modals/open-in-window.ts
 function openInWindowOf(modal, anchor) {
@@ -33549,7 +34310,7 @@ function errorNotice(error) {
   const message = error == null ? void 0 : error.message;
   const text11 = typeof message === "string" ? message : String(error);
   if (error instanceof NoteStyleFileError) return actionNotice(text11, t("ui.note_style_open_file"), error.open);
-  return new import_obsidian20.Notice(text11);
+  return new import_obsidian21.Notice(text11);
 }
 function stylePickerFor(app, plugin) {
   const store = plugin.noteStyles;
@@ -33561,15 +34322,15 @@ function stylePickerFor(app, plugin) {
   };
 }
 async function openVaultFile(app, path) {
-  const file = app.vault.getAbstractFileByPath((0, import_obsidian20.normalizePath)(path));
-  if (!(file instanceof import_obsidian20.TFile)) return false;
+  const file = app.vault.getAbstractFileByPath((0, import_obsidian21.normalizePath)(path));
+  if (!(file instanceof import_obsidian21.TFile)) return false;
   await app.workspace.getLeaf("tab").openFile(file);
   return true;
 }
 async function openRecipeFile(app, store, ref) {
   const path = store.recipeFilePath(ref);
   if (path === void 0 || !await openVaultFile(app, path)) {
-    new import_obsidian20.Notice(t("ui.note_style_edit_missing_0", ref.startsWith("file:") ? `${ref.slice("file:".length)}.md` : ref));
+    new import_obsidian21.Notice(t("ui.note_style_edit_missing_0", ref.startsWith("file:") ? `${ref.slice("file:".length)}.md` : ref));
   }
 }
 var ISSUE_KEYS = /* @__PURE__ */ new Set([
@@ -33593,7 +34354,7 @@ function styleIssueText(issue2) {
   return t(issue2.code, ...issue2.values);
 }
 var PICKER_SHOWN = 4;
-var TopicStylePickerModal = class extends import_obsidian20.Modal {
+var TopicStylePickerModal = class extends import_obsidian21.Modal {
   constructor(app, rows2, handlers) {
     super(app);
     this.rows = rows2;
@@ -33844,7 +34605,7 @@ function firstMarkdownTable(markdown) {
 }
 
 // experiences/visual-map/relevance-tag.ts
-var import_obsidian21 = require("obsidian");
+var import_obsidian22 = require("obsidian");
 var RELEVANCE_ICON = {
   core: "target",
   support: "library",
@@ -33858,7 +34619,7 @@ var RELEVANCE_LABEL = {
 function renderRelevanceTag(parent, tier, label) {
   const tag = parent.createSpan({ cls: "vam-relevance-tag" });
   tag.dataset.tier = tier;
-  (0, import_obsidian21.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
+  (0, import_obsidian22.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
   tag.createSpan({ text: label });
   return tag;
 }
@@ -33873,7 +34634,7 @@ function renderRelevanceTagButton(parent, tier, label, ariaLabel, open, disabled
   tag.setAttr("aria-label", ariaLabel);
   tag.setAttr("aria-labelledby", nameId);
   tag.setAttr("aria-haspopup", "menu");
-  (0, import_obsidian21.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
+  (0, import_obsidian22.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
   const visible = tag.createSpan({ text: label });
   visible.setAttr("aria-hidden", "true");
   tag.createSpan({ cls: "vam-relevance-tag-name", text: ariaLabel, attr: { id: nameId } });
@@ -34122,8 +34883,8 @@ function chooseCardToolsSpot(input2) {
 }
 
 // experiences/visual-map/relevance-summary-modal.ts
-var import_obsidian22 = require("obsidian");
-var RelevanceSummaryModal = class extends import_obsidian22.Modal {
+var import_obsidian23 = require("obsidian");
+var RelevanceSummaryModal = class extends import_obsidian23.Modal {
   constructor(app, host) {
     super(app);
     this.host = host;
@@ -34140,7 +34901,7 @@ var RelevanceSummaryModal = class extends import_obsidian22.Modal {
       const arrow = tags.createSpan({ cls: "vam-relevance-arrow" });
       arrow.setAttr("role", "img");
       arrow.setAttr("aria-label", t("ui.relevance_changed_to"));
-      (0, import_obsidian22.setIcon)(arrow, "arrow-right");
+      (0, import_obsidian23.setIcon)(arrow, "arrow-right");
       renderRelevanceTag(tags, row.after.tier, t(RELEVANCE_LABEL[row.after.tier]));
     }
   }
@@ -34199,7 +34960,7 @@ var RelevanceSummaryModal = class extends import_obsidian22.Modal {
 };
 
 // experiences/visual-map/map-chat.ts
-var import_obsidian23 = require("obsidian");
+var import_obsidian24 = require("obsidian");
 
 // core/map-chat-render.ts
 var MAX_INLINE_DEPTH = 4;
@@ -34588,7 +35349,7 @@ function blockCost(block) {
 function itemCost(item) {
   return 1 + inlineCost(item.c) + (item.sub ? blockCost(item.sub) : 0);
 }
-var blocksCost = (blocks) => blocks.reduce((sum, block) => sum + blockCost(block), 0);
+var blocksCost = (blocks) => blocks.reduce((sum2, block) => sum2 + blockCost(block), 0);
 function layoutReply(text11, budget = MAX_REPLY_NODES) {
   const clean4 = text11.replace(/\r\n?/g, "\n");
   let head = clean4;
@@ -35792,7 +36553,7 @@ ${typed}` : draft;
       cls: "vam-map-chat-toggle",
       attr: { "aria-label": t("ui.map_chat_open"), "aria-expanded": "false", "aria-controls": this.id }
     });
-    (0, import_obsidian23.setIcon)(this.toggleEl.createSpan("vam-map-chat-toggle-icon"), "message-square");
+    (0, import_obsidian24.setIcon)(this.toggleEl.createSpan("vam-map-chat-toggle-icon"), "message-square");
     this.badgeEl = this.toggleEl.createSpan({ cls: "vam-map-chat-unread", attr: { "aria-hidden": "true" } });
     this.badgeEl.hidden = true;
     this.toggleEl.addEventListener("click", () => this.setOpen(true, true));
@@ -35819,13 +36580,13 @@ ${typed}` : draft;
       cls: "vam-map-chat-save clickable-icon",
       attr: { type: "button", "aria-label": t("ui.map_chat_save"), title: t("ui.map_chat_save") }
     });
-    (0, import_obsidian23.setIcon)(this.saveEl, "file-down");
+    (0, import_obsidian24.setIcon)(this.saveEl, "file-down");
     this.saveEl.addEventListener("click", () => void this.saveNote());
     const close = this.closeEl = this.headEl.createEl("button", {
       cls: "vam-map-chat-close clickable-icon",
       attr: { "aria-label": t("ui.map_chat_close") }
     });
-    (0, import_obsidian23.setIcon)(close, "x");
+    (0, import_obsidian24.setIcon)(close, "x");
     close.addEventListener("click", () => this.setOpen(false, true));
     this.heroTitleEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-hero-title",
@@ -35851,7 +36612,7 @@ ${typed}` : draft;
       const href = anchor.getAttribute("data-href");
       if (!href) return;
       event.preventDefault();
-      this.host.openLink(href, import_obsidian23.Keymap.isModEvent(event));
+      this.host.openLink(href, import_obsidian24.Keymap.isModEvent(event));
     };
     this.logEl.addEventListener("click", (event) => openInternal(event, event.target));
     this.logEl.addEventListener("keydown", (event) => {
@@ -36639,7 +37400,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.pickEls.set(item, pick);
     if (item.broken) {
       const gap = pick.createDiv({ cls: "vam-map-chat-images-missing", attr: { "aria-hidden": "true" } });
-      (0, import_obsidian23.setIcon)(gap.createSpan({ cls: "vam-map-chat-images-missing-icon" }), "image-off");
+      (0, import_obsidian24.setIcon)(gap.createSpan({ cls: "vam-map-chat-images-missing-icon" }), "image-off");
     } else {
       const thumb = pick.createEl("img", {
         cls: "vam-map-chat-images-thumb",
@@ -36655,7 +37416,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     pick.createSpan({ cls: "vam-map-chat-images-title", text: clip2(candidate.title, 80) });
     if (item.inserted) {
       const state = pick.createSpan({ cls: "vam-map-chat-images-state is-inserted" });
-      (0, import_obsidian23.setIcon)(state.createSpan({ cls: "vam-map-chat-images-state-icon" }), "check");
+      (0, import_obsidian24.setIcon)(state.createSpan({ cls: "vam-map-chat-images-state-icon" }), "check");
       state.createSpan({ text: t("ui.map_chat_images_inserted_0", clip2(item.inserted)) });
     } else if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
     pick.addEventListener("click", () => this.pickImage(block, item));
@@ -36868,7 +37629,7 @@ function buildPreparedTaskContext(input2, model, budget = 32e3, provider = "code
     context.workingFindings,
     context.sourceContext,
     context.anchorContext
-  ].reduce((sum, value) => sum + estimateTokens(value), 0);
+  ].reduce((sum2, value) => sum2 + estimateTokens(value), 0);
   for (const key2 of optional)
     if (used() > budget && context[key2])
       context[key2] = String(context[key2]).slice(
@@ -36894,7 +37655,7 @@ function buildPreparedTaskContext(input2, model, budget = 32e3, provider = "code
     contextBreakdown.workingFindings,
     contextBreakdown.sourceContext,
     contextBreakdown.anchorContext
-  ].reduce((sum, count) => sum + count, 0);
+  ].reduce((sum2, count) => sum2 + count, 0);
   return {
     context,
     metrics: {
@@ -36922,6 +37683,13 @@ function isSearchNotPerformed(error) {
 
 // core/ai-calls.ts
 var import_node_crypto7 = require("node:crypto");
+function promptTextOf(request) {
+  const input2 = request == null ? void 0 : request.input;
+  if (!Array.isArray(input2)) return "";
+  return input2.map(
+    (item) => (item == null ? void 0 : item.type) === "text" && typeof item.text === "string" ? item.text : ""
+  ).join("\n");
+}
 var AiCalls = class {
   constructor(options) {
     this.options = options;
@@ -36994,6 +37762,11 @@ var AiCalls = class {
     const log = () => started ? this.options.exchanges() : void 0;
     const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto7.randomUUID)();
     const milestones = {};
+    const startedMs = Date.now();
+    let reportedUsage;
+    let reply;
+    let sentText = "";
+    let provider;
     let milestonesWritten = false;
     const writeMilestones = () => {
       var _a3, _b3;
@@ -37035,21 +37808,29 @@ var AiCalls = class {
       });
       if (started) (_c = options.onBegin) == null ? void 0 : _c.call(options, id);
       const runtime = this.options.runtimeFor(options.model);
+      provider = runtime.capabilities.id;
       (_d = options.validate) == null ? void 0 : _d.call(options, runtime);
       const task = (_e = options.task) != null ? _e : {};
       const controls = {
         ...task,
         signal: controller.signal,
-        ...options.milestones === false ? {} : {
+        // Needed by the usage record even when no milestones event is written (`milestones: false`).
+        ...options.milestones === false && !this.options.usage ? {} : {
           onMilestones: (data) => {
-            var _a3;
+            var _a3, _b3, _c2;
             (_a3 = task.onMilestones) == null ? void 0 : _a3.call(task, data);
-            Object.assign(milestones, data);
+            if (data.usage)
+              reportedUsage = {
+                inputTokens: (_b3 = data.usage.inputTokens) != null ? _b3 : 0,
+                outputTokens: (_c2 = data.usage.outputTokens) != null ? _c2 : 0
+              };
+            if (options.milestones !== false) Object.assign(milestones, data);
           }
         },
         onRequest: (data) => {
           var _a3, _b3;
           (_a3 = task.onRequest) == null ? void 0 : _a3.call(task, data);
+          sentText += promptTextOf(data);
           (_b3 = log()) == null ? void 0 : _b3.sent(
             id,
             JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
@@ -37065,6 +37846,7 @@ var AiCalls = class {
         controls,
         localCodex: options.localCodex
       });
+      reply = raw;
       if (controller.signal.aborted) throw stopped();
       (_f = options.afterReply) == null ? void 0 : _f.call(options);
       milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -37084,8 +37866,35 @@ var AiCalls = class {
         );
       throw error;
     } finally {
+      this.recordUsage(sentText, options, provider, reportedUsage, reply, startedMs);
       options.signal.removeEventListener("abort", abort);
       if (this.activeTasks.get(key2) === controller) this.activeTasks.delete(key2);
+    }
+  }
+  /** Records one call in the usage store (once, success or failure). Counting is best effort and never changes the call's result. */
+  recordUsage(prompt, options, provider, reported, reply, startedMs) {
+    var _a2, _b2, _c, _d, _e, _f;
+    try {
+      const store = (_b2 = (_a2 = this.options).usage) == null ? void 0 : _b2.call(_a2);
+      if (!store || !provider) return;
+      const imageReply = !!((_c = options.task) == null ? void 0 : _c.generateImage) || (reply != null ? reply : "").startsWith("data:");
+      const tokens2 = reported != null ? reported : provider === "codex" && (prompt || reply) ? {
+        inputTokens: estimateUsageTokens(prompt),
+        outputTokens: imageReply ? 0 : estimateUsageTokens(reply != null ? reply : "")
+      } : void 0;
+      if (!tokens2 || tokens2.inputTokens === 0 && tokens2.outputTokens === 0) return;
+      store.record({
+        action: (_e = (_d = options.usage) == null ? void 0 : _d.action) != null ? _e : "other",
+        ...((_f = options.usage) == null ? void 0 : _f.mapPath) ? { mapPath: options.usage.mapPath } : {},
+        ...options.topic ? { topic: options.topic } : {},
+        provider,
+        model: options.model,
+        ...tokens2,
+        estimated: !reported,
+        durationMs: Date.now() - startedMs
+      });
+    } catch (error) {
+      console.warn("Visual Agent Map token usage", error);
     }
   }
 };
@@ -37233,7 +38042,7 @@ var CodexAppServerRuntime = class {
     return [...new Map(models.map((model) => [model.model, model])).values()];
   }
   async runTask(prompt, model, effort, outputSchema, controls) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
     if ((_a2 = controls == null ? void 0 : controls.signal) == null ? void 0 : _a2.aborted) throw cancelledError();
     await this.start();
     if ((_b2 = controls == null ? void 0 : controls.signal) == null ? void 0 : _b2.aborted) throw cancelledError();
@@ -37384,10 +38193,14 @@ var CodexAppServerRuntime = class {
     } finally {
       (_o = controls == null ? void 0 : controls.signal) == null ? void 0 : _o.removeEventListener("abort", onAbort);
       try {
+        if (state.usage) (_p = controls == null ? void 0 : controls.onMilestones) == null ? void 0 : _p.call(controls, { usage: state.usage });
+      } catch (e) {
+      }
+      try {
         await this.request("thread/unsubscribe", { threadId }, 5e3);
       } catch (error) {
-        (_q = (_p = this.options).onLog) == null ? void 0 : _q.call(
-          _p,
+        (_r = (_q = this.options).onLog) == null ? void 0 : _r.call(
+          _q,
           "warn",
           t("log.codex_unsubscribe_failed_0", error instanceof Error ? error.message : String(error))
         );
@@ -37465,7 +38278,7 @@ var CodexAppServerRuntime = class {
     }
   }
   handle(message) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if ("id" in message && "method" in message) {
       this.respondToServerRequest(message);
       return;
@@ -37499,6 +38312,12 @@ var CodexAppServerRuntime = class {
       (_b2 = state.onText) == null ? void 0 : _b2.call(state, [...state.visibleMessages.values()].join("\n\n"));
       return;
     }
+    if (message.method === "thread/tokenUsage/updated") {
+      const total2 = (_c = params == null ? void 0 : params.tokenUsage) == null ? void 0 : _c.total;
+      if (typeof (total2 == null ? void 0 : total2.inputTokens) === "number" && typeof total2.outputTokens === "number")
+        state.usage = { inputTokens: total2.inputTokens, outputTokens: total2.outputTokens };
+      return;
+    }
     if (message.method === "item/started") {
       const item = params == null ? void 0 : params.item;
       if ((item == null ? void 0 : item.type) === "webSearch") {
@@ -37515,7 +38334,7 @@ var CodexAppServerRuntime = class {
       }
       if ((item == null ? void 0 : item.type) === "webSearch")
         state.webRetrievals.add(typeof item.id === "string" ? item.id : `web-${state.webRetrievals.size}`);
-      if ((item == null ? void 0 : item.type) === "webSearch" && ((_c = item.action) == null ? void 0 : _c.type) === "search") {
+      if ((item == null ? void 0 : item.type) === "webSearch" && ((_d = item.action) == null ? void 0 : _d.type) === "search") {
         const id = typeof item.id === "string" ? item.id : void 0;
         if (!id || !state.countedSearchIds.has(id)) {
           if (id) state.countedSearchIds.add(id);
@@ -37532,10 +38351,10 @@ var CodexAppServerRuntime = class {
         };
       }
       if ((item == null ? void 0 : item.type) === "agentMessage" && typeof item.text === "string") {
-        const id = typeof item.id === "string" ? item.id : (_d = state.streamItem) != null ? _d : `message-${state.messages.length}`;
+        const id = typeof item.id === "string" ? item.id : (_e = state.streamItem) != null ? _e : `message-${state.messages.length}`;
         state.visibleMessages.set(id, item.text);
         state.messages.push(item.text);
-        (_e = state.onText) == null ? void 0 : _e.call(state, [...state.visibleMessages.values()].join("\n\n"));
+        (_f = state.onText) == null ? void 0 : _f.call(state, [...state.visibleMessages.values()].join("\n\n"));
       }
       return;
     }
@@ -37556,7 +38375,7 @@ var CodexAppServerRuntime = class {
           );
       } else if ((turn == null ? void 0 : turn.status) === "completed")
         state.resolve(
-          state.onText && !state.resolveLast ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "" : ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || ""
+          state.onText && !state.resolveLast ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || "" : ((_h = state.messages.at(-1)) == null ? void 0 : _h.trim()) || ""
         );
       else state.reject(new Error(codexTurnFailureMessage(turn)));
     }
@@ -37838,12 +38657,17 @@ var ClaudeTranscriptFacts = class {
     this.structured = true;
   }
   read(item) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     if (!item || typeof item !== "object") return;
     const record = item;
     if (record.type === "result") {
-      const input2 = (_a2 = record.usage) == null ? void 0 : _a2.input_tokens;
-      const output = (_b2 = record.usage) == null ? void 0 : _b2.output_tokens;
+      const parts = [
+        (_a2 = record.usage) == null ? void 0 : _a2.input_tokens,
+        (_b2 = record.usage) == null ? void 0 : _b2.cache_creation_input_tokens,
+        (_c = record.usage) == null ? void 0 : _c.cache_read_input_tokens
+      ].filter((value) => typeof value === "number");
+      const input2 = parts.length ? parts.reduce((total2, value) => total2 + value, 0) : void 0;
+      const output = (_d = record.usage) == null ? void 0 : _d.output_tokens;
       if (typeof input2 === "number" || typeof output === "number")
         this.usage = {
           ...typeof input2 === "number" ? { inputTokens: input2 } : {},
@@ -37853,13 +38677,13 @@ var ClaudeTranscriptFacts = class {
     }
     if (record.parent_tool_use_id) return;
     if (record.type === "assistant") {
-      for (const block of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : []) {
+      for (const block of (_f = (_e = record.message) == null ? void 0 : _e.content) != null ? _f : []) {
         if (block.type === "tool_use" && block.name === "StructuredOutput") this.structured = true;
         else if (!this.fromStream && block.type === "text" && !this.structured && typeof block.text === "string") {
           this.texts.push(block.text.slice(0, TEXT_KEEP_CHARS));
         }
       }
-    } else if (record.type === "user" && JSON.stringify((_e = record.message) != null ? _e : "").includes("structured-output-enforce"))
+    } else if (record.type === "user" && JSON.stringify((_g = record.message) != null ? _g : "").includes("structured-output-enforce"))
       this.enforce = true;
   }
   /** A record was lost (an unreadable line): what came before a tool call can no longer be claimed either way. */
@@ -37867,7 +38691,7 @@ var ClaudeTranscriptFacts = class {
     this.incomplete = true;
   }
   milestones() {
-    const chars = this.texts.reduce((sum, text11) => sum + text11.trim().length, 0);
+    const chars = this.texts.reduce((sum2, text11) => sum2 + text11.trim().length, 0);
     return {
       ...this.usage ? { usage: this.usage } : {},
       ...this.structured && !this.incomplete ? {
@@ -39316,9 +40140,9 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
   if (strictGapAudit && (!["user_condition", "external_evidence"].includes(parsed.summary) || !parsed.detail.trim() || !Array.isArray(parsed.suggestions) || parsed.suggestions.length !== 0 || !Array.isArray(parsed.visualReferences) || parsed.visualReferences.length !== 0)) {
     throw new Error("AIM research-gap audit returned an invalid structured classification.");
   }
-  const isRecord4 = (value) => typeof value === "object" && value !== null;
+  const isRecord5 = (value) => typeof value === "object" && value !== null;
   const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(
-    (item) => isRecord4(item) && typeof item.title === "string" && typeof item.task === "string"
+    (item) => isRecord5(item) && typeof item.title === "string" && typeof item.task === "string"
   ).map((item) => ({
     title: String(item.title).trim(),
     task: String(item.task).trim(),
@@ -39326,7 +40150,7 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
     parentTitle: typeof item.parentTitle === "string" ? item.parentTitle.trim() : ""
   })).filter((item) => item.title) : [];
   const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter(
-    (item) => isRecord4(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
+    (item) => isRecord5(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
   ).map((item) => ({
     title: typeof item.title === "string" ? item.title.trim() : translateNote(language2, "note.visual_reference"),
     imageUrl: String(item.imageUrl).trim(),
@@ -39443,6 +40267,12 @@ var realClock2 = {
   setTimeout: (callback, ms) => window.setTimeout(callback, ms),
   clearTimeout: (handle) => window.clearTimeout(handle)
 };
+function usageActionOf(context, role) {
+  if (role !== void 0 || context.countRepair || context.promptProfile === "aim") return "other";
+  if (context.mode === "decompose") return "expand";
+  if (context.mode === "synthesize" || context.mode === "merge") return "synthesize";
+  return "research";
+}
 var AiTaskService = class {
   constructor(options) {
     this.options = options;
@@ -39536,34 +40366,38 @@ var AiTaskService = class {
         }
       };
       const calls = this.callsIn(pluginDirectory, exchanges);
-      const sendOnce = async (setup) => {
+      const sendOnce = async (setup) => ({ raw: await sendRaw(setup) });
+      const sendRaw = async (setup) => {
         var _a3, _b3, _c2;
-        return {
-          raw: await calls.run(
-            step,
-            {
-              model,
-              effort,
-              topic: context.title,
-              mode: (_a3 = context.mode) != null ? _a3 : "task",
-              taskName: "ai-task",
-              signal: (_c2 = (_b3 = setup == null ? void 0 : setup.signal) != null ? _b3 : signal) != null ? _c2 : new AbortController().signal,
-              localCodex: context.researchMode === "local",
-              requestLog: "request",
-              // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
-              entryEnd: "caller",
-              stopped: cancelled,
-              task: { ...controls, onWebSearchEvent: webHook, ...setup ? setup.hooks : {} },
-              ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply } : {},
-              onBegin: (id) => {
-                exchangeId = id;
-                setup == null ? void 0 : setup.onExchange(id);
-                onExchange == null ? void 0 : onExchange(id);
-              }
+        return calls.run(
+          step,
+          {
+            model,
+            effort,
+            topic: context.title,
+            mode: (_a3 = context.mode) != null ? _a3 : "task",
+            taskName: "ai-task",
+            signal: (_c2 = (_b3 = setup == null ? void 0 : setup.signal) != null ? _b3 : signal) != null ? _c2 : new AbortController().signal,
+            localCodex: context.researchMode === "local",
+            usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
+            requestLog: "request",
+            // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
+            entryEnd: "caller",
+            stopped: cancelled,
+            task: {
+              ...controls,
+              onWebSearchEvent: webHook,
+              ...setup ? setup.hooks : {}
             },
-            (raw2) => raw2
-          )
-        };
+            ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply } : {},
+            onBegin: (id) => {
+              exchangeId = id;
+              setup == null ? void 0 : setup.onExchange(id);
+              onExchange == null ? void 0 : onExchange(id);
+            }
+          },
+          (raw2) => raw2
+        );
       };
       let raw = "";
       for (let attempt = 1; ; attempt++) {
@@ -39658,8 +40492,8 @@ var AiTaskService = class {
    */
   async sendObserved(observer, taskSignal, accepted, send) {
     var _a2;
-    const clock = (_a2 = this.options.clock) != null ? _a2 : realClock2;
-    const iso = () => new Date(clock.now()).toISOString();
+    const clock2 = (_a2 = this.options.clock) != null ? _a2 : realClock2;
+    const iso = () => new Date(clock2.now()).toISOString();
     const safe = (callback) => {
       try {
         callback();
@@ -39684,7 +40518,7 @@ var AiTaskService = class {
       const live = () => !controller.signal.aborted && !resendRequested;
       const disarm = () => {
         if (timer === void 0) return;
-        clock.clearTimeout(timer);
+        clock2.clearTimeout(timer);
         timer = void 0;
       };
       const resend = () => {
@@ -39698,7 +40532,7 @@ var AiTaskService = class {
       const arm = () => {
         disarm();
         if (!watching || firstEvent || !live()) return;
-        timer = clock.setTimeout(() => {
+        timer = clock2.setTimeout(() => {
           timer = void 0;
           if (firstEvent || !live()) return;
           extra.slowShownAt = iso();
@@ -39857,6 +40691,7 @@ var AiTaskService = class {
         claude: () => this.options.claudeRuntime(pluginDirectory),
         codex: (local) => this.options.codexRuntime(pluginDirectory, local)
       }),
+      ...this.options.usage ? { usage: this.options.usage } : {},
       exchanges: () => exchanges && this.options.exchangeLoggingEnabled() ? exchanges : null
     });
   }
@@ -39935,6 +40770,7 @@ var AiTaskService = class {
           taskName: "chart",
           signal: signal != null ? signal : new AbortController().signal,
           localCodex: true,
+          usage: { action: "other", mapPath: input2.usageMapPath },
           requestLog: "request",
           stopped: () => new DOMException("Aborted", "AbortError"),
           failMessage: (error) => aborted2(error) ? error instanceof Error ? error.message : String(error) : notAdded(codeOf(error)),
@@ -39992,6 +40828,7 @@ var AiTaskService = class {
             researchDepth: "fast",
             visualMode: "off",
             intermediateDetail: true,
+            ...context.usageMapPath ? { usageMapPath: context.usageMapPath } : {},
             // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
             ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
           },
@@ -40013,7 +40850,7 @@ ${value}`).join("\n\n");
         (_c = context.onProgress) == null ? void 0 : _c.call(context, "");
         return joined;
       }
-      if (joined.length >= working.reduce((sum, value) => sum + value.length, 0)) {
+      if (joined.length >= working.reduce((sum2, value) => sum2 + value.length, 0)) {
         throw new Error(t("ui.reference_processing_could_not_reduce"));
       }
       working = findings;
@@ -41333,7 +42170,7 @@ var RELATION_KIND_RECORD = {
   prerequisite: true
 };
 var RELATION_KINDS = Object.keys(RELATION_KIND_RECORD);
-var isRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isRecord4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var own = (record, key2) => Object.prototype.hasOwnProperty.call(record, key2) ? record[key2] : void 0;
 var fail = (reason) => ({ ok: false, reason });
 var startsWithFrontmatter = (body) => /^---[ \t]*(?:\r?\n|$)/.test(body.replace(/^\uFEFF/, ""));
@@ -41347,7 +42184,7 @@ function parseClipboard(raw) {
     } catch (e) {
       return fail("bad-json");
     }
-    if (!isRecord2(data) || own(data, "format") !== CLIPBOARD_FORMAT) return fail("not-vam");
+    if (!isRecord4(data) || own(data, "format") !== CLIPBOARD_FORMAT) return fail("not-vam");
     if (own(data, "version") !== CLIPBOARD_VERSION) return fail("version");
     const clipId = own(data, "clipId");
     if (typeof clipId !== "string" || !CLIP_ID.test(clipId)) return fail("bad-clip-id");
@@ -41357,7 +42194,7 @@ function parseClipboard(raw) {
     const nodes = [];
     const seen = /* @__PURE__ */ new Set();
     for (const item of rawNodes) {
-      if (!isRecord2(item)) return fail("bad-nodes");
+      if (!isRecord4(item)) return fail("bad-nodes");
       const id = own(item, "id");
       if (typeof id !== "string" || !NODE_ID.test(id) || seen.has(id)) return fail("bad-id");
       const parent = own(item, "parent");
@@ -41390,7 +42227,7 @@ function parseClipboard(raw) {
     const pairs = /* @__PURE__ */ new Set();
     let droppedRelations = 0;
     for (const item of list) {
-      if (!isRecord2(item)) {
+      if (!isRecord4(item)) {
         droppedRelations++;
         continue;
       }
@@ -41870,7 +42707,7 @@ function sameApartFromStamps(a, b) {
 }
 
 // experiences/visual-map/outline-import-modal.ts
-var import_obsidian24 = require("obsidian");
+var import_obsidian25 = require("obsidian");
 
 // experiences/visual-map/research-fields.ts
 var AI_MODES = ["quick", "standard"];
@@ -42096,7 +42933,7 @@ var messageOf = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 };
-var OutlineImportModal = class extends import_obsidian24.Modal {
+var OutlineImportModal = class extends import_obsidian25.Modal {
   constructor(app, create, models = { list: () => [], watch: () => () => {
   } }, target = { map: "none" }, initialPlacement = "tree", generator, links = {}, defaultModelLabel) {
     super(app);
@@ -42150,7 +42987,7 @@ var OutlineImportModal = class extends import_obsidian24.Modal {
     sourceHeader.createSpan({ text: t("ui.outline_import_text_label"), cls: "vam-outline-label" });
     const actions = sourceHeader.createDiv("vam-outline-actions");
     actions.createEl("button", { text: t("ui.outline_import_copy_format"), cls: "vam-outline-link" }).addEventListener("click", () => {
-      void navigator.clipboard.writeText(t("ui.outline_import_format")).then(() => new import_obsidian24.Notice(t("ui.outline_import_format_copied"))).catch(() => new import_obsidian24.Notice(t("ui.outline_import_copy_failed")));
+      void navigator.clipboard.writeText(t("ui.outline_import_format")).then(() => new import_obsidian25.Notice(t("ui.outline_import_format_copied"))).catch(() => new import_obsidian25.Notice(t("ui.outline_import_copy_failed")));
     });
     this.textarea = source.createEl("textarea", { cls: "vam-task-input vam-outline-text" });
     this.textarea.rows = 8;
@@ -42510,7 +43347,7 @@ var OutlineImportModal = class extends import_obsidian24.Modal {
 };
 
 // experiences/visual-map/outline-exchange-io.ts
-var import_obsidian25 = require("obsidian");
+var import_obsidian26 = require("obsidian");
 
 // experiences/visual-map/outline-exchange.ts
 var EXCHANGE_MAX_BYTES = 5 * 1024 * 1024;
@@ -42958,7 +43795,7 @@ function exchangeRefusal(reason, line) {
 }
 async function importExchangeFile(host, file) {
   const refuse = (why) => {
-    new import_obsidian25.Notice(t("ui.exchange_refused", file.name, why));
+    new import_obsidian26.Notice(t("ui.exchange_refused", file.name, why));
     return false;
   };
   if (file.size > EXCHANGE_MAX_BYTES) return refuse(exchangeRefusal("too-large"));
@@ -42973,7 +43810,7 @@ async function importExchangeFile(host, file) {
   try {
     await host.importOutline({ nodes: parsed.nodes, source: { file: file.name }, shallowResearch: false });
   } catch (error) {
-    new import_obsidian25.Notice(messageOf2(error));
+    new import_obsidian26.Notice(messageOf2(error));
     return false;
   }
   return true;
@@ -42983,7 +43820,7 @@ function chooseAndImportExchange(host) {
   input2.addEventListener("change", () => {
     var _a2;
     const file = (_a2 = input2.files) == null ? void 0 : _a2[0];
-    if (file) void importExchangeFile(host, file).catch((error) => new import_obsidian25.Notice(messageOf2(error)));
+    if (file) void importExchangeFile(host, file).catch((error) => new import_obsidian26.Notice(messageOf2(error)));
   });
   input2.click();
 }
@@ -43018,17 +43855,17 @@ async function exportMapExchange(vault, request) {
 async function exportMapWithNotice(vault, request) {
   try {
     const path = await exportMapExchange(vault, request);
-    new import_obsidian25.Notice(t("ui.exchange_exported", path));
+    new import_obsidian26.Notice(t("ui.exchange_exported", path));
     return path;
   } catch (error) {
-    new import_obsidian25.Notice(t("ui.exchange_export_failed", messageOf2(error)));
+    new import_obsidian26.Notice(t("ui.exchange_export_failed", messageOf2(error)));
     return null;
   }
 }
 
 // experiences/visual-map/multi-research-modal.ts
-var import_obsidian26 = require("obsidian");
-var MultiResearchModal = class extends import_obsidian26.Modal {
+var import_obsidian27 = require("obsidian");
+var MultiResearchModal = class extends import_obsidian27.Modal {
   constructor(app, names3, models, submit, links = {}, modes = []) {
     super(app);
     this.names = names3;
@@ -43093,227 +43930,14 @@ var MultiResearchModal = class extends import_obsidian26.Modal {
 };
 
 // experiences/visual-map/structure-review-modal.ts
-var import_obsidian29 = require("obsidian");
+var import_obsidian30 = require("obsidian");
 
 // experiences/visual-map/modals.ts
+var import_obsidian29 = require("obsidian");
+
+// ui/modals/debug-log-modal.ts
 var import_obsidian28 = require("obsidian");
-
-// ui/modals/debug-log-modal.ts
-var import_obsidian27 = require("obsidian");
-
-// store-adapter.ts
-async function readStoreText(adapter, path) {
-  if (await adapter.exists(path)) return adapter.read(path);
-  const temporary = `${path}.tmp`;
-  if (!await adapter.exists(temporary)) return null;
-  const text11 = await adapter.read(temporary);
-  await adapter.rename(temporary, path);
-  return text11;
-}
-async function writeStoreAtomically(adapter, path, text11) {
-  const temporary = `${path}.tmp`;
-  await adapter.write(temporary, text11);
-  if (await adapter.exists(path)) await adapter.remove(path);
-  await adapter.rename(temporary, path);
-}
-
-// ai-exchange-log.ts
-function isRecord3(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function isUnknownArray(value) {
-  return Array.isArray(value);
-}
-function formatElapsed(durationMs) {
-  if (durationMs < 1e3) return `${durationMs} ms`;
-  if (durationMs < 6e4) return `${(durationMs / 1e3).toFixed(1)} s`;
-  const minutes = Math.floor(durationMs / 6e4);
-  const seconds = Math.floor(durationMs % 6e4 / 1e3);
-  return `${minutes}m ${seconds}s`;
-}
-function promptMetrics(entry) {
-  var _a2, _b2, _c, _d, _e;
-  let prompt = typeof entry.prompt === "string" ? entry.prompt : "";
-  if (!prompt && entry.request) {
-    try {
-      const parsed = JSON.parse(entry.request);
-      const parsedRecord = isRecord3(parsed) ? parsed : void 0;
-      const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
-      const request = isRecord3(requestValue) ? requestValue : void 0;
-      if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
-      else if (request && isUnknownArray(request.input)) {
-        prompt = request.input.map((item) => isRecord3(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
-      }
-    } catch (e) {
-    }
-  }
-  const characters = Array.from(prompt).length;
-  const nonAscii = Array.from(prompt).filter((character) => character.charCodeAt(0) > 127).length;
-  const phase = (_c = (_b2 = upgradeLegacyAimText(prompt).match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _b2[1]) != null ? _c : entry.mode;
-  const repairReason = /repair/i.test(phase) ? (_e = (_d = prompt.match(/(?:Format validation error|Repair reason):\s*([^\r\n]+)/i)) == null ? void 0 : _d[1]) == null ? void 0 : _e.trim() : void 0;
-  return {
-    prompt,
-    phase,
-    ...repairReason ? { repairReason } : {},
-    characters,
-    estimatedTokens: Math.ceil((characters - nonAscii) / 4 + nonAscii)
-  };
-}
-function formatAiExchange(entry) {
-  var _a2, _b2;
-  const metrics = promptMetrics(entry);
-  const step = entry.step ? ` \xB7 step: ${entry.step}` : "";
-  const timing = `Request ID: ${entry.id}${step} \xB7 phase: ${metrics.phase} \xB7 prompt: ${metrics.characters} characters \xB7 approximately ${metrics.estimatedTokens} tokens (estimate, not billed usage) \xB7 sent: ${(_a2 = entry.sentAt) != null ? _a2 : "unavailable"} \xB7 completed: ${(_b2 = entry.completedAt) != null ? _b2 : "unavailable"} \xB7 elapsed: ${entry.durationMs === void 0 ? "unavailable" : formatElapsed(entry.durationMs)}`;
-  const milestones = entry.milestones ? `milestones: ${JSON.stringify(entry.milestones)}` : "";
-  return [
-    `[${entry.startedAt}] ${entry.topic} \xB7 ${entry.mode} \xB7 ${entry.model}/${entry.effort} \xB7 ${entry.status}`,
-    ...milestones ? [timing, milestones] : [timing],
-    `
-${t("log.exchange_full_prompt")}
-`,
-    metrics.prompt || t("log.exchange_legacy_prompt_missing"),
-    `
-${t("log.exchange_request")}
-`,
-    entry.request || t("log.exchange_not_sent"),
-    `
-${t("log.exchange_raw_reply")}
-`,
-    entry.response || t("log.exchange_none"),
-    `
-${t("log.exchange_error")}
-`,
-    entry.error || t("log.exchange_none")
-  ].join("\n");
-}
-var AiExchangeLog = class {
-  constructor(adapter, path, onError, limit = 1e3) {
-    this.adapter = adapter;
-    this.path = path;
-    this.onError = onError;
-    this.limit = limit;
-    __publicField(this, "entries", []);
-    __publicField(this, "loadError", null);
-    __publicField(this, "listeners", /* @__PURE__ */ new Set());
-    __publicField(this, "writes", Promise.resolve());
-  }
-  async load() {
-    try {
-      const text11 = await readStoreText(this.adapter, this.path);
-      if (text11 === null) return;
-      const parsed = JSON.parse(text11);
-      if (!Array.isArray(parsed)) throw new Error(t("error.exchange_log_invalid"));
-      const entries = parsed.filter((item) => {
-        if (!item || typeof item !== "object") return false;
-        const entry = item;
-        return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
-          (key2) => typeof entry[key2] === "string"
-        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord3(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
-      });
-      if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
-      this.entries = entries.slice(-this.limit);
-      this.loadError = null;
-      this.emit();
-    } catch (error) {
-      this.loadError = error;
-      this.onError(error);
-    }
-  }
-  getEntries() {
-    return this.entries.map((entry) => ({ ...entry }));
-  }
-  subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-  begin(entry) {
-    this.entries.push({ ...entry, request: "", response: "", status: "preparing", error: "" });
-    this.entries = this.entries.slice(-this.limit);
-    this.changed();
-  }
-  sent(id, request, prompt) {
-    const entry = this.entries.find((item) => item.id === id);
-    if (entry == null ? void 0 : entry.request) {
-      const sentAt = (/* @__PURE__ */ new Date()).toISOString();
-      const followupId = `${id}-${Date.now()}-${this.entries.length}`;
-      this.entries.push({
-        id: followupId,
-        startedAt: sentAt,
-        topic: entry.topic,
-        mode: "steer",
-        model: entry.model,
-        effort: entry.effort,
-        request,
-        sentAt,
-        response: "",
-        status: "sent",
-        error: ""
-      });
-      this.entries = this.entries.slice(-this.limit);
-      this.changed();
-      return;
-    }
-    this.update(id, {
-      request,
-      ...prompt !== void 0 ? { prompt } : {},
-      sentAt: (/* @__PURE__ */ new Date()).toISOString(),
-      status: "sent"
-    });
-  }
-  received(id, response) {
-    this.update(id, { response, status: "received" });
-  }
-  /** Stores the call's milestones; the provider writes them once, when the call ends. */
-  milestones(id, data) {
-    this.update(id, { milestones: data });
-  }
-  parsed(id) {
-    this.finish(id, { status: "parsed" });
-  }
-  completed(id) {
-    this.finish(id, { status: "completed" });
-  }
-  failed(id, error) {
-    this.finish(id, { error, status: "failed" });
-  }
-  clear() {
-    this.entries = [];
-    this.changed();
-  }
-  async flush() {
-    await this.writes;
-  }
-  update(id, patch) {
-    const entry = this.entries.find((item) => item.id === id);
-    if (!entry) return;
-    Object.assign(entry, patch);
-    this.changed();
-  }
-  finish(id, patch) {
-    var _a2;
-    const entry = this.entries.find((item) => item.id === id);
-    if (!entry) return;
-    const completedAt = (/* @__PURE__ */ new Date()).toISOString();
-    const start = (_a2 = entry.sentAt) != null ? _a2 : entry.startedAt;
-    const durationMs = Math.max(0, Date.parse(completedAt) - Date.parse(start));
-    this.update(id, { ...patch, completedAt, durationMs });
-  }
-  emit() {
-    for (const listener of this.listeners) listener();
-  }
-  changed() {
-    this.emit();
-    if (this.loadError) {
-      this.onError(this.loadError);
-      return;
-    }
-    const snapshot = JSON.stringify(this.entries);
-    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).catch(this.onError);
-  }
-};
-
-// ui/modals/debug-log-modal.ts
-var DebugLogModal = class extends import_obsidian27.Modal {
+var DebugLogModal = class extends import_obsidian28.Modal {
   constructor(app, logs, exchanges, exchangeEnabled, setExchangeEnabled) {
     super(app);
     this.logs = logs;
@@ -43337,20 +43961,20 @@ var DebugLogModal = class extends import_obsidian27.Modal {
       cls: "vam-modal-intro",
       text: t("ui.logs_are_kept_in_memory_only_and_disappear_when_the_plugin_r")
     });
-    const actions = new import_obsidian27.Setting(this.contentEl);
+    const actions = new import_obsidian28.Setting(this.contentEl);
     actions.addButton((button) => button.setButtonText(t("ui.refresh_logs")).onClick(() => this.renderLogs()));
     actions.addButton(
       (button) => button.setButtonText(t("ui.copy_logs")).setCta().onClick(async () => {
         const text11 = formatDebugLogs(this.logs.getLogs());
         if (!text11) {
-          new import_obsidian27.Notice(t("ui.there_are_no_debug_logs_yet"));
+          new import_obsidian28.Notice(t("ui.there_are_no_debug_logs_yet"));
           return;
         }
         try {
           await navigator.clipboard.writeText(text11);
-          new import_obsidian27.Notice(t("ui.debug_log_copied"));
+          new import_obsidian28.Notice(t("ui.debug_log_copied"));
         } catch (e) {
-          new import_obsidian27.Notice(t("ui.unable_to_copy_the_debug_log"));
+          new import_obsidian28.Notice(t("ui.unable_to_copy_the_debug_log"));
         }
       })
     );
@@ -43375,7 +43999,7 @@ var DebugLogModal = class extends import_obsidian27.Modal {
       cls: "vam-modal-intro",
       text: this.exchangeEnabled() ? t("ui.up_to_20_exchanges_are_stored_in_this_vault_s_plugin_folder") : t("ui.ai_exchange_recording_is_off_enable_it_in_vam_settings")
     });
-    const exchangeActions = new import_obsidian27.Setting(this.contentEl);
+    const exchangeActions = new import_obsidian28.Setting(this.contentEl);
     if (this.setExchangeEnabled)
       exchangeActions.setName(t("ui.record_ai_exchanges")).addToggle(
         (toggle) => toggle.setValue(this.exchangeEnabled()).onChange(async (value) => {
@@ -43391,9 +44015,9 @@ var DebugLogModal = class extends import_obsidian27.Modal {
           await navigator.clipboard.writeText(
             ((_b3 = (_a3 = this.exchanges) == null ? void 0 : _a3.getEntries()) != null ? _b3 : []).map(formatAiExchange).join("\n\n---\n\n")
           );
-          new import_obsidian27.Notice(t("ui.ai_exchange_copied"));
+          new import_obsidian28.Notice(t("ui.ai_exchange_copied"));
         } catch (e) {
-          new import_obsidian27.Notice(t("ui.unable_to_copy_the_ai_exchange"));
+          new import_obsidian28.Notice(t("ui.unable_to_copy_the_ai_exchange"));
         }
       })
     );
@@ -43411,8 +44035,8 @@ var DebugLogModal = class extends import_obsidian27.Modal {
       text: t(
         "ui.prompt_monitor_totals",
         sent.length,
-        metrics.reduce((sum, entry) => sum + entry.characters, 0),
-        metrics.reduce((sum, entry) => sum + entry.estimatedTokens, 0)
+        metrics.reduce((sum2, entry) => sum2 + entry.characters, 0),
+        metrics.reduce((sum2, entry) => sum2 + entry.estimatedTokens, 0)
       )
     });
     if (!exchanges.length)
@@ -43440,7 +44064,7 @@ var DebugLogModal = class extends import_obsidian27.Modal {
       if (exchange.error) item.createEl("pre", { text: `${t("ui.error")}: ${exchange.error}` });
       const copy = item.createEl("button", { text: t("ui.copy_this_exchange") });
       copy.addEventListener("click", () => {
-        void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new import_obsidian27.Notice(t("ui.ai_exchange_copied"))).catch(() => new import_obsidian27.Notice(t("ui.unable_to_copy_the_ai_exchange")));
+        void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new import_obsidian28.Notice(t("ui.ai_exchange_copied"))).catch(() => new import_obsidian28.Notice(t("ui.unable_to_copy_the_ai_exchange")));
       });
     }
   }
@@ -43534,7 +44158,7 @@ function reasoningLabel(level) {
 }
 var PartialChildBatchError = class extends Error {
 };
-var NextStepModal = class extends import_obsidian28.Modal {
+var NextStepModal = class extends import_obsidian29.Modal {
   constructor(app, topic, childrenCount, pendingCount, plugin, research, expand, synthesize, modelSettings, selectionFlow) {
     super(app);
     this.topic = topic;
@@ -43975,7 +44599,7 @@ var NextStepModal = class extends import_obsidian28.Modal {
         direction,
         (message) => {
           if (this.closed) {
-            new import_obsidian28.Notice(message);
+            new import_obsidian29.Notice(message);
             return;
           }
           settle();
@@ -44000,7 +44624,7 @@ var NextStepModal = class extends import_obsidian28.Modal {
     button.disabled = false;
   }
   startedInBackground() {
-    new import_obsidian28.Notice(t("ui.task_started_in_background_0", this.topic));
+    new import_obsidian29.Notice(t("ui.task_started_in_background_0", this.topic));
     this.close();
   }
   failedAi(panel, button, message) {
@@ -44066,7 +44690,7 @@ var NextStepModal = class extends import_obsidian28.Modal {
                 return;
               }
               consumed();
-              new import_obsidian28.Notice(t("ui.subtopics_created"));
+              new import_obsidian29.Notice(t("ui.subtopics_created"));
               this.taskSignal = void 0;
               this.taskController = void 0;
               this.close();
@@ -44131,7 +44755,7 @@ var NextStepModal = class extends import_obsidian28.Modal {
             this.startedInBackground();
             return;
           }
-          new import_obsidian28.Notice(t("ui.subtopics_created"));
+          new import_obsidian29.Notice(t("ui.subtopics_created"));
           this.close();
         },
         false
@@ -44309,7 +44933,7 @@ var NextStepModal = class extends import_obsidian28.Modal {
           },
           (message) => {
             if (this.closed) {
-              new import_obsidian28.Notice(message);
+              new import_obsidian29.Notice(message);
               return;
             }
             release2();
@@ -44433,7 +45057,7 @@ var NextStepModal = class extends import_obsidian28.Modal {
             },
             (message, retryable) => {
               if (this.closed) {
-                new import_obsidian28.Notice(message);
+                new import_obsidian29.Notice(message);
                 return;
               }
               consumed();
@@ -44934,7 +45558,7 @@ var DraftReviewView = class {
     this.confirm = confirm;
     this.discard = discard;
     this.close = close;
-    __publicField(this, "renderer", new import_obsidian28.Component());
+    __publicField(this, "renderer", new import_obsidian29.Component());
     __publicField(this, "disarm");
     __publicField(this, "intro");
   }
@@ -44975,7 +45599,7 @@ var DraftReviewView = class {
       const state = (_a3 = generations.get(target)) != null ? _a3 : { count: 0 };
       const generation = ++state.count;
       if (state.child) this.renderer.removeChild(state.child);
-      const child = this.renderer.addChild(new import_obsidian28.Component());
+      const child = this.renderer.addChild(new import_obsidian29.Component());
       state.child = child;
       generations.set(target, state);
       target.empty();
@@ -44985,7 +45609,7 @@ var DraftReviewView = class {
         target.setText(markdown);
       };
       try {
-        void import_obsidian28.MarkdownRenderer.render(this.app, markdown, target, (_b2 = this.review.sourcePath) != null ? _b2 : "", child).catch(fallback);
+        void import_obsidian29.MarkdownRenderer.render(this.app, markdown, target, (_b2 = this.review.sourcePath) != null ? _b2 : "", child).catch(fallback);
       } catch (e) {
         fallback();
       }
@@ -45045,7 +45669,7 @@ var DraftReviewView = class {
     this.renderer.unload();
   }
 };
-var DraftReviewModal = class extends import_obsidian28.Modal {
+var DraftReviewModal = class extends import_obsidian29.Modal {
   constructor(app, summary, detail, review, confirm, discard) {
     super(app);
     __publicField(this, "view");
@@ -45064,7 +45688,7 @@ var DraftReviewModal = class extends import_obsidian28.Modal {
     this.contentEl.empty();
   }
 };
-var ChildProposalModal = class extends import_obsidian28.Modal {
+var ChildProposalModal = class extends import_obsidian29.Modal {
   constructor(app, suggestions, submit) {
     super(app);
     this.suggestions = suggestions;
@@ -45097,7 +45721,7 @@ var ChildProposalModal = class extends import_obsidian28.Modal {
     });
   }
 };
-var MapConflictModal = class extends import_obsidian28.Modal {
+var MapConflictModal = class extends import_obsidian29.Modal {
   constructor(app, local, disk, resolve) {
     super(app);
     this.local = local;
@@ -45154,7 +45778,7 @@ var MapConflictModal = class extends import_obsidian28.Modal {
     if (!this.settled) this.resolve(clone(this.disk));
   }
 };
-var NoteCollectionModal = class extends import_obsidian28.Modal {
+var NoteCollectionModal = class extends import_obsidian29.Modal {
   constructor(app, titleText, files, actions) {
     super(app);
     this.titleText = titleText;
@@ -45174,10 +45798,10 @@ var NoteCollectionModal = class extends import_obsidian28.Modal {
           action.run(file);
         });
     }
-    new import_obsidian28.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
+    new import_obsidian29.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
   }
 };
-var TopicPickerModal = class extends import_obsidian28.Modal {
+var TopicPickerModal = class extends import_obsidian29.Modal {
   constructor(app, titleText, topics, choose) {
     super(app);
     this.titleText = titleText;
@@ -45187,14 +45811,14 @@ var TopicPickerModal = class extends import_obsidian28.Modal {
   onOpen() {
     this.titleEl.setText(this.titleText);
     for (const topic of this.topics)
-      new import_obsidian28.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton(
+      new import_obsidian29.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton(
         (button) => button.setButtonText(t("ui.select")).onClick(() => {
           this.close();
           this.choose(topic);
         })
       );
     if (!this.topics.length) this.contentEl.createEl("p", { text: t("ui.no_other_topics") });
-    new import_obsidian28.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
+    new import_obsidian29.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
   }
 };
 
@@ -45209,7 +45833,7 @@ var KIND = {
   move: "move",
   merge: "merge"
 };
-var StructureReviewModal = class extends import_obsidian29.Modal {
+var StructureReviewModal = class extends import_obsidian30.Modal {
   constructor(app, host) {
     super(app);
     this.host = host;
@@ -45388,39 +46012,43 @@ var StructureReviewModal = class extends import_obsidian29.Modal {
 // core/provider-step-runner.ts
 var stepEffort = (reasoning) => reasoning === "auto" ? "low" : reasoning;
 function providerStepRunner(aiCalls, config) {
-  return (request, signal, prepared, onStructuredJson, hooks) => aiCalls.run(
-    prepared,
-    {
-      model: request.model,
-      effort: stepEffort(request.reasoning),
-      topic: config.topic(request),
-      taskName: config.name,
-      signal,
-      localCodex: true,
-      stopped: config.stopped,
-      validate: (runtime) => {
-        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
-          throw new Error("Unsupported Claude model");
+  return (request, signal, prepared, onStructuredJson, hooks) => {
+    var _a2;
+    return aiCalls.run(
+      prepared,
+      {
+        model: request.model,
+        effort: stepEffort(request.reasoning),
+        topic: config.topic(request),
+        taskName: config.name,
+        signal,
+        localCodex: true,
+        usage: { mapPath: (_a2 = config.mapPath) == null ? void 0 : _a2.call(config, request) },
+        stopped: config.stopped,
+        validate: (runtime) => {
+          if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
+            throw new Error("Unsupported Claude model");
+        },
+        task: {
+          textOnly: true,
+          searchBudget: 0,
+          ...config.stream ? { stream: true } : {},
+          ...config.lastMessageOnly ? { resolveLast: true } : {},
+          ...config.stream && onStructuredJson ? { onStructuredJson } : {},
+          ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
+          ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
+          ...(hooks == null ? void 0 : hooks.onStreamMode) ? { onStreamMode: hooks.onStreamMode } : {},
+          ...(hooks == null ? void 0 : hooks.onText) && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model) ? { onText: hooks.onText } : {}
+        }
       },
-      task: {
-        textOnly: true,
-        searchBudget: 0,
-        ...config.stream ? { stream: true } : {},
-        ...config.lastMessageOnly ? { resolveLast: true } : {},
-        ...config.stream && onStructuredJson ? { onStructuredJson } : {},
-        ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
-        ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
-        ...(hooks == null ? void 0 : hooks.onStreamMode) ? { onStreamMode: hooks.onStreamMode } : {},
-        ...(hooks == null ? void 0 : hooks.onText) && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model) ? { onText: hooks.onText } : {}
+      (raw, exchange) => {
+        if (exchange.signal.aborted) throw config.stopped();
+        prepared.parse(raw);
+        exchange.parsed();
+        return raw;
       }
-    },
-    (raw, exchange) => {
-      if (exchange.signal.aborted) throw config.stopped();
-      prepared.parse(raw);
-      exchange.parsed();
-      return raw;
-    }
-  );
+    );
+  };
 }
 
 // core/steps/structure-review/language.en.md
@@ -45851,6 +46479,7 @@ function providerStructureReviewRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "structure-review",
     topic: (request) => `Structure review \xB7 ${request.rootQuestion.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new StructureReviewError("stopped", "Structure review stopped")
   });
 }
@@ -46554,6 +47183,7 @@ function providerRelevanceGradeRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "relevance-grade",
     topic: (request) => `Relevance ${"previous" in request ? "recalibrate" : "grade"} \xB7 ${request.goal.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new RelevanceGradeError("stopped", "Relevance grading stopped"),
     stream: true
   });
@@ -46750,8 +47380,8 @@ function renderTopicTree(parent, options) {
 }
 
 // ui/modals/topic-tree-modal.ts
-var import_obsidian30 = require("obsidian");
-var TopicTreeModal = class extends import_obsidian30.Modal {
+var import_obsidian31 = require("obsidian");
+var TopicTreeModal = class extends import_obsidian31.Modal {
   constructor(app, titleText, description, nodes, title, selectable, choose) {
     super(app);
     this.titleText = titleText;
@@ -46783,9 +47413,9 @@ var TopicTreeModal = class extends import_obsidian30.Modal {
 };
 
 // ui/modals/aim-start-modal.ts
-var import_obsidian31 = require("obsidian");
+var import_obsidian32 = require("obsidian");
 var import_node_crypto10 = require("node:crypto");
-var AimStartModal = class extends import_obsidian31.Modal {
+var AimStartModal = class extends import_obsidian32.Modal {
   constructor(app, submit, models = [], defaultModel = FALLBACK_MODEL, defaultReasoning = "low", refreshModels) {
     super(app);
     this.submit = submit;
@@ -46981,7 +47611,7 @@ var AimStartModal = class extends import_obsidian31.Modal {
     const status = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
     let pending2 = false;
     let cancelButton;
-    const create = new import_obsidian31.Setting(this.contentEl).addButton((button) => {
+    const create = new import_obsidian32.Setting(this.contentEl).addButton((button) => {
       cancelButton = button;
       button.setButtonText(t("ui.cancel")).onClick(() => this.close());
     }).addButton(
@@ -47067,9 +47697,9 @@ var AimStartModal = class extends import_obsidian31.Modal {
 };
 
 // ui/modals/aim-answer-modal.ts
-var import_obsidian32 = require("obsidian");
+var import_obsidian33 = require("obsidian");
 var import_node_crypto11 = require("node:crypto");
-var AimAnswerModal = class extends import_obsidian32.Modal {
+var AimAnswerModal = class extends import_obsidian33.Modal {
   constructor(app, question, options, submit, requestId = (0, import_node_crypto11.randomUUID)()) {
     super(app);
     this.question = question;
@@ -47111,7 +47741,7 @@ var AimAnswerModal = class extends import_obsidian32.Modal {
     });
     const status = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
     let pending2 = false, submitButton;
-    const setting = new import_obsidian32.Setting(this.contentEl).addButton(
+    const setting = new import_obsidian33.Setting(this.contentEl).addButton(
       (button) => button.setButtonText(t("ui.cancel")).onClick(() => {
         if (!pending2) this.close();
       })
@@ -47140,8 +47770,8 @@ var AimAnswerModal = class extends import_obsidian32.Modal {
 };
 
 // ui/modals/aim-assumption-modal.ts
-var import_obsidian33 = require("obsidian");
-var AimAssumptionModal = class extends import_obsidian33.Modal {
+var import_obsidian34 = require("obsidian");
+var AimAssumptionModal = class extends import_obsidian34.Modal {
   constructor(app, assumptions, submit) {
     super(app);
     this.assumptions = assumptions;
@@ -47157,7 +47787,7 @@ var AimAssumptionModal = class extends import_obsidian33.Modal {
     const actualLabel = this.contentEl.createEl("label", { cls: "vam-field" });
     actualLabel.createSpan({ text: t("ui.aim_correct_assumption_actual") });
     const actual = actualLabel.createEl("textarea", { attr: { rows: "3" } });
-    new import_obsidian33.Setting(this.contentEl).addButton(
+    new import_obsidian34.Setting(this.contentEl).addButton(
       (button) => button.setButtonText(t("ui.aim_correct_assumption_submit")).setCta().onClick(() => {
         if (!actual.value.trim()) {
           actual.focus();
@@ -47175,8 +47805,8 @@ var AimAssumptionModal = class extends import_obsidian33.Modal {
 };
 
 // ui/modals/aim-steer-modal.ts
-var import_obsidian34 = require("obsidian");
-var AimSteerModal = class extends import_obsidian34.Modal {
+var import_obsidian35 = require("obsidian");
+var AimSteerModal = class extends import_obsidian35.Modal {
   constructor(app, submit) {
     super(app);
     this.submit = submit;
@@ -47187,7 +47817,7 @@ var AimSteerModal = class extends import_obsidian34.Modal {
     const label = this.contentEl.createEl("label", { cls: "vam-field" });
     label.createSpan({ text: t("ui.aim_steer_prompt") });
     const direction = label.createEl("textarea", { attr: { rows: "3" } });
-    new import_obsidian34.Setting(this.contentEl).addButton(
+    new import_obsidian35.Setting(this.contentEl).addButton(
       (button) => button.setButtonText(t("ui.aim_steer_submit")).setCta().onClick(() => {
         if (!direction.value.trim()) {
           direction.focus();
@@ -48989,7 +49619,7 @@ ${(_d = context.task) != null ? _d : ""}`
       deduplicated.ancestors,
       deduplicated.workingFindings,
       deduplicated.sourceContext
-    ].reduce((sum, value) => sum + estimateTokens(value), 0);
+    ].reduce((sum2, value) => sum2 + estimateTokens(value), 0);
     if (requestTokens > AIM_REQUEST_TOKEN_LIMIT)
       throw new Error(
         `AIM model request is too large (${requestTokens} estimated tokens); no goal, condition, or evidence was discarded.`
@@ -53018,7 +53648,7 @@ function canvasPointerIntent(state) {
 }
 
 // experiences/visual-map/merge-topics.ts
-var import_obsidian35 = require("obsidian");
+var import_obsidian36 = require("obsidian");
 function readingOrder2(nodes) {
   return [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
 }
@@ -53100,7 +53730,7 @@ function mergeTitleFromResult(result, fallback) {
   const name2 = raw.replace(/^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g, "").trim();
   return name2 && name2.length <= MERGE_TITLE_MAX ? name2 : sanitizeGeneratedTitle(fallback);
 }
-var MergeTopicsModal = class extends import_obsidian35.Modal {
+var MergeTopicsModal = class extends import_obsidian36.Modal {
   constructor(app, count, value, submit, cancelled2 = () => {
   }, ai, parentName) {
     super(app);
@@ -53450,7 +54080,7 @@ var AIM_STAGE_KEYS = {
 var documentReadyNotice = null;
 function showDocumentReady() {
   documentReadyNotice == null ? void 0 : documentReadyNotice.hide();
-  documentReadyNotice = new import_obsidian36.Notice(t("ui.aim_document_ready"), 6e4);
+  documentReadyNotice = new import_obsidian37.Notice(t("ui.aim_document_ready"), 6e4);
 }
 function chatSynthesisOptions(input2) {
   return {
@@ -53506,7 +54136,7 @@ function relationPairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 var goalSuggestSeq = 0;
-var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.ItemView {
+var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -53786,6 +54416,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     __publicField(this, "aimProgress", null);
     /** Text spans the one-second tick rewrites in place, so progress never re-renders the whole map. */
     __publicField(this, "aimProgressEls", /* @__PURE__ */ new Map());
+    /** Token-usage button and panel in the zoom controls; null when the plugin has no usage store. */
+    __publicField(this, "usageControl", null);
     /** Model of each AIM branch's root topic, resolved once when its first progress event arrives; dropped when the run ends. */
     __publicField(this, "aimBranchModels", /* @__PURE__ */ new Map());
     __publicField(this, "aimBranchModelPending", /* @__PURE__ */ new Set());
@@ -53954,7 +54586,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.registerEvent(
       workspace.on("active-leaf-change", (leaf) => {
         var _a2;
-        if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian36.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian37.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
         (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
         this.syncStatusBarClearance();
       })
@@ -53987,7 +54619,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       );
   }
   async onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
     this.closed = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = (_c = (_b2 = this.containerEl) == null ? void 0 : _b2.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
@@ -53997,24 +54629,27 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.announcedStages.clear();
     (_g = this.unsubscribeResearch) == null ? void 0 : _g.call(this);
     this.unsubscribeResearch = (_i = (_h = this.plugin.researchProgress) == null ? void 0 : _h.subscribe((path) => this.onResearchProgress(path))) != null ? _i : null;
+    (_j = this.usageControl) == null ? void 0 : _j.stop();
+    this.usageControl = this.plugin.usage ? new UsageControl(this.plugin.usage, () => this.path) : null;
+    (_k = this.usageControl) == null ? void 0 : _k.start();
     const epoch = ++this.aimViewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
     this.contentEl.tabIndex = 0;
     this.registerWorkspaceEvents();
-    this.registerDomEvent((_j = this.contentEl.win) != null ? _j : window, "keydown", (event) => {
+    this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "keydown", (event) => {
       if (event.code === "Space" && !(event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]")))
         this.spaceHeld = true;
     });
-    this.registerDomEvent((_k = this.contentEl.win) != null ? _k : window, "keyup", (event) => {
+    this.registerDomEvent((_m = this.contentEl.win) != null ? _m : window, "keyup", (event) => {
       if (event.code === "Space") this.spaceHeld = false;
     });
-    this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "blur", () => {
+    this.registerDomEvent((_n = this.contentEl.win) != null ? _n : window, "blur", () => {
       this.spaceHeld = false;
     });
-    this.registerDomEvent((_n = (_m = this.contentEl.ownerDocument) == null ? void 0 : _m.defaultView) != null ? _n : window, "focus", () => this.onMapWindowFocus());
+    this.registerDomEvent((_p = (_o = this.contentEl.ownerDocument) == null ? void 0 : _o.defaultView) != null ? _p : window, "focus", () => this.onMapWindowFocus());
     this.bindClipboard();
-    (_p = (_o = this.contentEl).onWindowMigrated) == null ? void 0 : _p.call(_o, () => this.bindClipboard());
+    (_r = (_q = this.contentEl).onWindowMigrated) == null ? void 0 : _r.call(_q, () => this.bindClipboard());
     this.registerDomEvent(this.contentEl, "keydown", (event) => this.presentationKey(event), { capture: true });
     this.registerDomEvent(this.contentEl, "keydown", (event) => this.onMapKeydown(event));
     this.registerDomEvent(this.contentEl, "focusin", (event) => this.trackMapFocus(event.target));
@@ -54091,7 +54726,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     return true;
   }
   installUndoScope() {
-    const scope = new import_obsidian36.Scope(this.app.scope);
+    const scope = new import_obsidian37.Scope(this.app.scope);
     const seen = /* @__PURE__ */ new WeakSet();
     const run = (redo) => (event) => {
       if (!redo && !this.closed && !event.isComposing && this.undoNewCardNow(event.target)) return false;
@@ -54600,7 +55235,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
   startMapTitleEdit() {
     if (!this.map || this.inlineName || this.presentation) return;
     if (this.aimActiveForPath(this.path)) {
-      new import_obsidian36.Notice(t("ui.aim_research_already_running"));
+      new import_obsidian37.Notice(t("ui.aim_research_already_running"));
       return;
     }
     this.inlineName = { target: "map", id: "", draft: this.map.title, fresh: true, created: false };
@@ -54759,7 +55394,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     return true;
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     this.closeTopicLinkMenu();
     this.closed = true;
     this.closeMapSearch(false);
@@ -54783,6 +55418,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.announcedStages.clear();
     (_f = this.unsubscribeResearch) == null ? void 0 : _f.call(this);
     this.unsubscribeResearch = null;
+    (_g = this.usageControl) == null ? void 0 : _g.stop();
+    this.usageControl = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
     this.researchTick = this.researchRenderTimer = null;
@@ -54791,16 +55428,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
-    if ((_g = this.chat) == null ? void 0 : _g.hasUnsavedTurns) new import_obsidian36.Notice(t("ui.map_chat_unsaved_on_close"));
+    if ((_h = this.chat) == null ? void 0 : _h.hasUnsavedTurns) new import_obsidian37.Notice(t("ui.map_chat_unsaved_on_close"));
     this.abortMapChat();
-    (_h = this.chat) == null ? void 0 : _h.dispose();
-    (_i = this.relevancePanelCleanup) == null ? void 0 : _i.call(this);
+    (_i = this.chat) == null ? void 0 : _i.dispose();
+    (_j = this.relevancePanelCleanup) == null ? void 0 : _j.call(this);
     this.relevancePanelCleanup = null;
-    (_j = this.goalSuggestCleanup) == null ? void 0 : _j.call(this);
+    (_k = this.goalSuggestCleanup) == null ? void 0 : _k.call(this);
     this.goalSuggestCleanup = null;
-    (_k = this.mapSourcesPanelCleanup) == null ? void 0 : _k.call(this);
+    (_l = this.mapSourcesPanelCleanup) == null ? void 0 : _l.call(this);
     this.mapSourcesPanelCleanup = null;
-    if (this.relevancePanelOpen) (_m = (_l = this.plugin).releaseWarmClaude) == null ? void 0 : _m.call(_l);
+    if (this.relevancePanelOpen) (_n = (_m = this.plugin).releaseWarmClaude) == null ? void 0 : _n.call(_m);
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -54821,8 +55458,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_n = this.hoverCard) == null ? void 0 : _n.remove();
-    (_o = this.dragCleanup) == null ? void 0 : _o.call(this);
+    (_o = this.hoverCard) == null ? void 0 : _o.remove();
+    (_p = this.dragCleanup) == null ? void 0 : _p.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -54976,7 +55613,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
   }
   /** Every menu this view opens: Esc that closes it must not also clear the selection, and focus returns to the map. */
   newMenu(nodeId) {
-    const menu = new import_obsidian36.Menu();
+    const menu = new import_obsidian37.Menu();
     this.restoreFocusOnMenuHide(menu, nodeId);
     return menu;
   }
@@ -55046,16 +55683,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       var _a2;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
       if (this.plugin.topicRuns.isBusy(node.path)) {
-        new import_obsidian36.Notice(t("ui.ai_running_ai"));
+        new import_obsidian37.Notice(t("ui.ai_running_ai"));
         return;
       }
       if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
-        new import_obsidian36.Notice(t("ui.ai_locked_notice"));
+        new import_obsidian37.Notice(t("ui.ai_locked_notice"));
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
         const outputLanguage2 = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
-        await this.runAgent(node, void 0, (message) => new import_obsidian36.Notice(message), {
+        await this.runAgent(node, void 0, (message) => new import_obsidian37.Notice(message), {
           task: researchTopicTask(outputLanguage2, note.title),
           referenceGroups: [],
           outputLanguage: outputLanguage2,
@@ -55338,7 +55975,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     var _a2;
     const target = prefill ? this.reopenedImportTarget(prefill.inputs) : this.outlineImportTarget();
     if (target.map !== "editable") {
-      new import_obsidian36.Notice(target.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map"));
+      new import_obsidian37.Notice(target.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map"));
       return;
     }
     const placement = prefill ? prefill.inputs.placement : target.selected ? "under" : "tree";
@@ -55397,7 +56034,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
           [parent.id],
           /* @__PURE__ */ new Map([[parent.id, await this.plugin.repo.readNote(parent.path, (_d = this.map) != null ? _d : void 0)]])
         )) {
-          new import_obsidian36.Notice(t("ui.ai_locked_notice"));
+          new import_obsidian37.Notice(t("ui.ai_locked_notice"));
           throw new Error(t("ui.ai_locked_notice"));
         }
         const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_e = this.map) != null ? _e : void 0) : null;
@@ -55428,6 +56065,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
             const result = await this.plugin.outlineGeneration.generate(
               {
                 ...forService,
+                ...this.usageMapField(),
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
@@ -55446,7 +56084,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
             if (controller.signal.aborted || this.outlineDraftTask !== own2 || this.closed) return;
             own2.state = "failed";
             own2.message = plainFailure(t("error.plain_outline_context"), error);
-            new import_obsidian36.Notice(own2.message);
+            new import_obsidian37.Notice(own2.message);
           }
           if (!this.closed) this.render();
         });
@@ -55542,6 +56180,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
           {
+            ...this.usageMapField(),
             topic: note.title,
             presetText: request.requirements ? `${preset.text}
 
@@ -55607,7 +56246,7 @@ ${request.requirements}` : preset.text,
     const existing = this.structureReviewTask;
     if (existing && existing.mapPath === this.path) {
       if (existing.state === "running") {
-        new import_obsidian36.Notice(t("ui.ai_running_ai"));
+        new import_obsidian37.Notice(t("ui.ai_running_ai"));
         return;
       }
       if (existing.state === "done" && existing.scopeId === scopeId) {
@@ -55677,6 +56316,7 @@ ${request.requirements}` : preset.text,
               {
                 rootQuestion,
                 nodes,
+                ...this.usageMapField(),
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
                 model,
@@ -55686,7 +56326,7 @@ ${request.requirements}` : preset.text,
             );
             if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
             const { kept, skipped: lockedCount } = this.dropAiLockedSuggestions(review);
-            if (lockedCount) new import_obsidian36.Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
+            if (lockedCount) new import_obsidian37.Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
             own2.state = "done";
             own2.result = kept;
             backgroundResultNotice(t("ui.structure_review_ready_0", kept.suggestions.length), {
@@ -55697,7 +56337,7 @@ ${request.requirements}` : preset.text,
             if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
             own2.state = "failed";
             own2.message = plainFailure(t("error.plain_review_context"), error);
-            new import_obsidian36.Notice(own2.message);
+            new import_obsidian37.Notice(own2.message);
           }
           if (!this.closed) this.render();
         });
@@ -55816,7 +56456,7 @@ ${request.requirements}` : preset.text,
     const icon = (kind, name2, run, disabled) => {
       const button = actions.createEl("button", { cls: "vam-goal-icon" });
       appendGoalSvg(button, kind);
-      (0, import_obsidian36.setTooltip)(button, name2);
+      (0, import_obsidian37.setTooltip)(button, name2);
       button.setAttr("aria-label", name2);
       button.disabled = disabled;
       button.addEventListener("click", (event) => {
@@ -55953,7 +56593,7 @@ ${request.requirements}` : preset.text,
         } catch (error) {
           if (!this.goalSuggestCurrent(task)) return;
           this.endGoalSuggest(task, { refocus: true });
-          new import_obsidian36.Notice(
+          new import_obsidian37.Notice(
             error instanceof GoalTopicSuggestError ? error.message : plainFailure(t("error.plain_goal_suggest_context"), error)
           );
         }
@@ -55961,7 +56601,7 @@ ${request.requirements}` : preset.text,
     } catch (error) {
       if (this.goalSuggestCurrent(task)) {
         this.endGoalSuggest(task, { refocus: true });
-        new import_obsidian36.Notice(plainFailure(t("error.plain_goal_suggest_context"), error));
+        new import_obsidian37.Notice(plainFailure(t("error.plain_goal_suggest_context"), error));
       }
       return;
     }
@@ -55972,11 +56612,11 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d;
     const kept = suggestions.filter((item) => !this.aiLockReason("addChild", [item.parentId]));
     const locked = suggestions.length - kept.length;
-    if (locked) new import_obsidian36.Notice(t("ui.ai_locked_suggestions_skipped_0", locked));
+    if (locked) new import_obsidian37.Notice(t("ui.ai_locked_suggestions_skipped_0", locked));
     if (!kept.length) {
       this.endGoalSuggest(task, { refocus: true });
       if (!locked)
-        new import_obsidian36.Notice(
+        new import_obsidian37.Notice(
           suggestions.length === 0 && unusable ? t("ui.goal_suggest_unusable_0", unusable) : t("ui.goal_suggest_none")
         );
       return;
@@ -56142,7 +56782,7 @@ ${request.requirements}` : preset.text,
     }
     if (this.closed) return;
     this.endGoalSuggest(task, { refocus: !added });
-    if (skipped2) new import_obsidian36.Notice(t("ui.goal_suggest_skipped_0", skipped2));
+    if (skipped2) new import_obsidian37.Notice(t("ui.goal_suggest_skipped_0", skipped2));
     if (!added) return;
     (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.goal_suggest_added_0", added));
     const goal = this.relevanceGoal;
@@ -56201,11 +56841,11 @@ ${request.requirements}` : preset.text,
   editRelevanceGoal() {
     var _a2, _b2, _c, _d;
     if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
-      new import_obsidian36.Notice(t("ui.relevance_goal_unavailable_grading"));
+      new import_obsidian37.Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
     }
     if (!this.relevanceBarEl) {
-      new import_obsidian36.Notice(t("ui.relevance_goal_unavailable_toolbar"));
+      new import_obsidian37.Notice(t("ui.relevance_goal_unavailable_toolbar"));
       return;
     }
     if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
@@ -56387,7 +57027,7 @@ ${request.requirements}` : preset.text,
     if (unreadable) {
       const warn = button.createSpan({ cls: "vam-map-sources-warning" });
       warn.setAttr("aria-hidden", "true");
-      (0, import_obsidian36.setIcon)(warn, "alert-triangle");
+      (0, import_obsidian37.setIcon)(warn, "alert-triangle");
     }
     button.createSpan({ cls: "vam-sources-button-label", text: label });
     button.setAttr("aria-label", label);
@@ -56499,7 +57139,7 @@ ${request.requirements}` : preset.text,
           (_b2 = this.announcer) == null ? void 0 : _b2.setText(t(change2 === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name2));
         }
       } catch (error) {
-        new import_obsidian36.Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));
+        new import_obsidian37.Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));
         return;
       }
       if (this.closed || this.path !== mapPath) return;
@@ -56631,7 +57271,8 @@ ${request.requirements}` : preset.text,
           language: settings.language,
           model,
           reasoning: gradeReasoning,
-          ...pins.length ? { pins } : {}
+          ...pins.length ? { pins } : {},
+          ...this.usageMapField()
         };
         const hooks = {
           onRepair: (_round, kind) => {
@@ -56805,7 +57446,7 @@ ${request.requirements}` : preset.text,
         skipped2++;
       }
     }
-    if (skipped2) new import_obsidian36.Notice(t("ui.relevance_undo_skipped_0", skipped2));
+    if (skipped2) new import_obsidian37.Notice(t("ui.relevance_undo_skipped_0", skipped2));
   }
   /**
    * The tag's menu: the three tiers (a check on the current one) and Clear grade. Disabled while a grading run is
@@ -56990,7 +57631,7 @@ ${request.requirements}` : preset.text,
       if (reason) throw new Error(reason);
       const touched = [suggestion.targetId, suggestion.newParentId, suggestion.mergeIntoId];
       if (touched.some((id) => !!id && this.isMerging(id))) {
-        new import_obsidian36.Notice(t("ui.merge_locked"));
+        new import_obsidian37.Notice(t("ui.merge_locked"));
         throw new Error(t("ui.merge_locked"));
       }
       if (this.structureLockReason(suggestion)) throw new Error(t("ui.ai_locked_notice"));
@@ -57248,7 +57889,7 @@ ${request.requirements}` : preset.text,
   topicCoverOff(node) {
     var _a2, _b2;
     const file = this.app.vault.getAbstractFileByPath(node.path);
-    const value = file instanceof import_obsidian36.TFile ? (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["topic-cover"] : null;
+    const value = file instanceof import_obsidian37.TFile ? (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["topic-cover"] : null;
     return typeof value === "string" && value.trim().toLowerCase() === "none";
   }
   /**
@@ -57261,7 +57902,7 @@ ${request.requirements}` : preset.text,
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof import_obsidian36.TFile)) throw new Error(path);
+      if (!(file instanceof import_obsidian37.TFile)) throw new Error(path);
       await this.app.vault.process(file, (content) => off ? withCoverOn(content) : withCoverOff(content));
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
@@ -57281,7 +57922,7 @@ ${request.requirements}` : preset.text,
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof import_obsidian36.TFile)) throw new Error(path);
+      if (!(file instanceof import_obsidian37.TFile)) throw new Error(path);
       await this.app.vault.process(file, (content) => withCoverLook(content, write));
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
@@ -57300,14 +57941,14 @@ ${request.requirements}` : preset.text,
     var _a2, _b2;
     try {
       const file = this.app.vault.getAbstractFileByPath(node.path);
-      if (!(file instanceof import_obsidian36.TFile)) return null;
+      if (!(file instanceof import_obsidian37.TFile)) return null;
       const cover = resolveCoverWithFrame(
         this.app.metadataCache.getFileCache(file),
         (link) => this.app.metadataCache.getFirstLinkpathDest(link, node.path)
       );
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
-      const src = image instanceof import_obsidian36.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
+      const src = image instanceof import_obsidian37.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
       return src ? { src, path: cover.path, frame: cover.frame, size: cover.size, position: cover.position } : null;
     } catch (e) {
       return null;
@@ -57595,7 +58236,7 @@ ${request.requirements}` : preset.text,
     } catch (e) {
       opened = false;
     }
-    if (result.failure) new import_obsidian36.Notice(t("ui.outline_import_partial", result.created, result.total, result.failure));
+    if (result.failure) new import_obsidian37.Notice(t("ui.outline_import_partial", result.created, result.total, result.failure));
     if (result.failure || !opened || !request.shallowResearch || result.nodes.length < 2) return;
     const root = result.nodes.find((node) => node.parentId === null);
     if (!root) return;
@@ -57653,7 +58294,7 @@ ${request.requirements}` : preset.text,
         const { map, path, parent } = current;
         if (request.aiGenerated && parent && this.aiLockReason("addChild", [parent.id], /* @__PURE__ */ new Map([[parent.id, await repo.readNote(parent.path, map)]]))) {
           const skippedCount = request.nodes.length;
-          new import_obsidian36.Notice(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          new import_obsidian37.Notice(t("ui.ai_locked_outline_skipped_0", skippedCount));
           state.rejection = new Error(t("ui.ai_locked_outline_skipped_0", skippedCount));
           return;
         }
@@ -57702,7 +58343,7 @@ ${request.requirements}` : preset.text,
               kept.unshift(node.path);
               continue;
             }
-            if (!(file instanceof import_obsidian36.TFile)) {
+            if (!(file instanceof import_obsidian37.TFile)) {
               this.notes.delete(node.id);
               continue;
             }
@@ -57719,7 +58360,7 @@ ${request.requirements}` : preset.text,
             return;
           }
           state.saveFailed = true;
-          new import_obsidian36.Notice(t("ui.outline_import_map_save_failed", `${errorMessage(cause)} (${kept.join(", ")})`));
+          new import_obsidian37.Notice(t("ui.outline_import_map_save_failed", `${errorMessage(cause)} (${kept.join(", ")})`));
         };
         if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
@@ -57962,14 +58603,14 @@ ${request.requirements}` : preset.text,
           this.render();
           this.focusNode(question2);
         }
-        new import_obsidian36.Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new import_obsidian36.Notice(t("ui.aim_research_partial"));
+        new import_obsidian37.Notice(t("ui.aim_waiting_user"));
+      } else if (result.status === "partial") new import_obsidian37.Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new import_obsidian36.Notice(t("ui.aim_research_already_running"));
+      else if (result.status === "in-progress") new import_obsidian37.Notice(t("ui.aim_research_already_running"));
     } catch (error) {
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new import_obsidian36.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+      if (controller.signal.aborted) new import_obsidian37.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
       const latest = await this.plugin.repo.readMap(mapPath);
       if (this.aimViewIsCurrent(epoch, mapPath)) {
         this.map = latest;
@@ -58020,7 +58661,7 @@ ${request.requirements}` : preset.text,
       for (let waited = 0; this.aimBusy && waited < 3e4; waited += 100)
         await new Promise((resolve) => window.setTimeout(resolve, 100));
       if (this.aimBusy) {
-        new import_obsidian36.Notice(t("ui.aim_research_already_running"));
+        new import_obsidian37.Notice(t("ui.aim_research_already_running"));
         return;
       }
     }
@@ -58037,7 +58678,7 @@ ${request.requirements}` : preset.text,
     const note = (_d = node && this.notes.get(node.id)) != null ? _d : topic && this.notes.get(topic.id);
     if (this.closed || !node || !note || !this.path || !((_e = this.map) == null ? void 0 : _e.aim)) return;
     if (this.aimBusy) {
-      new import_obsidian36.Notice(t("ui.aim_research_already_running"));
+      new import_obsidian37.Notice(t("ui.aim_research_already_running"));
       return;
     }
     const epoch = this.aimViewEpoch, mapPath = this.path, controller = new AbortController();
@@ -58053,12 +58694,12 @@ ${request.requirements}` : preset.text,
       this.map = await this.plugin.repo.readMap(mapPath);
       await this.hydrate(() => this.aimViewIsCurrent(epoch, mapPath));
       if (outcome.status === "completed") showDocumentReady();
-      else if (outcome.status === "partial") new import_obsidian36.Notice(t("ui.aim_research_partial"));
-      else if (outcome.status === "waiting-user") new import_obsidian36.Notice(t("ui.aim_waiting_user"));
+      else if (outcome.status === "partial") new import_obsidian37.Notice(t("ui.aim_research_partial"));
+      else if (outcome.status === "waiting-user") new import_obsidian37.Notice(t("ui.aim_waiting_user"));
     } catch (error) {
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new import_obsidian36.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+      if (controller.signal.aborted) new import_obsidian37.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
     } finally {
       if (this.aimController === controller) {
         this.aimBusy = false;
@@ -58142,10 +58783,10 @@ ${request.requirements}` : preset.text,
         this.selection.setSelected(result.node.id);
         this.render();
         this.focusNode(result.node);
-        new import_obsidian36.Notice(t("ui.aim_question_ready"));
+        new import_obsidian37.Notice(t("ui.aim_question_ready"));
       } else if (result.outcome) {
         const outcome = result.outcome;
-        if (outcome.status === "partial") new import_obsidian36.Notice(t("ui.aim_research_partial"));
+        if (outcome.status === "partial") new import_obsidian37.Notice(t("ui.aim_research_partial"));
         else if (outcome.status === "waiting-user") {
           const question = (_f = this.map) == null ? void 0 : _f.nodes.find((item) => item.id === outcome.questionNodeId);
           if (question) {
@@ -58153,15 +58794,15 @@ ${request.requirements}` : preset.text,
             this.render();
             this.focusNode(question);
           }
-          new import_obsidian36.Notice(t("ui.aim_waiting_user"));
+          new import_obsidian37.Notice(t("ui.aim_waiting_user"));
         } else if (outcome.status === "completed") showDocumentReady();
-        else if (outcome.status === "in-progress") new import_obsidian36.Notice(t("ui.aim_research_already_running"));
-        else new import_obsidian36.Notice(t("ui.aim_research_result_stale"));
-      } else new import_obsidian36.Notice(t("ui.aim_no_question_needed"));
+        else if (outcome.status === "in-progress") new import_obsidian37.Notice(t("ui.aim_research_already_running"));
+        else new import_obsidian37.Notice(t("ui.aim_research_result_stale"));
+      } else new import_obsidian37.Notice(t("ui.aim_no_question_needed"));
     } catch (error) {
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new import_obsidian36.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+      if (controller.signal.aborted) new import_obsidian37.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
     } finally {
       if (this.aimController === controller) {
         this.aimBusy = false;
@@ -58201,15 +58842,15 @@ ${request.requirements}` : preset.text,
           this.render();
           this.focusNode(question);
         }
-        new import_obsidian36.Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new import_obsidian36.Notice(t("ui.aim_research_partial"));
+        new import_obsidian37.Notice(t("ui.aim_waiting_user"));
+      } else if (result.status === "partial") new import_obsidian37.Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new import_obsidian36.Notice(t("ui.aim_research_already_running"));
-      else new import_obsidian36.Notice(t("ui.aim_research_result_stale"));
+      else if (result.status === "in-progress") new import_obsidian37.Notice(t("ui.aim_research_already_running"));
+      else new import_obsidian37.Notice(t("ui.aim_research_result_stale"));
     } catch (error) {
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new import_obsidian36.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+      if (controller.signal.aborted) new import_obsidian37.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
     } finally {
       if (this.aimController === controller) {
         this.aimBusy = false;
@@ -58248,13 +58889,13 @@ ${request.requirements}` : preset.text,
       if (!isCurrent()) return;
       if (result.status === "waiting-user") {
         this.selection.setSelected(result.questionNodeId);
-        new import_obsidian36.Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new import_obsidian36.Notice(t("ui.aim_research_partial"));
+        new import_obsidian37.Notice(t("ui.aim_waiting_user"));
+      } else if (result.status === "partial") new import_obsidian37.Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new import_obsidian36.Notice(t("ui.aim_research_already_running"));
+      else if (result.status === "in-progress") new import_obsidian37.Notice(t("ui.aim_research_already_running"));
     } catch (error) {
       if (!isCurrent()) return;
-      new import_obsidian36.Notice(
+      new import_obsidian37.Notice(
         controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error)
       );
     } finally {
@@ -58268,7 +58909,7 @@ ${request.requirements}` : preset.text,
             }
           }
         } catch (error) {
-          if (isCurrent()) new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+          if (isCurrent()) new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
         } finally {
           if (this.aimController === controller) {
             this.aimBusy = false;
@@ -58301,7 +58942,7 @@ ${request.requirements}` : preset.text,
         const current = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.id);
         if (current) this.openAimAnswer(current);
       }).catch((error) => {
-        if (this.aimViewIsCurrent(epoch, mapPath)) new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+        if (this.aimViewIsCurrent(epoch, mapPath)) new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
       });
       return;
     }
@@ -58331,16 +58972,16 @@ ${request.requirements}` : preset.text,
               this.render();
               this.focusNode(question);
             }
-            new import_obsidian36.Notice(t("ui.aim_waiting_user"));
-          } else if (result.status === "partial") new import_obsidian36.Notice(t("ui.aim_research_partial"));
+            new import_obsidian37.Notice(t("ui.aim_waiting_user"));
+          } else if (result.status === "partial") new import_obsidian37.Notice(t("ui.aim_research_partial"));
           else if (result.status === "completed") showDocumentReady();
-          else if (result.status === "in-progress") new import_obsidian36.Notice(t("ui.aim_research_already_running"));
-          else new import_obsidian36.Notice(t("ui.aim_research_result_stale"));
+          else if (result.status === "in-progress") new import_obsidian37.Notice(t("ui.aim_research_already_running"));
+          else new import_obsidian37.Notice(t("ui.aim_research_result_stale"));
         } catch (error) {
           if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) throw error;
           this.aimAnswerRequestIds.set(node.id, input2.requestId);
-          if (controller.signal.aborted) new import_obsidian36.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-          else new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+          if (controller.signal.aborted) new import_obsidian37.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+          else new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
           throw error;
         } finally {
           if (this.aimController === controller) {
@@ -58420,7 +59061,7 @@ ${request.requirements}` : preset.text,
     if (this.renderingCard) button.tabIndex = -1;
     button.setAttr("aria-label", label);
     button.dataset.icon = icon;
-    (0, import_obsidian36.setIcon)(button, icon);
+    (0, import_obsidian37.setIcon)(button, icon);
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       action(event);
@@ -58548,7 +59189,7 @@ ${request.requirements}` : preset.text,
     const progress = this.aimProgress;
     if (!progress) return "";
     const elapsed = Math.round((Date.now() - progress.startedAt) / 1e3);
-    const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+    const clock2 = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
     const targets = [...progress.targets.values()];
     const stage = progress.stage === "research" && targets.length ? t(
       "ui.aim_stage_research_0_1",
@@ -58557,7 +59198,7 @@ ${request.requirements}` : preset.text,
     ) : t((_a2 = AIM_STAGE_KEYS[progress.stage]) != null ? _a2 : "ui.aim_stage_research");
     const model = this.aimBranchModels.get(progress.branchId);
     const shown = model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(model)) : stage;
-    return t("ui.aim_stage_with_elapsed_0_1", shown, clock);
+    return t("ui.aim_stage_with_elapsed_0_1", shown, clock2);
   }
   /** One-second tick: rewrite only the progress texts; stop when the run is over. */
   paintAimProgress() {
@@ -58646,8 +59287,8 @@ ${request.requirements}` : preset.text,
   }
   researchElapsedText(startedAt) {
     const seconds = Math.max(0, Math.round((Date.now() - startedAt) / 1e3));
-    const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-    return t("ui.aim_stage_with_elapsed_0_1", "", clock);
+    const clock2 = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    return t("ui.aim_stage_with_elapsed_0_1", "", clock2);
   }
   trackResearchElapsed(element, startedAt) {
     this.researchElapsed.set(element, startedAt);
@@ -58663,6 +59304,10 @@ ${request.requirements}` : preset.text,
       window.clearInterval(this.researchTick);
       this.researchTick = null;
     }
+  }
+  /** The map a request's token usage is counted under (this view's map file). */
+  usageMapField() {
+    return this.path ? { usageMapPath: this.path } : {};
   }
   /** The progress key of this map's multi-select synthesis or AI merge (a name no Vault path can have). */
   taskProgressKey(kind, mapPath = this.path) {
@@ -58987,7 +59632,7 @@ ${request.requirements}` : preset.text,
   mergeUnlocked(ids) {
     for (const id of ids)
       if (this.isMerging(id)) {
-        new import_obsidian36.Notice(t("ui.merge_locked"));
+        new import_obsidian37.Notice(t("ui.merge_locked"));
         return false;
       }
     return true;
@@ -59006,12 +59651,12 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d, _e;
     if (!this.map || this.aimLive() || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     if (this.mergeTasks.has(this.path)) {
-      new import_obsidian36.Notice(t("ui.merge_locked"));
+      new import_obsidian37.Notice(t("ui.merge_locked"));
       return;
     }
     const check = this.mergeCheck();
     if (!check.ok) {
-      new import_obsidian36.Notice(t(check.reason));
+      new import_obsidian37.Notice(t(check.reason));
       return;
     }
     const snapshot = {
@@ -59025,7 +59670,7 @@ ${request.requirements}` : preset.text,
       check.sources.map((source) => source.id),
       check.targetId
     );
-    if (locked) new import_obsidian36.Notice(t("ui.ai_locked_notice"));
+    if (locked) new import_obsidian37.Notice(t("ui.ai_locked_notice"));
     const withContent = !locked && hasMergeContent(
       check.sources.map((source) => this.notes.get(source.id)),
       isPlaceholder
@@ -59087,12 +59732,12 @@ ${request.requirements}` : preset.text,
       snapshot.targetId,
       await this.freshNotes()
     )) {
-      new import_obsidian36.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian37.Notice(t("ui.ai_locked_notice"));
       return false;
     }
     await this.refreshNoteStyles();
     if (!stillValid()) {
-      new import_obsidian36.Notice(t("ui.merge_draft_stale"));
+      new import_obsidian37.Notice(t("ui.merge_draft_stale"));
       return false;
     }
     const { model, reasoning } = await this.mergeModel((_a2 = snapshot.targetId) != null ? _a2 : snapshot.parentId);
@@ -59125,7 +59770,7 @@ ${request.requirements}` : preset.text,
       this.render();
       task.run = this.runMergeDraft(task);
     });
-    if (accepted && !began && !signal.aborted) new import_obsidian36.Notice(t("ui.merge_draft_stale"));
+    if (accepted && !began && !signal.aborted) new import_obsidian37.Notice(t("ui.merge_draft_stale"));
     return began;
   }
   isLiveMergeTask(task) {
@@ -59156,6 +59801,7 @@ ${request.requirements}` : preset.text,
         },
         outputLanguage: language2,
         mode: "merge",
+        usageMapPath: task.mapPath,
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
@@ -59246,15 +59892,15 @@ ${request.requirements}` : preset.text,
           },
           MERGE_DONE_NOTICE_MS
         );
-      else new import_obsidian36.Notice(done, MERGE_DONE_NOTICE_MS);
+      else new import_obsidian37.Notice(done, MERGE_DONE_NOTICE_MS);
     } catch (error) {
       const live = this.mergeTasks.get(task.mapPath) === task;
       if (live) this.mergeTasks.delete(task.mapPath);
       if (!this.closed) this.render();
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
-      if (isAiLockedError(error)) new import_obsidian36.Notice(t("ui.ai_locked_notice"));
-      else new import_obsidian36.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
+      if (isAiLockedError(error)) new import_obsidian37.Notice(t("ui.ai_locked_notice"));
+      else new import_obsidian37.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
     } finally {
       progress.end();
     }
@@ -59273,7 +59919,7 @@ ${request.requirements}` : preset.text,
         },
         MERGE_DONE_NOTICE_MS
       );
-    else new import_obsidian36.Notice(message, MERGE_DONE_NOTICE_MS);
+    else new import_obsidian37.Notice(message, MERGE_DONE_NOTICE_MS);
   }
   /** Stop, or clear a finished one: the run is aborted and forgotten, so a late result changes nothing. */
   stopMergeTask(task) {
@@ -59338,7 +59984,7 @@ ${request.requirements}` : preset.text,
     );
     if (!check.ok) {
       if (content) stale();
-      new import_obsidian36.Notice(t(check.reason));
+      new import_obsidian37.Notice(t(check.reason));
       return;
     }
     if (((_a2 = snapshot.targetId) != null ? _a2 : null) !== check.targetId || check.sources.some((node) => {
@@ -59346,7 +59992,7 @@ ${request.requirements}` : preset.text,
       return ((_a3 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a3.path) !== node.path;
     })) {
       if (content) stale();
-      new import_obsidian36.Notice(t("ui.merge_missing_note"));
+      new import_obsidian37.Notice(t("ui.merge_missing_note"));
       return;
     }
     if (content && this.mergeLockReason(
@@ -59530,8 +60176,8 @@ ${request.requirements}` : preset.text,
   }
   /** Tells the user how many links the last merge removed: duplicates of a pair, and links that would have formed a cycle (both sentences when both happened). */
   noticeDroppedCycles() {
-    if (this.lastDroppedSamePair > 0) new import_obsidian36.Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
-    if (this.lastDroppedCycles > 0) new import_obsidian36.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
+    if (this.lastDroppedSamePair > 0) new import_obsidian37.Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
+    if (this.lastDroppedCycles > 0) new import_obsidian37.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
   }
   /** The merge is saved and in history; a failing reload must not look like the merge failed. */
   async finishMerge(id) {
@@ -59544,7 +60190,7 @@ ${request.requirements}` : preset.text,
       if (merged) this.focusNode(merged);
     } catch (e) {
       this.render();
-      new import_obsidian36.Notice(t("ui.merge_saved_refresh_failed"));
+      new import_obsidian37.Notice(t("ui.merge_saved_refresh_failed"));
     }
   }
   /** What the user is told when the transaction refuses or cannot restore; other errors pass through unchanged. */
@@ -59688,7 +60334,7 @@ ${request.requirements}` : preset.text,
       el.style.width = `${image.w}px`;
       el.style.height = `${image.h}px`;
       const file = this.app.vault.getAbstractFileByPath(image.path);
-      const source = file instanceof import_obsidian36.TFile ? (_e = (_d = this.app.vault).getResourcePath) == null ? void 0 : _e.call(_d, file) : void 0;
+      const source = file instanceof import_obsidian37.TFile ? (_e = (_d = this.app.vault).getResourcePath) == null ? void 0 : _e.call(_d, file) : void 0;
       if (annotated) this.renderAnnotatedBar(el, annotated, name2);
       let picture = null;
       const placeholder2 = () => {
@@ -59958,7 +60604,7 @@ ${request.requirements}` : preset.text,
       const picked = this.picking;
       if (!picked) return;
       if (!findAnnotatedImage((_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : [], id)) {
-        new import_obsidian36.Notice(t("ui.anchor_pick_plain_image"));
+        new import_obsidian37.Notice(t("ui.anchor_pick_plain_image"));
         return;
       }
       this.cancelPicking(false);
@@ -60072,7 +60718,7 @@ ${request.requirements}` : preset.text,
     const current = findAnnotatedImage((_a2 = this.map.canvasItems) != null ? _a2 : [], imageId);
     if (!current) return;
     if (current.anchors.length >= ANCHOR_LIMIT) {
-      new import_obsidian36.Notice(t("ui.anchor_limit", ANCHOR_LIMIT));
+      new import_obsidian37.Notice(t("ui.anchor_limit", ANCHOR_LIMIT));
       return;
     }
     if (target.kind === "existing" && !this.map.nodes.some((node2) => node2.id === target.topicId)) return;
@@ -60124,7 +60770,7 @@ ${request.requirements}` : preset.text,
     );
     if (firstWithoutNote && !this.noteReminded.has(imageId)) {
       this.noteReminded.add(imageId);
-      new import_obsidian36.Notice(t("ui.anchor_no_note_notice"));
+      new import_obsidian37.Notice(t("ui.anchor_no_note_notice"));
     }
   }
   /** A topic for a new anchor: a child of the main topic, named after the anchor note (or the default new-topic name). */
@@ -60132,7 +60778,7 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c;
     if (!this.map) return null;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
-      new import_obsidian36.Notice(t("ui.legacy_map_view_only"));
+      new import_obsidian37.Notice(t("ui.legacy_map_view_only"));
       return null;
     }
     const map = this.map, parent = (_a2 = map.nodes.find((n) => !n.parentId)) != null ? _a2 : null;
@@ -60162,7 +60808,7 @@ ${request.requirements}` : preset.text,
   renderAnnotatedBar(el, image, name2) {
     const bar = el.createDiv("vam-annotated-bar");
     const pill = bar.createSpan("vam-annotated-pill");
-    (0, import_obsidian36.setIcon)(pill.createSpan("vam-annotated-pill-icon"), "map-pin");
+    (0, import_obsidian37.setIcon)(pill.createSpan("vam-annotated-pill-icon"), "map-pin");
     pill.createSpan({ text: t("ui.annotated_image_pill") });
     bar.createSpan({ text: image.note || name2, cls: "vam-annotated-note" });
     bar.createSpan({ text: t("ui.annotated_image_anchor_count", image.anchors.length), cls: "vam-annotated-count" });
@@ -60249,11 +60895,11 @@ ${request.requirements}` : preset.text,
   }
   openImageOriginal(path) {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof import_obsidian36.TFile)) {
-      new import_obsidian36.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+    if (!(file instanceof import_obsidian37.TFile)) {
+      new import_obsidian37.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
       return;
     }
-    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian36.Notice(error instanceof Error ? error.message : String(error)));
+    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian37.Notice(error instanceof Error ? error.message : String(error)));
   }
   /** Text nodes change only on a map the user may edit, and never while presenting. */
   canEditText() {
@@ -60786,7 +61432,7 @@ ${request.requirements}` : preset.text,
       var _a2;
       if (!this.map) return;
       if (!this.canEditText()) {
-        if (this.selection.state.multiSelectMode) new import_obsidian36.Notice(t("ui.text_node_add_multiselect"));
+        if (this.selection.state.multiSelectMode) new import_obsidian37.Notice(t("ui.text_node_add_multiselect"));
         return;
       }
       const target = parent != null ? parent : this.map.nodes.find((node) => node.id === this.selection.state.selected);
@@ -60990,7 +61636,7 @@ ${request.requirements}` : preset.text,
     const check = this.summaryEntryCheck(ids);
     if (!check.ok) {
       (_a2 = this.announcer) == null ? void 0 : _a2.setText(t(check.reason));
-      new import_obsidian36.Notice(t(check.reason));
+      new import_obsidian37.Notice(t(check.reason));
       return;
     }
     if (this.suspendSummaryEdit) this.suspendSummaryEdit();
@@ -61203,7 +61849,7 @@ ${request.requirements}` : preset.text,
       } catch (error) {
         this.focusItemId = null;
         this.render();
-        new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+        new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
       }
       return;
     }
@@ -61232,7 +61878,7 @@ ${request.requirements}` : preset.text,
     const check = this.summaryEntryCheck(this.summaryTargets());
     if (!check.ok) {
       (_a2 = this.announcer) == null ? void 0 : _a2.setText(t(check.reason));
-      new import_obsidian36.Notice(t(check.reason));
+      new import_obsidian37.Notice(t(check.reason));
       return;
     }
     this.focusItemId = id;
@@ -61453,7 +62099,7 @@ ${request.requirements}` : preset.text,
     const all = Array.from((_c = (_b2 = event.dataTransfer) == null ? void 0 : _b2.files) != null ? _c : []), images = imageFilesFrom({ files: all });
     const point = this.stagePoint({ x: event.clientX, y: event.clientY });
     for (const other of all.filter((item) => !images.includes(item)))
-      new import_obsidian36.Notice(t("ui.canvas_image_refused", other.name || "?"));
+      new import_obsidian37.Notice(t("ui.canvas_image_refused", other.name || "?"));
     if (images.length && point) this.queueCanvasImages(images, point);
   }
   // ---- Pictures on a card: drop and paste (ticket 32, decisions D5, D6) --------------------------------------------
@@ -61483,7 +62129,7 @@ ${request.requirements}` : preset.text,
     event.stopPropagation();
     const all = Array.from((_b2 = (_a2 = event.dataTransfer) == null ? void 0 : _a2.files) != null ? _b2 : []), images = imageFilesFrom({ files: all });
     for (const other of all.filter((item) => !images.includes(item)))
-      new import_obsidian36.Notice(t("ui.canvas_image_refused", other.name || "?"));
+      new import_obsidian37.Notice(t("ui.canvas_image_refused", other.name || "?"));
     if (images.length) this.enqueue(() => this.attachCardImages(node, images));
   }
   /**
@@ -61501,18 +62147,18 @@ ${request.requirements}` : preset.text,
       let data;
       try {
         if (file.size > IMAGE_MAX_BYTES) {
-          new import_obsidian36.Notice(t("ui.canvas_image_too_large", label));
+          new import_obsidian37.Notice(t("ui.canvas_image_too_large", label));
           continue;
         }
         data = await file.arrayBuffer();
       } catch (e) {
-        if (!stale()) new import_obsidian36.Notice(t("ui.canvas_image_unreadable", label));
+        if (!stale()) new import_obsidian37.Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
       if (stale()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
-        new import_obsidian36.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        new import_obsidian37.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
         continue;
       }
       const name2 = safeImageName(file.name, accepted.mime);
@@ -61523,7 +62169,7 @@ ${request.requirements}` : preset.text,
         const viewport = clone(this.map.viewport);
         const entry = await this.beginMapTransaction().createAttachment("image", { name: name2, data, sourcePath: node.path }).rewriteNote(node.path, async (target, attachment) => {
           const note = this.app.vault.getAbstractFileByPath(target);
-          if (!(note instanceof import_obsidian36.TFile)) throw new Error(target);
+          if (!(note instanceof import_obsidian37.TFile)) throw new Error(target);
           const link = attachment("image");
           await this.app.vault.process(note, (content) => {
             const withEmbed = appendImageEmbed(content, link);
@@ -61586,11 +62232,11 @@ ${request.requirements}` : preset.text,
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
   openNoteInTab(node) {
     const file = this.app.vault.getAbstractFileByPath(node.path);
-    if (!(file instanceof import_obsidian36.TFile)) {
-      new import_obsidian36.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+    if (!(file instanceof import_obsidian37.TFile)) {
+      new import_obsidian37.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
       return;
     }
-    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian36.Notice(error instanceof Error ? error.message : String(error)));
+    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian37.Notice(error instanceof Error ? error.message : String(error)));
   }
   /** Folds or unfolds a card's branch: the card's fold tool and its menu entry. */
   toggleCollapsed(node) {
@@ -61715,18 +62361,18 @@ ${request.requirements}` : preset.text,
       let data;
       try {
         if (file.size > IMAGE_MAX_BYTES) {
-          new import_obsidian36.Notice(t("ui.canvas_image_too_large", label));
+          new import_obsidian37.Notice(t("ui.canvas_image_too_large", label));
           continue;
         }
         data = await file.arrayBuffer();
       } catch (e) {
-        if (!stale()) new import_obsidian36.Notice(t("ui.canvas_image_unreadable", label));
+        if (!stale()) new import_obsidian37.Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
       if (stale()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
-        new import_obsidian36.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        new import_obsidian37.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
         continue;
       }
       const name2 = safeImageName(file.name, accepted.mime);
@@ -62080,7 +62726,7 @@ ${request.requirements}` : preset.text,
     const ids = this.selection.state.multiSelected.size ? [...this.selection.state.multiSelected] : this.selection.state.selected ? [this.selection.state.selected] : [];
     if (!map || !ids.length || !event.clipboardData) return;
     if (mode === "cut" && this.clipboardReadOnly()) {
-      new import_obsidian36.Notice(t("ui.clipboard_cut_readonly"));
+      new import_obsidian37.Notice(t("ui.clipboard_cut_readonly"));
       return;
     }
     const selection = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.getSelection) == null ? void 0 : _b2.call(_a2);
@@ -62108,7 +62754,7 @@ ${request.requirements}` : preset.text,
       clipId: crypto.randomUUID()
     });
     if (!built.ok || !visited.length) {
-      new import_obsidian36.Notice(t("ui.clipboard_copy_failed"));
+      new import_obsidian37.Notice(t("ui.clipboard_copy_failed"));
       return;
     }
     const serialized = serializeClipboard(built.payload);
@@ -62140,13 +62786,13 @@ ${request.requirements}` : preset.text,
     }
     event.preventDefault();
     if (this.clipboardReadOnly()) {
-      new import_obsidian36.Notice(t("ui.clipboard_paste_readonly"));
+      new import_obsidian37.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
     const parsed = parseClipboard(vam);
     if (!parsed.ok) {
       if (text11.trim()) this.pasteText(event, text11);
-      else new import_obsidian36.Notice(t("ui.clipboard_paste_invalid"));
+      else new import_obsidian37.Notice(t("ui.clipboard_paste_invalid"));
       return;
     }
     this.enqueue(() => this.pasteBranches(parsed.payload, vam));
@@ -62157,12 +62803,12 @@ ${request.requirements}` : preset.text,
     if (!text11.trim()) return;
     event.preventDefault();
     if (this.clipboardReadOnly()) {
-      new import_obsidian36.Notice(t("ui.clipboard_paste_readonly"));
+      new import_obsidian37.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
     const parsed = parseIndentedText(text11);
     if (!parsed.ok) {
-      new import_obsidian36.Notice(this.pasteTextRefusal(parsed.reason, parsed.line));
+      new import_obsidian37.Notice(this.pasteTextRefusal(parsed.reason, parsed.line));
       return;
     }
     if (!parsed.nodes.length) return;
@@ -62200,7 +62846,7 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d, _e, _f;
     const map = this.map;
     if (!map || this.clipboardReadOnly()) {
-      new import_obsidian36.Notice(t("ui.clipboard_paste_readonly"));
+      new import_obsidian37.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
     const target = (_a2 = map.nodes.find((node) => node.id === this.selection.state.selected)) != null ? _a2 : null;
@@ -62253,7 +62899,7 @@ ${request.requirements}` : preset.text,
           (_d = target == null ? void 0 : target.id) != null ? _d : null
         );
         if (!check.ok) {
-          new import_obsidian36.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          new import_obsidian37.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
           return;
         }
         await this.moveBranches(roots, target);
@@ -62280,7 +62926,7 @@ ${request.requirements}` : preset.text,
     } else {
       const plan = planPaste(payload);
       if (!plan.ok) {
-        new import_obsidian36.Notice(t("ui.clipboard_paste_invalid"));
+        new import_obsidian37.Notice(t("ui.clipboard_paste_invalid"));
         return;
       }
       const repo = this.plugin.repo, settings = this.plugin.settings, before = clone(map), model = target ? inheritModel((await repo.readNote(target.path, map)).model, settings.cliModel) : settings.cliModel;
@@ -62383,7 +63029,7 @@ ${request.requirements}` : preset.text,
     const session = sessionFor(this.plugin), from = record.sourceMapPath;
     const refuse = (key2, drop = false) => {
       if (drop && session.cancelCut()) this.refreshCutMarks();
-      new import_obsidian36.Notice(t(key2));
+      new import_obsidian37.Notice(t(key2));
       return null;
     };
     if (!this.app.vault.getAbstractFileByPath(from)) return refuse("ui.clipboard_cut_missing", true);
@@ -62445,7 +63091,7 @@ ${request.requirements}` : preset.text,
       },
       finish: async (entry) => {
         if (droppedImageRelations > 0)
-          new import_obsidian36.Notice(t("ui.cross_cut_dropped_image_relations_0", String(droppedImageRelations)));
+          new import_obsidian37.Notice(t("ui.cross_cut_dropped_image_relations_0", String(droppedImageRelations)));
         ledgerFor(plugin).push({
           id,
           paths: [from, into],
@@ -62584,7 +63230,7 @@ ${request.requirements}` : preset.text,
       this.render();
     } catch (e) {
       this.render();
-      new import_obsidian36.Notice(t("ui.change_saved_refresh_failed"));
+      new import_obsidian37.Notice(t("ui.change_saved_refresh_failed"));
     }
   }
   async claimToCurrent(file) {
@@ -62768,7 +63414,7 @@ ${request.requirements}` : preset.text,
     this.updateHistoryButtons();
   }
   openDetails(node) {
-    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian36.Notice(error instanceof Error ? error.message : String(error)));
+    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian37.Notice(error instanceof Error ? error.message : String(error)));
   }
   async travel(redo) {
     if (this.map && this.path && (redo ? this.history.canRedo : this.history.canUndo) && await this.resolveMapConflict()) {
@@ -62811,7 +63457,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     if (!this.path || !this.map || this.closed) return;
-    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian36.TFile)) {
+    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian37.TFile)) {
       this.map = null;
       this.path = "";
       this.history.clear();
@@ -62865,7 +63511,7 @@ ${request.requirements}` : preset.text,
   /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
   exportCoverPath(notePath) {
     const file = this.app.vault.getAbstractFileByPath(notePath);
-    if (!(file instanceof import_obsidian36.TFile)) return null;
+    if (!(file instanceof import_obsidian37.TFile)) return null;
     const cover = resolveCoverWithFrame(
       this.app.metadataCache.getFileCache(file),
       (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
@@ -62912,7 +63558,7 @@ ${request.requirements}` : preset.text,
     const imageHref = async (path) => {
       var _a3, _b3;
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof import_obsidian36.TFile)) return null;
+      if (!(file instanceof import_obsidian37.TFile)) return null;
       if (!loaded.has(path)) {
         const data = await this.app.vault.readBinary(file);
         const mime = sniffImage(data);
@@ -63180,12 +63826,12 @@ ${request.requirements}` : preset.text,
         const got = await this.collectExportScene(isCurrent);
         if (!got || !isCurrent()) return;
         if (got.refuse) {
-          new import_obsidian36.Notice(t(got.refuse === "empty" ? "ui.export_empty" : "ui.export_refused_embedded"));
+          new import_obsidian37.Notice(t(got.refuse === "empty" ? "ui.export_empty" : "ui.export_refused_embedded"));
           return;
         }
         const limit = exportLimits(got.scene);
         if (limit.action === "refuse") {
-          new import_obsidian36.Notice(
+          new import_obsidian37.Notice(
             t(
               limit.reason === "embedded" ? "ui.export_refused_embedded" : limit.reason === "pixels" ? "ui.export_refused_pixels" : "ui.export_empty"
             )
@@ -63199,7 +63845,7 @@ ${request.requirements}` : preset.text,
           let scale = 1;
           if (limit.action === "scaleDown") {
             scale = limit.scale;
-            new import_obsidian36.Notice(t("ui.export_scaled", String(EXPORT_MAX_EDGE)));
+            new import_obsidian37.Notice(t("ui.export_scaled", String(EXPORT_MAX_EDGE)));
           } else if (Math.max(width, height) * 2 <= EXPORT_MAX_EDGE && width * height * 4 <= EXPORT_MAX_PIXELS)
             scale = 2;
           blob = await this.pngBlob(svg, width, height, scale);
@@ -63209,16 +63855,16 @@ ${request.requirements}` : preset.text,
       const name2 = `${exportFileStem(map.title)}.${format}`;
       if (target === "download") {
         this.downloadBlob(blob, name2);
-        new import_obsidian36.Notice(t("ui.export_downloaded", name2));
+        new import_obsidian37.Notice(t("ui.export_downloaded", name2));
         return;
       }
       const data = await blob.arrayBuffer();
       const destination = await this.app.fileManager.getAvailablePathForAttachment(name2, mapPath);
       if (!isCurrent()) return;
       await this.app.vault.createBinary(destination, data);
-      new import_obsidian36.Notice(t("ui.export_saved", destination));
+      new import_obsidian37.Notice(t("ui.export_saved", destination));
     } catch (error) {
-      if (isCurrent()) new import_obsidian36.Notice(t("ui.export_failed", errorMessage(error)));
+      if (isCurrent()) new import_obsidian37.Notice(t("ui.export_failed", errorMessage(error)));
     }
   }
   /**
@@ -63317,7 +63963,7 @@ ${request.requirements}` : preset.text,
   renameCurrentMap() {
     if (!this.map) return;
     if (this.aimActiveForPath(this.path)) {
-      new import_obsidian36.Notice(t("ui.aim_research_already_running"));
+      new import_obsidian37.Notice(t("ui.aim_research_already_running"));
       return;
     }
     new NameModal(
@@ -63346,11 +63992,11 @@ ${request.requirements}` : preset.text,
   async renameMapTo(title) {
     if (!this.map) return;
     if (this.aimActiveForPath(this.path)) {
-      new import_obsidian36.Notice(t("ui.aim_research_already_running"));
+      new import_obsidian37.Notice(t("ui.aim_research_already_running"));
       return;
     }
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
-      new import_obsidian36.Notice(t("ui.legacy_map_view_only"));
+      new import_obsidian37.Notice(t("ui.legacy_map_view_only"));
       return;
     }
     const before = clone(this.map), beforeRoot = this.plugin.repo.topicRoot(this.path);
@@ -63432,7 +64078,7 @@ ${request.requirements}` : preset.text,
     const deleted = this.deletedMap;
     if (!deleted || deleted.deleted) return;
     const file = this.app.vault.getAbstractFileByPath(deleted.path);
-    if (!(file instanceof import_obsidian36.TFile) || await this.app.vault.read(file) !== deleted.content)
+    if (!(file instanceof import_obsidian37.TFile) || await this.app.vault.read(file) !== deleted.content)
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
@@ -63538,7 +64184,7 @@ ${request.requirements}` : preset.text,
     this.settleCardHeights();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -63635,20 +64281,20 @@ ${request.requirements}` : preset.text,
     const switchMap = switcher.createEl("button", { cls: "vam-map-switch-button" });
     switchMap.setAttr("aria-label", t("ui.switch_mind_map"));
     switchMap.setAttr("title", t("ui.switch_mind_map"));
-    (0, import_obsidian36.setIcon)(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
+    (0, import_obsidian37.setIcon)(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switchMap.addEventListener("click", () => this.openMapSwitcher());
     if (this.map && !this.aimLive() && this.map.nodes.length) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
       newMap.createSpan({ text: t("ui.new_map") });
-      (0, import_obsidian36.setIcon)(newMap.createSpan("vam-new-map-icon"), "chevron-down");
+      (0, import_obsidian37.setIcon)(newMap.createSpan("vam-new-map-icon"), "chevron-down");
       newMap.addEventListener("click", (event) => {
         event.stopPropagation();
         this.openNewMapMenu(event);
       });
       this.iconButton(headerActions, "list-tree", t("ui.open_topic_outline"), () => {
-        void this.plugin.activateOutline(this).catch((error) => new import_obsidian36.Notice(String(error)));
+        void this.plugin.activateOutline(this).catch((error) => new import_obsidian37.Notice(String(error)));
       });
       const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
       undo.disabled = !this.history.canUndo;
@@ -63884,6 +64530,7 @@ ${request.requirements}` : preset.text,
     }) : null;
     const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
     const zoom = controls.createDiv("vam-zoom-controls");
+    (_L = this.usageControl) == null ? void 0 : _L.mount(zoom, controls);
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
       var _a3;
       this.markCanvasHintSeen();
@@ -63955,7 +64602,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_L = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _L.focus({ preventScroll: true });
+        (_M = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _M.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -63965,9 +64612,9 @@ ${request.requirements}` : preset.text,
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_M = this.stageEl.querySelector(
+        (_N = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _M.focus({ preventScroll: true });
+        )) == null ? void 0 : _N.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -64203,7 +64850,7 @@ ${request.requirements}` : preset.text,
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
-        (0, import_obsidian36.setTooltip)(tagButton, manualText);
+        (0, import_obsidian37.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
       const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
@@ -65130,14 +65777,14 @@ ${request.requirements}` : preset.text,
     let position = "top";
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
-      if (!(file instanceof import_obsidian36.TFile)) return null;
+      if (!(file instanceof import_obsidian37.TFile)) return null;
       const cover = resolveCoverWithFrame(
         this.app.metadataCache.getFileCache(file),
         (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
       );
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
-      source = image instanceof import_obsidian36.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
+      source = image instanceof import_obsidian37.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
       imagePath = cover.path;
       mask = cover.frame;
       size = cover.size;
@@ -65244,7 +65891,7 @@ ${request.requirements}` : preset.text,
     mark.setAttr("aria-label", text11);
     const icon = mark.createSpan({ cls: "vam-image-relations-mark-icon" });
     icon.setAttr("aria-hidden", "true");
-    (0, import_obsidian36.setIcon)(icon, "map-pin");
+    (0, import_obsidian37.setIcon)(icon, "map-pin");
     mark.createSpan({ cls: "vam-image-relations-mark-text", text: text11 });
   }
   paintCardMarkers(card, header, id) {
@@ -65492,7 +66139,7 @@ ${request.requirements}` : preset.text,
       this.paintHoverResearch();
     }
     const content = preview.createDiv("vam-hover-markdown");
-    void import_obsidian36.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
+    void import_obsidian37.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
     const host = workspace.getBoundingClientRect(), rect2 = card.getBoundingClientRect();
     const availableWidth = Math.max(180, host.width - 24);
     const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
@@ -65657,7 +66304,7 @@ ${request.requirements}` : preset.text,
               {
                 label: t("ui.rerun_standard"),
                 open: () => {
-                  if (this.path !== mapPath) new import_obsidian36.Notice(t("ui.rerun_standard_other_map"));
+                  if (this.path !== mapPath) new import_obsidian37.Notice(t("ui.rerun_standard_other_map"));
                   else this.rerunStandard(node);
                 }
               }
@@ -65682,7 +66329,7 @@ ${request.requirements}` : preset.text,
       var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
       if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
-        new import_obsidian36.Notice(t("ui.ai_locked_notice"));
+        new import_obsidian37.Notice(t("ui.ai_locked_notice"));
         return;
       }
       const sources = this.taskSourceSettings();
@@ -65795,7 +66442,7 @@ ${request.requirements}` : preset.text,
   openNodePanel(node, mode) {
     const render = (content, close, host) => this.renderInspector(content, node, mode, close, host);
     this.openMapModal(
-      new class extends import_obsidian36.Modal {
+      new class extends import_obsidian37.Modal {
         onOpen() {
           this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
           render(this.contentEl, () => this.close(), this.modalEl);
@@ -65827,16 +66474,16 @@ ${request.requirements}` : preset.text,
             const file = this.app.vault.getAbstractFileByPath(path);
             this.button(
               sources,
-              (_c = sourceNote == null ? void 0 : sourceNote.title) != null ? _c : file instanceof import_obsidian36.TFile ? file.basename : t("ui.0_moved", (_b2 = path.split("/").at(-1)) == null ? void 0 : _b2.replace(/\.md$/, "")),
+              (_c = sourceNote == null ? void 0 : sourceNote.title) != null ? _c : file instanceof import_obsidian37.TFile ? file.basename : t("ui.0_moved", (_b2 = path.split("/").at(-1)) == null ? void 0 : _b2.replace(/\.md$/, "")),
               () => {
                 close == null ? void 0 : close();
                 if (sourceNode) {
                   this.selection.setSelected(sourceNode.id);
                   this.render();
                   this.focusNode(sourceNode);
-                } else if (file instanceof import_obsidian36.TFile) void this.plugin.openDetails(file);
+                } else if (file instanceof import_obsidian37.TFile) void this.plugin.openDetails(file);
               },
-              !(sourceNode || file instanceof import_obsidian36.TFile)
+              !(sourceNode || file instanceof import_obsidian37.TFile)
             );
           }
         }
@@ -66058,7 +66705,7 @@ ${request.requirements}` : preset.text,
   async repairMissingTopic() {
     const broken = await this.plugin.repo.brokenTopics();
     if (!broken.length) {
-      new import_obsidian36.Notice(t("ui.no_topics_with_a_missing_map_md"));
+      new import_obsidian37.Notice(t("ui.no_topics_with_a_missing_map_md"));
       return;
     }
     new ChoiceModal(
@@ -66238,7 +66885,7 @@ ${request.requirements}` : preset.text,
         const relation = { kind: kind(), from: entry.anchorId, to: node.id };
         const image = findAnnotatedImage((_b3 = (_a3 = this.map) == null ? void 0 : _a3.canvasItems) != null ? _b3 : [], entry.imageId);
         if (!image || !anchorRelationAllowed(image, relation)) {
-          new import_obsidian36.Notice(t("ui.anchor_relation_not_added"));
+          new import_obsidian37.Notice(t("ui.anchor_relation_not_added"));
           return;
         }
         await this.changeCanvasItems(entry.imageId, (list) => addAnchorRelation(list, entry.imageId, relation));
@@ -66329,7 +66976,7 @@ ${request.requirements}` : preset.text,
     const render = (content, close) => {
       saveNote = this.renderAnchorRelationEditor(content, ref, close, onChanged);
     };
-    new class extends import_obsidian36.Modal {
+    new class extends import_obsidian37.Modal {
       onOpen() {
         this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
         render(this.contentEl, () => this.close());
@@ -66515,7 +67162,7 @@ ${request.requirements}` : preset.text,
     const render = (content, close) => {
       saveNote = this.renderRelationEditor(content, link, close, onChanged);
     };
-    new class extends import_obsidian36.Modal {
+    new class extends import_obsidian37.Modal {
       onOpen() {
         this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
         render(this.contentEl, () => this.close());
@@ -66903,7 +67550,7 @@ ${request.requirements}` : preset.text,
   openTopicLink(href) {
     const clean4 = normalizeTopicLink(href);
     if (!clean4) {
-      new import_obsidian36.Notice(t("ui.topic_link_blocked"));
+      new import_obsidian37.Notice(t("ui.topic_link_blocked"));
       return false;
     }
     window.open(clean4, "_blank", "noopener,noreferrer");
@@ -67182,7 +67829,7 @@ ${request.requirements}` : preset.text,
         const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === key2);
         if (node) return check("write", [node.id]);
         const file = this.app.vault.getAbstractFileByPath(key2);
-        const frontmatter2 = file instanceof import_obsidian36.TFile ? (_b2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _b2.frontmatter : void 0;
+        const frontmatter2 = file instanceof import_obsidian37.TFile ? (_b2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _b2.frontmatter : void 0;
         return frontmatter2 && readAiLocked(frontmatter2) ? refused : null;
       }
       default:
@@ -67283,7 +67930,7 @@ ${request.requirements}` : preset.text,
     const button = header.createEl("button", { cls: "vam-card-ai-lock" });
     cardAiLockButtons.set(card, button);
     button.type = "button";
-    (0, import_obsidian36.setIcon)(button, "lock");
+    (0, import_obsidian37.setIcon)(button, "lock");
     button.tabIndex = -1;
     button.setAttr("aria-label", t("ui.ai_unlock_card"));
     button.setAttr("title", t("ui.ai_unlock_card"));
@@ -67673,7 +68320,7 @@ ${request.requirements}` : preset.text,
     const interactive = suggestedTitle === void 0;
     const model = parent ? (await this.plugin.repo.resolveTopicModel(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).model : this.plugin.currentModelChoice().model;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
-      new import_obsidian36.Notice(t("ui.legacy_map_view_only"));
+      new import_obsidian37.Notice(t("ui.legacy_map_view_only"));
       return;
     }
     const defaultName = uniqueDefaultName(
@@ -67767,7 +68414,7 @@ ${request.requirements}` : preset.text,
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
-        else new import_obsidian36.Notice(message);
+        else new import_obsidian37.Notice(message);
         return;
       }
       if (!found) {
@@ -67825,7 +68472,7 @@ ${request.requirements}` : preset.text,
         outputLanguage: options == null ? void 0 : options.outputLanguage,
         accepted: acceptedCallback,
         failed,
-        notify: (message) => new import_obsidian36.Notice(message),
+        notify: (message) => new import_obsidian37.Notice(message),
         onStarted: () => {
           this.plugin.quickExpandPending.add(parent.path);
           this.render();
@@ -67854,6 +68501,7 @@ ${request.requirements}` : preset.text,
               outputLanguage: options == null ? void 0 : options.outputLanguage,
               ...await this.proposalTone(note, options),
               mode: "decompose",
+              ...this.usageMapField(),
               researchMode: (_b2 = options == null ? void 0 : options.researchMode) != null ? _b2 : "research",
               researchDepth: (_c = options == null ? void 0 : options.researchDepth) != null ? _c : "normal",
               visualMode: "off"
@@ -67897,7 +68545,7 @@ ${request.requirements}` : preset.text,
     if (new Set(roots).size !== roots.length) {
       this.plugin.topicRuns.dropPending(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
-      new import_obsidian36.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
+      new import_obsidian37.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
     }
     new ChildProposalModal(this.app, suggestions.slice(0, 15), (items) => {
@@ -67923,7 +68571,7 @@ ${request.requirements}` : preset.text,
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
           await this.startShallowResearch(parent, createdNodes, researchOptions);
       })().catch((error) => {
-        new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+        new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
       });
     }).open();
   }
@@ -68177,7 +68825,7 @@ ${request.requirements}` : preset.text,
     if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const key2 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key2)) {
-      new import_obsidian36.Notice(t("ui.multi_research_already_running"));
+      new import_obsidian37.Notice(t("ui.multi_research_already_running"));
       return;
     }
     const selected = [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
@@ -68199,19 +68847,19 @@ ${request.requirements}` : preset.text,
       await confirmEach(0, async () => {
         var _a2;
         if (this.plugin.expansionCoordinator.isRunning(key2)) {
-          new import_obsidian36.Notice(t("ui.multi_research_already_running"));
+          new import_obsidian37.Notice(t("ui.multi_research_already_running"));
           return;
         }
         const busy = (node) => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.topicRuns.hasTask(node.path);
         const unlocked = selected.filter((node) => !this.aiLockReason("write", [node.id]));
         if (unlocked.length < selected.length)
-          new import_obsidian36.Notice(t("ui.ai_locked_skipped_0", selected.length - unlocked.length));
+          new import_obsidian37.Notice(t("ui.ai_locked_skipped_0", selected.length - unlocked.length));
         const nodes = unlocked.filter((node) => !busy(node));
         if (!nodes.length) {
-          if (unlocked.length) new import_obsidian36.Notice(t("ui.multi_research_all_skipped"));
+          if (unlocked.length) new import_obsidian37.Notice(t("ui.multi_research_all_skipped"));
           return;
         }
-        if (nodes.length < unlocked.length) new import_obsidian36.Notice(t("ui.multi_research_skipped", unlocked.length - nodes.length));
+        if (nodes.length < unlocked.length) new import_obsidian37.Notice(t("ui.multi_research_skipped", unlocked.length - nodes.length));
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const shared2 = {
@@ -68270,7 +68918,7 @@ ${request.requirements}` : preset.text,
               const state = this.plugin.expansionBatches.get(key2);
               if (state && state.status !== "running" && !reported) {
                 reported = true;
-                new import_obsidian36.Notice(
+                new import_obsidian37.Notice(
                   [
                     t(
                       state.status === "stopped" ? "ui.multi_research_stopped" : "ui.multi_research_finished",
@@ -68433,7 +69081,7 @@ ${request.requirements}` : preset.text,
     const help = this.button(
       selection,
       t("ui.selection_help"),
-      () => new import_obsidian36.Notice(t("ui.drag_to_select_topics_hint"), 12e3)
+      () => new import_obsidian37.Notice(t("ui.drag_to_select_topics_hint"), 12e3)
     );
     help.setAttr("aria-label", t("ui.selection_help_hint"));
     help.setAttr("title", t("ui.selection_help_hint"));
@@ -68543,7 +69191,7 @@ ${request.requirements}` : preset.text,
     const paths = [...section3.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map((match) => {
       var _a2, _b2;
       const link = match[1], direct = link.endsWith(".md") ? link : `${link}.md`;
-      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian36.TFile) return direct;
+      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian37.TFile) return direct;
       return (_b2 = (_a2 = this.app.metadataCache.getFirstLinkpathDest(link, ownerPath)) == null ? void 0 : _a2.path) != null ? _b2 : direct;
     });
     return [...new Set(paths)];
@@ -68595,6 +69243,7 @@ ${request.requirements}` : preset.text,
             outputLanguage: options.outputLanguage,
             ...await this.proposalTone(note, options),
             mode: "synthesize",
+            ...this.usageMapField(),
             researchMode: options.researchMode,
             researchDepth: options.researchDepth,
             visualMode: "off"
@@ -68707,6 +69356,7 @@ ${request.requirements}` : preset.text,
             outputLanguage: options == null ? void 0 : options.outputLanguage,
             ...synthesisStyle.tone,
             mode: "synthesize",
+            ...this.usageMapField(),
             researchMode: (_c = options == null ? void 0 : options.researchMode) != null ? _c : "local",
             researchDepth: (_d = options == null ? void 0 : options.researchDepth) != null ? _d : "normal",
             visualMode: (_e = options == null ? void 0 : options.visualMode) != null ? _e : note.visualMode,
@@ -68749,7 +69399,7 @@ ${request.requirements}` : preset.text,
       },
       queueCharts: (job) => this.queueCharts(job),
       failed,
-      notify: (message) => new import_obsidian36.Notice(message),
+      notify: (message) => new import_obsidian37.Notice(message),
       onSettled: async () => {
         await this.hydrate();
         this.render();
@@ -68910,7 +69560,7 @@ ${request.requirements}` : preset.text,
             node,
             { ...task.options, continuesDirections: task.step === "draft" },
             task.step === "directions" ? null : task.direction,
-            (message) => new import_obsidian36.Notice(message),
+            (message) => new import_obsidian37.Notice(message),
             () => {
             }
           );
@@ -68921,12 +69571,12 @@ ${request.requirements}` : preset.text,
   /** Multi-select synthesis: the same dialog and flow as a single topic's, over the selected topics. */
   integrateSelected() {
     if (!this.map || this.selection.state.multiSelected.size < 2) {
-      new import_obsidian36.Notice(t("ui.select_at_least_two_topics"));
+      new import_obsidian37.Notice(t("ui.select_at_least_two_topics"));
       return;
     }
     const task = this.integrationTask && this.integrationTask.mapPath === this.path ? this.integrationTask : null;
     if ((task == null ? void 0 : task.state) === "running") {
-      new import_obsidian36.Notice(t("ui.ai_running_ai"));
+      new import_obsidian37.Notice(t("ui.ai_running_ai"));
       return;
     }
     this.openSelectionSynthesis((task == null ? void 0 : task.state) === "directions" ? task : null);
@@ -69155,6 +69805,7 @@ ${request.requirements}` : preset.text,
             outputLanguage: runOptions.outputLanguage,
             ...await this.proposalTone(void 0, runOptions),
             mode: "synthesize",
+            ...this.usageMapField(),
             researchMode: runOptions.researchMode,
             researchDepth: runOptions.researchDepth,
             visualMode: "off"
@@ -69186,6 +69837,7 @@ ${request.requirements}` : preset.text,
           outputLanguage: runOptions.outputLanguage,
           ...integrationStyle.toneText ? { toneText: integrationStyle.toneText } : {},
           mode: "synthesize",
+          ...this.usageMapField(),
           researchMode: (_g = runOptions.researchMode) != null ? _g : "local",
           researchDepth: (_h = runOptions.researchDepth) != null ? _h : "normal",
           visualMode: (_i = runOptions.visualMode) != null ? _i : "auto",
@@ -69281,7 +69933,7 @@ ${request.requirements}` : preset.text,
           task.sources,
           { ...retained, synthesisTitle: task.title, continuesDirections: task.directions.length > 0 },
           task.step === "directions" ? null : task.goal,
-          (message) => new import_obsidian36.Notice(message),
+          (message) => new import_obsidian37.Notice(message),
           () => {
           }
         );
@@ -69385,7 +70037,7 @@ ${note.detail.trim()}` : "",
       );
       integrated.parentId = null;
       integrated.x = Math.max(...sources.map((node) => node.x)) + 340;
-      integrated.y = sources.reduce((sum, node) => sum + node.y, 0) / sources.length;
+      integrated.y = sources.reduce((sum2, node) => sum2 + node.y, 0) / sources.length;
       const previousEntry = this.history.undoEntry;
       try {
         await this.mapChangeSnapshots(
@@ -69446,7 +70098,7 @@ ${note.detail.trim()}` : "",
           this.focusNode(integrated);
         } catch (e) {
           this.render();
-          new import_obsidian36.Notice(t("ui.synthesis_saved_refresh_failed"));
+          new import_obsidian37.Notice(t("ui.synthesis_saved_refresh_failed"));
         }
         return;
       }
@@ -69747,7 +70399,7 @@ ${note.detail.trim()}` : "",
       const hint = t("ui.fit_clamped");
       (_b2 = this.announcer) == null ? void 0 : _b2.setText(hint);
       (_c = this.fitNotice) == null ? void 0 : _c.hide();
-      this.fitNotice = new import_obsidian36.Notice(hint);
+      this.fitNotice = new import_obsidian37.Notice(hint);
     }
   }
   setupPan() {
@@ -70236,7 +70888,7 @@ ${note.detail.trim()}` : "",
     const doc = this.contentEl.ownerDocument;
     for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "markdown")) != null ? _c : []) {
       const view = leaf.view;
-      if (!(view instanceof import_obsidian36.MarkdownView) || !view.file) continue;
+      if (!(view instanceof import_obsidian37.MarkdownView) || !view.file) continue;
       const el = view.containerEl;
       if (!el || doc && el.ownerDocument !== doc || !el.isShown()) continue;
       if (!shown.includes(view.file.path)) shown.push(view.file.path);
@@ -70249,7 +70901,7 @@ ${note.detail.trim()}` : "",
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
-      if (file instanceof import_obsidian36.TFile && file.extension === "md") return file;
+      if (file instanceof import_obsidian37.TFile && file.extension === "md") return file;
     }
     return null;
   }
@@ -70262,8 +70914,8 @@ ${note.detail.trim()}` : "",
     const workspace = this.app.workspace;
     const open = /* @__PURE__ */ new Set();
     for (const leaf of (_b2 = (_a2 = workspace.getLeavesOfType) == null ? void 0 : _a2.call(workspace, "markdown")) != null ? _b2 : [])
-      if (leaf.view instanceof import_obsidian36.MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
-    const live = (_e = (_d = (_c = workspace.getActiveViewOfType) == null ? void 0 : _c.call(workspace, import_obsidian36.MarkdownView)) == null ? void 0 : _d.file) == null ? void 0 : _e.path;
+      if (leaf.view instanceof import_obsidian37.MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
+    const live = (_e = (_d = (_c = workspace.getActiveViewOfType) == null ? void 0 : _c.call(workspace, import_obsidian37.MarkdownView)) == null ? void 0 : _d.file) == null ? void 0 : _e.path;
     const candidates = [
       live,
       this.lastMarkdownPath && open.has(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
@@ -70271,21 +70923,21 @@ ${note.detail.trim()}` : "",
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
-      if (file instanceof import_obsidian36.TFile && file.extension === "md") return file;
+      if (file instanceof import_obsidian37.TFile && file.extension === "md") return file;
     }
     return null;
   }
   openMarkdownEditor(path) {
     var _a2, _b2, _c, _d;
     for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "markdown")) != null ? _c : [])
-      if (leaf.view instanceof import_obsidian36.MarkdownView && ((_d = leaf.view.file) == null ? void 0 : _d.path) === path) return leaf.view.editor;
+      if (leaf.view instanceof import_obsidian37.MarkdownView && ((_d = leaf.view.file) == null ? void 0 : _d.path) === path) return leaf.view.editor;
     return null;
   }
   /** A vault note's text as it is right now (an open note is read from its editor, which may hold unsaved typing). */
   async readChatFile(path) {
     const key2 = normalizeVaultPath(path);
     const file = key2 ? this.app.vault.getAbstractFileByPath(key2) : null;
-    if (!(file instanceof import_obsidian36.TFile)) return null;
+    if (!(file instanceof import_obsidian37.TFile)) return null;
     const editor = this.openMarkdownEditor(file.path);
     return { file, editor, text: editor ? editor.getValue() : await this.app.vault.read(file) };
   }
@@ -70489,14 +71141,14 @@ ${note.detail.trim()}` : "",
     const abandon = (reason) => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
       if (!chat.retract(turn, again ? void 0 : draft)) return;
-      if (reason !== void 0) new import_obsidian36.Notice(reason);
+      if (reason !== void 0) new import_obsidian37.Notice(reason);
     };
     const stopPreparing = () => abandon();
     this.chatPrepAbandon = stopPreparing;
     const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request;
     try {
-      request = await this.buildChatRequest(message, chat, origin);
+      request = { ...await this.buildChatRequest(message, chat, origin), ...this.usageMapField() };
     } catch (error) {
       abandon(this.closed ? void 0 : errorMessage(error));
       return;
@@ -71804,7 +72456,7 @@ ${note.detail.trim()}` : "",
     this.history.push({
       undo: async () => {
         const file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof import_obsidian36.TFile) || await this.chatFileText(path) !== content) throw this.chatUndoRefusal();
+        if (!(file instanceof import_obsidian37.TFile) || await this.chatFileText(path) !== content) throw this.chatUndoRefusal();
         await this.app.fileManager.trashFile(file);
       },
       redo: async () => {
@@ -71828,7 +72480,7 @@ ${note.detail.trim()}` : "",
     for (const node of map.nodes)
       if (noteIds.has(node.id)) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
-        notes.push([node.id, file instanceof import_obsidian36.TFile ? await this.app.vault.read(file) : null]);
+        notes.push([node.id, file instanceof import_obsidian37.TFile ? await this.app.vault.read(file) : null]);
       }
     const texts2 = [];
     for (const path of files) texts2.push([path, await this.chatFileText(path)]);
@@ -72158,7 +72810,7 @@ ${addition}` : addition });
   }
   /** The bytes of a picked picture (a seam: it needs the network). */
   async chatFetchImage(url) {
-    return (await (0, import_obsidian36.requestUrl)({ url, method: "GET", throw: true })).arrayBuffer;
+    return (await (0, import_obsidian37.requestUrl)({ url, method: "GET", throw: true })).arrayBuffer;
   }
   /**
    * Makes a picked web picture the card's cover: only when the card has no cover and has not turned it off (a cover set by hand,
@@ -72176,7 +72828,7 @@ ${addition}` : addition });
     const hasNoCover = (node2) => {
       var _a2;
       const file = this.app.vault.getAbstractFileByPath(node2.path);
-      if (!(file instanceof import_obsidian36.TFile)) return false;
+      if (!(file instanceof import_obsidian37.TFile)) return false;
       const cache = this.app.metadataCache.getFileCache(file);
       const declared = (_a2 = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _a2["topic-cover"];
       if (declared !== void 0 && declared !== null) return false;
@@ -72194,7 +72846,7 @@ ${addition}` : addition });
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().createAttachment("image", { name: name2, data, sourcePath: node.path }).rewriteNote(node.path, async (path, attachment) => {
       const note = this.app.vault.getAbstractFileByPath(path);
-      if (!(note instanceof import_obsidian36.TFile)) throw new Error(path);
+      if (!(note instanceof import_obsidian37.TFile)) throw new Error(path);
       const link = attachment("image");
       await this.app.vault.process(note, (content) => withCover(appendImageEmbed(content, link), link));
     }).editMap(this.path, (map) => {
@@ -72296,10 +72948,10 @@ ${addition}` : addition });
     }
     if (written2.error !== void 0) {
       const reason = t("ui.map_chat_save_failed_0", errorMessage(written2.error));
-      new import_obsidian36.Notice(reason);
+      new import_obsidian37.Notice(reason);
       return { ok: false, reason };
     }
-    new import_obsidian36.Notice(t("ui.map_chat_saved_0", written2.path));
+    new import_obsidian37.Notice(t("ui.map_chat_saved_0", written2.path));
     return { ok: true, path: written2.path };
   }
   /**
@@ -72311,7 +72963,7 @@ ${addition}` : addition });
   async chatExpand(parent, direction) {
     var _a2;
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
-      new import_obsidian36.Notice(t("ui.ai_running_ai"));
+      new import_obsidian37.Notice(t("ui.ai_running_ai"));
       return;
     }
     const controller = new AbortController();
@@ -72322,7 +72974,7 @@ ${addition}` : addition });
     try {
       const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
       if (note.aiLocked) {
-        new import_obsidian36.Notice(t("ui.ai_locked_notice"));
+        new import_obsidian37.Notice(t("ui.ai_locked_notice"));
         return;
       }
       const outline = this.quickOutline(parent);
@@ -72345,7 +72997,7 @@ ${addition}` : addition });
       const { nodes } = limitOutline(generated, limits);
       const items = outlineProposals(nodes);
       if (!items.length) {
-        new import_obsidian36.Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
+        new import_obsidian37.Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
         return;
       }
       await outline.create(proposalOutline(items), {
@@ -72360,7 +73012,7 @@ ${addition}` : addition });
         )
       });
     } catch (error) {
-      if (!controller.signal.aborted) new import_obsidian36.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
+      if (!controller.signal.aborted) new import_obsidian37.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
     } finally {
       if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
       this.plugin.running.delete(parent.path);
@@ -72431,7 +73083,7 @@ ${addition}` : addition });
       void this.plugin.confirmAiUsage(model, async () => {
         await start(
           (message) => {
-            if (settled) new import_obsidian36.Notice(message);
+            if (settled) new import_obsidian37.Notice(message);
             else settle({ status: "failed", reason: message });
           },
           () => settle({ status: "done" })
@@ -72879,7 +73531,7 @@ ${addition}` : addition });
           if (!group || !travelled || this.relevanceSortOn()) return;
           setHover(locked || overChat ? null : targetAt(e));
           if (locked || timelineBlocked && !hover) {
-            if (!warned) new import_obsidian36.Notice(t(locked ? "ui.merge_locked" : "ui.group_drag_timeline_top_level"));
+            if (!warned) new import_obsidian37.Notice(t(locked ? "ui.merge_locked" : "ui.group_drag_timeline_top_level"));
             warned = true;
             return;
           }
@@ -72892,7 +73544,7 @@ ${addition}` : addition });
         if (this.relevanceSortOn()) return;
         moved || (moved = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3);
         if (moved && locked) {
-          if (!warned) new import_obsidian36.Notice(t("ui.merge_locked"));
+          if (!warned) new import_obsidian37.Notice(t("ui.merge_locked"));
           warned = true;
         }
         if (!moved || locked) return;
@@ -72961,7 +73613,7 @@ ${addition}` : addition });
           }
           if (landed) {
             putBack();
-            if (landed.invalid) new import_obsidian36.Notice(t("ui.circular_links_are_not_allowed"));
+            if (landed.invalid) new import_obsidian37.Notice(t("ui.circular_links_are_not_allowed"));
             else this.enqueue(() => this.moveBranches(this.selectedRoots(), landed.node));
             return;
           }
@@ -72987,7 +73639,7 @@ ${addition}` : addition });
         } else if (moved && landed) {
           putBack();
           const dragged = (_c2 = this.map) == null ? void 0 : _c2.nodes.find((item) => item.id === node.id);
-          if (landed.invalid) new import_obsidian36.Notice(t("ui.circular_links_are_not_allowed"));
+          if (landed.invalid) new import_obsidian37.Notice(t("ui.circular_links_are_not_allowed"));
           else if (dragged) this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
           paint();
@@ -73648,7 +74300,7 @@ ${addition}` : addition });
     const issue2 = issues.blockIssues[0];
     if (!issue2 || (gate == null ? void 0 : gate.shown)) return;
     if (gate) gate.shown = true;
-    new import_obsidian36.Notice(t("ui.preview_issue_0_1_2", (_a2 = issue2.fileName) != null ? _a2 : issue2.id, issue2.line, styleIssueText(issue2)));
+    new import_obsidian37.Notice(t("ui.preview_issue_0_1_2", (_a2 = issue2.fileName) != null ? _a2 : issue2.id, issue2.line, styleIssueText(issue2)));
   }
   /**
    * The structure set for a topic type was not found: say so, once per `gate`. The topic's own missing structure is told by
@@ -73659,7 +74311,7 @@ ${addition}` : addition });
     const ref = (_a2 = this.plugin.settings.noteStyleByKind) == null ? void 0 : _a2[kind];
     if (!ref || ref === topicTemplateId || !issues.missing.includes(ref) || (gate == null ? void 0 : gate.shown)) return;
     if (gate) gate.shown = true;
-    new import_obsidian36.Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
+    new import_obsidian37.Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
   }
   /**
    * The note style of the AIM conclusion note (the "aim" row). A row that cannot be read, or whose structure the AIM
@@ -73679,7 +74331,7 @@ ${addition}` : addition });
     const unusable = !style.recipe.aimDelivery && (sections === 0 || sections > AIM_MAX_SECTIONS);
     if (ref && (style.issues.missing.includes(ref) || unusable) && !this.aimStyleNoticed.has(this.path)) {
       this.aimStyleNoticed.add(this.path);
-      new import_obsidian36.Notice(
+      new import_obsidian37.Notice(
         t("ui.note_style_kind_missing_0_1", t("ui.note_style_kind_aim"), ref.replace(/^(?:builtin|file):/, ""))
       );
     }
@@ -73782,12 +74434,12 @@ ${addition}` : addition });
     const vault = this.app.vault;
     const folderAt = (path) => {
       const found = vault.getAbstractFileByPath(path);
-      return found instanceof import_obsidian36.TFolder ? found : null;
+      return found instanceof import_obsidian37.TFolder ? found : null;
     };
     return {
       readRaw: async (path) => {
         const file = vault.getAbstractFileByPath(path);
-        if (!(file instanceof import_obsidian36.TFile)) throw new Error(path);
+        if (!(file instanceof import_obsidian37.TFile)) throw new Error(path);
         return vault.read(file);
       },
       backupNote: (path, content) => {
@@ -73802,7 +74454,7 @@ ${addition}` : addition });
             folderExists: async (candidate) => exists(candidate),
             list: async (folder) => {
               var _a3, _b2;
-              return ((_b2 = (_a3 = folderAt(folder)) == null ? void 0 : _a3.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian36.TFile).map((child) => child.name);
+              return ((_b2 = (_a3 = folderAt(folder)) == null ? void 0 : _a3.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian37.TFile).map((child) => child.name);
             },
             createFolder: async (folder) => {
               await vault.createFolder(folder);
@@ -73812,7 +74464,7 @@ ${addition}` : addition });
             },
             read: async (file) => {
               const found = vault.getAbstractFileByPath(file);
-              if (!(found instanceof import_obsidian36.TFile)) throw new Error(file);
+              if (!(found instanceof import_obsidian37.TFile)) throw new Error(file);
               return vault.read(found);
             }
           },
@@ -73832,11 +74484,12 @@ ${addition}` : addition });
       ...this.writebackHooks(),
       origin: this,
       map: (_a2 = this.map) != null ? _a2 : void 0,
+      usageMapPath: this.path || void 0,
       request,
       runOnce,
       done,
       failed,
-      notify: (message) => new import_obsidian36.Notice(message),
+      notify: (message) => new import_obsidian37.Notice(message),
       accepted: onLaunchAccepted,
       resolveStyle: (language2) => this.detailTemplateFor(node, void 0, void 0, language2),
       ancestors: (language2) => this.ancestorContext(node, language2),
@@ -73907,10 +74560,10 @@ async function applyMathRepair(vault, plan) {
 }
 
 // main.ts
-var import_obsidian47 = require("obsidian");
+var import_obsidian48 = require("obsidian");
 
 // ui/modals/prompt-preview-modal.ts
-var import_obsidian37 = require("obsidian");
+var import_obsidian38 = require("obsidian");
 
 // core/blocks/prompt-preview.ts
 var PREVIEW_STEPS = [
@@ -73981,7 +74634,7 @@ var GROUP_KEYS = {
   fixed: "ui.preview_group_fixed",
   input: "ui.preview_group_input"
 };
-var PromptPreviewModal = class extends import_obsidian37.Modal {
+var PromptPreviewModal = class extends import_obsidian38.Modal {
   constructor(app, store, language2, provider, trigger, styleOf) {
     super(app);
     this.store = store;
@@ -74081,7 +74734,7 @@ var PromptPreviewModal = class extends import_obsidian37.Modal {
 };
 
 // ui/settings-tab.ts
-var import_obsidian40 = require("obsidian");
+var import_obsidian41 = require("obsidian");
 
 // ai/note-style-card-voices.ts
 var CARD_VOICES = [
@@ -74123,10 +74776,10 @@ function renderRadioGroup(parent, label, choices, current, pick, idPrefix = "vam
 }
 
 // ui/modals/note-style-manage-modal.ts
-var import_obsidian39 = require("obsidian");
+var import_obsidian40 = require("obsidian");
 
 // ui/modals/note-style-editor-modal.ts
-var import_obsidian38 = require("obsidian");
+var import_obsidian39 = require("obsidian");
 
 // ai/note-style-structure-edit.ts
 function splitStructure(text11) {
@@ -74229,7 +74882,7 @@ var UPDATE_DESC_KEYS = {
 };
 var plainMd = (value) => value.replace(/\s+/g, " ").trim().replace(/[!-/:-@[-`{-~]/g, "\\$&");
 var EXAMPLE_DELAY_MS = 200;
-var NoteStyleEditorModal = class extends import_obsidian38.Modal {
+var NoteStyleEditorModal = class extends import_obsidian39.Modal {
   constructor(app, plugin, options) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     super(app);
@@ -74247,7 +74900,7 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
     /** The voice the style had when the window opened, and whether the source wrote its own voice and format keys. */
     __publicField(this, "voiceKey");
     __publicField(this, "formatRef");
-    __publicField(this, "component", new import_obsidian38.Component());
+    __publicField(this, "component", new import_obsidian39.Component());
     /** The child that owns the sample on screen now; the next picture replaces it, so the children do not pile up. */
     __publicField(this, "exampleChild");
     __publicField(this, "closed", false);
@@ -74295,7 +74948,7 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
     const { contentEl } = this;
     this.modalEl.addClass("vam-editor-modal");
     this.titleEl.setText(t(this.options.source ? "ui.editor_title_edit" : "ui.editor_title_new"));
-    const nameRow = new import_obsidian38.Setting(contentEl).setName(t("ui.editor_name"));
+    const nameRow = new import_obsidian39.Setting(contentEl).setName(t("ui.editor_name"));
     nameRow.settingEl.addClass("vam-editor-row");
     nameRow.addText((text11) => {
       const input2 = text11.inputEl;
@@ -74684,10 +75337,10 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
     const token = ++this.renderToken;
     const markdown = this.exampleMarkdown();
     const next = host.createDiv({ cls: "vam-editor-example-body" });
-    const child = new import_obsidian38.Component();
+    const child = new import_obsidian39.Component();
     this.component.addChild(child);
     try {
-      await import_obsidian38.MarkdownRenderer.render(this.app, markdown, next, "", child);
+      await import_obsidian39.MarkdownRenderer.render(this.app, markdown, next, "", child);
     } catch (e) {
       next.remove();
       this.component.removeChild(child);
@@ -74746,7 +75399,7 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
       const kindName = (kind) => t(kind === "aim" ? "ui.note_style_kind_aim" : `ui.topic_kind_${kind}`);
       if (switched.length) {
         for (const kind of switched) await this.plugin.setKindStyle(kind, result.ref);
-        new import_obsidian38.Notice(
+        new import_obsidian39.Notice(
           t(
             "ui.recipe_notice_switched_0_1",
             result.ref.slice("file:".length),
@@ -74757,9 +75410,9 @@ var NoteStyleEditorModal = class extends import_obsidian38.Modal {
       if (this.draft.applyAll) {
         const kept = this.kindsWithOwnVoice(result.ref);
         await this.plugin.setGlobalPart("voice", this.draft.voice);
-        new import_obsidian38.Notice(t("ui.editor_apply_notice_0", this.voiceName()));
+        new import_obsidian39.Notice(t("ui.editor_apply_notice_0", this.voiceName()));
         if (kept.length)
-          new import_obsidian38.Notice(t("ui.editor_apply_kept_0", kept.map(kindName).join(t("ui.manage_list_separator"))));
+          new import_obsidian39.Notice(t("ui.editor_apply_kept_0", kept.map(kindName).join(t("ui.manage_list_separator"))));
       }
       this.forceClose = true;
       super.close();
@@ -74799,7 +75452,7 @@ function styleKindName(kind) {
   return kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`);
 }
 var lower5 = (value) => value.toLocaleLowerCase();
-var NoteStyleManageModal = class extends import_obsidian39.Modal {
+var NoteStyleManageModal = class extends import_obsidian40.Modal {
   constructor(app, plugin, initialTab = "recipe", trigger, onClosed) {
     super(app);
     this.plugin = plugin;
@@ -74941,7 +75594,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
     list.empty();
     this.editButtons.clear();
     for (const entry of this.entries()) {
-      const setting = new import_obsidian39.Setting(list);
+      const setting = new import_obsidian40.Setting(list);
       setting.settingEl.addClass("vam-manage-row");
       setting.setName(entry.name);
       if (entry.builtin) setting.nameEl.createSpan({ text: t("ui.block_group_builtin"), cls: "vam-manage-badge" });
@@ -75132,7 +75785,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
       try {
         ref = await this.plugin.noteStyles.duplicateFile(this.category, entry.ref);
       } catch (e) {
-        new import_obsidian39.Notice(t("ui.manage_create_failed"));
+        new import_obsidian40.Notice(t("ui.manage_create_failed"));
       }
       await this.redraw(ref != null ? ref : entry.ref);
     } finally {
@@ -75231,7 +75884,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
     try {
       const result = await this.plugin.noteStyles.trashFiles(this.unusedCopies());
       if (result.failed.length)
-        new import_obsidian39.Notice(t("ui.manage_trash_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+        new import_obsidian40.Notice(t("ui.manage_trash_failed_0", result.failed.join(t("ui.manage_list_separator"))));
       this.trashed = result.trashed.length ? result.trashed : void 0;
       await this.redraw(null);
     } finally {
@@ -75244,7 +75897,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
     try {
       const result = await this.plugin.noteStyles.restoreTrashed(this.trashed);
       if (result.failed.length)
-        new import_obsidian39.Notice(t("ui.manage_undo_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+        new import_obsidian40.Notice(t("ui.manage_undo_failed_0", result.failed.join(t("ui.manage_list_separator"))));
       this.trashed = void 0;
       await this.redraw(null);
     } finally {
@@ -75328,7 +75981,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
     const fromRadio = radio("from", t("ui.manage_add_from"));
     const blankRadio = radio("blank", t("ui.manage_add_blank"));
     let sourceSelect;
-    new import_obsidian39.Setting(form).setName(t("ui.manage_add_source")).addDropdown((dropdown) => {
+    new import_obsidian40.Setting(form).setName(t("ui.manage_add_source")).addDropdown((dropdown) => {
       sourceSelect = dropdown.selectEl;
       dropdown.selectEl.setAttr("aria-label", t("ui.manage_add_source"));
       dropdown.onChange((value) => {
@@ -75339,7 +75992,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
     });
     let nameInput;
     const errorId = `vam-manage-error-${tab}`;
-    new import_obsidian39.Setting(form).setName(t("ui.manage_add_name")).addText((text11) => {
+    new import_obsidian40.Setting(form).setName(t("ui.manage_add_name")).addText((text11) => {
       nameInput = text11.inputEl;
       text11.inputEl.setAttr("aria-label", t("ui.manage_add_name"));
       text11.inputEl.setAttr("aria-describedby", errorId);
@@ -75360,7 +76013,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
       attr: { id: errorId, "aria-live": "polite" }
     });
     let createButton;
-    new import_obsidian39.Setting(form).addButton((button) => {
+    new import_obsidian40.Setting(form).addButton((button) => {
       createButton = button;
       button.setButtonText(t("ui.manage_add_create")).setCta().onClick(() => void create());
     });
@@ -75435,7 +76088,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
         try {
           target = await this.plugin.noteStyles.createPart(tab, from, name2);
         } catch (e) {
-          new import_obsidian39.Notice(t("ui.manage_create_failed"));
+          new import_obsidian40.Notice(t("ui.manage_create_failed"));
         }
         if (target) target = (_a2 = await this.plugin.editNotePart(tab, target)) != null ? _a2 : target;
         if (!target) return;
@@ -75459,7 +76112,7 @@ var NoteStyleManageModal = class extends import_obsidian39.Modal {
     check();
   }
 };
-var RenameDialog = class extends import_obsidian39.Modal {
+var RenameDialog = class extends import_obsidian40.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -75523,7 +76176,7 @@ var RenameDialog = class extends import_obsidian39.Modal {
     if (!this.done) this.opts.trigger.focus();
   }
 };
-var ConfirmDialog = class extends import_obsidian39.Modal {
+var ConfirmDialog = class extends import_obsidian40.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -75559,7 +76212,7 @@ var ConfirmDialog = class extends import_obsidian39.Modal {
     if (!this.done) this.opts.trigger.focus();
   }
 };
-var ViewDialog = class extends import_obsidian39.Modal {
+var ViewDialog = class extends import_obsidian40.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -75681,7 +76334,7 @@ function renderNoteLocationSetting(setting, plugin, refresh) {
     });
     setting.addButton(
       (button) => button.setButtonText(t("ui.note_style_folder_choose")).onClick(async () => {
-        const value = (0, import_obsidian40.normalizePath)(input2.trim());
+        const value = (0, import_obsidian41.normalizePath)(input2.trim());
         if (!input2.trim() || value === ".") return;
         settings.noteStylesFolder = value;
         await plugin.saveSettings();
@@ -75850,7 +76503,7 @@ function renderMyStylesSetting(setting, plugin) {
     const own2 = (items) => items.filter((item) => item.kind === "file").length;
     const styles = own2(store.listRecipes());
     const parts = ["structure", "voice", "format"].reduce(
-      (sum, category) => sum + own2(store.listParts(category)),
+      (sum2, category) => sum2 + own2(store.listParts(category)),
       0
     );
     setting.setName(t("ui.my_styles_count_0_1", styles, parts));
@@ -75911,7 +76564,7 @@ function bindMapFolderInput(plugin, key2, input2) {
   });
 }
 var offersEveryLanguage = (values) => SUPPORTED_LANGUAGES.every((item) => values.includes(item.id));
-var CodexSetupModal = class extends import_obsidian40.Modal {
+var CodexSetupModal = class extends import_obsidian41.Modal {
   constructor(app, executable, recheck) {
     super(app);
     this.executable = executable;
@@ -75935,7 +76588,7 @@ var CodexSetupModal = class extends import_obsidian40.Modal {
       cls: "vam-setup-note"
     });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian40.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
       (button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
@@ -75943,7 +76596,7 @@ var CodexSetupModal = class extends import_obsidian40.Modal {
     );
   }
 };
-var AiUsageModal = class extends import_obsidian40.Modal {
+var AiUsageModal = class extends import_obsidian41.Modal {
   constructor(app, provider, resolve) {
     super(app);
     this.provider = provider;
@@ -75964,7 +76617,7 @@ var AiUsageModal = class extends import_obsidian40.Modal {
       this.close();
       this.resolve(confirmed);
     };
-    new import_obsidian40.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
+    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
       (button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true))
     );
   }
@@ -75972,7 +76625,7 @@ var AiUsageModal = class extends import_obsidian40.Modal {
     if (!this.settled) this.resolve(false);
   }
 };
-var ClaudeSetupModal = class extends import_obsidian40.Modal {
+var ClaudeSetupModal = class extends import_obsidian41.Modal {
   constructor(app, executable, url, recheck) {
     super(app);
     this.executable = executable;
@@ -75992,7 +76645,7 @@ var ClaudeSetupModal = class extends import_obsidian40.Modal {
     });
     steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian40.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
       (button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
@@ -76000,7 +76653,7 @@ var ClaudeSetupModal = class extends import_obsidian40.Modal {
     );
   }
 };
-var VisualAgentMapSettingTab = class extends import_obsidian40.PluginSettingTab {
+var VisualAgentMapSettingTab = class extends import_obsidian41.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -76584,10 +77237,10 @@ var PendingSuggestions = class extends Map {
 };
 
 // ui/outline-view.ts
-var import_obsidian41 = require("obsidian");
+var import_obsidian42 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 var foldOutlineSearch = (text11) => toSimplifiedFold(text11.toLocaleLowerCase().replace(/\u0307/g, ""));
-var OutlineView = class extends import_obsidian41.ItemView {
+var OutlineView = class extends import_obsidian42.ItemView {
   constructor(leaf, openNote) {
     super(leaf);
     this.openNote = openNote;
@@ -76753,7 +77406,7 @@ var OutlineView = class extends import_obsidian41.ItemView {
       if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
       button.addEventListener("click", () => {
         var _a3;
-        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian41.Notice(t("ui.coffee_segment_no_content"));
+        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian42.Notice(t("ui.coffee_segment_no_content"));
       });
     });
   }
@@ -76848,7 +77501,7 @@ var OutlineView = class extends import_obsidian41.ItemView {
 };
 
 // experiences/sharing/share-modal.ts
-var import_obsidian43 = require("obsidian");
+var import_obsidian44 = require("obsidian");
 
 // experiences/sharing/share-format.ts
 var SHARE_FORMAT = "vam-share";
@@ -78277,7 +78930,7 @@ function attachTranslations(payload, options) {
 }
 
 // experiences/sharing/share-exporter.ts
-var import_obsidian42 = require("obsidian");
+var import_obsidian43 = require("obsidian");
 
 // experiences/sharing/share-viewer-dictionaries.ts
 var SHARE_VIEWER_UI_EXTRA = {
@@ -78690,6 +79343,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }
 .vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.vam-zoom-controls > .vam-usage-button { width: auto; gap: 4px; padding: 0 6px; font-size: var(--font-ui-small); font-variant-numeric: tabular-nums; color: var(--text-muted); }
 .vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }
 .vam-canvas-overlay > .vam-canvas-hint { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }
@@ -79149,7 +79803,7 @@ async function installWrapper() {
   if (installedWrapper) return;
   installing != null ? installing : installing = (async () => {
     try {
-      const mermaid = await (0, import_obsidian42.loadMermaid)();
+      const mermaid = await (0, import_obsidian43.loadMermaid)();
       const original = mermaid.render;
       if (typeof original === "function" && !installedWrapper) {
         const wrapped = function(id, text11, ...rest) {
@@ -79197,7 +79851,7 @@ var ShareExporter = class {
     __publicField(this, "images", /* @__PURE__ */ new Map());
     __publicField(this, "registry", createAssetRegistry());
     __publicField(this, "ownerPath", /* @__PURE__ */ new Map());
-    __publicField(this, "component", new import_obsidian42.Component());
+    __publicField(this, "component", new import_obsidian43.Component());
     __publicField(this, "container", null);
     __publicField(this, "disposed", false);
     __publicField(this, "forbidden", null);
@@ -79271,13 +79925,13 @@ ${detail}`;
   async renderOne(detail, titles, ticket) {
     const cleaned = cleanShareMarkdown(detail, { titleOf: (target) => titles.get(target), assets: this.registry });
     const host = this.host().createDiv();
-    const child = new import_obsidian42.Component();
+    const child = new import_obsidian43.Component();
     this.component.addChild(child);
     const hasDiagram = /(`{3,}|~{3,})[ \t]*mermaid\b/i.test(cleaned.markdown);
     const capture = hasDiagram ? await captureMermaidSources() : { sources: /* @__PURE__ */ new Map(), restore() {
     } };
     try {
-      await import_obsidian42.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
+      await import_obsidian43.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
       const finished = this.finish(host, capture.sources);
@@ -79306,11 +79960,11 @@ ${detail}`;
     if (this.disposed || signal.aborted) return null;
     const ticket = { generation: 0, signal, isCurrent: () => !signal.aborted && !this.disposed };
     const host = this.host().createDiv();
-    const child = new import_obsidian42.Component();
+    const child = new import_obsidian43.Component();
     this.component.addChild(child);
     try {
       const fence = source.includes("```") ? "~~~~" : "```";
-      await import_obsidian42.MarkdownRenderer.render(this.app, `${fence}mermaid
+      await import_obsidian43.MarkdownRenderer.render(this.app, `${fence}mermaid
 ${source}
 ${fence}`, host, "", child);
       await this.settleMermaid(host, ticket);
@@ -79385,7 +80039,7 @@ ${fence}`, host, "", child);
         pre.after(caption);
       }
     const clean4 = createDiv();
-    clean4.append((0, import_obsidian42.sanitizeHTMLToDom)(host.innerHTML));
+    clean4.append((0, import_obsidian43.sanitizeHTMLToDom)(host.innerHTML));
     unwrapLocalLinks(clean4, () => createSpan());
     scrubShareTree(clean4);
     const slots = Array.from(clean4.querySelectorAll(".vam-mermaid-slot"));
@@ -79411,8 +80065,8 @@ ${fence}`, host, "", child);
     const relative = resolveRelative(folder, entry.ref);
     const candidates = [
       (_c = this.app.metadataCache.getFirstLinkpathDest(entry.ref, fromPath)) == null ? void 0 : _c.path,
-      relative ? (0, import_obsidian42.normalizePath)(relative) : void 0,
-      (0, import_obsidian42.normalizePath)(entry.ref)
+      relative ? (0, import_obsidian43.normalizePath)(relative) : void 0,
+      (0, import_obsidian43.normalizePath)(entry.ref)
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getFileByPath(path) : null;
@@ -79448,7 +80102,7 @@ ${fence}`, host, "", child);
       const folder = this.source.mapPath.split("/").slice(0, -1).join("/");
       this.forbidden = forbiddenStringsFor(
         {
-          vaultPath: adapter instanceof import_obsidian42.FileSystemAdapter ? adapter.getBasePath() : void 0,
+          vaultPath: adapter instanceof import_obsidian43.FileSystemAdapter ? adapter.getBasePath() : void 0,
           vaultName: this.app.vault.getName(),
           mapFolder: folder
         },
@@ -79652,7 +80306,7 @@ function originalLanguage(source, uiLanguage) {
 }
 var UNVERIFIED_LANGUAGES = ["ja", "ko", "es"];
 var AUTO_LANGUAGE = "auto";
-var ShareModal = class extends import_obsidian43.Modal {
+var ShareModal = class extends import_obsidian44.Modal {
   constructor(app, options) {
     var _a2, _b2;
     super(app);
@@ -79708,7 +80362,7 @@ var ShareModal = class extends import_obsidian43.Modal {
   onOpen() {
     this.titleEl.setText(t("share.title"));
     this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
-    this.fullSetting = new import_obsidian43.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t(this.includeDetail ? "share.option_full_desc_on" : "share.option_full_desc")).addToggle((toggle) => {
+    this.fullSetting = new import_obsidian44.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t(this.includeDetail ? "share.option_full_desc_on" : "share.option_full_desc")).addToggle((toggle) => {
       this.fullToggle = toggle;
       toggle.setValue(this.includeDetail).onChange((value) => {
         this.includeDetail = value;
@@ -79716,7 +80370,7 @@ var ShareModal = class extends import_obsidian43.Modal {
         this.restart();
       });
     });
-    this.imagesSetting = new import_obsidian43.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t(this.includeImages ? "share.option_images_desc_on" : "share.option_images_desc")).addToggle((toggle) => {
+    this.imagesSetting = new import_obsidian44.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t(this.includeImages ? "share.option_images_desc_on" : "share.option_images_desc")).addToggle((toggle) => {
       this.imagesToggle = toggle;
       toggle.setValue(this.includeImages).onChange((value) => {
         this.includeImages = value;
@@ -79785,11 +80439,11 @@ var ShareModal = class extends import_obsidian43.Modal {
   openTranslationSection() {
     const host = this.options.translation;
     if (!host) return;
-    new import_obsidian43.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
+    new import_obsidian44.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
     this.contentEl.createEl("p", { text: t("share.translate_intro"), cls: "vam-modal-intro" });
     for (const language2 of SHARE_TRANSLATION_LANGUAGES) {
       const original = language2 === this.sourceLanguage;
-      const setting = new import_obsidian43.Setting(this.contentEl).setName(
+      const setting = new import_obsidian44.Setting(this.contentEl).setName(
         original ? t("share.translate_original_0", this.languageLabel(language2)) : this.languageLabel(language2)
       );
       if (!original && UNVERIFIED_LANGUAGES.includes(language2))
@@ -79802,7 +80456,7 @@ var ShareModal = class extends import_obsidian43.Modal {
             else this.picked.delete(language2);
             if (!value && this.defaultChoice === language2) {
               this.defaultChoice = AUTO_LANGUAGE;
-              new import_obsidian43.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
+              new import_obsidian44.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
             }
             this.renderOpenLanguage();
             this.selectionChanged();
@@ -79812,7 +80466,7 @@ var ShareModal = class extends import_obsidian43.Modal {
     }
     this.openLangEl = this.contentEl.createDiv();
     this.renderOpenLanguage();
-    this.modelSetting = new import_obsidian43.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
+    this.modelSetting = new import_obsidian44.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
       this.modelDropdown = dropdown;
       dropdown.addOption(FOLLOW_DEFAULT_MODEL, t("ui.follow_default_model", host.modelLabel(host.defaultModel())));
       for (const id of host.models()) dropdown.addOption(id, host.modelLabel(id));
@@ -79833,7 +80487,7 @@ var ShareModal = class extends import_obsidian43.Modal {
     if (!container) return;
     container.empty();
     const ids = [String(this.sourceLanguage), ...this.selected()];
-    this.openLangSetting = new import_obsidian43.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
+    this.openLangSetting = new import_obsidian44.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
       this.openLangDropdown = dropdown;
       dropdown.addOption(AUTO_LANGUAGE, t("share.translate_default_auto"));
       for (const id of ids) dropdown.addOption(id, this.languageLabel(id));
@@ -79960,7 +80614,7 @@ var ShareModal = class extends import_obsidian43.Modal {
       this.phase = "done";
       this.estimateMemo = null;
       this.applyTranslation();
-      new import_obsidian43.Notice(t("share.translate_done"));
+      new import_obsidian44.Notice(t("share.translate_done"));
       this.render();
       this.saveButton.focus();
     } catch (error) {
@@ -80003,7 +80657,7 @@ var ShareModal = class extends import_obsidian43.Modal {
     if (choice2 === AUTO_LANGUAGE || choice2 === String(this.sourceLanguage)) return;
     const carried = ((_b2 = (_a2 = this.translationArg()) == null ? void 0 : _a2.pieces) != null ? _b2 : []).map((item) => item.language);
     if (carried.includes(choice2)) return;
-    new import_obsidian43.Notice(
+    new import_obsidian44.Notice(
       t("share.translate_open_dropped_0_1", this.languageLabel(choice2), this.languageLabel(String(this.sourceLanguage)))
     );
   }
@@ -80089,7 +80743,7 @@ var ShareModal = class extends import_obsidian43.Modal {
         row.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
     }
     if (item.status === "incomplete")
-      new import_obsidian43.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
+      new import_obsidian44.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
         (toggle) => toggle.setValue(this.includeIncomplete.has(item.language)).onChange((value) => {
           if (value) this.includeIncomplete.add(item.language);
           else this.includeIncomplete.delete(item.language);
@@ -80211,9 +80865,9 @@ var ShareModal = class extends import_obsidian43.Modal {
     try {
       const write = (_a2 = this.options.writeClipboard) != null ? _a2 : (text11) => navigator.clipboard.writeText(text11);
       await write(publishInstructions());
-      new import_obsidian43.Notice(t("share.publish_done"));
+      new import_obsidian44.Notice(t("share.publish_done"));
     } catch (e) {
-      new import_obsidian43.Notice(t("share.publish_fail"));
+      new import_obsidian44.Notice(t("share.publish_fail"));
       this.publishFallback = true;
       if (!this.closed) this.render();
     }
@@ -80264,12 +80918,12 @@ var ShareModal = class extends import_obsidian43.Modal {
       else {
         const size = formatBytes(result.bytes);
         this.savedText = t(outcome === "saved" ? "share.saved_0_1" : "share.downloaded_0_1", name2, size);
-        new import_obsidian43.Notice(this.savedText);
+        new import_obsidian44.Notice(this.savedText);
       }
     } catch (e) {
       if (!this.closed) {
         this.savedText = "";
-        new import_obsidian43.Notice(t("share.save_failed"));
+        new import_obsidian44.Notice(t("share.save_failed"));
       }
     }
     this.saving = false;
@@ -80278,13 +80932,13 @@ var ShareModal = class extends import_obsidian43.Modal {
 };
 
 // experiences/sharing/share-translate-dom.ts
-var import_obsidian44 = require("obsidian");
+var import_obsidian45 = require("obsidian");
 function obsidianTranslateDom() {
   return {
     parse: (html) => new DOMParser().parseFromString(html, "text/html").body,
     serialize: (root) => root.innerHTML,
     sanitize: (root) => {
-      const clean4 = (0, import_obsidian44.sanitizeHTMLToDom)(root.innerHTML);
+      const clean4 = (0, import_obsidian45.sanitizeHTMLToDom)(root.innerHTML);
       root.replaceChildren(clean4);
     },
     createSpan: () => createSpan(),
@@ -80660,9 +81314,9 @@ var ShareTranslateService = class {
     const prepared = prepareSource(source, options);
     const perLanguage = languages.map((language2) => {
       const { groups } = groupsFor(prepared, language2, source.mapId, options.model, options.cache);
-      return { language: language2, calls: groups.reduce((sum, group) => sum + group.batches.length, 0) };
+      return { language: language2, calls: groups.reduce((sum2, group) => sum2 + group.batches.length, 0) };
     });
-    const calls = perLanguage.reduce((sum, item) => sum + item.calls, 0);
+    const calls = perLanguage.reduce((sum2, item) => sum2 + item.calls, 0);
     return { calls, minutes: estimateMinutes(calls), perLanguage };
   }
   async translate(source, languages, options) {
@@ -80687,7 +81341,7 @@ var ShareTranslateService = class {
     const { groups, hits } = groupsFor(prepared, language2, source.mapId, model, cache);
     let languageCalls = 0;
     let firstError;
-    const batchTotal = groups.reduce((sum, group) => sum + group.batches.length, 0);
+    const batchTotal = groups.reduce((sum2, group) => sum2 + group.batches.length, 0);
     let batchDone = 0;
     const progress = (phase) => {
       var _a3;
@@ -80747,9 +81401,9 @@ var ShareTranslateService = class {
     let localRefs = 0;
     let fallbackNodes = 0;
     let diagramsKept = prepared.nodes.reduce(
-      (sum, node) => {
+      (sum2, node) => {
         var _a3;
-        return sum + (node.root ? (_a3 = node.input.diagramsUnsourced) != null ? _a3 : 0 : 0);
+        return sum2 + (node.root ? (_a3 = node.input.diagramsUnsourced) != null ? _a3 : 0 : 0);
       },
       0
     );
@@ -81061,8 +81715,8 @@ var realClock3 = {
   clearTimeout: (handle) => window.clearTimeout(handle)
 };
 var ResearchProgressStore = class {
-  constructor(clock = realClock3) {
-    this.clock = clock;
+  constructor(clock2 = realClock3) {
+    this.clock = clock2;
     __publicField(this, "entries", /* @__PURE__ */ new Map());
     __publicField(this, "listeners", /* @__PURE__ */ new Set());
     __publicField(this, "lastNotified", /* @__PURE__ */ new Map());
@@ -81385,6 +82039,7 @@ function providerOutlineRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "outline-generate",
     topic: (request) => `Outline \xB7 ${request.topic.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new OutlineGenerateError("stopped", "Outline generation stopped")
   });
 }
@@ -81521,6 +82176,7 @@ function providerMapChatRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "map-chat",
     topic: (request) => `Map chat \xB7 ${request.message.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),
     stream: true,
     lastMessageOnly: true
@@ -81653,10 +82309,10 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
 }
 
 // experiences/markdown-context/selection-ai.ts
-var import_obsidian46 = require("obsidian");
+var import_obsidian47 = require("obsidian");
 
 // experiences/markdown-context/image-translate-action.ts
-var import_obsidian45 = require("obsidian");
+var import_obsidian46 = require("obsidian");
 
 // experiences/markdown-context/steps/image-translate/prompt.md
 var prompt_default9 = "Edit the attached image: create the same image with every piece of visible text translated into {{target}}.\nKeep the layout, illustrations, colors, arrows, icons and style the same; only replace the text, in a matching size and weight that fits each original text area. Do not add, remove or redraw other content. Leave proper names, numbers and units as they are unless they are normally translated.\nGenerate the image with the image generation tool, then reply with one short sentence describing the result in {{target}}.\n";
@@ -81682,7 +82338,7 @@ var languageIdsPattern = () => [...SUPPORTED_LANGUAGES, ...OUTPUT_LANGUAGE_CHOIC
 function imageFileBase(alt) {
   return (alt || "image").replace(/\.(?:png|jpe?g|gif|webp)$/i, "").replace(new RegExp(`-(?:${languageIdsPattern()})(?:[ -]\\d+)?$`), "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
-var ImageTranslateAction = class extends import_obsidian45.Component {
+var ImageTranslateAction = class extends import_obsidian46.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -81763,7 +82419,7 @@ var ImageTranslateAction = class extends import_obsidian45.Component {
     this.target = { view, path: view.file.path, image, token };
     const rect2 = image.getBoundingClientRect();
     const pill = this.app.workspace.containerEl.createEl("button", { cls: "vam-image-action vam-image-action-pill" });
-    (0, import_obsidian45.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
+    (0, import_obsidian46.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
     pill.createSpan({ text: t("ui.image_translate_action") });
     pill.addEventListener("click", () => this.openPopover());
     this.pill = pill;
@@ -81801,7 +82457,7 @@ var ImageTranslateAction = class extends import_obsidian45.Component {
     header.createEl("strong", { text: t("ui.image_translate_action"), attr: { id: titleId } });
     const close = header.createEl("button", { cls: "clickable-icon" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian45.setIcon)(close, "x");
+    (0, import_obsidian46.setIcon)(close, "x");
     close.addEventListener("click", () => this.hide());
     const field = popover.createEl("label", { cls: "vam-image-action-field" });
     field.createSpan({ text: t("ui.image_translate_language") });
@@ -81858,8 +82514,8 @@ var ImageTranslateAction = class extends import_obsidian45.Component {
       text11 = target.view.editor.getValue();
     } catch (e) {
     }
-    if (noteTextAiLocked(text11, import_obsidian45.parseYaml)) {
-      new import_obsidian45.Notice(t("ui.ai_locked_notice"));
+    if (noteTextAiLocked(text11, import_obsidian46.parseYaml)) {
+      new import_obsidian46.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const controller = new AbortController();
@@ -81890,10 +82546,10 @@ var ImageTranslateAction = class extends import_obsidian45.Component {
       const link = this.app.fileManager.generateMarkdownLink(saved, target.path);
       const embed = link.startsWith("!") ? link : `!${link}`;
       const outcome = await this.write(target, note, embed, placement);
-      new import_obsidian45.Notice(t(outcome, saved.path));
+      new import_obsidian46.Notice(t(outcome, saved.path));
       saved = null;
     } catch (error) {
-      if (!controller.signal.aborted) new import_obsidian45.Notice(error instanceof Error ? error.message : String(error));
+      if (!controller.signal.aborted) new import_obsidian46.Notice(error instanceof Error ? error.message : String(error));
       if (saved) await this.app.fileManager.trashFile(saved);
     } finally {
       if (this.running === controller) {
@@ -81911,7 +82567,7 @@ var ImageTranslateAction = class extends import_obsidian45.Component {
     let outcome = "ui.image_translate_appended";
     const edit = (text11) => {
       var _a2, _b2, _c, _d;
-      if (noteTextAiLocked(text11, import_obsidian45.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
+      if (noteTextAiLocked(text11, import_obsidian46.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
       const copies = target.token ? occurrences(text11, target.token.text) : [];
       const at = target.token && copies.length === target.token.count ? copies[target.token.occurrence] : copies.length === 1 ? copies[0] : -1;
       const token = (_b2 = (_a2 = target.token) == null ? void 0 : _a2.text) != null ? _b2 : "";
@@ -81945,7 +82601,7 @@ ${embed}
     };
     const open = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view) => {
       var _a2;
-      return view instanceof import_obsidian45.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
+      return view instanceof import_obsidian46.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
     });
     if (open) {
       const editor = open.editor;
@@ -82116,7 +82772,7 @@ function locateImageToken(view, image, markdown, matches) {
   return rendered.length === matches.length ? toToken(matches[rendered.indexOf(image)]) : null;
 }
 var panelSequence2 = 0;
-var MarkdownSelectionAi = class extends import_obsidian46.Component {
+var MarkdownSelectionAi = class extends import_obsidian47.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -82157,8 +82813,8 @@ var MarkdownSelectionAi = class extends import_obsidian46.Component {
       const image = event.target;
       if (!(image instanceof HTMLImageElement) || !this.options.autoOpen()) return;
       if (image.closest(".vam-context-ai-panel, .vam-image-action")) return;
-      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian46.MarkdownView && candidate.containerEl.contains(image));
-      if (!(view instanceof import_obsidian46.MarkdownView) || !view.file) return;
+      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian47.MarkdownView && candidate.containerEl.contains(image));
+      if (!(view instanceof import_obsidian47.MarkdownView) || !view.file) return;
       const markdown = view.editor.getValue();
       const embeddedPath = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src");
       const tokens2 = [...markdown.matchAll(/!\[\[[^\]\n]+\]\]|!\[[^\]\n]*\]\([^\n]+?\)/g)].filter((match) => {
@@ -82212,9 +82868,9 @@ var MarkdownSelectionAi = class extends import_obsidian46.Component {
     const selection = window.getSelection();
     const range = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null;
     const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find(
-      (candidate) => candidate instanceof import_obsidian46.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
+      (candidate) => candidate instanceof import_obsidian47.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
     );
-    if (!(view instanceof import_obsidian46.MarkdownView) || !view.file) {
+    if (!(view instanceof import_obsidian47.MarkdownView) || !view.file) {
       this.hideLauncher();
       return;
     }
@@ -82256,7 +82912,7 @@ var MarkdownSelectionAi = class extends import_obsidian46.Component {
     }
     this.updateLauncher(this.options.autoOpen());
     if (!this.snapshot) {
-      const view = this.app.workspace.getActiveViewOfType(import_obsidian46.MarkdownView);
+      const view = this.app.workspace.getActiveViewOfType(import_obsidian47.MarkdownView);
       if (!(view == null ? void 0 : view.file) || view.getMode() !== "source") return false;
       const markdown = view.editor.getValue();
       const selected = view.editor.getSelection();
@@ -82294,7 +82950,7 @@ var MarkdownSelectionAi = class extends import_obsidian46.Component {
     this.panel.open();
   }
 };
-var SelectionAiPanel = class extends import_obsidian46.Component {
+var SelectionAiPanel = class extends import_obsidian47.Component {
   constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run) {
     super();
     this.app = app;
@@ -82339,7 +82995,7 @@ var SelectionAiPanel = class extends import_obsidian46.Component {
     this.titleEl.id = titleId;
     const close = header.createEl("button", { cls: "clickable-icon vam-context-ai-close" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian46.setIcon)(close, "x");
+    (0, import_obsidian47.setIcon)(close, "x");
     close.addEventListener("click", () => this.close());
     this.contentEl = this.modalEl.createDiv({ cls: "vam-context-ai-body" });
     this.load();
@@ -82413,7 +83069,7 @@ var SelectionAiPanel = class extends import_obsidian46.Component {
     const preset = (id, icon, label, prompt) => {
       const button = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
       button.dataset.preset = id;
-      (0, import_obsidian46.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
+      (0, import_obsidian47.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
       button.createSpan({ text: label });
       button.addEventListener(
         "click",
@@ -82482,7 +83138,7 @@ var SelectionAiPanel = class extends import_obsidian46.Component {
     const bar = footer.createDiv({ cls: "vam-context-ai-bar" });
     bar.createSpan({
       cls: "vam-context-ai-shortcut",
-      text: t("ui.context_ai_shortcut", import_obsidian46.Platform.isMacOS ? "\u2318" : "Ctrl")
+      text: t("ui.context_ai_shortcut", import_obsidian47.Platform.isMacOS ? "\u2318" : "Ctrl")
     });
     this.stopButton = bar.createEl("button", { text: t("ui.cancel") });
     this.stopButton.addEventListener("click", () => {
@@ -82556,7 +83212,7 @@ var SelectionAiPanel = class extends import_obsidian46.Component {
     if (this.controller) return;
     if (this.noteLocked()) {
       this.status.setText(t("ui.ai_locked_notice"));
-      new import_obsidian46.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian47.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const controller = new AbortController();
@@ -82666,9 +83322,9 @@ var SelectionAiPanel = class extends import_obsidian46.Component {
           result = result.replace(/\r\n?/g, "\n");
           if (!/^```mermaid[ \t]*\n(?:(?!```)[\s\S])+\n```$/.test(result.trim()) || unsafeMermaid(result.trim().split("\n").slice(1, -1)) || /(?:%%\{|@\{|\bimg\s*:|\bimage\s*:|\burl\s*\(|https?:|data:|file:|javascript:)/i.test(result))
             throw new Error(t("ui.context_ai_invalid_diagram"));
-          this.previewChild = new import_obsidian46.Component();
+          this.previewChild = new import_obsidian47.Component();
           this.previewChild.load();
-          await import_obsidian46.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
+          await import_obsidian47.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
         }
       }
       if (controller.signal.aborted || !this.modalEl.isConnected) return;
@@ -82738,13 +83394,13 @@ ${caption.trim()}`;
       current = view.editor.getValue();
     } catch (e) {
     }
-    return noteTextAiLocked(current, import_obsidian46.parseYaml);
+    return noteTextAiLocked(current, import_obsidian47.parseYaml);
   }
   applyResult(result, action, status) {
     var _a2;
     if (this.noteLocked()) {
       status.setText(t("ui.ai_locked_notice"));
-      new import_obsidian46.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian47.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const { view, path, markdown, text: text11, matchAt } = this.snapshot;
@@ -82784,7 +83440,7 @@ ${value}
       editor.replaceRange(addition, end, end);
     }
     this.close();
-    new import_obsidian46.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
+    new import_obsidian47.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
   }
 };
 
@@ -82839,7 +83495,7 @@ function normalizeNoteStyleRecipeMarker(value) {
 }
 function obsidianAppLanguage() {
   try {
-    return typeof import_obsidian47.getLanguage === "function" ? (0, import_obsidian47.getLanguage)() : "en";
+    return typeof import_obsidian48.getLanguage === "function" ? (0, import_obsidian48.getLanguage)() : "en";
   } catch (e) {
     return "en";
   }
@@ -82894,7 +83550,7 @@ function settingsFromSaved(saved, appLocale) {
     canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
   };
 }
-var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
+var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
   constructor() {
     super(...arguments);
     /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
@@ -82914,7 +83570,8 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     __publicField(this, "aiCalls", new AiCalls({
       runtimeFor: (model) => this.aiRuntime.runtimeFor(model),
       exchanges: () => this.settings.aiExchangeLoggingEnabled ? this.exchanges : null,
-      releaseWarm: () => this.aiRuntime.releaseWarm()
+      releaseWarm: () => this.aiRuntime.releaseWarm(),
+      usage: () => this.usage
     }));
     __publicField(this, "activeTasks", this.aiCalls.activeTasks);
     /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
@@ -82961,7 +83618,7 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
       claudePath: () => this.settings.claudePath,
       clientVersion: () => this.manifest.version || "0.0.0",
       pluginDirectory: () => this.pluginDirectory(),
-      readLocalFile: (path) => import_obsidian47.FileSystemAdapter.readLocalFile(path),
+      readLocalFile: (path) => import_obsidian48.FileSystemAdapter.readLocalFile(path),
       onLog: (level, message) => this.logs.appendLog(level, message),
       checks: {
         refresh: (id) => this.refreshModelDiscovery(id),
@@ -82974,12 +83631,13 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
       defaultReasoning: () => this.settings.cliReasoning,
       exchangeLoggingEnabled: () => this.settings.aiExchangeLoggingEnabled,
       exchanges: () => this.exchanges,
+      usage: () => this.usage,
       diagramsEnabled: () => this.settings.addDiagramsAfterResearch,
       codexRuntime: (directory, local) => this.runtime(directory, local),
       claudeRuntime: (directory) => this.claudeCli(directory),
       mermaidParses: async (code) => {
         try {
-          const mermaid = await (0, import_obsidian47.loadMermaid)();
+          const mermaid = await (0, import_obsidian48.loadMermaid)();
           await mermaid.parse(code);
           return true;
         } catch (e) {
@@ -83005,6 +83663,8 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
     __publicField(this, "relevanceGrades", /* @__PURE__ */ new Map());
     __publicField(this, "exchanges", null);
+    /** Token usage of every provider call (`ai-usage.json`); null until onload has the plugin folder. Views query and subscribe to it. */
+    __publicField(this, "usage", null);
     __publicField(this, "currentModelListeners", /* @__PURE__ */ new Set());
     __publicField(this, "modelDiscovery", new ModelDiscovery(
       () => this.codexDiagnostic().installed,
@@ -83160,9 +83820,9 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     var _a2;
     const view = (_a2 = source != null ? source : this.app.workspace.getActiveViewOfType(VisualAgentMapView)) != null ? _a2 : this.views()[0];
     const snapshot = view == null ? void 0 : view.shareSnapshot();
-    if (!snapshot || snapshot === "none") return void new import_obsidian47.Notice(t("share.unavailable_no_map"));
-    if (snapshot === "aim") return void new import_obsidian47.Notice(t("share.unavailable_aim"));
-    if (snapshot === "empty") return void new import_obsidian47.Notice(t("share.unavailable_empty"));
+    if (!snapshot || snapshot === "none") return void new import_obsidian48.Notice(t("share.unavailable_no_map"));
+    if (snapshot === "aim") return void new import_obsidian48.Notice(t("share.unavailable_aim"));
+    if (snapshot === "empty") return void new import_obsidian48.Notice(t("share.unavailable_empty"));
     new ShareModal(this.app, {
       source: snapshot,
       vamVersion: this.manifest.version || "0.0.0",
@@ -83204,18 +83864,18 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
       this.useOutlineSource(leaf.view);
       return;
     }
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian47.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian48.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
     const path = leaf.view.file.path;
-    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian47.Notice(error instanceof Error ? error.message : String(error)));
+    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian48.Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload() {
-    announceTestOverrides((message) => new import_obsidian47.Notice(message, 0));
+    announceTestOverrides((message) => new import_obsidian48.Notice(message, 0));
     const saved = await this.loadData();
     this.settings = settingsFromSaved(saved, obsidianAppLanguage());
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
-    for (const kind of TOPIC_KINDS) (0, import_obsidian47.addIcon)(kindIconId(kind), kindIconSvg(kind));
+    for (const kind of TOPIC_KINDS) (0, import_obsidian48.addIcon)(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
@@ -83247,20 +83907,26 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     });
     this.addLocalizedCommand("preview-full-prompt", "ui.command_preview_prompt", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
-    if (this.app.vault.adapter instanceof import_obsidian47.FileSystemAdapter && this.manifest.dir) {
+    if (this.app.vault.adapter instanceof import_obsidian48.FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
       this.exchanges = new AiExchangeLog(
         adapter,
-        (0, import_obsidian47.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
+        (0, import_obsidian48.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.exchange_log_save_failed_0", error instanceof Error ? error.message : String(error))
         )
       );
       await this.exchanges.load();
+      this.usage = new AiUsageStore(
+        adapter,
+        (0, import_obsidian48.normalizePath)(`${this.manifest.dir}/ai-usage.json`),
+        (error) => this.logs.appendLog("error", `ai-usage.json: ${error instanceof Error ? error.message : String(error)}`)
+      );
+      await this.usage.load();
       this.pendingSuggestions = new PendingSuggestions(
         adapter,
-        (0, import_obsidian47.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
+        (0, import_obsidian48.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -83279,7 +83945,7 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
         await this.saveSettings();
-        if (count) new import_obsidian47.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        if (count) new import_obsidian48.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
       }
     });
     this.ready = initialize;
@@ -83300,7 +83966,7 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     this.registerView(COFFEE_TABLES_VIEW_TYPE, (leaf) => new CoffeeTablesView(leaf, this));
     this.buildCoffee();
     const openCoffee = () => {
-      void this.activateCoffeeTables().catch((error) => new import_obsidian47.Notice(String(error)));
+      void this.activateCoffeeTables().catch((error) => new import_obsidian48.Notice(String(error)));
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
     this.coffeeRibbonIcon = coffeeRibbonIcon;
@@ -83317,12 +83983,12 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
           }
           await this.openDetails(this.repo.file(path));
         } catch (error) {
-          new import_obsidian47.Notice(error instanceof Error ? error.message : String(error));
+          new import_obsidian48.Notice(error instanceof Error ? error.message : String(error));
         }
       })
     );
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
-      void this.activateView().catch((error) => new import_obsidian47.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian48.Notice(String(error)));
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
@@ -83340,26 +84006,26 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
       key: "ui.map_chat_toggle_command"
     });
     this.addLocalizedCommand("open-map", "ui.command_open_map", () => {
-      void this.activateView().catch((error) => new import_obsidian47.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian48.Notice(String(error)));
     });
     if (aimEnabled())
       this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
         void this.activateView().then(() => {
           var _a2;
           return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
-        }).catch((error) => new import_obsidian47.Notice(String(error)));
+        }).catch((error) => new import_obsidian48.Notice(String(error)));
       });
     this.addLocalizedCommand("import-outline", "ui.command_import_outline", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openOutlineImport();
-      }).catch((error) => new import_obsidian47.Notice(String(error)));
+      }).catch((error) => new import_obsidian48.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline-exchange", "ui.command_import_exchange", () => {
       void this.activateView().then(() => {
         const view = this.views()[0];
         if (view) chooseAndImportExchange(view);
-      }).catch((error) => new import_obsidian47.Notice(String(error)));
+      }).catch((error) => new import_obsidian48.Notice(String(error)));
     });
     this.localizedCommands.push({
       command: this.addCommand({
@@ -83413,7 +84079,7 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
       });
     this.addLocalizedCommand("share-map", "ui.command_share_map", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
-      void this.activateOutline().catch((error) => new import_obsidian47.Notice(String(error)));
+      void this.activateOutline().catch((error) => new import_obsidian48.Notice(String(error)));
     });
     this.addLocalizedCommand("rebuild-references", "ui.command_refresh_data", () => {
       this.runMutation(() => this.fullRebuild());
@@ -83421,23 +84087,23 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     this.addLocalizedCommand("normalize-note-filenames", "ui.command_sync_filenames", () => {
       this.runMutation(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian47.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
+        new import_obsidian48.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.command_repair_note_display", () => {
       this.runMutation(async () => {
         await this.repo.ensureNodePresentation();
-        new import_obsidian47.Notice(t("ui.topic_note_display_repaired"));
+        new import_obsidian48.Notice(t("ui.topic_note_display_repaired"));
       });
     });
     this.addLocalizedCommand("fix-math-formulas", "ui.command_fix_math", () => {
       void this.offerFixMathFormulas().catch(
-        (error) => new import_obsidian47.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian48.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("organize-workspace-folders", "ui.command_organize_folders", () => {
       void this.offerOrganizeWorkspaceFolders().catch(
-        (error) => new import_obsidian47.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian48.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("repair-workspace", "ui.command_repair_workspace", () => {
@@ -83470,7 +84136,7 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     this.registerNoteStyleEntrypoints();
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof import_obsidian47.TFile && this.isMap(file))
+        if (file instanceof import_obsidian48.TFile && this.isMap(file))
           menu.addItem(
             (item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => {
               void this.activateView(file.path);
@@ -83572,14 +84238,14 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
         this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
       } else if (result.status === "failed") {
         this.logs.appendLog("warn", `Note style conversion failed: ${(_a2 = result.error) != null ? _a2 : "unknown error"}`);
-        new import_obsidian47.Notice(t("ui.note_style_migrate_failed"));
+        new import_obsidian48.Notice(t("ui.note_style_migrate_failed"));
       } else if (result.notify) {
         const maps = result.notify.maps.join(t("ui.list_separator"));
         const text11 = [
           t("ui.note_style_maps_notice_0", maps),
           result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
         ].filter(Boolean).join(" ");
-        new import_obsidian47.Notice(text11, 0);
+        new import_obsidian48.Notice(text11, 0);
       }
     } catch (error) {
       this.logs.appendLog(
@@ -83591,13 +84257,13 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
   registerVaultEvents() {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (!this.writing && file instanceof import_obsidian47.TFile) for (const view of this.views()) view.changed(file);
+        if (!this.writing && file instanceof import_obsidian48.TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian47.TFile) this.scheduleExternalReconciliation(file.path);
-        if (!this.writing && file instanceof import_obsidian47.TFile) {
+        if (file instanceof import_obsidian48.TFile) this.scheduleExternalReconciliation(file.path);
+        if (!this.writing && file instanceof import_obsidian48.TFile) {
           for (const view of this.views()) view.deleted(file);
           if (file.path.startsWith(`${this.settings.mapsFolder}/`) || isManagedMapPath(this.settings, file.path) && file.name === "Map.md")
             this.runMutation(() => this.repo.rebuildDerivedData());
@@ -83606,7 +84272,7 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (!(file instanceof import_obsidian47.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
+        if (!(file instanceof import_obsidian48.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
         if (external) for (const view of this.views()) view.relocate(/* @__PURE__ */ new Map([[oldPath, file.path]]));
@@ -83641,7 +84307,7 @@ ${error}`;
       this.unreadableReported.set(key2, now);
       const message = t("ui.map_unreadable_skipped_0_1", path, error);
       this.logs.appendLog("warn", message);
-      new import_obsidian47.Notice(message);
+      new import_obsidian48.Notice(message);
     }
   }
   /**
@@ -83654,7 +84320,7 @@ ${error}`;
       report: (done, total2, title) => {
         const message = t("ui.organize_progress_0_1_2", done, total2, title);
         if (notice) notice.setMessage(message);
-        else notice = new import_obsidian47.Notice(message, 0);
+        else notice = new import_obsidian48.Notice(message, 0);
       },
       done: () => notice == null ? void 0 : notice.hide()
     };
@@ -83689,12 +84355,12 @@ ${error}`;
         cleaned = await this.repo.removeEmptyLegacyFolders();
       });
       const base = plan.skipped.length ? t("ui.organize_only_skipped_0", plan.skipped.length) : t("ui.organize_nothing_to_do");
-      new import_obsidian47.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
+      new import_obsidian48.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
       return;
     }
     const busyOpen = this.views().some((view) => plan.moves.some((move) => view.hasActiveAimWork(move.mapPath)));
     if (plan.busy.length || busyOpen) {
-      new import_obsidian47.Notice(t("error.organize_aim_busy"));
+      new import_obsidian48.Notice(t("error.organize_aim_busy"));
       return;
     }
     const mind = plan.moves.filter((move) => move.kind === "mind").length;
@@ -83728,7 +84394,7 @@ ${t("ui.organize_link_wait_hint")}`;
           for (const view of this.views()) view.relocate(mapping);
           this.app.workspace.requestSaveLayout();
           const cleaned = await this.repo.removeEmptyLegacyFolders();
-          new import_obsidian47.Notice(
+          new import_obsidian48.Notice(
             cleaned.length ? `${t("ui.organize_done_0", mapping.size)} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : t("ui.organize_done_0", mapping.size)
           );
         })
@@ -83741,7 +84407,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const files = (await this.repo.markedFiles("agent-map-node")).filter((file) => file.path.startsWith(prefix));
     const plan = await planMathRepair(this.app.vault, files);
     if (!plan.items.length) {
-      new import_obsidian47.Notice(t("ui.fix_math_none"));
+      new import_obsidian48.Notice(t("ui.fix_math_none"));
       return;
     }
     new ChoiceModal(
@@ -83752,10 +84418,10 @@ ${t("ui.organize_link_wait_hint")}`;
         {
           label: t("ui.fix_math_start"),
           action: () => void applyMathRepair(this.app.vault, plan).then(
-            (result) => new import_obsidian47.Notice(
+            (result) => new import_obsidian48.Notice(
               result.skipped ? t("ui.fix_math_done_0_1", result.changed, result.skipped) : t("ui.fix_math_done_0", result.changed)
             )
-          ).catch((error) => new import_obsidian47.Notice(error instanceof Error ? error.message : String(error)))
+          ).catch((error) => new import_obsidian48.Notice(error instanceof Error ? error.message : String(error)))
         }
       ]
     ).open();
@@ -83765,13 +84431,13 @@ ${t("ui.organize_link_wait_hint")}`;
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian47.Notice(t("ui.agent_workspace_is_ready"));
+    new import_obsidian48.Notice(t("ui.agent_workspace_is_ready"));
   }
   async fullRebuild() {
     await this.repo.reconcileMissingNodePaths();
     await this.repo.rebuildDerivedData();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian47.Notice(t("ui.vam_data_has_been_refreshed"));
+    new import_obsidian48.Notice(t("ui.vam_data_has_been_refreshed"));
   }
   /** Builds Coffee Tables storage and manager for the current workspace folder (CoffeeStorage fixes its folder at construction). */
   buildCoffee() {
@@ -83818,7 +84484,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const candidates = known != null ? known : await this.repo.workspaceCandidates();
     this.workspaceRecoveryCandidates = [];
     if (!candidates.length) {
-      new import_obsidian47.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
+      new import_obsidian48.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
       return;
     }
     new ChoiceModal(
@@ -83833,7 +84499,7 @@ ${t("ui.organize_link_wait_hint")}`;
           await this.rebuildCoffee();
           await this.repo.rebuildDerivedData();
           for (const view of this.views()) await view.refreshFromPlugin();
-          new import_obsidian47.Notice(t("ui.reconnected_workspace_0", root));
+          new import_obsidian48.Notice(t("ui.reconnected_workspace_0", root));
         })
       }))
     ).open();
@@ -83945,19 +84611,19 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
-      else new import_obsidian47.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+      else new import_obsidian48.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
     const state = await this.refreshModelDiscovery("codex");
-    if (state.status === "ready") new import_obsidian47.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+    if (state.status === "ready") new import_obsidian48.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
     else if (state.status === "error")
-      new import_obsidian47.Notice(
+      new import_obsidian48.Notice(
         t(
           "ui.codex_app_server_check_failed_0",
           this.recordFailure(t("log.codex_recheck_failed"), (_a2 = state.error) != null ? _a2 : "unknown error")
         )
       );
-    else new import_obsidian47.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+    else new import_obsidian48.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
   }
   isMap(file) {
     var _a2, _b2;
@@ -83970,11 +84636,11 @@ ${t("ui.organize_link_wait_hint")}`;
     return marker5 === true || marker5 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || isManagedMapPath(this.settings, file.path));
   }
   styleNodeLeaf(leaf) {
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian47.MarkdownView)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian48.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     this.topicRuns.dispose();
     (_a2 = this.repo) == null ? void 0 : _a2.dispose();
     void ((_b2 = this.coffeeManager) == null ? void 0 : _b2.stop());
@@ -83987,48 +84653,49 @@ ${t("ui.organize_link_wait_hint")}`;
     this.resetCodexRuntime();
     this.unloaded = true;
     this.aiRuntime.dispose();
+    void ((_c = this.usage) == null ? void 0 : _c.dispose());
   }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   noteStylePort() {
     const folderAt = (path) => {
-      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian47.normalizePath)(path));
-      return found instanceof import_obsidian47.TFolder ? found : null;
+      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path));
+      return found instanceof import_obsidian48.TFolder ? found : null;
     };
     return {
       list: async (folder) => {
         var _a2, _b2;
-        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian47.TFile && child.extension === "md").map((child) => child.name);
+        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian48.TFile && child.extension === "md").map((child) => child.name);
       },
       read: (path) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian47.normalizePath)(path));
-        if (!(file instanceof import_obsidian47.TFile)) return Promise.reject(new Error(path));
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path));
+        if (!(file instanceof import_obsidian48.TFile)) return Promise.reject(new Error(path));
         return this.app.vault.read(file);
       },
       folderExists: (path) => folderAt(path) !== null,
       createFolder: async (path) => {
         let current = "";
-        for (const part of (0, import_obsidian47.normalizePath)(path).split("/")) {
+        for (const part of (0, import_obsidian48.normalizePath)(path).split("/")) {
           current = current ? `${current}/${part}` : part;
           if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
         }
       },
       create: async (path, content) => {
-        await this.app.vault.create((0, import_obsidian47.normalizePath)(path), content);
+        await this.app.vault.create((0, import_obsidian48.normalizePath)(path), content);
       },
       modify: async (path, content) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian47.normalizePath)(path));
-        if (!(file instanceof import_obsidian47.TFile)) throw new Error(path);
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path));
+        if (!(file instanceof import_obsidian48.TFile)) throw new Error(path);
         await this.app.vault.modify(file, content);
       },
       trash: async (path) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian47.normalizePath)(path));
-        if (file instanceof import_obsidian47.TFile) await this.app.fileManager.trashFile(file);
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path));
+        if (file instanceof import_obsidian48.TFile) await this.app.fileManager.trashFile(file);
       },
       // FileManager.renameFile (not Vault.rename): it also updates links to the file; it rejects when the target exists.
       rename: async (from, to) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian47.normalizePath)(from));
-        if (!(file instanceof import_obsidian47.TFile)) throw new Error(from);
-        await this.app.fileManager.renameFile(file, (0, import_obsidian47.normalizePath)(to));
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(from));
+        if (!(file instanceof import_obsidian48.TFile)) throw new Error(from);
+        await this.app.fileManager.renameFile(file, (0, import_obsidian48.normalizePath)(to));
       }
     };
   }
@@ -84036,8 +84703,8 @@ ${t("ui.organize_link_wait_hint")}`;
   registerNoteStyleEntrypoints() {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (file instanceof import_obsidian47.TFolder)
-          void this.noteStyles.followFolderRename((0, import_obsidian47.normalizePath)(oldPath), file.path).catch(() => void 0);
+        if (file instanceof import_obsidian48.TFolder)
+          void this.noteStyles.followFolderRename((0, import_obsidian48.normalizePath)(oldPath), file.path).catch(() => void 0);
       })
     );
     this.addLocalizedCommand("open-note-styles-folder", "ui.command_open_note_styles_folder", () => {
@@ -84049,15 +84716,15 @@ ${t("ui.organize_link_wait_hint")}`;
     var _a2, _b2, _c, _d, _e;
     try {
       const folder = await this.noteStyles.ensureBlockFolder();
-      new import_obsidian47.Notice(t("ui.note_style_folder_opened_0", folder));
-      const target = this.app.vault.getAbstractFileByPath((0, import_obsidian47.normalizePath)(folder));
+      new import_obsidian48.Notice(t("ui.note_style_folder_opened_0", folder));
+      const target = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(folder));
       if (target) {
         const explorer = (_d = (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "file-explorer")) == null ? void 0 : _c[0]) == null ? void 0 : _d.view;
         (_e = explorer == null ? void 0 : explorer.revealInFolder) == null ? void 0 : _e.call(explorer, target);
       }
       return folder;
     } catch (error) {
-      new import_obsidian47.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian48.Notice(error instanceof Error ? error.message : String(error));
       return null;
     }
   }
@@ -84069,15 +84736,15 @@ ${t("ui.organize_link_wait_hint")}`;
   async editNotePart(category, ref) {
     try {
       const { ref: target, created } = await this.noteStyles.copyPartOnce(category, ref);
-      if (created) new import_obsidian47.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
+      if (created) new import_obsidian48.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
       await this.noteStyles.refresh();
       const path = this.noteStyles.partFilePath(category, target);
-      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian47.normalizePath)(path)) : null;
-      if (!(file instanceof import_obsidian47.TFile)) throw new Error("not a file");
+      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path)) : null;
+      if (!(file instanceof import_obsidian48.TFile)) throw new Error("not a file");
       await this.app.workspace.getLeaf("tab").openFile(file);
       return target;
     } catch (e) {
-      new import_obsidian47.Notice(t("ui.block_notice_open_failed"));
+      new import_obsidian48.Notice(t("ui.block_notice_open_failed"));
       return null;
     }
   }
@@ -84107,7 +84774,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const oldName = ref.slice("file:".length);
     const renamed = await this.noteStyles.renameFile(category, ref, name2);
     if (!renamed.ok) {
-      new import_obsidian47.Notice(t("ui.manage_rename_refused"));
+      new import_obsidian48.Notice(t("ui.manage_rename_refused"));
       return renamed;
     }
     if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
@@ -84158,8 +84825,8 @@ ${t("ui.organize_link_wait_hint")}`;
         failed.push(topic.path);
       }
     }
-    new import_obsidian47.Notice(t("ui.manage_rename_done_0_1_2", name2, changedTopics, styles));
-    if (failed.length) new import_obsidian47.Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
+    new import_obsidian48.Notice(t("ui.manage_rename_done_0_1_2", name2, changedTopics, styles));
+    if (failed.length) new import_obsidian48.Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
     return { ok: true, ref: next, topics: changedTopics, styles, failed };
   }
   /** Removes the entries of `noteStyleByKind` that name `ref` (those topic types go back to their built-in style); one save. Returns the kinds. */
@@ -84185,7 +84852,7 @@ ${t("ui.organize_link_wait_hint")}`;
     try {
       await this.noteStyles.trashFile(category, ref);
     } catch (e) {
-      new import_obsidian47.Notice(t("ui.manage_delete_failed"));
+      new import_obsidian48.Notice(t("ui.manage_delete_failed"));
       return false;
     }
     if (category === "recipe") await this.clearKindStyles(ref);
@@ -84216,9 +84883,9 @@ ${t("ui.organize_link_wait_hint")}`;
   /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
   async saveNoteRecipe(input2) {
     const result = await this.noteStyles.saveRecipe(input2);
-    if (result.ok) new import_obsidian47.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
+    if (result.ok) new import_obsidian48.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
     else
-      new import_obsidian47.Notice(
+      new import_obsidian48.Notice(
         t(
           result.reason === "name" ? "ui.recipe_notice_name_unavailable" : result.reason === "changed" ? "ui.recipe_notice_changed" : "ui.recipe_notice_failed"
         )
@@ -84241,7 +84908,7 @@ ${t("ui.organize_link_wait_hint")}`;
         await this.saveData(nextSettings);
       } catch (error) {
         this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
-        new import_obsidian47.Notice(translate(previous, "ui.language_change_save_failed"));
+        new import_obsidian48.Notice(translate(previous, "ui.language_change_save_failed"));
         return false;
       }
       Object.assign(this.settings, nextSettings);
@@ -84268,7 +84935,7 @@ ${t("ui.organize_link_wait_hint")}`;
         failures.push(error);
       }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
-      new import_obsidian47.Notice(
+      new import_obsidian48.Notice(
         failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved")
       );
       return true;
@@ -84333,10 +85000,10 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.claudeDiagnostic();
     const state = await this.refreshModelDiscovery("claude");
     if (!diagnostic.installed) {
-      new import_obsidian47.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+      new import_obsidian48.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
       return;
     }
-    new import_obsidian47.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    new import_obsidian48.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
   /** `noticeOpening` is called just before the usage notice opens (only when it really does), so a caller can say it waits for it. */
@@ -84362,7 +85029,7 @@ ${t("ui.organize_link_wait_hint")}`;
       await this.repo.rebuildDerivedData(paths ? { roots: [], paths } : void 0);
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
-      new import_obsidian47.Notice(
+      new import_obsidian48.Notice(
         t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error))
       );
     }
@@ -84394,7 +85061,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.app.workspace.getLeavesOfType("markdown").some(
       (leaf) => {
         var _a2, _b2;
-        return leaf.getRoot() === split && leaf.view instanceof import_obsidian47.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
+        return leaf.getRoot() === split && leaf.view instanceof import_obsidian48.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
       }
     );
   }
@@ -84407,7 +85074,7 @@ ${t("ui.organize_link_wait_hint")}`;
       this.detailsLeaf = (_b2 = (_a2 = markdownLeaves.filter(
         (leaf) => {
           var _a3, _b3;
-          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian47.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
+          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian48.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
         }
       ).sort(
         (a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top
@@ -84429,11 +85096,11 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   closeStaleDetails() {
     var _a2, _b2, _c, _d;
-    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian47.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
+    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian48.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian47.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
+      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian48.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
@@ -84449,7 +85116,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
   async runCoffeeRequest(request) {
-    if (!(this.app.vault.adapter instanceof import_obsidian47.FileSystemAdapter) || !this.manifest.dir)
+    if (!(this.app.vault.adapter instanceof import_obsidian48.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
     const effort = effectiveReasoningLevel(
@@ -84502,16 +85169,16 @@ ${t("ui.organize_link_wait_hint")}`;
     }
     let bytes;
     const embeddedPath = (_b2 = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src")) == null ? void 0 : _b2.split("#")[0];
-    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian47.MarkdownView && view2.containerEl.contains(image));
+    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian48.MarkdownView && view2.containerEl.contains(image));
     const file = embeddedPath ? this.app.metadataCache.getFirstLinkpathDest(
       embeddedPath,
-      view instanceof import_obsidian47.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
+      view instanceof import_obsidian48.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
     ) : null;
     const remote = image.currentSrc || image.src;
-    if (file instanceof import_obsidian47.TFile) bytes = await this.app.vault.readBinary(file);
+    if (file instanceof import_obsidian48.TFile) bytes = await this.app.vault.readBinary(file);
     else if (/^https?:\/\//i.test(remote)) {
       try {
-        bytes = (await (0, import_obsidian47.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
+        bytes = (await (0, import_obsidian48.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
       } catch (e) {
         throw new Error(t("ui.context_ai_image_download_failed"));
       }
@@ -84560,7 +85227,7 @@ ${t("ui.organize_link_wait_hint")}`;
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
       this.currentModelChoice().reasoning
     );
-    return this.aiCalls.run(
+    return await this.aiCalls.run(
       prepared,
       {
         model,
@@ -84569,6 +85236,7 @@ ${t("ui.organize_link_wait_hint")}`;
         taskName: "markdown-context",
         signal,
         localCodex: !webSearch,
+        usage: { action: "writeback" },
         task: {
           textOnly: !webSearch && !generateImage,
           webSearchOnly: webSearch,
@@ -84590,7 +85258,7 @@ ${t("ui.organize_link_wait_hint")}`;
       if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
       await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);
     } catch (error) {
-      new import_obsidian47.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian48.Notice(error instanceof Error ? error.message : String(error));
     }
   }
   async openResearchMap(path) {
@@ -84609,7 +85277,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   async loadCodexModels() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian47.FileSystemAdapter) || !this.manifest.dir)
+    if (!(adapter instanceof import_obsidian48.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Codex model discovery requires desktop Obsidian");
     const pluginDirectory = (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
@@ -84681,7 +85349,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   pluginDirectory() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian47.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
+    if (!(adapter instanceof import_obsidian48.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
     return (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
   }

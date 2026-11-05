@@ -98,6 +98,8 @@ export interface TaskContext {
   /** Trusted: the map's AI mode for a research or expansion request. Quick (with local research) swaps in the Quick prompt text; never serialized. */
   mapAiMode?: MapAiMode;
   visualMode?: VisualMode;
+  /** Trusted: the map file this request belongs to, for token-usage accounting only; never serialized into a prompt. */
+  usageMapPath?: string;
 }
 /** Provider-neutral web activity event; Claude events are translated into the Codex App Server shape. */
 export interface WebSearchEvent {

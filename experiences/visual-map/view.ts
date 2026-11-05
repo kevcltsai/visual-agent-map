@@ -19772,7 +19772,9 @@ export class VisualAgentMapView extends ItemView {
   /** Ends the running turn's record (a no-op when there is none or it already ended). */
   private endChatRecord(status: RecordTurnStatus, fields?: TurnEndFields): void {
     const record = this.chatLastRecord;
-    if (record?.isOpen) record.end(status, fields);
+    // Whatever the status, the turn's answer is in the record now: a stopped turn that left text must not be written again
+    // as a backfilled one by the next send, and closing the view loses nothing of it.
+    if (record?.isOpen && record.end(status, fields)) this.chatRecordLogged.add(record.answer);
   }
   /**
    * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished

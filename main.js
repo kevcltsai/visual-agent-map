@@ -72258,7 +72258,7 @@ ${note.detail.trim()}` : "",
   /** Ends the running turn's record (a no-op when there is none or it already ended). */
   endChatRecord(status, fields) {
     const record = this.chatLastRecord;
-    if (record == null ? void 0 : record.isOpen) record.end(status, fields);
+    if ((record == null ? void 0 : record.isOpen) && record.end(status, fields)) this.chatRecordLogged.add(record.answer);
   }
   /**
    * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished

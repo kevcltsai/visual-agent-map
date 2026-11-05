@@ -6074,6 +6074,22 @@ integrationTest('map chat records: A4 records failed, stopped, resent turns and 
   assert.equal(allRecordFiles(h).every(p => p.startsWith(`${ROOT_A}/Chats/records/`)), true, 'only under the map\'s Chats/records');
 });
 
+integrationTest('map chat records: A4 a stopped turn that left text is not written again at the next send, and closing does not warn', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  const gate = deferred(); h.control.reply = async (_request, _signal, onReply) => { onReply('half an ans'); await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('stop midway'); const stopping = h.view.sendMapChat(); await requestOut(chat); h.view.stopMapChat(); gate.resolve(); await stopping; await recordIdle(h);
+  assert.equal(chat.completedTurns().length, 1, 'the stopped turn with text counts as finished in memory');
+  await sendOne(h, 'next', 'fine');
+  const [file] = recordFiles(h); const lines = recordLines(h, file);
+  eq(lineKinds(lines), ['conversation', 'turn_start', 'end:stopped', 'turn_start', 'end:done']);
+  assert.equal(lines.some(l => l.backfilled), false, 'no backfilled start');
+  await h.view.onClose(); eq(unsavedNotice(h), [], 'nothing is lost, so no notice');
+  const again = await harness({ records: true }); await again.view.hydrate();
+  await seedRecord(again, lines.map(l => ({ ...l })), file.split('/').at(-1).replace('.jsonl', ''));
+  const c = again.open(); await until(() => c.hasMessages);
+  eq(c.transcript().map(m => m.text), ['next', 'fine'], 'a stopped turn is not shown again');
+});
+
 integrationTest('map chat records: A5 restores the latest conversation on reopen, the next turn carries it and appends to the same file', async () => {
   const first = await harness({ records: true }); await first.view.hydrate(); first.open();
   await sendOne(first, 'what is sleep', 'Sleep is rest.');

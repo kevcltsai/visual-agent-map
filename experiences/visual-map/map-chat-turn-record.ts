@@ -32,7 +32,7 @@ export class MapChatTurnRecord {
     private readonly writer: MapChatRecordWriter,
     readonly conversationId: string,
     readonly turn: number,
-    private readonly answer: MapChatMessage,
+    readonly answer: MapChatMessage,
     private readonly log: (message: string) => void
   ) {}
 

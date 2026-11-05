@@ -202,6 +202,7 @@ import {
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
+import { UsageControl } from "./usage-panel";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
 import { PLACEHOLDER_MAP_NAMES, isPlaceholderMapTitle, uniqueDefaultName } from "../../core/default-names";
@@ -1385,6 +1386,8 @@ export class VisualAgentMapView extends ItemView {
   } | null = null;
   /** Text spans the one-second tick rewrites in place, so progress never re-renders the whole map. */
   private aimProgressEls = new Map<string, HTMLElement>();
+  /** Token-usage button and panel in the zoom controls; null when the plugin has no usage store. */
+  private usageControl: UsageControl | null = null;
   /** Model of each AIM branch's root topic, resolved once when its first progress event arrives; dropped when the run ends. */
   private aimBranchModels = new Map<string, string>();
   private aimBranchModelPending = new Set<string>();
@@ -1495,6 +1498,9 @@ export class VisualAgentMapView extends ItemView {
     this.announcedStages.clear();
     this.unsubscribeResearch?.();
     this.unsubscribeResearch = this.plugin.researchProgress?.subscribe(path => this.onResearchProgress(path)) ?? null;
+    this.usageControl?.stop();
+    this.usageControl = this.plugin.usage ? new UsageControl(this.plugin.usage, () => this.path) : null;
+    this.usageControl?.start();
     const epoch = ++this.aimViewEpoch;
     this.mapOpenEpoch++;
     this.contentEl.addClass("vam-view");
@@ -2306,6 +2312,8 @@ export class VisualAgentMapView extends ItemView {
     this.announcedStages.clear();
     this.unsubscribeResearch?.();
     this.unsubscribeResearch = null;
+    this.usageControl?.stop();
+    this.usageControl = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
     this.researchTick = this.researchRenderTimer = null;
@@ -5987,6 +5995,10 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /** The progress key of this map's multi-select synthesis or AI merge (a name no Vault path can have). */
+  /** The map a request's token usage is counted under (this view's map file). */
+  private usageMapField(): { usageMapPath?: string } {
+    return this.path ? { usageMapPath: this.path } : {};
+  }
   private taskProgressKey(kind: "integration" | "merge", mapPath = this.path): string {
     return `${TASK_PROGRESS_PREFIX}${kind}:${mapPath}`;
   }
@@ -6524,6 +6536,7 @@ export class VisualAgentMapView extends ItemView {
         },
         outputLanguage: language,
         mode: "merge",
+        usageMapPath: task.mapPath,
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
@@ -11622,6 +11635,8 @@ export class VisualAgentMapView extends ItemView {
         : null;
     const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
     const zoom = controls.createDiv("vam-zoom-controls");
+    // Far left of the zoom controls; absent when the usage store could not be created.
+    this.usageControl?.mount(zoom, controls);
     // The hint teaches pan, zoom and opening a card, so using a zoom-control button retires it too.
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
       this.markCanvasHintSeen();
@@ -15956,6 +15971,7 @@ export class VisualAgentMapView extends ItemView {
               outputLanguage: options?.outputLanguage,
               ...(await this.proposalTone(note, options)),
               mode: "decompose",
+              ...this.usageMapField(),
               researchMode: options?.researchMode ?? "research",
               researchDepth: options?.researchDepth ?? "normal",
               visualMode: "off"
@@ -16739,6 +16755,7 @@ export class VisualAgentMapView extends ItemView {
             outputLanguage: options.outputLanguage,
             ...(await this.proposalTone(note, options)),
             mode: "synthesize",
+            ...this.usageMapField(),
             researchMode: options.researchMode,
             researchDepth: options.researchDepth,
             visualMode: "off"
@@ -16862,6 +16879,7 @@ export class VisualAgentMapView extends ItemView {
             outputLanguage: options?.outputLanguage,
             ...synthesisStyle.tone,
             mode: "synthesize",
+            ...this.usageMapField(),
             researchMode: options?.researchMode ?? "local",
             researchDepth: options?.researchDepth ?? "normal",
             visualMode: options?.visualMode ?? note.visualMode,
@@ -17362,6 +17380,7 @@ export class VisualAgentMapView extends ItemView {
             outputLanguage: runOptions.outputLanguage,
             ...(await this.proposalTone(undefined, runOptions)),
             mode: "synthesize",
+            ...this.usageMapField(),
             researchMode: runOptions.researchMode,
             researchDepth: runOptions.researchDepth,
             visualMode: "off"
@@ -17392,6 +17411,7 @@ export class VisualAgentMapView extends ItemView {
           outputLanguage: runOptions.outputLanguage,
           ...(integrationStyle.toneText ? { toneText: integrationStyle.toneText } : {}),
           mode: "synthesize",
+          ...this.usageMapField(),
           researchMode: runOptions.researchMode ?? "local",
           researchDepth: runOptions.researchDepth ?? "normal",
           visualMode: runOptions.visualMode ?? "auto",
@@ -22362,6 +22382,7 @@ export class VisualAgentMapView extends ItemView {
       ...this.writebackHooks(),
       origin: this,
       map: this.map ?? undefined,
+      usageMapPath: this.path || undefined,
       request,
       runOnce,
       done,

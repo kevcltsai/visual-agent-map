@@ -162,10 +162,10 @@ test('Claude: a reported usage of 120 in / 45 out is recorded once, not estimate
   same({ ...h.records[0], durationMs: typeof h.records[0].durationMs }, { action: 'research', mapPath: 'A/map.vam', topic: 'Topic', provider: 'claude', model: 'claude:sonnet', inputTokens: 120, outputTokens: 45, estimated: false, durationMs: 'number' });
 });
 
-test('actions: decompose is expand, synthesize stays, merge is writeback, a local task is writeback, a count repair is other', async () => {
+test('actions: decompose is expand, synthesize and merge are synthesize, every task (quick or local too) is research, a count repair is other', async () => {
   const h = rig({ handler: call => { call.controls.onMilestones({ usage: { inputTokens: 1, outputTokens: 1 } }); return GOOD; } });
   for (const mode of ['decompose', 'synthesize', 'merge', 'task']) await h.service.askModel(context({ mode }), 'claude:sonnet', 'low');
-  same(h.records.map(r => r.action), ['expand', 'synthesize', 'writeback', 'writeback']);
+  same(h.records.map(r => r.action), ['expand', 'synthesize', 'synthesize', 'research']);
   h.records.length = 0;
   await h.service.askModel(context({ countRepair: true }), 'claude:sonnet', 'low');
   assert.equal(h.records[0].action, 'other');

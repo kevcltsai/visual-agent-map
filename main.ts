@@ -2081,30 +2081,44 @@ export default class VisualAgentMapPlugin extends Plugin {
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
       this.currentModelChoice().reasoning
     );
-    return this.aiCalls.run(
-      prepared,
-      {
-        model,
-        effort,
-        topic: "Markdown selection",
-        taskName: "markdown-context",
-        signal,
-        localCodex: !webSearch,
-        task: {
-          textOnly: !webSearch && !generateImage,
-          webSearchOnly: webSearch,
-          generateImage,
-          imageDataUrl,
-          searchBudget: webSearch ? 4 : 0,
-          // Drawing takes longer than a text reply.
-          ...(generateImage ? { timeoutMs: 6 * 60 * 1000 } : {})
+    // Selected-text AI writes into a note: its tokens count as "writeback". Counting never changes the result.
+    const usage = this.aiTasks.beginUsage({
+      action: "writeback",
+      topic: "Markdown selection",
+      provider: this.runtimeIdFor(model),
+      model
+    });
+    let reply: string | undefined;
+    try {
+      reply = await this.aiCalls.run(
+        prepared,
+        {
+          model,
+          effort,
+          topic: "Markdown selection",
+          taskName: "markdown-context",
+          signal,
+          localCodex: !webSearch,
+          task: {
+            textOnly: !webSearch && !generateImage,
+            webSearchOnly: webSearch,
+            generateImage,
+            imageDataUrl,
+            searchBudget: webSearch ? 4 : 0,
+            // Drawing takes longer than a text reply.
+            ...(generateImage ? { timeoutMs: 6 * 60 * 1000 } : {}),
+            ...usage.hooks({})
+          }
+        },
+        (raw, exchange) => {
+          if (exchange.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+          return raw;
         }
-      },
-      (raw, exchange) => {
-        if (exchange.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-        return raw;
-      }
-    );
+      );
+      return reply;
+    } finally {
+      usage.end(reply);
+    }
   }
   async openCoffeeHandoff(session: CoffeeSession, sourcePath: string, insightId?: string): Promise<void> {
     try {

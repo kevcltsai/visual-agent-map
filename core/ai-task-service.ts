@@ -88,13 +88,12 @@ export interface AiTaskServiceOptions {
   diagramsEnabled?: () => boolean;
 }
 
-/** The usage action of a request: reference rounds, count repairs and AIM are "other"; chart calls name their own. */
+/** The usage action of a request: every task (quick or standard) is research, merge is a kind of synthesis; reference rounds, count repairs and AIM are "other"; chart calls name their own. */
 function usageActionOf(context: TaskContext, role?: TaskStepRole): UsageAction {
   if (role !== undefined || context.countRepair || context.promptProfile === "aim") return "other";
   if (context.mode === "decompose") return "expand";
-  if (context.mode === "synthesize") return "synthesize";
-  if (context.mode === "merge") return "writeback";
-  return context.researchMode === "research" ? "research" : "writeback";
+  if (context.mode === "synthesize" || context.mode === "merge") return "synthesize";
+  return "research";
 }
 
 /** The prompt text a runtime request carries (Codex: the text inputs; Claude's request has none, so nothing to estimate from). */
@@ -137,7 +136,7 @@ export class AiTaskService {
   }
 
   /** Starts counting one provider call for the usage store; `end` records it exactly once, on success or failure. */
-  private beginUsage(info: {
+  beginUsage(info: {
     action: UsageAction;
     topic?: string;
     mapPath?: string;

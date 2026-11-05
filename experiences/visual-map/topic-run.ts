@@ -176,6 +176,8 @@ export interface ResearchStart extends WritebackHooks {
   /** The caller's identity: the view that started the run keeps its undo, every other view clears its history. */
   origin?: unknown;
   map?: MapDocument;
+  /** The map file the run's token usage is counted under. */
+  usageMapPath?: string;
   request?: Partial<TaskContext> & { runStyle?: RunStyle };
   runOnce?: RunOnceModel;
   done?: (result: AiResult) => void;
@@ -1097,6 +1099,7 @@ export class TopicRuns {
         researchDepth: "normal",
         visualMode: note.visualMode,
         ...(runStyle.toneText ? { toneText: runStyle.toneText } : {}),
+        ...(options.usageMapPath ? { usageMapPath: options.usageMapPath } : {}),
         ...overrides,
         detailTemplate,
         ...runStyle.contextFields,

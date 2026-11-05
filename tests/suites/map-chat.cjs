@@ -5675,3 +5675,73 @@ integrationTest('persona 27: a card that grows after the layout (cover picture a
   h.view.settleCardHeights(); await until(() => coverAny(h.view.map.nodes, id => heights[id]).length === 0);
   eq(coverAny(await h.saved(), id => heights[id]), [], 'the saved map has no overlap either');
 });
+
+// ---- persona 27b: the height settling writes through the queue, and never inside a chat reply's step -----------------------
+const fakeCards = (h, heights) => { h.view.cardEls = new Map(h.view.map.nodes.map(n => [n.id, { get offsetHeight() { return heights[n.id]; } }])); };
+const undoSteps = h => h.view.history.past.length;
+// Every Map.md transaction takes a moment to commit (a real vault is slower than the fake one), so two that overlap really overlap.
+const slowCommits = (h, ms = 15) => {
+  const probe = { running: 0, most: 0 };
+  const begin = h.view.beginMapTransaction.bind(h.view);
+  h.view.beginMapTransaction = (...args) => { const tx = begin(...args); const commit = tx.commit.bind(tx); tx.commit = async (...c) => { probe.running++; probe.most = Math.max(probe.most, probe.running); try { await new Promise(r => setTimeout(r, ms)); return await commit(...c); } finally { probe.running--; } }; return tx; };
+  return probe;
+};
+integrationTest('persona 27b: a reply while a card has grown (cover arrived) stays one undo step; the settling adds none inside it', async () => {
+  const h = await harness({ viaSync: false, realRender: true }); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  fakeCards(h, heights); h.view.settleCardHeights(); await tick();
+  const steps = undoSteps(h); slowCommits(h, 60);
+  heights[h.ids.a] = 520; // a cover picture arrives while the reply is being applied
+  const lines = await apply(h, [{ kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 'What we dream' }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines)); await tick(); await tick();
+  assert.equal(undoSteps(h), steps + 1, 'the reply is one undo step, the settling did not add a step under or over it');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.equal(undoSteps(h), steps, 'one Undo takes back the whole reply');
+  assert.equal((await h.saved()).length, 4, 'the child is gone again');
+});
+integrationTest('persona 27b: what a reply wrote is still in Map.md after the settling; never two Map.md writes at once', async () => {
+  const h = await harness({ viaSync: false, realRender: true }); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  fakeCards(h, heights); h.view.settleCardHeights(); await tick();
+  const probe = slowCommits(h);
+  heights[h.ids.a] = 520;
+  const lines = await apply(h, [
+    { kind: 'update_summary', nodeId: h.ids.a, summary: 'A long summary '.repeat(40) },
+    { kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 'What we dream' }
+  ]);
+  eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
+  h.view.render(); await tick(); await tick(); await tick();
+  assert.equal(probe.most, 1, 'Map.md transactions never ran at the same time');
+  const saved = await h.saved();
+  assert.ok(saved.some(n => n.parentId === h.ids.b), 'the child the reply added is still in the saved map');
+  assert.equal(saved.length, 5);
+  eq(coverAny(saved, id => heights[id] ?? 180), [], 'and nothing overlaps');
+  assert.equal(JSON.stringify(saved.map(n => [n.id, n.x, n.y])), JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), 'the saved map is the one on screen');
+});
+integrationTest('persona 27b: the settling waits for the queue; a write already running is not read over', async () => {
+  const h = await harness({ viaSync: false, realRender: true }); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  fakeCards(h, heights); h.view.settleCardHeights(); await tick();
+  heights[h.ids.a] = 520;
+  let release; const gate = new Promise(r => { release = r; });
+  const busy = h.view.plugin.mutate(async () => { await gate; });
+  const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  h.view.settleCardHeights(); await tick(); await tick();
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), before, 'nothing is written while another job holds the queue');
+  release(); await busy; await until(() => coverAny(h.view.map.nodes, id => heights[id]).length === 0);
+});
+integrationTest('persona 27b: a card drawn for the first time that covers nothing writes nothing; one that covers another is laid out', async () => {
+  const h = await harness({ viaSync: false, realRender: true }); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  fakeCards(h, heights); h.view.settleCardHeights(); await tick();
+  const steps = undoSteps(h); const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const fresh = { ...h.view.map.nodes[0], id: 'fresh', parentId: null, x: 2000, y: 2000, path: 'x.md' };
+  h.view.map.nodes.push(fresh); heights.fresh = 300; fakeCards(h, heights);
+  h.view.settleCardHeights(); await tick(); await tick();
+  assert.equal(undoSteps(h), steps, 'no write, no undo step'); assert.equal(JSON.stringify(h.view.map.nodes.slice(0, -1).map(n => [n.id, n.x, n.y])), before);
+  const over = { ...fresh, id: 'over', x: h.view.map.nodes[1].x, y: h.view.map.nodes[1].y + 40 }; h.view.map.nodes.push(over); heights.over = 300; fakeCards(h, heights);
+  const stepsBefore = undoSteps(h);
+  h.view.settleCardHeights(); await until(() => undoSteps(h) === stepsBefore + 1);
+  eq(coverAny(h.view.map.nodes.filter(n => n.id !== 'fresh'), id => heights[id] ?? 180), [], 'the card that covered another is laid out again');
+});

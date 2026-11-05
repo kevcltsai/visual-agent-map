@@ -724,7 +724,8 @@ function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: s
   return id => resolve(id, new Set());
 }
 function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
-  const bend = Math.max(60, Math.abs(x2 - x1) / 2);
+  const run = x2 - x1;
+  const bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 /** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */

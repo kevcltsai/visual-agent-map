@@ -252,7 +252,7 @@ test('D-5: tree edges in a down map leave the parent bottom midpoint and enter t
   const parent = { x: 100, y: 50, width: 300, height: 120 };
   const child = { x: 40, y: 400, width: 300, height: 90 };
   assert.equal(geometry.treeEdgePathData(parent, child, 'down'), 'M 250 170 C 250 285, 190 285, 190 400');
-  assert.equal(geometry.treeEdgePathData(parent, { ...child, y: 190 }, 'down'), 'M 250 170 C 250 230, 190 130, 190 190', 'a short run keeps arms of 60');
+  assert.equal(geometry.treeEdgePathData(parent, { ...child, y: 190 }, 'down'), 'M 250 170 C 250 210, 190 150, 190 190', 'a short run (20) has arms of 40');
   const above = { x: 40, y: -300, width: 300, height: 90 };
   assert.equal(geometry.treeEdgePathData(parent, above, 'up'), 'M 250 50 C 250 -80, 190 -80, 190 -210');
   for (const [name, [nodes, heightOf]] of Object.entries(plainTrees())) {
@@ -686,7 +686,7 @@ test('R-4: radial and timeline are accepted by the data format; the other arrang
       assert.deepEqual(layoutOf({ layout: value, aim: { version: 1 } }), { direction: 'right' });
     }
   assert.equal(layout.layoutDirectionOf({ layout: { direction: 'radial' } }), 'right');
-  const a = { x: 0, y: 0, width: 300, height: 100 }, b = { x: 400, y: 200, width: 300, height: 100 };
+  const a = { x: 0, y: 0, width: 300, height: 100 }, b = { x: 320, y: 200, width: 300, height: 100 };
   assert.notEqual(geometry.treeEdgePathData(a, b, 'radial'), geometry.treeEdgePathData(a, b, 'right'), 'radial has its own curve');
 });
 
@@ -1312,7 +1312,7 @@ test('V4b: a branch with its own direction draws its edges by the parent card\'s
   h.view.cardEls.set(root.id, card(1000, 80)); h.view.cardEls.set(a.id, card(1360, 0)); h.view.cardEls.set(b.id, card(1360, 300)); h.view.cardEls.set(a1.id, card(1360, 300));
   h.view.drawEdges();
   const d = (p, c) => h.view.edgeEls.get(`${p.id}\u0000${c.id}`).attrs.d;
-  assert.equal(d(root, a), 'M 1300 170 C 1360 170, 1300 90, 1360 90', 'into the branch: the parent (right map) decides');
+  assert.equal(d(root, a), 'M 1300 170 C 1330 170, 1330 90, 1360 90', 'into the branch: the parent (right map) decides');
   assert.equal(d(a, a1), 'M 1510 180 C 1510 240, 1510 240, 1510 300', 'inside the branch: down');
 });
 

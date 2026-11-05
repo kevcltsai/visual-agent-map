@@ -156,7 +156,8 @@ export function treeEdgePathData(parent: RelationBox, child: RelationBox, direct
       down = direction === "down",
       y1 = down ? parent.y + parent.height : parent.y,
       y2 = down ? child.y : child.y + child.height,
-      bend = Math.max(60, Math.abs(y2 - y1) / 2),
+      run = down ? y2 - y1 : y1 - y2,
+      bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2),
       sign = down ? 1 : -1;
     return `M ${x1} ${y1} C ${x1} ${y1 + sign * bend}, ${x2} ${y2 - sign * bend}, ${x2} ${y2}`;
   }
@@ -167,12 +168,14 @@ export function treeEdgePathData(parent: RelationBox, child: RelationBox, direct
   if (leftward) {
     const x1 = parent.x,
       x2 = child.x + child.width,
-      bend = Math.max(60, Math.abs(x2 - x1) / 2);
+      run = x1 - x2,
+      bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
     return `M ${x1} ${y1} C ${x1 - bend} ${y1}, ${x2 + bend} ${y2}, ${x2} ${y2}`;
   }
   const x1 = parent.x + parent.width,
     x2 = child.x,
-    bend = Math.max(60, Math.abs(x2 - x1) / 2);
+    run = x2 - x1,
+    bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 

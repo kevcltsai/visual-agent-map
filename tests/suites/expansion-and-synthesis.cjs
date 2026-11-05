@@ -1356,7 +1356,7 @@ async function templateHarness({ language = 'zh-TW', settings = {}, mapTemplate,
   let view;
   const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language, ...settings }, running: new Set(), abortChartJobs: path => chartAborts.push(path), addChartsAfterWrite: job => chartJobs.push(job), activeTasks: new Map(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), views: () => [view], recordFailure: (_label, error) => error.message,
     askModel: async (context, _model, _reasoning, _signal, _exchange, onAccepted) => { contexts.push(context); onAccepted?.(); return (reply ?? (() => ({ summary: 'Saved summary', detail: 'Saved detail', visualReferences: [], suggestions: [] })))(context, contexts.length); } });
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, ...(captureModals ? { Modal: class { constructor() {} open() { modals.push(this); } close() {} } } : {}), Notice: class { constructor(message) { notices.push(message); } hide() {} } } }, { createFragment: require('../support-dom.cjs').createFragment });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, ...(captureModals === 'dom' ? { Modal: class extends require('../support-dom.cjs').makeModal() { open() { modals.push(this); super.open(); } } } : captureModals ? { Modal: class { constructor() {} open() { modals.push(this); } close() {} } } : {}), Notice: class { constructor(message) { notices.push(message); } hide() {} } } }, { createFragment: require('../support-dom.cjs').createFragment });
   view = new VisualAgentMapView({ app }, attachTopicRuns(plugin)); view.path = mapPath; view.map = doc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   // The research run aborts the old chart job inside the run module; record it there like the plugin double does for the other entries.
   const abortCharts = plugin.topicRuns.abortCharts.bind(plugin.topicRuns); plugin.topicRuns.abortCharts = path => { chartAborts.push(path); abortCharts(path); };
@@ -1819,42 +1819,45 @@ integrationTest('multi research with a chosen style uses it for each started top
 // T6 P3: the topic's own note style chooser replaces the map style and map tone lists (grilling Q15/Q17, C5, #15, #45).
 const OLD_PAIR = { detailTemplateId: 'textbook', toneId: 'plain' };
 async function chooserHarness(patch = {}, { settings = {}, files = {} } = {}) {
-  const h = await templateHarness({ language: 'en', captureModals: true, settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', ...settings } });
+  const h = await templateHarness({ language: 'en', captureModals: 'dom', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', ...settings } });
   await installStyleFiles(h.plugin, files);
   if (Object.keys(patch).length) await h.repo.updateNote(h.topic.path, patch);
   const file = h.app.vault.getAbstractFileByPath(h.topic.path);
   const read = () => h.app.vault.read(file);
   const pending = []; h.view.enqueue = work => { const done = work(); pending.push(done); return done; }; h.view.hydrate = async () => {}; h.view.render = () => {};
-  const choose = async (modal, label) => { await modal.choices.find(choice => choice.label === label).action(); await Promise.all(pending); };
+  const dom = require('../support-dom.cjs');
+  const radios = modal => dom.findAll(modal.contentEl, i => i.attrs.role === 'radio');
+  const nameOf = row => dom.find(row, i => (i.cls ?? '').split(/\s+/).includes('vam-picker-name')).text.replace(/ · Current setting$/, '');
+  const pick = (modal, label) => radios(modal).find(row => nameOf(row) === label);
+  const button = (modal, text) => dom.button(modal.modalEl, text);
+  // Choose a row, then press Apply: the write is queued by the view and awaited here.
+  const choose = async (modal, label) => { pick(modal, label).click(); button(modal, 'Apply').click(); await Promise.all(pending); };
   let processes = 0; const process = h.app.vault.process.bind(h.app.vault); h.app.vault.process = (f, fn) => { processes++; return process(f, fn); };
   const open = async () => { await h.view.chooseTopicStyle(h.topic); return h.modals.at(-1); };
-  const rowOf = (modal, label) => modal.choices.find(choice => choice.label === label);
-  return { ...h, read, open, rowOf, choose, processes: () => processes };
+  return { ...h, read, open, radios, nameOf, pick, button, choose, processes: () => processes };
 }
 const withoutKeys = (text, keys) => text.split('\n').filter(line => !keys.some(key => line.startsWith(`${key}:`))).join('\n');
-integrationTest('topic style chooser: the rows are Follow the topic type (X), the old pair when the topic has one, then every built-in but the AIM report and the user\'s styles, each with its four small labels; the row in force is marked (counterexample 8; was: the map style list)', async () => {
+integrationTest('topic style picker: the one in force is first and marked, then the old pair row, four rows on show and the rest under "Other N styles", never the AIM report; opening writes nothing (counterexample 8; was: the rows of the choice list)', async () => {
   const h = await chooserHarness(OLD_PAIR, { files: { 'WS/S/Styles/Mine.md': '---\nstructure: Standard\n---\n', 'WS/S/Styles/Broken.md': '---\nstructure: Nope\nupdate: bogus\n---\n' } });
   const modal = await h.open();
-  assert.equal(modal.titleText, 'Note style of this topic');
-  assert.equal(modal.choices[0].label, 'Follow the topic type (General research)');
-  assert.ok(!/Current setting/.test(modal.choices[0].description), 'a topic with only the old pair is on the old setting, not on the topic type');
-  assert.equal(modal.choices[1].label, 'Old setting (Intro + six · Plain explanation)'); assert.match(modal.choices[1].description, /^Current setting/);
-  const labels = plain(modal.choices.map(choice => choice.label));
+  assert.equal(modal.titleEl.text, 'Note style of this topic');
+  const rows = h.radios(modal);
+  assert.equal(h.nameOf(rows[0]), 'Old setting (Intro + six · Plain explanation)'); assert.equal(rows[0].attrs['aria-checked'], 'true', 'a topic with only the old pair is on the old setting, first and marked');
+  assert.equal(h.nameOf(rows[1]), 'Follow the topic type (General research)'); assert.equal(rows[1].attrs['aria-checked'], 'false');
+  const labels = rows.map(h.nameOf);
   assert.ok(!labels.some(label => /AIM/i.test(label)), labels.join('|'));
-  assert.ok(labels.includes('Textbook') && labels.includes('Mine'), labels.join('|'));
-  assert.ok(modal.choices.every(choice => choice.named === true && choice.description), 'one line of labels under every row');
-  assert.match(h.rowOf(modal, 'Textbook').description, /^.+ · .+ · .+ · .+$/, 'structure · voice · format · update');
-  const broken = labels.find(label => /Broken/.test(label));
-  if (broken) assert.equal(h.rowOf(modal, broken).buttonLabel, 'Open this file', 'a style file with a problem opens instead of being chosen');
-  assert.equal(h.processes(), 0, 'opening the chooser writes nothing');
+  assert.ok(labels.includes('Textbook'), labels.join('|'));
+  const more = require('../support-dom.cjs').find(modal.contentEl, i => i.attrs['aria-expanded'] !== undefined);
+  assert.match(more.text, /^Other \d+ styles$/);
+  assert.equal(h.processes(), 0, 'opening the picker writes nothing');
 });
 integrationTest('topic style chooser: Follow the topic type removes note-style, detail-template and tone, keeps every other line and the body, leaves updated alone, and undo gives the file back byte for byte (counterexample 1, #15; was: map style chosen on the map)', async () => {
   const h = await chooserHarness({ ...OLD_PAIR, noteStyle: 'builtin:evidence' });
   const before = await h.read();
   assert.ok(/^tone: /m.test(before) && /^detail-template: /m.test(before) && /^note-style: /m.test(before));
   const modal = await h.open();
-  assert.match(h.rowOf(modal, 'Evidence record').description, /^Current setting/, 'the stored note-style is the one in force');
-  await h.choose(modal, modal.choices[0].label);
+  assert.equal(h.nameOf(h.radios(modal)[0]), 'Evidence record', 'the stored note-style is the one in force, first'); assert.equal(h.radios(modal)[0].attrs['aria-checked'], 'true');
+  await h.choose(modal, 'Follow the topic type (General research)');
   const after = await h.read();
   assert.equal(after, withoutKeys(before, ['note-style', 'detail-template', 'tone']), 'only the three keys are gone: other lines, updated and the body keep their bytes');
   assert.equal(h.view.history.past.length, 1);
@@ -1870,18 +1873,23 @@ integrationTest('topic style chooser: choosing a style writes note-style only an
   assert.match(after, /^note-style: "builtin:textbook"$/m);
   assert.ok(/^detail-template: /m.test(after) && /^tone: /m.test(after));
   const second = await h.open();
-  assert.match(h.rowOf(second, 'Textbook').description, /^Current setting/, 'the new choice is the one in force when the chooser opens again');
-  assert.ok(!second.choices.some(choice => /^Old setting/.test(choice.label)), 'a topic with note-style no longer reads its old pair');
+  assert.equal(h.nameOf(h.radios(second)[0]), 'Textbook', 'the new choice is the one in force, first, when the picker opens again'); assert.equal(h.radios(second)[0].attrs['aria-checked'], 'true');
+  assert.ok(!h.radios(second).some(row => /^Old setting/.test(h.nameOf(row))), 'a topic with note-style no longer reads its old pair');
 });
-integrationTest('topic style chooser: choosing the row in force writes nothing and adds no history (counterexample 3)', async () => {
+integrationTest('topic style picker: choosing alone writes nothing; the row in force leaves Apply disabled; Cancel and Esc write nothing and add no history (counterexample 3)', async () => {
   const h = await chooserHarness({ noteStyle: 'builtin:evidence' });
   const modal = await h.open();
-  await h.rowOf(modal, 'Evidence record').action();
+  h.pick(modal, 'Atomic note').click();
+  assert.equal(h.processes(), 0, 'choosing writes nothing'); assert.equal(h.view.history.past.length, 0);
+  h.pick(modal, 'Evidence record').click();
+  assert.equal(h.button(modal, 'Apply').disabled, true); h.button(modal, 'Apply').click(); await Promise.resolve();
+  assert.equal(h.processes(), 0); assert.equal(h.view.history.past.length, 0);
+  h.pick(modal, 'Atomic note').click(); h.button(modal, 'Cancel').click();
   assert.equal(h.processes(), 0); assert.equal(h.view.history.past.length, 0);
   const bare = await chooserHarness();
   const second = await bare.open();
-  assert.match(second.choices[0].description, /^Current setting/, 'a topic with no style follows the topic type');
-  await second.choices[0].action();
+  assert.equal(bare.nameOf(bare.radios(second)[0]), 'Follow the topic type (General research)'); assert.equal(bare.radios(second)[0].attrs['aria-checked'], 'true', 'a topic with no style follows the topic type');
+  bare.pick(second, 'Textbook').click(); second.close();
   assert.equal(bare.processes(), 0); assert.equal(bare.view.history.past.length, 0);
 });
 integrationTest('topic style chooser: refuses an AIM map, presentation mode and an AIM conclusion card, and re-reads the style folder before it opens (counterexample 15; the new style file is listed)', async () => {
@@ -1892,14 +1900,14 @@ integrationTest('topic style chooser: refuses an AIM map, presentation mode and 
   const files = {}; const { NoteStyleStore } = load('ai/note-style-store.ts');
   const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => {}, trash: async () => {} };
   h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} }); await h.plugin.noteStyles.refresh();
-  files['WS/S/Styles/Fresh.md'] = '---\nstructure: Standard\n---\n';
-  const fresh = await h.open(); assert.ok(fresh.choices.some(choice => choice.label === 'Fresh'), plain(fresh.choices.map(c => c.label)).join('|'));
+  files['WS/S/Styles/Fresh.md'] = '---\nvoice: magazine\n---\n';
+  const fresh = await h.open(); assert.ok(h.radios(fresh).some(row => h.nameOf(row) === 'Fresh'), plain(h.radios(fresh).map(h.nameOf)).join('|'));
 });
 integrationTest('topic style chooser (counterexample 16, keyboard): the focus goes back to the topic card after Cancel and after a choice is written', async () => {
   const h = await chooserHarness();
   let focused = 0; h.view.cardEls = new Map([[h.topic.id, { focus: () => focused++ }]]);
   const modal = await h.open();
-  modal.dismissed(); assert.equal(focused, 1, 'Cancel / Escape');
+  modal.close(); assert.equal(focused, 1, 'Cancel / Escape');
   await h.choose(modal, 'Textbook'); assert.equal(focused, 2, 'after the write');
 });
 integrationTest('R1-L1 / counterexample 11: a topic tone that is gone is told once at the research entry with Use another style, the voice is academic and the note is not rewritten', async () => {
@@ -1916,7 +1924,7 @@ integrationTest('R1-L1 / counterexample 11: a topic tone that is gone is told on
   assert.equal(before.split('\n').filter(l => l.startsWith('tone:')).length, 1);
 });
 integrationTest('counterexample 12 and the Notice action: an unreadable note-style file is told with Use another style, and the button opens the same topic chooser; the note is not rewritten', async () => {
-  const h = await templateHarness({ language: 'en', captureModals: true, settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' } });
+  const h = await templateHarness({ language: 'en', captureModals: 'dom', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' } });
   await installStyleFiles(h.plugin, {});
   h.view.enqueue = work => work();
   await h.repo.updateNote(h.topic.path, { noteStyle: 'file:Deleted' });
@@ -1925,8 +1933,8 @@ integrationTest('counterexample 12 and the Notice action: an unreadable note-sty
   assert.equal(h.notices.length, 1); assert.match(String(h.notices[0]), /"Deleted\.md" is missing/);
   const button = require('../support-dom.cjs').findAll(h.notices[0], i => i.tag === 'button')[0];
   button.click(); await until(() => h.modals.length === 1);
-  assert.equal(h.modals[0].titleText, 'Note style of this topic');
-  assert.equal(await h.app.vault.read(h.app.vault.getAbstractFileByPath(h.topic.path)), before, 'the Notice and the chooser write nothing');
+  assert.equal(h.modals[0].titleEl.text, 'Note style of this topic');
+  assert.equal(await h.app.vault.read(h.app.vault.getAbstractFileByPath(h.topic.path)), before, 'the Notice and the picker write nothing');
 });
 integrationTest('run-style P3: the style line of the research and synthesis dialogs names the style the run really uses (topic type voice, topic override, topic style file; the map tone and the workspace tone block are not read; was: "Keep as is (…)" naming style and tone; grilling Q5/Q10/Q15, D3)', async () => {
   const FILES = { 'WS/S/Voices/Pirate.md': 'Talk like a pirate.', 'WS/S/Styles/Pirated.md': '---\nvoice: Pirate\n---\n', 'WS/S/Styles/Own.md': '---\nvoice: plain\n---\n' };

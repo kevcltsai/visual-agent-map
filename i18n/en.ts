@@ -1773,6 +1773,8 @@ export const en = {
   "ui.note_style_menu": "Note style…",
   "ui.note_style_topic_title": "Note style of this topic",
   "ui.note_style_topic_desc": "Only later research is affected; content already written does not change.",
+  "ui.note_style_more_0": "Other {0} styles",
+  "ui.apply": "Apply",
   "ui.note_style_follow_kind_0": "Follow the topic type ({0})",
   "ui.note_style_tone_missing_0": 'The writing voice "{0}" was not found; this topic now uses Professional.',
   "ui.note_style_group_builtin": "Built-in",

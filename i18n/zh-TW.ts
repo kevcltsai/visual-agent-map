@@ -1681,6 +1681,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.note_style_menu": "筆記風格…",
   "ui.note_style_topic_title": "這個議題的筆記風格",
   "ui.note_style_topic_desc": "只影響之後的研究，已寫好的內容不會改。",
+  "ui.note_style_more_0": "其他 {0} 個風格",
+  "ui.apply": "套用",
   "ui.note_style_follow_kind_0": "跟著議題類型（{0}）",
   "ui.note_style_tone_missing_0": "找不到寫作口吻「{0}」，這個議題改用專業。",
   "ui.note_style_group_builtin": "內建",

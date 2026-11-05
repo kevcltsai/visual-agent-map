@@ -1713,6 +1713,8 @@ var en = {
   "ui.note_style_menu": "Note style\u2026",
   "ui.note_style_topic_title": "Note style of this topic",
   "ui.note_style_topic_desc": "Only later research is affected; content already written does not change.",
+  "ui.note_style_more_0": "Other {0} styles",
+  "ui.apply": "Apply",
   "ui.note_style_follow_kind_0": "Follow the topic type ({0})",
   "ui.note_style_tone_missing_0": 'The writing voice "{0}" was not found; this topic now uses Professional.',
   "ui.note_style_group_builtin": "Built-in",
@@ -4288,6 +4290,8 @@ var zhCN = {
   "ui.note_style_menu": "\u7B14\u8BB0\u98CE\u683C\u2026",
   "ui.note_style_topic_title": "\u8FD9\u4E2A\u8BAE\u9898\u7684\u7B14\u8BB0\u98CE\u683C",
   "ui.note_style_topic_desc": "\u53EA\u5F71\u54CD\u4E4B\u540E\u7684\u7814\u7A76\uFF0C\u5DF2\u5199\u597D\u7684\u5185\u5BB9\u4E0D\u4F1A\u6539\u3002",
+  "ui.note_style_more_0": "\u5176\u4ED6 {0} \u4E2A\u98CE\u683C",
+  "ui.apply": "\u5E94\u7528",
   "ui.note_style_follow_kind_0": "\u8DDF\u7740\u8BAE\u9898\u7C7B\u578B\uFF08{0}\uFF09",
   "ui.note_style_tone_missing_0": "\u627E\u4E0D\u5230\u5199\u4F5C\u53E3\u543B\u201C{0}\u201D\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E13\u4E1A\u3002",
   "ui.note_style_group_builtin": "\u5185\u7F6E",
@@ -6863,6 +6867,8 @@ var zhTW = {
   "ui.note_style_menu": "\u7B46\u8A18\u98A8\u683C\u2026",
   "ui.note_style_topic_title": "\u9019\u500B\u8B70\u984C\u7684\u7B46\u8A18\u98A8\u683C",
   "ui.note_style_topic_desc": "\u53EA\u5F71\u97FF\u4E4B\u5F8C\u7684\u7814\u7A76\uFF0C\u5DF2\u5BEB\u597D\u7684\u5167\u5BB9\u4E0D\u6703\u6539\u3002",
+  "ui.note_style_more_0": "\u5176\u4ED6 {0} \u500B\u98A8\u683C",
+  "ui.apply": "\u5957\u7528",
   "ui.note_style_follow_kind_0": "\u8DDF\u8457\u8B70\u984C\u985E\u578B\uFF08{0}\uFF09",
   "ui.note_style_tone_missing_0": "\u627E\u4E0D\u5230\u5BEB\u4F5C\u53E3\u543B\u300C{0}\u300D\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u5C08\u696D\u3002",
   "ui.note_style_group_builtin": "\u5167\u5EFA",
@@ -31840,6 +31846,16 @@ var TopicRuns = class {
 
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian17 = require("obsidian");
+
+// ui/modals/open-in-window.ts
+function openInWindowOf(modal, anchor) {
+  modal.open();
+  const doc = anchor == null ? void 0 : anchor.ownerDocument;
+  const container = modal.containerEl;
+  if ((doc == null ? void 0 : doc.body) && container && container.ownerDocument !== doc) doc.body.appendChild(container);
+}
+
+// experiences/visual-map/note-style-picker.ts
 function builtinRecipeItems() {
   const nameOf = (list, id) => {
     const found = list.find((item) => item.id === id);
@@ -31923,8 +31939,130 @@ function styleIssueText(issue2) {
   if (ISSUE_KEYS.has(issue2.code)) return t(`ui.note_style_issue_${issue2.code}`, ...issue2.values);
   return t(issue2.code, ...issue2.values);
 }
+var PICKER_SHOWN = 4;
+var TopicStylePickerModal = class extends import_obsidian17.Modal {
+  constructor(app, rows2, handlers) {
+    super(app);
+    this.rows = rows2;
+    this.handlers = handlers;
+    __publicField(this, "applied", false);
+    __publicField(this, "selected");
+    __publicField(this, "radios", []);
+    __publicField(this, "expanded", false);
+    __publicField(this, "applyButton");
+    this.selected = rows2.find((row) => row.current);
+  }
+  onClose() {
+    var _a2, _b2;
+    if (!this.applied) (_b2 = (_a2 = this.handlers).dismissed) == null ? void 0 : _b2.call(_a2);
+    this.applied = true;
+  }
+  onOpen() {
+    var _a2;
+    this.titleEl.setText(t("ui.note_style_topic_title"));
+    this.contentEl.createEl("p", { text: t("ui.note_style_topic_desc"), cls: "vam-modal-intro" });
+    const choosable = this.rows.filter((row) => !row.issue);
+    const broken = this.rows.filter((row) => row.issue);
+    const shown = choosable.slice(0, PICKER_SHOWN);
+    const rest = [...choosable.slice(PICKER_SHOWN), ...broken];
+    const group = this.contentEl.createDiv({
+      cls: "vam-picker-group",
+      attr: { role: "radiogroup", "aria-label": t("ui.note_style_topic_title") }
+    });
+    for (const row of shown) this.addRow(group, row, false);
+    let toggle;
+    if (rest.length) {
+      toggle = this.contentEl.createEl("button", {
+        text: t("ui.note_style_more_0", String(rest.length)),
+        cls: "vam-picker-more",
+        attr: { type: "button", "aria-expanded": "false" }
+      });
+      const extra = this.contentEl.createDiv({ cls: "vam-picker-group vam-picker-rest", attr: { role: "group" } });
+      extra.hidden = true;
+      for (const row of rest) {
+        if (row.issue) this.addBroken(extra, row);
+        else this.addRow(extra, row, true);
+      }
+      toggle.addEventListener("click", () => {
+        var _a3;
+        this.expanded = !this.expanded;
+        extra.hidden = !this.expanded;
+        toggle == null ? void 0 : toggle.setAttr("aria-expanded", String(this.expanded));
+        if (this.expanded) (_a3 = this.radios.find((entry) => entry.extra)) == null ? void 0 : _a3.el.focus();
+      });
+    }
+    const actions = modalActions(this);
+    const cancel = actions.createEl("button", { text: t("ui.cancel") });
+    cancel.addEventListener("click", () => this.close());
+    this.applyButton = actions.createEl("button", { text: t("ui.apply"), cls: "mod-cta" });
+    this.applyButton.addEventListener("click", () => this.apply());
+    this.syncChecked();
+    const start = (_a2 = this.radios.find((entry) => entry.row === this.selected)) != null ? _a2 : this.radios[0];
+    start == null ? void 0 : start.el.focus();
+    if (typeof window !== "undefined") window.setTimeout(() => start == null ? void 0 : start.el.focus(), 0);
+  }
+  addRow(parent, row, extra) {
+    const el = parent.createEl("button", {
+      cls: `vam-picker-row${row.current ? " is-current" : ""}`,
+      attr: { type: "button", role: "radio", "aria-checked": "false", tabindex: "-1" }
+    });
+    el.createSpan({
+      text: row.current ? `${row.label} \xB7 ${t("ui.detail_template_current")}` : row.label,
+      cls: "vam-picker-name"
+    });
+    el.createSpan({ text: row.tags, cls: "vam-picker-desc" });
+    const entry = { row, el, extra };
+    this.radios.push(entry);
+    el.addEventListener("click", () => this.choose(entry));
+    el.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.apply();
+        return;
+      }
+      const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      const live = this.radios.filter((item) => !item.extra || this.expanded);
+      const from = live.indexOf(entry);
+      this.choose(live[(from + step + live.length) % live.length], true);
+    });
+  }
+  addBroken(parent, row) {
+    const issue2 = row.issue;
+    const el = parent.createDiv({ cls: "vam-picker-row vam-picker-broken" });
+    const text11 = el.createDiv({ cls: "vam-picker-text" });
+    text11.createSpan({ text: row.label, cls: "vam-picker-name" });
+    text11.createSpan({ text: row.tags, cls: "vam-picker-desc" });
+    el.createEl("button", { text: t("ui.note_style_open_file") }).addEventListener(
+      "click",
+      () => this.handlers.openFile(issue2.ref)
+    );
+  }
+  choose(entry, focus = false) {
+    this.selected = entry.row;
+    this.syncChecked();
+    if (focus) entry.el.focus();
+  }
+  syncChecked() {
+    for (const entry of this.radios) {
+      const on = entry.row === this.selected;
+      entry.el.setAttr("aria-checked", String(on));
+      entry.el.setAttr("tabindex", on || !this.selected && entry === this.radios[0] ? "0" : "-1");
+    }
+    const changed = !!this.selected && !this.selected.current && this.selected.value !== void 0;
+    if (this.applyButton) this.applyButton.disabled = !changed;
+  }
+  apply() {
+    const row = this.selected;
+    if (!row || row.current || row.value === void 0) return;
+    this.applied = true;
+    this.close();
+    void this.handlers.apply(row.value);
+  }
+};
 async function openTopicStyleChooser(app, plugin, options) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e;
   const picker = stylePickerFor(app, plugin);
   const store = (_a2 = plugin.noteStyles) != null ? _a2 : emptyNoteStyleStore(() => plugin.settings);
   try {
@@ -31936,20 +32074,13 @@ async function openTopicStyleChooser(app, plugin, options) {
   const { note } = options;
   const legacy = !note.noteStyle && (!!note.detailTemplateId || !!note.toneId);
   const followed = store.runStyle({ kind: options.kind, outputLanguage: language2 });
-  const current = t("ui.detail_template_current");
-  const describe = (tags, isCurrent) => isCurrent ? `${current} \xB7 ${tags}` : tags;
-  const choices = [];
   const followedItem = recipes.find((item) => item.ref === followed.recipe.ref);
-  const followCurrent = !note.noteStyle && !legacy;
-  choices.push({
+  const rows2 = [];
+  rows2.push({
     label: t("ui.note_style_follow_kind_0", followed.recipe.name),
-    description: describe(
-      followedItem ? recipeTags(followedItem) : `${followed.label.templateName} \xB7 ${followed.label.toneName}`,
-      followCurrent
-    ),
-    action: () => {
-      if (!followCurrent) void options.write(null);
-    }
+    tags: followedItem ? recipeTags(followedItem) : `${followed.label.templateName} \xB7 ${followed.label.toneName}`,
+    current: !note.noteStyle && !legacy,
+    value: null
   });
   if (legacy) {
     const old = store.runStyle({
@@ -31957,39 +32088,29 @@ async function openTopicStyleChooser(app, plugin, options) {
       topic: { template: note.detailTemplateId, tone: note.toneId },
       outputLanguage: language2
     });
-    choices.push({
-      label: old.recipe.name,
-      description: describe(`${old.label.templateName} \xB7 ${old.label.toneName}`, true),
-      action: () => void 0
-    });
+    rows2.push({ label: old.recipe.name, tags: `${old.label.templateName} \xB7 ${old.label.toneName}`, current: true });
   }
   for (const item of recipes) {
     if (item.issues.length) {
       const first = item.issues[0];
-      choices.push({
+      rows2.push({
         label: item.name,
-        description: t("ui.note_style_unusable_0_1_2", (_d = item.fileName) != null ? _d : item.name, first.line, styleIssueText(first)),
-        buttonLabel: t("ui.note_style_open_file"),
-        action: () => void (picker == null ? void 0 : picker.openRecipe(item.ref))
+        tags: t("ui.note_style_unusable_0_1_2", (_d = item.fileName) != null ? _d : item.name, first.line, styleIssueText(first)),
+        current: false,
+        issue: { fileName: (_e = item.fileName) != null ? _e : item.name, ref: item.ref, reason: styleIssueText(first) }
       });
       continue;
     }
-    const isCurrent = note.noteStyle === item.ref;
-    choices.push({
-      label: item.name,
-      description: describe(recipeTags(item), isCurrent),
-      action: () => {
-        if (!isCurrent) void options.write(item.ref);
-      }
-    });
+    rows2.push({ label: item.name, tags: recipeTags(item), current: note.noteStyle === item.ref, value: item.ref });
   }
-  new ChoiceModal(
-    app,
-    t("ui.note_style_topic_title"),
-    t("ui.note_style_topic_desc"),
-    choices.map((choice2) => ({ ...choice2, named: true })),
-    options.dismissed
-  ).open();
+  const at = rows2.findIndex((row) => row.current);
+  if (at > 0) rows2.unshift(...rows2.splice(at, 1));
+  const modal = new TopicStylePickerModal(app, rows2, {
+    apply: options.write,
+    dismissed: options.dismissed,
+    openFile: (ref) => void (picker == null ? void 0 : picker.openRecipe(ref))
+  });
+  openInWindowOf(modal, options.anchor);
 }
 
 // ui/preview-utils.ts
@@ -69368,9 +69489,9 @@ ${addition}` : addition });
       actionNotice(messages.join(" "), t("ui.note_style_switch"), () => void this.chooseTopicStyle(node));
   }
   /**
-   * The topic's note style chooser (right-click "Note style…", or the Notice above). Choosing writes `note-style` only; "Follow
-   * the topic type" removes it with the old `detail-template` and `tone`. One undoable step for the topic file; the current
-   * row writes nothing.
+   * The topic's note style picker (right-click "Note style…", or the Notice above). Apply writes `note-style` only; "Follow
+   * the topic type" removes it with the old `detail-template` and `tone`. One undoable step for the topic file; choosing alone,
+   * Cancel and Esc write nothing.
    */
   async chooseTopicStyle(node) {
     var _a2;
@@ -69384,6 +69505,7 @@ ${addition}` : addition });
     await openTopicStyleChooser(this.app, this.plugin, {
       note,
       kind: (_a2 = note.topicKind) != null ? _a2 : "topic",
+      anchor: this.cardEls.get(node.id),
       dismissed: refocus,
       write: (ref) => this.enqueue(async () => {
         if (!this.map) return;
@@ -69775,14 +69897,6 @@ function renderRadioGroup(parent, label, choices, current, pick, idPrefix = "vam
     return chip;
   });
   return buttons;
-}
-
-// ui/modals/open-in-window.ts
-function openInWindowOf(modal, anchor) {
-  modal.open();
-  const doc = anchor == null ? void 0 : anchor.ownerDocument;
-  const container = modal.containerEl;
-  if ((doc == null ? void 0 : doc.body) && container && container.ownerDocument !== doc) doc.body.appendChild(container);
 }
 
 // ui/modals/note-style-manage-modal.ts

@@ -20155,9 +20155,9 @@ export class VisualAgentMapView extends ItemView {
       actionNotice(messages.join(" "), t("ui.note_style_switch"), () => void this.chooseTopicStyle(node));
   }
   /**
-   * The topic's note style chooser (right-click "Note style…", or the Notice above). Choosing writes `note-style` only; "Follow
-   * the topic type" removes it with the old `detail-template` and `tone`. One undoable step for the topic file; the current
-   * row writes nothing.
+   * The topic's note style picker (right-click "Note style…", or the Notice above). Apply writes `note-style` only; "Follow
+   * the topic type" removes it with the old `detail-template` and `tone`. One undoable step for the topic file; choosing alone,
+   * Cancel and Esc write nothing.
    */
   private async chooseTopicStyle(node: MapNode): Promise<void> {
     if (!this.map || this.aimLive() || this.presentation || isAimNode(node)) return;
@@ -20167,6 +20167,7 @@ export class VisualAgentMapView extends ItemView {
     await openTopicStyleChooser(this.app, this.plugin, {
       note,
       kind: note.topicKind ?? "topic",
+      anchor: this.cardEls.get(node.id),
       dismissed: refocus,
       write: ref =>
         this.enqueue(async () => {

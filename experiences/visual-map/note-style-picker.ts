@@ -1,4 +1,4 @@
-import { Notice, normalizePath, TFile, type App } from "obsidian";
+import { Modal, Notice, normalizePath, TFile, type App } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
 import { emptyNoteStyleStore, type NoteStyleStore } from "../../ai/note-style-store";
 import type { TopicKind } from "../../note-values";
@@ -6,7 +6,8 @@ import { builtinRef } from "../../core/blocks/block-files";
 import { t, type TranslationKey } from "../../i18n";
 import type { NoteStyleIssue } from "../../ai/note-style-file";
 import { backgroundResultNotice } from "../../ui/background-run";
-import { ChoiceModal, type Choice } from "../../ui/modals/choice-modal";
+import { modalActions } from "../../ui/modals/action-bar";
+import { openInWindowOf } from "../../ui/modals/open-in-window";
 import { BUILTIN_BLOCKS, BUILTIN_FORMATS } from "../../core/blocks/builtin";
 import { AIM_DELIVERY_STRUCTURE, BUILTIN_RECIPES, UPDATE_MODE_KEYS, type UpdateMode } from "../../ai/note-style-recipe";
 
@@ -148,16 +149,166 @@ export interface TopicStyleChooserOptions {
   note: { noteStyle?: string; detailTemplateId?: string; toneId?: string };
   /** The topic type, which decides what "Follow the topic type" means. */
   kind: TopicKind;
-  /** A ref sets `note-style`; null follows the topic type (and removes the old 0.28.0 keys). Never called for the current row. */
+  /** A ref sets `note-style`; null follows the topic type (and removes the old 0.28.0 keys). Called by Apply only, never for the current row. */
   write: (ref: string | null) => void | Promise<void>;
-  /** The dialog was closed without a choice. */
+  /** The dialog was closed without applying (Cancel, Esc). */
   dismissed?: () => void;
+  /** The element that asked (the topic card): the dialog opens in its window. */
+  anchor?: HTMLElement | null;
+}
+
+/** One row of the picker. `value` is what Apply writes; a row with `issue` is a style file that cannot be chosen. */
+interface PickerRow {
+  label: string;
+  tags: string;
+  current: boolean;
+  /** `undefined`: the row cannot be applied (the old setting, a style file with a problem). */
+  value?: string | null;
+  issue?: { fileName: string; ref: string; reason: string };
+}
+
+/** How many styles show before the rest are folded under "Other N styles". */
+const PICKER_SHOWN = 4;
+
+/**
+ * The picker window: a radio list with the one in force first and marked, four rows on show and the rest under "Other N
+ * styles", Cancel and Apply at the bottom. Choosing writes nothing; only Apply calls `write`.
+ */
+class TopicStylePickerModal extends Modal {
+  private applied = false;
+  private selected: PickerRow | undefined;
+  private readonly radios: { row: PickerRow; el: HTMLElement; extra: boolean }[] = [];
+  private expanded = false;
+  private applyButton?: HTMLButtonElement;
+  constructor(
+    app: App,
+    private readonly rows: PickerRow[],
+    private readonly handlers: {
+      apply: (value: string | null) => void | Promise<void>;
+      dismissed?: () => void;
+      openFile: (ref: string) => void;
+    }
+  ) {
+    super(app);
+    this.selected = rows.find(row => row.current);
+  }
+  onClose(): void {
+    if (!this.applied) this.handlers.dismissed?.();
+    this.applied = true;
+  }
+  onOpen(): void {
+    this.titleEl.setText(t("ui.note_style_topic_title"));
+    this.contentEl.createEl("p", { text: t("ui.note_style_topic_desc"), cls: "vam-modal-intro" });
+    const choosable = this.rows.filter(row => !row.issue);
+    const broken = this.rows.filter(row => row.issue);
+    const shown = choosable.slice(0, PICKER_SHOWN);
+    const rest = [...choosable.slice(PICKER_SHOWN), ...broken];
+    const group = this.contentEl.createDiv({
+      cls: "vam-picker-group",
+      attr: { role: "radiogroup", "aria-label": t("ui.note_style_topic_title") }
+    });
+    for (const row of shown) this.addRow(group, row, false);
+    let toggle: HTMLButtonElement | undefined;
+    if (rest.length) {
+      toggle = this.contentEl.createEl("button", {
+        text: t("ui.note_style_more_0", String(rest.length)),
+        cls: "vam-picker-more",
+        attr: { type: "button", "aria-expanded": "false" }
+      });
+      const extra = this.contentEl.createDiv({ cls: "vam-picker-group vam-picker-rest", attr: { role: "group" } });
+      extra.hidden = true;
+      for (const row of rest) {
+        if (row.issue) this.addBroken(extra, row);
+        else this.addRow(extra, row, true);
+      }
+      toggle.addEventListener("click", () => {
+        this.expanded = !this.expanded;
+        extra.hidden = !this.expanded;
+        toggle?.setAttr("aria-expanded", String(this.expanded));
+        if (this.expanded) this.radios.find(entry => entry.extra)?.el.focus();
+      });
+    }
+    const actions = modalActions(this);
+    const cancel = actions.createEl("button", { text: t("ui.cancel") });
+    cancel.addEventListener("click", () => this.close());
+    this.applyButton = actions.createEl("button", { text: t("ui.apply"), cls: "mod-cta" });
+    this.applyButton.addEventListener("click", () => this.apply());
+    this.syncChecked();
+    const start = this.radios.find(entry => entry.row === this.selected) ?? this.radios[0];
+    start?.el.focus();
+    // Obsidian may move focus after onOpen; take it back to the current row.
+    if (typeof window !== "undefined") window.setTimeout(() => start?.el.focus(), 0);
+  }
+  private addRow(parent: HTMLElement, row: PickerRow, extra: boolean): void {
+    const el = parent.createEl("button", {
+      cls: `vam-picker-row${row.current ? " is-current" : ""}`,
+      attr: { type: "button", role: "radio", "aria-checked": "false", tabindex: "-1" }
+    });
+    el.createSpan({
+      text: row.current ? `${row.label} · ${t("ui.detail_template_current")}` : row.label,
+      cls: "vam-picker-name"
+    });
+    el.createSpan({ text: row.tags, cls: "vam-picker-desc" });
+    const entry = { row, el, extra };
+    this.radios.push(entry);
+    el.addEventListener("click", () => this.choose(entry));
+    el.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.apply();
+        return;
+      }
+      const step =
+        event.key === "ArrowDown" || event.key === "ArrowRight"
+          ? 1
+          : event.key === "ArrowUp" || event.key === "ArrowLeft"
+            ? -1
+            : 0;
+      if (!step) return;
+      event.preventDefault();
+      const live = this.radios.filter(item => !item.extra || this.expanded);
+      const from = live.indexOf(entry);
+      this.choose(live[(from + step + live.length) % live.length], true);
+    });
+  }
+  private addBroken(parent: HTMLElement, row: PickerRow): void {
+    const issue = row.issue!;
+    const el = parent.createDiv({ cls: "vam-picker-row vam-picker-broken" });
+    const text = el.createDiv({ cls: "vam-picker-text" });
+    text.createSpan({ text: row.label, cls: "vam-picker-name" });
+    text.createSpan({ text: row.tags, cls: "vam-picker-desc" });
+    el.createEl("button", { text: t("ui.note_style_open_file") }).addEventListener("click", () =>
+      this.handlers.openFile(issue.ref)
+    );
+  }
+  private choose(entry: { row: PickerRow; el: HTMLElement }, focus = false): void {
+    this.selected = entry.row;
+    this.syncChecked();
+    if (focus) entry.el.focus();
+  }
+  private syncChecked(): void {
+    for (const entry of this.radios) {
+      const on = entry.row === this.selected;
+      entry.el.setAttr("aria-checked", String(on));
+      entry.el.setAttr("tabindex", on || (!this.selected && entry === this.radios[0]) ? "0" : "-1");
+    }
+    const changed = !!this.selected && !this.selected.current && this.selected.value !== undefined;
+    if (this.applyButton) this.applyButton.disabled = !changed;
+  }
+  private apply(): void {
+    const row = this.selected;
+    if (!row || row.current || row.value === undefined) return;
+    this.applied = true;
+    this.close();
+    void this.handlers.apply(row.value);
+  }
 }
 
 /**
- * The note style of one topic: "Follow the topic type (X)" first, the topic's old template/tone pair when it has one, then
- * every built-in (not the AIM report) and the user's styles, each with its four small labels. The row in force says "Current
- * setting" and writes nothing; a style file with a problem shows its reason and opens instead of being chosen.
+ * The note style of one topic: the one in force first (when the topic has no style of its own that is "Follow the topic type
+ * (X)"), the topic's old template/tone pair when it has one, then every built-in (not the AIM report) and the user's styles,
+ * each with its four small labels. Choosing writes nothing; Apply writes `note-style`. A style file with a problem shows its
+ * reason and opens instead of being chosen.
  */
 export async function openTopicStyleChooser(
   app: App,
@@ -176,20 +327,13 @@ export async function openTopicStyleChooser(
   const { note } = options;
   const legacy = !note.noteStyle && (!!note.detailTemplateId || !!note.toneId);
   const followed = store.runStyle({ kind: options.kind, outputLanguage: language });
-  const current = t("ui.detail_template_current");
-  const describe = (tags: string, isCurrent: boolean): string => (isCurrent ? `${current} · ${tags}` : tags);
-  const choices: Choice[] = [];
   const followedItem = recipes.find(item => item.ref === followed.recipe.ref);
-  const followCurrent = !note.noteStyle && !legacy;
-  choices.push({
+  const rows: PickerRow[] = [];
+  rows.push({
     label: t("ui.note_style_follow_kind_0", followed.recipe.name),
-    description: describe(
-      followedItem ? recipeTags(followedItem) : `${followed.label.templateName} · ${followed.label.toneName}`,
-      followCurrent
-    ),
-    action: () => {
-      if (!followCurrent) void options.write(null);
-    }
+    tags: followedItem ? recipeTags(followedItem) : `${followed.label.templateName} · ${followed.label.toneName}`,
+    current: !note.noteStyle && !legacy,
+    value: null
   });
   if (legacy) {
     const old = store.runStyle({
@@ -197,37 +341,28 @@ export async function openTopicStyleChooser(
       topic: { template: note.detailTemplateId, tone: note.toneId },
       outputLanguage: language
     });
-    choices.push({
-      label: old.recipe.name,
-      description: describe(`${old.label.templateName} · ${old.label.toneName}`, true),
-      action: () => undefined
-    });
+    rows.push({ label: old.recipe.name, tags: `${old.label.templateName} · ${old.label.toneName}`, current: true });
   }
   for (const item of recipes) {
     if (item.issues.length) {
       const first = item.issues[0];
-      choices.push({
+      rows.push({
         label: item.name,
-        description: t("ui.note_style_unusable_0_1_2", item.fileName ?? item.name, first.line, styleIssueText(first)),
-        buttonLabel: t("ui.note_style_open_file"),
-        action: () => void picker?.openRecipe(item.ref)
+        tags: t("ui.note_style_unusable_0_1_2", item.fileName ?? item.name, first.line, styleIssueText(first)),
+        current: false,
+        issue: { fileName: item.fileName ?? item.name, ref: item.ref, reason: styleIssueText(first) }
       });
       continue;
     }
-    const isCurrent = note.noteStyle === item.ref;
-    choices.push({
-      label: item.name,
-      description: describe(recipeTags(item), isCurrent),
-      action: () => {
-        if (!isCurrent) void options.write(item.ref);
-      }
-    });
+    rows.push({ label: item.name, tags: recipeTags(item), current: note.noteStyle === item.ref, value: item.ref });
   }
-  new ChoiceModal(
-    app,
-    t("ui.note_style_topic_title"),
-    t("ui.note_style_topic_desc"),
-    choices.map(choice => ({ ...choice, named: true })),
-    options.dismissed
-  ).open();
+  // The one in force goes first.
+  const at = rows.findIndex(row => row.current);
+  if (at > 0) rows.unshift(...rows.splice(at, 1));
+  const modal = new TopicStylePickerModal(app, rows, {
+    apply: options.write,
+    dismissed: options.dismissed,
+    openFile: ref => void picker?.openRecipe(ref)
+  });
+  openInWindowOf(modal, options.anchor);
 }

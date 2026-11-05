@@ -1678,6 +1678,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.note_style_menu": "笔记风格…",
   "ui.note_style_topic_title": "这个议题的笔记风格",
   "ui.note_style_topic_desc": "只影响之后的研究，已写好的内容不会改。",
+  "ui.note_style_more_0": "其他 {0} 个风格",
+  "ui.apply": "应用",
   "ui.note_style_follow_kind_0": "跟着议题类型（{0}）",
   "ui.note_style_tone_missing_0": "找不到写作口吻“{0}”，这个议题改用专业。",
   "ui.note_style_group_builtin": "内置",

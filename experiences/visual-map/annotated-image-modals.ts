@@ -132,3 +132,61 @@ export class AnchorModal extends Modal {
     this.contentEl.empty();
   }
 }
+
+/** One anchor the topic can be linked to: `label` is "<image note or file name> · <anchor note>" (text only). */
+export interface AnchorPickEntry {
+  imageId: string;
+  anchorId: string;
+  label: string;
+  /** True when the anchor already has a relation with this topic (a pair holds one relation). */
+  taken: boolean;
+}
+
+/**
+ * "Point on an image…" from a topic: lists the existing anchors of every annotated image (a linked one is disabled with the
+ * reason) and offers "Place a new point on an image", which the caller turns into the pick mode.
+ */
+export class AnchorPickModal extends Modal {
+  constructor(
+    app: App,
+    private readonly entries: AnchorPickEntry[],
+    private readonly canPlaceNew: boolean,
+    private readonly choose: (entry: AnchorPickEntry) => void,
+    private readonly placeNew: () => void
+  ) {
+    super(app);
+  }
+  onOpen(): void {
+    this.titleEl.setText(t("ui.anchor_relation_pick_title"));
+    const list = this.contentEl.createDiv("vam-anchor-pick-list");
+    for (const entry of this.entries) {
+      const row = list.createDiv("vam-anchor-pick-row");
+      const button = row.createEl("button", { text: entry.label, attr: { type: "button" } });
+      button.disabled = entry.taken;
+      if (entry.taken) {
+        button.setAttr("aria-disabled", "true");
+        row.createSpan({ text: t("ui.anchor_relation_pick_taken"), cls: "vam-anchor-pick-taken" });
+      }
+      button.addEventListener("click", () => {
+        if (entry.taken) return;
+        this.close();
+        this.choose(entry);
+      });
+    }
+    if (!this.entries.length)
+      this.contentEl.createEl("p", { text: t("ui.anchor_relation_pick_none"), cls: "vam-hint" });
+    const actions = modalActions(this);
+    actionStatus(actions);
+    actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
+    const fresh = actions.createEl("button", { text: t("ui.anchor_relation_pick_new"), cls: "mod-cta" });
+    fresh.disabled = !this.canPlaceNew;
+    fresh.addEventListener("click", () => {
+      if (!this.canPlaceNew) return;
+      this.close();
+      this.placeNew();
+    });
+  }
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}

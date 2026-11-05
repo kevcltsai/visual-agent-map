@@ -1848,3 +1848,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-anchor-choices { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .vam-anchor-choice { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .vam-anchor-note-input { width: 100%; }
+.vam-view .vam-place-hint .vam-place-hint-esc { margin-left: 10px; opacity: 0.8; }
+.vam-relation-add .vam-relation-add-anchor { flex: 0 0 auto; }
+.vam-anchor-pick-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.vam-anchor-pick-row { display: flex; align-items: center; gap: 10px; }
+.vam-anchor-pick-row button { flex: 1 1 auto; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vam-anchor-pick-taken { flex: 0 0 auto; font-size: var(--font-ui-smaller); color: var(--text-muted); }

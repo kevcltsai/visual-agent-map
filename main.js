@@ -924,6 +924,20 @@ var en = {
   "ui.anchor_relation_end_0": "Annotated image \xB7 {0}",
   "ui.anchor_relation_end_empty": "Annotated image \xB7 anchor",
   "ui.card_image_relations_0": "{0} image relation(s)",
+  "ui.anchor_relation_add_button": "Point on an image\u2026",
+  "ui.anchor_relation_pick_title": "Choose a point on an image",
+  "ui.anchor_relation_pick_taken": "Already linked to this topic",
+  "ui.anchor_relation_pick_none": "No annotated images with points yet.",
+  "ui.anchor_relation_pick_new": "Place a new point on an image",
+  "ui.anchor_relation_not_added": "This point was not linked: it already has a relation with this topic, or the image has too many relations.",
+  "ui.anchor_relation_row_in_0_1": "{0} \u2190 {1}",
+  "ui.anchor_relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.anchor_relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.anchor_pick_entry_0_1": "{0} \xB7 {1}",
+  "ui.anchor_pick_mode_hint": "Pick mode: only annotated images can be clicked",
+  "ui.anchor_pick_mode_esc": "Esc to cancel",
+  "ui.anchor_pick_cancelled": "Pick mode cancelled",
+  "ui.anchor_pick_plain_image": "This is a plain image. Right-click it and choose \u201CConvert to annotated image\u201D first, then you can place a point.",
   "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse",
   "ui.anchor_place_cancelled": "Placing cancelled",
   "ui.anchor_no_note_notice": "This image has no note yet. The AI cannot see pictures; add one sentence on what it is and what to research.",
@@ -3591,6 +3605,20 @@ var zhCN = {
   "ui.anchor_relation_end_0": "\u6807\u6CE8\u56FE\u30FB{0}",
   "ui.anchor_relation_end_empty": "\u6807\u6CE8\u56FE\u30FB\u951A\u70B9",
   "ui.card_image_relations_0": "{0} \u4E2A\u56FE\u7247\u5173\u7CFB",
+  "ui.anchor_relation_add_button": "\u6807\u6CE8\u56FE\u4E0A\u7684\u70B9\u2026",
+  "ui.anchor_relation_pick_title": "\u9009\u56FE\u4E0A\u7684\u70B9",
+  "ui.anchor_relation_pick_taken": "\u5DF2\u548C\u8FD9\u4E2A\u8BAE\u9898\u6709\u5173\u7CFB",
+  "ui.anchor_relation_pick_none": "\u8FD8\u6CA1\u6709\u5E26\u951A\u70B9\u7684\u6807\u6CE8\u56FE\u3002",
+  "ui.anchor_relation_pick_new": "\u5728\u6807\u6CE8\u56FE\u4E0A\u65B0\u653E\u4E00\u4E2A\u70B9",
+  "ui.anchor_relation_not_added": "\u8FD9\u4E2A\u70B9\u6CA1\u6709\u8FDE\u4E0A\uFF1A\u5B83\u5DF2\u548C\u8FD9\u4E2A\u8BAE\u9898\u6709\u5173\u7CFB\uFF0C\u6216\u8FD9\u5F20\u56FE\u7684\u5173\u7CFB\u592A\u591A\u3002",
+  "ui.anchor_relation_row_in_0_1": "{0} \u2190 {1}",
+  "ui.anchor_relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.anchor_relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.anchor_pick_entry_0_1": "{0}\u30FB{1}",
+  "ui.anchor_pick_mode_hint": "\u70B9\u9009\u6A21\u5F0F\uFF1A\u53EA\u6709\u6807\u6CE8\u56FE\u53EF\u4EE5\u70B9",
+  "ui.anchor_pick_mode_esc": "Esc \u53D6\u6D88",
+  "ui.anchor_pick_cancelled": "\u5DF2\u53D6\u6D88\u70B9\u9009",
+  "ui.anchor_pick_plain_image": "\u8FD9\u662F\u666E\u901A\u56FE\u7247\u3002\u5148\u5728\u56FE\u7247\u4E0A\u53F3\u952E\u300C\u8F6C\u6210\u6807\u6CE8\u56FE\u300D\uFF0C\u624D\u80FD\u653E\u70B9\u3002",
   "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 \u79FB\u52A8\u3001Shift \u79FB\u52A8\u8F83\u8FDC\u3001Enter \u653E\u4E0B\u3001Esc \u53D6\u6D88\u3001\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u9F20\u6807\u70B9",
   "ui.anchor_place_cancelled": "\u5DF2\u53D6\u6D88\u653E\u951A\u70B9",
   "ui.anchor_no_note_notice": "\u8FD9\u5F20\u6807\u6CE8\u56FE\u8FD8\u6CA1\u6709\u8BF4\u660E\u3002AI \u770B\u4E0D\u5230\u56FE\u7247\uFF0C\u5EFA\u8BAE\u8865\u4E00\u53E5\u201C\u8FD9\u662F\u4EC0\u4E48\u56FE\u3001\u8981\u7814\u7A76\u4EC0\u4E48\u201D\u3002",
@@ -6258,6 +6286,20 @@ var zhTW = {
   "ui.anchor_relation_end_0": "\u6A19\u8A3B\u5716\u30FB{0}",
   "ui.anchor_relation_end_empty": "\u6A19\u8A3B\u5716\u30FB\u9328\u9EDE",
   "ui.card_image_relations_0": "{0} \u500B\u5716\u7247\u95DC\u4FC2",
+  "ui.anchor_relation_add_button": "\u6A19\u8A3B\u5716\u4E0A\u7684\u9EDE\u2026",
+  "ui.anchor_relation_pick_title": "\u9078\u5716\u4E0A\u7684\u9EDE",
+  "ui.anchor_relation_pick_taken": "\u5DF2\u548C\u9019\u500B\u8B70\u984C\u6709\u95DC\u4FC2",
+  "ui.anchor_relation_pick_none": "\u9084\u6C92\u6709\u5E36\u9328\u9EDE\u7684\u6A19\u8A3B\u5716\u3002",
+  "ui.anchor_relation_pick_new": "\u5728\u6A19\u8A3B\u5716\u4E0A\u65B0\u653E\u4E00\u500B\u9EDE",
+  "ui.anchor_relation_not_added": "\u9019\u500B\u9EDE\u6C92\u6709\u9023\u4E0A\uFF1A\u5B83\u5DF2\u548C\u9019\u500B\u8B70\u984C\u6709\u95DC\u4FC2\uFF0C\u6216\u9019\u5F35\u5716\u7684\u95DC\u4FC2\u592A\u591A\u3002",
+  "ui.anchor_relation_row_in_0_1": "{0} \u2190 {1}",
+  "ui.anchor_relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.anchor_relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.anchor_pick_entry_0_1": "{0}\u30FB{1}",
+  "ui.anchor_pick_mode_hint": "\u9EDE\u9078\u6A21\u5F0F\uFF1A\u53EA\u6709\u6A19\u8A3B\u5716\u53EF\u4EE5\u9EDE",
+  "ui.anchor_pick_mode_esc": "Esc \u53D6\u6D88",
+  "ui.anchor_pick_cancelled": "\u5DF2\u53D6\u6D88\u9EDE\u9078",
+  "ui.anchor_pick_plain_image": "\u9019\u662F\u666E\u901A\u5716\u7247\u3002\u5148\u5728\u5716\u7247\u4E0A\u6309\u53F3\u9375\u300C\u8F49\u6210\u6A19\u8A3B\u5716\u300D\uFF0C\u624D\u80FD\u653E\u9EDE\u3002",
   "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 \u79FB\u52D5\u3001Shift \u79FB\u52D5\u8F03\u9060\u3001Enter \u653E\u4E0B\u3001Esc \u53D6\u6D88\u3001\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u6ED1\u9F20\u9EDE",
   "ui.anchor_place_cancelled": "\u5DF2\u53D6\u6D88\u653E\u9328\u9EDE",
   "ui.anchor_no_note_notice": "\u9019\u5F35\u6A19\u8A3B\u5716\u9084\u6C92\u6709\u8AAA\u660E\u3002AI \u770B\u4E0D\u5230\u5716\u7247\uFF0C\u5EFA\u8B70\u88DC\u4E00\u53E5\u300C\u9019\u662F\u4EC0\u9EBC\u5716\u3001\u8981\u7814\u7A76\u4EC0\u9EBC\u300D\u3002",
@@ -18003,6 +18045,34 @@ function addAnchorRelation(items, imageId, relation) {
     return withRelations(img, [...(_a2 = img.relations) != null ? _a2 : [], clean4]);
   });
 }
+function removeAnchorRelation(items, imageId, anchorId, topicId) {
+  const key2 = relationPair({ from: anchorId, to: topicId });
+  return mapImage(items, imageId, (image) => {
+    var _a2;
+    const list = (_a2 = image.relations) != null ? _a2 : [];
+    const rest = list.filter((r) => relationPair(r) !== key2);
+    return rest.length === list.length ? image : withRelations(image, rest);
+  });
+}
+function updateAnchorRelation(items, imageId, anchorId, topicId, next) {
+  var _a2;
+  const image = findAnnotatedImage(items, imageId);
+  if (!image) return [...items];
+  const key2 = relationPair({ from: anchorId, to: topicId });
+  const index = ((_a2 = image.relations) != null ? _a2 : []).findIndex((r) => relationPair(r) === key2);
+  if (index < 0 || relationPair(next) !== key2) return [...items];
+  const old = image.relations[index];
+  if (!anchorRelationAllowed(image, next, old)) return [...items];
+  const clean4 = cleanAnchorRelation(next, anchorIdsOf(image));
+  return mapImage(
+    items,
+    imageId,
+    (img) => withRelations(
+      img,
+      img.relations.map((r, i) => i === index ? clean4 : r)
+    )
+  );
+}
 function anchorRelationsForTopic(items, topicId) {
   var _a2;
   const out = [];
@@ -18448,6 +18518,48 @@ var AnchorModal = class extends import_obsidian9.Modal {
       this.done = true;
       this.cancelled();
     }
+    this.contentEl.empty();
+  }
+};
+var AnchorPickModal = class extends import_obsidian9.Modal {
+  constructor(app, entries, canPlaceNew, choose, placeNew) {
+    super(app);
+    this.entries = entries;
+    this.canPlaceNew = canPlaceNew;
+    this.choose = choose;
+    this.placeNew = placeNew;
+  }
+  onOpen() {
+    this.titleEl.setText(t("ui.anchor_relation_pick_title"));
+    const list = this.contentEl.createDiv("vam-anchor-pick-list");
+    for (const entry of this.entries) {
+      const row = list.createDiv("vam-anchor-pick-row");
+      const button = row.createEl("button", { text: entry.label, attr: { type: "button" } });
+      button.disabled = entry.taken;
+      if (entry.taken) {
+        button.setAttr("aria-disabled", "true");
+        row.createSpan({ text: t("ui.anchor_relation_pick_taken"), cls: "vam-anchor-pick-taken" });
+      }
+      button.addEventListener("click", () => {
+        if (entry.taken) return;
+        this.close();
+        this.choose(entry);
+      });
+    }
+    if (!this.entries.length)
+      this.contentEl.createEl("p", { text: t("ui.anchor_relation_pick_none"), cls: "vam-hint" });
+    const actions = modalActions(this);
+    actionStatus(actions);
+    actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
+    const fresh = actions.createEl("button", { text: t("ui.anchor_relation_pick_new"), cls: "mod-cta" });
+    fresh.disabled = !this.canPlaceNew;
+    fresh.addEventListener("click", () => {
+      if (!this.canPlaceNew) return;
+      this.close();
+      this.placeNew();
+    });
+  }
+  onClose() {
     this.contentEl.empty();
   }
 };
@@ -53195,6 +53307,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
     /** The anchor place mode: which image, where the crosshair is (0-1) and what to do when a spot is chosen. */
     __publicField(this, "placing", null);
     __publicField(this, "endPlacingListeners", null);
+    /** The pick mode started from a topic's "Point on an image…": only an annotated image can be clicked; Esc or a click elsewhere leaves. */
+    __publicField(this, "picking", null);
+    __publicField(this, "endPickingListeners", null);
     /** Images that already got the "no note yet" reminder at their first anchor (memory only). */
     __publicField(this, "noteReminded", /* @__PURE__ */ new Set());
     __publicField(this, "anchorTipSeq", 0);
@@ -58476,11 +58591,13 @@ ${request.requirements}` : preset.text,
     if (!stage || !(items == null ? void 0 : items.length) && !this.pendingSummary) {
       if (this.linkingTextId) this.cancelLinking(false);
       if (this.placing) this.cancelPlacing(false);
+      if (this.picking) this.cancelPicking(false);
       if (this.suspendSummaryEdit) this.suspendSummaryEdit();
       this.summaryEditDraft = null;
       return;
     }
     const editable = this.canEditCanvasItems();
+    if (this.picking && !editable) this.cancelPicking(false);
     const layer = items.some((item) => item.kind === "image" || isAnnotatedImage(item)) ? stage.createDiv("vam-canvas-items") : null;
     layer == null ? void 0 : layer.setAttr("role", "group");
     layer == null ? void 0 : layer.setAttr("aria-label", t("ui.canvas_images_group"));
@@ -58729,6 +58846,91 @@ ${request.requirements}` : preset.text,
       this.endPlacingListeners = null;
     };
   }
+  // ---- Pick mode from a topic: "Point on an image… > Place a new point" ------------------------------------------------
+  /**
+   * Enters the pick mode for the topic `topicId`: only an annotated image can be clicked. A click on one starts the place mode
+   * (P3b) and its result is the anchor plus the relation (kind `kind`, anchor -> topic) in one undo step. A plain image only
+   * gives a Notice (never converted); Esc or a click anywhere else leaves the mode and writes nothing.
+   */
+  startPickingAnchorImage(topicId, kind) {
+    var _a2;
+    if (!this.anchorRelationsEditable() || !this.contentEl) return;
+    this.cancelPicking(false);
+    this.cancelPlacing(false);
+    this.picking = { topicId, kind };
+    const root = this.contentEl;
+    const hint = root.createDiv("vam-place-hint");
+    hint.setAttr("role", "status");
+    hint.createSpan({ text: t("ui.anchor_pick_mode_hint"), cls: "vam-place-hint-main" });
+    hint.createSpan({ text: t("ui.anchor_pick_mode_esc"), cls: "vam-place-hint-esc" });
+    const imageIdOf = (target) => {
+      var _a3;
+      for (const [id, el] of this.canvasImageEls) if (el === target || ((_a3 = el.contains) == null ? void 0 : _a3.call(el, target))) return id;
+      return null;
+    };
+    const down = (event) => {
+      if (imageIdOf(event.target)) event.stopPropagation();
+    };
+    const click = (event) => {
+      var _a3, _b2, _c;
+      const target = event.target;
+      if (target === hint || ((_a3 = hint.contains) == null ? void 0 : _a3.call(hint, target))) return;
+      const id = imageIdOf(target);
+      if (!id) {
+        this.cancelPicking(true);
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const picked = this.picking;
+      if (!picked) return;
+      if (!findAnnotatedImage((_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : [], id)) {
+        new import_obsidian35.Notice(t("ui.anchor_pick_plain_image"));
+        return;
+      }
+      this.cancelPicking(false);
+      this.startPlacingAnchor(id, (at) => {
+        this.focusItemId = id;
+        this.enqueue(
+          () => this.commitAnchor(id, at, "", { kind: "existing", topicId: picked.topicId, relationKind: picked.kind })
+        );
+      });
+    };
+    const key2 = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.cancelPicking(true);
+    };
+    root.addEventListener("pointerdown", down, true);
+    root.addEventListener("click", click, true);
+    root.addEventListener("keydown", key2, true);
+    this.endPickingListeners = () => {
+      root.removeEventListener("pointerdown", down, true);
+      root.removeEventListener("click", click, true);
+      root.removeEventListener("keydown", key2, true);
+      hint.remove();
+      this.endPickingListeners = null;
+    };
+    (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.anchor_pick_mode_hint"));
+    window.setTimeout(() => {
+      var _a3, _b2, _c;
+      if (!this.picking) return;
+      for (const [id, el] of this.canvasImageEls)
+        if (findAnnotatedImage((_b2 = (_a3 = this.map) == null ? void 0 : _a3.canvasItems) != null ? _b2 : [], id)) {
+          (_c = el.focus) == null ? void 0 : _c.call(el, { preventScroll: true });
+          break;
+        }
+    }, 0);
+  }
+  /** Leaves the pick mode without writing anything; `announce` tells a screen reader it was cancelled. */
+  cancelPicking(announce) {
+    var _a2, _b2;
+    const was = this.picking;
+    (_a2 = this.endPickingListeners) == null ? void 0 : _a2.call(this);
+    this.picking = null;
+    if (was && announce) (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.anchor_pick_cancelled"));
+  }
   /** Leaves the place mode without writing anything; `announce` tells a screen reader it was cancelled. */
   cancelPlacing(announce) {
     var _a2, _b2, _c, _d;
@@ -58836,7 +59038,12 @@ ${request.requirements}` : preset.text,
           at: { kind: "image-2d", x: at.x, y: at.y },
           ...note.trim() ? { note } : {}
         });
-        if (topicId) items = addAnchorRelation(items, imageId, { kind: "related", from: anchorId, to: topicId });
+        if (topicId)
+          items = addAnchorRelation(items, imageId, {
+            kind: target.kind === "existing" && target.relationKind || "related",
+            from: anchorId,
+            to: topicId
+          });
         map.canvasItems = items;
       },
       !!added,
@@ -64844,7 +65051,7 @@ ${request.requirements}` : preset.text,
    * legal targets (never this card itself, never a card already linked to it, never a cycle), so it is refilled when
    * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
    */
-  renderRelationAddRow(parent, node, onAdded, exposeFirst) {
+  renderRelationAddRow(parent, node, onAdded, exposeFirst, close) {
     const row = parent.createDiv("vam-relation-add");
     row.setAttr("role", "group");
     row.setAttr("aria-label", t("ui.relation_add_row"));
@@ -64888,6 +65095,75 @@ ${request.requirements}` : preset.text,
         onAdded();
       });
     });
+    if (this.anchorRelationsEditable()) {
+      const point = row.createEl("button", {
+        text: t("ui.anchor_relation_add_button"),
+        cls: "vam-relation-add-anchor"
+      });
+      point.type = "button";
+      point.addEventListener("click", () => this.openAnchorPick(node, currentKind, onAdded, close));
+    }
+  }
+  /** Only a map the user may edit takes anchor relations: not AIM, not while picking topics (the same rule as the image itself). */
+  anchorRelationsEditable() {
+    return this.relationsEnabled() && this.canEditCanvasItems();
+  }
+  /** The dialog behind "Point on an image…": the existing anchors of every annotated image, and "Place a new point". */
+  openAnchorPick(node, kind, onAdded, close) {
+    var _a2, _b2, _c, _d;
+    if (!this.anchorRelationsEditable()) return;
+    const items = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], entries = [];
+    for (const item of items) {
+      if (!isAnnotatedImage(item)) continue;
+      const name2 = item.note || ((_c = item.path.split("/").pop()) != null ? _c : item.path);
+      for (const anchor of item.anchors) {
+        if (!isImage2dAnchor(anchor)) continue;
+        entries.push({
+          imageId: item.id,
+          anchorId: anchor.id,
+          label: t("ui.anchor_pick_entry_0_1", name2, anchor.note || t("ui.anchor_label_empty")),
+          taken: ((_d = item.relations) != null ? _d : []).some(
+            (r) => r.from === anchor.id && r.to === node.id || r.to === anchor.id && r.from === node.id
+          )
+        });
+      }
+    }
+    new AnchorPickModal(
+      this.app,
+      entries,
+      items.some((item) => isAnnotatedImage(item)),
+      (entry) => this.enqueue(async () => {
+        var _a3, _b3;
+        const relation = { kind: kind(), from: entry.anchorId, to: node.id };
+        const image = findAnnotatedImage((_b3 = (_a3 = this.map) == null ? void 0 : _a3.canvasItems) != null ? _b3 : [], entry.imageId);
+        if (!image || !anchorRelationAllowed(image, relation)) {
+          new import_obsidian35.Notice(t("ui.anchor_relation_not_added"));
+          return;
+        }
+        await this.changeCanvasItems(entry.imageId, (list) => addAnchorRelation(list, entry.imageId, relation));
+        onAdded();
+      }),
+      () => {
+        close == null ? void 0 : close();
+        this.startPickingAnchorImage(node.id, kind());
+      }
+    ).open();
+  }
+  /** "Annotated image · <anchor note>" (or the empty form) for the anchor `anchorId` of image `imageId`. */
+  anchorEndText(imageId, anchorId) {
+    var _a2, _b2, _c, _d;
+    const note = (_d = (_c = findAnnotatedImage((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], imageId)) == null ? void 0 : _c.anchors.find((a) => a.id === anchorId)) == null ? void 0 : _d.note;
+    return note ? t("ui.anchor_relation_end_0", note) : t("ui.anchor_relation_end_empty");
+  }
+  /** A panel row of an anchor relation: "Kind ← Annotated image · note" (the anchor is the source), "→" (it is the target), "—" for related. */
+  anchorRelationRowText(ref) {
+    const name2 = t(RELATION_NAME_KEY[ref.relation.kind]), end = this.anchorEndText(ref.imageId, ref.anchorId);
+    if (ref.relation.kind === "related") return t("ui.anchor_relation_row_related_0_1", name2, end);
+    return t(
+      ref.relation.from === ref.anchorId ? "ui.anchor_relation_row_in_0_1" : "ui.anchor_relation_row_out_0_1",
+      name2,
+      end
+    );
   }
   /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
   relationRowText(link, selfId) {
@@ -64898,6 +65174,229 @@ ${request.requirements}` : preset.text,
     if (link.kind === "related")
       return t("ui.relation_row_related_0_1", name2, titleOf(link.from === selfId ? link.to : link.from));
     return link.from === selfId ? t("ui.relation_row_out_0_1", name2, titleOf(link.to)) : t("ui.relation_row_in_0_1", titleOf(link.from), name2);
+  }
+  /**
+   * One anchor relation in a topic's panel (the topic is the other end). The row reads "Kind ← Annotated image · note"; a click
+   * on it (or its pencil) opens the anchor relation editor, the trash removes it (the anchor stays). A map that cannot be
+   * edited shows the row alone. Everything the user typed goes in as text.
+   */
+  renderAnchorRelationRow(list, node, ref, repaint, editButtons) {
+    const key2 = anchorLineKey(ref.imageId, ref.anchorId, node.id), text11 = this.anchorRelationRowText(ref), described = ref.relation.description ? `${text11}. ${ref.relation.description}` : text11, end = { imageId: ref.imageId, anchorId: ref.anchorId, topicId: node.id };
+    const row = list.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
+    this.bindRelationRow(row, ref.relation, described, key2);
+    this.relationSwatch(row, ref.relation.kind);
+    const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+    label.createSpan({ text: text11, cls: "vam-relation-sentence", attr: { dir: "auto" } });
+    if (ref.relation.description)
+      label.createSpan({ text: ref.relation.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
+    if (!this.anchorRelationsEditable()) return;
+    const tools = row.createSpan({ cls: "vam-relation-tools" });
+    const reopen = () => {
+      var _a2;
+      return (_a2 = editButtons.get(key2)) == null ? void 0 : _a2.focus();
+    };
+    row.addEventListener("click", (event) => {
+      var _a2;
+      if ((_a2 = tools.contains) == null ? void 0 : _a2.call(tools, event.target)) return;
+      this.openAnchorRelationEditor(end, repaint, reopen);
+    });
+    editButtons.set(
+      key2,
+      this.iconButton(
+        tools,
+        "pencil",
+        t("ui.edit_relation_0", text11),
+        () => this.openAnchorRelationEditor(end, repaint, reopen)
+      )
+    );
+    this.iconButton(
+      tools,
+      "trash-2",
+      t("ui.remove_relation_0", text11),
+      () => this.enqueue(async () => {
+        await this.changeCanvasItems(
+          ref.imageId,
+          (items) => removeAnchorRelation(items, ref.imageId, ref.anchorId, node.id)
+        );
+        repaint();
+      })
+    );
+  }
+  /** The anchor relation editor in a dialog; the same host and close-time save as {@link openRelationEditor}. */
+  openAnchorRelationEditor(ref, onChanged, onClosed) {
+    if (!this.anchorRelationsEditable()) return;
+    let saveNote = () => Promise.resolve();
+    const render = (content, close) => {
+      saveNote = this.renderAnchorRelationEditor(content, ref, close, onChanged);
+    };
+    new class extends import_obsidian35.Modal {
+      onOpen() {
+        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
+        render(this.contentEl, () => this.close());
+      }
+      onClose() {
+        void saveNote().then(() => {
+          if (onClosed) window.setTimeout(onClosed, 0);
+        });
+      }
+    }(this.app).open();
+  }
+  /** The relation of this (anchor, topic) pair as the map holds it now. */
+  anchorRelationOf(ref) {
+    var _a2, _b2, _c, _d;
+    return (_d = (_c = findAnnotatedImage((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], ref.imageId)) == null ? void 0 : _c.relations) == null ? void 0 : _d.find(
+      (r) => r.from === ref.anchorId && r.to === ref.topicId || r.from === ref.topicId && r.to === ref.anchorId
+    );
+  }
+  /**
+   * The editor of an anchor relation: type, reverse, a one-line note and delete (the anchor stays). Each change is one undo
+   * step written at once (the note on blur, Ctrl/Cmd+Enter or close). The pair holds one relation, so a type or direction
+   * change can never make a second one; anchor relations take no part in the derives/prerequisite cycle rule (decision 2).
+   * Returns the close-time save, settled when its write is done.
+   */
+  renderAnchorRelationEditor(parent, ref, close, onChanged) {
+    const root = parent.createDiv("vam-relation-editor"), key2 = anchorLineKey(ref.imageId, ref.anchorId, ref.topicId);
+    const apply = (next, repaint = true) => new Promise(
+      (done) => this.enqueue(async () => {
+        try {
+          const old = this.anchorRelationOf(ref);
+          if (!old) return;
+          const result = next(old);
+          await this.changeCanvasItems(
+            ref.imageId,
+            (items) => result ? updateAnchorRelation(items, ref.imageId, ref.anchorId, ref.topicId, result) : removeAnchorRelation(items, ref.imageId, ref.anchorId, ref.topicId)
+          );
+          if (!result) {
+            this.selection.deselectRelation(key2);
+            this.syncRelationClasses();
+            onChanged == null ? void 0 : onChanged();
+            close == null ? void 0 : close();
+            return;
+          }
+          this.selection.selectRelation(key2);
+          this.syncRelationClasses();
+          if (repaint) paint();
+          onChanged == null ? void 0 : onChanged();
+        } finally {
+          done();
+        }
+      })
+    );
+    let savedNote;
+    let noteWrite = Promise.resolve();
+    let saveNote = () => {
+    };
+    let refocus = null;
+    const paint = () => {
+      var _a2, _b2, _c;
+      root.empty();
+      saveNote = () => {
+      };
+      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
+      const current = this.anchorRelationOf(ref), image = findAnnotatedImage((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], ref.imageId);
+      if (!current || !image) {
+        root.createEl("p", { text: t("ui.relation_gone") });
+        return;
+      }
+      const titleOf = (id) => {
+        var _a3, _b3;
+        return id === ref.anchorId ? this.anchorEndText(ref.imageId, ref.anchorId) : (_b3 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title) != null ? _b3 : id;
+      };
+      const summary = root.createDiv("vam-relation-editor-summary");
+      this.relationSwatch(summary, current.kind);
+      summary.createSpan({
+        text: t(
+          current.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
+          t(RELATION_NAME_KEY[current.kind]),
+          titleOf(current.from),
+          titleOf(current.to)
+        ),
+        cls: "vam-relation-sentence",
+        attr: { dir: "auto" }
+      });
+      const field = (label, id) => {
+        const row = root.createDiv("vam-relation-field");
+        row.createEl("label", { text: label, attr: { for: id } });
+        return row;
+      };
+      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
+      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
+      kindSelect.setAttr("id", "vam-relation-kind");
+      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+      for (const kind of RELATION_KINDS2) {
+        const option = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+        if (kind !== current.kind && !anchorRelationAllowed(image, { ...current, kind }, current))
+          option.disabled = true;
+      }
+      kindSelect.value = current.kind;
+      kindSelect.addEventListener("change", () => {
+        const kind = kindSelect.value;
+        if (kind === current.kind) return;
+        refocus = "kind";
+        void apply((rel) => ({ ...rel, kind }));
+      });
+      let reverseButton = null;
+      if (current.kind !== "related") {
+        const directionRow = root.createDiv("vam-relation-field");
+        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
+        reverseButton = this.button(
+          directionRow,
+          t("ui.relation_reverse"),
+          () => {
+            refocus = "reverse";
+            void apply((rel) => ({ ...rel, from: rel.to, to: rel.from }));
+          },
+          !anchorRelationAllowed(image, { ...current, from: current.to, to: current.from }, current)
+        );
+        reverseButton.addClass("vam-relation-reverse");
+      }
+      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
+      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
+      description.setAttr("id", "vam-relation-description");
+      description.setAttr("rows", "4");
+      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
+      savedNote = current.description;
+      description.value = savedNote != null ? savedNote : "";
+      description.setAttr("aria-label", t("ui.relation_description_label"));
+      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
+      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
+      saveNote = () => {
+        const text11 = normalizeRelationDescription(description.value);
+        if (text11 === savedNote) return;
+        savedNote = text11;
+        noteWrite = apply((rel) => {
+          const next = { kind: rel.kind, from: rel.from, to: rel.to };
+          if (text11 !== void 0) next.description = text11;
+          return next;
+        }, false);
+      };
+      const footer = root.createDiv("vam-next-actions vam-relation-footer");
+      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
+      remove.addEventListener("click", () => void apply(() => null));
+      footer.createSpan({ cls: "vam-next-status" });
+      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
+      const refresh = () => remaining.setText(
+        t(
+          "ui.relation_description_remaining_0",
+          Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
+        )
+      );
+      description.addEventListener("input", refresh);
+      description.addEventListener("change", () => saveNote());
+      description.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+        event.preventDefault();
+        saveNote();
+      });
+      refresh();
+      if (refocus) (_c = { kind: kindSelect, reverse: reverseButton }[refocus]) == null ? void 0 : _c.focus();
+      refocus = null;
+    };
+    paint();
+    return () => {
+      saveNote();
+      return noteWrite;
+    };
   }
   /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". With a null `selfId` (the editor) both ends are named by title. */
   relationSentence(link, selfId) {
@@ -65928,9 +66427,10 @@ ${request.requirements}` : preset.text,
     const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section3.createDiv("vam-hypothesis-body");
     const editByPair = /* @__PURE__ */ new Map();
+    const anchorEdit = /* @__PURE__ */ new Map();
     let addRelationControl = null;
     const paint = (focusStrength = false, focusKind = false, focusAdd = false, focusLeaning) => {
-      var _a2, _b2, _c, _d, _e, _f;
+      var _a2, _b2, _c, _d, _e, _f, _g, _h;
       body.empty();
       const currentKind = this.topicKindOf(node.id);
       body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
@@ -66005,9 +66505,11 @@ ${request.requirements}` : preset.text,
         }
       }
       editByPair.clear();
+      anchorEdit.clear();
       const links = ((_f = (_e = this.map) == null ? void 0 : _e.topicRelations) != null ? _f : []).filter((r) => r.from === node.id || r.to === node.id);
       body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
-      if (links.length) {
+      const anchored = anchorRelationsForTopic((_h = (_g = this.map) == null ? void 0 : _g.canvasItems) != null ? _h : [], node.id);
+      if (links.length || anchored.length) {
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {
           const row = list.createEl("li", { cls: "vam-relation-row" }), text11 = this.relationRowText(link, node.id), described = link.description ? `${text11}. ${link.description}` : text11;
@@ -66043,6 +66545,7 @@ ${request.requirements}` : preset.text,
             })
           );
         }
+        for (const ref of anchored) this.renderAnchorRelationRow(list, node, ref, paint, anchorEdit);
       } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
       this.renderRelationAddRow(
         body,
@@ -66050,7 +66553,8 @@ ${request.requirements}` : preset.text,
         () => paint(false, false, true),
         (kindControl) => {
           addRelationControl = kindControl;
-        }
+        },
+        close
       );
       if (focusAdd) addRelationControl == null ? void 0 : addRelationControl.focus();
     };
@@ -71662,7 +72166,13 @@ ${addition}` : addition });
         event.stopPropagation();
         this.selection.selectRelation(key2);
         this.syncRelationClasses();
-        if (!link.anchor) this.openRelationEditor(link.relation);
+        if (link.anchor)
+          this.openAnchorRelationEditor({
+            imageId: link.anchor.imageId,
+            anchorId: link.anchor.anchorId,
+            topicId: link.anchor.topicId
+          });
+        else this.openRelationEditor(link.relation);
       });
       hit.addEventListener("pointerenter", () => {
         this.hoverRelation = key2;
@@ -71829,8 +72339,7 @@ ${addition}` : addition });
     this.relationEndIds = ends;
   }
   /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
-  bindRelationRow(row, link, ariaLabel) {
-    const key2 = relationIdentity(link);
+  bindRelationRow(row, link, ariaLabel, key2 = relationIdentity(link)) {
     row.tabIndex = 0;
     row.setAttr("role", "group");
     row.setAttr("aria-label", ariaLabel);

@@ -899,6 +899,22 @@ export const en = {
   "ui.anchor_relation_end_0": "Annotated image · {0}",
   "ui.anchor_relation_end_empty": "Annotated image · anchor",
   "ui.card_image_relations_0": "{0} image relation(s)",
+  "ui.anchor_relation_add_button": "Point on an image…",
+  "ui.anchor_relation_pick_title": "Choose a point on an image",
+  "ui.anchor_relation_pick_taken": "Already linked to this topic",
+  "ui.anchor_relation_pick_none": "No annotated images with points yet.",
+  "ui.anchor_relation_pick_new": "Place a new point on an image",
+  "ui.anchor_relation_not_added":
+    "This point was not linked: it already has a relation with this topic, or the image has too many relations.",
+  "ui.anchor_relation_row_in_0_1": "{0} ← {1}",
+  "ui.anchor_relation_row_out_0_1": "{0} → {1}",
+  "ui.anchor_relation_row_related_0_1": "{0} — {1}",
+  "ui.anchor_pick_entry_0_1": "{0} · {1}",
+  "ui.anchor_pick_mode_hint": "Pick mode: only annotated images can be clicked",
+  "ui.anchor_pick_mode_esc": "Esc to cancel",
+  "ui.anchor_pick_cancelled": "Pick mode cancelled",
+  "ui.anchor_pick_plain_image":
+    "This is a plain image. Right-click it and choose “Convert to annotated image” first, then you can place a point.",
   "ui.anchor_place_hint":
     "← ↑ → ↓ to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse",
   "ui.anchor_place_cancelled": "Placing cancelled",

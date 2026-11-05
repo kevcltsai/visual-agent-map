@@ -188,10 +188,12 @@ test('selecting a topic highlights its anchor lines and dims the others; focusin
   assert.ok(toB.hasClass('is-related') && !toA.hasClass('is-related'));
 });
 
-test('hovering or pressing a line selects it; the selected line ends mark the topic card only; the editor is not opened yet (P4b)', () => {
+test('hovering or pressing a line selects it; the selected line ends mark the topic card only; a click on it opens the anchor relation editor, never the topic one (P4b)', () => {
   const h = harness({ relations: [rel('supports', 'p1', 'a')] });
   let opened = 0;
+  const anchorOpened = [];
   h.view.openRelationEditor = () => { opened++; };
+  h.view.openAnchorRelationEditor = ref => { anchorOpened.push(ref); };
   h.view.draw();
   const key = KEY('img1', 'p1', 'a'), hit = h.view.relationHitEls.get(key);
   hit.fire('pointerenter');
@@ -202,6 +204,7 @@ test('hovering or pressing a line selects it; the selected line ends mark the to
   assert.ok(h.view.cardEls.get('a').hasClass('is-relation-end'));
   hit.fire('click');
   assert.equal(opened, 0, 'the topic relation editor must not open for an anchor line');
+  assert.deepEqual(JSON.parse(JSON.stringify(anchorOpened)), [{ imageId: 'img1', anchorId: 'p1', topicId: 'a' }]);
   h.view.drawRelations();
   assert.equal(h.view.selection.state.selectedRelation, key, 'a redraw keeps the selection of a line that still exists');
   h.view.map.canvasItems[0].relations = [rel('related', 'p2', 'b')];
@@ -279,4 +282,268 @@ test('annotated image element is a group with its label; a plain image stays an 
   assert.equal(ann.attrs.role, 'group');
   assert.equal(ann.attrs['aria-label'], 'Annotated image: cow scan');
   assert.equal(plain.attrs.role, 'img');
+});
+
+// ---- P4b: the topic panel's rows, the anchor relation editor, "Point on an image…" and the pick mode --------------------
+// These use the real repo fixture (like steps-annotated-image-view.cjs) so a write goes through Map.md and the undo stack.
+const { load: loadMain, fixture, DEFAULT_SETTINGS, obsidian, core, withExpansionCoordinator } = support;
+const TOPICS = 'Agent Workspace/Topics';
+const MAP = `${TOPICS}/map-a/Map.md`;
+const plain = value => JSON.parse(JSON.stringify(value));
+const ann = (over = {}) => ({ id: 'img1', kind: 'annotated-image', path: 'attachments/a.png', x: 100, y: 50, w: 200, h: 100, note: 'cow scan', anchors: [], ...over });
+const pt = (id, note, x = 0.5, y = 0.5) => ({ id, at: { kind: 'image-2d', x, y }, ...(note === undefined ? {} : { note }) });
+
+async function real(items) {
+  const { repo, app, contents } = fixture('en', { linkIndex: true });
+  const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
+  repo.settings = settings;
+  const doc = { id: 'map-a', title: 'A', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders(`${TOPICS}/map-a`);
+  await app.vault.create(MAP, core.serializeMap(doc));
+  const root = await repo.createNote('Root', 'gpt-6-luna', doc, MAP, 'workspace');
+  doc.nodes.push(root);
+  const child = await repo.createNote('Child', 'gpt-6-luna', doc, MAP, 'inherited');
+  child.parentId = root.id; child.x = 340;
+  doc.nodes.push(child);
+  doc.canvasItems = typeof items === 'function' ? items(root.id, child.id) : items;
+  await repo.saveMap(MAP, doc);
+  await repo.rebuildDerivedData();
+  await app.vault.create('attachments/a.png', 'png-bytes');
+  app.vault.getResourcePath = file => `app://vault/${file.path}`;
+  const modals = [], notices = [];
+  const BaseModal = dom.makeModal();
+  class Modal extends BaseModal { constructor(a) { super(a); modals.push(this); } }
+  class Setting {
+    constructor(parent) { this.el = parent.createDiv('setting-item'); }
+    setName(text) { this.el.createSpan({ text }); return this; } setDesc(text) { this.el.createSpan({ text }); return this; }
+    addButton(cb) { const b = this.el.createEl('button'); cb({ setButtonText(t) { b.text = t; return this; }, onClick(fn) { b.addEventListener('click', fn); return this; } }); return this; }
+  }
+  const { VisualAgentMapView } = loadMain('main.ts', { obsidian: { ...obsidian, Modal, Setting, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment, createSvg });
+  let pending = Promise.resolve();
+  const plugin = withExpansionCoordinator({
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    mutate: work => (pending = Promise.resolve().then(work))
+  });
+  const view = new VisualAgentMapView({ app }, plugin);
+  view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = element('div'); view.stageEl = element('div');
+  view.focusNode = () => {}; view.openDetails = () => {};
+  view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
+  await view.hydrate();
+  view.render = () => { view.stageEl.children = []; view.stageEl.child('div', 'vam-node'); view.renderCanvasItems(); };
+  const settle = async () => { await pending; await dom.tick(); await pending; await dom.tick(); };
+  const onDisk = async () => { const got = (await repo.readMap(MAP)).canvasItems; return got === undefined ? undefined : plain(got); };
+  const panel = (node = view.map.nodes[0]) => { const host = element('div'); view.renderHypothesisSection(host, node, () => { host.closed = true; }); return host; };
+  const rows = host => findAll(host, i => i.hasClass('vam-relation-row'));
+  const imageEls = () => findAll(view.stageEl, i => i.hasClass('vam-canvas-image'));
+  return { repo, view, settle, onDisk, modals, notices, panel, rows, imageEls, root: view.map.nodes[0].id, child: view.map.nodes[1].id, fileText: () => contents.get(MAP) };
+}
+const rowTexts = host => findAll(host, i => i.hasClass('vam-relation-row')).map(r => r.attrs['aria-label']);
+
+test('P4b rows: the panel lists anchor relations as "kind <- Annotated image · anchor" (arrow follows the direction, related uses a dash), with the note', async () => {
+  const h = await real((root, child) => [
+    ann({ anchors: [pt('p1', 'cow back'), pt('p2'), pt('p3', 'hind')], relations: [
+      { kind: 'supports', from: 'p1', to: root, description: 'strong' },
+      { kind: 'contradicts', from: root, to: 'p2' },
+      { kind: 'related', from: 'p3', to: root }
+    ] })
+  ]);
+  const host = h.panel();
+  assert.deepEqual(rowTexts(host), [
+    'Supports ← Annotated image · cow back. strong',
+    'Contradicts → Annotated image · anchor',
+    'Related — Annotated image · hind'
+  ]);
+  assert.equal(findAll(host, i => i.hasClass('vam-relation-empty')).length, 0, 'the empty hint is gone when only image relations exist');
+  const first = h.rows(host)[0];
+  assert.ok(find(first, i => i.hasClass('vam-relation-description-text') && i.text === 'strong'));
+  const other = h.panel(h.view.map.nodes[1]);
+  assert.deepEqual(rowTexts(other), [], 'a topic without image relations shows none');
+});
+
+test('counter-example (security P4b): hostile anchor and relation text stays plain text in rows, the pick panel and the editor', async () => {
+  const evil = '<img src=x onerror=alert(1)> javascript:alert(1)\nline two';
+  const h = await real(root => [ann({ note: evil, anchors: [pt('p1', evil)], relations: [{ kind: 'related', from: 'p1', to: root, description: evil.slice(0, 40) }] })]);
+  const host = h.panel();
+  const row = h.rows(host)[0];
+  assert.ok(row.attrs['aria-label'].includes('<img src=x onerror=alert(1)>'), 'kept as text');
+  assert.equal(findAll(host, i => i.tag === 'img').length, 0);
+  assert.equal(findAll(host, i => i.tag === 'a').length, 0);
+  assert.ok(!('innerHTML' in row) || row.innerHTML === undefined);
+  const editor = element('div');
+  h.view.renderAnchorRelationEditor(editor, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => {}, () => {});
+  assert.equal(findAll(editor, i => i.tag === 'img' || i.tag === 'a').length, 0);
+  const select = findAll(host, i => i.hasClass('vam-relation-add-kind'))[0];
+  assert.ok(select);
+  findAll(host, i => i.hasClass('vam-relation-add-anchor'))[0].click();
+  const modal = h.modals.at(-1);
+  assert.equal(findAll(modal.modalEl, i => i.tag === 'img' || i.tag === 'a').length, 0);
+  assert.ok(findAll(modal.modalEl, i => i.text.includes('<img src=x onerror=alert(1)>')).length >= 1);
+});
+
+test('editor: kind, reverse, note and delete are one undo step each; delete keeps the anchor and the card mark count drops; undo restores', async () => {
+  const start = root => [ann({ anchors: [pt('p1', 'cow back')], relations: [{ kind: 'supports', from: 'p1', to: root }] })];
+  const h = await real(start);
+  const original = (await h.onDisk())[0];
+  const host = element('div');
+  let changed = 0;
+  h.view.renderAnchorRelationEditor(host, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => {}, () => { changed++; });
+  const entries = () => h.view.history.past.length;
+  let n = entries();
+  const kind = find(host, i => i.tag === 'select');
+  assert.equal(findAll(kind, i => i.tag === 'option' && !i.disabled).length, 6, 'all six kinds stay open (anchor relations have no cycle rule)');
+  kind.value = 'verifies'; kind.fire('change');
+  await h.settle();
+  assert.equal((await h.onDisk())[0].relations[0].kind, 'verifies');
+  assert.equal(entries(), n + 1);
+  dom.button(host, 'Reverse direction').click();
+  await h.settle();
+  assert.deepEqual((await h.onDisk())[0].relations, [{ kind: 'verifies', from: h.root, to: 'p1' }]);
+  assert.equal(entries(), n + 2);
+  const note = find(host, i => i.tag === 'textarea');
+  note.value = 'line one\nline two'; note.fire('change');
+  await h.settle();
+  assert.equal((await h.onDisk())[0].relations[0].description, 'line one line two');
+  assert.equal(entries(), n + 3);
+  assert.equal((await h.onDisk())[0].relations.length, 1, 'still one relation for the pair');
+  n = entries();
+  let closed = false;
+  const host2 = element('div');
+  h.view.renderAnchorRelationEditor(host2, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => { closed = true; }, () => {});
+  dom.button(host2, 'Delete relation').click();
+  await h.settle();
+  const after = (await h.onDisk())[0];
+  assert.deepEqual(after.anchors.map(a => a.id), ['p1'], 'the anchor stays');
+  assert.equal(after.relations, undefined);
+  assert.ok(closed);
+  assert.equal(entries(), n + 1);
+  const card = element('div', 'vam-node');
+  h.view.map = await h.repo.readMap(MAP);
+  h.view.paintCardImageRelations(card, h.root);
+  assert.equal(findAll(card, i => i.hasClass('vam-image-relations-mark')).length, 0, 'the mark count dropped to none');
+  await h.view.history.undoEntry.undo();
+  assert.equal((await h.onDisk())[0].relations.length, 1, 'one undo restores the deleted relation');
+});
+
+test('editor: an unreachable pair (already related) cannot be duplicated; the line click on an anchor line opens this editor', async () => {
+  const h = await real(root => [ann({ anchors: [pt('p1', 'x')], relations: [{ kind: 'related', from: 'p1', to: root }] })]);
+  // The data layer refuses a second relation for the pair, whatever the kind or direction.
+  const canvas = support.load('experiences/visual-map/canvas-items.ts');
+  const items = h.view.map.canvasItems;
+  for (const [from, to] of [['p1', h.root], [h.root, 'p1']]) {
+    const next = canvas.addAnchorRelation(items, 'img1', { kind: 'supports', from, to });
+    assert.equal(next[0].relations.length, 1);
+  }
+  h.view.cardEls = new Map(h.view.map.nodes.map(n => { const c = element('div', 'vam-node'); Object.assign(c, { offsetLeft: n.x, offsetTop: n.y, offsetWidth: 280, offsetHeight: 100 }); return [n.id, c]; }));
+  h.view.edgesEl = createSvg('svg');
+  h.view.viewportEl = element('div'); h.view.viewportEl.computed = style({});
+  h.view.drawRelations();
+  const key = `anchor:img1:p1:${h.root}`;
+  const hit = h.view.relationHitEls.get(key);
+  assert.ok(hit);
+  const before = h.modals.length;
+  hit.fire('click');
+  assert.equal(h.modals.length, before + 1, 'the click opens the anchor relation editor dialog');
+  assert.equal(h.view.selection.state.selectedRelation, key);
+  const ro = await real(root => [ann({ anchors: [pt('p1', 'x')], relations: [{ kind: 'related', from: 'p1', to: root }] })]);
+  ro.view.aimLive = () => true;
+  ro.view.openAnchorRelationEditor({ imageId: 'img1', anchorId: 'p1', topicId: ro.root });
+  assert.equal(ro.modals.length, 0, 'AIM opens no editor');
+});
+
+test('add from topic: "Point on an image…" lists existing anchors ("image · anchor"), disables the linked one, and adds a relation with the row kind (anchor -> topic)', async () => {
+  const h = await real((root, child) => [
+    ann({ note: 'cow scan', anchors: [pt('p1', 'cow back'), pt('p2', 'hind'), pt('p3')], relations: [{ kind: 'related', from: 'p1', to: root }] }),
+    ann({ id: 'img2', note: '', path: 'attachments/b.png', anchors: [pt('q1', 'tail')] })
+  ]);
+  const host = h.panel();
+  const kind = find(host, i => i.hasClass('vam-relation-add-kind'));
+  kind.value = 'supports'; kind.fire('change');
+  find(host, i => i.hasClass('vam-relation-add-anchor')).click();
+  const modal = h.modals.at(-1);
+  const entry = text => find(modal.modalEl, i => i.tag === 'button' && i.text === text);
+  assert.ok(entry('cow scan · cow back').disabled, 'already linked to this topic');
+  assert.ok(find(modal.modalEl, i => i.text === 'Already linked to this topic'));
+  assert.equal(entry('cow scan · hind').disabled, false);
+  assert.ok(entry('cow scan · Anchor (no note)'));
+  assert.ok(entry('b.png · tail'), 'no image note falls back to the file name');
+  const n = h.view.history.past.length;
+  entry('cow scan · hind').click();
+  await h.settle();
+  const rel = (await h.onDisk())[0].relations;
+  assert.deepEqual(rel[1], { kind: 'supports', from: 'p2', to: h.root });
+  assert.equal(h.view.history.past.length, n + 1);
+  assert.equal((await h.onDisk())[0].relations.length, 2, 'the linked anchor got no second relation');
+});
+
+test('pick mode: "new point" closes the panel and shows the hint (role status); a plain image gives a Notice and stays in the mode; Esc leaves map and undo stack unchanged', async () => {
+  const h = await real([ann({ anchors: [] }), { id: 'plain1', kind: 'image', path: 'attachments/a.png', x: 0, y: 0, w: 10, h: 10 }]);
+  h.view.render();
+  const host = h.panel();
+  find(host, i => i.hasClass('vam-relation-add-anchor')).click();
+  const before = h.fileText(), n = h.view.history.past.length;
+  dom.button(h.modals.at(-1).modalEl, 'Place a new point on an image').click();
+  assert.ok(host.closed, 'the panel dialog is closed so the canvas can be clicked');
+  const hint = find(h.view.contentEl, i => i.hasClass('vam-place-hint'));
+  assert.ok(hint);
+  assert.equal(hint.attrs.role, 'status');
+  assert.ok(findAll(hint, i => i.text === 'Pick mode: only annotated images can be clicked').length === 1);
+  assert.ok(findAll(hint, i => i.text === 'Esc to cancel').length === 1);
+  const [annotatedEl, plainEl] = h.imageEls();
+  h.view.contentEl.fire('click', { target: plainEl });
+  assert.deepEqual(h.notices, ['This is a plain image. Right-click it and choose “Convert to annotated image” first, then you can place a point.']);
+  assert.ok(find(h.view.contentEl, i => i.hasClass('vam-place-hint')), 'still in the mode');
+  assert.equal(h.view.map.canvasItems[1].kind, 'image', 'not converted');
+  let prevented = false;
+  h.view.contentEl.fire('keydown', { key: 'Escape', target: annotatedEl, preventDefault() { prevented = true; } });
+  assert.ok(prevented);
+  assert.equal(find(h.view.contentEl, i => i.hasClass('vam-place-hint')), undefined);
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, n);
+  h.view.contentEl.fire('click', { target: annotatedEl });
+  assert.equal(find(h.view.contentEl, i => i.hasClass('vam-anchor-crosshair')) ?? find(annotatedEl, i => i.hasClass('vam-anchor-crosshair')), undefined, 'the mode is over: a click does not start placing');
+});
+
+test('pick mode: clicking an annotated image starts placing; Enter writes the anchor and the relation (row kind, anchor -> topic) as one undo step; a click elsewhere cancels', async () => {
+  const h = await real([ann({ anchors: [] })]);
+  h.view.render();
+  const host = h.panel();
+  const kind = find(host, i => i.hasClass('vam-relation-add-kind'));
+  kind.value = 'verifies'; kind.fire('change');
+  find(host, i => i.hasClass('vam-relation-add-anchor')).click();
+  dom.button(h.modals.at(-1).modalEl, 'Place a new point on an image').click();
+  const [el] = h.imageEls();
+  h.view.contentEl.fire('click', { target: element('div') });
+  assert.equal(find(h.view.contentEl, i => i.hasClass('vam-place-hint')), undefined, 'a click elsewhere cancels');
+  find(host, i => i.hasClass('vam-relation-add-anchor')).click();
+  dom.button(h.modals.at(-1).modalEl, 'Place a new point on an image').click();
+  const n = h.view.history.past.length;
+  h.view.contentEl.fire('click', { target: el, clientX: 0, clientY: 0 });
+  assert.ok(h.view.placing, 'now in the place mode of P3b');
+  h.view.stageEl.fire('keydown', { key: 'Enter', target: el, preventDefault() {} });
+  await h.settle();
+  const [img] = await h.onDisk();
+  assert.equal(img.anchors.length, 1);
+  assert.deepEqual(img.relations, [{ kind: 'verifies', from: img.anchors[0].id, to: h.root }]);
+  assert.equal(h.view.history.past.length, n + 1, 'anchor and relation in one step');
+  await h.view.history.undoEntry.undo();
+  const undone = (await h.onDisk())[0];
+  assert.deepEqual(undone.anchors, []);
+  assert.equal(undone.relations, undefined);
+});
+
+test('counter-example (read-only P4b): AIM and selection mode show the rows but no add entry, edit or remove buttons', async () => {
+  for (const mode of ['selection', 'aim']) {
+    const h = await real(root => [ann({ anchors: [pt('p1', 'x')], relations: [{ kind: 'related', from: 'p1', to: root }] })]);
+    if (mode === 'selection') h.view.selection.toggleMultiSelect();
+    else h.view.aimLive = () => true;
+    const host = h.panel();
+    if (mode === 'aim') { assert.deepEqual(rowTexts(host), [], mode + ': AIM shows no relation section at all'); continue; }
+    assert.deepEqual(rowTexts(host), ['Related — Annotated image · x'], mode);
+    assert.equal(findAll(host, i => i.hasClass('vam-relation-add-anchor')).length, 0, mode);
+    assert.equal(findAll(host, i => i.tag === 'button' && /Edit relation|Remove relation/.test(i.attrs['aria-label'] ?? '')).length, 0, mode);
+    const row = h.rows(host)[0];
+    row.fire('click');
+    assert.equal(h.modals.length, 0, mode);
+  }
 });

@@ -23,6 +23,7 @@ import {
 } from "../../../note-values";
 import languageEn from "./language.en.md";
 import languageZh from "./language.zh.md";
+import steerTemplate from "./steer.en.md";
 import templateEn from "./prompt.en.md";
 import templateZh from "./prompt.zh.md";
 import conciseEn from "./style.concise.en.md";
@@ -708,6 +709,14 @@ export function parseMapChat(
     }
   });
   return { reply: body.reply, actions, rejected };
+}
+
+/**
+ * The message sent into a turn that is already running, when the user adds to the request. English in every interface
+ * language (like Coffee Tables' steering lines); the text is embedded as a JSON string so it cannot change the instructions.
+ */
+export function renderMapChatSteer(text: string): string {
+  return renderTemplate(steerTemplate, { text: JSON.stringify(text) });
 }
 
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */

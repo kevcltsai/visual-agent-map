@@ -18,6 +18,8 @@ export interface ProviderStepHooks {
   onText?: (text: string) => void;
   /** Claude only: whether its output can be watched (`stream-json`) or only arrives at the end (`json`, `json-fallback`). */
   onStreamMode?: (mode: "stream-json" | "json" | "json-fallback") => void;
+  /** Receives a function that adds a user message to the running turn (Claude: stdin; Codex: `turn/steer`). It rejects once the turn can no longer take one. */
+  onSteer?: (steer: (text: string) => Promise<void>) => void;
 }
 
 /**
@@ -74,6 +76,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
           ...(hooks?.onFirstEvent ? { onFirstEvent: hooks.onFirstEvent } : {}),
           ...(hooks?.onActivity ? { onActivity: hooks.onActivity } : {}),
           ...(hooks?.onStreamMode ? { onStreamMode: hooks.onStreamMode } : {}),
+          ...(hooks?.onSteer ? { onSteer: hooks.onSteer } : {}),
           ...(hooks?.onText && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model)
             ? { onText: hooks.onText }
             : {})

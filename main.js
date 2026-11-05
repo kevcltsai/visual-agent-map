@@ -1390,6 +1390,12 @@ var en = {
   "ui.map_chat_stop": "Stop",
   "ui.map_chat_model_short": "Model",
   "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
+  "ui.map_chat_steer_placeholder": "What do you want to add? The AI reads it midway through this reply.",
+  "ui.map_chat_steer_hint": "Enter to add",
+  "ui.map_chat_steer_tag_live": "Added midway",
+  "ui.map_chat_steer_tag_queued": "Sends after this reply ends",
+  "ui.map_chat_steer_sent": "Added to this reply.",
+  "ui.map_chat_steer_queued_announce": "Will send after this reply ends.",
   "ui.map_chat_stopped": "Stopped.",
   "ui.map_chat_overflow_note": "Content too long; the rest is shown as plain text.",
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
@@ -1602,6 +1608,7 @@ var en = {
   "ui.map_chat_note_images_failed_0": "The picture search failed: {0}",
   "ui.map_chat_note_images_stopped": "The picture search was stopped.",
   "ui.map_chat_note_inserted_0": "(inserted into {0})",
+  "ui.map_chat_note_steer": "Added while the AI was answering",
   "ui.structure_review_entry_label": "AI structure suggestions:",
   "ui.structure_review_entry_map": "What to strengthen or cut? (whole map)",
   "ui.structure_review_entry_branch": "What to strengthen or cut? (this branch)",
@@ -4094,6 +4101,12 @@ var zhCN = {
   "ui.map_chat_stop": "\u505C\u6B62",
   "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u5F53\u524D\u6A21\u578B\uFF1A\u804A\u5929\u4E0E\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A",
+  "ui.map_chat_steer_placeholder": "\u8981\u8865\u5145\u4EC0\u4E48\uFF1FAI \u4F1A\u5728\u8FD9\u4E00\u8F6E\u4E2D\u9014\u8BFB\u5230\u3002",
+  "ui.map_chat_steer_hint": "Enter \u8865\u5145",
+  "ui.map_chat_steer_tag_live": "\u4E2D\u9014\u8865\u5145",
+  "ui.map_chat_steer_tag_queued": "\u7B49\u8FD9\u8F6E\u7ED3\u675F\u540E\u53D1\u9001",
+  "ui.map_chat_steer_sent": "\u5DF2\u53D1\u9001\u8865\u5145\u3002",
+  "ui.map_chat_steer_queued_announce": "\u7B49\u8FD9\u8F6E\u7ED3\u675F\u540E\u53D1\u9001\u3002",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.map_chat_overflow_note": "\u5185\u5BB9\u8FC7\u957F\uFF0C\u4EE5\u4E0B\u4EE5\u7EAF\u6587\u672C\u663E\u793A",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
@@ -4306,6 +4319,7 @@ var zhCN = {
   "ui.map_chat_note_images_failed_0": "\u627E\u56FE\u5931\u8D25\uFF1A{0}",
   "ui.map_chat_note_images_stopped": "\u5DF2\u505C\u6B62\u627E\u56FE\u3002",
   "ui.map_chat_note_inserted_0": "\uFF08\u5DF2\u63D2\u5165\u201C{0}\u201D\uFF09",
+  "ui.map_chat_note_steer": "\u4E2D\u9014\u8865\u5145",
   "ui.structure_review_entry_label": "AI \u7ED3\u6784\u5EFA\u8BAE\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u6574\u5F20\u56FE\uFF09",
   "ui.structure_review_entry_branch": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u8FD9\u4E2A\u5206\u652F\uFF09",
@@ -6798,6 +6812,12 @@ var zhTW = {
   "ui.map_chat_stop": "\u505C\u6B62",
   "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u76EE\u524D\u6A21\u578B\uFF1A\u804A\u5929\u8207\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B",
+  "ui.map_chat_steer_placeholder": "\u8981\u88DC\u5145\u4EC0\u9EBC\uFF1FAI \u6703\u5728\u9019\u4E00\u8F2A\u4E2D\u9014\u8B80\u5230\u3002",
+  "ui.map_chat_steer_hint": "Enter \u88DC\u5145",
+  "ui.map_chat_steer_tag_live": "\u4E2D\u9014\u88DC\u5145",
+  "ui.map_chat_steer_tag_queued": "\u7B49\u9019\u8F2A\u7D50\u675F\u5F8C\u9001\u51FA",
+  "ui.map_chat_steer_sent": "\u5DF2\u9001\u51FA\u88DC\u5145\u3002",
+  "ui.map_chat_steer_queued_announce": "\u7B49\u9019\u8F2A\u7D50\u675F\u5F8C\u9001\u51FA\u3002",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.map_chat_overflow_note": "\u5167\u5BB9\u904E\u9577\uFF0C\u4EE5\u4E0B\u4EE5\u7D14\u6587\u5B57\u986F\u793A",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
@@ -7010,6 +7030,7 @@ var zhTW = {
   "ui.map_chat_note_images_failed_0": "\u627E\u5716\u5931\u6557\uFF1A{0}",
   "ui.map_chat_note_images_stopped": "\u5DF2\u505C\u6B62\u627E\u5716\u3002",
   "ui.map_chat_note_inserted_0": "\uFF08\u5DF2\u63D2\u5165\u300C{0}\u300D\uFF09",
+  "ui.map_chat_note_steer": "\u4E2D\u9014\u88DC\u5145",
   "ui.structure_review_entry_label": "AI \u7D50\u69CB\u5EFA\u8B70\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u6574\u5F35\u5716\uFF09",
   "ui.structure_review_entry_branch": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u9019\u500B\u5206\u652F\uFF09",
@@ -35928,9 +35949,15 @@ function transcriptMarkdown(input2) {
 ${escapeLine(labels.saved)}: ${localStamp(input2.savedAt)}`
   ];
   input2.turns.forEach((turn, index) => {
+    var _a2;
     parts.push("---");
     parts.push(`## ${index + 1}. ${escapeLine(labels.you)}`);
     parts.push(escapeMultiline(turn.question));
+    const steers = ((_a2 = turn.steers) != null ? _a2 : []).filter((text11) => text11.trim());
+    if (steers.length) {
+      parts.push(`**${escapeLine(labels.steer)}**`);
+      parts.push(steers.map((text11) => escapeMultiline(text11)).join("\n\n"));
+    }
     const refs = turn.refs.map(refMarkdown).filter(Boolean);
     if (refs.length) parts.push(`${escapeLine(labels.references)}: ${refs.join(", ")}`);
     parts.push(`### ${escapeLine(labels.ai)}`);
@@ -36067,6 +36094,7 @@ var MapChatPanel = class {
     /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
     __publicField(this, "modelTagEl");
     __publicField(this, "stopEl");
+    __publicField(this, "steerHintEl");
     __publicField(this, "saveEl");
     /** The note is being written; a second press does nothing. */
     __publicField(this, "saving", false);
@@ -36188,12 +36216,17 @@ var MapChatPanel = class {
   }
   /** Finished question and answer turns, oldest first, for the next request. */
   turns() {
+    var _a2;
     const turns = [];
     for (let at = 0; at + 1 < this.messages.length; at += 2) {
       const question = this.messages[at];
       const answer = this.messages[at + 1];
       if (answer.streaming || answer.error || !answer.text.trim()) continue;
-      turns.push({ role: "user", text: question.text }, { role: "assistant", text: answer.text });
+      const steered = ((_a2 = question.steers) != null ? _a2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text);
+      turns.push(
+        { role: "user", text: [question.text, ...steered].join("\n\n") },
+        { role: "assistant", text: answer.text }
+      );
     }
     return turns;
   }
@@ -36412,10 +36445,12 @@ var MapChatPanel = class {
    * meanwhile). Returns false, and changes nothing, when the turn is no longer there (a reset already took it).
    */
   retract(turn, draft) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!this.hasTurn(turn)) return false;
     this.messages = this.messages.filter((message) => message !== turn.user && message !== turn.assistant);
     for (const choices of turn.retired) choices.picked = false;
+    const steered = ((_a2 = turn.user.steers) != null ? _a2 : []).map((steer) => steer.text);
+    if (steered.length) draft = [draft, ...steered].filter(Boolean).join("\n");
     this.cancelFrame();
     this.busy = false;
     this.clearStage();
@@ -36430,8 +36465,57 @@ ${typed}` : draft;
     this.renderLog();
     this.renderBusy();
     this.renderHint();
-    (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
+    (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
     return true;
+  }
+  /** The latest question: where follow-ups attach. */
+  lastQuestion() {
+    for (let at = this.messages.length - 1; at >= 0; at--)
+      if (this.messages[at].role === "user") return this.messages[at];
+    return null;
+  }
+  /** A follow-up typed while the turn works: it joins the latest question (under it, above the answer) and the field empties. */
+  addSteer(text11, state) {
+    var _a2;
+    const question = this.lastQuestion();
+    if (!question || !text11.trim()) return null;
+    const steer = { text: text11, state };
+    ((_a2 = question.steers) != null ? _a2 : question.steers = []).push(steer);
+    if (this.built) this.inputEl.value = "";
+    this.renderLog(true);
+    this.renderBusy();
+    this.announce(t(state === "live" ? "ui.map_chat_steer_sent" : "ui.map_chat_steer_queued_announce"));
+    return steer;
+  }
+  /** A follow-up that could not go into the running turn waits for the turn to end (`speak` false: no announcement). */
+  setSteerState(steer, state, speak = true) {
+    if (steer.state === state) return;
+    steer.state = state;
+    this.renderLog();
+    if (speak && state === "queued") this.announce(t("ui.map_chat_steer_queued_announce"));
+  }
+  /** Removes the queued follow-ups of the latest question and returns their texts, oldest first. */
+  takeQueued() {
+    var _a2;
+    const question = this.lastQuestion();
+    if (!((_a2 = question == null ? void 0 : question.steers) == null ? void 0 : _a2.some((steer) => steer.state === "queued"))) return [];
+    const taken = question.steers.filter((steer) => steer.state === "queued");
+    question.steers = question.steers.filter((steer) => steer.state !== "queued");
+    if (!question.steers.length) delete question.steers;
+    this.renderLog();
+    return taken.map((steer) => steer.text);
+  }
+  /** The texts of the follow-ups of the latest question that went into the turn, oldest first. */
+  takeSteerTexts() {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = this.lastQuestion()) == null ? void 0 : _a2.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text);
+  }
+  /** Puts texts back into the field, in front of what was typed meanwhile. */
+  restoreDraft(texts2) {
+    if (!this.built || !texts2.length) return;
+    const typed = this.inputEl.value;
+    this.inputEl.value = [...texts2, ...typed.trim() ? [typed] : []].join("\n");
+    this.renderHint();
   }
   clockNow() {
     var _a2, _b2, _c;
@@ -36911,6 +36995,8 @@ ${typed}` : draft;
       cls: "vam-map-chat-input",
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
+    this.steerHintEl = box.createSpan({ cls: "vam-map-chat-steer-hint", attr: { id: "vam-map-chat-steer-hint" } });
+    this.steerHintEl.hidden = true;
     this.sendEl = box.createEl("button", {
       cls: "vam-map-chat-send",
       attr: { type: "button", "aria-label": t("ui.map_chat_send") }
@@ -36930,6 +37016,7 @@ ${typed}` : draft;
       this.composing = false;
     });
     this.inputEl.addEventListener("keydown", (event) => this.onKey(event));
+    this.inputEl.addEventListener("input", () => this.renderSteerHint());
     this.inputEl.addEventListener("focus", () => this.refreshNote());
     this.el.addEventListener("keydown", (event) => {
       const target = event.target;
@@ -37002,7 +37089,7 @@ ${typed}` : draft;
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
-    this.inputEl.setAttr("placeholder", t("ui.map_chat_input_placeholder"));
+    this.renderPlaceholder();
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
@@ -37042,6 +37129,7 @@ ${typed}` : draft;
     }
   }
   onKey(event) {
+    var _a2, _b2;
     if (event.key === "Escape" && !event.isComposing && !this.composing) {
       if (this.hero) return;
       event.preventDefault();
@@ -37051,6 +37139,10 @@ ${typed}` : draft;
     }
     if (event.key !== "Enter" || event.shiftKey || event.isComposing || this.composing) return;
     event.preventDefault();
+    if (this.working) {
+      if (this.draft.trim()) (_b2 = (_a2 = this.host).steer) == null ? void 0 : _b2.call(_a2);
+      return;
+    }
     this.host.send();
   }
   // ---- width ----------------------------------------------------------------------------------------------------
@@ -37249,7 +37341,7 @@ ${typed}` : draft;
     this.headEl.toggleClass("is-hero", hero);
     this.heroTitleEl.hidden = !hero;
     this.heroTitleEl.toggleClass("is-hidden", !hero);
-    this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
+    this.renderPlaceholder();
     this.applyWidth();
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
@@ -37358,7 +37450,7 @@ ${shown}` : t("ui.map_chat_model_label"));
   }
   /** Everything a message row shows; the row is rebuilt only when this changes. */
   rowKey(message) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
@@ -37371,6 +37463,9 @@ ${shown}` : t("ui.map_chat_model_label"));
       this.stageMessage() === message ? "p" : "",
       this.canRetry(message, asked) ? "r" : "",
       message.linesOpen ? "o" : "",
+      ((_b2 = message.steers) != null ? _b2 : []).map((steer) => `${steer.state}:${steer.text}`).join("\n"),
+      t("ui.map_chat_steer_tag_live"),
+      t("ui.map_chat_steer_tag_queued"),
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
       t("ui.map_chat_plan_summary_0", ""),
@@ -37378,14 +37473,14 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_plan_title_applied"),
       t("ui.map_chat_plan_title_cancelled"),
       t("ui.map_chat_role_you"),
-      message.role === "assistant" ? (_b2 = message.modelLabel) != null ? _b2 : "" : "",
+      message.role === "assistant" ? (_c = message.modelLabel) != null ? _c : "" : "",
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_d = (_c = message.plan.groups) == null ? void 0 : _c.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _d : ""}` : "",
+      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_e = (_d = message.plan.groups) == null ? void 0 : _d.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _e : ""}` : "",
       message.choices ? `choices:${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
-      ((_e = message.images) != null ? _e : []).map(
+      ((_f = message.images) != null ? _f : []).map(
         (block) => {
           var _a3, _b3;
           return `images:${block.state}:${(_a3 = block.reason) != null ? _a3 : ""}:${(_b3 = block.notice) != null ? _b3 : ""}:${block.items.map((item) => {
@@ -37430,7 +37525,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (stick) this.scrollToEnd();
   }
   buildRow(message) {
-    var _a2;
+    var _a2, _b2;
     const row = this.logEl.createDiv({
       cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
     });
@@ -37442,12 +37537,13 @@ ${shown}` : t("ui.map_chat_model_label"));
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    for (const steer of (_a2 = message.steers) != null ? _a2 : []) this.buildSteer(row, steer);
     if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
-    for (const block of (_a2 = message.images) != null ? _a2 : []) this.buildImages(row, block);
+    for (const block of (_b2 = message.images) != null ? _b2 : []) this.buildImages(row, block);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
     if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
@@ -37460,12 +37556,21 @@ ${shown}` : t("ui.map_chat_model_label"));
       more.disabled = this.working;
       more.addEventListener("click", () => {
         if (!this.working) this.handOffFocus(() => {
-          var _a3, _b2;
-          return (_b2 = (_a3 = this.host).retry) == null ? void 0 : _b2.call(_a3, origin);
+          var _a3, _b3;
+          return (_b3 = (_a3 = this.host).retry) == null ? void 0 : _b3.call(_a3, origin);
         });
       });
     }
     return { row, body, more };
+  }
+  /** A follow-up under the question: its own small bubble, tagged in words (the tag is text, never colour alone). */
+  buildSteer(row, steer) {
+    const bubble = row.createDiv({ cls: `vam-map-chat-steer is-${steer.state}` });
+    bubble.createEl("small", {
+      cls: "vam-map-chat-steer-tag",
+      text: t(steer.state === "live" ? "ui.map_chat_steer_tag_live" : "ui.map_chat_steer_tag_queued")
+    });
+    bubble.createSpan({ cls: "vam-map-chat-steer-text", text: steer.text });
   }
   /** The raw error of a failed turn: folded away, selectable and copyable. */
   buildTechnical(row, raw) {
@@ -37743,9 +37848,30 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     }
   }
+  /** The field's hint: a follow-up while a turn works, the opening screen's ask, or the ordinary one. */
+  renderPlaceholder() {
+    if (!this.built) return;
+    const key2 = this.working ? "ui.map_chat_steer_placeholder" : this.hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder";
+    this.inputEl.setAttr("placeholder", t(key2));
+  }
+  /** "Enter 補充" beside the stop key while a turn works and the field has text. */
+  renderSteerHint() {
+    var _a2, _b2, _c, _d;
+    if (!this.built) return;
+    const show = this.working && this.inputEl.value.trim().length > 0;
+    this.steerHintEl.setText(show ? t("ui.map_chat_steer_hint") : "");
+    this.steerHintEl.hidden = !show;
+    this.steerHintEl.toggleClass("is-hidden", !show);
+    if (this.working) this.inputEl.setAttr("aria-keyshortcuts", "Enter");
+    else (_b2 = (_a2 = this.inputEl).removeAttribute) == null ? void 0 : _b2.call(_a2, "aria-keyshortcuts");
+    if (show) this.inputEl.setAttr("aria-describedby", "vam-map-chat-steer-hint");
+    else (_d = (_c = this.inputEl).removeAttribute) == null ? void 0 : _d.call(_c, "aria-describedby");
+  }
   renderBusy() {
     var _a2, _b2;
     if (!this.built) return;
+    this.renderPlaceholder();
+    this.renderSteerHint();
     this.statusEl.setText(this.applying ? t("ui.map_chat_applying") : "");
     this.el.toggleClass("is-busy", this.working);
     this.sendEl.hidden = this.working;
@@ -39288,10 +39414,11 @@ var ClaudeCodeCliRuntime = class {
     let args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     const image = controls.imageDataUrl ? claudeImageSource(controls.imageDataUrl) : null;
     const observed = !!outputSchema && controls.stream === true && !image && !fallback && !this.streamUnsupported;
+    const steerable = !!controls.onSteer && (!!controls.onText && !outputSchema || observed || !!image) && !fallback && !this.streamUnsupported;
     if (controls.onText && !outputSchema) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
-      if (controls.onSteer || image) args.push("--input-format", "stream-json");
+      if (steerable || image) args.push("--input-format", "stream-json");
     } else if (image) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--input-format", "stream-json");
@@ -39300,9 +39427,9 @@ var ClaudeCodeCliRuntime = class {
       args.push("--include-partial-messages");
     }
     const pool = this.options.warmPool;
-    const warmArgs = pool && observed && !controls.onSteer ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
-    const warm = warmArgs ? pool.take(this.warmKey(warmArgs)) : null;
-    if (warmArgs && warm) args = warmArgs;
+    const warmArgs = (pool || steerable) && observed ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
+    const warm = warmArgs && pool ? pool.take(this.warmKey(warmArgs)) : null;
+    if (warmArgs && (warm || steerable)) args = warmArgs;
     if (outputSchema && controls.stream === true) {
       try {
         (_e = controls.onStreamMode) == null ? void 0 : _e.call(controls, observed ? "stream-json" : fallback ? "json-fallback" : "json");
@@ -39346,7 +39473,7 @@ var ClaudeCodeCliRuntime = class {
         reject2(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer || image || warm);
+      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(steerable || image || warm);
       let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
       const streaming = !!controls.onText && !outputSchema || !!image || observed;
       const activity = new ClaudeWebActivity(controls.onWebSearchEvent);
@@ -39540,7 +39667,7 @@ var ClaudeCodeCliRuntime = class {
       (_e2 = (_d2 = child.stdin).on) == null ? void 0 : _e2.call(_d2, "error", () => {
       });
       try {
-        if (controls.onSteer || image || warm) {
+        if (steerable || image || warm) {
           const sendInput = (text11, accepted2, withImage = false) => {
             if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
             const content = [...withImage && image ? [{ type: "image", source: image }] : [], { type: "text", text: text11 }];
@@ -39556,9 +39683,10 @@ var ClaudeCodeCliRuntime = class {
             });
           };
           sendInput(prompt, markAccepted, true);
-          (_f2 = controls.onSteer) == null ? void 0 : _f2.call(controls, async (text11) => {
-            sendInput(text11);
-          });
+          if (steerable)
+            (_f2 = controls.onSteer) == null ? void 0 : _f2.call(controls, async (text11) => {
+              sendInput(text11);
+            });
         } else if (controls.onAccepted || observer) {
           child.stdin.end(prompt, (error) => {
             if (error) {
@@ -41091,6 +41219,9 @@ var language_en_default2 = "Write the reply, and every title, summary, note text
 // core/steps/map-chat/language.zh.md
 var language_zh_default2 = "\u56DE\u8986\uFF0C\u4EE5\u53CA\u4F60\u7522\u751F\u7684\u6240\u6709\u6A19\u984C\u3001\u6458\u8981\u3001\u7B46\u8A18\u6587\u5B57\u8207\u65B0\u6A94\u6848\u6587\u5B57\uFF0C\u8ACB\u4EE5{{language}}\u64B0\u5BEB\u3002\n";
 
+// core/steps/map-chat/steer.en.md
+var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
+
 // core/steps/map-chat/prompt.en.md
 var prompt_en_default6 = `You are the assistant inside a research mind map. The user is talking to you about the map. Answer the user's message in "reply", and, only when the user asked for a change or an action, list actions in "actions". Actions are applied for the user after your reply, in the order you list them: the user's message is the confirmation, except that a long list, a new map or research on many cards is first shown to the user as a plan to approve. Never ask the user in "reply" to approve, confirm or apply anything: the app shows its own Apply and Cancel buttons when a plan is needed, and otherwise the actions simply run. Never say a change has already been made: "reply" only says what you are going to do; the result list the user sees afterwards says what was done. Use future or intention wording ("I'll add ...", "Here is what I will do: ..."), not "I added" or "done". When the user only asks a question, return an empty "actions" list.
 
@@ -41633,6 +41764,9 @@ function parseMapChat(raw, context) {
     }
   });
   return { reply: body.reply, actions, rejected };
+}
+function renderMapChatSteer(text11) {
+  return renderTemplate(steer_en_default, { text: JSON.stringify(text11) });
 }
 var mapChatStep = {
   id: "map-chat",
@@ -46265,6 +46399,7 @@ function providerStepRunner(aiCalls, config) {
           ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
           ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
           ...(hooks == null ? void 0 : hooks.onStreamMode) ? { onStreamMode: hooks.onStreamMode } : {},
+          ...(hooks == null ? void 0 : hooks.onSteer) ? { onSteer: hooks.onSteer } : {},
           ...(hooks == null ? void 0 : hooks.onText) && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model) ? { onText: hooks.onText } : {}
         }
       },
@@ -54462,6 +54597,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "chatCarryOver", false);
     /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
     __publicField(this, "chatApplying", false);
+    /** The follow-ups of the turn that is running (or ran last). */
+    __publicField(this, "chatSteer", null);
     /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
     __publicField(this, "chatImageSearches", /* @__PURE__ */ new Map());
     __publicField(this, "chatImageSequence", 0);
@@ -71279,6 +71416,7 @@ ${note.detail.trim()}` : "",
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
+      steer: () => this.steerMapChat(),
       modelChoices: () => this.chatModelChoices(),
       model: () => this.plugin.settings.cliModel,
       setModel: (model) => {
@@ -71605,12 +71743,16 @@ ${note.detail.trim()}` : "",
     };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  async sendMapChat(again) {
+  async sendMapChat(again, restore) {
     const chat = this.chat;
+    if (chat && !again && this.chatApplying && !chat.isBusy && !this.closed && chat.draft.trim()) {
+      this.steerMapChat();
+      return;
+    }
     if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
-    const origin = again != null ? again : {
+    const origin = again ? { ...again } : {
       text: message,
       chips: chat.attachments(),
       selectedIds: this.chatSelectionIds()
@@ -71621,11 +71763,23 @@ ${note.detail.trim()}` : "",
     let sent = false;
     const abandon = (reason) => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-      if (!chat.retract(turn, again ? void 0 : draft)) return;
+      if (!chat.retract(turn, again ? restore : draft)) return;
       if (reason !== void 0) new import_obsidian37.Notice(reason);
     };
     const stopPreparing = () => abandon();
     this.chatPrepAbandon = stopPreparing;
+    const steerState = {
+      turn,
+      question: message,
+      origin,
+      handler: null,
+      gen: 0,
+      entries: [],
+      chain: Promise.resolve(),
+      noLive: false,
+      closed: false
+    };
+    this.chatSteer = steerState;
     const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request;
     try {
@@ -71692,6 +71846,7 @@ ${note.detail.trim()}` : "",
               stopWatching();
               this.releaseChatTask();
               controller.abort();
+              steerState.handler = null;
               attempt = openAttempt();
               chat.restartWaiting();
               wake();
@@ -71714,10 +71869,14 @@ ${note.detail.trim()}` : "",
                     if (!alive()) return;
                     if (event.kind === "stream-mode") {
                       if (event.mode !== "stream-json") stopWatching();
+                      this.setSteerLive(steerState, event.mode === "stream-json");
                       return;
                     }
                     if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
                     if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                  },
+                  (handler) => {
+                    if (alive()) this.bindSteerHandler(steerState, handler);
                   }
                 ),
                 swapped.then(() => null)
@@ -71726,6 +71885,9 @@ ${note.detail.trim()}` : "",
               if (outcome === null) continue;
               if (!alive()) return;
               const result = outcome;
+              await this.closeSteers(steerState);
+              if (!alive()) return;
+              const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
               const plan = result.actions.length ? planFor(result.actions, request.context, {
                 diagrams: this.plugin.settings.addDiagramsAfterResearch,
                 mapAiMode: (_b2 = this.map) == null ? void 0 : _b2.aiMode
@@ -71733,24 +71895,22 @@ ${note.detail.trim()}` : "",
               if (plan) {
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
-                  this.offerChatPlan(
-                    result,
-                    plan,
-                    request.context,
-                    { path: anchor.path, id: anchor.id },
-                    request.message
-                  );
+                  this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, fullMessage);
+                  this.flushSteers(false);
                 }
                 return;
               }
               if (result.actions.length) chat.setStage("applying");
               const lines = await this.applyMapChatActions(
-                { ...result, message: request.message },
+                { ...result, message: fullMessage },
                 request.context,
                 alive,
                 anchor
               );
-              if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+              if (alive() && chat.isBusy) {
+                chat.finish(result.reply, lines);
+                this.flushSteers(true);
+              }
               return;
             } catch (error) {
               stopWatching();
@@ -71758,6 +71918,7 @@ ${note.detail.trim()}` : "",
               if (alive()) {
                 const failure = this.chatErrorText(error);
                 chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
+                this.returnSteers(steerState);
               }
               return;
             } finally {
@@ -71778,6 +71939,121 @@ ${note.detail.trim()}` : "",
       return;
     }
     if (!went && !sent) abandon(this.closed ? void 0 : notSent());
+  }
+  /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
+  steerMapChat() {
+    const chat = this.chat;
+    if (!chat || this.closed) return;
+    const text11 = chat.draft.trim();
+    if (!text11) return;
+    const state = this.chatSteer;
+    if (state && !state.closed && chat.isBusy && chat.hasTurn(state.turn)) {
+      const waits = state.noLive;
+      const steer = chat.addSteer(text11, waits ? "queued" : "live");
+      if (!steer) return;
+      state.entries.push({ text: text11, steer, status: waits ? "queued" : "pending" });
+      this.pumpSteers(state);
+      return;
+    }
+    if (chat.isBusy || this.chatApplying) chat.addSteer(text11, "queued");
+  }
+  steerAlive(state) {
+    var _a2;
+    return !this.closed && this.chatSteer === state && !!((_a2 = this.chat) == null ? void 0 : _a2.hasTurn(state.turn));
+  }
+  /** The attempt can (or cannot) take a follow-up as it runs; when it cannot, the ones waiting for it wait for the end. */
+  setSteerLive(state, live) {
+    var _a2;
+    if (!this.steerAlive(state)) return;
+    state.noLive = !live;
+    if (live) return;
+    state.handler = null;
+    for (const entry of state.entries) {
+      if (entry.status !== "pending" && entry.status !== "sending" && entry.status !== "delivered") continue;
+      entry.status = "queued";
+      (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
+    }
+    this.syncSteerOrigin(state);
+  }
+  /** A retry after a failure asks the question with the follow-ups that went in, and only those. */
+  syncSteerOrigin(state) {
+    state.origin.text = [state.question, ...state.entries.filter((e) => e.status === "delivered").map((e) => e.text)].join(
+      "\n\n"
+    );
+  }
+  /** A new attempt has a new way in: what the earlier one took is handed over again, once, and what waited for it goes in. */
+  bindSteerHandler(state, handler) {
+    if (!this.steerAlive(state) || state.closed) return;
+    state.gen++;
+    state.handler = handler;
+    state.chain = Promise.resolve();
+    for (const entry of state.entries)
+      if (entry.status === "sending" || entry.status === "delivered") entry.status = "pending";
+    this.pumpSteers(state);
+  }
+  /** Hands every pending follow-up to the attempt, in the order typed. A refusal (the turn already ended) leaves it waiting. */
+  pumpSteers(state) {
+    const handler = state.handler;
+    if (!handler || state.noLive) return;
+    const gen = state.gen;
+    for (const entry of state.entries) {
+      if (entry.status !== "pending") continue;
+      entry.status = "sending";
+      state.chain = state.chain.then(async () => {
+        var _a2;
+        const current = () => gen === state.gen && entry.status === "sending" && this.steerAlive(state);
+        if (!current()) return;
+        try {
+          await handler(entry.text);
+        } catch (e) {
+          if (!current()) return;
+          entry.status = "queued";
+          (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
+          return;
+        }
+        if (!current()) return;
+        entry.status = "delivered";
+        this.syncSteerOrigin(state);
+      });
+    }
+  }
+  /** The reply is in: hand-overs still running settle, and what has not gone in waits for the next message. */
+  async closeSteers(state) {
+    var _a2;
+    await state.chain;
+    state.closed = true;
+    for (const entry of state.entries) {
+      if (entry.status === "delivered" || entry.status === "queued") continue;
+      entry.status = "queued";
+      (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
+    }
+  }
+  /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
+  returnSteers(state) {
+    state.closed = true;
+    const chat = this.chat;
+    if (!chat) return;
+    for (const entry of state.entries) {
+      if (entry.status === "delivered") continue;
+      entry.status = "queued";
+      chat.setSteerState(entry.steer, "queued", false);
+    }
+    chat.restoreDraft(chat.takeQueued());
+  }
+  /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
+  flushSteers(send) {
+    const chat = this.chat;
+    if (!chat) return;
+    const texts2 = chat.takeQueued();
+    if (!texts2.length) return;
+    if (!send || this.closed || chat.isBusy || this.chatApplying || !this.map) {
+      chat.restoreDraft(texts2);
+      return;
+    }
+    void this.sendMapChat(
+      { text: texts2.join("\n\n"), chips: [], selectedIds: this.chatSelectionIds() },
+      texts2.join("\n")
+    );
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   supersedeChatPlan() {
@@ -71843,6 +72119,7 @@ ${note.detail.trim()}` : "",
     this.chatApplying = true;
     chat.settlePlan(card, "applied");
     chat.setApplying(true);
+    const stopped = () => token !== this.chatPlanToken;
     let lines;
     try {
       lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, {
@@ -71856,6 +72133,7 @@ ${note.detail.trim()}` : "",
       chat.setApplying(false);
     }
     if (!this.closed) chat.settlePlan(card, "applied", lines);
+    if (!this.closed) this.flushSteers(!stopped());
   }
   releaseChatTask() {
     var _a2;
@@ -71880,6 +72158,7 @@ ${note.detail.trim()}` : "",
     this.releaseChatTask();
     controller.abort();
     (_d = this.chat) == null ? void 0 : _d.markStopped();
+    if (this.chatSteer) this.returnSteers(this.chatSteer);
     (_e = this.chat) == null ? void 0 : _e.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
@@ -72054,6 +72333,7 @@ ${note.detail.trim()}` : "",
     } finally {
       this.chatApplying = false;
     }
+    if (!this.closed) this.flushSteers(true);
   }
   /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
   chatTargetModels(ids) {
@@ -72536,6 +72816,7 @@ ${note.detail.trim()}` : "",
     } finally {
       this.chatApplying = false;
     }
+    if (!this.closed) this.flushSteers(true);
   }
   /**
    * Opens a map for the conversation (inside a mutate) and moves `anchor`, the map the turn belongs to, along with it; returns
@@ -73338,7 +73619,7 @@ ${addition}` : addition });
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   chatTranscriptTurn(turn) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const { question, answer } = turn;
     const refs = [];
     const seen = /* @__PURE__ */ new Set();
@@ -73357,11 +73638,12 @@ ${addition}` : addition });
     for (const id of (_d = (_c = question.origin) == null ? void 0 : _c.selectedIds) != null ? _d : []) topic(id);
     return {
       question: question.text,
+      steers: ((_e = question.steers) != null ? _e : []).filter((steer) => steer.state === "live").map((steer) => steer.text),
       refs,
       answer: answer.text,
       lines: answer.lines.map((line) => settledLine(line).text),
       ...answer.plan ? { plan: answer.plan.state } : {},
-      images: ((_e = answer.images) != null ? _e : []).map((block) => ({
+      images: ((_f = answer.images) != null ? _f : []).map((block) => ({
         nodeTitle: block.nodeTitle,
         query: block.query,
         state: block.state,
@@ -73396,6 +73678,7 @@ ${addition}` : addition });
         map: t("ui.map_chat_note_map"),
         saved: t("ui.map_chat_note_saved"),
         you: t("ui.map_chat_role_you"),
+        steer: t("ui.map_chat_note_steer"),
         ai: t("ui.map_chat_role_ai"),
         references: t("ui.map_chat_note_references"),
         results: t("ui.map_chat_note_results"),
@@ -82673,8 +82956,11 @@ var MapChatService = class {
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
    * `rejected`. Claude streams the StructuredOutput JSON; Codex streams its message text (only growing). Other providers never call `onReply`.
    * `onProgress` gets the runtime's model events (never after a stop); it only drives a display.
+   * `onSteer` receives a function that adds the user's follow-up text to the running turn (the text is wrapped in the steer
+   * template here); it rejects when the turn can no longer take one or after a stop. A steer restarts the reply, so the reply
+   * shown so far is forgotten and a shorter new reply replaces it.
    */
-  async chat(request, signal, onReply, onProgress) {
+  async chat(request, signal, onReply, onProgress, onSteer) {
     const stopped = () => new MapChatError("stopped", "Map chat stopped");
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(mapChatStep, request);
@@ -82693,8 +82979,15 @@ var MapChatService = class {
       shown = text11;
       onReply(text11);
     } : void 0;
-    const hooks = onProgress || onText ? {
+    const hooks = onProgress || onText || onSteer ? {
       ...onText ? { onText } : {},
+      ...onSteer ? {
+        onSteer: (steer) => onSteer(async (text11) => {
+          if (signal.aborted) throw stopped();
+          shown = "";
+          await steer(renderMapChatSteer(text11));
+        })
+      } : {},
       ...onProgress ? {
         onFirstEvent: () => {
           if (!signal.aborted) onProgress({ kind: "first-event" });

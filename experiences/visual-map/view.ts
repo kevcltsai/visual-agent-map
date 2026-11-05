@@ -386,6 +386,8 @@ import {
   type MapChatOrigin,
   type MapChatPlanCard,
   type MapChatSavedTurn,
+  type MapChatSteer,
+  type MapChatTurnHandle,
   settledLine
 } from "./map-chat";
 import { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
@@ -1111,6 +1113,31 @@ interface GoalSuggestTask {
   focus: "stop" | "list" | null;
 }
 
+/** One follow-up typed while a map-chat turn works, and where it is: not yet handed over, being handed over, taken in, or waiting. */
+interface ChatSteerEntry {
+  text: string;
+  steer: MapChatSteer;
+  status: "pending" | "sending" | "delivered" | "queued";
+}
+/** What one running turn knows about its follow-ups. Every list is the one `entries`, so a follow-up is in exactly one state. */
+interface ChatSteerState {
+  turn: MapChatTurnHandle;
+  /** The question as first asked and the origin a retry would send; delivered follow-ups are added to it. */
+  question: string;
+  origin: MapChatOrigin;
+  /** Hands text to the running attempt; null until that attempt gives one. */
+  handler: ((text: string) => Promise<void>) | null;
+  /** Counts handlers: an answer from an earlier attempt's handler changes nothing. */
+  gen: number;
+  entries: ChatSteerEntry[];
+  /** Hand-overs run one after the other, so follow-ups go in as typed. */
+  chain: Promise<void>;
+  /** The attempt cannot take a follow-up as it runs (Claude json): everything waits for the end. */
+  noLive: boolean;
+  /** The reply is in: later follow-ups wait for the next message. */
+  closed: boolean;
+}
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -1175,6 +1202,8 @@ export class VisualAgentMapView extends ItemView {
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
+  /** The follow-ups of the turn that is running (or ran last). */
+  private chatSteer: ChatSteerState | null = null;
   /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
   private chatImageSearches = new Map<number, AbortController>();
   private chatImageSequence = 0;
@@ -19280,6 +19309,7 @@ export class VisualAgentMapView extends ItemView {
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
+      steer: () => this.steerMapChat(),
       modelChoices: () => this.chatModelChoices(),
       model: () => this.plugin.settings.cliModel,
       setModel: model => {
@@ -19616,17 +19646,25 @@ export class VisualAgentMapView extends ItemView {
     };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  private async sendMapChat(again?: MapChatOrigin): Promise<void> {
+  private async sendMapChat(again?: MapChatOrigin, restore?: string): Promise<void> {
     const chat = this.chat;
+    // A message typed while a plan or a choice is being applied waits for it like a follow-up (it is sent when that ends).
+    if (chat && !again && this.chatApplying && !chat.isBusy && !this.closed && chat.draft.trim()) {
+      this.steerMapChat();
+      return;
+    }
     if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
     // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
-    const origin: MapChatOrigin = again ?? {
-      text: message,
-      chips: chat.attachments(),
-      selectedIds: this.chatSelectionIds()
-    };
+    // The turn has its own copy: follow-ups that go in are added to it, and a copy keeps the earlier turn's retry as it was.
+    const origin: MapChatOrigin = again
+      ? { ...again }
+      : {
+          text: message,
+          chips: chat.attachments(),
+          selectedIds: this.chatSelectionIds()
+        };
     // Where this turn is anchored. A create_map / open_map of the turn itself moves it (see applyMapChatActions).
     const anchor = { path: this.path, id: this.map.id as string | undefined };
     // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
@@ -19638,12 +19676,24 @@ export class VisualAgentMapView extends ItemView {
     // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
     const abandon = (reason?: string): void => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-      if (!chat.retract(turn, again ? undefined : draft)) return;
+      if (!chat.retract(turn, again ? restore : draft)) return;
       if (reason !== undefined) new Notice(reason);
     };
     // Stop while preparing is the user's own act: the send is taken back like any early end, without a Notice.
     const stopPreparing = (): void => abandon();
     this.chatPrepAbandon = stopPreparing;
+    const steerState: ChatSteerState = {
+      turn,
+      question: message,
+      origin,
+      handler: null,
+      gen: 0,
+      entries: [],
+      chain: Promise.resolve(),
+      noLive: false,
+      closed: false
+    };
+    this.chatSteer = steerState;
     const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request: MapChatRequest;
     try {
@@ -19731,6 +19781,8 @@ export class VisualAgentMapView extends ItemView {
               stopWatching();
               this.releaseChatTask();
               controller.abort();
+              // Follow-ups typed before the new attempt hands out its handler wait for it; they are not for the old one.
+              steerState.handler = null;
               attempt = openAttempt();
               chat.restartWaiting();
               wake();
@@ -19753,6 +19805,7 @@ export class VisualAgentMapView extends ItemView {
                     if (!alive()) return;
                     if (event.kind === "stream-mode") {
                       if (event.mode !== "stream-json") stopWatching();
+                      this.setSteerLive(steerState, event.mode === "stream-json");
                       return;
                     }
                     // Claude's first event, and Codex's searching / reading / writing, are model events. Codex's `started` is not: the
@@ -19761,6 +19814,10 @@ export class VisualAgentMapView extends ItemView {
                     if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
                     // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
                     if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                  },
+                  handler => {
+                    // A handler from a replaced or stopped attempt is not taken.
+                    if (alive()) this.bindSteerHandler(steerState, handler);
                   }
                 ),
                 swapped.then(() => null)
@@ -19769,6 +19826,11 @@ export class VisualAgentMapView extends ItemView {
               if (outcome === null) continue;
               if (!alive()) return;
               const result: MapChatResult = outcome;
+              // Follow-ups still being handed over settle first; later ones wait for the next message. The ones that went in are
+              // part of the message the plan and the actions are applied for.
+              await this.closeSteers(steerState);
+              if (!alive()) return;
+              const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
               const plan = result.actions.length
                 ? planFor(result.actions, request.context, {
                     diagrams: this.plugin.settings.addDiagramsAfterResearch,
@@ -19779,25 +19841,25 @@ export class VisualAgentMapView extends ItemView {
                 // Nothing is touched until the user applies the plan.
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
-                  this.offerChatPlan(
-                    result,
-                    plan,
-                    request.context,
-                    { path: anchor.path, id: anchor.id },
-                    request.message
-                  );
+                  this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, fullMessage);
+                  // The plan waits for the user's yes: a message sent now would cancel it, so waiting follow-ups go back to the field.
+                  this.flushSteers(false);
                 }
                 return;
               }
               // A pure answer has nothing to apply: the reader is not told "applying" for it.
               if (result.actions.length) chat.setStage("applying");
               const lines = await this.applyMapChatActions(
-                { ...result, message: request.message },
+                { ...result, message: fullMessage },
                 request.context,
                 alive,
                 anchor
               );
-              if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+              if (alive() && chat.isBusy) {
+                chat.finish(result.reply, lines);
+                // Waiting follow-ups are the next message, sent once.
+                this.flushSteers(true);
+              }
               return;
             } catch (error) {
               stopWatching();
@@ -19806,6 +19868,7 @@ export class VisualAgentMapView extends ItemView {
               if (alive()) {
                 const failure = this.chatErrorText(error);
                 chat.fail(failure.text, failure.wrapped ? failure.text : undefined, failure.technical);
+                this.returnSteers(steerState);
               }
               return;
             } finally {
@@ -19828,6 +19891,121 @@ export class VisualAgentMapView extends ItemView {
     }
     // The AI is not ready (it said why itself) or the usage notice was declined.
     if (!went && !sent) abandon(this.closed ? undefined : notSent());
+  }
+  /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
+  private steerMapChat(): void {
+    const chat = this.chat;
+    if (!chat || this.closed) return;
+    const text = chat.draft.trim();
+    if (!text) return;
+    const state = this.chatSteer;
+    if (state && !state.closed && chat.isBusy && chat.hasTurn(state.turn)) {
+      const waits = state.noLive;
+      const steer = chat.addSteer(text, waits ? "queued" : "live");
+      if (!steer) return;
+      state.entries.push({ text, steer, status: waits ? "queued" : "pending" });
+      this.pumpSteers(state);
+      return;
+    }
+    // The reply is in and its actions (or a plan, a choice) are being applied: the follow-up is the next message.
+    if (chat.isBusy || this.chatApplying) chat.addSteer(text, "queued");
+  }
+  private steerAlive(state: ChatSteerState): boolean {
+    return !this.closed && this.chatSteer === state && !!this.chat?.hasTurn(state.turn);
+  }
+  /** The attempt can (or cannot) take a follow-up as it runs; when it cannot, the ones waiting for it wait for the end. */
+  private setSteerLive(state: ChatSteerState, live: boolean): void {
+    if (!this.steerAlive(state)) return;
+    state.noLive = !live;
+    if (live) return;
+    // json-fallback: the first process (which may already have taken a follow-up) is gone and the rerun never asks for one again,
+    // so what was handed over or is being handed over waits for the end like the rest.
+    state.handler = null;
+    for (const entry of state.entries) {
+      if (entry.status !== "pending" && entry.status !== "sending" && entry.status !== "delivered") continue;
+      entry.status = "queued";
+      this.chat?.setSteerState(entry.steer, "queued");
+    }
+    // What is no longer delivered must not ride along with a retry of the question.
+    this.syncSteerOrigin(state);
+  }
+  /** A retry after a failure asks the question with the follow-ups that went in, and only those. */
+  private syncSteerOrigin(state: ChatSteerState): void {
+    state.origin.text = [state.question, ...state.entries.filter(e => e.status === "delivered").map(e => e.text)].join(
+      "\n\n"
+    );
+  }
+  /** A new attempt has a new way in: what the earlier one took is handed over again, once, and what waited for it goes in. */
+  private bindSteerHandler(state: ChatSteerState, handler: (text: string) => Promise<void>): void {
+    if (!this.steerAlive(state) || state.closed) return;
+    state.gen++;
+    state.handler = handler;
+    state.chain = Promise.resolve();
+    for (const entry of state.entries)
+      if (entry.status === "sending" || entry.status === "delivered") entry.status = "pending";
+    this.pumpSteers(state);
+  }
+  /** Hands every pending follow-up to the attempt, in the order typed. A refusal (the turn already ended) leaves it waiting. */
+  private pumpSteers(state: ChatSteerState): void {
+    const handler = state.handler;
+    if (!handler || state.noLive) return;
+    const gen = state.gen;
+    for (const entry of state.entries) {
+      if (entry.status !== "pending") continue;
+      entry.status = "sending";
+      state.chain = state.chain.then(async () => {
+        const current = (): boolean => gen === state.gen && entry.status === "sending" && this.steerAlive(state);
+        if (!current()) return;
+        try {
+          await handler(entry.text);
+        } catch {
+          if (!current()) return;
+          entry.status = "queued";
+          this.chat?.setSteerState(entry.steer, "queued");
+          return;
+        }
+        if (!current()) return;
+        entry.status = "delivered";
+        this.syncSteerOrigin(state);
+      });
+    }
+  }
+  /** The reply is in: hand-overs still running settle, and what has not gone in waits for the next message. */
+  private async closeSteers(state: ChatSteerState): Promise<void> {
+    await state.chain;
+    state.closed = true;
+    for (const entry of state.entries) {
+      if (entry.status === "delivered" || entry.status === "queued") continue;
+      entry.status = "queued";
+      this.chat?.setSteerState(entry.steer, "queued");
+    }
+  }
+  /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
+  private returnSteers(state: ChatSteerState): void {
+    state.closed = true;
+    const chat = this.chat;
+    if (!chat) return;
+    for (const entry of state.entries) {
+      if (entry.status === "delivered") continue;
+      entry.status = "queued";
+      chat.setSteerState(entry.steer, "queued", false);
+    }
+    chat.restoreDraft(chat.takeQueued());
+  }
+  /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
+  private flushSteers(send: boolean): void {
+    const chat = this.chat;
+    if (!chat) return;
+    const texts = chat.takeQueued();
+    if (!texts.length) return;
+    if (!send || this.closed || chat.isBusy || this.chatApplying || !this.map) {
+      chat.restoreDraft(texts);
+      return;
+    }
+    void this.sendMapChat(
+      { text: texts.join("\n\n"), chips: [], selectedIds: this.chatSelectionIds() },
+      texts.join("\n")
+    );
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   private supersedeChatPlan(): void {
@@ -19916,6 +20094,7 @@ export class VisualAgentMapView extends ItemView {
     chat.settlePlan(card, "applied");
     // The window shows that it is working, and Stop ends the rest of the plan.
     chat.setApplying(true);
+    const stopped = (): boolean => token !== this.chatPlanToken;
     let lines: MapChatLine[];
     try {
       lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, {
@@ -19929,6 +20108,8 @@ export class VisualAgentMapView extends ItemView {
       chat.setApplying(false);
     }
     if (!this.closed) chat.settlePlan(card, "applied", lines);
+    // Follow-ups typed while the plan was applied: sent once, unless Stop ended it.
+    if (!this.closed) this.flushSteers(!stopped());
   }
   private releaseChatTask(): void {
     if (this.chatTaskKey) this.plugin.activeTasks?.delete(this.chatTaskKey);
@@ -19952,6 +20133,8 @@ export class VisualAgentMapView extends ItemView {
     this.releaseChatTask();
     controller.abort();
     this.chat?.markStopped();
+    // Follow-ups that did not go in are not sent after a stop: they are in the field again.
+    if (this.chatSteer) this.returnSteers(this.chatSteer);
     this.chat?.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
@@ -20140,6 +20323,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.chatApplying = false;
     }
+    if (!this.closed) this.flushSteers(true);
   }
   /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
   private chatTargetModels(ids: string[]): string[] {
@@ -20708,6 +20892,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       this.chatApplying = false;
     }
+    if (!this.closed) this.flushSteers(true);
   }
   /**
    * Opens a map for the conversation (inside a mutate) and moves `anchor`, the map the turn belongs to, along with it; returns
@@ -21610,6 +21795,7 @@ export class VisualAgentMapView extends ItemView {
     for (const id of question.origin?.selectedIds ?? []) topic(id);
     return {
       question: question.text,
+      steers: (question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text),
       refs,
       answer: answer.text,
       lines: answer.lines.map(line => settledLine(line).text),
@@ -21650,6 +21836,7 @@ export class VisualAgentMapView extends ItemView {
         map: t("ui.map_chat_note_map"),
         saved: t("ui.map_chat_note_saved"),
         you: t("ui.map_chat_role_you"),
+        steer: t("ui.map_chat_note_steer"),
         ai: t("ui.map_chat_role_ai"),
         references: t("ui.map_chat_note_references"),
         results: t("ui.map_chat_note_results"),

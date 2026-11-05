@@ -1,4 +1,4 @@
-import { assignSides, greedySides, sideFromOffset, type BalancedSide } from "./layouts/balanced";
+import { assignSides, greedySides, sideFromOffset, sideFromTextBox, type BalancedSide } from "./layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, composePositions, layoutDirectionFor } from "./layouts/compose";
 import { fishbonePositions } from "./layouts/fishbone";
 import { radialPositions } from "./layouts/radial";
@@ -15,6 +15,10 @@ function widthExcess(node: MapNode): number {
 /** A text block laid out as a leaf (empty path) has its own drawn width; a card keeps the standard width in the engines that read this. */
 function textBlockWidth(node: MapNode): number {
   return node.path === "" ? (node.width ?? CARD_WIDTH) : CARD_WIDTH;
+}
+/** The side a first-level topic stands on now: a text block by its own box, a card by its x against the root's. */
+function knownSide(topic: MapNode, root: MapNode): BalancedSide | undefined {
+  return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
 }
 /** Vertical space kept between two stacked cards at the standard spacing, in canvas units. */
 export const LAYOUT_GAP = 24;
@@ -244,7 +248,7 @@ function balancedPositions(
       kidsOf(root),
       topic => sizes.get(topic.id)!,
       gap,
-      topic => (reset ? undefined : sideFromOffset((byId.get(topic.id) ?? topic).x - rootNode.x))
+      topic => (reset ? undefined : knownSide(byId.get(topic.id) ?? topic, rootNode))
     );
     const half = (side: BalancedSide) =>
       horizontalPositions({
@@ -452,7 +456,7 @@ function arrangeBalancedBranch(
   });
   const loads = { left: 0, right: 0 };
   for (const kid of kidsOf(parent)) {
-    const side = sideFromOffset(kid.x - parent.x);
+    const side = knownSide(kid, parent);
     if (side) loads[side] += sizes.get(kid.id)! + gap;
   }
   const { sizes: freshSizes } = horizontalPositions({

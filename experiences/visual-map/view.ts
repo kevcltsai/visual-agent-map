@@ -284,6 +284,7 @@ import {
 } from "../../map-layout";
 import { arrangeMapWithText, arrangeNewBranchWithText } from "../../map-layout-text";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
+import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
@@ -836,6 +837,29 @@ function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: s
     return answer;
   };
   return id => resolve(id, new Set());
+}
+/**
+ * A text block's x after its width changed from `from` to `to`: the edge or center facing its topic stays where it was
+ * (left: right edge; up/down: horizontal center). Right layouts and free blocks keep x.
+ */
+function textXAfterWidth(direction: string | undefined, x: number, from: number, to: number): number {
+  if (direction === "left") return x + from - to;
+  if (direction === "up" || direction === "down") return x + (from - to) / 2;
+  return x;
+}
+/**
+ * A text block's width as fitted to its text: measured with the inline width and `has-width` taken off for a moment, so a
+ * drag in progress (which sets both) cannot change the answer.
+ */
+function fittedTextWidth(el: HTMLElement): number {
+  const inline = el.style.width,
+    had = el.hasClass("has-width");
+  el.style.removeProperty("width");
+  el.removeClass("has-width");
+  const fitted = el.offsetWidth || TEXT_NODE_WIDTH;
+  if (inline) el.style.width = inline;
+  if (had) el.addClass("has-width");
+  return fitted;
 }
 function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
   const run = x2 - x1;
@@ -8567,12 +8591,13 @@ export class VisualAgentMapView extends ItemView {
     const storedWidth = (): number | undefined =>
       (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === text.id)
         ?.width;
-    const shownWidth = (): number => storedWidth() ?? (el.offsetWidth || TEXT_NODE_WIDTH);
+    const shownWidth = (): number => storedWidth() ?? fittedTextWidth(el);
     const sync = (width: number): void => handle.setAttr("aria-valuenow", String(width));
     sync(shownWidth());
-    const commit = (width: number | undefined): void => {
+    /** `from` is the width before this change, read before anything touched the element (a drag sets the inline width). */
+    const commit = (width: number | undefined, from: number): void => {
       this.focusTextResizeId = text.id;
-      this.enqueue(() => this.changeCanvasItems(text.id, items => setTextNodeWidth(items, text.id, width)));
+      this.enqueue(() => this.resizeText(text.id, width, from));
     };
     handle.addEventListener("pointerdown", event => {
       if (event.button !== 0 || !this.map || this.presentation) return;
@@ -8589,6 +8614,8 @@ export class VisualAgentMapView extends ItemView {
         width = clampTextWidth(from + (e.clientX - startX) / zoom) ?? from;
         el.style.width = `${width}px`;
         el.addClass("has-width");
+        // The edge or center facing the topic stays; the commit asks the same helper with the same `from`.
+        el.style.left = `${this.textAnchoredX(text.id, from, width)}px`;
         sync(width);
         this.drawEdges();
       };
@@ -8604,6 +8631,7 @@ export class VisualAgentMapView extends ItemView {
           el.style.removeProperty("width");
           el.removeClass("has-width");
         } else el.style.width = `${before}px`;
+        el.style.left = `${this.textAnchoredX(text.id, from, from)}px`;
         sync(from);
         this.drawEdges();
       };
@@ -8612,7 +8640,7 @@ export class VisualAgentMapView extends ItemView {
         settle();
         if (width === from) return restore();
         this.suppressClickUntil = Date.now() + 250;
-        commit(width);
+        commit(width, from);
       };
       const cancel = (): void => {
         if (done) return;
@@ -8629,7 +8657,7 @@ export class VisualAgentMapView extends ItemView {
       if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
-      if (storedWidth() !== undefined) commit(undefined);
+      if (storedWidth() !== undefined) commit(undefined, shownWidth());
     });
     handle.addEventListener("keydown", event => {
       if (this.presentation) return;
@@ -8644,13 +8672,55 @@ export class VisualAgentMapView extends ItemView {
       event.preventDefault();
       event.stopPropagation();
       if (next === undefined) {
-        if (storedWidth() !== undefined) commit(undefined);
+        if (storedWidth() !== undefined) commit(undefined, current);
         return;
       }
       const width = clampTextWidth(next) ?? current;
       if (width === storedWidth() || (storedWidth() === undefined && width === current)) return;
-      commit(width);
+      commit(width, current);
     });
+  }
+  /**
+   * The x a text block takes when its width goes from `from` to `to`: the edge or center facing its topic stays (left: right
+   * edge; up/down: center; right and free blocks keep x). The one source for the live drag, cancel and the committed write.
+   * In a balanced map the side is that of the block's first-level topic against the root (`sideFromOffset`, the rule the
+   * layouts use); a topic too close to the root to have a side keeps x.
+   */
+  private textAnchoredX(id: string, from: number, to: number): number {
+    const item = (this.map?.canvasItems ?? []).find(
+      (entry): entry is TextItem => entry.kind === "text" && entry.id === id
+    );
+    if (!item) return 0;
+    if (!this.map || !item.parentId || this.textEls.get(id)?.hasClass("is-free")) return item.x;
+    let direction: string | undefined = branchDirectionResolver(
+      this.map.nodes,
+      layoutOf(this.map).direction
+    )(item.parentId);
+    if (direction === "balanced") {
+      const byId = new Map(this.map.nodes.map(node => [node.id, node]));
+      let topic = byId.get(item.parentId);
+      // Hanging on the root itself: the side is that of the block's own box against the root card (same rule as the layout).
+      if (topic && !topic.parentId) return textXAfterWidth(sideFromTextBox(item.x, from, topic.x), item.x, from, to);
+      for (let guard = 0; topic?.parentId && byId.get(topic.parentId)?.parentId && guard < 10000; guard++)
+        topic = byId.get(topic.parentId);
+      const root = topic?.parentId ? byId.get(topic.parentId) : undefined;
+      direction = topic && root ? sideFromOffset(topic.x - root.x) : undefined;
+    }
+    return textXAfterWidth(direction, item.x, from, to);
+  }
+  /**
+   * Sets (or clears) a text block's width and, in the same undo step, moves only this block (see `textAnchoredX`).
+   * `from` is the width before the change; resetting to automatic measures the fitted width for `to`.
+   */
+  private async resizeText(id: string, width: number | undefined, from: number): Promise<void> {
+    const el = this.textEls.get(id);
+    const to = width ?? (el ? fittedTextWidth(el) : from);
+    const x = this.textAnchoredX(id, from, to);
+    await this.changeCanvasItems(id, items =>
+      setTextNodeWidth(items, id, width).map(entry =>
+        entry.kind === "text" && (entry as TextItem).id === id ? { ...(entry as TextItem), x } : entry
+      )
+    );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
   private liveLinks(text: TextItem): string[] {

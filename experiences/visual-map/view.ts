@@ -27,6 +27,11 @@ import {
   removeTextNode,
   resizeKeepRatio,
   setSummaryMembers,
+  setTextNodeWidth,
+  clampTextWidth,
+  TEXT_WIDTH_MIN,
+  TEXT_WIDTH_MAX,
+  TEXT_AUTO_WIDTH_MAX,
   setSummaryText,
   summaryDirectionContext,
   treeTextNodes,
@@ -842,7 +847,24 @@ const RELATION_LABEL_NOTE_MAX = 60;
 /** A card's distance from its root (a root is 0); only the fishbone edge reads it. */
 /** A one-line plain text node as drawn (padding + one line); a node not drawn yet takes this so the layout leaves no gap. */
 const TEXT_NODE_HEIGHT = 28;
-const TEXT_NODE_WIDTH = 300;
+/** Width guess for a text block that is not drawn yet (an automatic block is as wide as its text, at most this). */
+const TEXT_NODE_WIDTH = TEXT_AUTO_WIDTH_MAX;
+/** What an automatic block's width will roughly be before it is drawn: its longest line (CJK counts double) plus padding and border, within the automatic limits. */
+function estimateTextWidth(text: string): number {
+  const line = Math.max(
+    0,
+    ...text
+      .split(/\r?\n/)
+      .map(part =>
+        Array.from(part).reduce(
+          (sum, ch) =>
+            sum + (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 6.5),
+          0
+        )
+      )
+  );
+  return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
+}
 function depthOf(nodes: MapNode[], id: string): number {
   const byId = new Map(nodes.map(node => [node.id, node]));
   let depth = 0;
@@ -863,6 +885,23 @@ interface AnchorLine {
 const anchorLineKey = (imageId: string, anchorId: string, topicId: string): string =>
   `anchor:${imageId}:${anchorId}:${topicId}`;
 const BOUNDARY_PAD = 16;
+/**
+ * The lines of an exported text block. The block's real horizontal padding + border is 14, and the exporter's width guess runs wider than
+ * the browser's, so the text is widened until it needs no more lines than the screen shows: a fitted one-line block never loses its text.
+ */
+function textBlockLines(text: string, boxWidth: number, boxHeight: number, lineHeight: number): string[] {
+  const shown = Math.max(
+    1,
+    Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19))
+  );
+  let room = Math.max(1, boxWidth - 14);
+  let lines = wrapText(text, room);
+  for (let tries = 0; lines.length > shown && tries < 40; tries++) {
+    room *= 1.1;
+    lines = wrapText(text, room);
+  }
+  return lines;
+}
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -1314,8 +1353,19 @@ export class VisualAgentMapView extends ItemView {
     (this.isTextId(id)
       ? this.textEls.get(id)?.offsetHeight || TEXT_NODE_HEIGHT
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
+  /** A text block's width for the layout: as drawn, else the stored one, else a guess from its text (a block not drawn yet). */
+  private textWidthOf = (id: string): number | undefined => {
+    const drawn = this.textEls.get(id)?.offsetWidth;
+    if (drawn) return drawn;
+    const item = (this.map?.canvasItems ?? []).find(
+      (entry): entry is TextItem => entry.kind === "text" && entry.id === id
+    );
+    return item ? (item.width ?? estimateTextWidth(item.text)) : undefined;
+  };
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
   private textEls = new Map<string, HTMLElement>();
+  /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
+  private focusTextResizeId: string | null = null;
   /** Image element per image id, rebuilt on every render (the place mode finds its image here). */
   private canvasImageEls = new Map<string, HTMLElement>();
   /** The anchor place mode: which image, where the crosshair is (0-1) and what to do when a spot is chosen. */
@@ -1391,7 +1441,7 @@ export class VisualAgentMapView extends ItemView {
       supersededAimNodeIds(map),
       this.cardHeightOf,
       layoutOf(map),
-      options
+      { ...options, widthOf: this.textWidthOf }
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -1405,7 +1455,8 @@ export class VisualAgentMapView extends ItemView {
       newIds,
       this.cardHeightOf,
       minTop,
-      layoutOf(map)
+      layoutOf(map),
+      this.textWidthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -8365,12 +8416,17 @@ export class VisualAgentMapView extends ItemView {
       el.tabIndex = 0;
       el.style.left = `${text.x}px`;
       el.style.top = `${text.y}px`;
-      el.style.width = `${TEXT_NODE_WIDTH}px`;
+      // No stored width: the block is as wide as its text (CSS max-content, capped); a stored one is fixed and the text wraps.
+      if (text.width !== undefined) {
+        el.style.width = `${text.width}px`;
+        el.addClass("has-width");
+      }
       el.createDiv({ cls: "vam-text-node-body", text: text.text });
       this.textEls.set(text.id, el);
       el.addEventListener("focus", () => el.addClass("is-selected"));
       el.addEventListener("blur", () => el.removeClass("is-selected"));
       if (!editable) continue;
+      this.attachTextResizeHandle(el, text);
       el.addEventListener("dblclick", event => {
         event.stopPropagation();
         this.startTextEdit(text.id);
@@ -8441,6 +8497,114 @@ export class VisualAgentMapView extends ItemView {
       this.focusItemId = null;
       if (this.mapWindowIsActive()) this.textEls.get(wanted)?.focus({ preventScroll: true });
     }
+    const resizeId = this.focusTextResizeId;
+    this.focusTextResizeId = null;
+    if (resizeId && this.mapWindowIsActive())
+      this.textEls.get(resizeId)?.querySelector<HTMLElement>(".vam-text-resize")?.focus({ preventScroll: true });
+  }
+  /**
+   * The width handle on a text block's right edge (same behaviour as the card's): drag, arrows (CARD_WIDTH_STEP), Home/End,
+   * Enter or double click back to automatic width. Dragging shows the width and the lines live; release writes once.
+   */
+  private attachTextResizeHandle(el: HTMLElement, text: TextItem): void {
+    const handle = el.createSpan({
+      cls: "vam-text-resize",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.text_resize_label"),
+        "aria-valuemin": String(TEXT_WIDTH_MIN),
+        "aria-valuemax": String(TEXT_WIDTH_MAX)
+      }
+    });
+    handle.tabIndex = 0;
+    const storedWidth = (): number | undefined =>
+      (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === text.id)
+        ?.width;
+    const shownWidth = (): number => storedWidth() ?? (el.offsetWidth || TEXT_NODE_WIDTH);
+    const sync = (width: number): void => handle.setAttr("aria-valuenow", String(width));
+    sync(shownWidth());
+    const commit = (width: number | undefined): void => {
+      this.focusTextResizeId = text.id;
+      this.enqueue(() => this.changeCanvasItems(text.id, items => setTextNodeWidth(items, text.id, width)));
+    };
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || !this.map || this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      const startX = event.clientX,
+        zoom = this.map.viewport.zoom || 1,
+        from = shownWidth(),
+        before = storedWidth();
+      let width = from,
+        done = false;
+      handle.setPointerCapture?.(event.pointerId);
+      const move = (e: PointerEvent): void => {
+        width = clampTextWidth(from + (e.clientX - startX) / zoom) ?? from;
+        el.style.width = `${width}px`;
+        el.addClass("has-width");
+        sync(width);
+        this.drawEdges();
+      };
+      const settle = (): void => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = (): void => {
+        if (before === undefined) {
+          el.style.removeProperty("width");
+          el.removeClass("has-width");
+        } else el.style.width = `${before}px`;
+        sync(from);
+        this.drawEdges();
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        if (width === from) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        commit(width);
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", event => event.stopPropagation());
+    handle.addEventListener("dblclick", event => {
+      if (this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      if (storedWidth() !== undefined) commit(undefined);
+    });
+    handle.addEventListener("keydown", event => {
+      if (this.presentation) return;
+      const current = shownWidth();
+      let next: number | undefined | null = null;
+      if (event.key === "ArrowRight") next = current + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = current - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = TEXT_WIDTH_MIN;
+      else if (event.key === "End") next = TEXT_WIDTH_MAX;
+      else if (event.key === "Enter") next = undefined;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (next === undefined) {
+        if (storedWidth() !== undefined) commit(undefined);
+        return;
+      }
+      const width = clampTextWidth(next) ?? current;
+      if (width === storedWidth() || (storedWidth() === undefined && width === current)) return;
+      commit(width);
+    });
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
   private liveLinks(text: TextItem): string[] {
@@ -8684,7 +8848,19 @@ export class VisualAgentMapView extends ItemView {
     });
     input.value = draft ?? text.text;
     // The field is as tall as its text, so the block keeps its place and its line stays on its middle while typing.
+    // Without a set width the field also grows with the text (same limits as the drawn block); a set width stays as it is.
+    const grows = text.width === undefined;
+    const measure = grows ? el.createSpan({ cls: "vam-text-node-measure", attr: { "aria-hidden": "true" } }) : null;
+    const fitWidth = (): void => {
+      if (!measure) return;
+      measure.setText(`${input.value}\u200b`);
+      const chrome = el.offsetWidth - input.offsetWidth;
+      const want = (measure.offsetWidth || 0) + (Number.isFinite(chrome) ? chrome : 14) + 2;
+      el.style.width = `${Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(want)))}px`;
+      el.addClass("has-width");
+    };
     const fitHeight = (): void => {
+      fitWidth();
       input.style.removeProperty("height");
       input.style.height = `${input.scrollHeight}px`;
       this.drawEdges();
@@ -8697,6 +8873,11 @@ export class VisualAgentMapView extends ItemView {
       this.editingTextId = null;
       this.suspendTextEdit = null;
       input.remove();
+      if (measure) {
+        measure.remove();
+        el.style.removeProperty("width");
+        el.removeClass("has-width");
+      }
       body?.removeClass("vam-sr-only");
       // Back to its text's height: the line to its topic follows (an unchanged text writes nothing, so no repaint does it).
       this.drawEdges();
@@ -8862,7 +9043,10 @@ export class VisualAgentMapView extends ItemView {
       if (!owner) {
         // No topic selected: a free block in the middle of the view (canvas-text-node decision #4).
         const center = this.stagePoint(null);
-        await this.addFreeText(center && { x: center.x - TEXT_NODE_WIDTH / 2, y: center.y });
+        // The new block shows the placeholder, as wide as that text; centre on that, not on the 300 limit.
+        await this.addFreeText(
+          center && { x: center.x - estimateTextWidth(t("ui.text_node_placeholder")) / 2, y: center.y }
+        );
         return;
       }
       const id = `txt-${randomUUID().slice(0, 8)}`;
@@ -11352,7 +11536,12 @@ export class VisualAgentMapView extends ItemView {
         y: box.y,
         w: box.width,
         h: box.height,
-        title: wrapText(body?.textContent ?? "", box.width - 28),
+        title: textBlockLines(
+          body?.textContent ?? "",
+          box.width,
+          box.height,
+          parseFloat(computed(body ?? el).lineHeight)
+        ),
         plain: true,
         textColor: colorOf(computed(body ?? el).color)
       });
@@ -18574,7 +18763,12 @@ export class VisualAgentMapView extends ItemView {
       const text = item as TextItem;
       const el = this.textEls.get(text.id);
       if (!el?.hasClass("is-free")) continue; // attached blocks follow their topic; a folded one is not drawn
-      boxes.push({ x: text.x, y: text.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
+      boxes.push({
+        x: text.x,
+        y: text.y,
+        w: el.offsetWidth || text.width || TEXT_NODE_WIDTH,
+        h: el.offsetHeight || TEXT_NODE_HEIGHT
+      });
     }
     // Summary bracket text (summary-bracket decision #9): it sits beyond the brace tip and would be clipped otherwise.
     for (const el of this.summaryEls.values()) {

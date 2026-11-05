@@ -785,6 +785,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.text_node_label": "文字节点：{0}",
   "ui.text_nodes_group": "文字节点",
   "ui.text_node_edit_label": "编辑文字节点",
+  "ui.text_resize_label": "文字块宽度",
   "ui.text_node_added": "已添加文字节点。",
   "ui.text_node_removed": "已删除文字节点。",
   "ui.text_node_promote": "转成议题卡",

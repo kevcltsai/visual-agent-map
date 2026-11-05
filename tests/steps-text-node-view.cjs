@@ -162,7 +162,8 @@ test('canvas-text-node: add without a selection makes a free text block in the v
   assert.equal(items.length, 1);
   assert.equal(items[0].parentId, undefined, 'a free block has no parent');
   assert.equal(items[0].links, undefined);
-  assert.deepEqual([items[0].x, items[0].y], [250, 300]);
+  // The block shows the short placeholder ("Text", about 42 wide), so it is centred on that, not on the 300 limit (old x was 250).
+  assert.deepEqual([items[0].x, items[0].y], [379, 300]);
   assert.equal(h.view.history.past.length, past + 1);
   assert.ok(h.textEl(items[0].id).hasClass('is-free'));
   assert.ok(find(h.textEl(items[0].id), i => i.tag === 'textarea'), 'the editor opens at once');
@@ -497,4 +498,137 @@ test('canvas-text-node: AIM and presentation cannot start link mode or move a bl
     await h.settle();
     assert.equal((await h.onDisk())[0].x, 600, mode);
   }
+});
+
+// text-node-width: automatic width fits the text, a stored width is fixed and set with a right-edge handle.
+const handleOf = h => id => find(h.textEl(id), i => i.classes.includes('vam-text-resize'));
+const widthOnDisk = async h => (await h.onDisk())[0].width;
+const pointer = (handle, name, x) => handle.fire(name, { button: 0, pointerId: 1, clientX: x });
+const cssRule = (selector) => require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8').split('\n').find(line => line.startsWith(selector + ' {'));
+
+test('text-node-width: no stored width means no fixed 300 (CSS fits the text, capped at 300); a stored width is fixed', async () => {
+  const h = await harness(() => [txt({ text: 'hello~~' }), free({ width: 180 })]);
+  assert.equal(h.textEl('t1').style.width, undefined, 'automatic: no inline width');
+  assert.equal(h.textEl('t1').hasClass('has-width'), false);
+  assert.equal(h.textEl('f1').style.width, '180px');
+  assert.equal(h.textEl('f1').hasClass('has-width'), true);
+  const rule = cssRule('.vam-view .vam-text-node');
+  assert.match(rule, /width: max-content/);
+  assert.match(rule, /max-width: 300px/);
+  assert.match(rule, /min-width: 32px/);
+  assert.match(cssRule('.vam-view .vam-text-node.has-width'), /max-width: none/);
+});
+
+test('text-node-width: the handle is a separator with range; not drawn when the map cannot be edited', async () => {
+  const h = await harness(() => [txt()]);
+  const handle = handleOf(h)('t1');
+  assert.deepEqual({ role: handle.attrs.role, min: handle.attrs['aria-valuemin'], max: handle.attrs['aria-valuemax'] }, { role: 'separator', min: '32', max: '560' });
+  h.view.presentation = {};
+  h.view.render();
+  assert.equal(handleOf(h)('t1'), undefined, 'no handle while presenting');
+});
+
+test('text-node-width: no handle in an AIM map or in selection mode (the map cannot edit canvas items); it is there again afterwards', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id }), free()]);
+  assert.ok(handleOf(h)('t1') && handleOf(h)('f1'), 'editable map has handles');
+  h.view.map.aim = { branches: [] };
+  h.view.render();
+  assert.equal(handleOf(h)('t1'), undefined, 'AIM attached');
+  assert.equal(handleOf(h)('f1'), undefined, 'AIM free');
+  delete h.view.map.aim;
+  h.view.selection.toggleMultiSelect();
+  assert.equal(h.view.selection.state.multiSelectMode, true);
+  h.view.render();
+  assert.equal(handleOf(h)('t1'), undefined, 'selection mode attached');
+  assert.equal(handleOf(h)('f1'), undefined, 'selection mode free');
+  h.view.selection.toggleMultiSelect();
+  h.view.render();
+  assert.ok(handleOf(h)('t1'), 'handle back');
+});
+
+test('text-node-width: a drag writes once on release (clamped), one undo step; undo restores automatic width', async () => {
+  const h = await harness(() => [txt()]);
+  const past = h.view.history.past.length;
+  let handle = handleOf(h)('t1');
+  h.textEl('t1').offsetWidth = 100;
+  pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 60); pointer(handle, 'pointermove', 90);
+  assert.equal(h.textEl('t1').style.width, '190px', 'live while dragging');
+  await h.settle();
+  assert.equal(h.view.history.past.length, past, 'nothing written while moving');
+  pointer(handle, 'pointerup', 90);
+  await h.settle();
+  assert.equal(await widthOnDisk(h), 190);
+  assert.equal(h.view.history.past.length, past + 1);
+  h.view.render();
+  handle = handleOf(h)('t1');
+  pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 5000); pointer(handle, 'pointerup', 5000);
+  await h.settle();
+  assert.equal(await widthOnDisk(h), 560);
+  await h.view.travel(false);
+  assert.equal(await widthOnDisk(h), 190, 'undo is one step');
+  await h.view.travel(false);
+  assert.equal((await h.onDisk())[0].width, undefined);
+});
+
+test('text-node-width: a cancelled or zero-length drag writes nothing', async () => {
+  const h = await harness(() => [txt()]);
+  const past = h.view.history.past.length;
+  const handle = handleOf(h)('t1');
+  h.textEl('t1').offsetWidth = 100;
+  pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 50); pointer(handle, 'pointercancel', 50);
+  assert.equal(h.textEl('t1').style.width, undefined, 'back to automatic');
+  pointer(handle, 'pointerdown', 0); pointer(handle, 'pointerup', 0);
+  await h.settle();
+  assert.equal(h.view.history.past.length, past);
+});
+
+test('text-node-width: arrows step 40, Home/End jump, Enter and double click go back to automatic; each is one undo step', async () => {
+  const h = await harness(() => [txt({ width: 200 })]);
+  const key = async k => { handleOf(h)('t1').fire('keydown', { key: k }); await h.settle(); h.view.render(); };
+  const past = h.view.history.past.length;
+  await key('ArrowRight'); assert.equal(await widthOnDisk(h), 240);
+  await key('ArrowLeft'); await key('ArrowLeft'); assert.equal(await widthOnDisk(h), 160);
+  await key('Home'); assert.equal(await widthOnDisk(h), 32);
+  await key('End'); assert.equal(await widthOnDisk(h), 560);
+  assert.equal(h.view.history.past.length, past + 5);
+  await key('End'); assert.equal(h.view.history.past.length, past + 5, 'at the limit nothing is written');
+  await key('Enter'); assert.equal(await widthOnDisk(h), undefined);
+  await key('Enter'); assert.equal(h.view.history.past.length, past + 6, 'already automatic: nothing written');
+  await key('ArrowRight'); handleOf(h)('t1').fire('dblclick', {}); await h.settle();
+  assert.equal(await widthOnDisk(h), undefined, 'double click removes the width');
+  assert.equal(h.view.history.past.length, past + 8);
+  await h.view.travel(false);
+  assert.ok((await widthOnDisk(h)) > 0, 'undo of the reset brings the width back in one step');
+});
+
+test('text-node-width: editing an automatic block grows its width with the text (32..300) and gives it back on close; a set width stays', async () => {
+  const h = await harness(() => [txt({ text: 'hi' }), free({ width: 180 })]);
+  h.view.startTextEdit('t1');
+  const el = h.textEl('t1'), area = find(el, i => i.tag === 'textarea'), measure = find(el, i => i.classes.includes('vam-text-node-measure'));
+  measure.offsetWidth = 120; area.fire('input');
+  assert.equal(el.style.width, '136px');
+  measure.offsetWidth = 5000; area.fire('input');
+  assert.equal(el.style.width, '300px');
+  measure.offsetWidth = 0; area.fire('input');
+  assert.equal(el.style.width, '32px');
+  area.fire('keydown', { key: 'Escape' });
+  assert.equal(el.style.width, undefined, 'automatic again after closing');
+  h.view.startTextEdit('f1');
+  const fixed = h.textEl('f1');
+  assert.equal(find(fixed, i => i.classes.includes('vam-text-node-measure')), undefined);
+  find(fixed, i => i.tag === 'textarea').fire('input');
+  assert.equal(fixed.style.width, '180px');
+});
+
+test('text-node-width: a left layout line ends on the real (fitted) right edge of the block', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id, text: 'hello~~' })]);
+  const root = h.view.cardEls.get(h.root.id), el = h.textEl('t1');
+  Object.assign(root, { offsetLeft: 500, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 });
+  Object.assign(el, { offsetLeft: 300, offsetTop: 10, offsetWidth: 60, offsetHeight: 28 });
+  h.view.map.layout = { direction: 'left' };
+  h.view.edgesEl = { children: [], replaceChildren() { this.children = []; }, appendChild(c) { this.children.push(c); } };
+  h.view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  h.view.drawEdges();
+  const path = h.view.edgesEl.children.find(p => p.classes.includes('vam-text-edge'));
+  assert.ok(String(path.attrs.d).endsWith('360 24'), path.attrs.d);
 });

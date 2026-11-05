@@ -423,11 +423,11 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }
 /* The goal bar: a chat-input style bar at the top centre of the canvas. --vam-goal-inset is the width of a laid-over chat window, so the bar centres on the visible canvas. The goal wraps and is never cut off. */
-.vam-goal-bar { position: absolute; z-index: 2; top: 12px; left: calc(50% + var(--vam-goal-inset, 0px) / 2); transform: translateX(-50%); box-sizing: border-box; width: min(560px, calc(100% - 24px - var(--vam-goal-inset, 0px) - 108px)); display: flex; align-items: center; gap: 12px; padding: 14px 18px; border: 1px solid var(--background-modifier-border); border-radius: 16px; background: var(--background-primary); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
+.vam-goal-bar { position: absolute; z-index: 2; top: 12px; left: calc(50% + var(--vam-goal-inset, 0px) / 2); transform: translateX(-50%); box-sizing: border-box; width: min(460px, calc(100% - 24px - var(--vam-goal-inset, 0px))); display: flex; align-items: center; gap: 12px; padding: 14px 18px; border: 1px solid var(--background-modifier-border); border-radius: 16px; background: var(--background-primary); box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .vam-goal-bar:hover, .vam-goal-bar:focus-within { border-color: var(--interactive-accent); }
 .vam-goal-target { display: inline-flex; flex: none; color: var(--interactive-accent); }
 .vam-goal-target svg { width: 26px; height: 26px; }
-.vam-goal-text { flex: 1 1 auto; min-width: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: .01em; line-height: 1.35; color: var(--text-normal); overflow-wrap: anywhere; cursor: default; border-radius: var(--radius-s); }
+.vam-goal-text { flex: 1 1 auto; min-width: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: .01em; line-height: 1.35; padding-block: 3px; color: var(--text-normal); overflow-wrap: anywhere; cursor: default; border-radius: var(--radius-s); }
 .vam-goal-bar.is-empty .vam-goal-text { color: var(--text-muted); font-weight: 600; cursor: text; }
 .vam-goal-text:focus-visible, .vam-goal-icon:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 /* The four icons show only while the pointer is over the bar or the keyboard is inside it. */
@@ -597,7 +597,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 }
 .vam-integration-sources { display: flex; flex-direction: column; gap: 5px; max-height: 150px; overflow-y: auto; margin: 12px 0; padding: 10px 12px; border-radius: var(--radius-s); background: var(--background-secondary); color: var(--text-muted); }
 .vam-integration-sources strong { color: var(--text-normal); }
-.vam-empty { margin: 60px auto; padding: 24px; max-width: 440px; color: var(--text-muted); text-align: center; line-height: 1.8; pointer-events: none; }
+.vam-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(440px, calc(100% - 24px)); margin: 0; padding: 24px; color: var(--text-muted); text-align: center; line-height: 1.8; pointer-events: none; }
 .vam-empty button { pointer-events: auto; }
 .vam-empty-state { margin: auto; padding: 32px; max-width: 520px; text-align: center; }
 .vam-empty-state p { color: var(--text-muted); line-height: 1.6; }

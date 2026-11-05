@@ -52445,6 +52445,7 @@ function researchWebLines(web) {
 }
 var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
+var GOAL_BAR_TOOLS_GAP = 8;
 var CHAT_EXPAND_LEVELS = 2;
 var CHAT_EXPAND_MAX_TOPICS = 15;
 var chatAppearanceChange = (action) => {
@@ -52742,6 +52743,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "framingViewport", false);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
+    __publicField(this, "goalBarObserver", null);
+    __publicField(this, "goalBarObserved", null);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
     __publicField(this, "blankMapPaths", /* @__PURE__ */ new Set());
     __publicField(this, "aimStyleNoticed", /* @__PURE__ */ new Set());
@@ -53509,7 +53512,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     ).open();
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     this.closeTopicLinkMenu();
     this.closed = true;
     this.closeMapSearch(false);
@@ -53523,12 +53526,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.unbindClipboard = null;
     (_c = this.statusBarObserver) == null ? void 0 : _c.disconnect();
     this.statusBarObserver = null;
+    (_d = this.goalBarObserver) == null ? void 0 : _d.disconnect();
+    this.goalBarObserver = null;
     this.statusBarObserved = null;
     this.renderAfterDrag = false;
-    (_d = this.announcer) == null ? void 0 : _d.remove();
+    (_e = this.announcer) == null ? void 0 : _e.remove();
     this.announcer = null;
     this.announcedStages.clear();
-    (_e = this.unsubscribeResearch) == null ? void 0 : _e.call(this);
+    (_f = this.unsubscribeResearch) == null ? void 0 : _f.call(this);
     this.unsubscribeResearch = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
@@ -53538,12 +53543,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
-    if ((_f = this.chat) == null ? void 0 : _f.hasUnsavedTurns) new import_obsidian34.Notice(t("ui.map_chat_unsaved_on_close"));
+    if ((_g = this.chat) == null ? void 0 : _g.hasUnsavedTurns) new import_obsidian34.Notice(t("ui.map_chat_unsaved_on_close"));
     this.abortMapChat();
-    (_g = this.chat) == null ? void 0 : _g.dispose();
-    (_h = this.relevancePanelCleanup) == null ? void 0 : _h.call(this);
+    (_h = this.chat) == null ? void 0 : _h.dispose();
+    (_i = this.relevancePanelCleanup) == null ? void 0 : _i.call(this);
     this.relevancePanelCleanup = null;
-    if (this.relevancePanelOpen) (_j = (_i = this.plugin).releaseWarmClaude) == null ? void 0 : _j.call(_i);
+    if (this.relevancePanelOpen) (_k = (_j = this.plugin).releaseWarmClaude) == null ? void 0 : _k.call(_j);
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -53564,8 +53569,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_k = this.hoverCard) == null ? void 0 : _k.remove();
-    (_l = this.dragCleanup) == null ? void 0 : _l.call(this);
+    (_l = this.hoverCard) == null ? void 0 : _l.remove();
+    (_m = this.dragCleanup) == null ? void 0 : _m.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -54477,7 +54482,12 @@ ${request.requirements}` : preset.text,
     this.relevancePanelEl = null;
     const bar = overlay.createDiv({
       cls: "vam-goal-bar",
-      attr: { role: "group", "aria-label": t("ui.relevance_goal_label") }
+      attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
+    });
+    bar.createSpan({
+      cls: "vam-sr-only",
+      text: t("ui.relevance_goal_label"),
+      attr: { id: `${this.relevancePanelId}-name` }
     });
     this.relevanceBarEl = bar;
     this.drawGoalBar(bar);
@@ -67300,13 +67310,35 @@ ${note.detail.trim()}` : "",
     const left = ((_b2 = this.chat) == null ? void 0 : _b2.isOverlay) ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
     tools.style.left = left > 0 ? `${left}px` : "";
   }
-  /** The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. */
+  /**
+   * The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. The tool
+   * group sits right below the bar (following its real height, also when the goal wraps), so an opened toolbar never covers it.
+   */
   placeGoalBar() {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     const bar = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-goal-bar");
+    this.syncToolsBelowGoalBar(bar != null ? bar : null);
     if (!bar) return;
     const covered = ((_b2 = this.chat) == null ? void 0 : _b2.isOverlay) ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
     bar.style.setProperty("--vam-goal-inset", `${covered}px`);
+    if (bar !== this.goalBarObserved) {
+      (_c = this.goalBarObserver) == null ? void 0 : _c.disconnect();
+      this.goalBarObserver = null;
+      this.goalBarObserved = bar;
+      const win = (_d = bar.ownerDocument) == null ? void 0 : _d.defaultView;
+      if (typeof (win == null ? void 0 : win.ResizeObserver) === "function") {
+        this.goalBarObserver = new win.ResizeObserver(() => this.syncToolsBelowGoalBar(bar));
+        this.goalBarObserver.observe(bar);
+      }
+    }
+  }
+  /** With a goal bar the tools sit GOAL_BAR_TOOLS_GAP below it; without one they keep the stylesheet's top. */
+  syncToolsBelowGoalBar(bar) {
+    var _a2;
+    const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
+    if (!(tools == null ? void 0 : tools.style)) return;
+    const bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
+    tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize() {

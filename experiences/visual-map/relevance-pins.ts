@@ -1,8 +1,4 @@
-import {
-  normalizeRelevanceContext,
-  normalizeRelevanceGoal,
-  type RelevanceTier
-} from "../../note-values";
+import { normalizeRelevanceContext, normalizeRelevanceGoal, type RelevanceTier } from "../../note-values";
 
 /**
  * Pure rules for pinned (hand-set) relevance tiers: the bounds a pin puts on the cards around it, the parent-child

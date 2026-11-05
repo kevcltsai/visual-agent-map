@@ -2791,9 +2791,8 @@ integrationTest('goal banner P3: both toolbar renderers drop "+ Topic" and its c
   assert.match(css, /^\.vam-tools-mini \{[^}]*padding: 2px; opacity: \.75;/m);
   assert.match(css, /^\.vam-tools-mini \{[^}]*z-index: 3;/m, 'the opened toolbar floats over the goal bar (z-index 2)');
   const goal = css.split('\n').find(l => l.startsWith('.vam-goal-bar {'));
-  assert.match(goal, /z-index: 2;/); assert.match(goal, /width: min\(560px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\) - 108px\)\)/, 'the goal bar keeps clear of the collapsed icon on both sides');
-  // Collapsed icon: left 12px + 34px wide (30px button + 2*2px padding); the goal bar starts at (W - bar) / 2 (>= 54px) at any width.
-  for (const w of [320, 420, 600, 664, 800, 1060]) { const bar = Math.min(560, w - 24 - 108); assert.ok((w - bar) / 2 >= 12 + 34 + 8, `canvas ${w}px: bar left edge ${(w - bar) / 2} is clear of the icon`); }
+  assert.match(goal, /z-index: 2;/); assert.match(goal, /width: min\(460px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\)\)\)/, 'at most 460px, and truly centred: no side reservation for the toolbar icon');
+  assert.doesNotMatch(goal, /108px/, 'the old side reservation is gone');
 });
 integrationTest('goal banner P3: the empty canvas button opens the add menu and the keyboard goes to it after "Create an empty mind map"', async () => {
   const h = await harness({ empty: true }); await h.view.hydrate();

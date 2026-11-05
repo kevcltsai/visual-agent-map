@@ -4620,14 +4620,33 @@ test('goal bar: styles keep it above the cards, centred on the visible canvas, w
   const rule = selector => css.split('\n').find(line => line.startsWith(`${selector} {`)) ?? '';
   const bar = rule('.vam-goal-bar');
   assert.match(bar, /position: absolute;[^}]*top: 12px;[^}]*left: calc\(50% \+ var\(--vam-goal-inset, 0px\) \/ 2\);[^}]*transform: translateX\(-50%\)/, 'centred on the canvas the chat window does not cover');
-  assert.match(bar, /width: min\(560px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\) - 108px\)\)/, 'never wider than the visible canvas minus 24px and the room the collapsed toolbar icon needs on both sides');
+  assert.match(bar, /width: min\(460px, calc\(100% - 24px - var\(--vam-goal-inset, 0px\)\)\)/, 'at most 460px, never wider than the visible canvas minus 24px, no side reservation (the tools sit below the bar)');
+  assert.doesNotMatch(bar, /108px/);
   assert.match(bar, /padding: 14px 18px/); assert.match(bar, /border-radius: 16px/); assert.match(bar, /background: var\(--background-primary\)/); assert.match(bar, /border: 1px solid var\(--background-modifier-border\)/);
   assert.doesNotMatch(bar, /#[0-9a-f]{3,6}\b/i, 'theme variables, not mock-up hex colours');
   const text = rule('.vam-goal-text');
   assert.match(text, /font-size: 1\.2rem;[^}]*font-weight: 800/); assert.match(text, /overflow-wrap: anywhere/); assert.doesNotMatch(text, /text-overflow|ellipsis|white-space: nowrap|overflow: hidden/, 'the goal wraps, never cut');
   assert.match(rule('.vam-goal-actions'), /display: none/);
+  // Showing the icons must not change the bar height: one text line (1.2rem x 1.35 + 2 x 3px) is already as tall as the 30px icons.
+  assert.match(text, /padding-block: 3px/); assert.match(text, /line-height: 1\.35/);
+  assert.ok(19.2 * 1.35 + 6 >= 30, 'a one-line text box is at least as tall as the icon row, so hover does not grow the bar');
+  assert.match(css, /^\.vam-empty \{[^}]*top: 50%;[^}]*left: 50%;[^}]*translate\(-50%, -50%\)/m, 'the empty-map text and button are centred in the canvas');
   assert.match(css, /\.vam-goal-bar:hover \.vam-goal-actions, \.vam-goal-bar:focus-within \.vam-goal-actions \{ display: flex; \}/);
   assert.match(css, /\.vam-goal-bar:hover, \.vam-goal-bar:focus-within \{ border-color: var\(--interactive-accent\); \}/);
   assert.match(rule('.vam-goal-icon'), /width: 30px; height: 30px/);
   assert.doesNotMatch(css, /vam-relevance-level|vam-relevance-sort|vam-relevance-grade-button|\.vam-map-tools \.vam-relevance-goal/, 'the old goal pill and panel rules are gone');
+});
+
+test('goal bar: the tool group is placed right below the bar and follows its height; without a bar it keeps the stylesheet top', () => {
+  const { view } = viewportFixture();
+  const tools = { style: {} }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: null };
+  view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
+  view.placeGoalBar();
+  assert.equal(tools.style.top, '82px', 'bar bottom (74) + 8px gap');
+  bar.offsetHeight = 140; view.placeGoalBar();
+  assert.equal(tools.style.top, '160px', 'a wrapped, taller bar pushes the tools down with it');
+  for (const height of [62, 140]) { bar.offsetHeight = height; view.placeGoalBar(); const barBottom = bar.offsetTop + bar.offsetHeight; assert.ok(parseInt(tools.style.top, 10) > barBottom, `tools start below the bar (${height})`); }
+  view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : null) };
+  view.placeGoalBar();
+  assert.equal(tools.style.top, '', 'no goal bar (AIM or empty map): today\'s top');
 });

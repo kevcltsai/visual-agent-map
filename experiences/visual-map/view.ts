@@ -916,6 +916,8 @@ interface ChatRun {
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
 const CHAT_TOOLS_GAP = 12;
+/** Space between the goal bar and the tool group placed under it. */
+const GOAL_BAR_TOOLS_GAP = 8;
 /** The size of a chat expand: the Next Step dialog's defaults (levels below the topic, topics in total). */
 const CHAT_EXPAND_LEVELS = 2;
 const CHAT_EXPAND_MAX_TOPICS = 15;
@@ -2089,6 +2091,8 @@ export class VisualAgentMapView extends ItemView {
     this.unbindClipboard = null;
     this.statusBarObserver?.disconnect();
     this.statusBarObserver = null;
+    this.goalBarObserver?.disconnect();
+    this.goalBarObserver = null;
     this.statusBarObserved = null;
     this.renderAfterDrag = false;
     this.announcer?.remove();
@@ -3101,7 +3105,14 @@ export class VisualAgentMapView extends ItemView {
     this.relevancePanelEl = null;
     const bar = overlay.createDiv({
       cls: "vam-goal-bar",
-      attr: { role: "group", "aria-label": t("ui.relevance_goal_label") }
+      attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
+    });
+    // The group's name comes from a hidden label, not aria-label: Obsidian turns every aria-label into a hover tooltip,
+    // and the whole bar must not show one.
+    bar.createSpan({
+      cls: "vam-sr-only",
+      text: t("ui.relevance_goal_label"),
+      attr: { id: `${this.relevancePanelId}-name` }
     });
     this.relevanceBarEl = bar;
     this.drawGoalBar(bar);
@@ -17031,12 +17042,36 @@ export class VisualAgentMapView extends ItemView {
     const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
     tools.style.left = left > 0 ? `${left}px` : "";
   }
-  /** The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. */
+  /**
+   * The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. The tool
+   * group sits right below the bar (following its real height, also when the goal wraps), so an opened toolbar never covers it.
+   */
   private placeGoalBar(): void {
     const bar = this.contentEl?.querySelector<HTMLElement>(".vam-goal-bar");
+    this.syncToolsBelowGoalBar(bar ?? null);
     if (!bar) return;
     const covered = this.chat?.isOverlay ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
     bar.style.setProperty("--vam-goal-inset", `${covered}px`);
+    if (bar !== this.goalBarObserved) {
+      this.goalBarObserver?.disconnect();
+      this.goalBarObserver = null;
+      this.goalBarObserved = bar;
+      const win = bar.ownerDocument?.defaultView as
+        (Window & { ResizeObserver?: typeof ResizeObserver }) | null | undefined;
+      if (typeof win?.ResizeObserver === "function") {
+        this.goalBarObserver = new win.ResizeObserver(() => this.syncToolsBelowGoalBar(bar));
+        this.goalBarObserver.observe(bar);
+      }
+    }
+  }
+  private goalBarObserver: ResizeObserver | null = null;
+  private goalBarObserved: HTMLElement | null = null;
+  /** With a goal bar the tools sit GOAL_BAR_TOOLS_GAP below it; without one they keep the stylesheet's top. */
+  private syncToolsBelowGoalBar(bar: HTMLElement | null): void {
+    const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
+    if (!tools?.style) return;
+    const bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
+    tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {

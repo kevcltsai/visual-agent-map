@@ -483,6 +483,14 @@ const contextInput = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-context-i
 const group = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-setup'));
 const open = h => { h.chip().click(); return h.input(); };
 
+integrationTest('goal bar: the group is named by a hidden label, not aria-label (Obsidian would show that as a tooltip over the whole bar)', async () => {
+  const h = await harness();
+  const bar = h.goalBar();
+  assert.equal(bar.attrs.role, 'group'); assert.equal(bar.attrs['aria-label'], undefined, 'no aria-label on the bar');
+  const label = findAll(bar, i => hasCls(i, 'vam-sr-only'))[0];
+  assert.ok(label); assert.equal(label.text, 'Map goal'); assert.equal(bar.attrs['aria-labelledby'], label.attrs.id);
+});
+
 integrationTest('relevance: the edit popover is one group with exactly two fields, goal and an optional context, and no button (en)', async () => {
   const h = await harness();
   open(h);

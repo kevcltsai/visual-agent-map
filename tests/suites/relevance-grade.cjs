@@ -408,7 +408,7 @@ integrationTest('relevance: AIM maps have no goal entry and never grade', async 
   await h.view.submitRelevanceGoal('Goal'); assert.equal(h.control.calls.length, 0); assert.equal(h.run(), undefined); assert.equal(await h.repo.readRelevanceGoal(MAP), undefined);
   // The goal bar and the status bar sit behind the same guards in the real render: not on an AIM map, not on an empty map.
   const source = fs.readFileSync(path.join(projectRoot, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.renderGoalBar\(overlay\);/);
+  assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.mountGoalBar\(\);/);
   assert.match(source, /private relevanceGradeable\(\): boolean \{\s*return !!this\.map && !this\.map\.aim && !!this\.path;/);
   assert.match(source, /if \(!this\.map\.aim\) this\.renderRelevanceStatus\(this\.contentEl\);/);
 });

@@ -191,12 +191,13 @@ export function rectsIntersect(a: ScreenRect, b: ScreenRect): boolean {
 
 /**
  * Every layer that floats over the canvas. One list for the stack layout's watch, for the rects cards avoid, and for the tests,
- * so a new layer is added in one place. `.vam-goal-attachment` is whichever panel hangs under the goal bar (edit panel,
- * suggestions); `.vam-map-sources-panel` hangs from the tool group.
+ * so a new layer is added in one place. The goal bar itself is not in it (it sits in the header row, not over the canvas):
+ * `.vam-goal-attachment` is whichever panel hangs under it (edit panel, suggestions) and `.vam-goal-actions` its icons, which
+ * float under the goal on a narrow pane; `.vam-map-sources-panel` hangs from the tool group.
  */
 export const FLOATING_LAYER_SELECTORS = [
   ".vam-map-tools",
-  ".vam-goal-bar",
+  ".vam-goal-actions",
   ".vam-goal-attachment",
   ".vam-map-sources-panel",
   ".vam-zoom-controls",

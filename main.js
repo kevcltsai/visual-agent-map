@@ -34959,19 +34959,12 @@ function rectsIntersect(a, b) {
 }
 var FLOATING_LAYER_SELECTORS = [
   ".vam-map-tools",
-  ".vam-goal-bar",
+  ".vam-goal-actions",
   ".vam-goal-attachment",
   ".vam-map-sources-panel",
   ".vam-zoom-controls",
   ".vam-canvas-hint"
 ];
-function sharesHorizontalSpace(a, b) {
-  var _a2, _b2;
-  const first = (_a2 = a.getBoundingClientRect) == null ? void 0 : _a2.call(a);
-  const second = (_b2 = b.getBoundingClientRect) == null ? void 0 : _b2.call(b);
-  if (!first || !second) return true;
-  return first.left < second.right && second.left < first.right;
-}
 function isObscured(rect2, view, covers) {
   if (rect2.left < view.left || rect2.right > view.right || rect2.top < view.top || rect2.bottom > view.bottom) return true;
   return covers.some((cover) => rectsIntersect(rect2, cover));
@@ -54420,7 +54413,6 @@ function researchWebLines(web) {
 }
 var CHAT_RAIL_WIDTH = 44;
 var CHAT_TOOLS_GAP = 12;
-var GOAL_BAR_TOOLS_GAP = 8;
 var GOAL_SUGGEST_GAP = 6;
 var CHAT_EXPAND_LEVELS = 2;
 var CHAT_EXPAND_MAX_TOPICS = 15;
@@ -54480,6 +54472,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "relevancePanelOpen", false);
     __publicField(this, "relevanceDraft", null);
     __publicField(this, "relevanceBarEl", null);
+    /** The row the goal bar sits in (Obsidian's header row, or the toolbar when that row is hidden); it carries `vam-goal-host`. */
+    __publicField(this, "goalHostEl", null);
     /** The "suggest new topics for the goal" task: one at a time; it owns the AI call, the list and the Add press. */
     __publicField(this, "goalSuggestTask", null);
     __publicField(this, "goalSuggestCleanup", null);
@@ -54780,8 +54774,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "chatForcedOpen", false);
     __publicField(this, "goalBarObserver", null);
     __publicField(this, "goalBarObserved", []);
-    /** The attachment the tools were last pushed below; they stay there while it is open (see layoutTopStack). */
-    __publicField(this, "toolsStackedFor", null);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
     __publicField(this, "blankMapPaths", /* @__PURE__ */ new Set());
     __publicField(this, "aimStyleNoticed", /* @__PURE__ */ new Set());
@@ -55742,6 +55734,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     (_d = this.goalBarObserver) == null ? void 0 : _d.disconnect();
     this.goalBarObserver = null;
     this.goalBarObserved = [];
+    this.removeGoalBar();
     this.statusBarObserved = null;
     this.renderAfterDrag = false;
     (_e = this.announcer) == null ? void 0 : _e.remove();
@@ -55817,10 +55810,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     }
   }
   renderPreservingFocus() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     const doc = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument;
     const current = (_b2 = doc == null ? void 0 : doc.activeElement) != null ? _b2 : null;
-    if (!doc || !current || !this.contentEl.contains(current) || ((_c = this.chat) == null ? void 0 : _c.isInput(current)) || current.closest(".vam-text-node")) {
+    if (!doc || !current || !(this.contentEl.contains(current) || !!((_d = (_c = this.relevanceBarEl) == null ? void 0 : _c.contains) == null ? void 0 : _d.call(_c, current))) || ((_e = this.chat) == null ? void 0 : _e.isInput(current)) || current.closest(".vam-text-node")) {
       this.render();
       return;
     }
@@ -55830,7 +55823,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     const selection = active.tagName === "INPUT" || active.tagName === "TEXTAREA" ? [active.selectionStart, active.selectionEnd] : null;
     this.render();
     if (!this.mapWindowIsActive()) return;
-    const target = anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null;
+    const target = anchor ? this.resolveMapFocus(anchor) : null;
     if (focusedContainer) this.contentEl.focus();
     else if (target) target.focus();
     else this.restoreMapFocus(anchor);
@@ -55860,13 +55853,23 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     return { card: (id) => this.cardEls.get(id), text: (id) => this.textEls.get(id) };
   }
   describeMapFocus(el) {
-    return describeFocus(el, this.contentEl, (id) => {
-      var _a2, _b2, _c;
-      const text11 = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+    var _a2;
+    const bar = this.relevanceBarEl;
+    const root = el && ((_a2 = bar == null ? void 0 : bar.contains) == null ? void 0 : _a2.call(bar, el)) && !this.contentEl.contains(el) ? bar : this.contentEl;
+    return describeFocus(el, root, (id) => {
+      var _a3, _b2, _c;
+      const text11 = ((_b2 = (_a3 = this.map) == null ? void 0 : _a3.canvasItems) != null ? _b2 : []).find(
         (item) => item.kind === "text" && item.id === id
       );
       return text11 ? text11.parentId : ((_c = this.lastMapFocus) == null ? void 0 : _c.itemId) === id ? this.lastMapFocus.parentId : null;
     });
+  }
+  /** The element that now stands for the anchor: found in the view first, else in the goal bar (which sits outside contentEl). */
+  resolveMapFocus(anchor) {
+    var _a2;
+    const lookup = this.mapFocusLookup();
+    const bar = this.relevanceBarEl;
+    return (_a2 = resolveFocus(anchor, this.contentEl, lookup)) != null ? _a2 : bar && anchor.key && !anchor.nodeId && !anchor.itemId ? resolveFocus(anchor, bar, lookup) : null;
   }
   /** Focus moved inside the map: remember the control, so a dialog or menu that closes onto a removed opener can send it back. */
   trackMapFocus(target) {
@@ -55909,7 +55912,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     if (!doc || this.closed || !this.mapWindowIsActive() || !focusIsLost(doc, this.contentEl)) return;
     const selected = this.selection.state.selected;
     const candidates = [
-      anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null,
+      anchor ? this.resolveMapFocus(anchor) : null,
       (anchor == null ? void 0 : anchor.parentId) ? this.cardEls.get(anchor.parentId) : void 0,
       fallbackNodeId ? this.cardEls.get(fallbackNodeId) : void 0,
       selected ? this.cardEls.get(selected) : void 0
@@ -56703,11 +56706,12 @@ ${request.requirements}` : preset.text,
     return !!this.map && !this.map.aim && !!this.path;
   }
   /**
-   * The goal bar: a chat-input style bar at the top centre of the canvas (not in the toolbar). It shows the goal, big and
-   * wrapped, never cut off; the four icons (suggest topics, recalibrate, sort, edit) show on hover or keyboard focus.
-   * Editing opens a popover under the bar with the goal and the extra context.
+   * The goal bar: the goal as a title in the middle of the row above the map (Obsidian's header row, or the toolbar when
+   * that row is hidden). It wraps and is never cut off; the four icons (suggest topics, recalibrate, sort, edit) show on
+   * hover or keyboard focus. Editing opens a popover under the bar with the goal and the extra context.
+   * `before` is the sibling the bar goes in front of (the row's action group); without it the bar is appended.
    */
-  renderGoalBar(overlay) {
+  renderGoalBar(host, before) {
     var _a2, _b2, _c, _d;
     this.relevancePanelGen++;
     (_a2 = this.relevancePanelCleanup) == null ? void 0 : _a2.call(this);
@@ -56716,9 +56720,18 @@ ${request.requirements}` : preset.text,
     (_b2 = this.goalSuggestCleanup) == null ? void 0 : _b2.call(this);
     this.goalSuggestCleanup = null;
     this.goalSuggestPanelEl = null;
-    const bar = overlay.createDiv({
+    const bar = host.createDiv({
       cls: "vam-goal-bar",
       attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
+    });
+    if (before && before.parentElement === host) host.insertBefore(bar, before);
+    bar.addEventListener("keydown", (event) => {
+      const suggest = this.goalSuggestTask;
+      if (event.key !== "Escape" || event.defaultPrevented || !suggest) return;
+      if (suggest.state !== "ready" && suggest.state !== "running") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.endGoalSuggest(suggest, { refocus: true });
     });
     bar.createSpan({
       cls: "vam-sr-only",
@@ -56868,11 +56881,12 @@ ${request.requirements}` : preset.text,
   }
   /** Focus goes back to the spark icon; while the icons are hidden (no hover) it goes to the goal text, which shows them. */
   focusGoalReturn() {
-    var _a2, _b2, _c, _d, _e, _f;
-    const spark = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, '.vam-goal-icon[data-goal-action="suggest"]')) != null ? _c : null;
+    var _a2, _b2, _c, _d;
+    const root = this.goalLayerRoot();
+    const spark = (_b2 = (_a2 = root == null ? void 0 : root.querySelector) == null ? void 0 : _a2.call(root, '.vam-goal-icon[data-goal-action="suggest"]')) != null ? _b2 : null;
     const usable = spark && !spark.disabled && spark.offsetParent !== null;
     if (usable) spark.focus();
-    else (_f = (_e = (_d = this.contentEl) == null ? void 0 : _d.querySelector) == null ? void 0 : _e.call(_d, ".vam-goal-text")) == null ? void 0 : _f.focus();
+    else (_d = (_c = root == null ? void 0 : root.querySelector) == null ? void 0 : _c.call(root, ".vam-goal-text")) == null ? void 0 : _d.focus();
   }
   /** The spark icon: ask the AI which topics are missing for the goal. Nothing is written until the user adds some. */
   async startGoalSuggest() {
@@ -57539,7 +57553,7 @@ ${request.requirements}` : preset.text,
     return () => {
       var _a3, _b3, _c2, _d2, _e2, _f2, _g;
       if (!this.mapWindowIsActive()) return;
-      const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.contentEl) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-goal-text");
+      const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.goalLayerRoot()) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-goal-text");
       target == null ? void 0 : target.focus();
     };
   }
@@ -57943,7 +57957,7 @@ ${request.requirements}` : preset.text,
       var _a3, _b3, _c;
       this.plugin.relevanceGrades.delete(this.path);
       this.render();
-      (_c = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-goal-text")) == null ? void 0 : _c.focus();
+      (_c = (_b3 = (_a3 = this.goalLayerRoot()) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-goal-text")) == null ? void 0 : _c.focus();
     });
   }
   /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
@@ -64790,6 +64804,7 @@ ${request.requirements}` : preset.text,
     })))
       this.inlineSummary = null;
     this.inlineSummaryInput = null;
+    this.removeGoalBar();
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
@@ -65051,7 +65066,7 @@ ${request.requirements}` : preset.text,
     canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
-    if (this.relevanceGradeable() && this.map.nodes.length) this.renderGoalBar(overlay);
+    if (this.relevanceGradeable() && this.map.nodes.length) this.mountGoalBar();
     else {
       this.relevanceBarEl = null;
       this.relevanceButtonEl = null;
@@ -66014,10 +66029,12 @@ ${request.requirements}` : preset.text,
   }
   /** Screen rectangles of the floating layers that cover part of the canvas (FLOATING_LAYER_SELECTORS). */
   floatingControlRects() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     const rects = [];
     for (const selector of FLOATING_LAYER_SELECTORS) {
-      const rect2 = (_d = (_c = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, selector)) == null ? void 0 : _c.getBoundingClientRect) == null ? void 0 : _d.call(_c);
+      const el = (_b2 = (_a2 = this.goalLayerRoot()) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, selector);
+      if (((_f = (_e = (_d = (_c = el == null ? void 0 : el.ownerDocument) == null ? void 0 : _c.defaultView) == null ? void 0 : _d.getComputedStyle) == null ? void 0 : _e.call(_d, el)) == null ? void 0 : _f.opacity) === "0") continue;
+      const rect2 = (_g = el == null ? void 0 : el.getBoundingClientRect) == null ? void 0 : _g.call(el);
       if (rect2 && rect2.right > rect2.left && rect2.bottom > rect2.top) rects.push(rect2);
     }
     return rects;
@@ -70799,17 +70816,11 @@ ${note.detail.trim()}` : "",
   }
   /** Safe area under the floating toolbar, measured so a wrapped toolbar is covered too. */
   canvasInset() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e;
     const canvas = (_b2 = (_a2 = this.viewportEl) == null ? void 0 : _a2.getBoundingClientRect) == null ? void 0 : _b2.call(_a2);
-    return canvas ? Math.max(
-      insetFromRects(
-        canvas.top,
-        (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector(".vam-map-tools")) == null ? void 0 : _d.getBoundingClientRect) == null ? void 0 : _e.call(_d)
-      ),
-      insetFromRects(
-        canvas.top,
-        (_h = (_g = (_f = this.contentEl) == null ? void 0 : _f.querySelector(".vam-goal-bar")) == null ? void 0 : _g.getBoundingClientRect) == null ? void 0 : _h.call(_g)
-      )
+    return canvas ? insetFromRects(
+      canvas.top,
+      (_e = (_d = (_c = this.contentEl) == null ? void 0 : _c.querySelector(".vam-map-tools")) == null ? void 0 : _d.getBoundingClientRect) == null ? void 0 : _e.call(_d)
     ) : 0;
   }
   /**
@@ -70825,10 +70836,7 @@ ${note.detail.trim()}` : "",
       return (_c = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector(selector)) == null ? void 0 : _b3.getBoundingClientRect) == null ? void 0 : _c.call(_b3);
     };
     return {
-      top: Math.max(
-        insetFromRects(canvas.top, rectOf(".vam-map-tools")),
-        insetFromRects(canvas.top, rectOf(".vam-goal-bar"))
-      ),
+      top: insetFromRects(canvas.top, rectOf(".vam-map-tools")),
       right: 0,
       bottom: bottomInsetFromRects(canvas.bottom, rectOf(".vam-zoom-controls")),
       left: leftInsetFromRects(canvas.left, rectOf(".vam-map-chat.is-overlay"))
@@ -70854,7 +70862,7 @@ ${note.detail.trim()}` : "",
     var _a2, _b2, _c, _d;
     const canvas = (_b2 = (_a2 = this.viewportEl) == null ? void 0 : _a2.getBoundingClientRect) == null ? void 0 : _b2.call(_a2);
     if (!this.map || !canvas) return [];
-    const bars = [".vam-map-tools", ".vam-goal-bar"].flatMap((selector) => {
+    const bars = [".vam-map-tools"].flatMap((selector) => {
       var _a3, _b3, _c2;
       const rect2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector(selector)) == null ? void 0 : _b3.getBoundingClientRect) == null ? void 0 : _c2.call(_b3);
       return rect2 && rect2.bottom > rect2.top ? [
@@ -71148,17 +71156,70 @@ ${note.detail.trim()}` : "",
     this.layoutTopStack(bar);
   }
   /**
-   * The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. Returns the
-   * bar (null without one); layoutTopStack then places everything that hangs below it.
+   * Keeps the goal bar in the right row and returns it (null without one); layoutTopStack then places everything that hangs
+   * below it. The row can change without any event (the user hides or shows Obsidian's header row), so every layout pass
+   * looks again and moves the bar when its row changed.
    */
   placeGoalBar() {
     var _a2, _b2, _c;
-    const bar = (_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-goal-bar")) != null ? _b2 : null;
+    const bar = (_c = (_b2 = (_a2 = this.goalLayerRoot()) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ".vam-goal-bar")) != null ? _c : null;
+    if (bar) {
+      const target = this.goalHostTarget();
+      if (target && bar.parentElement !== target.host) {
+        target.host.insertBefore(bar, target.before);
+        this.markGoalHost(target.host);
+      }
+    }
     this.watchToolPlacement(bar);
-    if (!bar) return null;
-    const covered = ((_c = this.chat) == null ? void 0 : _c.isOverlay) ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
-    bar.style.setProperty("--vam-goal-inset", `${covered}px`);
     return bar;
+  }
+  /** What holds the goal bar's layers: the container (it has the header row), else the view's own element. */
+  goalLayerRoot() {
+    var _a2;
+    return (_a2 = this.containerEl) != null ? _a2 : this.contentEl;
+  }
+  /** Obsidian's header row of this view, whether or not it is shown. */
+  goalHeaderEl() {
+    var _a2, _b2, _c;
+    return (_c = (_b2 = (_a2 = this.containerEl) == null ? void 0 : _a2.querySelector) == null ? void 0 : _b2.call(_a2, ":scope > .view-header")) != null ? _c : null;
+  }
+  /**
+   * Where the goal bar goes: Obsidian's header row (in front of its action group) while that row is shown, else the middle
+   * of the toolbar (in front of the toolbar's actions). Shown is read from the row's own computed display, not its height:
+   * a tab hidden behind another has no height either. Null when the toolbar is not there yet.
+   */
+  goalHostTarget() {
+    var _a2, _b2, _c;
+    const header = this.goalHeaderEl();
+    const win = (_a2 = header == null ? void 0 : header.ownerDocument) == null ? void 0 : _a2.defaultView;
+    if (header && win && win.getComputedStyle(header).display !== "none") {
+      return { host: header, before: header.querySelector(":scope > .view-actions") };
+    }
+    const toolbar = (_c = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector) == null ? void 0 : _c.call(_b2, ".vam-toolbar");
+    return toolbar ? { host: toolbar, before: toolbar.querySelector(":scope > .vam-toolbar-actions") } : null;
+  }
+  /** Draws the goal bar into its row. */
+  mountGoalBar() {
+    const target = this.goalHostTarget();
+    if (!target) return;
+    this.renderGoalBar(target.host, target.before);
+    this.markGoalHost(target.host);
+  }
+  /** The one z rule and the container live on the host (styles.css `.vam-goal-host`); it moves with the bar. */
+  markGoalHost(host) {
+    var _a2, _b2, _c;
+    if (this.goalHostEl && this.goalHostEl !== host) (_b2 = (_a2 = this.goalHostEl).removeClass) == null ? void 0 : _b2.call(_a2, "vam-goal-host");
+    this.goalHostEl = host;
+    (_c = host.addClass) == null ? void 0 : _c.call(host, "vam-goal-host");
+  }
+  /** Takes the bar out of its row and clears the host mark: before a repaint empties the view, and when it closes. */
+  removeGoalBar() {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    (_b2 = (_a2 = this.relevanceBarEl) == null ? void 0 : _a2.remove) == null ? void 0 : _b2.call(_a2);
+    for (const stray of Array.from((_e = (_d = (_c = this.goalLayerRoot()) == null ? void 0 : _c.querySelectorAll) == null ? void 0 : _d.call(_c, ".vam-goal-bar")) != null ? _e : []))
+      stray.remove();
+    (_g = (_f = this.goalHostEl) == null ? void 0 : _f.removeClass) == null ? void 0 : _g.call(_f, "vam-goal-host");
+    this.goalHostEl = null;
   }
   /** The panel hanging under the goal bar (edit panel or suggestion list; at most one is open), if it is on screen. */
   goalAttachmentEl() {
@@ -71167,8 +71228,8 @@ ${note.detail.trim()}` : "",
     return el && el.isConnected !== false ? el : null;
   }
   /**
-   * Every layer that decides the stack is watched: bar, attachment, tools, sources panel, canvas, zoom bar and hint (a
-   * collapsing sidebar changes the canvas without any chat event). The watch is dropped when the view closes.
+   * Every layer that decides the stack is watched: bar, the header row (hiding it changes its size), attachment, tools,
+   * sources panel, canvas, zoom bar and hint (a collapsing sidebar changes the canvas without any chat event). The watch is dropped when the view closes.
    */
   watchToolPlacement(bar) {
     var _a2, _b2, _c, _d, _e;
@@ -71179,6 +71240,7 @@ ${note.detail.trim()}` : "",
     const sources = this.mapSourcesPanelEl;
     const targets = [
       bar,
+      this.goalHeaderEl(),
       this.goalAttachmentEl(),
       q(".vam-map-tools"),
       (sources == null ? void 0 : sources.isConnected) === false ? null : sources,
@@ -71199,36 +71261,41 @@ ${note.detail.trim()}` : "",
     for (const el of targets) this.goalBarObserver.observe(el);
   }
   /**
-   * The one place that stacks the top of the canvas: goal bar, then the panel hanging under it (height limited, it scrolls),
-   * then the tool group (below the panel only where the two share horizontal space; otherwise GOAL_BAR_TOOLS_GAP under the
-   * bar), then the sources panel hanging from the tools (height limited). Without a bar the tools keep the stylesheet's top.
+   * The one place that stacks what hangs off the top of the canvas: the panel hanging under the goal bar (height limited, it
+   * scrolls; it may cover the toolbar and the canvas while open), and the sources panel hanging from the tool group (height
+   * limited). The tool group itself never moves: it keeps the stylesheet's top.
    */
   layoutTopStack(bar) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
     if (!(tools == null ? void 0 : tools.style)) return;
-    let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
     const attachment = bar ? this.goalAttachmentEl() : null;
     (_b2 = bar == null ? void 0 : bar.toggleClass) == null ? void 0 : _b2.call(bar, "has-attachment", !!attachment);
+    const actions = (_d = (_c = bar == null ? void 0 : bar.querySelector) == null ? void 0 : _c.call(bar, ".vam-goal-actions")) != null ? _d : null;
+    const actionsRect = (_e = actions == null ? void 0 : actions.getBoundingClientRect) == null ? void 0 : _e.call(actions);
     if (bar && attachment) {
-      const stacked = ((_c = attachment.hasClass) == null ? void 0 : _c.call(attachment, "vam-goal-suggest")) === true || this.toolsStackedFor === attachment || sharesHorizontalSpace(attachment, tools);
-      this.toolsStackedFor = stacked ? attachment : null;
-      const room2 = this.attachRoom(bar, bottom, stacked ? tools.offsetHeight : 0);
-      if (room2 !== null && typeof ((_d = attachment.style) == null ? void 0 : _d.setProperty) === "function") {
-        attachment.style.setProperty("--vam-goal-attach-max", `${room2}px`);
+      const box = (_f = attachment.offsetParent) != null ? _f : bar;
+      const boxBottom = (_i = (_h = (_g = box.getBoundingClientRect) == null ? void 0 : _g.call(box)) == null ? void 0 : _h.bottom) != null ? _i : 0;
+      const clear = actionsRect ? Math.max(0, actionsRect.bottom - boxBottom) : 0;
+      if (typeof ((_j = attachment.style) == null ? void 0 : _j.setProperty) === "function") {
+        attachment.style.setProperty("--vam-goal-attach-clear", `${clear}px`);
+        const room2 = this.attachRoom(boxBottom + GOAL_SUGGEST_GAP + clear);
+        if (room2 !== null) attachment.style.setProperty("--vam-goal-attach-max", `${room2}px`);
       }
-      if (stacked) bottom += GOAL_SUGGEST_GAP + attachment.offsetHeight;
-    } else {
-      this.toolsStackedFor = null;
     }
-    tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
+    const toolsRect = (_k = tools.getBoundingClientRect) == null ? void 0 : _k.call(tools);
+    if (actionsRect && toolsRect && actionsRect.bottom > toolsRect.top && actionsRect.left > toolsRect.left) {
+      tools.style.setProperty("--vam-tools-max", `${actionsRect.left - toolsRect.left - INSET_GAP}px`);
+    } else {
+      tools.style.removeProperty("--vam-tools-max");
+    }
     const sources = this.mapSourcesPanelEl;
     const open = !!sources && sources.isConnected !== false;
-    (_e = tools.toggleClass) == null ? void 0 : _e.call(tools, "has-panel", open);
+    (_l = tools.toggleClass) == null ? void 0 : _l.call(tools, "has-panel", open);
     if (!open || !sources) return;
     this.placeMapSourcesPanel(sources);
     const room = this.sourcesRoom(tools);
-    if (room !== null && typeof ((_f = sources.style) == null ? void 0 : _f.setProperty) === "function") {
+    if (room !== null && typeof ((_m = sources.style) == null ? void 0 : _m.setProperty) === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
     }
   }
@@ -71246,20 +71313,16 @@ ${note.detail.trim()}` : "",
     return (canvas ? canvas.bottom : (_g = overlayRect == null ? void 0 : overlayRect.bottom) != null ? _g : canvasHeight) - clear;
   }
   /**
-   * Height the panel under the goal bar may take: down to the top of the lowest bottom control, kept INSET_GAP clear, minus
-   * the tool group when that hangs under the panel (`toolsHeight`, else 0). Measured on screen, so the overlay and the
-   * viewport need not share an origin. Null when the canvas is not laid out.
+   * Height the panel under the goal bar may take: from `top` (screen y where the panel starts) down to the top of the lowest
+   * bottom control, kept INSET_GAP clear. Measured on screen (the bar is in another element than the canvas). Null when the
+   * canvas is not laid out. The panel's own rect is not read: its entry animation moves it a few px for a moment.
    */
-  attachRoom(bar, barBottom, toolsHeight) {
-    var _a2, _b2, _c, _d;
-    const overlay = bar.parentElement;
-    const canvasHeight = (_a2 = overlay == null ? void 0 : overlay.clientHeight) != null ? _a2 : 0;
+  attachRoom(top) {
+    var _a2, _b2;
+    const overlay = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-canvas-overlay");
+    const canvasHeight = (_b2 = overlay == null ? void 0 : overlay.clientHeight) != null ? _b2 : 0;
     if (!(canvasHeight > 0)) return null;
-    const overlayRect = (_b2 = overlay == null ? void 0 : overlay.getBoundingClientRect) == null ? void 0 : _b2.call(overlay);
-    const canvas = (_d = (_c = this.viewportEl) == null ? void 0 : _c.getBoundingClientRect) == null ? void 0 : _d.call(_c);
-    const limit = this.bottomLimit(overlay, canvasHeight);
-    const barBottomOnScreen = (overlayRect ? overlayRect.top : canvas ? canvas.top : 0) + barBottom;
-    return Math.max(0, limit - barBottomOnScreen - GOAL_SUGGEST_GAP - GOAL_BAR_TOOLS_GAP - (toolsHeight || 0));
+    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - top);
   }
   /** Height the sources panel may take: from the tools' bottom edge (plus the gap) down to the same limit. */
   sourcesRoom(tools) {
@@ -80014,7 +80077,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .vam-canvas-overlay > * { pointer-events: auto; }
 .vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
-.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }
+.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: min(calc(100% - 24px), var(--vam-tools-max, 100%)); }
 .vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }
 .vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }
@@ -80166,6 +80229,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node[data-relevance="side"] { border-style: dashed; }
 .vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }
+.vam-toolbar > .vam-goal-bar { flex-basis: 240px; }
 .theme-dark .vam-viewport { background-color: var(--background-primary); }
 .theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }
 .vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }

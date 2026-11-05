@@ -358,7 +358,6 @@ import {
   bottomInsetFromRects,
   FLOATING_LAYER_SELECTORS,
   INSET_GAP,
-  sharesHorizontalSpace,
   cardToolsPlacement,
   chooseCardToolsSpot,
   clearToolbar,
@@ -1051,8 +1050,6 @@ interface ChatRun {
 /** The narrow edge the laid-over chat window leaves in place, and the gap the tool group keeps from the window. */
 const CHAT_RAIL_WIDTH = 44;
 const CHAT_TOOLS_GAP = 12;
-/** Space between the goal bar and the tool group placed under it. */
-const GOAL_BAR_TOOLS_GAP = 8;
 /** The suggestion card hangs this far under the goal bar (styles.css: top calc(100% + 6px)). */
 const GOAL_SUGGEST_GAP = 6;
 /** The size of a chat expand: the Next Step dialog's defaults (levels below the topic, topics in total). */
@@ -1175,6 +1172,8 @@ export class VisualAgentMapView extends ItemView {
   private relevancePanelOpen = false;
   private relevanceDraft: { goal: string; context: string } | null = null;
   private relevanceBarEl: HTMLElement | null = null;
+  /** The row the goal bar sits in (Obsidian's header row, or the toolbar when that row is hidden); it carries `vam-goal-host`. */
+  private goalHostEl: HTMLElement | null = null;
   /** The "suggest new topics for the goal" task: one at a time; it owns the AI call, the list and the Add press. */
   private goalSuggestTask: GoalSuggestTask | null = null;
   private goalSuggestCleanup: (() => void) | null = null;
@@ -2532,6 +2531,7 @@ export class VisualAgentMapView extends ItemView {
     this.goalBarObserver?.disconnect();
     this.goalBarObserver = null;
     this.goalBarObserved = [];
+    this.removeGoalBar();
     this.statusBarObserved = null;
     this.renderAfterDrag = false;
     this.announcer?.remove();
@@ -2618,7 +2618,7 @@ export class VisualAgentMapView extends ItemView {
     if (
       !doc ||
       !current ||
-      !this.contentEl.contains(current) ||
+      !(this.contentEl.contains(current) || !!this.relevanceBarEl?.contains?.(current)) ||
       this.chat?.isInput(current) ||
       current.closest(".vam-text-node")
     ) {
@@ -2636,7 +2636,7 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     // Another window (Settings in a pop-out) is the active one: a focus move here would make Obsidian blur the element the user is on there.
     if (!this.mapWindowIsActive()) return;
-    const target = anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null;
+    const target = anchor ? this.resolveMapFocus(anchor) : null;
     if (focusedContainer) this.contentEl.focus();
     else if (target) target.focus();
     else this.restoreMapFocus(anchor);
@@ -2673,13 +2673,25 @@ export class VisualAgentMapView extends ItemView {
     return { card: id => this.cardEls.get(id), text: id => this.textEls.get(id) };
   }
   private describeMapFocus(el: Element | null): MapFocusAnchor | null {
-    return describeFocus(el, this.contentEl, id => {
+    // The goal bar lives outside contentEl (in the header row), so a control inside it is described against the bar itself.
+    const bar = this.relevanceBarEl;
+    const root = el && bar?.contains?.(el) && !this.contentEl.contains(el) ? bar : this.contentEl;
+    return describeFocus(el, root, id => {
       const text = (this.map?.canvasItems ?? []).find(
         (item): item is TextItem => item.kind === "text" && item.id === id
       );
       // A block that is already gone (undo removed it) is remembered from when it still had focus.
       return text ? text.parentId : this.lastMapFocus?.itemId === id ? this.lastMapFocus.parentId : null;
     });
+  }
+  /** The element that now stands for the anchor: found in the view first, else in the goal bar (which sits outside contentEl). */
+  private resolveMapFocus(anchor: MapFocusAnchor): HTMLElement | null {
+    const lookup = this.mapFocusLookup();
+    const bar = this.relevanceBarEl;
+    return (
+      resolveFocus(anchor, this.contentEl, lookup) ??
+      (bar && anchor.key && !anchor.nodeId && !anchor.itemId ? resolveFocus(anchor, bar, lookup) : null)
+    );
   }
   /** Focus moved inside the map: remember the control, so a dialog or menu that closes onto a removed opener can send it back. */
   private trackMapFocus(target: EventTarget | null): void {
@@ -2719,7 +2731,7 @@ export class VisualAgentMapView extends ItemView {
     if (!doc || this.closed || !this.mapWindowIsActive() || !focusIsLost(doc, this.contentEl)) return;
     const selected = this.selection.state.selected;
     const candidates = [
-      anchor ? resolveFocus(anchor, this.contentEl, this.mapFocusLookup()) : null,
+      anchor ? this.resolveMapFocus(anchor) : null,
       anchor?.parentId ? this.cardEls.get(anchor.parentId) : undefined,
       fallbackNodeId ? this.cardEls.get(fallbackNodeId) : undefined,
       selected ? this.cardEls.get(selected) : undefined
@@ -3551,11 +3563,12 @@ export class VisualAgentMapView extends ItemView {
     return !!this.map && !this.map.aim && !!this.path;
   }
   /**
-   * The goal bar: a chat-input style bar at the top centre of the canvas (not in the toolbar). It shows the goal, big and
-   * wrapped, never cut off; the four icons (suggest topics, recalibrate, sort, edit) show on hover or keyboard focus.
-   * Editing opens a popover under the bar with the goal and the extra context.
+   * The goal bar: the goal as a title in the middle of the row above the map (Obsidian's header row, or the toolbar when
+   * that row is hidden). It wraps and is never cut off; the four icons (suggest topics, recalibrate, sort, edit) show on
+   * hover or keyboard focus. Editing opens a popover under the bar with the goal and the extra context.
+   * `before` is the sibling the bar goes in front of (the row's action group); without it the bar is appended.
    */
-  private renderGoalBar(overlay: HTMLElement): void {
+  private renderGoalBar(host: HTMLElement, before?: HTMLElement | null): void {
     // A repaint drops the old DOM: stop its listeners and make sure its late focus events cannot close the new panel.
     this.relevancePanelGen++;
     this.relevancePanelCleanup?.();
@@ -3564,9 +3577,19 @@ export class VisualAgentMapView extends ItemView {
     this.goalSuggestCleanup?.();
     this.goalSuggestCleanup = null;
     this.goalSuggestPanelEl = null;
-    const bar = overlay.createDiv({
+    const bar = host.createDiv({
       cls: "vam-goal-bar",
       attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
+    });
+    if (before && before.parentElement === host) host.insertBefore(bar, before);
+    // The bar is outside contentEl, which carries the map's Esc handling: an open suggestion list closes here too.
+    bar.addEventListener("keydown", event => {
+      const suggest = this.goalSuggestTask;
+      if (event.key !== "Escape" || event.defaultPrevented || !suggest) return;
+      if (suggest.state !== "ready" && suggest.state !== "running") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.endGoalSuggest(suggest, { refocus: true });
     });
     // The group's name comes from a hidden label, not aria-label: Obsidian turns every aria-label into a hover tooltip,
     // and the whole bar must not show one.
@@ -3722,10 +3745,11 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Focus goes back to the spark icon; while the icons are hidden (no hover) it goes to the goal text, which shows them. */
   private focusGoalReturn(): void {
-    const spark = this.contentEl?.querySelector?.<HTMLElement>('.vam-goal-icon[data-goal-action="suggest"]') ?? null;
+    const root = this.goalLayerRoot();
+    const spark = root?.querySelector?.<HTMLElement>('.vam-goal-icon[data-goal-action="suggest"]') ?? null;
     const usable = spark && !(spark as HTMLButtonElement).disabled && spark.offsetParent !== null;
     if (usable) spark.focus();
-    else this.contentEl?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
+    else root?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
   }
   /** The spark icon: ask the AI which topics are missing for the goal. Nothing is written until the user adds some. */
   private async startGoalSuggest(): Promise<void> {
@@ -4398,7 +4422,7 @@ export class VisualAgentMapView extends ItemView {
       if (!this.mapWindowIsActive()) return;
       const target =
         this.contentEl?.querySelector?.(".vam-relevance-statusbar")?.querySelector?.<HTMLElement>("button") ??
-        this.contentEl?.querySelector?.<HTMLElement>(".vam-goal-text");
+        this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-text");
       target?.focus();
     };
   }
@@ -4840,7 +4864,7 @@ export class VisualAgentMapView extends ItemView {
     this.iconButton(bar, "x", t("ui.dismiss"), () => {
       this.plugin.relevanceGrades.delete(this.path);
       this.render();
-      this.contentEl?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
+      this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
     });
   }
   /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
@@ -12243,6 +12267,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.inlineSummary && !this.map?.nodes.some(node => node.id === this.inlineSummary?.id))
       this.inlineSummary = null;
     this.inlineSummaryInput = null;
+    // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
+    this.removeGoalBar();
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     // The title text renames the map in place; the arrows beside it switch maps.
@@ -12526,9 +12552,9 @@ export class VisualAgentMapView extends ItemView {
     canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
-    // The goal bar floats at the top centre of the canvas, above cards and edges. A mind map only, and only once it has
-    // topics: an empty map cannot be graded or sorted, so it shows no bar.
-    if (this.relevanceGradeable() && this.map.nodes.length) this.renderGoalBar(overlay);
+    // The goal bar sits in the header row (or the toolbar when that row is hidden), not over the canvas. A mind map only,
+    // and only once it has topics: an empty map cannot be graded or sorted, so it shows no bar.
+    if (this.relevanceGradeable() && this.map.nodes.length) this.mountGoalBar();
     else {
       this.relevanceBarEl = null;
       this.relevanceButtonEl = null;
@@ -13655,7 +13681,10 @@ export class VisualAgentMapView extends ItemView {
   private floatingControlRects(): { left: number; top: number; right: number; bottom: number }[] {
     const rects = [];
     for (const selector of FLOATING_LAYER_SELECTORS) {
-      const rect = this.contentEl?.querySelector?.<HTMLElement>(selector)?.getBoundingClientRect?.();
+      const el = this.goalLayerRoot()?.querySelector?.<HTMLElement>(selector);
+      // A layer that is invisible (the goal's icons while the pointer is elsewhere) covers nothing: cards need not avoid it.
+      if (el?.ownerDocument?.defaultView?.getComputedStyle?.(el)?.opacity === "0") continue;
+      const rect = el?.getBoundingClientRect?.();
       if (rect && rect.right > rect.left && rect.bottom > rect.top) rects.push(rect);
     }
     return rects;
@@ -18766,15 +18795,9 @@ export class VisualAgentMapView extends ItemView {
   private canvasInset(): number {
     const canvas = this.viewportEl?.getBoundingClientRect?.();
     return canvas
-      ? Math.max(
-          insetFromRects(
-            canvas.top,
-            this.contentEl?.querySelector<HTMLElement>(".vam-map-tools")?.getBoundingClientRect?.()
-          ),
-          insetFromRects(
-            canvas.top,
-            this.contentEl?.querySelector<HTMLElement>(".vam-goal-bar")?.getBoundingClientRect?.()
-          )
+      ? insetFromRects(
+          canvas.top,
+          this.contentEl?.querySelector<HTMLElement>(".vam-map-tools")?.getBoundingClientRect?.()
         )
       : 0;
   }
@@ -18788,10 +18811,7 @@ export class VisualAgentMapView extends ItemView {
     const rectOf = (selector: string) =>
       this.contentEl?.querySelector<HTMLElement>(selector)?.getBoundingClientRect?.();
     return {
-      top: Math.max(
-        insetFromRects(canvas.top, rectOf(".vam-map-tools")),
-        insetFromRects(canvas.top, rectOf(".vam-goal-bar"))
-      ),
+      top: insetFromRects(canvas.top, rectOf(".vam-map-tools")),
       right: 0,
       bottom: bottomInsetFromRects(canvas.bottom, rectOf(".vam-zoom-controls")),
       left: leftInsetFromRects(canvas.left, rectOf(".vam-map-chat.is-overlay"))
@@ -18819,8 +18839,8 @@ export class VisualAgentMapView extends ItemView {
   private topsUnderToolbar(zoomHint: number): number[] {
     const canvas = this.viewportEl?.getBoundingClientRect?.();
     if (!this.map || !canvas) return [];
-    // The toolbar and the goal bar both float over the canvas top.
-    const bars = [".vam-map-tools", ".vam-goal-bar"].flatMap(selector => {
+    // Only the tool group floats over the canvas top: the goal bar is in the row above it.
+    const bars = [".vam-map-tools"].flatMap(selector => {
       const rect = this.contentEl?.querySelector<HTMLElement>(selector)?.getBoundingClientRect?.();
       return rect && rect.bottom > rect.top
         ? [
@@ -19136,16 +19156,66 @@ export class VisualAgentMapView extends ItemView {
     this.layoutTopStack(bar);
   }
   /**
-   * The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. Returns the
-   * bar (null without one); layoutTopStack then places everything that hangs below it.
+   * Keeps the goal bar in the right row and returns it (null without one); layoutTopStack then places everything that hangs
+   * below it. The row can change without any event (the user hides or shows Obsidian's header row), so every layout pass
+   * looks again and moves the bar when its row changed.
    */
   private placeGoalBar(): HTMLElement | null {
-    const bar = this.contentEl?.querySelector<HTMLElement>(".vam-goal-bar") ?? null;
+    const bar = this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-bar") ?? null;
+    if (bar) {
+      const target = this.goalHostTarget();
+      if (target && bar.parentElement !== target.host) {
+        target.host.insertBefore(bar, target.before);
+        this.markGoalHost(target.host);
+      }
+    }
     this.watchToolPlacement(bar);
-    if (!bar) return null;
-    const covered = this.chat?.isOverlay ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
-    bar.style.setProperty("--vam-goal-inset", `${covered}px`);
     return bar;
+  }
+  /** What holds the goal bar's layers: the container (it has the header row), else the view's own element. */
+  private goalLayerRoot(): HTMLElement {
+    return this.containerEl ?? this.contentEl;
+  }
+  /** Obsidian's header row of this view, whether or not it is shown. */
+  private goalHeaderEl(): HTMLElement | null {
+    return this.containerEl?.querySelector?.<HTMLElement>(":scope > .view-header") ?? null;
+  }
+  /**
+   * Where the goal bar goes: Obsidian's header row (in front of its action group) while that row is shown, else the middle
+   * of the toolbar (in front of the toolbar's actions). Shown is read from the row's own computed display, not its height:
+   * a tab hidden behind another has no height either. Null when the toolbar is not there yet.
+   */
+  private goalHostTarget(): { host: HTMLElement; before: HTMLElement | null } | null {
+    const header = this.goalHeaderEl();
+    const win = header?.ownerDocument?.defaultView;
+    if (header && win && win.getComputedStyle(header).display !== "none") {
+      return { host: header, before: header.querySelector<HTMLElement>(":scope > .view-actions") };
+    }
+    const toolbar = this.contentEl?.querySelector?.<HTMLElement>(".vam-toolbar");
+    return toolbar
+      ? { host: toolbar, before: toolbar.querySelector<HTMLElement>(":scope > .vam-toolbar-actions") }
+      : null;
+  }
+  /** Draws the goal bar into its row. */
+  private mountGoalBar(): void {
+    const target = this.goalHostTarget();
+    if (!target) return;
+    this.renderGoalBar(target.host, target.before);
+    this.markGoalHost(target.host);
+  }
+  /** The one z rule and the container live on the host (styles.css `.vam-goal-host`); it moves with the bar. */
+  private markGoalHost(host: HTMLElement): void {
+    if (this.goalHostEl && this.goalHostEl !== host) this.goalHostEl.removeClass?.("vam-goal-host");
+    this.goalHostEl = host;
+    host.addClass?.("vam-goal-host");
+  }
+  /** Takes the bar out of its row and clears the host mark: before a repaint empties the view, and when it closes. */
+  private removeGoalBar(): void {
+    this.relevanceBarEl?.remove?.();
+    for (const stray of Array.from(this.goalLayerRoot()?.querySelectorAll?.<HTMLElement>(".vam-goal-bar") ?? []))
+      stray.remove();
+    this.goalHostEl?.removeClass?.("vam-goal-host");
+    this.goalHostEl = null;
   }
   /** The panel hanging under the goal bar (edit panel or suggestion list; at most one is open), if it is on screen. */
   private goalAttachmentEl(): HTMLElement | null {
@@ -19153,14 +19223,15 @@ export class VisualAgentMapView extends ItemView {
     return el && el.isConnected !== false ? el : null;
   }
   /**
-   * Every layer that decides the stack is watched: bar, attachment, tools, sources panel, canvas, zoom bar and hint (a
-   * collapsing sidebar changes the canvas without any chat event). The watch is dropped when the view closes.
+   * Every layer that decides the stack is watched: bar, the header row (hiding it changes its size), attachment, tools,
+   * sources panel, canvas, zoom bar and hint (a collapsing sidebar changes the canvas without any chat event). The watch is dropped when the view closes.
    */
   private watchToolPlacement(bar: HTMLElement | null): void {
     const q = (selector: string) => this.contentEl?.querySelector?.<HTMLElement>(selector) ?? null;
     const sources = this.mapSourcesPanelEl;
     const targets = [
       bar,
+      this.goalHeaderEl(),
       this.goalAttachmentEl(),
       q(".vam-map-tools"),
       sources?.isConnected === false ? null : sources,
@@ -19184,36 +19255,38 @@ export class VisualAgentMapView extends ItemView {
   }
   private goalBarObserver: ResizeObserver | null = null;
   private goalBarObserved: HTMLElement[] = [];
-  /** The attachment the tools were last pushed below; they stay there while it is open (see layoutTopStack). */
-  private toolsStackedFor: HTMLElement | null = null;
   /**
-   * The one place that stacks the top of the canvas: goal bar, then the panel hanging under it (height limited, it scrolls),
-   * then the tool group (below the panel only where the two share horizontal space; otherwise GOAL_BAR_TOOLS_GAP under the
-   * bar), then the sources panel hanging from the tools (height limited). Without a bar the tools keep the stylesheet's top.
+   * The one place that stacks what hangs off the top of the canvas: the panel hanging under the goal bar (height limited, it
+   * scrolls; it may cover the toolbar and the canvas while open), and the sources panel hanging from the tool group (height
+   * limited). The tool group itself never moves: it keeps the stylesheet's top.
    */
   private layoutTopStack(bar: HTMLElement | null): void {
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
     if (!tools?.style) return;
-    let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
     const attachment = bar ? this.goalAttachmentEl() : null;
+    // An open panel keeps the floating icons shown (display only; no z-index), so the panel never leaves a gap above it.
     bar?.toggleClass?.("has-attachment", !!attachment);
+    const actions = bar?.querySelector?.<HTMLElement>(".vam-goal-actions") ?? null;
+    const actionsRect = actions?.getBoundingClientRect?.();
     if (bar && attachment) {
-      // The suggestion list always pushes the tools below it (as before); another panel only where they would meet. The
-      // tools widen on hover, so once pushed they stay below until the panel closes (no flicker between the two places).
-      const stacked =
-        attachment.hasClass?.("vam-goal-suggest") === true ||
-        this.toolsStackedFor === attachment ||
-        sharesHorizontalSpace(attachment, tools);
-      this.toolsStackedFor = stacked ? attachment : null;
-      const room = this.attachRoom(bar, bottom, stacked ? tools.offsetHeight : 0);
-      if (room !== null && typeof attachment.style?.setProperty === "function") {
-        attachment.style.setProperty("--vam-goal-attach-max", `${room}px`);
+      // The panel hangs from the box it is positioned in (the bar, or the whole row on a narrow pane). Icons that float below
+      // that box (narrow pane) push the panel down by the part that hangs out; measured, so no breakpoint or constant is kept.
+      const box: Element = attachment.offsetParent ?? bar;
+      const boxBottom = box.getBoundingClientRect?.()?.bottom ?? 0;
+      const clear = actionsRect ? Math.max(0, actionsRect.bottom - boxBottom) : 0;
+      if (typeof attachment.style?.setProperty === "function") {
+        attachment.style.setProperty("--vam-goal-attach-clear", `${clear}px`);
+        const room = this.attachRoom(boxBottom + GOAL_SUGGEST_GAP + clear);
+        if (room !== null) attachment.style.setProperty("--vam-goal-attach-max", `${room}px`);
       }
-      if (stacked) bottom += GOAL_SUGGEST_GAP + attachment.offsetHeight;
-    } else {
-      this.toolsStackedFor = null;
     }
-    tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
+    // Icons floating over the tool group's row: the group gives up the width they take (it wraps) instead of sliding under them.
+    const toolsRect = tools.getBoundingClientRect?.();
+    if (actionsRect && toolsRect && actionsRect.bottom > toolsRect.top && actionsRect.left > toolsRect.left) {
+      tools.style.setProperty("--vam-tools-max", `${actionsRect.left - toolsRect.left - INSET_GAP}px`);
+    } else {
+      tools.style.removeProperty("--vam-tools-max");
+    }
     const sources = this.mapSourcesPanelEl;
     const open = !!sources && sources.isConnected !== false;
     tools.toggleClass?.("has-panel", open);
@@ -19237,19 +19310,15 @@ export class VisualAgentMapView extends ItemView {
     return (canvas ? canvas.bottom : (overlayRect?.bottom ?? canvasHeight)) - clear;
   }
   /**
-   * Height the panel under the goal bar may take: down to the top of the lowest bottom control, kept INSET_GAP clear, minus
-   * the tool group when that hangs under the panel (`toolsHeight`, else 0). Measured on screen, so the overlay and the
-   * viewport need not share an origin. Null when the canvas is not laid out.
+   * Height the panel under the goal bar may take: from `top` (screen y where the panel starts) down to the top of the lowest
+   * bottom control, kept INSET_GAP clear. Measured on screen (the bar is in another element than the canvas). Null when the
+   * canvas is not laid out. The panel's own rect is not read: its entry animation moves it a few px for a moment.
    */
-  private attachRoom(bar: HTMLElement, barBottom: number, toolsHeight: number): number | null {
-    const overlay = bar.parentElement;
+  private attachRoom(top: number): number | null {
+    const overlay = this.contentEl?.querySelector<HTMLElement>(".vam-canvas-overlay");
     const canvasHeight = overlay?.clientHeight ?? 0;
     if (!(canvasHeight > 0)) return null;
-    const overlayRect = overlay?.getBoundingClientRect?.();
-    const canvas = this.viewportEl?.getBoundingClientRect?.();
-    const limit = this.bottomLimit(overlay, canvasHeight);
-    const barBottomOnScreen = (overlayRect ? overlayRect.top : canvas ? canvas.top : 0) + barBottom;
-    return Math.max(0, limit - barBottomOnScreen - GOAL_SUGGEST_GAP - GOAL_BAR_TOOLS_GAP - (toolsHeight || 0));
+    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - top);
   }
   /** Height the sources panel may take: from the tools' bottom edge (plus the gap) down to the same limit. */
   private sourcesRoom(tools: HTMLElement): number | null {

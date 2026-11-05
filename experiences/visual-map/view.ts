@@ -110,6 +110,7 @@ import {
   markerLabelKey,
   readTopicMarkers,
   markerSymbol,
+  markedProgressPercent,
   type TopicMarker
 } from "../../topic-markers";
 import { normalizeTopicLink, readTopicLinks, TOPIC_LINKS_MAX, type AddTopicLinkResult } from "../../topic-links";
@@ -5853,6 +5854,10 @@ export class VisualAgentMapView extends ItemView {
       node => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending?.has(node.path)
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
+    // Marked progress is shown beside the research count (the bar itself stays research-only): the average of the marked topics.
+    const marked = markedProgressPercent(nodes.map(node => this.markersOf(node.id)));
+    if (marked !== null)
+      progress.createSpan({ cls: "vam-research-progress-marked", text: t("ui.marked_progress_0", marked) });
   }
   /** Runs a card-tool action unless a presentation is on: a presentation is read-only, so these entries do nothing. */
   private whenEditing(action: () => void): void {
@@ -11042,7 +11047,7 @@ export class VisualAgentMapView extends ItemView {
         if (active) chip.setAttr("role", "status");
       }
       if (note) {
-        if (showsToResearch(kind, note.status))
+        if (showsToResearch(kind, note.status, this.progressDone(node.id)))
           this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
         else this.labelCard(card, note.title);
       }
@@ -12002,6 +12007,10 @@ export class VisualAgentMapView extends ItemView {
     const raw = this.notes.get(id)?.markers;
     return raw ? readTopicMarkers({ "topic-markers": raw }) : [];
   }
+  /** True when the user marked this topic 100% progress. */
+  private progressDone(id: string): boolean {
+    return this.markersOf(id).includes("progress-100");
+  }
   /** "Markers: Done, Star" in the language of the UI, or "" when the topic has none. */
   private markersText(markers: readonly TopicMarker[]): string {
     return markers.length
@@ -12459,7 +12468,7 @@ export class VisualAgentMapView extends ItemView {
       const label =
         note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
-      if (showsToResearch(this.topicKindOf(node.id), note.status))
+      if (showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)))
         this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
       else this.labelCard(card, note.title);
       if (note.status === "idea") status?.remove();
@@ -12696,7 +12705,9 @@ export class VisualAgentMapView extends ItemView {
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
-          ...(showsToResearch(this.topicKindOf(node.id), note.status) ? { topicStatus: note.status } : {}),
+          ...(showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id))
+            ? { topicStatus: note.status }
+            : {}),
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
               .length ?? 0,

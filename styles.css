@@ -188,6 +188,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-topic-modal .vam-choice-group button:hover { background: var(--background-modifier-hover); }
 .vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
 .vam-topic-modal .vam-choice-group button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+/* The four strengths (None, Weak, Medium, Strong) stay in one row instead of folding into 3 + 1. */
+.vam-topic-modal .vam-choice-group.vam-hypothesis-strengths { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.vam-topic-modal .vam-choice-group.vam-hypothesis-strengths button { justify-content: center; padding: 4px 6px; }
+/* A choice that cannot be picked now (None while a leaning is set) looks off and shows not-allowed; it stays focusable for its reason. */
+.vam-topic-modal .vam-choice-group button[aria-disabled="true"], .vam-topic-modal .vam-choice-group button.is-disabled { color: var(--text-faint); opacity: 0.5; cursor: not-allowed; }
+.vam-topic-modal .vam-choice-group button[aria-disabled="true"]:hover, .vam-topic-modal .vam-choice-group button.is-disabled:hover { background: transparent; }
 .vam-topic-modal .vam-topic-markers { display: flex; flex-direction: column; gap: 6px; }
 .vam-topic-modal .vam-topic-marker-group-title { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-modal .vam-topic-marker-group { margin-bottom: 4px; }

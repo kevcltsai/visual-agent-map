@@ -1318,7 +1318,7 @@ var en = {
   "ui.map_chat_guard_not_markdown": "only .md files are allowed",
   "ui.map_chat_guard_map_unparseable": "the edit would break the map file",
   "ui.map_chat_guard_topic_identity_changed": "the edit would change the topic's identity fields",
-  "ui.map_chat_guard_hypothesis_frontmatter_changed": "the edit would change a topic's type or hypothesis fields (topic-kind or hypothesis-strength)",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "the edit would change a topic's type or hypothesis fields (topic-kind, hypothesis-leaning or hypothesis-strength)",
   "ui.map_chat_guard_reserved_frontmatter": "the new file would use fields reserved by this plugin",
   "ui.map_chat_guard_identity_added": "this edit would add the topic fields reserved by this plugin to a regular note",
   "ui.map_chat_guard_map_file": "the file is a map file; use the topic actions instead",
@@ -3865,7 +3865,7 @@ var zhCN = {
   "ui.map_chat_guard_not_markdown": "\u53EA\u5141\u8BB8 .md \u6587\u4EF6",
   "ui.map_chat_guard_map_unparseable": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u5F04\u574F\u5FC3\u667A\u56FE\u6587\u4EF6",
   "ui.map_chat_guard_topic_identity_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u8BC6\u522B\u5B57\u6BB5",
-  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u7C7B\u578B\u6216\u5F3A\u5EA6\u5B57\u6BB5\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u7C7B\u578B\u6216\u5F3A\u5EA6\u5B57\u6BB5\uFF08topic-kind\u3001hypothesis-leaning \u6216 hypothesis-strength\uFF09",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6587\u4EF6\u4F1A\u7528\u5230\u63D2\u4EF6\u4FDD\u7559\u7684\u5B57\u6BB5",
   "ui.map_chat_guard_identity_added": "\u8FD9\u6B21\u4FEE\u6539\u4F1A\u7ED9\u666E\u901A\u7B14\u8BB0\u52A0\u4E0A\u63D2\u4EF6\u4FDD\u7559\u7684\u8BAE\u9898\u5B57\u6BB5",
   "ui.map_chat_guard_map_file": "\u8FD9\u662F\u5FC3\u667A\u56FE\u6587\u4EF6\uFF0C\u8BF7\u6539\u7528\u8BAE\u9898\u52A8\u4F5C",
@@ -6412,7 +6412,7 @@ var zhTW = {
   "ui.map_chat_guard_not_markdown": "\u53EA\u5141\u8A31 .md \u6A94",
   "ui.map_chat_guard_map_unparseable": "\u9019\u500B\u4FEE\u6539\u6703\u5F04\u58DE\u5FC3\u667A\u5716\u6A94",
   "ui.map_chat_guard_topic_identity_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u8B58\u5225\u6B04\u4F4D",
-  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u985E\u578B\u6216\u5F37\u5EA6\u6B04\u4F4D\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u985E\u578B\u6216\u5F37\u5EA6\u6B04\u4F4D\uFF08topic-kind\u3001hypothesis-leaning \u6216 hypothesis-strength\uFF09",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6A94\u6848\u6703\u7528\u5230\u5916\u639B\u4FDD\u7559\u7684\u6B04\u4F4D",
   "ui.map_chat_guard_identity_added": "\u9019\u6B21\u4FEE\u6539\u6703\u66FF\u4E00\u822C\u7B46\u8A18\u52A0\u4E0A\u5916\u639B\u4FDD\u7559\u7684\u8B70\u984C\u6B04\u4F4D",
   "ui.map_chat_guard_map_file": "\u9019\u662F\u5FC3\u667A\u5716\u6A94\uFF0C\u8ACB\u6539\u7528\u8B70\u984C\u52D5\u4F5C",
@@ -22505,7 +22505,7 @@ function topLevelValues(block, keys) {
   }
   return found;
 }
-var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-strength"];
+var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-leaning", "hypothesis-strength"];
 function hypothesisLines(block) {
   var _a2, _b2;
   if (block === null) return [];
@@ -39288,6 +39288,9 @@ function parseClipboard(raw) {
       const strength = own(item, "strength");
       if (kind === "hypothesis" && typeof strength === "string" && HYPOTHESIS_STRENGTHS.includes(strength))
         node.strength = strength;
+      const leaning = own(item, "leaning");
+      if (kind === "hypothesis" && typeof leaning === "string" && HYPOTHESIS_LEANINGS.includes(leaning))
+        node.leaning = leaning;
       nodes.push(node);
     }
     const rawRelations = own(data, "relations");
@@ -39389,6 +39392,7 @@ function buildClipboardPayload(input2) {
       const note = input2.noteOf(id);
       const node = { id: clipped, parent, title: note.title, kind: note.kind, body: note.body };
       if (note.strength !== void 0) node.strength = note.strength;
+      if (note.leaning !== void 0) node.leaning = note.leaning;
       nodes.push(node);
       for (const child of [...(_a3 = children.get(id)) != null ? _a3 : []].sort((a, b) => rank(a) - rank(b))) visit(child, clipped);
     };
@@ -39489,6 +39493,7 @@ function planPaste(payload) {
         body: n.body
       };
       if (n.strength !== void 0) item.strength = n.strength;
+      if (n.leaning !== void 0) item.leaning = n.leaning;
       return item;
     });
     const relations = [];
@@ -56580,19 +56585,24 @@ ${request.requirements}` : preset.text,
       );
     const appearance = sharedMergeAppearance(sourceNotes);
     const model = (_b2 = content == null ? void 0 : content.task.model) != null ? _b2 : (await this.mergeModel(check.parentId)).model;
-    const firstNote = this.notes.get(sources[0].id), firstKind = firstNote == null ? void 0 : firstNote.topicKind, firstStrength = (firstNote == null ? void 0 : firstNote.topicKind) === "hypothesis" ? firstNote.hypothesisStrength : void 0;
+    const firstNote = this.notes.get(sources[0].id), firstKind = firstNote == null ? void 0 : firstNote.topicKind, firstHypothesis = (firstNote == null ? void 0 : firstNote.topicKind) === "hypothesis" ? firstNote : void 0;
     const created = await repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       before,
       mapPath,
       check.parentId ? "inherited" : "workspace",
-      { ...content ? {} : { detail }, ...firstKind ? { topicKind: firstKind } : {} }
+      {
+        ...content ? {} : { detail },
+        ...firstKind ? { topicKind: firstKind } : {},
+        // A leaning on a non-hypothesis is not carried over.
+        ...(firstHypothesis == null ? void 0 : firstHypothesis.hypothesisLeaning) ? { hypothesisLeaning: firstHypothesis.hypothesisLeaning } : {},
+        ...(firstHypothesis == null ? void 0 : firstHypothesis.hypothesisStrength) ? { hypothesisStrength: firstHypothesis.hypothesisStrength } : {}
+      }
     );
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"), viewport = clone((_d = (_c = this.map) == null ? void 0 : _c.viewport) != null ? _d : before.viewport);
     let entry;
     try {
-      if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (appearance) await repo.writeTopicAppearance(created.path, appearance);
       if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(created.path, true);
       if (content) {
@@ -58735,7 +58745,8 @@ ${request.requirements}` : preset.text,
           title: (_b3 = (_a3 = note == null ? void 0 : note.title) != null ? _a3 : node == null ? void 0 : node.path.replace(/^.*\//, "").replace(/\.md$/, "")) != null ? _b3 : "",
           body: (_c2 = note == null ? void 0 : note.detail) != null ? _c2 : "",
           kind: (_d = note == null ? void 0 : note.topicKind) != null ? _d : "topic",
-          ...(note == null ? void 0 : note.hypothesisStrength) !== void 0 ? { strength: note.hypothesisStrength } : {}
+          ...(note == null ? void 0 : note.hypothesisStrength) !== void 0 ? { strength: note.hypothesisStrength } : {},
+          ...(note == null ? void 0 : note.hypothesisLeaning) !== void 0 ? { leaning: note.hypothesisLeaning } : {}
         };
       },
       relations: (_c = map.topicRelations) != null ? _c : [],
@@ -58927,11 +58938,17 @@ ${request.requirements}` : preset.text,
             before,
             this.path,
             target || item.parent !== null ? "inherited" : "workspace",
-            { topicKind: item.kind, detail: item.body }
+            {
+              topicKind: item.kind,
+              detail: item.body,
+              ...item.kind === "hypothesis" ? {
+                ...item.leaning ? { hypothesisLeaning: item.leaning } : {},
+                ...item.strength ? { hypothesisStrength: item.strength } : {}
+              } : {}
+            }
           );
           node.parentId = item.parent === null ? (_a3 = target == null ? void 0 : target.id) != null ? _a3 : null : copies[item.parent].id;
           copies.push(node);
-          if (item.kind === "hypothesis" && item.strength) await repo.writeHypothesisStrength(node.path, item.strength);
         }
         for (const link of plan.relations)
           relations.push({

@@ -230,3 +230,28 @@ test('P1: a body holding a Visual Agent Map marker is refused (a copied note bod
   for (const body of ['x\n<!-- visual-agent-map:detail:start -->\ny', '<!-- visual-agent-map:detail:end -->', 'a <!-- visual-agent-map: b']) assert.equal(reason(payload({ nodes: [node('a', null, { body })] })), 'bad-body', JSON.stringify(body));
   ok(payload({ nodes: [node('a', null, { body: 'a plain <!-- comment --> is fine' })] }));
 });
+
+test('hypothesis-leaning: leaning is kept only for a hypothesis with a known value; a v1 payload without it parses as before', () => {
+  const leaning = (kind, value) => ok(payload({ nodes: [node('a', null, { kind, leaning: value })] })).payload.nodes[0].leaning;
+  for (const value of ['supported', 'undecided', 'refuted']) assert.equal(leaning('hypothesis', value), value);
+  for (const value of ['maybe', 'Supported', 3, null, [], {}]) assert.equal(leaning('hypothesis', value), undefined, String(value));
+  assert.equal(leaning('topic', 'supported'), undefined); assert.equal(leaning('evidence', 'refuted'), undefined);
+  const old = ok(payload({ nodes: [node('a', null, { kind: 'hypothesis', strength: 'strong' })] })).payload.nodes[0];
+  assert.equal(Object.hasOwn(old, 'leaning'), false); assert.equal(old.strength, 'strong');
+  assert.equal(ok(payload()).payload.version, 1);
+});
+test('hypothesis-leaning: building a payload writes the leaning when the note has one, and a round trip keeps it', () => {
+  const notes = { r: { title: 'R', body: '', kind: 'hypothesis', strength: 'weak', leaning: 'supported' }, c: { title: 'C', body: '', kind: 'topic' } };
+  const built = buildClipboardPayload({ nodes: [{ id: 'r', parentId: null }, { id: 'c', parentId: 'r' }], order: ['r', 'c'], selectedIds: ['r'], noteOf: id => notes[id], relations: [], clipId: 'clip-0001' });
+  assert.equal(built.ok, true);
+  assert.equal(built.payload.nodes[0].leaning, 'supported'); assert.equal(Object.hasOwn(built.payload.nodes[1], 'leaning'), false);
+  const back = parseClipboard(serializeClipboard(built.payload));
+  assert.equal(back.payload.nodes[0].leaning, 'supported'); assert.equal(back.payload.nodes[0].strength, 'weak');
+});
+
+test('hypothesis-leaning: the outline text of a clipboard payload and the share scrub carry no leaning or strength', () => {
+  const p = ok(payload({ nodes: [node('a', null, { title: 'Claim', kind: 'hypothesis', leaning: 'supported', strength: 'strong' }), node('b', 'a', { title: 'Sub' })] })).payload;
+  const outline = clipboardOutline(p);
+  assert.equal(outline, '- Claim\n\t- Sub');
+  assert.doesNotMatch(outline, /leaning|supported|strong|hypothesis/i);
+});

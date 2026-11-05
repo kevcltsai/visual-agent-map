@@ -5451,3 +5451,27 @@ integrationTest('chat 08: Undo takes back every appearance change of one reply i
   await h.view.travel(true);
   assert.equal(await state(), after);
 });
+
+test('hypothesis-leaning: edit_md_file cannot add, change or remove hypothesis-leaning, bare or quoted; quote style alone is not a change', () => {
+  const refused = { ok: false, code: 'hypothesis_frontmatter_changed' };
+  const plainNote = heNote(''), hypothesis = heNote('topic-kind: hypothesis\nhypothesis-leaning: undecided\nhypothesis-strength: none\n');
+  eq(heEdit(plainNote, heNote('hypothesis-leaning: supported\n')), refused, 'add a leaning');
+  eq(heEdit(plainNote, heNote('"hypothesis-leaning": supported\n')), refused, 'add a double-quoted leaning');
+  eq(heEdit(plainNote, heNote("'hypothesis-leaning': supported\n")), refused, 'add a single-quoted leaning');
+  eq(heEdit(hypothesis, hypothesis.replace('undecided', 'refuted')), refused, 'change the leaning');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided', '"hypothesis-leaning": refuted')), refused, 'change it through a double-quoted key');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided', "'hypothesis-leaning': refuted")), refused, 'change it through a single-quoted key');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided\n', '')), refused, 'remove the leaning');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided', 'hypothesis-leaning: undecided\nhypothesis-leaning: undecided')), refused, 'a duplicated leaning');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided', "'hypothesis-leaning': undecided")), { ok: true }, 'quote style alone is not a change');
+  eq(heEdit(hypothesis, hypothesis.replace('Body', 'Changed body')), { ok: true }, 'body edits are still allowed');
+});
+test('hypothesis-leaning: the guard message names topic-kind, hypothesis-leaning and hypothesis-strength in all three languages', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const source = fs.readFileSync(path.join(__dirname, '..', '..', 'i18n', `${lang}.ts`), 'utf8');
+    const line = source.match(/"ui\.map_chat_guard_hypothesis_frontmatter_changed":\s*\n?\s*"([^"]*)"/);
+    assert.ok(line, lang);
+    for (const key of ['topic-kind', 'hypothesis-leaning', 'hypothesis-strength']) assert.ok(line[1].includes(key), `${lang} ${key}`);
+  }
+});

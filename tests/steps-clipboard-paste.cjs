@@ -77,3 +77,9 @@ test('cut: unknown target, nothing selected, and a parent loop in the map do not
   const loop = [{ id: 'x', parentId: 'y' }, { id: 'y', parentId: 'x' }, { id: 'z', parentId: null }];
   assert.deepEqual(canPasteCut(loop, ['z'], 'x'), { ok: true });
 });
+
+test('hypothesis-leaning: the plan keeps a hypothesis leaning and leaves items without one bare', () => {
+  const p = planPaste(payload([node('a', null, { kind: 'hypothesis', leaning: 'refuted', strength: 'weak' }), node('b', 'a', { kind: 'hypothesis' }), node('c', 'a')]));
+  assert.equal(p.items[0].leaning, 'refuted'); assert.equal(p.items[0].strength, 'weak');
+  assert.equal(Object.hasOwn(p.items[1], 'leaning'), false); assert.equal(Object.hasOwn(p.items[2], 'leaning'), false);
+});

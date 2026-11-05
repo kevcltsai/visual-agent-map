@@ -1341,7 +1341,7 @@ export const en = {
   "ui.map_chat_guard_map_unparseable": "the edit would break the map file",
   "ui.map_chat_guard_topic_identity_changed": "the edit would change the topic's identity fields",
   "ui.map_chat_guard_hypothesis_frontmatter_changed":
-    "the edit would change a topic's type or hypothesis fields (topic-kind or hypothesis-strength)",
+    "the edit would change a topic's type or hypothesis fields (topic-kind, hypothesis-leaning or hypothesis-strength)",
   "ui.map_chat_guard_reserved_frontmatter": "the new file would use fields reserved by this plugin",
   "ui.map_chat_guard_identity_added": "this edit would add the topic fields reserved by this plugin to a regular note",
   "ui.map_chat_guard_map_file": "the file is a map file; use the topic actions instead",

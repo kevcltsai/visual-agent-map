@@ -73,7 +73,7 @@ function topLevelValues(block: string | null, keys: readonly string[]): Map<stri
 }
 
 /** The keys that make a note a hypothesis and set its strength; the chat may not add, remove or change them. */
-export const HYPOTHESIS_KEYS: readonly string[] = ["topic-kind", "hypothesis-strength"];
+export const HYPOTHESIS_KEYS: readonly string[] = ["topic-kind", "hypothesis-leaning", "hypothesis-strength"];
 
 /** Every top-level occurrence of the hypothesis keys, in file order, so a duplicate or a quote-free value change shows. */
 function hypothesisLines(block: string | null): string[] {

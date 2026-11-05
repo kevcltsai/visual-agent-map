@@ -1266,7 +1266,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_guard_map_unparseable": "这个修改会弄坏心智图文件",
   "ui.map_chat_guard_topic_identity_changed": "这个修改会改到议题的识别字段",
   "ui.map_chat_guard_hypothesis_frontmatter_changed":
-    "这个修改会改到议题的类型或强度字段（topic-kind 或 hypothesis-strength）",
+    "这个修改会改到议题的类型或强度字段（topic-kind、hypothesis-leaning 或 hypothesis-strength）",
   "ui.map_chat_guard_reserved_frontmatter": "新文件会用到插件保留的字段",
   "ui.map_chat_guard_identity_added": "这次修改会给普通笔记加上插件保留的议题字段",
   "ui.map_chat_guard_map_file": "这是心智图文件，请改用议题动作",

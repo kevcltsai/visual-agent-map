@@ -4543,3 +4543,12 @@ test('UX-A canvas: zoomed out, the tool row wraps in screen pixels (its own scal
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /this\.stageEl\.style\.setProperty\("--vam-zoom", String\(zoom\)\)/);
 });
+integrationTest('hypothesis-leaning: styles.css dims a disabled choice with not-allowed, and lays the four strengths in one row without touching other choice groups', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const block = selector => { const m = css.match(new RegExp(`^${selector.replace(/[.[\]"=-]/g, '\\$&')}[^{]*\\{([^}]*)\\}`, 'm')); assert.ok(m, `rule ${selector}`); return m[1]; };
+  const disabled = block('.vam-topic-modal .vam-choice-group button[aria-disabled="true"]');
+  assert.match(disabled, /opacity:\s*0\.5/); assert.match(disabled, /cursor:\s*not-allowed/); assert.match(disabled, /var\(--text-faint\)/);
+  assert.match(css, /\.vam-topic-modal \.vam-choice-group button\.is-disabled/);
+  assert.match(block('.vam-topic-modal .vam-choice-group.vam-hypothesis-strengths'), /repeat\(4,/);
+  assert.match(block('.vam-topic-modal .vam-choice-group'), /repeat\(3,/, 'the shared group keeps three columns');
+});

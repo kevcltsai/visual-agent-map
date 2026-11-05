@@ -6431,20 +6431,25 @@ export class VisualAgentMapView extends ItemView {
     // The new topic keeps the type (and a hypothesis its strength) of the first source in reading order.
     const firstNote = this.notes.get(sources[0].id),
       firstKind = firstNote?.topicKind,
-      firstStrength = firstNote?.topicKind === "hypothesis" ? firstNote.hypothesisStrength : undefined;
+      firstHypothesis = firstNote?.topicKind === "hypothesis" ? firstNote : undefined;
     const created = await repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       before,
       mapPath,
       check.parentId ? "inherited" : "workspace",
-      { ...(content ? {} : { detail }), ...(firstKind ? { topicKind: firstKind } : {}) }
+      {
+        ...(content ? {} : { detail }),
+        ...(firstKind ? { topicKind: firstKind } : {}),
+        // A leaning on a non-hypothesis is not carried over.
+        ...(firstHypothesis?.hypothesisLeaning ? { hypothesisLeaning: firstHypothesis.hypothesisLeaning } : {}),
+        ...(firstHypothesis?.hypothesisStrength ? { hypothesisStrength: firstHypothesis.hypothesisStrength } : {})
+      }
     );
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"),
       viewport = clone(this.map?.viewport ?? before.viewport);
     let entry: TransactionEntry;
     try {
-      if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (appearance) await repo.writeTopicAppearance(created.path, appearance);
       if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(created.path, true);
       if (content) {
@@ -8767,7 +8772,8 @@ export class VisualAgentMapView extends ItemView {
           title: note?.title ?? node?.path.replace(/^.*\//, "").replace(/\.md$/, "") ?? "",
           body: note?.detail ?? "",
           kind: note?.topicKind ?? "topic",
-          ...(note?.hypothesisStrength !== undefined ? { strength: note.hypothesisStrength } : {})
+          ...(note?.hypothesisStrength !== undefined ? { strength: note.hypothesisStrength } : {}),
+          ...(note?.hypothesisLeaning !== undefined ? { leaning: note.hypothesisLeaning } : {})
         };
       },
       relations: map.topicRelations ?? [],
@@ -8971,11 +8977,19 @@ export class VisualAgentMapView extends ItemView {
             before,
             this.path,
             target || item.parent !== null ? "inherited" : "workspace",
-            { topicKind: item.kind, detail: item.body }
+            {
+              topicKind: item.kind,
+              detail: item.body,
+              ...(item.kind === "hypothesis"
+                ? {
+                    ...(item.leaning ? { hypothesisLeaning: item.leaning } : {}),
+                    ...(item.strength ? { hypothesisStrength: item.strength } : {})
+                  }
+                : {})
+            }
           );
           node.parentId = item.parent === null ? (target?.id ?? null) : copies[item.parent].id;
           copies.push(node);
-          if (item.kind === "hypothesis" && item.strength) await repo.writeHypothesisStrength(node.path, item.strength);
         }
         for (const link of plan.relations)
           relations.push({

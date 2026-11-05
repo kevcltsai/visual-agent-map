@@ -1269,7 +1269,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_guard_map_unparseable": "這個修改會弄壞心智圖檔",
   "ui.map_chat_guard_topic_identity_changed": "這個修改會改到議題的識別欄位",
   "ui.map_chat_guard_hypothesis_frontmatter_changed":
-    "這個修改會改到議題的類型或強度欄位（topic-kind 或 hypothesis-strength）",
+    "這個修改會改到議題的類型或強度欄位（topic-kind、hypothesis-leaning 或 hypothesis-strength）",
   "ui.map_chat_guard_reserved_frontmatter": "新檔案會用到外掛保留的欄位",
   "ui.map_chat_guard_identity_added": "這次修改會替一般筆記加上外掛保留的議題欄位",
   "ui.map_chat_guard_map_file": "這是心智圖檔，請改用議題動作",

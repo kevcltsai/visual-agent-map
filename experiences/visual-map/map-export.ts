@@ -16,6 +16,8 @@ export interface SceneCard {
   textColor?: string;
   /** The topic-colour bar at the card's left edge (the `::before` of a card that has a topic colour). */
   accent?: string;
+  /** A plain text block (tree-text-node): only its text is drawn, no box. */
+  plain?: boolean;
   /** card-style: the title's font size in px, only when the topic has a text-size style (default 13). */
   titleSize?: number;
   /** card-style: the title's font weight (400 to 900), only when the topic is bold. */
@@ -206,7 +208,9 @@ export function buildMapSvg(scene: MapScene): string {
     const titleWeight = numberIn(card.titleWeight, 100, 900);
     const lineStep = titleSize === undefined ? 16 : Math.max(16, Math.round(titleSize * 1.3));
     out.push(
-      `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="8" fill="${color(card.fill, cardColor)}" stroke="${color(card.stroke, strokeColor)}"${cardStrokeWidth === undefined ? "" : ` stroke-width="${cardStrokeWidth}"`}/>`
+      card.plain === true
+        ? "<g>"
+        : `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="8" fill="${color(card.fill, cardColor)}" stroke="${color(card.stroke, strokeColor)}"${cardStrokeWidth === undefined ? "" : ` stroke-width="${cardStrokeWidth}"`}/>`
     );
     if (card.accent !== undefined)
       out.push(

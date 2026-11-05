@@ -565,3 +565,29 @@ test('card editor 03: a card with its picture at the bottom or beside the text e
   const bottom = (await h.view.collectExportScene(() => true)).scene.cards.find(c => c.cover);
   assert.equal(bottom.titleAt.y, 58, 'bottom: the title above the picture');
 });
+
+test('persona 32: a card that shows a summary exports it (lines clamped like the screen); a card without one draws none', async () => {
+  const h = await harness();
+  const rootEl = h.view.cardEls.get(h.root.id);
+  const summary = rootEl.createDiv('vam-card-summary');
+  summary.text = 'First summary sentence that keeps going well past one line of the card width here';
+  Object.assign(summary, { offsetLeft: 14, offsetTop: 60, offsetWidth: 140 });
+  summary.computed = style({ color: 'rgb(90, 90, 90)', fontSize: '12px', '-webkit-line-clamp': '3' });
+  const scene = (await h.view.collectExportScene(() => true)).scene;
+  const rootCard = scene.cards.find(c => c.x === 100);
+  assert.ok(rootCard.summary, 'the summary is in the scene');
+  assert.equal(rootCard.summary.lines.length, 3, 'clamped to the screen line count');
+  assert.match(rootCard.summary.lines[2], /…$/);
+  const svg = ex.buildMapSvg(scene);
+  assert.match(svg, /First summary/, 'drawn in the PNG source');
+  assert.match(svg, /fill="rgb\(90, 90, 90\)"/);
+  assert.equal(scene.cards.find(c => c.x === 500).summary, undefined, 'no summary element: nothing drawn');
+});
+
+test('persona 32: latin words are not cut in the middle when the title wraps', () => {
+  const lines = JSON.parse(JSON.stringify(ex.wrapText('Manage your subscription plan', 120)));
+  assert.ok(lines.every(l => !/subsc$|^ription/.test(l.trim())), `got ${JSON.stringify(lines)}`);
+  assert.ok(lines.some(l => l.includes('subscription')));
+  assert.deepEqual(JSON.parse(JSON.stringify(ex.wrapText('abcdefghij', 35))), ['abcde', 'fghij'], 'a word wider than a line is still cut');
+  assert.deepEqual(JSON.parse(JSON.stringify(ex.wrapText('中文標題很長很長', 39))), ['中文標', '題很長', '很長']);
+});

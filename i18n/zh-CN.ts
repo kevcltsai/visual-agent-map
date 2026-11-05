@@ -1118,7 +1118,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it":
     "AI 任务超过 3 分钟，为避免长时间占用资源，VAM 会尝试中断。未完成的结果不会应用；请缩小任务范围后重试。",
   "ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and":
-    "整合 {0} 个已选议题。下一步可选完整内容或摘要；AI 完成后会直接创建新根议题，可撤销。",
+    "整合 {0} 个已选议题。可在下方选择完整内容或摘要；AI 完成后会直接创建新根议题，可撤销。",
   "ui.invalid_merged_contents_0": "合并内容无效：{0}",
   "ui.delete_0": "删除“{0}”",
   "ui.unassigned_0": "未归类（{0}）",

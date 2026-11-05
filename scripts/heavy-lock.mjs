@@ -138,7 +138,14 @@ function takeMutex(dir) {
   }
   return null;
 }
-const dropMutex = (dir, nonce) => { if (readJson(join(dir, MUTEX_NAME, "owner"))?.nonce === nonce) rmSync(join(dir, MUTEX_NAME), { recursive: true, force: true }); };
+// Moved away before it is emptied, so the mutex path never holds a folder that is ours but already half-removed (a racer renaming into it would make rmdir fail ENOTEMPTY).
+function dropMutex(dir, nonce) {
+  const mutex = join(dir, MUTEX_NAME);
+  if (readJson(join(mutex, "owner"))?.nonce !== nonce) return;
+  const tomb = join(dir, `.mutex-dropped-${nonce}`);
+  try { renameSync(mutex, tomb); } catch (error) { if (error.code === "ENOENT") return; throw error; }
+  rmSync(tomb, { recursive: true, force: true });
+}
 
 // Processes still alive that carry a dead holder's token: the test-profile ones are its leaks, anything else is still running its tests.
 function afterlife(owner) {

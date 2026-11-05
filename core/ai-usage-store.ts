@@ -10,13 +10,18 @@ export interface UsageTokens {
   outputTokens: number;
 }
 
+export type UsageProvider = "claude" | "codex";
+
+/** Query sums: `estimated` is present (true) only when at least one summed row was counted from text, not reported. */
+export type UsageSum = UsageTokens & { estimated?: true };
+
 /** One provider call. `at` is an ISO instant; `estimated` is true when the tokens were counted from text, not reported. */
 export interface UsageEntry extends UsageTokens {
   at: string;
   action: UsageAction;
   mapPath?: string;
   topic?: string;
-  provider: "claude" | "codex";
+  provider: UsageProvider;
   model: string;
   estimated: boolean;
   durationMs?: number;
@@ -28,10 +33,17 @@ export type UsageQuery<T> = { status: "ready"; value: T } | { status: "unreadabl
 /** Details older than this are folded into `monthly`. */
 export const USAGE_DETAIL_DAYS = 90;
 
-type ActionTokens = Partial<Record<UsageAction, UsageTokens>>;
-/** One month of folded-away details: per map path ("" = no map) and action. */
+/** Folded tokens; `estimated` is set when any folded row was an estimate. */
+type FoldedTokens = UsageTokens & { estimated?: true };
+type ActionTokens = Partial<Record<UsageAction, FoldedTokens>>;
+/**
+ * One month of folded-away details: per map path ("" = no map) and action, for both providers together in `maps`
+ * and per provider in `providers`. `providers` is optional so buckets folded before it existed still load; such
+ * months count under Total only.
+ */
 interface MonthlyBucket {
   maps: Record<string, ActionTokens>;
+  providers?: Partial<Record<UsageProvider, Record<string, ActionTokens>>>;
 }
 interface UsageFile {
   version: 1;
@@ -63,10 +75,21 @@ function isEntry(value: unknown): value is UsageEntry {
   );
 }
 
+const isFolded = (value: unknown): boolean =>
+  isTokens(value) &&
+  ((value as { estimated?: unknown }).estimated === undefined || (value as { estimated?: unknown }).estimated === true);
+const isMaps = (value: unknown): boolean =>
+  isRecord(value) &&
+  Object.values(value).every(
+    actions => isRecord(actions) && Object.entries(actions).every(([key, tokens]) => isAction(key) && isFolded(tokens))
+  );
+
 function isBucket(value: unknown): value is MonthlyBucket {
-  if (!isRecord(value) || !isRecord(value.maps)) return false;
-  return Object.values(value.maps).every(
-    actions => isRecord(actions) && Object.entries(actions).every(([key, tokens]) => isAction(key) && isTokens(tokens))
+  if (!isRecord(value) || !isMaps(value.maps)) return false;
+  if (value.providers === undefined) return true;
+  return (
+    isRecord(value.providers) &&
+    Object.entries(value.providers).every(([key, maps]) => (key === "claude" || key === "codex") && isMaps(maps))
   );
 }
 
@@ -167,36 +190,39 @@ export class AiUsageStore {
     }
   }
 
-  /** Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all. */
-  totals(query: { mapPath?: string; since?: number } = {}): UsageQuery<UsageTokens> {
+  /**
+   * Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all, and one provider
+   * or both. Folded months keep a per-provider breakdown; months folded before it existed count under Total only.
+   */
+  totals(query: { mapPath?: string; since?: number; provider?: UsageProvider } = {}): UsageQuery<UsageSum> {
     if (this.loadError) return { status: "unreadable" };
-    const sum = ZERO();
-    this.each(query, (_action, tokens) => {
+    const sum: UsageSum = ZERO();
+    this.each(query, (_action, tokens, estimated) => {
       sum.inputTokens += tokens.inputTokens;
       sum.outputTokens += tokens.outputTokens;
+      if (estimated) sum.estimated = true;
     });
     return { status: "ready", value: sum };
   }
 
-  /** Tokens of one map per action (all five keys present); sums to `totals({ mapPath, since })`. */
-  byAction(mapPath: string, since?: number): UsageQuery<Record<UsageAction, UsageTokens>> {
+  /** Tokens of one map per action (all five keys present); sums to `totals({ mapPath, since, provider })`. */
+  byAction(mapPath: string, since?: number, provider?: UsageProvider): UsageQuery<Record<UsageAction, UsageSum>> {
     if (this.loadError) return { status: "unreadable" };
-    const result = Object.fromEntries(USAGE_ACTIONS.map(action => [action, ZERO()])) as Record<
-      UsageAction,
-      UsageTokens
-    >;
-    this.each({ mapPath, since }, (action, tokens) => {
+    const result = Object.fromEntries(USAGE_ACTIONS.map(action => [action, ZERO()])) as Record<UsageAction, UsageSum>;
+    this.each({ mapPath, since, provider }, (action, tokens, estimated) => {
       result[action].inputTokens += tokens.inputTokens;
       result[action].outputTokens += tokens.outputTokens;
+      if (estimated) result[action].estimated = true;
     });
     return { status: "ready", value: result };
   }
 
-  /** The newest `limit` detail rows of one map (all maps when absent), newest first. */
-  recent(mapPath: string | undefined, limit = 10): UsageQuery<UsageEntry[]> {
+  /** The newest `limit` detail rows of one map (all maps when absent) and one provider (both when absent), newest first. */
+  recent(mapPath: string | undefined, limit = 10, provider?: UsageProvider): UsageQuery<UsageEntry[]> {
     if (this.loadError) return { status: "unreadable" };
     const rows = this.entries
       .filter(entry => mapPath === undefined || entry.mapPath === mapPath)
+      .filter(entry => provider === undefined || entry.provider === provider)
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
       .slice(0, limit)
       .map(entry => ({ ...entry }));
@@ -224,21 +250,26 @@ export class AiUsageStore {
   }
 
   private each(
-    query: { mapPath?: string; since?: number },
-    visit: (action: UsageAction, tokens: UsageTokens) => void
+    query: { mapPath?: string; since?: number; provider?: UsageProvider },
+    visit: (action: UsageAction, tokens: UsageTokens, estimated: boolean) => void
   ): void {
-    const { mapPath, since } = query;
+    const { mapPath, since, provider } = query;
     for (const entry of this.entries) {
       if (mapPath !== undefined && entry.mapPath !== mapPath) continue;
+      if (provider !== undefined && entry.provider !== provider) continue;
       if (since !== undefined && Date.parse(entry.at) < since) continue;
-      visit(entry.action, entry);
+      visit(entry.action, entry, entry.estimated);
     }
     // A folded month counts when it starts at or after `since`; it only ever holds rows older than the detail window.
+    // With a provider filter only that provider's breakdown counts (months folded before it existed have none).
     for (const [key, bucket] of Object.entries(this.monthly)) {
       if (since !== undefined && monthStartOf(key) < since) continue;
-      for (const [path, actions] of Object.entries(bucket.maps)) {
+      const maps = provider === undefined ? bucket.maps : bucket.providers?.[provider];
+      if (!maps) continue;
+      for (const [path, actions] of Object.entries(maps)) {
         if (mapPath !== undefined && path !== mapPath) continue;
-        for (const [action, tokens] of Object.entries(actions)) visit(action as UsageAction, tokens);
+        for (const [action, tokens] of Object.entries(actions))
+          if (tokens) visit(action as UsageAction, tokens, tokens.estimated === true);
       }
     }
   }
@@ -254,10 +285,14 @@ export class AiUsageStore {
         continue;
       }
       const bucket = (this.monthly[monthKey(time)] ??= { maps: {} });
-      const actions = (bucket.maps[entry.mapPath ?? ""] ??= {});
-      const tokens = (actions[entry.action] ??= ZERO());
-      tokens.inputTokens += entry.inputTokens;
-      tokens.outputTokens += entry.outputTokens;
+      const perProvider = ((bucket.providers ??= {})[entry.provider] ??= {});
+      for (const maps of [bucket.maps, perProvider]) {
+        const actions = (maps[entry.mapPath ?? ""] ??= {});
+        const tokens: FoldedTokens = (actions[entry.action] ??= ZERO());
+        tokens.inputTokens += entry.inputTokens;
+        tokens.outputTokens += entry.outputTokens;
+        if (entry.estimated) tokens.estimated = true;
+      }
     }
     this.entries = keep;
   }

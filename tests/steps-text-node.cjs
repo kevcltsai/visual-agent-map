@@ -192,3 +192,40 @@ test('A3: readingOrder hides text of a collapsed parent unless includeHidden; ig
   assert.deepEqual([...order.readingOrder(nodes, { textNodes })], ['r']);
   assert.deepEqual([...order.readingOrder(nodes, { textNodes, includeHidden: true })], ['r', 'a', 't']);
 });
+
+// text-node-width: a text block is laid out with the width it really has (drawn width, else stored, else standard card).
+const CARD = 280;
+const widthLeaf = (width, over = {}) => txt({ id: 'tw', parentId: 'r', ...over, ...(width === undefined ? {} : { width }) });
+const solo = () => [{ id: 'r', path: 'r.md', parentId: null, x: 0, y: 0, collapsed: false }];
+const placeText = (kind, width, items = [widthLeaf(width)], widthOf) => {
+  const out = layoutText.arrangeMapWithText(solo(), items, undefined, () => 100, kind, { widthOf });
+  return { root: plain(out.nodes)[0], texts: plain(out.items).filter(i => i.kind === 'text') };
+};
+
+test('text-node-width: growing left, a narrow block ends where a card would end, next to its topic', () => {
+  const card = placeText('left', undefined).texts[0];
+  assert.equal(card.x + CARD, placeText('left', 40, [widthLeaf(40)]).texts[0].x + 40, 'same right edge for 40 wide as the card slot');
+  const narrow = placeText('left', 60, [widthLeaf(60)]);
+  const gap = narrow.root.x - (narrow.texts[0].x + 60);
+  assert.equal(gap, placeText('left', undefined).root.x - (card.x + CARD), 'gap to the topic does not grow with a narrower block');
+  const viaDrawn = placeText('left', undefined, [widthLeaf(undefined)], () => 60).texts[0];
+  assert.equal(viaDrawn.x, narrow.texts[0].x, 'the drawn width is used when nothing is stored');
+});
+
+test('text-node-width: width 560 growing left does not overlap its topic and keeps the right edge', () => {
+  const out = placeText('left', 560, [widthLeaf(560)]);
+  const right = out.texts[0].x + 560;
+  assert.ok(right <= out.root.x, `block ends at ${right}, topic starts at ${out.root.x}`);
+  assert.equal(right, placeText('left', undefined).texts[0].x + CARD, 'right edge as for a card');
+});
+
+test('text-node-width: down, siblings keep clear of a 560 block, and a narrow block is centred under its topic', () => {
+  const two = [widthLeaf(560, { id: 'w1' }), widthLeaf(undefined, { id: 'w2', text: 'next' })];
+  const out = placeText('down', undefined, two);
+  const [a, b] = out.texts.sort((p, q) => p.x - q.x);
+  assert.ok(a.x + 560 <= b.x, `first ends at ${a.x + 560}, next starts at ${b.x}`);
+  const one = placeText('down', 60, [widthLeaf(60)]);
+  assert.equal(one.texts[0].x + 30, one.root.x + CARD / 2, 'a narrow block is centred under its topic');
+  const wide = placeText('down', 560, [widthLeaf(560)]);
+  assert.equal(wide.texts[0].x + 280, wide.root.x + CARD / 2, 'a wide block is centred under its topic');
+});

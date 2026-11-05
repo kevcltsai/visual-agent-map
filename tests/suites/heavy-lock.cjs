@@ -416,6 +416,34 @@ test('heavy lock: the reclaim mutex of a live but stalled process is never broke
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('heavy lock: a racer renaming its mutex in while the holder removes its own is not an error and keeps its mutex', async () => {
+  const { reclaimStale } = await lib();
+  const dir = tmp('vam-heavy-lock-');
+  const mutex = path.join(dir, 'heavy-test.reclaim');
+  const ghost = { token: 'ghost', pid: 2 ** 22 + 7, worktree: 'w', command: 'ghost', startedAt: new Date().toISOString() };
+  const realRm = fs.rmSync;
+  let raced = false;
+  // Recursive removal deletes the files first and the folder last; the racer's complete mutex folder lands between those two steps.
+  const wrapper = (target, options) => {
+    const name = path.basename(String(target));
+    if (raced || !(name === 'heavy-test.reclaim' || name.startsWith('.mutex-dropped-'))) return realRm(target, options);
+    raced = true;
+    for (const entry of fs.readdirSync(target)) realRm(path.join(target, entry), { recursive: true, force: true });
+    const pending = path.join(dir, '.mutex-racerpending');
+    fs.mkdirSync(pending); fs.writeFileSync(path.join(pending, 'owner'), JSON.stringify({ nonce: 'racer', pid: process.pid }));
+    fs.renameSync(pending, mutex);
+    fs.rmdirSync(target);
+  };
+  try {
+    fs.writeFileSync(lockFile(dir), JSON.stringify(ghost));
+    fs.rmSync = wrapper; require('node:module').syncBuiltinESMExports();
+    try { assert.doesNotThrow(() => reclaimStale(dir, () => {})); } finally { fs.rmSync = realRm; require('node:module').syncBuiltinESMExports(); }
+    assert.equal(raced, true, 'the racer got in while the holder was removing its mutex');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(mutex, 'owner'), 'utf8')).nonce, 'racer', 'the racer keeps the mutex it took');
+    assert.deepEqual(fs.readdirSync(dir).filter(name => name.startsWith('.mutex-')), [], 'no leftover mutex folders');
+  } finally { fs.rmSync = realRm; require('node:module').syncBuiltinESMExports(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('heavy lock: test:aim:run refuses to run outside the lock, with no token or a forged one, and runs under the wrapper', async () => {
   const cli = path.join(root, 'scripts', 'heavy-lock.mjs');
   const dir = tmp('vam-heavy-lock-');

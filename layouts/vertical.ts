@@ -1,3 +1,5 @@
+import { CARD_WIDTH } from "../map-graph";
+
 /** What the vertical engine needs to know about the tree; the caller decides what is collapsed or joined. */
 export interface VerticalInput<T extends { id: string }> {
   roots: T[];
@@ -14,6 +16,8 @@ export interface VerticalInput<T extends { id: string }> {
   flip: boolean;
   left: number;
   top: number;
+  /** A card's own width when it is not the standard one (a text block fitted to its text); wider ones get a wider slot. */
+  widthFor?: (node: T) => number;
 }
 
 /**
@@ -25,6 +29,7 @@ export function verticalPositions<T extends { id: string }>(
   input: VerticalInput<T>
 ): Map<string, { x: number; y: number }> {
   const { roots, kidsOf, joinsOf, heightFor, column, rowGap, flip, left, top } = input;
+  const cardWidth = (node: T) => input.widthFor?.(node) ?? CARD_WIDTH;
   const widths = new Map<string, number>();
   const spans = new Map<string, number>();
   const rowWidth = (list: T[]) => list.reduce((total, item) => total + widths.get(item.id)!, 0);
@@ -32,7 +37,8 @@ export function verticalPositions<T extends { id: string }>(
     const kids = kidsOf(node);
     const extra = joinsOf(node);
     for (const child of [...kids, ...extra]) measure(child);
-    widths.set(node.id, Math.max(column, rowWidth(kids), rowWidth(extra)));
+    // A card wider than standard keeps the standard gap beside it, so its slot grows by the excess.
+    widths.set(node.id, Math.max(column, rowWidth(kids), rowWidth(extra), cardWidth(node) + column - CARD_WIDTH));
     spans.set(node.id, 1 + Math.max(0, ...kids.map(kid => spans.get(kid.id)!)));
   };
   const xs = new Map<string, number>();
@@ -54,7 +60,16 @@ export function verticalPositions<T extends { id: string }>(
     const joinXs = row(extra, depth + spans.get(node.id)!);
     const own = kidXs.length ? kidXs : joinXs;
     depths.set(node.id, depth);
-    xs.set(node.id, own.length ? (own[0] + own[own.length - 1]) / 2 : start);
+    // Cards are centred over their children by their centres; a narrower card centres in its slot's standard card place.
+    const centres = (list: T[], xsOf: number[]) => xsOf.map((x, i) => x + cardWidth(list[i]) / 2);
+    const ownList = kidXs.length ? kids : extra;
+    const ownCentres = centres(ownList, own);
+    xs.set(
+      node.id,
+      own.length
+        ? (ownCentres[0] + ownCentres[ownCentres.length - 1]) / 2 - cardWidth(node) / 2
+        : start + Math.max(0, CARD_WIDTH - cardWidth(node)) / 2
+    );
   };
   let cursor = left;
   const order: T[] = [];

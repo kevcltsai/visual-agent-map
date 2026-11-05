@@ -12,6 +12,10 @@ const WIDTH = 300;
 function widthExcess(node: MapNode): number {
   return Math.max(0, (node.width ?? CARD_WIDTH) - CARD_WIDTH);
 }
+/** A text block laid out as a leaf (empty path) has its own drawn width; a card keeps the standard width in the engines that read this. */
+function textBlockWidth(node: MapNode): number {
+  return node.path === "" ? (node.width ?? CARD_WIDTH) : CARD_WIDTH;
+}
 /** Vertical space kept between two stacked cards at the standard spacing, in canvas units. */
 export const LAYOUT_GAP = 24;
 
@@ -214,7 +218,9 @@ function horizontalPositions(input: HorizontalInput): {
   };
   for (const [id, point] of result) {
     const depth = depths.get(id)!;
-    point.x = left + sign * (depth * COLUMN + shiftAt(depth));
+    // Growing left, a text block narrower than a card keeps its right edge where a card's would be (next to its topic).
+    const narrow = sign < 0 ? Math.max(0, CARD_WIDTH - textBlockWidth(byId.get(id)!)) : 0;
+    point.x = left + sign * (depth * COLUMN + shiftAt(depth)) + narrow;
   }
   return { placed: result, sizes };
 }
@@ -300,7 +306,15 @@ function positions(
   /** One arrangement for the given tree; branches with their own layout call this once per direction. */
   const engine = (kind: string, tree: Tree): Map<string, { x: number; y: number }> => {
     if (kind === "down" || kind === "up")
-      return verticalPositions({ ...tree, column: COLUMN, rowGap: COLUMN - WIDTH, flip: kind === "up", left, top });
+      return verticalPositions({
+        ...tree,
+        column: COLUMN,
+        rowGap: COLUMN - WIDTH,
+        flip: kind === "up",
+        left,
+        top,
+        widthFor: textBlockWidth
+      });
     const flat = { ...tree, column: COLUMN, gap: LAYOUT_GAP, left, top };
     if (kind === "radial") return radialPositions({ ...flat, width: WIDTH });
     if (kind === "timeline") return timelinePositions({ ...flat, width: WIDTH });

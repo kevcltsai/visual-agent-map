@@ -29,6 +29,7 @@ function fakeChat(control) {
     showPlan(card) { chat.plans.push(card); chat.calls.push(['plan']); },
     settlePlan(card, state, lines) { card.state = state; chat.calls.push(['settle', state]); if (lines) chat.lines.push(lines); },
     markTurn(extra) { chat.marks.push(extra); }, refreshReplyUndo() {},
+    takeQueued: () => [], takeSteerTexts: () => [], addSteer: () => ({}), setSteerState() {}, restoreDraft(texts) { chat.calls.push(['restore', texts]); },
     setApplying() {}, focusInput() {}, reset() {}
   };
   return chat;

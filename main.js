@@ -555,11 +555,8 @@ var en = {
   "ui.synthesis_no_source_topics": "No source topics. Select extra Markdown sources below.",
   "ui.legacy_rules_not_applied": "The note\u2019s old Rules are not applied automatically. Enter any conditions AI must follow for this run in Additional requirements above.",
   "ui.requirements_this_task_only": "Only used for this task. Leave blank to proceed with the selected action.",
-  "ui.reference_select_mind_map": "Select a mind map",
-  "ui.reference_select_folder": "Select a folder",
-  "ui.reference_select_markdown": "Select Markdown files",
   "ui.selected_mind_map_notes": "Selected mind map notes",
-  "ui.reference_time_and_citations_hint": "Folder selections exclude archived VAM notes. More material takes longer to process. Results cite the source files used.",
+  "ui.reference_time_and_citations_hint": "When you add a folder, archived VAM notes are excluded. More material takes longer to process. Results cite the source files used.",
   "ui.reference_processing_progress": "Extracting evidence: batch {0} of {1}\u2026",
   "ui.reference_processing_empty_result": "A selected source batch returned no readable findings. No partial result was saved.",
   "ui.reference_processing_could_not_reduce": "The selected material could not be condensed while preserving traceable evidence. No partial result was saved.",
@@ -569,21 +566,31 @@ var en = {
   "ui.map_sources_unreadable_description_0": "{0} unreadable",
   "ui.map_sources_title": "Data sources for this mind map",
   "ui.map_sources_intro": "Research, expand and synthesize use these sources. They are saved in this mind map and stay the next time you open it.",
-  "ui.map_sources_folder_count_0": "({0} files)",
-  "ui.map_sources_kind_map": "(mind map)",
+  "ui.map_sources_folder_count_0": "Folder \xB7 {0} files",
+  "ui.map_sources_kind_map": "Mind map",
   "ui.map_sources_unreadable_row": "Unreadable; tasks skip it",
   "ui.map_sources_remove_0": 'Remove "{0}"',
   "ui.map_sources_none": "No data sources yet.",
-  "ui.map_sources_added_0": "Added {0}",
+  "ui.map_sources_added_0": 'Added "{0}"',
   "ui.map_sources_removed_0": "Removed {0}",
-  "ui.map_sources_already_added_0": "{0} is already added",
-  "ui.map_sources_pick_map_placeholder": "Type a mind map name\u2026",
-  "ui.map_sources_pick_folder_placeholder": "Type a folder name\u2026",
-  "ui.map_sources_pick_file_placeholder": "Type a Markdown file name\u2026",
-  "ui.map_sources_no_other_maps": "There are no other mind maps in this vault.",
-  "ui.map_sources_no_folders": "There are no folders in this vault.",
-  "ui.map_sources_no_files": "There are no Markdown files in this vault.",
+  "ui.map_sources_already_added_0": '"{0}" is already added',
+  "ui.map_sources_added_one_0": 'Added "{0}"',
+  "ui.map_sources_added_many_0": "Added {0} items",
   "ui.map_sources_save_failed_0": "Could not save the data sources: {0}",
+  "ui.map_sources_kind_file": "Markdown",
+  "ui.map_sources_kind_folder": "Folder",
+  "ui.map_sources_drop_main": "Drag files, folders or mind maps from the left to here",
+  "ui.map_sources_drop_hint": "Only Markdown, folders or mind maps from this vault",
+  "ui.map_sources_drop_release": "Release to add",
+  "ui.map_sources_drop_items_0": "{0} items",
+  "ui.map_sources_search": "Search and add\u2026",
+  "ui.map_sources_search_placeholder": "Type a mind map, folder or Markdown name\u2026",
+  "ui.map_sources_search_empty": "There is nothing to add in this vault.",
+  "ui.map_sources_reject_title_0": "{0} not added",
+  "ui.map_sources_reject_line_0": '"{0}": {1}',
+  "ui.map_sources_reject_current": "The current mind map cannot be added",
+  "ui.map_sources_reject_type": "Only Markdown, folders or mind maps can be added",
+  "ui.map_sources_reject_outside": "Only items in this vault can be added",
   "ui.additional_requirements": "Additional requirements (optional)",
   "ui.ai_subtopic_proposals": "AI subtopic proposals",
   "ui.select_subtopics_to_create_you_can_edit_their_names_and_task": "Select subtopics to create. You can edit their names and tasks first.",
@@ -862,6 +869,7 @@ var en = {
   "ui.text_node_label": "Text node: {0}",
   "ui.text_nodes_group": "Text nodes",
   "ui.text_node_edit_label": "Edit text node",
+  "ui.text_resize_label": "Text block width",
   "ui.text_node_added": "Text node added.",
   "ui.text_node_removed": "Text node removed.",
   "ui.text_node_promote": "To card",
@@ -1145,7 +1153,7 @@ var en = {
   "ui.usage_button_today_0": "Token usage: today {0}",
   "ui.usage_button_unavailable": "Token usage: unavailable",
   "ui.usage_panel_title": "Token usage",
-  "ui.usage_panel_providers": "Claude \xB7 Codex",
+  "ui.usage_filter_label": "Filter by provider",
   "ui.usage_totals": "TOTALS",
   "ui.usage_this_map": "This mind map",
   "ui.usage_today": "Today",
@@ -1164,7 +1172,8 @@ var en = {
   "ui.usage_minutes_seconds_01": "{0} min {1} s",
   "ui.usage_empty": "No AI requests recorded for this mind map yet.",
   "ui.usage_unreadable": "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
-  "ui.usage_footer": "Counts only requests sent by VAM. Numbers are reported by the AI service. Values marked ~ are estimates, shown only when the AI service did not report usage. No money amounts are shown, because subscription plans are not charged per request.",
+  "ui.usage_footer_scope": "Counts only AI requests sent by VAM.",
+  "ui.usage_footer_estimates": "Values marked ~ are estimates.",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "The map or parent topic changed while AI was running. No subtopics were created.",
   "ui.create_subtopics_after_confirmation_without_running_research": "Create subtopics after confirmation without running research",
@@ -1384,6 +1393,12 @@ var en = {
   "ui.map_chat_stop": "Stop",
   "ui.map_chat_model_short": "Model",
   "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
+  "ui.map_chat_steer_placeholder": "What do you want to add? The AI reads it midway through this reply.",
+  "ui.map_chat_steer_hint": "Enter to add",
+  "ui.map_chat_steer_tag_live": "Added midway",
+  "ui.map_chat_steer_tag_queued": "Sends after this reply ends",
+  "ui.map_chat_steer_sent": "Added to this reply.",
+  "ui.map_chat_steer_queued_announce": "Will send after this reply ends.",
   "ui.map_chat_stopped": "Stopped.",
   "ui.map_chat_overflow_note": "Content too long; the rest is shown as plain text.",
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
@@ -1528,24 +1543,6 @@ var en = {
   "ui.map_chat_choose_label_0_1_2": "{0} ({1}) #{2}",
   "ui.map_chat_log_label": "Conversation",
   "ui.map_chat_hero_title": "What do you want to research or organize?",
-  "ui.map_chat_examples_label": "Examples to start from",
-  "ui.map_chat_example_research": "Research the coffee industry: players, supply chain, trends",
-  "ui.map_chat_example_learn": "Plan a three-month route to learn basic Japanese",
-  "ui.map_chat_example_decide": "Compare renting and buying a home: costs, risks, timing",
-  "ui.map_chat_suggestions_label": "Suggested messages",
-  "ui.map_chat_suggest_empty_build": "Build a three-level topic tree about",
-  "ui.map_chat_suggest_empty_new_map": "Create a new map about",
-  "ui.map_chat_suggest_empty_from_note": "Build a map from the open note",
-  "ui.map_chat_suggest_all_missing": "What is missing from this map?",
-  "ui.map_chat_suggest_all_layout": "Arrange the whole map",
-  "ui.map_chat_suggest_all_collapse": "Collapse every branch below the first level",
-  "ui.map_chat_suggest_one_expand": "Add three subtopics under the selected topic",
-  "ui.map_chat_suggest_one_research": "Research the selected topic",
-  "ui.map_chat_suggest_one_summary": "Rewrite the summary of the selected topic",
-  "ui.map_chat_suggest_many_compare": "Compare the selected topics",
-  "ui.map_chat_suggest_many_integrate": "Integrate the selected topics into one",
-  "ui.map_chat_suggest_many_group": "Group the selected topics under a new topic",
-  "ui.map_chat_suggest_note_add": "Add what the open note says to the map",
   "ui.map_chat_width_label": "AI chat width (arrow keys change it)",
   "ui.map_chat_open_unread": "Open AI chat (new reply)",
   "ui.map_chat_live_done_0": "AI replied: {0}",
@@ -1565,7 +1562,7 @@ var en = {
   "ui.map_chat_plan_group_research_0": "Research and AI work ({0})",
   "ui.map_chat_plan_group_view_0": "Map and view ({0})",
   "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
-  "ui.map_chat_empty_log": "No messages yet. The AI can build or extend this map, research its topics, or rearrange it. Try one of these, or type your own:",
+  "ui.map_chat_empty_log": "No messages yet. The AI can build or extend this map, research its topics, or rearrange it.",
   "ui.map_chat_canvas_building": "Building the map\u2026",
   "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
   "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",
@@ -1634,6 +1631,7 @@ var en = {
   "ui.map_chat_note_images_failed_0": "The picture search failed: {0}",
   "ui.map_chat_note_images_stopped": "The picture search was stopped.",
   "ui.map_chat_note_inserted_0": "(inserted into {0})",
+  "ui.map_chat_note_steer": "Added while the AI was answering",
   "ui.structure_review_entry_label": "AI structure suggestions:",
   "ui.structure_review_entry_map": "What to strengthen or cut? (whole map)",
   "ui.structure_review_entry_branch": "What to strengthen or cut? (this branch)",
@@ -3291,11 +3289,8 @@ var zhCN = {
   "ui.synthesis_no_source_topics": "\u6CA1\u6709\u6765\u6E90\u8BAE\u9898\uFF0C\u8BF7\u5728\u4E0B\u65B9\u9009\u62E9\u5176\u4ED6 Markdown \u6765\u6E90\u3002",
   "ui.legacy_rules_not_applied": "\u7B14\u8BB0\u4E2D\u7684\u65E7 Rules \u4E0D\u4F1A\u81EA\u52A8\u5E94\u7528\u3002\u8FD9\u6B21\u9700\u8981\u9075\u5B88\u7684\u6761\u4EF6\uFF0C\u8BF7\u586B\u5165\u4E0A\u65B9\u9644\u52A0\u8981\u6C42\u3002",
   "ui.requirements_this_task_only": "\u4EC5\u7528\u4E8E\u8FD9\u6B21\u4EFB\u52A1\uFF1B\u7559\u7A7A\u5373\u53EF\u4F9D\u6240\u9009\u529F\u80FD\u8FD0\u884C\u3002",
-  "ui.reference_select_mind_map": "\u9009\u62E9\u5FC3\u667A\u56FE",
-  "ui.reference_select_folder": "\u9009\u62E9\u6587\u4EF6\u5939",
-  "ui.reference_select_markdown": "\u9009\u62E9 Markdown \u6587\u4EF6",
   "ui.selected_mind_map_notes": "\u6240\u9009\u5FC3\u667A\u56FE\u7684\u8BAE\u9898\u7B14\u8BB0",
-  "ui.reference_time_and_citations_hint": "\u9009\u62E9\u6587\u4EF6\u5939\u65F6\u4F1A\u6392\u9664 VAM \u5F52\u6863\u7B14\u8BB0\u3002\u6570\u636E\u8D8A\u591A\uFF0C\u5904\u7406\u65F6\u95F4\u8D8A\u957F\uFF1B\u7ED3\u679C\u4F1A\u6807\u793A\u5B9E\u9645\u4F7F\u7528\u7684\u6765\u6E90\u6587\u4EF6\u3002",
+  "ui.reference_time_and_citations_hint": "\u653E\u5165\u6587\u4EF6\u5939\u65F6\u4F1A\u6392\u9664 VAM \u5F52\u6863\u7B14\u8BB0\u3002\u6570\u636E\u8D8A\u591A\uFF0C\u5904\u7406\u65F6\u95F4\u8D8A\u957F\uFF1B\u7ED3\u679C\u4F1A\u6807\u793A\u5B9E\u9645\u4F7F\u7528\u7684\u6765\u6E90\u6587\u4EF6\u3002",
   "ui.reference_processing_progress": "\u6B63\u5728\u622A\u53D6\u6570\u636E\uFF1A\u7B2C {0}\uFF0F{1} \u6279\u2026",
   "ui.reference_processing_empty_result": "\u6709\u4E00\u6279\u9009\u62E9\u6570\u636E\u65E0\u6CD5\u4EA7\u751F\u53EF\u8BFB\u5185\u5BB9\uFF0C\u672A\u4FDD\u5B58\u90E8\u5206\u7ED3\u679C\u3002",
   "ui.reference_processing_could_not_reduce": "\u9009\u62E9\u6570\u636E\u91CF\u8FC7\u5927\uFF0C\u65E0\u6CD5\u5728\u4FDD\u7559\u6765\u6E90\u5F15\u7528\u7684\u60C5\u51B5\u4E0B\u6574\u7406\uFF1B\u672A\u4FDD\u5B58\u90E8\u5206\u7ED3\u679C\u3002",
@@ -3304,22 +3299,32 @@ var zhCN = {
   "ui.map_sources_button_count_0": "\u6570\u636E\u6E90 \xB7 {0} \u4EFD",
   "ui.map_sources_unreadable_description_0": "{0} \u4EFD\u8BFB\u4E0D\u5230",
   "ui.map_sources_title": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u7684\u6570\u636E\u6E90",
-  "ui.map_sources_intro": "\u7814\u7A76\u3001\u5C55\u5F00\u3001\u6536\u655B\u90FD\u4F1A\u4F7F\u7528\u8FD9\u4E9B\u6570\u636E\uFF0C\u5E76\u4FDD\u5B58\u5728\u8FD9\u5F20\u5FC3\u667A\u56FE\u91CC\uFF0C\u4E0B\u6B21\u6253\u5F00\u8FD8\u5728\u3002",
-  "ui.map_sources_folder_count_0": "\uFF08{0} \u4EFD\uFF09",
-  "ui.map_sources_kind_map": "\uFF08\u5FC3\u667A\u56FE\uFF09",
+  "ui.map_sources_intro": "\u7814\u7A76\u3001\u5C55\u5F00\u3001\u6574\u5408\u90FD\u4F1A\u4F7F\u7528\u8FD9\u4E9B\u6570\u636E\uFF0C\u5E76\u4FDD\u5B58\u5728\u8FD9\u5F20\u5FC3\u667A\u56FE\u91CC\uFF0C\u4E0B\u6B21\u6253\u5F00\u8FD8\u5728\u3002",
+  "ui.map_sources_folder_count_0": "\u6587\u4EF6\u5939 \xB7 {0} \u4EFD",
+  "ui.map_sources_kind_map": "\u5FC3\u667A\u56FE",
   "ui.map_sources_unreadable_row": "\u8BFB\u4E0D\u5230\uFF0C\u4EFB\u52A1\u4F1A\u7565\u8FC7",
   "ui.map_sources_remove_0": "\u79FB\u9664 \u3008{0}\u3009",
   "ui.map_sources_none": "\u8FD8\u6CA1\u6709\u6570\u636E\u6E90\u3002",
-  "ui.map_sources_added_0": "\u5DF2\u52A0\u5165 {0}",
+  "ui.map_sources_added_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
   "ui.map_sources_removed_0": "\u5DF2\u79FB\u9664 {0}",
-  "ui.map_sources_already_added_0": "{0} \u5DF2\u7ECF\u52A0\u5165\u8FC7\u4E86",
-  "ui.map_sources_pick_map_placeholder": "\u8F93\u5165\u5FC3\u667A\u56FE\u540D\u79F0\u2026",
-  "ui.map_sources_pick_folder_placeholder": "\u8F93\u5165\u6587\u4EF6\u5939\u540D\u79F0\u2026",
-  "ui.map_sources_pick_file_placeholder": "\u8F93\u5165 Markdown \u6587\u4EF6\u540D\u79F0\u2026",
-  "ui.map_sources_no_other_maps": "\u8FD9\u4E2A Vault \u6CA1\u6709\u5176\u4ED6\u5FC3\u667A\u56FE\u3002",
-  "ui.map_sources_no_folders": "\u8FD9\u4E2A Vault \u6CA1\u6709\u6587\u4EF6\u5939\u3002",
-  "ui.map_sources_no_files": "\u8FD9\u4E2A Vault \u6CA1\u6709 Markdown \u6587\u4EF6\u3002",
+  "ui.map_sources_already_added_0": "\u3008{0}\u3009\u5DF2\u7ECF\u52A0\u5165\u8FC7\u4E86",
+  "ui.map_sources_added_one_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
+  "ui.map_sources_added_many_0": "\u5DF2\u52A0\u5165 {0} \u9879",
   "ui.map_sources_save_failed_0": "\u65E0\u6CD5\u4FDD\u5B58\u6570\u636E\u6E90\uFF1A{0}",
+  "ui.map_sources_kind_file": "Markdown",
+  "ui.map_sources_kind_folder": "\u6587\u4EF6\u5939",
+  "ui.map_sources_drop_main": "\u628A\u5DE6\u8FB9\u7684\u6587\u4EF6\u3001\u6587\u4EF6\u5939\u6216\u5FC3\u667A\u56FE\u62D6\u5230\u8FD9\u91CC",
+  "ui.map_sources_drop_hint": "\u53EA\u80FD\u653E\u8FD9\u4E2A Vault \u91CC\u7684 Markdown\u3001\u6587\u4EF6\u5939\u6216\u5FC3\u667A\u56FE",
+  "ui.map_sources_drop_release": "\u677E\u5F00\u4EE5\u52A0\u5165",
+  "ui.map_sources_drop_items_0": "{0} \u4E2A\u9879\u76EE",
+  "ui.map_sources_search": "\u641C\u7D22\u5E76\u52A0\u5165\u2026",
+  "ui.map_sources_search_placeholder": "\u8F93\u5165\u5FC3\u667A\u56FE\u3001\u6587\u4EF6\u5939\u6216 Markdown \u540D\u79F0\u2026",
+  "ui.map_sources_search_empty": "\u8FD9\u4E2A Vault \u6CA1\u6709\u53EF\u52A0\u5165\u7684\u9879\u76EE\u3002",
+  "ui.map_sources_reject_title_0": "\u6709 {0} \u4E2A\u6CA1\u6709\u52A0\u5165",
+  "ui.map_sources_reject_line_0": "\u3008{0}\u3009\uFF1A{1}",
+  "ui.map_sources_reject_current": "\u4E0D\u80FD\u52A0\u5165\u5F53\u524D\u8FD9\u5F20\u5FC3\u667A\u56FE",
+  "ui.map_sources_reject_type": "\u53EA\u80FD\u52A0\u5165 Markdown\u3001\u6587\u4EF6\u5939\u6216\u5FC3\u667A\u56FE",
+  "ui.map_sources_reject_outside": "\u53EA\u80FD\u52A0\u5165\u8FD9\u4E2A Vault \u91CC\u7684",
   "ui.additional_requirements": "\u672C\u6B21\u9644\u52A0\u8981\u6C42\uFF08\u9009\u586B\uFF09",
   "ui.ai_subtopic_proposals": "AI \u5B50\u8BAE\u9898\u63D0\u6848",
   "ui.select_subtopics_to_create_you_can_edit_their_names_and_task": "\u52FE\u9009\u8981\u521B\u5EFA\u7684\u5B50\u8BAE\u9898\uFF1B\u521B\u5EFA\u524D\u53EF\u76F4\u63A5\u4FEE\u6539\u540D\u79F0\u4E0E\u4EFB\u52A1\u3002",
@@ -3598,6 +3603,7 @@ var zhCN = {
   "ui.text_node_label": "\u6587\u5B57\u8282\u70B9\uFF1A{0}",
   "ui.text_nodes_group": "\u6587\u5B57\u8282\u70B9",
   "ui.text_node_edit_label": "\u7F16\u8F91\u6587\u5B57\u8282\u70B9",
+  "ui.text_resize_label": "\u6587\u5B57\u5757\u5BBD\u5EA6",
   "ui.text_node_added": "\u5DF2\u6DFB\u52A0\u6587\u5B57\u8282\u70B9\u3002",
   "ui.text_node_removed": "\u5DF2\u5220\u9664\u6587\u5B57\u8282\u70B9\u3002",
   "ui.text_node_promote": "\u8F6C\u6210\u8BAE\u9898\u5361",
@@ -3881,7 +3887,7 @@ var zhCN = {
   "ui.usage_button_today_0": "Token \u7528\u91CF\uFF1A\u4ECA\u5929 {0}",
   "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u65E0\u6CD5\u8BFB\u53D6",
   "ui.usage_panel_title": "Token \u7528\u91CF",
-  "ui.usage_panel_providers": "Claude\u30FBCodex",
+  "ui.usage_filter_label": "\u6309\u670D\u52A1\u7B5B\u9009",
   "ui.usage_totals": "\u603B\u91CF",
   "ui.usage_this_map": "\u8FD9\u5F20\u5FC3\u667A\u56FE",
   "ui.usage_today": "\u4ECA\u5929",
@@ -3900,7 +3906,8 @@ var zhCN = {
   "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
   "ui.usage_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709 AI \u8BF7\u6C42\u8BB0\u5F55\u3002",
   "ui.usage_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u7528\u91CF\u6570\u636E\uFF0C\u6240\u4EE5\u4E0D\u663E\u793A\u6570\u5B57\u3002\u63D2\u4EF6\u6587\u4EF6\u5939\u91CC\u7684 ai-usage.json \u5DF2\u539F\u6837\u4FDD\u7559\u3002",
-  "ui.usage_footer": "\u53EA\u8BA1\u7B97 VAM \u53D1\u51FA\u7684\u8BF7\u6C42\u3002\u6570\u5B57\u7531 AI \u670D\u52A1\u56DE\u62A5\u3002\u6807\u201C\u7EA6\u201D\u7684\u662F AI \u670D\u52A1\u6CA1\u6709\u56DE\u62A5\u7528\u91CF\u65F6\u7684\u4F30\u8BA1\u503C\u3002\u4E0D\u663E\u793A\u91D1\u989D\uFF0C\u56E0\u4E3A\u8BA2\u9605\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8BF7\u6C42\u6536\u8D39\u3002",
+  "ui.usage_footer_scope": "\u53EA\u8BA1\u7B97 VAM \u53D1\u51FA\u7684 AI \u8BF7\u6C42\u3002",
+  "ui.usage_footer_estimates": "\u6807\u201C\u7EA6\u201D\u7684\u662F\u4F30\u7B97\u503C\u3002",
   "ui.expansion_failed": "\u5C55\u5F00\u5931\u8D25",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u56FE\u6216\u7236\u8BAE\u9898\u5728 AI \u8FD0\u884C\u671F\u95F4\u5DF2\u53D8\u66F4\uFF0C\u672A\u521B\u5EFA\u5B50\u8BAE\u9898\u3002",
   "ui.create_subtopics_after_confirmation_without_running_research": "\u786E\u8BA4\u540E\u53EA\u521B\u5EFA\u5B50\u8BAE\u9898\uFF0C\u4E0D\u8FD0\u884C\u7814\u7A76",
@@ -4120,6 +4127,12 @@ var zhCN = {
   "ui.map_chat_stop": "\u505C\u6B62",
   "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u5F53\u524D\u6A21\u578B\uFF1A\u804A\u5929\u4E0E\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A",
+  "ui.map_chat_steer_placeholder": "\u8981\u8865\u5145\u4EC0\u4E48\uFF1FAI \u4F1A\u5728\u8FD9\u4E00\u8F6E\u4E2D\u9014\u8BFB\u5230\u3002",
+  "ui.map_chat_steer_hint": "Enter \u8865\u5145",
+  "ui.map_chat_steer_tag_live": "\u4E2D\u9014\u8865\u5145",
+  "ui.map_chat_steer_tag_queued": "\u7B49\u8FD9\u8F6E\u7ED3\u675F\u540E\u53D1\u9001",
+  "ui.map_chat_steer_sent": "\u5DF2\u53D1\u9001\u8865\u5145\u3002",
+  "ui.map_chat_steer_queued_announce": "\u7B49\u8FD9\u8F6E\u7ED3\u675F\u540E\u53D1\u9001\u3002",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.map_chat_overflow_note": "\u5185\u5BB9\u8FC7\u957F\uFF0C\u4EE5\u4E0B\u4EE5\u7EAF\u6587\u672C\u663E\u793A",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
@@ -4264,24 +4277,6 @@ var zhCN = {
   "ui.map_chat_choose_label_0_1_2": "{0}\uFF08{1}\uFF09#{2}",
   "ui.map_chat_log_label": "\u5BF9\u8BDD\u8BB0\u5F55",
   "ui.map_chat_hero_title": "\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48\uFF1F",
-  "ui.map_chat_examples_label": "\u53EF\u4EE5\u4ECE\u8FD9\u4E9B\u5F00\u59CB",
-  "ui.map_chat_example_research": "\u7814\u7A76\u5496\u5561\u4EA7\u4E1A\uFF1A\u4E3B\u8981\u53C2\u4E0E\u8005\u3001\u4F9B\u5E94\u94FE\u4E0E\u8D8B\u52BF",
-  "ui.map_chat_example_learn": "\u89C4\u5212\u4E09\u4E2A\u6708\u5B66\u4F1A\u57FA\u7840\u65E5\u6587\u7684\u5B66\u4E60\u8DEF\u7EBF",
-  "ui.map_chat_example_decide": "\u6BD4\u8F83\u79DF\u623F\u548C\u4E70\u623F\uFF1A\u6210\u672C\u3001\u98CE\u9669\u4E0E\u65F6\u673A",
-  "ui.map_chat_suggestions_label": "\u5EFA\u8BAE\u6307\u4EE4",
-  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C42\u7684\u8BAE\u9898\u6811\uFF0C\u4E3B\u9898\u662F",
-  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F20\u5730\u56FE\uFF0C\u4E3B\u9898\u662F",
-  "ui.map_chat_suggest_empty_from_note": "\u7528\u5F53\u524D\u6253\u5F00\u7684\u7B14\u8BB0\u5EFA\u7ACB\u5730\u56FE",
-  "ui.map_chat_suggest_all_missing": "\u8FD9\u5F20\u56FE\u8FD8\u7F3A\u4EC0\u4E48\uFF1F",
-  "ui.map_chat_suggest_all_layout": "\u6574\u7406\u5E76\u91CD\u65B0\u6392\u7248\u6574\u5F20\u56FE",
-  "ui.map_chat_suggest_all_collapse": "\u628A\u7B2C\u4E00\u5C42\u4EE5\u4E0B\u7684\u5206\u652F\u90FD\u6536\u8D77\u6765",
-  "ui.map_chat_suggest_one_expand": "\u5728\u9009\u53D6\u7684\u8BAE\u9898\u5E95\u4E0B\u52A0\u4E09\u4E2A\u5B50\u8BAE\u9898",
-  "ui.map_chat_suggest_one_research": "\u7814\u7A76\u9009\u53D6\u7684\u8BAE\u9898",
-  "ui.map_chat_suggest_one_summary": "\u6539\u5199\u9009\u53D6\u8BAE\u9898\u7684\u6458\u8981",
-  "ui.map_chat_suggest_many_compare": "\u6BD4\u8F83\u9009\u53D6\u7684\u8FD9\u51E0\u4E2A\u8BAE\u9898",
-  "ui.map_chat_suggest_many_integrate": "\u628A\u9009\u53D6\u7684\u8BAE\u9898\u6574\u5408\u6210\u4E00\u4E2A",
-  "ui.map_chat_suggest_many_group": "\u628A\u9009\u53D6\u7684\u8BAE\u9898\u5F52\u5230\u4E00\u4E2A\u65B0\u8BAE\u9898\u5E95\u4E0B",
-  "ui.map_chat_suggest_note_add": "\u628A\u5F53\u524D\u6253\u5F00\u7684\u7B14\u8BB0\u5185\u5BB9\u8865\u8FDB\u5730\u56FE",
   "ui.map_chat_width_label": "AI \u5BF9\u8BDD\u5BBD\u5EA6\uFF08\u65B9\u5411\u952E\u53EF\u8C03\u6574\uFF09",
   "ui.map_chat_open_unread": "\u6253\u5F00 AI \u5BF9\u8BDD\uFF08\u6709\u65B0\u56DE\u590D\uFF09",
   "ui.map_chat_live_done_0": "AI \u5DF2\u56DE\u590D\uFF1A{0}",
@@ -4301,7 +4296,7 @@ var zhCN = {
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u4E0E AI \u4F5C\u4E1A\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5730\u56FE\u4E0E\u753B\u9762\uFF08{0}\uFF09",
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8BDD\u8BF4\u8BF4\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48",
-  "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u6269\u5145\u8FD9\u5F20\u5730\u56FE\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8BAE\u9898\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u5E03\u5C40\u3002\u8BD5\u8BD5\u4E0B\u9762\u7684\u4F8B\u5B50\uFF0C\u6216\u81EA\u5DF1\u8F93\u5165\uFF1A",
+  "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u6269\u5145\u8FD9\u5F20\u5730\u56FE\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8BAE\u9898\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u5E03\u5C40\u3002",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5730\u56FE\u2026",
   "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u786E\u8BA4\u4F7F\u7528\u989D\u5EA6\u3002\u540C\u610F\u540E\u624D\u4F1A\u5F00\u59CB\u5EFA\u7ACB\u5730\u56FE\u3002",
   "ui.map_chat_canvas_plan": "\u786E\u8BA4\u8BA1\u5212\u540E\uFF0C\u5730\u56FE\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC",
@@ -4370,6 +4365,7 @@ var zhCN = {
   "ui.map_chat_note_images_failed_0": "\u627E\u56FE\u5931\u8D25\uFF1A{0}",
   "ui.map_chat_note_images_stopped": "\u5DF2\u505C\u6B62\u627E\u56FE\u3002",
   "ui.map_chat_note_inserted_0": "\uFF08\u5DF2\u63D2\u5165\u201C{0}\u201D\uFF09",
+  "ui.map_chat_note_steer": "\u4E2D\u9014\u8865\u5145",
   "ui.structure_review_entry_label": "AI \u7ED3\u6784\u5EFA\u8BAE\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u6574\u5F20\u56FE\uFF09",
   "ui.structure_review_entry_branch": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u8FD9\u4E2A\u5206\u652F\uFF09",
@@ -6027,11 +6023,8 @@ var zhTW = {
   "ui.synthesis_no_source_topics": "\u6C92\u6709\u4F86\u6E90\u8B70\u984C\uFF0C\u8ACB\u5728\u4E0B\u65B9\u9078\u53D6\u5176\u4ED6 Markdown \u4F86\u6E90\u3002",
   "ui.legacy_rules_not_applied": "\u7B46\u8A18\u4E2D\u7684\u820A Rules \u4E0D\u6703\u81EA\u52D5\u5957\u7528\u3002\u9019\u6B21\u9700\u8981\u9075\u5B88\u7684\u689D\u4EF6\uFF0C\u8ACB\u586B\u5165\u4E0A\u65B9\u9644\u52A0\u8981\u6C42\u3002",
   "ui.requirements_this_task_only": "\u50C5\u7528\u65BC\u9019\u6B21\u4EFB\u52D9\uFF1B\u7559\u7A7A\u5373\u53EF\u4F9D\u6240\u9078\u529F\u80FD\u57F7\u884C\u3002",
-  "ui.reference_select_mind_map": "\u9078\u64C7\u5FC3\u667A\u5716",
-  "ui.reference_select_folder": "\u9078\u64C7\u8CC7\u6599\u593E",
-  "ui.reference_select_markdown": "\u9078\u64C7 Markdown \u6A94\u6848",
   "ui.selected_mind_map_notes": "\u6240\u9078\u5FC3\u667A\u5716\u7684\u8B70\u984C\u7B46\u8A18",
-  "ui.reference_time_and_citations_hint": "\u9078\u53D6\u8CC7\u6599\u593E\u6642\u6703\u6392\u9664 VAM \u5C01\u5B58\u7B46\u8A18\u3002\u8CC7\u6599\u8D8A\u591A\uFF0C\u8655\u7406\u6642\u9593\u8D8A\u9577\uFF1B\u7D50\u679C\u6703\u6A19\u793A\u5BE6\u969B\u4F7F\u7528\u7684\u4F86\u6E90\u6A94\u6848\u3002",
+  "ui.reference_time_and_citations_hint": "\u653E\u5165\u8CC7\u6599\u593E\u6642\u6703\u6392\u9664 VAM \u5C01\u5B58\u7B46\u8A18\u3002\u8CC7\u6599\u8D8A\u591A\uFF0C\u8655\u7406\u6642\u9593\u8D8A\u9577\uFF1B\u7D50\u679C\u6703\u6A19\u793A\u5BE6\u969B\u4F7F\u7528\u7684\u4F86\u6E90\u6A94\u6848\u3002",
   "ui.reference_processing_progress": "\u6B63\u5728\u64F7\u53D6\u8CC7\u6599\uFF1A\u7B2C {0}\uFF0F{1} \u6279\u2026",
   "ui.reference_processing_empty_result": "\u6709\u4E00\u6279\u9078\u53D6\u8CC7\u6599\u7121\u6CD5\u7522\u751F\u53EF\u8B80\u5167\u5BB9\uFF0C\u672A\u5132\u5B58\u90E8\u5206\u7D50\u679C\u3002",
   "ui.reference_processing_could_not_reduce": "\u9078\u53D6\u8CC7\u6599\u91CF\u904E\u5927\uFF0C\u7121\u6CD5\u5728\u4FDD\u7559\u4F86\u6E90\u5F15\u7528\u7684\u60C5\u6CC1\u4E0B\u6574\u7406\uFF1B\u672A\u5132\u5B58\u90E8\u5206\u7D50\u679C\u3002",
@@ -6040,22 +6033,32 @@ var zhTW = {
   "ui.map_sources_button_count_0": "\u8CC7\u6599\u4F86\u6E90 \xB7 {0} \u4EFD",
   "ui.map_sources_unreadable_description_0": "{0} \u4EFD\u8B80\u4E0D\u5230",
   "ui.map_sources_title": "\u9019\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u4F86\u6E90",
-  "ui.map_sources_intro": "\u7814\u7A76\u3001\u5C55\u958B\u3001\u6536\u6582\u90FD\u6703\u4F7F\u7528\u9019\u4E9B\u8CC7\u6599\uFF0C\u4E26\u5B58\u5728\u9019\u5F35\u5FC3\u667A\u5716\u88E1\uFF0C\u4E0B\u6B21\u6253\u958B\u9084\u5728\u3002",
-  "ui.map_sources_folder_count_0": "\uFF08{0} \u4EFD\uFF09",
-  "ui.map_sources_kind_map": "\uFF08\u5FC3\u667A\u5716\uFF09",
+  "ui.map_sources_intro": "\u7814\u7A76\u3001\u5C55\u958B\u3001\u6574\u5408\u90FD\u6703\u4F7F\u7528\u9019\u4E9B\u8CC7\u6599\uFF0C\u4E26\u5B58\u5728\u9019\u5F35\u5FC3\u667A\u5716\u88E1\uFF0C\u4E0B\u6B21\u6253\u958B\u9084\u5728\u3002",
+  "ui.map_sources_folder_count_0": "\u8CC7\u6599\u593E \xB7 {0} \u4EFD",
+  "ui.map_sources_kind_map": "\u5FC3\u667A\u5716",
   "ui.map_sources_unreadable_row": "\u8B80\u4E0D\u5230\uFF0C\u4EFB\u52D9\u6703\u7565\u904E",
   "ui.map_sources_remove_0": "\u79FB\u9664 \u3008{0}\u3009",
   "ui.map_sources_none": "\u9084\u6C92\u6709\u8CC7\u6599\u4F86\u6E90\u3002",
-  "ui.map_sources_added_0": "\u5DF2\u52A0\u5165 {0}",
+  "ui.map_sources_added_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
   "ui.map_sources_removed_0": "\u5DF2\u79FB\u9664 {0}",
-  "ui.map_sources_already_added_0": "{0} \u5DF2\u7D93\u52A0\u5165\u904E\u4E86",
-  "ui.map_sources_pick_map_placeholder": "\u8F38\u5165\u5FC3\u667A\u5716\u540D\u7A31\u2026",
-  "ui.map_sources_pick_folder_placeholder": "\u8F38\u5165\u8CC7\u6599\u593E\u540D\u7A31\u2026",
-  "ui.map_sources_pick_file_placeholder": "\u8F38\u5165 Markdown \u6A94\u6848\u540D\u7A31\u2026",
-  "ui.map_sources_no_other_maps": "\u9019\u500B Vault \u6C92\u6709\u5176\u4ED6\u5FC3\u667A\u5716\u3002",
-  "ui.map_sources_no_folders": "\u9019\u500B Vault \u6C92\u6709\u8CC7\u6599\u593E\u3002",
-  "ui.map_sources_no_files": "\u9019\u500B Vault \u6C92\u6709 Markdown \u6A94\u6848\u3002",
+  "ui.map_sources_already_added_0": "\u3008{0}\u3009\u5DF2\u7D93\u52A0\u5165\u904E\u4E86",
+  "ui.map_sources_added_one_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
+  "ui.map_sources_added_many_0": "\u5DF2\u52A0\u5165 {0} \u9805",
   "ui.map_sources_save_failed_0": "\u7121\u6CD5\u5132\u5B58\u8CC7\u6599\u4F86\u6E90\uFF1A{0}",
+  "ui.map_sources_kind_file": "Markdown",
+  "ui.map_sources_kind_folder": "\u8CC7\u6599\u593E",
+  "ui.map_sources_drop_main": "\u628A\u5DE6\u908A\u7684\u6A94\u6848\u3001\u8CC7\u6599\u593E\u6216\u5FC3\u667A\u5716\u62D6\u5230\u9019\u88E1",
+  "ui.map_sources_drop_hint": "\u53EA\u80FD\u653E\u9019\u500B Vault \u88E1\u7684 Markdown\u3001\u8CC7\u6599\u593E\u6216\u5FC3\u667A\u5716",
+  "ui.map_sources_drop_release": "\u653E\u958B\u4EE5\u52A0\u5165",
+  "ui.map_sources_drop_items_0": "{0} \u500B\u9805\u76EE",
+  "ui.map_sources_search": "\u641C\u5C0B\u4E26\u52A0\u5165\u2026",
+  "ui.map_sources_search_placeholder": "\u8F38\u5165\u5FC3\u667A\u5716\u3001\u8CC7\u6599\u593E\u6216 Markdown \u540D\u7A31\u2026",
+  "ui.map_sources_search_empty": "\u9019\u500B Vault \u6C92\u6709\u53EF\u52A0\u5165\u7684\u9805\u76EE\u3002",
+  "ui.map_sources_reject_title_0": "\u6709 {0} \u500B\u6C92\u6709\u52A0\u5165",
+  "ui.map_sources_reject_line_0": "\u3008{0}\u3009\uFF1A{1}",
+  "ui.map_sources_reject_current": "\u4E0D\u80FD\u52A0\u5165\u76EE\u524D\u9019\u5F35\u5FC3\u667A\u5716",
+  "ui.map_sources_reject_type": "\u53EA\u80FD\u52A0\u5165 Markdown\u3001\u8CC7\u6599\u593E\u6216\u5FC3\u667A\u5716",
+  "ui.map_sources_reject_outside": "\u53EA\u80FD\u52A0\u5165\u9019\u500B Vault \u88E1\u7684",
   "ui.additional_requirements": "\u672C\u6B21\u9644\u52A0\u8981\u6C42\uFF08\u9078\u586B\uFF09",
   "ui.ai_subtopic_proposals": "AI \u5B50\u8B70\u984C\u63D0\u6848",
   "ui.select_subtopics_to_create_you_can_edit_their_names_and_task": "\u52FE\u9078\u8981\u5EFA\u7ACB\u7684\u5B50\u8B70\u984C\uFF1B\u5EFA\u7ACB\u524D\u53EF\u76F4\u63A5\u4FEE\u6539\u540D\u7A31\u8207\u4EFB\u52D9\u3002",
@@ -6334,6 +6337,7 @@ var zhTW = {
   "ui.text_node_label": "\u6587\u5B57\u5340\u584A\uFF1A{0}",
   "ui.text_nodes_group": "\u6587\u5B57\u5340\u584A",
   "ui.text_node_edit_label": "\u7DE8\u8F2F\u6587\u5B57\u5340\u584A",
+  "ui.text_resize_label": "\u6587\u5B57\u5340\u584A\u5BEC\u5EA6",
   "ui.text_node_added": "\u5DF2\u65B0\u589E\u6587\u5B57\u5340\u584A\u3002",
   "ui.text_node_removed": "\u5DF2\u522A\u9664\u6587\u5B57\u5340\u584A\u3002",
   "ui.text_node_promote": "\u8F49\u6210\u8B70\u984C\u5361",
@@ -6617,7 +6621,7 @@ var zhTW = {
   "ui.usage_button_today_0": "Token \u7528\u91CF\uFF1A\u4ECA\u5929 {0}",
   "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u7121\u6CD5\u8B80\u53D6",
   "ui.usage_panel_title": "Token \u7528\u91CF",
-  "ui.usage_panel_providers": "Claude\u30FBCodex",
+  "ui.usage_filter_label": "\u4F9D\u670D\u52D9\u7BE9\u9078",
   "ui.usage_totals": "\u7E3D\u91CF",
   "ui.usage_this_map": "\u9019\u5F35\u5FC3\u667A\u5716",
   "ui.usage_today": "\u4ECA\u5929",
@@ -6636,7 +6640,8 @@ var zhTW = {
   "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
   "ui.usage_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709 AI \u8ACB\u6C42\u7D00\u9304\u3002",
   "ui.usage_unreadable": "\u7121\u6CD5\u8B80\u53D6\u7528\u91CF\u8CC7\u6599\uFF0C\u6240\u4EE5\u4E0D\u986F\u793A\u6578\u5B57\u3002\u5916\u639B\u8CC7\u6599\u593E\u88E1\u7684 ai-usage.json \u5DF2\u539F\u6A23\u4FDD\u7559\u3002",
-  "ui.usage_footer": "\u53EA\u8A08\u7B97 VAM \u9001\u51FA\u7684\u8ACB\u6C42\u3002\u6578\u5B57\u7531 AI \u670D\u52D9\u56DE\u5831\u3002\u6A19\u300C\u7D04\u300D\u7684\u662F AI \u670D\u52D9\u6C92\u6709\u56DE\u5831\u7528\u91CF\u6642\u7684\u4F30\u8A08\u503C\u3002\u4E0D\u986F\u793A\u91D1\u984D\uFF0C\u56E0\u70BA\u8A02\u95B1\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8ACB\u6C42\u6536\u8CBB\u3002",
+  "ui.usage_footer_scope": "\u53EA\u8A08\u7B97 VAM \u767C\u51FA\u7684 AI \u8ACB\u6C42\u3002",
+  "ui.usage_footer_estimates": "\u6A19\u300C\u7D04\u300D\u7684\u662F\u4F30\u7B97\u503C\u3002",
   "ui.expansion_failed": "\u5C55\u958B\u5931\u6557",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u5716\u6216\u6BCD\u8B70\u984C\u5728 AI \u57F7\u884C\u671F\u9593\u5DF2\u8B8A\u66F4\uFF0C\u672A\u5EFA\u7ACB\u5B50\u8B70\u984C\u3002",
   "ui.create_subtopics_after_confirmation_without_running_research": "\u78BA\u8A8D\u5F8C\u53EA\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u4E0D\u57F7\u884C\u7814\u7A76",
@@ -6856,6 +6861,12 @@ var zhTW = {
   "ui.map_chat_stop": "\u505C\u6B62",
   "ui.map_chat_model_short": "\u6A21\u578B",
   "ui.map_chat_model_label": "\u76EE\u524D\u6A21\u578B\uFF1A\u804A\u5929\u8207\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B",
+  "ui.map_chat_steer_placeholder": "\u8981\u88DC\u5145\u4EC0\u9EBC\uFF1FAI \u6703\u5728\u9019\u4E00\u8F2A\u4E2D\u9014\u8B80\u5230\u3002",
+  "ui.map_chat_steer_hint": "Enter \u88DC\u5145",
+  "ui.map_chat_steer_tag_live": "\u4E2D\u9014\u88DC\u5145",
+  "ui.map_chat_steer_tag_queued": "\u7B49\u9019\u8F2A\u7D50\u675F\u5F8C\u9001\u51FA",
+  "ui.map_chat_steer_sent": "\u5DF2\u9001\u51FA\u88DC\u5145\u3002",
+  "ui.map_chat_steer_queued_announce": "\u7B49\u9019\u8F2A\u7D50\u675F\u5F8C\u9001\u51FA\u3002",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.map_chat_overflow_note": "\u5167\u5BB9\u904E\u9577\uFF0C\u4EE5\u4E0B\u4EE5\u7D14\u6587\u5B57\u986F\u793A",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
@@ -7000,24 +7011,6 @@ var zhTW = {
   "ui.map_chat_choose_label_0_1_2": "{0}\uFF08{1}\uFF09#{2}",
   "ui.map_chat_log_label": "\u5C0D\u8A71\u7D00\u9304",
   "ui.map_chat_hero_title": "\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC\uFF1F",
-  "ui.map_chat_examples_label": "\u53EF\u4EE5\u5F9E\u9019\u4E9B\u958B\u59CB",
-  "ui.map_chat_example_research": "\u7814\u7A76\u5496\u5561\u7522\u696D\uFF1A\u4E3B\u8981\u53C3\u8207\u8005\u3001\u4F9B\u61C9\u93C8\u8207\u8DA8\u52E2",
-  "ui.map_chat_example_learn": "\u898F\u5283\u4E09\u500B\u6708\u5B78\u6703\u57FA\u790E\u65E5\u6587\u7684\u5B78\u7FD2\u8DEF\u7DDA",
-  "ui.map_chat_example_decide": "\u6BD4\u8F03\u79DF\u623F\u548C\u8CB7\u623F\uFF1A\u6210\u672C\u3001\u98A8\u96AA\u8207\u6642\u6A5F",
-  "ui.map_chat_suggestions_label": "\u5EFA\u8B70\u6307\u4EE4",
-  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C64\u7684\u8B70\u984C\u6A39\uFF0C\u4E3B\u984C\u662F",
-  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F35\u5FC3\u667A\u5716\uFF0C\u4E3B\u984C\u662F",
-  "ui.map_chat_suggest_empty_from_note": "\u7528\u76EE\u524D\u958B\u8457\u7684\u7B46\u8A18\u5EFA\u7ACB\u5FC3\u667A\u5716",
-  "ui.map_chat_suggest_all_missing": "\u9019\u5F35\u5716\u9084\u7F3A\u4EC0\u9EBC\uFF1F",
-  "ui.map_chat_suggest_all_layout": "\u6574\u7406\u4E26\u91CD\u65B0\u6392\u7248\u6574\u5F35\u5716",
-  "ui.map_chat_suggest_all_collapse": "\u628A\u7B2C\u4E00\u5C64\u4EE5\u4E0B\u7684\u5206\u652F\u90FD\u6536\u8D77\u4F86",
-  "ui.map_chat_suggest_one_expand": "\u5728\u9078\u53D6\u7684\u8B70\u984C\u5E95\u4E0B\u52A0\u4E09\u500B\u5B50\u8B70\u984C",
-  "ui.map_chat_suggest_one_research": "\u7814\u7A76\u9078\u53D6\u7684\u8B70\u984C",
-  "ui.map_chat_suggest_one_summary": "\u6539\u5BEB\u9078\u53D6\u8B70\u984C\u7684\u6458\u8981",
-  "ui.map_chat_suggest_many_compare": "\u6BD4\u8F03\u9078\u53D6\u7684\u9019\u5E7E\u500B\u8B70\u984C",
-  "ui.map_chat_suggest_many_integrate": "\u628A\u9078\u53D6\u7684\u8B70\u984C\u6574\u5408\u6210\u4E00\u500B",
-  "ui.map_chat_suggest_many_group": "\u628A\u9078\u53D6\u7684\u8B70\u984C\u6B78\u5230\u4E00\u500B\u65B0\u8B70\u984C\u5E95\u4E0B",
-  "ui.map_chat_suggest_note_add": "\u628A\u76EE\u524D\u958B\u8457\u7684\u7B46\u8A18\u5167\u5BB9\u88DC\u9032\u5FC3\u667A\u5716",
   "ui.map_chat_width_label": "AI \u5C0D\u8A71\u5BEC\u5EA6\uFF08\u65B9\u5411\u9375\u53EF\u8ABF\u6574\uFF09",
   "ui.map_chat_open_unread": "\u958B\u555F AI \u5C0D\u8A71\uFF08\u6709\u65B0\u56DE\u8986\uFF09",
   "ui.map_chat_live_done_0": "AI \u5DF2\u56DE\u8986\uFF1A{0}",
@@ -7037,7 +7030,7 @@ var zhTW = {
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u8207 AI \u4F5C\u696D\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5FC3\u667A\u5716\u8207\u756B\u9762\uFF08{0}\uFF09",
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8A71\u8AAA\u8AAA\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC",
-  "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u64F4\u5145\u9019\u5F35\u5FC3\u667A\u5716\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8B70\u984C\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u7248\u9762\u3002\u8A66\u8A66\u4E0B\u9762\u7684\u4F8B\u5B50\uFF0C\u6216\u81EA\u5DF1\u8F38\u5165\uFF1A",
+  "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u64F4\u5145\u9019\u5F35\u5FC3\u667A\u5716\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8B70\u984C\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u7248\u9762\u3002",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5FC3\u667A\u5716\u2026",
   "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u78BA\u8A8D\u4F7F\u7528\u984D\u5EA6\u3002\u540C\u610F\u5F8C\u624D\u6703\u958B\u59CB\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002",
   "ui.map_chat_canvas_plan": "\u78BA\u8A8D\u8A08\u756B\u5F8C\uFF0C\u5FC3\u667A\u5716\u6703\u51FA\u73FE\u5728\u9019\u88E1",
@@ -7106,6 +7099,7 @@ var zhTW = {
   "ui.map_chat_note_images_failed_0": "\u627E\u5716\u5931\u6557\uFF1A{0}",
   "ui.map_chat_note_images_stopped": "\u5DF2\u505C\u6B62\u627E\u5716\u3002",
   "ui.map_chat_note_inserted_0": "\uFF08\u5DF2\u63D2\u5165\u300C{0}\u300D\uFF09",
+  "ui.map_chat_note_steer": "\u4E2D\u9014\u88DC\u5145",
   "ui.structure_review_entry_label": "AI \u7D50\u69CB\u5EFA\u8B70\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u6574\u5F35\u5716\uFF09",
   "ui.structure_review_entry_branch": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u9019\u500B\u5206\u652F\uFF09",
@@ -17933,6 +17927,13 @@ var CONTROL_ALL = /[\u0000-\u001f\u007f]/g;
 var LABEL_LIMIT = 200;
 var MEMBER_LIMIT = 500;
 var TEXT_LIMIT = 2e3;
+var TEXT_WIDTH_MIN = 32;
+var TEXT_AUTO_WIDTH_MAX = 300;
+var TEXT_WIDTH_MAX = 560;
+function clampTextWidth(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
+  return Math.min(TEXT_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.round(value)));
+}
 var PARENT_ID_LIMIT = 200;
 var LINK_LIMIT = 20;
 var SUMMARY_MEMBER_LIMIT = 50;
@@ -18077,6 +18078,8 @@ function cleanTextItem(raw) {
     if (typeof parentId !== "string" || !parentId || parentId.length > PARENT_ID_LIMIT) return null;
     item.parentId = parentId;
   }
+  const width = clampTextWidth(raw.width);
+  if (width !== void 0) item.width = width;
   const links = cleanLinks(raw.links, id);
   if (links.length) item.links = links;
   return item;
@@ -18409,6 +18412,14 @@ var withLinks = (item, links) => {
 };
 function addFreeTextNode(items, node) {
   return addTextNode(items, { id: node.id, text: node.text, x: node.x, y: node.y });
+}
+function setTextNodeWidth(items, id, width) {
+  return items.map((item) => {
+    if (!isText(item) || item.id !== id) return item;
+    const { width: _old, ...rest } = item;
+    const next = clampTextWidth(width);
+    return next === void 0 ? rest : { ...rest, width: next };
+  });
 }
 function moveTextNode(items, id, dx, dy) {
   if (!finite(dx) || !finite(dy)) return [...items];
@@ -20088,113 +20099,6 @@ function radialPositions(input2) {
   return result;
 }
 
-// layouts/vertical.ts
-function verticalPositions(input2) {
-  const { roots, kidsOf, joinsOf, heightFor, column, rowGap, flip, left, top } = input2;
-  const widths = /* @__PURE__ */ new Map();
-  const spans = /* @__PURE__ */ new Map();
-  const rowWidth = (list) => list.reduce((total2, item) => total2 + widths.get(item.id), 0);
-  const measure = (node) => {
-    const kids = kidsOf(node);
-    const extra = joinsOf(node);
-    for (const child of [...kids, ...extra]) measure(child);
-    widths.set(node.id, Math.max(column, rowWidth(kids), rowWidth(extra)));
-    spans.set(node.id, 1 + Math.max(0, ...kids.map((kid) => spans.get(kid.id))));
-  };
-  const xs = /* @__PURE__ */ new Map();
-  const depths = /* @__PURE__ */ new Map();
-  const place = (node, depth, start) => {
-    const kids = kidsOf(node);
-    const extra = joinsOf(node);
-    const width = widths.get(node.id);
-    const row = (list, level) => {
-      let next2 = start + (width - rowWidth(list)) / 2;
-      return list.map((item) => {
-        place(item, level, next2);
-        const x = xs.get(item.id);
-        next2 += widths.get(item.id);
-        return x;
-      });
-    };
-    const kidXs = row(kids, depth + 1);
-    const joinXs = row(extra, depth + spans.get(node.id));
-    const own2 = kidXs.length ? kidXs : joinXs;
-    depths.set(node.id, depth);
-    xs.set(node.id, own2.length ? (own2[0] + own2[own2.length - 1]) / 2 : start);
-  };
-  let cursor = left;
-  const order = [];
-  const collect = (node) => {
-    order.push(node);
-    for (const child of [...kidsOf(node), ...joinsOf(node)]) collect(child);
-  };
-  for (const root of roots) {
-    measure(root);
-    place(root, 0, cursor);
-    cursor += widths.get(root.id);
-    collect(root);
-  }
-  const deepest = Math.max(0, ...depths.values());
-  const heights = Array.from({ length: deepest + 1 }, () => 0);
-  for (const node of order) heights[depths.get(node.id)] = Math.max(heights[depths.get(node.id)], heightFor(node));
-  const tops = [];
-  let next = top;
-  for (let step = 0; step <= deepest; step++) {
-    const level = flip ? deepest - step : step;
-    tops[level] = next;
-    next += heights[level] + rowGap;
-  }
-  const result = /* @__PURE__ */ new Map();
-  for (const node of order) {
-    const level = depths.get(node.id);
-    const y = flip ? tops[level] + heights[level] - heightFor(node) : tops[level];
-    result.set(node.id, { x: xs.get(node.id), y });
-  }
-  return result;
-}
-
-// layouts/timeline.ts
-function timelinePositions(input2) {
-  const { roots, kidsOf, joinsOf, heightFor, width, column, gap, left, top } = input2;
-  const result = /* @__PURE__ */ new Map();
-  let offset = top;
-  for (const root of roots) {
-    const heights = /* @__PURE__ */ new Map();
-    const measure = (node) => {
-      heights.set(node.id, heightFor(node));
-      for (const child of [...kidsOf(node), ...joinsOf(node)]) measure(child);
-    };
-    measure(root);
-    const cards = [{ id: root.id, x: left, y: 0 }];
-    let cursor = left + column;
-    [...kidsOf(root), ...joinsOf(root)].forEach((topic, index) => {
-      const placed = verticalPositions({
-        roots: [topic],
-        kidsOf,
-        joinsOf,
-        heightFor,
-        column,
-        rowGap: column - width,
-        flip: index % 2 === 1,
-        left: cursor,
-        top: 0
-      });
-      const axis = placed.get(topic.id).y;
-      let reach = cursor;
-      for (const [id, point] of placed) {
-        cards.push({ id, x: point.x, y: point.y - axis });
-        reach = Math.max(reach, point.x);
-      }
-      cursor = reach + column;
-    });
-    const minY = Math.min(...cards.map((card) => card.y));
-    const maxY = Math.max(...cards.map((card) => card.y + heights.get(card.id)));
-    for (const card of cards) result.set(card.id, { x: card.x, y: offset + card.y - minY });
-    offset += maxY - minY + gap;
-  }
-  return result;
-}
-
 // map-graph.ts
 var CARD_WIDTH = 280;
 var CARD_WIDTH_MIN = 200;
@@ -20274,11 +20178,132 @@ function applyCollapseLevel(nodes, shownLevels) {
   }
 }
 
+// layouts/vertical.ts
+function verticalPositions(input2) {
+  const { roots, kidsOf, joinsOf, heightFor, column, rowGap, flip, left, top } = input2;
+  const cardWidth = (node) => {
+    var _a2, _b2;
+    return (_b2 = (_a2 = input2.widthFor) == null ? void 0 : _a2.call(input2, node)) != null ? _b2 : CARD_WIDTH;
+  };
+  const widths = /* @__PURE__ */ new Map();
+  const spans = /* @__PURE__ */ new Map();
+  const rowWidth = (list) => list.reduce((total2, item) => total2 + widths.get(item.id), 0);
+  const measure = (node) => {
+    const kids = kidsOf(node);
+    const extra = joinsOf(node);
+    for (const child of [...kids, ...extra]) measure(child);
+    widths.set(node.id, Math.max(column, rowWidth(kids), rowWidth(extra), cardWidth(node) + column - CARD_WIDTH));
+    spans.set(node.id, 1 + Math.max(0, ...kids.map((kid) => spans.get(kid.id))));
+  };
+  const xs = /* @__PURE__ */ new Map();
+  const depths = /* @__PURE__ */ new Map();
+  const place = (node, depth, start) => {
+    const kids = kidsOf(node);
+    const extra = joinsOf(node);
+    const width = widths.get(node.id);
+    const row = (list, level) => {
+      let next2 = start + (width - rowWidth(list)) / 2;
+      return list.map((item) => {
+        place(item, level, next2);
+        const x = xs.get(item.id);
+        next2 += widths.get(item.id);
+        return x;
+      });
+    };
+    const kidXs = row(kids, depth + 1);
+    const joinXs = row(extra, depth + spans.get(node.id));
+    const own2 = kidXs.length ? kidXs : joinXs;
+    depths.set(node.id, depth);
+    const centres = (list, xsOf) => xsOf.map((x, i) => x + cardWidth(list[i]) / 2);
+    const ownList = kidXs.length ? kids : extra;
+    const ownCentres = centres(ownList, own2);
+    xs.set(
+      node.id,
+      own2.length ? (ownCentres[0] + ownCentres[ownCentres.length - 1]) / 2 - cardWidth(node) / 2 : start + Math.max(0, CARD_WIDTH - cardWidth(node)) / 2
+    );
+  };
+  let cursor = left;
+  const order = [];
+  const collect = (node) => {
+    order.push(node);
+    for (const child of [...kidsOf(node), ...joinsOf(node)]) collect(child);
+  };
+  for (const root of roots) {
+    measure(root);
+    place(root, 0, cursor);
+    cursor += widths.get(root.id);
+    collect(root);
+  }
+  const deepest = Math.max(0, ...depths.values());
+  const heights = Array.from({ length: deepest + 1 }, () => 0);
+  for (const node of order) heights[depths.get(node.id)] = Math.max(heights[depths.get(node.id)], heightFor(node));
+  const tops = [];
+  let next = top;
+  for (let step = 0; step <= deepest; step++) {
+    const level = flip ? deepest - step : step;
+    tops[level] = next;
+    next += heights[level] + rowGap;
+  }
+  const result = /* @__PURE__ */ new Map();
+  for (const node of order) {
+    const level = depths.get(node.id);
+    const y = flip ? tops[level] + heights[level] - heightFor(node) : tops[level];
+    result.set(node.id, { x: xs.get(node.id), y });
+  }
+  return result;
+}
+
+// layouts/timeline.ts
+function timelinePositions(input2) {
+  const { roots, kidsOf, joinsOf, heightFor, width, column, gap, left, top } = input2;
+  const result = /* @__PURE__ */ new Map();
+  let offset = top;
+  for (const root of roots) {
+    const heights = /* @__PURE__ */ new Map();
+    const measure = (node) => {
+      heights.set(node.id, heightFor(node));
+      for (const child of [...kidsOf(node), ...joinsOf(node)]) measure(child);
+    };
+    measure(root);
+    const cards = [{ id: root.id, x: left, y: 0 }];
+    let cursor = left + column;
+    [...kidsOf(root), ...joinsOf(root)].forEach((topic, index) => {
+      const placed = verticalPositions({
+        roots: [topic],
+        kidsOf,
+        joinsOf,
+        heightFor,
+        column,
+        rowGap: column - width,
+        flip: index % 2 === 1,
+        left: cursor,
+        top: 0
+      });
+      const axis = placed.get(topic.id).y;
+      let reach = cursor;
+      for (const [id, point] of placed) {
+        cards.push({ id, x: point.x, y: point.y - axis });
+        reach = Math.max(reach, point.x);
+      }
+      cursor = reach + column;
+    });
+    const minY = Math.min(...cards.map((card) => card.y));
+    const maxY = Math.max(...cards.map((card) => card.y + heights.get(card.id)));
+    for (const card of cards) result.set(card.id, { x: card.x, y: offset + card.y - minY });
+    offset += maxY - minY + gap;
+  }
+  return result;
+}
+
 // map-layout.ts
 var WIDTH = 300;
 function widthExcess(node) {
   var _a2;
   return Math.max(0, ((_a2 = node.width) != null ? _a2 : CARD_WIDTH) - CARD_WIDTH);
+}
+function textBlockWidth(node) {
+  var _a2;
+  return node.path === "" ? (_a2 = node.width) != null ? _a2 : CARD_WIDTH : CARD_WIDTH;
 }
 var LAYOUT_GAP = 24;
 var SPACING = {
@@ -20408,7 +20433,8 @@ function horizontalPositions(input2) {
   };
   for (const [id, point] of result) {
     const depth = depths.get(id);
-    point.x = left + sign * (depth * COLUMN + shiftAt(depth));
+    const narrow = sign < 0 ? Math.max(0, CARD_WIDTH - textBlockWidth(byId.get(id))) : 0;
+    point.x = left + sign * (depth * COLUMN + shiftAt(depth)) + narrow;
   }
   return { placed: result, sizes };
 }
@@ -20470,7 +20496,15 @@ function positions(nodes, roots, left, top, folded2 = false, heightOf, layout = 
   const heightFor = (node) => cardHeight(heightOf, node.id);
   const engine = (kind, tree2) => {
     if (kind === "down" || kind === "up")
-      return verticalPositions({ ...tree2, column: COLUMN, rowGap: COLUMN - WIDTH, flip: kind === "up", left, top });
+      return verticalPositions({
+        ...tree2,
+        column: COLUMN,
+        rowGap: COLUMN - WIDTH,
+        flip: kind === "up",
+        left,
+        top,
+        widthFor: textBlockWidth
+      });
     const flat = { ...tree2, column: COLUMN, gap: LAYOUT_GAP2, left, top };
     if (kind === "radial") return radialPositions({ ...flat, width: WIDTH });
     if (kind === "timeline") return timelinePositions({ ...flat, width: WIDTH });
@@ -21378,8 +21412,8 @@ var History = class {
    * Drops the entries pushed since `mark`, so work done in between leaves no undo step; entries from before the mark stay.
    * When the history was cleared since the mark, every entry now in it was pushed after the mark and is dropped.
    */
-  discardSince(mark) {
-    const start = mark.epoch === this.epoch ? Math.max(0, mark.length - (this.dropped - mark.dropped)) : 0;
+  discardSince(mark2) {
+    const start = mark2.epoch === this.epoch ? Math.max(0, mark2.length - (this.dropped - mark2.dropped)) : 0;
     if (start < this.past.length) this.past.splice(start);
   }
   /**
@@ -21387,9 +21421,9 @@ var History = class {
    * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
    * undo/redo is read when it runs, so later patches to an entry (a wrapper replaced after push) still apply.
    */
-  collapseSince(mark, label) {
-    if (mark.epoch !== this.epoch) return;
-    const start = Math.max(0, mark.length - (this.dropped - mark.dropped));
+  collapseSince(mark2, label) {
+    if (mark2.epoch !== this.epoch) return;
+    const start = Math.max(0, mark2.length - (this.dropped - mark2.dropped));
     if (this.past.length - start < 2) return;
     const all = this.past.splice(start);
     const entries = all.filter((entry) => !this.solo.has(entry));
@@ -23469,24 +23503,6 @@ function chatDockedWidth(paneWidth, setWidth, inspector = 0) {
 function chatOverlayWidth(paneWidth, setWidth) {
   return Math.max(MAP_CHAT_WIDTH_MIN, Math.min(setWidth, paneWidth - MAP_CHAT_OVERLAY_MARGIN));
 }
-function chatSuggestionKeys(context) {
-  const keys = !context.hasTopics ? ["ui.map_chat_example_research", "ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"] : context.selected > 1 ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"] : context.selected === 1 ? ["ui.map_chat_suggest_one_expand", "ui.map_chat_suggest_one_research", "ui.map_chat_suggest_one_summary"] : ["ui.map_chat_suggest_all_missing", "ui.map_chat_suggest_all_layout", "ui.map_chat_suggest_all_collapse"];
-  if (context.hasNote)
-    keys.push(context.hasTopics ? "ui.map_chat_suggest_note_add" : "ui.map_chat_suggest_empty_from_note");
-  return keys;
-}
-var MAP_CHAT_OPEN_ENDED_KEYS = [
-  "ui.map_chat_suggest_empty_build",
-  "ui.map_chat_suggest_empty_new_map"
-];
-function chatSuggestionFill(text11, openEnded) {
-  return openEnded && /[A-Za-z]$/.test(text11) ? `${text11} ` : text11;
-}
-var MAP_CHAT_EXAMPLE_KEYS = [
-  "ui.map_chat_example_research",
-  "ui.map_chat_example_learn",
-  "ui.map_chat_example_decide"
-];
 var noteSet = (notes) => notes === void 0 ? [] : typeof notes === "string" ? [notes] : notes;
 function splitChatLines(lines, notes) {
   const texts2 = noteSet(notes);
@@ -28194,11 +28210,12 @@ var import_obsidian37 = require("obsidian");
 
 // ui/map-sources-panel.ts
 var import_obsidian15 = require("obsidian");
+var newMapSourcesSession = () => ({ rejected: [], fresh: [], added: "" });
 var ICONS = { map: "brain-circuit", folder: "folder-open", file: "file-text" };
-var PICK_LABELS = {
-  map: "ui.reference_select_mind_map",
-  folder: "ui.reference_select_folder",
-  file: "ui.reference_select_markdown"
+var KIND_LABELS = {
+  map: "ui.map_sources_kind_map",
+  folder: "ui.map_sources_kind_folder",
+  file: "ui.map_sources_kind_file"
 };
 var baseName3 = (path) => path.split("/").at(-1) || path;
 function mapSourceName(app, source) {
@@ -28247,78 +28264,233 @@ function vaultFolders(app) {
 function vaultMarkdown(app) {
   return app.vault.getMarkdownFiles().map((file) => file.path).sort((a, b) => a.localeCompare(b));
 }
-async function openPicker(host, kind, returnFocus) {
-  const choose = (path) => host.add({ kind, path });
-  let modal;
-  if (kind === "map") {
-    const items = (await host.mapItems()).filter((item) => item.mapPath !== host.currentMapPath).sort((a, b) => b.modified - a.modified || a.title.localeCompare(b.title));
-    modal = new MapSourcePickerModal(
-      host.app,
-      items,
-      (item) => `${item.title} ${item.folder}`.trim(),
-      t("ui.map_sources_pick_map_placeholder"),
-      t("ui.map_sources_no_other_maps"),
-      (item) => choose(item.mapPath),
-      (item, el) => {
-        el.addClass("mod-complex");
-        const content = el.createDiv("suggestion-content");
-        content.createDiv({ cls: "suggestion-title", text: item.title, attr: { dir: "auto" } });
-        if (item.folder) content.createDiv({ cls: "suggestion-note", text: item.folder });
-      }
-    );
-  } else {
-    const folder = kind === "folder";
-    modal = new MapSourcePickerModal(
-      host.app,
-      folder ? vaultFolders(host.app) : vaultMarkdown(host.app),
-      (path) => path,
-      t(folder ? "ui.map_sources_pick_folder_placeholder" : "ui.map_sources_pick_file_placeholder"),
-      t(folder ? "ui.map_sources_no_folders" : "ui.map_sources_no_files"),
-      choose
-    );
+var dirName = (path) => path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+var sourceKey = (source) => `${source.kind}:${source.path}`;
+function isDragSourceTarget(node) {
+  const el = node;
+  return typeof (el == null ? void 0 : el.closest) === "function" && !!el.closest('[draggable="true"]');
+}
+function dragManagerPaths(app) {
+  var _a2;
+  const draggable = (_a2 = app.dragManager) == null ? void 0 : _a2.draggable;
+  if (!draggable || typeof draggable !== "object") return null;
+  const { type, file, files } = draggable;
+  const paths = [];
+  if ((type === "file" || type === "folder") && typeof (file == null ? void 0 : file.path) === "string") paths.push(file.path);
+  else if (type === "files" && Array.isArray(files)) {
+    for (const item of files)
+      if (typeof (item == null ? void 0 : item.path) === "string") paths.push(item.path);
   }
-  host.setPickerOpen(true);
-  const hostClose = modal.onClose;
-  modal.onClose = () => {
-    hostClose == null ? void 0 : hostClose.call(modal);
-    host.setPickerOpen(false);
-    if (returnFocus.isConnected !== false) returnFocus.focus();
-  };
-  modal.open();
+  return paths.length ? paths : null;
+}
+function pathFromLine(line) {
+  var _a2;
+  const text11 = line.trim();
+  if (!text11 || text11.startsWith("#")) return null;
+  if (/^obsidian:\/\//i.test(text11)) {
+    const file = (_a2 = text11.match(/[?&]file=([^&#]*)/i)) == null ? void 0 : _a2[1];
+    if (file === void 0) return "";
+    try {
+      return decodeURIComponent(file);
+    } catch (e) {
+      return file;
+    }
+  }
+  const link = text11.match(/^\[\[([^\]|#]+)/);
+  return link ? link[1] : text11;
+}
+function lineName(line) {
+  var _a2;
+  let last = (_a2 = line.split(/[\\/]/).filter(Boolean).at(-1)) != null ? _a2 : line;
+  try {
+    last = decodeURIComponent(last);
+  } catch (e) {
+  }
+  return last;
+}
+function resolveInVault(app, path) {
+  if (!path) return null;
+  if (app.vault.getAbstractFileByPath(path)) return path;
+  return !/\.[^/]+$/.test(path) && app.vault.getAbstractFileByPath(`${path}.md`) ? `${path}.md` : null;
+}
+function readDrag(app, data) {
+  var _a2, _b2;
+  const read = { inside: [], outside: [] };
+  if (!data) return read;
+  const types = Array.from((_a2 = data.types) != null ? _a2 : []);
+  const files = Array.from((_b2 = data.files) != null ? _b2 : []);
+  if (types.includes("Files") || files.length) {
+    for (const file of files) read.outside.push(file.name);
+    if (!files.length) read.outside.push(t("ui.map_sources_drop_items_0", 1));
+    return read;
+  }
+  const lines = [];
+  const managed = dragManagerPaths(app);
+  if (managed) lines.push(...managed);
+  else
+    for (const type of ["text/uri-list", "text/plain"]) {
+      const text11 = typeof data.getData === "function" ? data.getData(type) : "";
+      if (text11) {
+        lines.push(...text11.split(/\r?\n/));
+        break;
+      }
+    }
+  const seen = /* @__PURE__ */ new Set();
+  for (const line of lines) {
+    const raw = managed ? line : pathFromLine(line);
+    if (raw === null) continue;
+    const path = resolveInVault(app, raw);
+    if (path === null) read.outside.push(lineName(raw || line));
+    else if (!seen.has(path)) {
+      seen.add(path);
+      read.inside.push({ path, name: baseName3(path) });
+    }
+  }
+  return read;
+}
+function hoverLabel(app) {
+  const paths = dragManagerPaths(app);
+  if (!paths) return "";
+  return paths.length === 1 ? baseName3(paths[0]) : t("ui.map_sources_drop_items_0", paths.length);
+}
+function classify(app, path, mapPaths, currentMapPath) {
+  const item = app.vault.getAbstractFileByPath(path);
+  if (path === currentMapPath || item instanceof import_obsidian15.TFolder && path === dirName(currentMapPath))
+    return { reason: t("ui.map_sources_reject_current") };
+  if (item instanceof import_obsidian15.TFile) {
+    if (mapPaths.includes(path)) return { source: { kind: "map", path } };
+    return item.extension.toLowerCase() === "md" ? { source: { kind: "file", path } } : { reason: t("ui.map_sources_reject_type") };
+  }
+  if (item instanceof import_obsidian15.TFolder) {
+    const map = mapPaths.find((mapPath) => dirName(mapPath) === path);
+    return map ? { source: { kind: "map", path: map } } : { source: { kind: "folder", path } };
+  }
+  return { reason: t("ui.map_sources_reject_outside") };
+}
+async function searchItems(host) {
+  const maps = await host.mapItems().catch(() => []);
+  const mapPaths = /* @__PURE__ */ new Set([...maps.map((item) => item.mapPath), host.currentMapPath]);
+  const mapFolders = new Set([...mapPaths].map(dirName));
+  const others = maps.filter((item) => item.mapPath !== host.currentMapPath).sort((a, b) => b.modified - a.modified || a.title.localeCompare(b.title)).map((item) => ({ kind: "map", path: item.mapPath, title: item.title, detail: item.folder }));
+  const folders = vaultFolders(host.app).filter((path) => !mapFolders.has(path)).map((path) => ({ kind: "folder", path, title: baseName3(path), detail: dirName(path) }));
+  const files = vaultMarkdown(host.app).filter((path) => !mapPaths.has(path)).map((path) => ({ kind: "file", path, title: baseName3(path), detail: dirName(path) }));
+  return [...others, ...folders, ...files];
 }
 function drawMapSourcesPanel(parent, host, focus) {
-  var _a2, _b2, _c;
+  var _a2, _b2, _c, _d, _e;
+  const session = (_a2 = host.session) != null ? _a2 : host.session = newMapSourcesSession();
   const panel = parent.createDiv({
     cls: "vam-map-sources-panel",
     attr: { id: host.id, role: "dialog", "aria-label": t("ui.map_sources_title") }
   });
   panel.createEl("h3", { text: t("ui.map_sources_title"), cls: "vam-map-sources-title" });
   panel.createEl("p", { text: t("ui.map_sources_intro"), cls: "vam-hint vam-map-sources-intro" });
-  const pickers = /* @__PURE__ */ new Map();
-  const actions = panel.createDiv("vam-map-sources-actions");
-  for (const kind of ["map", "folder", "file"]) {
-    const pick = actions.createEl("button", { cls: "vam-map-sources-pick" });
-    (0, import_obsidian15.setIcon)(pick.createSpan({ cls: "vam-map-sources-pick-icon", attr: { "aria-hidden": "true" } }), ICONS[kind]);
-    pick.createSpan({ cls: "vam-map-sources-pick-label", text: t(PICK_LABELS[kind]) });
-    pick.addEventListener("click", (event) => {
-      event.stopPropagation();
-      void openPicker(host, kind, pick);
-    });
-    pickers.set(kind, pick);
-  }
+  const hintId = `${host.id}-drop-hint`;
+  const zone = panel.createDiv({
+    cls: "vam-map-sources-drop",
+    attr: { role: "group", "aria-label": t("ui.map_sources_drop_main"), "aria-describedby": hintId }
+  });
+  const dropMain = zone.createSpan({ cls: "vam-map-sources-drop-main" });
+  const dropSub = zone.createSpan({ cls: "vam-map-sources-drop-sub", attr: { id: hintId } });
+  const dropResult = zone.createDiv({ cls: "vam-map-sources-drop-result" });
+  let hover = null;
+  const paint = () => {
+    const rejected = hover === null && session.rejected.length > 0;
+    zone.toggleClass("is-dragover", hover !== null);
+    zone.toggleClass("is-rejected", rejected);
+    dropMain.setText(
+      hover !== null ? t("ui.map_sources_drop_release") : rejected ? t("ui.map_sources_reject_title_0", session.rejected.length) : t("ui.map_sources_drop_main")
+    );
+    dropSub.setText(hover ? hover : t("ui.map_sources_drop_hint"));
+  };
+  const paintResult = () => {
+    dropResult.empty();
+    if (hover !== null) return;
+    if (session.added) dropResult.createDiv({ cls: "vam-map-sources-drop-ok", text: session.added });
+    for (const line of session.rejected) dropResult.createDiv({ cls: "vam-map-sources-drop-line", text: line });
+  };
+  const repaint = () => {
+    paint();
+    paintResult();
+  };
+  repaint();
+  const commit = async (items, outside) => {
+    var _a3;
+    const mapPaths = (await host.mapItems().catch(() => [])).map((item) => item.mapPath);
+    const lines = outside.map((name2) => t("ui.map_sources_reject_line_0", name2, t("ui.map_sources_reject_outside")));
+    const accepted = [];
+    for (const item of items) {
+      const result = classify(host.app, item.path, mapPaths, host.currentMapPath);
+      if ("reason" in result) {
+        lines.push(t("ui.map_sources_reject_line_0", item.name, result.reason));
+        continue;
+      }
+      const key2 = sourceKey(result.source);
+      if (host.sources.some((source) => sourceKey(source) === key2) || accepted.some((source) => sourceKey(source) === key2))
+        lines.push(t("ui.map_sources_already_added_0", item.name));
+      else accepted.push(result.source);
+    }
+    session.rejected = lines;
+    session.fresh = accepted.map(sourceKey);
+    session.added = !accepted.length ? "" : accepted.length === 1 ? t("ui.map_sources_added_one_0", mapSourceName(host.app, accepted[0])) : t("ui.map_sources_added_many_0", accepted.length);
+    repaint();
+    const spoken = [session.added, ...lines].filter(Boolean).join(" ");
+    if (spoken) (_a3 = host.announce) == null ? void 0 : _a3.call(host, spoken);
+    for (const source of accepted) host.add(source, true);
+  };
+  const accept = (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    if (hover !== null) return;
+    hover = hoverLabel(host.app);
+    repaint();
+  };
+  zone.addEventListener("dragenter", accept);
+  zone.addEventListener("dragover", accept);
+  zone.addEventListener("dragleave", (event) => {
+    if (event.relatedTarget && zone.contains(event.relatedTarget)) return;
+    hover = null;
+    repaint();
+  });
+  (_b2 = host.onDragEnd) == null ? void 0 : _b2.call(host, () => {
+    if (hover === null) return;
+    hover = null;
+    repaint();
+  });
+  zone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    hover = null;
+    const read = readDrag(host.app, event.dataTransfer);
+    if (!read.inside.length && !read.outside.length) return repaint();
+    void commit(read.inside, read.outside);
+  });
+  const search = panel.createEl("button", { cls: "vam-map-sources-search" });
+  (0, import_obsidian15.setIcon)(search.createSpan({ cls: "vam-map-sources-pick-icon", attr: { "aria-hidden": "true" } }), "search");
+  search.createSpan({ cls: "vam-map-sources-pick-label", text: t("ui.map_sources_search") });
+  search.addEventListener("click", (event) => {
+    event.stopPropagation();
+    session.rejected = [];
+    session.added = "";
+    repaint();
+    void openSearch(host, search, (items) => void commit(items, []));
+  });
   const list = panel.createDiv({ cls: "vam-map-sources-list", attr: { role: "list" } });
   const removers = [];
   if (!host.sources.length)
     list.createEl("p", { text: t("ui.map_sources_none"), cls: "vam-hint vam-map-sources-empty" });
-  for (const source of host.sources) {
+  const fresh = (source) => session.fresh.indexOf(sourceKey(source));
+  const order = host.sources.map((source, index) => ({ source, index })).sort((a, b) => (fresh(a.source) < 0 ? 1 : 0) - (fresh(b.source) < 0 ? 1 : 0) || fresh(a.source) - fresh(b.source));
+  for (const { source, index } of order) {
     const status = mapSourceStatus(host.app, source);
     const name2 = mapSourceName(host.app, source);
     const row = list.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
     row.toggleClass("is-unreadable", !status.exists);
+    row.toggleClass("is-new", fresh(source) >= 0);
     (0, import_obsidian15.setIcon)(row.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), ICONS[source.kind]);
     row.createSpan({ cls: "vam-map-sources-name", text: name2, attr: { title: source.path, dir: "auto" } });
-    const meta = !status.exists ? t("ui.map_sources_unreadable_row") : source.kind === "folder" ? t("ui.map_sources_folder_count_0", (_a2 = status.count) != null ? _a2 : 0) : source.kind === "map" ? t("ui.map_sources_kind_map") : "";
-    if (meta) row.createSpan({ cls: "vam-map-sources-meta", text: meta });
+    const meta = !status.exists ? t("ui.map_sources_unreadable_row") : source.kind === "folder" ? t("ui.map_sources_folder_count_0", (_c = status.count) != null ? _c : 0) : t(KIND_LABELS[source.kind]);
+    row.createSpan({ cls: "vam-map-sources-meta", text: meta });
     const remove = row.createEl("button", {
       cls: "vam-map-sources-remove",
       text: t("ui.reference_remove"),
@@ -28326,9 +28498,12 @@ function drawMapSourcesPanel(parent, host, focus) {
     });
     remove.addEventListener("click", (event) => {
       event.stopPropagation();
+      session.rejected = [];
+      session.added = "";
+      session.fresh = [];
       host.remove(source);
     });
-    removers.push(remove);
+    removers[index] = remove;
   }
   panel.createEl("p", { text: t("ui.reference_time_and_citations_hint"), cls: "vam-hint vam-map-sources-hint" });
   panel.addEventListener("keydown", (event) => {
@@ -28337,19 +28512,48 @@ function drawMapSourcesPanel(parent, host, focus) {
     event.stopPropagation();
     host.close(true);
   });
-  for (const control of [...pickers.values(), ...removers])
+  for (const control of [search, ...removers.filter(Boolean)])
     control.addEventListener("mousedown", (e) => e.preventDefault());
   panel.addEventListener("focusout", (event) => {
     const next = event.relatedTarget;
-    if (!next || host.isPickerOpen() || panel.contains(next) || next === host.button()) return;
+    if (!next || host.isPickerOpen() || panel.contains(next) || next === host.button() || isDragSourceTarget(next))
+      return;
     host.close(false);
   });
-  (_b2 = host.panelCreated) == null ? void 0 : _b2.call(host, panel);
+  (_d = host.panelCreated) == null ? void 0 : _d.call(host, panel);
   if (focus) {
-    const target = "picker" in focus ? pickers.get(focus.picker) : (_c = removers[focus.remove]) != null ? _c : pickers.get("map");
-    target == null ? void 0 : target.focus();
+    const target = "search" in focus ? search : (_e = removers[focus.remove]) != null ? _e : search;
+    target.focus();
   }
   return panel;
+}
+async function openSearch(host, returnFocus, choose) {
+  const modal = new MapSourcePickerModal(
+    host.app,
+    await searchItems(host),
+    (item) => `${item.title} ${item.detail}`.trim(),
+    t("ui.map_sources_search_placeholder"),
+    t("ui.map_sources_search_empty"),
+    (item) => choose([{ path: item.path, name: item.title }]),
+    (item, el) => {
+      el.addClass("mod-complex");
+      const content = el.createDiv("suggestion-content");
+      content.createDiv({ cls: "suggestion-title", text: item.title, attr: { dir: "auto" } });
+      if (item.detail) content.createDiv({ cls: "suggestion-note", text: item.detail });
+      el.createDiv({ cls: "suggestion-aux" }).createSpan({
+        cls: "vam-map-sources-kind",
+        text: t(KIND_LABELS[item.kind])
+      });
+    }
+  );
+  host.setPickerOpen(true);
+  const hostClose = modal.onClose;
+  modal.onClose = () => {
+    hostClose == null ? void 0 : hostClose.call(modal);
+    host.setPickerOpen(false);
+    if (returnFocus.isConnected !== false) returnFocus.focus();
+  };
+  modal.open();
 }
 
 // ai/provider-error.ts
@@ -28636,11 +28840,14 @@ function isEntry(value) {
   if (!isRecord3(value)) return false;
   return typeof value.at === "string" && !Number.isNaN(Date.parse(value.at)) && isAction(value.action) && (value.mapPath === void 0 || typeof value.mapPath === "string") && (value.topic === void 0 || typeof value.topic === "string") && (value.provider === "claude" || value.provider === "codex") && typeof value.model === "string" && isTokens(value) && typeof value.estimated === "boolean" && (value.durationMs === void 0 || isCount(value.durationMs));
 }
+var isFolded = (value) => isTokens(value) && (value.estimated === void 0 || value.estimated === true);
+var isMaps = (value) => isRecord3(value) && Object.values(value).every(
+  (actions) => isRecord3(actions) && Object.entries(actions).every(([key2, tokens2]) => isAction(key2) && isFolded(tokens2))
+);
 function isBucket(value) {
-  if (!isRecord3(value) || !isRecord3(value.maps)) return false;
-  return Object.values(value.maps).every(
-    (actions) => isRecord3(actions) && Object.entries(actions).every(([key2, tokens2]) => isAction(key2) && isTokens(tokens2))
-  );
+  if (!isRecord3(value) || !isMaps(value.maps)) return false;
+  if (value.providers === void 0) return true;
+  return isRecord3(value.providers) && Object.entries(value.providers).every(([key2, maps]) => (key2 === "claude" || key2 === "codex") && isMaps(maps));
 }
 function localDayStart(now = Date.now()) {
   const date = new Date(now);
@@ -28720,30 +28927,35 @@ var AiUsageStore = class {
       this.onError(error);
     }
   }
-  /** Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all. */
+  /**
+   * Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all, and one provider
+   * or both. Folded months keep a per-provider breakdown; months folded before it existed count under Total only.
+   */
   totals(query = {}) {
     if (this.loadError) return { status: "unreadable" };
     const sum2 = ZERO();
-    this.each(query, (_action, tokens2) => {
+    this.each(query, (_action, tokens2, estimated) => {
       sum2.inputTokens += tokens2.inputTokens;
       sum2.outputTokens += tokens2.outputTokens;
+      if (estimated) sum2.estimated = true;
     });
     return { status: "ready", value: sum2 };
   }
-  /** Tokens of one map per action (all five keys present); sums to `totals({ mapPath, since })`. */
-  byAction(mapPath, since) {
+  /** Tokens of one map per action (all five keys present); sums to `totals({ mapPath, since, provider })`. */
+  byAction(mapPath, since, provider) {
     if (this.loadError) return { status: "unreadable" };
     const result = Object.fromEntries(USAGE_ACTIONS.map((action) => [action, ZERO()]));
-    this.each({ mapPath, since }, (action, tokens2) => {
+    this.each({ mapPath, since, provider }, (action, tokens2, estimated) => {
       result[action].inputTokens += tokens2.inputTokens;
       result[action].outputTokens += tokens2.outputTokens;
+      if (estimated) result[action].estimated = true;
     });
     return { status: "ready", value: result };
   }
-  /** The newest `limit` detail rows of one map (all maps when absent), newest first. */
-  recent(mapPath, limit = 10) {
+  /** The newest `limit` detail rows of one map (all maps when absent) and one provider (both when absent), newest first. */
+  recent(mapPath, limit = 10, provider) {
     if (this.loadError) return { status: "unreadable" };
-    const rows2 = this.entries.filter((entry) => mapPath === void 0 || entry.mapPath === mapPath).sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit).map((entry) => ({ ...entry }));
+    const rows2 = this.entries.filter((entry) => mapPath === void 0 || entry.mapPath === mapPath).filter((entry) => provider === void 0 || entry.provider === provider).sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit).map((entry) => ({ ...entry }));
     return { status: "ready", value: rows2 };
   }
   /** Called after every recorded call and after load (also when load failed). Returns the unsubscribe function. */
@@ -28764,23 +28976,28 @@ var AiUsageStore = class {
     await this.writes;
   }
   each(query, visit) {
-    const { mapPath, since } = query;
+    var _a2;
+    const { mapPath, since, provider } = query;
     for (const entry of this.entries) {
       if (mapPath !== void 0 && entry.mapPath !== mapPath) continue;
+      if (provider !== void 0 && entry.provider !== provider) continue;
       if (since !== void 0 && Date.parse(entry.at) < since) continue;
-      visit(entry.action, entry);
+      visit(entry.action, entry, entry.estimated);
     }
     for (const [key2, bucket] of Object.entries(this.monthly)) {
       if (since !== void 0 && monthStartOf(key2) < since) continue;
-      for (const [path, actions] of Object.entries(bucket.maps)) {
+      const maps = provider === void 0 ? bucket.maps : (_a2 = bucket.providers) == null ? void 0 : _a2[provider];
+      if (!maps) continue;
+      for (const [path, actions] of Object.entries(maps)) {
         if (mapPath !== void 0 && path !== mapPath) continue;
-        for (const [action, tokens2] of Object.entries(actions)) visit(action, tokens2);
+        for (const [action, tokens2] of Object.entries(actions))
+          if (tokens2) visit(action, tokens2, tokens2.estimated === true);
       }
     }
   }
   /** Folds rows older than the detail window into their month. */
   compact() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const cutoff = this.now() - USAGE_DETAIL_DAYS * 864e5;
     const keep = [];
     for (const entry of this.entries) {
@@ -28790,10 +29007,14 @@ var AiUsageStore = class {
         continue;
       }
       const bucket = (_c = (_a2 = this.monthly)[_b2 = monthKey(time)]) != null ? _c : _a2[_b2] = { maps: {} };
-      const actions = (_g = (_e = bucket.maps)[_f = (_d = entry.mapPath) != null ? _d : ""]) != null ? _g : _e[_f] = {};
-      const tokens2 = (_i = actions[_h = entry.action]) != null ? _i : actions[_h] = ZERO();
-      tokens2.inputTokens += entry.inputTokens;
-      tokens2.outputTokens += entry.outputTokens;
+      const perProvider = (_g = (_e = (_d = bucket.providers) != null ? _d : bucket.providers = {})[_f = entry.provider]) != null ? _g : _e[_f] = {};
+      for (const maps of [bucket.maps, perProvider]) {
+        const actions = (_j = maps[_i = (_h = entry.mapPath) != null ? _h : ""]) != null ? _j : maps[_i] = {};
+        const tokens2 = (_l = actions[_k = entry.action]) != null ? _l : actions[_k] = ZERO();
+        tokens2.inputTokens += entry.inputTokens;
+        tokens2.outputTokens += entry.outputTokens;
+        if (entry.estimated) tokens2.estimated = true;
+      }
     }
     this.entries = keep;
   }
@@ -28843,6 +29064,9 @@ var clock = (iso) => {
 };
 var actionLabel = (action) => t(`ui.usage_action_${action}`);
 var sum = (tokens2) => tokens2.inputTokens + tokens2.outputTokens;
+var mark = (count, estimated) => estimated ? t("ui.usage_estimated_0", formatTokens(count)) : formatTokens(count);
+var FILTERS = ["total", "claude", "codex"];
+var FILTER_LABEL = { total: "Total", claude: "Claude", codex: "Codex" };
 var UsageControl = class {
   constructor(store, mapPath) {
     this.store = store;
@@ -28855,6 +29079,7 @@ var UsageControl = class {
     __publicField(this, "parts", null);
     __publicField(this, "doc", null);
     __publicField(this, "isOpen", false);
+    __publicField(this, "filter", "total");
     __publicField(this, "onKey", (event) => {
       var _a2;
       if (event.key !== "Escape" || !this.isOpen) return;
@@ -28918,6 +29143,7 @@ var UsageControl = class {
     var _a2;
     if (!this.overlay || this.isOpen) return;
     this.isOpen = true;
+    this.filter = "total";
     (_a2 = this.button) == null ? void 0 : _a2.setAttr("aria-expanded", "true");
     this.attachPanel();
     this.refresh();
@@ -28986,7 +29212,24 @@ var UsageControl = class {
     root.setAttr("tabindex", "0");
     const head = root.createEl("h3", { cls: "vam-usage-title" });
     head.createSpan({ text: t("ui.usage_panel_title") });
-    head.createSpan({ cls: "vam-usage-faint", text: t("ui.usage_panel_providers") });
+    const group = head.createSpan({ cls: "vam-usage-filter" });
+    group.setAttr("role", "radiogroup");
+    group.setAttr("aria-label", t("ui.usage_filter_label"));
+    const filters = /* @__PURE__ */ new Map();
+    for (const value of FILTERS) {
+      const radio = group.createEl("button", { cls: "vam-usage-filter-option", text: FILTER_LABEL[value] });
+      radio.setAttr("type", "button");
+      radio.setAttr("role", "radio");
+      radio.addEventListener("click", () => this.select(value, false));
+      filters.set(value, radio);
+    }
+    group.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.select(FILTERS[(FILTERS.indexOf(this.filter) + step + FILTERS.length) % FILTERS.length], true);
+    });
     const error = root.createEl("p", { cls: "vam-usage-error", text: t("ui.usage_unreadable") });
     error.setAttr("role", "status");
     error.hidden = true;
@@ -29034,7 +29277,11 @@ var UsageControl = class {
       row.hidden = true;
       rows2.push({ row, time, action, node, tokens: tokens2, duration });
     }
-    root.createDiv({ cls: "vam-usage-foot", text: t("ui.usage_footer") });
+    const foot = root.createDiv({ cls: "vam-usage-foot" });
+    foot.createDiv({ text: t("ui.usage_footer_scope") });
+    const footEstimates = foot.createDiv({ text: t("ui.usage_footer_estimates") });
+    footEstimates.hidden = true;
+    this.markFilters(filters);
     return {
       root,
       sections: [totalsSection, barsSection, recentSection],
@@ -29044,19 +29291,41 @@ var UsageControl = class {
       bars,
       barsBox,
       rows: rows2,
-      recentBox
+      recentBox,
+      filters,
+      footEstimates
     };
+  }
+  /** Picks one provider view; the chosen radio gets the focus when the choice came from the keyboard. */
+  select(value, focus) {
+    var _a2;
+    this.filter = value;
+    const parts = this.parts;
+    if (!parts) return;
+    this.markFilters(parts.filters);
+    if (focus) (_a2 = parts.filters.get(value)) == null ? void 0 : _a2.focus();
+    this.fillPanel(parts);
+  }
+  markFilters(filters) {
+    for (const [value, radio] of filters) {
+      const on = value === this.filter;
+      radio.setAttr("aria-checked", String(on));
+      radio.setAttr("tabindex", on ? "0" : "-1");
+      radio.toggleClass("is-selected", on);
+    }
   }
   fillPanel(parts) {
     const path = this.mapPath();
-    const map = this.store.totals({ mapPath: path });
-    const today = this.store.totals({ since: localDayStart() });
-    const month = this.store.totals({ since: localMonthStart() });
-    const actions = this.store.byAction(path);
-    const recent = this.store.recent(path, RECENT_ROWS);
+    const provider = this.filter === "total" ? void 0 : this.filter;
+    const map = this.store.totals({ mapPath: path, provider });
+    const today = this.store.totals({ since: localDayStart(), provider });
+    const month = this.store.totals({ since: localMonthStart(), provider });
+    const actions = this.store.byAction(path, void 0, provider);
+    const recent = this.store.recent(path, RECENT_ROWS, provider);
     if (map.status === "unreadable" || today.status === "unreadable" || month.status === "unreadable" || actions.status === "unreadable" || recent.status === "unreadable") {
       parts.error.hidden = false;
       parts.empty.hidden = true;
+      parts.footEstimates.hidden = true;
       for (const section3 of parts.sections) section3.hidden = true;
       this.place();
       return;
@@ -29064,7 +29333,7 @@ var UsageControl = class {
     parts.error.hidden = true;
     for (const section3 of parts.sections) section3.hidden = false;
     const total2 = (cell, tokens2) => {
-      cell.strong.setText(formatTokens(sum(tokens2)));
+      cell.strong.setText(mark(sum(tokens2), tokens2.estimated));
       cell.input.setText(t("ui.usage_in_0", formatTokens(tokens2.inputTokens)));
       cell.output.setText(t("ui.usage_out_0", formatTokens(tokens2.outputTokens)));
     };
@@ -29075,15 +29344,19 @@ var UsageControl = class {
     parts.empty.hidden = !noUsage;
     parts.sections[1].hidden = noUsage;
     parts.sections[2].hidden = noUsage;
+    let anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
     const biggest = Math.max(0, ...USAGE_ACTIONS.map((action) => sum(actions.value[action])));
     for (const action of USAGE_ACTIONS) {
       const used = sum(actions.value[action]);
       const bar = parts.bars.get(action);
       bar.row.hidden = used === 0;
       bar.fill.style.setProperty("width", `${biggest ? Math.max(2, Math.round(used / biggest * 100)) : 0}%`);
-      bar.value.setText(formatTokens(used));
+      bar.value.setText(mark(used, actions.value[action].estimated));
+      if (!noUsage && used > 0 && actions.value[action].estimated) anyEstimate = true;
     }
     parts.rows.forEach((slot, index) => this.fillRow(slot, recent.value[index]));
+    if (!noUsage && recent.value.some((entry) => entry.estimated)) anyEstimate = true;
+    parts.footEstimates.hidden = !anyEstimate;
     this.place();
   }
   fillRow(slot, entry) {
@@ -29306,14 +29579,19 @@ function visibleTexts(nodes, items, hidden) {
     return parent !== void 0 && !parent.collapsed && !(hidden == null ? void 0 : hidden.has(parent.id));
   });
 }
-var asLeaf = (text11) => ({
-  id: text11.id,
-  path: "",
-  parentId: text11.parentId,
-  x: text11.x,
-  y: text11.y,
-  collapsed: false
-});
+var asLeaf = (widthOf) => (text11) => {
+  var _a2;
+  const width = (_a2 = widthOf == null ? void 0 : widthOf(text11.id)) != null ? _a2 : text11.width;
+  return {
+    id: text11.id,
+    path: "",
+    parentId: text11.parentId,
+    x: text11.x,
+    y: text11.y,
+    collapsed: false,
+    ...width !== void 0 ? { width } : {}
+  };
+};
 function withTextPositions(items, texts2, placed) {
   const at = new Map(placed.map((node) => [node.id, node]));
   const mine = new Set(texts2.map((text11) => text11.id));
@@ -29326,7 +29604,7 @@ function withTextPositions(items, texts2, placed) {
 function arrangeMapWithText(nodes, items, hidden, heightOf, layout = "right", options = {}) {
   const texts2 = visibleTexts(nodes, items, hidden);
   if (!texts2.length) return { nodes: arrangeMap(nodes, hidden, heightOf, layout, options), items: [...items] };
-  const placed = arrangeMap([...nodes, ...texts2.map(asLeaf)], hidden, heightOf, layout, options);
+  const placed = arrangeMap([...nodes, ...texts2.map(asLeaf(options.widthOf))], hidden, heightOf, layout, options);
   const real = new Set(nodes.map((node) => node.id));
   return {
     nodes: placed.filter((node) => real.has(node.id)),
@@ -29337,13 +29615,20 @@ function arrangeMapWithText(nodes, items, hidden, heightOf, layout = "right", op
     )
   };
 }
-function arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout = "right") {
+function arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout = "right", widthOf) {
   const texts2 = visibleTexts(nodes, items);
   if (!texts2.length)
     return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout), items: [...items] };
   const withNew = new Set(newIds);
   for (const text11 of texts2) if (newIds.has(text11.parentId)) withNew.add(text11.id);
-  const placed = arrangeNewBranch([...nodes, ...texts2.map(asLeaf)], parentId, withNew, heightOf, minTop, layout);
+  const placed = arrangeNewBranch(
+    [...nodes, ...texts2.map(asLeaf(widthOf))],
+    parentId,
+    withNew,
+    heightOf,
+    minTop,
+    layout
+  );
   const real = new Set(nodes.map((node) => node.id));
   return {
     nodes: placed.filter((node) => real.has(node.id)),
@@ -29836,21 +30121,21 @@ function stripNoteStyleComments(text11) {
     let at = 0;
     let touched = false;
     while (at < line.length) {
-      const mark = line.indexOf(COMMENT_MARK, at);
+      const mark2 = line.indexOf(COMMENT_MARK, at);
       if (open !== void 0) {
         touched = true;
-        if (mark < 0) break;
+        if (mark2 < 0) break;
         open = void 0;
-        at = mark + COMMENT_MARK.length;
+        at = mark2 + COMMENT_MARK.length;
       } else {
-        if (mark < 0) {
+        if (mark2 < 0) {
           kept += line.slice(at);
           break;
         }
-        kept += line.slice(at, mark);
+        kept += line.slice(at, mark2);
         open = index + 1;
         touched = true;
-        at = mark + COMMENT_MARK.length;
+        at = mark2 + COMMENT_MARK.length;
       }
     }
     out.push(touched && !kept.trim() ? "" : kept);
@@ -32804,7 +33089,7 @@ function classifier(template2, language2) {
     sourcesKey: sourcesIndex >= 0 ? `t${sourcesIndex}` : null
   };
 }
-function scan2(text11, classify2) {
+function scan2(text11, classify3) {
   const lines = text11.split("\n");
   const starts = [];
   let position = 0;
@@ -32817,7 +33102,7 @@ function scan2(text11, classify2) {
   lines.forEach((line, index) => {
     if (code[index]) return;
     const match = /^###\s+(.+?)\s*$/.exec(line);
-    if (match) headings.push({ line: index, text: match[1], key: classify2.classify(match[1]) });
+    if (match) headings.push({ line: index, text: match[1], key: classify3.classify(match[1]) });
   });
   return { text: text11, lines, starts, code, headings };
 }
@@ -32907,8 +33192,8 @@ function mergeLogLines(existing, oldLines, summary, now) {
   const [first, ...rest] = added;
   return [...kept, [first, ...rest.map((line) => line.trim().replace(DATE_PREFIX, "").trim())].join("\uFF1B")];
 }
-function replySections(reply, classify2, template2) {
-  const view = scan2(reply, classify2);
+function replySections(reply, classify3, template2) {
+  const view = scan2(reply, classify3);
   const found = /* @__PURE__ */ new Map();
   view.headings.forEach((heading, position) => {
     var _a2, _b2, _c, _d;
@@ -32953,10 +33238,10 @@ function relabel(text11, map) {
 }
 function composeTop(input2) {
   const { oldDetail: old, template: template2, language: language2, now } = input2;
-  const classify2 = classifier(template2, language2);
-  const oldView = scan2(old, classify2);
+  const classify3 = classifier(template2, language2);
+  const oldView = scan2(old, classify3);
   const date = formatDate(now);
-  const sections = replySections(input2.aiDetail, classify2, template2).filter((section3) => section3.key !== classify2.logKey);
+  const sections = replySections(input2.aiDetail, classify3, template2).filter((section3) => section3.key !== classify3.logKey);
   const oldDefinitions = definitions(oldView);
   const oldTargets = new Map(oldDefinitions.map((item) => [item.label, item.target]));
   let counter = 0;
@@ -33047,8 +33332,8 @@ ${body}${needsBlank(at2) ? "\n" : ""}`, order: 0 });
 `, order: 0 });
     } else endParts.push(batch.join("\n\n"));
   }
-  const logRange = sectionRange(oldView, classify2.logKey);
-  const logLine = `${logMarker(logLines(oldView, classify2.logKey))}${summaryLine(now, input2.summary)}`;
+  const logRange = sectionRange(oldView, classify3.logKey);
+  const logLine = `${logMarker(logLines(oldView, classify3.logKey))}${summaryLine(now, input2.summary)}`;
   if (logRange) {
     const content = lastContentLine(oldView, logRange.from, logRange.to);
     const at = lineEnd(oldView, content >= 0 ? content : logRange.heading.line);
@@ -33130,13 +33415,13 @@ function chartPreserves(record, charted) {
 function composeWriteback(input2) {
   var _a2;
   if (input2.mode === "top") return composeTop(input2);
-  const classify2 = classifier(input2.template, input2.language);
-  const key2 = classify2.logKey;
+  const classify3 = classifier(input2.template, input2.language);
+  const key2 = classify3.logKey;
   const heading = logHeadingName(input2.template, input2.language);
-  const view = scan2(input2.aiDetail, classify2);
+  const view = scan2(input2.aiDetail, classify3);
   let detail;
   if (input2.mode === "merge") {
-    const oldLines = logLines(scan2(input2.oldDetail, classify2), key2);
+    const oldLines = logLines(scan2(input2.oldDetail, classify3), key2);
     detail = withLogLines(
       input2.aiDetail,
       view,
@@ -33145,7 +33430,7 @@ function composeWriteback(input2) {
       (existing) => mergeLogLines(existing, oldLines, input2.summary, input2.now)
     );
   } else {
-    const oldLines = logLines(scan2(input2.oldDetail, classify2), key2);
+    const oldLines = logLines(scan2(input2.oldDetail, classify3), key2);
     const line = `${logMarker(oldLines)}${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
     detail = withLogLines(input2.aiDetail, view, key2, heading, () => [...oldLines, line]);
   }
@@ -33849,9 +34134,9 @@ var TopicRuns = class {
             if (JSON.stringify(latest2.documents) !== options.recordedSources()) throw changed();
             if (options.signal.aborted) throw aborted2();
             if (options.closed()) throw changed();
-            const mark = options.applying();
+            const mark2 = options.applying();
             await this.ports.mutate()(() => options.write(result2));
-            options.written(mark);
+            options.written(mark2);
           } catch (error) {
             if (!options.current()) return;
             options.draftFailed(error);
@@ -35394,12 +35679,12 @@ function parseBlocks(lines, depth = 0, starts, budget) {
     starts == null ? void 0 : starts.push(at);
     const open = isFenceOpen(line);
     if (open) {
-      const mark = open[1][0];
+      const mark2 = open[1][0];
       const length = open[1].length;
       const body = [];
       for (at++; at < lines.length; at++) {
         const close = FENCE_CLOSE.exec(lines[at]);
-        if (close && close[1][0] === mark && close[1].length >= length) {
+        if (close && close[1][0] === mark2 && close[1].length >= length) {
           at++;
           break;
         }
@@ -35715,8 +36000,8 @@ function inlineMarkdown(nodes) {
         break;
       case "fmt": {
         const inner = inlineMarkdown(node.c);
-        const mark = node.tag === "strong" ? "**" : node.tag === "del" ? "~~" : "*";
-        out += inner.trim() ? `${mark}${inner}${mark}` : inner;
+        const mark2 = node.tag === "strong" ? "**" : node.tag === "del" ? "~~" : "*";
+        out += inner.trim() ? `${mark2}${inner}${mark2}` : inner;
         break;
       }
       case "wiki":
@@ -35809,9 +36094,15 @@ function transcriptMarkdown(input2) {
 ${escapeLine(labels.saved)}: ${localStamp(input2.savedAt)}`
   ];
   input2.turns.forEach((turn, index) => {
+    var _a2;
     parts.push("---");
     parts.push(`## ${index + 1}. ${escapeLine(labels.you)}`);
     parts.push(escapeMultiline(turn.question));
+    const steers = ((_a2 = turn.steers) != null ? _a2 : []).filter((text11) => text11.trim());
+    if (steers.length) {
+      parts.push(`**${escapeLine(labels.steer)}**`);
+      parts.push(steers.map((text11) => escapeMultiline(text11)).join("\n\n"));
+    }
     const refs = turn.refs.map(refMarkdown).filter(Boolean);
     if (refs.length) parts.push(`${escapeLine(labels.references)}: ${refs.join(", ")}`);
     parts.push(`### ${escapeLine(labels.ai)}`);
@@ -35936,10 +36227,7 @@ var MapChatPanel = class {
     __publicField(this, "guideEl");
     __publicField(this, "hintEl");
     __publicField(this, "logEl");
-    __publicField(this, "suggestEl");
     __publicField(this, "emptyMapEl");
-    __publicField(this, "suggestKey", "");
-    __publicField(this, "suggestInHero", false);
     __publicField(this, "resizerEl");
     __publicField(this, "liveEl");
     __publicField(this, "stopResizing", null);
@@ -35951,6 +36239,7 @@ var MapChatPanel = class {
     /** "Model", shown before the menu on the opening screen only, where the menu is a quiet line under the examples. */
     __publicField(this, "modelTagEl");
     __publicField(this, "stopEl");
+    __publicField(this, "steerHintEl");
     __publicField(this, "saveEl");
     /** The note is being written; a second press does nothing. */
     __publicField(this, "saving", false);
@@ -36069,19 +36358,23 @@ var MapChatPanel = class {
     if (visible && visible !== this.dismissedNote) this.dismissedNote = null;
     this.noteChip = visible && visible !== this.dismissedNote ? visible : null;
     this.renderChips();
-    this.renderSuggestions();
   }
   attachments() {
     return this.chips.map((chip) => ({ ...chip }));
   }
   /** Finished question and answer turns, oldest first, for the next request. */
   turns() {
+    var _a2;
     const turns = [];
     for (let at = 0; at + 1 < this.messages.length; at += 2) {
       const question = this.messages[at];
       const answer = this.messages[at + 1];
       if (answer.streaming || answer.error || !answer.text.trim()) continue;
-      turns.push({ role: "user", text: question.text }, { role: "assistant", text: answer.text });
+      const steered = ((_a2 = question.steers) != null ? _a2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text);
+      turns.push(
+        { role: "user", text: [question.text, ...steered].join("\n\n") },
+        { role: "assistant", text: answer.text }
+      );
     }
     return turns;
   }
@@ -36261,10 +36554,9 @@ var MapChatPanel = class {
     if (target) target.focus();
     else this.inputEl.focus();
   }
-  /** The selection changed: repaint the reference chips and the suggestions. */
+  /** The selection changed: repaint the reference chips. */
   refreshSelection() {
     this.renderChips();
-    this.renderSuggestions();
   }
   /** A turn starts: the user's text, an empty answer, and the busy state (the view starts in "preparing"). */
   begin(userText, origin, keepDraft = false, stage = "waiting") {
@@ -36303,10 +36595,12 @@ var MapChatPanel = class {
    * meanwhile). Returns false, and changes nothing, when the turn is no longer there (a reset already took it).
    */
   retract(turn, draft) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!this.hasTurn(turn)) return false;
     this.messages = this.messages.filter((message) => message !== turn.user && message !== turn.assistant);
     for (const choices of turn.retired) choices.picked = false;
+    const steered = ((_a2 = turn.user.steers) != null ? _a2 : []).map((steer) => steer.text);
+    if (steered.length) draft = [draft, ...steered].filter(Boolean).join("\n");
     this.cancelFrame();
     this.busy = false;
     this.clearStage();
@@ -36321,8 +36615,57 @@ ${typed}` : draft;
     this.renderLog();
     this.renderBusy();
     this.renderHint();
-    (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
+    (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
     return true;
+  }
+  /** The latest question: where follow-ups attach. */
+  lastQuestion() {
+    for (let at = this.messages.length - 1; at >= 0; at--)
+      if (this.messages[at].role === "user") return this.messages[at];
+    return null;
+  }
+  /** A follow-up typed while the turn works: it joins the latest question (under it, above the answer) and the field empties. */
+  addSteer(text11, state) {
+    var _a2;
+    const question = this.lastQuestion();
+    if (!question || !text11.trim()) return null;
+    const steer = { text: text11, state };
+    ((_a2 = question.steers) != null ? _a2 : question.steers = []).push(steer);
+    if (this.built) this.inputEl.value = "";
+    this.renderLog(true);
+    this.renderBusy();
+    this.announce(t(state === "live" ? "ui.map_chat_steer_sent" : "ui.map_chat_steer_queued_announce"));
+    return steer;
+  }
+  /** A follow-up that could not go into the running turn waits for the turn to end (`speak` false: no announcement). */
+  setSteerState(steer, state, speak = true) {
+    if (steer.state === state) return;
+    steer.state = state;
+    this.renderLog();
+    if (speak && state === "queued") this.announce(t("ui.map_chat_steer_queued_announce"));
+  }
+  /** Removes the queued follow-ups of the latest question and returns their texts, oldest first. */
+  takeQueued() {
+    var _a2;
+    const question = this.lastQuestion();
+    if (!((_a2 = question == null ? void 0 : question.steers) == null ? void 0 : _a2.some((steer) => steer.state === "queued"))) return [];
+    const taken = question.steers.filter((steer) => steer.state === "queued");
+    question.steers = question.steers.filter((steer) => steer.state !== "queued");
+    if (!question.steers.length) delete question.steers;
+    this.renderLog();
+    return taken.map((steer) => steer.text);
+  }
+  /** The texts of the follow-ups of the latest question that went into the turn, oldest first. */
+  takeSteerTexts() {
+    var _a2, _b2;
+    return ((_b2 = (_a2 = this.lastQuestion()) == null ? void 0 : _a2.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text);
+  }
+  /** Puts texts back into the field, in front of what was typed meanwhile. */
+  restoreDraft(texts2) {
+    if (!this.built || !texts2.length) return;
+    const typed = this.inputEl.value;
+    this.inputEl.value = [...texts2, ...typed.trim() ? [typed] : []].join("\n");
+    this.renderHint();
   }
   clockNow() {
     var _a2, _b2, _c;
@@ -36780,7 +37123,6 @@ ${typed}` : draft;
     this.logEl.addEventListener("keydown", (event) => {
       if (event.key === "Enter") openInternal(event, event.target);
     });
-    this.suggestEl = this.bodyEl.createDiv({ cls: "vam-map-chat-suggest", attr: { role: "group" } });
     this.emptyMapEl = this.bodyEl.createEl("button", {
       cls: "vam-map-chat-empty-map",
       text: t("ui.create_an_empty_mind_map"),
@@ -36801,21 +37143,23 @@ ${typed}` : draft;
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
     const form = this.bodyEl.createDiv("vam-map-chat-form");
-    this.inputEl = form.createEl("textarea", {
+    const box = form.createDiv("vam-map-chat-composer");
+    this.inputEl = box.createEl("textarea", {
       cls: "vam-map-chat-input",
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
-    const side = form.createDiv("vam-map-chat-side");
-    this.sendEl = side.createEl("button", {
-      cls: "vam-map-chat-send mod-cta",
-      text: t("ui.map_chat_send"),
-      attr: { "aria-label": t("ui.map_chat_send") }
+    this.steerHintEl = box.createSpan({ cls: "vam-map-chat-steer-hint", attr: { id: "vam-map-chat-steer-hint" } });
+    this.steerHintEl.hidden = true;
+    this.sendEl = box.createEl("button", {
+      cls: "vam-map-chat-send",
+      attr: { type: "button", "aria-label": t("ui.map_chat_send") }
     });
-    this.stopEl = side.createEl("button", {
+    (0, import_obsidian24.setIcon)(this.sendEl, "corner-down-left");
+    this.stopEl = box.createEl("button", {
       cls: "vam-map-chat-stop",
-      text: t("ui.map_chat_stop"),
-      attr: { "aria-label": t("ui.map_chat_stop") }
+      attr: { type: "button", "aria-label": t("ui.map_chat_stop") }
     });
+    (0, import_obsidian24.setIcon)(this.stopEl, "square");
     this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
@@ -36825,6 +37169,7 @@ ${typed}` : draft;
       this.composing = false;
     });
     this.inputEl.addEventListener("keydown", (event) => this.onKey(event));
+    this.inputEl.addEventListener("input", () => this.renderSteerHint());
     this.inputEl.addEventListener("focus", () => this.refreshNote());
     this.el.addEventListener("keydown", (event) => {
       const target = event.target;
@@ -36899,10 +37244,8 @@ ${typed}` : draft;
     this.emptyMapEl.setText(t("ui.create_an_empty_mind_map"));
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
-    this.inputEl.setAttr("placeholder", t("ui.map_chat_input_placeholder"));
-    this.sendEl.setText(t("ui.map_chat_send"));
+    this.renderPlaceholder();
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
-    this.stopEl.setText(t("ui.map_chat_stop"));
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
     this.applyOpen();
@@ -36941,6 +37284,7 @@ ${typed}` : draft;
     }
   }
   onKey(event) {
+    var _a2, _b2;
     if (event.key === "Escape" && !event.isComposing && !this.composing) {
       if (this.hero) return;
       event.preventDefault();
@@ -36950,6 +37294,10 @@ ${typed}` : draft;
     }
     if (event.key !== "Enter" || event.shiftKey || event.isComposing || this.composing) return;
     event.preventDefault();
+    if (this.working) {
+      if (this.draft.trim()) (_b2 = (_a2 = this.host).steer) == null ? void 0 : _b2.call(_a2);
+      return;
+    }
     this.host.send();
   }
   // ---- width ----------------------------------------------------------------------------------------------------
@@ -37089,45 +37437,6 @@ ${typed}` : draft;
     this.unread = true;
     this.applyOpen();
   }
-  // ---- suggested messages -----------------------------------------------------------------------------------------
-  /**
-   * Puts `text` into the message field in place of what was there and gives it the keyboard, with the cursor at the end (where an
-   * open-ended suggestion is finished). Sending is always the user's own act.
-   */
-  fill(text11, openEnded = false) {
-    const value = chatSuggestionFill(text11, openEnded);
-    this.inputEl.value = value;
-    this.inputEl.focus();
-    this.inputEl.setSelectionRange(value.length, value.length);
-  }
-  renderSuggestions() {
-    if (!this.built) return;
-    const hero = this.hero;
-    const keys = hero ? [...MAP_CHAT_EXAMPLE_KEYS] : this.host.suggestions ? chatSuggestionKeys({ ...this.host.suggestions(), hasNote: !!this.noteChip }) : [];
-    const signature = [hero ? "hero" : "side", ...keys.map((key2) => t(key2))].join("");
-    if (signature === this.suggestKey && hero === this.suggestInHero) return;
-    this.suggestKey = signature;
-    if (hero !== this.suggestInHero) {
-      this.suggestInHero = hero;
-      this.suggestEl.remove();
-      this.bodyEl.insertBefore(this.suggestEl, hero ? null : this.chipsEl);
-    }
-    this.suggestEl.empty();
-    this.suggestEl.setAttr("aria-label", t(hero ? "ui.map_chat_examples_label" : "ui.map_chat_suggestions_label"));
-    this.suggestEl.toggleClass("is-examples", hero);
-    this.suggestEl.hidden = keys.length === 0;
-    for (const key2 of keys) {
-      const text11 = t(key2);
-      const openEnded = MAP_CHAT_OPEN_ENDED_KEYS.includes(key2);
-      const button = this.suggestEl.createEl("button", {
-        cls: hero ? "vam-map-chat-example" : "vam-map-chat-suggestion",
-        // An open-ended suggestion is visibly unfinished: the user completes it in the field.
-        text: openEnded ? `${text11}\u2026` : text11,
-        attr: { type: "button" }
-      });
-      button.addEventListener("click", () => this.fill(text11, openEnded));
-    }
-  }
   onDragOver(event) {
     if (!event.dataTransfer) return;
     event.preventDefault();
@@ -37187,9 +37496,8 @@ ${typed}` : draft;
     this.headEl.toggleClass("is-hero", hero);
     this.heroTitleEl.hidden = !hero;
     this.heroTitleEl.toggleClass("is-hidden", !hero);
-    this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
+    this.renderPlaceholder();
     this.applyWidth();
-    this.renderSuggestions();
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
@@ -37369,7 +37677,7 @@ ${shown}` : t("ui.map_chat_model_label"));
   }
   /** Everything a message row shows; the row is rebuilt only when this changes. */
   rowKey(message) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
@@ -37386,6 +37694,9 @@ ${shown}` : t("ui.map_chat_model_label"));
       message.replyUndo ? "undo" : "",
       t("ui.map_chat_seen_image_0", ""),
       t("ui.map_chat_undo_reply"),
+      ((_b2 = message.steers) != null ? _b2 : []).map((steer) => `${steer.state}:${steer.text}`).join("\n"),
+      t("ui.map_chat_steer_tag_live"),
+      t("ui.map_chat_steer_tag_queued"),
       t("ui.map_chat_retry"),
       t("ui.map_chat_lines_hide"),
       t("ui.map_chat_plan_summary_0", ""),
@@ -37393,14 +37704,14 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_plan_title_applied"),
       t("ui.map_chat_plan_title_cancelled"),
       t("ui.map_chat_role_you"),
-      message.role === "assistant" ? (_b2 = message.modelLabel) != null ? _b2 : "" : "",
+      message.role === "assistant" ? (_c = message.modelLabel) != null ? _c : "" : "",
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_d = (_c = message.plan.groups) == null ? void 0 : _c.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _d : ""}` : "",
+      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_e = (_d = message.plan.groups) == null ? void 0 : _d.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _e : ""}` : "",
       message.choices ? `choices:${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
-      ((_e = message.images) != null ? _e : []).map(
+      ((_f = message.images) != null ? _f : []).map(
         (block) => {
           var _a3, _b3;
           return `images:${block.state}:${(_a3 = block.reason) != null ? _a3 : ""}:${(_b3 = block.notice) != null ? _b3 : ""}:${block.items.map((item) => {
@@ -37445,7 +37756,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (stick) this.scrollToEnd();
   }
   buildRow(message) {
-    var _a2;
+    var _a2, _b2;
     const row = this.logEl.createDiv({
       cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
     });
@@ -37457,12 +37768,13 @@ ${shown}` : t("ui.map_chat_model_label"));
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    for (const steer of (_a2 = message.steers) != null ? _a2 : []) this.buildSteer(row, steer);
     if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
-    for (const block of (_a2 = message.images) != null ? _a2 : []) this.buildImages(row, block);
+    for (const block of (_b2 = message.images) != null ? _b2 : []) this.buildImages(row, block);
     if (message.seenImage)
       row.createDiv({
         cls: "vam-map-chat-seen",
@@ -37481,8 +37793,8 @@ ${shown}` : t("ui.map_chat_model_label"));
       more.disabled = this.working;
       more.addEventListener("click", () => {
         if (!this.working) this.handOffFocus(() => {
-          var _a3, _b2;
-          return (_b2 = (_a3 = this.host).retry) == null ? void 0 : _b2.call(_a3, origin);
+          var _a3, _b3;
+          return (_b3 = (_a3 = this.host).retry) == null ? void 0 : _b3.call(_a3, origin);
         });
       });
     }
@@ -37501,6 +37813,15 @@ ${shown}` : t("ui.map_chat_model_label"));
       if (button.disabled || !this.host.undoReply) return;
       void this.host.undoReply(token).then(() => this.refreshReplyUndo());
     });
+  }
+  /** A follow-up under the question: its own small bubble, tagged in words (the tag is text, never colour alone). */
+  buildSteer(row, steer) {
+    const bubble = row.createDiv({ cls: `vam-map-chat-steer is-${steer.state}` });
+    bubble.createEl("small", {
+      cls: "vam-map-chat-steer-tag",
+      text: t(steer.state === "live" ? "ui.map_chat_steer_tag_live" : "ui.map_chat_steer_tag_queued")
+    });
+    bubble.createSpan({ cls: "vam-map-chat-steer-text", text: steer.text });
   }
   /** The raw error of a failed turn: folded away, selectable and copyable. */
   buildTechnical(row, raw) {
@@ -37778,9 +38099,30 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     }
   }
+  /** The field's hint: a follow-up while a turn works, the opening screen's ask, or the ordinary one. */
+  renderPlaceholder() {
+    if (!this.built) return;
+    const key2 = this.working ? "ui.map_chat_steer_placeholder" : this.hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder";
+    this.inputEl.setAttr("placeholder", t(key2));
+  }
+  /** "Enter 補充" beside the stop key while a turn works and the field has text. */
+  renderSteerHint() {
+    var _a2, _b2, _c, _d;
+    if (!this.built) return;
+    const show = this.working && this.inputEl.value.trim().length > 0;
+    this.steerHintEl.setText(show ? t("ui.map_chat_steer_hint") : "");
+    this.steerHintEl.hidden = !show;
+    this.steerHintEl.toggleClass("is-hidden", !show);
+    if (this.working) this.inputEl.setAttr("aria-keyshortcuts", "Enter");
+    else (_b2 = (_a2 = this.inputEl).removeAttribute) == null ? void 0 : _b2.call(_a2, "aria-keyshortcuts");
+    if (show) this.inputEl.setAttr("aria-describedby", "vam-map-chat-steer-hint");
+    else (_d = (_c = this.inputEl).removeAttribute) == null ? void 0 : _d.call(_c, "aria-describedby");
+  }
   renderBusy() {
     var _a2, _b2;
     if (!this.built) return;
+    this.renderPlaceholder();
+    this.renderSteerHint();
     this.statusEl.setText(this.applying ? t("ui.map_chat_applying") : "");
     this.el.toggleClass("is-busy", this.working);
     this.sendEl.hidden = this.working;
@@ -39328,10 +39670,11 @@ var ClaudeCodeCliRuntime = class {
     let args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     const image = controls.imageDataUrl ? claudeImageSource(controls.imageDataUrl) : null;
     const observed = !!outputSchema && controls.stream === true && !image && !fallback && !this.streamUnsupported;
+    const steerable = !!controls.onSteer && (!!controls.onText && !outputSchema || observed || !!image) && !fallback && !this.streamUnsupported;
     if (controls.onText && !outputSchema) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
-      if (controls.onSteer || image) args.push("--input-format", "stream-json");
+      if (steerable || image) args.push("--input-format", "stream-json");
     } else if (image) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--input-format", "stream-json");
@@ -39340,9 +39683,9 @@ var ClaudeCodeCliRuntime = class {
       args.push("--include-partial-messages");
     }
     const pool = this.options.warmPool;
-    const warmArgs = pool && observed && !controls.onSteer ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
-    const warm = warmArgs ? pool.take(this.warmKey(warmArgs)) : null;
-    if (warmArgs && warm) args = warmArgs;
+    const warmArgs = (pool || steerable) && observed ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
+    const warm = warmArgs && pool ? pool.take(this.warmKey(warmArgs)) : null;
+    if (warmArgs && (warm || steerable)) args = warmArgs;
     if (outputSchema && controls.stream === true) {
       try {
         (_e = controls.onStreamMode) == null ? void 0 : _e.call(controls, observed ? "stream-json" : fallback ? "json-fallback" : "json");
@@ -39386,7 +39729,7 @@ var ClaudeCodeCliRuntime = class {
         reject2(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer || image || warm);
+      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(steerable || image || warm);
       let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
       const streaming = !!controls.onText && !outputSchema || !!image || observed;
       const activity = new ClaudeWebActivity(controls.onWebSearchEvent);
@@ -39580,7 +39923,7 @@ var ClaudeCodeCliRuntime = class {
       (_e2 = (_d2 = child.stdin).on) == null ? void 0 : _e2.call(_d2, "error", () => {
       });
       try {
-        if (controls.onSteer || image || warm) {
+        if (steerable || image || warm) {
           const sendInput = (text11, accepted2, withImage = false) => {
             if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
             const content = [...withImage && image ? [{ type: "image", source: image }] : [], { type: "text", text: text11 }];
@@ -39596,9 +39939,10 @@ var ClaudeCodeCliRuntime = class {
             });
           };
           sendInput(prompt, markAccepted, true);
-          (_f2 = controls.onSteer) == null ? void 0 : _f2.call(controls, async (text11) => {
-            sendInput(text11);
-          });
+          if (steerable)
+            (_f2 = controls.onSteer) == null ? void 0 : _f2.call(controls, async (text11) => {
+              sendInput(text11);
+            });
         } else if (controls.onAccepted || observer) {
           child.stdin.end(prompt, (error) => {
             if (error) {
@@ -41132,6 +41476,9 @@ var language_en_default2 = "Write the reply, and every title, summary, note text
 // core/steps/map-chat/language.zh.md
 var language_zh_default2 = "\u56DE\u8986\uFF0C\u4EE5\u53CA\u4F60\u7522\u751F\u7684\u6240\u6709\u6A19\u984C\u3001\u6458\u8981\u3001\u7B46\u8A18\u6587\u5B57\u8207\u65B0\u6A94\u6848\u6587\u5B57\uFF0C\u8ACB\u4EE5{{language}}\u64B0\u5BEB\u3002\n";
 
+// core/steps/map-chat/steer.en.md
+var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message and every addition made so far in this turn, not only this one. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
+
 // core/steps/map-chat/prompt.en.md
 var prompt_en_default6 = `You are the assistant inside a research mind map. The user is talking to you about the map. Answer the user's message in "reply", and, only when the user asked for a change or an action, list actions in "actions". Actions are applied for the user after your reply, in the order you list them: the user's message is the confirmation, except that a long list, a new map or research on many cards is first shown to the user as a plan to approve. Never ask the user in "reply" to approve, confirm or apply anything: the app shows its own Apply and Cancel buttons when a plan is needed, and otherwise the actions simply run. Never say a change has already been made: "reply" only says what you are going to do; the result list the user sees afterwards says what was done. Use future or intention wording ("I'll add ...", "Here is what I will do: ..."), not "I added" or "done". When the user only asks a question, return an empty "actions" list.
 
@@ -41741,6 +42088,9 @@ function parseMapChat(raw, context) {
   });
   return { reply: body.reply, actions, rejected };
 }
+function renderMapChatSteer(text11) {
+  return renderTemplate(steer_en_default, { text: JSON.stringify(text11) });
+}
 var mapChatStep = {
   id: "map-chat",
   version: 16,
@@ -42183,18 +42533,18 @@ var MARKDOWN_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*(markdown|md)?[ \t]*$/i;
 function outlineTitle(raw) {
   let code = 57344;
   while (raw.includes(String.fromCharCode(code))) code++;
-  const mark = String.fromCharCode(code);
+  const mark2 = String.fromCharCode(code);
   const kept = [];
   const protectedText = raw.replace(
     /\\([!-/:-@[-`{-~])|(?<!`)(`+)(?!`)([\s\S]*?[^`])\2(?!`)/g,
     (_match, character, _ticks, content) => {
       var _a2;
       kept.push((_a2 = character != null ? character : content) != null ? _a2 : "");
-      return `${mark}${kept.length - 1}${mark}`;
+      return `${mark2}${kept.length - 1}${mark2}`;
     }
   );
   const plain = protectedText.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2").replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\*\*(?=\S)(.+?)(?<=\S)\*\*/g, "$1").replace(/(^|[^\p{L}\p{N}_])__(?=\S)(.+?)(?<=\S)__(?![\p{L}\p{N}_])/gu, "$1$2").replace(/\*(?=\S)(.+?)(?<=\S)\*/g, "$1").replace(/(^|[^\p{L}\p{N}_])_(?=\S)(.+?)(?<=\S)_(?![\p{L}\p{N}_])/gu, "$1$2");
-  return plain.replace(new RegExp(`${mark}(\\d+)${mark}`, "g"), (_match, index) => kept[Number(index)]).trim();
+  return plain.replace(new RegExp(`${mark2}(\\d+)${mark2}`, "g"), (_match, index) => kept[Number(index)]).trim();
 }
 function unwrapFencedOutline(lines) {
   const firstContent = lines.findIndex((line) => line.trim() !== "");
@@ -43178,8 +43528,8 @@ function styleChoiceField(parent, options) {
   };
   const paintLine = () => {
     text11.replaceChildren();
-    const mark = "";
-    const [before, after = ""] = t("ui.note_style_line_0", mark).split(mark);
+    const mark2 = "";
+    const [before, after = ""] = t("ui.note_style_line_0", mark2).split(mark2);
     if (before) text11.createSpan({ text: before });
     text11.createEl("strong", { text: nameNow() });
     if (after) text11.createSpan({ text: after });
@@ -43437,7 +43787,7 @@ var OutlineImportModal = class extends import_obsidian25.Modal {
       input2.addEventListener("change", () => {
         if (!input2.checked) return;
         this.placement = option.kind;
-        for (const mark of marks) mark.label.toggleClass("is-checked", mark.kind === this.placement);
+        for (const mark2 of marks) mark2.label.toggleClass("is-checked", mark2.kind === this.placement);
         this.syncModelLabel();
       });
       const text11 = label.createDiv("vam-outline-option-text");
@@ -46387,6 +46737,7 @@ function providerStepRunner(aiCalls, config) {
           ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
           ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
           ...(hooks == null ? void 0 : hooks.onStreamMode) ? { onStreamMode: hooks.onStreamMode } : {},
+          ...(hooks == null ? void 0 : hooks.onSteer) ? { onSteer: hooks.onSteer } : {},
           ...(hooks == null ? void 0 : hooks.onText) && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model) ? { onText: hooks.onText } : {}
         }
       },
@@ -54378,7 +54729,19 @@ var KIND_PICKER_ORDER = ["topic", "atomic", "hypothesis", "evidence", "conclusio
 var RELATION_LABEL_MIN_ZOOM = 0.6;
 var RELATION_LABEL_NOTE_MAX = 60;
 var TEXT_NODE_HEIGHT = 28;
-var TEXT_NODE_WIDTH = 300;
+var TEXT_NODE_WIDTH = TEXT_AUTO_WIDTH_MAX;
+function estimateTextWidth(text11) {
+  const line = Math.max(
+    0,
+    ...text11.split(/\r?\n/).map(
+      (part) => Array.from(part).reduce(
+        (sum2, ch) => sum2 + (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 6.5),
+        0
+      )
+    )
+  );
+  return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
+}
 function depthOf(nodes, id) {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   let depth = 0;
@@ -54387,6 +54750,19 @@ function depthOf(nodes, id) {
 }
 var anchorLineKey = (imageId, anchorId, topicId) => `anchor:${imageId}:${anchorId}:${topicId}`;
 var BOUNDARY_PAD = 16;
+function textBlockLines(text11, boxWidth, boxHeight, lineHeight) {
+  const shown = Math.max(
+    1,
+    Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19))
+  );
+  let room = Math.max(1, boxWidth - 14);
+  let lines = wrapText(text11, room);
+  for (let tries = 0; lines.length > shown && tries < 40; tries++) {
+    room *= 1.1;
+    lines = wrapText(text11, room);
+  }
+  return lines;
+}
 var boxOf = (card) => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -54525,6 +54901,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "mapSourcesPanelId", `vam-map-sources-panel-${++relevancePanelSeq}`);
     __publicField(this, "mapSourcesOpen", false);
     __publicField(this, "mapSourcesPickerOpen", false);
+    __publicField(this, "mapSourcesSession", newMapSourcesSession());
     __publicField(this, "mapSourcesToolsEl", null);
     __publicField(this, "mapSourcesButtonEl", null);
     __publicField(this, "mapSourcesPanelEl", null);
@@ -54552,6 +54929,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "chatCarryOver", false);
     /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
     __publicField(this, "chatApplying", false);
+    /** The follow-ups of the turn that is running (or ran last). */
+    __publicField(this, "chatSteer", null);
     /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
     __publicField(this, "chatImageSearches", /* @__PURE__ */ new Map());
     __publicField(this, "chatImageSequence", 0);
@@ -54688,8 +55067,20 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === id)) == null ? void 0 : _c.height) || // A text node is no card: its own rendered height, or the default while it is not drawn yet.
       (this.isTextId(id) ? ((_d = this.textEls.get(id)) == null ? void 0 : _d.offsetHeight) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
     });
+    /** A text block's width for the layout: as drawn, else the stored one, else a guess from its text (a block not drawn yet). */
+    __publicField(this, "textWidthOf", (id) => {
+      var _a2, _b2, _c, _d;
+      const drawn = (_a2 = this.textEls.get(id)) == null ? void 0 : _a2.offsetWidth;
+      if (drawn) return drawn;
+      const item = ((_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : []).find(
+        (entry) => entry.kind === "text" && entry.id === id
+      );
+      return item ? (_d = item.width) != null ? _d : estimateTextWidth(item.text) : void 0;
+    });
     /** Text node element per id (tree-attached and free), rebuilt on every render. */
     __publicField(this, "textEls", /* @__PURE__ */ new Map());
+    /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
+    __publicField(this, "focusTextResizeId", null);
     /** Image element per image id, rebuilt on every render (the place mode finds its image here). */
     __publicField(this, "canvasImageEls", /* @__PURE__ */ new Map());
     /** The anchor place mode: which image, where the crosshair is (0-1) and what to do when a spot is chosen. */
@@ -54873,7 +55264,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       supersededAimNodeIds(map),
       this.cardHeightOf,
       layoutOf(map),
-      options
+      { ...options, widthOf: this.textWidthOf }
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -54888,7 +55279,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       newIds,
       this.cardHeightOf,
       minTop,
-      layoutOf(map)
+      layoutOf(map),
+      this.textWidthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -57121,7 +57513,7 @@ ${request.requirements}` : preset.text,
           return;
         }
         const fresh = await this.freshNotesOf(picked.map((item) => item.parentId));
-        const mark = this.history.mark();
+        const mark2 = this.history.mark();
         try {
           for (const item of picked) {
             const parent = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === item.parentId);
@@ -57134,7 +57526,7 @@ ${request.requirements}` : preset.text,
           }
           if (added) await this.plugin.rebuildDerivedData();
         } finally {
-          this.history.collapseSince(mark, t("ui.goal_suggest_history_label"));
+          this.history.collapseSince(mark2, t("ui.goal_suggest_history_label"));
           this.updateHistoryButtons();
         }
       });
@@ -57364,7 +57756,7 @@ ${request.requirements}` : preset.text,
       var _a2;
       if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button || this.mapSourcesPickerOpen) return;
       const next = event.relatedTarget;
-      if (next && (next === button || ((_a2 = this.mapSourcesPanelEl) == null ? void 0 : _a2.contains(next)))) return;
+      if (next && (next === button || ((_a2 = this.mapSourcesPanelEl) == null ? void 0 : _a2.contains(next)) || isDragSourceTarget(next))) return;
       this.closeMapSourcesPanel(false);
     });
     button.addEventListener("keydown", (event) => {
@@ -57402,7 +57794,8 @@ ${request.requirements}` : preset.text,
     if (!this.mapSourcesToolsEl) return;
     this.mapSourcesOpen = true;
     (_a2 = this.mapSourcesButtonEl) == null ? void 0 : _a2.setAttr("aria-expanded", "true");
-    this.drawMapSourcesPanelEl({ picker: "map" });
+    this.mapSourcesSession = newMapSourcesSession();
+    this.drawMapSourcesPanelEl({ search: true });
   }
   closeMapSourcesPanel(refocus) {
     var _a2, _b2, _c, _d;
@@ -57411,6 +57804,7 @@ ${request.requirements}` : preset.text,
     (_b2 = this.mapSourcesPanelEl) == null ? void 0 : _b2.remove();
     this.mapSourcesPanelEl = null;
     this.mapSourcesOpen = false;
+    this.mapSourcesSession = newMapSourcesSession();
     this.mapSourcesPickerOpen = false;
     (_c = this.mapSourcesButtonEl) == null ? void 0 : _c.setAttr("aria-expanded", "false");
     this.placeMapTools();
@@ -57424,6 +57818,7 @@ ${request.requirements}` : preset.text,
     this.mapSourcesPanelCleanup = null;
     (_b2 = this.mapSourcesPanelEl) == null ? void 0 : _b2.remove();
     const mapPath = this.path;
+    const panelCleanups = [];
     const panel = drawMapSourcesPanel(
       tools,
       {
@@ -57432,7 +57827,18 @@ ${request.requirements}` : preset.text,
         sources: this.mapSources,
         currentMapPath: mapPath,
         mapItems: () => this.plugin.repo.mapSwitcherItems(),
-        add: (source) => this.changeMapSources(mapPath, "add", source),
+        add: (source, quiet) => this.changeMapSources(mapPath, "add", source, quiet),
+        announce: (text11) => {
+          var _a3;
+          return (_a3 = this.announcer) == null ? void 0 : _a3.setText(text11);
+        },
+        onDragEnd: (handler) => {
+          var _a3;
+          const doc2 = (_a3 = this.contentEl) == null ? void 0 : _a3.ownerDocument;
+          if (!(doc2 == null ? void 0 : doc2.addEventListener)) return;
+          doc2.addEventListener("dragend", handler, true);
+          panelCleanups.push(() => doc2.removeEventListener("dragend", handler, true));
+        },
         remove: (source) => this.changeMapSources(mapPath, "remove", source),
         close: (refocus) => this.closeMapSourcesPanel(refocus),
         setPickerOpen: (open) => {
@@ -57440,6 +57846,7 @@ ${request.requirements}` : preset.text,
         },
         isPickerOpen: () => this.mapSourcesPickerOpen,
         button: () => this.mapSourcesButtonEl,
+        session: this.mapSourcesSession,
         panelCreated: (created) => {
           this.mapSourcesPanelEl = created;
         }
@@ -57453,12 +57860,14 @@ ${request.requirements}` : preset.text,
         var _a3;
         if (this.mapSourcesPickerOpen) return;
         const target = event.target;
-        if (target && (panel.contains(target) || ((_a3 = this.mapSourcesButtonEl) == null ? void 0 : _a3.contains(target)))) return;
+        if (target && (panel.contains(target) || ((_a3 = this.mapSourcesButtonEl) == null ? void 0 : _a3.contains(target)) || isDragSourceTarget(target)))
+          return;
         this.closeMapSourcesPanel(false);
       };
       doc.addEventListener("pointerdown", outside, true);
-      this.mapSourcesPanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
+      panelCleanups.push(() => doc.removeEventListener("pointerdown", outside, true));
     }
+    this.mapSourcesPanelCleanup = () => panelCleanups.forEach((clean4) => clean4());
     this.placeMapTools();
   }
   /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
@@ -57478,17 +57887,17 @@ ${request.requirements}` : preset.text,
    * Adds or removes one source through the view mutation queue. The list is re-read inside the queue, so a repeated
    * add (same kind and path) writes nothing, and the write only touches `map-sources`.
    */
-  changeMapSources(mapPath, change2, source) {
+  changeMapSources(mapPath, change2, source, quiet = false) {
     const name2 = mapSourceName(this.app, source);
     this.enqueue(async () => {
       var _a2, _b2;
       if (this.closed || this.path !== mapPath) return;
-      let focus = { picker: source.kind };
+      let focus = { search: true };
       try {
         const current = await this.plugin.repo.readMapSources(mapPath);
         const at = current.findIndex((item) => sameMapSource(item, source));
         if (change2 === "add" && at >= 0) {
-          (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.map_sources_already_added_0", name2));
+          if (!quiet) (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.map_sources_already_added_0", name2));
         } else if (change2 === "remove" && at < 0) {
           this.mapSources = current;
         } else {
@@ -57496,7 +57905,8 @@ ${request.requirements}` : preset.text,
           await this.plugin.repo.writeMapSources(mapPath, next);
           this.mapSources = next;
           if (change2 === "remove") focus = { remove: at };
-          (_b2 = this.announcer) == null ? void 0 : _b2.setText(t(change2 === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name2));
+          if (!quiet || change2 === "remove")
+            (_b2 = this.announcer) == null ? void 0 : _b2.setText(t(change2 === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name2));
         }
       } catch (error) {
         new import_obsidian37.Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));
@@ -58370,7 +58780,7 @@ ${request.requirements}` : preset.text,
    */
   async applyCardEdit(node, frame, look, width, text11) {
     var _a2;
-    const mark = this.history.mark();
+    const mark2 = this.history.mark();
     try {
       const entry = await this.changeTopicCoverFrame(node, frame, look, width);
       if (!entry) return;
@@ -58379,7 +58789,7 @@ ${request.requirements}` : preset.text,
       if (text11.summary !== void 0) patch.summary = text11.summary;
       if (Object.keys(patch).length) await this.noteChange(node, patch);
     } finally {
-      this.history.collapseSince(mark, t("ui.topic_cover_frame_title"));
+      this.history.collapseSince(mark2, t("ui.topic_cover_frame_title"));
       this.updateHistoryButtons();
     }
   }
@@ -60776,7 +61186,7 @@ ${request.requirements}` : preset.text,
       dot.addEventListener("pointerdown", (event) => event.stopPropagation());
       dot.addEventListener("click", (event) => event.stopPropagation());
       const ref = `${image.id}\0${anchor.id}`;
-      const mark = (on) => {
+      const mark2 = (on) => {
         if (on) this.hoverAnchor = ref;
         else if (this.hoverAnchor === ref) this.hoverAnchor = null;
         else return;
@@ -60788,7 +61198,7 @@ ${request.requirements}` : preset.text,
         ["focus", true],
         ["blur", false]
       ])
-        dot.addEventListener(name2, () => mark(on));
+        dot.addEventListener(name2, () => mark2(on));
       if (!editable) continue;
       dot.addEventListener("keydown", (event) => {
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
@@ -61326,7 +61736,7 @@ ${request.requirements}` : preset.text,
    * textarea, so nothing the user writes is ever parsed as markup.
    */
   renderTextNodes(stage, items) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     if (this.suspendTextEdit) this.textEditDraft = this.suspendTextEdit();
     if (!this.map) return;
     const { attached } = treeTextNodes(
@@ -61361,12 +61771,16 @@ ${request.requirements}` : preset.text,
       el.tabIndex = 0;
       el.style.left = `${text11.x}px`;
       el.style.top = `${text11.y}px`;
-      el.style.width = `${TEXT_NODE_WIDTH}px`;
+      if (text11.width !== void 0) {
+        el.style.width = `${text11.width}px`;
+        el.addClass("has-width");
+      }
       el.createDiv({ cls: "vam-text-node-body", text: text11.text });
       this.textEls.set(text11.id, el);
       el.addEventListener("focus", () => el.addClass("is-selected"));
       el.addEventListener("blur", () => el.removeClass("is-selected"));
       if (!editable) continue;
+      this.attachTextResizeHandle(el, text11);
       el.addEventListener("dblclick", (event) => {
         event.stopPropagation();
         this.startTextEdit(text11.id);
@@ -61429,6 +61843,117 @@ ${request.requirements}` : preset.text,
       this.focusItemId = null;
       if (this.mapWindowIsActive()) (_b2 = this.textEls.get(wanted)) == null ? void 0 : _b2.focus({ preventScroll: true });
     }
+    const resizeId = this.focusTextResizeId;
+    this.focusTextResizeId = null;
+    if (resizeId && this.mapWindowIsActive())
+      (_d = (_c = this.textEls.get(resizeId)) == null ? void 0 : _c.querySelector(".vam-text-resize")) == null ? void 0 : _d.focus({ preventScroll: true });
+  }
+  /**
+   * The width handle on a text block's right edge (same behaviour as the card's): drag, arrows (CARD_WIDTH_STEP), Home/End,
+   * Enter or double click back to automatic width. Dragging shows the width and the lines live; release writes once.
+   */
+  attachTextResizeHandle(el, text11) {
+    const handle = el.createSpan({
+      cls: "vam-text-resize",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.text_resize_label"),
+        "aria-valuemin": String(TEXT_WIDTH_MIN),
+        "aria-valuemax": String(TEXT_WIDTH_MAX)
+      }
+    });
+    handle.tabIndex = 0;
+    const storedWidth = () => {
+      var _a2, _b2, _c;
+      return (_c = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find((item) => item.kind === "text" && item.id === text11.id)) == null ? void 0 : _c.width;
+    };
+    const shownWidth = () => {
+      var _a2;
+      return (_a2 = storedWidth()) != null ? _a2 : el.offsetWidth || TEXT_NODE_WIDTH;
+    };
+    const sync = (width) => handle.setAttr("aria-valuenow", String(width));
+    sync(shownWidth());
+    const commit = (width) => {
+      this.focusTextResizeId = text11.id;
+      this.enqueue(() => this.changeCanvasItems(text11.id, (items) => setTextNodeWidth(items, text11.id, width)));
+    };
+    handle.addEventListener("pointerdown", (event) => {
+      var _a2;
+      if (event.button !== 0 || !this.map || this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      const startX = event.clientX, zoom = this.map.viewport.zoom || 1, from = shownWidth(), before = storedWidth();
+      let width = from, done = false;
+      (_a2 = handle.setPointerCapture) == null ? void 0 : _a2.call(handle, event.pointerId);
+      const move = (e) => {
+        var _a3;
+        width = (_a3 = clampTextWidth(from + (e.clientX - startX) / zoom)) != null ? _a3 : from;
+        el.style.width = `${width}px`;
+        el.addClass("has-width");
+        sync(width);
+        this.drawEdges();
+      };
+      const settle = () => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = () => {
+        if (before === void 0) {
+          el.style.removeProperty("width");
+          el.removeClass("has-width");
+        } else el.style.width = `${before}px`;
+        sync(from);
+        this.drawEdges();
+      };
+      const up = () => {
+        if (done) return;
+        settle();
+        if (width === from) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        commit(width);
+      };
+      const cancel = () => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", (event) => event.stopPropagation());
+    handle.addEventListener("dblclick", (event) => {
+      if (this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      if (storedWidth() !== void 0) commit(void 0);
+    });
+    handle.addEventListener("keydown", (event) => {
+      var _a2;
+      if (this.presentation) return;
+      const current = shownWidth();
+      let next = null;
+      if (event.key === "ArrowRight") next = current + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = current - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = TEXT_WIDTH_MIN;
+      else if (event.key === "End") next = TEXT_WIDTH_MAX;
+      else if (event.key === "Enter") next = void 0;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (next === void 0) {
+        if (storedWidth() !== void 0) commit(void 0);
+        return;
+      }
+      const width = (_a2 = clampTextWidth(next)) != null ? _a2 : current;
+      if (width === storedWidth() || storedWidth() === void 0 && width === current) return;
+      commit(width);
+    });
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
   liveLinks(text11) {
@@ -61669,7 +62194,18 @@ ${request.requirements}` : preset.text,
       attr: { rows: "1", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
     });
     input2.value = draft != null ? draft : text11.text;
+    const grows = text11.width === void 0;
+    const measure = grows ? el.createSpan({ cls: "vam-text-node-measure", attr: { "aria-hidden": "true" } }) : null;
+    const fitWidth = () => {
+      if (!measure) return;
+      measure.setText(`${input2.value}\u200B`);
+      const chrome = el.offsetWidth - input2.offsetWidth;
+      const want = (measure.offsetWidth || 0) + (Number.isFinite(chrome) ? chrome : 14) + 2;
+      el.style.width = `${Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(want)))}px`;
+      el.addClass("has-width");
+    };
     const fitHeight = () => {
+      fitWidth();
       input2.style.removeProperty("height");
       input2.style.height = `${input2.scrollHeight}px`;
       this.drawEdges();
@@ -61682,6 +62218,11 @@ ${request.requirements}` : preset.text,
       this.editingTextId = null;
       this.suspendTextEdit = null;
       input2.remove();
+      if (measure) {
+        measure.remove();
+        el.style.removeProperty("width");
+        el.removeClass("has-width");
+      }
       body == null ? void 0 : body.removeClass("vam-sr-only");
       this.drawEdges();
     };
@@ -61854,7 +62395,9 @@ ${request.requirements}` : preset.text,
       const owner = target && this.map.nodes.find((node) => node.id === target.id);
       if (!owner) {
         const center = this.stagePoint(null);
-        await this.addFreeText(center && { x: center.x - TEXT_NODE_WIDTH / 2, y: center.y });
+        await this.addFreeText(
+          center && { x: center.x - estimateTextWidth(t("ui.text_node_placeholder")) / 2, y: center.y }
+        );
         return;
       }
       const id = `txt-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`;
@@ -63570,12 +64113,12 @@ ${request.requirements}` : preset.text,
       throw result.error;
     }
     if (result.reason === "wrong-state" || result.reason === "unknown") {
-      const mark = this.history.mark();
+      const mark2 = this.history.mark();
       if (direction === "undo") {
         this.history.redo();
-        this.history.discardSince(mark);
+        this.history.discardSince(mark2);
       } else {
-        this.history.discardSince({ ...mark, length: mark.length - 1 });
+        this.history.discardSince({ ...mark2, length: mark2.length - 1 });
       }
     }
   }
@@ -64090,7 +64633,12 @@ ${request.requirements}` : preset.text,
         y: box.y,
         w: box.width,
         h: box.height,
-        title: wrapText((_g = body == null ? void 0 : body.textContent) != null ? _g : "", box.width - 28),
+        title: textBlockLines(
+          (_g = body == null ? void 0 : body.textContent) != null ? _g : "",
+          box.width,
+          box.height,
+          parseFloat(computed(body != null ? body : el).lineHeight)
+        ),
         plain: true,
         textColor: colorOf(computed(body != null ? body : el).color)
       });
@@ -66304,13 +66852,13 @@ ${request.requirements}` : preset.text,
     if (!this.map || !this.relationsEnabled()) return;
     const count = anchorRelationsForTopic((_b2 = this.map.canvasItems) != null ? _b2 : [], id).length;
     if (!count) return;
-    const text11 = t("ui.card_image_relations_0", count), mark = card.createDiv({ cls: "vam-image-relations-mark" });
-    cardImageRelationMarks.set(card, mark);
-    mark.setAttr("aria-label", text11);
-    const icon = mark.createSpan({ cls: "vam-image-relations-mark-icon" });
+    const text11 = t("ui.card_image_relations_0", count), mark2 = card.createDiv({ cls: "vam-image-relations-mark" });
+    cardImageRelationMarks.set(card, mark2);
+    mark2.setAttr("aria-label", text11);
+    const icon = mark2.createSpan({ cls: "vam-image-relations-mark-icon" });
     icon.setAttr("aria-hidden", "true");
     (0, import_obsidian37.setIcon)(icon, "map-pin");
-    mark.createSpan({ cls: "vam-image-relations-mark-text", text: text11 });
+    mark2.createSpan({ cls: "vam-image-relations-mark-text", text: text11 });
   }
   paintCardMarkers(card, header, id) {
     var _a2, _b2;
@@ -66330,8 +66878,8 @@ ${request.requirements}` : preset.text,
       row.setAttr("aria-hidden", "true");
       cardMarkerRows.set(card, row);
       for (const marker5 of markers) {
-        const mark = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker5) });
-        mark.dataset.marker = marker5;
+        const mark2 = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker5) });
+        mark2.dataset.marker = marker5;
       }
       card.dataset.markerText = text11;
     } else {
@@ -70793,7 +71341,12 @@ ${note.detail.trim()}` : "",
       const text11 = item;
       const el = this.textEls.get(text11.id);
       if (!(el == null ? void 0 : el.hasClass("is-free"))) continue;
-      boxes.push({ x: text11.x, y: text11.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
+      boxes.push({
+        x: text11.x,
+        y: text11.y,
+        w: el.offsetWidth || text11.width || TEXT_NODE_WIDTH,
+        h: el.offsetHeight || TEXT_NODE_HEIGHT
+      });
     }
     for (const el of this.summaryEls.values()) {
       const text11 = el.querySelector(".vam-summary-text");
@@ -71219,6 +71772,7 @@ ${note.detail.trim()}` : "",
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
+      steer: () => this.steerMapChat(),
       modelChoices: () => this.chatModelChoices(),
       model: () => this.plugin.settings.cliModel,
       setModel: (model) => {
@@ -71286,13 +71840,6 @@ ${note.detail.trim()}` : "",
         this.plugin.settings.mapChatWidth = clampMapChatWidth(width);
         void this.plugin.saveSettings();
         this.syncChatNarrow();
-      },
-      suggestions: () => {
-        var _a2, _b2;
-        return {
-          selected: this.chatSelectionIds().length,
-          hasTopics: ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.length) != null ? _b2 : 0) > 0
-        };
       },
       insertImage: (images, item) => this.chatInsertImage(images, item),
       canSave: () => !this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true },
@@ -71692,12 +72239,16 @@ ${note.detail.trim()}` : "",
     };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
-  async sendMapChat(again) {
+  async sendMapChat(again, restore) {
     const chat = this.chat;
+    if (chat && !again && this.chatApplying && !chat.isBusy && !this.closed && chat.draft.trim()) {
+      this.steerMapChat();
+      return;
+    }
     if (!chat || chat.isBusy || this.chatApplying || this.closed || !this.map) return;
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
-    const origin = again != null ? again : {
+    const origin = again ? { ...again } : {
       text: message,
       chips: chat.attachments(),
       selectedIds: this.chatSelectionIds(),
@@ -71710,7 +72261,7 @@ ${note.detail.trim()}` : "",
     let sent = false;
     const abandon = (reason) => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-      if (!chat.retract(turn, again ? void 0 : draft)) return;
+      if (!chat.retract(turn, again ? restore : draft)) return;
       if (reason !== void 0) new import_obsidian37.Notice(reason);
     };
     const preparing = new AbortController();
@@ -71719,6 +72270,18 @@ ${note.detail.trim()}` : "",
       abandon();
     };
     this.chatPrepAbandon = stopPreparing;
+    const steerState = {
+      turn,
+      question: message,
+      origin,
+      handler: null,
+      gen: 0,
+      entries: [],
+      chain: Promise.resolve(),
+      noLive: false,
+      closed: false
+    };
+    this.chatSteer = steerState;
     const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request;
     try {
@@ -71785,6 +72348,7 @@ ${note.detail.trim()}` : "",
               stopWatching();
               this.releaseChatTask();
               controller.abort();
+              steerState.handler = null;
               attempt = openAttempt();
               chat.restartWaiting();
               wake();
@@ -71807,10 +72371,14 @@ ${note.detail.trim()}` : "",
                     if (!alive()) return;
                     if (event.kind === "stream-mode") {
                       if (event.mode !== "stream-json") stopWatching();
+                      this.setSteerLive(steerState, event.mode === "stream-json");
                       return;
                     }
                     if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
                     if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                  },
+                  (handler) => {
+                    if (alive()) this.bindSteerHandler(steerState, handler);
                   }
                 ),
                 swapped.then(() => null)
@@ -71819,6 +72387,9 @@ ${note.detail.trim()}` : "",
               if (outcome === null) continue;
               if (!alive()) return;
               const result = outcome;
+              await this.closeSteers(steerState);
+              if (!alive()) return;
+              const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
               const plan = result.actions.length ? planFor(result.actions, request.context, {
                 diagrams: this.plugin.settings.addDiagramsAfterResearch,
                 mapAiMode: (_b2 = this.map) == null ? void 0 : _b2.aiMode,
@@ -71829,19 +72400,14 @@ ${note.detail.trim()}` : "",
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
                   this.markChatTurn(origin, request);
-                  this.offerChatPlan(
-                    result,
-                    plan,
-                    request.context,
-                    { path: anchor.path, id: anchor.id },
-                    request.message
-                  );
+                  this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, fullMessage);
+                  this.flushSteers(false);
                 }
                 return;
               }
               if (result.actions.length) chat.setStage("applying");
               const lines = await this.applyMapChatActions(
-                { ...result, message: request.message },
+                { ...result, message: fullMessage },
                 request.context,
                 alive,
                 anchor
@@ -71850,6 +72416,7 @@ ${note.detail.trim()}` : "",
                 const entry = this.chatReplyEntry();
                 chat.finish(result.reply, lines);
                 this.markChatTurn(origin, request, entry);
+                this.flushSteers(true);
               }
               return;
             } catch (error) {
@@ -71858,6 +72425,7 @@ ${note.detail.trim()}` : "",
               if (alive()) {
                 const failure = this.chatErrorText(error);
                 chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
+                this.returnSteers(steerState);
               }
               return;
             } finally {
@@ -71878,6 +72446,121 @@ ${note.detail.trim()}` : "",
       return;
     }
     if (!went && !sent) abandon(this.closed ? void 0 : notSent());
+  }
+  /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
+  steerMapChat() {
+    const chat = this.chat;
+    if (!chat || this.closed) return;
+    const text11 = chat.draft.trim();
+    if (!text11) return;
+    const state = this.chatSteer;
+    if (state && !state.closed && chat.isBusy && chat.hasTurn(state.turn)) {
+      const waits = state.noLive;
+      const steer = chat.addSteer(text11, waits ? "queued" : "live");
+      if (!steer) return;
+      state.entries.push({ text: text11, steer, status: waits ? "queued" : "pending" });
+      this.pumpSteers(state);
+      return;
+    }
+    if (chat.isBusy || this.chatApplying) chat.addSteer(text11, "queued");
+  }
+  steerAlive(state) {
+    var _a2;
+    return !this.closed && this.chatSteer === state && !!((_a2 = this.chat) == null ? void 0 : _a2.hasTurn(state.turn));
+  }
+  /** The attempt can (or cannot) take a follow-up as it runs; when it cannot, the ones waiting for it wait for the end. */
+  setSteerLive(state, live) {
+    var _a2;
+    if (!this.steerAlive(state)) return;
+    state.noLive = !live;
+    if (live) return;
+    state.handler = null;
+    for (const entry of state.entries) {
+      if (entry.status !== "pending" && entry.status !== "sending" && entry.status !== "delivered") continue;
+      entry.status = "queued";
+      (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
+    }
+    this.syncSteerOrigin(state);
+  }
+  /** A retry after a failure asks the question with the follow-ups that went in, and only those. */
+  syncSteerOrigin(state) {
+    state.origin.text = [state.question, ...state.entries.filter((e) => e.status === "delivered").map((e) => e.text)].join(
+      "\n\n"
+    );
+  }
+  /** A new attempt has a new way in: what the earlier one took is handed over again, once, and what waited for it goes in. */
+  bindSteerHandler(state, handler) {
+    if (!this.steerAlive(state) || state.closed) return;
+    state.gen++;
+    state.handler = handler;
+    state.chain = Promise.resolve();
+    for (const entry of state.entries)
+      if (entry.status === "sending" || entry.status === "delivered") entry.status = "pending";
+    this.pumpSteers(state);
+  }
+  /** Hands every pending follow-up to the attempt, in the order typed. A refusal (the turn already ended) leaves it waiting. */
+  pumpSteers(state) {
+    const handler = state.handler;
+    if (!handler || state.noLive) return;
+    const gen = state.gen;
+    for (const entry of state.entries) {
+      if (entry.status !== "pending") continue;
+      entry.status = "sending";
+      state.chain = state.chain.then(async () => {
+        var _a2;
+        const current = () => gen === state.gen && entry.status === "sending" && this.steerAlive(state);
+        if (!current()) return;
+        try {
+          await handler(entry.text);
+        } catch (e) {
+          if (!current()) return;
+          entry.status = "queued";
+          (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
+          return;
+        }
+        if (!current()) return;
+        entry.status = "delivered";
+        this.syncSteerOrigin(state);
+      });
+    }
+  }
+  /** The reply is in: hand-overs still running settle, and what has not gone in waits for the next message. */
+  async closeSteers(state) {
+    var _a2;
+    await state.chain;
+    state.closed = true;
+    for (const entry of state.entries) {
+      if (entry.status === "delivered" || entry.status === "queued") continue;
+      entry.status = "queued";
+      (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
+    }
+  }
+  /** The turn stopped or failed: follow-ups that did not go in are not sent; they are in the field again. */
+  returnSteers(state) {
+    state.closed = true;
+    const chat = this.chat;
+    if (!chat) return;
+    for (const entry of state.entries) {
+      if (entry.status === "delivered") continue;
+      entry.status = "queued";
+      chat.setSteerState(entry.steer, "queued", false);
+    }
+    chat.restoreDraft(chat.takeQueued());
+  }
+  /** Follow-ups that waited become one new message (sent once), or, when it cannot be sent now, go back into the field. */
+  flushSteers(send) {
+    const chat = this.chat;
+    if (!chat) return;
+    const texts2 = chat.takeQueued();
+    if (!texts2.length) return;
+    if (!send || this.closed || chat.isBusy || this.chatApplying || !this.map) {
+      chat.restoreDraft(texts2);
+      return;
+    }
+    void this.sendMapChat(
+      { text: texts2.join("\n\n"), chips: [], selectedIds: this.chatSelectionIds() },
+      texts2.join("\n")
+    );
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   supersedeChatPlan() {
@@ -71957,6 +72640,7 @@ ${note.detail.trim()}` : "",
     this.clearChatPreview();
     chat.settlePlan(card, "applied");
     chat.setApplying(true);
+    const stopped = () => token !== this.chatPlanToken;
     let lines;
     try {
       lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, {
@@ -71970,6 +72654,7 @@ ${note.detail.trim()}` : "",
       chat.setApplying(false);
     }
     if (!this.closed) chat.settlePlan(card, "applied", lines);
+    if (!this.closed) this.flushSteers(!stopped());
   }
   releaseChatTask() {
     var _a2;
@@ -71994,6 +72679,7 @@ ${note.detail.trim()}` : "",
     this.releaseChatTask();
     controller.abort();
     (_d = this.chat) == null ? void 0 : _d.markStopped();
+    if (this.chatSteer) this.returnSteers(this.chatSteer);
     (_e = this.chat) == null ? void 0 : _e.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
@@ -72183,6 +72869,7 @@ ${note.detail.trim()}` : "",
     } finally {
       this.chatApplying = false;
     }
+    if (!this.closed) this.flushSteers(true);
   }
   /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
   chatTargetModels(ids) {
@@ -72665,6 +73352,7 @@ ${note.detail.trim()}` : "",
     } finally {
       this.chatApplying = false;
     }
+    if (!this.closed) this.flushSteers(true);
   }
   /**
    * Opens a map for the conversation (inside a mutate) and moves `anchor`, the map the turn belongs to, along with it; returns
@@ -73532,7 +74220,7 @@ ${addition}` : addition });
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   chatTranscriptTurn(turn) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const { question, answer } = turn;
     const refs = [];
     const seen = /* @__PURE__ */ new Set();
@@ -73551,11 +74239,12 @@ ${addition}` : addition });
     for (const id of (_d = (_c = question.origin) == null ? void 0 : _c.selectedIds) != null ? _d : []) topic(id);
     return {
       question: question.text,
+      steers: ((_e = question.steers) != null ? _e : []).filter((steer) => steer.state === "live").map((steer) => steer.text),
       refs,
       answer: answer.text,
       lines: answer.lines.map((line) => settledLine(line).text),
       ...answer.plan ? { plan: answer.plan.state } : {},
-      images: ((_e = answer.images) != null ? _e : []).map((block) => ({
+      images: ((_f = answer.images) != null ? _f : []).map((block) => ({
         nodeTitle: block.nodeTitle,
         query: block.query,
         state: block.state,
@@ -73590,6 +74279,7 @@ ${addition}` : addition });
         map: t("ui.map_chat_note_map"),
         saved: t("ui.map_chat_note_saved"),
         you: t("ui.map_chat_role_you"),
+        steer: t("ui.map_chat_note_steer"),
         ai: t("ui.map_chat_role_ai"),
         references: t("ui.map_chat_note_references"),
         results: t("ui.map_chat_note_results"),
@@ -78107,8 +78797,8 @@ var OutlineView = class extends import_obsidian42.ItemView {
         );
         const row2 = button.createSpan("vam-markers");
         for (const id of marks) {
-          const mark = row2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
-          mark.dataset.marker = id;
+          const mark2 = row2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+          mark2.dataset.marker = id;
         }
       }
       const linkCount = readTopicLinks({ "topic-links": this.links.get(node.id) }).length;
@@ -78362,11 +79052,11 @@ function fenceRanges(lines, offsets, html) {
   for (let i = 0; i < lines.length; i++) {
     const open = FENCE_OPEN3.exec(lines[i]);
     if (!open || inHtml(i)) continue;
-    const mark = open[1];
-    if (mark[0] === "`" && open[2].includes("`")) continue;
+    const mark2 = open[1];
+    if (mark2[0] === "`" && open[2].includes("`")) continue;
     for (let j = i + 1; j < lines.length; j++) {
       const run = FENCE_LINE.exec(lines[j]);
-      if (run && run[1][0] === mark[0] && run[1].length >= mark.length && lines[j].slice(run[0].length).trim() === "") {
+      if (run && run[1][0] === mark2[0] && run[1].length >= mark2.length && lines[j].slice(run[0].length).trim() === "") {
         ranges.push({ start: offsets[i], end: offsets[j] + lines[j].length });
         i = j;
         break;
@@ -79004,7 +79694,7 @@ function hasBlockDescendant(element) {
   }
   return false;
 }
-function classify(element) {
+function classify2(element) {
   const tag = tagOf(element);
   if (SKIP_BLOCK_TAGS.has(tag)) return "skip";
   if (ATOM_TAGS.has(tag) || element.getAttribute("translate") === "no" || classesOf(element).some((name2) => ATOM_CLASSES.has(name2)))
@@ -79032,7 +79722,7 @@ function buildText(nodes, parts) {
       return;
     }
     const element = node;
-    if (classify(element) === "inline") {
+    if (classify2(element) === "inline") {
       parts.push({ node: element, atom: false });
       const number = parts.length;
       out += `${PLACEHOLDER_OPEN}${number}${PLACEHOLDER_CLOSE}`;
@@ -79099,7 +79789,7 @@ function extractSegments(root) {
         continue;
       }
       const element = child;
-      const kind = classify(element);
+      const kind = classify2(element);
       if (kind === "atom" || kind === "inline") run.push(element);
       else {
         flush(run);
@@ -79883,7 +80573,7 @@ function shareViewerUiExtras(languages) {
 }
 
 // experiences/sharing/viewer-bundle.generated.ts
-var SHARE_VIEWER_JS = '(()=>{function nn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}var ur=80,fr=720;function rn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(fr,Math.max(ur,Math.round(t)))}function on(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(a=>a!==t.parentId)]}function pr(t){var r;let o=new Map;for(let a of t){let i=(r=a.parentId)!=null?r:"",c=o.get(i);c?c.push(a):o.set(i,[a])}return o}function mr(t,o,r){var i;let a=[o];for(;a.length;){let c=a.pop();for(let u of(i=t.get(c))!=null?i:[])u.id!==o&&!r.has(u.id)&&(r.add(u.id),a.push(u.id))}}function oe(t,o){let r=new Set;return mr(pr(t),o,r),r}function we(t,o){let r=new Map(t.map(c=>[c.id,c])),a=c=>{let u=0,d=new Set([c.id]);for(let g=c.parentId;g&&r.has(g)&&!d.has(g);g=r.get(g).parentId)d.add(g),u++;return u},i=new Set(t.map(c=>c.parentId).filter(c=>!!c&&r.has(c)));for(let c of t)i.has(c.id)&&(c.collapsed=o===null?!1:a(c)>=o)}function ve(t){if(t>150)return"right";if(t<-150)return"left"}function sn(t,o,r,a={left:0,right:0}){let i={...a},c=new Map;for(let u of t){let d=i.left<i.right?"left":"right";c.set(u.id,d),i[d]+=o(u)+r}return c}function an(t,o,r,a){let i=t.map(a),c={left:0,right:0};t.forEach((d,g)=>{let y=i[g];y&&(c[y]+=o(d)+r)});let u=sn(t.filter((d,g)=>!i[g]),o,r,c);return new Map(t.map((d,g)=>{var y;return[d.id,(y=i[g])!=null?y:u.get(d.id)]}))}function gr(t){return t==="right"||t==="left"||t==="down"||t==="up"}function ln(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function ie(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return gr(r)?r:void 0}function cn(t){let{width:o,column:r,mapDirection:a,engine:i}=t,c=(u,d)=>{var k,$;let g=[],y=(w,h)=>{for(let x of[...t.kidsOf(w),...t.joinsOf(w)])ie(x)?g.push({node:x,root:h}):y(x,h)};for(let w of u)y(w,w);let p={roots:u,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!g.length)return i(d,p);let b=d==="down"||d==="up",T=g.map(({node:w,root:h})=>{let x=c([w],ie(w)),R=1/0,v=-1/0,f=1/0,B=-1/0,N=new Map,F=L=>{N.set(L.id,L);for(let C of[...t.kidsOf(L),...t.joinsOf(L)])F(C)};F(w);for(let[L,C]of x)R=Math.min(R,C.x),v=Math.max(v,C.x+o),f=Math.min(f,C.y),B=Math.max(B,C.y+t.heightFor(N.get(L)));let A=Math.max(1,Math.ceil((v-R+r-o)/r));return{node:w,root:h,placed:x,minX:R,maxX:v,minY:f,maxY:B,slots:A}}),E=new Map(T.map(w=>[w.node.id,w])),z=w=>{let h=E.get(w.id);return!h||!b?[]:Array.from({length:h.slots},(x,R)=>({id:`${w.id}\\0pad${R}`}))},P=new Set,S=i(d,{roots:u,kidsOf:w=>{if(!E.has(w.id))return t.kidsOf(w);let h=z(w);for(let x of h)P.add(x.id);return h},joinsOf:w=>E.has(w.id)?[]:t.joinsOf(w),heightFor:w=>{if(P.has(w.id))return 0;let h=E.get(w.id);return h&&!b?h.maxY-h.minY:t.heightFor(w)}}),D=new Map;for(let[w,h]of S)!P.has(w)&&!E.has(w)&&D.set(w,h);for(let w of T){let h=S.get(w.node.id),x,R;b?(x=h.x+r/2-(w.minX+w.maxX)/2,R=d==="down"?h.y-w.minY:h.y+t.heightFor(w.node)-w.maxY):(x=d==="right"||d==="balanced"&&h.x>=(($=(k=S.get(w.root.id))==null?void 0:k.x)!=null?$:h.x)?h.x-w.minX:h.x+o-w.maxX,R=h.y-w.minY);for(let[v,f]of w.placed)D.set(v,{x:f.x+x,y:f.y+R})}return D};return c(t.roots,a)}var dn=1/Math.tan(Math.PI/3);function un(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,p=u-c,b=_=>[...r(_),...a(_)],T=o.map(_=>{let S=new Map,D=N=>N.reduce((F,A)=>F+S.get(A.id),0)+Math.max(0,N.length-1)*d,k=N=>{let F=b(N);for(let A of F)k(A);S.set(N.id,Math.max(i(N),D(F)))},$=(N,F,A,L)=>{let C=b(N),j=A+(S.get(N.id)-D(C))/2,U=C.map(J=>{let q=$(J,F+1,j,L);return j+=S.get(J.id)+d,q}),Q=i(N),Z=U.length?(U[0]+U[U.length-1])/2:A+S.get(N.id)/2;return L.push({id:N.id,x:-F*u,centre:Z,height:Q}),Z},w=b(_).map((N,F)=>{let A=F%2===0?1:-1,L=b(N);for(let rt of L)k(rt);let C=[],j=d;for(let rt of L){let Gt=C.length,Ot=$(rt,0,j,C)*dn-p;for(let ct=Gt;ct<C.length;ct++)C[ct].x+=Ot-c;j+=S.get(rt.id)+d}let U=Math.max(u,j),Q=U*dn,Z=i(N),J=[-c/2,...C.map(rt=>rt.x)],q=[c/2,Q,...C.map(rt=>rt.x+c)];return{topic:N,side:A,length:U,height:Z,cards:C,minX:Math.min(...J),maxX:Math.max(...q)}}),h=i(_),x=[{id:_.id,x:0,y:-h/2,height:h}],R={above:-p,below:-p};for(let N of w){let F=N.side===1?"above":"below",A=R[F]-N.maxX,L=-N.side*N.length;x.push({id:N.topic.id,x:A-c/2,y:L-N.side*(N.height/2)-N.height/2,height:N.height});for(let C of N.cards)x.push({id:C.id,x:A+C.x,y:L+N.side*C.centre-C.height/2,height:C.height});R[F]=A+N.minX-p}let v=Math.min(...x.map(N=>N.x)),f=Math.min(...x.map(N=>N.y)),B=Math.max(...x.map(N=>N.y+N.height));return{out:x,minX:v,minY:f,maxY:B}}),E=new Map,z=g+Math.max(0,...T.map(_=>-_.minX)),P=y;for(let _ of T){for(let S of _.out)E.set(S.id,{x:z+S.x,y:P+S.y-_.minY});P+=_.maxY-_.minY+d}return E}var hr=Math.PI*2,yr=6,br=60;function xr(t,o,r,a){let i=[...t.values()].sort((u,d)=>u.y-d.y),c=new Set;for(let u=0;u<i.length;u++){let d=i[u];for(let g=u+1;g<i.length;g++){let y=i[g];if(y.y>=d.y+d.height+r)break;a&&a.checks++,Math.abs(d.x-y.x)<o&&d.y<y.y+y.height+r&&c.add(Math.max(d.depth,y.depth))}}return c}function fn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,p=new Map,b=y;for(let T of o){let E=[],z=new Map,P=A=>[...r(A),...a(A)],_=A=>{let L=P(A),C=L.length?L.reduce((j,U)=>j+_(U),0):1;return z.set(A.id,C),C};_(T);let S=(A,L,C,j)=>{E.push({id:A.id,depth:L,angle:(C+j)/2,height:i(A)});let U=C,Q=(j-C)/z.get(A.id);for(let Z of P(A)){let J=Q*z.get(Z.id);S(Z,L+1,U,U+J),U+=J}};S(T,0,0,hr);let D=Math.max(...E.map(A=>A.depth)),k=Array.from({length:D+1},(A,L)=>L*u),$=()=>{let A=[];return k.forEach((L,C)=>A.push(C?Math.max(L,A[C-1]+u):0)),new Map(E.map(L=>{let C=A[L.depth];return[L.id,{x:Math.round(C*Math.sin(L.angle)-c/2),y:Math.round(-C*Math.cos(L.angle)-L.height/2),depth:L.depth,height:L.height}]}))},w=u/yr,h=()=>(t.stats&&t.stats.rounds++,xr($(),c,d,t.stats)),x=w,R=h(),v=k.slice();for(let A=0;R.size&&A<br;A++){v=k.slice();for(let L of R)k[L]+=x;x*=2,R=h()}if(!R.size&&v.some((A,L)=>k[L]-A>w)){let A=k.slice();for(;A.some((L,C)=>L-v[C]>w);){let L=A.map((C,j)=>(C+v[j])/2);k.splice(0,k.length,...L),h().size?v=L:A=L}k.splice(0,k.length,...A)}let f=$(),B=Math.min(...[...f.values()].map(A=>A.x)),N=Math.min(...[...f.values()].map(A=>A.y)),F=Math.max(...[...f.values()].map(A=>A.y+A.height));for(let[A,L]of f)p.set(A,{x:Math.round(g)+L.x-B,y:b+L.y-N});b+=F-N+d}return p}function se(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,rowGap:u,flip:d,left:g,top:y}=t,p=new Map,b=new Map,T=v=>v.reduce((f,B)=>f+p.get(B.id),0),E=v=>{let f=r(v),B=a(v);for(let N of[...f,...B])E(N);p.set(v.id,Math.max(c,T(f),T(B))),b.set(v.id,1+Math.max(0,...f.map(N=>b.get(N.id))))},z=new Map,P=new Map,_=(v,f,B)=>{let N=r(v),F=a(v),A=p.get(v.id),L=(Q,Z)=>{let J=B+(A-T(Q))/2;return Q.map(q=>{_(q,Z,J);let rt=z.get(q.id);return J+=p.get(q.id),rt})},C=L(N,f+1),j=L(F,f+b.get(v.id)),U=C.length?C:j;P.set(v.id,f),z.set(v.id,U.length?(U[0]+U[U.length-1])/2:B)},S=g,D=[],k=v=>{D.push(v);for(let f of[...r(v),...a(v)])k(f)};for(let v of o)E(v),_(v,0,S),S+=p.get(v.id),k(v);let $=Math.max(0,...P.values()),w=Array.from({length:$+1},()=>0);for(let v of D)w[P.get(v.id)]=Math.max(w[P.get(v.id)],i(v));let h=[],x=y;for(let v=0;v<=$;v++){let f=d?$-v:v;h[f]=x,x+=w[f]+u}let R=new Map;for(let v of D){let f=P.get(v.id),B=d?h[f]+w[f]-i(v):h[f];R.set(v.id,{x:z.get(v.id),y:B})}return R}function pn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:u,gap:d,left:g,top:y}=t,p=new Map,b=y;for(let T of o){let E=new Map,z=k=>{E.set(k.id,i(k));for(let $ of[...r(k),...a(k)])z($)};z(T);let P=[{id:T.id,x:g,y:0}],_=g+u;[...r(T),...a(T)].forEach((k,$)=>{let w=se({roots:[k],kidsOf:r,joinsOf:a,heightFor:i,column:u,rowGap:u-c,flip:$%2===1,left:_,top:0}),h=w.get(k.id).y,x=_;for(let[R,v]of w)P.push({id:R,x:v.x,y:v.y-h}),x=Math.max(x,v.x);_=x+u});let S=Math.min(...P.map(k=>k.y)),D=Math.max(...P.map(k=>k.y+E.get(k.id)));for(let k of P)p.set(k.id,{x:k.x,y:b+k.y-S});b+=D-S+d}return p}var Yt=300;function Mr(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}var Tr=24,wr={compact:{column:330,gap:12},standard:{column:360,gap:Tr},spacious:{column:420,gap:48}};function vr(t){return t==="compact"||t==="spacious"}var kr=180;function Sr(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...wr[vr(r)?r:"standard"]}}var Ar=t=>t==="left"?-1:1;var Er=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:kr};function Lr(t,o){var g,y;let r=new Map(t.map(p=>[p.id,p])),a=new Map,i=new Map,c=(p,b,T)=>{var E;return p.set(b,[...(E=p.get(b))!=null?E:[],T])};for(let p of t){if(!p.parentId)continue;let b=p.aimKind!=="question"&&((g=p.aimConvergesFromNodeIds)!=null&&g.length)?on(p).map(E=>r.get(E)):[],T=(y=b[0])==null?void 0:y.parentId;T&&r.has(T)&&b.every(E=>E&&E.parentId===T)?c(i,T,p):c(a,p.parentId,p)}return{kidsOf:p=>{var b;return o&&p.collapsed?[]:(b=a.get(p.id))!=null?b:[]},joinsOf:p=>{var b;return o&&p.collapsed?[]:((b=i.get(p.id))!=null?b:[]).filter(T=>{var E;return!(o&&((E=r.get(T.parentId))!=null&&E.collapsed))})}}}function ke(t){var w;let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,gap:u,sign:d,left:g,top:y}=t,p=new Map,b=new Map,T=new Map,E=new Map,z=new Map,P=h=>h.reduce((x,R)=>x+b.get(R.id),0)+Math.max(0,h.length-1)*u,_=h=>{let x=r(h),R=a(h);z.set(h.id,h);for(let v of[...x,...R])_(v);b.set(h.id,Math.max(i(h),P(x),P(R))),T.set(h.id,1+Math.max(0,...x.map(v=>T.get(v.id))))},S=(h,x,R)=>{let v=r(h),f=a(h),B=b.get(h.id),N=(Q,Z)=>{let J=R+(B-P(Q))/2;return Q.map(q=>{let rt=S(q,Z,J);return J+=b.get(q.id)+u,rt})},F=N(v,x+1),A=N(f,x+T.get(h.id)),L=F.length?v:f,C=F.length?F:A,j=i(h),U=R+(B-j)/2;if(C.length){let Q=C[0]+i(L[0])/2,Z=C[C.length-1]+i(L[L.length-1])/2;U=(Q+Z)/2-j/2}return p.set(h.id,{x:0,y:y+U}),E.set(h.id,x),U},D=0;for(let h of o)_(h),S(h,0,D),D+=b.get(h.id)+u;let k=[];for(let[h,x]of E)k[x]=Math.max((w=k[x])!=null?w:0,Mr(z.get(h)));let $=h=>{var R,v;let x=0;if(d>0)for(let f=0;f<h;f++)x+=(R=k[f])!=null?R:0;else for(let f=1;f<=h;f++)x+=(v=k[f])!=null?v:0;return x};for(let[h,x]of p){let R=E.get(h);x.x=g+d*(R*c+$(R))}return{placed:p,sizes:b}}function Nr(t,o,r){let{roots:a,kidsOf:i,joinsOf:c,heightFor:u,gap:d,left:g,top:y}=o,p=ke({...o,sign:1}).sizes,b=new Map(t.map(S=>[S.id,S])),T=a.map(S=>{var w;let D=(w=b.get(S.id))!=null?w:S,k=an(i(S),h=>p.get(h.id),d,h=>{var x;return r?void 0:ve(((x=b.get(h.id))!=null?x:h).x-D.x)}),$=h=>ke({...o,roots:[S],kidsOf:x=>x.id===S.id?i(x).filter(R=>k.get(R.id)===h):i(x),joinsOf:x=>x.id===S.id&&h==="left"?[]:c(x),sign:h==="left"?-1:1,left:0,top:0}).placed;return{root:S,right:$("right"),left:$("left")}}),E=Math.max(0,...T.flatMap(({left:S})=>[...S.values()].map(D=>-D.x))),z=g+E,P=new Map,_=0;for(let{root:S,right:D,left:k}of T){let $=f=>f.get(S.id).y+u(S)/2,w=Math.max($(D),$(k)),h=[];for(let f of[{placed:D,isLeft:!1},{placed:k,isLeft:!0}]){let{placed:B,isLeft:N}=f,F=w-$(B);for(let[A,L]of B)N&&A===S.id||h.push([A,{x:z+L.x,y:L.y+F}])}let x=f=>u(b.get(f)),R=Math.min(...h.map(([,f])=>f.y)),v=Math.max(...h.map(([f,B])=>B.y+x(f)));for(let[f,B]of h)P.set(f,{x:B.x,y:y+_+B.y-R});_+=v-R+d}return P}function _r(t,o,r,a,i=!1,c,u="right",d=!1){let{direction:g,column:y,gap:p}=Sr(u),{kidsOf:b,joinsOf:T}=Lr(t,i),E=_=>Er(c,_.id),z=(_,S)=>{if(_==="down"||_==="up")return se({...S,column:y,rowGap:y-Yt,flip:_==="up",left:r,top:a});let D={...S,column:y,gap:p,left:r,top:a};if(_==="radial")return fn({...D,width:Yt});if(_==="timeline")return pn({...D,width:Yt});if(_==="fishbone")return un({...D,width:Yt});let k={...D,sign:Ar(_)};return _==="balanced"?Nr(t,k,d):ke(k).placed},P={roots:o,kidsOf:b,joinsOf:T,heightFor:E};return ln(g)&&t.some(_=>ie(_))?cn({...P,width:Yt,column:y,mapDirection:g,engine:z}):z(g,P)}function mn(t,o,r,a="right",i={}){let c=o!=null&&o.size?t.filter(g=>!o.has(g.id)):t,u=c.filter(g=>!g.parentId),d=_r(c,u,80,80,!0,r,a,i.reset===!0);return t.map(g=>({...g,...d.get(g.id)}))}function gn(t){return typeof t=="number"?{top:t,right:0,bottom:0,left:0}:t}function hn(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function yn(t,o,r,a){let i=t.zoom,c=gn(a);return{zoom:i,x:c.left+(r.width-c.left-c.right)/2-o.x*i,y:c.top+(r.height-c.top-c.bottom)/2-o.y*i}}var Ir=.25;function bn(t,o,r,a=1.2){let i=gn(r),c=Math.max(1,o.width-i.left-i.right),u=Math.max(1,o.height-i.top-i.bottom),d=t.maxX-t.minX,g=t.maxY-t.minY,y=Math.max(Ir,Math.min(a,(c-80)/d,(u-80)/g));return{zoom:y,x:i.left+(c-d*y)/2-t.minX*y,y:i.top+(u-g*y)/2-t.minY*y}}var ae={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",linksLabel:"Links: {0}",linkOpen:"Open link: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3","priority-4":"Priority 4","priority-5":"Priority 5","progress-0":"Progress 0%","progress-25":"Progress 25%","progress-50":"Progress 50%","progress-75":"Progress 75%","progress-100":"Progress 100%","flag-red":"Red flag","flag-yellow":"Yellow flag","flag-green":"Green flag","flag-blue":"Blue flag",smile:"Smile",neutral:"Neutral",sad:"Sad",question:"Question"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Se(t){let o=3735928559,r=1103547991;for(let a=0;a<t.length;a++){let i=t.charCodeAt(a);o=Math.imul(o^i,2654435761),r=Math.imul(r^i,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var kt="\\u27E6",St="\\u27E7",Xt=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,Tn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Ae=new Set(["pre","script","style","textarea","template","noscript"]),Cr=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),Or=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),Rr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,Pr=/\\p{L}/u,jt=t=>t.localName.toLowerCase(),wn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},le=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function vn(t){for(let o of le(t))if(Tn.has(jt(o))||Ae.has(jt(o))||vn(o))return!0;return!1}function kn(t){let o=jt(t);return Ae.has(o)?"skip":Cr.has(o)||t.getAttribute("translate")==="no"||wn(t).some(r=>Or.has(r))?"atom":Tn.has(o)||vn(t)?"block":"inline"}function Hr(t,o){return t.replace(Rr,r=>(o.push({literal:r,atom:!0}),`${kt}${o.length}/${St}`))}function Dr(t,o){let r="",a=i=>{var u;if(i.nodeType===3){r+=Hr((u=i.nodeValue)!=null?u:"",o);return}if(i.nodeType!==1){o.push({node:i,atom:!0}),r+=`${kt}${o.length}/${St}`;return}let c=i;if(kn(c)==="inline"){o.push({node:c,atom:!1});let d=o.length;r+=`${kt}${d}${St}`;for(let g of Array.from(c.childNodes))a(g);r+=`${kt}/${d}${St}`;return}o.push({node:c,atom:!0}),r+=`${kt}${o.length}/${St}`};for(let i of t)a(i);return r}function xn(t){return Pr.test(t.replace(Xt,""))}function Sn(t){let o=[],r=u=>{let d=u.getAttribute("alt");d&&xn(d)&&o.push({index:o.length,kind:"attribute",text:d.trim(),nodes:[],lead:"",trail:"",parts:[],element:u,attribute:"alt"})},a=u=>{for(let d of le(u)){let g=jt(d);Ae.has(g)||g==="svg"||(g==="img"?r(d):a(d))}},i=u=>{if(!u.length)return;let d=[],g=Dr(u,d),y=g.trim();if(!y||!xn(y)||g.includes("\\u27E6\\u27E6"))return;let p=g.replace(Xt,"");if(p.includes(kt)||p.includes(St))return;let b=g.slice(0,g.length-g.trimStart().length),T=g.slice(g.trimEnd().length);o.push({index:o.length,kind:"run",text:y,nodes:u,lead:b,trail:T,parts:d})},c=u=>{let d=[];for(let g of Array.from(u.childNodes)){if(g.nodeType===3){d.push(g);continue}if(g.nodeType!==1){i(d),d=[];continue}let y=g,p=kn(y);p==="atom"||p==="inline"?d.push(y):(i(d),d=[],p==="block"&&c(y))}i(d)};return a(t),c(t),{units:o}}var Mn=t=>[...t.matchAll(Xt)].map(o=>o[0]);function zr(t,o){if(!o.trim())return!1;let r=Mn(t),a=Mn(o);if(r.length!==a.length||r.some((c,u)=>c!==a[u]))return!1;let i=o.replace(Xt,"");return!i.includes(kt)&&!i.includes(St)}function Br(t,o,r){var g;let a=[],i=[],c=y=>{let p=i[i.length-1];p?p.appendChild(y):a.push(y)},u=y=>{y&&c(r.createTextNode(y))};u(t.lead);let d=0;for(let y of o.matchAll(Xt)){u(o.slice(d,y.index)),d=((g=y.index)!=null?g:0)+y[0].length;let p=t.parts[Number(y[2])-1];if(y[1]==="/")i.pop();else if(y[3]==="/")p.literal!==void 0?u(p.literal):p.node&&c(p.node.cloneNode(!0));else if(p.node){let b=p.node.cloneNode(!1);c(b),i.push(b)}}return u(o.slice(d)),u(t.trail),a}function An(t,o){var i,c,u;let r={applied:0,kept:0},a=[...t.units.filter(d=>d.kind==="attribute"),...t.units.filter(d=>d.kind==="run")];for(let d of a){let g=o(d);if(g===void 0||!zr(d.text,g)){r.kept++;continue}if(d.kind==="attribute"){(c=d.element)==null||c.setAttribute((i=d.attribute)!=null?i:"alt",g.trim()),r.applied++;continue}let y=d.nodes[0],p=y==null?void 0:y.parentNode,b=y==null?void 0:y.ownerDocument;if(!y||!p||!b){r.kept++;continue}for(let T of Br(d,g,b))p.insertBefore(T,y);for(let T of d.nodes)(u=T.parentNode)==null||u.removeChild(T);r.applied++}return r}function En(t){let o=[],r=a=>{for(let i of le(a))jt(i)==="svg"?o.push(i):r(i)};return r(t),o}function Ln(t,o){let r=[],a=i=>{for(let c of le(i))wn(c).includes(o)&&r.push(c),a(c)};return a(t),r}var Nn="vam-mermaid-slot",ce=1,_n=3,In=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},$r=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Fr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function Kr(t){var o,r;return t.nodeType===_n?$r((o=t.nodeValue)!=null?o:""):t.nodeType!==ce?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:Cn(t)}function Cn(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(a=>{var i;return` ${a}="${Fr((i=t.getAttribute(a))!=null?i:"")}"`}).join("");return`<${o}${r}>${Wr(t)}</${o}>`}function Wr(t){return Array.from(t.childNodes).map(Kr).join("")}function Ur(t){let o=[],r=a=>{if(o.push(a),a.nodeType===ce)for(let i of Array.from(a.childNodes))r(i)};return r(t),o}function Vr(t,o){var a;let r=En(t);for(let i of r){let c=o();c.setAttribute("class",Nn),(a=i.parentNode)==null||a.replaceChild(c,i)}return{root:t,svgs:r,extraction:Sn(t)}}function Yr(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Se(o)}`}var jr=t=>Se(Cn(t));function Xr(t,o){if(!Array.isArray(o))return!1;let r=Ur(t);for(let a of o){if(!Array.isArray(a)||a.length!==2)return!1;let[i,c]=a;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=r.length)return!1;let u=r[i];if(typeof c=="string"){if(u.nodeType!==_n)return!1;u.nodeValue=c}else if(c&&typeof c=="object"&&!Array.isArray(c)){if(u.nodeType!==ce)return!1;for(let[d,g]of Object.entries(c))if(g===null)u.removeAttribute(d);else if(typeof g=="string")u.setAttribute(d,g);else return!1}else return!1}return!0}function Gr(t,o,r){if(!t||typeof t!="object")return null;let a=t;if(typeof a.svg=="string"){let i=r(a.svg),c=Array.from(i.childNodes).filter(u=>u.nodeType===ce);return c.length===1&&c[0].localName.toLowerCase()==="svg"?c[0]:null}if(typeof a.check=="string"&&a.check===jr(o)){let i=o.cloneNode(!0);return Xr(i,a.patch)?i:null}return null}function On(t,o,r){var g,y;let a={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:c}=Vr(t,r.createSlot),u=o.detailSegments;if(u!==void 0||o.detailCheck!==void 0)if(Array.isArray(u)&&u.length===c.units.length&&o.detailCheck===Yr(c)){let p=An(c,T=>{let E=u[T.index];return typeof E=="string"?E:void 0}),b=u.filter(T=>typeof T!="string").length;if(a.applied=p.applied,a.kept=Math.max(0,p.kept-b),r.afterText&&!r.afterText(t))return a.fallback=!0,a}else a.fallback=!0;let d=Ln(t,Nn);d.length!==i.length&&(a.fallback=!0);for(let[p,b]of d.entries()){let T=i[p];if(!T)break;let E=(g=o.detailDiagrams)==null?void 0:g[p],z=T;if(E){let P=null;try{P=Gr(E,T,r.parse)}catch{P=null}P?z=P:a.diagramsKept++}(y=b.parentNode)==null||y.replaceChild(z,b)}return a}function ut(t,o,r){let a=t.createElement(o);return r&&(a.className=r),a}function qr(t,o){var u;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),a=(u=r==null?void 0:r[1])!=null?u:t,[i,c=""]=o.imageSource.split("{0}");return[i,a,c]}var Qr=20,Rn=2048,Pn=URL;function Zr(t){if(typeof t!="string")return null;let o=t.trim();if(!o||o.length>Rn||/[\\x00-\\x20\\x7f-\\x9f\\u2028\\u2029]/.test(o)||!/^https?:\\/\\//i.test(o))return null;let r;try{r=new Pn(o)}catch{return null}return r.protocol!=="http:"&&r.protocol!=="https:"||!r.hostname||r.username||r.password||r.href.length>Rn?null:r.href}function Jr(t){if(!Array.isArray(t))return[];let o=new Set,r=[];for(let a of t){let i=Zr(a);if(!(!i||o.has(i))&&(o.add(i),r.push({href:i,host:new Pn(i).host}),r.length>=Qr))break}return r}function Hn(t,o,r){let a=Jr(o);if(!a.length)return null;let i=ut(t,"div");i.className="vam-inspector-links",i.setAttribute("role","group"),i.setAttribute("aria-label",r.linksLabel.replace("{0}",a.map(c=>c.host).join(", ")));for(let{href:c,host:u}of a){let d=ut(t,"a");d.setAttribute("href",c),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.setAttribute("referrerpolicy","no-referrer"),d.setAttribute("aria-label",r.linkOpen.replace("{0}",u)),d.textContent=u,i.append(d)}return i}function to(t,o,r){let[a,i,c]=qr(o,r),u=ut(t,"span");u.className="vam-image-source";let d=ut(t,"a");return d.setAttribute("href",o),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.textContent=i,u.append(t.createTextNode(a),d,t.createTextNode(c)),u}function Ee(t,o,r,a,i){Dn(t,o,new DOMParser().parseFromString(r,"text/html").body,a,i)}function Dn(t,o,r,a,i){var u,d,g,y;for(let p of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(r.querySelectorAll("*")))for(let b of p.getAttributeNames()){let T=(u=p.getAttribute(b))!=null?u:"",E=b.toLowerCase();(E.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(E)&&/^\\s*(javascript|vbscript):/i.test(T))&&p.removeAttribute(b)}let c=()=>{let p=ut(t,"span");return p.className="vam-image-omitted",p.textContent=i.imageOmitted,p};for(let p of Array.from(r.querySelectorAll("img"))){let b=(d=p.getAttribute("src"))!=null?d:"";if(b.startsWith("vam-asset:")){let T=a[b.slice(10)];typeof T=="string"&&T.startsWith("data:image/")?p.setAttribute("src",T):p.replaceWith(c())}else if(/^https?:\\/\\//i.test(b)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let T=p.closest("a");(T!=null?T:p).after(to(t,b,i))}else/^data:image\\//i.test(b)||p.replaceWith(c())}for(let p of Array.from(r.querySelectorAll("a"))){let b=(g=p.getAttribute("href"))!=null?g:"";/^(https?:|mailto:)/i.test(b)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):b.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(r.querySelectorAll("table"))){if((y=p.parentElement)!=null&&y.classList.contains("vam-table-scroll"))continue;let b=ut(t,"div");b.className="vam-table-scroll",p.replaceWith(b),b.append(p)}o.append(...Array.from(r.childNodes).map(p=>t.importNode(p,!0)))}function zn(t,o,r,a,i,c){let u=d=>new DOMParser().parseFromString(d,"text/html").body;try{let d=u(r);On(d,a,{parse:u,createSlot:()=>ut(t,"div")}),Dn(t,o,d,i,c)}catch{o.replaceChildren(),Ee(t,o,r,i,c)}}function de(t,o,r,a){let i=r-t,c=i>=40?i/2:i>=0?60-i:Math.max(60,-i/2);return`M ${t} ${o} C ${t+c} ${o}, ${r-c} ${a}, ${r} ${a}`}var Le=["red","orange","yellow","green","blue","purple"];function $n(t){let o=t["topic-color"];return Le.find(r=>r===o)}var eo=["bold","text-small","text-large","border-thick","line-thick"],Bn=["text-small","text-large"];function no(t){return Array.isArray(t)?t:typeof t=="string"&&t?[t]:[]}function Fn(t){let o=no(t["topic-style"]),r=o.find(a=>Bn.some(i=>i===a));return eo.filter(a=>Bn.includes(a)?a===r:o.includes(a))}var ro=["done","warning","star","priority-1","priority-2","priority-3","priority-4","priority-5","progress-0","progress-25","progress-50","progress-75","progress-100","flag-red","flag-yellow","flag-green","flag-blue","smile","neutral","sad","question"],Kn=[{group:"status",single:!1,ids:["done","warning","star"]},{group:"priority",single:!0,ids:["priority-1","priority-2","priority-3","priority-4","priority-5"]},{group:"progress",single:!0,ids:["progress-0","progress-25","progress-50","progress-75","progress-100"]},{group:"flag",single:!1,ids:["flag-red","flag-yellow","flag-green","flag-blue"]},{group:"face",single:!1,ids:["smile","neutral","sad","question"]}];function oo(t){return Kn.find(o=>o.ids.includes(t)).group}function io(t){return Kn.find(o=>o.ids.includes(t)).single}var so={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3","priority-4":"P4","priority-5":"P5","progress-0":"\\u25CB","progress-25":"\\u25D4","progress-50":"\\u25D1","progress-75":"\\u25D5","progress-100":"\\u25CF","flag-red":"\\u2691R","flag-yellow":"\\u2691Y","flag-green":"\\u2691G","flag-blue":"\\u2691B",smile:"\\u263A",neutral:"-_-",sad:"\\u2639",question:"?"};function Wn(t){let o=t["topic-markers"];if(!Array.isArray(o))return[];let r=new Set;return ro.filter(a=>{if(!o.includes(a))return!1;if(!io(a))return!0;let i=oo(a);return r.has(i)?!1:(r.add(i),!0)})}function Un(t){return so[t]}var ao=(t,o)=>t.toLowerCase()===o.toLowerCase(),ue=(t,o)=>t.find(r=>ao(r,o));function lo(t,o){if(typeof t!="string"||!t.trim())return;let r=ue(o,t.trim());if(r)return r;let a=t.trim().toLowerCase().split(/[-_]/),i=a[0];if(i==="zh"){let u=a.slice(1).some(d=>d==="hant"||d==="tw"||d==="hk"||d==="mo")?"TW":"CN";return ue(o,`${i}-${u}`)}return o.find(c=>c.toLowerCase().split(/[-_]/)[0]===i)}function Vn(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let a=ue(o,t.stored);if(a)return a}if(typeof t.defaultLanguage=="string"){let a=ue(o,t.defaultLanguage);if(a)return a}for(let a of t.browser){let i=lo(a,o);if(i)return i}return r}function Yn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var co="https://github.com/kevcltsai/visual-agent-map?ref=share",uo="und",bt="http://www.w3.org/2000/svg",jn="vam-share-panel-width",Xn="vam-share-outline-open",fo="(max-width: 600px)",po=300,Ne=240,mo=.25,go=2,ho=4,yo={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},bo={core:"target",support:"library",side:"skip"},Gn=t=>t==="core"||t==="support"||t==="side",At=(t,o)=>t.replace("{0}",String(o));function Ce(t,o){var a;let r=(a=t.getElementById(o))==null?void 0:a.textContent;if(r)try{return JSON.parse(r)}catch{return}}function qn(t){let o={...ae};if(t&&typeof t=="object")for(let i of Object.keys(o)){let c=t[i];typeof c=="string"&&(o[i]=c)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...ae.markerNames};for(let i of Object.keys(o.markerNames)){let c=r[i];typeof c=="string"&&c.trim()&&(o.markerNames[i]=c)}}let a=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...ae.colorNames},a&&typeof a=="object")for(let i of Le){let c=a[i];typeof c=="string"&&c.trim()&&(o.colorNames[i]=c)}return o}function xo(t){let o=Ce(t,"vam-ui"),r=new Map,a={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[i,c]of Object.entries(o.uiByLanguage))r.set(i,qn(c));if(o.languageNames&&typeof o.languageNames=="object")for(let[i,c]of Object.entries(o.languageNames))typeof c=="string"&&c&&(a[i]=c)}return{sets:r,names:a}}var ft=t=>typeof t=="string"&&t.trim()!=="";function _e(t){try{return window.localStorage.getItem(t)}catch{return null}}function Ie(t,o){try{window.localStorage.setItem(t,o)}catch{}}function Mo(t,o){let r=Math.min(...o.map(x=>x.x)),a=Math.min(...o.map(x=>x.y)),i=Math.max(...o.map(x=>x.x+x.w)),c=Math.max(...o.map(x=>x.y+x.h)),u=14,d=12,g=8,y=t==="down"||t==="up",p=y?r:a,b=y?i:c,T=t==="right"?i+u:t==="left"?r-u:t==="down"?c+u:a-u,E=t==="right"||t==="down"?1:-1,z=(p+b)/2,P=Math.min(d,Math.max(0,(b-p)/4)),_=x=>Math.round(x*100)/100,S=(x,R)=>y?`${_(x)} ${_(R)}`:`${_(R)} ${_(x)}`,D=T,k=T+E*d,$=T+E*2*d,w=[`M ${S(p,D)}`,`Q ${S(p,k)} ${S(p+P,k)}`,`L ${S(z-P,k)}`,`Q ${S(z,k)} ${S(z,$)}`,`Q ${S(z,k)} ${S(z+P,k)}`,`L ${S(b-P,k)}`,`Q ${S(b,k)} ${S(b,D)}`].join(" "),h=$+E*g;return y?{path:w,x:_(z),y:_(h)}:{path:w,x:_(h),y:_(z)}}var mt=()=>window.matchMedia(fo).matches;function Qn(t){var Qe,Ze,Je,tn;let o=qn(Ce(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let a=t.getElementById("vam-app"),i=Ce(t,"vam-map");if(!a)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){a.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let c=i.assets&&typeof i.assets=="object"?i.assets:{},u=new Map,d=[];for(let e of i.nodes){if(!e||typeof e.id!="string"||u.has(e.id))continue;u.set(e.id,e);let n=nn(e.width),s=rn(e.height);d.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{},...s!==void 0?{height:s}:{}})}let g=new Map(d.map(e=>[e.id,e]));for(let e of d)e.parentId&&(!g.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let y=[];if(Array.isArray(i.textNodes)){let e=new Set;for(let n of i.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let s=typeof n.parentId=="string"?g.get(n.parentId):void 0;y.push({id:n.id,parentId:s?s.id:null,text:n.text,dx:s?n.x-s.x:n.x,dy:s?n.y-s.y:n.y,links:!s&&Array.isArray(n.links)?Array.from(new Set(n.links.filter(l=>typeof l=="string"&&g.has(l)))):[]})}}let p=e=>e==="right"||e==="left"||e==="down"||e==="up"?e:null,b=[];if(Array.isArray(i.summaries)){let e=new Set;for(let n of i.summaries){let s=p(n==null?void 0:n.side);if(!n||typeof n.id!="string"||e.has(n.id)||!s||typeof n.text!="string"||!n.text.trim()||!Array.isArray(n.members))continue;let l=Array.from(new Set(n.members.filter(m=>typeof m=="string"&&g.has(m))));l.length&&(e.add(n.id),b.push({id:n.id,members:l,side:s,text:n.text}))}}let T=new Map,E=new Map;for(let e of d)e.parentId&&E.set(e.parentId,[...(Qe=E.get(e.parentId))!=null?Qe:[],e]);let z=xo(t),P=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(ft))):[],_=Yn((Ze=i.source)==null?void 0:Ze.mapId),S=P.length>=2,D=S?P[0]:"",k=D;if(S){let e=[];try{e=Array.from((Je=window.navigator.languages)!=null?Je:[window.navigator.language]).filter(ft)}catch{}k=Vn({languages:P,stored:_?_e(_):null,defaultLanguage:ft(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let $=e=>{var n;return(n=z.sets.get(e))!=null?n:o},w=S&&D===uo,h=()=>S&&k!==D;S&&(r=$(k),t.documentElement.lang=k);let x=e=>{var s;let n=h()?(s=e.translations)==null?void 0:s[k]:void 0;return!n||typeof n!="object"?e:{title:ft(n.title)?n.title:e.title,summary:ft(n.summary)?n.summary:e.summary,reason:ft(n.reason)?n.reason:e.reason,detailHtml:ft(n.detailHtml)?n.detailHtml:e.detailHtml,...In(n)&&ft(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},R=()=>{var l;let e=h()?(l=i.translations)==null?void 0:l[k]:void 0,n=ft(e==null?void 0:e.title)?e.title:i.title,s=ft(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof s=="string"?s.trim():""}},v=(e,n)=>{var s;try{let l=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(l&&l!==e)return l}catch{}return(s=z.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let f=(e,n,s)=>{let l=ut(t,e);return n&&(l.className=n),s!==void 0&&(l.textContent=s),l},B=e=>{let n=t.createElementNS(bt,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let s of yo[e]){let[l,...m]=s.split("|"),M=t.createElementNS(bt,l);for(let I of m)M.setAttribute(I.slice(0,I.indexOf("=")),I.slice(I.indexOf("=")+1));n.append(M)}return n},N=(e,n,s,l)=>{let m=f("button",s,n);return m.type="button",m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},F=(e,n,s,l)=>{let m=f("button");return m.type="button",m.setAttribute("aria-label",s),m.title=s,m.append(B(n)),m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},A=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,L=e=>Wn({"topic-markers":e.markers}),C=()=>/^(zh|ja)/.test(r.lang),j=(e,n)=>{if(!n.length)return e;let s=n.map(l=>r.markerNames[l]).join(C()?"\\u3001":", ");return`${e}${C()?"\\uFF0C":", "}${At(r.markerLabel,s)}`},U=e=>$n({"topic-color":e.color}),Q=e=>Fn({"topic-style":e.style}),Z=e=>{let n=f("span","vam-markers");for(let s of e){let l=f("span","vam-marker",Un(s));l.dataset.marker=s,l.setAttribute("aria-hidden","true"),n.append(l)}return n},J=(e,n)=>{let s=f("span","vam-relevance-tag");s.dataset.tier=e,n&&(s.title=n);let l=f("span","vam-relevance-icon");return l.append(B(bo[e])),s.append(l,f("span",void 0,A(e))),s};a.className="vam-app";let q=f("div","vam-toolbar"),rt=f("h1","vam-map-switcher"),Gt=f("span","vam-shared");q.append(rt,Gt);let xt=F(q,"list","",()=>_t(tt.hidden,!0));q.prepend(xt),xt.setAttribute("aria-controls","vam-outline");let Ot=f("div","vam-toolbar-actions"),ct=f("select","vam-language");if(S){for(let e of P){let n=f("option",void 0,(tn=z.names[e])!=null?tn:v(e));n.value=e,w&&e===D&&(n.dataset.original="1"),ct.append(n)}ct.value=k,Ot.append(ct)}let Oe=f("span","vam-made-with"),Rt=f("a","vam-install");Rt.href=co,Rt.target="_blank",Rt.rel="noopener noreferrer",Ot.append(Oe,Rt),q.append(Ot);let Pt=f("div","vam-translate-note");Pt.hidden=!0;let Mt=f("div","vam-workspace"),Y=f("div","vam-viewport"),gt=f("div","vam-stage");gt.setAttribute("role","tree");let Tt=t.createElementNS(bt,"svg");Tt.setAttribute("class","vam-edges"),Tt.setAttribute("aria-hidden","true"),gt.append(Tt);let Ht=f("div","vam-summaries");Ht.setAttribute("role","group"),b.length&&gt.append(Ht),Y.append(gt);let qt=f("div","vam-canvas-overlay"),Et=f("div","vam-map-tools"),Dt=f("span","vam-goal"),Re=f("span","vam-goal-text");Dt.append(B("target"),Re);let Pe=f("span","vam-canvas-hint"),ht=f("div","vam-zoom-controls"),Zn=F(ht,"minus","",()=>$t(1/1.2)),zt=f("button","vam-zoom","100%");zt.type="button",zt.addEventListener("click",e=>{e.stopPropagation(),$t(1/K.zoom)}),ht.append(zt);let Jn=F(ht,"plus","",()=>$t(1.2)),tr=F(ht,"max","",()=>Ft()),pt=f("button","vam-layout-button");pt.type="button",pt.setAttribute("aria-haspopup","menu"),pt.setAttribute("aria-expanded","false"),ht.append(pt);let st=f("div","vam-layout-menu");st.setAttribute("role","menu"),st.hidden=!0,ht.append(st),qt.append(Et,Pe,ht);let W=f("aside","vam-inspector");W.hidden=!0;let tt=f("nav","vam-outline");tt.id="vam-outline";let Bt=f("div","vam-outline-tree");Bt.setAttribute("role","tree"),tt.append(Bt),Mt.append(tt,Y,qt,W),a.replaceChildren(...S?[q,Pt,Mt]:[q,Mt]);let K={x:0,y:0,zoom:1},et=null,fe=!1,Qt=Number(_e(jn))||po,V=new Map,er=()=>{let e=new Set,n=(s,l)=>{var m;for(let M of(m=E.get(s.id))!=null?m:[])l&&e.add(M.id),n(M,l||M.collapsed)};for(let s of d)s.parentId||n(s,s.collapsed);return e},He=e=>{var s,l;let n=0;for(let m=e.parentId;m&&!(++n>d.length);m=(l=(s=g.get(m))==null?void 0:s.parentId)!=null?l:null);return n},De=()=>hn(Y.getBoundingClientRect().top,Et.hidden?void 0:Et.getBoundingClientRect());function yt(){gt.style.transform=`translate(${K.x}px, ${K.y}px) scale(${K.zoom})`;let e=`${Math.round(K.zoom*100)}%`;zt.textContent=e,zt.setAttribute("aria-label",At(r.zoomReset,e))}function $t(e,n){let s=n!=null?n:{x:Y.clientWidth/2,y:Y.clientHeight/2},l=Math.min(go,Math.max(mo,K.zoom*e)),m=l/K.zoom;K={x:s.x-(s.x-K.x)*m,y:s.y-(s.y-K.y)*m,zoom:l},yt()}let pe=!1;function Ft(){if(!V.size)return;if(!Y.clientWidth||!Y.clientHeight){pe=!0;return}let e=1/0,n=1/0,s=-1/0,l=-1/0;for(let m of V.values())e=Math.min(e,m.offsetLeft),n=Math.min(n,m.offsetTop),s=Math.max(s,m.offsetLeft+(m.offsetWidth||280)),l=Math.max(l,m.offsetTop+m.offsetHeight);for(let m of y){let M=m.parentId?void 0:T.get(m.id);M&&(e=Math.min(e,M.offsetLeft),n=Math.min(n,M.offsetTop),s=Math.max(s,M.offsetLeft+(M.offsetWidth||300)),l=Math.max(l,M.offsetTop+(M.offsetHeight||60)))}for(let m of Array.from(Ht.querySelectorAll(".vam-summary"))){let M=m.querySelector(".vam-summary-text");if(!M)continue;let I=parseFloat(M.style.left),H=parseFloat(M.style.top),O=M.offsetWidth,X=M.offsetHeight;if(!Number.isFinite(I)||!Number.isFinite(H))continue;let at=m.classList.contains("is-side-left")?I-O:m.classList.contains("is-side-down")||m.classList.contains("is-side-up")?I-O/2:I,lt=m.classList.contains("is-side-up")?H-X:m.classList.contains("is-side-down")?H:H-X/2;e=Math.min(e,at),n=Math.min(n,lt),s=Math.max(s,at+O),l=Math.max(l,lt+X)}K=bn({minX:e,minY:n,maxX:s,maxY:l},{width:Y.clientWidth,height:Y.clientHeight},De()),yt()}function ze(e){let n=V.get(e);n&&(K=yn(K,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:Y.clientWidth,height:Y.clientHeight},De()),yt())}function Lt(){var e;Tt.replaceChildren();for(let n of d){let s=n.parentId?V.get(n.parentId):void 0,l=V.get(n.id);if(!s||!l)continue;let m=t.createElementNS(bt,"path");m.setAttribute("d",de(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class",((e=u.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge");let M=u.get(n.id);M&&Q(M).includes("line-thick")&&m.setAttribute("data-line-thick",""),Tt.append(m)}for(let n of y){let s=n.parentId?V.get(n.parentId):void 0,l=T.get(n.id);if(!s||!l)continue;let m=t.createElementNS(bt,"path");m.setAttribute("d",de(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class","vam-edge vam-text-edge"),Tt.append(m)}for(let n of y){let s=T.get(n.id);if(s)for(let l of n.links){let m=V.get(l);if(!m)continue;let M=s.offsetLeft+s.offsetWidth/2<=m.offsetLeft+m.offsetWidth/2,I=t.createElementNS(bt,"path");I.setAttribute("d",de(M?s.offsetLeft+s.offsetWidth:s.offsetLeft,s.offsetTop+s.offsetHeight/2,M?m.offsetLeft:m.offsetLeft+m.offsetWidth,m.offsetTop+m.offsetHeight/2)),I.setAttribute("class","vam-edge vam-text-link"),Tt.append(I)}}nr()}function nr(){Ht.replaceChildren();for(let e of b){let n=[];for(let H of e.members)for(let O of[H,...oe(d,H)]){let X=V.get(O);X&&n.push({x:X.offsetLeft,y:X.offsetTop,w:X.offsetWidth||280,h:X.offsetHeight})}if(!n.length)continue;let s=Mo(e.side,n),l=f("div",`vam-summary is-side-${e.side}`);l.setAttribute("role","note");let m=t.createElementNS(bt,"svg");m.setAttribute("class","vam-summary-brace"),m.setAttribute("aria-hidden","true");let M=t.createElementNS(bt,"path");M.setAttribute("d",s.path),M.setAttribute("fill","none"),m.append(M),l.append(m);let I=f("div","vam-summary-text");I.textContent=e.text,I.style.left=`${s.x}px`,I.style.top=`${s.y}px`,l.append(I),Ht.append(l)}}let me=0,Be=()=>{me||(me=window.requestAnimationFrame(()=>{me=0,Lt()}))},ge=e=>{let n=V.get(e),s=g.get(e);!n||!s||(n.style.left=`${s.x}px`,n.style.top=`${s.y}px`,s.width&&(n.style.width=`${s.width}px`),s.height&&(n.style.height=`${s.height}px`),$e(e))},$e=e=>{let n=g.get(e);if(n)for(let s of y){let l=s.parentId===e?T.get(s.id):void 0;l&&(l.style.left=`${n.x+s.dx}px`,l.style.top=`${n.y+s.dy}px`)}};function rr(){for(let e of T.values())e.remove();T.clear();for(let e of y){let n=e.parentId?g.get(e.parentId):void 0;if(e.parentId&&(!n||!V.has(e.parentId)||n.collapsed))continue;let s=f("div",`vam-text-node${n?"":" is-free"}`);s.setAttribute("role","note"),s.textContent=e.text,n||(s.style.left=`${e.dx}px`,s.style.top=`${e.dy}px`),gt.append(s),T.set(e.id,s),n&&$e(n.id)}}function he(){var n,s;for(let l of V.values())l.remove();V.clear();let e=er();for(let l of d){if(e.has(l.id))continue;let m=u.get(l.id),M=x(m),I=oe(d,l.id).size,H=Gn(m.tier)?m.tier:void 0,O=f("div",`vam-node${l.id===et?" is-selected":""}`);O.dataset.nodeId=l.id,O.dataset.status=m.status==="completed"?"completed":"idea",H&&(O.dataset.relevance=H),O.tabIndex=0,O.setAttribute("role","treeitem"),O.setAttribute("aria-level",String(He(l)+1)),O.setAttribute("aria-selected",String(l.id===et));let X=L(m),at=U(m);at&&(O.dataset.topicColor=at);let lt=Q(m);lt.includes("bold")&&(O.dataset.topicStyleBold="true"),lt.includes("border-thick")&&(O.dataset.topicStyleBorder="thick"),lt.includes("text-small")?O.dataset.topicStyleSize="small":lt.includes("text-large")&&(O.dataset.topicStyleSize="large");let nt=j(String((n=M.title)!=null?n:""),X);O.setAttribute("aria-label",at?`${nt}${C()?"\\uFF0C":", "}${At(r.colorLabel,r.colorNames[at])}`:nt),I&&O.setAttribute("aria-expanded",String(!l.collapsed));let ot=f("div","vam-node-header");O.append(ot),m.status!=="completed"&&ot.append(f("span","vam-status vam-status-idea",r.toResearch)),H&&ot.append(J(H,typeof M.reason=="string"?M.reason:void 0)),X.length&&ot.append(Z(X));let en=f("div","vam-node-tools");if(O.append(en),I){let it=l.collapsed?At(r.expandCount,I):r.collapse,It=N(ot,it,"vam-collapse-button",()=>{l.collapsed=!l.collapsed,Kt(l.id,!0)});It.setAttribute("aria-expanded",String(!l.collapsed)),It.setAttribute("aria-label",it),It.title=it}if(N(en,r.detailsButton,void 0,()=>Nt(l.id)),O.append(f("h3","vam-card-title",String((s=M.title)!=null?s:""))),typeof M.summary=="string"&&M.summary.trim()&&O.append(f("p","vam-card-summary",M.summary)),l.height){let it=f("span","vam-card-fade"),It=f("span","vam-card-more","\\u2026");it.setAttribute("aria-hidden","true"),It.setAttribute("aria-hidden","true"),O.append(it,It)}O.addEventListener("click",()=>{fe||Nt(l.id)}),O.addEventListener("keydown",it=>{it.target===O&&(it.key==="Enter"||it.key===" "?(it.preventDefault(),Nt(l.id)):I&&it.key===(l.collapsed?"ArrowRight":"ArrowLeft")&&(it.preventDefault(),l.collapsed=!l.collapsed,Kt(l.id)))}),O.addEventListener("pointerdown",it=>or(it,l,O)),gt.append(O),V.set(l.id,O),ge(l.id)}rr(),Fe()}function Fe(){var e;for(let[n,s]of V)(e=g.get(n))!=null&&e.height&&(s.classList.remove("is-clipped"),s.classList.toggle("is-clipped",s.scrollHeight>s.clientHeight+1))}function Zt(){mn(d,void 0,n=>{var s;return(s=V.get(n))==null?void 0:s.offsetHeight}).forEach((n,s)=>{d[s].x=n.x,d[s].y=n.y});for(let n of V.keys())ge(n);Fe()}function Kt(e,n=!1){var m;let s=e?(m=V.get(e))==null?void 0:m.getBoundingClientRect():void 0;he(),Zt(),Lt();let l=e?V.get(e):void 0;if(l){if(s){let I=l.getBoundingClientRect();K={...K,x:K.x+s.left-I.left,y:K.y+s.top-I.top},yt()}let M=n?l.querySelector(".vam-collapse-button"):null;(M!=null?M:l).focus({preventScroll:!0})}}function or(e,n,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let l=e.clientX,m=e.clientY,M=n.x,I=n.y,H=!1,O=at=>{let lt=at.clientX-l,nt=at.clientY-m;if(!H){if(Math.hypot(lt,nt)<=ho)return;H=!0,s.classList.add("is-dragging"),s.setPointerCapture(at.pointerId)}n.x=M+lt/K.zoom,n.y=I+nt/K.zoom,ge(n.id),Be()},X=()=>{s.removeEventListener("pointermove",O),s.removeEventListener("pointerup",X),s.removeEventListener("pointercancel",X),s.classList.remove("is-dragging"),H&&(fe=!0,window.setTimeout(()=>fe=!1,0))};s.addEventListener("pointermove",O),s.addEventListener("pointerup",X),s.addEventListener("pointercancel",X)}let ye=e=>Math.round(Math.min(Math.max(Ne,e),Math.max(Ne,Mt.clientWidth*.7)));function Jt(){let e=mt();if(W.hidden||e){W.style.removeProperty("width"),qt.style.removeProperty("right");return}let n=ye(Qt);W.style.width=`${n}px`,qt.style.right=`${n}px`,G.setAttribute("aria-valuenow",String(n)),G.setAttribute("aria-valuemax",String(ye(1/0)))}let G=f("div","vam-inspector-resizer");G.setAttribute("role","separator"),G.setAttribute("aria-orientation","vertical"),G.setAttribute("aria-label",r.resizePanel),G.setAttribute("aria-valuemin",String(Ne)),G.tabIndex=0;let te=(e,n)=>{Qt=ye(e),Jt(),n&&Ie(jn,String(Qt))};G.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,s=W.offsetWidth;G.setPointerCapture(e.pointerId),G.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let l=M=>te(s+n-M.clientX,!1),m=()=>{G.removeEventListener("pointermove",l),G.removeEventListener("pointerup",m),G.removeEventListener("pointercancel",m),G.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),te(Qt,!0)};G.addEventListener("pointermove",l),G.addEventListener("pointerup",m),G.addEventListener("pointercancel",m)}),G.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")te(W.offsetWidth+n,!0);else if(e.key==="ArrowRight")te(W.offsetWidth-n,!0);else return;e.preventDefault()});let be=mt();window.addEventListener("resize",()=>{Jt(),yt(),mt()!==be&&(be=mt(),_t(be?!1:Ve(),!1))});function xe(){et=null;for(let e of V.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");W.hidden=!0,Mt.classList.remove("has-inspector"),W.replaceChildren(),Jt(),vt()}function Nt(e){var X,at,lt;let n=g.get(e),s=u.get(e);if(!n||!s)return;let l={...s,...x(s)};et=e;for(let[nt,ot]of V)ot.classList.toggle("is-selected",nt===e),ot.setAttribute("aria-selected",String(nt===e));W.replaceChildren(G);let m=f("div","vam-inspector-heading");m.append(f("strong",void 0,r.topicDetails)),N(m,r.close,void 0,xe),W.append(m,f("h3",void 0,String((X=l.title)!=null?X:"")));let M=Gn(l.tier)?l.tier:void 0;if(M){let nt=f("div","vam-inspector-why");nt.append(J(M));let ot=typeof l.reason=="string"&&l.reason.trim()?l.reason:l.manual?r.manualReason:"";ot&&nt.append(f("span",void 0,ot)),W.append(nt)}typeof l.summary=="string"&&l.summary.trim()&&W.append(f("p","vam-sample-summary",l.summary));let I=Hn(t,l.links,r);I&&W.append(I);let H=f("div","vam-sample-detail");typeof l.detailHtml=="string"&&l.detailHtml.trim()?l.compact?zn(t,H,l.detailHtml,l.compact,c,r):Ee(t,H,l.detailHtml,c,r):H.append(f("p","vam-inspector-empty",r.noContent)),W.append(H);let O=(at=E.get(e))!=null?at:[];if(O.length){let nt=f("div","vam-subtopics");nt.append(f("strong",void 0,r.subtopics));for(let ot of O)N(nt,String((lt=x(u.get(ot.id)).title)!=null?lt:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Kt(n.id)),Nt(ot.id),ze(ot.id)});W.append(nt)}W.hidden=!1,Mt.classList.add("has-inspector"),Jt(),W.scrollTop=0,vt(),Ye()}let Me=e=>{we(d,e),Kt(),Ft()},Wt=e=>{st.hidden||(st.hidden=!0,pt.setAttribute("aria-expanded","false"),e&&pt.focus())};function ir(){st.replaceChildren();let e=[{label:r.collapseAll,run:()=>Me(0)},{label:r.expandAll,run:()=>Me(null)},...[1,2,3].map(n=>({label:At(r.expandToLevel,n),run:()=>Me(n)})),null,{label:r.autoLayout,run:()=>{Zt(),Lt()}}];for(let n of e){if(!n){st.append(f("hr"));continue}let s=f("button",void 0,n.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",l=>{l.stopPropagation(),Wt(!0),n.run()}),st.append(s)}}let Ke=()=>Array.from(st.querySelectorAll("button"));pt.addEventListener("click",e=>{var n;if(e.stopPropagation(),!st.hidden)return Wt(!0);st.hidden=!1,pt.setAttribute("aria-expanded","true"),(n=Ke()[0])==null||n.focus()}),st.addEventListener("keydown",e=>{let n=Ke(),s=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(s+1)%n.length].focus();else if(e.key==="ArrowUp")n[(s-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Wt(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!st.hidden&&!ht.contains(e.target)&&Wt(!1);let n=e.target;mt()&&!tt.hidden&&!tt.contains(n)&&!xt.contains(n)&&_t(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!st.hidden)Wt(!0);else if(mt()&&!tt.hidden)_t(!1,!1),xt.focus();else if(!W.hidden){let n=et?V.get(et):void 0;xe(),n==null||n.focus({preventScroll:!0})}}});function We(){let e=R();if(t.title=e.title,rt.textContent=e.title,gt.setAttribute("aria-label",e.title),Gt.textContent=r.readOnly,Oe.textContent=r.madeWithVam,Rt.textContent=r.install,ct.setAttribute("aria-label",r.language),ct.title=r.language,w)for(let s of Array.from(ct.options))s.dataset.original&&(s.textContent=r.originalText);e.goal?(Re.textContent=At(r.goal,e.goal),Dt.title=e.goal,Dt.parentElement||Et.append(Dt),Et.hidden=!1):(Dt.remove(),Et.hidden=!0),Pe.textContent=r.hint;let n=(s,l)=>{s.setAttribute("aria-label",l),s.title=l};if(n(Zn,r.zoomOut),n(Jn,r.zoomIn),n(tr,r.showAll),pt.textContent=r.layout,W.setAttribute("aria-label",r.topicDetails),tt.setAttribute("aria-label",r.outline),Bt.setAttribute("aria-label",r.outline),n(xt,r.outline),G.setAttribute("aria-label",r.resizePanel),ir(),h()){let s=w?r.aiTranslatedUnknown:At(r.aiTranslated,v(D,k));Pt.textContent=`${s} ${r.imageTextUntranslated}`,Pt.hidden=!1}else Pt.hidden=!0;yt()}function sr(e){if(e===k||!P.includes(e))return;k=e,r=$(e),_&&Ie(_,e),t.documentElement.lang=e;let n=W.scrollTop;We(),he(),Lt(),Xe(),et!==null&&g.has(et)&&!W.hidden&&(Nt(et),W.scrollTop=n),Be()}ct.addEventListener("change",()=>sr(ct.value));let ee=[],Ue=e=>{var n;ee.push(e);for(let s of(n=E.get(e.id))!=null?n:[])Ue(s)};for(let e of d)e.parentId||Ue(e);let Ut=new Set,wt=new Map,ne=null;function Ve(){return _e(Xn)!=="0"}function _t(e,n){tt.hidden=!e,Mt.classList.toggle("has-outline",e),xt.setAttribute("aria-expanded",String(e)),n&&!mt()&&Ie(Xn,e?"1":"0")}let ar=()=>ee.filter(e=>{var n;return!((n=wt.get(e.id))!=null&&n.hidden)});function vt(){var s,l,m;let e=[];for(let M of ee){let I=wt.get(M.id);if(!I)continue;let H=!1;for(let O=M.parentId;O&&!H;O=(l=(s=g.get(O))==null?void 0:s.parentId)!=null?l:null)H=Ut.has(O);I.hidden=H,H||e.push(M),E.has(M.id)&&I.setAttribute("aria-expanded",String(!Ut.has(M.id))),M.id===et?I.setAttribute("aria-current","true"):I.removeAttribute("aria-current")}let n=(m=e.find(M=>M.id===ne))!=null?m:e[0];for(let[M,I]of wt)I.tabIndex=M===(n==null?void 0:n.id)?0:-1}function Ye(){let e=et?wt.get(et):void 0;!e||e.hidden||!tt.clientHeight||(e.offsetTop<tt.scrollTop?tt.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>tt.scrollTop+tt.clientHeight&&(tt.scrollTop=e.offsetTop+e.offsetHeight-tt.clientHeight))}function Te(e){Ut.delete(e)||Ut.add(e),vt()}function lr(e){var n;ne=e,vt(),(n=wt.get(e))==null||n.focus()}function cr(){for(let[e,n]of V)n.classList.toggle("is-selected",e===et),n.setAttribute("aria-selected",String(e===et))}function je(e){var m,M,I;let n=g.get(e);if(!n)return;let s=!1,l=0;for(let H=n.parentId;H&&l++<=d.length;H=(M=(m=g.get(H))==null?void 0:m.parentId)!=null?M:null){let O=g.get(H);O!=null&&O.collapsed&&(O.collapsed=!1,s=!0)}et=e,s&&Kt(),ze(e),W.hidden?cr():Nt(e),vt(),Ye(),mt()&&_t(!1,!1),(I=V.get(e))==null||I.focus({preventScroll:!0})}function dr(e,n){var H;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let s=ar(),l=s.indexOf(n),m=(H=E.get(n.id))!=null?H:[],M=Ut.has(n.id),I;switch(e.key){case"ArrowDown":I=s[l+1];break;case"ArrowUp":I=s[l-1];break;case"Home":I=s[0];break;case"End":I=s[s.length-1];break;case"ArrowRight":m.length&&M?Te(n.id):I=m[0];break;case"ArrowLeft":m.length&&!M?Te(n.id):I=n.parentId?g.get(n.parentId):void 0;break;case"Enter":case" ":je(n.id);break;default:return}e.preventDefault(),I&&lr(I.id)}function Xe(){var e;Bt.replaceChildren(),wt.clear();for(let n of ee){let s=String((e=x(u.get(n.id)).title)!=null?e:""),l=f("div","vam-outline-item");l.dataset.outlineId=n.id,l.setAttribute("role","treeitem");let m=He(n)+1;l.setAttribute("aria-level",String(m)),l.style.setProperty("--depth",String(m-1));let M=f("span","vam-outline-twist");E.has(n.id)&&(M.append(B("chevron")),M.addEventListener("click",O=>{O.stopPropagation(),Te(n.id)}));let I=f("span","vam-outline-title",s);I.title=s,l.append(M,I);let H=L(u.get(n.id));H.length&&(l.append(Z(H)),l.setAttribute("aria-label",j(s,H))),l.addEventListener("click",()=>je(n.id)),l.addEventListener("keydown",O=>dr(O,n)),l.addEventListener("focus",()=>{ne!==n.id&&(ne=n.id,vt())}),Bt.append(l),wt.set(n.id,l)}vt()}let dt=new Map,Vt=0,re=!1;Y.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(Y.setPointerCapture(e.pointerId),dt.set(e.pointerId,{x:e.clientX,y:e.clientY}),Y.classList.add("is-panning"),dt.size===1&&(re=!1),dt.size===2)){let[n,s]=Array.from(dt.values());Vt=Math.hypot(n.x-s.x,n.y-s.y)}}),Y.addEventListener("pointermove",e=>{let n=dt.get(e.pointerId);if(!n)return;if(dt.set(e.pointerId,{x:e.clientX,y:e.clientY}),dt.size===2&&Vt){let[m,M]=Array.from(dt.values()),I=Math.hypot(m.x-M.x,m.y-M.y),H=Y.getBoundingClientRect();$t(I/Vt,{x:(m.x+M.x)/2-H.left,y:(m.y+M.y)/2-H.top}),Vt=I,re=!0;return}let s=e.clientX-n.x,l=e.clientY-n.y;re||(re=Math.abs(s)+Math.abs(l)>0),K={...K,x:K.x+s,y:K.y+l},yt()});let Ge=e=>{dt.delete(e.pointerId)&&(dt.size<2&&(Vt=0),dt.size||(Y.classList.remove("is-panning"),!re&&e.type==="pointerup"&&!W.hidden&&xe()))};Y.addEventListener("pointerup",Ge),Y.addEventListener("pointercancel",Ge),Y.addEventListener("wheel",e=>{e.preventDefault();let n=Y.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?$t(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(K={...K,x:K.x-e.deltaX,y:K.y-e.deltaY},yt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{pe&&(pe=!1,Ft())}).observe(Y),We(),Xe(),_t(mt()?!1:Ve(),!1),we(d,1),he(),Zt(),Lt(),Ft();let qe=t.fonts;qe&&qe.ready.then(()=>{et!==null||dt.size||(Zt(),Lt(),Ft())})}Qn(document);})();';
+var SHARE_VIEWER_JS = '(()=>{function nn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}var fr=80,pr=720;function rn(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(pr,Math.max(fr,Math.round(t)))}function on(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(a=>a!==t.parentId)]}function mr(t){var r;let o=new Map;for(let a of t){let i=(r=a.parentId)!=null?r:"",c=o.get(i);c?c.push(a):o.set(i,[a])}return o}function gr(t,o,r){var i;let a=[o];for(;a.length;){let c=a.pop();for(let f of(i=t.get(c))!=null?i:[])f.id!==o&&!r.has(f.id)&&(r.add(f.id),a.push(f.id))}}function oe(t,o){let r=new Set;return gr(mr(t),o,r),r}function we(t,o){let r=new Map(t.map(c=>[c.id,c])),a=c=>{let f=0,d=new Set([c.id]);for(let g=c.parentId;g&&r.has(g)&&!d.has(g);g=r.get(g).parentId)d.add(g),f++;return f},i=new Set(t.map(c=>c.parentId).filter(c=>!!c&&r.has(c)));for(let c of t)i.has(c.id)&&(c.collapsed=o===null?!1:a(c)>=o)}function ve(t){if(t>150)return"right";if(t<-150)return"left"}function sn(t,o,r,a={left:0,right:0}){let i={...a},c=new Map;for(let f of t){let d=i.left<i.right?"left":"right";c.set(f.id,d),i[d]+=o(f)+r}return c}function an(t,o,r,a){let i=t.map(a),c={left:0,right:0};t.forEach((d,g)=>{let y=i[g];y&&(c[y]+=o(d)+r)});let f=sn(t.filter((d,g)=>!i[g]),o,r,c);return new Map(t.map((d,g)=>{var y;return[d.id,(y=i[g])!=null?y:f.get(d.id)]}))}function hr(t){return t==="right"||t==="left"||t==="down"||t==="up"}function ln(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function ie(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return hr(r)?r:void 0}function cn(t){let{width:o,column:r,mapDirection:a,engine:i}=t,c=(f,d)=>{var v,F;let g=[],y=(w,h)=>{for(let x of[...t.kidsOf(w),...t.joinsOf(w)])ie(x)?g.push({node:x,root:h}):y(x,h)};for(let w of f)y(w,w);let p={roots:f,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!g.length)return i(d,p);let b=d==="down"||d==="up",T=g.map(({node:w,root:h})=>{let x=c([w],ie(w)),O=1/0,D=-1/0,u=1/0,R=-1/0,S=new Map,$=N=>{S.set(N.id,N);for(let I of[...t.kidsOf(N),...t.joinsOf(N)])$(I)};$(w);for(let[N,I]of x)O=Math.min(O,I.x),D=Math.max(D,I.x+o),u=Math.min(u,I.y),R=Math.max(R,I.y+t.heightFor(S.get(N)));let A=Math.max(1,Math.ceil((D-O+r-o)/r));return{node:w,root:h,placed:x,minX:O,maxX:D,minY:u,maxY:R,slots:A}}),E=new Map(T.map(w=>[w.node.id,w])),z=w=>{let h=E.get(w.id);return!h||!b?[]:Array.from({length:h.slots},(x,O)=>({id:`${w.id}\\0pad${O}`}))},P=new Set,k=i(d,{roots:f,kidsOf:w=>{if(!E.has(w.id))return t.kidsOf(w);let h=z(w);for(let x of h)P.add(x.id);return h},joinsOf:w=>E.has(w.id)?[]:t.joinsOf(w),heightFor:w=>{if(P.has(w.id))return 0;let h=E.get(w.id);return h&&!b?h.maxY-h.minY:t.heightFor(w)}}),B=new Map;for(let[w,h]of k)!P.has(w)&&!E.has(w)&&B.set(w,h);for(let w of T){let h=k.get(w.node.id),x,O;b?(x=h.x+r/2-(w.minX+w.maxX)/2,O=d==="down"?h.y-w.minY:h.y+t.heightFor(w.node)-w.maxY):(x=d==="right"||d==="balanced"&&h.x>=((F=(v=k.get(w.root.id))==null?void 0:v.x)!=null?F:h.x)?h.x-w.minX:h.x+o-w.maxX,O=h.y-w.minY);for(let[D,u]of w.placed)B.set(D,{x:u.x+x,y:u.y+O})}return B};return c(t.roots,a)}var dn=1/Math.tan(Math.PI/3);function un(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:f,gap:d,left:g,top:y}=t,p=f-c,b=L=>[...r(L),...a(L)],T=o.map(L=>{let k=new Map,B=S=>S.reduce(($,A)=>$+k.get(A.id),0)+Math.max(0,S.length-1)*d,v=S=>{let $=b(S);for(let A of $)v(A);k.set(S.id,Math.max(i(S),B($)))},F=(S,$,A,N)=>{let I=b(S),U=A+(k.get(S.id)-B(I))/2,j=I.map(rt=>{let Q=F(rt,$+1,U,N);return U+=k.get(rt.id)+d,Q}),Z=i(S),J=j.length?(j[0]+j[j.length-1])/2:A+k.get(S.id)/2;return N.push({id:S.id,x:-$*f,centre:J,height:Z}),J},w=b(L).map((S,$)=>{let A=$%2===0?1:-1,N=b(S);for(let q of N)v(q);let I=[],U=d;for(let q of N){let bt=I.length,pt=F(q,0,U,I)*dn-p;for(let st=bt;st<I.length;st++)I[st].x+=pt-c;U+=k.get(q.id)+d}let j=Math.max(f,U),Z=j*dn,J=i(S),rt=[-c/2,...I.map(q=>q.x)],Q=[c/2,Z,...I.map(q=>q.x+c)];return{topic:S,side:A,length:j,height:J,cards:I,minX:Math.min(...rt),maxX:Math.max(...Q)}}),h=i(L),x=[{id:L.id,x:0,y:-h/2,height:h}],O={above:-p,below:-p};for(let S of w){let $=S.side===1?"above":"below",A=O[$]-S.maxX,N=-S.side*S.length;x.push({id:S.topic.id,x:A-c/2,y:N-S.side*(S.height/2)-S.height/2,height:S.height});for(let I of S.cards)x.push({id:I.id,x:A+I.x,y:N+S.side*I.centre-I.height/2,height:I.height});O[$]=A+S.minX-p}let D=Math.min(...x.map(S=>S.x)),u=Math.min(...x.map(S=>S.y)),R=Math.max(...x.map(S=>S.y+S.height));return{out:x,minX:D,minY:u,maxY:R}}),E=new Map,z=g+Math.max(0,...T.map(L=>-L.minX)),P=y;for(let L of T){for(let k of L.out)E.set(k.id,{x:z+k.x,y:P+k.y-L.minY});P+=L.maxY-L.minY+d}return E}var yr=Math.PI*2,br=6,xr=60;function Mr(t,o,r,a){let i=[...t.values()].sort((f,d)=>f.y-d.y),c=new Set;for(let f=0;f<i.length;f++){let d=i[f];for(let g=f+1;g<i.length;g++){let y=i[g];if(y.y>=d.y+d.height+r)break;a&&a.checks++,Math.abs(d.x-y.x)<o&&d.y<y.y+y.height+r&&c.add(Math.max(d.depth,y.depth))}}return c}function fn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:f,gap:d,left:g,top:y}=t,p=new Map,b=y;for(let T of o){let E=[],z=new Map,P=A=>[...r(A),...a(A)],L=A=>{let N=P(A),I=N.length?N.reduce((U,j)=>U+L(j),0):1;return z.set(A.id,I),I};L(T);let k=(A,N,I,U)=>{E.push({id:A.id,depth:N,angle:(I+U)/2,height:i(A)});let j=I,Z=(U-I)/z.get(A.id);for(let J of P(A)){let rt=Z*z.get(J.id);k(J,N+1,j,j+rt),j+=rt}};k(T,0,0,yr);let B=Math.max(...E.map(A=>A.depth)),v=Array.from({length:B+1},(A,N)=>N*f),F=()=>{let A=[];return v.forEach((N,I)=>A.push(I?Math.max(N,A[I-1]+f):0)),new Map(E.map(N=>{let I=A[N.depth];return[N.id,{x:Math.round(I*Math.sin(N.angle)-c/2),y:Math.round(-I*Math.cos(N.angle)-N.height/2),depth:N.depth,height:N.height}]}))},w=f/br,h=()=>(t.stats&&t.stats.rounds++,Mr(F(),c,d,t.stats)),x=w,O=h(),D=v.slice();for(let A=0;O.size&&A<xr;A++){D=v.slice();for(let N of O)v[N]+=x;x*=2,O=h()}if(!O.size&&D.some((A,N)=>v[N]-A>w)){let A=v.slice();for(;A.some((N,I)=>N-D[I]>w);){let N=A.map((I,U)=>(I+D[U])/2);v.splice(0,v.length,...N),h().size?D=N:A=N}v.splice(0,v.length,...A)}let u=F(),R=Math.min(...[...u.values()].map(A=>A.x)),S=Math.min(...[...u.values()].map(A=>A.y)),$=Math.max(...[...u.values()].map(A=>A.y+A.height));for(let[A,N]of u)p.set(A,{x:Math.round(g)+N.x-R,y:b+N.y-S});b+=$-S+d}return p}function se(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,rowGap:f,flip:d,left:g,top:y}=t,p=u=>{var R,S;return(S=(R=t.widthFor)==null?void 0:R.call(t,u))!=null?S:280},b=new Map,T=new Map,E=u=>u.reduce((R,S)=>R+b.get(S.id),0),z=u=>{let R=r(u),S=a(u);for(let $ of[...R,...S])z($);b.set(u.id,Math.max(c,E(R),E(S),p(u)+c-280)),T.set(u.id,1+Math.max(0,...R.map($=>T.get($.id))))},P=new Map,L=new Map,k=(u,R,S)=>{let $=r(u),A=a(u),N=b.get(u.id),I=(q,bt)=>{let ut=S+(N-E(q))/2;return q.map(pt=>{k(pt,bt,ut);let st=P.get(pt.id);return ut+=b.get(pt.id),st})},U=I($,R+1),j=I(A,R+T.get(u.id)),Z=U.length?U:j;L.set(u.id,R);let J=(q,bt)=>bt.map((ut,pt)=>ut+p(q[pt])/2),rt=U.length?$:A,Q=J(rt,Z);P.set(u.id,Z.length?(Q[0]+Q[Q.length-1])/2-p(u)/2:S+Math.max(0,280-p(u))/2)},B=g,v=[],F=u=>{v.push(u);for(let R of[...r(u),...a(u)])F(R)};for(let u of o)z(u),k(u,0,B),B+=b.get(u.id),F(u);let w=Math.max(0,...L.values()),h=Array.from({length:w+1},()=>0);for(let u of v)h[L.get(u.id)]=Math.max(h[L.get(u.id)],i(u));let x=[],O=y;for(let u=0;u<=w;u++){let R=d?w-u:u;x[R]=O,O+=h[R]+f}let D=new Map;for(let u of v){let R=L.get(u.id),S=d?x[R]+h[R]-i(u):x[R];D.set(u.id,{x:P.get(u.id),y:S})}return D}function pn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:c,column:f,gap:d,left:g,top:y}=t,p=new Map,b=y;for(let T of o){let E=new Map,z=v=>{E.set(v.id,i(v));for(let F of[...r(v),...a(v)])z(F)};z(T);let P=[{id:T.id,x:g,y:0}],L=g+f;[...r(T),...a(T)].forEach((v,F)=>{let w=se({roots:[v],kidsOf:r,joinsOf:a,heightFor:i,column:f,rowGap:f-c,flip:F%2===1,left:L,top:0}),h=w.get(v.id).y,x=L;for(let[O,D]of w)P.push({id:O,x:D.x,y:D.y-h}),x=Math.max(x,D.x);L=x+f});let k=Math.min(...P.map(v=>v.y)),B=Math.max(...P.map(v=>v.y+E.get(v.id)));for(let v of P)p.set(v.id,{x:v.x,y:b+v.y-k});b+=B-k+d}return p}var jt=300;function Tr(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}function mn(t){var o;return t.path===""?(o=t.width)!=null?o:280:280}var wr=24,vr={compact:{column:330,gap:12},standard:{column:360,gap:wr},spacious:{column:420,gap:48}};function kr(t){return t==="compact"||t==="spacious"}var Sr=180;function Ar(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...vr[kr(r)?r:"standard"]}}var Er=t=>t==="left"?-1:1;var Lr=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:Sr};function Nr(t,o){var g,y;let r=new Map(t.map(p=>[p.id,p])),a=new Map,i=new Map,c=(p,b,T)=>{var E;return p.set(b,[...(E=p.get(b))!=null?E:[],T])};for(let p of t){if(!p.parentId)continue;let b=p.aimKind!=="question"&&((g=p.aimConvergesFromNodeIds)!=null&&g.length)?on(p).map(E=>r.get(E)):[],T=(y=b[0])==null?void 0:y.parentId;T&&r.has(T)&&b.every(E=>E&&E.parentId===T)?c(i,T,p):c(a,p.parentId,p)}return{kidsOf:p=>{var b;return o&&p.collapsed?[]:(b=a.get(p.id))!=null?b:[]},joinsOf:p=>{var b;return o&&p.collapsed?[]:((b=i.get(p.id))!=null?b:[]).filter(T=>{var E;return!(o&&((E=r.get(T.parentId))!=null&&E.collapsed))})}}}function ke(t){var w;let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:c,gap:f,sign:d,left:g,top:y}=t,p=new Map,b=new Map,T=new Map,E=new Map,z=new Map,P=h=>h.reduce((x,O)=>x+b.get(O.id),0)+Math.max(0,h.length-1)*f,L=h=>{let x=r(h),O=a(h);z.set(h.id,h);for(let D of[...x,...O])L(D);b.set(h.id,Math.max(i(h),P(x),P(O))),T.set(h.id,1+Math.max(0,...x.map(D=>T.get(D.id))))},k=(h,x,O)=>{let D=r(h),u=a(h),R=b.get(h.id),S=(Z,J)=>{let rt=O+(R-P(Z))/2;return Z.map(Q=>{let q=k(Q,J,rt);return rt+=b.get(Q.id)+f,q})},$=S(D,x+1),A=S(u,x+T.get(h.id)),N=$.length?D:u,I=$.length?$:A,U=i(h),j=O+(R-U)/2;if(I.length){let Z=I[0]+i(N[0])/2,J=I[I.length-1]+i(N[N.length-1])/2;j=(Z+J)/2-U/2}return p.set(h.id,{x:0,y:y+j}),E.set(h.id,x),j},B=0;for(let h of o)L(h),k(h,0,B),B+=b.get(h.id)+f;let v=[];for(let[h,x]of E)v[x]=Math.max((w=v[x])!=null?w:0,Tr(z.get(h)));let F=h=>{var O,D;let x=0;if(d>0)for(let u=0;u<h;u++)x+=(O=v[u])!=null?O:0;else for(let u=1;u<=h;u++)x+=(D=v[u])!=null?D:0;return x};for(let[h,x]of p){let O=E.get(h),D=d<0?Math.max(0,280-mn(z.get(h))):0;x.x=g+d*(O*c+F(O))+D}return{placed:p,sizes:b}}function _r(t,o,r){let{roots:a,kidsOf:i,joinsOf:c,heightFor:f,gap:d,left:g,top:y}=o,p=ke({...o,sign:1}).sizes,b=new Map(t.map(k=>[k.id,k])),T=a.map(k=>{var w;let B=(w=b.get(k.id))!=null?w:k,v=an(i(k),h=>p.get(h.id),d,h=>{var x;return r?void 0:ve(((x=b.get(h.id))!=null?x:h).x-B.x)}),F=h=>ke({...o,roots:[k],kidsOf:x=>x.id===k.id?i(x).filter(O=>v.get(O.id)===h):i(x),joinsOf:x=>x.id===k.id&&h==="left"?[]:c(x),sign:h==="left"?-1:1,left:0,top:0}).placed;return{root:k,right:F("right"),left:F("left")}}),E=Math.max(0,...T.flatMap(({left:k})=>[...k.values()].map(B=>-B.x))),z=g+E,P=new Map,L=0;for(let{root:k,right:B,left:v}of T){let F=u=>u.get(k.id).y+f(k)/2,w=Math.max(F(B),F(v)),h=[];for(let u of[{placed:B,isLeft:!1},{placed:v,isLeft:!0}]){let{placed:R,isLeft:S}=u,$=w-F(R);for(let[A,N]of R)S&&A===k.id||h.push([A,{x:z+N.x,y:N.y+$}])}let x=u=>f(b.get(u)),O=Math.min(...h.map(([,u])=>u.y)),D=Math.max(...h.map(([u,R])=>R.y+x(u)));for(let[u,R]of h)P.set(u,{x:R.x,y:y+L+R.y-O});L+=D-O+d}return P}function Ir(t,o,r,a,i=!1,c,f="right",d=!1){let{direction:g,column:y,gap:p}=Ar(f),{kidsOf:b,joinsOf:T}=Nr(t,i),E=L=>Lr(c,L.id),z=(L,k)=>{if(L==="down"||L==="up")return se({...k,column:y,rowGap:y-jt,flip:L==="up",left:r,top:a,widthFor:mn});let B={...k,column:y,gap:p,left:r,top:a};if(L==="radial")return fn({...B,width:jt});if(L==="timeline")return pn({...B,width:jt});if(L==="fishbone")return un({...B,width:jt});let v={...B,sign:Er(L)};return L==="balanced"?_r(t,v,d):ke(v).placed},P={roots:o,kidsOf:b,joinsOf:T,heightFor:E};return ln(g)&&t.some(L=>ie(L))?cn({...P,width:jt,column:y,mapDirection:g,engine:z}):z(g,P)}function gn(t,o,r,a="right",i={}){let c=o!=null&&o.size?t.filter(g=>!o.has(g.id)):t,f=c.filter(g=>!g.parentId),d=Ir(c,f,80,80,!0,r,a,i.reset===!0);return t.map(g=>({...g,...d.get(g.id)}))}function hn(t){return typeof t=="number"?{top:t,right:0,bottom:0,left:0}:t}function yn(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function bn(t,o,r,a){let i=t.zoom,c=hn(a);return{zoom:i,x:c.left+(r.width-c.left-c.right)/2-o.x*i,y:c.top+(r.height-c.top-c.bottom)/2-o.y*i}}var Cr=.25;function xn(t,o,r,a=1.2){let i=hn(r),c=Math.max(1,o.width-i.left-i.right),f=Math.max(1,o.height-i.top-i.bottom),d=t.maxX-t.minX,g=t.maxY-t.minY,y=Math.max(Cr,Math.min(a,(c-80)/d,(f-80)/g));return{zoom:y,x:i.left+(c-d*y)/2-t.minX*y,y:i.top+(f-g*y)/2-t.minY*y}}var ae={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",linksLabel:"Links: {0}",linkOpen:"Open link: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3","priority-4":"Priority 4","priority-5":"Priority 5","progress-0":"Progress 0%","progress-25":"Progress 25%","progress-50":"Progress 50%","progress-75":"Progress 75%","progress-100":"Progress 100%","flag-red":"Red flag","flag-yellow":"Yellow flag","flag-green":"Green flag","flag-blue":"Blue flag",smile:"Smile",neutral:"Neutral",sad:"Sad",question:"Question"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Se(t){let o=3735928559,r=1103547991;for(let a=0;a<t.length;a++){let i=t.charCodeAt(a);o=Math.imul(o^i,2654435761),r=Math.imul(r^i,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var Et="\\u27E6",Lt="\\u27E7",Gt=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,wn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Ae=new Set(["pre","script","style","textarea","template","noscript"]),Or=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),Rr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),Pr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,Hr=/\\p{L}/u,Xt=t=>t.localName.toLowerCase(),vn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},le=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function kn(t){for(let o of le(t))if(wn.has(Xt(o))||Ae.has(Xt(o))||kn(o))return!0;return!1}function Sn(t){let o=Xt(t);return Ae.has(o)?"skip":Or.has(o)||t.getAttribute("translate")==="no"||vn(t).some(r=>Rr.has(r))?"atom":wn.has(o)||kn(t)?"block":"inline"}function Dr(t,o){return t.replace(Pr,r=>(o.push({literal:r,atom:!0}),`${Et}${o.length}/${Lt}`))}function zr(t,o){let r="",a=i=>{var f;if(i.nodeType===3){r+=Dr((f=i.nodeValue)!=null?f:"",o);return}if(i.nodeType!==1){o.push({node:i,atom:!0}),r+=`${Et}${o.length}/${Lt}`;return}let c=i;if(Sn(c)==="inline"){o.push({node:c,atom:!1});let d=o.length;r+=`${Et}${d}${Lt}`;for(let g of Array.from(c.childNodes))a(g);r+=`${Et}/${d}${Lt}`;return}o.push({node:c,atom:!0}),r+=`${Et}${o.length}/${Lt}`};for(let i of t)a(i);return r}function Mn(t){return Hr.test(t.replace(Gt,""))}function An(t){let o=[],r=f=>{let d=f.getAttribute("alt");d&&Mn(d)&&o.push({index:o.length,kind:"attribute",text:d.trim(),nodes:[],lead:"",trail:"",parts:[],element:f,attribute:"alt"})},a=f=>{for(let d of le(f)){let g=Xt(d);Ae.has(g)||g==="svg"||(g==="img"?r(d):a(d))}},i=f=>{if(!f.length)return;let d=[],g=zr(f,d),y=g.trim();if(!y||!Mn(y)||g.includes("\\u27E6\\u27E6"))return;let p=g.replace(Gt,"");if(p.includes(Et)||p.includes(Lt))return;let b=g.slice(0,g.length-g.trimStart().length),T=g.slice(g.trimEnd().length);o.push({index:o.length,kind:"run",text:y,nodes:f,lead:b,trail:T,parts:d})},c=f=>{let d=[];for(let g of Array.from(f.childNodes)){if(g.nodeType===3){d.push(g);continue}if(g.nodeType!==1){i(d),d=[];continue}let y=g,p=Sn(y);p==="atom"||p==="inline"?d.push(y):(i(d),d=[],p==="block"&&c(y))}i(d)};return a(t),c(t),{units:o}}var Tn=t=>[...t.matchAll(Gt)].map(o=>o[0]);function Br(t,o){if(!o.trim())return!1;let r=Tn(t),a=Tn(o);if(r.length!==a.length||r.some((c,f)=>c!==a[f]))return!1;let i=o.replace(Gt,"");return!i.includes(Et)&&!i.includes(Lt)}function $r(t,o,r){var g;let a=[],i=[],c=y=>{let p=i[i.length-1];p?p.appendChild(y):a.push(y)},f=y=>{y&&c(r.createTextNode(y))};f(t.lead);let d=0;for(let y of o.matchAll(Gt)){f(o.slice(d,y.index)),d=((g=y.index)!=null?g:0)+y[0].length;let p=t.parts[Number(y[2])-1];if(y[1]==="/")i.pop();else if(y[3]==="/")p.literal!==void 0?f(p.literal):p.node&&c(p.node.cloneNode(!0));else if(p.node){let b=p.node.cloneNode(!1);c(b),i.push(b)}}return f(o.slice(d)),f(t.trail),a}function En(t,o){var i,c,f;let r={applied:0,kept:0},a=[...t.units.filter(d=>d.kind==="attribute"),...t.units.filter(d=>d.kind==="run")];for(let d of a){let g=o(d);if(g===void 0||!Br(d.text,g)){r.kept++;continue}if(d.kind==="attribute"){(c=d.element)==null||c.setAttribute((i=d.attribute)!=null?i:"alt",g.trim()),r.applied++;continue}let y=d.nodes[0],p=y==null?void 0:y.parentNode,b=y==null?void 0:y.ownerDocument;if(!y||!p||!b){r.kept++;continue}for(let T of $r(d,g,b))p.insertBefore(T,y);for(let T of d.nodes)(f=T.parentNode)==null||f.removeChild(T);r.applied++}return r}function Ln(t){let o=[],r=a=>{for(let i of le(a))Xt(i)==="svg"?o.push(i):r(i)};return r(t),o}function Nn(t,o){let r=[],a=i=>{for(let c of le(i))vn(c).includes(o)&&r.push(c),a(c)};return a(t),r}var _n="vam-mermaid-slot",ce=1,In=3,Cn=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},Fr=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Wr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function Kr(t){var o,r;return t.nodeType===In?Fr((o=t.nodeValue)!=null?o:""):t.nodeType!==ce?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:On(t)}function On(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(a=>{var i;return` ${a}="${Wr((i=t.getAttribute(a))!=null?i:"")}"`}).join("");return`<${o}${r}>${Ur(t)}</${o}>`}function Ur(t){return Array.from(t.childNodes).map(Kr).join("")}function Vr(t){let o=[],r=a=>{if(o.push(a),a.nodeType===ce)for(let i of Array.from(a.childNodes))r(i)};return r(t),o}function Yr(t,o){var a;let r=Ln(t);for(let i of r){let c=o();c.setAttribute("class",_n),(a=i.parentNode)==null||a.replaceChild(c,i)}return{root:t,svgs:r,extraction:An(t)}}function jr(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Se(o)}`}var Xr=t=>Se(On(t));function Gr(t,o){if(!Array.isArray(o))return!1;let r=Vr(t);for(let a of o){if(!Array.isArray(a)||a.length!==2)return!1;let[i,c]=a;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=r.length)return!1;let f=r[i];if(typeof c=="string"){if(f.nodeType!==In)return!1;f.nodeValue=c}else if(c&&typeof c=="object"&&!Array.isArray(c)){if(f.nodeType!==ce)return!1;for(let[d,g]of Object.entries(c))if(g===null)f.removeAttribute(d);else if(typeof g=="string")f.setAttribute(d,g);else return!1}else return!1}return!0}function qr(t,o,r){if(!t||typeof t!="object")return null;let a=t;if(typeof a.svg=="string"){let i=r(a.svg),c=Array.from(i.childNodes).filter(f=>f.nodeType===ce);return c.length===1&&c[0].localName.toLowerCase()==="svg"?c[0]:null}if(typeof a.check=="string"&&a.check===Xr(o)){let i=o.cloneNode(!0);return Gr(i,a.patch)?i:null}return null}function Rn(t,o,r){var g,y;let a={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:c}=Yr(t,r.createSlot),f=o.detailSegments;if(f!==void 0||o.detailCheck!==void 0)if(Array.isArray(f)&&f.length===c.units.length&&o.detailCheck===jr(c)){let p=En(c,T=>{let E=f[T.index];return typeof E=="string"?E:void 0}),b=f.filter(T=>typeof T!="string").length;if(a.applied=p.applied,a.kept=Math.max(0,p.kept-b),r.afterText&&!r.afterText(t))return a.fallback=!0,a}else a.fallback=!0;let d=Nn(t,_n);d.length!==i.length&&(a.fallback=!0);for(let[p,b]of d.entries()){let T=i[p];if(!T)break;let E=(g=o.detailDiagrams)==null?void 0:g[p],z=T;if(E){let P=null;try{P=qr(E,T,r.parse)}catch{P=null}P?z=P:a.diagramsKept++}(y=b.parentNode)==null||y.replaceChild(z,b)}return a}function mt(t,o,r){let a=t.createElement(o);return r&&(a.className=r),a}function Qr(t,o){var f;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),a=(f=r==null?void 0:r[1])!=null?f:t,[i,c=""]=o.imageSource.split("{0}");return[i,a,c]}var Zr=20,Pn=2048,Hn=URL;function Jr(t){if(typeof t!="string")return null;let o=t.trim();if(!o||o.length>Pn||/[\\x00-\\x20\\x7f-\\x9f\\u2028\\u2029]/.test(o)||!/^https?:\\/\\//i.test(o))return null;let r;try{r=new Hn(o)}catch{return null}return r.protocol!=="http:"&&r.protocol!=="https:"||!r.hostname||r.username||r.password||r.href.length>Pn?null:r.href}function to(t){if(!Array.isArray(t))return[];let o=new Set,r=[];for(let a of t){let i=Jr(a);if(!(!i||o.has(i))&&(o.add(i),r.push({href:i,host:new Hn(i).host}),r.length>=Zr))break}return r}function Dn(t,o,r){let a=to(o);if(!a.length)return null;let i=mt(t,"div");i.className="vam-inspector-links",i.setAttribute("role","group"),i.setAttribute("aria-label",r.linksLabel.replace("{0}",a.map(c=>c.host).join(", ")));for(let{href:c,host:f}of a){let d=mt(t,"a");d.setAttribute("href",c),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.setAttribute("referrerpolicy","no-referrer"),d.setAttribute("aria-label",r.linkOpen.replace("{0}",f)),d.textContent=f,i.append(d)}return i}function eo(t,o,r){let[a,i,c]=Qr(o,r),f=mt(t,"span");f.className="vam-image-source";let d=mt(t,"a");return d.setAttribute("href",o),d.setAttribute("target","_blank"),d.setAttribute("rel","noopener noreferrer"),d.textContent=i,f.append(t.createTextNode(a),d,t.createTextNode(c)),f}function Ee(t,o,r,a,i){zn(t,o,new DOMParser().parseFromString(r,"text/html").body,a,i)}function zn(t,o,r,a,i){var f,d,g,y;for(let p of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(r.querySelectorAll("*")))for(let b of p.getAttributeNames()){let T=(f=p.getAttribute(b))!=null?f:"",E=b.toLowerCase();(E.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(E)&&/^\\s*(javascript|vbscript):/i.test(T))&&p.removeAttribute(b)}let c=()=>{let p=mt(t,"span");return p.className="vam-image-omitted",p.textContent=i.imageOmitted,p};for(let p of Array.from(r.querySelectorAll("img"))){let b=(d=p.getAttribute("src"))!=null?d:"";if(b.startsWith("vam-asset:")){let T=a[b.slice(10)];typeof T=="string"&&T.startsWith("data:image/")?p.setAttribute("src",T):p.replaceWith(c())}else if(/^https?:\\/\\//i.test(b)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let T=p.closest("a");(T!=null?T:p).after(eo(t,b,i))}else/^data:image\\//i.test(b)||p.replaceWith(c())}for(let p of Array.from(r.querySelectorAll("a"))){let b=(g=p.getAttribute("href"))!=null?g:"";/^(https?:|mailto:)/i.test(b)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):b.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(r.querySelectorAll("table"))){if((y=p.parentElement)!=null&&y.classList.contains("vam-table-scroll"))continue;let b=mt(t,"div");b.className="vam-table-scroll",p.replaceWith(b),b.append(p)}o.append(...Array.from(r.childNodes).map(p=>t.importNode(p,!0)))}function Bn(t,o,r,a,i,c){let f=d=>new DOMParser().parseFromString(d,"text/html").body;try{let d=f(r);Rn(d,a,{parse:f,createSlot:()=>mt(t,"div")}),zn(t,o,d,i,c)}catch{o.replaceChildren(),Ee(t,o,r,i,c)}}function de(t,o,r,a){let i=r-t,c=i>=40?i/2:i>=0?60-i:Math.max(60,-i/2);return`M ${t} ${o} C ${t+c} ${o}, ${r-c} ${a}, ${r} ${a}`}var Le=["red","orange","yellow","green","blue","purple"];function Fn(t){let o=t["topic-color"];return Le.find(r=>r===o)}var no=["bold","text-small","text-large","border-thick","line-thick"],$n=["text-small","text-large"];function ro(t){return Array.isArray(t)?t:typeof t=="string"&&t?[t]:[]}function Wn(t){let o=ro(t["topic-style"]),r=o.find(a=>$n.some(i=>i===a));return no.filter(a=>$n.includes(a)?a===r:o.includes(a))}var oo=["done","warning","star","priority-1","priority-2","priority-3","priority-4","priority-5","progress-0","progress-25","progress-50","progress-75","progress-100","flag-red","flag-yellow","flag-green","flag-blue","smile","neutral","sad","question"],Kn=[{group:"status",single:!1,ids:["done","warning","star"]},{group:"priority",single:!0,ids:["priority-1","priority-2","priority-3","priority-4","priority-5"]},{group:"progress",single:!0,ids:["progress-0","progress-25","progress-50","progress-75","progress-100"]},{group:"flag",single:!1,ids:["flag-red","flag-yellow","flag-green","flag-blue"]},{group:"face",single:!1,ids:["smile","neutral","sad","question"]}];function io(t){return Kn.find(o=>o.ids.includes(t)).group}function so(t){return Kn.find(o=>o.ids.includes(t)).single}var ao={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3","priority-4":"P4","priority-5":"P5","progress-0":"\\u25CB","progress-25":"\\u25D4","progress-50":"\\u25D1","progress-75":"\\u25D5","progress-100":"\\u25CF","flag-red":"\\u2691R","flag-yellow":"\\u2691Y","flag-green":"\\u2691G","flag-blue":"\\u2691B",smile:"\\u263A",neutral:"-_-",sad:"\\u2639",question:"?"};function Un(t){let o=t["topic-markers"];if(!Array.isArray(o))return[];let r=new Set;return oo.filter(a=>{if(!o.includes(a))return!1;if(!so(a))return!0;let i=io(a);return r.has(i)?!1:(r.add(i),!0)})}function Vn(t){return ao[t]}var lo=(t,o)=>t.toLowerCase()===o.toLowerCase(),ue=(t,o)=>t.find(r=>lo(r,o));function co(t,o){if(typeof t!="string"||!t.trim())return;let r=ue(o,t.trim());if(r)return r;let a=t.trim().toLowerCase().split(/[-_]/),i=a[0];if(i==="zh"){let f=a.slice(1).some(d=>d==="hant"||d==="tw"||d==="hk"||d==="mo")?"TW":"CN";return ue(o,`${i}-${f}`)}return o.find(c=>c.toLowerCase().split(/[-_]/)[0]===i)}function Yn(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let a=ue(o,t.stored);if(a)return a}if(typeof t.defaultLanguage=="string"){let a=ue(o,t.defaultLanguage);if(a)return a}for(let a of t.browser){let i=co(a,o);if(i)return i}return r}function jn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var uo="https://github.com/kevcltsai/visual-agent-map?ref=share",fo="und",wt="http://www.w3.org/2000/svg",Xn="vam-share-panel-width",Gn="vam-share-outline-open",po="(max-width: 600px)",mo=300,Ne=240,go=.25,ho=2,yo=4,bo={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},xo={core:"target",support:"library",side:"skip"},qn=t=>t==="core"||t==="support"||t==="side",Nt=(t,o)=>t.replace("{0}",String(o));function Ce(t,o){var a;let r=(a=t.getElementById(o))==null?void 0:a.textContent;if(r)try{return JSON.parse(r)}catch{return}}function Qn(t){let o={...ae};if(t&&typeof t=="object")for(let i of Object.keys(o)){let c=t[i];typeof c=="string"&&(o[i]=c)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...ae.markerNames};for(let i of Object.keys(o.markerNames)){let c=r[i];typeof c=="string"&&c.trim()&&(o.markerNames[i]=c)}}let a=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...ae.colorNames},a&&typeof a=="object")for(let i of Le){let c=a[i];typeof c=="string"&&c.trim()&&(o.colorNames[i]=c)}return o}function Mo(t){let o=Ce(t,"vam-ui"),r=new Map,a={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[i,c]of Object.entries(o.uiByLanguage))r.set(i,Qn(c));if(o.languageNames&&typeof o.languageNames=="object")for(let[i,c]of Object.entries(o.languageNames))typeof c=="string"&&c&&(a[i]=c)}return{sets:r,names:a}}var gt=t=>typeof t=="string"&&t.trim()!=="";function _e(t){try{return window.localStorage.getItem(t)}catch{return null}}function Ie(t,o){try{window.localStorage.setItem(t,o)}catch{}}function To(t,o){let r=Math.min(...o.map(x=>x.x)),a=Math.min(...o.map(x=>x.y)),i=Math.max(...o.map(x=>x.x+x.w)),c=Math.max(...o.map(x=>x.y+x.h)),f=14,d=12,g=8,y=t==="down"||t==="up",p=y?r:a,b=y?i:c,T=t==="right"?i+f:t==="left"?r-f:t==="down"?c+f:a-f,E=t==="right"||t==="down"?1:-1,z=(p+b)/2,P=Math.min(d,Math.max(0,(b-p)/4)),L=x=>Math.round(x*100)/100,k=(x,O)=>y?`${L(x)} ${L(O)}`:`${L(O)} ${L(x)}`,B=T,v=T+E*d,F=T+E*2*d,w=[`M ${k(p,B)}`,`Q ${k(p,v)} ${k(p+P,v)}`,`L ${k(z-P,v)}`,`Q ${k(z,v)} ${k(z,F)}`,`Q ${k(z,v)} ${k(z+P,v)}`,`L ${k(b-P,v)}`,`Q ${k(b,v)} ${k(b,B)}`].join(" "),h=F+E*g;return y?{path:w,x:L(z),y:L(h)}:{path:w,x:L(h),y:L(z)}}var yt=()=>window.matchMedia(po).matches;function Zn(t){var Qe,Ze,Je,tn;let o=Qn(Ce(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let a=t.getElementById("vam-app"),i=Ce(t,"vam-map");if(!a)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){a.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let c=i.assets&&typeof i.assets=="object"?i.assets:{},f=new Map,d=[];for(let e of i.nodes){if(!e||typeof e.id!="string"||f.has(e.id))continue;f.set(e.id,e);let n=nn(e.width),s=rn(e.height);d.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{},...s!==void 0?{height:s}:{}})}let g=new Map(d.map(e=>[e.id,e]));for(let e of d)e.parentId&&(!g.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let y=[];if(Array.isArray(i.textNodes)){let e=new Set;for(let n of i.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let s=typeof n.parentId=="string"?g.get(n.parentId):void 0;y.push({id:n.id,parentId:s?s.id:null,text:n.text,dx:s?n.x-s.x:n.x,dy:s?n.y-s.y:n.y,links:!s&&Array.isArray(n.links)?Array.from(new Set(n.links.filter(l=>typeof l=="string"&&g.has(l)))):[]})}}let p=e=>e==="right"||e==="left"||e==="down"||e==="up"?e:null,b=[];if(Array.isArray(i.summaries)){let e=new Set;for(let n of i.summaries){let s=p(n==null?void 0:n.side);if(!n||typeof n.id!="string"||e.has(n.id)||!s||typeof n.text!="string"||!n.text.trim()||!Array.isArray(n.members))continue;let l=Array.from(new Set(n.members.filter(m=>typeof m=="string"&&g.has(m))));l.length&&(e.add(n.id),b.push({id:n.id,members:l,side:s,text:n.text}))}}let T=new Map,E=new Map;for(let e of d)e.parentId&&E.set(e.parentId,[...(Qe=E.get(e.parentId))!=null?Qe:[],e]);let z=Mo(t),P=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(gt))):[],L=jn((Ze=i.source)==null?void 0:Ze.mapId),k=P.length>=2,B=k?P[0]:"",v=B;if(k){let e=[];try{e=Array.from((Je=window.navigator.languages)!=null?Je:[window.navigator.language]).filter(gt)}catch{}v=Yn({languages:P,stored:L?_e(L):null,defaultLanguage:gt(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let F=e=>{var n;return(n=z.sets.get(e))!=null?n:o},w=k&&B===fo,h=()=>k&&v!==B;k&&(r=F(v),t.documentElement.lang=v);let x=e=>{var s;let n=h()?(s=e.translations)==null?void 0:s[v]:void 0;return!n||typeof n!="object"?e:{title:gt(n.title)?n.title:e.title,summary:gt(n.summary)?n.summary:e.summary,reason:gt(n.reason)?n.reason:e.reason,detailHtml:gt(n.detailHtml)?n.detailHtml:e.detailHtml,...Cn(n)&&gt(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},O=()=>{var l;let e=h()?(l=i.translations)==null?void 0:l[v]:void 0,n=gt(e==null?void 0:e.title)?e.title:i.title,s=gt(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof s=="string"?s.trim():""}},D=(e,n)=>{var s;try{let l=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(l&&l!==e)return l}catch{}return(s=z.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let u=(e,n,s)=>{let l=mt(t,e);return n&&(l.className=n),s!==void 0&&(l.textContent=s),l},R=e=>{let n=t.createElementNS(wt,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let s of bo[e]){let[l,...m]=s.split("|"),M=t.createElementNS(wt,l);for(let _ of m)M.setAttribute(_.slice(0,_.indexOf("=")),_.slice(_.indexOf("=")+1));n.append(M)}return n},S=(e,n,s,l)=>{let m=u("button",s,n);return m.type="button",m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},$=(e,n,s,l)=>{let m=u("button");return m.type="button",m.setAttribute("aria-label",s),m.title=s,m.append(R(n)),m.addEventListener("click",M=>{M.stopPropagation(),l()}),e.append(m),m},A=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,N=e=>Un({"topic-markers":e.markers}),I=()=>/^(zh|ja)/.test(r.lang),U=(e,n)=>{if(!n.length)return e;let s=n.map(l=>r.markerNames[l]).join(I()?"\\u3001":", ");return`${e}${I()?"\\uFF0C":", "}${Nt(r.markerLabel,s)}`},j=e=>Fn({"topic-color":e.color}),Z=e=>Wn({"topic-style":e.style}),J=e=>{let n=u("span","vam-markers");for(let s of e){let l=u("span","vam-marker",Vn(s));l.dataset.marker=s,l.setAttribute("aria-hidden","true"),n.append(l)}return n},rt=(e,n)=>{let s=u("span","vam-relevance-tag");s.dataset.tier=e,n&&(s.title=n);let l=u("span","vam-relevance-icon");return l.append(R(xo[e])),s.append(l,u("span",void 0,A(e))),s};a.className="vam-app";let Q=u("div","vam-toolbar"),q=u("h1","vam-map-switcher"),bt=u("span","vam-shared");Q.append(q,bt);let ut=$(Q,"list","",()=>Ot(tt.hidden,!0));Q.prepend(ut),ut.setAttribute("aria-controls","vam-outline");let pt=u("div","vam-toolbar-actions"),st=u("select","vam-language");if(k){for(let e of P){let n=u("option",void 0,(tn=z.names[e])!=null?tn:D(e));n.value=e,w&&e===B&&(n.dataset.original="1"),st.append(n)}st.value=v,pt.append(st)}let Oe=u("span","vam-made-with"),Pt=u("a","vam-install");Pt.href=uo,Pt.target="_blank",Pt.rel="noopener noreferrer",pt.append(Oe,Pt),Q.append(pt);let Ht=u("div","vam-translate-note");Ht.hidden=!0;let vt=u("div","vam-workspace"),Y=u("div","vam-viewport"),xt=u("div","vam-stage");xt.setAttribute("role","tree");let kt=t.createElementNS(wt,"svg");kt.setAttribute("class","vam-edges"),kt.setAttribute("aria-hidden","true"),xt.append(kt);let Dt=u("div","vam-summaries");Dt.setAttribute("role","group"),b.length&&xt.append(Dt),Y.append(xt);let qt=u("div","vam-canvas-overlay"),_t=u("div","vam-map-tools"),zt=u("span","vam-goal"),Re=u("span","vam-goal-text");zt.append(R("target"),Re);let Pe=u("span","vam-canvas-hint"),Mt=u("div","vam-zoom-controls"),Jn=$(Mt,"minus","",()=>Ft(1/1.2)),Bt=u("button","vam-zoom","100%");Bt.type="button",Bt.addEventListener("click",e=>{e.stopPropagation(),Ft(1/W.zoom)}),Mt.append(Bt);let tr=$(Mt,"plus","",()=>Ft(1.2)),er=$(Mt,"max","",()=>Wt()),ht=u("button","vam-layout-button");ht.type="button",ht.setAttribute("aria-haspopup","menu"),ht.setAttribute("aria-expanded","false"),Mt.append(ht);let at=u("div","vam-layout-menu");at.setAttribute("role","menu"),at.hidden=!0,Mt.append(at),qt.append(_t,Pe,Mt);let K=u("aside","vam-inspector");K.hidden=!0;let tt=u("nav","vam-outline");tt.id="vam-outline";let $t=u("div","vam-outline-tree");$t.setAttribute("role","tree"),tt.append($t),vt.append(tt,Y,qt,K),a.replaceChildren(...k?[Q,Ht,vt]:[Q,vt]);let W={x:0,y:0,zoom:1},et=null,fe=!1,Qt=Number(_e(Xn))||mo,V=new Map,nr=()=>{let e=new Set,n=(s,l)=>{var m;for(let M of(m=E.get(s.id))!=null?m:[])l&&e.add(M.id),n(M,l||M.collapsed)};for(let s of d)s.parentId||n(s,s.collapsed);return e},He=e=>{var s,l;let n=0;for(let m=e.parentId;m&&!(++n>d.length);m=(l=(s=g.get(m))==null?void 0:s.parentId)!=null?l:null);return n},De=()=>yn(Y.getBoundingClientRect().top,_t.hidden?void 0:_t.getBoundingClientRect());function Tt(){xt.style.transform=`translate(${W.x}px, ${W.y}px) scale(${W.zoom})`;let e=`${Math.round(W.zoom*100)}%`;Bt.textContent=e,Bt.setAttribute("aria-label",Nt(r.zoomReset,e))}function Ft(e,n){let s=n!=null?n:{x:Y.clientWidth/2,y:Y.clientHeight/2},l=Math.min(ho,Math.max(go,W.zoom*e)),m=l/W.zoom;W={x:s.x-(s.x-W.x)*m,y:s.y-(s.y-W.y)*m,zoom:l},Tt()}let pe=!1;function Wt(){if(!V.size)return;if(!Y.clientWidth||!Y.clientHeight){pe=!0;return}let e=1/0,n=1/0,s=-1/0,l=-1/0;for(let m of V.values())e=Math.min(e,m.offsetLeft),n=Math.min(n,m.offsetTop),s=Math.max(s,m.offsetLeft+(m.offsetWidth||280)),l=Math.max(l,m.offsetTop+m.offsetHeight);for(let m of y){let M=m.parentId?void 0:T.get(m.id);M&&(e=Math.min(e,M.offsetLeft),n=Math.min(n,M.offsetTop),s=Math.max(s,M.offsetLeft+(M.offsetWidth||300)),l=Math.max(l,M.offsetTop+(M.offsetHeight||60)))}for(let m of Array.from(Dt.querySelectorAll(".vam-summary"))){let M=m.querySelector(".vam-summary-text");if(!M)continue;let _=parseFloat(M.style.left),H=parseFloat(M.style.top),C=M.offsetWidth,X=M.offsetHeight;if(!Number.isFinite(_)||!Number.isFinite(H))continue;let lt=m.classList.contains("is-side-left")?_-C:m.classList.contains("is-side-down")||m.classList.contains("is-side-up")?_-C/2:_,ct=m.classList.contains("is-side-up")?H-X:m.classList.contains("is-side-down")?H:H-X/2;e=Math.min(e,lt),n=Math.min(n,ct),s=Math.max(s,lt+C),l=Math.max(l,ct+X)}W=xn({minX:e,minY:n,maxX:s,maxY:l},{width:Y.clientWidth,height:Y.clientHeight},De()),Tt()}function ze(e){let n=V.get(e);n&&(W=bn(W,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:Y.clientWidth,height:Y.clientHeight},De()),Tt())}function It(){var e;kt.replaceChildren();for(let n of d){let s=n.parentId?V.get(n.parentId):void 0,l=V.get(n.id);if(!s||!l)continue;let m=t.createElementNS(wt,"path");m.setAttribute("d",de(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class",((e=f.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge");let M=f.get(n.id);M&&Z(M).includes("line-thick")&&m.setAttribute("data-line-thick",""),kt.append(m)}for(let n of y){let s=n.parentId?V.get(n.parentId):void 0,l=T.get(n.id);if(!s||!l)continue;let m=t.createElementNS(wt,"path");m.setAttribute("d",de(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,l.offsetLeft,l.offsetTop+l.offsetHeight/2)),m.setAttribute("class","vam-edge vam-text-edge"),kt.append(m)}for(let n of y){let s=T.get(n.id);if(s)for(let l of n.links){let m=V.get(l);if(!m)continue;let M=s.offsetLeft+s.offsetWidth/2<=m.offsetLeft+m.offsetWidth/2,_=t.createElementNS(wt,"path");_.setAttribute("d",de(M?s.offsetLeft+s.offsetWidth:s.offsetLeft,s.offsetTop+s.offsetHeight/2,M?m.offsetLeft:m.offsetLeft+m.offsetWidth,m.offsetTop+m.offsetHeight/2)),_.setAttribute("class","vam-edge vam-text-link"),kt.append(_)}}rr()}function rr(){Dt.replaceChildren();for(let e of b){let n=[];for(let H of e.members)for(let C of[H,...oe(d,H)]){let X=V.get(C);X&&n.push({x:X.offsetLeft,y:X.offsetTop,w:X.offsetWidth||280,h:X.offsetHeight})}if(!n.length)continue;let s=To(e.side,n),l=u("div",`vam-summary is-side-${e.side}`);l.setAttribute("role","note");let m=t.createElementNS(wt,"svg");m.setAttribute("class","vam-summary-brace"),m.setAttribute("aria-hidden","true");let M=t.createElementNS(wt,"path");M.setAttribute("d",s.path),M.setAttribute("fill","none"),m.append(M),l.append(m);let _=u("div","vam-summary-text");_.textContent=e.text,_.style.left=`${s.x}px`,_.style.top=`${s.y}px`,l.append(_),Dt.append(l)}}let me=0,Be=()=>{me||(me=window.requestAnimationFrame(()=>{me=0,It()}))},ge=e=>{let n=V.get(e),s=g.get(e);!n||!s||(n.style.left=`${s.x}px`,n.style.top=`${s.y}px`,s.width&&(n.style.width=`${s.width}px`),s.height&&(n.style.height=`${s.height}px`),$e(e))},$e=e=>{let n=g.get(e);if(n)for(let s of y){let l=s.parentId===e?T.get(s.id):void 0;l&&(l.style.left=`${n.x+s.dx}px`,l.style.top=`${n.y+s.dy}px`)}};function or(){for(let e of T.values())e.remove();T.clear();for(let e of y){let n=e.parentId?g.get(e.parentId):void 0;if(e.parentId&&(!n||!V.has(e.parentId)||n.collapsed))continue;let s=u("div",`vam-text-node${n?"":" is-free"}`);s.setAttribute("role","note"),s.textContent=e.text,n||(s.style.left=`${e.dx}px`,s.style.top=`${e.dy}px`),xt.append(s),T.set(e.id,s),n&&$e(n.id)}}function he(){var n,s;for(let l of V.values())l.remove();V.clear();let e=nr();for(let l of d){if(e.has(l.id))continue;let m=f.get(l.id),M=x(m),_=oe(d,l.id).size,H=qn(m.tier)?m.tier:void 0,C=u("div",`vam-node${l.id===et?" is-selected":""}`);C.dataset.nodeId=l.id,C.dataset.status=m.status==="completed"?"completed":"idea",H&&(C.dataset.relevance=H),C.tabIndex=0,C.setAttribute("role","treeitem"),C.setAttribute("aria-level",String(He(l)+1)),C.setAttribute("aria-selected",String(l.id===et));let X=N(m),lt=j(m);lt&&(C.dataset.topicColor=lt);let ct=Z(m);ct.includes("bold")&&(C.dataset.topicStyleBold="true"),ct.includes("border-thick")&&(C.dataset.topicStyleBorder="thick"),ct.includes("text-small")?C.dataset.topicStyleSize="small":ct.includes("text-large")&&(C.dataset.topicStyleSize="large");let nt=U(String((n=M.title)!=null?n:""),X);C.setAttribute("aria-label",lt?`${nt}${I()?"\\uFF0C":", "}${Nt(r.colorLabel,r.colorNames[lt])}`:nt),_&&C.setAttribute("aria-expanded",String(!l.collapsed));let ot=u("div","vam-node-header");C.append(ot),m.status!=="completed"&&ot.append(u("span","vam-status vam-status-idea",r.toResearch)),H&&ot.append(rt(H,typeof M.reason=="string"?M.reason:void 0)),X.length&&ot.append(J(X));let en=u("div","vam-node-tools");if(C.append(en),_){let it=l.collapsed?Nt(r.expandCount,_):r.collapse,Rt=S(ot,it,"vam-collapse-button",()=>{l.collapsed=!l.collapsed,Kt(l.id,!0)});Rt.setAttribute("aria-expanded",String(!l.collapsed)),Rt.setAttribute("aria-label",it),Rt.title=it}if(S(en,r.detailsButton,void 0,()=>Ct(l.id)),C.append(u("h3","vam-card-title",String((s=M.title)!=null?s:""))),typeof M.summary=="string"&&M.summary.trim()&&C.append(u("p","vam-card-summary",M.summary)),l.height){let it=u("span","vam-card-fade"),Rt=u("span","vam-card-more","\\u2026");it.setAttribute("aria-hidden","true"),Rt.setAttribute("aria-hidden","true"),C.append(it,Rt)}C.addEventListener("click",()=>{fe||Ct(l.id)}),C.addEventListener("keydown",it=>{it.target===C&&(it.key==="Enter"||it.key===" "?(it.preventDefault(),Ct(l.id)):_&&it.key===(l.collapsed?"ArrowRight":"ArrowLeft")&&(it.preventDefault(),l.collapsed=!l.collapsed,Kt(l.id)))}),C.addEventListener("pointerdown",it=>ir(it,l,C)),xt.append(C),V.set(l.id,C),ge(l.id)}or(),Fe()}function Fe(){var e;for(let[n,s]of V)(e=g.get(n))!=null&&e.height&&(s.classList.remove("is-clipped"),s.classList.toggle("is-clipped",s.scrollHeight>s.clientHeight+1))}function Zt(){gn(d,void 0,n=>{var s;return(s=V.get(n))==null?void 0:s.offsetHeight}).forEach((n,s)=>{d[s].x=n.x,d[s].y=n.y});for(let n of V.keys())ge(n);Fe()}function Kt(e,n=!1){var m;let s=e?(m=V.get(e))==null?void 0:m.getBoundingClientRect():void 0;he(),Zt(),It();let l=e?V.get(e):void 0;if(l){if(s){let _=l.getBoundingClientRect();W={...W,x:W.x+s.left-_.left,y:W.y+s.top-_.top},Tt()}let M=n?l.querySelector(".vam-collapse-button"):null;(M!=null?M:l).focus({preventScroll:!0})}}function ir(e,n,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let l=e.clientX,m=e.clientY,M=n.x,_=n.y,H=!1,C=lt=>{let ct=lt.clientX-l,nt=lt.clientY-m;if(!H){if(Math.hypot(ct,nt)<=yo)return;H=!0,s.classList.add("is-dragging"),s.setPointerCapture(lt.pointerId)}n.x=M+ct/W.zoom,n.y=_+nt/W.zoom,ge(n.id),Be()},X=()=>{s.removeEventListener("pointermove",C),s.removeEventListener("pointerup",X),s.removeEventListener("pointercancel",X),s.classList.remove("is-dragging"),H&&(fe=!0,window.setTimeout(()=>fe=!1,0))};s.addEventListener("pointermove",C),s.addEventListener("pointerup",X),s.addEventListener("pointercancel",X)}let ye=e=>Math.round(Math.min(Math.max(Ne,e),Math.max(Ne,vt.clientWidth*.7)));function Jt(){let e=yt();if(K.hidden||e){K.style.removeProperty("width"),qt.style.removeProperty("right");return}let n=ye(Qt);K.style.width=`${n}px`,qt.style.right=`${n}px`,G.setAttribute("aria-valuenow",String(n)),G.setAttribute("aria-valuemax",String(ye(1/0)))}let G=u("div","vam-inspector-resizer");G.setAttribute("role","separator"),G.setAttribute("aria-orientation","vertical"),G.setAttribute("aria-label",r.resizePanel),G.setAttribute("aria-valuemin",String(Ne)),G.tabIndex=0;let te=(e,n)=>{Qt=ye(e),Jt(),n&&Ie(Xn,String(Qt))};G.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,s=K.offsetWidth;G.setPointerCapture(e.pointerId),G.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let l=M=>te(s+n-M.clientX,!1),m=()=>{G.removeEventListener("pointermove",l),G.removeEventListener("pointerup",m),G.removeEventListener("pointercancel",m),G.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),te(Qt,!0)};G.addEventListener("pointermove",l),G.addEventListener("pointerup",m),G.addEventListener("pointercancel",m)}),G.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")te(K.offsetWidth+n,!0);else if(e.key==="ArrowRight")te(K.offsetWidth-n,!0);else return;e.preventDefault()});let be=yt();window.addEventListener("resize",()=>{Jt(),Tt(),yt()!==be&&(be=yt(),Ot(be?!1:Ve(),!1))});function xe(){et=null;for(let e of V.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");K.hidden=!0,vt.classList.remove("has-inspector"),K.replaceChildren(),Jt(),At()}function Ct(e){var X,lt,ct;let n=g.get(e),s=f.get(e);if(!n||!s)return;let l={...s,...x(s)};et=e;for(let[nt,ot]of V)ot.classList.toggle("is-selected",nt===e),ot.setAttribute("aria-selected",String(nt===e));K.replaceChildren(G);let m=u("div","vam-inspector-heading");m.append(u("strong",void 0,r.topicDetails)),S(m,r.close,void 0,xe),K.append(m,u("h3",void 0,String((X=l.title)!=null?X:"")));let M=qn(l.tier)?l.tier:void 0;if(M){let nt=u("div","vam-inspector-why");nt.append(rt(M));let ot=typeof l.reason=="string"&&l.reason.trim()?l.reason:l.manual?r.manualReason:"";ot&&nt.append(u("span",void 0,ot)),K.append(nt)}typeof l.summary=="string"&&l.summary.trim()&&K.append(u("p","vam-sample-summary",l.summary));let _=Dn(t,l.links,r);_&&K.append(_);let H=u("div","vam-sample-detail");typeof l.detailHtml=="string"&&l.detailHtml.trim()?l.compact?Bn(t,H,l.detailHtml,l.compact,c,r):Ee(t,H,l.detailHtml,c,r):H.append(u("p","vam-inspector-empty",r.noContent)),K.append(H);let C=(lt=E.get(e))!=null?lt:[];if(C.length){let nt=u("div","vam-subtopics");nt.append(u("strong",void 0,r.subtopics));for(let ot of C)S(nt,String((ct=x(f.get(ot.id)).title)!=null?ct:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Kt(n.id)),Ct(ot.id),ze(ot.id)});K.append(nt)}K.hidden=!1,vt.classList.add("has-inspector"),Jt(),K.scrollTop=0,At(),Ye()}let Me=e=>{we(d,e),Kt(),Wt()},Ut=e=>{at.hidden||(at.hidden=!0,ht.setAttribute("aria-expanded","false"),e&&ht.focus())};function sr(){at.replaceChildren();let e=[{label:r.collapseAll,run:()=>Me(0)},{label:r.expandAll,run:()=>Me(null)},...[1,2,3].map(n=>({label:Nt(r.expandToLevel,n),run:()=>Me(n)})),null,{label:r.autoLayout,run:()=>{Zt(),It()}}];for(let n of e){if(!n){at.append(u("hr"));continue}let s=u("button",void 0,n.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",l=>{l.stopPropagation(),Ut(!0),n.run()}),at.append(s)}}let We=()=>Array.from(at.querySelectorAll("button"));ht.addEventListener("click",e=>{var n;if(e.stopPropagation(),!at.hidden)return Ut(!0);at.hidden=!1,ht.setAttribute("aria-expanded","true"),(n=We()[0])==null||n.focus()}),at.addEventListener("keydown",e=>{let n=We(),s=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(s+1)%n.length].focus();else if(e.key==="ArrowUp")n[(s-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Ut(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!at.hidden&&!Mt.contains(e.target)&&Ut(!1);let n=e.target;yt()&&!tt.hidden&&!tt.contains(n)&&!ut.contains(n)&&Ot(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!at.hidden)Ut(!0);else if(yt()&&!tt.hidden)Ot(!1,!1),ut.focus();else if(!K.hidden){let n=et?V.get(et):void 0;xe(),n==null||n.focus({preventScroll:!0})}}});function Ke(){let e=O();if(t.title=e.title,q.textContent=e.title,xt.setAttribute("aria-label",e.title),bt.textContent=r.readOnly,Oe.textContent=r.madeWithVam,Pt.textContent=r.install,st.setAttribute("aria-label",r.language),st.title=r.language,w)for(let s of Array.from(st.options))s.dataset.original&&(s.textContent=r.originalText);e.goal?(Re.textContent=Nt(r.goal,e.goal),zt.title=e.goal,zt.parentElement||_t.append(zt),_t.hidden=!1):(zt.remove(),_t.hidden=!0),Pe.textContent=r.hint;let n=(s,l)=>{s.setAttribute("aria-label",l),s.title=l};if(n(Jn,r.zoomOut),n(tr,r.zoomIn),n(er,r.showAll),ht.textContent=r.layout,K.setAttribute("aria-label",r.topicDetails),tt.setAttribute("aria-label",r.outline),$t.setAttribute("aria-label",r.outline),n(ut,r.outline),G.setAttribute("aria-label",r.resizePanel),sr(),h()){let s=w?r.aiTranslatedUnknown:Nt(r.aiTranslated,D(B,v));Ht.textContent=`${s} ${r.imageTextUntranslated}`,Ht.hidden=!1}else Ht.hidden=!0;Tt()}function ar(e){if(e===v||!P.includes(e))return;v=e,r=F(e),L&&Ie(L,e),t.documentElement.lang=e;let n=K.scrollTop;Ke(),he(),It(),Xe(),et!==null&&g.has(et)&&!K.hidden&&(Ct(et),K.scrollTop=n),Be()}st.addEventListener("change",()=>ar(st.value));let ee=[],Ue=e=>{var n;ee.push(e);for(let s of(n=E.get(e.id))!=null?n:[])Ue(s)};for(let e of d)e.parentId||Ue(e);let Vt=new Set,St=new Map,ne=null;function Ve(){return _e(Gn)!=="0"}function Ot(e,n){tt.hidden=!e,vt.classList.toggle("has-outline",e),ut.setAttribute("aria-expanded",String(e)),n&&!yt()&&Ie(Gn,e?"1":"0")}let lr=()=>ee.filter(e=>{var n;return!((n=St.get(e.id))!=null&&n.hidden)});function At(){var s,l,m;let e=[];for(let M of ee){let _=St.get(M.id);if(!_)continue;let H=!1;for(let C=M.parentId;C&&!H;C=(l=(s=g.get(C))==null?void 0:s.parentId)!=null?l:null)H=Vt.has(C);_.hidden=H,H||e.push(M),E.has(M.id)&&_.setAttribute("aria-expanded",String(!Vt.has(M.id))),M.id===et?_.setAttribute("aria-current","true"):_.removeAttribute("aria-current")}let n=(m=e.find(M=>M.id===ne))!=null?m:e[0];for(let[M,_]of St)_.tabIndex=M===(n==null?void 0:n.id)?0:-1}function Ye(){let e=et?St.get(et):void 0;!e||e.hidden||!tt.clientHeight||(e.offsetTop<tt.scrollTop?tt.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>tt.scrollTop+tt.clientHeight&&(tt.scrollTop=e.offsetTop+e.offsetHeight-tt.clientHeight))}function Te(e){Vt.delete(e)||Vt.add(e),At()}function cr(e){var n;ne=e,At(),(n=St.get(e))==null||n.focus()}function dr(){for(let[e,n]of V)n.classList.toggle("is-selected",e===et),n.setAttribute("aria-selected",String(e===et))}function je(e){var m,M,_;let n=g.get(e);if(!n)return;let s=!1,l=0;for(let H=n.parentId;H&&l++<=d.length;H=(M=(m=g.get(H))==null?void 0:m.parentId)!=null?M:null){let C=g.get(H);C!=null&&C.collapsed&&(C.collapsed=!1,s=!0)}et=e,s&&Kt(),ze(e),K.hidden?dr():Ct(e),At(),Ye(),yt()&&Ot(!1,!1),(_=V.get(e))==null||_.focus({preventScroll:!0})}function ur(e,n){var H;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let s=lr(),l=s.indexOf(n),m=(H=E.get(n.id))!=null?H:[],M=Vt.has(n.id),_;switch(e.key){case"ArrowDown":_=s[l+1];break;case"ArrowUp":_=s[l-1];break;case"Home":_=s[0];break;case"End":_=s[s.length-1];break;case"ArrowRight":m.length&&M?Te(n.id):_=m[0];break;case"ArrowLeft":m.length&&!M?Te(n.id):_=n.parentId?g.get(n.parentId):void 0;break;case"Enter":case" ":je(n.id);break;default:return}e.preventDefault(),_&&cr(_.id)}function Xe(){var e;$t.replaceChildren(),St.clear();for(let n of ee){let s=String((e=x(f.get(n.id)).title)!=null?e:""),l=u("div","vam-outline-item");l.dataset.outlineId=n.id,l.setAttribute("role","treeitem");let m=He(n)+1;l.setAttribute("aria-level",String(m)),l.style.setProperty("--depth",String(m-1));let M=u("span","vam-outline-twist");E.has(n.id)&&(M.append(R("chevron")),M.addEventListener("click",C=>{C.stopPropagation(),Te(n.id)}));let _=u("span","vam-outline-title",s);_.title=s,l.append(M,_);let H=N(f.get(n.id));H.length&&(l.append(J(H)),l.setAttribute("aria-label",U(s,H))),l.addEventListener("click",()=>je(n.id)),l.addEventListener("keydown",C=>ur(C,n)),l.addEventListener("focus",()=>{ne!==n.id&&(ne=n.id,At())}),$t.append(l),St.set(n.id,l)}At()}let ft=new Map,Yt=0,re=!1;Y.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(Y.setPointerCapture(e.pointerId),ft.set(e.pointerId,{x:e.clientX,y:e.clientY}),Y.classList.add("is-panning"),ft.size===1&&(re=!1),ft.size===2)){let[n,s]=Array.from(ft.values());Yt=Math.hypot(n.x-s.x,n.y-s.y)}}),Y.addEventListener("pointermove",e=>{let n=ft.get(e.pointerId);if(!n)return;if(ft.set(e.pointerId,{x:e.clientX,y:e.clientY}),ft.size===2&&Yt){let[m,M]=Array.from(ft.values()),_=Math.hypot(m.x-M.x,m.y-M.y),H=Y.getBoundingClientRect();Ft(_/Yt,{x:(m.x+M.x)/2-H.left,y:(m.y+M.y)/2-H.top}),Yt=_,re=!0;return}let s=e.clientX-n.x,l=e.clientY-n.y;re||(re=Math.abs(s)+Math.abs(l)>0),W={...W,x:W.x+s,y:W.y+l},Tt()});let Ge=e=>{ft.delete(e.pointerId)&&(ft.size<2&&(Yt=0),ft.size||(Y.classList.remove("is-panning"),!re&&e.type==="pointerup"&&!K.hidden&&xe()))};Y.addEventListener("pointerup",Ge),Y.addEventListener("pointercancel",Ge),Y.addEventListener("wheel",e=>{e.preventDefault();let n=Y.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?Ft(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(W={...W,x:W.x-e.deltaX,y:W.y-e.deltaY},Tt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{pe&&(pe=!1,Wt())}).observe(Y),Ke(),Xe(),Ot(yt()?!1:Ve(),!1),we(d,1),he(),Zt(),It(),Wt();let qe=t.fonts;qe&&qe.ready.then(()=>{et!==null||ft.size||(Zt(),It(),Wt())})}Zn(document);})();';
 var SHARE_VIEWER_CSS = `/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */
 :root {
   color-scheme: light;
@@ -82835,8 +83525,11 @@ var MapChatService = class {
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
    * `rejected`. Claude streams the StructuredOutput JSON; Codex streams its message text (only growing). Other providers never call `onReply`.
    * `onProgress` gets the runtime's model events (never after a stop); it only drives a display.
+   * `onSteer` receives a function that adds the user's follow-up text to the running turn (the text is wrapped in the steer
+   * template here); it rejects when the turn can no longer take one or after a stop. A steer restarts the reply, so the reply
+   * shown so far is forgotten and a shorter new reply replaces it.
    */
-  async chat(request, signal, onReply, onProgress) {
+  async chat(request, signal, onReply, onProgress, onSteer) {
     const stopped = () => new MapChatError("stopped", "Map chat stopped");
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(mapChatStep, request);
@@ -82855,8 +83548,15 @@ var MapChatService = class {
       shown = text11;
       onReply(text11);
     } : void 0;
-    const hooks = onProgress || onText ? {
+    const hooks = onProgress || onText || onSteer ? {
       ...onText ? { onText } : {},
+      ...onSteer ? {
+        onSteer: (steer) => onSteer(async (text11) => {
+          if (signal.aborted) throw stopped();
+          shown = "";
+          await steer(renderMapChatSteer(text11));
+        })
+      } : {},
       ...onProgress ? {
         onFirstEvent: () => {
           if (!signal.aborted) onProgress({ kind: "first-event" });

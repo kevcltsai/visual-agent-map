@@ -456,6 +456,28 @@ test('tree-text-node: a text node is exported as plain text with its text escape
   assert.doesNotMatch(svg, /<rect x="600" y="40"/, 'a text node is drawn without a box, like on screen');
 });
 
+test('text-node-width: a fitted one-line text block exports its whole text (real padding is 14, not 28)', async () => {
+  const h = await harness();
+  const el = element('div', 'vam-text-node');
+  // "hello~~" is 7 characters: the exporter's width guess is 49, the fitted box (46 text + 14 padding and border) is 60 wide and one line high.
+  Object.assign(el, { offsetLeft: 600, offsetTop: 40, offsetWidth: 60, offsetHeight: 28 });
+  el.computed = style({ backgroundColor: 'rgb(255, 255, 255)', borderTopColor: 'rgb(204, 204, 204)' });
+  const body = el.createDiv('vam-text-node-body');
+  body.text = 'hello~~';
+  body.computed = style({ color: 'rgb(34, 34, 34)' });
+  h.view.textEls = new Map([['t1', el]]);
+  const got = await h.view.collectExportScene(() => true);
+  const card = got.scene.cards.find(c => c.plain === true);
+  assert.equal(card.title.length === 1 && card.title[0], 'hello~~', 'one line, nothing wrapped away');
+  assert.match(ex.buildMapSvg(got.scene), />hello~~</);
+  // A taller block (two lines on screen) may wrap, but never to more lines than the screen shows.
+  body.text = 'hello world again and again';
+  Object.assign(el, { offsetWidth: 90, offsetHeight: 28 + 19 });
+  const two = (await h.view.collectExportScene(() => true)).scene.cards.find(c => c.plain === true);
+  assert.ok(two.title.length <= 2, two.title.join('|'));
+  assert.equal(two.title.join('').replace(/\s/g, ''), 'helloworldagainandagain', 'no text lost');
+});
+
 test('Bug bash E #22: a selected card and a selected text block export the stroke of their saved style, and stay selected on screen afterwards', async () => {
   const h = await harness();
   const SELECTED = 'rgb(152, 115, 247)', SAVED = 'rgb(204, 204, 204)';

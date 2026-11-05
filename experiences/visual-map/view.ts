@@ -167,6 +167,7 @@ export { COVER_MAX_HEIGHT_RATIO, coverFrameRatio } from "./cover-layout";
 import {
   TOPIC_KIND_SHAPES,
   hasSvgShape,
+  kindIconId,
   renderShapeBackground,
   shapeInsets,
   showsToResearch
@@ -751,7 +752,8 @@ function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: s
   return id => resolve(id, new Set());
 }
 function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
-  const bend = Math.max(60, Math.abs(x2 - x1) / 2);
+  const run = x2 - x1;
+  const bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 /** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */
@@ -765,7 +767,8 @@ const RELATION_LABEL_MIN_ZOOM = 0.6;
 /** A note shown under an expanded label is cut to this many characters. */
 const RELATION_LABEL_NOTE_MAX = 60;
 /** A card's distance from its root (a root is 0); only the fishbone edge reads it. */
-const TEXT_NODE_HEIGHT = 180;
+/** A one-line plain text node as drawn (padding + one line); a node not drawn yet takes this so the layout leaves no gap. */
+const TEXT_NODE_HEIGHT = 28;
 const TEXT_NODE_WIDTH = 300;
 function depthOf(nodes: MapNode[], id: string): number {
   const byId = new Map(nodes.map(node => [node.id, node]));
@@ -802,14 +805,6 @@ type AimTargetProgress = {
   startedAt?: number;
 };
 
-const TOPIC_KIND_ICON: Record<TopicKind, string> = {
-  topic: "circle",
-  action: "square-check",
-  atomic: "atom",
-  hypothesis: "lightbulb",
-  evidence: "file-search",
-  conclusion: "flag"
-};
 const RELATION_KINDS: readonly TopicRelationKind[] = [
   "supports",
   "contradicts",
@@ -2324,6 +2319,10 @@ export class VisualAgentMapView extends ItemView {
     const menu = new Menu();
     this.restoreFocusOnMenuHide(menu, nodeId);
     return menu;
+  }
+  /** A menu that lists topic types is drawn by Obsidian, not the system: a native menu shows no icons, and the shapes are the point. */
+  private drawInDom(menu: Menu): void {
+    (menu as Partial<Pick<Menu, "setUseNativeMenu">>).setUseNativeMenu?.(false);
   }
   private restoreFocusOnMenuHide(menu: Menu, nodeId?: string): void {
     (menu as unknown as { onHide?: (callback: () => void) => void }).onHide?.(() => {
@@ -4192,11 +4191,12 @@ export class VisualAgentMapView extends ItemView {
   private openAddMenu(event: MouseEvent, parent: MapNode | null): void {
     if (this.presentation) return;
     const menu = this.newMenu();
+    this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
           .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
-          .setIcon(TOPIC_KIND_ICON[kind])
+          .setIcon(kindIconId(kind))
           .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(parent, undefined, true, true, kind))))
       );
     if (this.canEditText())
@@ -4212,6 +4212,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private openTopicMenu(event: MouseEvent): void {
     const menu = this.newMenu();
+    this.drawInDom(menu);
     menu.addItem(item =>
       item
         .setTitle(t("ui.paste_outline_add_many"))
@@ -4223,7 +4224,7 @@ export class VisualAgentMapView extends ItemView {
         menu.addItem(item =>
           item
             .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
-            .setIcon(TOPIC_KIND_ICON[kind])
+            .setIcon(kindIconId(kind))
             .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind))))
         );
     menu.showAtMouseEvent(event);
@@ -4434,11 +4435,12 @@ export class VisualAgentMapView extends ItemView {
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
     const menu = this.newMenu();
+    this.drawInDom(menu);
     for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
           .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
-          .setIcon(TOPIC_KIND_ICON[kind])
+          .setIcon(kindIconId(kind))
           .onClick(() => pick(kind))
       );
     menu.showAtMouseEvent(event);
@@ -7645,6 +7647,9 @@ export class VisualAgentMapView extends ItemView {
   /** The buttons and drag of a free text block: connect to a card, remove a connection, drag with the pointer. */
   private addFreeTextControls(el: HTMLElement, text: TextItem, liveLinks: readonly string[]): void {
     const bar = el.createDiv("vam-text-node-links");
+    // The buttons hang below the text in one row, so they never change the block's height (its line stays on its middle).
+    const promote = el.querySelector(".vam-text-node-promote");
+    if (promote) bar.appendChild(promote);
     const connect = bar.createEl("button", {
       cls: "vam-text-node-connect",
       text: t("ui.text_link_start"),
@@ -7872,9 +7877,17 @@ export class VisualAgentMapView extends ItemView {
     body?.addClass("vam-sr-only");
     const input = el.createEl("textarea", {
       cls: "vam-text-node-input",
-      attr: { rows: "4", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
+      attr: { rows: "1", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
     });
     input.value = draft ?? text.text;
+    // The field is as tall as its text, so the block keeps its place and its line stays on its middle while typing.
+    const fitHeight = (): void => {
+      input.style.removeProperty("height");
+      input.style.height = `${input.scrollHeight}px`;
+      this.drawEdges();
+    };
+    input.addEventListener("input", fitHeight);
+    fitHeight();
     let done = false;
     const close = (): void => {
       done = true;
@@ -7882,6 +7895,8 @@ export class VisualAgentMapView extends ItemView {
       this.suspendTextEdit = null;
       input.remove();
       body?.removeClass("vam-sr-only");
+      // Back to its text's height: the line to its topic follows (an unchanged text writes nothing, so no repaint does it).
+      this.drawEdges();
     };
     this.suspendTextEdit = () => {
       done = true;
@@ -8860,7 +8875,6 @@ export class VisualAgentMapView extends ItemView {
         node.collapsed ? "chevrons-up-down" : "chevrons-down-up",
         () => this.toggleCollapsed(node)
       );
-    if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
     // "Edit card", the same dialog as the panel's button; only for an editable topic whose cover picture is showing.
     if (this.markersEditable(node) && this.coverPictureOf(node))
       add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
@@ -10527,11 +10541,10 @@ export class VisualAgentMapView extends ItemView {
       }
       cards.push(item);
     }
-    // Text nodes as drawn (tree-text-node): a plain card with the text wrapped; the line to the parent is in edgesEl.
+    // Text nodes as drawn (tree-text-node): plain text with no box, wrapped; the line to the parent is in edgesEl.
     for (const el of this.textEls.values()) {
       const box = boxOf(el);
       grow(box.x, box.y, box.width, box.height);
-      const style = savedLook(el);
       const body = el.querySelector<HTMLElement>(".vam-text-node-body");
       cards.push({
         x: box.x,
@@ -10539,8 +10552,7 @@ export class VisualAgentMapView extends ItemView {
         w: box.width,
         h: box.height,
         title: wrapText(body?.textContent ?? "", box.width - 28),
-        fill: colorOf(style.backgroundColor),
-        stroke: colorOf(style.borderTopColor),
+        plain: true,
         textColor: colorOf(computed(body ?? el).color)
       });
     }
@@ -11940,7 +11952,7 @@ export class VisualAgentMapView extends ItemView {
     // Hover-only tools float beside the card (above its top edge unless that covers a neighbour), so showing them (hover,
     // focus, selection) never moves the card's content. What must always show (status, stop and review actions, a folded
     // branch's count) stays in the header. Only three tools float: AI explore, Details and "More", which holds the rest
-    // (fold, structure, rename, select subtopics, add text, remove).
+    // (fold, structure, rename, select subtopics, remove). Add text is in the card's + menu only.
     const tools = card.createDiv("vam-node-tools");
     const count = descendants(this.map!.nodes, node.id).size;
     const more: Array<{ title: string; icon: string; action: () => void }> = [];
@@ -11983,12 +11995,6 @@ export class VisualAgentMapView extends ItemView {
             title: t("ui.select_subtopics"),
             icon: "list-checks",
             action: () => this.whenEditing(() => this.selectSubtopics(node))
-          });
-        if (this.canEditText() && !isAimNode(node))
-          more.push({
-            title: t("ui.text_node_add"),
-            icon: "text-cursor-input",
-            action: () => this.whenEditing(() => this.addTextNodeUnder(node))
           });
       }
       if (aimEnabled() && this.map?.aim && node.aimKind === "question")

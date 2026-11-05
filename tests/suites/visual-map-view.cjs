@@ -1533,7 +1533,7 @@ integrationTest('topic outline: switching to another map tab re-syncs the outlin
   state.views = []; plugin.releaseOutline(a);
   assert.equal(plugin.outlineMap, null, 'no map left: the outline empties');
 });
-integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card, Rename, Select subtopics and Add text', () => {
+integrationTest('card tools: only AI explore, Details and More float; More holds Collapse, This card, Rename and Select subtopics', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   // The tools float over the card's top edge, hidden until hover, focus or selection, and take no space.
   assert.match(css, /^\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*bottom: calc\(100% - 6px\);[^}]*opacity: 0; pointer-events: none;[^}]*width: max-content;/m);
@@ -1552,7 +1552,7 @@ integrationTest('card tools: only AI explore, Details and More float; More holds
   };
   const buttons = toolsOf();
   assert.deepEqual(buttons.map(button => button.text), ['AI explore', 'Details', '⋯ More'], 'three floating buttons');
-  assert.deepEqual(buttons.menu, ['Collapse', 'This card', 'Rename', 'Select subtopics', 'Add text'], 'every other action is in More');
+  assert.deepEqual(buttons.menu, ['Collapse', 'This card', 'Rename', 'Select subtopics'], 'every other action is in More; Add text is only in the + menu');
   const explore = buttons[0];
   assert.ok(explore.classes.has('vam-ai-explore')); assert.equal(explore.attrs['aria-label'], undefined, 'the visible text is the accessible name (WCAG 2.5.3)');
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
@@ -1560,7 +1560,7 @@ integrationTest('card tools: only AI explore, Details and More float; More holds
   assert.equal(buttons[2].attrs['aria-label'], 'More actions for this topic'); assert.equal(buttons[2].attrs['aria-haspopup'], 'menu');
   // A leaf has no Collapse; select mode keeps Details and a More with only Collapse.
   const leaf = toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); });
-  assert.deepEqual(leaf.map(button => button.text), ['AI explore', 'Details', '⋯ More']); assert.deepEqual(leaf.menu, ['This card', 'Rename', 'Add text']);
+  assert.deepEqual(leaf.map(button => button.text), ['AI explore', 'Details', '⋯ More']); assert.deepEqual(leaf.menu, ['This card', 'Rename']);
   const selecting = toolsOf(({ view }) => { view.selection.toggleMultiSelect(); });
   assert.deepEqual(selecting.map(button => button.text), ['Details', '⋯ More']); assert.deepEqual(selecting.menu, ['Collapse']);
   const { translate } = load('i18n.ts');

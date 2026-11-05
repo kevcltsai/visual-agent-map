@@ -199,9 +199,39 @@ test('L8: treeEdgePathData right is exactly the plugin edge curve; left goes fro
       viewerEdge.edgePathData(parent.x + parent.width, parent.y + parent.height / 2, child.x, child.y + child.height / 2)
     );
   const parent = { x: 800, y: 100, width: 300, height: 180 }, child = { x: 440, y: 0, width: 300, height: 100 };
-  assert.equal(geometry.treeEdgePathData(parent, child, 'left'), 'M 800 190 C 740 190, 800 50, 740 50');
+  assert.equal(geometry.treeEdgePathData(parent, child, 'left'), 'M 800 190 C 770 190, 770 50, 740 50');
   const far = { x: 0, y: 0, width: 300, height: 100 };
   assert.equal(geometry.treeEdgePathData(parent, far, 'left'), 'M 800 190 C 550 190, 550 50, 300 50', 'arms are half the distance when it is wide');
+});
+
+const ctrl = path => { const n = path.match(/-?\d+(?:\.\d+)?/g).map(Number); return { c1: [n[2], n[3]], c2: [n[4], n[5]] }; };
+const armOf = (x1, x2) => { const { c1, c2 } = ctrl(viewerEdge.edgePathData(x1, 0, x2, 100)); return c1[0] - x1 + 0 * c2[0]; };
+
+test('L8b: with the standard ~72px gap the two control points do not cross, so sibling curves do not bundle', () => {
+  const parent = { x: 66, y: 0, width: 400, height: 96 };
+  for (const mid of [48, 167, 322, 472, 572]) {
+    const child = { x: 538, y: mid - 40, width: 300, height: 80 };
+    const right = ctrl(geometry.treeEdgePathData(parent, child, 'right'));
+    assert.ok(right.c1[0] <= right.c2[0], `right to y=${mid}: c1x ${right.c1[0]} <= c2x ${right.c2[0]}`);
+    const edge = ctrl(viewerEdge.edgePathData(466, 48, 538, mid));
+    assert.ok(edge.c1[0] <= edge.c2[0], `edgePathData to y=${mid}`);
+  }
+  const p = { x: 1000, y: 0, width: 400, height: 96 }, c = { x: 528, y: 300, width: 400, height: 80 };
+  const left = ctrl(geometry.treeEdgePathData(p, c, 'left'));
+  assert.ok(left.c1[0] >= left.c2[0], `left: c1x ${left.c1[0]} >= c2x ${left.c2[0]}`);
+  const dp = { x: 0, y: 0, width: 300, height: 100 };
+  const down = ctrl(geometry.treeEdgePathData(dp, { x: 500, y: 172, width: 300, height: 80 }, 'down'));
+  assert.ok(down.c1[1] <= down.c2[1], `down: c1y ${down.c1[1]} <= c2y ${down.c2[1]}`);
+  const up = ctrl(geometry.treeEdgePathData({ ...dp, y: 300 }, { x: 500, y: 148, width: 300, height: 80 }, 'up'));
+  assert.ok(up.c1[1] >= up.c2[1], `up: c1y ${up.c1[1]} >= c2y ${up.c2[1]}`);
+});
+
+test('L8c: the arm is continuous at run 40, 60 at run 0, and unchanged for a child behind its parent', () => {
+  assert.ok(Math.abs(armOf(0, 39.9) - armOf(0, 40)) < 0.2);
+  assert.equal(armOf(0, 0), 60);
+  assert.equal(armOf(0, 40), 20);
+  assert.equal(armOf(0, 120), 60);
+  assert.equal(armOf(0, -300), 150);
 });
 
 const relevance = load('experiences/visual-map/relevance-order.ts');
@@ -316,7 +346,7 @@ const edgeHost = () => ({ children: [], replaceChildren() { this.children = []; 
 const card = (x, y, width = 300, height = 180) => ({ offsetLeft: x, offsetTop: y, offsetWidth: width, offsetHeight: height });
 
 test('V2: in a left map the parent line leaves the parent\'s left edge for the child\'s right edge; right maps keep the old curve', async () => {
-  for (const [extra, expected] of [[LEFT_MAP, 'M 1000 170 C 820 170, 820 90, 640 90'], [{}, 'M 1300 170 C 1360 170, 1300 90, 1360 90']]) {
+  for (const [extra, expected] of [[LEFT_MAP, 'M 1000 170 C 820 170, 820 90, 640 90'], [{}, 'M 1300 170 C 1330 170, 1330 90, 1360 90']]) {
     const h = await harness(tree4.slice(0, 2), extra);
     const root = h.named('Root'), a = h.named('A');
     h.view.edgesEl = edgeHost(); h.view.relationsLayerEl = edgeHost();

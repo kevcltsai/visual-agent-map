@@ -3,6 +3,7 @@
 //   - placeholder multisets equal: {0}, {1}, ... and {{name}}
 //   - Markdown/structure token counts equal: **, `, [[, ]], ](, line-start #, > and "- ", HTML tags, newlines
 //   - coffee.* keys contiguous between the coffee:begin / coffee:end markers of each dictionary file
+//   - zh-TW ui.* strings (except ui.aim_*) say 議題/心智圖/工作區: no 節點, 地圖 or bare Workspace (Agent Workspace/ is fine)
 // Usage: node scripts/check-i18n.mjs [--root <dir>]   (<dir> holds i18n/languages.ts; default: the repository root)
 import { buildSync } from "esbuild";
 import { existsSync, readFileSync } from "node:fs";
@@ -55,6 +56,18 @@ export function checkDictionaries(dictionaries) {
   return problems;
 }
 
+/** zh-TW map UI wording: same rule as the "map UI terms in zh-TW" test in tests/suites/visual-map-view.cjs. */
+export function checkZhTwMapTerms(dictionaries) {
+  const problems = [];
+  for (const [key, value] of Object.entries(dictionaries["zh-TW"] ?? {})) {
+    if (!key.startsWith("ui.") || key.includes("aim_") || typeof value !== "string") continue;
+    if (value.includes("節點")) problems.push({ language: "zh-TW", key, reason: "uses 節點; write 議題" });
+    if (value.includes("地圖")) problems.push({ language: "zh-TW", key, reason: "uses 地圖; write 心智圖" });
+    if (value.replace("Agent Workspace/", "").includes("Workspace")) problems.push({ language: "zh-TW", key, reason: "uses Workspace; write 工作區" });
+  }
+  return problems;
+}
+
 /** Each dictionary file keeps all coffee.* keys in one block between the coffee:begin and coffee:end markers. */
 export function checkCoffeeBlock(language, source) {
   const problems = [];
@@ -97,7 +110,7 @@ function loadFromRoot(root) {
 
 export function checkRoot(root) {
   const { dictionaries, problems } = loadFromRoot(root);
-  return [...problems, ...checkDictionaries(dictionaries)];
+  return [...problems, ...checkDictionaries(dictionaries), ...checkZhTwMapTerms(dictionaries)];
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

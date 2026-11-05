@@ -439,7 +439,7 @@ test('frames (ticket 43) are exported as drawn: measured from the cards, label a
   assert.doesNotMatch(svg, /<b>/);
 });
 
-test('tree-text-node: a text node is exported as a card with its text escaped, and a script text stays literal', async () => {
+test('tree-text-node: a text node is exported as plain text with its text escaped, and a script text stays literal', async () => {
   const h = await harness();
   const el = element('div', 'vam-text-node');
   Object.assign(el, { offsetLeft: 600, offsetTop: 40, offsetWidth: 300, offsetHeight: 50 });
@@ -452,7 +452,8 @@ test('tree-text-node: a text node is exported as a card with its text escaped, a
   const svg = ex.buildMapSvg(got.scene);
   assert.match(svg, /note &lt;script&gt;/);
   assert.doesNotMatch(svg, /<script|<img/);
-  assert.ok(got.scene.cards.some(c => c.x === 600 && c.y === 40), 'the text node box is in the scene');
+  assert.ok(got.scene.cards.some(c => c.x === 600 && c.y === 40 && c.plain === true), 'the text node is in the scene as plain text');
+  assert.doesNotMatch(svg, /<rect x="600" y="40"/, 'a text node is drawn without a box, like on screen');
 });
 
 test('Bug bash E #22: a selected card and a selected text block export the stroke of their saved style, and stay selected on screen afterwards', async () => {
@@ -470,7 +471,9 @@ test('Bug bash E #22: a selected card and a selected text block export the strok
   body.text = 'note'; body.computed = style({ color: 'rgb(34, 34, 34)' });
   h.view.textEls = new Map([['t1', el]]);
   const got = await h.view.collectExportScene(() => true);
-  assert.equal(got.scene.cards.map(c => c.stroke).join('|'), [SAVED, SAVED, SAVED].join('|'), 'selected cards, plain card and text block all carry the saved stroke');
+  const boxed = got.scene.cards.filter(c => !c.plain);
+  assert.equal(boxed.map(c => c.stroke).join('|'), [SAVED, SAVED].join('|'), 'the selected card and the plain card carry the saved stroke');
+  assert.equal(got.scene.cards.filter(c => c.plain).length, 1, 'the selected text block is exported as plain text (no box, so no stroke to pick)');
   assert.equal(rootCard.hasClass('is-selected'), true, 'the selection is still shown on screen');
   assert.equal(el.hasClass('is-selected'), true);
   assert.doesNotMatch(ex.buildMapSvg(got.scene), /152, 115, 247/);
@@ -497,7 +500,8 @@ test('Bug bash E #22 (round 2): the border is read with transitions off, so a ca
   const got = await h.view.collectExportScene(() => true);
   const strokes = got.scene.cards.map(c => c.stroke);
   assert.equal(strokes[0], SAVED, 'selected card');
-  assert.equal(strokes[2], SAVED, 'selected text block');
+  assert.equal(got.scene.cards[2].plain, true, 'the selected text block is plain text: no box, no stroke');
+  assert.equal(strokes[2], undefined, 'no stroke is read for the text block');
   assert.equal(card.hasClass('vam-export-measure') || el.hasClass('vam-export-measure'), false, 'the measuring class is taken off again');
   assert.equal(card.hasClass('is-selected'), true);
 });

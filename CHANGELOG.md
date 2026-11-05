@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- The "+" and "Add subtopic" lists show each topic type's shape and colour next to its name, the same as the type picker.
+
 ### Mark points on a picture
 
 Turn a picture on the canvas into an annotated image, drop anchors on it such as "the cow's back", and link each anchor to a topic.

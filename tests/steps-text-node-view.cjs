@@ -199,10 +199,10 @@ test('canvas-text-node: the empty-canvas menu offers Add text node here; AIM and
   }
 });
 
-test('layout: text nodes follow auto layout, a map without text keeps no canvasItems, heightOf gives text 180', async () => {
+test('layout: text nodes follow auto layout, a map without text keeps no canvasItems, heightOf gives an undrawn text one line (28)', async () => {
   const h = await harness(({ root }) => [txt({ parentId: root.id, x: 9999, y: 9999 })]);
-  assert.equal(h.view.cardHeightOf('t1'), 180);
-  assert.equal(h.view.cardHeightOf('txt-new'), 180);
+  assert.equal(h.view.cardHeightOf('t1'), 28);
+  assert.equal(h.view.cardHeightOf('txt-new'), 28);
   h.view.autoLayout();
   await h.settle();
   const [item] = await h.onDisk();

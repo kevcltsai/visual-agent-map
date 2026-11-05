@@ -633,7 +633,7 @@ test('text-node-width: a left layout line ends on the real (fitted) right edge o
   assert.ok(String(path.attrs.d).endsWith('360 24'), path.attrs.d);
 });
 
-// text-node-width: a committed width re-places the block the way the layout would (same undo step); a left drag keeps the right edge.
+// text-node-width: a width change moves only that block, keeping the edge/center facing its topic (same rule live and at commit).
 async function withLayout(h, direction) {
   h.view.map.layout = { direction };
   Object.assign(h.view.map.nodes[0], { x: 800, y: 100 });
@@ -649,7 +649,7 @@ async function withLayout(h, direction) {
 const textOnDisk = async (h, id = 't1') => (await h.onDisk()).find(i => i.id === id);
 const WIDE = 'wide text that is longer than a card width '.repeat(3);
 
-test('text-node-width: left layout, End key at 560 grows leftward and leaves the topic card clear; one undo restores width and x', async () => {
+test('text-node-width: left layout, End key at 560 grows leftward, right edge unchanged, clear of the topic card; one undo restores width and x', async () => {
   const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 })]);
   await withLayout(h, 'left');
   const topic = h.view.map.nodes[0];
@@ -660,7 +660,7 @@ test('text-node-width: left layout, End key at 560 grows leftward and leaves the
   const after = await textOnDisk(h);
   assert.equal(after.width, 560);
   assert.ok(after.x + 560 <= topic.x, `box ${after.x}+560 must end left of the topic at ${topic.x}`);
-  assert.ok(after.x < before.x, 'moved left');
+  assert.equal(after.x + 560, before.x + 100, 'right edge unchanged');
   assert.equal(h.view.history.past.length, past + 1);
   await h.view.travel(false);
   const undone = await textOnDisk(h);
@@ -669,10 +669,9 @@ test('text-node-width: left layout, End key at 560 grows leftward and leaves the
   assert.equal(undone.y, before.y);
 });
 
-test('text-node-width: left layout drag keeps the right edge live, then settles clear of the topic card', async () => {
+test('text-node-width: left layout drag keeps the right edge live and after release; zero-length and cancelled drags restore x', async () => {
   const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 })]);
   await withLayout(h, 'left');
-  const topic = h.view.map.nodes[0];
   const start = await textOnDisk(h);
   const el = h.textEl('t1');
   el.offsetWidth = 100;
@@ -680,11 +679,37 @@ test('text-node-width: left layout drag keeps the right edge live, then settles 
   pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 200);
   assert.equal(el.style.width, '300px');
   assert.equal(parseFloat(el.style.left) + 300, start.x + 100, 'right edge anchored while dragging');
-  pointer(handle, 'pointermove', 5000); pointer(handle, 'pointerup', 5000);
+  pointer(handle, 'pointercancel', 200);
+  assert.equal(el.style.left, `${start.x}px`, 'cancel restores x');
+  pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 5000); pointer(handle, 'pointerup', 5000);
   await h.settle();
   const after = await textOnDisk(h);
   assert.equal(after.width, 560);
-  assert.ok(after.x + 560 <= topic.x, `box ${after.x}+560 must end left of the topic at ${topic.x}`);
+  assert.equal(after.x + 560, start.x + 100, 'right edge anchored after release');
+  h.view.render();
+  const again = h.textEl('t1');
+  again.offsetWidth = 560;
+  const past = h.view.history.past.length;
+  pointer(handleOf(h)('t1'), 'pointerdown', 0); pointer(handleOf(h)('t1'), 'pointerup', 0);
+  await h.settle();
+  assert.equal(h.view.history.past.length, past, 'zero-length drag writes nothing');
+  assert.equal(again.style.left, `${after.x}px`);
+});
+
+test('text-node-width: down layout keeps the horizontal center (live and committed)', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 })]);
+  await withLayout(h, 'down');
+  const before = await textOnDisk(h);
+  const el = h.textEl('t1');
+  el.offsetWidth = 100;
+  const handle = handleOf(h)('t1');
+  pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 200);
+  assert.equal(parseFloat(el.style.left) + 150, before.x + 50, 'center holds live');
+  pointer(handle, 'pointerup', 200);
+  await h.settle();
+  const after = await textOnDisk(h);
+  assert.equal(after.width, 300);
+  assert.equal(after.x + 150, before.x + 50, 'center holds after release');
 });
 
 test('text-node-width: right layout keeps the box x when the width changes', async () => {
@@ -698,19 +723,66 @@ test('text-node-width: right layout keeps the box x when the width changes', asy
   assert.equal(after.x, before.x);
 });
 
-test('text-node-width: down layout at 560 does not overlap its sibling text block', async () => {
-  const h = await harness(({ root }) => [
-    txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 }),
-    txt({ id: 't2', parentId: root.id, text: 'sibling', width: 100, x: 0, y: 0 })
-  ]);
-  await withLayout(h, 'down');
-  const a = await textOnDisk(h), b = await textOnDisk(h, 't2');
-  assert.ok(Math.abs(a.x - b.x) >= 100 || Math.abs(a.y - b.y) >= 20, 'precondition: placed apart');
+test('text-node-width: a free block keeps x even when the layout is left', async () => {
+  const h = await harness(() => [txt({ parentId: undefined, text: WIDE, width: 100, x: 50, y: 60 })]);
+  h.view.map.layout = { direction: 'left' };
+  await h.repo.saveMap(MAP, h.view.map);
+  h.view.map = await h.repo.readMap(MAP);
+  h.view.render();
   handleOf(h)('t1').fire('keydown', { key: 'End' });
   await h.settle();
-  const w = await textOnDisk(h), s = await textOnDisk(h, 't2');
-  assert.equal(w.width, 560);
-  const clearX = w.x + 560 <= s.x || s.x + 100 <= w.x;
-  const clearY = w.y + 30 <= s.y || s.y + 30 <= w.y;
-  assert.ok(clearX || clearY, `wide box (${w.x},${w.y}) overlaps sibling (${s.x},${s.y})`);
+  const after = await textOnDisk(h);
+  assert.equal(after.width, 560);
+  assert.equal(after.x, 50);
+});
+
+test('text-node-width: no other card or text block moves on a width change (manually moved sibling card and sibling text)', async () => {
+  for (const direction of ['left', 'down', 'right']) {
+    const h = await harness(({ root }) => [
+      txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 }),
+      txt({ id: 't2', parentId: root.id, text: 'sibling', width: 100, x: 0, y: 0 })
+    ]);
+    await withLayout(h, direction);
+    h.view.map.nodes[1].x = 1234; h.view.map.nodes[1].y = 777;
+    h.view.map.canvasItems.find(i => i.id === 't2').x = 4321;
+    h.view.map.canvasItems.find(i => i.id === 't2').y = 555;
+    await h.repo.saveMap(MAP, h.view.map);
+    h.view.map = await h.repo.readMap(MAP);
+    h.view.render();
+    const nodesBefore = plain((await h.repo.readMap(MAP)).nodes);
+    const siblingBefore = await textOnDisk(h, 't2');
+    handleOf(h)('t1').fire('keydown', { key: 'End' });
+    await h.settle();
+    assert.equal((await textOnDisk(h)).width, 560, direction);
+    assert.deepEqual(plain((await h.repo.readMap(MAP)).nodes), nodesBefore, `${direction}: cards unchanged`);
+    assert.deepEqual(await textOnDisk(h, 't2'), siblingBefore, `${direction}: sibling text unchanged`);
+  }
+});
+
+test('text-node-width: a per-branch left override (map layout down) anchors the right edge', async () => {
+  const h = await harness(({ child }) => [txt({ parentId: child.id, text: WIDE, width: 100, x: 300, y: 50 })]);
+  h.view.map.layout = { direction: 'down' };
+  h.view.map.nodes[1].layout = { direction: 'left' };
+  await h.repo.saveMap(MAP, h.view.map);
+  h.view.map = await h.repo.readMap(MAP);
+  h.view.render();
+  handleOf(h)('t1').fire('keydown', { key: 'End' });
+  await h.settle();
+  const after = await textOnDisk(h);
+  assert.equal(after.width, 560);
+  assert.equal(after.x + 560, 300 + 100, 'right edge unchanged');
+});
+
+test('text-node-width: reset to automatic uses the fitted width, so the anchored right edge holds', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 })]);
+  await withLayout(h, 'left');
+  const before = await textOnDisk(h);
+  const el = h.textEl('t1');
+  Object.defineProperty(el, 'offsetWidth', { configurable: true, get() { return this.style.width ? parseFloat(this.style.width) : 180; } });
+  handleOf(h)('t1').fire('keydown', { key: 'Enter' });
+  await h.settle();
+  const after = await textOnDisk(h);
+  assert.equal(after.width, undefined);
+  assert.equal(after.x + 180, before.x + 100, 'right edge holds against the fitted width');
+  assert.equal(el.style.width, '100px', 'measuring did not leave the inline width changed');
 });

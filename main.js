@@ -54238,6 +54238,11 @@ function branchDirectionResolver(nodes, mapDirection) {
   };
   return (id) => resolve(id, /* @__PURE__ */ new Set());
 }
+function textXAfterWidth(direction, x, from, to) {
+  if (direction === "left") return x + from - to;
+  if (direction === "up" || direction === "down") return x + (from - to) / 2;
+  return x;
+}
 function edgePathData(x1, y1, x2, y2) {
   const run = x2 - x1;
   const bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
@@ -54780,7 +54785,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     if (map.canvasItems) map.canvasItems = out.items;
   }
   /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
-  arrangeBranch(map, parentId, newIds, minTop, widthOf = this.textWidthOf) {
+  arrangeBranch(map, parentId, newIds, minTop) {
     var _a2;
     const out = arrangeNewBranchWithText(
       map.nodes,
@@ -54790,7 +54795,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       this.cardHeightOf,
       minTop,
       layoutOf(map),
-      widthOf
+      this.textWidthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -61333,20 +61338,20 @@ ${request.requirements}` : preset.text,
       this.enqueue(() => this.resizeText(text11.id, width));
     };
     handle.addEventListener("pointerdown", (event) => {
-      var _a2;
+      var _a2, _b2;
       if (event.button !== 0 || !this.map || this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       const startX = event.clientX, zoom = this.map.viewport.zoom || 1, from = shownWidth(), before = storedWidth();
-      const leftward = layoutOf(this.map).direction === "left";
+      const direction = el.hasClass("is-free") ? void 0 : branchDirectionResolver(this.map.nodes, layoutOf(this.map).direction)((_a2 = text11.parentId) != null ? _a2 : "");
       let width = from, done = false;
-      (_a2 = handle.setPointerCapture) == null ? void 0 : _a2.call(handle, event.pointerId);
+      (_b2 = handle.setPointerCapture) == null ? void 0 : _b2.call(handle, event.pointerId);
       const move = (e) => {
         var _a3;
         width = (_a3 = clampTextWidth(from + (e.clientX - startX) / zoom)) != null ? _a3 : from;
         el.style.width = `${width}px`;
         el.addClass("has-width");
-        if (leftward) el.style.left = `${text11.x + from - width}px`;
+        el.style.left = `${textXAfterWidth(direction, text11.x, from, width)}px`;
         sync(width);
         this.drawEdges();
       };
@@ -61362,7 +61367,7 @@ ${request.requirements}` : preset.text,
           el.style.removeProperty("width");
           el.removeClass("has-width");
         } else el.style.width = `${before}px`;
-        if (leftward) el.style.left = `${text11.x}px`;
+        el.style.left = `${text11.x}px`;
         sync(from);
         this.drawEdges();
       };
@@ -61413,32 +61418,35 @@ ${request.requirements}` : preset.text,
     });
   }
   /**
-   * Sets (or clears) a text block's width and, in the same undo step, places the block again the way the layout would
-   * (a block under a shown topic only: it may now need to grow leftward or clear a sibling).
+   * Sets (or clears) a text block's width and, in the same undo step, moves only this block so the edge or center
+   * facing its topic stays (same rule as the live drag). Resetting to automatic measures the fitted width first.
    */
   async resizeText(id, width) {
+    var _a2, _b2, _c, _d;
+    const el = this.textEls.get(id);
+    const item = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (entry) => entry.kind === "text" && entry.id === id
+    );
+    let x;
+    if (el && item && this.map && !el.hasClass("is-free")) {
+      const from = (_c = item.width) != null ? _c : el.offsetWidth || TEXT_NODE_WIDTH;
+      let to = width;
+      if (to === void 0) {
+        const inline = el.style.width, had = el.hasClass("has-width");
+        el.style.removeProperty("width");
+        el.removeClass("has-width");
+        to = el.offsetWidth || from;
+        if (inline) el.style.width = inline;
+        if (had) el.addClass("has-width");
+      }
+      const direction = branchDirectionResolver(this.map.nodes, layoutOf(this.map).direction)((_d = item.parentId) != null ? _d : "");
+      x = textXAfterWidth(direction, item.x, from, to);
+    }
     await this.changeCanvasItems(
       id,
-      (items) => setTextNodeWidth(items, id, width),
-      (map) => {
-        var _a2, _b2;
-        const item = ((_a2 = map.canvasItems) != null ? _a2 : []).find((entry) => entry.kind === "text" && entry.id === id);
-        const parent = (item == null ? void 0 : item.parentId) ? map.nodes.find((node) => node.id === item.parentId) : void 0;
-        if (!item || !parent || parent.collapsed) return;
-        const branch = new Set(descendants(map.nodes, parent.id));
-        for (const entry of (_b2 = map.canvasItems) != null ? _b2 : [])
-          if (entry.kind === "text" && entry.parentId === parent.id) branch.add(entry.id);
-        this.arrangeBranch(
-          map,
-          parent.id,
-          branch,
-          void 0,
-          (textId) => {
-            var _a3;
-            return textId === id ? (_a3 = item.width) != null ? _a3 : estimateTextWidth(item.text) : this.textWidthOf(textId);
-          }
-        );
-      }
+      (items) => setTextNodeWidth(items, id, width).map(
+        (entry) => x !== void 0 && entry.kind === "text" && entry.id === id ? { ...entry, x } : entry
+      )
     );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
@@ -62453,7 +62461,7 @@ ${request.requirements}` : preset.text,
     handle.addEventListener("pointerdown", (event) => begin2(event, true));
   }
   /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
-  async changeCanvasItems(id, change2, afterChange) {
+  async changeCanvasItems(id, change2) {
     var _a2;
     if (!this.map || !this.canEditCanvasItems()) return;
     if (!((_a2 = this.map.canvasItems) == null ? void 0 : _a2.some((item) => item.id === id))) return;
@@ -62469,7 +62477,6 @@ ${request.requirements}` : preset.text,
       const next = pruneBoundaries(dangling.size ? removeLinksTo(changed, dangling) : changed, [...alive]);
       if (next.length) map.canvasItems = next;
       else delete map.canvasItems;
-      afterChange == null ? void 0 : afterChange(map);
     }, false);
   }
   /** Moves a free image by (dx, dy) in map units. */

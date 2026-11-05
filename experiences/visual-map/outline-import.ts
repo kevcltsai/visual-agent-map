@@ -1,6 +1,6 @@
 import { sanitizeGeneratedTitle, titleProblem } from "../../core/title-safety";
 import type { MapDocument, MapNode } from "../../map-model";
-import { safeName, type Repository } from "../../repository";
+import { isPlaceholder, safeName, type Repository } from "../../repository";
 import { arrangeMap } from "../../map-layout";
 import { canonicalDetail } from "../../ai/result-utils";
 import { standardTemplate, type DetailTemplate } from "../../ai/detail-templates";
@@ -17,6 +17,8 @@ export interface OutlineNode {
   line: number;
   /** Note text that came with the node (an OPML / FreeMind file); becomes the topic's Detail. */
   body?: string;
+  /** One-sentence summary written by the AI for this heading; becomes the new card's summary. Absent: the card keeps the placeholder. */
+  summary?: string;
 }
 /** Where an outline came from: a vault note (shown as a link), a file by name (plain text only), or nothing. */
 export type OutlineSource = string | { file: string } | null;
@@ -276,6 +278,53 @@ export function parseOutline(input: string): OutlineParse {
   };
 }
 
+/** A summary as it may be written to a note: one line, no fence, no wikilink brackets; empty when nothing usable is left. */
+export function cleanOutlineSummary(summary: string | undefined): string {
+  if (!summary) return "";
+  const text = sanitizeGeneratedTitle(summary.replace(/\s+/g, " ").trim());
+  return isPlaceholder(text) ? "" : text.trim();
+}
+
+/** The title path of each node (its ancestors' titles, then its own) as a key; `null` for a dropped single root. */
+function outlinePathKeys(nodes: OutlineNode[], dropSingleRoot: boolean): (string | null)[] {
+  const drop = dropSingleRoot && nodes.filter(node => node.parent === null).length === 1;
+  const paths: string[][] = [];
+  return nodes.map(node => {
+    const parent = node.parent === null ? undefined : paths[node.parent];
+    if (node.parent !== null && !parent) return null;
+    paths[node.index] = [...(parent ?? []), node.title];
+    if (drop && node.parent === null) {
+      paths[node.index] = [];
+      return null;
+    }
+    return JSON.stringify(paths[node.index]);
+  });
+}
+/**
+ * The AI's summaries by title path, so they can find their headings again after the outline went through a text box or a
+ * review list that only keeps titles. `dropSingleRoot`: the outline's own root is not created (quick explore), so paths
+ * start below it.
+ */
+export function outlineSummaryBank(nodes: OutlineNode[], dropSingleRoot = false): Map<string, string> {
+  const bank = new Map<string, string>();
+  const keys = outlinePathKeys(nodes, dropSingleRoot);
+  nodes.forEach((node, index) => {
+    const key = keys[index];
+    if (key !== null && node.summary) bank.set(key, node.summary);
+  });
+  return bank;
+}
+/** The nodes with the banked summary of their title path; a heading the user typed or renamed has none and stays empty. */
+export function applyOutlineSummaries(nodes: OutlineNode[], bank: ReadonlyMap<string, string>): OutlineNode[] {
+  if (!bank.size) return nodes;
+  const keys = outlinePathKeys(nodes, false);
+  return nodes.map((node, index) => {
+    const key = keys[index];
+    const summary = node.summary ?? (key === null ? undefined : bank.get(key));
+    return summary ? { ...node, summary } : node;
+  });
+}
+
 export interface OutlineCreateResult {
   mapPath: string;
   nodes: MapNode[];
@@ -351,6 +400,9 @@ async function createOutlineNotes(
             ? { detail: rootDetail, researchMode: "local" }
             : { researchMode: "local" }
       );
+      // The summary goes through the same write as a chat card's (frontmatter, Current Summary and the preview together).
+      const summary = cleanOutlineSummary(node.summary);
+      if (summary) await repository.updateNote(note.path, { summary });
       note.parentId = top ? parentId : created[node.parent!].id;
       created.push(note);
     } catch (error) {

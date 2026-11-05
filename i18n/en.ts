@@ -2607,6 +2607,8 @@ export const en = {
   "error.outline_generate_no_headings": "The AI returned no Markdown headings.",
   "error.outline_generate_non_heading":
     "The AI returned text that is not a heading ({0} lines); only headings are accepted.",
+  "error.outline_generate_missing_summary":
+    "The AI outline has {0} heading(s) without a summary; every heading needs one.",
   "error.outline_generate_too_many": "The AI outline has {0} headings; the limit is {1}.",
   "error.structure_review_empty": "There is nothing to review: the selected branch has no cards.",
   "error.structure_review_over_budget": "The map is too large to review at once; review a smaller branch.",

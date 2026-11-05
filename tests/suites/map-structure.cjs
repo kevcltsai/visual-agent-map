@@ -966,6 +966,7 @@ test('outline modal: a generator that ignores abort and resolves late changes no
   const outline = load('core/outline-generation-service.ts', { obsidian });
   const cases = { leadingProse: 'Here is your outline:\n# Sleep\n## Stages', trailingProse: '# Sleep\n## Stages\nHope this helps!', bullets: '# Sleep\n- item', proseFenceMix: 'Sure!\n```markdown\n# Sleep\n## A\n```', fenceThenProse: '```md\n# Sleep\n## A\n```\nDone.', frontMatter: '---\ntitle: x\n---\n# Sleep\n## A', html: '<!-- c -->\n# Sleep\n## A', empty: '', onlyProse: 'No headings here' };
   for (const [name, raw] of Object.entries(cases)) assert.throws(() => outline.parseOutlineReply(raw, 'en'), e => e.name === 'OutlineGenerateError', name);
-  assert.doesNotThrow(() => outline.parseOutlineReply('```markdown\n# Sleep\n## A\n```', 'en'));
-  assert.doesNotThrow(() => outline.parseOutlineReply('# Sleep\n## A\n', 'en'));
+  assert.doesNotThrow(() => outline.parseOutlineReply('```markdown\n# Sleep\n> About sleep.\n## A\n> About A.\n```', 'en'));
+  assert.doesNotThrow(() => outline.parseOutlineReply('# Sleep\n> About sleep.\n## A\n> About A.\n', 'en'));
+  assert.throws(() => outline.parseOutlineReply('# Sleep\n## A\n', 'en'), e => e.code === 'missing_summary', 'headings without summaries are refused');
 });

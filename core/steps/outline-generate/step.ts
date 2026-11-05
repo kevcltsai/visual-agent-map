@@ -3,6 +3,7 @@ import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import { inLanguage, inLanguageNaming } from "../_shared/fragments";
 import type { ReasoningLevel } from "../../../ai/types";
 import {
+  cleanOutlineSummary,
   OUTLINE_NODE_LIMIT,
   parseOutline,
   sanitizeOutlineDraft,
@@ -33,12 +34,20 @@ export interface OutlineGenerateRequest {
   limits?: OutlineLimits;
 }
 export interface OutlineGenerateResult {
-  /** Heading-only Markdown (fence removed), ready for the outline textarea and `parseOutline`. */
+  /** Heading-only Markdown (fence removed, summary lines taken out), ready for the outline textarea and `parseOutline`. */
   markdown: string;
+  /** The headings in order; each carries the AI's one-line `summary` (the reply is refused when any heading lacks one). */
   nodes: OutlineNode[];
 }
 export type OutlineGenerateErrorCode =
-  "empty_topic" | "over_budget" | "stopped" | "invalid" | "no_headings" | "non_heading" | "too_many";
+  | "empty_topic"
+  | "over_budget"
+  | "stopped"
+  | "invalid"
+  | "no_headings"
+  | "non_heading"
+  | "too_many"
+  | "missing_summary";
 /** Typed failure of outline generation; `message` is already localized. */
 export class OutlineGenerateError extends Error {
   constructor(
@@ -78,16 +87,44 @@ export function stripWrappingFence(raw: string): string {
   return match ? match[2] : text;
 }
 
+const REPLY_HEADING = /^ {0,3}#{1,6}(?:[ \t]+.*)?$/;
+const REPLY_SUMMARY = /^ {0,3}>[ \t]?(.*)$/;
 /**
- * Accept only heading-only Markdown: wrapping fence removed, headings cleaned with `sanitizeOutlineDraft`, then `parseOutline` (not relaxed). Anything the
- * parser reports as an error, any non-heading line, comment, fenced block or front matter, no heading at all, or
- * more than the 100-heading limit rejects the whole reply.
+ * Take the summary lines out of a reply: a `>` line directly under a heading line is that heading's summary. Every
+ * other `>` line stays in the text, where `parseOutline` counts it as a non-heading line. Returns the heading-only
+ * text and, per heading in order, its summary (empty string for a bare `>`, undefined for none).
+ */
+function splitSummaries(text: string): { text: string; summaries: (string | undefined)[] } {
+  const kept: string[] = [];
+  const summaries: (string | undefined)[] = [];
+  let afterHeading = false;
+  for (const line of text.split("\n")) {
+    const quote = REPLY_SUMMARY.exec(line);
+    if (quote && afterHeading) {
+      summaries[summaries.length - 1] = quote[1].trim();
+      afterHeading = false;
+      continue;
+    }
+    afterHeading = REPLY_HEADING.test(line);
+    if (afterHeading) summaries.push(undefined);
+    kept.push(line);
+  }
+  return { text: kept.join("\n"), summaries };
+}
+
+/**
+ * Accept only heading Markdown where each heading line is followed by one `> summary` line: wrapping fence removed,
+ * summary lines taken out, headings cleaned with `sanitizeOutlineDraft`, then `parseOutline` (not relaxed). Anything the
+ * parser reports as an error, any non-heading line (a `>` line anywhere but right under a heading included), comment,
+ * fenced block or front matter, no heading at all, more than the 100-heading limit, or a heading (the root too) without
+ * a non-empty summary rejects the whole reply.
  */
 export function parseOutlineReply(raw: string, language: ContentLanguage): OutlineGenerateResult {
   const locale = uiLocale(language);
+  const split = splitSummaries(stripWrappingFence(raw));
   // A heading title that would break a note (unpaired [[ ]], an escaped fence) is cleaned here, as the outline box does,
   // so one such heading does not fail the whole AI reply; the user's own pasted outline still goes through the strict parser.
-  const text = sanitizeOutlineDraft(stripWrappingFence(raw));
+  const text = sanitizeOutlineDraft(split.text);
   const parsed = parseOutline(text);
   if (parsed.nodes.length > OUTLINE_NODE_LIMIT)
     throw new OutlineGenerateError(
@@ -107,16 +144,25 @@ export function parseOutlineReply(raw: string, language: ContentLanguage): Outli
       "non_heading",
       translate(locale, "error.outline_generate_non_heading", parsed.ignoredLines + parsed.skippedLines)
     );
-  return { markdown: `${text}\n`, nodes: parsed.nodes };
+  const summaries = split.summaries.map(summary => cleanOutlineSummary(summary));
+  const missing =
+    parsed.nodes.length !== summaries.length ? parsed.nodes.length : summaries.filter(item => !item).length;
+  if (missing)
+    throw new OutlineGenerateError(
+      "missing_summary",
+      translate(locale, "error.outline_generate_missing_summary", missing)
+    );
+  const nodes = parsed.nodes.map((node, index) => ({ ...node, summary: summaries[index] }));
+  return { markdown: `${text}\n`, nodes };
 }
 
 /**
- * Generate a heading-only outline from a topic and a preset. The whole request must fit the token budget; nothing is
+ * Generate an outline (headings, each with a one-line summary) from a topic and a preset. The whole request must fit the token budget; nothing is
  * truncated. Plain text reply (no response schema).
  */
 export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, OutlineGenerateResult> = {
   id: "outline-generate",
-  version: 1,
+  version: 2,
   render: request => {
     const content = request.contentLanguage ?? request.language;
     return renderTemplate(template, {

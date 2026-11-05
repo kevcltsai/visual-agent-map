@@ -44,10 +44,12 @@ test('empty topic and an over-budget request are refused before any provider cal
 });
 
 test('outline reply: headings accepted, a wrapping fence is stripped, parseOutline nodes returned', () => {
-  const plain = '# Root\n## A\n### A1\n## B\n';
+  const headings = '# Root\n## A\n### A1\n## B\n';
+  const plain = '# Root\n> About root.\n## A\n> About A.\n### A1\n> About A1.\n## B\n> About B.\n';
   const ok = outlineGenerateStep.parse(plain, outlineRequest());
-  assert.equal(ok.nodes.length, 4); assert.equal(ok.markdown, plain);
-  for (const wrapped of ['```markdown\n' + plain + '```', '```\n# Root\n## A\n### A1\n## B\n```\n', '~~~md\r\n# Root\r\n## A\r\n### A1\r\n## B\r\n~~~'])
+  assert.equal(ok.nodes.length, 4); assert.equal(ok.markdown, headings, 'the text box gets headings only');
+  assert.deepEqual([...ok.nodes.map(node => node.summary)], ['About root.', 'About A.', 'About A1.', 'About B.']);
+  for (const wrapped of ['```markdown\n' + plain + '```', '```\n' + plain + '```\n', '~~~md\r\n' + plain.replace(/\n/g, '\r\n') + '~~~'])
     assert.equal(outline.parseOutlineReply(wrapped, 'en').nodes.length, 4);
   assert.equal(outline.stripWrappingFence('```md\n# R\n```'), '# R');
   assert.equal(outline.stripWrappingFence('# R\n```\ncode\n```'), '# R\n```\ncode\n```', 'only a fence around the whole reply is removed');
@@ -64,15 +66,15 @@ test('outline reply: bad output is rejected with typed, localized errors', () =>
   fails('# One\n# Two', 'invalid');
   fails('#\n', 'invalid');
   fails('<!-- visual-agent-map: x -->\n# Root', 'invalid');
-  const hundred = ['# Root', ...Array.from({ length: 99 }, (_, i) => `## n${i}`)].join('\n');
+  const hundred = ['# Root\n> s', ...Array.from({ length: 99 }, (_, i) => `## n${i}\n> s${i}`)].join('\n');
   assert.equal(outline.parseOutlineReply(hundred, 'en').nodes.length, 100);
-  fails(`${hundred}\n## one more`, 'too_many'); fails(`${hundred}\n## one more`, 'too_many', 'zh-TW');
+  fails(`${hundred}\n## one more\n> s`, 'too_many'); fails(`${hundred}\n## one more\n> s`, 'too_many', 'zh-TW');
   assert.throws(() => outline.parseOutlineReply('x', 'zh-TW'), error => error.message === translate('zh-TW', 'error.outline_generate_no_headings'));
-  assert.throws(() => outline.parseOutlineReply(`${hundred}\n## x`, 'en'), error => error.message === translate('en', 'error.outline_generate_too_many', 101, 100));
+  assert.throws(() => outline.parseOutlineReply(`${hundred}\n## x\n> s`, 'en'), error => error.message === translate('en', 'error.outline_generate_too_many', 101, 100));
 });
 
 test('outline reply: a heading title that would break a note is cleaned, not fatal; a pasted outline stays strict', () => {
-  const cleaned = (heading) => outline.parseOutlineReply(`# Root\n${heading}`, 'en');
+  const cleaned = (heading) => outline.parseOutlineReply(`# Root\n> r\n${heading}\n> s`, 'en');
   assert.equal(cleaned('## a [[ b').markdown, '# Root\n## a [ b\n');
   assert.equal(cleaned('## Array ]] end').markdown, '# Root\n## Array ] end\n');
   const fenced = '## Fence \\`\\`\\` x';
@@ -94,7 +96,7 @@ function serviceFixture(reply, model = 'gpt-6-luna') {
 }
 
 test('outline service: provider path sends the prompt with no schema, logs the step label, returns parsed nodes', async () => {
-  const fx = serviceFixture('```markdown\n# Root\n## A\n```');
+  const fx = serviceFixture('```markdown\n# Root\n> r\n## A\n> a\n```');
   const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
   const result = await service.generate(outlineRequest(), new AbortController().signal);
   assert.equal(result.nodes.length, 2); assert.equal(fx.active.size, 0);
@@ -102,7 +104,7 @@ test('outline service: provider path sends the prompt with no schema, logs the s
   assert.equal(prompt, outline.buildOutlineGeneratePrompt(outlineRequest())); assert.equal(model, 'gpt-6-luna'); assert.equal(effort, 'low');
   assert.equal(schema, undefined); assert.equal(controls.textOnly, true); assert.equal(controls.searchBudget, 0);
   const [entry] = fx.log.getEntries();
-  assert.equal(entry.step, 'outline-generate@1'); assert.equal(entry.status, 'completed');
+  assert.equal(entry.step, 'outline-generate@2'); assert.equal(entry.status, 'completed');
 });
 
 test('outline service: invalid reply rejects with the typed error and nothing is returned; empty topic never reaches the provider', async () => {
@@ -121,10 +123,94 @@ test('outline service: a stop before or during the call surfaces as the stopped 
   await assert.rejects(service.generate(outlineRequest(), early.signal), error => error.code === 'stopped' && /stopped/.test(error.message));
   assert.equal(fx.calls.length, 0);
   const controller = new AbortController();
-  const late = serviceFixture(() => { controller.abort(); return '# Root\n## A'; });
+  const late = serviceFixture(() => { controller.abort(); return '# Root\n> r\n## A\n> a'; });
   const lateService = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, late.options, late.active)));
   await assert.rejects(lateService.generate(outlineRequest(), controller.signal), error => error.code === 'stopped');
   assert.equal(late.active.size, 0);
+});
+
+
+// ---- every generated heading carries a summary ----
+const withSummaries = '# Root\n> r\n## A\n> a\n';
+const failsWith = (raw, code) => assert.throws(() => outline.parseOutlineReply(raw, 'en'), error => error.name === 'OutlineGenerateError' && error.code === code, `${code}: ${JSON.stringify(raw)}`);
+
+test('outline summary: a heading without a summary rejects the whole reply (root included), with a localized message', () => {
+  failsWith('# Root\n> r\n## A\n## B\n> b', 'missing_summary');
+  failsWith('# Root\n## A\n> a', 'missing_summary');
+  failsWith('# Root\n> r\n## A\n>   \n', 'missing_summary');
+  failsWith('# Root\n> r\n## A\n> 尚未形成結論\n', 'missing_summary');
+  failsWith('# Root\n## A', 'missing_summary');
+  assert.throws(() => outline.parseOutlineReply('# Root\n> r\n## A', 'zh-TW'), error => error.message === translate('zh-TW', 'error.outline_generate_missing_summary', 1));
+  assert.ok(translate('en', 'error.outline_generate_missing_summary', 2).includes('2'));
+});
+
+test('outline summary: a misplaced > line is a non-heading line, never a summary', () => {
+  failsWith('> before\n# Root\n> r', 'non_heading');
+  failsWith('# Root\n> r\n> second\n', 'non_heading');
+  failsWith('# Root\n\n> r\n', 'non_heading');
+  failsWith('# Root\n> r\n## A\n> a\nplain prose\n', 'non_heading');
+  failsWith('# Root\n> r\n- bullet\n> x\n', 'non_heading');
+});
+
+test('outline summary: injection-looking summary text is cleaned to one safe line', () => {
+  const result = outline.parseOutlineReply('# Root\n>   ```js [[Link]] and ]] bracket  \t spaced\n', 'en');
+  assert.equal(result.nodes[0].summary, 'js [Link] and ] bracket spaced');
+  assert.ok(!/```|\[\[|\]\]|\n/.test(result.nodes[0].summary));
+  assert.equal(result.markdown, '# Root\n');
+  const fm = outline.parseOutlineReply('# Root\n> ---\n', 'en');
+  assert.equal(fm.nodes[0].summary, '---', 'a lone --- is only text in a single-line summary; the repository writes it as a YAML string');
+});
+
+test('outline service: a reply missing a summary is asked for once more; a complete second reply succeeds', async () => {
+  const replies = ['# Root\n> r\n## A', withSummaries];
+  const fx = serviceFixture(() => replies.shift());
+  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
+  const result = await service.generate(outlineRequest(), new AbortController().signal);
+  assert.equal(fx.calls.length, 2); assert.deepEqual([...result.nodes.map(node => node.summary)], ['r', 'a']);
+});
+
+test('outline service: two replies missing a summary give the error after exactly two calls and no nodes', async () => {
+  const fx = serviceFixture('# Root\n> r\n## A');
+  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
+  await assert.rejects(service.generate(outlineRequest(), new AbortController().signal), error => error.code === 'missing_summary');
+  assert.equal(fx.calls.length, 2); assert.equal(fx.active.size, 0);
+});
+
+test('outline service: other bad replies are not retried; a stop during the first call is not retried', async () => {
+  const prose = serviceFixture('Sorry, no.');
+  await assert.rejects(new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, prose.options, prose.active))).generate(outlineRequest(), new AbortController().signal), error => error.code === 'no_headings');
+  assert.equal(prose.calls.length, 1);
+  const controller = new AbortController();
+  const stopped = serviceFixture(() => { controller.abort(); return '# Root\n> r\n## A'; });
+  await assert.rejects(new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, stopped.options, stopped.active))).generate(outlineRequest(), controller.signal), error => error.code === 'stopped');
+  assert.equal(stopped.calls.length, 1);
+});
+
+test('outline prompt: the summary contract comes after the preset and overrides a "headings only" preset', () => {
+  const prompt = outline.buildOutlineGeneratePrompt(outlineRequest({ presetText: '只輸出 Markdown 標題，不使用任何補充說明。{填入研究主題}' }));
+  assert.ok(prompt.indexOf('Output contract') > prompt.indexOf('只輸出 Markdown 標題'));
+  assert.match(prompt, /overrides any output-format wording in the preset/);
+  assert.match(prompt, /EVERY heading line, including the root/);
+  assert.equal(outlineGenerateStep.version, 2);
+});
+
+test('outline summaries: the bank finds each summary again by heading path; edited or typed headings stay empty', () => {
+  const strict = load('experiences/visual-map/outline-import.ts', { obsidian });
+  const generated = outline.parseOutlineReply('# Root\n> r\n## A\n> a\n### X\n> ax\n## B\n> b\n### X\n> bx\n', 'en').nodes;
+  const typed = strict.parseOutline('# Root\n## A\n### X\n## B\n### X\n## Mine\n### X\n').nodes;
+  const applied = strict.applyOutlineSummaries(typed, strict.outlineSummaryBank(generated));
+  assert.deepEqual([...applied.map(node => node.summary)], ['r', 'a', 'ax', 'b', 'bx', undefined, undefined], 'same title under another parent gets its own summary; a new heading gets none');
+  const below = strict.outlineSummaryBank(generated, true);
+  const reviewed = [{ index: 0, title: 'A', level: 1, parent: null, line: 0 }, { index: 1, title: 'X', level: 2, parent: 0, line: 0 }, { index: 2, title: 'B', level: 1, parent: null, line: 0 }, { index: 3, title: 'X', level: 2, parent: 2, line: 0 }];
+  assert.deepEqual([...strict.applyOutlineSummaries(reviewed, below).map(node => node.summary)], ['a', 'ax', 'b', 'bx'], 'quick explore paths start below the dropped root');
+  assert.equal(strict.applyOutlineSummaries(typed, new Map()), typed);
+});
+
+test('a pasted outline with > lines parses exactly as before (parseOutline is not relaxed)', () => {
+  const strict = load('experiences/visual-map/outline-import.ts', { obsidian });
+  const parsed = strict.parseOutline('# Root\n> quoted\n## A\n');
+  assert.equal(parsed.nodes.length, 2); assert.equal(parsed.ignoredLines, 1);
+  assert.ok(parsed.nodes.every(node => node.summary === undefined));
 });
 
 // ---- structure review ----

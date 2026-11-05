@@ -1662,6 +1662,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-editor-row > .setting-item-control { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
 .vam-editor-row select, .vam-editor-row input[type="text"] { max-width: 100%; min-width: 0; }
 .vam-editor-error { min-height: 1.4em; color: var(--text-error); }
+.vam-editor-sections, .vam-editor-voice { margin: var(--size-4-3) 0; }
+.vam-editor-section-list { display: flex; flex-direction: column; gap: var(--size-4-2); margin-bottom: var(--size-4-2); }
+.vam-editor-section { display: flex; align-items: center; gap: var(--size-4-1); }
+.vam-editor-section-name { flex: 1 1 auto; min-width: 0; }
+.vam-editor-section button { flex: none; min-width: 40px; min-height: 40px; }
+.vam-editor-apply { display: flex; align-items: center; gap: var(--size-4-2); margin-right: auto; }
 .vam-editor-update { margin: var(--size-4-3) 0; padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
 .vam-editor-mode { display: flex; align-items: flex-start; gap: var(--size-4-2); padding: var(--size-4-1) 0; }
 .vam-editor-mode input { margin-top: var(--size-4-1); }

@@ -1,18 +1,29 @@
 import { Component, MarkdownRenderer, Modal, Notice, Setting, type App } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
 import { t, type TranslationKey } from "../../i18n";
-import type { PartListItem, RecipeListItem } from "../../ai/note-style-store";
+import type { RecipeListItem } from "../../ai/note-style-store";
 import {
   KIND_DEFAULT_RECIPE,
+  STYLE_KINDS,
   UPDATE_MODES,
   UPDATE_MODE_KEYS,
   validatePartName,
   type NameCategory,
-  type PartCategory,
   type StyleKind,
   type UpdateMode
 } from "../../ai/note-style-recipe";
+import { CARD_VOICES } from "../../ai/note-style-card-voices";
+import {
+  composeStructure,
+  rowsOf,
+  sameRows,
+  splitStructure,
+  type SectionRow,
+  type StructureChunks
+} from "../../ai/note-style-structure-edit";
+import { parseTemplateBlock } from "../../core/blocks/template-block";
 import { cleanBlockName } from "../../core/blocks/block-files";
+import { renderRadioGroup } from "../radio-group";
 import { ChoiceModal } from "./choice-modal";
 import { openInWindowOf } from "./open-in-window";
 import { modalActions } from "./action-bar";
@@ -61,12 +72,6 @@ function takenRecipeNames(plugin: VisualAgentMapPlugin): Set<string> {
   );
 }
 
-const PART_CATEGORIES: readonly PartCategory[] = ["structure", "voice", "format"];
-const PART_LABEL_KEYS: Record<PartCategory, TranslationKey> = {
-  structure: "ui.editor_part_structure",
-  voice: "ui.editor_part_voice",
-  format: "ui.editor_part_format"
-};
 const UPDATE_DESC_KEYS: Record<UpdateMode, TranslationKey> = {
   merge: "ui.editor_update_desc_merge",
   top: "ui.editor_update_desc_top",
@@ -90,10 +95,11 @@ export interface NoteStyleEditorOptions {
 
 interface Draft {
   name: string;
-  structure: string;
+  rows: SectionRow[];
   voice: string;
-  format: string;
   update: UpdateMode;
+  /** Also make the chosen voice the global one (the other topic types follow it, except those that set their own). */
+  applyAll: boolean;
 }
 
 /**
@@ -109,30 +115,38 @@ const plainMd = (value: string): string =>
 const EXAMPLE_DELAY_MS = 200;
 
 /**
- * The window "Edit note style": a name, the structure, voice and format rules (each a list with an Edit button), the
- * update mode, a sample note that follows the choices (no AI), and a preview of the AI instructions. Opening it reads;
- * the only write is Save (and Edit on a built-in part, which saves it as the user's own file first).
+ * The window "Edit note style": a name, the sections (added, removed, moved and renamed here, no file is opened), the
+ * voice (chips with a sample sentence), the update mode, a sample note that follows the choices (no AI), and a preview of
+ * the AI instructions. Opening it reads; the only write is Save, which writes the style (and the sections when they
+ * changed) and, when asked, the global voice. Cancel leaves nothing behind.
  */
 export class NoteStyleEditorModal extends Modal {
   private draft: Draft;
-  private readonly initial: Draft;
+  private readonly initial: { name: string; rows: SectionRow[]; voice: string; update: UpdateMode };
   private readonly existing: { ref: string; text: string } | undefined;
   /** The built-in style this window was opened on: the topic types that use it switch to the saved file (decision #41). */
   private readonly builtinSource: string | undefined;
+  /** The structure the style uses (as opened), the text the sections were read from, and its sections cut apart. */
+  private readonly structureRef: string;
+  private baseText: string;
+  private chunks: StructureChunks;
+  /** The voice the style had when the window opened, and whether the source wrote its own voice and format keys. */
+  private readonly voiceKey: boolean;
+  private readonly formatRef: string | null;
   private readonly component = new Component();
   /** The child that owns the sample on screen now; the next picture replaces it, so the children do not pile up. */
   private exampleChild?: Component;
   private closed = false;
   private forceClose = false;
   private asking = false;
-  private busy = false;
   private saving = false;
   private timer: number | undefined;
   private renderToken = 0;
-  private selects = new Map<PartCategory, HTMLSelectElement>();
   private nameInput?: HTMLInputElement;
   private errorEl?: HTMLElement;
   private exampleEl?: HTMLElement;
+  private listEl?: HTMLElement;
+  private voiceEl?: HTMLElement;
   private saveButton?: HTMLButtonElement;
   private updateRadios = new Map<UpdateMode, HTMLInputElement>();
   private focusWindow?: Window;
@@ -151,12 +165,6 @@ export class NoteStyleEditorModal extends Modal {
       recipes.find(item => item.ref === ref);
     const base: RecipeListItem | undefined =
       byRef(source ?? options.from ?? undefined) ?? byRef(KIND_DEFAULT_RECIPE.topic) ?? recipes[0];
-    const parts = {
-      structure: base?.structure.ref ?? "builtin:standard",
-      voice: base?.voice.ref ?? "builtin:academic",
-      format: base?.format.ref ?? "builtin:standard",
-      update: base?.update ?? "merge"
-    };
     const sourceItem = byRef(source);
     const isFile = sourceItem?.kind === "file";
     this.existing = isFile ? { ref: sourceItem.ref, text: store.recipeText(sourceItem.ref) ?? "" } : undefined;
@@ -165,8 +173,20 @@ export class NoteStyleEditorModal extends Modal {
       ? sourceItem.name
       : (options.name ??
         suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null));
-    this.draft = { name, ...parts };
-    this.initial = { ...this.draft };
+    this.structureRef = base?.structure.ref ?? "builtin:standard";
+    // A structure that cannot be read (a file that is gone) shows the Standard sections; saving without a change keeps the ref.
+    const language = plugin.settings.language;
+    try {
+      this.baseText = store.partSourceText("structure", this.structureRef, language);
+    } catch {
+      this.baseText = store.partSourceText("structure", "builtin:standard", language);
+    }
+    this.chunks = splitStructure(this.baseText);
+    this.voiceKey = base?.voiceSource === "style";
+    this.formatRef = base?.formatSource === "style" ? base.format.ref : null;
+    const voice = base?.voice.ref ?? store.globalPartRef("voice");
+    this.draft = { name, rows: rowsOf(this.chunks), voice, update: base?.update ?? "merge", applyAll: false };
+    this.initial = { name, rows: rowsOf(this.chunks), voice, update: this.draft.update };
   }
 
   onOpen(): void {
@@ -198,24 +218,23 @@ export class NoteStyleEditorModal extends Modal {
       attr: { id: "vam-editor-error", "aria-live": "polite" }
     });
 
-    for (const category of PART_CATEGORIES) {
-      const label = t(PART_LABEL_KEYS[category]);
-      const row = new Setting(contentEl).setName(label);
-      row.settingEl.addClass("vam-editor-row");
-      row.addDropdown(dropdown => {
-        this.selects.set(category, dropdown.selectEl);
-        dropdown.selectEl.setAttr("aria-label", label);
-        dropdown.onChange(value => {
-          this.draft[category] = value;
-          this.changed();
-        });
-      });
-      row.addButton(button => {
-        button.setButtonText(t("ui.manage_edit")).onClick(() => void this.editPart(category, button.buttonEl));
-        button.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", label));
-      });
-    }
-    this.fillSelects();
+    const sections = contentEl.createDiv({ cls: "vam-editor-sections" });
+    sections.createEl("p", {
+      text: t("ui.editor_sections_label"),
+      cls: "vam-style-card-label",
+      attr: { id: "vam-editor-sections-label" }
+    });
+    this.listEl = sections.createDiv({
+      cls: "vam-editor-section-list",
+      attr: { role: "group", "aria-labelledby": "vam-editor-sections-label" }
+    });
+    this.drawRows();
+    const add = sections.createEl("button", { text: `＋ ${t("ui.editor_section_add")}`, attr: { type: "button" } });
+    add.addEventListener("click", () => this.addRow());
+    sections.createEl("p", { text: t("ui.editor_sections_hint"), cls: "setting-item-description" });
+
+    this.voiceEl = contentEl.createDiv({ cls: "vam-editor-voice" });
+    this.drawVoice();
 
     const fieldset = contentEl.createEl("fieldset", { cls: "vam-editor-update" });
     fieldset.createEl("legend", { text: t("ui.editor_update_legend") });
@@ -245,6 +264,13 @@ export class NoteStyleEditorModal extends Modal {
     });
 
     const actions = modalActions(this);
+    const applyLine = actions.createEl("label", { cls: "vam-editor-apply" });
+    const apply = applyLine.createEl("input", { type: "checkbox", attr: { id: "vam-editor-apply-all" } });
+    apply.addEventListener("change", () => {
+      this.draft.applyAll = apply.checked;
+      this.changed();
+    });
+    applyLine.createSpan({ text: t("ui.editor_apply_all") });
     const preview = actions.createEl("button", { text: t("ui.preview_prompt_open") });
     preview.addEventListener("click", () => void this.previewPrompt(preview));
     const cancel = actions.createEl("button", { text: t("ui.cancel") });
@@ -260,7 +286,7 @@ export class NoteStyleEditorModal extends Modal {
       this.focusWindow = win;
       win.addEventListener("focus", this.onFocus);
     }
-    (this.existing ? this.selects.get("structure") : this.nameInput)?.focus();
+    (this.existing ? this.listEl.querySelector("input") : this.nameInput)?.focus();
   }
 
   onClose(): void {
@@ -308,62 +334,173 @@ export class NoteStyleEditorModal extends Modal {
   private isDirty(): boolean {
     const a = this.draft;
     const b = this.initial;
+    const rows = this.cleanRows();
     return (
       a.name !== b.name ||
-      a.structure !== b.structure ||
       a.voice !== b.voice ||
-      a.format !== b.format ||
-      a.update !== b.update
+      a.update !== b.update ||
+      a.applyAll ||
+      rows.length !== b.rows.length ||
+      rows.some((row, index) => row.origin !== b.rows[index].origin || row.name !== b.rows[index].name)
     );
   }
 
-  // ---- the choices ----
+  // ---- the sections ----
 
-  /** Fills the three lists from the parts that exist now, keeping each choice (one that is gone stays as "Not found"). */
-  private fillSelects(): void {
-    const store = this.plugin.noteStyles;
-    for (const category of PART_CATEGORIES) {
-      const select = this.selects.get(category);
-      if (!select) continue;
-      const current = this.draft[category];
-      // A retired part is not offered, except the one this style uses now (marked, and kept as it is).
-      const items = store
-        .listParts(category)
-        .filter(item => !item.issues.some(issue => issue.code === "builtin_name"))
-        .filter(item => !item.retired || item.ref === current);
-      select.replaceChildren();
-      if (!items.some(item => item.ref === current)) {
-        const bare = current.replace(/^(?:file|builtin):/, "");
-        select.createEl("option", { value: current, text: t("ui.block_missing_option_0", bare) });
-      }
-      const optionText = (item: PartListItem): string =>
-        item.retired
-          ? t("ui.note_style_retired_option_0", item.name)
-          : item.issues.length
-            ? t("ui.note_style_unusable_option_0", item.name)
-            : item.name;
-      const addGroup = (title: string, group: PartListItem[]): void => {
-        if (!group.length) return;
-        const parent = select.createEl("optgroup", { attr: { label: title } });
-        for (const item of group) parent.createEl("option", { value: item.ref, text: optionText(item) });
-      };
-      addGroup(
-        t("ui.block_group_builtin"),
-        items.filter(item => item.kind === "builtin")
+  /** The rows with their names trimmed, which is how the parser reads them back. */
+  private cleanRows(): SectionRow[] {
+    return this.draft.rows.map(row => ({ origin: row.origin, name: row.name.trim() }));
+  }
+
+  /** Whether the sections are not what the text had (a new file or a change in place is needed). */
+  private sectionsEdited(): boolean {
+    return !sameRows(this.chunks, this.cleanRows());
+  }
+
+  /** The reason the sections cannot be saved, or "" (an empty list, a name used twice, a name with # ...). */
+  private sectionProblem(): string {
+    if (!this.sectionsEdited()) return "";
+    const rows = this.cleanRows();
+    const parsed = parseTemplateBlock(composeStructure(this.chunks, rows), { id: "file:draft", name: "draft" });
+    const say = (text: string): string => t("ui.editor_sections_problem_0", text);
+    if (!parsed.ok) {
+      const first = parsed.issues[0];
+      if (!first.code.startsWith("ui.")) return say(first.message);
+      const values = first.values.map(value =>
+        String(value).startsWith("ui.") ? t(String(value) as TranslationKey) : String(value)
       );
-      addGroup(
-        t("ui.note_style_group_folder"),
-        items.filter(item => item.kind === "file")
-      );
-      select.value = current;
+      return say(t(first.code as TranslationKey, ...values));
+    }
+    const names = parsed.template.sections.map(section => section.name);
+    const wrong = rows.findIndex((row, index) => names[index] !== row.name);
+    if (wrong >= 0 || names.length !== rows.length)
+      return say(t("ui.detail_template_error_section_name_invalid", String(Math.max(wrong, 0) + 1)));
+    return "";
+  }
+
+  private freshSectionName(): string {
+    const taken = new Set(this.draft.rows.map(row => lower(row.name.trim())));
+    for (let n = 1; ; n++) {
+      const name = t("ui.editor_section_new_name_0", String(n));
+      if (!taken.has(lower(name)) || n > 999) return name;
     }
   }
 
-  private partName(category: PartCategory): string {
-    const select = this.selects.get(category);
-    const ref = this.draft[category];
-    const item = this.plugin.noteStyles.listParts(category).find(part => part.ref === ref);
-    return item?.name ?? select?.value ?? ref;
+  private addRow(): void {
+    this.draft.rows.push({ origin: null, name: this.freshSectionName() });
+    this.drawRows({ index: this.draft.rows.length - 1, control: "name" });
+    this.changed();
+  }
+
+  private moveRow(index: number, step: -1 | 1): void {
+    const rows = this.draft.rows;
+    const to = index + step;
+    if (to < 0 || to >= rows.length) return;
+    [rows[index], rows[to]] = [rows[to], rows[index]];
+    this.drawRows({ index: to, control: step < 0 ? "up" : "down" });
+    this.changed();
+  }
+
+  private removeRow(index: number): void {
+    this.draft.rows.splice(index, 1);
+    this.drawRows({ index: Math.min(index, this.draft.rows.length - 1), control: "remove" });
+    this.changed();
+  }
+
+  /** Draws the section list again; the focus goes to `focus` (a row's control), or to the nearest one that still works. */
+  private drawRows(focus?: { index: number; control: "name" | "up" | "down" | "remove" }): void {
+    const list = this.listEl;
+    if (!list) return;
+    list.empty();
+    const rows = this.draft.rows;
+    const controls: Record<"name" | "up" | "down" | "remove", HTMLElement>[] = [];
+    rows.forEach((row, index) => {
+      const line = list.createDiv({ cls: "vam-editor-section" });
+      const input = line.createEl("input", { type: "text", cls: "vam-editor-section-name" });
+      input.value = row.name;
+      const button = (text: string, key: "up" | "down" | "remove", cls: string, run: () => void): HTMLButtonElement => {
+        const el = line.createEl("button", { text, cls, attr: { type: "button" } });
+        el.addEventListener("click", run);
+        return el;
+      };
+      const up = button("↑", "up", "vam-editor-section-up", () => this.moveRow(index, -1));
+      const down = button("↓", "down", "vam-editor-section-down", () => this.moveRow(index, 1));
+      const remove = button("−", "remove", "vam-editor-section-remove", () => this.removeRow(index));
+      up.disabled = index === 0;
+      down.disabled = index === rows.length - 1;
+      const label = (): void => {
+        const name = row.name.trim() || String(index + 1);
+        input.setAttr("aria-label", t("ui.editor_section_name_aria_0", String(index + 1)));
+        up.setAttr("aria-label", t("ui.editor_section_up_aria_0", name));
+        down.setAttr("aria-label", t("ui.editor_section_down_aria_0", name));
+        remove.setAttr("aria-label", t("ui.editor_section_remove_aria_0", name));
+      };
+      label();
+      input.addEventListener("input", () => {
+        row.name = input.value;
+        label();
+        this.changed();
+      });
+      controls.push({ name: input, up, down, remove });
+    });
+    if (!focus) return;
+    const row = controls[focus.index];
+    if (!row) return;
+    const usable = (el: HTMLElement): boolean => !(el as HTMLButtonElement).disabled;
+    // A button that has become unavailable (the first row's "up") hands the focus to its opposite, else to the name.
+    const order: ("name" | "up" | "down" | "remove")[] =
+      focus.control === "up"
+        ? ["up", "down", "name"]
+        : focus.control === "down"
+          ? ["down", "up", "name"]
+          : [focus.control, "name"];
+    const target = order.map(key => row[key]).find(usable) ?? row.name;
+    target.focus();
+  }
+
+  // ---- the voice ----
+
+  /** Draws the voice chips and the sample sentence under them; `focus` puts the focus back on the chip just picked. */
+  private drawVoice(focus?: string): void {
+    const box = this.voiceEl;
+    if (!box) return;
+    box.empty();
+    const choices = CARD_VOICES.map(item => ({ value: `builtin:${item.id}`, label: t(item.name) }));
+    const buttons = renderRadioGroup(
+      box,
+      t("ui.note_style_voice_label"),
+      choices,
+      this.draft.voice,
+      value => {
+        this.draft.voice = value;
+        this.drawVoice(value);
+        this.changed();
+      },
+      "vam-editor-radio"
+    );
+    if (focus) buttons[choices.findIndex(choice => choice.value === focus)]?.focus();
+    const sample = box.createDiv({ cls: "vam-style-sample", attr: { "aria-live": "polite" } });
+    const chosen = CARD_VOICES.find(item => `builtin:${item.id}` === this.draft.voice);
+    if (chosen) {
+      sample.createSpan({ text: t("ui.note_style_sample_caption"), cls: "vam-style-sample-caption" });
+      sample.createSpan({ text: t(chosen.sample) });
+    } else sample.createSpan({ text: t("ui.note_style_voice_other_0", this.voiceName()) });
+  }
+
+  private voiceName(): string {
+    const ref = this.draft.voice;
+    return this.plugin.noteStyles.listParts("voice").find(part => part.ref === ref)?.name ?? ref;
+  }
+
+  /**
+   * The voice key to write: none when the style follows the global voice. A voice that was not touched is written as the
+   * source had it (its own key or none); a chosen voice is written only when it differs from the global one; "also use it
+   * for the other types" makes it the global voice, so no key is needed.
+   */
+  private voiceToWrite(): string | null {
+    if (this.draft.applyAll) return null;
+    if (this.draft.voice === this.initial.voice) return this.voiceKey ? this.draft.voice : null;
+    return this.draft.voice === this.plugin.noteStyles.globalPartRef("voice") ? null : this.draft.voice;
   }
 
   private takenNames(): Set<string> {
@@ -374,9 +511,9 @@ export class NoteStyleEditorModal extends Modal {
     return this.existing ? "" : namePartProblem(this.draft.name, "recipe", this.takenNames());
   }
 
-  /** Writes the name error (only when its text changes) and enables or disables Save. */
+  /** Writes the error (only when its text changes) and enables or disables Save. */
   private syncState(): void {
-    const problem = this.nameProblem();
+    const problem = this.nameProblem() || this.sectionProblem();
     const error = this.errorEl;
     if (error && error.textContent !== problem) error.setText(problem);
     if (this.saveButton) this.saveButton.disabled = !!problem || this.saving;
@@ -387,36 +524,46 @@ export class NoteStyleEditorModal extends Modal {
     this.scheduleExample();
   }
 
-  /** The parts the draft holds, with a name the store can use for a style that is not saved. */
-  private draftParts(): Draft {
-    return { ...this.draft, name: this.draft.name || t("ui.recipe_new_name") };
-  }
-
-  // ---- Edit on a part ----
-
-  private async editPart(category: PartCategory, button: HTMLElement): Promise<void> {
-    if (this.busy) return;
-    this.busy = true;
-    try {
-      const target = await this.plugin.editNotePart(category, this.draft[category]);
-      if (!target || this.closed) return;
-      this.draft[category] = target;
-      await this.plugin.noteStyles.refresh().catch(() => undefined);
-      if (this.closed) return;
-      this.fillSelects();
-      this.syncState();
-      this.scheduleExample();
-      button.focus();
-    } finally {
-      this.busy = false;
-    }
+  /** The style the draft stands for, for the sample and the preview (the edited sections stand in for the structure). */
+  private draftStyle(): ReturnType<VisualAgentMapPlugin["noteStyles"]["draftStyle"]> {
+    return this.plugin.noteStyles.draftStyle(
+      {
+        name: this.draft.name || t("ui.recipe_new_name"),
+        structure: this.structureRef,
+        voice: this.draft.voice,
+        ...(this.formatRef !== null ? { format: this.formatRef } : {}),
+        update: this.draft.update,
+        ...(this.sectionsEdited() ? { structureText: composeStructure(this.chunks, this.cleanRows()) } : {})
+      },
+      "topic",
+      this.plugin.settings.language
+    );
   }
 
   /** The window is in front again: read the files again and redraw what depends on them. */
   private async reload(): Promise<void> {
     await this.plugin.noteStyles.refresh().catch(() => undefined);
     if (this.closed) return;
-    this.fillSelects();
+    // Sections that were not touched follow the file; edited ones stay, and Save checks the file still holds the old text.
+    if (!this.sectionsEdited()) {
+      try {
+        const text = this.plugin.noteStyles.partSourceText(
+          "structure",
+          this.structureRef,
+          this.plugin.settings.language
+        );
+        if (text !== this.baseText) {
+          this.baseText = text;
+          this.chunks = splitStructure(text);
+          this.draft.rows = rowsOf(this.chunks);
+          this.initial.rows = rowsOf(this.chunks);
+          this.drawRows();
+        }
+      } catch {
+        // the structure is gone: the sections already shown stay
+      }
+    }
+    this.drawVoice();
     this.syncState();
     this.scheduleExample();
   }
@@ -434,11 +581,13 @@ export class NoteStyleEditorModal extends Modal {
 
   /** The sample as Markdown: the structure's section names and descriptions with fixed sample text, shaped by the format rules. */
   exampleMarkdown(): string {
-    const language = this.plugin.settings.language;
-    const style = this.plugin.noteStyles.draftStyle(this.draftParts(), "topic", language);
-    const formatId = this.draft.format.startsWith("builtin:") ? this.draft.format.slice("builtin:".length) : undefined;
+    const style = this.draftStyle();
+    const formatRef = this.formatRef ?? this.plugin.noteStyles.globalPartRef("format");
+    const formatId = formatRef.startsWith("builtin:") ? formatRef.slice("builtin:".length) : undefined;
+    const formatName =
+      this.plugin.noteStyles.listParts("format").find(part => part.ref === formatRef)?.name ?? formatRef;
     const lines: string[] = [
-      `*${plainMd(t("ui.editor_example_voice_0", this.partName("voice")))}* · *${plainMd(t("ui.editor_example_format_0", this.partName("format")))}*`,
+      `*${plainMd(t("ui.editor_example_voice_0", this.voiceName()))}* · *${plainMd(t("ui.editor_example_format_0", formatName))}*`,
       ""
     ];
     const callout = (title: string): string[] => [
@@ -505,15 +654,21 @@ export class NoteStyleEditorModal extends Modal {
     // The part files may have been edited in a tab since they were read: read them again before the draft is built.
     await this.plugin.noteStyles.refresh().catch(() => undefined);
     if (this.closed) return;
-    this.plugin.openPromptPreview(button, () =>
-      this.plugin.noteStyles.draftStyle(this.draftParts(), "topic", this.plugin.settings.language)
-    );
+    this.plugin.openPromptPreview(button, () => this.draftStyle());
+  }
+
+  /** The topic types (not AIM, not the ones that use `ref`) whose style sets its own voice: "also use it" does not change them. */
+  private kindsWithOwnVoice(ref: string): StyleKind[] {
+    const recipes = this.plugin.noteStyles.listRecipes();
+    return STYLE_KINDS.filter(kind => kind !== "aim").filter(kind => {
+      const item = recipes.find(candidate => candidate.usedByKinds.includes(kind));
+      return item !== undefined && item.ref !== ref && item.voiceSource === "style";
+    });
   }
 
   private async save(): Promise<void> {
     if (this.saving || this.closed) return;
-    const problem = this.nameProblem();
-    if (problem) {
+    if (this.nameProblem() || this.sectionProblem()) {
       this.syncState();
       return;
     }
@@ -527,10 +682,13 @@ export class NoteStyleEditorModal extends Modal {
         : [];
       const result = await this.plugin.saveNoteRecipe({
         name: this.draft.name,
-        structure: this.draft.structure,
-        voice: this.draft.voice,
-        format: this.draft.format,
+        structure: this.structureRef,
+        voice: this.voiceToWrite(),
+        format: this.formatRef,
         update: this.draft.update,
+        ...(this.sectionsEdited()
+          ? { structureEdit: { text: composeStructure(this.chunks, this.cleanRows()), base: this.baseText } }
+          : {}),
         ...(this.existing ? { original: this.existing } : {})
       });
       if (this.closed) return;
@@ -539,17 +697,24 @@ export class NoteStyleEditorModal extends Modal {
         if (result.reason === "name") this.errorEl?.setText(t("ui.recipe_notice_name_unavailable"));
         return;
       }
+      const kindName = (kind: StyleKind): string =>
+        t(kind === "aim" ? "ui.note_style_kind_aim" : `ui.topic_kind_${kind}`);
       if (switched.length) {
         for (const kind of switched) await this.plugin.setKindStyle(kind, result.ref);
         new Notice(
           t(
             "ui.recipe_notice_switched_0_1",
             result.ref.slice("file:".length),
-            switched
-              .map(kind => t(kind === "aim" ? "ui.note_style_kind_aim" : `ui.topic_kind_${kind}`))
-              .join(t("ui.manage_list_separator"))
+            switched.map(kindName).join(t("ui.manage_list_separator"))
           )
         );
+      }
+      if (this.draft.applyAll) {
+        const kept = this.kindsWithOwnVoice(result.ref);
+        await this.plugin.setGlobalPart("voice", this.draft.voice);
+        new Notice(t("ui.editor_apply_notice_0", this.voiceName()));
+        if (kept.length)
+          new Notice(t("ui.editor_apply_kept_0", kept.map(kindName).join(t("ui.manage_list_separator"))));
       }
       this.forceClose = true;
       super.close();

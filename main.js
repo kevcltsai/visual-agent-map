@@ -2581,9 +2581,18 @@ var en = {
   "ui.editor_title_new": "New note style",
   "ui.editor_name": "Name",
   "ui.editor_name_fixed": "The name of an existing style stays as it is.",
-  "ui.editor_part_structure": "Structure",
-  "ui.editor_part_voice": "Voice",
-  "ui.editor_part_format": "Format rules",
+  "ui.editor_sections_label": "Sections (the AI writes them in this order)",
+  "ui.editor_sections_hint": "Renaming keeps a section's description. A new section starts with none.",
+  "ui.editor_section_name_aria_0": "Name of section {0}",
+  "ui.editor_section_up_aria_0": "Move section {0} up",
+  "ui.editor_section_down_aria_0": "Move section {0} down",
+  "ui.editor_section_remove_aria_0": "Delete section {0}",
+  "ui.editor_section_add": "Add a section",
+  "ui.editor_section_new_name_0": "New section {0}",
+  "ui.editor_sections_problem_0": "The sections cannot be saved: {0}",
+  "ui.editor_apply_all": "Also use this voice for the other 5 topic types",
+  "ui.editor_apply_notice_0": "The voice for all topic types is now \u201C{0}\u201D.",
+  "ui.editor_apply_kept_0": "These types keep the voice set for them: {0}.",
   "ui.editor_update_legend": "When a note already has this kind of content",
   "ui.editor_update_desc_merge": "Rewrite the whole note so old and new findings read as one. Findings that disagree are both kept and marked.",
   "ui.editor_update_desc_top": "Keep the old text as it is and put the new findings at the top of each section, under a dated heading.",
@@ -5114,9 +5123,18 @@ var zhCN = {
   "ui.editor_title_new": "\u65B0\u589E\u7B14\u8BB0\u98CE\u683C",
   "ui.editor_name": "\u540D\u79F0",
   "ui.editor_name_fixed": "\u5DF2\u5B58\u5728\u7684\u98CE\u683C\u4E0D\u80FD\u5728\u8FD9\u91CC\u6539\u540D\u3002",
-  "ui.editor_part_structure": "\u6BB5\u843D\u7ED3\u6784",
-  "ui.editor_part_voice": "\u5199\u4F5C\u53E3\u543B",
-  "ui.editor_part_format": "\u683C\u5F0F\u89C4\u5219",
+  "ui.editor_sections_label": "\u6BB5\u843D\uFF08AI \u4F1A\u6309\u8FD9\u4E2A\u987A\u5E8F\u5199\uFF09",
+  "ui.editor_sections_hint": "\u6539\u540D\u4F1A\u4FDD\u7559\u8FD9\u6BB5\u7684\u8BF4\u660E\uFF1B\u65B0\u52A0\u7684\u6BB5\u843D\u4E00\u5F00\u59CB\u6CA1\u6709\u8BF4\u660E\u3002",
+  "ui.editor_section_name_aria_0": "\u7B2C {0} \u6BB5\u7684\u540D\u79F0",
+  "ui.editor_section_up_aria_0": "\u628A\u201C{0}\u201D\u5F80\u4E0A\u79FB",
+  "ui.editor_section_down_aria_0": "\u628A\u201C{0}\u201D\u5F80\u4E0B\u79FB",
+  "ui.editor_section_remove_aria_0": "\u5220\u9664\u201C{0}\u201D\u8FD9\u6BB5",
+  "ui.editor_section_add": "\u52A0\u4E00\u6BB5",
+  "ui.editor_section_new_name_0": "\u65B0\u6BB5\u843D {0}",
+  "ui.editor_sections_problem_0": "\u6BB5\u843D\u65E0\u6CD5\u4FDD\u5B58\uFF1A{0}",
+  "ui.editor_apply_all": "\u53E3\u543B\u4E5F\u5957\u7528\u5230\u5176\u4ED6 5 \u79CD\u7C7B\u578B",
+  "ui.editor_apply_notice_0": "\u6240\u6709\u8BAE\u9898\u7C7B\u578B\u7684\u53E3\u543B\u5DF2\u6539\u4E3A\u201C{0}\u201D\u3002",
+  "ui.editor_apply_kept_0": "\u8FD9\u4E9B\u7C7B\u578B\u6709\u53E6\u5916\u6307\u5B9A\u53E3\u543B\uFF0C\u6CA1\u6709\u6539\uFF1A{0}\u3002",
   "ui.editor_update_legend": "\u7B14\u8BB0\u5DF2\u7ECF\u6709\u5185\u5BB9\u65F6",
   "ui.editor_update_desc_merge": "\u6574\u4EFD\u91CD\u5199\uFF0C\u8BA9\u65B0\u65E7\u53D1\u73B0\u8BFB\u8D77\u6765\u662F\u4E00\u4EFD\u3002\u4E92\u76F8\u77DB\u76FE\u7684\u8BF4\u6CD5\u4E24\u79CD\u90FD\u4FDD\u7559\u5E76\u6807\u6CE8\u3002",
   "ui.editor_update_desc_top": "\u65E7\u5185\u5BB9\u539F\u6837\u4FDD\u7559\uFF0C\u65B0\u53D1\u73B0\u653E\u5728\u6BCF\u6BB5\u6700\u4E0A\u9762\uFF0C\u52A0\u4E0A\u65E5\u671F\u5C0F\u6807\u3002",
@@ -7647,9 +7665,18 @@ var zhTW = {
   "ui.editor_title_new": "\u65B0\u589E\u7B46\u8A18\u98A8\u683C",
   "ui.editor_name": "\u540D\u7A31",
   "ui.editor_name_fixed": "\u5DF2\u5B58\u5728\u7684\u98A8\u683C\u4E0D\u80FD\u5728\u9019\u88E1\u6539\u540D\u3002",
-  "ui.editor_part_structure": "\u6BB5\u843D\u7D50\u69CB",
-  "ui.editor_part_voice": "\u5BEB\u4F5C\u53E3\u543B",
-  "ui.editor_part_format": "\u683C\u5F0F\u898F\u5247",
+  "ui.editor_sections_label": "\u6BB5\u843D\uFF08AI \u6703\u7167\u9019\u500B\u9806\u5E8F\u5BEB\uFF09",
+  "ui.editor_sections_hint": "\u6539\u540D\u6703\u4FDD\u7559\u9019\u6BB5\u7684\u8AAA\u660E\uFF1B\u65B0\u52A0\u7684\u6BB5\u843D\u4E00\u958B\u59CB\u6C92\u6709\u8AAA\u660E\u3002",
+  "ui.editor_section_name_aria_0": "\u7B2C {0} \u6BB5\u7684\u540D\u7A31",
+  "ui.editor_section_up_aria_0": "\u628A\u300C{0}\u300D\u5F80\u4E0A\u79FB",
+  "ui.editor_section_down_aria_0": "\u628A\u300C{0}\u300D\u5F80\u4E0B\u79FB",
+  "ui.editor_section_remove_aria_0": "\u522A\u9664\u300C{0}\u300D\u9019\u6BB5",
+  "ui.editor_section_add": "\u52A0\u4E00\u6BB5",
+  "ui.editor_section_new_name_0": "\u65B0\u6BB5\u843D {0}",
+  "ui.editor_sections_problem_0": "\u6BB5\u843D\u7121\u6CD5\u5132\u5B58\uFF1A{0}",
+  "ui.editor_apply_all": "\u53E3\u543B\u4E5F\u5957\u7528\u5230\u5176\u4ED6 5 \u7A2E\u985E\u578B",
+  "ui.editor_apply_notice_0": "\u6240\u6709\u8B70\u984C\u985E\u578B\u7684\u53E3\u543B\u5DF2\u6539\u70BA\u300C{0}\u300D\u3002",
+  "ui.editor_apply_kept_0": "\u9019\u4E9B\u985E\u578B\u6709\u53E6\u5916\u6307\u5B9A\u53E3\u543B\uFF0C\u6C92\u6709\u6539\uFF1A{0}\u3002",
   "ui.editor_update_legend": "\u7B46\u8A18\u5DF2\u7D93\u6709\u5167\u5BB9\u6642",
   "ui.editor_update_desc_merge": "\u6574\u4EFD\u91CD\u5BEB\uFF0C\u8B93\u65B0\u820A\u767C\u73FE\u8B80\u8D77\u4F86\u662F\u4E00\u4EFD\u3002\u4E92\u76F8\u77DB\u76FE\u7684\u8AAA\u6CD5\u5169\u7A2E\u90FD\u7559\u4E0B\u4E26\u6A19\u8A3B\u3002",
   "ui.editor_update_desc_top": "\u820A\u5167\u5BB9\u539F\u6A23\u4FDD\u7559\uFF0C\u65B0\u767C\u73FE\u653E\u5728\u6BCF\u6BB5\u6700\u4E0A\u9762\uFF0C\u52A0\u4E0A\u65E5\u671F\u5C0F\u6A19\u3002",
@@ -28583,13 +28610,18 @@ function partNameOfRef(category, ref, language2) {
   return translate(language2, found.nameKeys[0]);
 }
 function slotValue(slot, parts, language2) {
-  return slot === "update" ? parts.update : partNameOfRef(slot, parts[slot], language2);
+  if (slot === "update") return parts.update;
+  const ref = parts[slot];
+  return ref === null ? null : partNameOfRef(slot, ref, language2);
 }
 function recipeFileText(input2, language2) {
   var _a2;
   const lines = [
     "---",
-    ...SLOTS.map((slot) => `${translate(language2, PART_KEY[slot])}: ${slotValue(slot, input2, language2)}`),
+    ...SLOTS.flatMap((slot) => {
+      const value = slotValue(slot, input2, language2);
+      return value === null ? [] : [`${translate(language2, PART_KEY[slot])}: ${value}`];
+    }),
     "---"
   ];
   const description = (_a2 = input2.description) == null ? void 0 : _a2.trim();
@@ -28606,10 +28638,18 @@ function updateRecipeFileText(oldText, parts, language2) {
   const closing = bare(lines[0]).trimEnd() === "---" ? lines.findIndex((line, index) => index > 0 && bare(line).trimEnd() === "---") : -1;
   const wanted = (slot) => slotValue(slot, parts, language2);
   if (closing < 0) {
-    const head = ["---", ...SLOTS.map((slot) => `${translate(language2, PART_KEY[slot])}: ${wanted(slot)}`), "---"];
+    const head = [
+      "---",
+      ...SLOTS.flatMap((slot) => {
+        const value = wanted(slot);
+        return value === null ? [] : [`${translate(language2, PART_KEY[slot])}: ${value}`];
+      }),
+      "---"
+    ];
     return `${bom}${head.join(eol)}${eol}${text11}`;
   }
   const seen = /* @__PURE__ */ new Set();
+  const removed = /* @__PURE__ */ new Set();
   for (let index = 1; index < closing; index++) {
     const raw = bare(lines[index]);
     if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
@@ -28619,17 +28659,21 @@ function updateRecipeFileText(oldText, parts, language2) {
     const slot = SLOTS.find((item) => KEYS[item].includes(key2));
     if (!slot) continue;
     seen.add(slot);
+    if (wanted(slot) === null) {
+      removed.add(index);
+      continue;
+    }
     let value = pair6[3].trim();
     if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
     const same = slot === "update" ? updateModeOf(value) === parts.update : value !== "" && (builtinPartIdOf(slot, value) !== void 0 || validatePartName(value, slot).ok) && partRef(slot, value) === parts[slot];
     if (same) continue;
     lines[index] = `${pair6[1]}${wanted(slot)}${lines[index].endsWith("\r") ? "\r" : ""}`;
   }
-  const added = SLOTS.filter((slot) => !seen.has(slot)).map(
+  const added = SLOTS.filter((slot) => !seen.has(slot) && wanted(slot) !== null).map(
     (slot) => `${translate(language2, PART_KEY[slot])}: ${wanted(slot)}${eol === "\r\n" ? "\r" : ""}`
   );
   lines.splice(closing, 0, ...added);
-  return `${bom}${lines.join("\n")}`;
+  return `${bom}${lines.filter((_, index) => !removed.has(index)).join("\n")}`;
 }
 function globalPartRef(defaults2, category) {
   const saved = defaults2 == null ? void 0 : defaults2[category];
@@ -29188,14 +29232,18 @@ var NoteStyleStore = class {
     }
     const text11 = this.blocks.template.get(parsed.name);
     if (text11 === void 0) return void 0;
-    const fileName = `${parsed.name}.md`;
+    return this.structureFromText(text11, ref, parsed.name, language2);
+  }
+  /** The structure a text of a file part gives (the file `name`); one that does not parse is the Standard stand-in with issues. */
+  structureFromText(text11, ref, name2, language2) {
+    const fileName = `${name2}.md`;
     const choice2 = { id: ref, body: text11, fileName };
-    const read = parseTemplateBlock(text11, { id: ref, name: parsed.name });
+    const read = parseTemplateBlock(text11, { id: ref, name: name2 });
     if (read.ok)
       return {
         template: { ...read.template },
         choice: choice2,
-        name: parsed.name,
+        name: name2,
         fileName,
         issues: [],
         notices: read.notices.map((notice) => ({ ...notice, id: ref, fileName }))
@@ -29203,7 +29251,7 @@ var NoteStyleStore = class {
     return {
       template: builtinTemplates(noteLanguageOf(language2), language2)[0],
       choice: choice2,
-      name: parsed.name,
+      name: name2,
       fileName,
       issues: read.issues.map((issue2) => ({ ...issue2, category: "template", id: ref, fileName })),
       notices: []
@@ -29593,7 +29641,11 @@ var NoteStyleStore = class {
     }
     return name2;
   }
-  /** The text a copy of `from` starts with (see `createPart`); throws for a missing file or an unknown ref. */
+  /**
+   * The text a copy of `from` starts with (see `createPart`), which is the text of that part: a file as the last `refresh()`
+   * read it, a built-in in `language`. Throws for a missing file or an unknown ref. Reads only; the editor takes the
+   * sections of a structure from here.
+   */
   partSourceText(category, from, language2) {
     let text11;
     if (from === null) text11 = category === "structure" ? translate(language2, "ui.part_blank_structure") : "";
@@ -29663,28 +29715,62 @@ var NoteStyleStore = class {
    */
   saveRecipe(input2) {
     return this.serial(async () => {
+      const language2 = this.settings.language;
+      const { port } = this.deps;
+      await this.loadBlocks();
+      const dirs = this.blockDirectories();
+      const original = input2.original ? parseRecipeRef(input2.original.ref, "recipe") : void 0;
+      const edit = input2.structureEdit;
       const parts = {
         structure: input2.structure,
         voice: input2.voice,
         format: input2.format,
         update: input2.update
       };
-      const language2 = this.settings.language;
-      const { port } = this.deps;
-      await this.loadBlocks();
-      const dirs = this.blockDirectories();
-      const original = input2.original ? parseRecipeRef(input2.original.ref, "recipe") : void 0;
+      let inPlace;
+      let created;
+      if (edit) {
+        const used = parseRecipeRef(input2.structure, "structure");
+        const ownName = (original == null ? void 0 : original.kind) === "file" ? original.name : void 0;
+        const users = (used == null ? void 0 : used.kind) === "file" ? this.stylesUsing("structure", input2.structure) : [];
+        if ((used == null ? void 0 : used.kind) === "file" && this.blocks.template.has(used.name) && ownName !== void 0 && users.length === 1 && users[0] === ownName) {
+          inPlace = { path: `${dirs.template}/${used.name}.md`, name: used.name };
+        } else {
+          const taken = new Set([...this.blocks.template.keys()].map(lower3));
+          const base = ownName != null ? ownName : input2.name;
+          let name3 = base;
+          for (let n = 2; taken.has(lower3(name3)) || !validatePartName(name3, "structure").ok || cleanBlockName(name3) !== name3; n++) {
+            if (n > 999) return { ok: false, reason: "name" };
+            name3 = `${base} (${n})`;
+          }
+          created = { path: `${dirs.template}/${name3}.md`, name: name3 };
+          parts.structure = fileRef(name3);
+        }
+      }
       if (input2.original && (original == null ? void 0 : original.kind) === "file") {
         const path = `${dirs.recipe}/${original.name}.md`;
         let live;
+        let partLive;
         try {
           if (!this.recipes.has(original.name)) return { ok: false, reason: "write-failed" };
           live = await port.read(path);
+          if (inPlace) partLive = await port.read(inPlace.path);
         } catch (e) {
           return { ok: false, reason: "write-failed" };
         }
         if (live !== input2.original.text) return { ok: false, reason: "changed" };
+        if (inPlace && partLive !== (edit == null ? void 0 : edit.base)) return { ok: false, reason: "changed" };
         try {
+          if (inPlace && edit) {
+            if (edit.text !== partLive) await port.modify(inPlace.path, edit.text);
+            this.blocks.template.set(inPlace.name, edit.text);
+          }
+          if (created && edit) {
+            await this.pinFolder();
+            await port.createFolder(dirs.template);
+            await port.create(created.path, edit.text);
+            this.blocks.template.set(created.name, edit.text);
+          }
           const next = updateRecipeFileText(live, parts, language2);
           if (next !== live) await port.modify(path, next);
           this.recipes.set(original.name, next);
@@ -29699,6 +29785,11 @@ var NoteStyleStore = class {
       try {
         const text11 = recipeFileText(parts, language2);
         await this.pinFolder();
+        if (created && edit) {
+          await port.createFolder(dirs.template);
+          await port.create(created.path, edit.text);
+          this.blocks.template.set(created.name, edit.text);
+        }
         await port.createFolder(dirs.recipe);
         await port.create(`${dirs.recipe}/${name2}.md`, text11);
         this.recipes.set(name2, text11);
@@ -29715,12 +29806,14 @@ var NoteStyleStore = class {
   draftStyle(draft, kind, language2) {
     const ref = fileRef(draft.name);
     const fileName = `${draft.name}.md`;
+    const parts = this.fileParts(ref, fileName, draft, {}, language2);
     const chosen = {
       ref,
       name: draft.name,
       update: draft.update,
       fileName,
-      ...this.fileParts(ref, fileName, draft, {}, language2),
+      ...parts,
+      ...draft.structureText !== void 0 ? { structure: this.structureFromText(draft.structureText, ref, draft.name, language2) } : {},
       issues: []
     };
     return this.assemble(chosen, "run", [], language2);
@@ -69344,6 +69437,45 @@ var PromptPreviewModal = class extends import_obsidian35.Modal {
 // ui/settings-tab.ts
 var import_obsidian38 = require("obsidian");
 
+// ai/note-style-card-voices.ts
+var CARD_VOICES = [
+  { id: "academic", name: "ui.preset_name_academic", sample: "ui.note_style_sample_academic" },
+  { id: "plain", name: "ui.preset_name_plain", sample: "ui.note_style_sample_plain" },
+  { id: "magazine", name: "ui.preset_name_magazine", sample: "ui.note_style_sample_magazine" }
+];
+
+// ui/radio-group.ts
+function renderRadioGroup(parent, label, choices, current, pick, idPrefix = "vam-radio") {
+  const labelEl = parent.createEl("p", { text: label, cls: "vam-style-card-label" });
+  const id = `${idPrefix}-${label}`;
+  labelEl.setAttr("id", id);
+  const group = parent.createDiv({ cls: "vam-style-chips", attr: { role: "radiogroup", "aria-labelledby": id } });
+  const stop = choices.findIndex((choice2) => choice2.value === current);
+  const buttons = choices.map((choice2, index) => {
+    const checked = index === stop;
+    const chip = group.createEl("button", {
+      text: choice2.label,
+      cls: "vam-style-chip",
+      attr: {
+        type: "button",
+        role: "radio",
+        "aria-checked": String(checked),
+        tabindex: checked || stop < 0 && index === 0 ? "0" : "-1"
+      }
+    });
+    chip.addEventListener("click", () => pick(choice2.value));
+    chip.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      const next = (index + step + choices.length) % choices.length;
+      pick(choices[next].value);
+    });
+    return chip;
+  });
+  return buttons;
+}
+
 // ui/modals/open-in-window.ts
 function openInWindowOf(modal, anchor) {
   modal.open();
@@ -69357,6 +69489,65 @@ var import_obsidian37 = require("obsidian");
 
 // ui/modals/note-style-editor-modal.ts
 var import_obsidian36 = require("obsidian");
+
+// ai/note-style-structure-edit.ts
+function splitStructure(text11) {
+  const bom = text11.startsWith("\uFEFF");
+  const body = bom ? text11.slice(1) : text11;
+  const eol = body.includes("\r\n") ? "\r\n" : "\n";
+  const lines = body.replace(/\r\n?/g, "\n").split("\n");
+  const stripped = stripNoteStyleComments(lines.join("\n")).text.split("\n");
+  const code = fencedLines(stripped);
+  const at = [];
+  stripped.forEach((line, index) => {
+    var _a2;
+    if (code[index]) return;
+    const heading = /^##(?:[ \t]+(.*?))?[ \t]*$/.exec(line);
+    if (heading) at.push({ index, name: ((_a2 = heading[1]) != null ? _a2 : "").trim() });
+  });
+  const first = at.length ? at[0].index : lines.length;
+  return {
+    head: lines.slice(0, first),
+    sections: at.map((item, position) => ({
+      name: item.name,
+      lines: lines.slice(item.index, position + 1 < at.length ? at[position + 1].index : lines.length)
+    })),
+    eol
+  };
+}
+function rowsOf(chunks) {
+  return chunks.sections.map((section3, origin) => ({ origin, name: section3.name }));
+}
+function sameRows(chunks, rows2) {
+  return rows2.length === chunks.sections.length && rows2.every((row, index) => row.origin === index && row.name === chunks.sections[index].name);
+}
+var trimTrailingBlank = (lines) => {
+  let end = lines.length;
+  while (end > 0 && !lines[end - 1].trim()) end--;
+  return lines.slice(0, end);
+};
+function composeStructure(chunks, rows2) {
+  const pieces = [];
+  const head = trimTrailingBlank(chunks.head);
+  if (head.length) pieces.push(head);
+  for (const row of rows2) {
+    const original = row.origin === null ? void 0 : chunks.sections[row.origin];
+    if (!original) {
+      pieces.push([`## ${row.name}`]);
+      continue;
+    }
+    const lines = trimTrailingBlank(original.lines);
+    if (row.name !== original.name) {
+      const comment = lines[0].indexOf("%%");
+      lines[0] = `## ${row.name}${comment >= 0 ? ` ${lines[0].slice(comment)}` : ""}`;
+    }
+    pieces.push(lines);
+  }
+  const text11 = pieces.map((piece) => piece.join("\n")).join("\n\n");
+  return `${chunks.eol === "\r\n" ? text11.replace(/\n/g, "\r\n") : text11}${chunks.eol}`;
+}
+
+// ui/modals/note-style-editor-modal.ts
 var lower4 = (value) => value.toLocaleLowerCase();
 function namePartProblem(value, category, taken) {
   var _a2;
@@ -69393,12 +69584,6 @@ function takenRecipeNames(plugin) {
     plugin.noteStyles.listRecipes().filter((item) => item.kind === "file").map((item) => lower4(item.name))
   );
 }
-var PART_CATEGORIES = ["structure", "voice", "format"];
-var PART_LABEL_KEYS = {
-  structure: "ui.editor_part_structure",
-  voice: "ui.editor_part_voice",
-  format: "ui.editor_part_format"
-};
 var UPDATE_DESC_KEYS = {
   merge: "ui.editor_update_desc_merge",
   top: "ui.editor_update_desc_top",
@@ -69408,7 +69593,7 @@ var plainMd = (value) => value.replace(/\s+/g, " ").trim().replace(/[!-/:-@[-`{-
 var EXAMPLE_DELAY_MS = 200;
 var NoteStyleEditorModal = class extends import_obsidian36.Modal {
   constructor(app, plugin, options) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     super(app);
     this.plugin = plugin;
     this.options = options;
@@ -69417,20 +69602,27 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
     __publicField(this, "existing");
     /** The built-in style this window was opened on: the topic types that use it switch to the saved file (decision #41). */
     __publicField(this, "builtinSource");
+    /** The structure the style uses (as opened), the text the sections were read from, and its sections cut apart. */
+    __publicField(this, "structureRef");
+    __publicField(this, "baseText");
+    __publicField(this, "chunks");
+    /** The voice the style had when the window opened, and whether the source wrote its own voice and format keys. */
+    __publicField(this, "voiceKey");
+    __publicField(this, "formatRef");
     __publicField(this, "component", new import_obsidian36.Component());
     /** The child that owns the sample on screen now; the next picture replaces it, so the children do not pile up. */
     __publicField(this, "exampleChild");
     __publicField(this, "closed", false);
     __publicField(this, "forceClose", false);
     __publicField(this, "asking", false);
-    __publicField(this, "busy", false);
     __publicField(this, "saving", false);
     __publicField(this, "timer");
     __publicField(this, "renderToken", 0);
-    __publicField(this, "selects", /* @__PURE__ */ new Map());
     __publicField(this, "nameInput");
     __publicField(this, "errorEl");
     __publicField(this, "exampleEl");
+    __publicField(this, "listEl");
+    __publicField(this, "voiceEl");
     __publicField(this, "saveButton");
     __publicField(this, "updateRadios", /* @__PURE__ */ new Map());
     __publicField(this, "focusWindow");
@@ -69440,19 +69632,24 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
     const recipes = store.listRecipes();
     const byRef = (ref) => recipes.find((item) => item.ref === ref);
     const base = (_c = (_b2 = byRef((_a2 = source != null ? source : options.from) != null ? _a2 : void 0)) != null ? _b2 : byRef(KIND_DEFAULT_RECIPE.topic)) != null ? _c : recipes[0];
-    const parts = {
-      structure: (_d = base == null ? void 0 : base.structure.ref) != null ? _d : "builtin:standard",
-      voice: (_e = base == null ? void 0 : base.voice.ref) != null ? _e : "builtin:academic",
-      format: (_f = base == null ? void 0 : base.format.ref) != null ? _f : "builtin:standard",
-      update: (_g = base == null ? void 0 : base.update) != null ? _g : "merge"
-    };
     const sourceItem = byRef(source);
     const isFile = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
-    this.existing = isFile ? { ref: sourceItem.ref, text: (_h = store.recipeText(sourceItem.ref)) != null ? _h : "" } : void 0;
+    this.existing = isFile ? { ref: sourceItem.ref, text: (_d = store.recipeText(sourceItem.ref)) != null ? _d : "" } : void 0;
     this.builtinSource = (sourceItem == null ? void 0 : sourceItem.kind) === "builtin" ? sourceItem.ref : void 0;
-    const name2 = isFile ? sourceItem.name : (_i = options.name) != null ? _i : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
-    this.draft = { name: name2, ...parts };
-    this.initial = { ...this.draft };
+    const name2 = isFile ? sourceItem.name : (_e = options.name) != null ? _e : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
+    this.structureRef = (_f = base == null ? void 0 : base.structure.ref) != null ? _f : "builtin:standard";
+    const language2 = plugin.settings.language;
+    try {
+      this.baseText = store.partSourceText("structure", this.structureRef, language2);
+    } catch (e) {
+      this.baseText = store.partSourceText("structure", "builtin:standard", language2);
+    }
+    this.chunks = splitStructure(this.baseText);
+    this.voiceKey = (base == null ? void 0 : base.voiceSource) === "style";
+    this.formatRef = (base == null ? void 0 : base.formatSource) === "style" ? base.format.ref : null;
+    const voice = (_g = base == null ? void 0 : base.voice.ref) != null ? _g : store.globalPartRef("voice");
+    this.draft = { name: name2, rows: rowsOf(this.chunks), voice, update: (_h = base == null ? void 0 : base.update) != null ? _h : "merge", applyAll: false };
+    this.initial = { name: name2, rows: rowsOf(this.chunks), voice, update: this.draft.update };
   }
   onOpen() {
     var _a2, _b2, _c, _d;
@@ -69482,24 +69679,22 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
       cls: "vam-block-status-error vam-editor-error",
       attr: { id: "vam-editor-error", "aria-live": "polite" }
     });
-    for (const category of PART_CATEGORIES) {
-      const label = t(PART_LABEL_KEYS[category]);
-      const row = new import_obsidian36.Setting(contentEl).setName(label);
-      row.settingEl.addClass("vam-editor-row");
-      row.addDropdown((dropdown) => {
-        this.selects.set(category, dropdown.selectEl);
-        dropdown.selectEl.setAttr("aria-label", label);
-        dropdown.onChange((value) => {
-          this.draft[category] = value;
-          this.changed();
-        });
-      });
-      row.addButton((button) => {
-        button.setButtonText(t("ui.manage_edit")).onClick(() => void this.editPart(category, button.buttonEl));
-        button.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", label));
-      });
-    }
-    this.fillSelects();
+    const sections = contentEl.createDiv({ cls: "vam-editor-sections" });
+    sections.createEl("p", {
+      text: t("ui.editor_sections_label"),
+      cls: "vam-style-card-label",
+      attr: { id: "vam-editor-sections-label" }
+    });
+    this.listEl = sections.createDiv({
+      cls: "vam-editor-section-list",
+      attr: { role: "group", "aria-labelledby": "vam-editor-sections-label" }
+    });
+    this.drawRows();
+    const add = sections.createEl("button", { text: `\uFF0B ${t("ui.editor_section_add")}`, attr: { type: "button" } });
+    add.addEventListener("click", () => this.addRow());
+    sections.createEl("p", { text: t("ui.editor_sections_hint"), cls: "setting-item-description" });
+    this.voiceEl = contentEl.createDiv({ cls: "vam-editor-voice" });
+    this.drawVoice();
     const fieldset = contentEl.createEl("fieldset", { cls: "vam-editor-update" });
     fieldset.createEl("legend", { text: t("ui.editor_update_legend") });
     for (const mode of UPDATE_MODES) {
@@ -69526,6 +69721,13 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
       attr: { role: "region", "aria-label": t("ui.editor_example_label") }
     });
     const actions = modalActions(this);
+    const applyLine = actions.createEl("label", { cls: "vam-editor-apply" });
+    const apply = applyLine.createEl("input", { type: "checkbox", attr: { id: "vam-editor-apply-all" } });
+    apply.addEventListener("change", () => {
+      this.draft.applyAll = apply.checked;
+      this.changed();
+    });
+    applyLine.createSpan({ text: t("ui.editor_apply_all") });
     const preview = actions.createEl("button", { text: t("ui.preview_prompt_open") });
     preview.addEventListener("click", () => void this.previewPrompt(preview));
     const cancel = actions.createEl("button", { text: t("ui.cancel") });
@@ -69539,7 +69741,7 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
       this.focusWindow = win;
       win.addEventListener("focus", this.onFocus);
     }
-    (_d = this.existing ? this.selects.get("structure") : this.nameInput) == null ? void 0 : _d.focus();
+    (_d = this.existing ? this.listEl.querySelector("input") : this.nameInput) == null ? void 0 : _d.focus();
   }
   onClose() {
     var _a2, _b2, _c;
@@ -69585,45 +69787,150 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
   isDirty() {
     const a = this.draft;
     const b = this.initial;
-    return a.name !== b.name || a.structure !== b.structure || a.voice !== b.voice || a.format !== b.format || a.update !== b.update;
+    const rows2 = this.cleanRows();
+    return a.name !== b.name || a.voice !== b.voice || a.update !== b.update || a.applyAll || rows2.length !== b.rows.length || rows2.some((row, index) => row.origin !== b.rows[index].origin || row.name !== b.rows[index].name);
   }
-  // ---- the choices ----
-  /** Fills the three lists from the parts that exist now, keeping each choice (one that is gone stays as "Not found"). */
-  fillSelects() {
-    const store = this.plugin.noteStyles;
-    for (const category of PART_CATEGORIES) {
-      const select = this.selects.get(category);
-      if (!select) continue;
-      const current = this.draft[category];
-      const items = store.listParts(category).filter((item) => !item.issues.some((issue2) => issue2.code === "builtin_name")).filter((item) => !item.retired || item.ref === current);
-      select.replaceChildren();
-      if (!items.some((item) => item.ref === current)) {
-        const bare = current.replace(/^(?:file|builtin):/, "");
-        select.createEl("option", { value: current, text: t("ui.block_missing_option_0", bare) });
-      }
-      const optionText = (item) => item.retired ? t("ui.note_style_retired_option_0", item.name) : item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.name;
-      const addGroup = (title, group) => {
-        if (!group.length) return;
-        const parent = select.createEl("optgroup", { attr: { label: title } });
-        for (const item of group) parent.createEl("option", { value: item.ref, text: optionText(item) });
-      };
-      addGroup(
-        t("ui.block_group_builtin"),
-        items.filter((item) => item.kind === "builtin")
+  // ---- the sections ----
+  /** The rows with their names trimmed, which is how the parser reads them back. */
+  cleanRows() {
+    return this.draft.rows.map((row) => ({ origin: row.origin, name: row.name.trim() }));
+  }
+  /** Whether the sections are not what the text had (a new file or a change in place is needed). */
+  sectionsEdited() {
+    return !sameRows(this.chunks, this.cleanRows());
+  }
+  /** The reason the sections cannot be saved, or "" (an empty list, a name used twice, a name with # ...). */
+  sectionProblem() {
+    if (!this.sectionsEdited()) return "";
+    const rows2 = this.cleanRows();
+    const parsed = parseTemplateBlock(composeStructure(this.chunks, rows2), { id: "file:draft", name: "draft" });
+    const say = (text11) => t("ui.editor_sections_problem_0", text11);
+    if (!parsed.ok) {
+      const first = parsed.issues[0];
+      if (!first.code.startsWith("ui.")) return say(first.message);
+      const values = first.values.map(
+        (value) => String(value).startsWith("ui.") ? t(String(value)) : String(value)
       );
-      addGroup(
-        t("ui.note_style_group_folder"),
-        items.filter((item) => item.kind === "file")
-      );
-      select.value = current;
+      return say(t(first.code, ...values));
+    }
+    const names3 = parsed.template.sections.map((section3) => section3.name);
+    const wrong = rows2.findIndex((row, index) => names3[index] !== row.name);
+    if (wrong >= 0 || names3.length !== rows2.length)
+      return say(t("ui.detail_template_error_section_name_invalid", String(Math.max(wrong, 0) + 1)));
+    return "";
+  }
+  freshSectionName() {
+    const taken = new Set(this.draft.rows.map((row) => lower4(row.name.trim())));
+    for (let n = 1; ; n++) {
+      const name2 = t("ui.editor_section_new_name_0", String(n));
+      if (!taken.has(lower4(name2)) || n > 999) return name2;
     }
   }
-  partName(category) {
+  addRow() {
+    this.draft.rows.push({ origin: null, name: this.freshSectionName() });
+    this.drawRows({ index: this.draft.rows.length - 1, control: "name" });
+    this.changed();
+  }
+  moveRow(index, step) {
+    const rows2 = this.draft.rows;
+    const to = index + step;
+    if (to < 0 || to >= rows2.length) return;
+    [rows2[index], rows2[to]] = [rows2[to], rows2[index]];
+    this.drawRows({ index: to, control: step < 0 ? "up" : "down" });
+    this.changed();
+  }
+  removeRow(index) {
+    this.draft.rows.splice(index, 1);
+    this.drawRows({ index: Math.min(index, this.draft.rows.length - 1), control: "remove" });
+    this.changed();
+  }
+  /** Draws the section list again; the focus goes to `focus` (a row's control), or to the nearest one that still works. */
+  drawRows(focus) {
+    var _a2;
+    const list = this.listEl;
+    if (!list) return;
+    list.empty();
+    const rows2 = this.draft.rows;
+    const controls = [];
+    rows2.forEach((row2, index) => {
+      const line = list.createDiv({ cls: "vam-editor-section" });
+      const input2 = line.createEl("input", { type: "text", cls: "vam-editor-section-name" });
+      input2.value = row2.name;
+      const button = (text11, key2, cls, run) => {
+        const el = line.createEl("button", { text: text11, cls, attr: { type: "button" } });
+        el.addEventListener("click", run);
+        return el;
+      };
+      const up = button("\u2191", "up", "vam-editor-section-up", () => this.moveRow(index, -1));
+      const down = button("\u2193", "down", "vam-editor-section-down", () => this.moveRow(index, 1));
+      const remove = button("\u2212", "remove", "vam-editor-section-remove", () => this.removeRow(index));
+      up.disabled = index === 0;
+      down.disabled = index === rows2.length - 1;
+      const label = () => {
+        const name2 = row2.name.trim() || String(index + 1);
+        input2.setAttr("aria-label", t("ui.editor_section_name_aria_0", String(index + 1)));
+        up.setAttr("aria-label", t("ui.editor_section_up_aria_0", name2));
+        down.setAttr("aria-label", t("ui.editor_section_down_aria_0", name2));
+        remove.setAttr("aria-label", t("ui.editor_section_remove_aria_0", name2));
+      };
+      label();
+      input2.addEventListener("input", () => {
+        row2.name = input2.value;
+        label();
+        this.changed();
+      });
+      controls.push({ name: input2, up, down, remove });
+    });
+    if (!focus) return;
+    const row = controls[focus.index];
+    if (!row) return;
+    const usable = (el) => !el.disabled;
+    const order = focus.control === "up" ? ["up", "down", "name"] : focus.control === "down" ? ["down", "up", "name"] : [focus.control, "name"];
+    const target = (_a2 = order.map((key2) => row[key2]).find(usable)) != null ? _a2 : row.name;
+    target.focus();
+  }
+  // ---- the voice ----
+  /** Draws the voice chips and the sample sentence under them; `focus` puts the focus back on the chip just picked. */
+  drawVoice(focus) {
+    var _a2;
+    const box = this.voiceEl;
+    if (!box) return;
+    box.empty();
+    const choices = CARD_VOICES.map((item) => ({ value: `builtin:${item.id}`, label: t(item.name) }));
+    const buttons = renderRadioGroup(
+      box,
+      t("ui.note_style_voice_label"),
+      choices,
+      this.draft.voice,
+      (value) => {
+        this.draft.voice = value;
+        this.drawVoice(value);
+        this.changed();
+      },
+      "vam-editor-radio"
+    );
+    if (focus) (_a2 = buttons[choices.findIndex((choice2) => choice2.value === focus)]) == null ? void 0 : _a2.focus();
+    const sample = box.createDiv({ cls: "vam-style-sample", attr: { "aria-live": "polite" } });
+    const chosen = CARD_VOICES.find((item) => `builtin:${item.id}` === this.draft.voice);
+    if (chosen) {
+      sample.createSpan({ text: t("ui.note_style_sample_caption"), cls: "vam-style-sample-caption" });
+      sample.createSpan({ text: t(chosen.sample) });
+    } else sample.createSpan({ text: t("ui.note_style_voice_other_0", this.voiceName()) });
+  }
+  voiceName() {
     var _a2, _b2;
-    const select = this.selects.get(category);
-    const ref = this.draft[category];
-    const item = this.plugin.noteStyles.listParts(category).find((part) => part.ref === ref);
-    return (_b2 = (_a2 = item == null ? void 0 : item.name) != null ? _a2 : select == null ? void 0 : select.value) != null ? _b2 : ref;
+    const ref = this.draft.voice;
+    return (_b2 = (_a2 = this.plugin.noteStyles.listParts("voice").find((part) => part.ref === ref)) == null ? void 0 : _a2.name) != null ? _b2 : ref;
+  }
+  /**
+   * The voice key to write: none when the style follows the global voice. A voice that was not touched is written as the
+   * source had it (its own key or none); a chosen voice is written only when it differs from the global one; "also use it
+   * for the other types" makes it the global voice, so no key is needed.
+   */
+  voiceToWrite() {
+    if (this.draft.applyAll) return null;
+    if (this.draft.voice === this.initial.voice) return this.voiceKey ? this.draft.voice : null;
+    return this.draft.voice === this.plugin.noteStyles.globalPartRef("voice") ? null : this.draft.voice;
   }
   takenNames() {
     return takenRecipeNames(this.plugin);
@@ -69631,9 +69938,9 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
   nameProblem() {
     return this.existing ? "" : namePartProblem(this.draft.name, "recipe", this.takenNames());
   }
-  /** Writes the name error (only when its text changes) and enables or disables Save. */
+  /** Writes the error (only when its text changes) and enables or disables Save. */
   syncState() {
-    const problem = this.nameProblem();
+    const problem = this.nameProblem() || this.sectionProblem();
     const error = this.errorEl;
     if (error && error.textContent !== problem) error.setText(problem);
     if (this.saveButton) this.saveButton.disabled = !!problem || this.saving;
@@ -69642,33 +69949,43 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
     this.syncState();
     this.scheduleExample();
   }
-  /** The parts the draft holds, with a name the store can use for a style that is not saved. */
-  draftParts() {
-    return { ...this.draft, name: this.draft.name || t("ui.recipe_new_name") };
-  }
-  // ---- Edit on a part ----
-  async editPart(category, button) {
-    if (this.busy) return;
-    this.busy = true;
-    try {
-      const target = await this.plugin.editNotePart(category, this.draft[category]);
-      if (!target || this.closed) return;
-      this.draft[category] = target;
-      await this.plugin.noteStyles.refresh().catch(() => void 0);
-      if (this.closed) return;
-      this.fillSelects();
-      this.syncState();
-      this.scheduleExample();
-      button.focus();
-    } finally {
-      this.busy = false;
-    }
+  /** The style the draft stands for, for the sample and the preview (the edited sections stand in for the structure). */
+  draftStyle() {
+    return this.plugin.noteStyles.draftStyle(
+      {
+        name: this.draft.name || t("ui.recipe_new_name"),
+        structure: this.structureRef,
+        voice: this.draft.voice,
+        ...this.formatRef !== null ? { format: this.formatRef } : {},
+        update: this.draft.update,
+        ...this.sectionsEdited() ? { structureText: composeStructure(this.chunks, this.cleanRows()) } : {}
+      },
+      "topic",
+      this.plugin.settings.language
+    );
   }
   /** The window is in front again: read the files again and redraw what depends on them. */
   async reload() {
     await this.plugin.noteStyles.refresh().catch(() => void 0);
     if (this.closed) return;
-    this.fillSelects();
+    if (!this.sectionsEdited()) {
+      try {
+        const text11 = this.plugin.noteStyles.partSourceText(
+          "structure",
+          this.structureRef,
+          this.plugin.settings.language
+        );
+        if (text11 !== this.baseText) {
+          this.baseText = text11;
+          this.chunks = splitStructure(text11);
+          this.draft.rows = rowsOf(this.chunks);
+          this.initial.rows = rowsOf(this.chunks);
+          this.drawRows();
+        }
+      } catch (e) {
+      }
+    }
+    this.drawVoice();
     this.syncState();
     this.scheduleExample();
   }
@@ -69683,11 +70000,13 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
   }
   /** The sample as Markdown: the structure's section names and descriptions with fixed sample text, shaped by the format rules. */
   exampleMarkdown() {
-    const language2 = this.plugin.settings.language;
-    const style = this.plugin.noteStyles.draftStyle(this.draftParts(), "topic", language2);
-    const formatId = this.draft.format.startsWith("builtin:") ? this.draft.format.slice("builtin:".length) : void 0;
+    var _a2, _b2, _c;
+    const style = this.draftStyle();
+    const formatRef = (_a2 = this.formatRef) != null ? _a2 : this.plugin.noteStyles.globalPartRef("format");
+    const formatId = formatRef.startsWith("builtin:") ? formatRef.slice("builtin:".length) : void 0;
+    const formatName = (_c = (_b2 = this.plugin.noteStyles.listParts("format").find((part) => part.ref === formatRef)) == null ? void 0 : _b2.name) != null ? _c : formatRef;
     const lines = [
-      `*${plainMd(t("ui.editor_example_voice_0", this.partName("voice")))}* \xB7 *${plainMd(t("ui.editor_example_format_0", this.partName("format")))}*`,
+      `*${plainMd(t("ui.editor_example_voice_0", this.voiceName()))}* \xB7 *${plainMd(t("ui.editor_example_format_0", formatName))}*`,
       ""
     ];
     const callout = (title) => [
@@ -69749,16 +70068,20 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
   async previewPrompt(button) {
     await this.plugin.noteStyles.refresh().catch(() => void 0);
     if (this.closed) return;
-    this.plugin.openPromptPreview(
-      button,
-      () => this.plugin.noteStyles.draftStyle(this.draftParts(), "topic", this.plugin.settings.language)
-    );
+    this.plugin.openPromptPreview(button, () => this.draftStyle());
+  }
+  /** The topic types (not AIM, not the ones that use `ref`) whose style sets its own voice: "also use it" does not change them. */
+  kindsWithOwnVoice(ref) {
+    const recipes = this.plugin.noteStyles.listRecipes();
+    return STYLE_KINDS.filter((kind) => kind !== "aim").filter((kind) => {
+      const item = recipes.find((candidate) => candidate.usedByKinds.includes(kind));
+      return item !== void 0 && item.ref !== ref && item.voiceSource === "style";
+    });
   }
   async save() {
     var _a2, _b2, _c, _d, _e;
     if (this.saving || this.closed) return;
-    const problem = this.nameProblem();
-    if (problem) {
+    if (this.nameProblem() || this.sectionProblem()) {
       this.syncState();
       return;
     }
@@ -69770,10 +70093,11 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
       ].filter((kind) => kind !== "aim") : [];
       const result = await this.plugin.saveNoteRecipe({
         name: this.draft.name,
-        structure: this.draft.structure,
-        voice: this.draft.voice,
-        format: this.draft.format,
+        structure: this.structureRef,
+        voice: this.voiceToWrite(),
+        format: this.formatRef,
         update: this.draft.update,
+        ...this.sectionsEdited() ? { structureEdit: { text: composeStructure(this.chunks, this.cleanRows()), base: this.baseText } } : {},
         ...this.existing ? { original: this.existing } : {}
       });
       if (this.closed) return;
@@ -69781,15 +70105,23 @@ var NoteStyleEditorModal = class extends import_obsidian36.Modal {
         if (result.reason === "name") (_c = this.errorEl) == null ? void 0 : _c.setText(t("ui.recipe_notice_name_unavailable"));
         return;
       }
+      const kindName = (kind) => t(kind === "aim" ? "ui.note_style_kind_aim" : `ui.topic_kind_${kind}`);
       if (switched.length) {
         for (const kind of switched) await this.plugin.setKindStyle(kind, result.ref);
         new import_obsidian36.Notice(
           t(
             "ui.recipe_notice_switched_0_1",
             result.ref.slice("file:".length),
-            switched.map((kind) => t(kind === "aim" ? "ui.note_style_kind_aim" : `ui.topic_kind_${kind}`)).join(t("ui.manage_list_separator"))
+            switched.map(kindName).join(t("ui.manage_list_separator"))
           )
         );
+      }
+      if (this.draft.applyAll) {
+        const kept = this.kindsWithOwnVoice(result.ref);
+        await this.plugin.setGlobalPart("voice", this.draft.voice);
+        new import_obsidian36.Notice(t("ui.editor_apply_notice_0", this.voiceName()));
+        if (kept.length)
+          new import_obsidian36.Notice(t("ui.editor_apply_kept_0", kept.map(kindName).join(t("ui.manage_list_separator"))));
       }
       this.forceClose = true;
       super.close();
@@ -70214,47 +70546,12 @@ function renderSettingsIntro(setting, text11) {
   setting.setName("");
   setting.setDesc(text11);
 }
-var CARD_VOICES = [
-  { id: "academic", name: "ui.preset_name_academic", sample: "ui.note_style_sample_academic" },
-  { id: "plain", name: "ui.preset_name_plain", sample: "ui.note_style_sample_plain" },
-  { id: "magazine", name: "ui.preset_name_magazine", sample: "ui.note_style_sample_magazine" }
-];
 var CARD_FORMATS = [
   { id: "standard", name: "ui.note_style_chip_format_standard", desc: "ui.note_style_format_desc_standard" },
   { id: "lean", name: "ui.note_style_chip_format_lean", desc: "ui.note_style_format_desc_lean" },
   { id: "rich", name: "ui.note_style_chip_format_rich", desc: "ui.note_style_format_desc_rich" },
   { id: "skim", name: "ui.note_style_chip_format_skim", desc: "ui.note_style_format_desc_skim" }
 ];
-function renderRadioGroup(parent, label, choices, current, pick) {
-  const labelEl = parent.createEl("p", { text: label, cls: "vam-style-card-label" });
-  const id = `vam-radio-${label}`;
-  labelEl.setAttr("id", id);
-  const group = parent.createDiv({ cls: "vam-style-chips", attr: { role: "radiogroup", "aria-labelledby": id } });
-  const stop = choices.findIndex((choice2) => choice2.value === current);
-  const buttons = choices.map((choice2, index) => {
-    const checked = index === stop;
-    const chip = group.createEl("button", {
-      text: choice2.label,
-      cls: "vam-style-chip",
-      attr: {
-        type: "button",
-        role: "radio",
-        "aria-checked": String(checked),
-        tabindex: checked || stop < 0 && index === 0 ? "0" : "-1"
-      }
-    });
-    chip.addEventListener("click", () => pick(choice2.value));
-    chip.addEventListener("keydown", (event) => {
-      const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
-      if (!step) return;
-      event.preventDefault();
-      const next = (index + step + choices.length) % choices.length;
-      pick(choices[next].value);
-    });
-    return chip;
-  });
-  return buttons;
-}
 function renderNoteStyleCard(setting, plugin) {
   setting.setName(t("ui.note_style_card_title")).setDesc(t("ui.note_style_card_desc"));
   setting.settingEl.addClass("vam-style-card");

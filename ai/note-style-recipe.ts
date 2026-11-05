@@ -364,18 +364,33 @@ export function partNameOfRef(category: PartCategory, ref: string, language: UiL
   return translate(language, found.nameKeys[0]);
 }
 
-function slotValue(slot: PartCategory | "update", parts: RecipeFileParts, language: UiLanguage): string {
-  return slot === "update" ? parts.update : partNameOfRef(slot, parts[slot], language);
+/**
+ * What a style file is written from: `voice` or `format` null leaves the key out of a new file and removes it from an
+ * existing one, so the style follows the global voice or format (settings-redesign A2).
+ */
+export type RecipeFileInput = Pick<RecipeFileParts, "structure" | "update"> & {
+  voice: string | null;
+  format: string | null;
+};
+
+/** The value written under a key, or null when the key is left out. */
+function slotValue(slot: PartCategory | "update", parts: RecipeFileInput, language: UiLanguage): string | null {
+  if (slot === "update") return parts.update;
+  const ref = parts[slot];
+  return ref === null ? null : partNameOfRef(slot, ref, language);
 }
 
 /**
  * The text of a new style file: the frontmatter with the four keys (named in the interface language), then the
  * description line when there is one. `parseRecipeFile` reads it back to the same four values.
  */
-export function recipeFileText(input: RecipeFileParts & { description?: string }, language: UiLanguage): string {
+export function recipeFileText(input: RecipeFileInput & { description?: string }, language: UiLanguage): string {
   const lines = [
     "---",
-    ...SLOTS.map(slot => `${translate(language, PART_KEY[slot])}: ${slotValue(slot, input, language)}`),
+    ...SLOTS.flatMap(slot => {
+      const value = slotValue(slot, input, language);
+      return value === null ? [] : [`${translate(language, PART_KEY[slot])}: ${value}`];
+    }),
     "---"
   ];
   const description = input.description?.trim();
@@ -387,7 +402,7 @@ export function recipeFileText(input: RecipeFileParts & { description?: string }
  * whose value already means the wanted one keeps its line as written; a missing key is added before the closing `---`;
  * a file with no frontmatter gets one in front. Every other byte (other keys, comments, the body, line endings) stays.
  */
-export function updateRecipeFileText(oldText: string, parts: RecipeFileParts, language: UiLanguage): string {
+export function updateRecipeFileText(oldText: string, parts: RecipeFileInput, language: UiLanguage): string {
   const bom = oldText.startsWith("﻿") ? "﻿" : "";
   const text = bom ? oldText.slice(1) : oldText;
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
@@ -397,12 +412,20 @@ export function updateRecipeFileText(oldText: string, parts: RecipeFileParts, la
     bare(lines[0]).trimEnd() === "---"
       ? lines.findIndex((line, index) => index > 0 && bare(line).trimEnd() === "---")
       : -1;
-  const wanted = (slot: PartCategory | "update"): string => slotValue(slot, parts, language);
+  const wanted = (slot: PartCategory | "update"): string | null => slotValue(slot, parts, language);
   if (closing < 0) {
-    const head = ["---", ...SLOTS.map(slot => `${translate(language, PART_KEY[slot])}: ${wanted(slot)}`), "---"];
+    const head = [
+      "---",
+      ...SLOTS.flatMap(slot => {
+        const value = wanted(slot);
+        return value === null ? [] : [`${translate(language, PART_KEY[slot])}: ${value}`];
+      }),
+      "---"
+    ];
     return `${bom}${head.join(eol)}${eol}${text}`;
   }
   const seen = new Set<PartCategory | "update">();
+  const removed = new Set<number>();
   for (let index = 1; index < closing; index++) {
     const raw = bare(lines[index]);
     if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
@@ -412,6 +435,10 @@ export function updateRecipeFileText(oldText: string, parts: RecipeFileParts, la
     const slot = SLOTS.find(item => KEYS[item].includes(key));
     if (!slot) continue;
     seen.add(slot);
+    if (wanted(slot) === null) {
+      removed.add(index);
+      continue;
+    }
     let value = pair[3].trim();
     if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
     const same =
@@ -423,11 +450,11 @@ export function updateRecipeFileText(oldText: string, parts: RecipeFileParts, la
     if (same) continue;
     lines[index] = `${pair[1]}${wanted(slot)}${lines[index].endsWith("\r") ? "\r" : ""}`;
   }
-  const added = SLOTS.filter(slot => !seen.has(slot)).map(
+  const added = SLOTS.filter(slot => !seen.has(slot) && wanted(slot) !== null).map(
     slot => `${translate(language, PART_KEY[slot])}: ${wanted(slot)}${eol === "\r\n" ? "\r" : ""}`
   );
   lines.splice(closing, 0, ...added);
-  return `${bom}${lines.join("\n")}`;
+  return `${bom}${lines.filter((_, index) => !removed.has(index)).join("\n")}`;
 }
 
 /** The global voice or format ref: the saved one when it is a part ref of that category, else the built-in default. */

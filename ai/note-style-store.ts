@@ -42,6 +42,7 @@ import {
   recipeFileText,
   STYLE_KINDS,
   updateRecipeFileText,
+  type RecipeFileInput,
   validatePartName,
   type NoteStyleDefaults,
   type PartCategory,
@@ -238,11 +239,21 @@ export interface UnusedCopy {
   sameAs: string;
 }
 
-export interface SaveRecipeInput extends RecipeFileParts {
+export interface SaveRecipeInput extends Pick<RecipeFileParts, "structure" | "update"> {
   /** The name of a new style file; ignored when `original` is a user's file (its name stays). */
   name: string;
+  /** The voice and format refs to write; null leaves the key out (the style follows the global one). */
+  voice: string | null;
+  format: string | null;
   /** The style the editor opened, with the file text it read then. */
   original?: { ref: string; text: string };
+  /**
+   * The edited sections of `structure` (settings-redesign A4): `text` is the whole new structure text and `base` the text
+   * the editor read it from. A structure file that only this (existing) style uses is changed in place, and nothing is
+   * written when it no longer holds `base`; any other structure is left alone and `text` becomes a new structure file named
+   * like the style (" (2)", " (3)" ... when that name is taken).
+   */
+  structureEdit?: { text: string; base: string };
 }
 export type SaveRecipeResult = { ok: true; ref: string } | { ok: false; reason: "name" | "changed" | "write-failed" };
 
@@ -793,14 +804,19 @@ export class NoteStyleStore {
     }
     const text = this.blocks.template.get(parsed.name);
     if (text === undefined) return undefined;
-    const fileName = `${parsed.name}.md`;
+    return this.structureFromText(text, ref, parsed.name, language);
+  }
+
+  /** The structure a text of a file part gives (the file `name`); one that does not parse is the Standard stand-in with issues. */
+  private structureFromText(text: string, ref: string, name: string, language: ContentLanguage): StructurePart {
+    const fileName = `${name}.md`;
     const choice: BlockChoice = { id: ref, body: text, fileName };
-    const read = parseTemplateBlock(text, { id: ref, name: parsed.name });
+    const read = parseTemplateBlock(text, { id: ref, name: name });
     if (read.ok)
       return {
         template: { ...read.template },
         choice,
-        name: parsed.name,
+        name: name,
         fileName,
         issues: [],
         notices: read.notices.map((notice): RunStyleNotice => ({ ...notice, id: ref, fileName }))
@@ -808,7 +824,7 @@ export class NoteStyleStore {
     return {
       template: builtinTemplates(noteLanguageOf(language), language)[0],
       choice,
-      name: parsed.name,
+      name: name,
       fileName,
       issues: read.issues.map((issue): BlockIssue => ({ ...issue, category: "template", id: ref, fileName })),
       notices: []
@@ -1243,8 +1259,12 @@ export class NoteStyleStore {
     return name;
   }
 
-  /** The text a copy of `from` starts with (see `createPart`); throws for a missing file or an unknown ref. */
-  private partSourceText(category: PartCategory, from: string | null, language: UiLanguage): string {
+  /**
+   * The text a copy of `from` starts with (see `createPart`), which is the text of that part: a file as the last `refresh()`
+   * read it, a built-in in `language`. Throws for a missing file or an unknown ref. Reads only; the editor takes the
+   * sections of a structure from here.
+   */
+  partSourceText(category: PartCategory, from: string | null, language: UiLanguage): string {
     let text: string;
     if (from === null) text = category === "structure" ? translate(language, "ui.part_blank_structure") : "";
     else {
@@ -1325,28 +1345,73 @@ export class NoteStyleStore {
    */
   saveRecipe(input: SaveRecipeInput): Promise<SaveRecipeResult> {
     return this.serial(async (): Promise<SaveRecipeResult> => {
-      const parts: RecipeFileParts = {
-        structure: input.structure,
-        voice: input.voice,
-        format: input.format,
-        update: input.update
-      };
       const language = this.settings.language;
       const { port } = this.deps;
       await this.loadBlocks();
       const dirs = this.blockDirectories();
       const original = input.original ? parseRecipeRef(input.original.ref, "recipe") : undefined;
+      const edit = input.structureEdit;
+      const parts: RecipeFileInput = {
+        structure: input.structure,
+        voice: input.voice,
+        format: input.format,
+        update: input.update
+      };
+      // Where the edited sections go: into the structure file only this style uses, else into a new file named like the style.
+      let inPlace: { path: string; name: string } | undefined;
+      let created: { path: string; name: string } | undefined;
+      if (edit) {
+        const used = parseRecipeRef(input.structure, "structure");
+        const ownName = original?.kind === "file" ? original.name : undefined;
+        const users = used?.kind === "file" ? this.stylesUsing("structure", input.structure) : [];
+        if (
+          used?.kind === "file" &&
+          this.blocks.template.has(used.name) &&
+          ownName !== undefined &&
+          users.length === 1 &&
+          users[0] === ownName
+        ) {
+          inPlace = { path: `${dirs.template}/${used.name}.md`, name: used.name };
+        } else {
+          const taken = new Set([...this.blocks.template.keys()].map(lower));
+          const base = ownName ?? input.name;
+          let name = base;
+          for (
+            let n = 2;
+            taken.has(lower(name)) || !validatePartName(name, "structure").ok || cleanBlockName(name) !== name;
+            n++
+          ) {
+            if (n > 999) return { ok: false, reason: "name" };
+            name = `${base} (${n})`;
+          }
+          created = { path: `${dirs.template}/${name}.md`, name };
+          parts.structure = fileRef(name);
+        }
+      }
       if (input.original && original?.kind === "file") {
         const path = `${dirs.recipe}/${original.name}.md`;
         let live: string;
+        let partLive: string | undefined;
         try {
           if (!this.recipes.has(original.name)) return { ok: false, reason: "write-failed" };
           live = await port.read(path);
+          if (inPlace) partLive = await port.read(inPlace.path);
         } catch {
           return { ok: false, reason: "write-failed" };
         }
         if (live !== input.original.text) return { ok: false, reason: "changed" };
+        if (inPlace && partLive !== edit?.base) return { ok: false, reason: "changed" };
         try {
+          if (inPlace && edit) {
+            if (edit.text !== partLive) await port.modify(inPlace.path, edit.text);
+            this.blocks.template.set(inPlace.name, edit.text);
+          }
+          if (created && edit) {
+            await this.pinFolder();
+            await port.createFolder(dirs.template);
+            await port.create(created.path, edit.text);
+            this.blocks.template.set(created.name, edit.text);
+          }
           const next = updateRecipeFileText(live, parts, language);
           if (next !== live) await port.modify(path, next);
           this.recipes.set(original.name, next);
@@ -1365,6 +1430,11 @@ export class NoteStyleStore {
       try {
         const text = recipeFileText(parts, language);
         await this.pinFolder();
+        if (created && edit) {
+          await port.createFolder(dirs.template);
+          await port.create(created.path, edit.text);
+          this.blocks.template.set(created.name, edit.text);
+        }
         await port.createFolder(dirs.recipe);
         await port.create(`${dirs.recipe}/${name}.md`, text);
         this.recipes.set(name, text);
@@ -1380,18 +1450,28 @@ export class NoteStyleStore {
    * the same parts, it equals `runStyle` of the style file `saveRecipe` would write. Reads only the loaded cache.
    */
   draftStyle(
-    draft: Omit<RecipeFileParts, "voice" | "format"> & { voice?: string; format?: string; name: string },
+    draft: Omit<RecipeFileParts, "voice" | "format"> & {
+      voice?: string;
+      format?: string;
+      name: string;
+      /** Sections that are not saved: used in place of the structure `structure` names. */
+      structureText?: string;
+    },
     kind: StyleKind,
     language: ContentLanguage
   ): RunStyle {
     const ref = fileRef(draft.name);
     const fileName = `${draft.name}.md`;
+    const parts = this.fileParts(ref, fileName, draft, {}, language);
     const chosen: Candidate = {
       ref,
       name: draft.name,
       update: draft.update,
       fileName,
-      ...this.fileParts(ref, fileName, draft, {}, language),
+      ...parts,
+      ...(draft.structureText !== undefined
+        ? { structure: this.structureFromText(draft.structureText, ref, draft.name, language) }
+        : {}),
       issues: []
     };
     // A draft is a whole style of its own, like a run's own choice: no lower level applies, whatever the kind.

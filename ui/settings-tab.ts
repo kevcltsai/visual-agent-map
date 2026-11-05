@@ -15,6 +15,8 @@ import {
   UPDATE_MODE_KEYS,
   type StyleKind
 } from "../ai/note-style-recipe";
+import { CARD_VOICES } from "../ai/note-style-card-voices";
+import { renderRadioGroup } from "./radio-group";
 import { BUILTIN_BLOCKS } from "../core/blocks/builtin";
 import { openInWindowOf } from "./modals/open-in-window";
 import { aimEnabled } from "../experiences/aim/availability";
@@ -30,13 +32,6 @@ export function renderSettingsIntro(setting: Setting, text: string): void {
   setting.setDesc(text);
 }
 
-/** The voices the card offers (the retired ones are not listed), each with its sample sentence. */
-const CARD_VOICES = [
-  { id: "academic", name: "ui.preset_name_academic", sample: "ui.note_style_sample_academic" },
-  { id: "plain", name: "ui.preset_name_plain", sample: "ui.note_style_sample_plain" },
-  { id: "magazine", name: "ui.preset_name_magazine", sample: "ui.note_style_sample_magazine" }
-] as const satisfies readonly { id: string; name: TranslationKey; sample: TranslationKey }[];
-
 /** The formats the card offers, each with its one-line explanation. */
 const CARD_FORMATS = [
   { id: "standard", name: "ui.note_style_chip_format_standard", desc: "ui.note_style_format_desc_standard" },
@@ -44,53 +39,6 @@ const CARD_FORMATS = [
   { id: "rich", name: "ui.note_style_chip_format_rich", desc: "ui.note_style_format_desc_rich" },
   { id: "skim", name: "ui.note_style_chip_format_skim", desc: "ui.note_style_format_desc_skim" }
 ] as const satisfies readonly { id: string; name: TranslationKey; desc: TranslationKey }[];
-
-/**
- * A row of choices as one radio group: each choice is a button with role "radio" and `aria-checked`; Tab reaches the
- * checked one (the first when none is checked), the arrow keys move to and pick the next or previous choice, Enter and
- * Space pick the focused one.
- */
-function renderRadioGroup(
-  parent: HTMLElement,
-  label: string,
-  choices: { value: string; label: string }[],
-  current: string | undefined,
-  pick: (value: string) => void
-): HTMLElement[] {
-  const labelEl = parent.createEl("p", { text: label, cls: "vam-style-card-label" });
-  const id = `vam-radio-${label}`;
-  labelEl.setAttr("id", id);
-  const group = parent.createDiv({ cls: "vam-style-chips", attr: { role: "radiogroup", "aria-labelledby": id } });
-  const stop = choices.findIndex(choice => choice.value === current);
-  const buttons: HTMLElement[] = choices.map((choice, index) => {
-    const checked = index === stop;
-    const chip = group.createEl("button", {
-      text: choice.label,
-      cls: "vam-style-chip",
-      attr: {
-        type: "button",
-        role: "radio",
-        "aria-checked": String(checked),
-        tabindex: checked || (stop < 0 && index === 0) ? "0" : "-1"
-      }
-    });
-    chip.addEventListener("click", () => pick(choice.value));
-    chip.addEventListener("keydown", (event: KeyboardEvent) => {
-      const step =
-        event.key === "ArrowRight" || event.key === "ArrowDown"
-          ? 1
-          : event.key === "ArrowLeft" || event.key === "ArrowUp"
-            ? -1
-            : 0;
-      if (!step) return;
-      event.preventDefault();
-      const next = (index + step + choices.length) % choices.length;
-      pick(choices[next].value);
-    });
-    return chip;
-  });
-  return buttons;
-}
 
 /**
  * The "How notes are written" card at the top of the Note style page: the global voice (chips plus a sample sentence that

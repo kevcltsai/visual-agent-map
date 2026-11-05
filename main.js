@@ -2400,6 +2400,9 @@ var en = {
   "error.plain_next_signin": "Sign in again in Settings, then try again; a try uses 1 AI call.",
   "error.plain_next_quota": "Wait for the limit to reset or switch provider; a new try uses 1 AI call.",
   "error.plain_card_context": "This card's AI step did not finish",
+  "error.plain_chat_context": "The AI chat did not finish",
+  "error.plain_outline_context": "The outline draft did not finish",
+  "error.plain_review_context": "The structure review did not finish",
   "ui.technical_details": "Technical details",
   "ui.copy_technical_details": "Copy technical details",
   "error.relevance_grade_unavailable": "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
@@ -4956,6 +4959,9 @@ var zhCN = {
   "error.plain_next_signin": "\u8BF7\u5230\u8BBE\u7F6E\u91CD\u65B0\u767B\u5F55\u518D\u8BD5\uFF1B\u8BD5\u4E00\u6B21\u4F1A\u7528 1 \u6B21 AI\u3002",
   "error.plain_next_quota": "\u7B49\u989D\u5EA6\u91CD\u7F6E\u6216\u6539\u7528\u53E6\u4E00\u4E2A\u670D\u52A1\uFF1B\u65B0\u7684\u5C1D\u8BD5\u4F1A\u7528 1 \u6B21 AI\u3002",
   "error.plain_card_context": "\u8FD9\u5F20\u5361\u7684 AI \u6B65\u9AA4\u6CA1\u6709\u5B8C\u6210",
+  "error.plain_chat_context": "AI \u5BF9\u8BDD\u6CA1\u6709\u5B8C\u6210",
+  "error.plain_outline_context": "\u5927\u7EB2\u8349\u7A3F\u6CA1\u6709\u5B8C\u6210",
+  "error.plain_review_context": "\u7ED3\u6784\u68C0\u89C6\u6CA1\u6709\u5B8C\u6210",
   "ui.technical_details": "\u6280\u672F\u7EC6\u8282",
   "ui.copy_technical_details": "\u590D\u5236\u6280\u672F\u7EC6\u8282",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u65E0\u6CD5\u4E3A\u8FD9\u5F20\u5FC3\u667A\u56FE\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u5185\u5BB9\u88AB\u6539\u53D8\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
@@ -7512,6 +7518,9 @@ var zhTW = {
   "error.plain_next_signin": "\u8ACB\u5230\u8A2D\u5B9A\u91CD\u65B0\u767B\u5165\u518D\u8A66\uFF1B\u8A66\u4E00\u6B21\u6703\u7528 1 \u6B21 AI\u3002",
   "error.plain_next_quota": "\u7B49\u984D\u5EA6\u91CD\u7F6E\u6216\u6539\u7528\u53E6\u4E00\u500B\u670D\u52D9\uFF1B\u65B0\u7684\u5617\u8A66\u6703\u7528 1 \u6B21 AI\u3002",
   "error.plain_card_context": "\u9019\u5F35\u5361\u7684 AI \u6B65\u9A5F\u6C92\u6709\u5B8C\u6210",
+  "error.plain_chat_context": "AI \u5C0D\u8A71\u6C92\u6709\u5B8C\u6210",
+  "error.plain_outline_context": "\u5927\u7DB1\u8349\u7A3F\u6C92\u6709\u5B8C\u6210",
+  "error.plain_review_context": "\u7D50\u69CB\u6AA2\u8996\u6C92\u6709\u5B8C\u6210",
   "ui.technical_details": "\u6280\u8853\u7D30\u7BC0",
   "ui.copy_technical_details": "\u8907\u88FD\u6280\u8853\u7D30\u7BC0",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u7121\u6CD5\u70BA\u9019\u5F35\u5FC3\u667A\u5716\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u5167\u5BB9\u88AB\u6539\u8B8A\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
@@ -33693,11 +33702,12 @@ ${typed}` : draft;
     this.markUnread();
   }
   /** The turn ended without an answer. */
-  fail(text11, announce) {
+  fail(text11, announce, technical) {
     const last = this.messages.at(-1);
     if (last == null ? void 0 : last.streaming) {
       last.text = text11;
       last.error = true;
+      last.technical = technical || void 0;
       last.streaming = false;
     }
     this.busy = false;
@@ -34417,11 +34427,14 @@ ${shown}` : t("ui.map_chat_model_label"));
   }
   /** Everything a message row shows; the row is rebuilt only when this changes. */
   rowKey(message) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
       message.error ? "e" : "",
+      (_a2 = message.technical) != null ? _a2 : "",
+      t("ui.technical_details"),
+      t("ui.copy_technical_details"),
       message.streaming ? "s" : "",
       // Only whether the stage line is there (its words and seconds change in place, never the row).
       this.stageMessage() === message ? "p" : "",
@@ -34434,14 +34447,14 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_plan_title_applied"),
       t("ui.map_chat_plan_title_cancelled"),
       t("ui.map_chat_role_you"),
-      message.role === "assistant" ? (_a2 = message.modelLabel) != null ? _a2 : "" : "",
+      message.role === "assistant" ? (_b2 = message.modelLabel) != null ? _b2 : "" : "",
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_c = (_b2 = message.plan.groups) == null ? void 0 : _b2.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _c : ""}` : "",
+      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_d = (_c = message.plan.groups) == null ? void 0 : _c.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _d : ""}` : "",
       message.choices ? `choices:${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
-      ((_d = message.images) != null ? _d : []).map(
+      ((_e = message.images) != null ? _e : []).map(
         (block) => {
           var _a3, _b3;
           return `images:${block.state}:${(_a3 = block.reason) != null ? _a3 : ""}:${(_b3 = block.notice) != null ? _b3 : ""}:${block.items.map((item) => {
@@ -34498,6 +34511,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
@@ -34521,6 +34535,17 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     }
     return { row, body, more };
+  }
+  /** The raw error of a failed turn: folded away, selectable and copyable. */
+  buildTechnical(row, raw) {
+    const more = row.createEl("details", { cls: "vam-map-chat-error-details" });
+    more.createEl("summary", { text: t("ui.technical_details") });
+    more.createEl("pre", { text: raw });
+    const copy = more.createEl("button", { text: t("ui.copy_technical_details"), attr: { type: "button" } });
+    copy.addEventListener("click", () => {
+      var _a2;
+      return void ((_a2 = navigator.clipboard) == null ? void 0 : _a2.writeText(raw));
+    });
   }
   /** The stage line of the running turn: the stage name, then the seconds (hidden from screen readers; they tick). */
   buildStage(row, message) {
@@ -53301,7 +53326,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
           } catch (error) {
             if (controller.signal.aborted || this.outlineDraftTask !== own2 || this.closed) return;
             own2.state = "failed";
-            own2.message = errorMessage(error);
+            own2.message = plainFailure(t("error.plain_outline_context"), error);
             new import_obsidian34.Notice(own2.message);
           }
           if (!this.closed) this.render();
@@ -53552,7 +53577,7 @@ ${request.requirements}` : preset.text,
           } catch (error) {
             if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
             own2.state = "failed";
-            own2.message = errorMessage(error);
+            own2.message = plainFailure(t("error.plain_review_context"), error);
             new import_obsidian34.Notice(own2.message);
           }
           if (!this.closed) this.render();
@@ -66781,7 +66806,11 @@ ${note.detail.trim()}` : "",
     if (code === "over_budget") return { text: t("ui.map_chat_error_over_budget"), wrapped: false };
     if (code === "invalid") return { text: t("ui.map_chat_error_invalid"), wrapped: false };
     if (code === "stopped") return { text: t("ui.map_chat_stopped"), wrapped: false };
-    return { text: t("ui.map_chat_error_failed_0", errorMessage(error)), wrapped: true };
+    return {
+      text: plainFailure(t("error.plain_chat_context"), error),
+      wrapped: true,
+      technical: rawErrorText(error) || errorMessage(error)
+    };
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
   async sendMapChat(again) {
@@ -66936,7 +66965,7 @@ ${note.detail.trim()}` : "",
               if (replaced) continue;
               if (alive()) {
                 const failure = this.chatErrorText(error);
-                chat.fail(failure.text, failure.wrapped ? failure.text : void 0);
+                chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
               }
               return;
             } finally {

@@ -51868,6 +51868,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
     __publicField(this, "toolbarClearedFor", null);
     __publicField(this, "fitNotice", null);
+    /** True while a framing action (fit) applies its viewport: tool-row placement must not pan the canvas then. */
+    __publicField(this, "framingViewport", false);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
@@ -61718,7 +61720,7 @@ ${request.requirements}` : preset.text,
     }
     if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
     if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);
-    if ((spot.pan.dx || spot.pan.dy) && this.map) {
+    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,
@@ -66183,7 +66185,12 @@ ${note.detail.trim()}` : "",
     const fitSize = { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight };
     const fitInset = this.canvasInsets();
     this.map.viewport = fitViewport(fitBounds, fitSize, fitInset);
-    this.transform();
+    this.framingViewport = true;
+    try {
+      this.transform();
+    } finally {
+      this.framingViewport = false;
+    }
     this.saveViewport();
     if (anyBoxOffscreen(boxes, this.map.viewport, fitSize)) {
       const hint = t("ui.fit_clamped");

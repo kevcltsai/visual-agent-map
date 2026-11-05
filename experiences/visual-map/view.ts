@@ -12567,6 +12567,9 @@ export class VisualAgentMapView extends ItemView {
       this.openLayoutMenu(event);
     });
     this.stageEl = this.viewportEl.createDiv("vam-stage");
+    // Before any card exists: focus handed back below measures the selected card's tool row, and a card on an untransformed stage
+    // reads at scale 1 with no pan, which would throw the map off the canvas.
+    this.applyStageTransform();
     this.stageEl.setAttr("role", "tree");
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
@@ -18573,12 +18576,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The zoom the selected card's tool row was last fitted at. */
   private toolsZoom: number | null = null;
-  private transform(): void {
+  /** Only puts the viewport on the stage; measures nothing, so it is safe while a repaint is still drawing cards. */
+  private applyStageTransform(): void {
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
     // The stylesheet counter-scales each card's tool row by this, so its buttons stay a tappable size when zoomed out.
     this.stageEl.style.setProperty("--vam-zoom", String(zoom));
+  }
+  private transform(): void {
+    if (!this.map || !this.stageEl) return;
+    this.applyStageTransform();
+    const { zoom } = this.map.viewport;
     if (zoom !== this.toolsZoom) {
       this.toolsZoom = zoom;
       // The open row was fitted at the old zoom: its max-width and shift would linger.

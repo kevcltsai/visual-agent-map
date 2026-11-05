@@ -2,39 +2,44 @@
 
 ## [Unreleased]
 
-- **AIM is paused in this version.** Its entry points and settings are hidden; a map built with AIM still opens and edits like any other map, except that card resizing and grading by a goal stay off while AIM is paused. Nothing in your vault is deleted.
-- **Hypothesis leaning.** A hypothesis can now lean supported, undecided or refuted, next to its strength (now starting at none); you can set both by hand, and the map chat can set and read them.
-- **AI lock.** Lock a topic (topic panel, card button or selection bar; `ai-locked: true`) and no AI action changes it, its children or its relations; your own edits still work.
-- **Grading by goal works again with Codex.** The grade request no longer gets refused for a missing `anchor`, and a grading failure now reads as one plain sentence instead of raw error text.
-- **Integrating while a child is being researched.** Synthesizing a topic now waits for its children's running research instead of failing with "The topic changed".
-- **Standard research follows the interface language.** In an English interface a Standard research now writes in English instead of Chinese, and the "Use AI on selection" button changes language when you switch the interface language.
-- **Explore dialog remembers and explains.** Typing in the Levels and size fields replaces the old number and tells you when it is over the limit; the outline review reopens with the levels and size you set; the AI mode hint follows Quick or Standard.
+## [0.30.0] - 2026-11-05
 
-### Cards, links and marks
+### Start a map with one sentence
 
-A card's cover picture now shows the whole picture instead of a 96 px strip cut from the middle. For example, a book cover that used to lose its top and bottom now appears complete.
+Press "New map", type what you want to research, for example "Compare three note-taking apps", and the AI names the map for you; click the title to rename it.
 
-- **Whole picture.** The cover is as wide as the card and as tall as the picture needs, up to 1.5 times the card width. A taller picture is scaled down to fit, with space at the sides, and is never cropped. Exported images match the canvas.
-- **Show only part of the picture.** Add `topic-cover-frame: "x y w h"` to a topic note to show just that part of its cover, as fractions of the picture. For example, `0 0.4 1 0.33` shows a full-width band starting 40% down. The picture file is never cut or changed, and exported images show the same part. A wrong or out-of-range value is ignored and the whole picture shows; `topic-cover: none` still hides the cover. When VAM itself changes the cover picture, the old frame is removed. Older VAM versions ignore the property and show the whole picture.
-- **Edit card.** Double-click the cover picture, choose "Edit card" from the card's right-click menu, or use the button next to the cover switch in the topic panel. The dialog is one card you edit directly. Drag inside the picture to move the mask and use the eight handles to hide a side; the rest stays in place and at its size, and hiding the top or bottom makes the card shorter. "Picture size" (30–100% of the card width, `topic-cover-size`) and the picture position (top, bottom, left or right, `topic-cover-position`) are set there too, and "Show whole picture" brings the whole picture back. Drag the card's right edge (arrow keys work too) to set its width within the same limits as on the map, and type the title and summary right on the card. Apply saves everything as one undoable step; Cancel or closing writes nothing.
-- **Relations in notes.** A topic note's Reference Links now list its relations to other topics (for example "Supports" and "Supported by"), so Obsidian backlinks and graph view see them.
+- "+" asks for a topic type first, including a text block, and the new card opens ready to rename.
+- Duplicate a map to make your own version, and the map chat is still there after you restart Obsidian.
 
-### Changed behavior
+### Hypotheses, locks and the map chat
 
-Built-in note styles are rewritten so each kind of note has sections that each hold one thing. Your own style files are not touched.
+Mark whether a hypothesis leans supported, undecided or refuted, next to its strength, by hand or by asking the map chat.
 
-- **New sections for every kind of note.** General topics and Textbook: Core conclusions, Background and mechanism, Disagreements and limits, Open questions to check, Sources, Update log. Atomic notes: In one sentence, Why, Example, How it differs, Source, Update log. Hypotheses: Claim, Current judgment, If true we would see, What would refute it, How to test, Evidence table, Sources, Update log. Evidence: Summary, Source text or data, How it was obtained, Credibility, Related topics, Source, Update log. Conclusions: Conclusion, Confidence, Basis, What would change it, Scope, Impact and next steps, Sources, Update log. Actions: Status, Goal and done-when, Next step, Steps, Blockers and risks, Expected output, References, Update log.
-- **General topics change on purpose.** The six sections of a general topic and of Textbook are renamed and rewritten (for example "Key knowledge" is now "Background and mechanism", "Tradeoffs and limitations" is now "Disagreements and limits", and the answer comes first). This is an exception to "a general topic's prompt only differs by the conflict rule".
-- **Old notes follow when you research them again.** A note written with the old section names is rewritten with the new names the next time you research it with "merge and rewrite". With "add new findings on top", old sections keep their text and only gain new content under their old names (for example "Evidence and sources" keeps taking sources). Old names are still recognized, so nothing is lost.
-- **Hypotheses now merge and rewrite by default.** The Current judgment is kept as one (it used to pile up one dated judgment per research), and a change is written in the update log as "from X to Y: reason". Choose a style with "add new findings on top" if you want the old way. Conclusion Confidence and Action Status are kept as one in the same way.
-- **Atomic notes and evidence use the lean format and leave empty sections out.** A section with nothing reliable is left out whole instead of saying "No new content this time". The evidence note's "Source text or data" is kept as written; later research may add to it but not rewrite it.
-- **Voices renamed.** "Academic rigor" is now "Professional", and "Magazine column" is now "Narrative". Narrative is rewritten: it keeps the section headings and writes each section as connected prose with a concrete example instead of bullet lists. Styles and files that use the old names still work, and the old names stay reserved.
-- **One shared writing baseline for every voice.** No filler like "First, second, in conclusion", no exaggeration, and concrete numbers. For Traditional Chinese output it also asks for Taiwan wording. AIM reports are not affected.
-- **New parts you can pick.** The "How-to guide" structure (When to use, How to do it, Common mistakes, Decision rules, Sources, Update log) and the "Skim list" format (the lean format with a stricter one-point-per-line rule).
-- **A same-named file may stop being used.** The new built-in names "Professional", "Narrative", "Skim list" and "How-to guide" are reserved. A file of yours with one of these names is listed but not used; rename it.
-- **Sections named Sources, Source or References hold the source list.** In your own structure files too, a section with one of these names now gets the footnote list, as "Evidence and sources" did.
-- **Merge write-back keeps your old update log lines.** When "merge and rewrite" is used, every earlier update log line stays in its place and exactly one new line is added at the bottom, even if the AI did not copy the old lines back.
-- **Three voices retired.** "Key-point summary", "Practical guide" and "AI choice" no longer appear in the voice lists. A style that already uses one keeps working and shows it as "(retired)".
+- Lock a topic and no AI action changes it, its children or its relations; merging keeps the lock, and synthesizing makes a conclusion card linked to its sources.
+- Ask the map chat to "sort the cards under Budget by cost"; one Undo takes back the whole set of chat changes.
+
+### Whole cover pictures
+
+A card's cover now shows the whole picture instead of a strip cut from the middle; for example, a book cover appears complete.
+
+- "Edit card" shows only the part of the picture you choose, sets its size and position, and lets you type the title and summary on the card.
+- A picture picked in the map chat becomes the card's cover.
+
+### Clearer cards and layout
+
+A selected card shows three buttons that no longer cover its neighbours, and the card dialog, now "This card", starts with what it is, how reliable it is and what it relates to.
+
+- When an AI action fails, you see what did not finish, whether the map changed and what to press next; technical details are folded away.
+- After AI adds or moves cards the map lays itself out again, and dropping a card between its siblings reorders them for good.
+
+### Changed
+
+- AIM is paused: its entry points and settings are hidden. Maps built with AIM still open and edit, and nothing in your vault is deleted.
+- Built-in note styles get new sections for each kind of note; an old note takes them when you next "merge and rewrite". "Academic rigor" is now "Professional", "Magazine column" is "Narrative", and three voices are retired.
+
+### Fixes
+
+- Grading by goal works with Codex again, research writes in the interface language, parallel research no longer reports "The topic changed", and exports keep summaries; plus many small fixes to keyboard use, dialogs and wording.
 
 ## [0.29.0] - 2026-11-04
 

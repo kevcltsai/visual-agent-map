@@ -12705,7 +12705,9 @@ export class VisualAgentMapView extends ItemView {
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
-          ...(showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)) ? { topicStatus: note.status } : {}),
+          ...(showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id))
+            ? { topicStatus: note.status }
+            : {}),
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
               .length ?? 0,

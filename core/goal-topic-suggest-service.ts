@@ -36,6 +36,7 @@ export function providerGoalTopicSuggestRunner(aiCalls: AiCalls): GoalTopicSugge
   return providerStepRunner<GoalTopicSuggestRequest, GoalTopicSuggestResult>(aiCalls, {
     name: "goal-topic-suggest",
     topic: request => `Goal topic suggestions · ${request.goal.trim().slice(0, 80)}`,
+    mapPath: request => request.usageMapPath,
     stopped: () => new GoalTopicSuggestError("stopped", "Goal topic suggestions stopped")
   });
 }

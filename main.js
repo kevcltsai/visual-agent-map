@@ -46445,6 +46445,7 @@ function providerGoalTopicSuggestRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "goal-topic-suggest",
     topic: (request) => `Goal topic suggestions \xB7 ${request.goal.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new GoalTopicSuggestError("stopped", "Goal topic suggestions stopped")
   });
 }
@@ -56578,6 +56579,7 @@ ${request.requirements}` : preset.text,
           const context = (_a3 = this.relevanceContext) != null ? _a3 : void 0;
           const result = await this.plugin.goalTopicSuggest.suggest(
             {
+              ...this.usageMapField(),
               goal,
               ...context ? { context } : {},
               nodes: buildStructureReviewNodes(this.map.nodes, (id) => this.describeForReview(id), null),

@@ -3650,6 +3650,7 @@ export class VisualAgentMapView extends ItemView {
           const context = this.relevanceContext ?? undefined;
           const result = await this.plugin.goalTopicSuggest.suggest(
             {
+              ...this.usageMapField(),
               goal,
               ...(context ? { context } : {}),
               nodes: buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), null),

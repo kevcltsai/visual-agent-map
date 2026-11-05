@@ -14,6 +14,8 @@ export const GOAL_TOPIC_SUGGEST_TOKEN_BUDGET = 32_000;
 export const GOAL_TOPIC_TITLE_LIMIT = 200;
 
 export interface GoalTopicSuggestRequest {
+  /** Trusted: the map file this request belongs to, for token-usage accounting only; never serialized into a prompt. */
+  usageMapPath?: string;
   /** What the learner wants to achieve; sent as a JSON string and treated as untrusted data. */
   goal: string;
   /** The learner's 補充 (conditions or what they already know); sent as a JSON string or `null`. Untrusted data. */

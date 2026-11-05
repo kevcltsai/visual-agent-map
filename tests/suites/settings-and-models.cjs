@@ -717,7 +717,7 @@ test('turning records off asks keep/delete with count N', async () => {
     assert.equal(modals.length, 1);
     const m = modals[0];
     assert.equal(w.enabled, false);
-    assert.match(m.contentEl.children[0].text, /3 conversations/);
+    assert.match(m.contentEl.children[0].text, /Saved conversations: 3/);
     const buttons = dom.findAll(m.modalEl, i => i.tag === 'button');
     assert.deepEqual(buttons.map(b => b.text), ['Keep', 'Delete conversations (3)']);
     assert.equal(dom.focusedNow(), buttons[0]);

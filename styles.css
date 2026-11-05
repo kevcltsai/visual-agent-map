@@ -774,6 +774,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-composer { position: relative; }
 .vam-map-chat-composer .vam-map-chat-input { padding-bottom: 36px; }
 .vam-map-chat-composer button.vam-map-chat-send, .vam-map-chat-composer button.vam-map-chat-stop { position: absolute; right: 6px; bottom: 6px; display: inline-flex; align-items: center; justify-content: center; width: 28px; min-width: 24px; height: 28px; min-height: 24px; padding: 0; border: 0; border-radius: 50%; box-shadow: none; cursor: pointer; }
+.vam-map-chat-composer button.vam-map-chat-send.is-hidden, .vam-map-chat-composer button.vam-map-chat-stop.is-hidden, .vam-map-chat-composer button.vam-map-chat-send[hidden], .vam-map-chat-composer button.vam-map-chat-stop[hidden] { display: none; }
 .vam-map-chat-composer button.vam-map-chat-send { background: transparent; color: var(--text-muted); }
 .vam-map-chat-composer button.vam-map-chat-send:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); }
 .vam-map-chat-composer button.vam-map-chat-stop { background: var(--interactive-accent); color: var(--text-on-accent); }

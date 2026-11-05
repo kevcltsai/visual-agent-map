@@ -2858,10 +2858,26 @@ test('map chat composer: the styles put the keys inside the box with theme varia
   assert.match(rule('.vam-map-chat-composer'), /position: relative/);
   assert.match(rule('.vam-map-chat-composer button.vam-map-chat-send, .vam-map-chat-composer button.vam-map-chat-stop'), /position: absolute; right: \d+px; bottom: \d+px;[^}]*border-radius: 50%/);
   assert.match(rule('.vam-map-chat-composer button.vam-map-chat-send'), /background: transparent/, 'idle: no fill');
+  // The shared key rule sets display at (0,2,1); the hide rule must match it, or both keys paint on the same spot.
+  assert.match(rule('.vam-map-chat-composer button.vam-map-chat-send.is-hidden, .vam-map-chat-composer button.vam-map-chat-stop.is-hidden, .vam-map-chat-composer button.vam-map-chat-send[hidden], .vam-map-chat-composer button.vam-map-chat-stop[hidden]'), /display: none/, 'a hidden key is not drawn');
   assert.match(rule('.vam-map-chat-composer button.vam-map-chat-stop'), /background: var\(--interactive-accent\)/, 'working: a filled circle');
   for (const line of lines.filter(l => l.includes('.vam-map-chat-composer'))) assert.doesNotMatch(line, /#[0-9a-fA-F]{3,8}\b|rgb\(/, 'theme variables only');
   for (const gone of ['.vam-map-chat-suggest', '.vam-map-chat-suggestion', '.vam-map-chat-example', '.vam-map-chat-side']) assert.equal(css.includes(gone), false, `${gone} is gone`);
 });
+
+integrationTest('UX B9: an empty map leaves out "Select several topics", the goal bar and the gesture hint; a map with topics has them', async () => {
+  // The goal bar has its own suite (relevance-grade) and is drawn in the overlay, not the toolbar; its guard is pinned from the source below.
+  const tools = h => { const box = element('div'); h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
+  const empty = await harness({ empty: true }); await empty.view.hydrate();
+  eq(tools(empty), [], 'an empty map: no add button and no select control in the toolbar (the centre button adds the first topic)');
+  const full = await harness(); await full.view.hydrate(); const all = tools(full);
+  assert.deepEqual(all, ['Select several topics', 'Data sources']); assert.equal(all.some(l => /goal/i.test(l)), false, 'the goal lives in its own bar, not in the toolbar');
+  const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /if \(this\.relevanceGradeable\(\) && this\.map\.nodes\.length\) this\.renderGoalBar\(overlay\);/, 'no goal bar on an empty or AIM map');
+  assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
+});
+
 
 test('map chat composer: the suggestion layout symbols, host.suggestions and the suggestion / example translation keys are gone', () => {
   const layout = load('core/map-chat-layout.ts'); for (const name of ['chatSuggestionKeys', 'chatSuggestionFill', 'MAP_CHAT_EXAMPLE_KEYS', 'MAP_CHAT_OPEN_ENDED_KEYS']) assert.equal(name in layout, false, name);

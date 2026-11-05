@@ -598,6 +598,12 @@ test('K3 (P4, now on the My styles row): a retired built-in is never counted, on
   assert.equal(mineRow({ parts }).view.name, '0 styles, 1 structures, voices and formats');
 });
 
+test('P3 rows (was failing first): no space follows a full-width closing bracket before the dot, so "（另外指定）" is not followed by a gap', async () => {
+  const line = kindStyleLine(rec('file:X', 'X', { voiceSource: 'global', formatSource: 'global', voice: { ref: 'file:V', name: '口吻（另外指定）' } }));
+  assert.ok(line.includes('口吻（另外指定）· '), line);
+  assert.ok(!line.includes('） '), line);
+});
+
 // ---- the topic-type rows: set apart, voice retired, only new content (settings-redesign P3) ----
 test('P3 rows: a voice or format the style sets apart says "(set apart)" in the line; the ones that follow the global choice say nothing; the AIM report is never marked', async () => {
   const apart = rec('builtin:evidence', 'Evidence', { format: { ref: 'builtin:lean', name: 'Lean format' }, formatSource: 'style', voiceSource: 'global' });

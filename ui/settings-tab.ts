@@ -230,7 +230,8 @@ export function kindStyleLine(item: RecipeListItem): string {
   );
   const parts = [item.structure.name, voice, apart(item.format.name, item.formatSource)];
   if (!item.aimOnly) parts.push(t(UPDATE_MODE_KEYS[item.update]));
-  return parts.join(" · ");
+  // A full-width closing bracket already leaves room, so no space follows it.
+  return parts.join(" · ").replace(/） · /g, "）· ");
 }
 
 /** The small tags beside a topic-type row's name: "voice retired" and "only new content". */

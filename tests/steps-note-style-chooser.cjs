@@ -191,3 +191,9 @@ test('openNoteStylesFolder (D15) creates the block folders, shows their path and
   assert.equal(failing, null);
   assert.ok(shown.some(text => /disk full/.test(String(text))));
 });
+
+test('picker: the folded group stays folded - a display rule on .vam-picker-group must not beat the hidden attribute (was failing first)', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-picker-rest\[hidden\]\s*\{\s*display:\s*none/);
+  assert.ok(css.indexOf('.vam-picker-rest[hidden]') > css.indexOf('.vam-picker-group {'), 'the hidden rule comes after the group rule');
+});

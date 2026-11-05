@@ -12,5 +12,10 @@ export function openInWindowOf(modal: Modal, anchor: HTMLElement | undefined | n
   modal.open();
   const doc = anchor?.ownerDocument;
   const container = modal.containerEl;
-  if (doc?.body && container && container.ownerDocument !== doc) doc.body.appendChild(container);
+  if (!doc?.body || !container || container.ownerDocument === doc) return;
+  // `onOpen` put the focus inside the modal while it was still in the old document; the move drops it, so it is set again.
+  const focused = container.ownerDocument?.activeElement;
+  const keep = focused && container.contains?.(focused) ? (focused as HTMLElement) : undefined;
+  doc.body.appendChild(container);
+  keep?.focus?.();
 }

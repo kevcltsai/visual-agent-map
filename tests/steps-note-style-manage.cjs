@@ -902,6 +902,20 @@ test('P1 popout: a modal opened for a button in another window is moved to that 
 });
 
 
+test('P1 popout: the focus that onOpen set inside the modal is set again after the move to the other window (was failing first)', () => {
+  const { openInWindowOf } = S.load('ui/modals/open-in-window.ts');
+  const popout = { body: { appendChild(node) { node.ownerDocument = popout; return node; } } };
+  const inside = { focusCount: 0, focus() { this.focusCount++; } };
+  const outside = { focusCount: 0, focus() { this.focusCount++; } };
+  const main = { activeElement: inside };
+  const modal = { containerEl: { ownerDocument: main, contains: node => node === inside }, open() {} };
+  openInWindowOf(modal, { ownerDocument: popout });
+  assert.equal(inside.focusCount, 1);
+  const other = { containerEl: { ownerDocument: { activeElement: outside }, contains: node => node === inside }, open() {} };
+  openInWindowOf(other, { ownerDocument: popout });
+  assert.equal(outside.focusCount, 0, 'a focus outside the modal is left alone');
+});
+
 // ---- listUnusedCopies (settings-redesign P3, A5): read-only, shared with the manage window's clean-up ----
 const same = (actual, expected) => assert.deepEqual(plain(actual), expected);
 const STYLES_DIR = language => dirOf(language, 'recipe');
@@ -1181,6 +1195,24 @@ test('P5a built-in rows: "View" then "Copy and edit"; View shows the text or the
   assert.deepEqual(opened, []);
 });
 
+test('Esc with the "..." menu open goes through the window\'s scope: only the menu closes, focus returns to the button, the window stays; the handler is gone once the menu closes (was failing first)', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, {});
+  const { root, modal } = await openManage(setup, 'recipe');
+  const row = rowFor(root, 'Weekly');
+  const more = moreOf(row);
+  const before = modal.scope.handlers.length;
+  more.click();
+  assert.equal(modal.scope.handlers.length, before + 1, 'one Escape handler while the menu is open');
+  assert.equal(modal.scope.press('Escape'), false, 'the key is handled (not passed on to close the window)');
+  assert.equal(menuOf(row), undefined);
+  assert.equal(more.focused, true);
+  assert.equal(modal.closeCount, 0);
+  assert.equal(modal.scope.handlers.length, before, 'unregistered with the menu');
+  more.click();
+  menuOf(row).keydown({ key: 'Tab' });
+  assert.equal(modal.scope.handlers.length, before, 'closing another way unregisters too');
+});
+
 test('P5a own rows: "Edit" and a "..." menu button named for the row; the menu is role=menu with items, opens and closes with the button and Escape (focus back on the button)', async () => {
   const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY, [`${RECIPES}/Used.md`]: WEEKLY }, { noteStyleByKind: { action: 'file:Used' } });
   const { root } = await openManage(setup, 'recipe');
@@ -1275,6 +1307,14 @@ test('P5a Restore the built-in default removes the keys of the topic types that 
   // the last key goes: the whole object goes
   await pickMenu(rowFor(root, 'Other'), 'Restore the built-in default');
   assert.equal('noteStyleByKind' in setup.settings, false);
+});
+
+test('P5a Delete: the delete question opens with the focus on the safe "Cancel", not on "Move to trash"', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, {});
+  const { root } = await openManage(setup, 'recipe');
+  await pickMenu(rowFor(root, 'Weekly'), 'Delete (move to trash)');
+  assert.equal(dom.button(windows[1].modalEl, 'Cancel').focused, true);
+  assert.notEqual(dom.button(windows[1].modalEl, 'Move to trash').focused, true);
 });
 
 test('P5a Delete asks first and lists where the style is used; Cancel changes nothing; Move to trash uses the trash, frees the topic types (back to built-in) and leaves the topics alone', async () => {

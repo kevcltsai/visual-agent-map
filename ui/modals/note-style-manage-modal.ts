@@ -352,7 +352,13 @@ export class NoteStyleManageModal extends Modal {
       });
       return button;
     });
+    // Obsidian handles Escape through the window's scope before the page sees the key, so the menu takes it there.
+    const escape = this.scope.register([], "Escape", () => {
+      close(true);
+      return false;
+    });
     const close = (focus: boolean): void => {
+      this.scope.unregister(escape);
       el.remove();
       more.setAttr("aria-expanded", "false");
       if (this.menu?.el === el) this.menu = undefined;

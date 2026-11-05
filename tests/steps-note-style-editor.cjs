@@ -352,6 +352,20 @@ test('A4: section names as they were - also after a rename that is renamed back,
   assert.equal(setup.v.modifies.includes(OWN_STRUCT), false);
 });
 
+test('M1 (was failing first): a structure file only this style uses, but that the 0.29.0 legacy table still points at (detail-template t1), is not rewritten; the edit goes to a new file named like the style', async () => {
+  const setup = await editorSetup(OWN_SEED, { noteStyleRecipe: { migrated: 1, legacy: { templates: { t1: 'file:Own' }, tones: {} } } });
+  const ed = openEditor(setup, { source: 'file:Own' });
+  await settle();
+  renameSection(ed, 0, 'Alpha 2');
+  saveOf(ed).click();
+  await settle();
+  assert.equal(setup.v.files[OWN_STRUCT], OWN_SEED[OWN_STRUCT], 'the old structure file keeps its bytes');
+  assert.deepEqual(setup.v.modifies.filter(file => file === OWN_STRUCT), []);
+  assert.equal(setup.v.creates.length, 1);
+  assert.notEqual(M.parseRecipeFile(setup.v.files[OWN]).structure, 'file:Own');
+  assert.equal(setup.settings.noteStyleRecipe.legacy.templates.t1, 'file:Own');
+});
+
 test('A4: changed sections of a built-in or shared structure become a new structure file named like the style; the original lines (descriptions, the Count line, comments) travel with their sections, a new section has an empty description, a deleted one is gone, and nothing else is written', async () => {
   const shared = { ...OWN_SEED, [`${RECIPE_DIR}/Other.md`]: recipeText({ structure: 'file:Own' }) };
   // a shared structure file is not changed: the style that edits it gets a copy named like itself

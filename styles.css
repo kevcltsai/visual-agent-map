@@ -1709,6 +1709,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 
 /* Topic note-style picker (card right-click "Note style…"): a radio list, four rows on show, the rest folded. */
 .vam-picker-group { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.vam-picker-rest[hidden] { display: none; }
 .vam-picker-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; height: auto; min-height: 40px; padding: 12px 14px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); color: var(--text-normal); box-shadow: none; text-align: start; cursor: pointer; }
 .vam-picker-row[aria-checked="true"] { border-color: var(--interactive-accent); background: var(--background-modifier-active-hover); }
 .vam-picker-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }

@@ -1558,7 +1558,7 @@ export class NoteStyleStore {
         format: input.format,
         update: input.update
       };
-      // Where the edited sections go: into the structure file only this style uses, else into a new file named like the style.
+      // Where the edited sections go: into the structure file only this style uses (and the 0.29.0 legacy table does not point at), else into a new file named like the style.
       let inPlace: { path: string; name: string } | undefined;
       let created: { path: string; name: string } | undefined;
       if (edit) {
@@ -1570,7 +1570,8 @@ export class NoteStyleStore {
           this.blocks.template.has(used.name) &&
           ownName !== undefined &&
           users.length === 1 &&
-          users[0] === ownName
+          users[0] === ownName &&
+          !this.legacyRefs("structure").has(input.structure)
         ) {
           inPlace = { path: `${dirs.template}/${used.name}.md`, name: used.name };
         } else {

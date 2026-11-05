@@ -51,10 +51,20 @@ const byLabel = (root, label) => find(root, i => i.attrs['aria-label'] === label
 const button = (root, text) => find(root, i => i.tag === 'button' && i.text === text);
 const buttons = root => findAll(root, i => i.tag === 'button').map(b => b.text);
 const texts = root => findAll(root, i => i.text).map(i => i.text);
+/** A Keymap Scope stand-in: `handlers` are the registered ones; `press(key)` runs the last registered match like Obsidian and returns false when one handled it. */
+function makeScope() {
+  const handlers = [];
+  return {
+    handlers,
+    register(modifiers, key, func) { const handler = { modifiers, key, func }; handlers.push(handler); return handler; },
+    unregister(handler) { const at = handlers.indexOf(handler); if (at >= 0) handlers.splice(at, 1); },
+    press(key) { for (const handler of [...handlers].reverse()) if (handler.key === key && handler.func({ key }, {}) === false) return false; return true; }
+  };
+}
 /** A Modal base class whose contentEl lives inside modalEl; `closed` counts close() calls. */
 function makeModal() {
   return class Modal {
-    constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); this.closeCount = 0; }
+    constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); this.closeCount = 0; this.scope = makeScope(); }
     // Like Obsidian's Modal, opening stores the page's text selection on `this.selection`.
     open() { this.selection = { rangeCount: 0 }; this.onOpen?.(); }
     close() { this.closeCount++; this.onClose?.(); }

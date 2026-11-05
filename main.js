@@ -30039,7 +30039,7 @@ var NoteStyleStore = class {
         const used = parseRecipeRef(input2.structure, "structure");
         const ownName = (original == null ? void 0 : original.kind) === "file" ? original.name : void 0;
         const users = (used == null ? void 0 : used.kind) === "file" ? this.stylesUsing("structure", input2.structure) : [];
-        if ((used == null ? void 0 : used.kind) === "file" && this.blocks.template.has(used.name) && ownName !== void 0 && users.length === 1 && users[0] === ownName) {
+        if ((used == null ? void 0 : used.kind) === "file" && this.blocks.template.has(used.name) && ownName !== void 0 && users.length === 1 && users[0] === ownName && !this.legacyRefs("structure").has(input2.structure)) {
           inPlace = { path: `${dirs.template}/${used.name}.md`, name: used.name };
         } else {
           const taken = new Set([...this.blocks.template.keys()].map(lower3));
@@ -31849,10 +31849,15 @@ var import_obsidian17 = require("obsidian");
 
 // ui/modals/open-in-window.ts
 function openInWindowOf(modal, anchor) {
+  var _a2, _b2, _c;
   modal.open();
   const doc = anchor == null ? void 0 : anchor.ownerDocument;
   const container = modal.containerEl;
-  if ((doc == null ? void 0 : doc.body) && container && container.ownerDocument !== doc) doc.body.appendChild(container);
+  if (!(doc == null ? void 0 : doc.body) || !container || container.ownerDocument === doc) return;
+  const focused = (_a2 = container.ownerDocument) == null ? void 0 : _a2.activeElement;
+  const keep = focused && ((_b2 = container.contains) == null ? void 0 : _b2.call(container, focused)) ? focused : void 0;
+  doc.body.appendChild(container);
+  (_c = keep == null ? void 0 : keep.focus) == null ? void 0 : _c.call(keep);
 }
 
 // experiences/visual-map/note-style-picker.ts
@@ -70829,8 +70834,13 @@ var NoteStyleManageModal = class extends import_obsidian37.Modal {
       });
       return button;
     });
+    const escape = this.scope.register([], "Escape", () => {
+      close(true);
+      return false;
+    });
     const close = (focus) => {
       var _a3;
+      this.scope.unregister(escape);
       el.remove();
       more.setAttr("aria-expanded", "false");
       if (((_a3 = this.menu) == null ? void 0 : _a3.el) === el) this.menu = void 0;
@@ -71504,7 +71514,7 @@ function kindStyleLine(item) {
   );
   const parts = [item.structure.name, voice, apart(item.format.name, item.formatSource)];
   if (!item.aimOnly) parts.push(t(UPDATE_MODE_KEYS[item.update]));
-  return parts.join(" \xB7 ");
+  return parts.join(" \xB7 ").replace(/） · /g, "\uFF09\xB7 ");
 }
 function kindStyleTags(item) {
   if (item.aimOnly) return [];

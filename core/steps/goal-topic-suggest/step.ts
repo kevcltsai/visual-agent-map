@@ -1,3 +1,4 @@
+import type { RelevanceTier } from "../../../note-values";
 import { estimateTokens } from "../../../ai/context-builder";
 import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import type { ReasoningLevel } from "../../../ai/types";
@@ -22,6 +23,11 @@ export interface GoalTopicSuggestRequest {
   context?: string;
   /** The whole map, parent before child (see `buildStructureReviewNodes`). */
   nodes: StructureNode[];
+  /**
+   * Current relevance tier by REAL card id (a pin's tier included); top-level and ungraded cards are not listed. Shown
+   * to the model as `tier`, and a suggestion under a "side" card is dropped.
+   */
+  tiers?: Readonly<Record<string, RelevanceTier>>;
   /** The interface language, used for error messages. */
   language: ContentLanguage;
   /** Language of the prompt and model output (`outputLanguageForMap`); defaults to `language`. */
@@ -34,7 +40,7 @@ export interface GoalTopicSuggestion {
   parentId: string;
   title: string;
 }
-export type GoalTopicDropCode = "unknown_parent" | "empty_title" | "title_too_long" | "duplicate_title";
+export type GoalTopicDropCode = "unknown_parent" | "side_parent" | "empty_title" | "title_too_long" | "duplicate_title";
 export interface GoalTopicDrop {
   index: number;
   code: GoalTopicDropCode;
@@ -81,7 +87,7 @@ const invalid = (locale: ContentLanguage, detail: string): GoalTopicSuggestError
 export const goalTopicTitleKey = (title: string): string => title.replace(/\s+/g, " ").trim().toLowerCase();
 
 /** The cards as the model sees them: position ids (c1..cN in map order) for `id` and `parentId`, no UUIDs. */
-const promptCards = (nodes: ReadonlyArray<StructureNode>) => {
+const promptCards = (nodes: ReadonlyArray<StructureNode>, tiers?: GoalTopicSuggestRequest["tiers"]) => {
   const ids = positionIds(nodes.map(node => node.id));
   const label = (id: string): string => ids.short(id) ?? id;
   return nodes.map(node => ({
@@ -89,7 +95,8 @@ const promptCards = (nodes: ReadonlyArray<StructureNode>) => {
     title: node.title,
     summary: node.summary,
     parentId: node.parentId === null ? null : label(node.parentId),
-    depth: node.depth
+    depth: node.depth,
+    ...(tiers?.[node.id] ? { tier: tiers[node.id] } : {})
   }));
 };
 
@@ -99,7 +106,8 @@ const promptCards = (nodes: ReadonlyArray<StructureNode>) => {
  *   `suggestions` array, an item that is not an object with exactly string `parentId` and `title`, or more than
  *   {@link GOAL_TOPIC_SUGGEST_MAX_SUGGESTIONS} suggestions. Nothing is coerced or truncated.
  * - A well-formed suggestion that cannot be used is dropped individually and reported in `dropped`: a `parentId` that is
- *   not a short id of the supplied cards (a real id included), an empty title, a title longer than
+ *   not a short id of the supplied cards (a real id included), a parent the learner can skip (`tiers` says "side"), an
+ *   empty title, a title longer than
  *   {@link GOAL_TOPIC_TITLE_LIMIT}, or a title equal (case and whitespace insensitive) to any existing card or to an
  *   earlier suggestion.
  * Short ids are turned back into real ids here.
@@ -107,7 +115,8 @@ const promptCards = (nodes: ReadonlyArray<StructureNode>) => {
 export function parseGoalTopicSuggest(
   raw: string,
   tree: ReadonlyArray<StructureNode>,
-  language: ContentLanguage = "en"
+  language: ContentLanguage = "en",
+  tiers?: GoalTopicSuggestRequest["tiers"]
 ): GoalTopicSuggestResult {
   const locale = uiLocale(language);
   let value: unknown;
@@ -147,6 +156,7 @@ export function parseGoalTopicSuggest(
     };
     const parentId = ids.real(item.parentId.trim());
     if (parentId === undefined) return drop("unknown_parent");
+    if (tiers?.[parentId] === "side") return drop("side_parent");
     const title = item.title.trim();
     if (!title) return drop("empty_title");
     if ([...title].length > GOAL_TOPIC_TITLE_LIMIT || /[\r\n]/.test(title)) return drop("title_too_long");
@@ -161,7 +171,7 @@ export function parseGoalTopicSuggest(
 /** Suggest missing topics for a learner goal. Input is titles, summaries and structure only; the reply is strict JSON. */
 export const goalTopicSuggestStep: StepDefinition<GoalTopicSuggestRequest, GoalTopicSuggestResult> = {
   id: "goal-topic-suggest",
-  version: 1,
+  version: 2,
   render: request =>
     renderTemplate(template, {
       languageInstruction: inLanguageNaming(
@@ -174,7 +184,7 @@ export const goalTopicSuggestStep: StepDefinition<GoalTopicSuggestRequest, GoalT
       limit: String(GOAL_TOPIC_SUGGEST_MAX_SUGGESTIONS),
       goal: JSON.stringify(request.goal),
       context: JSON.stringify(request.context?.trim() ? request.context : null),
-      nodes: JSON.stringify(promptCards(request.nodes))
+      nodes: JSON.stringify(promptCards(request.nodes, request.tiers))
     }),
   schema: GOAL_TOPIC_SUGGEST_SCHEMA,
   policy: (prompt, request) => {
@@ -184,5 +194,5 @@ export const goalTopicSuggestStep: StepDefinition<GoalTopicSuggestRequest, GoalT
     if (estimateTokens(prompt + JSON.stringify(GOAL_TOPIC_SUGGEST_SCHEMA)) > GOAL_TOPIC_SUGGEST_TOKEN_BUDGET)
       throw new GoalTopicSuggestError("over_budget", translate(locale, "error.goal_topic_suggest_over_budget"));
   },
-  parse: (raw, request) => parseGoalTopicSuggest(raw, request.nodes, request.language)
+  parse: (raw, request) => parseGoalTopicSuggest(raw, request.nodes, request.language, request.tiers)
 };

@@ -590,3 +590,72 @@ test('goal stack: CSS gives an open attachment and an open sources panel a z-ind
   // Children of the attachment never outrank layers outside the bar: its stacking context decides, so no z-index inside it.
   for (const cls of ['vam-relevance-panel', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /z-index/, `.${cls} sets no z-index of its own`);
 });
+
+// ---- the tier floor for just-added cards, and no suggestion under a skippable card --------------------------------
+
+const SIDE_FOR_NEW = request => request.nodes.filter(n => n.parentId !== null).map(n => ({ id: labelOf(request, n.id), tier: ['Sleep stages', 'Stress habits'].includes(n.title) ? 'side' : (TITLES[n.title] ?? 'support') }));
+const tierOnDisk = async (h, title) => {
+  const map = await h.repo.readMap(MAP);
+  for (const n of map.nodes) { const note = await h.repo.readNote(n.path); if (note.title === title) return note.relevance?.tier; }
+  return 'missing';
+};
+
+test('goal suggest: a card the AI grades side under a non-side parent is written as support after Add (full grade; counter-examples 1, 7)', async () => {
+  const h = await harness();
+  h.control.grade = async request => request.nodes.length && { items: SIDE_FOR_NEW(request) };
+  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
+  assert.equal(h.control.gradeCalls[0].step, 'relevance-grade');
+  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support', 'under Body (core)');
+  assert.equal(await tierOnDisk(h, 'Stress habits'), 'support', 'under Mind (support)');
+  assert.equal(await tierOnDisk(h, 'REM'), 'side', 'an old card the AI called side stays side');
+});
+
+test('goal suggest: the same floor applies in recalibrate mode (counter-example 7)', async () => {
+  const h = await harness();
+  h.control.grade = async request => ({ changes: request.nodes.filter(n => ['Sleep stages', 'Stress habits'].includes(n.title)).map(n => ({ id: labelOf(request, n.id), tier: 'side', anchor: null })) });
+  h.view.relevanceAiGrades = () => [{ id: h.ids.a, tier: 'core' }, { id: h.ids.b, tier: 'support' }, { id: h.ids.c, tier: 'side' }, { id: h.ids.d, tier: 'support' }];
+  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
+  assert.equal(h.control.gradeCalls[0].step, 'relevance-recalibrate');
+  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support');
+  assert.equal(await tierOnDisk(h, 'Stress habits'), 'support');
+});
+
+test('goal suggest: an ordinary grade without suggested cards leaves side as side, and the floor is not kept (counter-examples 2, 9)', async () => {
+  const h = await harness();
+  h.control.grade = async request => ({ items: SIDE_FOR_NEW(request) });
+  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
+  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support');
+  await h.view.hydrate();
+  await h.view.submitRelevanceGoal('Sleep better', '', 'full');
+  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'side', 'the next ordinary grade is not floored');
+  assert.equal(await tierOnDisk(h, 'Stress habits'), 'side');
+});
+
+test('goal suggest: the request carries the current tiers (top-level and ungraded cards left out) and the prompt shows tier', async () => {
+  const h = await harness();
+  const write = async (key, tier) => h.repo.writeRelevance((await h.repo.readMap(MAP)).nodes.find(n => n.id === h.ids[key]).path, { tier });
+  await write('a', 'core'); await write('c', 'side');
+  await h.view.hydrate();
+  await h.open();
+  const { request } = h.control.suggestCalls[0];
+  assert.deepEqual(JSON.parse(JSON.stringify(request.tiers)), { [h.ids.a]: 'core', [h.ids.c]: 'side' });
+  const prompt = load('core/goal-topic-suggest-service.ts', { obsidian }).buildGoalTopicSuggestPrompt(request);
+  assert.match(prompt, /"title":"Body"[^}]*"tier":"core"/);
+  assert.match(prompt, /"title":"REM"[^}]*"tier":"side"/);
+  assert.doesNotMatch(prompt, /"title":"Mind"[^}]*"tier"/);
+  assert.doesNotMatch(prompt, /"title":"Sleep"[^}]*"tier"/);
+});
+
+test('goal suggest: a suggestion under a side card is dropped and counted as side_parent; support, core, ungraded and top-level parents stay (counter-example 8)', () => {
+  const { parseGoalTopicSuggest } = load('core/goal-topic-suggest-service.ts', { obsidian });
+  const node = (id, parentId, depth) => ({ id, title: id, summary: '', status: '', parentId, depth });
+  const tree = [node('r', null, 0), node('s', 'r', 1), node('p', 'r', 1), node('k', 'r', 1), node('u', 'r', 1)];
+  const tiers = { s: 'side', p: 'support', k: 'core' };
+  const raw = JSON.stringify({ suggestions: [{ parentId: 'c2', title: 'under side' }, { parentId: 'c3', title: 'under support' }, { parentId: 'c4', title: 'under core' }, { parentId: 'c5', title: 'under ungraded' }, { parentId: 'c1', title: 'under top' }] });
+  const result = parseGoalTopicSuggest(raw, tree, 'en', tiers);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.dropped)), [{ index: 0, code: 'side_parent' }]);
+  assert.deepEqual([...result.suggestions.map(x => x.title)], ['under support', 'under core', 'under ungraded', 'under top']);
+  assert.equal(parseGoalTopicSuggest(raw, tree, 'en').dropped.length, 0, 'no tiers, no drop');
+  const all = parseGoalTopicSuggest(JSON.stringify({ suggestions: [{ parentId: 'c2', title: 'x' }] }), tree, 'en', tiers);
+  assert.deepEqual([all.suggestions.length, all.dropped.length].map(Number), [0, 1], 'all dropped takes the existing "could not be used" path');
+});

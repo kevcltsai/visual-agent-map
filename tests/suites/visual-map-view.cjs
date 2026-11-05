@@ -2423,7 +2423,7 @@ integrationTest('hypothesis-evidence: every topic type has the add-relation entr
   assert.deepEqual(dom.buttons(hypPanel).filter(label => ['None', 'Weak', 'Medium', 'Strong'].includes(label)), ['None', 'Weak', 'Medium', 'Strong']);
   const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
   assert.ok(heKindSelect(factPanel));
-  assert.deepEqual(dom.buttons(factPanel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label)), []);
+  assert.deepEqual(dom.buttons(factPanel).filter(label => ['None', 'Weak', 'Medium', 'Strong'].includes(label)), []);
 });
 integrationTest('hypothesis-evidence: the supports picker offers every topic that can newly be supported (any type), and with none it shows a Notice and no dialog', () => {
   const topics = [node('fact'), node('hyp'), node('linked'), node('plain'), node('hyp2')];

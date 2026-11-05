@@ -12866,7 +12866,8 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
-    // Order (ticket 41): what it is (type), how far to trust it (strength), who it relates to; then the folded
+    // Order (ticket 41): what it is (type), where the evidence points and how much there is (leaning, strength),
+    // who it relates to; then the folded
     // "Appearance" and "Layout" groups; then the AI lock; then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) {

@@ -1156,7 +1156,7 @@ export const en = {
   "ui.usage_unreadable":
     "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
   "ui.usage_footer":
-    "Numbers are reported by the AI service. Values marked ~ are estimates, shown only when the AI service did not report usage. No money amounts are shown, because subscription plans are not charged per request.",
+    "Counts only requests sent by VAM. Numbers are reported by the AI service. Values marked ~ are estimates, shown only when the AI service did not report usage. No money amounts are shown, because subscription plans are not charged per request.",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "The map or parent topic changed while AI was running. No subtopics were created.",

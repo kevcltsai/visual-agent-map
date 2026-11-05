@@ -853,7 +853,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.anchor_pick_mode_hint": "点选模式：只有标注图可以点",
   "ui.anchor_pick_mode_esc": "Esc 取消",
   "ui.anchor_pick_cancelled": "已取消点选",
-  "ui.anchor_pick_plain_image": "这是普通图片。先在图片上右键「转成标注图」，才能放点。",
+  "ui.anchor_pick_plain_image": "这是普通图片。先在图片上右键“转成标注图”，才能放点。",
   "ui.anchor_place_hint": "← ↑ → ↓ 移动、Shift 移动较远、Enter 放下、Esc 取消、也可以直接用鼠标点",
   "ui.anchor_place_cancelled": "已取消放锚点",
   "ui.anchor_no_note_notice": "这张标注图还没有说明。AI 看不到图片，建议补一句“这是什么图、要研究什么”。",

@@ -3616,7 +3616,7 @@ var zhCN = {
   "ui.anchor_pick_mode_hint": "\u70B9\u9009\u6A21\u5F0F\uFF1A\u53EA\u6709\u6807\u6CE8\u56FE\u53EF\u4EE5\u70B9",
   "ui.anchor_pick_mode_esc": "Esc \u53D6\u6D88",
   "ui.anchor_pick_cancelled": "\u5DF2\u53D6\u6D88\u70B9\u9009",
-  "ui.anchor_pick_plain_image": "\u8FD9\u662F\u666E\u901A\u56FE\u7247\u3002\u5148\u5728\u56FE\u7247\u4E0A\u53F3\u952E\u300C\u8F6C\u6210\u6807\u6CE8\u56FE\u300D\uFF0C\u624D\u80FD\u653E\u70B9\u3002",
+  "ui.anchor_pick_plain_image": "\u8FD9\u662F\u666E\u901A\u56FE\u7247\u3002\u5148\u5728\u56FE\u7247\u4E0A\u53F3\u952E\u201C\u8F6C\u6210\u6807\u6CE8\u56FE\u201D\uFF0C\u624D\u80FD\u653E\u70B9\u3002",
   "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 \u79FB\u52A8\u3001Shift \u79FB\u52A8\u8F83\u8FDC\u3001Enter \u653E\u4E0B\u3001Esc \u53D6\u6D88\u3001\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u9F20\u6807\u70B9",
   "ui.anchor_place_cancelled": "\u5DF2\u53D6\u6D88\u653E\u951A\u70B9",
   "ui.anchor_no_note_notice": "\u8FD9\u5F20\u6807\u6CE8\u56FE\u8FD8\u6CA1\u6709\u8BF4\u660E\u3002AI \u770B\u4E0D\u5230\u56FE\u7247\uFF0C\u5EFA\u8BAE\u8865\u4E00\u53E5\u201C\u8FD9\u662F\u4EC0\u4E48\u56FE\u3001\u8981\u7814\u7A76\u4EC0\u4E48\u201D\u3002",
@@ -53051,6 +53051,7 @@ var CARD_EDITOR_DROP = [
 var coverShapes = /* @__PURE__ */ new Map();
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
+var cardImageRelationMarks = /* @__PURE__ */ new WeakMap();
 var cardLinkButtons = /* @__PURE__ */ new WeakMap();
 var cardAiLockButtons = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
@@ -64219,12 +64220,14 @@ ${request.requirements}` : preset.text,
    * image is related to the topic (and never on an AIM map). The text is a count, so it is plain text and nothing else.
    */
   paintCardImageRelations(card, id) {
-    var _a2;
-    for (const old of Array.from(card.querySelectorAll(".vam-image-relations-mark"))) old.remove();
+    var _a2, _b2;
+    (_a2 = cardImageRelationMarks.get(card)) == null ? void 0 : _a2.remove();
+    cardImageRelationMarks.delete(card);
     if (!this.map || !this.relationsEnabled()) return;
-    const count = anchorRelationsForTopic((_a2 = this.map.canvasItems) != null ? _a2 : [], id).length;
+    const count = anchorRelationsForTopic((_b2 = this.map.canvasItems) != null ? _b2 : [], id).length;
     if (!count) return;
     const text11 = t("ui.card_image_relations_0", count), mark = card.createDiv({ cls: "vam-image-relations-mark" });
+    cardImageRelationMarks.set(card, mark);
     mark.setAttr("aria-label", text11);
     const icon = mark.createSpan({ cls: "vam-image-relations-mark-icon" });
     icon.setAttr("aria-hidden", "true");

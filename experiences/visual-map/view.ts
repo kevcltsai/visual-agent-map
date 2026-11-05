@@ -722,6 +722,8 @@ const coverShapes = new Map<string, number>();
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
+/** The image-relations mark of a card, kept by reference so a repaint removes it without querying the card's DOM. */
+const cardImageRelationMarks = new WeakMap<HTMLElement, HTMLElement>();
 /** The link button drawn in each card header, so a refresh can replace it. */
 const cardLinkButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** The AI lock button of each locked card, so a repaint replaces it instead of adding a second. */
@@ -12934,12 +12936,14 @@ export class VisualAgentMapView extends ItemView {
    * image is related to the topic (and never on an AIM map). The text is a count, so it is plain text and nothing else.
    */
   private paintCardImageRelations(card: HTMLElement, id: string): void {
-    for (const old of Array.from(card.querySelectorAll(".vam-image-relations-mark"))) old.remove();
+    cardImageRelationMarks.get(card)?.remove();
+    cardImageRelationMarks.delete(card);
     if (!this.map || !this.relationsEnabled()) return;
     const count = anchorRelationsForTopic(this.map.canvasItems ?? [], id).length;
     if (!count) return;
     const text = t("ui.card_image_relations_0", count),
       mark = card.createDiv({ cls: "vam-image-relations-mark" });
+    cardImageRelationMarks.set(card, mark);
     mark.setAttr("aria-label", text);
     const icon = mark.createSpan({ cls: "vam-image-relations-mark-icon" });
     icon.setAttr("aria-hidden", "true");

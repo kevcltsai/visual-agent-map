@@ -42,7 +42,7 @@ export interface TaskContext {
   /** Summary brackets under this topic: framed child titles and the user's conclusion text, read-only; empty or absent adds nothing. */
   summaryDirections?: string;
   /**
-   * Anchors of annotated images that relate to this topic (experiences/visual-map/anchor-context.ts): user-written, unverified,
+   * Anchors of annotated images that relate to this topic (built by the map's anchor-context module): user-written, unverified,
    * read-only data, never a source to cite. Research and expand only; empty or absent adds nothing.
    */
   anchorContext?: string;

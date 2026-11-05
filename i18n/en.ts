@@ -604,8 +604,6 @@ export const en = {
   "ui.card_edit_summary_label": "Card summary",
   "ui.card_edit_summary_placeholder": "Add a summary",
   "ui.card_summary_add_hint": "Click to add a summary…",
-  "ui.card_edit_title_keys": "Enter or click elsewhere saves · Esc cancels",
-  "ui.card_edit_summary_keys": "Enter or click elsewhere saves · Shift+Enter new line · Esc cancels",
   "ui.card_edit_picture_position": "Picture position",
   "ui.card_edit_position_top": "Top",
   "ui.card_edit_position_bottom": "Bottom",

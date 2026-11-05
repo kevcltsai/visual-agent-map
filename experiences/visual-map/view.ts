@@ -2340,8 +2340,6 @@ export class VisualAgentMapView extends ItemView {
       else this.enqueue(() => this.noteChange(node, { title: name }));
     });
     this.nameEditField(card, input, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
-    // A new card's name field is covered by its own flow; the hint is for editing an existing title.
-    if (!this.inlineName?.created) card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_title_keys") });
     return input;
   }
   /** True while a card's title or summary may be typed in place: not presenting, not picking cards, not in a live AIM run. */
@@ -2445,7 +2443,6 @@ export class VisualAgentMapView extends ItemView {
     });
     area.addEventListener("blur", () => finish(true));
     this.inlineSummaryInput = area;
-    card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_summary_keys") });
     return area;
   }
   /**

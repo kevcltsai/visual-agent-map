@@ -553,8 +553,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.card_edit_summary_label": "卡片摘要",
   "ui.card_edit_summary_placeholder": "加上摘要",
   "ui.card_summary_add_hint": "點這裡加摘要…",
-  "ui.card_edit_title_keys": "Enter 或點別處＝儲存　Esc＝取消",
-  "ui.card_edit_summary_keys": "Enter 或點別處＝儲存　Shift+Enter＝換行　Esc＝取消",
   "ui.card_edit_picture_position": "圖片位置",
   "ui.card_edit_position_top": "上",
   "ui.card_edit_position_bottom": "下",

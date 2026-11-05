@@ -1923,7 +1923,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-node .vam-card-summary-add { opacity: 0; pointer-events: none; margin: 0; color: var(--text-faint); font-size: var(--font-ui-small); font-style: italic; line-height: 1.55; cursor: text; }
 .vam-view .vam-node.is-selected .vam-card-summary-add { opacity: 1; pointer-events: auto; }
 .vam-view .vam-stage[data-presenting] .vam-card-summary-add { opacity: 0; pointer-events: none; }
-.vam-view .vam-node .vam-card-edit-hint { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-view .vam-anchor { position: absolute; z-index: 1; box-sizing: border-box; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0; border: 2px solid var(--interactive-accent); border-radius: 50%; background: transparent; box-shadow: 0 0 0 1px var(--background-primary); cursor: pointer; transition: transform 0.1s ease; }
 .vam-view .vam-anchor.is-linked { border-color: var(--background-primary); background: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); }
 .vam-view .vam-anchor:hover, .vam-view .vam-anchor:focus-visible { transform: scale(1.35); outline: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 35%, transparent); }

@@ -892,6 +892,12 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-chips:empty { display: none; }
 .vam-map-chat-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 1px 4px 1px 8px; border: 1px solid var(--background-modifier-border); border-radius: 999px; background: var(--background-secondary); font-size: var(--font-ui-smaller); }
 .vam-map-chat-chip.is-auto { padding-right: 8px; border-style: dashed; }
+.vam-view .vam-map-chat-refs-label { flex: 0 0 100%; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-view .vam-map-chat-chip-icon, .vam-view .vam-map-chat-seen-icon { display: inline-flex; flex: 0 0 auto; align-items: center; color: var(--text-muted); }
+.vam-view .vam-map-chat-chip-icon svg, .vam-view .vam-map-chat-seen-icon svg { width: 12px; height: 12px; }
+.vam-view .vam-map-chat-seen-row { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; }
+.vam-view .vam-map-chat-seen-row .vam-map-chat-seen { margin-top: 0; }
+.vam-view .vam-map-chat-seen-icon { margin-top: 2px; }
 .vam-map-chat-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-map-chat-chip-remove, .vam-map-chat-note-remove { height: auto; padding: 0 4px; border: 0; background: transparent; box-shadow: none; }
 .vam-map-chat-status { min-height: 1.2em; color: var(--text-muted); font-size: var(--font-ui-smaller); }

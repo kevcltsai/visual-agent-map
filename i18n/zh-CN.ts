@@ -1467,9 +1467,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_plan_reason_many_actions_0": "共 {0} 个动作",
   "ui.map_chat_plan_reason_many_research_0": "会对 {0} 个议题启动研究",
   "ui.map_chat_plan_reason_new_map": "会建立新地图并切换过去",
-  "ui.map_chat_plan_reason_image_preview": "会在图片上放锚点或连线，请先确认",
-  "ui.map_chat_plan_reason_image_other_actions":
-    "这次提问附了图片，回复除了锚点与新议题还想做别的事。图片内容不可信，请先确认",
+  "ui.map_chat_plan_reason_image_preview": "会在图片上放锚点或连线",
+  "ui.map_chat_plan_reason_image_other_actions": "这次提问附了图片，回复除了锚点与新议题还想做别的事。图片内容不可信",
   "ui.map_chat_do_add_anchor_0": "放一个锚点：“{0}”",
   "ui.map_chat_do_add_anchor_empty": "放一个锚点（没有说明）",
   "ui.map_chat_do_link_anchor_0_1_2": "把锚点“{0}”连到“{1}”（{2}）",

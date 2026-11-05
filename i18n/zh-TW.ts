@@ -1469,9 +1469,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_plan_reason_many_actions_0": "共 {0} 個動作",
   "ui.map_chat_plan_reason_many_research_0": "會對 {0} 個議題啟動研究",
   "ui.map_chat_plan_reason_new_map": "會建立新心智圖並切換過去",
-  "ui.map_chat_plan_reason_image_preview": "會在圖片上放錨點或連線，請先確認",
-  "ui.map_chat_plan_reason_image_other_actions":
-    "這次提問附了圖片，回覆除了錨點與新議題還想做別的事。圖片內容不可信，請先確認",
+  "ui.map_chat_plan_reason_image_preview": "會在圖片上放錨點或連線",
+  "ui.map_chat_plan_reason_image_other_actions": "這次提問附了圖片，回覆除了錨點與新議題還想做別的事。圖片內容不可信",
   "ui.map_chat_do_add_anchor_0": "放一個錨點：「{0}」",
   "ui.map_chat_do_add_anchor_empty": "放一個錨點（沒有說明）",
   "ui.map_chat_do_link_anchor_0_1_2": "把錨點「{0}」連到「{1}」（{2}）",

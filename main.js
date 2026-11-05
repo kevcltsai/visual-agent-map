@@ -1519,8 +1519,8 @@ var en = {
   "ui.map_chat_plan_reason_many_actions_0": "{0} actions",
   "ui.map_chat_plan_reason_many_research_0": "Starts research on {0} topics",
   "ui.map_chat_plan_reason_new_map": "Creates a new map and opens it",
-  "ui.map_chat_plan_reason_image_preview": "Places or links anchors on the picture. Check it first.",
-  "ui.map_chat_plan_reason_image_other_actions": "This question came with a picture, and the reply wants more than anchors and new topics. The picture is not trusted, so confirm it first.",
+  "ui.map_chat_plan_reason_image_preview": "Places or links anchors on the picture.",
+  "ui.map_chat_plan_reason_image_other_actions": "This question came with a picture, and the reply wants more than anchors and new topics. The picture is not trusted.",
   "ui.map_chat_do_add_anchor_0": "Place an anchor: \u201C{0}\u201D",
   "ui.map_chat_do_add_anchor_empty": "Place an anchor (no note)",
   "ui.map_chat_do_link_anchor_0_1_2": "Link anchor \u201C{0}\u201D to \u201C{1}\u201D ({2})",
@@ -4253,8 +4253,8 @@ var zhCN = {
   "ui.map_chat_plan_reason_many_actions_0": "\u5171 {0} \u4E2A\u52A8\u4F5C",
   "ui.map_chat_plan_reason_many_research_0": "\u4F1A\u5BF9 {0} \u4E2A\u8BAE\u9898\u542F\u52A8\u7814\u7A76",
   "ui.map_chat_plan_reason_new_map": "\u4F1A\u5EFA\u7ACB\u65B0\u5730\u56FE\u5E76\u5207\u6362\u8FC7\u53BB",
-  "ui.map_chat_plan_reason_image_preview": "\u4F1A\u5728\u56FE\u7247\u4E0A\u653E\u951A\u70B9\u6216\u8FDE\u7EBF\uFF0C\u8BF7\u5148\u786E\u8BA4",
-  "ui.map_chat_plan_reason_image_other_actions": "\u8FD9\u6B21\u63D0\u95EE\u9644\u4E86\u56FE\u7247\uFF0C\u56DE\u590D\u9664\u4E86\u951A\u70B9\u4E0E\u65B0\u8BAE\u9898\u8FD8\u60F3\u505A\u522B\u7684\u4E8B\u3002\u56FE\u7247\u5185\u5BB9\u4E0D\u53EF\u4FE1\uFF0C\u8BF7\u5148\u786E\u8BA4",
+  "ui.map_chat_plan_reason_image_preview": "\u4F1A\u5728\u56FE\u7247\u4E0A\u653E\u951A\u70B9\u6216\u8FDE\u7EBF",
+  "ui.map_chat_plan_reason_image_other_actions": "\u8FD9\u6B21\u63D0\u95EE\u9644\u4E86\u56FE\u7247\uFF0C\u56DE\u590D\u9664\u4E86\u951A\u70B9\u4E0E\u65B0\u8BAE\u9898\u8FD8\u60F3\u505A\u522B\u7684\u4E8B\u3002\u56FE\u7247\u5185\u5BB9\u4E0D\u53EF\u4FE1",
   "ui.map_chat_do_add_anchor_0": "\u653E\u4E00\u4E2A\u951A\u70B9\uFF1A\u201C{0}\u201D",
   "ui.map_chat_do_add_anchor_empty": "\u653E\u4E00\u4E2A\u951A\u70B9\uFF08\u6CA1\u6709\u8BF4\u660E\uFF09",
   "ui.map_chat_do_link_anchor_0_1_2": "\u628A\u951A\u70B9\u201C{0}\u201D\u8FDE\u5230\u201C{1}\u201D\uFF08{2}\uFF09",
@@ -6987,8 +6987,8 @@ var zhTW = {
   "ui.map_chat_plan_reason_many_actions_0": "\u5171 {0} \u500B\u52D5\u4F5C",
   "ui.map_chat_plan_reason_many_research_0": "\u6703\u5C0D {0} \u500B\u8B70\u984C\u555F\u52D5\u7814\u7A76",
   "ui.map_chat_plan_reason_new_map": "\u6703\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716\u4E26\u5207\u63DB\u904E\u53BB",
-  "ui.map_chat_plan_reason_image_preview": "\u6703\u5728\u5716\u7247\u4E0A\u653E\u9328\u9EDE\u6216\u9023\u7DDA\uFF0C\u8ACB\u5148\u78BA\u8A8D",
-  "ui.map_chat_plan_reason_image_other_actions": "\u9019\u6B21\u63D0\u554F\u9644\u4E86\u5716\u7247\uFF0C\u56DE\u8986\u9664\u4E86\u9328\u9EDE\u8207\u65B0\u8B70\u984C\u9084\u60F3\u505A\u5225\u7684\u4E8B\u3002\u5716\u7247\u5167\u5BB9\u4E0D\u53EF\u4FE1\uFF0C\u8ACB\u5148\u78BA\u8A8D",
+  "ui.map_chat_plan_reason_image_preview": "\u6703\u5728\u5716\u7247\u4E0A\u653E\u9328\u9EDE\u6216\u9023\u7DDA",
+  "ui.map_chat_plan_reason_image_other_actions": "\u9019\u6B21\u63D0\u554F\u9644\u4E86\u5716\u7247\uFF0C\u56DE\u8986\u9664\u4E86\u9328\u9EDE\u8207\u65B0\u8B70\u984C\u9084\u60F3\u505A\u5225\u7684\u4E8B\u3002\u5716\u7247\u5167\u5BB9\u4E0D\u53EF\u4FE1",
   "ui.map_chat_do_add_anchor_0": "\u653E\u4E00\u500B\u9328\u9EDE\uFF1A\u300C{0}\u300D",
   "ui.map_chat_do_add_anchor_empty": "\u653E\u4E00\u500B\u9328\u9EDE\uFF08\u6C92\u6709\u8AAA\u660E\uFF09",
   "ui.map_chat_do_link_anchor_0_1_2": "\u628A\u9328\u9EDE\u300C{0}\u300D\u9023\u5230\u300C{1}\u300D\uFF08{2}\uFF09",
@@ -37631,7 +37631,11 @@ ${shown}` : t("ui.map_chat_model_label"));
     const picture = (_c = (_b2 = (_a2 = this.host).image) == null ? void 0 : _b2.call(_a2)) != null ? _c : null;
     if (picture) {
       const name2 = picture.note.trim() || picture.name;
+      this.chipsEl.createSpan({ cls: "vam-map-chat-refs-label", text: t("ui.map_chat_references") }).setAttr("aria-hidden", "true");
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto is-image" });
+      const pin = chip.createSpan("vam-map-chat-chip-icon");
+      pin.setAttr("aria-hidden", "true");
+      (0, import_obsidian24.setIcon)(pin, "map-pin");
       chip.createSpan({
         cls: "vam-map-chat-chip-label",
         text: t(
@@ -37775,11 +37779,16 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
     for (const block of (_b2 = message.images) != null ? _b2 : []) this.buildImages(row, block);
-    if (message.seenImage)
-      row.createDiv({
+    if (message.seenImage) {
+      const line = row.createDiv("vam-map-chat-seen-row");
+      const eye = line.createSpan("vam-map-chat-seen-icon");
+      eye.setAttr("aria-hidden", "true");
+      (0, import_obsidian24.setIcon)(eye, "eye");
+      line.createDiv({
         cls: "vam-map-chat-seen",
         text: t("ui.map_chat_seen_image_0", clip2(message.seenImage.note, 80))
       });
+    }
     if (message.replyUndo) this.buildReplyUndo(row, message.replyUndo.token);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
@@ -37892,6 +37901,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     for (const group of groups) {
       const danger = "danger" in group ? group.danger : void 0;
       const list = group.label ? card.createEl("details", { cls: `vam-map-chat-plan-group${danger ? " is-danger" : ""}` }) : card.createDiv("vam-map-chat-plan-group");
+      if (plan.openGroups && group.label) list.open = true;
       if (group.label) {
         const summary = list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
         if (danger) summary.createSpan({ cls: "vam-map-chat-plan-mark", text: danger.mark });
@@ -61121,11 +61131,9 @@ ${request.requirements}` : preset.text,
         img.addEventListener("error", placeholder2);
       }
       if (annotated) this.renderAnchors(el, annotated, editable);
-      el.addEventListener("focus", () => {
-        el.addClass("is-selected");
-        this.setChatImage(image.id);
-      });
-      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      el.toggleClass("is-selected", this.chatImageId === image.id);
+      el.addEventListener("focus", () => this.setChatImage(image.id));
+      el.addEventListener("click", () => this.setChatImage(image.id));
       if (!editable) continue;
       const handle = el.createDiv("vam-canvas-image-handle");
       handle.setAttr("aria-hidden", "true");
@@ -67060,6 +67068,7 @@ ${request.requirements}` : preset.text,
   }
   selectMapNode(node) {
     if (this.hintEl) this.markCanvasHintSeen();
+    this.clearChatImage();
     this.applySelectionChange(this.selection.selectIfChanged(node.id));
   }
   hideHoverCardSoon() {
@@ -72006,13 +72015,17 @@ ${note.detail.trim()}` : "",
   setChatImage(id) {
     if (this.chatImageId === id) return;
     this.chatImageId = id;
-    this.clearChatPreview();
+    this.syncChatImageOutline();
     for (const listener of [...this.chatImageListeners]) listener();
+  }
+  /** The outline of the canvas pictures follows the picture selection of the chat. The preview dots do not: they follow the plan. */
+  syncChatImageOutline() {
+    for (const [id, el] of this.canvasImageEls) el.toggleClass("is-selected", id === this.chatImageId);
   }
   clearChatImage() {
     if (this.chatImageId === null) return;
     this.chatImageId = null;
-    this.clearChatPreview();
+    this.syncChatImageOutline();
     for (const listener of [...this.chatImageListeners]) listener();
   }
   /** The undo step of the reply applied last (undefined when it wrote nothing): the chat's "undo this reply" button acts on it. */
@@ -72621,6 +72634,8 @@ ${note.detail.trim()}` : "",
       ] : [];
     });
     const card = {
+      // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
+      ...plan.reasons.some((reason) => reason === "image_preview" || reason === "image_other_actions") ? { openGroups: true } : {},
       reasons: plan.reasons.map((reason) => this.planReasonText(reason, result, baseline.selectedCount)),
       items,
       groups,

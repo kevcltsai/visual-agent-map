@@ -86,6 +86,8 @@ export interface MapChatPlanCard {
   summary?: string;
   /** The same actions by kind of work, each folded on the card; `items` is shown flat when absent. */
   groups?: { label: string; items: string[]; danger?: { mark: string } }[];
+  /** The groups are shown open (a plan about a picture); folded when absent. */
+  openGroups?: boolean;
   /** The plan starts AI work (research, expand, …): undo does not take that part back, and the card says so. */
   aiWork?: boolean;
   state: "pending" | "applied" | "cancelled";
@@ -1792,7 +1794,14 @@ export class MapChatPanel {
     if (picture) {
       // The note is the user's or the AI's text: only setText ever shows it. No ×: the chip follows the selection on the canvas.
       const name = picture.note.trim() || picture.name;
+      // The small heading of the mockup: only while a picture is chosen, so a chat without one looks as before.
+      this.chipsEl
+        .createSpan({ cls: "vam-map-chat-refs-label", text: t("ui.map_chat_references") })
+        .setAttr("aria-hidden", "true");
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto is-image" });
+      const pin = chip.createSpan("vam-map-chat-chip-icon");
+      pin.setAttr("aria-hidden", "true");
+      setIcon(pin, "map-pin");
       chip.createSpan({
         cls: "vam-map-chat-chip-label",
         text: t(
@@ -1947,11 +1956,17 @@ export class MapChatPanel {
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
     for (const block of message.images ?? []) this.buildImages(row, block);
-    if (message.seenImage)
-      row.createDiv({
+    if (message.seenImage) {
+      // The words stay one plain-text element; the eye sits beside it.
+      const line = row.createDiv("vam-map-chat-seen-row");
+      const eye = line.createSpan("vam-map-chat-seen-icon");
+      eye.setAttr("aria-hidden", "true");
+      setIcon(eye, "eye");
+      line.createDiv({
         cls: "vam-map-chat-seen",
         text: t("ui.map_chat_seen_image_0", clip(message.seenImage.note, 80))
       });
+    }
     if (message.replyUndo) this.buildReplyUndo(row, message.replyUndo.token);
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];
@@ -2074,6 +2089,7 @@ export class MapChatPanel {
       const list = group.label
         ? card.createEl("details", { cls: `vam-map-chat-plan-group${danger ? " is-danger" : ""}` })
         : card.createDiv("vam-map-chat-plan-group");
+      if (plan.openGroups && group.label) (list as HTMLDetailsElement).open = true;
       if (group.label) {
         const summary = list.createEl("summary", { cls: "vam-map-chat-plan-group-title", text: group.label });
         // Text as well as colour: a group that removes cards says so in words.

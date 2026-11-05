@@ -7856,11 +7856,12 @@ export class VisualAgentMapView extends ItemView {
         img.addEventListener("error", placeholder);
       }
       if (annotated) this.renderAnchors(el, annotated, editable);
-      el.addEventListener("focus", () => {
-        el.addClass("is-selected");
-        this.setChatImage(image.id);
-      });
-      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      // The outline is the chip's twin: it follows the picture selection of the chat, not the keyboard focus (a picture that kept
+      // focus after Esc has no chip, so it has no outline; a press or focus on it selects it again).
+      el.toggleClass("is-selected", this.chatImageId === image.id);
+      el.addEventListener("focus", () => this.setChatImage(image.id));
+      // click, not pointerdown: a read-only picture (selection mode, AIM) takes no pointerdown of its own.
+      el.addEventListener("click", () => this.setChatImage(image.id));
       if (!editable) continue;
       const handle = el.createDiv("vam-canvas-image-handle");
       handle.setAttr("aria-hidden", "true");
@@ -14289,6 +14290,8 @@ export class VisualAgentMapView extends ItemView {
   private selectMapNode(node: MapNode): void {
     // Opening a card is one of the things the canvas hint teaches; mark it first so the repaint does not draw the hint again.
     if (this.hintEl) this.markCanvasHintSeen();
+    // Clicking a card that is already chosen touches nothing, so applySelectionChange cannot tell: the picture ends here.
+    this.clearChatImage();
     this.applySelectionChange(this.selection.selectIfChanged(node.id));
   }
   private hideHoverCardSoon(): void {
@@ -19557,13 +19560,17 @@ export class VisualAgentMapView extends ItemView {
   private setChatImage(id: string): void {
     if (this.chatImageId === id) return;
     this.chatImageId = id;
-    this.clearChatPreview();
+    this.syncChatImageOutline();
     for (const listener of [...this.chatImageListeners]) listener();
+  }
+  /** The outline of the canvas pictures follows the picture selection of the chat. The preview dots do not: they follow the plan. */
+  private syncChatImageOutline(): void {
+    for (const [id, el] of this.canvasImageEls) el.toggleClass("is-selected", id === this.chatImageId);
   }
   private clearChatImage(): void {
     if (this.chatImageId === null) return;
     this.chatImageId = null;
-    this.clearChatPreview();
+    this.syncChatImageOutline();
     for (const listener of [...this.chatImageListeners]) listener();
   }
   /** The undo step of the reply applied last (undefined when it wrote nothing): the chat's "undo this reply" button acts on it. */
@@ -20252,6 +20259,10 @@ export class VisualAgentMapView extends ItemView {
         : [];
     });
     const card: MapChatPlanCard = {
+      // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
+      ...(plan.reasons.some(reason => reason === "image_preview" || reason === "image_other_actions")
+        ? { openGroups: true }
+        : {}),
       reasons: plan.reasons.map(reason => this.planReasonText(reason, result, baseline.selectedCount)),
       items,
       groups,

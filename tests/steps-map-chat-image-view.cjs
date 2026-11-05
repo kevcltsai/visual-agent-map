@@ -338,7 +338,7 @@ test('plan: "show me first" offers a plan for anchors and writes nothing; Apply 
   await h.send('place anchors');
   assert.equal(h.chat.plans.length, 1);
   const card = h.chat.plans[0];
-  assert.deepEqual(plain(card.reasons), ['Places or links anchors on the picture. Check it first.']);
+  assert.deepEqual(plain(card.reasons), ['Places or links anchors on the picture.']);
   assert.equal((await h.image()).anchors.length, 1, 'nothing written yet');
   card.apply();
   await until(() => h.chat.calls.filter(c => c[0] === 'settle').length >= 2);
@@ -608,12 +608,12 @@ test('P4b preview (counter-example): Apply, Cancel, the next message, abort, a p
   // Abort (view closing).
   o = await planned(); o.h.view.abortMapChat();
   assert.equal(dots(o.el()).length, 0, 'aborted');
-  // Another picture is chosen.
+  // Another picture is chosen: the plan card can still be applied, so its dots stay (F-b M2); Apply then takes them away.
   o = await planned(); o.h.view.setChatImage('img2');
-  assert.equal(dots(o.el()).length, 0, 'picture changed');
-  // A late Apply of an old plan does not bring the dots back.
-  o.card.apply(); await until(() => true);
-  assert.equal(dots(o.el()).length, 0);
+  assert.equal(dots(o.el()).length, 3, 'picture changed: the plan is still pending, the dots stay');
+  o.card.apply(); await until(() => o.h.chat.calls.filter(c => c[0] === 'settle').length >= 2);
+  assert.equal(dots(o.el()).length, 0, 'applied after a picture change');
+  assert.equal((await o.h.image()).anchors.length, 4);
   // Map switch: the chat of another map starts empty.
   o = await planned();
   o.h.view.map = { ...o.h.view.map, id: 'map-b' }; o.h.view.placeChatPanel = () => {}; o.h.view.syncChatNarrow = () => {};
@@ -642,4 +642,48 @@ test('P4b preview whitelist (counter-example): a note of <img onerror> is no ele
   h.view.syncAnchorPreview();
   assert.equal(dots(el()).length, 1, 'only the finite one is drawn');
   assert.deepEqual(plain([dots(el())[0].style.left, dots(el())[0].style.top]), ['100%', '0%'], 'clamped to 0-100%');
+});
+
+// ---- F-b: B4, M7, M2 -----------------------------------------------------------------------------------------------------
+test('F-b B4 (counter-example): clicking a card that is already selected still ends the picture selection; the chip is gone and the next send carries no picture', async () => {
+  const h = await harness();
+  const node = h.view.map.nodes.find(n => n.id === h.ids.a);
+  h.view.applySelectionChange(h.view.selection.selectIfChanged(node.id));
+  h.view.setChatImage('img1');
+  // Root cause: choosing the card that is already chosen touches nothing, so the old `if (touched.length)` never fired.
+  assert.equal(h.view.selection.selectIfChanged(node.id).touched.length, 0);
+  h.view.selectMapNode(node);
+  assert.equal(h.view.chatImage(), null, 'the click cleared the picture');
+  h.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] });
+  await h.send('hello');
+  assert.equal(h.control.requests[0].imageDataUrl, undefined);
+  assert.equal(h.control.requests[0].context.selectedImage, undefined);
+});
+
+test('F-b M7: clicking or focusing a picture selects it again after Esc cleared it, and the outline follows the chip', async () => {
+  const h = await harness(); const el = canvas(h);
+  const fire = (target, name) => { for (const fn of target.listeners[name] ?? []) fn({ target }); };
+  fire(el(), 'focus');
+  assert.equal(h.view.chatImage()?.id, 'img1'); assert.ok(el().hasClass('is-selected'));
+  h.view.clearChatImage();
+  assert.equal(h.view.chatImage(), null); assert.equal(el().hasClass('is-selected'), false, 'no chip, no outline');
+  fire(el(), 'click');
+  assert.equal(h.view.chatImage()?.id, 'img1', 'the same picture, still focused, comes back with a click');
+  assert.ok(el().hasClass('is-selected'));
+  h.view.setChatImage('img2');
+  assert.equal(el().hasClass('is-selected'), false, 'another picture: the first one loses the outline');
+  // A full redraw keeps the outline where the chip is.
+  h.view.setChatImage('img1'); h.view.stageEl = dom.element('div'); h.view.renderCanvasItems();
+  assert.ok(dom.find(h.view.stageEl, i => i.dataset?.itemId === 'img1').hasClass('is-selected'));
+  assert.equal(dom.find(h.view.stageEl, i => i.dataset?.itemId === 'img2').hasClass('is-selected'), false);
+});
+
+test('F-b M2 (counter-example): a pending plan keeps its dots when the picture selection changes, Esc, an empty-canvas press or a card choice; only the plan ends them', async () => {
+  const o = await planned(); const v = o.h.view;
+  v.setChatImage('img2'); assert.equal(dots(o.el()).length, 3, 'picture change');
+  v.clearChatImage(); assert.equal(dots(o.el()).length, 3, 'cleared');
+  const node = v.map.nodes.find(n => n.id === o.h.ids.a);
+  v.setChatImage('img1'); v.selectMapNode(node); assert.equal(dots(o.el()).length, 3, 'card chosen');
+  assert.ok(v.chatPreview, 'the preview state is still there');
+  o.card.cancel(); assert.equal(dots(o.el()).length, 0, 'cancelling ends them');
 });

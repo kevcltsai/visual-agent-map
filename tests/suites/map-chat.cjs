@@ -6190,3 +6190,32 @@ integrationTest('map chat steer: a reply with a plan keeps the waiting follow-up
   h.type('big'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('late'); pressEnter(chat); await tick(); await tick(); s.gate.resolve(); await sending;
   assert.ok(chat.pendingPlan(), 'the plan still waits'); assert.equal(chat.draft, 'late'); assert.equal(h.control.requests.length, 1);
 });
+
+// ---- F-b: mockup 方案甲 (M5) and the open plan card (M6) --------------------------------------------------------------------
+test('F-b M5 chip: a picture chip has a pin icon and a visible small heading "References for the AI"; the heading is not there without a picture; the seen line has an eye icon; icons are aria-hidden', () => {
+  const f = imageHostFixture(null); const label = () => findAll(f.panel.chipsEl, i => hasClass(i, 'vam-map-chat-refs-label'));
+  f.panel.refreshSelection();
+  assert.equal(label().length, 0, 'no picture: no heading');
+  f.set({ id: 'i1', kind: 'annotated', note: 'Cow cuts', name: 'a.png' });
+  assert.equal(label().length, 1); assert.equal(label()[0].text, 'References for the AI'); assert.equal(label()[0].children.length, 0);
+  const chip = find(f.panel.chipsEl, i => hasClass(i, 'is-image'));
+  const icon = find(chip, i => hasClass(i, 'vam-map-chat-chip-icon'));
+  assert.equal(icon.iconName, 'map-pin'); assert.equal(icon.attrs['aria-hidden'], 'true');
+  assert.deepEqual(f.parts.chipTexts(), ['Selected: annotated image · Cow cuts'], 'the label text is unchanged');
+  f.set(null); assert.equal(label().length, 0);
+  f.set({ id: 'i1', kind: 'annotated', note: 'n', name: 'a.png' });
+  f.panel.begin('q'); f.panel.finish('a', []); f.panel.markTurn({ seenImage: { note: 'n' } });
+  const seen = findAll(f.panel.logEl, i => hasClass(i, 'vam-map-chat-seen'))[0];
+  const eye = find(seen.parent ?? f.panel.logEl, i => hasClass(i, 'vam-map-chat-seen-icon'));
+  assert.equal(eye.iconName, 'eye'); assert.equal(eye.attrs['aria-hidden'], 'true');
+  assert.equal(seen.text, 'AI looked at this picture: n', 'the seen words are unchanged');
+});
+
+test('F-b M6 plan: a plan card with an image reason opens its groups at once; a card without one stays folded', () => {
+  const f = imageHostFixture(); const groups = () => findAll(f.panel.logEl, i => i.tag === 'details');
+  const card = open => ({ reasons: ['r'], items: ['i'], groups: [{ label: 'Add (1)', items: ['i'] }, { label: 'Delete (1)', items: ['j'], danger: { mark: 'x' } }], estimate: 'e', state: 'pending', ...(open ? { openGroups: true } : {}), apply() {}, cancel() {} });
+  f.panel.begin('a'); f.panel.finish('plan', []); f.panel.showPlan(card(false));
+  assert.deepEqual(groups().map(d => !!d.open), [false, false]);
+  f.panel.begin('b'); f.panel.finish('plan', []); f.panel.showPlan(card(true));
+  assert.deepEqual(groups().slice(2).map(d => !!d.open), [true, true]);
+});

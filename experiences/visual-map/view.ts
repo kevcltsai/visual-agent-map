@@ -284,7 +284,7 @@ import {
 } from "../../map-layout";
 import { arrangeMapWithText, arrangeNewBranchWithText } from "../../map-layout-text";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
-import { sideFromOffset } from "../../layouts/balanced";
+import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { anchorContextFor } from "./anchor-context";
@@ -8653,6 +8653,8 @@ export class VisualAgentMapView extends ItemView {
     if (direction === "balanced") {
       const byId = new Map(this.map.nodes.map(node => [node.id, node]));
       let topic = byId.get(item.parentId);
+      // Hanging on the root itself: the side is that of the block's own box against the root card (same rule as the layout).
+      if (topic && !topic.parentId) return textXAfterWidth(sideFromTextBox(item.x, from, topic.x), item.x, from, to);
       for (let guard = 0; topic?.parentId && byId.get(topic.parentId)?.parentId && guard < 10000; guard++)
         topic = byId.get(topic.parentId);
       const root = topic?.parentId ? byId.get(topic.parentId) : undefined;

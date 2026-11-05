@@ -811,10 +811,31 @@ const ANCHOR_CASES = {
   up: { rule: 'center', expected: (x, from, to) => x + (from - to) / 2 },
   down: { rule: 'center', expected: (x, from, to) => x + (from - to) / 2 },
   right: { rule: 'x', expected: x => x },
-  balancedRight: { rule: 'x', expected: x => x }
+  balancedRight: { rule: 'x', expected: x => x },
+  balancedRootLeft: { rule: 'right edge', expected: (x, from, to) => x + from - to },
+  balancedRootRight: { rule: 'x', expected: x => x }
 };
+// Cells another test in this file already covers with the same assertions (stored width 100), so the matrix skips them:
+// the removed cell -> the test that still covers it. Mapping table: handoff section 4.
+const COVERED = new Set([
+  'left|stored|End', // 'left layout, End key at 560 grows leftward'
+  'left|stored|drag', // 'left layout drag keeps the right edge live and after release'
+  'down|stored|drag', // 'down layout keeps the horizontal center'
+  'right|stored|End', // 'right layout keeps the box x when the width changes'
+  'left|stored|reset' // 'reset to automatic uses the fitted width'
+]);
 async function anchorSetup(kind, stored) {
   const width = stored ? { width: 100 } : {};
+  if (kind.startsWith('balancedRoot')) {
+    const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, x: kind === 'balancedRootLeft' ? 500 : 1100, y: 400, ...width })]);
+    await withLayout(h, 'balanced');
+    Object.assign(h.view.map.nodes[0], { x: 800, y: 100 });
+    h.view.map.canvasItems.find(i => i.id === 't1').x = kind === 'balancedRootLeft' ? 500 : 1100;
+    await h.repo.saveMap(MAP, h.view.map);
+    h.view.map = await h.repo.readMap(MAP);
+    h.view.render();
+    return h;
+  }
   if (kind.startsWith('balanced')) {
     const h = await harness(({ child }) => [txt({ parentId: child.id, text: WIDE, x: kind === 'balancedLeft' ? 200 : 1350, y: 400, ...width })]);
     h.view.map.layout = { direction: 'balanced' };
@@ -834,7 +855,7 @@ for (const kind of Object.keys(ANCHOR_CASES)) {
   for (const stored of [false, true]) {
     const label = `${kind}, ${stored ? 'stored' : 'auto'} width`;
     const { expected, rule } = ANCHOR_CASES[kind];
-    test(`text-node-width: anchoring matrix, drag: ${label}`, async () => {
+    if (!COVERED.has(`${kind}|${stored ? 'stored' : 'auto'}|drag`)) test(`text-node-width: anchoring matrix, drag: ${label}`, async () => {
       const h = await anchorSetup(kind, stored);
       const before = await textOnDisk(h);
       const el = h.textEl('t1');
@@ -855,7 +876,7 @@ for (const kind of Object.keys(ANCHOR_CASES)) {
       assert.equal(undone.width, stored ? 100 : undefined);
       assert.equal(undone.x, before.x, 'one undo restores x');
     });
-    test(`text-node-width: anchoring matrix, End key: ${label}`, async () => {
+    if (!COVERED.has(`${kind}|${stored ? 'stored' : 'auto'}|End`)) test(`text-node-width: anchoring matrix, End key: ${label}`, async () => {
       const h = await anchorSetup(kind, stored);
       const before = await textOnDisk(h);
       h.textEl('t1').offsetWidth = 100;
@@ -869,7 +890,7 @@ for (const kind of Object.keys(ANCHOR_CASES)) {
       await h.view.travel(false);
       assert.equal((await textOnDisk(h)).x, before.x, 'one undo restores x');
     });
-    test(`text-node-width: anchoring matrix, reset to auto: ${label}`, async () => {
+    if (!COVERED.has(`${kind}|${stored ? 'stored' : 'auto'}|reset`)) test(`text-node-width: anchoring matrix, reset to auto: ${label}`, async () => {
       const h = await anchorSetup(kind, stored);
       const before = await textOnDisk(h);
       h.textEl('t1').offsetWidth = 180; // fitted width differs from the stored 100
@@ -885,6 +906,32 @@ for (const kind of Object.keys(ANCHOR_CASES)) {
       }
       assert.equal(after.x, expected(before.x, 100, 180), `${rule} holds against the fitted width`);
       assert.equal(h.textEl('t1').style.width, undefined);
+    });
+  }
+}
+
+// A 59-wide automatic block on the root of a balanced map sits 139 from the root (inside the 150 deadband by its left edge).
+for (const side of ['Left', 'Right']) {
+  for (const op of ['End', 'drag']) {
+    test(`text-node-width: balanced root, 59-wide auto block on the ${side.toLowerCase()}, ${op}`, async () => {
+      const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, x: side === 'Left' ? 661 : 939, y: 400 })]);
+      await withLayout(h, 'balanced');
+      const item = h.view.map.canvasItems.find(i => i.id === 't1');
+      item.x = side === 'Left' ? 661 : 939;
+      Object.assign(h.view.map.nodes[0], { x: 800, y: 100 }); // root at 800
+      await h.repo.saveMap(MAP, h.view.map);
+      h.view.map = await h.repo.readMap(MAP);
+      h.view.render();
+      const before = await textOnDisk(h);
+      h.textEl('t1').offsetWidth = 59;
+      const handle = handleOf(h)('t1');
+      if (op === 'End') handle.fire('keydown', { key: 'End' });
+      else { pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 5000); pointer(handle, 'pointerup', 5000); }
+      await h.settle();
+      const after = await textOnDisk(h);
+      assert.equal(after.width, 560);
+      if (side === 'Left') assert.equal(after.x + 560, before.x + 59, 'right edge holds, clear of the root card');
+      else assert.equal(after.x, before.x);
     });
   }
 }

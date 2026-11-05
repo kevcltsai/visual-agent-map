@@ -1505,3 +1505,23 @@ test('chat 07: reorderSiblings puts a child in front of another child of the sam
     assert.equal(layout.reorderSiblings(nodes, ...args), nodes, args.join());
   assert.deepEqual(ids(nodes), ['r', 'a', 'x', 'b', 'c', 'd'], 'the input is not modified');
 });
+
+// ---- text blocks on the root of a balanced map keep their side by their own box ----
+const rootH = id => ({ r: 70, a: 200, b: 100, c: 80, a1: 60, b1: 90 })[id];
+test('B-text: a card-only balanced arrange keeps cards on the side they stand on, at pinned positions', () => {
+  const nodes = [node('r', null, { x: 800 }), node('a', 'r', { x: 1160 }), node('b', 'r', { x: 440 }), node('c', 'r', { x: 1160 }), node('a1', 'a', { x: 1520 }), node('b1', 'b', { x: 80 })];
+  assert.deepEqual(snap(layout.arrangeMap(nodes, undefined, rootH, 'balanced')), [['r', 800, 227], ['a', 1160, 80], ['b', 440, 212], ['c', 1160, 304], ['a1', 1520, 150], ['b1', 80, 217]]);
+});
+test('B-text: a narrow root-level text block in the left half stays left after a full arrange (not dealt to the right)', () => {
+  // The block is 60 wide, 139 left of the root: inside the 150 deadband by its left edge, clear left by its own box.
+  const nodes = [node('r', null, { x: 800 }), node('b', 'r', { x: 440 }), node('t', 'r', { path: '', width: 60, x: 661, y: 50 }), node('c', 'r', { x: 440 })];
+  const placed = layout.arrangeMap(nodes, undefined, rootH, 'balanced');
+  const by = new Map(placed.map(item => [item.id, item]));
+  assert.ok(by.get('t').x + 60 <= by.get('r').x, `block ${by.get('t').x}+60 stays left of the root at ${by.get('r').x}`);
+  assert.deepEqual(snap(placed), [['r', 440, 254], ['b', 80, 80], ['t', 300, 204], ['c', 80, 408]]);
+});
+test('B-text: a narrow root-level text block in the right half stays right after a full arrange', () => {
+  const nodes = [node('r', null, { x: 800 }), node('b', 'r', { x: 1160 }), node('t', 'r', { path: '', width: 60, x: 961, y: 50 }), node('c', 'r', { x: 1160 })];
+  const by = new Map(layout.arrangeMap(nodes, undefined, rootH, 'balanced').map(item => [item.id, item]));
+  assert.ok(by.get('t').x >= by.get('r').x + 300, 'right block is on the right of the root card');
+});

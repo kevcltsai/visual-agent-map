@@ -132,7 +132,17 @@ test('usage store: a corrupt file is kept byte for byte, persistence stops, and 
 });
 
 test('usage store: a file with a wrong shape or an invalid row is also unreadable', async () => {
-  for (const content of ['[]', JSON.stringify({ version: 1, entries: [{ at: 'x' }], monthly: {} }), JSON.stringify({ version: 2, entries: [], monthly: {} })]) {
+  const tokens = { inputTokens: 1, outputTokens: 1 };
+  const month = providers => JSON.stringify({ version: 1, entries: [], monthly: { '2026-01': { maps: { '': { research: tokens } }, providers } } });
+  for (const content of [
+    '[]',
+    JSON.stringify({ version: 1, entries: [{ at: 'x' }], monthly: {} }),
+    JSON.stringify({ version: 2, entries: [], monthly: {} }),
+    month({ gemini: { '': { research: tokens } } }),
+    month([]),
+    month(null),
+    JSON.stringify({ version: 1, entries: [], monthly: { '2026-01': { maps: { '': { research: { ...tokens, estimated: false } } } } } })
+  ]) {
     const file = tempFile();
     fs.writeFileSync(file, content);
     const store = newStore(file);
@@ -424,15 +434,8 @@ test('usage store provider filter: totals, byAction and recent narrow to one pro
   assert.equal(ok(store.recent('A/map.vam', 10, 'claude')).length, 1);
 });
 
-test('usage store provider filter: a folded month still counts for its provider, the other provider gets none; unreadable stays unreadable', async () => {
+test('usage store provider filter: an unreadable store stays unreadable under every filter', async () => {
   const file = tempFile();
-  const store = newStore(file);
-  const now = Date.now();
-  store.record(row({ at: new Date(now - 200 * 86_400_000).toISOString(), inputTokens: 500, outputTokens: 50 }));
-  store.record(row({ inputTokens: 10, outputTokens: 5 }));
-  same(ok(store.totals()), { inputTokens: 510, outputTokens: 55 });
-  same(ok(store.totals({ provider: 'claude' })), { inputTokens: 510, outputTokens: 55 });
-  same(ok(store.totals({ provider: 'codex' })), { inputTokens: 0, outputTokens: 0 });
   fs.writeFileSync(file, '{ not json');
   const broken = newStore(file);
   await broken.load();

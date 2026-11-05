@@ -521,7 +521,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-next-modal .vam-next-requirements > :not(summary), .vam-next-modal .vam-next-model > :not(summary) { margin-inline: 10px; }
 .vam-next-modal .vam-next-requirements > :last-child, .vam-next-modal .vam-next-model > :last-child { margin-bottom: 10px; }
 .vam-next-disclosure-value { margin-left: 12px; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: 400; overflow-wrap: anywhere; }
-.vam-next-modal .vam-next-requirements:not([open]) > :not(summary), .vam-next-modal .vam-next-source-details:not([open]) > :not(summary), .vam-next-modal .vam-next-output:not([open]) > :not(summary) { display: none; }
+.vam-next-modal .vam-next-requirements:not([open]) > :not(summary), .vam-next-modal .vam-next-output:not([open]) > :not(summary) { display: none; }
 .vam-next-output { margin: 10px 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
 .vam-next-output > summary { min-height: 38px; padding: 7px 10px; cursor: pointer; }
 .vam-next-output[open] > summary { border-bottom: 1px solid var(--background-modifier-border); }
@@ -564,12 +564,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-multi-research-mode { flex: 0 0 auto; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-next-research > p { color: var(--text-muted); }
 .vam-next-research { border-top: 1px solid var(--background-modifier-border); padding-top: 16px; }
-.vam-next-source-details { margin: 10px 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
-.vam-next-source-details > summary { min-height: 38px; padding: 7px 10px; cursor: pointer; }
 .vam-next-source-summary-row { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; min-width: 0; }
 .vam-next-source-summary { min-width: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
-.vam-next-source-details[open] > summary { border-bottom: 1px solid var(--background-modifier-border); }
-.vam-next-source-details .vam-reference-picker { margin: 0; border: 0; padding: 10px; }
 .vam-next-focus { width: 100%; min-height: 72px; resize: vertical; }
 .vam-quick-limits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .vam-outline-research-options.is-hidden { display: none; }

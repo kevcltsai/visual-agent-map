@@ -173,7 +173,8 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
-import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
+import { type ReferenceGroup } from "../../ai/reference-materials";
+import { resolveMapSources } from "./map-sources";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
@@ -12653,46 +12654,21 @@ export class VisualAgentMapView extends ItemView {
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
-  private taskSourceSettings(
-    currentLabel: string,
-    currentTopicId = this.map?.id ?? "",
-    synthesisLabel?: string
-  ): TaskSourceSettings {
+  /** The map's saved sources, read from the map the dialog opened on (not the one open when the task starts). */
+  private taskSourceSettings(): TaskSourceSettings {
+    const mapPath = this.path;
     return {
-      currentTopicId,
-      currentLabel,
-      topics: async () =>
-        Promise.all(
-          (await this.plugin.repo.topics()).map(async topic => {
-            const map = await this.plugin.repo.readMap(topic.mapPath);
-            return {
-              id: topic.id,
-              title: topic.title,
-              mapPath: topic.mapPath,
-              nodePaths: map.nodes.map(node => node.path)
-            };
-          })
-        ),
-      readTopic: async (topic, signal, progress) => {
-        const map = await this.plugin.repo.readMap(topic.mapPath);
-        const files = map.nodes.map(node => {
-          const file = this.app.vault.getAbstractFileByPath(node.path);
-          if (!(file instanceof TFile) || file.extension.toLowerCase() !== "md")
-            throw new Error(t("ui.reference_map_note_unavailable", node.path));
-          return file;
-        });
-        const documents: { path: string; content: string }[] = [];
-        for (let index = 0; index < files.length; index += 20) {
-          if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-          progress(t("ui.reference_read_progress", Math.min(index + 20, files.length), files.length));
-          documents.push(
-            ...(await Promise.all(files.slice(index, index + 20).map(file => readMarkdownFile(this.app, file))))
-          );
-        }
-        if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-        return documents;
-      },
-      synthesisLabel
+      mapSources: async signal => {
+        const sources = await this.plugin.repo.readMapSources(mapPath);
+        if (!sources.length) return [];
+        const { groups } = await resolveMapSources(
+          { app: this.app, readMap: path => this.plugin.repo.readMap(path) },
+          sources,
+          mapPath,
+          signal
+        );
+        return groups;
+      }
     };
   }
   /**
@@ -12770,9 +12746,7 @@ export class VisualAgentMapView extends ItemView {
         new Notice(t("ui.ai_locked_notice"));
         return;
       }
-      const currentLabel = t("ui.reference_current_topic_included", note.title);
-      const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
-      const sources = this.taskSourceSettings(currentLabel, this.map?.id, synthesisLabel);
+      const sources = this.taskSourceSettings();
       // Read the styles again first (#38): a style file made since the last run is what `note-style` may point at.
       await this.refreshNoteStyles();
       const current = this.topicStyle(note);
@@ -15923,8 +15897,7 @@ export class VisualAgentMapView extends ItemView {
         .map(id => this.map!.nodes.find(node => node.id === id))
         .filter((node): node is MapNode => !!node);
     const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
-    const selectedLabel = t("ui.reference_selected_topics_included", names.join(", "));
-    const sources = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
+    const sources = this.taskSourceSettings();
     const settings = this.plugin.settings;
     // The styles are read again first (#38), so the line shows a style file made since the last run.
     this.enqueue(async () => {

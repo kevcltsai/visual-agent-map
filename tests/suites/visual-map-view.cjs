@@ -210,7 +210,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
   const checkedModels = [];
   const modelState = provider => ({ provider, status: 'ready', models: provider === 'codex' ? ['gpt-test'] : [] });
-  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', synthesisTopics: ['Child A', 'Child B'], topics: async () => [], readTopic: async () => [] } };
+  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async model => { checkedModels.push(model); return true; }, confirmAiUsage: async (model, run) => { checkedModels.push(model); await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { mapSources: async () => [], synthesisTopics: ['Child A', 'Child B'] } };
   const modelSettings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources };
   const modal = new NextStepModal({}, 'Parent', 1, 1, plugin,
     async (options, _focus, _done, _failed, accepted) => { researchOptions = options; accepted(); },
@@ -253,11 +253,8 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(all(modal.contentEl, item => item.tag === 'fieldset').length, 0, 'the research-depth fieldset is gone; the AI mode switch replaces it');
   const summaryLine = find(modal.contentEl, item => item.cls === 'vam-next-summary');
   assert.equal(summaryLine.text, 'Quick mode · Same language as my text');
-  const sourceDisclosures = all(modal.contentEl, item => item.cls.includes('vam-next-source-details'));
-  assert.equal(sourceDisclosures.length, 1, 'one data-source picker serves every step');
-  const [sources] = sourceDisclosures;
-  assert.equal(sources.open, false);
-  assert.ok(sources.children[0].children[0].children[1].text.includes('0 Markdown files'));
+  assert.equal(all(modal.contentEl, item => /vam-next-source-details|vam-reference-/.test(item.cls ?? '')).length, 0, 'the task dialog has no data-source section (the map owns its sources)');
+  assert.equal(find(modal.contentEl, item => /Data sources/.test(item.text ?? '')), undefined);
   const outputLanguage = find(modal.contentEl, item => item['aria-label'] === 'Answer language for this task');
   assert.equal(outputLanguage.value, 'same-as-input');
   outputLanguage.value = 'zh-TW';
@@ -267,10 +264,6 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   assert.equal(all(modal.contentEl, item => item.tag === 'textarea').length, 1);
   assert.equal(button(modal.contentEl, 'Save instructions'), undefined);
   requirements.value = 'Only this run';
-  // The data sources keep only local files: no web or image choice (the AI mode decides both).
-  assert.equal(all(sources, item => item.tag === 'input' && item.type === 'checkbox').length, 0);
-  assert.equal(find(sources, item => item.text === 'Search for image references'), undefined);
-  assert.equal(find(sources, item => item.text === 'Allow web search'), undefined);
   assert.ok(find(modal.contentEl, item => /Use Standard once the structure is settled, or when the topic is new or obscure/.test(item.text ?? '')), 'one line says when to use Standard');
   // The expansion's subtopic research is one option; its hint follows the AI mode and never claims the web for Quick.
   const expandChecks = all(expandAdjust, item => item.tag === 'input' && item.type === 'checkbox');
@@ -285,7 +278,6 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   button(find(modal.contentEl, item => item['aria-label'] === 'AI mode'), 'Quick').click();
   assert.match(shallowHint().text, /without the web/);
   assert.equal(load('i18n.ts').translate('zh-TW', 'ui.shallow_research_for_expanded_subtopics_0', load('i18n.ts').translate('zh-TW', 'ui.ai_mode_quick_desc')).includes('快速'), false, 'the zh hint does not repeat the mode name');
-  assert.equal(all(sources, item => item.tag === 'input' && item.type === 'file').length, 2);
   assert.ok(find(synthesize, item => /run a Standard research on the topic first/.test(item.text ?? '')));
   assert.equal(find(synthesize, item => item.text === 'Does not copy full subtopic notes'), undefined);
   cards.children[1].click();
@@ -707,7 +699,7 @@ integrationTest('Next Step modal: the style choice goes into research, expansion
   class Modal { constructor() { this.modalEl = element('modal'); this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl.children.push(this.contentEl); } close() { this.onClose?.(); } }
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class {} } });
   const modelState = provider => ({ provider, status: 'ready', models: [] });
-  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async () => true, confirmAiUsage: async (_m, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { currentTopicId: 'current', currentLabel: 'Current', synthesisLabel: 'Current and children', synthesisTopics: ['Child'], topics: async () => [], readTopic: async () => [] } };
+  const plugin = { noteStyles: { refresh: async () => {}, listRecipes: () => [alphaStyle], listBlocks: category => (category === 'template' ? [{ ref: 'file:Alpha template', kind: 'file', name: 'Alpha template', fileName: 'Alpha template.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Alpha template' }) }, settings: { codexUsageNoticeSeen: true, claudeUsageNoticeSeen: true, models: 'gpt-test', cliReasoning: 'low', language: 'en' }, aiReadyForModel: async () => true, confirmAiUsage: async (_m, run) => { await run(); return true; }, saveSettings: async () => {}, activeTasks: new Map(), availableModels: () => ['gpt-test'], modelLabel: model => model, modelDiscoveryState: modelState, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async provider => modelState(provider), sources: { mapSources: async () => [], synthesisTopics: ['Child'] } };
   const templates = [{ id: 'standard', name: 'Standard' }, { id: 'A', name: 'Alpha template' }];
   const settings = { model: 'gpt-test', modelSource: 'workspace', reasoning: 'low', save: async () => {}, sources: plugin.sources, currentStyle: 'Standard' };
   const seen = {};
@@ -889,7 +881,7 @@ integrationTest('merge dialog (the shared synthesis dialog) names the topic afte
   class Component { load() {} unload() {} addChild(child) { return child; } removeChild() {} }
   const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, Component, MarkdownRenderer: { render: async () => {} }, setIcon: () => {} } });
   const plugin = { settings: { language: 'en', cliModel: 'gpt-test', codexUsageNoticeSeen: true }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { await run(); return true; }, activeTasks: new Map() };
-  const sources = { currentTopicId: 'map', currentLabel: 'Selected topics included', topics: async () => [], readTopic: async () => [] };
+  const sources = { mapSources: async () => [] };
   const open = (names, title, calls) => {
     const modal = new NextStepModal({}, '', 0, 0, plugin, async () => {}, async () => {}, async (options, direction, _failed, accepted) => { calls.push({ options, direction }); accepted(); },
       undefined, { names, initialTitle: title, defaultDirection: 'Find shared conclusions', fields: { sources, templates: [], tones: [] } });

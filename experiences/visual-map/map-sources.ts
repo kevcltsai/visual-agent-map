@@ -94,7 +94,7 @@ export interface MapSourceDeps {
   readMap(path: string): Promise<MapDocument>;
 }
 
-const aborted = (): DOMException => new DOMException("Aborted", "AbortError");
+const aborted = (): Error => Object.assign(new Error("Aborted"), { name: "AbortError" });
 
 function markdownFiles(folder: TFolder): TFile[] {
   const found: TFile[] = [];
@@ -193,7 +193,7 @@ export async function resolveMapSources(
         if (documents.length) groups.push({ id: `map:${map.id}`, name: map.title, location: source.path, documents });
       }
     } catch (error) {
-      if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) throw aborted();
+      if (signal.aborted || (error instanceof Error && error.name === "AbortError")) throw aborted();
       unreadable.push(source);
     }
   }

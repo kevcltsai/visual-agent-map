@@ -441,6 +441,16 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 /* The edit popover opens under the bar, on the same surface. */
 .vam-relevance-panel { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 5; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); animation: vam-relevance-panel-in 150ms ease-out; }
 @keyframes vam-relevance-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Suggested new topics: a card under the bar, same width, with one checkable row per suggestion. */
+.vam-goal-suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 5; display: flex; flex-direction: column; gap: 7px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); font-size: var(--font-ui-small); animation: vam-relevance-panel-in 150ms ease-out; }
+.vam-goal-suggest.is-running { flex-direction: row; align-items: center; justify-content: space-between; color: var(--text-muted); }
+.vam-goal-suggest-row { display: flex; align-items: flex-start; gap: 8px; margin: 0; cursor: pointer; }
+.vam-goal-suggest-row input[type="checkbox"] { flex: none; margin: 3px 0 0; }
+.vam-goal-suggest-text { display: flex; flex-direction: column; min-width: 0; }
+.vam-goal-suggest-title { color: var(--text-normal); overflow-wrap: anywhere; }
+.vam-goal-suggest-why { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-goal-suggest-foot { display: flex; justify-content: flex-end; gap: 6px; padding-top: 7px; border-top: 1px solid var(--background-modifier-border); }
+.vam-goal-suggest button:focus-visible, .vam-goal-suggest input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-relevance-setup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .vam-relevance-goal-input, .vam-relevance-context-input { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; font-size: var(--font-ui-small); }
 .vam-relevance-goal-input::placeholder, .vam-relevance-context-input::placeholder { color: var(--text-muted); opacity: 1; }
@@ -460,7 +470,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-relevance-unpin-all { font-size: var(--font-ui-small); }
 .vam-relevance-unpin-all:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) {
-  .vam-relevance-panel { animation: none; }
+  .vam-relevance-panel, .vam-goal-suggest { animation: none; }
   /* Same selector weight as the scan animation rule above, otherwise that rule keeps winning. */
   .vam-status-running::before, .vam-node:not([data-aim-kind])[data-status="running"]::after { animation: none; }
   .vam-node:not([data-aim-kind])[data-status="running"]::after { background: var(--interactive-accent); }

@@ -735,8 +735,10 @@ integrationTest('relevance goal bar: the text is one tab stop with aria-expanded
   assert.equal(h.icon('Sort by relevance').attrs['aria-pressed'], 'false');
   const long = 'x'.repeat(200); h.view.relevanceGoal = long; h.view.render();
   assert.equal(h.chip().text, long, 'a 200-character goal is not truncated');
-  // The suggest icon waits for P5: rendered, named, disabled.
-  assert.equal(h.icon('Suggest new topics for this goal').disabled, true);
+  // The suggest icon (P5) is on once there is a goal (the list itself is tested in tests/steps-goal-topic-suggest-view.cjs) and off without one.
+  assert.equal(h.icon('Suggest new topics for this goal').disabled, false);
+  h.view.relevanceGoal = null; h.view.render();
+  assert.equal(h.icon('Suggest new topics for this goal').disabled, true, 'no goal: nothing to suggest for');
 });
 
 integrationTest('relevance goal bar: the recalibrate icon is named by its mode and runs the grade it names; edit opens the popover; Enter on the text opens it too', async () => {

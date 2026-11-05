@@ -9,6 +9,7 @@ import {
   GOAL_TOPIC_SUGGEST_TOKEN_BUDGET,
   GoalTopicSuggestError,
   goalTopicSuggestStep,
+  goalTopicTitleKey,
   parseGoalTopicSuggest,
   type GoalTopicDrop,
   type GoalTopicSuggestion,
@@ -22,6 +23,7 @@ export {
   GOAL_TOPIC_SUGGEST_SCHEMA,
   GOAL_TOPIC_SUGGEST_TOKEN_BUDGET,
   GoalTopicSuggestError,
+  goalTopicTitleKey,
   parseGoalTopicSuggest
 };
 export type { GoalTopicDrop, GoalTopicSuggestion, GoalTopicSuggestRequest, GoalTopicSuggestResult };

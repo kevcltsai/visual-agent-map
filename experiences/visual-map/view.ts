@@ -418,6 +418,11 @@ import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal, type MultiResearchRequest } from "./multi-research-modal";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
+  GoalTopicSuggestError,
+  goalTopicTitleKey,
+  type GoalTopicSuggestion
+} from "../../core/goal-topic-suggest-service";
+import {
   buildStructureReviewNodes,
   isSuggestionStale,
   type StructureNode,
@@ -964,6 +969,24 @@ export type MapCommandAction =
   | "zoom-reset"
   | "search"
   | "shortcuts";
+let goalSuggestSeq = 0;
+/**
+ * `confirming`: the usage notice is open; `running`: the AI call is out (Stop works); `ready`: the list is shown;
+ * `applying`: Add was pressed and the topics are being written.
+ */
+interface GoalSuggestTask {
+  mapPath: string;
+  token: number;
+  controller: AbortController;
+  state: "confirming" | "running" | "ready" | "applying";
+  suggestions: GoalTopicSuggestion[];
+  /** What the AI saw of each parent (title, its parent): Add skips a suggestion whose parent no longer matches. */
+  basis: Map<string, { title: string; parentId: string | null }>;
+  checked: Set<number>;
+  /** Where the keyboard goes when the panel is next drawn (consumed by the draw). */
+  focus: "stop" | "list" | null;
+}
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -995,6 +1018,10 @@ export class VisualAgentMapView extends ItemView {
   private relevancePanelOpen = false;
   private relevanceDraft: { goal: string; context: string } | null = null;
   private relevanceBarEl: HTMLElement | null = null;
+  /** The "suggest new topics for the goal" task: one at a time; it owns the AI call, the list and the Add press. */
+  private goalSuggestTask: GoalSuggestTask | null = null;
+  private goalSuggestCleanup: (() => void) | null = null;
+  private goalSuggestPanelEl: HTMLElement | null = null;
   private relevanceButtonEl: HTMLElement | null = null;
   private relevancePanelEl: HTMLElement | null = null;
   private relevancePanelGen = 0;
@@ -2114,6 +2141,8 @@ export class VisualAgentMapView extends ItemView {
     this.chat?.dispose();
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
+    this.goalSuggestCleanup?.();
+    this.goalSuggestCleanup = null;
     // An open panel pre-started the CLI for a grade that will never be sent.
     if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
     this.abortRelevanceGrade();
@@ -2455,6 +2484,8 @@ export class VisualAgentMapView extends ItemView {
     const draft = this.outlineDraftTask;
     this.structureReviewTask = null;
     this.outlineDraftTask = null;
+    this.goalSuggestTask?.controller.abort();
+    this.goalSuggestTask = null;
     review?.controller.abort();
     draft?.controller.abort();
     this.highlightStructure([]);
@@ -3103,6 +3134,9 @@ export class VisualAgentMapView extends ItemView {
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
+    this.goalSuggestCleanup?.();
+    this.goalSuggestCleanup = null;
+    this.goalSuggestPanelEl = null;
     const bar = overlay.createDiv({
       cls: "vam-goal-bar",
       attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
@@ -3116,6 +3150,7 @@ export class VisualAgentMapView extends ItemView {
     });
     this.relevanceBarEl = bar;
     this.drawGoalBar(bar);
+    this.drawGoalSuggest(bar);
     if (!this.relevancePanelOpen) return;
     if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
       this.relevancePanelOpen = false;
@@ -3187,8 +3222,19 @@ export class VisualAgentMapView extends ItemView {
       });
       return button;
     };
-    // TODO(goal-banner P5): enable and wire this to the suggest-topics flow; until then it stays disabled.
-    icon("spark", t("ui.goal_suggest_topics"), () => {}, true);
+    // Busy (confirming, asking, writing): all four icons are off. A shown list leaves them on; the spark then closes it.
+    const suggestTask = this.goalSuggestTask;
+    const busy = !!suggestTask && suggestTask.state !== "ready";
+    const spark = icon(
+      "spark",
+      t("ui.goal_suggest_topics"),
+      () => {
+        if (this.goalSuggestTask?.state === "ready") this.endGoalSuggest(this.goalSuggestTask, { refocus: true });
+        else void this.startGoalSuggest();
+      },
+      running || !goal || busy
+    );
+    spark.setAttr("data-goal-action", "suggest");
     const mode: RelevanceMode = relevanceMode(
       { goal: goal ?? "", context: this.relevanceContext ?? "" },
       { goal, context: this.relevanceContext },
@@ -3200,7 +3246,7 @@ export class VisualAgentMapView extends ItemView {
       () => {
         if (goal) void this.submitRelevanceGoal(goal, this.relevanceContext ?? "", mode);
       },
-      running || !goal
+      running || !goal || busy
     );
     const sort = icon(
       "sort",
@@ -3211,11 +3257,293 @@ export class VisualAgentMapView extends ItemView {
         else relevanceSortedMaps.add(this.path);
         this.renderPreservingFocus();
       },
-      running
+      running || busy
     );
     sort.setAttr("aria-pressed", String(sorted));
     sort.toggleClass("on", sorted);
-    icon("edit", t("ui.goal_edit"), () => toggleEditor(), running);
+    icon("edit", t("ui.goal_edit"), () => toggleEditor(), running || busy);
+  }
+  // ---- Suggest new topics for the goal --------------------------------------------------------------------------
+  /** A result, a stop or a failure only counts while this is true: the task is still the view's own, on the same map. */
+  private goalSuggestCurrent(task: GoalSuggestTask): boolean {
+    return (
+      !this.closed && this.goalSuggestTask === task && task.mapPath === this.path && !task.controller.signal.aborted
+    );
+  }
+  /** Drops the task (aborting its AI call), its listeners and its panel; the late result then fails the fence. */
+  private endGoalSuggest(task: GoalSuggestTask, options: { refocus: boolean; repaint?: boolean }): void {
+    if (this.goalSuggestTask !== task) return;
+    this.goalSuggestTask = null;
+    task.controller.abort();
+    this.goalSuggestCleanup?.();
+    this.goalSuggestCleanup = null;
+    this.goalSuggestPanelEl?.remove();
+    this.goalSuggestPanelEl = null;
+    if (this.closed) return;
+    if (options.repaint !== false) this.render();
+    if (options.refocus)
+      this.contentEl?.querySelector?.<HTMLElement>('.vam-goal-icon[data-goal-action="suggest"]')?.focus();
+  }
+  /** The spark icon: ask the AI which topics are missing for the goal. Nothing is written until the user adds some. */
+  private async startGoalSuggest(): Promise<void> {
+    const goal = this.relevanceGoal;
+    if (!goal || !this.map || !this.map.nodes.length || !this.relevanceGradeable() || this.presentation) return;
+    if (this.outlineImportTarget().map !== "editable") return;
+    if (this.goalSuggestTask || this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
+    if (this.relevancePanelOpen) this.closeRelevancePanel(false);
+    const task: GoalSuggestTask = {
+      mapPath: this.path,
+      token: ++goalSuggestSeq,
+      controller: new AbortController(),
+      state: "confirming",
+      suggestions: [],
+      basis: new Map(),
+      checked: new Set(),
+      focus: null
+    };
+    // Claimed before the first await: a second press cannot start another call.
+    this.goalSuggestTask = task;
+    this.render();
+    const settings = this.plugin.settings;
+    const { model, reasoning } = this.plugin.currentModelChoice();
+    let began = false;
+    try {
+      await this.plugin.confirmAiUsage(model, async () => {
+        if (!this.goalSuggestCurrent(task) || !this.map) return;
+        began = true;
+        task.state = "running";
+        task.focus = "stop";
+        this.render();
+        try {
+          const context = this.relevanceContext ?? undefined;
+          const result = await this.plugin.goalTopicSuggest.suggest(
+            {
+              goal,
+              ...(context ? { context } : {}),
+              nodes: buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), null),
+              language: settings.language,
+              contentLanguage: outputLanguageForMap(this.map, settings.language, this.map.title),
+              model,
+              reasoning
+            },
+            task.controller.signal
+          );
+          if (!this.goalSuggestCurrent(task)) return;
+          this.showGoalSuggestions(task, result.suggestions, result.dropped.length);
+        } catch (error) {
+          if (!this.goalSuggestCurrent(task)) return;
+          this.endGoalSuggest(task, { refocus: true });
+          new Notice(
+            error instanceof GoalTopicSuggestError
+              ? error.message
+              : plainFailure(t("error.plain_goal_suggest_context"), error)
+          );
+        }
+      });
+    } catch (error) {
+      if (this.goalSuggestCurrent(task)) {
+        this.endGoalSuggest(task, { refocus: true });
+        new Notice(plainFailure(t("error.plain_goal_suggest_context"), error));
+      }
+      return;
+    }
+    // Usage notice declined (or closed): nothing was asked, nothing is written.
+    if (!began && this.goalSuggestCurrent(task)) this.endGoalSuggest(task, { refocus: true });
+  }
+  /** Locked parents are dropped (counted in a Notice); an empty rest says so and closes; otherwise the list opens. */
+  private showGoalSuggestions(task: GoalSuggestTask, suggestions: GoalTopicSuggestion[], unusable: number): void {
+    const kept = suggestions.filter(item => !this.aiLockReason("addChild", [item.parentId]));
+    const locked = suggestions.length - kept.length;
+    if (locked) new Notice(t("ui.ai_locked_suggestions_skipped_0", locked));
+    if (!kept.length) {
+      this.endGoalSuggest(task, { refocus: true });
+      // Quiet about single drops; only a reply that was entirely unusable says so.
+      if (!locked)
+        new Notice(
+          suggestions.length === 0 && unusable ? t("ui.goal_suggest_unusable_0", unusable) : t("ui.goal_suggest_none")
+        );
+      return;
+    }
+    for (const item of kept) {
+      const parent = this.map?.nodes.find(node => node.id === item.parentId);
+      task.basis.set(item.parentId, {
+        title: this.describeForReview(item.parentId)?.title ?? "",
+        parentId: parent?.parentId ?? null
+      });
+    }
+    task.suggestions = kept;
+    task.checked = new Set(kept.map((_, index) => index));
+    task.state = "ready";
+    task.focus = "list";
+    this.render();
+  }
+  /** The card under the bar: "Suggesting…" with Stop, or the checkable list with Skip and Add. Model text goes in as text only. */
+  private drawGoalSuggest(bar: HTMLElement): void {
+    const task = this.goalSuggestTask;
+    if (!task) return;
+    if (task.mapPath !== this.path) {
+      this.goalSuggestTask = null;
+      task.controller.abort();
+      return;
+    }
+    if (task.state === "confirming") return;
+    const panel = bar.createDiv("vam-goal-suggest");
+    this.goalSuggestPanelEl = panel;
+    if (task.state === "running") {
+      panel.addClass("is-running");
+      panel.createSpan({
+        cls: "vam-goal-suggest-status",
+        text: t("ui.goal_suggest_running"),
+        attr: { role: "status", "aria-live": "polite" }
+      });
+      const stop = panel.createEl("button", { cls: "vam-goal-suggest-stop", text: t("ui.goal_suggest_stop") });
+      stop.addEventListener("click", event => {
+        event.stopPropagation();
+        this.endGoalSuggest(task, { refocus: true });
+      });
+      panel.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.endGoalSuggest(task, { refocus: true });
+      });
+      if (task.focus === "stop") {
+        task.focus = null;
+        stop.focus();
+      }
+      return;
+    }
+    const applying = task.state === "applying";
+    panel.setAttr("role", "group");
+    panel.setAttr("aria-label", t("ui.goal_suggest_list_label"));
+    const boxes: HTMLInputElement[] = [];
+    task.suggestions.forEach((item, index) => {
+      const row = panel.createEl("label", { cls: "vam-goal-suggest-row" });
+      const box = row.createEl("input", { type: "checkbox" });
+      box.checked = task.checked.has(index);
+      box.disabled = applying;
+      boxes.push(box);
+      const text = row.createSpan("vam-goal-suggest-text");
+      text.createSpan({ cls: "vam-goal-suggest-title", text: item.title });
+      text.createSpan({
+        cls: "vam-goal-suggest-why",
+        text: t("ui.goal_suggest_under_0", task.basis.get(item.parentId)?.title ?? "")
+      });
+      box.addEventListener("change", () => {
+        if (box.checked) task.checked.add(index);
+        else task.checked.delete(index);
+        syncAdd();
+      });
+    });
+    const foot = panel.createDiv("vam-goal-suggest-foot");
+    const skip = foot.createEl("button", { cls: "vam-goal-suggest-skip", text: t("ui.goal_suggest_skip") });
+    const add = foot.createEl("button", { cls: "vam-goal-suggest-add mod-cta" });
+    const syncAdd = (): void => {
+      add.setText(t("ui.goal_suggest_add_0", task.checked.size));
+      add.disabled = applying || task.checked.size === 0;
+    };
+    syncAdd();
+    skip.disabled = applying;
+    skip.addEventListener("click", event => {
+      event.stopPropagation();
+      this.endGoalSuggest(task, { refocus: true });
+    });
+    add.addEventListener("click", event => {
+      event.stopPropagation();
+      this.whenEditing(() => void this.applyGoalSuggest(task));
+    });
+    panel.addEventListener("keydown", event => {
+      if (event.key !== "Escape" || task.state !== "ready") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.endGoalSuggest(task, { refocus: true });
+    });
+    if (task.focus === "list") {
+      task.focus = null;
+      (boxes[0] ?? add).focus();
+    }
+    // A press anywhere else closes it without writing (the spark toggles it itself).
+    const doc = this.contentEl?.ownerDocument;
+    if (doc?.addEventListener && !applying) {
+      const outside = (event: Event): void => {
+        const target = event.target as Node | null;
+        const spark = bar.querySelector?.('.vam-goal-icon[data-goal-action="suggest"]');
+        if (!target || panel.contains(target) || spark?.contains(target)) return;
+        this.endGoalSuggest(task, { refocus: false, repaint: false });
+      };
+      doc.addEventListener("pointerdown", outside, true);
+      this.goalSuggestCleanup = () => doc.removeEventListener("pointerdown", outside, true);
+    }
+  }
+  /**
+   * Add: every checked suggestion is checked again inside the map write (parent still there, same name and place, not
+   * AI-locked, title not taken meanwhile); the ones that no longer fit are skipped and counted. All the cards are one
+   * undo step. Then the map is graded by the goal again, which asks for the usage confirmation itself.
+   */
+  private async applyGoalSuggest(task: GoalSuggestTask): Promise<void> {
+    if (this.goalSuggestTask !== task || task.state !== "ready" || !task.checked.size) return;
+    task.state = "applying";
+    const picked = [...task.checked].sort((a, b) => a - b).flatMap(index => task.suggestions[index] ?? []);
+    this.goalSuggestCleanup?.();
+    this.goalSuggestCleanup = null;
+    this.render();
+    let added = 0;
+    let skipped = 0;
+    try {
+      await this.plugin.mutate(async () => {
+        if (!this.goalSuggestCurrent(task)) {
+          skipped = picked.length;
+          return;
+        }
+        const fresh = await this.freshNotesOf(picked.map(item => item.parentId));
+        const mark = this.history.mark();
+        try {
+          for (const item of picked) {
+            const parent = this.map?.nodes.find(node => node.id === item.parentId);
+            if (!this.map || this.closed || !parent || this.goalSuggestStale(item, task, parent, fresh)) {
+              skipped++;
+              continue;
+            }
+            await this.addNode(parent, item.title, false, false);
+            added++;
+          }
+          if (added) await this.plugin.rebuildDerivedData();
+        } finally {
+          this.history.collapseSince(mark, t("ui.goal_suggest_history_label"));
+          this.updateHistoryButtons();
+        }
+      });
+    } catch {
+      // mutate() has already shown the failure; whatever was added before it is still counted below.
+    }
+    if (this.closed) return;
+    this.endGoalSuggest(task, { refocus: !added });
+    if (skipped) new Notice(t("ui.goal_suggest_skipped_0", skipped));
+    if (!added) return;
+    this.announcer?.setText(t("ui.goal_suggest_added_0", added));
+    const goal = this.relevanceGoal;
+    if (!goal) return;
+    const context = this.relevanceContext ?? "";
+    const mode = relevanceMode(
+      { goal, context },
+      { goal, context: this.relevanceContext },
+      this.relevanceAiGrades().length > 0
+    );
+    void this.submitRelevanceGoal(goal, context, mode);
+  }
+  /** True when the suggestion no longer fits the map as it is now. */
+  private goalSuggestStale(
+    item: GoalTopicSuggestion,
+    task: GoalSuggestTask,
+    parent: MapNode,
+    fresh: ReadonlyMap<string, Note>
+  ): boolean {
+    const basis = task.basis.get(item.parentId);
+    const title = fresh.get(parent.id)?.title ?? this.describeForReview(parent.id)?.title ?? "";
+    if (!basis || title !== basis.title || parent.parentId !== basis.parentId) return true;
+    if (this.isMerging(parent.id) || this.aiLockReason("addChild", [parent.id], fresh)) return true;
+    const key = goalTopicTitleKey(item.title);
+    return !!this.map?.nodes.some(node => goalTopicTitleKey(this.notes.get(node.id)?.title ?? "") === key);
   }
   /**
    * Starts the Claude CLI for the grade the open panel would run (no model call; a Codex model starts nothing). The
@@ -3252,6 +3580,8 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.relevance_goal_unavailable_toolbar"));
       return;
     }
+    // The suggestions and the editor share the spot under the bar: opening the editor closes them.
+    if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
     this.relevancePanelOpen = true;
     this.relevanceDraft = {
       goal: this.relevanceGoal ?? "",
@@ -3450,6 +3780,8 @@ export class VisualAgentMapView extends ItemView {
     const mapPath = this.path;
     if (!goal || !this.relevanceGradeable()) return;
     if (this.plugin.relevanceGrades.get(mapPath)?.status === "running") return;
+    // Grading takes over the spot under the bar: an open list or a waiting suggestion call is dropped.
+    if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
     const run: RelevanceGradeRun = {
       token: ++relevanceRunToken,
       owner: this,

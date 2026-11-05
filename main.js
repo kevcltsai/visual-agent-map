@@ -1155,12 +1155,6 @@ var en = {
   "ui.usage_this_month": "This month",
   "ui.usage_in_0": "In {0}",
   "ui.usage_out_0": "Out {0}",
-  "ui.usage_by_action": "THIS MIND MAP \xB7 BY ACTION",
-  "ui.usage_action_research": "Research",
-  "ui.usage_action_expand": "Expand",
-  "ui.usage_action_synthesize": "Synthesize",
-  "ui.usage_action_writeback": "Write to note",
-  "ui.usage_action_other": "Other",
   "ui.usage_estimated_0": "~{0}",
   "ui.usage_empty": "No AI requests recorded for this mind map yet.",
   "ui.usage_unreadable": "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
@@ -3861,12 +3855,6 @@ var zhCN = {
   "ui.usage_this_month": "\u672C\u6708",
   "ui.usage_in_0": "\u8F93\u5165 {0}",
   "ui.usage_out_0": "\u8F93\u51FA {0}",
-  "ui.usage_by_action": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u30FB\u6309\u52A8\u4F5C",
-  "ui.usage_action_research": "\u7814\u7A76",
-  "ui.usage_action_expand": "\u5C55\u5F00",
-  "ui.usage_action_synthesize": "\u6574\u5408",
-  "ui.usage_action_writeback": "\u5199\u56DE\u7B14\u8BB0",
-  "ui.usage_action_other": "\u5176\u4ED6",
   "ui.usage_estimated_0": "\u7EA6 {0}",
   "ui.usage_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709 AI \u8BF7\u6C42\u8BB0\u5F55\u3002",
   "ui.usage_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u7528\u91CF\u6570\u636E\uFF0C\u6240\u4EE5\u4E0D\u663E\u793A\u6570\u5B57\u3002\u63D2\u4EF6\u6587\u4EF6\u5939\u91CC\u7684 ai-usage.json \u5DF2\u539F\u6837\u4FDD\u7559\u3002",
@@ -6567,12 +6555,6 @@ var zhTW = {
   "ui.usage_this_month": "\u672C\u6708",
   "ui.usage_in_0": "\u8F38\u5165 {0}",
   "ui.usage_out_0": "\u8F38\u51FA {0}",
-  "ui.usage_by_action": "\u9019\u5F35\u5FC3\u667A\u5716\u30FB\u4F9D\u52D5\u4F5C",
-  "ui.usage_action_research": "\u7814\u7A76",
-  "ui.usage_action_expand": "\u5C55\u958B",
-  "ui.usage_action_synthesize": "\u6574\u5408",
-  "ui.usage_action_writeback": "\u5BEB\u56DE\u7B46\u8A18",
-  "ui.usage_action_other": "\u5176\u4ED6",
   "ui.usage_estimated_0": "\u7D04 {0}",
   "ui.usage_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709 AI \u8ACB\u6C42\u7D00\u9304\u3002",
   "ui.usage_unreadable": "\u7121\u6CD5\u8B80\u53D6\u7528\u91CF\u8CC7\u6599\uFF0C\u6240\u4EE5\u4E0D\u986F\u793A\u6578\u5B57\u3002\u5916\u639B\u8CC7\u6599\u593E\u88E1\u7684 ai-usage.json \u5DF2\u539F\u6A23\u4FDD\u7559\u3002",
@@ -28922,7 +28904,6 @@ function formatTokens(count) {
   if (n < 1e5) return `${(Math.floor(n / 100) / 10).toFixed(1)}k`;
   return `${Math.round(n / 1e3)}k`;
 }
-var actionLabel = (action) => t(`ui.usage_action_${action}`);
 var sum = (tokens2) => tokens2.inputTokens + tokens2.outputTokens;
 var mark = (count, estimated) => estimated ? t("ui.usage_estimated_0", formatTokens(count)) : formatTokens(count);
 var FILTERS = ["total", "claude", "codex"];
@@ -29110,18 +29091,6 @@ var UsageControl = class {
     };
     const empty = root.createEl("p", { cls: "vam-usage-empty", text: t("ui.usage_empty") });
     empty.hidden = true;
-    const barsSection = root.createDiv({ cls: "vam-usage-section" });
-    barsSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_by_action") });
-    const barsBox = barsSection.createDiv({ cls: "vam-usage-bars" });
-    const bars = /* @__PURE__ */ new Map();
-    for (const action of USAGE_ACTIONS) {
-      const row = barsBox.createDiv({ cls: "vam-usage-bar" });
-      const fill2 = row.createDiv({ cls: "vam-usage-fill-track" }).createDiv({ cls: "vam-usage-fill" });
-      const name2 = row.createSpan({ text: actionLabel(action) });
-      row.insertBefore(name2, row.firstChild);
-      bars.set(action, { row, name: name2, fill: fill2, value: row.createSpan({ cls: "vam-usage-muted" }) });
-      row.hidden = true;
-    }
     const foot = root.createDiv({ cls: "vam-usage-foot" });
     foot.createDiv({ text: t("ui.usage_footer_scope") });
     const footEstimates = foot.createDiv({ text: t("ui.usage_footer_estimates") });
@@ -29129,12 +29098,10 @@ var UsageControl = class {
     this.markFilters(filters);
     return {
       root,
-      sections: [totalsSection, barsSection],
+      sections: [totalsSection],
       empty,
       error,
       cells,
-      bars,
-      barsBox,
       filters,
       footEstimates
     };
@@ -29163,8 +29130,7 @@ var UsageControl = class {
     const map = this.store.totals({ mapPath: path, provider });
     const today = this.store.totals({ since: localDayStart(), provider });
     const month = this.store.totals({ since: localMonthStart(), provider });
-    const actions = this.store.byAction(path, void 0, provider);
-    if (map.status === "unreadable" || today.status === "unreadable" || month.status === "unreadable" || actions.status === "unreadable") {
+    if (map.status === "unreadable" || today.status === "unreadable" || month.status === "unreadable") {
       parts.error.hidden = false;
       parts.empty.hidden = true;
       parts.footEstimates.hidden = true;
@@ -29184,17 +29150,7 @@ var UsageControl = class {
     total2(parts.cells.month, month.value);
     const noUsage = sum(map.value) === 0;
     parts.empty.hidden = !noUsage;
-    parts.sections[1].hidden = noUsage;
-    let anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
-    const biggest = Math.max(0, ...USAGE_ACTIONS.map((action) => sum(actions.value[action])));
-    for (const action of USAGE_ACTIONS) {
-      const used = sum(actions.value[action]);
-      const bar = parts.bars.get(action);
-      bar.row.hidden = used === 0;
-      bar.fill.style.setProperty("width", `${biggest ? Math.max(2, Math.round(used / biggest * 100)) : 0}%`);
-      bar.value.setText(mark(used, actions.value[action].estimated));
-      if (!noUsage && used > 0 && actions.value[action].estimated) anyEstimate = true;
-    }
+    const anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
     parts.footEstimates.hidden = !anyEstimate;
     this.place();
   }

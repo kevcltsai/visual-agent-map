@@ -203,6 +203,9 @@ import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
   drawMapSourcesPanel,
+  isDragSourceTarget,
+  newMapSourcesSession,
+  type MapSourcesSession,
   mapSourceName,
   mapSourcesButtonLabel,
   unreadableMapSources,
@@ -1007,6 +1010,7 @@ export class VisualAgentMapView extends ItemView {
   private readonly mapSourcesPanelId = `vam-map-sources-panel-${++relevancePanelSeq}`;
   private mapSourcesOpen = false;
   private mapSourcesPickerOpen = false;
+  private mapSourcesSession: MapSourcesSession = newMapSourcesSession();
   private mapSourcesToolsEl: HTMLElement | null = null;
   private mapSourcesButtonEl: HTMLButtonElement | null = null;
   private mapSourcesPanelEl: HTMLElement | null = null;
@@ -3681,7 +3685,7 @@ export class VisualAgentMapView extends ItemView {
     button.addEventListener("focusout", (event: FocusEvent) => {
       if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button || this.mapSourcesPickerOpen) return;
       const next = event.relatedTarget as Node | null;
-      if (next && (next === button || this.mapSourcesPanelEl?.contains(next))) return;
+      if (next && (next === button || this.mapSourcesPanelEl?.contains(next) || isDragSourceTarget(next))) return;
       this.closeMapSourcesPanel(false);
     });
     button.addEventListener("keydown", event => {
@@ -3717,7 +3721,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mapSourcesToolsEl) return;
     this.mapSourcesOpen = true;
     this.mapSourcesButtonEl?.setAttr("aria-expanded", "true");
-    this.drawMapSourcesPanelEl({ picker: "map" });
+    this.mapSourcesSession = newMapSourcesSession();
+    this.drawMapSourcesPanelEl({ search: true });
   }
   private closeMapSourcesPanel(refocus: boolean): void {
     this.mapSourcesPanelCleanup?.();
@@ -3725,6 +3730,7 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesPanelEl?.remove();
     this.mapSourcesPanelEl = null;
     this.mapSourcesOpen = false;
+    this.mapSourcesSession = newMapSourcesSession();
     this.mapSourcesPickerOpen = false;
     this.mapSourcesButtonEl?.setAttr("aria-expanded", "false");
     if (refocus) this.mapSourcesButtonEl?.focus();
@@ -3752,6 +3758,7 @@ export class VisualAgentMapView extends ItemView {
         },
         isPickerOpen: () => this.mapSourcesPickerOpen,
         button: () => this.mapSourcesButtonEl,
+        session: this.mapSourcesSession,
         panelCreated: created => {
           this.mapSourcesPanelEl = created;
         }
@@ -3765,7 +3772,12 @@ export class VisualAgentMapView extends ItemView {
       const outside = (event: Event): void => {
         if (this.mapSourcesPickerOpen) return;
         const target = event.target as Node | null;
-        if (target && (panel.contains(target) || this.mapSourcesButtonEl?.contains(target))) return;
+        // A press on a draggable row (the file explorer's) starts a drag to the drop zone; it must not close the panel.
+        if (
+          target &&
+          (panel.contains(target) || this.mapSourcesButtonEl?.contains(target) || isDragSourceTarget(target))
+        )
+          return;
         this.closeMapSourcesPanel(false);
       };
       doc.addEventListener("pointerdown", outside, true);
@@ -3794,7 +3806,7 @@ export class VisualAgentMapView extends ItemView {
     const name = mapSourceName(this.app, source);
     this.enqueue(async () => {
       if (this.closed || this.path !== mapPath) return;
-      let focus: MapSourcesPanelFocus = { picker: source.kind };
+      let focus: MapSourcesPanelFocus = { search: true };
       try {
         const current = await this.plugin.repo.readMapSources(mapPath);
         const at = current.findIndex(item => sameMapSource(item, source));

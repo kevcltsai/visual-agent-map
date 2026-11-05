@@ -555,9 +555,6 @@ var en = {
   "ui.synthesis_no_source_topics": "No source topics. Select extra Markdown sources below.",
   "ui.legacy_rules_not_applied": "The note\u2019s old Rules are not applied automatically. Enter any conditions AI must follow for this run in Additional requirements above.",
   "ui.requirements_this_task_only": "Only used for this task. Leave blank to proceed with the selected action.",
-  "ui.reference_select_mind_map": "Select a mind map",
-  "ui.reference_select_folder": "Select a folder",
-  "ui.reference_select_markdown": "Select Markdown files",
   "ui.selected_mind_map_notes": "Selected mind map notes",
   "ui.reference_time_and_citations_hint": "Folder selections exclude archived VAM notes. More material takes longer to process. Results cite the source files used.",
   "ui.reference_processing_progress": "Extracting evidence: batch {0} of {1}\u2026",
@@ -569,21 +566,29 @@ var en = {
   "ui.map_sources_unreadable_description_0": "{0} unreadable",
   "ui.map_sources_title": "Data sources for this mind map",
   "ui.map_sources_intro": "Research, expand and synthesize use these sources. They are saved in this mind map and stay the next time you open it.",
-  "ui.map_sources_folder_count_0": "({0} files)",
-  "ui.map_sources_kind_map": "(mind map)",
+  "ui.map_sources_folder_count_0": "Folder \xB7 {0} files",
+  "ui.map_sources_kind_map": "Mind map",
   "ui.map_sources_unreadable_row": "Unreadable; tasks skip it",
   "ui.map_sources_remove_0": 'Remove "{0}"',
   "ui.map_sources_none": "No data sources yet.",
   "ui.map_sources_added_0": "Added {0}",
   "ui.map_sources_removed_0": "Removed {0}",
   "ui.map_sources_already_added_0": "{0} is already added",
-  "ui.map_sources_pick_map_placeholder": "Type a mind map name\u2026",
-  "ui.map_sources_pick_folder_placeholder": "Type a folder name\u2026",
-  "ui.map_sources_pick_file_placeholder": "Type a Markdown file name\u2026",
-  "ui.map_sources_no_other_maps": "There are no other mind maps in this vault.",
-  "ui.map_sources_no_folders": "There are no folders in this vault.",
-  "ui.map_sources_no_files": "There are no Markdown files in this vault.",
   "ui.map_sources_save_failed_0": "Could not save the data sources: {0}",
+  "ui.map_sources_kind_file": "Markdown",
+  "ui.map_sources_kind_folder": "Folder",
+  "ui.map_sources_drop_main": "Drag files, folders or mind maps from the left to here",
+  "ui.map_sources_drop_hint": "Only Markdown, folders or mind maps from this vault",
+  "ui.map_sources_drop_release": "Release to add",
+  "ui.map_sources_drop_items_0": "{0} items",
+  "ui.map_sources_search": "Search and add\u2026",
+  "ui.map_sources_search_placeholder": "Type a mind map, folder or Markdown name\u2026",
+  "ui.map_sources_search_empty": "There is nothing to add in this vault.",
+  "ui.map_sources_reject_title_0": "{0} not added",
+  "ui.map_sources_reject_line_0": '"{0}": {1}',
+  "ui.map_sources_reject_current": "The current mind map cannot be added",
+  "ui.map_sources_reject_type": "Only Markdown, folders or mind maps can be added",
+  "ui.map_sources_reject_outside": "Only items in this vault can be added",
   "ui.additional_requirements": "Additional requirements (optional)",
   "ui.ai_subtopic_proposals": "AI subtopic proposals",
   "ui.select_subtopics_to_create_you_can_edit_their_names_and_task": "Select subtopics to create. You can edit their names and tasks first.",
@@ -3258,9 +3263,6 @@ var zhCN = {
   "ui.synthesis_no_source_topics": "\u6CA1\u6709\u6765\u6E90\u8BAE\u9898\uFF0C\u8BF7\u5728\u4E0B\u65B9\u9009\u62E9\u5176\u4ED6 Markdown \u6765\u6E90\u3002",
   "ui.legacy_rules_not_applied": "\u7B14\u8BB0\u4E2D\u7684\u65E7 Rules \u4E0D\u4F1A\u81EA\u52A8\u5E94\u7528\u3002\u8FD9\u6B21\u9700\u8981\u9075\u5B88\u7684\u6761\u4EF6\uFF0C\u8BF7\u586B\u5165\u4E0A\u65B9\u9644\u52A0\u8981\u6C42\u3002",
   "ui.requirements_this_task_only": "\u4EC5\u7528\u4E8E\u8FD9\u6B21\u4EFB\u52A1\uFF1B\u7559\u7A7A\u5373\u53EF\u4F9D\u6240\u9009\u529F\u80FD\u8FD0\u884C\u3002",
-  "ui.reference_select_mind_map": "\u9009\u62E9\u5FC3\u667A\u56FE",
-  "ui.reference_select_folder": "\u9009\u62E9\u6587\u4EF6\u5939",
-  "ui.reference_select_markdown": "\u9009\u62E9 Markdown \u6587\u4EF6",
   "ui.selected_mind_map_notes": "\u6240\u9009\u5FC3\u667A\u56FE\u7684\u8BAE\u9898\u7B14\u8BB0",
   "ui.reference_time_and_citations_hint": "\u9009\u62E9\u6587\u4EF6\u5939\u65F6\u4F1A\u6392\u9664 VAM \u5F52\u6863\u7B14\u8BB0\u3002\u6570\u636E\u8D8A\u591A\uFF0C\u5904\u7406\u65F6\u95F4\u8D8A\u957F\uFF1B\u7ED3\u679C\u4F1A\u6807\u793A\u5B9E\u9645\u4F7F\u7528\u7684\u6765\u6E90\u6587\u4EF6\u3002",
   "ui.reference_processing_progress": "\u6B63\u5728\u622A\u53D6\u6570\u636E\uFF1A\u7B2C {0}\uFF0F{1} \u6279\u2026",
@@ -3271,22 +3273,30 @@ var zhCN = {
   "ui.map_sources_button_count_0": "\u6570\u636E\u6E90 \xB7 {0} \u4EFD",
   "ui.map_sources_unreadable_description_0": "{0} \u4EFD\u8BFB\u4E0D\u5230",
   "ui.map_sources_title": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u7684\u6570\u636E\u6E90",
-  "ui.map_sources_intro": "\u7814\u7A76\u3001\u5C55\u5F00\u3001\u6536\u655B\u90FD\u4F1A\u4F7F\u7528\u8FD9\u4E9B\u6570\u636E\uFF0C\u5E76\u4FDD\u5B58\u5728\u8FD9\u5F20\u5FC3\u667A\u56FE\u91CC\uFF0C\u4E0B\u6B21\u6253\u5F00\u8FD8\u5728\u3002",
-  "ui.map_sources_folder_count_0": "\uFF08{0} \u4EFD\uFF09",
-  "ui.map_sources_kind_map": "\uFF08\u5FC3\u667A\u56FE\uFF09",
+  "ui.map_sources_intro": "\u7814\u7A76\u3001\u5C55\u5F00\u3001\u6574\u5408\u90FD\u4F1A\u4F7F\u7528\u8FD9\u4E9B\u6570\u636E\uFF0C\u5E76\u4FDD\u5B58\u5728\u8FD9\u5F20\u5FC3\u667A\u56FE\u91CC\uFF0C\u4E0B\u6B21\u6253\u5F00\u8FD8\u5728\u3002",
+  "ui.map_sources_folder_count_0": "\u6587\u4EF6\u5939 \xB7 {0} \u4EFD",
+  "ui.map_sources_kind_map": "\u5FC3\u667A\u56FE",
   "ui.map_sources_unreadable_row": "\u8BFB\u4E0D\u5230\uFF0C\u4EFB\u52A1\u4F1A\u7565\u8FC7",
   "ui.map_sources_remove_0": "\u79FB\u9664 \u3008{0}\u3009",
   "ui.map_sources_none": "\u8FD8\u6CA1\u6709\u6570\u636E\u6E90\u3002",
   "ui.map_sources_added_0": "\u5DF2\u52A0\u5165 {0}",
   "ui.map_sources_removed_0": "\u5DF2\u79FB\u9664 {0}",
   "ui.map_sources_already_added_0": "{0} \u5DF2\u7ECF\u52A0\u5165\u8FC7\u4E86",
-  "ui.map_sources_pick_map_placeholder": "\u8F93\u5165\u5FC3\u667A\u56FE\u540D\u79F0\u2026",
-  "ui.map_sources_pick_folder_placeholder": "\u8F93\u5165\u6587\u4EF6\u5939\u540D\u79F0\u2026",
-  "ui.map_sources_pick_file_placeholder": "\u8F93\u5165 Markdown \u6587\u4EF6\u540D\u79F0\u2026",
-  "ui.map_sources_no_other_maps": "\u8FD9\u4E2A Vault \u6CA1\u6709\u5176\u4ED6\u5FC3\u667A\u56FE\u3002",
-  "ui.map_sources_no_folders": "\u8FD9\u4E2A Vault \u6CA1\u6709\u6587\u4EF6\u5939\u3002",
-  "ui.map_sources_no_files": "\u8FD9\u4E2A Vault \u6CA1\u6709 Markdown \u6587\u4EF6\u3002",
   "ui.map_sources_save_failed_0": "\u65E0\u6CD5\u4FDD\u5B58\u6570\u636E\u6E90\uFF1A{0}",
+  "ui.map_sources_kind_file": "Markdown",
+  "ui.map_sources_kind_folder": "\u6587\u4EF6\u5939",
+  "ui.map_sources_drop_main": "\u628A\u5DE6\u8FB9\u7684\u6587\u4EF6\u3001\u6587\u4EF6\u5939\u6216\u5FC3\u667A\u56FE\u62D6\u5230\u8FD9\u91CC",
+  "ui.map_sources_drop_hint": "\u53EA\u80FD\u653E\u8FD9\u4E2A Vault \u91CC\u7684 Markdown\u3001\u6587\u4EF6\u5939\u6216\u5FC3\u667A\u56FE",
+  "ui.map_sources_drop_release": "\u677E\u5F00\u4EE5\u52A0\u5165",
+  "ui.map_sources_drop_items_0": "{0} \u4E2A\u9879\u76EE",
+  "ui.map_sources_search": "\u641C\u7D22\u5E76\u52A0\u5165\u2026",
+  "ui.map_sources_search_placeholder": "\u8F93\u5165\u5FC3\u667A\u56FE\u3001\u6587\u4EF6\u5939\u6216 Markdown \u540D\u79F0\u2026",
+  "ui.map_sources_search_empty": "\u8FD9\u4E2A Vault \u6CA1\u6709\u53EF\u52A0\u5165\u7684\u9879\u76EE\u3002",
+  "ui.map_sources_reject_title_0": "\u6709 {0} \u4E2A\u6CA1\u6709\u52A0\u5165",
+  "ui.map_sources_reject_line_0": "\u3008{0}\u3009\uFF1A{1}",
+  "ui.map_sources_reject_current": "\u4E0D\u80FD\u52A0\u5165\u5F53\u524D\u8FD9\u5F20\u5FC3\u667A\u56FE",
+  "ui.map_sources_reject_type": "\u53EA\u80FD\u52A0\u5165 Markdown\u3001\u6587\u4EF6\u5939\u6216\u5FC3\u667A\u56FE",
+  "ui.map_sources_reject_outside": "\u53EA\u80FD\u52A0\u5165\u8FD9\u4E2A Vault \u91CC\u7684",
   "ui.additional_requirements": "\u672C\u6B21\u9644\u52A0\u8981\u6C42\uFF08\u9009\u586B\uFF09",
   "ui.ai_subtopic_proposals": "AI \u5B50\u8BAE\u9898\u63D0\u6848",
   "ui.select_subtopics_to_create_you_can_edit_their_names_and_task": "\u52FE\u9009\u8981\u521B\u5EFA\u7684\u5B50\u8BAE\u9898\uFF1B\u521B\u5EFA\u524D\u53EF\u76F4\u63A5\u4FEE\u6539\u540D\u79F0\u4E0E\u4EFB\u52A1\u3002",
@@ -5961,9 +5971,6 @@ var zhTW = {
   "ui.synthesis_no_source_topics": "\u6C92\u6709\u4F86\u6E90\u8B70\u984C\uFF0C\u8ACB\u5728\u4E0B\u65B9\u9078\u53D6\u5176\u4ED6 Markdown \u4F86\u6E90\u3002",
   "ui.legacy_rules_not_applied": "\u7B46\u8A18\u4E2D\u7684\u820A Rules \u4E0D\u6703\u81EA\u52D5\u5957\u7528\u3002\u9019\u6B21\u9700\u8981\u9075\u5B88\u7684\u689D\u4EF6\uFF0C\u8ACB\u586B\u5165\u4E0A\u65B9\u9644\u52A0\u8981\u6C42\u3002",
   "ui.requirements_this_task_only": "\u50C5\u7528\u65BC\u9019\u6B21\u4EFB\u52D9\uFF1B\u7559\u7A7A\u5373\u53EF\u4F9D\u6240\u9078\u529F\u80FD\u57F7\u884C\u3002",
-  "ui.reference_select_mind_map": "\u9078\u64C7\u5FC3\u667A\u5716",
-  "ui.reference_select_folder": "\u9078\u64C7\u8CC7\u6599\u593E",
-  "ui.reference_select_markdown": "\u9078\u64C7 Markdown \u6A94\u6848",
   "ui.selected_mind_map_notes": "\u6240\u9078\u5FC3\u667A\u5716\u7684\u8B70\u984C\u7B46\u8A18",
   "ui.reference_time_and_citations_hint": "\u9078\u53D6\u8CC7\u6599\u593E\u6642\u6703\u6392\u9664 VAM \u5C01\u5B58\u7B46\u8A18\u3002\u8CC7\u6599\u8D8A\u591A\uFF0C\u8655\u7406\u6642\u9593\u8D8A\u9577\uFF1B\u7D50\u679C\u6703\u6A19\u793A\u5BE6\u969B\u4F7F\u7528\u7684\u4F86\u6E90\u6A94\u6848\u3002",
   "ui.reference_processing_progress": "\u6B63\u5728\u64F7\u53D6\u8CC7\u6599\uFF1A\u7B2C {0}\uFF0F{1} \u6279\u2026",
@@ -5974,22 +5981,30 @@ var zhTW = {
   "ui.map_sources_button_count_0": "\u8CC7\u6599\u4F86\u6E90 \xB7 {0} \u4EFD",
   "ui.map_sources_unreadable_description_0": "{0} \u4EFD\u8B80\u4E0D\u5230",
   "ui.map_sources_title": "\u9019\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u4F86\u6E90",
-  "ui.map_sources_intro": "\u7814\u7A76\u3001\u5C55\u958B\u3001\u6536\u6582\u90FD\u6703\u4F7F\u7528\u9019\u4E9B\u8CC7\u6599\uFF0C\u4E26\u5B58\u5728\u9019\u5F35\u5FC3\u667A\u5716\u88E1\uFF0C\u4E0B\u6B21\u6253\u958B\u9084\u5728\u3002",
-  "ui.map_sources_folder_count_0": "\uFF08{0} \u4EFD\uFF09",
-  "ui.map_sources_kind_map": "\uFF08\u5FC3\u667A\u5716\uFF09",
+  "ui.map_sources_intro": "\u7814\u7A76\u3001\u5C55\u958B\u3001\u6574\u5408\u90FD\u6703\u4F7F\u7528\u9019\u4E9B\u8CC7\u6599\uFF0C\u4E26\u5B58\u5728\u9019\u5F35\u5FC3\u667A\u5716\u88E1\uFF0C\u4E0B\u6B21\u6253\u958B\u9084\u5728\u3002",
+  "ui.map_sources_folder_count_0": "\u8CC7\u6599\u593E \xB7 {0} \u4EFD",
+  "ui.map_sources_kind_map": "\u5FC3\u667A\u5716",
   "ui.map_sources_unreadable_row": "\u8B80\u4E0D\u5230\uFF0C\u4EFB\u52D9\u6703\u7565\u904E",
   "ui.map_sources_remove_0": "\u79FB\u9664 \u3008{0}\u3009",
   "ui.map_sources_none": "\u9084\u6C92\u6709\u8CC7\u6599\u4F86\u6E90\u3002",
   "ui.map_sources_added_0": "\u5DF2\u52A0\u5165 {0}",
   "ui.map_sources_removed_0": "\u5DF2\u79FB\u9664 {0}",
   "ui.map_sources_already_added_0": "{0} \u5DF2\u7D93\u52A0\u5165\u904E\u4E86",
-  "ui.map_sources_pick_map_placeholder": "\u8F38\u5165\u5FC3\u667A\u5716\u540D\u7A31\u2026",
-  "ui.map_sources_pick_folder_placeholder": "\u8F38\u5165\u8CC7\u6599\u593E\u540D\u7A31\u2026",
-  "ui.map_sources_pick_file_placeholder": "\u8F38\u5165 Markdown \u6A94\u6848\u540D\u7A31\u2026",
-  "ui.map_sources_no_other_maps": "\u9019\u500B Vault \u6C92\u6709\u5176\u4ED6\u5FC3\u667A\u5716\u3002",
-  "ui.map_sources_no_folders": "\u9019\u500B Vault \u6C92\u6709\u8CC7\u6599\u593E\u3002",
-  "ui.map_sources_no_files": "\u9019\u500B Vault \u6C92\u6709 Markdown \u6A94\u6848\u3002",
   "ui.map_sources_save_failed_0": "\u7121\u6CD5\u5132\u5B58\u8CC7\u6599\u4F86\u6E90\uFF1A{0}",
+  "ui.map_sources_kind_file": "Markdown",
+  "ui.map_sources_kind_folder": "\u8CC7\u6599\u593E",
+  "ui.map_sources_drop_main": "\u628A\u5DE6\u908A\u7684\u6A94\u6848\u3001\u8CC7\u6599\u593E\u6216\u5FC3\u667A\u5716\u62D6\u5230\u9019\u88E1",
+  "ui.map_sources_drop_hint": "\u53EA\u80FD\u653E\u9019\u500B Vault \u88E1\u7684 Markdown\u3001\u8CC7\u6599\u593E\u6216\u5FC3\u667A\u5716",
+  "ui.map_sources_drop_release": "\u653E\u958B\u4EE5\u52A0\u5165",
+  "ui.map_sources_drop_items_0": "{0} \u500B\u9805\u76EE",
+  "ui.map_sources_search": "\u641C\u5C0B\u4E26\u52A0\u5165\u2026",
+  "ui.map_sources_search_placeholder": "\u8F38\u5165\u5FC3\u667A\u5716\u3001\u8CC7\u6599\u593E\u6216 Markdown \u540D\u7A31\u2026",
+  "ui.map_sources_search_empty": "\u9019\u500B Vault \u6C92\u6709\u53EF\u52A0\u5165\u7684\u9805\u76EE\u3002",
+  "ui.map_sources_reject_title_0": "\u6709 {0} \u500B\u6C92\u6709\u52A0\u5165",
+  "ui.map_sources_reject_line_0": "\u3008{0}\u3009\uFF1A{1}",
+  "ui.map_sources_reject_current": "\u4E0D\u80FD\u52A0\u5165\u76EE\u524D\u9019\u5F35\u5FC3\u667A\u5716",
+  "ui.map_sources_reject_type": "\u53EA\u80FD\u52A0\u5165 Markdown\u3001\u8CC7\u6599\u593E\u6216\u5FC3\u667A\u5716",
+  "ui.map_sources_reject_outside": "\u53EA\u80FD\u52A0\u5165\u9019\u500B Vault \u88E1\u7684",
   "ui.additional_requirements": "\u672C\u6B21\u9644\u52A0\u8981\u6C42\uFF08\u9078\u586B\uFF09",
   "ui.ai_subtopic_proposals": "AI \u5B50\u8B70\u984C\u63D0\u6848",
   "ui.select_subtopics_to_create_you_can_edit_their_names_and_task": "\u52FE\u9078\u8981\u5EFA\u7ACB\u7684\u5B50\u8B70\u984C\uFF1B\u5EFA\u7ACB\u524D\u53EF\u76F4\u63A5\u4FEE\u6539\u540D\u7A31\u8207\u4EFB\u52D9\u3002",
@@ -28058,11 +28073,12 @@ var import_obsidian37 = require("obsidian");
 
 // ui/map-sources-panel.ts
 var import_obsidian15 = require("obsidian");
+var newMapSourcesSession = () => ({ rejected: [], fresh: [] });
 var ICONS = { map: "brain-circuit", folder: "folder-open", file: "file-text" };
-var PICK_LABELS = {
-  map: "ui.reference_select_mind_map",
-  folder: "ui.reference_select_folder",
-  file: "ui.reference_select_markdown"
+var KIND_LABELS = {
+  map: "ui.map_sources_kind_map",
+  folder: "ui.map_sources_kind_folder",
+  file: "ui.map_sources_kind_file"
 };
 var baseName3 = (path) => path.split("/").at(-1) || path;
 function mapSourceName(app, source) {
@@ -28111,78 +28127,220 @@ function vaultFolders(app) {
 function vaultMarkdown(app) {
   return app.vault.getMarkdownFiles().map((file) => file.path).sort((a, b) => a.localeCompare(b));
 }
-async function openPicker(host, kind, returnFocus) {
-  const choose = (path) => host.add({ kind, path });
-  let modal;
-  if (kind === "map") {
-    const items = (await host.mapItems()).filter((item) => item.mapPath !== host.currentMapPath).sort((a, b) => b.modified - a.modified || a.title.localeCompare(b.title));
-    modal = new MapSourcePickerModal(
-      host.app,
-      items,
-      (item) => `${item.title} ${item.folder}`.trim(),
-      t("ui.map_sources_pick_map_placeholder"),
-      t("ui.map_sources_no_other_maps"),
-      (item) => choose(item.mapPath),
-      (item, el) => {
-        el.addClass("mod-complex");
-        const content = el.createDiv("suggestion-content");
-        content.createDiv({ cls: "suggestion-title", text: item.title, attr: { dir: "auto" } });
-        if (item.folder) content.createDiv({ cls: "suggestion-note", text: item.folder });
-      }
-    );
-  } else {
-    const folder = kind === "folder";
-    modal = new MapSourcePickerModal(
-      host.app,
-      folder ? vaultFolders(host.app) : vaultMarkdown(host.app),
-      (path) => path,
-      t(folder ? "ui.map_sources_pick_folder_placeholder" : "ui.map_sources_pick_file_placeholder"),
-      t(folder ? "ui.map_sources_no_folders" : "ui.map_sources_no_files"),
-      choose
-    );
+var dirName = (path) => path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+var sourceKey = (source) => `${source.kind}:${source.path}`;
+function isDragSourceTarget(node) {
+  const el = node;
+  return typeof (el == null ? void 0 : el.closest) === "function" && !!el.closest('[draggable="true"]');
+}
+function dragManagerPaths(app) {
+  var _a2;
+  const draggable = (_a2 = app.dragManager) == null ? void 0 : _a2.draggable;
+  if (!draggable || typeof draggable !== "object") return null;
+  const { type, file, files } = draggable;
+  const paths = [];
+  if ((type === "file" || type === "folder") && typeof (file == null ? void 0 : file.path) === "string") paths.push(file.path);
+  else if (type === "files" && Array.isArray(files)) {
+    for (const item of files)
+      if (typeof (item == null ? void 0 : item.path) === "string") paths.push(item.path);
   }
-  host.setPickerOpen(true);
-  const hostClose = modal.onClose;
-  modal.onClose = () => {
-    hostClose == null ? void 0 : hostClose.call(modal);
-    host.setPickerOpen(false);
-    if (returnFocus.isConnected !== false) returnFocus.focus();
-  };
-  modal.open();
+  return paths.length ? paths : null;
+}
+function pathFromLine(line) {
+  var _a2;
+  const text11 = line.trim();
+  if (!text11 || text11.startsWith("#")) return null;
+  if (/^obsidian:\/\//i.test(text11)) {
+    const file = (_a2 = text11.match(/[?&]file=([^&#]*)/i)) == null ? void 0 : _a2[1];
+    if (file === void 0) return "";
+    try {
+      return decodeURIComponent(file);
+    } catch (e) {
+      return file;
+    }
+  }
+  const link = text11.match(/^\[\[([^\]|#]+)/);
+  return link ? link[1] : text11;
+}
+function lineName(line) {
+  var _a2;
+  let last = (_a2 = line.split(/[\\/]/).filter(Boolean).at(-1)) != null ? _a2 : line;
+  try {
+    last = decodeURIComponent(last);
+  } catch (e) {
+  }
+  return last;
+}
+function resolveInVault(app, path) {
+  if (!path) return null;
+  if (app.vault.getAbstractFileByPath(path)) return path;
+  return !/\.[^/]+$/.test(path) && app.vault.getAbstractFileByPath(`${path}.md`) ? `${path}.md` : null;
+}
+function readDrag(app, data) {
+  var _a2, _b2;
+  const read = { inside: [], outside: [] };
+  if (!data) return read;
+  const types = Array.from((_a2 = data.types) != null ? _a2 : []);
+  const files = Array.from((_b2 = data.files) != null ? _b2 : []);
+  if (types.includes("Files") || files.length) {
+    for (const file of files) read.outside.push(file.name);
+    if (!files.length) read.outside.push(t("ui.map_sources_drop_items_0", 1));
+    return read;
+  }
+  const lines = [];
+  const managed = dragManagerPaths(app);
+  if (managed) lines.push(...managed);
+  else
+    for (const type of ["text/uri-list", "text/plain"]) {
+      const text11 = typeof data.getData === "function" ? data.getData(type) : "";
+      if (text11) {
+        lines.push(...text11.split(/\r?\n/));
+        break;
+      }
+    }
+  const seen = /* @__PURE__ */ new Set();
+  for (const line of lines) {
+    const raw = managed ? line : pathFromLine(line);
+    if (raw === null) continue;
+    const path = resolveInVault(app, raw);
+    if (path === null) read.outside.push(lineName(raw || line));
+    else if (!seen.has(path)) {
+      seen.add(path);
+      read.inside.push({ path, name: baseName3(path) });
+    }
+  }
+  return read;
+}
+function hoverLabel(app) {
+  const paths = dragManagerPaths(app);
+  if (!paths) return "";
+  return paths.length === 1 ? baseName3(paths[0]) : t("ui.map_sources_drop_items_0", paths.length);
+}
+function classify(app, path, mapPaths, currentMapPath) {
+  const item = app.vault.getAbstractFileByPath(path);
+  if (path === currentMapPath || item instanceof import_obsidian15.TFolder && path === dirName(currentMapPath))
+    return { reason: t("ui.map_sources_reject_current") };
+  if (item instanceof import_obsidian15.TFile) {
+    if (mapPaths.includes(path)) return { source: { kind: "map", path } };
+    return item.extension.toLowerCase() === "md" ? { source: { kind: "file", path } } : { reason: t("ui.map_sources_reject_type") };
+  }
+  if (item instanceof import_obsidian15.TFolder) {
+    const map = mapPaths.find((mapPath) => dirName(mapPath) === path);
+    return map ? { source: { kind: "map", path: map } } : { source: { kind: "folder", path } };
+  }
+  return { reason: t("ui.map_sources_reject_outside") };
+}
+async function searchItems(host) {
+  const maps = await host.mapItems().catch(() => []);
+  const mapPaths = /* @__PURE__ */ new Set([...maps.map((item) => item.mapPath), host.currentMapPath]);
+  const mapFolders = new Set([...mapPaths].map(dirName));
+  const others = maps.filter((item) => item.mapPath !== host.currentMapPath).sort((a, b) => b.modified - a.modified || a.title.localeCompare(b.title)).map((item) => ({ kind: "map", path: item.mapPath, title: item.title, detail: item.folder }));
+  const folders = vaultFolders(host.app).filter((path) => !mapFolders.has(path)).map((path) => ({ kind: "folder", path, title: baseName3(path), detail: dirName(path) }));
+  const files = vaultMarkdown(host.app).filter((path) => !mapPaths.has(path)).map((path) => ({ kind: "file", path, title: baseName3(path), detail: dirName(path) }));
+  return [...others, ...folders, ...files];
 }
 function drawMapSourcesPanel(parent, host, focus) {
-  var _a2, _b2, _c;
+  var _a2, _b2, _c, _d;
+  const session = (_a2 = host.session) != null ? _a2 : host.session = newMapSourcesSession();
   const panel = parent.createDiv({
     cls: "vam-map-sources-panel",
     attr: { id: host.id, role: "dialog", "aria-label": t("ui.map_sources_title") }
   });
   panel.createEl("h3", { text: t("ui.map_sources_title"), cls: "vam-map-sources-title" });
   panel.createEl("p", { text: t("ui.map_sources_intro"), cls: "vam-hint vam-map-sources-intro" });
-  const pickers = /* @__PURE__ */ new Map();
-  const actions = panel.createDiv("vam-map-sources-actions");
-  for (const kind of ["map", "folder", "file"]) {
-    const pick = actions.createEl("button", { cls: "vam-map-sources-pick" });
-    (0, import_obsidian15.setIcon)(pick.createSpan({ cls: "vam-map-sources-pick-icon", attr: { "aria-hidden": "true" } }), ICONS[kind]);
-    pick.createSpan({ cls: "vam-map-sources-pick-label", text: t(PICK_LABELS[kind]) });
-    pick.addEventListener("click", (event) => {
-      event.stopPropagation();
-      void openPicker(host, kind, pick);
-    });
-    pickers.set(kind, pick);
-  }
+  const hintId = `${host.id}-drop-hint`;
+  const zone = panel.createDiv({
+    cls: "vam-map-sources-drop",
+    attr: { role: "group", "aria-label": t("ui.map_sources_drop_main"), "aria-describedby": hintId }
+  });
+  const dropMain = zone.createSpan({ cls: "vam-map-sources-drop-main" });
+  const dropSub = zone.createSpan({ cls: "vam-map-sources-drop-sub", attr: { id: hintId } });
+  const dropResult = zone.createDiv({ cls: "vam-map-sources-drop-result", attr: { "aria-live": "polite" } });
+  let hover = null;
+  const paint = () => {
+    const rejected = hover === null && session.rejected.length > 0;
+    zone.toggleClass("is-dragover", hover !== null);
+    zone.toggleClass("is-rejected", rejected);
+    dropMain.setText(
+      hover !== null ? t("ui.map_sources_drop_release") : rejected ? t("ui.map_sources_reject_title_0", session.rejected.length) : t("ui.map_sources_drop_main")
+    );
+    dropSub.setText(hover ? hover : t("ui.map_sources_drop_hint"));
+  };
+  const paintResult = () => {
+    dropResult.empty();
+    for (const line of session.rejected) dropResult.createDiv({ cls: "vam-map-sources-drop-line", text: line });
+  };
+  paint();
+  paintResult();
+  const commit = async (items, outside) => {
+    const mapPaths = (await host.mapItems().catch(() => [])).map((item) => item.mapPath);
+    const lines = outside.map((name2) => t("ui.map_sources_reject_line_0", name2, t("ui.map_sources_reject_outside")));
+    const accepted = [];
+    for (const item of items) {
+      const result = classify(host.app, item.path, mapPaths, host.currentMapPath);
+      if ("reason" in result) {
+        lines.push(t("ui.map_sources_reject_line_0", item.name, result.reason));
+        continue;
+      }
+      const key2 = sourceKey(result.source);
+      if (host.sources.some((source) => sourceKey(source) === key2) || accepted.some((source) => sourceKey(source) === key2))
+        lines.push(t("ui.map_sources_already_added_0", item.name));
+      else accepted.push(result.source);
+    }
+    session.rejected = lines;
+    session.fresh = accepted.map(sourceKey);
+    paint();
+    paintResult();
+    for (const source of accepted) host.add(source);
+  };
+  const accept = (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    if (hover !== null) return;
+    hover = hoverLabel(host.app);
+    paint();
+  };
+  zone.addEventListener("dragenter", accept);
+  zone.addEventListener("dragover", accept);
+  zone.addEventListener("dragleave", (event) => {
+    if (event.relatedTarget && zone.contains(event.relatedTarget)) return;
+    hover = null;
+    paint();
+  });
+  zone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    hover = null;
+    const read = readDrag(host.app, event.dataTransfer);
+    if (!read.inside.length && !read.outside.length) return paint();
+    void commit(read.inside, read.outside);
+  });
+  const search = panel.createEl("button", { cls: "vam-map-sources-search" });
+  (0, import_obsidian15.setIcon)(search.createSpan({ cls: "vam-map-sources-pick-icon", attr: { "aria-hidden": "true" } }), "search");
+  search.createSpan({ cls: "vam-map-sources-pick-label", text: t("ui.map_sources_search") });
+  search.addEventListener("click", (event) => {
+    event.stopPropagation();
+    session.rejected = [];
+    paint();
+    paintResult();
+    void openSearch(host, search, (items) => void commit(items, []));
+  });
   const list = panel.createDiv({ cls: "vam-map-sources-list", attr: { role: "list" } });
   const removers = [];
   if (!host.sources.length)
     list.createEl("p", { text: t("ui.map_sources_none"), cls: "vam-hint vam-map-sources-empty" });
-  for (const source of host.sources) {
+  const fresh = (source) => session.fresh.indexOf(sourceKey(source));
+  const order = host.sources.map((source, index) => ({ source, index })).sort((a, b) => (fresh(a.source) < 0 ? 1 : 0) - (fresh(b.source) < 0 ? 1 : 0) || fresh(a.source) - fresh(b.source));
+  for (const { source, index } of order) {
     const status = mapSourceStatus(host.app, source);
     const name2 = mapSourceName(host.app, source);
     const row = list.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
     row.toggleClass("is-unreadable", !status.exists);
+    row.toggleClass("is-new", fresh(source) >= 0);
     (0, import_obsidian15.setIcon)(row.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), ICONS[source.kind]);
     row.createSpan({ cls: "vam-map-sources-name", text: name2, attr: { title: source.path, dir: "auto" } });
-    const meta = !status.exists ? t("ui.map_sources_unreadable_row") : source.kind === "folder" ? t("ui.map_sources_folder_count_0", (_a2 = status.count) != null ? _a2 : 0) : source.kind === "map" ? t("ui.map_sources_kind_map") : "";
-    if (meta) row.createSpan({ cls: "vam-map-sources-meta", text: meta });
+    const meta = !status.exists ? t("ui.map_sources_unreadable_row") : source.kind === "folder" ? t("ui.map_sources_folder_count_0", (_b2 = status.count) != null ? _b2 : 0) : t(KIND_LABELS[source.kind]);
+    row.createSpan({ cls: "vam-map-sources-meta", text: meta });
     const remove = row.createEl("button", {
       cls: "vam-map-sources-remove",
       text: t("ui.reference_remove"),
@@ -28190,9 +28348,11 @@ function drawMapSourcesPanel(parent, host, focus) {
     });
     remove.addEventListener("click", (event) => {
       event.stopPropagation();
+      session.rejected = [];
+      session.fresh = [];
       host.remove(source);
     });
-    removers.push(remove);
+    removers[index] = remove;
   }
   panel.createEl("p", { text: t("ui.reference_time_and_citations_hint"), cls: "vam-hint vam-map-sources-hint" });
   panel.addEventListener("keydown", (event) => {
@@ -28201,19 +28361,48 @@ function drawMapSourcesPanel(parent, host, focus) {
     event.stopPropagation();
     host.close(true);
   });
-  for (const control of [...pickers.values(), ...removers])
+  for (const control of [search, ...removers.filter(Boolean)])
     control.addEventListener("mousedown", (e) => e.preventDefault());
   panel.addEventListener("focusout", (event) => {
     const next = event.relatedTarget;
-    if (!next || host.isPickerOpen() || panel.contains(next) || next === host.button()) return;
+    if (!next || host.isPickerOpen() || panel.contains(next) || next === host.button() || isDragSourceTarget(next))
+      return;
     host.close(false);
   });
-  (_b2 = host.panelCreated) == null ? void 0 : _b2.call(host, panel);
+  (_c = host.panelCreated) == null ? void 0 : _c.call(host, panel);
   if (focus) {
-    const target = "picker" in focus ? pickers.get(focus.picker) : (_c = removers[focus.remove]) != null ? _c : pickers.get("map");
-    target == null ? void 0 : target.focus();
+    const target = "search" in focus ? search : (_d = removers[focus.remove]) != null ? _d : search;
+    target.focus();
   }
   return panel;
+}
+async function openSearch(host, returnFocus, choose) {
+  const modal = new MapSourcePickerModal(
+    host.app,
+    await searchItems(host),
+    (item) => `${item.title} ${item.detail}`.trim(),
+    t("ui.map_sources_search_placeholder"),
+    t("ui.map_sources_search_empty"),
+    (item) => choose([{ path: item.path, name: item.title }]),
+    (item, el) => {
+      el.addClass("mod-complex");
+      const content = el.createDiv("suggestion-content");
+      content.createDiv({ cls: "suggestion-title", text: item.title, attr: { dir: "auto" } });
+      if (item.detail) content.createDiv({ cls: "suggestion-note", text: item.detail });
+      el.createDiv({ cls: "suggestion-aux" }).createSpan({
+        cls: "vam-map-sources-kind",
+        text: t(KIND_LABELS[item.kind])
+      });
+    }
+  );
+  host.setPickerOpen(true);
+  const hostClose = modal.onClose;
+  modal.onClose = () => {
+    hostClose == null ? void 0 : hostClose.call(modal);
+    host.setPickerOpen(false);
+    if (returnFocus.isConnected !== false) returnFocus.focus();
+  };
+  modal.open();
 }
 
 // ai/provider-error.ts
@@ -32668,7 +32857,7 @@ function classifier(template2, language2) {
     sourcesKey: sourcesIndex >= 0 ? `t${sourcesIndex}` : null
   };
 }
-function scan2(text11, classify2) {
+function scan2(text11, classify3) {
   const lines = text11.split("\n");
   const starts = [];
   let position = 0;
@@ -32681,7 +32870,7 @@ function scan2(text11, classify2) {
   lines.forEach((line, index) => {
     if (code[index]) return;
     const match = /^###\s+(.+?)\s*$/.exec(line);
-    if (match) headings.push({ line: index, text: match[1], key: classify2.classify(match[1]) });
+    if (match) headings.push({ line: index, text: match[1], key: classify3.classify(match[1]) });
   });
   return { text: text11, lines, starts, code, headings };
 }
@@ -32771,8 +32960,8 @@ function mergeLogLines(existing, oldLines, summary, now) {
   const [first, ...rest] = added;
   return [...kept, [first, ...rest.map((line) => line.trim().replace(DATE_PREFIX, "").trim())].join("\uFF1B")];
 }
-function replySections(reply, classify2, template2) {
-  const view = scan2(reply, classify2);
+function replySections(reply, classify3, template2) {
+  const view = scan2(reply, classify3);
   const found = /* @__PURE__ */ new Map();
   view.headings.forEach((heading, position) => {
     var _a2, _b2, _c, _d;
@@ -32817,10 +33006,10 @@ function relabel(text11, map) {
 }
 function composeTop(input2) {
   const { oldDetail: old, template: template2, language: language2, now } = input2;
-  const classify2 = classifier(template2, language2);
-  const oldView = scan2(old, classify2);
+  const classify3 = classifier(template2, language2);
+  const oldView = scan2(old, classify3);
   const date = formatDate(now);
-  const sections = replySections(input2.aiDetail, classify2, template2).filter((section3) => section3.key !== classify2.logKey);
+  const sections = replySections(input2.aiDetail, classify3, template2).filter((section3) => section3.key !== classify3.logKey);
   const oldDefinitions = definitions(oldView);
   const oldTargets = new Map(oldDefinitions.map((item) => [item.label, item.target]));
   let counter = 0;
@@ -32911,8 +33100,8 @@ ${body}${needsBlank(at2) ? "\n" : ""}`, order: 0 });
 `, order: 0 });
     } else endParts.push(batch.join("\n\n"));
   }
-  const logRange = sectionRange(oldView, classify2.logKey);
-  const logLine = `${logMarker(logLines(oldView, classify2.logKey))}${summaryLine(now, input2.summary)}`;
+  const logRange = sectionRange(oldView, classify3.logKey);
+  const logLine = `${logMarker(logLines(oldView, classify3.logKey))}${summaryLine(now, input2.summary)}`;
   if (logRange) {
     const content = lastContentLine(oldView, logRange.from, logRange.to);
     const at = lineEnd(oldView, content >= 0 ? content : logRange.heading.line);
@@ -32994,13 +33183,13 @@ function chartPreserves(record, charted) {
 function composeWriteback(input2) {
   var _a2;
   if (input2.mode === "top") return composeTop(input2);
-  const classify2 = classifier(input2.template, input2.language);
-  const key2 = classify2.logKey;
+  const classify3 = classifier(input2.template, input2.language);
+  const key2 = classify3.logKey;
   const heading = logHeadingName(input2.template, input2.language);
-  const view = scan2(input2.aiDetail, classify2);
+  const view = scan2(input2.aiDetail, classify3);
   let detail;
   if (input2.mode === "merge") {
-    const oldLines = logLines(scan2(input2.oldDetail, classify2), key2);
+    const oldLines = logLines(scan2(input2.oldDetail, classify3), key2);
     detail = withLogLines(
       input2.aiDetail,
       view,
@@ -33009,7 +33198,7 @@ function composeWriteback(input2) {
       (existing) => mergeLogLines(existing, oldLines, input2.summary, input2.now)
     );
   } else {
-    const oldLines = logLines(scan2(input2.oldDetail, classify2), key2);
+    const oldLines = logLines(scan2(input2.oldDetail, classify3), key2);
     const line = `${logMarker(oldLines)}${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
     detail = withLogLines(input2.aiDetail, view, key2, heading, () => [...oldLines, line]);
   }
@@ -53925,6 +54114,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "mapSourcesPanelId", `vam-map-sources-panel-${++relevancePanelSeq}`);
     __publicField(this, "mapSourcesOpen", false);
     __publicField(this, "mapSourcesPickerOpen", false);
+    __publicField(this, "mapSourcesSession", newMapSourcesSession());
     __publicField(this, "mapSourcesToolsEl", null);
     __publicField(this, "mapSourcesButtonEl", null);
     __publicField(this, "mapSourcesPanelEl", null);
@@ -56432,7 +56622,7 @@ ${request.requirements}` : preset.text,
       var _a2;
       if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button || this.mapSourcesPickerOpen) return;
       const next = event.relatedTarget;
-      if (next && (next === button || ((_a2 = this.mapSourcesPanelEl) == null ? void 0 : _a2.contains(next)))) return;
+      if (next && (next === button || ((_a2 = this.mapSourcesPanelEl) == null ? void 0 : _a2.contains(next)) || isDragSourceTarget(next))) return;
       this.closeMapSourcesPanel(false);
     });
     button.addEventListener("keydown", (event) => {
@@ -56470,7 +56660,8 @@ ${request.requirements}` : preset.text,
     if (!this.mapSourcesToolsEl) return;
     this.mapSourcesOpen = true;
     (_a2 = this.mapSourcesButtonEl) == null ? void 0 : _a2.setAttr("aria-expanded", "true");
-    this.drawMapSourcesPanelEl({ picker: "map" });
+    this.mapSourcesSession = newMapSourcesSession();
+    this.drawMapSourcesPanelEl({ search: true });
   }
   closeMapSourcesPanel(refocus) {
     var _a2, _b2, _c, _d;
@@ -56479,6 +56670,7 @@ ${request.requirements}` : preset.text,
     (_b2 = this.mapSourcesPanelEl) == null ? void 0 : _b2.remove();
     this.mapSourcesPanelEl = null;
     this.mapSourcesOpen = false;
+    this.mapSourcesSession = newMapSourcesSession();
     this.mapSourcesPickerOpen = false;
     (_c = this.mapSourcesButtonEl) == null ? void 0 : _c.setAttr("aria-expanded", "false");
     if (refocus) (_d = this.mapSourcesButtonEl) == null ? void 0 : _d.focus();
@@ -56507,6 +56699,7 @@ ${request.requirements}` : preset.text,
         },
         isPickerOpen: () => this.mapSourcesPickerOpen,
         button: () => this.mapSourcesButtonEl,
+        session: this.mapSourcesSession,
         panelCreated: (created) => {
           this.mapSourcesPanelEl = created;
         }
@@ -56520,7 +56713,8 @@ ${request.requirements}` : preset.text,
         var _a3;
         if (this.mapSourcesPickerOpen) return;
         const target = event.target;
-        if (target && (panel.contains(target) || ((_a3 = this.mapSourcesButtonEl) == null ? void 0 : _a3.contains(target)))) return;
+        if (target && (panel.contains(target) || ((_a3 = this.mapSourcesButtonEl) == null ? void 0 : _a3.contains(target)) || isDragSourceTarget(target)))
+          return;
         this.closeMapSourcesPanel(false);
       };
       doc.addEventListener("pointerdown", outside, true);
@@ -56550,7 +56744,7 @@ ${request.requirements}` : preset.text,
     this.enqueue(async () => {
       var _a2, _b2;
       if (this.closed || this.path !== mapPath) return;
-      let focus = { picker: source.kind };
+      let focus = { search: true };
       try {
         const current = await this.plugin.repo.readMapSources(mapPath);
         const at = current.findIndex((item) => sameMapSource(item, source));
@@ -77658,7 +77852,7 @@ function hasBlockDescendant(element) {
   }
   return false;
 }
-function classify(element) {
+function classify2(element) {
   const tag = tagOf(element);
   if (SKIP_BLOCK_TAGS.has(tag)) return "skip";
   if (ATOM_TAGS.has(tag) || element.getAttribute("translate") === "no" || classesOf(element).some((name2) => ATOM_CLASSES.has(name2)))
@@ -77686,7 +77880,7 @@ function buildText(nodes, parts) {
       return;
     }
     const element = node;
-    if (classify(element) === "inline") {
+    if (classify2(element) === "inline") {
       parts.push({ node: element, atom: false });
       const number = parts.length;
       out += `${PLACEHOLDER_OPEN}${number}${PLACEHOLDER_CLOSE}`;
@@ -77753,7 +77947,7 @@ function extractSegments(root) {
         continue;
       }
       const element = child;
-      const kind = classify(element);
+      const kind = classify2(element);
       if (kind === "atom" || kind === "inline") run.push(element);
       else {
         flush(run);

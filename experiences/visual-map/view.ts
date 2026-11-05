@@ -221,6 +221,7 @@ import {
 import {
   arrangeNewBranch,
   arrangeNewTree,
+  cardsChangedHeight,
   cardsOverlapAny,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
@@ -10800,6 +10801,7 @@ export class VisualAgentMapView extends ItemView {
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
+    this.settleCardHeights();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   private emptyCanvasState(): "idle" | "building" | "consent" | "plan" {
@@ -12013,6 +12015,35 @@ export class VisualAgentMapView extends ItemView {
     if (!id || !this.map) return;
     this.fitKindShape(card, this.topicKindOf(id));
     this.drawEdges();
+    this.settleCardHeights();
+  }
+  /** Heights (canvas units) the cards had at the last check, and the map they belong to. */
+  private heightsSeen = new Map<string, number>();
+  private heightsSeenMap: string | null = null;
+  private settling = false;
+  /**
+   * A layout runs before a card is drawn at its final size: a cover's picture arrives later, a diamond's padding is fitted after
+   * the card is built. A card that ended up taller than it was and now covers another gets the map laid out again with the real
+   * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
+   */
+  private settleCardHeights(): void {
+    if (!this.map || this.closed) return;
+    const now = new Map<string, number>();
+    for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
+    const first = this.heightsSeenMap !== this.map.id;
+    const grew = cardsChangedHeight(first ? new Map() : this.heightsSeen, now);
+    this.heightsSeenMap = this.map.id;
+    this.heightsSeen = now;
+    if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
+    if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+    this.settling = true;
+    void this.mapChange(map => this.tidyAfterResize(map, grew), false)
+      .catch(() => {
+        // Only the tidy-up failed; the user can lay the map out by hand.
+      })
+      .finally(() => {
+        this.settling = false;
+      });
   }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   private releaseCovers(): void {

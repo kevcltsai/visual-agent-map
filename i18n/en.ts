@@ -879,7 +879,7 @@ export const en = {
   "ui.annotated_image_edit_title": "Edit note",
   "ui.annotated_image_note_label": "Note (optional)",
   "ui.annotated_image_note_hint":
-    "Write what this picture is and what to research. The AI cannot see the picture; it only reads this line and the anchor notes.",
+    "Write what this picture is and what to research. Research and expansion cannot see the picture; they read this line and the anchor notes. The map chat looks at the picture when you select it.",
   "ui.annotated_image_convert_button": "Convert",
   "ui.annotated_image_place_anchor": "Place anchor",
   "ui.anchor_new_title": "New anchor",
@@ -918,7 +918,7 @@ export const en = {
     "← ↑ → ↓ to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse",
   "ui.anchor_place_cancelled": "Placing cancelled",
   "ui.anchor_no_note_notice":
-    "This image has no note yet. The AI cannot see pictures; add one sentence on what it is and what to research.",
+    "This image has no note yet. Research and expansion cannot see pictures; add one sentence on what it is and what to research.",
   "ui.anchor_limit": "This image already has the most anchors it can hold ({0}).",
   "ui.canvas_boundaries_group": "Frames",
   "ui.canvas_boundary_label": "Frame: {0}",

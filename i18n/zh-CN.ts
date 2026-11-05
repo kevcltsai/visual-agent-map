@@ -821,7 +821,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.annotated_image_convert_title": "转成标注图",
   "ui.annotated_image_edit_title": "编辑说明",
   "ui.annotated_image_note_label": "说明（选填）",
-  "ui.annotated_image_note_hint": "写这是什么图、要研究什么。AI 看不到图片，只读这行字和锚点说明。",
+  "ui.annotated_image_note_hint":
+    "写这是什么图、要研究什么。研究和展开看不到图片，只读这行字和锚点说明；选中这张图时，地图 AI 对话会看图。",
   "ui.annotated_image_convert_button": "转换",
   "ui.annotated_image_place_anchor": "放置锚点",
   "ui.anchor_new_title": "新锚点",
@@ -856,7 +857,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.anchor_pick_plain_image": "这是普通图片。先在图片上右键“转成标注图”，才能放点。",
   "ui.anchor_place_hint": "← ↑ → ↓ 移动、Shift 移动较远、Enter 放下、Esc 取消、也可以直接用鼠标点",
   "ui.anchor_place_cancelled": "已取消放锚点",
-  "ui.anchor_no_note_notice": "这张标注图还没有说明。AI 看不到图片，建议补一句“这是什么图、要研究什么”。",
+  "ui.anchor_no_note_notice": "这张标注图还没有说明。研究和展开看不到图片，建议补一句“这是什么图、要研究什么”。",
   "ui.anchor_limit": "这张图的锚点已达上限（{0} 个）。",
   "ui.canvas_boundaries_group": "外框",
   "ui.canvas_boundary_label": "外框：{0}",

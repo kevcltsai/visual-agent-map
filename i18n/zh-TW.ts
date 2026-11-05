@@ -822,7 +822,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.annotated_image_convert_title": "轉成標註圖",
   "ui.annotated_image_edit_title": "編輯說明",
   "ui.annotated_image_note_label": "說明（選填）",
-  "ui.annotated_image_note_hint": "寫這是什麼圖、要研究什麼。AI 看不到圖片，只讀這行字和錨點說明。",
+  "ui.annotated_image_note_hint":
+    "寫這是什麼圖、要研究什麼。研究和展開看不到圖片，只讀這行字和錨點說明；選取這張圖時，心智圖 AI 對話會看圖。",
   "ui.annotated_image_convert_button": "轉換",
   "ui.annotated_image_place_anchor": "放錨點",
   "ui.anchor_new_title": "新錨點",
@@ -857,7 +858,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.anchor_pick_plain_image": "這是普通圖片。先在圖片上按右鍵「轉成標註圖」，才能放點。",
   "ui.anchor_place_hint": "← ↑ → ↓ 移動、Shift 移動較遠、Enter 放下、Esc 取消、也可以直接用滑鼠點",
   "ui.anchor_place_cancelled": "已取消放錨點",
-  "ui.anchor_no_note_notice": "這張標註圖還沒有說明。AI 看不到圖片，建議補一句「這是什麼圖、要研究什麼」。",
+  "ui.anchor_no_note_notice": "這張標註圖還沒有說明。研究和展開看不到圖片，建議補一句「這是什麼圖、要研究什麼」。",
   "ui.anchor_limit": "這張圖的錨點已達上限（{0} 個）。",
   "ui.canvas_boundaries_group": "外框",
   "ui.canvas_boundary_label": "外框：{0}",

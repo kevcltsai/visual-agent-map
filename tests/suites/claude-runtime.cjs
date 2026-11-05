@@ -595,6 +595,86 @@ test('S6 pool: dispose (release) kills the process, escalates to SIGKILL if it i
   h2.finish(h2.children[1]); await run;
 });
 
+test('steer: an observed schema call with onSteer uses exactly the warm command (one --input-format), takes the warm process, and writes the steer', async () => {
+  const h = warmHarness();
+  const { claudeWarmArgs } = load('ai/runtime/claude-code-cli.ts');
+  h.runtime.prewarm('sonnet', 'low', h.schema, false);
+  const warm = h.children[0]; let steer; const milestones = [];
+  const run = h.runtime.runTask('the prompt', 'sonnet', 'low', h.schema, { stream: true, onSteer: handler => { steer = handler; }, onMilestones: data => milestones.push(data) });
+  await until(() => !!steer && warm.writes.length === 1);
+  assert.equal(h.children.length, 1, 'the pre-started process is used');
+  assert.deepEqual([...warm.args], [...claudeWarmArgs('sonnet', 'low', h.schema, false)]);
+  assert.equal(warm.args.filter(arg => arg === '--input-format').length, 1);
+  await steer('make it two');
+  assert.deepEqual(warm.writes.map(line => JSON.parse(line).message.content[0].text), ['the prompt', 'make it two']);
+  h.finish(warm); await run;
+  assert.equal(milestones.find(item => 'prespawned' in item).prespawned, true);
+});
+test('steer: without a warm process the observed call still sends --input-format stream-json once and can steer', async () => {
+  const h = warmHarness(); let steer;
+  const run = h.runtime.runTask('p', 'sonnet', 'low', h.schema, { stream: true, onSteer: handler => { steer = handler; } });
+  await until(() => !!steer && h.children[0].writes.length === 1);
+  const args = h.children[0].args;
+  assert.equal(args.filter(arg => arg === '--input-format').length, 1); assert.equal(args[args.indexOf('--input-format') + 1], 'stream-json');
+  h.finish(h.children[0]); await run;
+});
+test('steer: a call that cannot take one (json, json-fallback, no schema without onText) never calls onSteer and never keeps stdin open', async () => {
+  const { EventEmitter } = require('node:events');
+  const spawnFor = (calls, lines) => (_exe, args) => {
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true; child.args = args; calls.push(child); child.ended = false; child.writes = [];
+    child.stdin = { on() {}, write(text) { child.writes.push(text); return true; }, end(text) { child.ended = true; if (text !== undefined) child.writes.push(text); process.nextTick(() => { child.stdout.emit('data', Buffer.from(lines(child))); child.emit('close', 0); }); } };
+    return child;
+  };
+  const result = JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { ok: 1 } });
+  const run = async (schema, controls) => {
+    const children = []; let called = 0;
+    const spawn = spawnFor(children, () => (schema ? result : JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'text' })));
+    const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+    const runtime = new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn });
+    await runtime.runTask('p', 'sonnet', 'low', schema, { ...controls, onSteer: () => { called++; } });
+    return { called, child: children[0] };
+  };
+  // json: schema without stream
+  let out = await run({ type: 'object' }, {});
+  assert.equal(out.called, 0, 'json mode'); assert.ok(!out.child.args.includes('--input-format')); assert.ok(out.child.ended);
+  // no schema and no onText
+  out = await run(undefined, {});
+  assert.equal(out.called, 0, 'no schema, no onText'); assert.ok(!out.child.args.includes('--input-format'));
+  // json-fallback: the CLI rejects the stream flags, the rerun is json mode
+  const children = []; let called = 0, n = 0;
+  const spawn = (exe, args) => {
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => true; child.args = args; children.push(child);
+    const rejectFlags = () => process.nextTick(() => { child.stderr.emit('data', Buffer.from('error: unknown option --include-partial-messages')); child.emit('close', 1); });
+    // The first (stream-json) process takes its prompt on stdin and fails; the rerun is json mode and gets the prompt through end().
+    child.stdin = { on() {}, write() { if (++n === 1) rejectFlags(); return true; }, end() { process.nextTick(() => { child.stdout.emit('data', Buffer.from(result)); child.emit('close', 0); }); } };
+    return child;
+  };
+  const { ClaudeCodeCliRuntime } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn } });
+  const runtime = new ClaudeCodeCliRuntime({ executable: 'claude', cwd: '/plugin', env: {}, spawn });
+  await runtime.runTask('p', 'sonnet', 'low', { type: 'object' }, { stream: true, onSteer: () => { called++; } });
+  // Expected but superseded: the first stream-json attempt hands out a steer handler, then fails; the json-fallback rerun never does.
+  // A steer taken by that first process is lost with it, so the view moves delivered steers back to the queue on the json-fallback event (map-chat suite, B-1).
+  assert.equal(called, 1, 'only the first (superseded) stream-json attempt hands out a steer; the json-fallback rerun does not');
+  assert.ok(!children[1].args.includes('--input-format'), 'the json-fallback rerun has no stream-json input');
+  assert.equal(runtime.streamUnsupported, true);
+});
+test('steer: after a steer the call settles at the last result (stdin is closed at the first, the steer still runs a second turn)', async () => {
+  const h = warmHarness(); let steer; const replies = [];
+  const run = h.runtime.runTask('p', 'sonnet', 'low', h.schema, { stream: true, onSteer: handler => { steer = handler; }, onStructuredJson: json => replies.push(json) });
+  await until(() => !!steer && h.children[0].writes.length === 1);
+  const child = h.children[0];
+  await steer('change it');
+  const result = text => JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { summary: text, detail: '', suggestions: [], visualReferences: [] } });
+  child.stdout.emit('data', Buffer.from(result('first') + '\n'));
+  assert.equal(child.stdinEnded, true, 'stdin closed at the first result');
+  let settled = false; run.then(() => { settled = true; }, () => { settled = true; });
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(settled, false, 'not settled at the first result');
+  await assert.rejects(steer('too late'), /already ended/);
+  child.stdout.emit('data', Buffer.from(result('second') + '\n')); child.emit('close', 0);
+  assert.equal(JSON.parse(await run).summary, 'second');
+});
+
 test('S6 pool: Stop after the process was taken kills it; Stop before the run reaches the CLI releases the waiting process', async () => {
   const h = warmHarness();
   h.runtime.prewarm('sonnet', 'low', h.schema, true);

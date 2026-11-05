@@ -297,10 +297,17 @@ export class ClaudeCodeCliRuntime {
     // An image travels as a content block, which only the stream-json input format can carry.
     const image = controls.imageDataUrl ? claudeImageSource(controls.imageDataUrl) : null;
     const observed = !!outputSchema && controls.stream === true && !image && !fallback && !this.streamUnsupported;
+    // A steer is written to stdin as a stream-json user message, so it needs a stream-json input format and an output that
+    // is read line by line (the first `result` closes stdin). json and json-fallback runs cannot take one: no onSteer call.
+    const steerable =
+      !!controls.onSteer &&
+      ((!!controls.onText && !outputSchema) || observed || !!image) &&
+      !fallback &&
+      !this.streamUnsupported;
     if (controls.onText && !outputSchema) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
-      if (controls.onSteer || image) args.push("--input-format", "stream-json");
+      if (steerable || image) args.push("--input-format", "stream-json");
     } else if (image) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--input-format", "stream-json");
@@ -310,10 +317,10 @@ export class ClaudeCodeCliRuntime {
     }
     // A process pre-started for exactly this command only needs the prompt; a different pre-started process stays for its own run.
     const pool = this.options.warmPool;
-    const warmArgs =
-      pool && observed && !controls.onSteer ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
-    const warm = warmArgs ? pool!.take(this.warmKey(warmArgs)) : null;
-    if (warmArgs && warm) args = warmArgs;
+    const warmArgs = (pool || steerable) && observed ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
+    const warm = warmArgs && pool ? pool.take(this.warmKey(warmArgs)) : null;
+    // A steerable observed call always uses the warm command: it is the observed command plus `--input-format stream-json`.
+    if (warmArgs && (warm || steerable)) args = warmArgs;
     if (outputSchema && controls.stream === true) {
       try {
         controls.onStreamMode?.(observed ? "stream-json" : fallback ? "json-fallback" : "json");
@@ -365,7 +372,7 @@ export class ClaudeCodeCliRuntime {
         stderr = "",
         settled = false,
         accepted = false,
-        inputOpen = Boolean(controls.onSteer || image || warm);
+        inputOpen = Boolean(steerable || image || warm);
       let streamBuffer = "",
         streamText = "",
         currentText = "",
@@ -582,7 +589,7 @@ export class ClaudeCodeCliRuntime {
         /* Surfaced through the process events. */
       });
       try {
-        if (controls.onSteer || image || warm) {
+        if (steerable || image || warm) {
           const sendInput = (text: string, accepted?: () => void, withImage = false): void => {
             if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
             const content = [...(withImage && image ? [{ type: "image", source: image }] : []), { type: "text", text }];
@@ -596,9 +603,10 @@ export class ClaudeCodeCliRuntime {
             });
           };
           sendInput(prompt, markAccepted, true);
-          controls.onSteer?.(async text => {
-            sendInput(text);
-          });
+          if (steerable)
+            controls.onSteer?.(async text => {
+              sendInput(text);
+            });
         } else if (controls.onAccepted || observer) {
           child.stdin.end(prompt, error => {
             if (error) {

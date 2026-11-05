@@ -18196,7 +18196,7 @@ function buildMapSvg(scene) {
     const titleWeight = numberIn(card.titleWeight, 100, 900);
     const lineStep = titleSize === void 0 ? 16 : Math.max(16, Math.round(titleSize * 1.3));
     out.push(
-      `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="8" fill="${color(card.fill, cardColor)}" stroke="${color(card.stroke, strokeColor)}"${cardStrokeWidth === void 0 ? "" : ` stroke-width="${cardStrokeWidth}"`}/>`
+      card.plain === true ? "<g>" : `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="8" fill="${color(card.fill, cardColor)}" stroke="${color(card.stroke, strokeColor)}"${cardStrokeWidth === void 0 ? "" : ` stroke-width="${cardStrokeWidth}"`}/>`
     );
     if (card.accent !== void 0)
       out.push(
@@ -52329,7 +52329,7 @@ var relationSwatchSequence = 0;
 var KIND_PICKER_ORDER = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 var RELATION_LABEL_MIN_ZOOM = 0.6;
 var RELATION_LABEL_NOTE_MAX = 60;
-var TEXT_NODE_HEIGHT = 180;
+var TEXT_NODE_HEIGHT = 28;
 var TEXT_NODE_WIDTH = 300;
 function depthOf(nodes, id) {
   const byId = new Map(nodes.map((node) => [node.id, node]));
@@ -58073,6 +58073,8 @@ ${request.requirements}` : preset.text,
   /** The buttons and drag of a free text block: connect to a card, remove a connection, drag with the pointer. */
   addFreeTextControls(el, text11, liveLinks) {
     const bar = el.createDiv("vam-text-node-links");
+    const promote = el.querySelector(".vam-text-node-promote");
+    if (promote) bar.appendChild(promote);
     const connect = bar.createEl("button", {
       cls: "vam-text-node-connect",
       text: t("ui.text_link_start"),
@@ -58298,9 +58300,16 @@ ${request.requirements}` : preset.text,
     body == null ? void 0 : body.addClass("vam-sr-only");
     const input2 = el.createEl("textarea", {
       cls: "vam-text-node-input",
-      attr: { rows: "4", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
+      attr: { rows: "1", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
     });
     input2.value = draft != null ? draft : text11.text;
+    const fitHeight = () => {
+      input2.style.removeProperty("height");
+      input2.style.height = `${input2.scrollHeight}px`;
+      this.drawEdges();
+    };
+    input2.addEventListener("input", fitHeight);
+    fitHeight();
     let done = false;
     const close = () => {
       done = true;
@@ -58308,6 +58317,7 @@ ${request.requirements}` : preset.text,
       this.suspendTextEdit = null;
       input2.remove();
       body == null ? void 0 : body.removeClass("vam-sr-only");
+      this.drawEdges();
     };
     this.suspendTextEdit = () => {
       done = true;
@@ -59245,7 +59255,6 @@ ${request.requirements}` : preset.text,
         node.collapsed ? "chevrons-up-down" : "chevrons-down-up",
         () => this.toggleCollapsed(node)
       );
-    if (this.canEditText()) add(t("ui.text_node_add"), "text-cursor-input", () => this.addTextNodeUnder(node));
     if (this.markersEditable(node) && this.coverPictureOf(node))
       add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
     menu.addSeparator();
@@ -60687,7 +60696,6 @@ ${request.requirements}` : preset.text,
     for (const el of this.textEls.values()) {
       const box = boxOf(el);
       grow(box.x, box.y, box.width, box.height);
-      const style = savedLook(el);
       const body = el.querySelector(".vam-text-node-body");
       cards.push({
         x: box.x,
@@ -60695,8 +60703,7 @@ ${request.requirements}` : preset.text,
         w: box.width,
         h: box.height,
         title: wrapText((_g = body == null ? void 0 : body.textContent) != null ? _g : "", box.width - 28),
-        fill: colorOf(style.backgroundColor),
-        stroke: colorOf(style.borderTopColor),
+        plain: true,
         textColor: colorOf(computed(body != null ? body : el).color)
       });
     }
@@ -62015,12 +62022,6 @@ ${request.requirements}` : preset.text,
             title: t("ui.select_subtopics"),
             icon: "list-checks",
             action: () => this.whenEditing(() => this.selectSubtopics(node))
-          });
-        if (this.canEditText() && !isAimNode(node))
-          more.push({
-            title: t("ui.text_node_add"),
-            icon: "text-cursor-input",
-            action: () => this.whenEditing(() => this.addTextNodeUnder(node))
           });
       }
       if (aimEnabled() && ((_w = this.map) == null ? void 0 : _w.aim) && node.aimKind === "question")

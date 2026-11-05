@@ -12056,16 +12056,34 @@ export class VisualAgentMapView extends ItemView {
    */
   private settleCardHeights(): void {
     if (!this.map || this.closed || !this.cardEls) return;
+    // A chat reply lays out its own cards (resized / arranged / placed) inside its undo step; looking now would also record
+    // heights it has not finished with. Nothing is recorded, so the first render after the reply compares against the old ones.
+    if (this.renderHold > 0 || this.history.grouping) return;
     const now = new Map<string, number>();
     for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
     const first = this.heightsSeenMap !== this.map.id;
-    const grew = cardsChangedHeight(first ? new Map() : this.heightsSeen, now);
+    const previous = this.heightsSeen;
+    const grew = cardsChangedHeight(first ? new Map() : previous, now);
     this.heightsSeenMap = this.map.id;
     this.heightsSeen = now;
     if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
     if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
     this.settling = true;
-    void this.mapChange(map => this.tidyAfterResize(map, grew), false)
+    const mapId = this.map.id;
+    // One write at a time with every other Map.md write: it waits in the plugin queue. With no step of the
+    // user's or the AI's behind it (opening, a cover arriving) it is an undo step of its own.
+    void this.plugin
+      .mutate(async () => {
+        if (!this.map || this.closed || this.map.id !== mapId) return;
+        // A reply began while this waited: it lays out its own cards; look again at the next render.
+        if (this.renderHold > 0 || this.history.grouping) {
+          this.heightsSeen = previous;
+          return;
+        }
+        // What was seen may be stale after the wait (another job moved cards): write only for an overlap that is still there.
+        if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+        await this.mapChange(map => this.tidyAfterResize(map, grew), false);
+      })
       .catch(() => {
         // Only the tidy-up failed; the user can lay the map out by hand.
       })

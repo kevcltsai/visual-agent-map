@@ -1121,6 +1121,10 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
   private owning = 0;
   /** Entries that stay a step of their own when collapseSince folds the ones around them (a closed group's step). */
   private solo = new WeakSet<object>();
+  /** True while a group is open (a chat reply is being applied). */
+  get grouping(): boolean {
+    return this.grouped !== null;
+  }
   get canUndo(): boolean {
     return this.past.length > 0;
   }

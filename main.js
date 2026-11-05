@@ -20121,6 +20121,10 @@ var History = class {
     /** Entries that stay a step of their own when collapseSince folds the ones around them (a closed group's step). */
     __publicField(this, "solo", /* @__PURE__ */ new WeakSet());
   }
+  /** True while a group is open (a chat reply is being applied). */
+  get grouping() {
+    return this.grouped !== null;
+  }
   get canUndo() {
     return this.past.length > 0;
   }
@@ -61733,16 +61737,27 @@ ${request.requirements}` : preset.text,
    */
   settleCardHeights() {
     if (!this.map || this.closed || !this.cardEls) return;
+    if (this.renderHold > 0 || this.history.grouping) return;
     const now = /* @__PURE__ */ new Map();
     for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
     const first = this.heightsSeenMap !== this.map.id;
-    const grew = cardsChangedHeight(first ? /* @__PURE__ */ new Map() : this.heightsSeen, now);
+    const previous = this.heightsSeen;
+    const grew = cardsChangedHeight(first ? /* @__PURE__ */ new Map() : previous, now);
     this.heightsSeenMap = this.map.id;
     this.heightsSeen = now;
     if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
     if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
     this.settling = true;
-    void this.mapChange((map) => this.tidyAfterResize(map, grew), false).catch(() => {
+    const mapId = this.map.id;
+    void this.plugin.mutate(async () => {
+      if (!this.map || this.closed || this.map.id !== mapId) return;
+      if (this.renderHold > 0 || this.history.grouping) {
+        this.heightsSeen = previous;
+        return;
+      }
+      if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+      await this.mapChange((map) => this.tidyAfterResize(map, grew), false);
+    }).catch(() => {
     }).finally(() => {
       this.settling = false;
     });

@@ -632,3 +632,85 @@ test('text-node-width: a left layout line ends on the real (fitted) right edge o
   const path = h.view.edgesEl.children.find(p => p.classes.includes('vam-text-edge'));
   assert.ok(String(path.attrs.d).endsWith('360 24'), path.attrs.d);
 });
+
+// text-node-width: a committed width re-places the block the way the layout would (same undo step); a left drag keeps the right edge.
+async function withLayout(h, direction) {
+  h.view.map.layout = { direction };
+  Object.assign(h.view.map.nodes[0], { x: 800, y: 100 });
+  Object.assign(h.view.map.nodes[1], { x: 800, y: 400 });
+  await h.repo.saveMap(MAP, h.view.map);
+  h.view.map = await h.repo.readMap(MAP);
+  await h.view.hydrate();
+  h.view.render();
+  h.view.arrangeAll(h.view.map);
+  await h.repo.saveMap(MAP, h.view.map);
+  h.view.render();
+}
+const textOnDisk = async (h, id = 't1') => (await h.onDisk()).find(i => i.id === id);
+const WIDE = 'wide text that is longer than a card width '.repeat(3);
+
+test('text-node-width: left layout, End key at 560 grows leftward and leaves the topic card clear; one undo restores width and x', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 })]);
+  await withLayout(h, 'left');
+  const topic = h.view.map.nodes[0];
+  const before = await textOnDisk(h);
+  const past = h.view.history.past.length;
+  handleOf(h)('t1').fire('keydown', { key: 'End' });
+  await h.settle();
+  const after = await textOnDisk(h);
+  assert.equal(after.width, 560);
+  assert.ok(after.x + 560 <= topic.x, `box ${after.x}+560 must end left of the topic at ${topic.x}`);
+  assert.ok(after.x < before.x, 'moved left');
+  assert.equal(h.view.history.past.length, past + 1);
+  await h.view.travel(false);
+  const undone = await textOnDisk(h);
+  assert.equal(undone.width, 100);
+  assert.equal(undone.x, before.x, 'one undo restores the position too');
+  assert.equal(undone.y, before.y);
+});
+
+test('text-node-width: left layout drag keeps the right edge live, then settles clear of the topic card', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 })]);
+  await withLayout(h, 'left');
+  const topic = h.view.map.nodes[0];
+  const start = await textOnDisk(h);
+  const el = h.textEl('t1');
+  el.offsetWidth = 100;
+  const handle = handleOf(h)('t1');
+  pointer(handle, 'pointerdown', 0); pointer(handle, 'pointermove', 200);
+  assert.equal(el.style.width, '300px');
+  assert.equal(parseFloat(el.style.left) + 300, start.x + 100, 'right edge anchored while dragging');
+  pointer(handle, 'pointermove', 5000); pointer(handle, 'pointerup', 5000);
+  await h.settle();
+  const after = await textOnDisk(h);
+  assert.equal(after.width, 560);
+  assert.ok(after.x + 560 <= topic.x, `box ${after.x}+560 must end left of the topic at ${topic.x}`);
+});
+
+test('text-node-width: right layout keeps the box x when the width changes', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 })]);
+  await withLayout(h, 'right');
+  const before = await textOnDisk(h);
+  handleOf(h)('t1').fire('keydown', { key: 'End' });
+  await h.settle();
+  const after = await textOnDisk(h);
+  assert.equal(after.width, 560);
+  assert.equal(after.x, before.x);
+});
+
+test('text-node-width: down layout at 560 does not overlap its sibling text block', async () => {
+  const h = await harness(({ root }) => [
+    txt({ parentId: root.id, text: WIDE, width: 100, x: 0, y: 0 }),
+    txt({ id: 't2', parentId: root.id, text: 'sibling', width: 100, x: 0, y: 0 })
+  ]);
+  await withLayout(h, 'down');
+  const a = await textOnDisk(h), b = await textOnDisk(h, 't2');
+  assert.ok(Math.abs(a.x - b.x) >= 100 || Math.abs(a.y - b.y) >= 20, 'precondition: placed apart');
+  handleOf(h)('t1').fire('keydown', { key: 'End' });
+  await h.settle();
+  const w = await textOnDisk(h), s = await textOnDisk(h, 't2');
+  assert.equal(w.width, 560);
+  const clearX = w.x + 560 <= s.x || s.x + 100 <= w.x;
+  const clearY = w.y + 30 <= s.y || s.y + 30 <= w.y;
+  assert.ok(clearX || clearY, `wide box (${w.x},${w.y}) overlaps sibling (${s.x},${s.y})`);
+});

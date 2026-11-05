@@ -282,7 +282,7 @@ import {
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
-import { arrangeMapWithText, arrangeNewBranchWithText } from "../../map-layout-text";
+import { arrangeMapWithText, arrangeNewBranchWithText, type TextWidthOf } from "../../map-layout-text";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
@@ -1447,7 +1447,13 @@ export class VisualAgentMapView extends ItemView {
     if (map.canvasItems) map.canvasItems = out.items;
   }
   /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
-  private arrangeBranch(map: MapDocument, parentId: string, newIds: Set<string>, minTop?: number): void {
+  private arrangeBranch(
+    map: MapDocument,
+    parentId: string,
+    newIds: Set<string>,
+    minTop?: number,
+    widthOf: TextWidthOf = this.textWidthOf
+  ): void {
     const out = arrangeNewBranchWithText(
       map.nodes,
       map.canvasItems ?? [],
@@ -1456,7 +1462,7 @@ export class VisualAgentMapView extends ItemView {
       this.cardHeightOf,
       minTop,
       layoutOf(map),
-      this.textWidthOf
+      widthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -8526,7 +8532,7 @@ export class VisualAgentMapView extends ItemView {
     sync(shownWidth());
     const commit = (width: number | undefined): void => {
       this.focusTextResizeId = text.id;
-      this.enqueue(() => this.changeCanvasItems(text.id, items => setTextNodeWidth(items, text.id, width)));
+      this.enqueue(() => this.resizeText(text.id, width));
     };
     handle.addEventListener("pointerdown", event => {
       if (event.button !== 0 || !this.map || this.presentation) return;
@@ -8536,6 +8542,7 @@ export class VisualAgentMapView extends ItemView {
         zoom = this.map.viewport.zoom || 1,
         from = shownWidth(),
         before = storedWidth();
+      const leftward = layoutOf(this.map).direction === "left";
       let width = from,
         done = false;
       handle.setPointerCapture?.(event.pointerId);
@@ -8543,6 +8550,8 @@ export class VisualAgentMapView extends ItemView {
         width = clampTextWidth(from + (e.clientX - startX) / zoom) ?? from;
         el.style.width = `${width}px`;
         el.addClass("has-width");
+        // A left layout grows leftward: the right edge stays where it was; release settles to the layout result.
+        if (leftward) el.style.left = `${text.x + from - width}px`;
         sync(width);
         this.drawEdges();
       };
@@ -8558,6 +8567,7 @@ export class VisualAgentMapView extends ItemView {
           el.style.removeProperty("width");
           el.removeClass("has-width");
         } else el.style.width = `${before}px`;
+        if (leftward) el.style.left = `${text.x}px`;
         sync(from);
         this.drawEdges();
       };
@@ -8605,6 +8615,29 @@ export class VisualAgentMapView extends ItemView {
       if (width === storedWidth() || (storedWidth() === undefined && width === current)) return;
       commit(width);
     });
+  }
+  /**
+   * Sets (or clears) a text block's width and, in the same undo step, places the block again the way the layout would
+   * (a block under a shown topic only: it may now need to grow leftward or clear a sibling).
+   */
+  private async resizeText(id: string, width: number | undefined): Promise<void> {
+    await this.changeCanvasItems(
+      id,
+      items => setTextNodeWidth(items, id, width),
+      map => {
+        const item = (map.canvasItems ?? []).find((entry): entry is TextItem => entry.kind === "text" && entry.id === id);
+        const parent = item?.parentId ? map.nodes.find(node => node.id === item.parentId) : undefined;
+        if (!item || !parent || parent.collapsed) return;
+        // The drawn width is still the old one here, so the layout is told the new width directly.
+        // The whole branch of the topic (its cards and its text blocks) takes its places again, so a wide block clears its siblings.
+        const branch = new Set(descendants(map.nodes, parent.id));
+        for (const entry of map.canvasItems ?? [])
+          if (entry.kind === "text" && (entry as TextItem).parentId === parent.id) branch.add((entry as TextItem).id);
+        this.arrangeBranch(map, parent.id, branch, undefined, textId =>
+          textId === id ? (item.width ?? estimateTextWidth(item.text)) : this.textWidthOf(textId)
+        );
+      }
+    );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
   private liveLinks(text: TextItem): string[] {
@@ -9640,7 +9673,11 @@ export class VisualAgentMapView extends ItemView {
     handle.addEventListener("pointerdown", event => begin(event, true));
   }
   /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
-  private async changeCanvasItems(id: string, change: (items: readonly CanvasItem[]) => CanvasItem[]): Promise<void> {
+  private async changeCanvasItems(
+    id: string,
+    change: (items: readonly CanvasItem[]) => CanvasItem[],
+    afterChange?: (map: MapDocument) => void
+  ): Promise<void> {
     if (!this.map || !this.canEditCanvasItems()) return;
     if (!this.map.canvasItems?.some(item => (item as { id?: unknown }).id === id)) return;
     await this.mapChange(map => {
@@ -9654,6 +9691,7 @@ export class VisualAgentMapView extends ItemView {
       const next = pruneBoundaries(dangling.size ? removeLinksTo(changed, dangling) : changed, [...alive]);
       if (next.length) map.canvasItems = next;
       else delete map.canvasItems;
+      afterChange?.(map);
     }, false);
   }
   /** Moves a free image by (dx, dy) in map units. */

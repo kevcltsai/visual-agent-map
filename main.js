@@ -55295,20 +55295,30 @@ ${request.requirements}` : preset.text,
       const oldParentId = moving.parentId;
       moving.parentId = parent.id;
       map.nodes.find((item) => item.id === parent.id).collapsed = false;
-      this.closeGapAt(map, oldParentId, parent.id);
-      this.arrangeBranch(map, parent.id, /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]), void 0);
+      const movedIds = /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]);
+      this.closeGapAt(map, oldParentId, parent.id, movedIds);
+      this.arrangeBranch(map, parent.id, movedIds, void 0);
     });
   }
   /**
    * A card left `oldParentId`: that branch is laid out again so the place it left closes up. Only that branch moves; the rest of
    * the map, and a branch the card moved within, stay as they are. Nothing when there was no parent, the parent still is the
-   * parent, or its branch is folded.
+   * parent, or its branch is folded. `moved` (the card that left and its own branch) still sits where it was, so it must not
+   * count as an obstacle: left in, the old children are pushed below it and the hole only gets bigger.
    */
-  closeGapAt(map, oldParentId, newParentId) {
+  closeGapAt(map, oldParentId, newParentId, moved) {
     if (!oldParentId || oldParentId === newParentId) return;
     const old = map.nodes.find((item) => item.id === oldParentId);
     if (!old || old.collapsed) return;
-    this.arrangeBranch(map, oldParentId, new Set(descendants(map.nodes, oldParentId)), void 0);
+    const stayers = new Set([...descendants(map.nodes, oldParentId)].filter((id) => !moved.has(id)));
+    const rest = { ...map, nodes: map.nodes.filter((item) => !moved.has(item.id)) };
+    this.arrangeBranch(rest, oldParentId, stayers, void 0);
+    const placed = new Map(rest.nodes.map((item) => [item.id, item]));
+    map.nodes = map.nodes.map((item) => {
+      var _a2;
+      return (_a2 = placed.get(item.id)) != null ? _a2 : item;
+    });
+    if (rest.canvasItems) map.canvasItems = rest.canvasItems;
   }
   /**
    * After a chat reply changed what cards show: cards that grew and now cover another card get the whole map laid out again
@@ -55357,7 +55367,7 @@ ${request.requirements}` : preset.text,
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
       box.placed = true;
-      this.closeGapAt(map, oldParentId, parent.id);
+      this.closeGapAt(map, oldParentId, parent.id, /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]));
       if (!map.aim && layoutOf(map).direction === "timeline" && !target.parentId) this.arrangeAll(map);
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), void 0);
     });

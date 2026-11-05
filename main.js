@@ -950,12 +950,6 @@ var en = {
   "ui.relevance_goal_label": "Map goal",
   "ui.relevance_panel_label": "Goal",
   "ui.relevance_goal_placeholder": "What do you want to achieve with this map?",
-  "ui.relevance_goal_level_0_1": "Goal: {0} \xB7 {1}",
-  "ui.relevance_level_label": "Your level",
-  "ui.relevance_level_none": "Not set",
-  "ui.relevance_level_beginner": "Beginner",
-  "ui.relevance_level_intermediate": "Some background",
-  "ui.relevance_level_familiar": "Familiar",
   "ui.relevance_context_label": "Extra context",
   "ui.relevance_context_placeholder": "Optional: what you already know, conditions or limits",
   "ui.relevance_grade_button": "Grade with this",
@@ -3580,12 +3574,6 @@ var zhCN = {
   "ui.relevance_goal_label": "\u5FC3\u667A\u56FE\u76EE\u6807",
   "ui.relevance_panel_label": "\u76EE\u6807",
   "ui.relevance_goal_placeholder": "\u4F60\u60F3\u7528\u8FD9\u5F20\u56FE\u8FBE\u6210\u4EC0\u4E48\uFF1F",
-  "ui.relevance_goal_level_0_1": "\u76EE\u6807\uFF1A{0} \xB7 {1}",
-  "ui.relevance_level_label": "\u5F53\u524D\u7A0B\u5EA6",
-  "ui.relevance_level_none": "\u672A\u6307\u5B9A",
-  "ui.relevance_level_beginner": "\u521D\u5B66",
-  "ui.relevance_level_intermediate": "\u6709\u57FA\u7840",
-  "ui.relevance_level_familiar": "\u719F\u6089",
   "ui.relevance_context_label": "\u8865\u5145\u8BF4\u660E",
   "ui.relevance_context_placeholder": "\u8865\u5145\uFF08\u9009\u586B\uFF09\uFF1A\u5DF2\u7ECF\u4F1A\u4EC0\u4E48\u3001\u6761\u4EF6\u6216\u9650\u5236",
   "ui.relevance_grade_button": "\u4F9D\u6B64\u5206\u7EA7",
@@ -6210,12 +6198,6 @@ var zhTW = {
   "ui.relevance_goal_label": "\u5FC3\u667A\u5716\u76EE\u6A19",
   "ui.relevance_panel_label": "\u76EE\u6A19",
   "ui.relevance_goal_placeholder": "\u4F60\u60F3\u7528\u9019\u5F35\u5716\u9054\u6210\u4EC0\u9EBC\uFF1F",
-  "ui.relevance_goal_level_0_1": "\u76EE\u6A19\uFF1A{0} \xB7 {1}",
-  "ui.relevance_level_label": "\u76EE\u524D\u7A0B\u5EA6",
-  "ui.relevance_level_none": "\u672A\u6307\u5B9A",
-  "ui.relevance_level_beginner": "\u521D\u5B78",
-  "ui.relevance_level_intermediate": "\u6709\u57FA\u790E",
-  "ui.relevance_level_familiar": "\u719F\u6089",
   "ui.relevance_context_label": "\u88DC\u5145\u8AAA\u660E",
   "ui.relevance_context_placeholder": "\u88DC\u5145\uFF08\u9078\u586B\uFF09\uFF1A\u5DF2\u7D93\u6703\u4EC0\u9EBC\u3001\u689D\u4EF6\u6216\u9650\u5236",
   "ui.relevance_grade_button": "\u4F9D\u6B64\u5206\u7D1A",
@@ -23164,14 +23146,6 @@ var RELEVANCE_GOAL_MAX_LENGTH = 200;
 function normalizeRelevanceGoal(value) {
   return [...value.replace(/\s+/g, " ").trim()].slice(0, RELEVANCE_GOAL_MAX_LENGTH).join("").trim();
 }
-var RELEVANCE_LEVELS = ["beginner", "intermediate", "familiar"];
-function readRelevanceLevel(fm) {
-  const level = fm["relevance-level"];
-  return typeof level === "string" && RELEVANCE_LEVELS.includes(level) ? level : void 0;
-}
-function normalizeRelevanceLevel(value) {
-  return typeof value === "string" && RELEVANCE_LEVELS.includes(value) ? value : void 0;
-}
 var RELEVANCE_CONTEXT_MAX_LENGTH = 200;
 function normalizeRelevanceContext(value) {
   const text11 = [...value.replace(/\s+/g, " ").trim()].slice(0, RELEVANCE_CONTEXT_MAX_LENGTH).join("").trim();
@@ -24522,10 +24496,10 @@ ${body}`);
   async readRelevanceGoal(path) {
     return readRelevanceGoal(frontmatter(await this.app.vault.read(this.file(path))));
   }
-  /** The goal, level and context keys of the map file in one read. */
+  /** The goal and context keys of the map file in one read (an old `relevance-level` key is ignored). */
   async readRelevanceSetup(path) {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
-    return { goal: readRelevanceGoal(fm), level: readRelevanceLevel(fm), context: readRelevanceContext(fm) };
+    return { goal: readRelevanceGoal(fm), context: readRelevanceContext(fm) };
   }
   /**
    * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-leaning` and `hypothesis-strength`
@@ -24688,19 +24662,17 @@ ${body}`);
     );
   }
   /**
-   * Sets the map's `relevance-goal`, `relevance-level` and `relevance-context` (a missing level or context removes
-   * its key) in one write and, when the goal differs from the current goal (or there was none), appends
+   * Sets the map's `relevance-goal` and `relevance-context` (a missing context removes its key) in one write and, when the goal differs from the current goal (or there was none), appends
    * `"YYYY-MM-DD: <goal>"` (local date) to `relevance-goal-history`. Only those keys change; the history records the
-   * goal alone. `changed` is about the goal (the history); `setupChanged` is true when any of the three values
-   * differs. Resolves with what was there before, for {@link restoreRelevanceGoal}.
+   * goal alone. `changed` is about the goal (the history); `setupChanged` is true when the goal or context
+   * differs. An old `relevance-level` key is never read, written or removed. Resolves with what was there before, for {@link restoreRelevanceGoal}.
    */
-  async writeRelevanceGoal(mapPath, goal, level, context) {
+  async writeRelevanceGoal(mapPath, goal, context) {
     const next = normalizeRelevanceGoal(goal);
     if (!next) throw new Error("A relevance goal is required.");
-    const nextLevel = readRelevanceLevel({ "relevance-level": level });
     const nextContext = context === void 0 ? void 0 : normalizeRelevanceContext(context);
     let previous = { goal: void 0, history: void 0 };
-    let nextState = { goal: next, history: void 0, level: nextLevel, context: nextContext };
+    let nextState = { goal: next, history: void 0, context: nextContext };
     let changed = false;
     let setupChanged = false;
     await this.app.vault.process(this.file(mapPath), (content) => {
@@ -24709,37 +24681,33 @@ ${body}`);
       previous = {
         goal: typeof fm["relevance-goal"] === "string" ? fm["relevance-goal"] : void 0,
         history: Array.isArray(fm["relevance-goal-history"]) ? fm["relevance-goal-history"].filter((item) => typeof item === "string") : void 0,
-        level: typeof fm["relevance-level"] === "string" ? fm["relevance-level"] : void 0,
         context: typeof fm["relevance-context"] === "string" ? fm["relevance-context"] : void 0
       };
       changed = ((_a2 = previous.goal) == null ? void 0 : _a2.trim()) !== next;
-      setupChanged = changed || readRelevanceLevel(fm) !== nextLevel || readRelevanceContext(fm) !== nextContext;
+      setupChanged = changed || readRelevanceContext(fm) !== nextContext;
       nextState = {
         goal: next,
         history: changed ? [...(_b2 = previous.history) != null ? _b2 : [], `${localDate()}: ${next}`] : previous.history,
-        level: nextLevel,
         context: nextContext
       };
       return setFrontmatterKeys(content, {
         "relevance-goal": next,
-        "relevance-level": nextLevel != null ? nextLevel : null,
         "relevance-context": nextContext != null ? nextContext : null,
         ...changed ? { "relevance-goal-history": (_c = nextState.history) != null ? _c : null } : {}
       });
     });
     return { previous, next: nextState, changed, setupChanged };
   }
-  /** Puts the goal, level, context and history keys back exactly as {@link writeRelevanceGoal} found them (a missing value removes the key). */
+  /** Puts the goal, context and history keys back exactly as {@link writeRelevanceGoal} found them (a missing value removes the key). */
   async restoreRelevanceGoal(mapPath, state) {
     await this.app.vault.process(
       this.file(mapPath),
       (content) => {
-        var _a2, _b2, _c, _d;
+        var _a2, _b2, _c;
         return setFrontmatterKeys(content, {
           "relevance-goal": (_a2 = state.goal) != null ? _a2 : null,
-          "relevance-level": (_b2 = state.level) != null ? _b2 : null,
-          "relevance-context": (_c = state.context) != null ? _c : null,
-          "relevance-goal-history": (_d = state.history) != null ? _d : null
+          "relevance-context": (_b2 = state.context) != null ? _b2 : null,
+          "relevance-goal-history": (_c = state.history) != null ? _c : null
         });
       }
     );
@@ -39693,7 +39661,7 @@ function relevanceSetupUnchanged(draft, saved) {
   var _a2, _b2;
   const goal = normalizeRelevanceGoal(draft.goal);
   if (!goal) return false;
-  return goal === normalizeRelevanceGoal((_a2 = saved.goal) != null ? _a2 : "") && normalizeRelevanceLevel(draft.level) === normalizeRelevanceLevel(saved.level) && normalizeRelevanceContext(draft.context) === normalizeRelevanceContext((_b2 = saved.context) != null ? _b2 : "");
+  return goal === normalizeRelevanceGoal((_a2 = saved.goal) != null ? _a2 : "") && normalizeRelevanceContext(draft.context) === normalizeRelevanceContext((_b2 = saved.context) != null ? _b2 : "");
 }
 function relevanceMode(draft, saved, hasAiGrades) {
   return hasAiGrades && relevanceSetupUnchanged(draft, saved) ? "recalibrate" : "full";
@@ -52460,7 +52428,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "notes", /* @__PURE__ */ new Map());
     /** Learning goal from the map file's frontmatter; shown only on mind maps (never AIM) and absent when not graded. */
     __publicField(this, "relevanceGoal");
-    __publicField(this, "relevanceLevel");
     __publicField(this, "relevanceContext");
     /** The selection rules and state (selected topic, ticked topics, multi-select mode, selected relation line, tab stop). */
     __publicField(this, "selection", new TopicSelection());
@@ -53787,11 +53754,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     var _a2, _b2, _c, _d;
     this.aimFailedReports.clear();
     let goal;
-    let level;
     let context;
     if (this.path && !((_a2 = this.map) == null ? void 0 : _a2.aim)) {
       try {
-        ({ goal, level, context } = await this.plugin.repo.readRelevanceSetup(this.path));
+        ({ goal, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch (e) {
       }
     }
@@ -53806,7 +53772,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     if (!isCurrent()) return;
     this.notes = loaded;
     this.relevanceGoal = goal;
-    this.relevanceLevel = level;
     this.relevanceContext = context;
     await this.hydrateFailedReportTargets(isCurrent);
   }
@@ -54440,7 +54405,7 @@ ${request.requirements}` : preset.text,
   }
   /**
    * One toolbar button, the same level as "Select topics": it shows the goal and opens a panel under it with the goal,
-   * level, context, a "Grade with this" button and the display-only sort switch.
+   * context, a "Grade with this" button and the display-only sort switch.
    */
   renderRelevanceGoalControl(parent) {
     var _a2, _b2, _c;
@@ -54459,9 +54424,6 @@ ${request.requirements}` : preset.text,
     }
     this.drawRelevancePanel(false);
   }
-  relevanceLevelLabel(level) {
-    return t(`ui.relevance_level_${level != null ? level : "none"}`);
-  }
   /** Display-only toggle: within each sibling group show core, support, side, then ungraded. */
   relevanceSortOn() {
     return this.relevanceGradeable() && relevanceSortedMaps.has(this.path);
@@ -54469,9 +54431,8 @@ ${request.requirements}` : preset.text,
   drawRelevanceButton(parent) {
     var _a2;
     const goal = this.relevanceGoal;
-    const level = this.relevanceLevel;
     const sorted = this.relevanceSortOn();
-    const label = goal ? level ? t("ui.relevance_goal_level_0_1", goal, this.relevanceLevelLabel(level)) : t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_set");
+    const label = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_set");
     const button = this.button(parent, label, () => {
       if (this.relevancePanelOpen && this.relevancePanelEl) this.closeRelevancePanel(true);
       else this.editRelevanceGoal();
@@ -54540,7 +54501,7 @@ ${request.requirements}` : preset.text,
   }
   /** Open the goal panel under the toolbar button (no-op while a grading run is going). */
   editRelevanceGoal() {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d;
     if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
       new import_obsidian34.Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
@@ -54552,27 +54513,25 @@ ${request.requirements}` : preset.text,
     this.relevancePanelOpen = true;
     this.relevanceDraft = {
       goal: (_b2 = this.relevanceGoal) != null ? _b2 : "",
-      level: (_c = this.relevanceLevel) != null ? _c : "",
-      context: (_d = this.relevanceContext) != null ? _d : ""
+      context: (_c = this.relevanceContext) != null ? _c : ""
     };
-    (_e = this.relevanceButtonEl) == null ? void 0 : _e.setAttr("aria-expanded", "true");
+    (_d = this.relevanceButtonEl) == null ? void 0 : _d.setAttr("aria-expanded", "true");
     this.drawRelevancePanel(true);
   }
   /**
-   * The panel holds one group: goal, level, context and a "Grade with this" button, then the sort switch. Enter in a
+   * The panel holds one group: goal, context and a "Grade with this" button, then the sort switch. Enter in a
    * text field or the button confirms; Esc, a press outside, or focus leaving the panel closes it without submitting.
    * Tab inside the panel does not. The sort switch does not close it.
    */
   drawRelevancePanel(focus) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e;
     const tools = this.relevanceToolsEl;
     if (!tools) return;
     (_a2 = this.relevancePanelEl) == null ? void 0 : _a2.remove();
     const gen = ++this.relevancePanelGen;
-    const draft = (_e = this.relevanceDraft) != null ? _e : this.relevanceDraft = {
+    const draft = (_d = this.relevanceDraft) != null ? _d : this.relevanceDraft = {
       goal: (_b2 = this.relevanceGoal) != null ? _b2 : "",
-      level: (_c = this.relevanceLevel) != null ? _c : "",
-      context: (_d = this.relevanceContext) != null ? _d : ""
+      context: (_c = this.relevanceContext) != null ? _c : ""
     };
     const panel = tools.createDiv({
       cls: "vam-relevance-panel",
@@ -54589,11 +54548,6 @@ ${request.requirements}` : preset.text,
     input2.setAttr("aria-label", t("ui.relevance_goal_label"));
     input2.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
     const row = group.createDiv("vam-relevance-setup-row");
-    const levelSelect = row.createEl("select", { cls: "dropdown vam-relevance-level" });
-    levelSelect.setAttr("aria-label", t("ui.relevance_level_label"));
-    for (const value of ["", ...RELEVANCE_LEVELS])
-      levelSelect.createEl("option", { text: this.relevanceLevelLabel(normalizeRelevanceLevel(value)), value });
-    levelSelect.value = draft.level;
     const context = row.createEl("input", { cls: "vam-relevance-context-input", type: "text" });
     context.value = draft.context;
     context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
@@ -54601,8 +54555,8 @@ ${request.requirements}` : preset.text,
     context.setAttr("placeholder", t("ui.relevance_context_placeholder"));
     const pinCount = this.relevancePinList().length;
     const planMode = () => relevanceMode(
-      { goal: input2.value, level: levelSelect.value, context: context.value },
-      { goal: this.relevanceGoal, level: this.relevanceLevel, context: this.relevanceContext },
+      { goal: input2.value, context: context.value },
+      { goal: this.relevanceGoal, context: this.relevanceContext },
       this.relevanceAiGrades().length > 0
     );
     const submitButton = group.createEl("button", {
@@ -54625,10 +54579,6 @@ ${request.requirements}` : preset.text,
     });
     context.addEventListener("input", () => {
       draft.context = context.value;
-      showMode();
-    });
-    levelSelect.addEventListener("change", () => {
-      draft.level = levelSelect.value;
       showMode();
     });
     let unpinAllButton;
@@ -54661,11 +54611,10 @@ ${request.requirements}` : preset.text,
       if (!alive()) return;
       finished = true;
       const value = input2.value;
-      const level = normalizeRelevanceLevel(levelSelect.value);
       const extra = context.value;
       const planned = planMode();
       this.closeRelevancePanel(refocus, submit && !!normalizeRelevanceGoal(value));
-      if (submit) void this.submitRelevanceGoal(value, level, extra, planned);
+      if (submit) void this.submitRelevanceGoal(value, extra, planned);
     };
     const confirm = () => finish(true, !normalizeRelevanceGoal(input2.value));
     const keys = (event, enterConfirms) => {
@@ -54681,7 +54630,6 @@ ${request.requirements}` : preset.text,
     };
     input2.addEventListener("keydown", (event) => keys(event, true));
     context.addEventListener("keydown", (event) => keys(event, true));
-    levelSelect.addEventListener("keydown", (event) => keys(event, false));
     submitButton.addEventListener("keydown", (event) => keys(event, false));
     unpinAllButton == null ? void 0 : unpinAllButton.addEventListener("keydown", (event) => keys(event, false));
     sort.addEventListener("keydown", (event) => keys(event, false));
@@ -54699,7 +54647,6 @@ ${request.requirements}` : preset.text,
     sort.addEventListener("mousedown", (event) => event.preventDefault());
     for (const control of [
       input2,
-      levelSelect,
       context,
       submitButton,
       ...unpinAllButton ? [unpinAllButton] : [],
@@ -54709,7 +54656,7 @@ ${request.requirements}` : preset.text,
         const next = event.relatedTarget;
         if (next && !panel.contains(next) && next !== this.relevanceButtonEl) finish(false, false);
       });
-    const doc = (_f = this.contentEl) == null ? void 0 : _f.ownerDocument;
+    const doc = (_e = this.contentEl) == null ? void 0 : _e.ownerDocument;
     if (doc == null ? void 0 : doc.addEventListener) {
       const outside = (event) => {
         var _a3;
@@ -54790,10 +54737,9 @@ ${request.requirements}` : preset.text,
    * whole map is graded and the result is written in one step. Nothing is written when the AI is declined, stopped,
    * fails or returns anything but exactly one valid grade for every card.
    */
-  async submitRelevanceGoal(raw, levelRaw, contextRaw, planned = "full") {
+  async submitRelevanceGoal(raw, contextRaw, planned = "full") {
     var _a2, _b2, _c;
     const goal = normalizeRelevanceGoal(raw);
-    const level = normalizeRelevanceLevel(levelRaw);
     const context = contextRaw === void 0 ? void 0 : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
     if (!goal || !this.relevanceGradeable()) return;
@@ -54825,12 +54771,10 @@ ${request.requirements}` : preset.text,
         const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(
           mapPath,
           goal,
-          level,
           context
         );
         if (this.path !== mapPath) return;
         this.relevanceGoal = goal;
-        this.relevanceLevel = level;
         this.relevanceContext = context;
         mode = relevanceModeAfterWrite(planned, setupChanged);
         if (mode !== planned) (_b3 = (_a3 = this.plugin).releaseWarmClaude) == null ? void 0 : _b3.call(_a3);
@@ -54858,7 +54802,6 @@ ${request.requirements}` : preset.text,
         pins = this.relevancePinList();
         const request = {
           goal,
-          ...level ? { level } : {},
           ...context ? { context } : {},
           nodes: basis,
           language: settings.language,

@@ -291,7 +291,6 @@ import { placeHoverPreview, previewMetrics } from "../../ui/preview-utils";
 import {
   normalizeRelevanceContext,
   normalizeRelevanceGoal,
-  normalizeRelevanceLevel,
   RELEVANCE_CONTEXT_MAX_LENGTH,
   RELEVANCE_GOAL_MAX_LENGTH,
   HYPOTHESIS_LEANINGS,
@@ -299,11 +298,9 @@ import {
   readAiLocked,
   resolveHypothesisWrite,
   TOPIC_KINDS,
-  RELEVANCE_LEVELS,
   type HypothesisLeaning,
   type HypothesisStrength,
   type NoteRelevance,
-  type RelevanceLevel,
   type RelevanceTier,
   type TopicKind
 } from "../../note-values";
@@ -931,7 +928,6 @@ export class VisualAgentMapView extends ItemView {
   private notes = new Map<string, Note>();
   /** Learning goal from the map file's frontmatter; shown only on mind maps (never AIM) and absent when not graded. */
   private relevanceGoal: string | undefined;
-  private relevanceLevel: RelevanceLevel | undefined;
   private relevanceContext: string | undefined;
   /** The selection rules and state (selected topic, ticked topics, multi-select mode, selected relation line, tab stop). */
   private selection = new TopicSelection();
@@ -943,7 +939,7 @@ export class VisualAgentMapView extends ItemView {
   private startedRelevance = false;
   private readonly relevancePanelId = `vam-relevance-panel-${++relevancePanelSeq}`;
   private relevancePanelOpen = false;
-  private relevanceDraft: { goal: string; level: string; context: string } | null = null;
+  private relevanceDraft: { goal: string; context: string } | null = null;
   private relevanceToolsEl: HTMLElement | null = null;
   private relevanceButtonEl: HTMLButtonElement | null = null;
   private relevancePanelEl: HTMLElement | null = null;
@@ -2349,11 +2345,10 @@ export class VisualAgentMapView extends ItemView {
   private async hydrate(isCurrent: () => boolean = () => true): Promise<void> {
     this.aimFailedReports.clear();
     let goal: string | undefined;
-    let level: RelevanceLevel | undefined;
     let context: string | undefined;
     if (this.path && !this.map?.aim) {
       try {
-        ({ goal, level, context } = await this.plugin.repo.readRelevanceSetup(this.path));
+        ({ goal, context } = await this.plugin.repo.readRelevanceSetup(this.path));
       } catch {
         /* An unreadable goal is simply not shown. */
       }
@@ -2370,7 +2365,6 @@ export class VisualAgentMapView extends ItemView {
     if (!isCurrent()) return;
     this.notes = loaded;
     this.relevanceGoal = goal;
-    this.relevanceLevel = level;
     this.relevanceContext = context;
     await this.hydrateFailedReportTargets(isCurrent);
   }
@@ -3044,7 +3038,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * One toolbar button, the same level as "Select topics": it shows the goal and opens a panel under it with the goal,
-   * level, context, a "Grade with this" button and the display-only sort switch.
+   * context, a "Grade with this" button and the display-only sort switch.
    */
   private renderRelevanceGoalControl(parent: HTMLElement): void {
     // A repaint drops the old DOM: stop its listeners and make sure its late focus events cannot close the new panel.
@@ -3063,21 +3057,15 @@ export class VisualAgentMapView extends ItemView {
     }
     this.drawRelevancePanel(false);
   }
-  private relevanceLevelLabel(level: RelevanceLevel | undefined): string {
-    return t(`ui.relevance_level_${level ?? "none"}`);
-  }
   /** Display-only toggle: within each sibling group show core, support, side, then ungraded. */
   private relevanceSortOn(): boolean {
     return this.relevanceGradeable() && relevanceSortedMaps.has(this.path);
   }
   private drawRelevanceButton(parent: HTMLElement): void {
     const goal = this.relevanceGoal;
-    const level = this.relevanceLevel;
     const sorted = this.relevanceSortOn();
     const label = goal
-      ? level
-        ? t("ui.relevance_goal_level_0_1", goal, this.relevanceLevelLabel(level))
-        : t("ui.relevance_goal_0", goal)
+      ? t("ui.relevance_goal_0", goal)
       : t("ui.relevance_goal_set");
     const button = this.button(parent, label, () => {
       if (this.relevancePanelOpen && this.relevancePanelEl) this.closeRelevancePanel(true);
@@ -3157,14 +3145,13 @@ export class VisualAgentMapView extends ItemView {
     this.relevancePanelOpen = true;
     this.relevanceDraft = {
       goal: this.relevanceGoal ?? "",
-      level: this.relevanceLevel ?? "",
       context: this.relevanceContext ?? ""
     };
     this.relevanceButtonEl?.setAttr("aria-expanded", "true");
     this.drawRelevancePanel(true);
   }
   /**
-   * The panel holds one group: goal, level, context and a "Grade with this" button, then the sort switch. Enter in a
+   * The panel holds one group: goal, context and a "Grade with this" button, then the sort switch. Enter in a
    * text field or the button confirms; Esc, a press outside, or focus leaving the panel closes it without submitting.
    * Tab inside the panel does not. The sort switch does not close it.
    */
@@ -3175,7 +3162,6 @@ export class VisualAgentMapView extends ItemView {
     const gen = ++this.relevancePanelGen;
     const draft = (this.relevanceDraft ??= {
       goal: this.relevanceGoal ?? "",
-      level: this.relevanceLevel ?? "",
       context: this.relevanceContext ?? ""
     });
     const panel = tools.createDiv({
@@ -3193,11 +3179,6 @@ export class VisualAgentMapView extends ItemView {
     input.setAttr("aria-label", t("ui.relevance_goal_label"));
     input.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
     const row = group.createDiv("vam-relevance-setup-row");
-    const levelSelect = row.createEl("select", { cls: "dropdown vam-relevance-level" });
-    levelSelect.setAttr("aria-label", t("ui.relevance_level_label"));
-    for (const value of ["", ...RELEVANCE_LEVELS])
-      levelSelect.createEl("option", { text: this.relevanceLevelLabel(normalizeRelevanceLevel(value)), value });
-    levelSelect.value = draft.level;
     const context = row.createEl("input", { cls: "vam-relevance-context-input", type: "text" });
     context.value = draft.context;
     context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
@@ -3207,8 +3188,8 @@ export class VisualAgentMapView extends ItemView {
     const pinCount = this.relevancePinList().length;
     const planMode = (): RelevanceMode =>
       relevanceMode(
-        { goal: input.value, level: levelSelect.value, context: context.value },
-        { goal: this.relevanceGoal, level: this.relevanceLevel, context: this.relevanceContext },
+        { goal: input.value, context: context.value },
+        { goal: this.relevanceGoal, context: this.relevanceContext },
         this.relevanceAiGrades().length > 0
       );
     const submitButton = group.createEl("button", {
@@ -3233,10 +3214,6 @@ export class VisualAgentMapView extends ItemView {
     });
     context.addEventListener("input", () => {
       draft.context = context.value;
-      showMode();
-    });
-    levelSelect.addEventListener("change", () => {
-      draft.level = levelSelect.value;
       showMode();
     });
     let unpinAllButton: HTMLButtonElement | undefined;
@@ -3272,11 +3249,10 @@ export class VisualAgentMapView extends ItemView {
       if (!alive()) return;
       finished = true;
       const value = input.value;
-      const level = normalizeRelevanceLevel(levelSelect.value);
       const extra = context.value;
       const planned = planMode();
       this.closeRelevancePanel(refocus, submit && !!normalizeRelevanceGoal(value));
-      if (submit) void this.submitRelevanceGoal(value, level, extra, planned);
+      if (submit) void this.submitRelevanceGoal(value, extra, planned);
     };
     const confirm = (): void => finish(true, !normalizeRelevanceGoal(input.value));
     const keys = (event: KeyboardEvent, enterConfirms: boolean): void => {
@@ -3293,7 +3269,6 @@ export class VisualAgentMapView extends ItemView {
     };
     input.addEventListener("keydown", event => keys(event, true));
     context.addEventListener("keydown", event => keys(event, true));
-    levelSelect.addEventListener("keydown", event => keys(event, false));
     submitButton.addEventListener("keydown", event => keys(event, false));
     unpinAllButton?.addEventListener("keydown", event => keys(event, false));
     sort.addEventListener("keydown", event => keys(event, false));
@@ -3312,7 +3287,6 @@ export class VisualAgentMapView extends ItemView {
     sort.addEventListener("mousedown", event => event.preventDefault());
     for (const control of [
       input,
-      levelSelect,
       context,
       submitButton,
       ...(unpinAllButton ? [unpinAllButton] : []),
@@ -3414,12 +3388,10 @@ export class VisualAgentMapView extends ItemView {
    */
   private async submitRelevanceGoal(
     raw: string,
-    levelRaw?: RelevanceLevel,
     contextRaw?: string,
     planned: RelevanceMode = "full"
   ): Promise<void> {
     const goal = normalizeRelevanceGoal(raw);
-    const level = normalizeRelevanceLevel(levelRaw);
     const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
     if (!goal || !this.relevanceGradeable()) return;
@@ -3449,18 +3421,16 @@ export class VisualAgentMapView extends ItemView {
         const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(
           mapPath,
           goal,
-          level,
           context
         );
         if (this.path !== mapPath) return;
         this.relevanceGoal = goal;
-        this.relevanceLevel = level;
         this.relevanceContext = context;
         // The repository has the last word: a setup that changed after all is graded in full.
         mode = relevanceModeAfterWrite(planned, setupChanged);
         // The pre-started process was for the planned mode's schema; another mode starts cold.
         if (mode !== planned) this.plugin.releaseWarmClaude?.();
-        // Goal, level and context are one undo step; none changed means nothing to undo.
+        // Goal and context are one undo step; none changed means nothing to undo.
         if (!setupChanged) return;
         this.history.push({
           label: t("ui.relevance_goal_history_label"),
@@ -3491,7 +3461,6 @@ export class VisualAgentMapView extends ItemView {
         pins = this.relevancePinList();
         const request = {
           goal,
-          ...(level ? { level } : {}),
           ...(context ? { context } : {}),
           nodes: basis,
           language: settings.language,

@@ -225,7 +225,7 @@ test('i18n: every new relevance string exists in English and Traditional Chinese
   const source = require('./support.cjs').i18nSource();
   const keys = [...new Set([...source.matchAll(/^\s*"((?:ui\.relevance_(?:goal_set|goal_set_hint|goal_edit_hint|goal_label|goal_placeholder|running|stop|stopped|not_started|failed_0|done_0_1_2|write_failed_0|view_changes|changes_title|changes_none|ungraded|changed_to|history_label|goal_history_label|undo_skipped_0))|error\.relevance_grade_[a-z_]+)":/gm)].map(match => match[1]))];
   assert.equal(keys.length, 26);
-  const added = ['goal_level_0_1', 'level_label', 'level_none', 'level_beginner', 'level_intermediate', 'level_familiar', 'context_label', 'context_placeholder', 'grade_button'].map(name => `ui.relevance_${name}`);
+  const added = ['context_label', 'context_placeholder', 'grade_button'].map(name => `ui.relevance_${name}`);
   keys.push(...added);
   const placeholders = text => [...text.matchAll(/\{\d+\}/g)].map(match => match[0]).sort().join();
   for (const key of keys) {
@@ -236,14 +236,12 @@ test('i18n: every new relevance string exists in English and Traditional Chinese
   }
 });
 
-test('i18n: level labels, context placeholder and the grade button read as specified in both languages', () => {
-  const levels = ['none', 'beginner', 'intermediate', 'familiar'];
-  assert.deepEqual(levels.map(l => translate('zh-TW', `ui.relevance_level_${l}`)), ['未指定', '初學', '有基礎', '熟悉']);
-  assert.deepEqual(levels.map(l => translate('en', `ui.relevance_level_${l}`)), ['Not set', 'Beginner', 'Some background', 'Familiar']);
+test('i18n: context placeholder and the grade button read as specified in both languages; the level labels are gone', () => {
+  for (const key of ['goal_level_0_1', 'level_label', 'level_none', 'level_beginner', 'level_intermediate', 'level_familiar'])
+    for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.equal(translate(lang, `ui.relevance_${key}`), `ui.relevance_${key}`, `${lang} ${key} removed`);
   assert.equal(translate('zh-TW', 'ui.relevance_context_placeholder'), '補充（選填）：已經會什麼、條件或限制');
   assert.equal(translate('zh-TW', 'ui.relevance_grade_button'), '依此分級');
   assert.equal(translate('en', 'ui.relevance_grade_button'), 'Grade with this');
-  assert.equal(translate('zh-TW', 'ui.relevance_goal_level_0_1', '香草', '初學'), '目標：香草 · 初學');
 });
 
 // ---- Repair round (v2.1): one follow-up request, only for parent-child violations -----------------------------------

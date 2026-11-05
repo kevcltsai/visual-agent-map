@@ -62,8 +62,6 @@ import {
   normalizeRelevanceGoal,
   normalizeRelevanceContext,
   readRelevanceContext,
-  readRelevanceLevel,
-  type RelevanceLevel,
   type NoteRelevance
 } from "./note-values";
 import { upgradeLegacyAimText } from "./experiences/aim/legacy-names";
@@ -566,13 +564,11 @@ const localDate = (date = new Date()): string =>
 export interface RelevanceGoalState {
   goal: string | undefined;
   history: string[] | undefined;
-  level?: RelevanceLevel | undefined;
   context?: string | undefined;
 }
-/** The three setup values of a map's relevance grading, as read from the map file. */
+/** The two setup values of a map's relevance grading, as read from the map file. */
 export interface RelevanceSetup {
   goal: string | undefined;
-  level: RelevanceLevel | undefined;
   context: string | undefined;
 }
 
@@ -1918,10 +1914,10 @@ export class Repository {
     return readRelevanceGoal(frontmatter(await this.app.vault.read(this.file(path))));
   }
 
-  /** The goal, level and context keys of the map file in one read. */
+  /** The goal and context keys of the map file in one read (an old `relevance-level` key is ignored). */
   async readRelevanceSetup(path: string): Promise<RelevanceSetup> {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
-    return { goal: readRelevanceGoal(fm), level: readRelevanceLevel(fm), context: readRelevanceContext(fm) };
+    return { goal: readRelevanceGoal(fm), context: readRelevanceContext(fm) };
   }
 
   /**
@@ -2098,24 +2094,21 @@ export class Repository {
   }
 
   /**
-   * Sets the map's `relevance-goal`, `relevance-level` and `relevance-context` (a missing level or context removes
-   * its key) in one write and, when the goal differs from the current goal (or there was none), appends
+   * Sets the map's `relevance-goal` and `relevance-context` (a missing context removes its key) in one write and, when the goal differs from the current goal (or there was none), appends
    * `"YYYY-MM-DD: <goal>"` (local date) to `relevance-goal-history`. Only those keys change; the history records the
-   * goal alone. `changed` is about the goal (the history); `setupChanged` is true when any of the three values
-   * differs. Resolves with what was there before, for {@link restoreRelevanceGoal}.
+   * goal alone. `changed` is about the goal (the history); `setupChanged` is true when the goal or context
+   * differs. An old `relevance-level` key is never read, written or removed. Resolves with what was there before, for {@link restoreRelevanceGoal}.
    */
   async writeRelevanceGoal(
     mapPath: string,
     goal: string,
-    level?: RelevanceLevel,
     context?: string
   ): Promise<{ previous: RelevanceGoalState; next: RelevanceGoalState; changed: boolean; setupChanged: boolean }> {
     const next = normalizeRelevanceGoal(goal);
     if (!next) throw new Error("A relevance goal is required.");
-    const nextLevel = readRelevanceLevel({ "relevance-level": level });
     const nextContext = context === undefined ? undefined : normalizeRelevanceContext(context);
     let previous: RelevanceGoalState = { goal: undefined, history: undefined };
-    let nextState: RelevanceGoalState = { goal: next, history: undefined, level: nextLevel, context: nextContext };
+    let nextState: RelevanceGoalState = { goal: next, history: undefined, context: nextContext };
     let changed = false;
     let setupChanged = false;
     await this.app.vault.process(this.file(mapPath), content => {
@@ -2125,20 +2118,17 @@ export class Repository {
         history: Array.isArray(fm["relevance-goal-history"])
           ? fm["relevance-goal-history"].filter((item): item is string => typeof item === "string")
           : undefined,
-        level: typeof fm["relevance-level"] === "string" ? (fm["relevance-level"] as RelevanceLevel) : undefined,
         context: typeof fm["relevance-context"] === "string" ? fm["relevance-context"] : undefined
       };
       changed = previous.goal?.trim() !== next;
-      setupChanged = changed || readRelevanceLevel(fm) !== nextLevel || readRelevanceContext(fm) !== nextContext;
+      setupChanged = changed || readRelevanceContext(fm) !== nextContext;
       nextState = {
         goal: next,
         history: changed ? [...(previous.history ?? []), `${localDate()}: ${next}`] : previous.history,
-        level: nextLevel,
         context: nextContext
       };
       return setFrontmatterKeys(content, {
         "relevance-goal": next,
-        "relevance-level": nextLevel ?? null,
         "relevance-context": nextContext ?? null,
         ...(changed ? { "relevance-goal-history": nextState.history ?? null } : {})
       });
@@ -2146,12 +2136,11 @@ export class Repository {
     return { previous, next: nextState, changed, setupChanged };
   }
 
-  /** Puts the goal, level, context and history keys back exactly as {@link writeRelevanceGoal} found them (a missing value removes the key). */
+  /** Puts the goal, context and history keys back exactly as {@link writeRelevanceGoal} found them (a missing value removes the key). */
   async restoreRelevanceGoal(mapPath: string, state: RelevanceGoalState): Promise<void> {
     await this.app.vault.process(this.file(mapPath), content =>
       setFrontmatterKeys(content, {
         "relevance-goal": state.goal ?? null,
-        "relevance-level": state.level ?? null,
         "relevance-context": state.context ?? null,
         "relevance-goal-history": state.history ?? null
       })

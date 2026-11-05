@@ -69,7 +69,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   const rootEl = element('div');
   const reload = async () => {
     view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)])));
-    ({ goal: view.relevanceGoal, level: view.relevanceLevel, context: view.relevanceContext } = await repo.readRelevanceSetup(MAP));
+    ({ goal: view.relevanceGoal, context: view.relevanceContext } = await repo.readRelevanceSetup(MAP));
   };
   view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = rootEl; view.focusNode = () => {}; view.hydrate = reload;
   let renders = 0;
@@ -473,57 +473,57 @@ integrationTest('relevance: focus inside the status bar survives a repaint (Stop
   assert.equal(doc.activeElement, chip);
 });
 
-// ---- Phase 4: level and context in the same inline group ----------------------------------------------------------
-const select = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-level'));
+// ---- Phase 4: context in the same inline group ----------------------------------------------------------
+// An old map carrying the retired `relevance-level` key (decision 2026-11-05-goal-banner#1: read-but-ignore, never write or delete).
+const withOldLevel = (h, value = 'beginner') => { h.contents.set(MAP, h.contents.get(MAP).replace(/^---\n/, `---\nrelevance-level: "${value}"\n`)); };
 const contextInput = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-context-input'));
 const gradeButton = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-grade-button'));
 const group = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-setup'));
 const open = h => { h.chip().click(); return h.input(); };
 
-integrationTest('relevance: the chip expands into one group: goal, a dropdown level, an optional context and a quiet button (en)', async () => {
+integrationTest('relevance: the chip expands into one group: goal, an optional context and a quiet button (en)', async () => {
   const h = await harness();
   open(h);
   assert.equal(group(h).attrs.role, 'group'); assert.equal(group(h).attrs['aria-label'], 'Map goal');
-  assert.ok(hasCls(select(h), 'dropdown'), 'the Obsidian dropdown class');
-  assert.deepEqual(select(h).children.map(o => [o.text, o.optionValue]), [['Not set', ''], ['Beginner', 'beginner'], ['Some background', 'intermediate'], ['Familiar', 'familiar']]);
-  assert.equal(select(h).value, ''); assert.equal(select(h).attrs['aria-label'], 'Your level');
+  assert.equal(findAll(h.rootEl, i => i.tag === 'select').length, 0, 'no level dropdown any more');
   assert.equal(contextInput(h).attrs.placeholder, 'Optional: what you already know, conditions or limits'); assert.equal(contextInput(h).attrs['aria-label'], 'Extra context');
   assert.equal(contextInput(h).maxLength, 200);
   assert.equal(gradeButton(h).text, 'Grade with this'); assert.equal(h.input().focused, true, 'focus starts on the goal');
 });
 
-integrationTest('relevance: goal, level and context are saved in one write, sent to the AI, and are one undo step; grading stays its own step', async () => {
+integrationTest('relevance: goal and context are saved in one write, sent to the AI (level null), and are one undo step; grading stays its own step', async () => {
   const h = await harness();
-  open(h); h.input().value = 'Grow herbs'; select(h).value = 'beginner'; contextInput(h).value = '  Half a day\nof sun  ';
+  open(h); h.input().value = 'Grow herbs'; contextInput(h).value = '  Half a day\nof sun  ';
   contextInput(h).fire('keydown', { key: 'Enter' }); await h.settled();
-  assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"\nrelevance-level: "beginner"\nrelevance-context: "Half a day of sun"/);
+  assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"\nrelevance-context: "Half a day of sun"/);
+  assert.doesNotMatch(frontmatterOf(h), /relevance-level/, 'no level key is written');
   const request = h.control.calls[0].request;
-  assert.equal(request.goal, 'Grow herbs'); assert.equal(request.level, 'beginner'); assert.equal(request.context, 'Half a day of sun');
-  assert.match(load('core/relevance-grade-service.ts').buildRelevanceGradePrompt(request), /Learner level \(JSON string[^\n]*: "beginner"\nLearner context \(JSON string, or null\): "Half a day of sun"\n/);
+  assert.equal(request.goal, 'Grow herbs'); assert.equal(request.level, undefined); assert.equal(request.context, 'Half a day of sun');
+  assert.match(load('core/relevance-grade-service.ts').buildRelevanceGradePrompt(request), /Learner level \(JSON string[^\n]*: null\nLearner context \(JSON string, or null\): "Half a day of sun"\n/);
   assert.equal(h.view.history.past.length, 2, 'one setup step plus one grading step');
-  assert.equal(h.chip().text, 'Goal: Grow herbs · Beginner'); assert.equal(h.chip().attrs['aria-label'], 'Goal: Grow herbs · Beginner');
+  assert.equal(h.chip().text, 'Goal: Grow herbs'); assert.equal(h.chip().attrs['aria-label'], 'Goal: Grow herbs');
   const history = h.contents.get(MAP).match(/^  - "/gm); assert.equal(history.length, 1, 'the history records the goal only');
   assert.doesNotMatch(h.contents.get(MAP), /relevance-goal-history:[\s\S]*Half a day/);
   button(h.bar(), 'Undo').click(); await afterTravel(h);
   await h.view.travel(false);
-  assert.doesNotMatch(h.contents.get(MAP), /relevance-(goal|level|context)/, 'the second undo removes all three keys together');
+  assert.doesNotMatch(h.contents.get(MAP), /relevance-(goal|level|context)/, 'the second undo removes both keys together');
   await h.view.travel(true);
-  assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"\nrelevance-level: "beginner"\nrelevance-context: "Half a day of sun"/);
+  assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"\nrelevance-context: "Half a day of sun"/);
 });
 
-integrationTest('relevance: only a level or context change is one undo step without a new history entry; an unchanged setup regrades with none', async () => {
+integrationTest('relevance: only a context change is one undo step without a new history entry; an unchanged setup regrades with none', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   assert.equal(h.view.history.past.length, 2);
-  open(h); select(h).value = 'familiar'; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
-  assert.equal(h.view.history.past.length, 3, 'a level change adds one setup step; the regrade changed no card, so no grading step');
+  open(h); contextInput(h).value = 'Half a day'; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  assert.equal(h.view.history.past.length, 3, 'a context change adds one setup step; the regrade changed no card, so no grading step');
   assert.equal(h.contents.get(MAP).match(/^  - "/gm).length, 1, 'no history entry: the goal is the same');
-  assert.equal(h.control.calls.at(-1).request.level, 'familiar'); assert.equal(h.control.calls.at(-1).request.context, undefined);
-  open(h); assert.equal(select(h).value, 'familiar', 'the saved level is preselected'); h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  assert.equal(h.control.calls.at(-1).request.level, undefined); assert.equal(h.control.calls.at(-1).request.context, 'Half a day');
+  open(h); assert.equal(contextInput(h).value, 'Half a day', 'the saved context is preselected'); h.input().fire('keydown', { key: 'Enter' }); await h.settled();
   assert.equal(h.control.calls.length, 3, 'regraded'); assert.equal(h.view.history.past.length, 3, 'nothing changed: no setup step, no grading step');
-  // Clearing the level and the context removes their keys.
-  open(h); select(h).value = ''; contextInput(h).value = '   '; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
-  assert.doesNotMatch(h.contents.get(MAP), /relevance-(level|context)/); assert.equal(h.chip().text, 'Goal: Goal');
+  // Clearing the context removes its key.
+  open(h); contextInput(h).value = '   '; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  assert.doesNotMatch(h.contents.get(MAP), /relevance-context/); assert.equal(h.chip().text, 'Goal: Goal');
   assert.equal(h.control.calls.at(-1).request.level, undefined);
 });
 
@@ -532,15 +532,15 @@ integrationTest('relevance: the button confirms; its press cannot count as leavi
   open(h); h.input().value = 'Via button';
   let prevented = 0; gradeButton(h).fire('mousedown', { preventDefault() { prevented++; } });
   assert.equal(prevented, 1, 'mousedown on the button keeps focus in the field');
-  // Tab from the goal to the select, to the context, to the button: focus stays inside the group.
-  h.input().fire('focusout', { relatedTarget: select(h) }); select(h).fire('focusout', { relatedTarget: contextInput(h) });
+  // Tab from the goal to the context, to the button: focus stays inside the group.
+  h.input().fire('focusout', { relatedTarget: contextInput(h) });
   contextInput(h).fire('focusout', { relatedTarget: gradeButton(h) });
   assert.ok(group(h), 'still open'); assert.equal(h.control.calls.length, 0);
   gradeButton(h).click(); await h.settled();
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Via button'); assert.equal(h.control.calls.length, 1);
   // Leaving to somewhere outside (or to nowhere) cancels, from any control.
   const outside = element('button');
-  for (const [name, pick] of [['context', contextInput], ['select', select], ['button', gradeButton]]) {
+  for (const [name, pick] of [['context', contextInput], ['button', gradeButton]]) {
     open(h); assert.ok(group(h)); pick(h).fire('focusout', { relatedTarget: outside }); await tick();
     assert.equal(group(h), undefined, `${name}: focus left the group`); assert.equal(h.control.calls.length, 1);
   }
@@ -548,13 +548,12 @@ integrationTest('relevance: the button confirms; its press cannot count as leavi
 
 integrationTest('relevance: Esc cancels from any control, an IME-confirming Enter in either text field is ignored, and an empty goal never reaches the AI', async () => {
   const h = await harness();
-  for (const pick of [h.input, select, contextInput, gradeButton]) {
+  for (const pick of [h.input, contextInput, gradeButton]) {
     open(h); pick(h).fire('keydown', { key: 'Escape' }); await tick();
     assert.equal(group(h), undefined); assert.equal(h.chip().focused, true, 'focus returns to the chip');
   }
   open(h); h.input().value = 'Goal'; h.input().fire('keydown', { key: 'Enter', isComposing: true }); contextInput(h).fire('keydown', { key: 'Enter', isComposing: true });
   assert.ok(group(h), 'composition Enter does nothing'); assert.equal(h.control.calls.length, 0);
-  select(h).fire('keydown', { key: 'Enter' }); assert.ok(group(h), 'Enter on the dropdown does not submit');
   h.input().value = '  '; contextInput(h).value = 'only context'; contextInput(h).fire('keydown', { key: 'Enter' }); await tick();
   assert.equal(group(h), undefined); assert.equal(h.control.calls.length, 0); assert.equal(h.control.usageAsks, 0);
   assert.equal(await h.repo.readRelevanceGoal(MAP), undefined, 'nothing written for a blank goal');
@@ -572,14 +571,47 @@ integrationTest('relevance: while a run is going the chip is disabled and no gro
   gate.resolve(); await h.settled();
 });
 
-integrationTest('relevance: the level and context keys survive map saves, read back only when valid, and the context is capped at 200', async () => {
+integrationTest('relevance: the context key survives map saves and is capped at 200; an old level key is neither read nor changed', async () => {
   const h = await harness();
-  open(h); h.input().value = 'Goal'; select(h).value = 'intermediate'; contextInput(h).value = 'c'.repeat(260); h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  open(h); h.input().value = 'Goal'; contextInput(h).value = 'c'.repeat(260); h.input().fire('keydown', { key: 'Enter' }); await h.settled();
   assert.equal((await h.repo.readRelevanceSetup(MAP)).context.length, 200);
   const map = await h.repo.readMap(MAP); map.viewport = { x: 1, y: 2, zoom: 1.5 }; await h.repo.saveMap(MAP, map);
-  assert.deepEqual({ ...(await h.repo.readRelevanceSetup(MAP)), context: '' }, { goal: 'Goal', level: 'intermediate', context: '' });
-  h.contents.set(MAP, h.contents.get(MAP).replace('relevance-level: "intermediate"', 'relevance-level: "expert"'));
-  assert.equal((await h.repo.readRelevanceSetup(MAP)).level, undefined, 'an unrecognised level reads as not set');
+  assert.deepEqual({ ...(await h.repo.readRelevanceSetup(MAP)), context: '' }, { goal: 'Goal', context: '' });
+});
+
+// Old maps: the retired `relevance-level` key is read-but-ignored. Saving a goal, saving the map, undo and redo leave it exactly as it was.
+integrationTest('relevance: an old relevance-level key stays unchanged through goal save, map save, undo and redo; the prompt level is null', async () => {
+  const h = await harness();
+  withOldLevel(h);
+  assert.deepEqual(Object.keys(await h.repo.readRelevanceSetup(MAP)).sort(), ['context', 'goal'], 'the level is not part of the setup');
+  await h.view.hydrate();
+  open(h); h.input().value = 'Grow herbs'; contextInput(h).value = 'Half a day of sun'; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  assert.match(frontmatterOf(h), /^relevance-level: "beginner"$/m, 'the old key is still there, unchanged');
+  assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"/);
+  assert.equal(h.control.calls[0].request.level, undefined);
+  assert.match(h.control.calls[0].prompt, /Learner level \(JSON string[^\n]*: null\n/, 'the prompt level is null');
+  const map = await h.repo.readMap(MAP); map.viewport = { x: 1, y: 2, zoom: 1.5 }; await h.repo.saveMap(MAP, map);
+  assert.match(frontmatterOf(h), /^relevance-level: "beginner"$/m, 'a map save keeps it');
+  await h.view.travel(false); await h.view.travel(false);
+  assert.doesNotMatch(h.contents.get(MAP), /relevance-(goal|context)/, 'undo removes goal and context');
+  assert.match(frontmatterOf(h), /^relevance-level: "beginner"$/m, 'undo leaves the old key');
+  await h.view.travel(true);
+  assert.match(frontmatterOf(h), /^relevance-level: "beginner"$/m, 'redo leaves the old key');
+  assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"/);
+});
+
+integrationTest('relevance: changing only the old level key is not a setup change (the same setup recalibrates)', async () => {
+  const h = await harness();
+  await h.enter('Goal'); await h.settled();
+  const past = h.view.history.past.length;
+  h.contents.set(MAP, h.contents.get(MAP).replace(/^---\n/, '---\nrelevance-level: "familiar"\n'));
+  const before = h.contents.get(MAP).match(/relevance-level: "familiar"/g).length;
+  const written = await h.repo.writeRelevanceGoal(MAP, 'Goal');
+  assert.equal(written.setupChanged, false, 'the level is not compared'); assert.equal(written.changed, false);
+  h.contents.set(MAP, h.contents.get(MAP).replace('relevance-level: "familiar"', 'relevance-level: "beginner"'));
+  assert.equal((await h.repo.writeRelevanceGoal(MAP, 'Goal')).setupChanged, false, 'a different old level is still no change');
+  assert.equal(h.contents.get(MAP).match(/relevance-level: "beginner"/g).length, before);
+  assert.equal(h.view.history.past.length, past);
 });
 
 // ---- Repair round (v2.1) -----------------------------------------------------------------------------------------
@@ -692,14 +724,14 @@ integrationTest('relevance toolbar: one button, label states, aria-expanded and 
   assert.equal(h.chip().attrs['aria-expanded'], 'true'); assert.equal(panelOf(h).attrs.id, h.chip().attrs['aria-controls']);
   h.chip().click();
   assert.equal(panelOf(h), undefined, 'a second click closes it'); assert.equal(h.chip().attrs['aria-expanded'], 'false'); assert.equal(h.chip().focused, true);
-  h.view.relevanceGoal = 'Sleep better'; h.view.relevanceLevel = 'intermediate'; h.view.relevanceContext = 'Night shifts'; h.view.render();
-  assert.equal(h.chip().text, 'Goal: Sleep better · Some background'); assert.equal(h.chip().attrs['aria-label'], 'Goal: Sleep better · Some background');
+  h.view.relevanceGoal = 'Sleep better'; h.view.relevanceContext = 'Night shifts'; h.view.render();
+  assert.equal(h.chip().text, 'Goal: Sleep better'); assert.equal(h.chip().attrs['aria-label'], 'Goal: Sleep better');
   assert.equal(h.chip().attrs['aria-description'], 'Change the goal and grade again');
   assert.equal(h.chip().iconName, undefined);
   assert.equal(findAll(h.chip(), i => hasCls(i, 'vam-relevance-sort-icon')).length, 0, 'no indicator while sorting is off');
 });
 
-integrationTest('relevance toolbar: the panel order is goal, level + context row, grade button, divider, sort switch row', async () => {
+integrationTest('relevance toolbar: the panel order is goal, context row, grade button, divider, sort switch row', async () => {
   const h = await harness();
   open(h);
   const kids = panelOf(h).children;
@@ -980,8 +1012,6 @@ integrationTest('relevance recalibrate: one button; its words follow the mode (a
   open(h); assert.equal(gradeButton(h).text, 'Recalibrate', 'unchanged setup and the map holds an AI grade');
   h.input().value = 'Goal two'; h.input().fire('input'); assert.equal(gradeButton(h).text, 'Grade with this', 'typing a new goal switches it back at once');
   h.input().value = '  Goal \n'; h.input().fire('input'); assert.equal(gradeButton(h).text, 'Recalibrate', 'spacing alone is no change');
-  select(h).value = 'beginner'; select(h).fire('change'); assert.equal(gradeButton(h).text, 'Grade with this');
-  select(h).value = ''; select(h).fire('change'); assert.equal(gradeButton(h).text, 'Recalibrate');
   contextInput(h).value = 'Half a day'; contextInput(h).fire('input'); assert.equal(gradeButton(h).text, 'Grade with this');
   contextInput(h).value = '   '; contextInput(h).fire('input'); assert.equal(gradeButton(h).text, 'Recalibrate');
   assert.equal(pinsRow(h), undefined, 'no pins: no line and no hand-back button');

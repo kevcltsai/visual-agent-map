@@ -1161,10 +1161,8 @@ export class MapChatPanel {
         if (turn.planState && turn.planState !== "cancelled" && turn.planLines?.length)
           answer.lines = [
             ...answer.lines,
-            ...turn.planLines.map(line => ({
-              status: (line.status === "skipped" || line.status === "failed"
-                ? line.status
-                : "done") as MapChatLine["status"],
+            ...turn.planLines.map((line): MapChatLine => ({
+              status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
               text: line.text
             }))
           ];

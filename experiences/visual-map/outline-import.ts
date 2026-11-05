@@ -332,24 +332,28 @@ export function applyOutlineSummaries(nodes: OutlineNode[], bank: ReadonlyMap<st
   const keys = outlinePathKeys(nodes, false);
   const taken = new Map<string, number>();
   const titlesUsed = new Set<string>();
-  return nodes.map((node, index) => {
+  const summaries = nodes.map(node => node.summary);
+  // Paths first, across the whole outline: a heading still at its own path keeps its summary wherever a copy of its title sits.
+  nodes.forEach((node, index) => {
     const key = keys[index];
-    let summary = node.summary;
-    if (!summary && key !== null) {
-      const list = bank.get(PATH_KEY + key);
-      if (list) {
-        const at = taken.get(key) ?? 0;
-        taken.set(key, at + 1);
-        summary = list[at];
-        if (summary) titlesUsed.add(node.title);
-      } else {
-        const byTitle = bank.get(TITLE_KEY + node.title);
-        if (byTitle?.length === 1 && !titlesUsed.has(node.title)) {
-          summary = byTitle[0];
-          titlesUsed.add(node.title);
-        }
-      }
-    }
+    if (summaries[index] || key === null) return;
+    const list = bank.get(PATH_KEY + key);
+    if (!list) return;
+    const at = taken.get(key) ?? 0;
+    taken.set(key, at + 1);
+    summaries[index] = list[at];
+    if (list[at]) titlesUsed.add(node.title);
+  });
+  nodes.forEach((node, index) => {
+    const key = keys[index];
+    if (summaries[index] || key === null || bank.has(PATH_KEY + key) || titlesUsed.has(node.title)) return;
+    const byTitle = bank.get(TITLE_KEY + node.title);
+    if (byTitle?.length !== 1) return;
+    summaries[index] = byTitle[0];
+    titlesUsed.add(node.title);
+  });
+  return nodes.map((node, index) => {
+    const summary = summaries[index];
     return summary ? { ...node, summary } : node;
   });
 }

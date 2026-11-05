@@ -237,6 +237,12 @@ test('outline summaries: a renamed ancestor keeps the summaries of untouched des
   // one generated summary is never handed to two headings
   const twice = strict.parseOutline('# Root\n## A\n## Z\n### X\n### X\n').nodes;
   assert.deepEqual([...strict.applyOutlineSummaries(twice, strict.outlineSummaryBank(generated)).map(node => node.summary)], ['r', 'a', undefined, 'ax', undefined]);
+  // a copy placed before the original: the original keeps its summary by path, the copy stays empty
+  const copyFirst = strict.parseOutline('# Root\n## Z\n### X\n## A\n### X\n### Y\n## B\n').nodes;
+  assert.deepEqual(sum(copyFirst), ['r', undefined, undefined, 'a', 'ax', 'ay', 'b']);
+  // a heading renamed to the title of a later original: only the original keeps it
+  const renamedToLater = strict.parseOutline('# Root\n## A\n### B\n### Y\n## B\n').nodes;
+  assert.deepEqual(sum(renamedToLater), ['r', 'a', undefined, 'ay', 'b']);
 });
 
 test('outline summaries: same-parent same-title siblings take their own summaries in order', () => {

@@ -42325,25 +42325,28 @@ function applyOutlineSummaries(nodes, bank) {
   const keys = outlinePathKeys(nodes, false);
   const taken = /* @__PURE__ */ new Map();
   const titlesUsed = /* @__PURE__ */ new Set();
-  return nodes.map((node, index) => {
+  const summaries = nodes.map((node) => node.summary);
+  nodes.forEach((node, index) => {
     var _a2;
     const key2 = keys[index];
-    let summary = node.summary;
-    if (!summary && key2 !== null) {
-      const list = bank.get(PATH_KEY + key2);
-      if (list) {
-        const at = (_a2 = taken.get(key2)) != null ? _a2 : 0;
-        taken.set(key2, at + 1);
-        summary = list[at];
-        if (summary) titlesUsed.add(node.title);
-      } else {
-        const byTitle = bank.get(TITLE_KEY + node.title);
-        if ((byTitle == null ? void 0 : byTitle.length) === 1 && !titlesUsed.has(node.title)) {
-          summary = byTitle[0];
-          titlesUsed.add(node.title);
-        }
-      }
-    }
+    if (summaries[index] || key2 === null) return;
+    const list = bank.get(PATH_KEY + key2);
+    if (!list) return;
+    const at = (_a2 = taken.get(key2)) != null ? _a2 : 0;
+    taken.set(key2, at + 1);
+    summaries[index] = list[at];
+    if (list[at]) titlesUsed.add(node.title);
+  });
+  nodes.forEach((node, index) => {
+    const key2 = keys[index];
+    if (summaries[index] || key2 === null || bank.has(PATH_KEY + key2) || titlesUsed.has(node.title)) return;
+    const byTitle = bank.get(TITLE_KEY + node.title);
+    if ((byTitle == null ? void 0 : byTitle.length) !== 1) return;
+    summaries[index] = byTitle[0];
+    titlesUsed.add(node.title);
+  });
+  return nodes.map((node, index) => {
+    const summary = summaries[index];
     return summary ? { ...node, summary } : node;
   });
 }

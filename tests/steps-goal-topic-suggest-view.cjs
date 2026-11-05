@@ -631,31 +631,3 @@ test('goal suggest: an ordinary grade without suggested cards leaves side as sid
   assert.equal(await tierOnDisk(h, 'Stress habits'), 'side');
 });
 
-test('goal suggest: the request carries the current tiers (top-level and ungraded cards left out) and the prompt shows tier', async () => {
-  const h = await harness();
-  const write = async (key, tier) => h.repo.writeRelevance((await h.repo.readMap(MAP)).nodes.find(n => n.id === h.ids[key]).path, { tier });
-  await write('a', 'core'); await write('c', 'side');
-  await h.view.hydrate();
-  await h.open();
-  const { request } = h.control.suggestCalls[0];
-  assert.deepEqual(JSON.parse(JSON.stringify(request.tiers)), { [h.ids.a]: 'core', [h.ids.c]: 'side' });
-  const prompt = load('core/goal-topic-suggest-service.ts', { obsidian }).buildGoalTopicSuggestPrompt(request);
-  assert.match(prompt, /"title":"Body"[^}]*"tier":"core"/);
-  assert.match(prompt, /"title":"REM"[^}]*"tier":"side"/);
-  assert.doesNotMatch(prompt, /"title":"Mind"[^}]*"tier"/);
-  assert.doesNotMatch(prompt, /"title":"Sleep"[^}]*"tier"/);
-});
-
-test('goal suggest: a suggestion under a side card is dropped and counted as side_parent; support, core, ungraded and top-level parents stay (counter-example 8)', () => {
-  const { parseGoalTopicSuggest } = load('core/goal-topic-suggest-service.ts', { obsidian });
-  const node = (id, parentId, depth) => ({ id, title: id, summary: '', status: '', parentId, depth });
-  const tree = [node('r', null, 0), node('s', 'r', 1), node('p', 'r', 1), node('k', 'r', 1), node('u', 'r', 1)];
-  const tiers = { s: 'side', p: 'support', k: 'core' };
-  const raw = JSON.stringify({ suggestions: [{ parentId: 'c2', title: 'under side' }, { parentId: 'c3', title: 'under support' }, { parentId: 'c4', title: 'under core' }, { parentId: 'c5', title: 'under ungraded' }, { parentId: 'c1', title: 'under top' }] });
-  const result = parseGoalTopicSuggest(raw, tree, 'en', tiers);
-  assert.deepEqual(JSON.parse(JSON.stringify(result.dropped)), [{ index: 0, code: 'side_parent' }]);
-  assert.deepEqual([...result.suggestions.map(x => x.title)], ['under support', 'under core', 'under ungraded', 'under top']);
-  assert.equal(parseGoalTopicSuggest(raw, tree, 'en').dropped.length, 0, 'no tiers, no drop');
-  const all = parseGoalTopicSuggest(JSON.stringify({ suggestions: [{ parentId: 'c2', title: 'x' }] }), tree, 'en', tiers);
-  assert.deepEqual([all.suggestions.length, all.dropped.length].map(Number), [0, 1], 'all dropped takes the existing "could not be used" path');
-});

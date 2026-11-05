@@ -3,7 +3,6 @@ Suggest topics that are MISSING from the mind map below for the learner to reach
 How to suggest:
 - Compare the goal (and the learner context) with the existing cards. Propose a topic only when the goal needs it and no existing card already covers it, even under another wording.
 - Put each new topic under the existing card where it fits best, in "parentId". A top-level card may be the parent.
-- A card may carry "tier" (core, support or side): how much the learner needs it for this goal. "side" means the learner can skip it. Never use a "side" card as a parent; choose its nearest ancestor that is not "side" instead. A card without "tier" is not graded.
 - Do not repeat, reword or split an existing card. Do not propose a title that is already on the map or that you already proposed.
 - Each title is a short plain-text card name (one line, no numbering, no markup).
 - Return at most 8 suggestions, the most valuable first. Return an empty list when the map already covers the goal; never pad the list with weak suggestions.
@@ -22,5 +21,5 @@ Learner goal (JSON string):
 Learner context (JSON string, or null):
 "Learner context text"
 
-Cards (JSON array, parent before child; parentId is null for a top-level card; "tier" appears only on graded cards):
+Cards (JSON array, parent before child; parentId is null for a top-level card):
 [{"id":"c1","title":"Root topic","summary":"Root summary","parentId":null,"depth":0},{"id":"c2","title":"Child topic","summary":"Child summary","parentId":"c1","depth":1}]

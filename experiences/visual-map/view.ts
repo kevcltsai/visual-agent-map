@@ -3741,7 +3741,6 @@ export class VisualAgentMapView extends ItemView {
               goal,
               ...(context ? { context } : {}),
               nodes: buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id), null),
-              ...this.goalSuggestTierField(),
               language: settings.language,
               contentLanguage: outputLanguageForMap(this.map, settings.language, this.map.title),
               model,
@@ -4698,15 +4697,6 @@ export class VisualAgentMapView extends ItemView {
       if (relevance?.manual) pins.push({ id: node.id, tier: relevance.tier });
     }
     return pins;
-  }
-  /** The current tier of every graded, non-top-level card (a pin's tier included), as the suggest request wants it. */
-  private goalSuggestTierField(): { tiers?: Record<string, RelevanceTier> } {
-    const tiers: Record<string, RelevanceTier> = {};
-    for (const node of this.map?.nodes ?? []) {
-      const relevance = node.parentId === null ? undefined : this.notes.get(node.id)?.relevance;
-      if (relevance) tiers[node.id] = relevance.tier;
-    }
-    return Object.keys(tiers).length ? { tiers } : {};
   }
   /** The gradable cards with an AI tier (not pinned): what a recalibration starts from. */
   private relevanceAiGrades(): RelevancePin[] {

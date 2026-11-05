@@ -216,6 +216,8 @@ import {
   clearQuestionConvergenceEdges,
   repairAimResultConvergence,
   clone,
+  branchSize,
+  childIndex,
   descendants,
   History,
   inheritModel,
@@ -1304,6 +1306,10 @@ export class VisualAgentMapView extends ItemView {
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
   }
+  /** The map's child index while a paint draws its cards; null otherwise. */
+  private paintChildIndex: Map<string, MapNode[]> | null = null;
+  /** Card measurements waiting for the paint to finish building every card; null outside a paint. */
+  private pendingCardFits: Array<() => void> | null = null;
   private cardChecks = new Map<string, HTMLInputElement>();
   /** Map search (Mod+F): the query, the current match and where Esc returns focus. Null while the search box is closed. */
   private mapSearch: {
@@ -11667,11 +11673,18 @@ export class VisualAgentMapView extends ItemView {
     if (this.selection.state.multiSelectMode) this.selectionBarEl = this.renderSelectionBar(canvas);
     this.selection.resetTabStop(shown.map(node => ({ id: node.id, parentId: node.parentId ?? null })));
     this.renderingCard = true;
+    // Every card shows its branch size: one child index per paint keeps that linear in the map size.
+    this.paintChildIndex = this.map ? childIndex(this.map.nodes) : null;
+    const fits: Array<() => void> = [];
+    this.pendingCardFits = fits;
     try {
       for (const node of shown) this.renderNode(node);
     } finally {
       this.renderingCard = false;
+      this.paintChildIndex = null;
+      this.pendingCardFits = null;
     }
+    for (const fit of fits) fit();
     this.renderAimPendingCards(shown);
     this.renderCanvasItems();
     if (this.focusNodeId) {
@@ -12147,7 +12160,9 @@ export class VisualAgentMapView extends ItemView {
     // branch's count) stays in the header. Only three tools float: AI explore, Details and "More", which holds the rest
     // (fold, structure, rename, select subtopics, remove). Add text is in the card's + menu only.
     const tools = card.createDiv("vam-node-tools");
-    const count = descendants(this.map!.nodes, node.id).size;
+    const count = this.paintChildIndex
+      ? branchSize(this.paintChildIndex, node.id)
+      : descendants(this.map!.nodes, node.id).size;
     const more: Array<{ title: string; icon: string; action: () => void }> = [];
     if (count) {
       if (node.collapsed) {
@@ -12543,7 +12558,10 @@ export class VisualAgentMapView extends ItemView {
     // Bottom, left and right need the whole card (the summary, the text column), so the cover is placed once it is built.
     this.arrangeCardCover(card);
     if (shownNode.height && !typingSummary) this.ensureClipParts(card);
-    this.fitKindShape(card, kind);
+    // During a paint every card is built first and measured afterwards: measuring each card as it is added would make the
+    // browser lay out the whole stage once per card.
+    if (this.pendingCardFits) this.pendingCardFits.push(() => this.fitKindShape(card, kind));
+    else this.fitKindShape(card, kind);
   }
   /**
    * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
@@ -21680,6 +21698,9 @@ export class VisualAgentMapView extends ItemView {
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
     const directionOf = branchDirectionResolver(allNodes, mapDirection);
+    // Lines are collected first and added after every position is read: adding each one before reading the next card's
+    // position would make the browser lay out the stage again for every line.
+    const lines: SVGPathElement[] = [];
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -21707,7 +21728,7 @@ export class VisualAgentMapView extends ItemView {
         if (!this.map.aim && this.notes.get(node.id)?.relevance?.tier === "side") path.addClass("vam-edge-side");
         // A mind map's own parent line is drawn lighter than the semantic lines (decision 35); AIM and the share viewer keep the accent line.
         else if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
-        this.edgesEl.appendChild(path);
+        lines.push(path);
         this.edgeEls.set(`${parentId}\u0000${node.id}`, path);
       }
     }
@@ -21733,7 +21754,7 @@ export class VisualAgentMapView extends ItemView {
       );
       path.addClass("vam-edge", "vam-text-edge");
       if (!this.map.aim) path.setAttribute("data-parent-line", "");
-      this.edgesEl.appendChild(path);
+      lines.push(path);
     }
     // A free text block is joined to the cards it links to by a dashed line: no arrow, no label (canvas-text-node decision #2).
     for (const [textId, textEl] of this.textEls) {
@@ -21750,9 +21771,10 @@ export class VisualAgentMapView extends ItemView {
         path.addClass("vam-text-link");
         path.setAttribute("data-text-id", textId);
         path.setAttribute("data-card-id", cardId);
-        this.edgesEl.appendChild(path);
+        lines.push(path);
       }
     }
+    for (const line of lines) this.edgesEl.appendChild(line);
     // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
     if (mapDirection === "fishbone") {
       for (const node of this.canvasNodes()) {

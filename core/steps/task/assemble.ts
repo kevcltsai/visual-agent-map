@@ -27,6 +27,7 @@ import {
   headingsVerbatim,
   inLanguage,
   LABEL_ANCESTORS,
+  LABEL_ANCHOR_CONTEXT,
   LABEL_RULES,
   LABEL_SOURCES,
   LABEL_SUMMARY,
@@ -480,6 +481,8 @@ export function assembleTaskPrompt(
   if (context.userTexts) add(input(`${inLanguage(LABEL_USER_TEXT, language)}:\n${context.userTexts}`, "user-texts"));
   if (context.summaryDirections)
     add(input(`${inLanguage(LABEL_SUMMARY_DIRECTION, language)}:\n${context.summaryDirections}`, "summary-directions"));
+  if (context.anchorContext)
+    add(input(`${inLanguage(LABEL_ANCHOR_CONTEXT, language)}:\n${context.anchorContext}`, "anchor-context"));
   add(input(`${inLanguage(LABEL_ANCESTORS, language)}:\n${context.ancestors || none}`, "ancestors"));
   add(input(`${inLanguage(LABEL_TASK, language)}:\n${context.task}`, "task"));
 

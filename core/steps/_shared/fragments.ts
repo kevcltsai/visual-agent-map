@@ -12,6 +12,8 @@ import {
 } from "../../../i18n";
 import LabelAncestorsZH from "./label-ancestors.zh.md";
 import LabelAncestorsEN from "./label-ancestors.en.md";
+import LabelAnchorContextZH from "./label-anchor-context.zh.md";
+import LabelAnchorContextEN from "./label-anchor-context.en.md";
 import LabelSummaryDirectionZH from "./label-summary-direction.zh.md";
 import LabelSummaryDirectionEN from "./label-summary-direction.en.md";
 import LabelUserTextZH from "./label-user-text.zh.md";
@@ -119,6 +121,7 @@ export function withProviderOutput(contract: string, provider: "claude" | "codex
   return provider === "claude" ? `${contract}\n${inLanguage(CLAUDE_STRUCTURED_OUTPUT, language)}` : contract;
 }
 
+export const LABEL_ANCHOR_CONTEXT: FragmentPair = pair(LabelAnchorContextZH, LabelAnchorContextEN);
 export const LABEL_ANCESTORS: FragmentPair = pair(LabelAncestorsZH, LabelAncestorsEN);
 export const LABEL_RULES: FragmentPair = pair(LabelRulesZH, LabelRulesEN);
 export const LABEL_SOURCES: FragmentPair = pair(LabelSourcesZH, LabelSourcesEN);

@@ -1396,6 +1396,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.decompose-anchor-context.en": {
+      "builder": "AiTaskService instructions: mode decompose (expand) with an annotated-image anchorContext",
+      "language": "en",
+      "schema": true
+    },
+    "service.decompose-anchor-context.zh": {
+      "builder": "AiTaskService instructions: mode decompose (expand) with an annotated-image anchorContext",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.decompose-anchor-context.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose (expand) with an annotated-image anchorContext",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.decompose-deep.en": {
       "builder": "AiTaskService instructions: mode decompose, deep research",
       "language": "en",
@@ -1979,6 +1994,21 @@
     "service.reference-groups.zh.2": {
       "builder": "AiTaskService reference extraction then task",
       "language": "zh-TW",
+      "schema": true
+    },
+    "service.research-anchor-context.en": {
+      "builder": "AiTaskService instructions: mode task, web research with an annotated-image anchorContext (two anchors, read-only data, not a source)",
+      "language": "en",
+      "schema": true
+    },
+    "service.research-anchor-context.zh": {
+      "builder": "AiTaskService instructions: mode task, web research with an annotated-image anchorContext (two anchors, read-only data, not a source)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.research-anchor-context.zh-CN": {
+      "builder": "AiTaskService instructions: mode task, web research with an annotated-image anchorContext (two anchors, read-only data, not a source)",
+      "language": "zh-CN",
       "schema": true
     },
     "service.synthesize-fresh.en": {

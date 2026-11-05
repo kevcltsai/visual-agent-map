@@ -79,7 +79,7 @@ Image: "Beef cut chart; research which dishes suit each cut"
   Relation: related (anchor -> topic): "Heavy marbling"
   Topic: "Ribeye"
 - Anchor: "Leg"
-  Relation: supports (topic -> anchor): ""
+  Relation: supports (anchor -> topic): ""
   Topic: "Ribeye"
 
 Ancestor topic context:

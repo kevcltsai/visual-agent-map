@@ -37,8 +37,8 @@ const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', 
 // upgrade module and are frozen in tests/fixtures/note-style-frozen (see its README); the snapshot files stay what they were
 // (the old file and its switches produced exactly this prompt). A missing key throws; nothing is recomputed.
 const FROZEN_SELECTIONS = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'note-style-frozen', 'upgraded-selections.json'), 'utf8')).entries;
-// Annotated image P5a fixed case: image note, anchor "back" related to the topic (note "marbling"), anchor "leg" supported by it.
-const caseImage = (image, back, leg, marbling) => ({ id: 'g1', kind: 'annotated-image', path: 'cuts.png', x: 0, y: 0, w: 10, h: 10, note: image, anchors: [{ id: 'a1', at: { kind: 'image-2d', x: 0.4, y: 0.2 }, note: back }, { id: 'a2', at: { kind: 'image-2d', x: 0.7, y: 0.8 }, note: leg }], relations: [{ kind: 'related', from: 'a1', to: 'rib', description: marbling }, { kind: 'supports', from: 'rib', to: 'a2' }] });
+// Annotated image P5a fixed case: image note, anchor "back" related to the topic (note "marbling"), anchor "leg" supports it (both relations run from the anchor to the topic).
+const caseImage = (image, back, leg, marbling) => ({ id: 'g1', kind: 'annotated-image', path: 'cuts.png', x: 0, y: 0, w: 10, h: 10, note: image, anchors: [{ id: 'a1', at: { kind: 'image-2d', x: 0.4, y: 0.2 }, note: back }, { id: 'a2', at: { kind: 'image-2d', x: 0.7, y: 0.8 }, note: leg }], relations: [{ kind: 'related', from: 'a1', to: 'rib', description: marbling }, { kind: 'supports', from: 'a2', to: 'rib' }] });
 const ANCHOR_CASE_ITEMS = { zh: [caseImage('牛的分切部位圖，研究各部位適合的料理', '牛的背部', '腿', '油花多')], en: [caseImage('Beef cut chart; research which dishes suit each cut', 'Back of the cow', 'Leg', 'Heavy marbling')] };
 
 function upgradedSelection(text, language) {

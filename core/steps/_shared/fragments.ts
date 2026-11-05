@@ -14,6 +14,8 @@ import LabelAncestorsZH from "./label-ancestors.zh.md";
 import LabelAncestorsEN from "./label-ancestors.en.md";
 import LabelAnchorContextZH from "./label-anchor-context.zh.md";
 import LabelAnchorContextEN from "./label-anchor-context.en.md";
+import FieldsAnchorContextZH from "./fields-anchor-context.zh.md";
+import FieldsAnchorContextEN from "./fields-anchor-context.en.md";
 import LabelSummaryDirectionZH from "./label-summary-direction.zh.md";
 import LabelSummaryDirectionEN from "./label-summary-direction.en.md";
 import LabelUserTextZH from "./label-user-text.zh.md";
@@ -122,6 +124,34 @@ export function withProviderOutput(contract: string, provider: "claude" | "codex
 }
 
 export const LABEL_ANCHOR_CONTEXT: FragmentPair = pair(LabelAnchorContextZH, LabelAnchorContextEN);
+const FIELDS_ANCHOR_CONTEXT: FragmentPair = pair(FieldsAnchorContextZH, FieldsAnchorContextEN);
+export interface AnchorContextFields {
+  readonly image: string;
+  readonly anchor: string;
+  readonly relation: string;
+  readonly topic: string;
+  readonly toTopic: string;
+  readonly toAnchor: string;
+}
+/** The fixed words around the user values in an anchorContext block (fields-anchor-context.*.md, one `key=word` per line). */
+export function anchorContextFields(language: ContentLanguage): AnchorContextFields {
+  const words = new Map(
+    inLanguage(FIELDS_ANCHOR_CONTEXT, language)
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)] as const)
+  );
+  const word = (key: keyof AnchorContextFields): string => words.get(key) ?? "";
+  return {
+    image: word("image"),
+    anchor: word("anchor"),
+    relation: word("relation"),
+    topic: word("topic"),
+    toTopic: word("toTopic"),
+    toAnchor: word("toAnchor")
+  };
+}
 export const LABEL_ANCESTORS: FragmentPair = pair(LabelAncestorsZH, LabelAncestorsEN);
 export const LABEL_RULES: FragmentPair = pair(LabelRulesZH, LabelRulesEN);
 export const LABEL_SOURCES: FragmentPair = pair(LabelSourcesZH, LabelSourcesEN);

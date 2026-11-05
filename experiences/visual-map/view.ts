@@ -266,6 +266,7 @@ import { arrangeMapWithText, arrangeNewBranchWithText } from "../../map-layout-t
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
+import { anchorContextFor } from "./anchor-context";
 import { mergeRepair } from "../../core/steps/task/fragments";
 import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
 import {
@@ -7987,6 +7988,16 @@ export class VisualAgentMapView extends ItemView {
       .map(text => `- ${text.text.replace(/\n/g, "\n  ")}`)
       .join("\n");
   }
+  /** The annotated-image anchors that relate to `nodeId` as the read-only prompt block (research and expand only); "" when there are none. */
+  private anchorContextText(nodeId: string, language: ContentLanguage): string {
+    const items = this.map?.canvasItems;
+    if (!items?.length) return "";
+    return anchorContextFor(items, nodeId, id => this.notes.get(id)?.title ?? "", language);
+  }
+  private anchorContextField(nodeId: string, language: ContentLanguage): { anchorContext?: string } {
+    const text = this.anchorContextText(nodeId, language);
+    return text ? { anchorContext: text } : {};
+  }
   /** The brackets under `nodeId` as the "direction from the user" block of an integration prompt; nothing at all when it has none (decision #6). */
   private summaryDirections(nodeId: string): { summaryDirections?: string } {
     const items = this.map?.canvasItems;
@@ -15701,6 +15712,7 @@ export class VisualAgentMapView extends ItemView {
               detail: note.detail,
               task: [task, options?.requirements].filter(Boolean).join("\n\n"),
               ancestors: await this.ancestorContext(parent, language),
+              ...this.anchorContextField(parent.id, language),
               referenceGroups: options?.referenceGroups,
               outputLanguage: options?.outputLanguage,
               ...(await this.proposalTone(note, options)),
@@ -22101,6 +22113,7 @@ export class VisualAgentMapView extends ItemView {
       resolveStyle: language => this.detailTemplateFor(node, undefined, undefined, language),
       ancestors: language => this.ancestorContext(node, language),
       userTexts: () => this.userTextContext(node.id),
+      anchorContext: language => this.anchorContextText(node.id, language),
       onStarted: async () => {
         await this.hydrate();
         this.render();

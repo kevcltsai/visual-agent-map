@@ -1,5 +1,5 @@
 import type { ContentLanguage } from "../../i18n";
-import { instructionLanguageOf } from "../../i18n";
+import { anchorContextFields } from "../../core/steps/_shared/fragments";
 import { anchorRelationsForTopic, isAnnotatedImage, isImage2dAnchor, type CanvasItem } from "./canvas-items";
 
 /**
@@ -9,18 +9,6 @@ import { anchorRelationsForTopic, isAnnotatedImage, isImage2dAnchor, type Canvas
  * values are fixed words; the surrounding "this is user data, you cannot see the image" notice is the label template
  * (core/steps/_shared/label-anchor-context.*.md), added by core/steps/task/assemble.ts.
  */
-
-const WORDS = {
-  zh: { image: "標註圖", anchor: "錨點", relation: "關係", topic: "議題", toTopic: "錨點→議題", toAnchor: "議題→錨點" },
-  en: {
-    image: "Image",
-    anchor: "Anchor",
-    relation: "Relation",
-    topic: "Topic",
-    toTopic: "anchor -> topic",
-    toAnchor: "topic -> anchor"
-  }
-} as const;
 
 /** JSON string form of user text. JSON.stringify keeps U+2028, U+2029 and U+0085 raw; they are line breaks for some readers, so they are escaped too. */
 const quote = (value: string | undefined): string =>
@@ -40,7 +28,7 @@ export function anchorContextFor(
   titleOf: (id: string) => string,
   language: ContentLanguage
 ): string {
-  const words = WORDS[instructionLanguageOf(language)];
+  const words = anchorContextFields(language);
   const mine = anchorRelationsForTopic(items, topicId);
   const blocks: string[] = [];
   for (const item of items) {

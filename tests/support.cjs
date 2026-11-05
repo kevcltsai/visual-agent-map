@@ -152,8 +152,8 @@ function fixture(language = 'zh-TW', options = {}) {
     create: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     createBinary: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     process: async (file, change) => { contents.set(file.path, change(contents.get(file.path))); },
-    // Like Vault.append: the handle must still be a file the vault holds (a stale or removed one throws).
-    append: async (file, data) => { if (files.get(file.path) !== file) throw new Error(`Missing file: ${file.path}`); contents.set(file.path, (contents.get(file.path) ?? '') + data); },
+    // Like Vault.append: it does not throw for a handle whose file is gone (trashed), it writes the path again as a new file holding only `data`.
+    append: async (file, data) => { if (!files.has(file.path)) { files.set(file.path, file); contents.set(file.path, ''); attach(file); } contents.set(file.path, (contents.get(file.path) ?? '') + data); },
     // Moves without touching any link, like Obsidian's Vault.rename.
     rename: async (item, target) => renameTree(item.path, target),
     adapter: {

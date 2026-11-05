@@ -286,7 +286,10 @@ export class MapChatRecordWriter {
       conv.held = false;
       return;
     }
-    if (conv.file && retry) conv.file = this.resolve(conv, configDir);
+    // The file was deleted or moved away while this writer held its handle: Vault.append would write the path again as a new
+    // file with no header, so the file is looked up again and, when it is gone, made again with the conversation header.
+    if (conv.file && (retry || !isFile(vault.getAbstractFileByPath(conv.file.path))))
+      conv.file = this.resolve(conv, configDir);
     if (!conv.file) {
       const path = recordPath(root, conv.id, configDir);
       const existing = vault.getAbstractFileByPath(path);

@@ -191,6 +191,21 @@ test('append failure retries once with a re-resolved file, then reports exactly 
   assert.equal(writer.failed, false);
   assert.equal(events.failures, 1);
 });
+test('a record deleted while the writer holds its handle is made again with the conversation header', async () => {
+  const { writer, recordFiles, fx, lines } = setup();
+  writer.write(turnStart(1));
+  await writer.idle();
+  const path = recordFiles()[0];
+  // The user trashed the file: a real Vault.append on that handle would write the path again without any header.
+  fx.files.delete(path); fx.contents.delete(path);
+  writer.write(turnEnd(1));
+  await writer.idle();
+  assert.deepEqual(lines(path).map(line => line.type), ['conversation', 'turn_end']);
+  assert.equal(lines(path)[0].id, path.split('/').at(-1).replace('.jsonl', ''));
+  writer.write(turnStart(2));
+  await writer.idle();
+  assert.deepEqual(lines(path).map(line => line.type), ['conversation', 'turn_end', 'turn_start']);
+});
 test('turn fence: a late turn_start or turn_end of an ended turn adds no line; plan lines still follow', async () => {
   const { writer, recordFiles, lines } = setup();
   writer.write(turnStart(1));

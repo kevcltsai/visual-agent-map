@@ -42047,7 +42047,8 @@ var MapChatRecordWriter = class {
       conv.held = false;
       return;
     }
-    if (conv.file && retry) conv.file = this.resolve(conv, configDir);
+    if (conv.file && (retry || !isFile(vault.getAbstractFileByPath(conv.file.path))))
+      conv.file = this.resolve(conv, configDir);
     if (!conv.file) {
       const path = recordPath(root, conv.id, configDir);
       const existing = vault.getAbstractFileByPath(path);

@@ -2925,6 +2925,17 @@ export class Repository {
           if (typeof next.parentId === "string") next.parentId = fresh(next.parentId);
           if (Array.isArray(next.members)) next.members = freshIds(next.members as string[]);
           if (Array.isArray(next.links)) next.links = freshIds(next.links as string[]);
+          // An annotated image's anchor relations: the topic end is the copied topic, the anchor id stays.
+          if (next.kind === "annotated-image" && Array.isArray(next.relations)) {
+            const anchors = new Set(
+              (Array.isArray(next.anchors) ? (next.anchors as Array<{ id?: unknown }>) : []).map(anchor => anchor.id)
+            );
+            next.relations = (next.relations as Array<{ from: string; to: string }>).map(relation => ({
+              ...relation,
+              from: anchors.has(relation.from) ? relation.from : fresh(relation.from),
+              to: anchors.has(relation.to) ? relation.to : fresh(relation.to)
+            }));
+          }
           return next as unknown as CanvasItem;
         });
     });

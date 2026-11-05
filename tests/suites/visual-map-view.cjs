@@ -3637,7 +3637,7 @@ integrationTest('hypothesis-evidence: a merge that drops same-pair relations sho
 });
 integrationTest('hypothesis-evidence: every merge path hands the retarget result to the notice, and the same-pair sentence exists in all three languages (decision #37)', () => {
   const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.equal((view.match(/this\.takeRetargetDrops\(retargetTopicRelations\(/g) ?? []).length, 3, 'merge, merge into a target and remove-with-adopter all record both counts');
+  assert.equal((view.match(/this\.takeRetargetDrops\(retargetRelationsToTopic\(/g) ?? []).length, 3, 'merge, merge into a target and remove-with-adopter all record both counts');
   assert.doesNotMatch(view, /lastDroppedCycles = retargetTopicRelations/);
   const texts = { en: 'Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)', 'zh-TW': '已移除 {0} 條重複的關係（同一對議題只保留一條）', 'zh-CN': '已移除 {0} 条重复的关系（同一对议题只保留一条）' };
   for (const [lang, text] of Object.entries(texts)) assert.equal(load('i18n.ts').translate(lang, 'ui.merge_dropped_same_pair_0', '3'), text.replace('{0}', '3'), lang);

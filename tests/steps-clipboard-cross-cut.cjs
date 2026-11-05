@@ -576,3 +576,57 @@ test('P7 counter-example M1c: a note is edited between the restore\'s read and i
   assert.ok(hits >= 2, 'the restore wrote both notes through vault.process');
   for (const path of [h.paths.p, h.paths.q]) assert.ok(h.contents.get(path)?.includes('Edited at the last moment.'), `${path} keeps the late edit`);
 });
+
+// ---- Annotated image P2 (A3): anchor relations of an image in the source map --------------------------------------------
+
+const withAnnotatedImage = async h => {
+  const image = { id: 'g1', kind: 'annotated-image', path: 'a/b.png', x: 1, y: 2, w: 30, h: 40, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }, { id: 'p2', at: { kind: 'image-2d', x: 0.1, y: 0.9 } }],
+    relations: [{ kind: 'supports', from: 'p1', to: h.ids.p }, { kind: 'related', from: 'p2', to: h.ids.q }, { kind: 'related', from: 'p2', to: h.ids.top }] };
+  await h.repo.updateMap(MAP_A, map => { map.canvasItems = [image]; });
+  h.viewA.map = await h.repo.readMap(MAP_A); await h.viewA.hydrate();
+  return JSON.parse(JSON.stringify((await h.repo.readMap(MAP_A)).canvasItems));
+};
+
+test('A3 cross-map cut: the source image loses the relations of the cut topics, keeps anchors and the others, shows a Notice; undo restores them field by field', async () => {
+  const h = await harness();
+  const before = await withAnnotatedImage(h);
+  await cutAndPaste(h);
+  assert.deepEqual(h.errors, []);
+  const after = JSON.parse(JSON.stringify((await h.repo.readMap(MAP_A)).canvasItems));
+  assert.deepEqual(after[0].relations, [{ kind: 'related', from: 'p2', to: h.ids.top }]);
+  assert.deepEqual(after[0].anchors, before[0].anchors, 'anchors stay');
+  assert.ok(h.notices.includes('Removed 2 image relation(s) with the cut topics.'), JSON.stringify(h.notices));
+  assert.equal(h.notices.filter(text => /image relation/.test(text)).length, 1, 'one Notice');
+  assert.equal((await h.repo.readMap(MAP_B)).canvasItems, undefined, 'the target map gets no anchor relation');
+  await h.viewB.travel(false); await h.idle();
+  assert.deepEqual(JSON.parse(JSON.stringify((await h.repo.readMap(MAP_A)).canvasItems)), before, 'undo restores the image and its relations');
+});
+
+test('A3 cross-map cut: with no annotated image there is no image Notice', async () => {
+  const h = await harness();
+  await cutAndPaste(h);
+  assert.equal(h.notices.filter(text => /image relation/.test(text)).length, 0);
+});
+
+test('A3 copy (same map and across maps): the copies carry no anchor relation and the source map is not changed', async () => {
+  const h = await harness();
+  await withAnnotatedImage(h);
+  const aBefore = h.contents.get(MAP_A);
+  h.viewA.selection.setSelected(null); h.viewA.selection.replaceMulti([h.ids.p]);
+  const event = clipboardEvent();
+  h.viewA.onClipboardEvent('copy', event);
+  const raw = event.clipboardData.store.get(MIME);
+  assert.ok(raw);
+  await pasteIntoB(h, raw);
+  const b = await h.repo.readMap(MAP_B);
+  assert.equal(b.nodes.length, 3, 'copies landed in B');
+  assert.equal(b.canvasItems, undefined, 'no image or anchor relation in B');
+  assert.equal(h.contents.get(MAP_A), aBefore, 'the source Map.md is byte for byte the same');
+  // Same map: paste the copy under Top in A.
+  h.viewA.selection.setSelected(h.ids.top); h.viewA.selection.replaceMulti([]);
+  h.viewA.onClipboardEvent('paste', clipboardEvent({ [MIME]: raw }));
+  await h.idle();
+  const a = await h.repo.readMap(MAP_A);
+  assert.equal(a.nodes.length, 5, 'copies landed in A');
+  assert.deepEqual(JSON.parse(JSON.stringify(a.canvasItems[0].relations)).map(r => r.to).sort(), [h.ids.p, h.ids.q, h.ids.top].sort(), 'the image has exactly the relations it had');
+});

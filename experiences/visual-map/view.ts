@@ -1955,7 +1955,6 @@ export class VisualAgentMapView extends ItemView {
     this.suspendInlineName = () => {
       if (!live) return;
       state.draft = input.value;
-      state.fresh = false;
       release();
     };
     const finish = (save: boolean): void => {
@@ -1968,6 +1967,11 @@ export class VisualAgentMapView extends ItemView {
     };
     input.addEventListener("input", () => {
       state.draft = input.value;
+      state.fresh = false;
+    });
+    // Placing the caret by hand also ends "select everything on focus"; a repaint must not undo the click.
+    input.addEventListener("mousedown", () => {
+      state.fresh = false;
     });
     input.addEventListener("keydown", event => {
       // The field owns its keys: shortcuts, arrows and Delete must not reach the canvas.
@@ -1992,10 +1996,10 @@ export class VisualAgentMapView extends ItemView {
     this.restoringFocus = true;
     try {
       input.focus({ preventScroll: true });
-      if (this.inlineName.fresh) {
-        input.select?.();
-        this.inlineName.fresh = false;
-      } else input.setSelectionRange?.(input.value.length, input.value.length);
+      // `fresh` lasts until the user types or clicks in the field: a repaint or the second focus after addNode
+      // must not collapse the selection to the caret (F21).
+      if (this.inlineName.fresh) input.select?.();
+      else input.setSelectionRange?.(input.value.length, input.value.length);
     } finally {
       this.restoringFocus = false;
     }

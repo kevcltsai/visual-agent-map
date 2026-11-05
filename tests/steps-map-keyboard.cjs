@@ -20,7 +20,8 @@ const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, a
   createEl(name, value = {}) { const child = make(name, value); child.parent = this; this.children.push(child); return child; },
   setAttr(name, value) { this.attrs[name] = value; }, addClass(...names) { names.forEach(name => this.classes.add(name)); }, removeClass(name) { this.classes.delete(name); },
   toggleClass(name, on) { if (on) this.classes.add(name); else this.classes.delete(name); }, addEventListener(name, handler) { this.handlers.set(name, handler); }, removeEventListener() {},
-  setPointerCapture() {}, focus() { this.focused++; make.last = this; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
+  setPointerCapture() {}, focus() { this.focused++; make.last = this; },
+  select() { this.selectionStart = 0; this.selectionEnd = String(this.value ?? '').length; }, setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
   querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} });
 const findAll = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(c => findAll(c, predicate))];
 
@@ -315,7 +316,7 @@ test('21: Mod+Enter makes a card named "New topic" at once (no dialog); its titl
   assert.equal(h.view.history.past.length, past + 1, 'one history entry');
   const field = nameField(h, fresh.id);
   assert.ok(field, 'the card shows a title field'); assert.equal(field.value, 'New topic');
-  assert.equal(make.last, field, 'DOM focus is on the title field'); assert.equal(h.view.inlineName.fresh, false, 'the name was selected once');
+  assert.equal(make.last, field, 'DOM focus is on the title field'); assert.equal(h.view.inlineName.fresh, true, 'the name stays selected until the user types');
   await h.view.travel(false); await tick();
   assert.equal(h.map().nodes.some(n => n.id === fresh.id), false, 'one undo removes the whole card');
   await h.view.travel(true); await tick();
@@ -410,6 +411,39 @@ test('21: Shift+Enter on a root adds a new root named "New topic" and its field 
   assert.equal(fresh.parentId ?? null, null); assert.equal(h.map().nodes.filter(n => !n.parentId).length, roots + 1);
   assert.equal(make.last, nameField(h, fresh.id)); assert.equal(h.view.notes.get(fresh.id).title, 'New topic');
   assert.equal(h.modals.filter(m => m.constructor.name === 'NameModal').length, 0);
+});
+
+// F21: the field's real selection (not just the "fresh" flag) must cover the whole default name after every entry point settles.
+const assertAllSelected = (h, label) => {
+  const field = nameField(h, freshCard(h).id);
+  assert.equal(make.last, field, `${label}: the title field has the focus`);
+  assert.equal(field.value, 'New topic');
+  assert.deepEqual([field.selectionStart, field.selectionEnd], [0, 'New topic'.length], `${label}: the whole default name is selected, so typing replaces it`);
+};
+
+test('F21: Mod+Enter, Shift+Enter, the type list and the card "+" all leave the new card\'s whole name selected after the repaints settle', async () => {
+  for (const entry of ['mod', 'shift', 'menu']) {
+    const h = await harness(); realAdd(h);
+    if (entry === 'menu') {
+      const menus = [];
+      h.view.newMenu = () => { const m = { items: [], addItem(cb) { const it = { setTitle() { return this; }, setIcon() { return this; }, onClick(f) { this.run = f; return this; } }; cb(it); m.items.push(it); return m; }, showAtMouseEvent() {}, select() {} }; menus.push(m); return m; };
+      h.view.canEditText = () => true;
+      h.view.openAddMenu({}, h.map().nodes.find(n => n.id === h.ids.leaf));
+      menus[0].items[0].run();
+    } else if (entry === 'mod') { h.view.contentEl.ownerDocument = { activeElement: h.card('leaf') }; modCtrlEnter(h); }
+    else { h.view.contentEl.ownerDocument = { activeElement: h.card('root') }; h.view.scope.keys.find(k => k.key === 'Enter' && k.modifiers.length === 1 && k.modifiers[0] === 'Shift').func({ key: 'Enter', isComposing: false, defaultPrevented: false }, {}); }
+    await until(() => h.map().nodes.length === 5); await tick(); await tick();
+    assertAllSelected(h, entry);
+    // Every later focus of the field (addNode focuses it again after the paint, so does each repaint) must keep the untouched default name selected.
+    h.view.focusInlineName(); await tick(); await tick();
+    assertAllSelected(h, entry + ' after a second focus');
+    // Once the user types, a re-focus keeps the caret at the end instead of selecting again.
+    const field = nameField(h, freshCard(h).id);
+    field.value = 'New topic!'; field.handlers.get('input')({});
+    h.view.focusInlineName(); await tick();
+    const typed = nameField(h, freshCard(h).id);
+    assert.deepEqual([typed.selectionStart, typed.selectionEnd], [10, 10], entry + ': after typing the caret stays at the end');
+  }
 });
 
 test('36: addNode with focus=false (AI suggestion, outline import, map chat) does not take focus', async () => {

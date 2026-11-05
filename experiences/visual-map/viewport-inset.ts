@@ -236,7 +236,8 @@ function overlapArea(a: ScreenRect, b: ScreenRect): number {
  * into its own card, which is what clears a narrow gap), then beside. `row` is the row's horizontal extent as already
  * fitted for the top and bottom sides, `size` its size. A side that covers no other card, no floating control and lies
  * inside the canvas wins; otherwise the first side that covers no other card (the canvas then pans), otherwise the side
- * that covers the least. All numbers are screen pixels.
+ * that covers the least. A row above or below may slide sideways but always keeps part of its width over its own card.
+ * All numbers are screen pixels.
  */
 export function chooseCardToolsSpot(input: {
   card: ScreenRect;
@@ -291,7 +292,15 @@ export function chooseCardToolsSpot(input: {
     slide: 0,
     rect: { left: card.left - 4 - size.width, right: card.left - 4, top: sideTop, bottom: sideTop + size.height }
   });
-  const scored = candidates.map(candidate => ({
+  // A row above or below that slid off its card leaves bare canvas between them, and the pointer loses the card on the way.
+  const touch = Math.min(32, card.right - card.left, size.width);
+  const attached = candidates.filter(
+    candidate =>
+      candidate.side === "left" ||
+      candidate.side === "right" ||
+      Math.min(candidate.rect.right, card.right) - Math.max(candidate.rect.left, card.left) >= touch
+  );
+  const scored = attached.map(candidate => ({
     ...candidate,
     overlap: others.reduce((total, other) => total + overlapArea(candidate.rect, other), 0),
     blocked:

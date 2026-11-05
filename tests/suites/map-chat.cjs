@@ -5813,3 +5813,29 @@ test('F26: showPlan scrolls the log to its end after the hint line is laid out (
   height = 1080; clock.run();
   assert.equal(log.scrollTop, 1080, 'and again once the final height is known');
 });
+
+// ---- persona G12: a move_topic without beforeId leaves no hole in the old branch (real Lane L coordinates: parent above, old parent below) ----
+integrationTest('persona G12: moving a card with its own branch up under another parent pulls the old parent\'s other children up to it, no big hole', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.cardHeightOf = () => 145;
+  // Mind (old parent) gets four children, the second with a branch of its own; Body (new parent, above Mind) has one child.
+  await apply(h, ['Cold', 'Food safety', 'Hot', 'Dry'].map(title => ({ kind: 'add_child', parentId: h.ids.b, title, summary: '' })));
+  const title = n => n.path.split('/').pop().replace(/\.md$/, '');
+  const kidsOf = id => h.view.map.nodes.filter(n => n.parentId === id).sort((x, y) => x.y - y.y);
+  const moving = h.view.map.nodes.find(n => title(n) === 'Food safety');
+  await apply(h, [{ kind: 'add_child', parentId: moving.id, title: 'Fridge', summary: '' }, { kind: 'add_child', parentId: moving.id, title: 'Freezer', summary: '' }]);
+  const step = 145 + 24;
+  const lines = await apply(h, [{ kind: 'move_topic', nodeId: moving.id, newParentId: h.ids.a }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const mind = h.view.map.nodes.find(n => n.id === h.ids.b);
+  const left = kidsOf(h.ids.b); eq(left.map(title), ['Cold', 'Hot', 'Dry']);
+  const mid = mind.y + 145 / 2;
+  const center = (left[0].y + left[2].y + 145) / 2;
+  assert.ok(Math.abs(center - mid) <= step, `the remaining children stay centred on their parent (centre ${center} vs parent ${mid})`);
+  for (let i = 1; i < left.length; i++) assert.ok(left[i].y - left[i - 1].y <= step, `siblings are one gap apart, not a hole (${left[i - 1].y} -> ${left[i].y})`);
+  assert.ok(Math.abs(left[0].y - mind.y) <= 3 * step, `the first remaining child sits next to its parent (${left[0].y} vs ${mind.y})`);
+  const dropped = kidsOf(h.ids.a).find(n => n.id === moving.id);
+  assert.ok(dropped, 'the moved card is under its new parent');
+  const crowd = h.view.map.nodes.filter(n => n.id !== moving.id && n.parentId !== moving.id && Math.abs(n.x - dropped.x) < 280 && n.y < dropped.y + 145 && dropped.y < n.y + 145);
+  eq(crowd.map(title), [], 'nothing overlaps the moved card');
+});

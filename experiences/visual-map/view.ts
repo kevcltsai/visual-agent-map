@@ -3975,20 +3975,32 @@ export class VisualAgentMapView extends ItemView {
       const oldParentId = moving.parentId;
       moving.parentId = parent.id;
       map.nodes.find(item => item.id === parent.id)!.collapsed = false;
-      this.closeGapAt(map, oldParentId, parent.id);
-      this.arrangeBranch(map, parent.id, new Set([node.id, ...descendants(map.nodes, node.id)]), undefined);
+      const movedIds = new Set([node.id, ...descendants(map.nodes, node.id)]);
+      this.closeGapAt(map, oldParentId, parent.id, movedIds);
+      this.arrangeBranch(map, parent.id, movedIds, undefined);
     });
   }
   /**
    * A card left `oldParentId`: that branch is laid out again so the place it left closes up. Only that branch moves; the rest of
    * the map, and a branch the card moved within, stay as they are. Nothing when there was no parent, the parent still is the
-   * parent, or its branch is folded.
+   * parent, or its branch is folded. `moved` (the card that left and its own branch) still sits where it was, so it must not
+   * count as an obstacle: left in, the old children are pushed below it and the hole only gets bigger.
    */
-  private closeGapAt(map: MapDocument, oldParentId: string | null, newParentId: string): void {
+  private closeGapAt(
+    map: MapDocument,
+    oldParentId: string | null,
+    newParentId: string,
+    moved: ReadonlySet<string>
+  ): void {
     if (!oldParentId || oldParentId === newParentId) return;
     const old = map.nodes.find(item => item.id === oldParentId);
     if (!old || old.collapsed) return;
-    this.arrangeBranch(map, oldParentId, new Set(descendants(map.nodes, oldParentId)), undefined);
+    const stayers = new Set([...descendants(map.nodes, oldParentId)].filter(id => !moved.has(id)));
+    const rest: MapDocument = { ...map, nodes: map.nodes.filter(item => !moved.has(item.id)) };
+    this.arrangeBranch(rest, oldParentId, stayers, undefined);
+    const placed = new Map(rest.nodes.map(item => [item.id, item]));
+    map.nodes = map.nodes.map(item => placed.get(item.id) ?? item);
+    if (rest.canvasItems) map.canvasItems = rest.canvasItems;
   }
   /**
    * After a chat reply changed what cards show: cards that grew and now cover another card get the whole map laid out again
@@ -4037,7 +4049,7 @@ export class VisualAgentMapView extends ItemView {
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
       box.placed = true;
-      this.closeGapAt(map, oldParentId, parent.id);
+      this.closeGapAt(map, oldParentId, parent.id, new Set([node.id, ...descendants(map.nodes, node.id)]));
       if (!map.aim && layoutOf(map).direction === "timeline" && !target.parentId) this.arrangeAll(map);
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
     });

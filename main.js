@@ -26583,7 +26583,9 @@ function kindIconId(kind) {
 }
 function kindIconSvg(kind) {
   const tag = (name2, attributes, cls = "vam-kind-outline") => `<${name2} class="${cls}" ${Object.entries(attributes).map(([key2, value]) => `${key2}="${value}"`).join(" ")}/>`;
-  const inset = (points) => points.split(" ").map((pair6) => pair6.split(",").map((value) => String(10 + Number(value) * 0.8)).join(",")).join(" ");
+  const inset = (points) => points.split(" ").map(
+    (pair6) => pair6.split(",").map((value) => String(10 + Number(value) * 0.8)).join(",")
+  ).join(" ");
   const shape2 = TOPIC_KIND_SHAPES[kind].shape;
   const drawn = shape2 === "rounded" || shape2 === "rect" ? tag("rect", { x: 10, y: 14, width: 80, height: 72, rx: shape2 === "rect" ? 6 : 20 }) : shape2 === "ellipse" ? tag("circle", { cx: 50, cy: 50, r: 40 }) : shape2 === "diamond" ? tag("polygon", { points: inset(DIAMOND) }) : shape2 === "hexagon" ? tag("polygon", { points: inset(HEXAGON) }) : tag("polygon", { points: inset(FOLDED) }) + tag("polyline", { points: inset(FOLD_LINE) }, "vam-kind-fold");
   return `<g class="vam-kind-shape vam-kind-icon" data-kind="${kind}">${drawn}</g>`;

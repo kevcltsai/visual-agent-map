@@ -47,7 +47,12 @@ export function kindIconSvg(kind: TopicKind): string {
   const inset = (points: string) =>
     points
       .split(" ")
-      .map(pair => pair.split(",").map(value => String(10 + Number(value) * 0.8)).join(","))
+      .map(pair =>
+        pair
+          .split(",")
+          .map(value => String(10 + Number(value) * 0.8))
+          .join(",")
+      )
       .join(" ");
   const shape = TOPIC_KIND_SHAPES[kind].shape;
   const drawn =
@@ -59,7 +64,8 @@ export function kindIconSvg(kind: TopicKind): string {
           ? tag("polygon", { points: inset(DIAMOND) })
           : shape === "hexagon"
             ? tag("polygon", { points: inset(HEXAGON) })
-            : tag("polygon", { points: inset(FOLDED) }) + tag("polyline", { points: inset(FOLD_LINE) }, "vam-kind-fold");
+            : tag("polygon", { points: inset(FOLDED) }) +
+              tag("polyline", { points: inset(FOLD_LINE) }, "vam-kind-fold");
   // The group carries vam-kind-shape, so the card's shape rules draw it (and the share viewer, which skips those, does not).
   return `<g class="vam-kind-shape vam-kind-icon" data-kind="${kind}">${drawn}</g>`;
 }

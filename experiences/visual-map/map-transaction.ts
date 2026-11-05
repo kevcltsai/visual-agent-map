@@ -1,5 +1,6 @@
 import { t } from "../../i18n";
 import { clone, type MapDocument } from "../../map-model";
+import { pruneAfterText } from "./canvas-items";
 import type { Note, Repository, TopicState } from "../../repository";
 import { claim, findSame, fingerprintOf, isLinked, release, unchangedFile, type Fingerprint } from "./attachment-store";
 
@@ -661,6 +662,8 @@ export function begin(deps: TransactionDeps): Transaction {
           const before = befores.get(mapPath)!;
           const after = clone(before);
           for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
+          // The same cleanup a read does, so the saved map is what a read would give back and the undo check does not go stale.
+          pruneAfterText(after);
           records.push({ mapPath, before, after });
           for (const path of relationNotePaths(before, after)) if (!refresh.includes(path)) refresh.push(path);
           if (ownership(before) !== ownership(after)) rebuildNeeded = true;

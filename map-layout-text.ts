@@ -1,7 +1,7 @@
 // Kept apart from map-layout.ts so the share viewer, which bundles map-layout.ts, does not pull in canvas items.
 import { treeTextNodes, type CanvasItem, type TextItem } from "./experiences/visual-map/canvas-items";
 import { arrangeMap, arrangeNewBranch, type HeightOf, type LayoutKind, type MapLayout } from "./map-layout";
-import type { MapNode } from "./map-graph";
+import { childIndex, walkDescendants, withTextParents, type MapNode } from "./map-graph";
 
 /** Text nodes that take part in a layout: their topic exists, is shown and is not collapsed. Others keep their coordinates. */
 function visibleTexts(nodes: MapNode[], items: readonly CanvasItem[], hidden?: Set<string>): TextItem[] {
@@ -42,7 +42,28 @@ function withTextPositions(items: readonly CanvasItem[], texts: TextItem[], plac
   });
 }
 
-/** `arrangeMap` with text nodes laid out as leaves under their topics. Without visible text nodes it is exactly `arrangeMap`. */
+/**
+ * The tree the layout works on: every text block is a node under its topic, and a topic that follows a text block hangs under
+ * that block (so a block with followers is an intermediate node, not a leaf). Only for layout; its `parentId`s are not the saved ones.
+ */
+function virtualTree(nodes: MapNode[], texts: TextItem[], widthOf?: TextWidthOf): MapNode[] {
+  const parents = new Map(texts.map(text => [text.id, text.parentId as string]));
+  return [...withTextParents(nodes, parents), ...texts.map(asLeaf(widthOf))];
+}
+
+/**
+ * Takes only x and y of the laid-out virtual tree back onto the real nodes. A virtual `parentId` (a text id) that got out into
+ * a saved map would make `parseMap` throw and the whole map unopenable, so nothing else is ever copied.
+ */
+function mergePositions(nodes: MapNode[], placed: MapNode[]): MapNode[] {
+  const at = new Map(placed.map(node => [node.id, node]));
+  return nodes.map(node => {
+    const spot = at.get(node.id);
+    return spot ? { ...node, x: spot.x, y: spot.y } : node;
+  });
+}
+
+/** `arrangeMap` with text nodes laid out under their topics (as leaves, or as the parent of the topics that follow them). Without visible text nodes it is exactly `arrangeMap`. */
 export function arrangeMapWithText(
   nodes: MapNode[],
   items: readonly CanvasItem[],
@@ -53,10 +74,10 @@ export function arrangeMapWithText(
 ): { nodes: MapNode[]; items: CanvasItem[] } {
   const texts = visibleTexts(nodes, items, hidden);
   if (!texts.length) return { nodes: arrangeMap(nodes, hidden, heightOf, layout, options), items: [...items] };
-  const placed = arrangeMap([...nodes, ...texts.map(asLeaf(options.widthOf))], hidden, heightOf, layout, options);
+  const placed = arrangeMap(virtualTree(nodes, texts, options.widthOf), hidden, heightOf, layout, options);
   const real = new Set(nodes.map(node => node.id));
   return {
-    nodes: placed.filter(node => real.has(node.id)),
+    nodes: mergePositions(nodes, placed),
     items: withTextPositions(
       items,
       texts,
@@ -66,8 +87,9 @@ export function arrangeMapWithText(
 }
 
 /**
- * `arrangeNewBranch` with text nodes as leaves: those under a new card are placed with it, the others are fixed
- * obstacles the new cards slide around. Without visible text nodes it is exactly `arrangeNewBranch`.
+ * `arrangeNewBranch` with text nodes in the tree: those under a new card are placed with it, the others are fixed
+ * obstacles the new cards slide around. A new topic that follows a text block brings the block (and what hangs after it) into
+ * the placement, so it lands after the block. Without visible text nodes it is exactly `arrangeNewBranch`.
  */
 export function arrangeNewBranchWithText(
   nodes: MapNode[],
@@ -82,19 +104,27 @@ export function arrangeNewBranchWithText(
   const texts = visibleTexts(nodes, items);
   if (!texts.length)
     return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout), items: [...items] };
+  const virtual = virtualTree(nodes, texts, widthOf);
+  const textIds = new Set(texts.map(text => text.id));
   const withNew = new Set(newIds);
+  const brought = new Set<string>();
   for (const text of texts) if (newIds.has(text.parentId as string)) withNew.add(text.id);
-  const placed = arrangeNewBranch(
-    [...nodes, ...texts.map(asLeaf(widthOf))],
-    parentId,
-    withNew,
-    heightOf,
-    minTop,
-    layout
-  );
+  // A new follower is only placed after its block when the block takes part: unless the block is the parent being grown from.
+  for (const node of virtual)
+    if (newIds.has(node.id) && textIds.has(node.parentId as string) && node.parentId !== parentId) {
+      withNew.add(node.parentId as string);
+      brought.add(node.parentId as string);
+    }
+  if (brought.size) {
+    const index = childIndex(virtual);
+    const below = new Set<string>();
+    for (const id of brought) walkDescendants(index, id, below);
+    for (const id of below) withNew.add(id);
+  }
+  const placed = arrangeNewBranch(virtual, parentId, withNew, heightOf, minTop, layout);
   const real = new Set(nodes.map(node => node.id));
   return {
-    nodes: placed.filter(node => real.has(node.id)),
+    nodes: mergePositions(nodes, placed),
     items: withTextPositions(
       items,
       texts,

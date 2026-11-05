@@ -2,7 +2,7 @@
  * Presentation reading order of a map: a pre-order walk of the parentId tree, siblings sorted by position.
  * Pure functions, no DOM. Collapsed branches are skipped by default so a presentation follows what is on screen.
  */
-import type { MapNode } from "../../map-graph";
+import { withTextParents, type MapNode } from "../../map-graph";
 
 export interface ReadingOrderOptions {
   /** Primary sibling axis: "y" for right/left reading (default), "x" for down/up. */
@@ -30,7 +30,8 @@ export function readingOrder(topics: readonly MapNode[], opts: ReadingOrderOptio
       known.add(text.id);
       leaves.push({ id: text.id, path: "", parentId: text.parentId, x: text.x, y: text.y, collapsed: false });
     }
-    nodes = [...topics, ...leaves];
+    // A topic that follows a text reads after it, among the text's children.
+    nodes = withTextParents([...topics, ...leaves], new Map(leaves.map(leaf => [leaf.id, leaf.parentId as string])));
   }
   const axis = opts.siblingAxis ?? "y";
   const other = axis === "y" ? "x" : "y";

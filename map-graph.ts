@@ -12,6 +12,12 @@ export interface MapNode {
   height?: number;
   /** This branch's own arrangement, instead of the map's; only right, left, down and up are stored (decision D9). */
   layout?: { direction: "right" | "left" | "down" | "up" };
+  /**
+   * This topic hangs after the attached text block with this id: it is drawn and laid out as the block's follower, but
+   * `parentId` is still the real topic the block hangs on (never a text id; a text is not a node). Dropped on read when it
+   * does not match an attached text of the same parent.
+   */
+  afterTextId?: string;
   aimKind?: AimNodeKind;
   aimQuestion?: {
     requestId: string;
@@ -47,6 +53,23 @@ export const CARD_HEIGHT_STEP = 40;
 export function clampCardHeight(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
   return Math.min(CARD_HEIGHT_MAX, Math.max(CARD_HEIGHT_MIN, Math.round(value)));
+}
+
+/**
+ * The virtual tree for layout and reading order: a node whose `afterTextId` names a text in `texts` (text id -> the topic it
+ * hangs on) with the same parent as the node gets that text as its parent. Everything else, and the whole list when nothing
+ * qualifies, is returned as it is. The result is for reading only; its `parentId` must never be saved.
+ */
+export function withTextParents(nodes: MapNode[], texts: ReadonlyMap<string, string>): MapNode[] {
+  if (!texts.size) return nodes;
+  let changed = false;
+  const out = nodes.map(node => {
+    const textId = node.afterTextId;
+    if (textId === undefined || texts.get(textId) !== node.parentId) return node;
+    changed = true;
+    return { ...node, parentId: textId };
+  });
+  return changed ? out : nodes;
 }
 
 export function parentIdsForNode(node: MapNode): string[] {

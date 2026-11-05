@@ -564,3 +564,25 @@ integrationTest('hypothesis-evidence: a merge that re-points relations (dedupe, 
   await entry.redo();
   assert.deepEqual(plain((await h.repo.readMap(MAP)).topicRelations), [heRel('supports', one, three)]);
 });
+
+integrationTest('map transaction: an edit that leaves a dangling afterTextId is cleaned like a read, and its undo is not stale', async () => {
+  const h = await harness();
+  const entry = await begin(h.deps).editMap(MAP, map => {
+    const [first, second] = map.nodes;
+    map.canvasItems = [{ id: 'tx', kind: 'text', text: 'hello', x: 0, y: 0, parentId: first.id }];
+    first.afterTextId = 'missing-text'; // no such text
+    second.afterTextId = 'tx'; // a text of a different parent (second is a root)
+    map.nodes[2].parentId = first.id;
+    map.nodes[2].afterTextId = 'tx'; // fine
+  }).commit();
+  const saved = await h.repo.readMap(MAP);
+  assert.equal(saved.nodes[0].afterTextId, undefined);
+  assert.equal(saved.nodes[1].afterTextId, undefined);
+  assert.equal(saved.nodes[2].afterTextId, 'tx');
+  assert.equal(h.contents.get(MAP).includes('missing-text'), false, 'the file never held the dangling value');
+  assert.deepEqual(h.counts.applied.at(-1)[0], MAP);
+  await entry.undo(); // would be stale if the baseline kept the dangling field
+  assert.equal((await h.repo.readMap(MAP)).canvasItems, undefined);
+  await entry.redo();
+  assert.equal((await h.repo.readMap(MAP)).nodes[2].afterTextId, 'tx');
+});

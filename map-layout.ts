@@ -682,14 +682,17 @@ export function orderSiblings<T extends { id: string; parentId?: string | null }
  * lays them out in. Only those children change places with each other; every other card keeps its index. An unknown id, a card
  * without a parent or one that is already first (or last) returns `nodes` itself.
  */
-export function shiftSibling<T extends { id: string; parentId?: string | null }>(
+export function shiftSibling<T extends { id: string; parentId?: string | null; afterTextId?: string }>(
   nodes: T[],
   id: string,
   offset: -1 | 1
 ): T[] {
   const moved = nodes.find(node => node.id === id);
   if (!moved?.parentId) return nodes;
-  const slots = nodes.flatMap((node, index) => (node.parentId === moved.parentId ? [index] : []));
+  // Topics that follow a text block are siblings of each other, not of the block's own topic children.
+  const slots = nodes.flatMap((node, index) =>
+    node.parentId === moved.parentId && node.afterTextId === moved.afterTextId ? [index] : []
+  );
   const order = slots.map(index => nodes[index]);
   const from = order.indexOf(moved);
   const to = from + offset;
@@ -707,14 +710,15 @@ export function shiftSibling<T extends { id: string; parentId?: string | null }>
  * places with each other in the array; every other card keeps its index. An unknown id, a card that is not a first-level
  * topic of that root or a `dropX` that is not a finite number returns `nodes` itself.
  */
-export function reorderTopLevel<T extends { id: string; parentId?: string | null; x: number }>(
+export function reorderTopLevel<T extends { id: string; parentId?: string | null; x: number; afterTextId?: string }>(
   nodes: T[],
   rootId: string,
   movedId: string,
   dropX: number
 ): T[] {
   if (!Number.isFinite(dropX)) return nodes;
-  const slots = nodes.flatMap((node, index) => (node.parentId === rootId ? [index] : []));
+  // A topic that follows a text block is not a first-level topic of the root.
+  const slots = nodes.flatMap((node, index) => (node.parentId === rootId && !node.afterTextId ? [index] : []));
   const moved = slots.map(index => nodes[index]).find(node => node.id === movedId);
   if (!moved) return nodes;
   const others = slots.map(index => nodes[index]).filter(node => node !== moved);

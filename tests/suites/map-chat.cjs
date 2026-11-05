@@ -2905,6 +2905,14 @@ integrationTest('B1 ui: the plan card has a one-sentence description, actions gr
   await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
 });
 
+integrationTest('persona-07 ui: an applied plan no longer says it needs confirmation', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); planButton(h, 'apply').click();
+  await until(() => h.view.chat.pendingPlan() === null && !h.view.chatApplying);
+  const text = visibleText(planCard(h)[0]); assert.doesNotMatch(text, /needs your confirmation/); assert.match(text, /Plan applied/);
+});
+
 integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the card says nothing changed', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
@@ -3609,6 +3617,45 @@ integrationTest('map chat merge: summary-only cards run the AI merge under the c
   assert.equal(merged[0].summary, 'Body needs rest. Mind needs calm.');
   assert.match(merged[0].detail, /Mind needs calm/);
   assert.equal(merged[0].color, 'red', 'the colour both sources share stays on the merged card');
+});
+// Persona 17: the reply's recolour and the AI merge it started (written later) are one undo step, one redo step.
+const mergeReply = async h => {
+  await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
+  await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
+  await h.view.hydrate();
+  h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
+  h.plugin.askModel = async () => ({ summary: 'Body needs rest. Mind needs calm.', detail: 'Body needs rest.\n\nMind needs calm.', visualReferences: [], suggestions: [{ title: 'AI picked name' }] });
+  await apply(h, [
+    lookAct([h.ids.a, h.ids.b], { color: 'red' }),
+    { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }
+  ]);
+  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+};
+integrationTest('persona 17: a chat reply that recolours and then AI-merges is one undo step and one redo step', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const before = (await h.saved()).map(n => n.id).sort(); const colourBefore = (await h.note('a')).color;
+  await mergeReply(h);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply'); assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1);
+  await h.view.travel(false);
+  eq((await h.saved()).map(n => n.id).sort(), before, 'both source cards are back after one undo'); assert.equal((await h.note('a')).color, colourBefore, 'and the colour is back too');
+  assert.equal(h.view.history.canUndo, false, 'nothing is left to undo');
+  await h.view.travel(true);
+  assert.equal(h.view.history.canRedo, false, 'one redo takes the whole reply back');
+  const titles = []; for (const n of await h.saved()) titles.push((await h.repo.readNote(n.path)).title);
+  assert.ok(titles.includes('Nothing to Fear'), 'the merged card is back after redo'); assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+});
+integrationTest('persona 17: when another step was pushed before the merge lands, the merge stays its own step', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const log = [];
+  await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
+  await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
+  await h.view.hydrate();
+  h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
+  h.plugin.askModel = async () => { h.view.history.push(foreignEntry('later edit', log)); return { summary: 'S.', detail: 'D.', visualReferences: [], suggestions: [] }; };
+  await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red' }), { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }]);
+  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1, 'the reply keeps its own step');
+  assert.ok(h.view.history.past.length >= 3, 'the merge is a separate step above the reply and the other edit');
 });
 integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
   const h = await harness(); await h.view.hydrate();
@@ -4840,9 +4887,12 @@ integrationTest('bug bash #27: the Rename tool on a card opens a dialog titled �
   view.stageEl = element('div'); view.viewportEl = element('div');
   view.labelCard = () => {}; // the card's accessible-name bookkeeping needs a real DOM; the tools do not
   view.renderNode(node);
-  const rename = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-rename-tool')); assert.ok(rename, 'the card has a Rename tool');
-  assert.equal(rename.text, '改名', 'the tool itself is in zh-TW');
-  rename.click(); await tick();
+  const more = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-more-tool')); assert.ok(more, 'the card has a More tool');
+  assert.equal(more.text, '⋯ 更多', 'the tool itself is in zh-TW');
+  const entries = [];
+  view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); entries.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+  more.click(); const rename = entries.find(e => e.title === '改名'); assert.ok(rename, 'More lists Rename, in zh-TW');
+  rename.fn(); await tick();
   assert.ok((h.control.modals ?? []).length === 1, 'one dialog opened');
   assert.equal(h.control.modals[0].titleText, '重新命名');
 });
@@ -5400,4 +5450,38 @@ integrationTest('chat 08: Undo takes back every appearance change of one reply i
   assert.equal(h.view.history.canUndo, false, 'one step');
   await h.view.travel(true);
   assert.equal(await state(), after);
+});
+
+// ---- persona 12: the layout follows a reply that changes card sizes or moves a card away --------------------------------
+const coverAny = (nodes, heightOf) => {
+  const found = [];
+  for (const a of nodes) for (const b of nodes) if (a.id < b.id && Math.abs(a.x - b.x) < 280 && a.y < b.y + heightOf(b.id) && b.y < a.y + heightOf(a.id)) found.push([a.id, b.id]);
+  return found;
+};
+integrationTest('persona 12: a summary that makes a card taller does not leave it covering the card below; with no overlap nothing moves', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const heights = { default: 180 }; h.view.cardHeightOf = id => heights[id] ?? heights.default;
+  const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const quiet = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'short' }]);
+  eq(quiet.map(l => l.status), ['done']);
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), before, 'cards that still fit stay where the user left them');
+  heights[h.ids.a] = 520; // the summary made Body much taller: it now covers Mind
+  assert.ok(coverAny(h.view.map.nodes, id => heights[id] ?? 180).length > 0, 'precondition: the grown card covers another');
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'A long summary '.repeat(40) }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  eq(coverAny(h.view.map.nodes, id => heights[id] ?? 180), [], 'nothing overlaps after the reply');
+  eq(coverAny(await h.saved(), id => heights[id] ?? 180), [], 'and the saved map is the same');
+});
+integrationTest('persona 12: moving a card to another branch closes the place it left, in the old branch only', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.cardHeightOf = () => 180;
+  await apply(h, [{ kind: 'add_child', parentId: h.ids.a, title: 'Second', summary: '' }, { kind: 'add_child', parentId: h.ids.a, title: 'Third', summary: '' }]);
+  const kids = () => h.view.map.nodes.filter(n => n.parentId === h.ids.a).sort((x, y) => x.y - y.y);
+  eq(kids().length, 3);
+  const [first, second, third] = kids();
+  const mind = h.view.map.nodes.find(n => n.id === h.ids.b); const mindAt = [mind.x, mind.y];
+  const lines = await apply(h, [{ kind: 'move_topic', nodeId: second.id, newParentId: h.ids.b }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const left = kids(); eq(left.map(n => n.id), [first.id, third.id]);
+  assert.equal(left[1].y - left[0].y, 180 + 24, 'the two cards that stayed are one gap apart, no hole where the third one moved from');
 });

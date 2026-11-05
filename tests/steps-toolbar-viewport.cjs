@@ -307,22 +307,24 @@ test('a very long word in the hover preview title wraps instead of clipping', ()
   assert.match(rule('.vam-hover-card strong'), /overflow-wrap: anywhere/);
 });
 
-test('the selection bar is left-anchored above the zoom cluster, names on their own line, and select mode draws no hint', () => {
+test('the selection bar is a narrow strip along the canvas bottom, names ellipsised, and select mode draws no hint', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const bar = css.split('\n').find(line => line.startsWith('.vam-selection-bar {'));
-  assert.ok(bar && !/translateX/.test(bar) && /left: 16px/.test(bar) && /bottom: 64px/.test(bar), 'left-anchored, clear of the bottom-right zoom controls');
+  assert.ok(bar && /bottom: 0; left: 0; right: 0/.test(bar) && /min-height: 44px/.test(bar), 'full width along the bottom');
   const names = css.split('\n').find(line => line.startsWith('.vam-selection-bar > span'));
-  assert.match(names, /flex: 0 0 100%/); assert.match(names, /text-overflow: ellipsis/);
+  assert.match(names, /text-overflow: ellipsis/);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /!this\.selection\.state\.multiSelectMode && !this\.plugin\.settings\.canvasHintSeen/, 'no hint while selecting topics');
 });
 
 
-test('bar children keep the same order and fixed labels at counts 0-3 (names span first)', () => {
+test('bar children keep the same order and fixed labels at counts 1-3 (names span first); no card picked draws nothing', () => {
   const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A very long title '.repeat(8) }], ['b', { title: 'B' }], ['c', { title: 'C' }]]), map: { nodes: [] } });
   view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k';
   const shapes = [];
-  for (const ids of [[], ['a'], ['a', 'b'], ['a', 'b', 'c']]) {
+  setSelection(view, false, []);
+  assert.equal(view.renderSelectionBar(fakeEl()).children.length, 0);
+  for (const ids of [['a'], ['a', 'b'], ['a', 'b', 'c']]) {
     setSelection(view, false, ids);
     const bar = view.renderSelectionBar(fakeEl());
     assert.equal(bar.children[0].tag, 'span');
@@ -535,7 +537,7 @@ test('the zoom controls, canvas hint, selection bar add the status bar clearance
   // The base rules keep their plain pixels (map-chat.cjs and the selection bar test read them); a following rule adds the clearance.
   assert.match(css, /^\.vam-zoom-controls \{ bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
   assert.match(css, /^\.vam-canvas-overlay > \.vam-canvas-hint \{ bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
-  assert.match(css, /^\.vam-selection-bar \{ bottom: calc\(64px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.match(css, /^\.vam-selection-bar \{ bottom: var\(--vam-status-clearance, 0px\); \}$/m);
   assert.match(read('experiences/sharing/viewer/viewer.css'), /--vam-status-clearance: 0px;/);
   const view = read('experiences/visual-map/view.ts');
   assert.match(view, /private syncStatusBarClearance\(\): void/);
@@ -552,4 +554,98 @@ test('theme 7: the outline row buttons keep a transparent background under Obsid
   assert.match(css, /^\.vam-outline-tree \.vam-outline-toggle, \.vam-outline-tree \.vam-outline-note \{ border: 0; box-shadow: none; background: transparent;/m);
   assert.match(css, /^\.vam-outline-tree \.vam-outline-note:hover, \.vam-outline-tree \.vam-outline-note\.is-active \{ background: var\(--background-modifier-hover\); \}$/m);
   assert.doesNotMatch(css, /^\.vam-outline-(toggle|note)(, |:hover|\.is-active)[^{]*\{[^}]*background/m, 'no unscoped (0,1,0) outline background rule is left');
+});
+
+// ---- persona #39: the card tool row and the multi-select bar never cover cards ----
+// A 13-card map in the standard layout (column 360, gap 24, card 280 x 60..120) shown at 60%.
+function thirteenCards(zoom, origin) {
+  const heights = [120, 80, 100, 60, 90, 70, 110, 60, 80, 100, 60, 90, 70];
+  const cards = [];
+  let y = 0;
+  heights.forEach((h, i) => {
+    const col = i === 0 ? 0 : i <= 4 ? 1 : 2;
+    if (i === 0 || i === 1 || i === 5) y = 0;
+    cards.push({ id: i, x: col * 360, y, w: 280, h });
+    y += h + 24;
+  });
+  return cards.map(c => ({ id: c.id, left: origin.x + c.x * zoom, top: origin.y + c.y * zoom, right: origin.x + (c.x + c.w) * zoom, bottom: origin.y + (c.y + c.h) * zoom }));
+}
+const overlapsAny = (rect, list) => list.some(o => rect.left < o.right && o.left < rect.right && rect.top < o.bottom && o.top < rect.bottom);
+test('chooseCardToolsSpot: with 13 cards at 60%, the selected card\'s tool row covers no other card and no floating control, for every card', () => {
+  const zoom = 0.6;
+  const visible = { left: 0, right: 1400, top: 0, bottom: 900 };
+  const controls = [{ left: 12, top: 12, right: 330, bottom: 52 }]; // the top-left canvas toolbar
+  const cards = thirteenCards(zoom, { x: 40, y: 20 });
+  const size = { width: 220, height: 32 };
+  let legacyCovers = 0;
+  for (const card of cards) {
+    const others = cards.filter(o => o.id !== card.id);
+    const row = { left: card.right - 10 * zoom - size.width, right: card.right - 10 * zoom };
+    const spot = inset.chooseCardToolsSpot({ card, row, size, others, controls, visible });
+    const moved = d => ({ left: d.left + spot.pan.dx, right: d.right + spot.pan.dx, top: d.top + spot.pan.dy, bottom: d.bottom + spot.pan.dy });
+    // The old placement (above the card, right-aligned, 6px overlap) is what the test must catch: it covers neighbours on this map.
+    const old = { left: row.left, right: row.right, top: card.top + 6 - size.height, bottom: card.top + 6 };
+    if (overlapsAny(old, others)) legacyCovers++;
+    assert.equal(spot.overlap, 0, `card ${card.id}: row on ${spot.side} covers a neighbour`);
+    assert.equal(overlapsAny(spot.rect, others.map(moved)), false, `card ${card.id}: row rectangle meets a neighbour`);
+    assert.equal(overlapsAny(spot.rect, controls), false, `card ${card.id}: row under the canvas toolbar`);
+    assert.equal(overlapsAny(moved(card), controls), false, `card ${card.id}: card under the canvas toolbar`);
+    assert.ok(spot.rect.left >= visible.left && spot.rect.right <= visible.right && spot.rect.top >= visible.top && spot.rect.bottom <= visible.bottom, `card ${card.id}: row inside the canvas`);
+  }
+  assert.ok(legacyCovers >= 3, `the old placement covers neighbours on this map (${legacyCovers} cards)`);
+});
+test('chooseCardToolsSpot: a card in the top-left corner pans clear of the canvas toolbar; a free card is not moved', () => {
+  const visible = { left: 0, right: 1400, top: 0, bottom: 900 };
+  const controls = [{ left: 12, top: 12, right: 330, bottom: 52 }];
+  const size = { width: 220, height: 32 };
+  const corner = { left: 20, top: 20, right: 300, bottom: 80 };
+  const spot = inset.chooseCardToolsSpot({ card: corner, row: { left: 70, right: 290 }, size, others: [], controls, visible });
+  assert.ok(spot.pan.dx > 0 || spot.pan.dy > 0, 'the canvas moves');
+  assert.equal(overlapsAny({ left: corner.left + spot.pan.dx, right: corner.right + spot.pan.dx, top: corner.top + spot.pan.dy, bottom: corner.bottom + spot.pan.dy }, controls), false);
+  const free = { left: 500, top: 400, right: 780, bottom: 460 };
+  const calm = inset.chooseCardToolsSpot({ card: free, row: { left: 550, right: 770 }, size, others: [], controls, visible });
+  assert.deepEqual({ ...calm.pan }, { dx: 0, dy: 0 }); assert.equal(calm.side, 'top');
+  // Boxed in on every side: the side covering least wins and the row still lies in the canvas after the pan.
+  const walls = [{ left: 0, top: 0, right: 1400, bottom: 395 }, { left: 0, top: 465, right: 1400, bottom: 900 }, { left: 0, top: 395, right: 495, bottom: 465 }, { left: 785, top: 395, right: 1400, bottom: 465 }];
+  const boxed = inset.chooseCardToolsSpot({ card: free, row: { left: 550, right: 770 }, size, others: walls, controls, visible });
+  assert.ok(boxed.overlap > 0);
+});
+test('card tools: only AI explore, Details and More float; More holds fold, structure, rename, select subtopics and add text', () => {
+  const view = read('experiences/visual-map/view.ts');
+  assert.match(view, /private openCardMoreMenu\(/);
+  assert.match(view, /alignCardTools\(card: HTMLElement\)[\s\S]*placeCardTools\(card, tools/);
+  const { translate } = load('i18n.ts');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) for (const key of ['ui.card_more', 'ui.card_more_hint', 'ui.selection_more_hint', 'ui.selection_help_hint']) {
+    assert.notEqual(translate(lang, key), key, `${lang} ${key}`);
+  }
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-node > \.vam-node-tools\.is-below \{[^}]*top: calc\(100% - 6px/);
+  assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-right \{/);
+  assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-left \{/);
+});
+test('selection bar: nothing before the first card is picked; then a narrow bottom bar whose main button follows the count', () => {
+  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A' }], ['b', { title: 'B' }]]), map: { nodes: [] } });
+  view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k'; view.aimLive = () => false;
+  const host = () => { const el = fakeEl(); el.toggleClass = (name, on) => (on ? el.classes.add(name) : el.classes.delete(name)); return el; };
+  setSelection(view, true, []);
+  const none = host(); const empty = view.renderSelectionBar(none);
+  assert.equal(empty.children.length, 0, 'no content before a card is picked');
+  assert.ok(empty.classes.has('is-empty')); assert.equal(none.classes.has('has-selection-bar'), false);
+  const labels = bar => bar.children.filter(c => c.tag === 'button').map(c => c.text);
+  setSelection(view, true, ['a']);
+  const one = host(); const oneBar = view.renderSelectionBar(one);
+  assert.deepEqual(labels(oneBar), ['Merge', 'Research', 'Move to…', '⋯ More', '?', 'Done selecting']);
+  assert.ok(one.classes.has('has-selection-bar'));
+  assert.ok(oneBar.children.find(c => c.text === 'Research').classes.has('mod-cta'));
+  assert.equal(oneBar.children.find(c => c.text === 'Merge').classes.has('mod-cta'), false);
+  setSelection(view, true, ['a', 'b']);
+  const two = view.renderSelectionBar(host());
+  assert.ok(two.children.find(c => c.text === 'Merge').classes.has('mod-cta'));
+  assert.equal(two.children.find(c => c.text === 'Research').classes.has('mod-cta'), false);
+  for (const button of two.children.filter(c => c.tag === 'button')) assert.ok(button.attrs['aria-label'] || button.text, 'every button is named');
+  for (const name of ['more', 'help']) assert.ok(two.children.find(c => c.classes.has('vam-selection-' + name)).attrs['aria-label']);
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^\.vam-selection-bar \{[^}]*bottom: 0; left: 0; right: 0;/m);
+  assert.match(css, /^\.vam-selection-bar\.is-empty \{ display: none; \}/m);
+  assert.match(css, /^\.vam-canvas\.has-selection-bar \{ padding-bottom: 44px;/m);
 });

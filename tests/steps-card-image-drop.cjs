@@ -270,3 +270,49 @@ test('a clipboard with text next to the picture is not taken by the card (the ou
   await h.settle();
   assert.equal(h.counts.createBinary, 0);
 });
+
+// Persona UX ticket 22: a picture picked in the map chat (a web link) also becomes the card's cover. Covers read local files
+// only, so the file is saved beside the note, embedded and set as `topic-cover`; the Detail keeps the picked link as before.
+const pick = { url: 'https://example.org/a.png', title: 'A picture', source: 'https://example.org/page' };
+const chatPick = async (h, fetchImage = async () => png()) => {
+  h.view.plugin.topicRuns = { isBusy: () => false, hasTask: () => false, stopTask() {}, dropPending() {}, flushPending: async () => {} };
+  h.view.chatFetchImage = fetchImage;
+  const result = await h.view.chatInsertImage({ mapPath: MAP, mapId: h.view.map.id, nodeId: h.node.id }, { candidate: pick });
+  await h.settle();
+  return result;
+};
+
+test('chat pick: the picked web picture becomes the card cover (saved file, embed, topic-cover) and stays in the Detail', async () => {
+  const h = await harness();
+  const result = await chatPick(h);
+  assert.equal(result.ok, true);
+  assert.deepEqual(h.mediaFiles(), [`${MEDIA}/A picture.png`]);
+  const text = h.note();
+  assert.match(text, /topic-cover: "\[\[Media\/A picture\.png\]\]"/);
+  assert.match(text, /!\[\[Media\/A picture\.png\]\]/);
+  assert.match(text, /!\[A picture\]\(<https:\/\/example\.org\/a\.png>\)/, 'the Detail still has the picked link');
+});
+
+test('chat pick: a cover set by hand, or turned off, is not replaced and nothing is downloaded', async () => {
+  for (const key of ['"[[Media/mine.png]]"', 'none']) {
+    const h = await harness();
+    h.contents.set(h.node.path, h.note().replace(/^---\n/, `---\ntopic-cover: ${key}\n`));
+    let fetched = 0;
+    const result = await chatPick(h, async () => { fetched++; return png(); });
+    assert.equal(result.ok, true);
+    assert.equal(fetched, 0, key);
+    assert.deepEqual(h.mediaFiles(), []);
+    assert.match(h.note(), new RegExp(`topic-cover: ${key.replace(/[[\]]/g, '\\$&')}`));
+  }
+});
+
+test('chat pick: a failed or non-image download still inserts the Detail picture and writes no cover', async () => {
+  for (const fetchImage of [async () => { throw new Error('offline'); }, async () => new TextEncoder().encode('<html>').buffer]) {
+    const h = await harness();
+    const result = await chatPick(h, fetchImage);
+    assert.equal(result.ok, true);
+    assert.match(h.note(), /!\[A picture\]\(<https:\/\/example\.org\/a\.png>\)/);
+    assert.doesNotMatch(h.note(), /topic-cover/);
+    assert.deepEqual(h.mediaFiles(), []);
+  }
+});

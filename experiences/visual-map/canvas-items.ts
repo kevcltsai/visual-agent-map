@@ -231,11 +231,16 @@ export function treeTextNodes(
   return { attached, orphans };
 }
 
-/** Bounding box of the members that currently have a rect, grown by `pad`. Null when none of them exist. */
+/**
+ * Bounding box of the members that currently have a rect, grown by `pad`. Null when none of them exist.
+ * `others` are the rects of cards that are not members: on each side, a neighbour that lies wholly beyond the members'
+ * edge (and overlaps them along the other axis) limits the pad to half the gap, so the frame's edge never runs into it.
+ */
 export function boundaryBounds(
   nodeIds: readonly string[],
   rectOf: (id: string) => Rect | null | undefined,
-  pad: number
+  pad: number,
+  others: readonly Rect[] = []
 ): Rect | null {
   const margin = finite(pad) && pad > 0 ? pad : 0;
   let left = Infinity;
@@ -251,7 +256,28 @@ export function boundaryBounds(
     bottom = Math.max(bottom, r.y + r.h);
   }
   if (left === Infinity) return null;
-  return { x: left - margin, y: top - margin, w: right - left + margin * 2, h: bottom - top + margin * 2 };
+  let padLeft = margin;
+  let padTop = margin;
+  let padRight = margin;
+  let padBottom = margin;
+  const half = (gap: number): number => Math.max(0, gap / 2);
+  for (const o of others) {
+    if (!o || !finite(o.x) || !finite(o.y) || !finite(o.w) || !finite(o.h)) continue;
+    const oRight = o.x + o.w;
+    const oBottom = o.y + o.h;
+    const overlapsX = o.x < right && oRight > left;
+    const overlapsY = o.y < bottom && oBottom > top;
+    if (overlapsX && oBottom <= top) padTop = Math.min(padTop, half(top - oBottom));
+    if (overlapsX && o.y >= bottom) padBottom = Math.min(padBottom, half(o.y - bottom));
+    if (overlapsY && oRight <= left) padLeft = Math.min(padLeft, half(left - oRight));
+    if (overlapsY && o.x >= right) padRight = Math.min(padRight, half(o.x - right));
+  }
+  return {
+    x: left - padLeft,
+    y: top - padTop,
+    w: right - left + padLeft + padRight,
+    h: bottom - top + padTop + padBottom
+  };
 }
 
 /** Removes boundaries none of whose members still exist; other items and partly-alive boundaries stay untouched. */

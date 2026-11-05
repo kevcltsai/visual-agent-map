@@ -89,12 +89,25 @@ const twFile = base => { const m = /^(.+?)(\.\d+)?$/.exec(base); return `${m[1]}
 const cnFile = base => twFile(base).replace('.zh', '.zh-CN');
 const schemaFile = (base, tag) => twFile(base).replace('.zh', `.${tag}`).replace(/\.txt$/, '.schema.json');
 
+const SCHEMA_DESCRIPTIONS = [
+  ['适合思维导图的一句简体中文结论，80 字内', '適合心智圖的一句繁體中文結論，80 字內'],
+  ['完整的简体中文 Markdown 分析', '完整的繁體中文 Markdown 分析']
+];
 test('zh-CN prompt snapshots: every zh snapshot has a zh-CN twin (prompt and schema)', () => {
   const missing = bases.filter(base => !fs.existsSync(path.join(directory, cnFile(base))));
   assert.deepEqual(missing, []);
   for (const base of bases) {
     const schema = path.join(directory, schemaFile(base, 'zh'));
-    if (fs.existsSync(schema)) assert.equal(fs.readFileSync(path.join(directory, schemaFile(base, 'zh-CN')), 'utf8'), fs.readFileSync(schema, 'utf8'), `${base} schema`);
+    if (fs.existsSync(schema)) {
+      // Persona 38: the two prose descriptions are Simplified in zh-CN. Everything else must still equal zh-TW, so map the
+      // Simplified descriptions back to the Traditional ones (and require each to be present) before comparing.
+      const cn = fs.readFileSync(path.join(directory, schemaFile(base, 'zh-CN')), 'utf8');
+      const hits = SCHEMA_DESCRIPTIONS.filter(([simplified]) => cn.includes(simplified));
+      const restored = hits.reduce((text, [simplified, traditional]) => text.split(simplified).join(traditional), cn);
+      const tw = fs.readFileSync(schema, 'utf8');
+      assert.equal(restored, tw, `${base} schema`);
+      assert.deepEqual(hits.map(item => item[0]), SCHEMA_DESCRIPTIONS.filter(([, traditional]) => tw.includes(traditional)).map(item => item[0]), `${base} schema: Simplified descriptions replace exactly the Traditional ones`);
+    }
   }
 });
 

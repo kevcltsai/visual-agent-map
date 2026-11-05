@@ -172,7 +172,7 @@ test('FG20-06: Copy to... lays the copies out clear of the target\'s children; o
   assert.deepEqual(h.overlaps(), []);
 });
 
-test('FG20-07: Structure and links > choosing a parent re-lays out the moved subtree at once; one undo restores it (decision 40)', async () => {
+test('FG20-07: This card > choosing a parent re-lays out the moved subtree at once; one undo restores it (decision 40)', async () => {
   const spec = [['R1', null, 80, 80]];
   for (let i = 1; i <= 7; i++) spec.push([`L${i}`, i === 1 ? 'R1' : `L${i - 1}`, 80 + 340 * i, 80]);
   spec.push(['R2', null, 80, 600], ['R2kid', 'R2', 420, 600]);
@@ -350,4 +350,58 @@ test('History (chat 04, chat 05): a group holds back every entry pushed inside o
   const c = new History(); c.openGroup(); await c.ownWrites(async () => { c.push(entry('old map')); c.clear(); c.push(entry('new map')); });
   assert.deepEqual([...c.closeGroup()].map(e => e.label), ['new map'], 'what was collected before clear() is gone with that history');
   assert.equal(new History().closeGroup().length, 0, 'no group: nothing');
+});
+
+const SIBLINGS = [['Root', null, 80, 80], ['A', 'Root', 420, 80], ['B', 'Root', 420, 304], ['C', 'Root', 420, 528], ['D', 'Root', 420, 752]];
+const childTitles = h => Array.from(h.view.map.nodes.filter(n => n.parentId === h.node('Root').id).sort((a, b) => a.y - b.y).map(n => h.titleOf(n.id)));
+
+test('persona 11: a card dragged above its siblings keeps that place after Auto layout', async () => {
+  const h = await harness(SIBLINGS);
+  await h.view.mapChange(map => h.view.placeDroppedCard(map, map.nodes.find(n => n.id === h.node('D').id), { x: 420, y: 0 }));
+  assert.deepEqual(childTitles(h), ['D', 'A', 'B', 'C'], 'the drop itself');
+  await h.view.mapChange(map => h.view.arrangeAll(map));
+  assert.deepEqual(childTitles(h), ['D', 'A', 'B', 'C'], 'Auto layout lays the cards out in the new order');
+  await h.undoAll();
+  assert.deepEqual(childTitles(h), ['A', 'B', 'C', 'D'], 'one undo puts it back');
+});
+
+test('persona 11: dropping a card where it already sits, or in the middle, changes only what moved', async () => {
+  const h = await harness(SIBLINGS);
+  await h.view.mapChange(map => h.view.placeDroppedCard(map, map.nodes.find(n => n.id === h.node('D').id), { x: 430, y: 760 }));
+  assert.deepEqual(Array.from(h.view.map.nodes, n => h.titleOf(n.id)), ['Root', 'A', 'B', 'C', 'D'], 'array order untouched');
+  await h.view.mapChange(map => h.view.placeDroppedCard(map, map.nodes.find(n => n.id === h.node('A').id), { x: 420, y: 400 }));
+  await h.view.mapChange(map => h.view.arrangeAll(map));
+  assert.deepEqual(childTitles(h), ['B', 'A', 'C', 'D']);
+});
+
+test('persona 11: a card dropped on empty canvas, away from its siblings, keeps its place in the order', async () => {
+  const h = await harness(SIBLINGS);
+  await h.view.mapChange(map => h.view.placeDroppedCard(map, map.nodes.find(n => n.id === h.node('D').id), { x: 1500, y: 0 }));
+  await h.view.mapChange(map => h.view.placeDroppedCard(map, map.nodes.find(n => n.id === h.node('A').id), { x: 420, y: 3000 }));
+  assert.deepEqual(Array.from(h.view.map.nodes, n => h.titleOf(n.id)), ['Root', 'A', 'B', 'C', 'D'], 'array order untouched');
+});
+
+test('persona 11: Alt+arrow trades places with the sibling, stays after Auto layout, is one undo, and stops at the ends', async () => {
+  const h = await harness(SIBLINGS);
+  await h.view.shiftSiblingByKey(h.node('D'), -1);
+  assert.deepEqual(childTitles(h), ['A', 'B', 'D', 'C']);
+  await h.view.mapChange(map => h.view.arrangeAll(map));
+  assert.deepEqual(childTitles(h), ['A', 'B', 'D', 'C'], 'the new order survives Auto layout');
+  await h.view.travel(false); await h.view.travel(false);
+  assert.deepEqual(childTitles(h), ['A', 'B', 'C', 'D'], 'one undo for the move');
+  const before = h.positions();
+  await h.view.shiftSiblingByKey(h.node('A'), -1);
+  await h.view.shiftSiblingByKey(h.node('D'), 1);
+  await h.view.shiftSiblingByKey(h.node('Root'), 1);
+  assert.equal(h.positions(), before, 'first/last/root: nothing written');
+  await h.view.shiftSiblingByKey(h.node('A'), 1);
+  assert.deepEqual(childTitles(h), ['B', 'A', 'C', 'D']);
+});
+
+test('persona 11: shiftSibling moves only siblings and returns the same array when nothing moves', () => {
+  const { shiftSibling } = load('map-layout.ts');
+  const nodes = [{ id: 'r', parentId: null }, { id: 'a', parentId: 'r' }, { id: 'x', parentId: 'a' }, { id: 'b', parentId: 'r' }, { id: 'c', parentId: 'r' }];
+  assert.deepEqual(shiftSibling(nodes, 'c', -1).map(n => n.id), ['r', 'a', 'x', 'c', 'b']);
+  assert.deepEqual(shiftSibling(nodes, 'a', 1).map(n => n.id), ['r', 'b', 'x', 'a', 'c']);
+  for (const [id, offset] of [['a', -1], ['c', 1], ['r', 1], ['zz', 1]]) assert.equal(shiftSibling(nodes, id, offset), nodes);
 });

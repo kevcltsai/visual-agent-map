@@ -762,7 +762,7 @@ integrationTest('integration still refuses to save when the user edits a child a
   await view.integrateChildren(parent, options, '', (_result, commit) => { save = commit; }, message => failures.push(message));
   assert.equal(typeof save, 'function');
   await repo.updateNote(child.path, { detail: 'User edited this child' });
-  await assert.rejects(save('Merged summary', 'Merged detail'), /topic changed/);
+  await assert.rejects(save('Merged summary', 'Merged detail'), /overwrite/);
   assert.notEqual((await repo.readNote(parent.path)).summary, 'Merged summary');
 });
 integrationTest('synthesis content is explicit for one, three and four children, with full default and no descendants', async () => {
@@ -1018,7 +1018,7 @@ integrationTest('direct synthesis write: Undo restores the parent note verbatim,
   await f.view.history.redo().redo();
   assert.equal((await f.repo.readNote(f.parent.path)).summary, 'Draft summary');
   await f.repo.updateNote(f.parent.path, { summary: 'Edited after the write' });
-  await assert.rejects(f.view.history.undo().undo(), /the synthesis draft was not saved/i);
+  await assert.rejects(f.view.history.undo().undo(), /Integration was not saved/i);
   assert.equal((await f.repo.readNote(f.parent.path)).summary, 'Edited after the write');
 });
 integrationTest('direct synthesis write: Undo is verbatim when the parent already carried format issues', async () => {
@@ -1105,7 +1105,7 @@ integrationTest('a parent topic edited while the draft AI call is pending refuse
   await until(() => accepted === 1);
   await f.repo.updateNote(f.parent.path, { summary: 'Edited while drafting' });
   gate.resolve(); await drafting;
-  const task = f.view.synthesisTasks.get(f.parent.path); assert.equal(task.state, 'failed'); assert.match(task.progress, /the synthesis draft was not saved/i);
+  const task = f.view.synthesisTasks.get(f.parent.path); assert.equal(task.state, 'failed'); assert.match(task.progress, /Integration was not saved/i);
   assert.equal(f.view.history.undoEntry, undefined, 'a refused write records no history step');
   const after = await f.repo.readNote(f.parent.path); assert.equal(after.summary, 'Edited while drafting'); assert.equal(after.detail, 'Existing knowledge');
 });
@@ -1264,7 +1264,7 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   const toolbar = () => { const root = element('content'); h.view.renderMultiResearchStatus(root); return all(root); };
   h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id }]));
   let items = bar(); const research = () => items.find(i => i.tag === 'button' && /^Research( 1 topic)?$/.test(i.text));
-  items = bar(); assert.ok(research()); assert.equal(research().disabled, true);
+  items = bar(); assert.equal(research(), undefined, 'no topic picked: no bar yet');
   h.view.selection.replaceMulti([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research'); assert.equal(research().attrs['aria-label'], 'Research 1 topic');
   h.view.map.aim = {}; items = bar(); assert.equal(research(), undefined); delete h.view.map.aim;
   assert.equal(toolbar().length, 1);

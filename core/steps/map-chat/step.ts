@@ -42,7 +42,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "ask_topic_kind",
   "add_relation",
   "remove_relation",
-  "set_appearance"
+  "set_appearance",
+  "rename_map"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -114,6 +115,8 @@ export type MapChatAction =
   | { kind: "create_map"; title: string }
   /** Always the last action: switch to the map the title names (matched by the view, not the model). */
   | { kind: "open_map"; title: string }
+  /** Always the first action: names the map the user is talking in (an empty map still waiting for its name); no other map is made. */
+  | { kind: "rename_map"; title: string }
   | { kind: "collapse_topic"; nodeId: string }
   | { kind: "expand_topic"; nodeId: string }
   | { kind: "auto_layout" }
@@ -304,6 +307,27 @@ class Dropped extends Error {
 }
 
 /**
+ * A new card's summary that names a note the user showed the chat by its path ("source: Reading/Notes.md") gets a wikilink
+ * ("[[Reading/Notes]]") instead, so the source can be clicked and the note lists the card as a backlink. Text already inside
+ * a wikilink is left alone.
+ */
+export function linkSources(summary: string, paths: readonly string[] | undefined): string {
+  if (!summary || !paths?.length) return summary;
+  let out = summary;
+  for (const path of paths) {
+    if (!/\.md$/i.test(path)) continue;
+    const target = path.replace(/\.md$/i, "");
+    const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp("`?" + escaped + "`?", "g");
+    out = out
+      .split(/(\[\[[^\]]*\]\])/)
+      .map(part => (part.startsWith("[[") ? part : part.replace(pattern, `[[${target}]]`)))
+      .join("");
+  }
+  return out;
+}
+
+/**
  * Parser. A reply that is not a JSON object with a string `reply` and an `actions` array rejects the whole reply with
  * {@link MapChatError}. Inside `actions` each item is judged alone: one that is not an object, has an unknown kind, names a
  * card that is not in the supplied context, misses a field its kind needs, or would put a card under itself is dropped and
@@ -320,6 +344,7 @@ class Dropped extends Error {
 export function parseMapChat(
   raw: string,
   context: Pick<MapChatContext, "nodeIds" | "parents"> & {
+    sourcePaths?: readonly string[];
     noEditableMap?: boolean;
     aim?: boolean;
     relations?: readonly MapChatRelation[];
@@ -430,7 +455,7 @@ export function parseMapChat(
             kind: "add_child",
             parentId,
             title,
-            summary: text("summary", false),
+            summary: linkSources(text("summary", false), context.sourcePaths),
             ...(ref ? { ref } : {}),
             ...(keepType ? { topicKind: typed as TopicKind } : {}),
             ...(keepType && power ? { strength: power } : {})
@@ -526,6 +551,11 @@ export function parseMapChat(
           if (index !== 0) throw new Dropped("bad_value");
           actions.push({ kind: "create_map", title: text("title") });
           created = true;
+          break;
+        }
+        case "rename_map": {
+          if (index !== 0) throw new Dropped("bad_value");
+          actions.push({ kind: "rename_map", title: text("title") });
           break;
         }
         case "open_map": {

@@ -245,3 +245,37 @@ test('P5 cut: when the source changed after the cut, the paste moves nothing and
 });
 
 function sessionOf(h) { return h.sessionFor(h.plugin); }
+
+const escOf = (h, target = body) => {
+  const event = { key: 'Escape', target, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} };
+  h.view.contentEl.ownerDocument = { querySelector: () => null };
+  h.view.restoreMapFocus = () => {};
+  h.view.onMapKeydown(event);
+  return event;
+};
+
+test('P5 cut: Esc cancels the pending cut, the marks go, and a later paste does not move anything', async () => {
+  const h = await harness();
+  cutOf(h, ['branch']);
+  h.view.render();
+  assert.deepEqual(marked(h).sort(), ['branch', 'kid']);
+  const raw = h.lastRaw;
+  const event = escOf(h);
+  assert.equal(event.defaultPrevented, true, 'Esc is still claimed as before');
+  assert.deepEqual(marked(h), []);
+  assert.equal(h.sessionFor(h.plugin).cancelCut(), false, 'no cut is pending any more');
+  h.view.selection.setSelected(h.ids.other);
+  pasteOf(h, { [MIME]: raw });
+  await until(() => h.map().nodes.length > 5 || h.notices.length >= 0);
+  assert.equal(parentOf(h, 'branch'), h.ids.root, 'the cut branch did not move');
+});
+
+test('P5 cut: Esc with a pending cut still clears the selection; Esc in a text control keeps the cut', async () => {
+  const h = await harness();
+  cutOf(h, ['branch']);
+  escOf(h, textControl);
+  assert.equal(h.sessionFor(h.plugin).cancelCut(), true, 'a field handles its own Esc; the cut stays');
+  cutOf(h, ['branch']);
+  escOf(h);
+  assert.equal(h.view.selection.state.selected, null);
+});

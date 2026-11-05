@@ -168,13 +168,16 @@ import {
   TFile,
   TFolder,
   WorkspaceLeaf,
+  requestUrl,
   setIcon,
   setTooltip
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
+import { cardFailure } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
+import { PLACEHOLDER_MAP_NAMES, isPlaceholderMapTitle, uniqueDefaultName } from "../../core/default-names";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
@@ -219,6 +222,7 @@ import {
 import {
   arrangeNewBranch,
   arrangeNewTree,
+  cardsOverlapAny,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
   layoutDirectionFor,
@@ -226,6 +230,7 @@ import {
   medianHeight,
   reorderSiblings,
   reorderTopLevel,
+  shiftSibling,
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
@@ -302,6 +307,7 @@ import { relevanceDisplayNodes } from "./relevance-order";
 import {
   bottomInsetFromRects,
   cardToolsPlacement,
+  chooseCardToolsSpot,
   clearToolbar,
   type CanvasInsets,
   fitIsClamped,
@@ -312,6 +318,7 @@ import {
   isObscured,
   leftInsetFromRects,
   rectsIntersect,
+  type ScreenRect,
   statusBarClearance
 } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
@@ -591,7 +598,14 @@ function aimQuestionStatus(
   return "not_started";
 }
 /** The AI merge that hid its dialog: owned by the view, one per map. It writes nothing until the draft is confirmed. */
+/** A chat reply's undo step, still open to the one AI merge the reply started (it lands later and joins the step). */
+interface ChatReplyStep {
+  entry: TransactionEntry;
+  absorb: (entry: TransactionEntry) => Promise<void>;
+}
 interface MergeTask {
+  /** The reply step this merge may join when it is written (the chat's merge); see {@link ChatReplyStep}. */
+  replyStep?: ChatReplyStep;
   mapPath: string;
   mapId: string;
   mapTitle: string;
@@ -616,6 +630,13 @@ interface MergeTask {
   run?: Promise<void>;
 }
 /** Progress keys for runs that have no card (multi-select synthesis, AI merge); Obsidian file names cannot contain ":". */
+/** Alt+arrow: how far a card trades places with its siblings (Up/Left earlier, Down/Right later). */
+const ARROW_OFFSETS = new Map<string, -1 | 1>([
+  ["ArrowUp", -1],
+  ["ArrowLeft", -1],
+  ["ArrowDown", 1],
+  ["ArrowRight", 1]
+]);
 const TASK_PROGRESS_PREFIX = "vam-task:";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
@@ -979,6 +1000,8 @@ export class VisualAgentMapView extends ItemView {
   private mergeOpen = false;
   /** AI merges that hid their dialog, keyed by map path (one per map). */
   private mergeTasks = new Map<string, MergeTask>();
+  /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
+  private chatReplyStep: ChatReplyStep | undefined;
 
   /**
    * AI actions whose dialog hid itself and whose provider request is not accepted yet, keyed by node path (or
@@ -986,6 +1009,7 @@ export class VisualAgentMapView extends ItemView {
    * reaches the run and no request is sent; the entry goes away once the run is accepted or ends.
    */
   private startingTasks = new Map<string, AbortController>();
+  private disclosureSeq = 0;
   /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
   private quickOutlines = new Map<
     string,
@@ -1127,6 +1151,12 @@ export class VisualAgentMapView extends ItemView {
   /** Detaches the open bracket editor without saving and returns its draft, so a repaint can reopen it. */
   private suspendSummaryEdit: (() => { id: string; value: string }) | null = null;
   private summaryEditDraft: { id: string; value: string } | null = null;
+  /** The name being typed in place: the map title (id "") or a card title. It outlives a repaint. */
+  private inlineName: { target: "map" | "card"; id: string; draft: string; fresh: boolean; created: boolean } | null =
+    null;
+  /** Ends the live in-place name field without saving (a repaint is about to replace it); the draft stays in `inlineName`. */
+  private suspendInlineName: (() => void) | null = null;
+  private inlineNameInput: HTMLInputElement | null = null;
   private summaryEls = new Map<string, HTMLElement>();
   /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
   private pendingTextEditId: string | null = null;
@@ -1442,6 +1472,8 @@ export class VisualAgentMapView extends ItemView {
     }
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
+      // A pending cut ends with this Esc as well; the selection is cleared exactly as before.
+      if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
       this.applySelectionChange(this.selection.escape());
       // Claimed here: unhandled, Obsidian answers Esc by activating another leaf and the next key edits that note.
       event.preventDefault();
@@ -1453,12 +1485,27 @@ export class VisualAgentMapView extends ItemView {
    * Mod+Z / Mod+Shift+Z while this view is the active pane, wherever focus is inside it. A text field keeps its own
    * undo (the handler passes the key through), and IME composition is never touched.
    */
+  /**
+   * Undo while a just-made card's name field still holds the default name: the field has nothing of its own to undo, so the
+   * key takes the whole card away (one step). Returns true when it did.
+   */
+  private undoNewCardNow(target: unknown): boolean {
+    const edit = this.inlineName;
+    const field = (target as Element | null)?.closest?.(".vam-card-title-input");
+    if (!field || edit?.target !== "card" || !edit.created || !this.history.canUndo) return false;
+    if (edit.draft !== this.notes.get(edit.id)?.title) return false;
+    this.suspendInlineName?.();
+    this.inlineName = null;
+    this.enqueue(() => this.travel(false));
+    return true;
+  }
   private installUndoScope(): void {
     const scope = new Scope(this.app.scope);
     const seen = new WeakSet<object>();
     const run =
       (redo: boolean) =>
       (event: KeyboardEvent): boolean => {
+        if (!redo && !this.closed && !event.isComposing && this.undoNewCardNow(event.target)) return false;
         if (this.closed || event.isComposing || isEditableTarget(event.target)) return true;
         // A presentation is read-only: undo and redo are swallowed, not passed on to Obsidian.
         if (this.presentation) return false;
@@ -1867,6 +1914,92 @@ export class VisualAgentMapView extends ItemView {
     (back ?? this.contentEl).focus({ preventScroll: true });
     this.announcer?.setText(t("ui.presentation_exited"));
   }
+  /**
+   * A name field in place of a title. Enter or leaving the field saves, Esc drops what was typed; Enter while an input method is
+   * composing only picks the text. A repaint suspends it (`suspendInlineName`) and the same field is built again from the draft.
+   * `done` gets the typed text, or null for Esc.
+   */
+  private createInlineNameInput(
+    parent: HTMLElement,
+    cls: string,
+    label: string,
+    done: (value: string | null) => void
+  ): HTMLInputElement {
+    const state = this.inlineName!;
+    const input = parent.createEl("input", { cls, attr: { type: "text", "aria-label": label, dir: "auto" } });
+    input.value = state.draft;
+    let live = true;
+    const release = (): void => {
+      live = false;
+      this.suspendInlineName = null;
+    };
+    this.suspendInlineName = () => {
+      if (!live) return;
+      state.draft = input.value;
+      state.fresh = false;
+      release();
+    };
+    const finish = (save: boolean): void => {
+      if (!live) return;
+      const value = input.value;
+      release();
+      this.inlineName = null;
+      this.inlineNameInput = null;
+      done(save ? value : null);
+    };
+    input.addEventListener("input", () => {
+      state.draft = input.value;
+    });
+    input.addEventListener("keydown", event => {
+      // The field owns its keys: shortcuts, arrows and Delete must not reach the canvas.
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        finish(true);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        finish(false);
+      }
+    });
+    input.addEventListener("blur", () => finish(true));
+    this.inlineNameInput = input;
+    return input;
+  }
+  /** After a repaint: the live name field takes focus (all text selected the first time, so typing replaces the default). */
+  private focusInlineName(): void {
+    const input = this.inlineNameInput;
+    if (!input || !input.isConnected || !this.inlineName) return;
+    this.restoringFocus = true;
+    try {
+      input.focus({ preventScroll: true });
+      if (this.inlineName.fresh) {
+        input.select?.();
+        this.inlineName.fresh = false;
+      } else input.setSelectionRange?.(input.value.length, input.value.length);
+    } finally {
+      this.restoringFocus = false;
+    }
+  }
+  /** The map title becomes a field; Enter saves, Esc leaves the name as it was. */
+  private startMapTitleEdit(): void {
+    if (!this.map || this.inlineName || this.presentation) return;
+    if (this.aimActiveForPath(this.path)) {
+      new Notice(t("ui.aim_research_already_running"));
+      return;
+    }
+    this.inlineName = { target: "map", id: "", draft: this.map.title, fresh: true, created: false };
+    this.render();
+  }
+  /** Draws the card title's field in place of the title text. */
+  private paintCardNameEdit(card: HTMLElement, node: MapNode, note: Note): HTMLInputElement {
+    const input = this.createInlineNameInput(card, "vam-card-title-input", t("ui.rename_topic"), value => {
+      const name = sanitizeGeneratedTitle(value ?? "").trim();
+      if (!name || name === note.title) this.render();
+      else this.enqueue(() => this.noteChange(node, { title: name }));
+    });
+    return input;
+  }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   private renameNode(node: MapNode, current: string): void {
     if (this.presentation) return;
@@ -1903,6 +2036,8 @@ export class VisualAgentMapView extends ItemView {
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
+    // The conversation is memory-only (DATA_CONTRACTS): tell the user before it is dropped, unless it was saved as a note.
+    if (this.chat?.hasUnsavedTurns) new Notice(t("ui.map_chat_unsaved_on_close"));
     this.abortMapChat();
     this.chat?.dispose();
     this.relevancePanelCleanup?.();
@@ -3810,10 +3945,34 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mergeUnlocked([node.id, parent.id])) return;
     await this.mapChange(map => {
       if (!canParent(map.nodes, node.id, parent.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-      map.nodes.find(item => item.id === node.id)!.parentId = parent.id;
+      const moving = map.nodes.find(item => item.id === node.id)!;
+      const oldParentId = moving.parentId;
+      moving.parentId = parent.id;
       map.nodes.find(item => item.id === parent.id)!.collapsed = false;
+      this.closeGapAt(map, oldParentId, parent.id);
       this.arrangeBranch(map, parent.id, new Set([node.id, ...descendants(map.nodes, node.id)]), undefined);
     });
+  }
+  /**
+   * A card left `oldParentId`: that branch is laid out again so the place it left closes up. Only that branch moves; the rest of
+   * the map, and a branch the card moved within, stay as they are. Nothing when there was no parent, the parent still is the
+   * parent, or its branch is folded.
+   */
+  private closeGapAt(map: MapDocument, oldParentId: string | null, newParentId: string): void {
+    if (!oldParentId || oldParentId === newParentId) return;
+    const old = map.nodes.find(item => item.id === oldParentId);
+    if (!old || old.collapsed) return;
+    this.arrangeBranch(map, oldParentId, new Set(descendants(map.nodes, oldParentId)), undefined);
+  }
+  /**
+   * After a chat reply changed what cards show: cards that grew and now cover another card get the whole map laid out again
+   * (the same layout "Auto layout" does); when nothing overlaps nothing moves, so a position the user set stays. A card that
+   * moved away from a parent had its old branch closed up already, at the move.
+   */
+  private tidyAfterResize(map: MapDocument, resized: ReadonlySet<string>): boolean {
+    if (!resized.size || !cardsOverlapAny(map.nodes, resized, this.cardHeightOf)) return false;
+    this.arrangeAll(map);
+    return true;
   }
   /**
    * `map.nodes` with every parent's children in on-screen order: sorted along the sibling axis of the arrangement they sit in
@@ -3821,9 +3980,10 @@ export class VisualAgentMapView extends ItemView {
    * the array order, which is what those arrangements lay out. A manual move or drag changes a position only, so the array
    * order can differ from this.
    */
-  private onScreenSiblingOrder(map: MapDocument): MapNode[] {
+  private onScreenSiblingOrder(map: MapDocument, onlyParentId?: string): MapNode[] {
     const base = layoutOf(map).direction;
     return alignSiblingsToScreen(map.nodes, (parentId, childId) => {
+      if (onlyParentId !== undefined && parentId !== onlyParentId) return null;
       const direction = layoutDirectionFor(map.nodes, childId, base) as LayoutKind;
       if (direction === "down" || direction === "up") return "x";
       if (direction === "right" || direction === "left") return "y";
@@ -3846,16 +4006,97 @@ export class VisualAgentMapView extends ItemView {
       if (!moving || !target || next?.parentId !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
       // The children of the new parent first take the order on screen (what the model was told), so the reorder keeps what was seen.
       map.nodes = this.onScreenSiblingOrder(map);
+      const oldParentId = map.nodes.find(item => item.id === node.id)?.parentId ?? null;
       moving.parentId = parent.id;
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
       box.placed = true;
+      this.closeGapAt(map, oldParentId, parent.id);
       if (!map.aim && layoutOf(map).direction === "timeline" && !target.parentId) this.arrangeAll(map);
       else this.arrangeBranch(map, parent.id, new Set(descendants(map.nodes, parent.id)), undefined);
     });
     return box.placed;
   }
+  /**
+   * A card dropped on empty canvas takes the place it was dropped at. The arrangements lay siblings out in array order, so it
+   * takes that place among its siblings there too; otherwise "Auto layout" would put it straight back.
+   */
+  private placeDroppedCard(map: MapDocument, card: MapNode, position: { x: number; y: number }): void {
+    card.x = Math.round(position.x);
+    card.y = Math.round(position.y);
+    if (card.parentId && !map.aim && this.droppedAmongSiblings(map, card))
+      map.nodes = this.onScreenSiblingOrder(map, card.parentId);
+  }
+  /**
+   * Whether a dropped card sits in its siblings' lane: close to their column (right/left maps) or row (down/up maps), and
+   * between them or within one card of the first or last. Anywhere else is empty canvas, where a drop only moves the card.
+   */
+  private droppedAmongSiblings(map: MapDocument, card: MapNode): boolean {
+    const others = map.nodes.filter(item => item.parentId === card.parentId && item.id !== card.id);
+    if (!others.length) return false;
+    const direction = layoutDirectionFor(map.nodes, card.id, layoutOf(map).direction) as LayoutKind;
+    const vertical = direction === "down" || direction === "up";
+    if (!vertical && direction !== "right" && direction !== "left") return false;
+    const along = (item: MapNode): number => (vertical ? item.x : item.y);
+    const across = (item: MapNode): number => (vertical ? item.y : item.x);
+    const reach = vertical ? 300 : DEFAULT_CARD_HEIGHT;
+    const lane = vertical ? DEFAULT_CARD_HEIGHT : 300;
+    const first = Math.min(...others.map(along)) - reach;
+    const last = Math.max(...others.map(along)) + reach;
+    return (
+      along(card) >= first && along(card) <= last && others.some(item => Math.abs(across(item) - across(card)) < lane)
+    );
+  }
+  /**
+   * Alt+Up/Down (Left/Right): the card trades places with the sibling before or after it, and the branch is laid out again in
+   * that order. One undo step. Nothing is written when the card is already first or last.
+   */
+  private async shiftSiblingByKey(node: MapNode, offset: -1 | 1): Promise<void> {
+    const map = this.map;
+    if (!map || !node.parentId || map.aim) return;
+    const aligned = this.onScreenSiblingOrder(map);
+    if (shiftSibling(aligned, node.id, offset) === aligned) return;
+    if (!this.mergeUnlocked([node.id, node.parentId])) return;
+    const parentId = node.parentId;
+    this.focusNodeId = node.id;
+    try {
+      await this.mapChange(change => {
+        const next = shiftSibling(this.onScreenSiblingOrder(change), node.id, offset);
+        change.nodes = next;
+        const parent = change.nodes.find(item => item.id === parentId);
+        if (layoutOf(change).direction === "timeline" && parent && !parent.parentId) this.arrangeAll(change);
+        else this.arrangeBranch(change, parentId, new Set(descendants(change.nodes, parentId)), undefined);
+      });
+    } finally {
+      this.focusNodeId = null;
+    }
+  }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
+  /**
+   * The "+" of a card and the toolbar's "+ Topic": a list of what to add (the six topic types and a text block). One pick makes
+   * it; Enter takes the first row, "Topic". Esc closes the list and adds nothing.
+   */
+  private openAddMenu(event: MouseEvent, parent: MapNode | null): void {
+    if (this.presentation) return;
+    const menu = this.newMenu();
+    for (const kind of TOPIC_KINDS)
+      menu.addItem(item =>
+        item
+          .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
+          .setIcon(TOPIC_KIND_ICON[kind])
+          .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(parent, undefined, true, true, kind))))
+      );
+    if (this.canEditText())
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.text_node_add"))
+          .setIcon("text-cursor-input")
+          .onClick(() => this.whenEditing(() => this.addTextNodeUnder(parent)))
+      );
+    menu.showAtMouseEvent(event);
+    // Enter on a freshly opened list takes its first row.
+    (menu as unknown as { select?: (index: number) => void }).select?.(0);
+  }
   private openTopicMenu(event: MouseEvent): void {
     const menu = this.newMenu();
     menu.addItem(item =>
@@ -4503,10 +4744,13 @@ export class VisualAgentMapView extends ItemView {
       )
       .catch(error => errorNotice(error));
   }
+  /** "New map": an untitled empty map opens at once (no name is asked); the first message names it, the title renames it. */
   private openNewMindMapModal(): void {
-    new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
-      this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
-    ).open();
+    this.enqueue(async () => {
+      const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+      const title = uniqueDefaultName(t("ui.untitled_mind_map"), titles);
+      await this.openMapInMutation(await this.plugin.repo.createMap(title));
+    });
   }
   async planAimQuestion(
     parentNodeId: string,
@@ -5202,24 +5446,24 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   private openNewMapMenu(event: MouseEvent): void {
+    // One entry would be a menu with one row: the button itself makes the map.
+    if (!aimEnabled()) {
+      this.openNewMindMapModal();
+      return;
+    }
     const menu = this.newMenu();
     menu.addItem(item =>
       item
         .setTitle(t("ui.new_mind_map"))
         .setIcon("file-plus")
-        .onClick(() =>
-          new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
-            this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
-          ).open()
-        )
+        .onClick(() => this.openNewMindMapModal())
     );
-    if (aimEnabled())
-      menu.addItem(item =>
-        item
-          .setTitle(t("ui.aim_create_map"))
-          .setIcon("route")
-          .onClick(() => this.openAimStart())
-      );
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.aim_create_map"))
+        .setIcon("route")
+        .onClick(() => this.openAimStart())
+    );
     menu.showAtMouseEvent(event);
   }
   /** Research coverage is the map's headline fact: how much of the frontier already has a conclusion. */
@@ -5882,7 +6126,7 @@ export class VisualAgentMapView extends ItemView {
     },
     started: () => void,
     signal: AbortSignal,
-    options: { keepTitle?: boolean } = {}
+    options: { keepTitle?: boolean; replyStep?: ChatReplyStep } = {}
   ): Promise<boolean> {
     const stillValid = (): boolean => {
       const check = this.mergeCheck(snapshot.sources.map(source => source.id));
@@ -5923,6 +6167,7 @@ export class VisualAgentMapView extends ItemView {
         mapTitle: this.map?.title ?? "",
         title,
         ...(options.keepTitle ? { keepTitle: true } : {}),
+        ...(options.replyStep ? { replyStep: options.replyStep } : {}),
         sources: snapshot.sources,
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
@@ -6035,7 +6280,15 @@ export class VisualAgentMapView extends ItemView {
       this.render();
       const previous = this.history.undoEntry;
       await this.confirmMergeDraft(task, result.summary, result.detail);
-      const entry = this.history.undoEntry;
+      let entry = this.history.undoEntry;
+      // A merge the chat reply started joins that reply's step when the reply is still the newest one: one undo, one redo.
+      let folded = false;
+      const step = task.replyStep;
+      if (step && entry && entry !== previous && previous === step.entry && this.history.dropTop(entry)) {
+        await step.absorb(entry);
+        entry = step.entry;
+        folded = true;
+      }
       let done = t("ui.merge_done_0", task.title);
       if (!check.ok) {
         const found = check.missing.length + check.added.length;
@@ -6046,7 +6299,7 @@ export class VisualAgentMapView extends ItemView {
         done = `${done} ${t("ui.merge_check_warning_0", String(found))}`;
       }
       // The Undo button only while this merge is still the newest history step.
-      if (entry && entry !== previous)
+      if (entry && (entry !== previous || folded))
         backgroundResultNotice(
           done,
           {
@@ -6247,17 +6500,25 @@ export class VisualAgentMapView extends ItemView {
           sourcePaths: sources.map(source => source.path),
           status: mergedStatus(detail)
         });
-      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id);
+      // The sources may hold the title's file name until they are parked: the merged note takes it once they are.
+      const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id, sanitizeGeneratedTitle(title));
       for (const source of sources) tx.park(source.path, parkFolder, before.id, "unassigned");
       entry = await tx
-        .editMap(mapPath, map => {
+        .editMap(mapPath, (map, resolve) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen.
           map.viewport = clone(viewport);
           const ids = new Set(sources.map(source => source.id)),
             first = map.nodes.find(item => item.id === sources[0].id);
           if (!first || sources.some(source => !map.nodes.some(item => item.id === source.id)))
             throw new Error(t("ui.merge_missing_note"));
-          const merged: MapNode = { ...created, parentId: check.parentId, x: first.x, y: first.y, collapsed: false },
+          const merged: MapNode = {
+              ...created,
+              path: resolve(created.path),
+              parentId: check.parentId,
+              x: first.x,
+              y: first.y,
+              collapsed: false
+            },
             adopted = new Set<string>();
           for (const item of map.nodes)
             if (item.parentId !== null && ids.has(item.parentId)) {
@@ -7120,6 +7381,17 @@ export class VisualAgentMapView extends ItemView {
       this.announcer?.setText(t("ui.text_node_added"));
     });
   }
+  /** Rects of the drawn cards that are not in `members`: a frame keeps its padding off them (ticket 31). */
+  private otherCardRects(members: readonly string[]): { x: number; y: number; w: number; h: number }[] {
+    const own = new Set(members);
+    const rects: { x: number; y: number; w: number; h: number }[] = [];
+    for (const [id, card] of this.cardEls) {
+      if (own.has(id)) continue;
+      const b = boxOf(card);
+      rects.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+    }
+    return rects;
+  }
   /**
    * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
    * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
@@ -7137,7 +7409,7 @@ export class VisualAgentMapView extends ItemView {
     };
     let layer: HTMLElement | null = null;
     for (const boundary of boundaries) {
-      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD);
+      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD, this.otherCardRects(boundary.members));
       if (!box) continue;
       if (!layer) {
         layer = stage.createDiv("vam-boundaries");
@@ -9480,6 +9752,25 @@ export class VisualAgentMapView extends ItemView {
         item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
         item.title = wrapText(title, titleEl.offsetWidth);
       }
+      // The summary the card shows (at most its clamp of lines) is drawn where the screen puts it.
+      const summaryEl = card.querySelector<HTMLElement>(".vam-card-summary");
+      const summaryText = (
+        summaryEl?.querySelector<HTMLElement>(".vam-card-preview-text") ?? summaryEl
+      )?.textContent?.trim();
+      if (summaryEl && summaryText && summaryEl.offsetWidth > 0) {
+        const summaryStyle = computed(summaryEl);
+        const clamp = parseInt(summaryStyle.getPropertyValue("-webkit-line-clamp"), 10);
+        const size = parseFloat(summaryStyle.fontSize);
+        const lines = wrapText(summaryText, summaryEl.offsetWidth);
+        item.summary = {
+          lines: Number.isFinite(clamp) && clamp > 0 ? lines.slice(0, clamp) : lines,
+          x: box.x + summaryEl.offsetLeft,
+          y: box.y + summaryEl.offsetTop,
+          size: Number.isFinite(size) && size > 0 ? Math.round((size * 13) / 15) : undefined,
+          textColor: colorOf(summaryStyle.color)
+        };
+        if (item.summary.lines.length < lines.length) item.summary.lines[item.summary.lines.length - 1] += "…";
+      }
       // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
@@ -9574,7 +9865,8 @@ export class VisualAgentMapView extends ItemView {
           const b = boxOf(card);
           return { x: b.x, y: b.y, w: b.width, h: b.height };
         },
-        BOUNDARY_PAD
+        BOUNDARY_PAD,
+        this.otherCardRects(frame.members)
       );
       if (!box) continue;
       grow(box.x, box.y, box.w, box.h);
@@ -9693,7 +9985,15 @@ export class VisualAgentMapView extends ItemView {
     try {
       let blob: Blob;
       if (format === "md") {
-        const outline = mapOutline(map.nodes, id => this.notes.get(id)?.title ?? "");
+        const outline = mapOutline(
+          this.onScreenSiblingOrder(map),
+          id => this.notes.get(id)?.title ?? "",
+          id => {
+            const summary = this.notes.get(id)?.summary ?? "";
+            return isPlaceholder(summary) ? "" : summary;
+          },
+          map.title
+        );
         blob = new Blob([`${outline}\n`], { type: "text/markdown;charset=utf-8" });
       } else {
         const got = await this.collectExportScene(isCurrent);
@@ -9798,6 +10098,8 @@ export class VisualAgentMapView extends ItemView {
       });
     };
     if (this.map) add(t("ui.rename_current_mind_map"), "pencil", () => this.renameCurrentMap());
+    if (this.map && !this.map.aim && isManagedMapPath(this.plugin.settings, this.path))
+      add(t("ui.duplicate_current_mind_map"), "copy", () => this.duplicateCurrentMap());
     if (this.map && !this.aimLive())
       add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
@@ -9840,34 +10142,51 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     new NameModal(this.app, t("ui.rename_mind_map"), this.map.title, title =>
-      this.enqueue(async () => {
-        if (!this.map) return;
-        if (this.aimActiveForPath(this.path)) {
-          new Notice(t("ui.aim_research_already_running"));
-          return;
-        }
-        if (!isManagedMapPath(this.plugin.settings, this.path)) {
-          new Notice(t("ui.legacy_map_view_only"));
-          return;
-        }
-        const before = clone(this.map),
-          beforeRoot = this.plugin.repo.topicRoot(this.path);
-        this.path = await this.plugin.repo.renameTopic(this.path, title);
-        this.map = await this.plugin.repo.readMap(this.path);
-        const after = clone(this.map),
-          afterRoot = this.plugin.repo.topicRoot(this.path);
-        const restore = async (map: MapDocument, root: string): Promise<void> => {
-          this.path = await this.plugin.repo.renameTopic(this.path, map.title, root);
-          this.map = clone(map);
-          await this.plugin.repo.saveMap(this.path, this.map);
-          await this.plugin.rebuildDerivedData();
-          this.render();
-        };
-        this.history.push({ undo: () => restore(before, beforeRoot), redo: () => restore(after, afterRoot) });
-        this.render();
-        this.app.workspace.requestSaveLayout();
-      })
+      this.enqueue(() => this.renameMapTo(title))
     ).open();
+  }
+  /** "Duplicate current mind map": copies the map and its notes into a new, independent map named "<title> copy" (or " 1", " 2" when taken) and opens it. */
+  private duplicateCurrentMap(): void {
+    if (!this.map) return;
+    const source = this.path;
+    this.enqueue(async () => {
+      if (!this.map || this.path !== source) return;
+      try {
+        const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+        const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
+        await this.openMapInMutation(await this.plugin.repo.duplicateMap(source, title));
+      } catch (error) {
+        errorNotice(error);
+      }
+    });
+  }
+  /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
+  private async renameMapTo(title: string): Promise<void> {
+    if (!this.map) return;
+    if (this.aimActiveForPath(this.path)) {
+      new Notice(t("ui.aim_research_already_running"));
+      return;
+    }
+    if (!isManagedMapPath(this.plugin.settings, this.path)) {
+      new Notice(t("ui.legacy_map_view_only"));
+      return;
+    }
+    const before = clone(this.map),
+      beforeRoot = this.plugin.repo.topicRoot(this.path);
+    this.path = await this.plugin.repo.renameTopic(this.path, title);
+    this.map = await this.plugin.repo.readMap(this.path);
+    const after = clone(this.map),
+      afterRoot = this.plugin.repo.topicRoot(this.path);
+    const restore = async (map: MapDocument, root: string): Promise<void> => {
+      this.path = await this.plugin.repo.renameTopic(this.path, map.title, root);
+      this.map = clone(map);
+      await this.plugin.repo.saveMap(this.path, this.map);
+      await this.plugin.rebuildDerivedData();
+      this.render();
+    };
+    this.history.push({ undo: () => restore(before, beforeRoot), redo: () => restore(after, afterRoot) });
+    this.render();
+    this.app.workspace.requestSaveLayout();
   }
   private deleteCurrentMap(): void {
     if (!this.map) return;
@@ -10086,13 +10405,44 @@ export class VisualAgentMapView extends ItemView {
     this.relevancePanelCleanup?.();
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
+    // A name being typed survives the repaint as its draft; one whose card is gone is dropped.
+    this.suspendInlineName?.();
+    if (this.inlineName?.target === "card" && !this.map?.nodes.some(node => node.id === this.inlineName?.id))
+      this.inlineName = null;
+    if (this.inlineName?.target === "map" && !this.map) this.inlineName = null;
+    this.inlineNameInput = null;
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
-    const switcher = toolbar.createEl("button", { cls: "vam-map-switcher" });
-    switcher.setAttr("aria-label", t("ui.switch_mind_map"));
-    switcher.createSpan({ text: this.map?.title ?? "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
-    setIcon(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
-    switcher.addEventListener("click", () => this.openMapSwitcher());
+    // The title text renames the map in place; the arrows beside it switch maps.
+    const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
+    const mapName = this.map?.title ?? "Visual Agent Map";
+    if (this.map && this.inlineName?.target === "map") {
+      const field = this.createInlineNameInput(switcher, "vam-map-title-input", t("ui.rename_mind_map"), value => {
+        const name = sanitizeGeneratedTitle(value ?? "").trim();
+        if (!name || name === this.map?.title) this.render();
+        else
+          this.enqueue(async () => {
+            try {
+              await this.renameMapTo(name);
+            } catch (error) {
+              errorNotice(error);
+              this.render();
+            }
+          });
+      });
+      field.setAttr("size", String(Math.max(8, Math.min(40, [...field.value].length + 2))));
+    } else {
+      const rename = switcher.createEl("button", { cls: "vam-map-title-button" });
+      rename.setAttr("aria-label", this.map ? t("ui.rename_mind_map") : t("ui.switch_mind_map"));
+      rename.setAttr("title", this.map ? t("ui.rename_mind_map") : t("ui.switch_mind_map"));
+      rename.createSpan({ text: mapName, cls: "vam-map-title", attr: { dir: "auto" } });
+      rename.addEventListener("click", () => (this.map ? this.startMapTitleEdit() : this.openMapSwitcher()));
+    }
+    const switchMap = switcher.createEl("button", { cls: "vam-map-switch-button" });
+    switchMap.setAttr("aria-label", t("ui.switch_mind_map"));
+    switchMap.setAttr("title", t("ui.switch_mind_map"));
+    setIcon(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
+    switchMap.addEventListener("click", () => this.openMapSwitcher());
     if (this.map && !this.aimLive() && this.map.nodes.length) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
@@ -10452,6 +10802,7 @@ export class VisualAgentMapView extends ItemView {
     restoreRelevanceFocus();
     restoreChatFocus();
     keepMapFocus();
+    this.focusInlineName();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
@@ -10503,9 +10854,9 @@ export class VisualAgentMapView extends ItemView {
    */
   private renderMapTools(tools: HTMLElement): void {
     if (!this.map || this.map.aim) return;
-    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
-      "mod-cta"
-    );
+    const addTopic = this.button(tools, t("ui.topic"), () => {});
+    addTopic.addEventListener("click", event => this.openAddMenu(event, null));
+    addTopic.addClass("mod-cta");
     this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
       "vam-topic-more"
     );
@@ -10527,9 +10878,9 @@ export class VisualAgentMapView extends ItemView {
    */
   private renderHiddenAimMapTools(tools: HTMLElement): void {
     if (!this.map) return;
-    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
-      "mod-cta"
-    );
+    const addTopic = this.button(tools, t("ui.topic"), () => {});
+    addTopic.addEventListener("click", event => this.openAddMenu(event, null));
+    addTopic.addClass("mod-cta");
     this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
       "vam-topic-more"
     );
@@ -10751,7 +11102,12 @@ export class VisualAgentMapView extends ItemView {
       issue.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
-    if (note?.status === "error" && note.lastError) errorDetails.push(note.lastError);
+    const technicalDetails: string[] = [];
+    if (note?.status === "error" && note.lastError) {
+      const failure = cardFailure(note.lastError);
+      errorDetails.push(failure.text);
+      if (failure.technical) technicalDetails.push(failure.technical);
+    }
     if (batch) {
       const currentNode = batch.currentPath ? this.map?.nodes.find(item => item.path === batch.currentPath) : undefined;
       const currentTitle = currentNode ? this.notes.get(currentNode.id)?.title : undefined;
@@ -10772,7 +11128,11 @@ export class VisualAgentMapView extends ItemView {
           text: `${batch.failures.length} ${t("ui.failed")}`
         });
         failure.setAttr("title", batch.failures.join("\n"));
-        errorDetails.push(...batch.failures);
+        for (const raw of batch.failures) {
+          const failure = cardFailure(raw);
+          errorDetails.push(failure.text);
+          if (failure.technical) technicalDetails.push(failure.technical);
+        }
       }
       this.renderRetryFailedButton(header, node.path, batch);
     }
@@ -10862,58 +11222,66 @@ export class VisualAgentMapView extends ItemView {
         this.button(header, t("ui.discard_synthesis"), () => this.discardSynthesis(node));
       }
     }
-    // Hover-only tools float above the card's top edge, so showing them (hover, focus, selection) never moves the card's
-    // content. What must always show (status, stop and review actions, a folded branch's count) stays in the header.
-    // Every tool is labelled: the toolbar floats, so its width never moves the card. Order: fold, structure, rename,
-    // select subtopics, details, then the AI action last.
+    // Hover-only tools float beside the card (above its top edge unless that covers a neighbour), so showing them (hover,
+    // focus, selection) never moves the card's content. What must always show (status, stop and review actions, a folded
+    // branch's count) stays in the header. Only three tools float: AI explore, Details and "More", which holds the rest
+    // (fold, structure, rename, select subtopics, add text, remove).
     const tools = card.createDiv("vam-node-tools");
     const count = descendants(this.map!.nodes, node.id).size;
+    const more: Array<{ title: string; icon: string; action: () => void }> = [];
     if (count) {
-      // A folded branch keeps its count on the card; the fold action itself is a hover tool.
-      const collapse = this.button(
-        node.collapsed ? header : tools,
-        node.collapsed ? t("ui.expand_0", count) : t("ui.collapse"),
-        () => this.whenEditing(() => this.toggleCollapsed(node))
-      );
-      collapse.addClass("vam-collapse-button", ...(node.collapsed ? ["is-collapsed"] : []));
-      collapse.setAttr("aria-expanded", String(!node.collapsed));
+      if (node.collapsed) {
+        // A folded branch keeps its count on the card; expanding is a header button.
+        const collapse = this.button(header, t("ui.expand_0", count), () =>
+          this.whenEditing(() => this.toggleCollapsed(node))
+        );
+        collapse.addClass("vam-collapse-button", "is-collapsed");
+        collapse.setAttr("aria-expanded", "false");
+      } else
+        more.push({
+          title: t("ui.collapse"),
+          icon: "chevrons-down-up",
+          action: () => this.whenEditing(() => this.toggleCollapsed(node))
+        });
     }
     if (!this.selection.state.multiSelectMode) {
       if (!this.aimLive()) {
-        const structure = this.button(tools, t("ui.node_tool_links"), () =>
-          this.whenEditing(() => this.openNodePanel(node, "structure"))
-        );
-        structure.addClass("vam-node-tool", "vam-structure-tool");
-        structure.setAttr("aria-label", t("ui.structure_and_links"));
+        more.push({
+          title: t("ui.structure_and_links"),
+          icon: "git-fork",
+          action: () => this.whenEditing(() => this.openNodePanel(node, "structure"))
+        });
         if (note)
-          this.button(tools, t("ui.node_tool_rename"), () =>
-            this.whenEditing(() =>
-              new NameModal(this.app, t("ui.rename_topic"), note.title, title =>
-                this.enqueue(() => this.noteChange(node, { title }))
-              ).open()
-            )
-          ).addClass("vam-node-tool", "vam-rename-tool");
+          more.push({
+            title: t("ui.node_tool_rename"),
+            icon: "pencil",
+            action: () =>
+              this.whenEditing(() =>
+                new NameModal(this.app, t("ui.rename_topic"), note.title, title =>
+                  this.enqueue(() => this.noteChange(node, { title }))
+                ).open()
+              )
+          });
         // Select every direct subtopic in one press. A folded card hides them, so it offers Expand instead.
-        if (!node.collapsed && this.map!.nodes.some(item => item.parentId === node.id)) {
-          const select = this.button(tools, t("ui.select_subtopics"), () =>
-            this.whenEditing(() => this.selectSubtopics(node))
-          );
-          select.addClass("vam-node-tool", "vam-select-subtopics-tool");
-          select.setAttr("aria-label", t("ui.select_subtopics_hint"));
-        }
+        if (!node.collapsed && this.map!.nodes.some(item => item.parentId === node.id))
+          more.push({
+            title: t("ui.select_subtopics"),
+            icon: "list-checks",
+            action: () => this.whenEditing(() => this.selectSubtopics(node))
+          });
         if (this.canEditText() && !isAimNode(node))
-          this.button(tools, t("ui.text_node_add"), () => this.whenEditing(() => this.addTextNodeUnder(node))).addClass(
-            "vam-node-tool",
-            "vam-add-text-tool"
-          );
+          more.push({
+            title: t("ui.text_node_add"),
+            icon: "text-cursor-input",
+            action: () => this.whenEditing(() => this.addTextNodeUnder(node))
+          });
       }
-      if (aimEnabled() && this.map?.aim && node.aimKind === "question") {
-        const remove = this.button(tools, t("ui.node_tool_remove"), () =>
-          this.whenEditing(() => this.confirmRemoveNode(node))
-        );
-        remove.addClass("vam-node-tool", "vam-remove-tool");
-        remove.setAttr("aria-label", t("ui.remove_from_map"));
-      }
+      if (aimEnabled() && this.map?.aim && node.aimKind === "question")
+        more.push({
+          title: t("ui.remove_from_map"),
+          icon: "trash",
+          action: () => this.whenEditing(() => this.confirmRemoveNode(node))
+        });
       if (
         aimEnabled() &&
         this.map?.aim &&
@@ -10955,16 +11323,24 @@ export class VisualAgentMapView extends ItemView {
         steer.setAttr("title", t("ui.aim_steer_hint"));
       }
     }
-    const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
-    details.addClass("vam-node-tool", "vam-detail-button");
-    details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
     if (!this.selection.state.multiSelectMode && !this.aimLive())
       this.button(tools, t("ui.ai_explore"), () => this.whenEditing(() => this.openNextStep(node))).addClass(
         "vam-node-tool",
         "vam-ai-explore"
       );
+    const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
+    details.addClass("vam-node-tool", "vam-detail-button");
+    details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
+    if (more.length) {
+      const moreButton = this.button(tools, t("ui.card_more"), () => {});
+      moreButton.addClass("vam-node-tool", "vam-more-tool");
+      moreButton.setAttr("aria-label", t("ui.card_more_hint"));
+      moreButton.setAttr("aria-haspopup", "menu");
+      moreButton.addEventListener("click", event => this.openCardMoreMenu(event, node, more));
+    }
     if (!this.selection.state.multiSelectMode && !this.aimLive()) {
-      const add = this.button(card, "+", () => this.whenEditing(() => this.enqueue(() => this.addNode(node))));
+      const add = this.button(card, "+", () => {});
+      add.addEventListener("click", event => this.openAddMenu(event, node));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
@@ -10973,6 +11349,11 @@ export class VisualAgentMapView extends ItemView {
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     title.setAttr("dir", "auto");
+    if (note && this.inlineName?.target === "card" && this.inlineName.id === node.id) {
+      // The field takes the heading's place (the heading stays for the card's label and tests that read it, but hidden).
+      title.addClass("vam-sr-only");
+      this.paintCardNameEdit(card, node, note);
+    }
     // Double-click renames, the same dialog as F2 and the Rename tool; on the cover picture it opens "Edit card".
     // It is handled on the card: enableDrag captures the pointer on the card, so a real mouse reports the card (not the
     // title or the picture) as the dblclick target.
@@ -10991,6 +11372,14 @@ export class VisualAgentMapView extends ItemView {
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
+      if (technicalDetails.length) {
+        const more = card.createEl("details", { cls: "vam-card-error-details" });
+        more.createEl("summary", { text: t("ui.technical_details") });
+        more.createEl("pre", { text: technicalDetails.join("\n\n") });
+        this.button(more, t("ui.copy_technical_details"), () => {
+          void navigator.clipboard?.writeText(technicalDetails.join("\n\n"));
+        });
+      }
     }
     if (node.aimKind === "conclusion" && aimEnabled() && this.map?.aim) {
       const branch = this.map.aim.branches.find(item => item.results.some(result => result.nodeId === node.id));
@@ -11146,6 +11535,13 @@ export class VisualAgentMapView extends ItemView {
     });
     card.addEventListener("keydown", event => {
       if (event.target !== card) return;
+      // Alt+arrow puts the card before or after its sibling (plain arrows walk the tree).
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ARROW_OFFSETS.has(event.key)) {
+        event.preventDefault();
+        if (!event.isComposing && !this.selection.state.multiSelectMode && !this.aimLive() && !this.presentation)
+          this.enqueue(() => this.shiftSiblingByKey(node, ARROW_OFFSETS.get(event.key)!));
+        return;
+      }
       const target = this.keyboardNeighbor(node, event.key);
       if (target) {
         event.preventDefault();
@@ -11413,6 +11809,17 @@ export class VisualAgentMapView extends ItemView {
     }
     return depth;
   }
+  /** The card's "More" menu: the tools that do not float over the map. Focus returns to the card when it closes. */
+  private openCardMoreMenu(
+    event: MouseEvent,
+    node: MapNode,
+    items: Array<{ title: string; icon: string; action: () => void }>
+  ): void {
+    const menu = this.newMenu(node.id);
+    for (const entry of items)
+      menu.addItem(item => item.setTitle(entry.title).setIcon(entry.icon).onClick(entry.action));
+    menu.showAtMouseEvent(event);
+  }
   /**
    * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
    * or past the canvas edge (a row wider than a card on the left edge); a row wider than the visible canvas wraps. Measured,
@@ -11433,7 +11840,8 @@ export class VisualAgentMapView extends ItemView {
     tools.toggleClass("is-wrapped", false);
     tools.style.removeProperty("max-width");
     tools.style.removeProperty("margin-left");
-    const visible = { left: visibleLeft, right: this.viewportEl.getBoundingClientRect().right };
+    const canvasRect = this.viewportEl.getBoundingClientRect();
+    const visible = { left: visibleLeft, right: canvasRect.right };
     const place = cardToolsPlacement(cardRect, tools.getBoundingClientRect().width, visible, 10 * zoom);
     tools.toggleClass("is-align-left", place.side === "left");
     if (place.maxWidth !== null) {
@@ -11442,6 +11850,67 @@ export class VisualAgentMapView extends ItemView {
       tools.style.maxWidth = `${place.maxWidth / (zoom * Math.max(1, 1 / zoom))}px`;
     }
     if (place.shift) tools.style.marginLeft = `${place.shift / zoom}px`;
+    this.placeCardTools(card, tools, cardRect, place, zoom, canvasRect, visibleLeft);
+  }
+  /**
+   * Puts the selected card's tool row on a side where it covers no other card (above, below, then beside), and pans the
+   * canvas when the row or the card would sit under a floating control or past the canvas edge. Measured, so it follows
+   * panning and zooming. A host that cannot measure (no card rectangles) keeps the row above the card.
+   */
+  private placeCardTools(
+    card: HTMLElement,
+    tools: HTMLElement,
+    cardRect: DOMRect,
+    place: { side: "left" | "right"; shift: number },
+    zoom: number,
+    canvasRect: DOMRect,
+    visibleLeft: number
+  ): void {
+    for (const name of ["is-below", "is-side-left", "is-side-right"]) tools.toggleClass(name, false);
+    tools.style.removeProperty("--vam-tools-inset");
+    tools.style.removeProperty("translate");
+    tools.style.removeProperty("--vam-tools-gap");
+    if (cardRect.top === undefined || cardRect.bottom === undefined || !this.cardEls) return;
+    const box = tools.getBoundingClientRect();
+    const width = box.width,
+      height = box.height || 32;
+    if (!(width > 0)) return;
+    const gap = 10 * zoom;
+    const rowRight = place.side === "left" ? undefined : cardRect.right - gap;
+    const rowLeft = place.side === "left" ? cardRect.left + gap + place.shift : rowRight! - width;
+    const others: ScreenRect[] = [];
+    for (const other of this.cardEls.values()) {
+      if (other === card || !other.isConnected) continue;
+      const rect = other.getBoundingClientRect?.();
+      if (rect && rect.right > rect.left && rect.bottom > rect.top) others.push(rect);
+    }
+    const spot = chooseCardToolsSpot({
+      card: cardRect,
+      row: { left: rowLeft, right: rowLeft + width },
+      size: { width, height },
+      others,
+      controls: this.floatingControlRects(),
+      visible: { left: visibleLeft, right: canvasRect.right, top: canvasRect.top, bottom: canvasRect.bottom }
+    });
+    // Panning moves every card alike, so the side and inset chosen here stay right. In memory only, like keyboard navigation.
+    if (spot.side === "bottom") tools.toggleClass("is-below", true);
+    if (spot.side === "left" || spot.side === "right") {
+      tools.toggleClass("is-align-left", false);
+      tools.toggleClass(spot.side === "left" ? "is-side-left" : "is-side-right", true);
+      tools.style.removeProperty("margin-left");
+      tools.style.setProperty("--vam-tools-gap", `${4 / zoom}px`);
+    }
+    if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
+    // `translate` moves the row in card units before the counter-scale, so it does not disturb the reveal transform.
+    if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);
+    if ((spot.pan.dx || spot.pan.dy) && this.map) {
+      this.map.viewport = {
+        ...this.map.viewport,
+        x: this.map.viewport.x + spot.pan.dx,
+        y: this.map.viewport.y + spot.pan.dy
+      };
+      this.transform();
+    }
   }
   /** Repaints only the named cards from the current selection state (class, aria-selected, roving tabindex, checkbox). */
   private paintCards(ids: Iterable<string | null>): void {
@@ -12153,7 +12622,7 @@ export class VisualAgentMapView extends ItemView {
         this.map?.nodes
           .filter(item => item.parentId === node.id)
           .map(item => this.notes.get(item.id)?.title ?? item.path) ?? [];
-      new NextStepModal(
+      const dialog = new NextStepModal(
         this.app,
         note.title,
         this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0,
@@ -12247,7 +12716,8 @@ export class VisualAgentMapView extends ItemView {
               : undefined;
           })()
         }
-      ).open();
+      );
+      this.openMapModal(dialog);
     });
   }
   private openNodePanel(node: MapNode, mode: "structure" | "proposals"): void {
@@ -12275,7 +12745,12 @@ export class VisualAgentMapView extends ItemView {
     heading.createEl("strong", {
       text: mode === "structure" ? t("ui.structure_and_links") : t("ui.expansion_suggestions")
     });
-    if (note) panel.createEl("p", { cls: "vam-inspector-topic", text: t("ui.topic_0", note.title) });
+    // The card settings dialog is titled "This card" and the subtitle is just the card's name.
+    if (note)
+      panel.createEl("p", {
+        cls: "vam-inspector-topic",
+        text: mode === "structure" ? note.title : t("ui.topic_0", note.title)
+      });
     if (note) {
       if (mode === "proposals") this.renderPendingProposals(panel, node, note, close, host);
       if (mode === "structure") {
@@ -12316,16 +12791,20 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
-    // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
+    // Order (ticket 41): what it is (type), how far to trust it (strength), who it relates to; then the folded
+    // "Appearance" and "Layout" groups; then the AI lock; then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
-    if (note) this.renderMarkerSection(panel, node);
-    if (note) this.renderLinkSection(panel, node);
-    if (note) this.renderColorSection(panel, node);
-    if (note) this.renderStyleSection(panel, node);
-    if (note) this.renderCoverSection(panel, node);
-    if (note) this.renderAiLockSection(panel, node);
-    this.renderBranchLayoutSection(panel, node);
-    const relationship = panel.createDiv("vam-inspector-section");
+    if (note) {
+      const look = this.renderDisclosure(panel, t("ui.card_group_appearance"));
+      this.renderMarkerSection(look, node);
+      this.renderLinkSection(look, node);
+      this.renderColorSection(look, node);
+      this.renderStyleSection(look, node);
+      this.renderCoverSection(look, node);
+    }
+    const layout = this.renderDisclosure(panel, t("ui.card_group_layout"));
+    this.renderBranchLayoutSection(layout, node);
+    const relationship = layout.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
       cls: "vam-topic-tree-heading vam-section-heading"
@@ -12346,6 +12825,7 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
+    if (note) this.renderAiLockSection(panel, node);
     const actions = (host ?? panel).createDiv("vam-next-actions");
     if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
@@ -12384,6 +12864,25 @@ export class VisualAgentMapView extends ItemView {
         });
       });
     };
+  }
+  /** A folded group: a button with `aria-expanded` that shows or hides its body. Every control inside stays in the DOM. Returns the body. */
+  private renderDisclosure(parent: HTMLElement, label: string): HTMLElement {
+    const group = parent.createDiv("vam-disclosure");
+    const toggle = group.createEl("button", { text: label, cls: "vam-disclosure-toggle" });
+    toggle.type = "button";
+    const body = group.createDiv("vam-disclosure-body");
+    body.id = `vam-disclosure-${++this.disclosureSeq}`;
+    body.hidden = true;
+    toggle.setAttr("aria-expanded", "false");
+    toggle.setAttr("aria-controls", body.id);
+    let open = false;
+    toggle.addEventListener("click", () => {
+      open = !open;
+      toggle.setAttr("aria-expanded", String(open));
+      toggle.toggleClass("is-open", open);
+      body.hidden = !open;
+    });
+    return body;
   }
   private renderPendingProposals(
     panel: HTMLElement,
@@ -12587,39 +13086,61 @@ export class VisualAgentMapView extends ItemView {
       );
     }, false);
   }
-  /** The six relation kinds as a menu; `pick` gets the chosen one. */
-  private openRelationKindMenu(event: MouseEvent, pick: (kind: TopicRelationKind) => void): void {
-    const menu = this.newMenu();
-    for (const kind of RELATION_KINDS)
-      menu.addItem(item =>
-        item
-          .setTitle(t(RELATION_NAME_KEY[kind]))
-          .setIcon("link")
-          .onClick(() => pick(kind))
-      );
-    menu.showAtMouseEvent(event);
-  }
-  /** Opens the picker for the other end (B) of a `kind` relation that starts at `node` (A); with no legal target it only says so. */
-  private chooseRelationTarget(node: MapNode, kind: TopicRelationKind, onAdded?: () => void): void {
-    if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalRelationTargets(this.map, kind, node.id));
-    if (!legal.size) {
-      new Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
-      return;
-    }
-    new TopicTreeModal(
-      this.app,
-      t("ui.add_relation_title_0", t(RELATION_NAME_KEY[kind])),
-      t("ui.add_relation_description"),
-      this.map.nodes,
-      target => this.notes.get(target.id)?.title ?? target.path,
-      target => legal.has(target.id),
-      target =>
-        this.enqueue(async () => {
-          await this.addRelation(node.id, target.id, kind);
-          onAdded?.();
-        })
-    ).open();
+  /**
+   * "This card [relation ▾] → [another card ▾] [Add]": one sentence adds a relation A -> B. The card list holds only
+   * legal targets (never this card itself, never a card already linked to it, never a cycle), so it is refilled when
+   * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
+   */
+  private renderRelationAddRow(
+    parent: HTMLElement,
+    node: MapNode,
+    onAdded: () => void,
+    exposeFirst: (control: HTMLElement) => void
+  ): void {
+    const row = parent.createDiv("vam-relation-add");
+    row.setAttr("role", "group");
+    row.setAttr("aria-label", t("ui.relation_add_row"));
+    row.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
+    const kindSelect = row.createEl("select", { cls: "dropdown vam-relation-add-kind" });
+    kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+    for (const kind of RELATION_KINDS) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+    exposeFirst(kindSelect);
+    row.createSpan({ text: "→", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
+    const targetSelect = row.createEl("select", { cls: "dropdown vam-relation-add-target" });
+    targetSelect.setAttr("aria-label", t("ui.relation_target_label"));
+    const add = row.createEl("button", { text: t("ui.relation_add_submit"), cls: "mod-cta" });
+    add.type = "button";
+    const currentKind = (): TopicRelationKind => (kindSelect.value as TopicRelationKind) || RELATION_KINDS[0];
+    const fill = (): void => {
+      targetSelect.empty();
+      const legal = this.map ? new Set(legalRelationTargets(this.map, currentKind(), node.id)) : new Set<string>();
+      const targets = (this.map?.nodes ?? []).filter(item => item.id !== node.id && legal.has(item.id));
+      targetSelect.createEl("option", {
+        text: targets.length
+          ? t("ui.relation_pick_card")
+          : t("ui.no_relation_target_0", t(RELATION_NAME_KEY[currentKind()])),
+        value: ""
+      });
+      for (const target of targets)
+        targetSelect.createEl("option", { text: this.notes.get(target.id)?.title ?? target.path, value: target.id });
+      targetSelect.value = "";
+      targetSelect.disabled = !targets.length;
+      add.disabled = true;
+    };
+    fill();
+    kindSelect.addEventListener("change", fill);
+    targetSelect.addEventListener("change", () => {
+      add.disabled = !targetSelect.value;
+    });
+    add.addEventListener("click", () => {
+      const toId = targetSelect.value;
+      if (!toId) return;
+      const kind = currentKind();
+      this.enqueue(async () => {
+        await this.addRelation(node.id, toId, kind);
+        onAdded();
+      });
+    });
   }
   /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
   private relationRowText(link: TopicRelation, selfId: string): string {
@@ -13318,7 +13839,7 @@ export class VisualAgentMapView extends ItemView {
   private async chatLockSkip(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" | "ask_topic_kind" }
+      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
     >,
     real: (id: string) => string | null
   ): Promise<ChatOutcome | null> {
@@ -13413,31 +13934,6 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  /**
-   * The selection bar's AI lock: one button whose `aria-pressed` is true when every selected topic is locked, false when
-   * none is and "mixed" otherwise (the title and name say how many). A click unlocks all when all are locked and locks
-   * the rest otherwise, in one undo step. Not on AIM maps.
-   */
-  private renderAiLockSelectionButton(selection: HTMLElement): void {
-    if (!this.map || this.aimLive()) return;
-    const nodes = [...this.selection.state.multiSelected]
-      .map(id => this.map?.nodes.find(node => node.id === id))
-      .filter((node): node is MapNode => !!node && !isAimNode(node) && !!this.notes.get(node.id));
-    const locked = nodes.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
-    const all = nodes.length > 0 && locked === nodes.length;
-    const button = this.button(
-      selection,
-      t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"),
-      () => this.enqueue(() => this.setAiLock(nodes, !all)),
-      !nodes.length
-    );
-    button.setAttr("aria-pressed", all ? "true" : locked ? "mixed" : "false");
-    if (locked && !all) {
-      const state = t("ui.ai_locked_some_0_1", locked, nodes.length);
-      button.setAttr("title", state);
-      button.setAttr("aria-label", `${t("ui.ai_lock_toggle")} (${state})`);
-    }
-  }
   /** The AI lock switch of the topic panel: one `aria-pressed` button, pressed while the topic is locked. */
   private renderAiLockSection(panel: HTMLElement, node: MapNode): void {
     if (!this.map || this.aimLive() || isAimNode(node) || this.selection.state.multiSelectMode) return;
@@ -13450,7 +13946,7 @@ export class VisualAgentMapView extends ItemView {
     let locked = this.notes.get(node.id)?.aiLocked === true;
     const paint = (focus = false): void => {
       group.empty();
-      const choice = this.button(group, t("ui.ai_lock_toggle"), () => {
+      const choice = this.button(group, t(locked ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle"), () => {
         this.enqueue(async () => {
           await this.setAiLock([node], !locked);
           locked = !locked;
@@ -13459,6 +13955,12 @@ export class VisualAgentMapView extends ItemView {
       });
       choice.setAttr("aria-pressed", String(locked));
       if (locked) choice.addClass("is-pressed");
+      // The row says the state it is in now, not only what the button would do.
+      group.createSpan({
+        cls: "vam-ai-lock-state",
+        text: t(locked ? "ui.ai_lock_state_on" : "ui.ai_lock_state_off"),
+        attr: { role: "status", "aria-live": "polite" }
+      });
       if (focus) choice.focus();
     };
     paint();
@@ -13732,7 +14234,7 @@ export class VisualAgentMapView extends ItemView {
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
     const editByPair = new Map<string, HTMLElement>();
-    let addRelationButton: HTMLElement | null = null;
+    let addRelationControl: HTMLElement | null = null;
     const paint = (focusStrength = false, focusKind = false, focusAdd = false): void => {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
@@ -13806,7 +14308,7 @@ export class VisualAgentMapView extends ItemView {
           // After the editor closes, focus goes to this pair's edit button as last painted (a pair has one relation),
           // or to "Add relation…" when the relation was deleted.
           const edit = this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
-            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationButton)?.focus())
+            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationControl)?.focus())
           );
           editByPair.set(pair, edit);
           this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
@@ -13817,16 +14319,16 @@ export class VisualAgentMapView extends ItemView {
           );
         }
       } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
-      const addRelation = body.createEl("button", { text: t("ui.add_relation") });
-      addRelationButton = addRelation;
-      addRelation.addEventListener("click", event => {
-        event.stopPropagation();
-        this.openRelationKindMenu(event, kind =>
-          this.chooseRelationTarget(node, kind, () => paint(false, false, true))
-        );
-      });
-      // Repainting replaced the button that started the flow; a keyboard user lands back on its replacement.
-      if (focusAdd) addRelation.focus();
+      this.renderRelationAddRow(
+        body,
+        node,
+        () => paint(false, false, true),
+        kindControl => {
+          addRelationControl = kindControl;
+        }
+      );
+      // Repainting replaced the control that started the flow; a keyboard user lands back on its replacement.
+      if (focusAdd) addRelationControl?.focus();
     };
     paint();
   }
@@ -13847,17 +14349,8 @@ export class VisualAgentMapView extends ItemView {
     const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
-    if (!suggestedTitle?.trim()) {
-      const dialogTitle = typed
-        ? t("ui.add_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey))
-        : parent
-          ? t("ui.new_subtopic")
-          : t("ui.my_core_topic");
-      new NameModal(this.app, dialogTitle, "", title =>
-        this.whenEditing(() => this.enqueue(() => this.addNode(parent, title, true, true, kind, true)))
-      ).open();
-      return;
-    }
+    // No name given (the "+", the toolbar, the keys): the card appears with a default name and its title opens for typing.
+    const interactive = suggestedTitle === undefined;
     // One resolution: a manual ancestor's model is inherited, otherwise the current model.
     const model = parent
       ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
@@ -13866,13 +14359,12 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.legacy_map_view_only"));
       return;
     }
+    const defaultName = uniqueDefaultName(
+      t("ui.new_topic"),
+      this.map.nodes.map(item => this.notes.get(item.id)?.title ?? "")
+    );
     const node = await this.plugin.repo.createNote(
-      sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() ||
-        (typed
-          ? t("ui.new_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey))
-          : parent
-            ? t("ui.new_subtopic")
-            : t("ui.my_core_topic")),
+      sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() || defaultName,
       model,
       this.map,
       this.path,
@@ -13890,33 +14382,48 @@ export class VisualAgentMapView extends ItemView {
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
     this.selection.setSelected(node.id);
-    await this.mapChangeSnapshots(
-      map => {
-        map.nodes.push(node);
-        const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
-        if (owner) {
-          owner.collapsed = false;
-          // A new sibling goes after the existing ones (not into a gap above them); collisions are then resolved from there.
-          const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== node.id);
-          const minTop = siblings.length
-            ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
-            : undefined;
-          this.arrangeBranch(map, owner.id, new Set([node.id]), minTop);
-        } else if (!parent) {
-          const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
-          if (roots.length)
-            node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
-        }
-      },
-      rebuildDerivedData,
-      [node.path]
-    );
+    // Set before the repaint that shows the card, so the card is drawn with its title field.
+    if (interactive && focus && !this.inlineName)
+      this.inlineName = {
+        target: "card",
+        id: node.id,
+        draft: this.notes.get(node.id)?.title ?? defaultName,
+        fresh: true,
+        created: true
+      };
+    try {
+      await this.mapChangeSnapshots(
+        map => {
+          map.nodes.push(node);
+          const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
+          if (owner) {
+            owner.collapsed = false;
+            // A new sibling goes after the existing ones (not into a gap above them); collisions are then resolved from there.
+            const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== node.id);
+            const minTop = siblings.length
+              ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
+              : undefined;
+            this.arrangeBranch(map, owner.id, new Set([node.id]), minTop);
+          } else if (!parent) {
+            const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
+            if (roots.length)
+              node.y = Math.max(...roots.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP;
+          }
+        },
+        rebuildDerivedData,
+        [node.path]
+      );
+    } catch (error) {
+      if (this.inlineName?.id === node.id) this.inlineName = null;
+      throw error;
+    }
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
     const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
     this.focusNode(placed);
     // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
-    if (keyboardFocus && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
+    if (keyboardFocus && !this.inlineName && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
+    this.focusInlineName();
   }
   private async proposeChildren(
     parent: MapNode,
@@ -14360,14 +14867,15 @@ export class VisualAgentMapView extends ItemView {
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
     });
     const names = shown.map(item => item.name);
-    new MultiResearchModal(
+    const dialog = new MultiResearchModal(
       this.app,
       names,
       this.modelChoices(),
       request => void this.startMultiResearch(request, retryBatchKey),
       this.fieldLinks(),
       shown.map(item => item.mode)
-    ).open();
+    );
+    this.openMapModal(dialog);
   }
   stopMultiResearch(): void {
     this.plugin.expansionCoordinator.stop(this.multiResearchKey());
@@ -14615,94 +15123,91 @@ export class VisualAgentMapView extends ItemView {
       dismiss.setAttr("aria-label", t("ui.dismiss"));
     }
   }
+  /**
+   * The narrow bar along the canvas bottom: nothing until a card is picked, then the names, Merge / Research, Move to…,
+   * More (everything else), the gesture help and Done. The canvas keeps its height free (see `has-selection-bar`).
+   */
   private renderSelectionBar(workspace: HTMLElement): HTMLElement {
     const selection = workspace.createDiv("vam-selection-bar");
+    const count = this.selection.state.multiSelected.size;
+    workspace.toggleClass?.("has-selection-bar", count > 0);
+    if (!count) {
+      selection.addClass("is-empty");
+      return selection;
+    }
     const names = [...this.selection.state.multiSelected].map(id => this.notes.get(id)?.title).filter(Boolean);
     selection.createSpan({
       attr: { dir: "auto" },
-      text: this.selection.state.multiSelected.size
-        ? t(
-            "ui.selected_0_1_2",
-            this.selection.state.multiSelected.size,
-            names.slice(0, 2).join(t("ui.list_separator")),
-            names.length > 2 ? "…" : ""
-          )
-        : t("ui.prompt_select_topics")
+      text: t("ui.selected_0_1_2", count, names.slice(0, 2).join(t("ui.list_separator")), names.length > 2 ? "…" : "")
     });
-    // One fixed line under the names: it cannot cover the canvas and never moves the buttons.
-    selection.createSpan({ cls: "vam-hint vam-selection-hint", text: t("ui.drag_to_select_topics_hint") });
-    this.button(
-      selection,
-      t("ui.clear"),
-      () => {
-        this.applySelectionChange(this.selection.clearMulti());
-      },
-      !this.selection.state.multiSelected.size
-    );
-    this.button(
-      selection,
-      t("ui.remove"),
-      () => this.confirmRemoveSelected(),
-      !this.selection.state.multiSelected.size
-    );
-    // Frames are added from here (the only multi-selection surface); AIM maps get no entry (D11).
-    if (!this.aimLive())
-      this.button(
-        selection,
-        t("ui.canvas_boundary_add"),
-        () => this.openAddBoundary(),
-        !this.selection.state.multiSelected.size
-      );
-    if (!this.aimLive()) {
-      // Not natively disabled (like Merge): a disabled button cannot take focus, so the reason would stay unreadable.
-      const check = this.summaryEntryCheck(this.summaryTargets()),
-        bracket = this.button(selection, t("ui.summary_add"), () => this.addSummaryOver());
-      if (!check.ok) {
-        bracket.setAttr("aria-disabled", "true");
-        bracket.setAttr("title", t(check.reason));
-      }
-    }
-    this.renderAiLockSelectionButton(selection);
-    this.button(
-      selection,
-      t("ui.move_to"),
-      () => this.chooseSelectedParent(false),
-      !this.selection.state.multiSelected.size
-    );
-    this.button(
-      selection,
-      t("ui.copy_to"),
-      () => this.chooseSelectedParent(true),
-      !this.selection.state.multiSelected.size
-    );
-    const count = this.selection.state.multiSelected.size;
-    // Labels never carry the count (it would shift every button to the right of it on each selection change);
-    // screen readers still hear it through aria-label.
-    const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
-    synthesize.addClass("mod-cta");
-    if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
+    // The main action follows the count: Merge for two or more, Research for one.
     if (!this.aimLive()) {
       // Not natively disabled: a disabled button cannot take focus, so keyboard and screen-reader users could not read why.
       const check = this.mergeCheck(),
         merge = this.button(selection, t("ui.merge"), () => this.openMerge());
       if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
+      if (count > 1) merge.addClass("mod-cta");
       if (!check.ok) {
         merge.setAttr("aria-disabled", "true");
         merge.setAttr("title", t(check.reason));
       }
-    }
-    if (!this.aimLive()) {
       const running = this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running";
-      const research = this.button(
-        selection,
-        t("ui.multi_research"),
-        () => this.openMultiResearch(),
-        !this.selection.state.multiSelected.size || running
-      );
-      if (count)
-        research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
+      const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running);
+      research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
+      if (count === 1) research.addClass("mod-cta");
     }
+    this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
+    const more = this.button(selection, t("ui.card_more"), () => {});
+    more.setAttr("aria-label", t("ui.selection_more_hint"));
+    more.setAttr("aria-haspopup", "menu");
+    more.addClass("vam-selection-more");
+    more.addEventListener("click", event => this.openSelectionMoreMenu(event, count));
+    const help = this.button(
+      selection,
+      t("ui.selection_help"),
+      () => new Notice(t("ui.drag_to_select_topics_hint"), 12000)
+    );
+    help.setAttr("aria-label", t("ui.selection_help_hint"));
+    help.setAttr("title", t("ui.selection_help_hint"));
+    help.addClass("vam-selection-help");
+    this.button(selection, t("ui.finish_topic_selection"), () =>
+      this.applySelectionChange(this.selection.toggleMultiSelect())
+    );
     return selection;
+  }
+  /** What the narrow selection bar has no room for: Synthesize, Copy to…, frame, summary bracket, AI lock, Clear, Remove. */
+  private openSelectionMoreMenu(event: MouseEvent, count: number): void {
+    const menu = this.newMenu();
+    const add = (title: string, icon: string, action: () => void, disabled = false): void => {
+      menu.addItem(item => item.setTitle(title).setIcon(icon).setDisabled(disabled).onClick(action));
+    };
+    add(
+      count > 1 ? t("ui.synthesize_0_topics", count) : t("ui.synthesize"),
+      "git-merge",
+      () => this.integrateSelected(),
+      count < 2
+    );
+    add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
+    if (!this.aimLive()) {
+      add(t("ui.canvas_boundary_add"), "square-dashed", () => this.openAddBoundary());
+      add(t("ui.summary_add"), "brackets", () => this.addSummaryOver());
+      const nodes = [...this.selection.state.multiSelected]
+        .map(id => this.map?.nodes.find(node => node.id === id))
+        .filter((node): node is MapNode => !!node && !isAimNode(node) && !!this.notes.get(node.id));
+      const all = nodes.length > 0 && nodes.every(node => this.notes.get(node.id)?.aiLocked === true);
+      const locked = nodes.filter(node => this.notes.get(node.id)?.aiLocked === true).length;
+      // A mixed selection says how many are locked; a click locks the rest (all locked: unlocks all).
+      add(
+        `${t(all ? "ui.ai_unlock_selected" : "ui.ai_lock_toggle")}${locked && !all ? ` (${t("ui.ai_locked_some_0_1", locked, nodes.length)})` : ""}`,
+        all ? "unlock" : "lock",
+        () => this.enqueue(() => this.setAiLock(nodes, !all)),
+        !nodes.length
+      );
+    }
+    menu.addSeparator();
+    add(t("ui.clear"), "x", () => this.applySelectionChange(this.selection.clearMulti()));
+    add(t("ui.remove"), "trash", () => this.confirmRemoveSelected());
+    menu.showAtMouseEvent(event);
   }
   /** The dialog's choices for each child's research; the data sources the user picked go to every child. */
   private researchChoices(options: TaskOptions): TaskOptions {
@@ -15192,7 +15697,7 @@ export class VisualAgentMapView extends ItemView {
     // The styles are read again first (#38), so the line shows a style file made since the last run.
     this.enqueue(async () => {
       const current = await this.mapStyle(settings.language, { kind: "topic" });
-      new NextStepModal(
+      const dialog = new NextStepModal(
         this.app,
         "",
         0,
@@ -15219,7 +15724,8 @@ export class VisualAgentMapView extends ItemView {
             ? { pending: { directions: pending.directions, discard: () => this.discardSelectionSynthesis() } }
             : {})
         }
-      ).open();
+      );
+      this.openMapModal(dialog);
     });
   }
   /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
@@ -15657,12 +16163,15 @@ export class VisualAgentMapView extends ItemView {
       sources.some(source => !this.map?.nodes.some(node => node.id === source.id && node.path === source.path))
     )
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    const concluded = this.relationsEnabled();
     const integrated = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       this.map,
       this.path,
-      "workspace"
+      "workspace",
+      // A synthesis is a conclusion drawn from its sources (ordinary maps only; AIM has its own kinds).
+      concluded ? { topicKind: "conclusion" } : {}
     );
     const detailTemplate = (await this.mapStyle(language, { style: task.options.noteStyle, kind: "topic" })).template;
     try {
@@ -15687,6 +16196,13 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChangeSnapshots(
           map => {
             map.nodes.push(integrated);
+            // The new conclusion links back to every source it was drawn from ("derived from").
+            if (concluded)
+              for (const source of sources) {
+                const link = { kind: "derives_from" as const, from: integrated.id, to: source.id };
+                if (relationAllowed(map.topicRelations ?? [], link))
+                  setTopicRelations(map, [...(map.topicRelations ?? []), link]);
+              }
           },
           true,
           [integrated.path]
@@ -16608,6 +17124,7 @@ export class VisualAgentMapView extends ItemView {
       mapTitle: map.title,
       mapTitles,
       noEditableMap: !isManagedMapPath(settings, this.path),
+      mapNeedsName: isPlaceholderMapTitle(map.title, PLACEHOLDER_MAP_NAMES),
       outline,
       selected: selectedIds.map(ref).filter(notNull),
       references: attached
@@ -17037,6 +17554,8 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_create_map_0", action.title);
       case "open_map":
         return t("ui.map_chat_do_open_map_0", action.title);
+      case "rename_map":
+        return t("ui.map_chat_do_rename_map_0", action.title);
       case "collapse_topic":
         return t("ui.map_chat_do_collapse_0", title(action.nodeId));
       case "expand_topic":
@@ -17297,6 +17816,8 @@ export class VisualAgentMapView extends ItemView {
     // How many cards existed when the last auto_layout of the reply ran: the ones made after it are only roughly placed.
     let laidOutCount = 0;
     let layoutDone = false;
+    /** Cards whose title, summary or note this reply changed: their size may have changed. */
+    const resized = new Set<string>();
     // True once the reply stopped before its end (the user's Stop, or the view going away).
     let stopped = false;
     const refTitles = this.chatRefTitles(result.actions);
@@ -17334,6 +17855,16 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(label, skipped(noNewMapReason));
           continue;
         }
+        if (action.kind === "rename_map") {
+          // The folder moves with the name, so the reply's anchor follows the map to its new path.
+          const outcome = await this.chatRenameMap(action.title, anchor, same);
+          if (outcome.status === "done") {
+            wrote = true;
+            touched.add(anchor.path);
+          }
+          lines[index] = this.chatLine(label, outcome);
+          continue;
+        }
         if (action.kind === "create_map") {
           // The map switch repaints on its own.
           await this.settleChatBatch(run);
@@ -17361,6 +17892,11 @@ export class VisualAgentMapView extends ItemView {
           box.outcome = { status: "failed", reason: errorMessage(error) };
         }
         if (box.outcome.status !== "skipped" && action.kind !== "focus_topic") wrote = true;
+        if (
+          box.outcome.status === "done" &&
+          (action.kind === "rename_topic" || action.kind === "update_summary" || action.kind === "edit_topic_note")
+        )
+          resized.add(action.nodeId);
         if (action.kind === "auto_layout" && box.outcome.status === "done") {
           laidOutCount = run.created.length;
           layoutDone = true;
@@ -17393,6 +17929,26 @@ export class VisualAgentMapView extends ItemView {
           // The cards are written already; only the tidy-up failed, and the user can lay the map out by hand.
         }
       }
+      // A card that grew (a summary, a longer title) can now cover the one below it: lay out again, only when that happened.
+      if (resized.size && !arranged && !noNewMap && same() && this.map) {
+        // The layout measures the cards, so the held repaint comes first. Looked at before any mutate is taken: a reply whose
+        // cards still fit writes nothing more (one mutate per action).
+        this.flushChatRender();
+        if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf)) {
+          try {
+            await this.plugin.mutate(() =>
+              this.history.ownWrites(async () => {
+                if (!same() || !this.map) return;
+                await this.mapChange(map => {
+                  this.tidyAfterResize(map, resized);
+                }, false);
+              })
+            );
+          } catch {
+            // The writes are done already; only the tidy-up failed, and the user can lay the map out by hand.
+          }
+        }
+      }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
       // A stop that lands after the last action is a stop too.
       if (!same()) stopped = true;
@@ -17421,10 +17977,11 @@ export class VisualAgentMapView extends ItemView {
       // so undo checks the files instead of writing an old snapshot over them. Another view of the same map keeps no entry
       // that would not know about these writes: its history is cleared, as for any change made outside it.
       const entries = this.history.closeGroup();
+      this.chatReplyStep = undefined;
       if (wrote) {
         try {
           if (!this.closed && this.path === anchor.path)
-            await this.pushChatReplyEntry(
+            this.chatReplyStep = await this.pushChatReplyEntry(
               entries,
               anchor.path,
               run.notes ?? new Set(),
@@ -17567,6 +18124,34 @@ export class VisualAgentMapView extends ItemView {
       ? { status: "skipped", reason: t("ui.map_chat_skip_map_not_opened"), created: true }
       : skipped("ui.map_chat_skip_map_changed");
   }
+  /** rename_map: names the open map (only while it still has its placeholder name) and moves the anchor to the renamed folder. */
+  private async chatRenameMap(
+    title: string,
+    anchor: { path: string; id: string | undefined },
+    same: () => boolean
+  ): Promise<ChatOutcome> {
+    const name = sanitizeGeneratedTitle(title).trim();
+    if (!name) return skipped("ui.map_chat_skip_unavailable");
+    let outcome: ChatOutcome = { status: "done" };
+    try {
+      await this.plugin.mutate(async () => {
+        if (!same() || !this.map) {
+          outcome = skipped("ui.map_chat_skip_map_changed");
+          return;
+        }
+        // A name the user chose stays; only the placeholder is replaced.
+        if (!isPlaceholderMapTitle(this.map.title, PLACEHOLDER_MAP_NAMES)) {
+          outcome = skipped("ui.map_chat_skip_map_named");
+          return;
+        }
+        await this.history.ownWrites(() => this.renameMapTo(name));
+        anchor.path = this.path;
+      });
+    } catch (error) {
+      return { status: "failed", reason: errorMessage(error) };
+    }
+    return outcome;
+  }
   /** open_map: the view names the map, not the model. One match opens it; several are listed to pick from; none is a skip. */
   private async chatOpenMap(
     title: string,
@@ -17643,7 +18228,7 @@ export class VisualAgentMapView extends ItemView {
   private async applyChatWrite(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "open_map" | "ask_topic_kind" }
+      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
     >,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
     same: () => boolean,
@@ -18087,8 +18672,8 @@ export class VisualAgentMapView extends ItemView {
     noteIds: ReadonlySet<string>,
     files: ReadonlySet<string>,
     parked: ReadonlySet<string> = new Set()
-  ): Promise<void> {
-    if (!entries.length) return;
+  ): Promise<ChatReplyStep | undefined> {
+    if (!entries.length) return undefined;
     const fingerprint = (): Promise<string> => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint();
     const run = async (redo: boolean): Promise<void> => {
@@ -18111,7 +18696,19 @@ export class VisualAgentMapView extends ItemView {
       expected = await fingerprint();
     };
     // Solo: a job that began before the reply ended (an expand) must not fold the reply into its own step.
-    this.history.pushSolo({ undo: () => run(false), redo: () => run(true), label: t("ui.map_chat_undo_label") });
+    const step: TransactionEntry = {
+      undo: () => run(false),
+      redo: () => run(true),
+      label: t("ui.map_chat_undo_label")
+    };
+    this.history.pushSolo(step);
+    return {
+      entry: step,
+      absorb: async (entry: TransactionEntry): Promise<void> => {
+        entries.push(entry);
+        expected = await fingerprint();
+      }
+    };
   }
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);
@@ -18241,7 +18838,8 @@ export class VisualAgentMapView extends ItemView {
         );
         if (hasMergeContent(sourceNotes, isPlaceholder)) {
           const began = await this.startMergeDraft(title, snapshot, () => {}, new AbortController().signal, {
-            keepTitle: true
+            keepTitle: true,
+            ...(this.chatReplyStep ? { replyStep: this.chatReplyStep } : {})
           });
           return began ? { status: "done" } : skipped("ui.map_chat_skip_unavailable");
         }
@@ -18404,7 +19002,63 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
     }
+    // The picture is in the Detail now. A remote link never becomes a card cover (covers read local files only), so the file is
+    // also saved beside the note; a failure here leaves the picture in the Detail as it is and says nothing more.
+    if (outcome.result.ok) await this.chatCoverFromPicture(block, item.candidate).catch(() => undefined);
     return outcome.result;
+  }
+  /** The bytes of a picked picture (a seam: it needs the network). */
+  private async chatFetchImage(url: string): Promise<ArrayBuffer> {
+    return (await requestUrl({ url, method: "GET", throw: true })).arrayBuffer;
+  }
+  /**
+   * Makes a picked web picture the card's cover: only when the card has no cover and has not turned it off (a cover set by hand,
+   * and `topic-cover: none`, stay as they are). The picture is checked by its bytes ({@link acceptImage}), stored beside the note,
+   * embedded in `## User Notes` and set as `topic-cover`, as one undoable step.
+   */
+  private async chatCoverFromPicture(block: MapChatImages, candidate: ImageCandidate): Promise<void> {
+    const sameMap = (): boolean =>
+      !this.closed && !!this.map && this.path === block.mapPath && this.map.id === block.mapId;
+    const target = (): MapNode | null => {
+      if (!sameMap() || this.aimLive()) return null;
+      const node = this.map?.nodes.find(item => item.id === block.nodeId);
+      return node && this.cardAcceptsImages(node) && !this.isMerging(node.id) ? node : null;
+    };
+    const hasNoCover = (node: MapNode): boolean => {
+      const file = this.app.vault.getAbstractFileByPath(node.path);
+      if (!(file instanceof TFile)) return false;
+      const cache = this.app.metadataCache.getFileCache(file);
+      // Any `topic-cover` the owner wrote (even a link that does not resolve now) is theirs and stays.
+      const declared: unknown = cache?.frontmatter?.["topic-cover"];
+      if (declared !== undefined && declared !== null) return false;
+      return (
+        resolveCoverWithFrame(cache, link => this.app.metadataCache.getFirstLinkpathDest(link, node.path)) === null
+      );
+    };
+    const first = target();
+    if (!first || !hasNoCover(first)) return;
+    const data = await this.chatFetchImage(candidate.url);
+    const node = target();
+    if (!node || !this.map || !hasNoCover(node)) return;
+    const accepted = acceptImage({ mime: "image/*", size: data.byteLength, bytes: data });
+    if (!accepted.ok) return;
+    const name = safeImageName(candidate.title, accepted.mime);
+    if (!name) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .createAttachment("image", { name, data, sourcePath: node.path })
+      .rewriteNote(node.path, async (path, attachment) => {
+        const note = this.app.vault.getAbstractFileByPath(path);
+        if (!(note instanceof TFile)) throw new Error(path);
+        const link = attachment("image");
+        await this.app.vault.process(note, content => withCover(appendImageEmbed(content, link), link));
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_cover") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   private chatTranscriptTurn(turn: MapChatSavedTurn): TranscriptTurn {
@@ -18995,7 +19649,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private enableDrag(card: HTMLElement, node: MapNode): void {
     card.addEventListener("pointerdown", event => {
-      if ((event.target as Element).closest("button") || event.button !== 0 || !this.map) return;
+      if ((event.target as Element).closest("button, .vam-card-title-input") || event.button !== 0 || !this.map) return;
       // In selection mode a card cannot be moved and a plain click still toggles it, but it can be dragged onto the chat.
       const selecting = this.selection.state.multiSelectMode;
       this.clearHoverTimer();
@@ -19231,8 +19885,7 @@ export class VisualAgentMapView extends ItemView {
                 this.arrangeAll(map);
                 return;
               }
-              current.x = Math.round(position.x);
-              current.y = Math.round(position.y);
+              this.placeDroppedCard(map, current, position);
             })
           );
         } else if (e.metaKey || e.ctrlKey) {

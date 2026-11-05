@@ -111,7 +111,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 21);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 22);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -474,7 +474,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-6)), ['focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-6)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -508,6 +508,38 @@ test('B1 noEditableMap: the reply has to start with create_map; anything else be
   assert.equal(wrongOrder.actions.length, 0, 'create_map is only valid as the first action, so the whole reply is dropped');
   assert.equal(parse(reply(child('r', '')), context()).actions.length, 1, 'without the flag a root card is fine');
 });
+// Ticket 21: an empty map is where the first reply builds; its name comes from rename_map, not from another map.
+test('ticket 21 rename_map: only as the very first action, with a title; the cards after it are the current map\'s', () => {
+  const ok = parse(reply(item('rename_map', { title: 'Phone design' }), child('r', ''), child('k', 'new:r')));
+  assert.deepEqual(ok.rejected, []);
+  assert.deepEqual(ok.actions[0], { kind: 'rename_map', title: 'Phone design' });
+  assert.equal(ok.actions.length, 3, 'unlike create_map the reply keeps building in the same map');
+  const late = parse(reply(child('r', ''), item('rename_map', { title: 'Late' })));
+  assert.deepEqual(late.rejected.map(entry => entry.code), ['bad_value']);
+  const blank = parse(reply(item('rename_map', { title: '  ' })));
+  assert.deepEqual(blank.rejected.map(entry => entry.code), ['missing_field']);
+  const none = parse(reply(item('rename_map', { title: 'X' })), { ...context(), noEditableMap: true });
+  assert.equal(none.actions.length, 0, 'a map that cannot be edited cannot be renamed by the reply');
+});
+test('ticket 21 context: an editable map without cards says emptyMap; a placeholder name says mapNeedsName; neither otherwise', () => {
+  const empty = JSON.parse(context({ outline: [], mapNeedsName: true }).json);
+  assert.equal(empty.emptyMap, true); assert.equal(empty.mapNeedsName, true);
+  const named = JSON.parse(context({ outline: [], mapNeedsName: false }).json);
+  assert.equal(named.emptyMap, true); assert.equal('mapNeedsName' in named, false);
+  const filled = JSON.parse(context({ mapNeedsName: false }).json);
+  assert.equal('emptyMap' in filled, false, 'a map with cards is not empty');
+  const locked = JSON.parse(context({ outline: [], noEditableMap: true, mapNeedsName: true }).json);
+  assert.equal('emptyMap' in locked, false); assert.equal('mapNeedsName' in locked, false);
+});
+test('ticket 21 prompt: both languages name rename_map, emptyMap and mapNeedsName, and keep create_map for an explicit second map', () => {
+  for (const [language, patterns] of [
+    ['en', [/rename_map: title/, /"emptyMap" is true/, /"mapNeedsName" is true/, /unless the user explicitly asks for another new map/]],
+    ['zh-TW', [/rename_map：title/, /"emptyMap" 為 true/, /"mapNeedsName" 為 true/, /除非使用者明確要求另開新地圖/]]
+  ]) {
+    const text = mapChatStep.render(request({ language }));
+    for (const pattern of patterns) assert.match(text, pattern, `${language} ${pattern}`);
+  }
+});
 test('B1 fix 7: with no editable map a lone open_map is kept (it needs no card), and cards still need create_map', () => {
   const none = { ...context(), noEditableMap: true };
   const lone = parse(reply(item('open_map', { title: 'Coffee' })), none);
@@ -526,7 +558,7 @@ test('B1 schema: ref is a required string property and the kinds list ends with 
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
@@ -1299,4 +1331,22 @@ test('one or two new cards and no layout line: counts and lines are unchanged', 
   const lines = [{ status: 'done', text: 'Added 0' }, { status: 'skipped', text: 'Skipped 1' }];
   assert.deepEqual(plain(countChatLines(lines, ['Arranged', 'Undo'])), { done: 1, skipped: 1, failed: 0 });
   assert.deepEqual(plain(splitChatLines(lines, ['Arranged', 'Undo'])), { results: lines, notes: [] });
+});
+
+test('add_child summary turns a plain source path of a shown note into a wikilink (persona 04)', () => {
+  const ctx = context({ activeFile: { path: 'Reading/Notes on onboarding research.md', content: 'body' }, files: [{ path: 'Other/File.md', content: 'x' }] });
+  assert.deepEqual(plain(ctx.sourcePaths), ['Other/File.md', 'Reading/Notes on onboarding research.md']);
+  const result = parse(reply(
+    item('add_child', { title: 'A', summary: 'One idea. source: Reading/Notes on onboarding research.md' }),
+    item('add_child', { title: 'B', summary: 'Two. `Other/File.md` and [[Reading/Notes on onboarding research]]' }),
+    item('add_child', { title: 'C', summary: 'Unrelated Elsewhere/Thing.md stays' })
+  ), ctx);
+  assert.equal(result.actions[0].summary, 'One idea. source: [[Reading/Notes on onboarding research]]');
+  assert.equal(result.actions[1].summary, 'Two. [[Other/File]] and [[Reading/Notes on onboarding research]]');
+  assert.equal(result.actions[2].summary, 'Unrelated Elsewhere/Thing.md stays');
+});
+
+test('add_child summary is untouched when no note was shown', () => {
+  const result = parse(reply(item('add_child', { title: 'A', summary: 'source: Reading/X.md' })));
+  assert.equal(result.actions[0].summary, 'source: Reading/X.md');
 });

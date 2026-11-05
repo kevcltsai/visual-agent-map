@@ -1834,3 +1834,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-topic-link-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; border: 0; box-shadow: none; background: transparent; color: var(--text-normal); font-weight: 400; }
 .vam-view .vam-topic-link-item:hover { background: var(--background-modifier-hover); }
 .vam-view .vam-node .vam-card-title-input { box-sizing: border-box; width: 100%; font: inherit; font-weight: 650; user-select: text; pointer-events: auto; }
+.vam-view .vam-node .vam-card-summary.is-inline-editable { cursor: text; }
+.vam-view .vam-node .vam-card-summary-input { box-sizing: border-box; display: block; width: 100%; min-height: 0; padding: 2px 6px; margin: 0; font: inherit; line-height: 1.55; color: var(--text-normal); height: var(--vam-summary-height, auto); resize: none; overflow: hidden; user-select: text; pointer-events: auto; }
+.vam-view .vam-node .vam-card-summary-add { opacity: 0; pointer-events: none; margin: 0; color: var(--text-faint); font-size: var(--font-ui-small); font-style: italic; line-height: 1.55; cursor: text; }
+.vam-view .vam-node.is-selected .vam-card-summary-add { opacity: 1; pointer-events: auto; }
+.vam-view .vam-stage[data-presenting] .vam-card-summary-add { opacity: 0; pointer-events: none; }
+.vam-view .vam-node .vam-card-edit-hint { margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); }

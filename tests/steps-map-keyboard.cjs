@@ -162,7 +162,7 @@ test('A4: Mod+Enter adds a subtopic of the focused card; Shift+Enter adds a sibl
   assert.equal(details, 1, 'plain Enter still opens details'); assert.deepEqual(h.added, []);
 });
 
-test('A4: double-clicking a card title opens the rename dialog even though the pointer is captured by the card', async () => {
+test('A4: double-clicking a card title opens the inline title field even though the pointer is captured by the card', async () => {
   const h = await harness();
   const card = h.card('leaf'), title = findAll(card, i => i.tag === 'h3')[0];
   title.getBoundingClientRect = () => ({ left: 20, right: 120, top: 30, bottom: 50 });
@@ -172,27 +172,27 @@ test('A4: double-clicking a card title opens the rename dialog even though the p
   assert.equal(dbl(60, 70).defaultPrevented, false, 'just below the title: nothing');
   const tool = element('button'); tool.closest = sel => (sel === 'button' ? tool : null);
   dbl(60, 40, tool);
-  assert.deepEqual(modalNames(h), [], 'a tool button never renames');
+  assert.equal(h.view.inlineName, null, 'a tool button never edits');
   assert.equal(dbl(60, 40).defaultPrevented, true, 'inside the title rect, target is the card');
-  assert.deepEqual(modalNames(h), ['NameModal']);
-  assert.equal(h.modals[0].value ?? h.modals[0].initial ?? 'Leaf', 'Leaf');
+  assert.deepEqual(modalNames(h), [], 'no rename dialog');
+  assert.equal(h.view.inlineName?.id, h.ids.leaf); assert.equal(h.view.inlineName.draft, 'Leaf');
 });
 
-test('A4: F2 on the view scope renames the focused card and passes through when no card has focus', async () => {
+test('A4: F2 on the view scope edits the focused card title in place and passes through when no card has focus', async () => {
   const h = await harness();
   const f2 = h.view.scope.keys.filter(k => k.key === 'F2' && k.modifiers.length === 0);
   assert.equal(f2.length, 1, 'F2 is registered on the view scope');
   const doc = { activeElement: null }; h.view.contentEl.ownerDocument = doc;
   const fire = () => f2[0].func({ key: 'F2', isComposing: false, defaultPrevented: false }, {});
   assert.equal(fire(), true, 'no focused card: left to Obsidian'); doc.activeElement = element('div');
-  assert.equal(fire(), true, 'focus elsewhere: left to Obsidian'); assert.deepEqual(modalNames(h), []);
+  assert.equal(fire(), true, 'focus elsewhere: left to Obsidian'); assert.equal(h.view.inlineName, null);
   doc.activeElement = h.card('leaf');
-  assert.equal(fire(), false, 'a focused card: handled'); assert.deepEqual(modalNames(h), ['NameModal']);
-  setSelection(h.view, true); assert.equal(fire(), true, 'selection mode: passes through'); assert.equal(h.modals.length, 1);
+  assert.equal(fire(), false, 'a focused card: handled'); assert.equal(h.view.inlineName?.id, h.ids.leaf); assert.deepEqual(modalNames(h), []); h.view.inlineName = null;
+  setSelection(h.view, true); assert.equal(fire(), true, 'selection mode: passes through'); assert.equal(h.view.inlineName, null);
   setSelection(h.view, false); h.view.closed = true; assert.equal(fire(), true, 'closed view: passes through');
   h.view.closed = false;
   const card = h.card('leaf'); card.handlers.get('keydown')({ key: 'F2', target: card, defaultPrevented: true, preventDefault() {} });
-  assert.equal(h.modals.length, 1, 'the card handler does not open a second dialog when the scope already handled F2');
+  assert.equal(h.view.inlineName, null, 'the card handler does not start a second edit when the scope already handled F2');
 });
 
 test('A4: an AIM map and selection mode ignore the new keys and the title double-click', async () => {

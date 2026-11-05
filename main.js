@@ -636,6 +636,9 @@ var en = {
   "ui.card_edit_title_label": "Card title",
   "ui.card_edit_summary_label": "Card summary",
   "ui.card_edit_summary_placeholder": "Add a summary",
+  "ui.card_summary_add_hint": "Click to add a summary\u2026",
+  "ui.card_edit_title_keys": "Enter or click elsewhere saves \xB7 Esc cancels",
+  "ui.card_edit_summary_keys": "Enter or click elsewhere saves \xB7 Shift+Enter new line \xB7 Esc cancels",
   "ui.card_edit_picture_position": "Picture position",
   "ui.card_edit_position_top": "Top",
   "ui.card_edit_position_bottom": "Bottom",
@@ -1105,7 +1108,6 @@ var en = {
   "ui.open_details_in_right_sidebar": "Open details in right sidebar",
   "ui.collapse": "Collapse",
   "ui.node_tool_links": "This card",
-  "ui.node_tool_rename": "Rename",
   "ui.node_tool_details": "Details",
   "ui.select_subtopics": "Select subtopics",
   "ui.select_subtopics_hint": "Select every direct subtopic of this topic",
@@ -3266,6 +3268,9 @@ var zhCN = {
   "ui.card_edit_title_label": "\u5361\u7247\u6807\u9898",
   "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
   "ui.card_edit_summary_placeholder": "\u6DFB\u52A0\u6458\u8981",
+  "ui.card_summary_add_hint": "\u70B9\u8FD9\u91CC\u52A0\u6458\u8981\u2026",
+  "ui.card_edit_title_keys": "Enter \u6216\u70B9\u522B\u5904\uFF1D\u4FDD\u5B58\u3000Esc\uFF1D\u53D6\u6D88",
+  "ui.card_edit_summary_keys": "Enter \u6216\u70B9\u522B\u5904\uFF1D\u4FDD\u5B58\u3000Shift+Enter\uFF1D\u6362\u884C\u3000Esc\uFF1D\u53D6\u6D88",
   "ui.card_edit_picture_position": "\u56FE\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -3735,7 +3740,6 @@ var zhCN = {
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u4FA7\u680F\u6253\u5F00\u8BE6\u60C5",
   "ui.collapse": "\u6298\u53E0",
   "ui.node_tool_links": "\u8FD9\u5F20\u5361",
-  "ui.node_tool_rename": "\u6539\u540D",
   "ui.node_tool_details": "\u8BE6\u60C5",
   "ui.select_subtopics": "\u9009\u62E9\u5B50\u8BAE\u9898",
   "ui.select_subtopics_hint": "\u9009\u62E9\u8FD9\u4E2A\u8BAE\u9898\u5E95\u4E0B\u6240\u6709\u76F4\u5C5E\u5B50\u8BAE\u9898",
@@ -5896,6 +5900,9 @@ var zhTW = {
   "ui.card_edit_title_label": "\u5361\u7247\u6A19\u984C",
   "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
   "ui.card_edit_summary_placeholder": "\u52A0\u4E0A\u6458\u8981",
+  "ui.card_summary_add_hint": "\u9EDE\u9019\u88E1\u52A0\u6458\u8981\u2026",
+  "ui.card_edit_title_keys": "Enter \u6216\u9EDE\u5225\u8655\uFF1D\u5132\u5B58\u3000Esc\uFF1D\u53D6\u6D88",
+  "ui.card_edit_summary_keys": "Enter \u6216\u9EDE\u5225\u8655\uFF1D\u5132\u5B58\u3000Shift+Enter\uFF1D\u63DB\u884C\u3000Esc\uFF1D\u53D6\u6D88",
   "ui.card_edit_picture_position": "\u5716\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -6365,7 +6372,6 @@ var zhTW = {
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u5074\u6B04\u958B\u555F\u8A73\u60C5",
   "ui.collapse": "\u6536\u5408",
   "ui.node_tool_links": "\u9019\u5F35\u5361",
-  "ui.node_tool_rename": "\u6539\u540D",
   "ui.node_tool_details": "\u8A73\u60C5",
   "ui.select_subtopics": "\u9078\u53D6\u5B50\u8B70\u984C",
   "ui.select_subtopics_hint": "\u9078\u53D6\u9019\u500B\u8B70\u984C\u5E95\u4E0B\u6240\u6709\u76F4\u5C6C\u5B50\u8B70\u984C",
@@ -52632,6 +52638,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "summaryEditDraft", null);
     /** The name being typed in place: the map title (id "") or a card title. It outlives a repaint. */
     __publicField(this, "inlineName", null);
+    /** The card summary being typed in place. `original` is what the card showed when the edit opened (blank for a placeholder). */
+    __publicField(this, "inlineSummary", null);
+    __publicField(this, "suspendInlineSummary", null);
+    __publicField(this, "inlineSummaryInput", null);
     /** Ends the live in-place name field without saving (a repaint is about to replace it); the draft stays in `inlineName`. */
     __publicField(this, "suspendInlineName", null);
     __publicField(this, "inlineNameInput", null);
@@ -53000,7 +53010,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       const node = entry && ((_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === entry[0]));
       const note = node && this.notes.get(node.id);
       if (!node || !note) return true;
-      this.renameNode(node, note.title);
+      this.startCardTitleEdit(node, { select: true });
       return false;
     });
     const cardKey = (sibling) => (event) => {
@@ -53418,6 +53428,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     input2.addEventListener("input", () => {
       state.draft = input2.value;
       state.fresh = false;
+      state.caret = void 0;
     });
     input2.addEventListener("mousedown", () => {
       state.fresh = false;
@@ -53439,17 +53450,39 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
   }
   /** After a repaint: the live name field takes focus (all text selected the first time, so typing replaces the default). */
   focusInlineName() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const input2 = this.inlineNameInput;
     if (!input2 || !input2.isConnected || !this.inlineName) return;
     this.restoringFocus = true;
     try {
       input2.focus({ preventScroll: true });
       if (this.inlineName.fresh) (_a2 = input2.select) == null ? void 0 : _a2.call(input2);
-      else (_b2 = input2.setSelectionRange) == null ? void 0 : _b2.call(input2, input2.value.length, input2.value.length);
+      else {
+        const at = Math.min((_b2 = this.inlineName.caret) != null ? _b2 : input2.value.length, input2.value.length);
+        (_c = input2.setSelectionRange) == null ? void 0 : _c.call(input2, at, at);
+      }
     } finally {
       this.restoringFocus = false;
     }
+  }
+  /** After a repaint: the live summary field takes focus with the caret where the click was (or at the end). */
+  focusInlineSummary() {
+    var _a2, _b2;
+    const area = this.inlineSummaryInput;
+    if (!area || !area.isConnected || !this.inlineSummary) return;
+    this.restoringFocus = true;
+    try {
+      area.focus({ preventScroll: true });
+      const at = Math.min((_a2 = this.inlineSummary.caret) != null ? _a2 : area.value.length, area.value.length);
+      (_b2 = area.setSelectionRange) == null ? void 0 : _b2.call(area, at, at);
+      this.growSummaryInput(area);
+    } finally {
+      this.restoringFocus = false;
+    }
+  }
+  growSummaryInput(area) {
+    area.setCssProps({ "--vam-summary-height": "auto" });
+    area.setCssProps({ "--vam-summary-height": `${area.scrollHeight}px` });
   }
   /** The map title becomes a field; Enter saves, Esc leaves the name as it was. */
   startMapTitleEdit() {
@@ -53463,22 +53496,140 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
   }
   /** Draws the card title's field in place of the title text. */
   paintCardNameEdit(card, node, note) {
+    var _a2;
     const input2 = this.createInlineNameInput(card, "vam-card-title-input", t("ui.rename_topic"), (value) => {
       const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
       if (!name2 || name2 === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name2 }));
     });
+    if (!((_a2 = this.inlineName) == null ? void 0 : _a2.created)) card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_title_keys") });
     return input2;
   }
-  /** The rename dialog shared by F2, the title double-click and the Rename tool. */
-  renameNode(node, current) {
-    if (this.presentation) return;
-    new NameModal(
-      this.app,
-      t("ui.rename_topic"),
-      current,
-      (name2) => this.enqueue(() => this.noteChange(node, { title: name2 }))
-    ).open();
+  /** True while a card's title or summary may be typed in place: not presenting, not picking cards, not in a live AIM run. */
+  cardTextEditable() {
+    return !this.closed && !this.presentation && !this.selection.state.multiSelectMode && !this.aimLive();
+  }
+  /** The caret offset inside `el`'s text at a screen point, or null when the browser cannot say. */
+  caretOffsetAt(el, x, y) {
+    var _a2, _b2;
+    const doc = el.ownerDocument;
+    if (!doc || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    try {
+      const position = (_a2 = doc.caretPositionFromPoint) == null ? void 0 : _a2.call(doc, x, y);
+      const node = position == null ? void 0 : position.offsetNode;
+      const offset = (_b2 = position == null ? void 0 : position.offset) != null ? _b2 : 0;
+      if (!node || !el.contains(node)) return null;
+      const measure = doc.createRange();
+      measure.selectNodeContents(el);
+      measure.setEnd(node, offset);
+      return measure.toString().length;
+    } catch (e) {
+      return null;
+    }
+  }
+  /** The card title becomes a field in place (F2, a click on the title, the command). Enter or leaving saves, Esc cancels. */
+  startCardTitleEdit(node, at = {}) {
+    var _a2, _b2;
+    const note = this.notes.get(node.id);
+    if (!note || !this.cardTextEditable() || this.inlineName) return;
+    (_a2 = this.suspendInlineSummary) == null ? void 0 : _a2.call(this);
+    this.inlineSummary = null;
+    this.inlineName = {
+      target: "card",
+      id: node.id,
+      draft: note.title,
+      fresh: !!at.select,
+      created: false,
+      caret: (_b2 = at.caret) != null ? _b2 : null
+    };
+    this.render();
+  }
+  /** The card summary becomes a multi-line field in place, showing the whole text. Enter or leaving saves. */
+  startCardSummaryEdit(node, caret = null) {
+    const note = this.notes.get(node.id);
+    if (!note || !this.cardTextEditable() || this.inlineSummary || this.inlineName) return;
+    const original = isPlaceholder(note.summary) ? "" : note.summary;
+    this.inlineSummary = { id: node.id, draft: original, original, caret };
+    this.render();
+  }
+  /** Draws the card summary's field in place of the summary text. */
+  paintCardSummaryEdit(card, node) {
+    const state = this.inlineSummary;
+    const area = card.createEl("textarea", {
+      cls: "vam-card-summary-input",
+      attr: { "aria-label": t("ui.card_edit_summary_label"), dir: "auto", rows: "1" }
+    });
+    area.value = state.draft;
+    let live = true;
+    const release2 = () => {
+      live = false;
+      this.suspendInlineSummary = null;
+    };
+    this.suspendInlineSummary = () => {
+      if (!live) return;
+      state.draft = area.value;
+      release2();
+    };
+    const finish = (save) => {
+      if (!live) return;
+      const value = area.value.trim();
+      release2();
+      this.inlineSummary = null;
+      this.inlineSummaryInput = null;
+      if (!save || value === state.original.trim()) this.render();
+      else this.enqueue(() => this.noteChange(node, { summary: value }));
+    };
+    area.addEventListener("input", () => {
+      state.draft = area.value;
+      state.caret = void 0;
+      this.growSummaryInput(area);
+    });
+    area.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        finish(true);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        finish(false);
+      }
+    });
+    area.addEventListener("blur", () => finish(true));
+    this.inlineSummaryInput = area;
+    card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_summary_keys") });
+    return area;
+  }
+  /**
+   * A plain click on a card (no drag, no modifier): a click on the title or the summary text turns it into a field.
+   * The point is checked against the boxes because enableDrag captures the pointer, so the target is often the card.
+   * The add-summary line (faint, shown while the card is selected) only counts when the card was already selected
+   * before this press. Returns true when an editor opened.
+   */
+  openCardTextEditor(point, card, node, wasSelected) {
+    var _a2;
+    if (!this.cardTextEditable() || !this.notes.has(node.id)) return false;
+    const target = point.target;
+    if ((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "button, input, textarea")) return false;
+    const hit = (el) => {
+      var _a3;
+      if (!el || !el.isConnected) return false;
+      if (target === el || ((_a3 = el.contains) == null ? void 0 : _a3.call(el, target))) return true;
+      if (!Number.isFinite(point.clientX) || !Number.isFinite(point.clientY)) return false;
+      const box = el.getBoundingClientRect();
+      return point.clientX >= box.left && point.clientX <= box.right && point.clientY >= box.top && point.clientY <= box.bottom;
+    };
+    const title = card.querySelector(".vam-card-title");
+    const summary = card.querySelector(".vam-card-summary.is-inline-editable");
+    const add = wasSelected ? card.querySelector(".vam-card-summary-add") : null;
+    if (title && hit(title)) {
+      this.startCardTitleEdit(node, { caret: this.caretOffsetAt(title, point.clientX, point.clientY) });
+    } else if (summary && hit(summary)) {
+      this.startCardSummaryEdit(node, this.caretOffsetAt(summary, point.clientX, point.clientY));
+    } else if (add && hit(add)) {
+      this.startCardSummaryEdit(node, 0);
+    } else return false;
+    return true;
   }
   async onClose() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
@@ -55560,10 +55711,10 @@ ${request.requirements}` : preset.text,
     }
   }
   /**
-   * A card's double-click: on the cover picture it opens "Edit card", on the title it renames. The point is
+   * A card's double-click: on the cover picture it opens "Edit card", on the title it edits the title in place. The point is
    * checked against both boxes because enableDrag captures the pointer on the card, so the target is often the card.
    */
-  onCardDoubleClick(event, card, title, node, noteTitle2) {
+  onCardDoubleClick(event, card, title, node) {
     var _a2, _b2;
     const target = event.target;
     if ((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "button")) return;
@@ -55579,7 +55730,7 @@ ${request.requirements}` : preset.text,
     }
     if (target !== title && !within(title)) return;
     event.preventDefault();
-    this.renameNode(node, noteTitle2);
+    this.startCardTitleEdit(node);
   }
   /** Opens the "Edit card" dialog for the topic's card. Only Apply writes (one undo step); Cancel and close do not. */
   openCoverFrameEditor(node) {
@@ -59239,7 +59390,6 @@ ${request.requirements}` : preset.text,
    * Groups: AI and new topics, editing, opening; the summary bracket, note style and remove follow in the caller.
    */
   addCardMenuActions(menu, node) {
-    const note = this.notes.get(node.id);
     const map = this.map;
     if (!map) return;
     const add = (title, icon, action) => {
@@ -59258,7 +59408,6 @@ ${request.requirements}` : preset.text,
       })
     );
     menu.addSeparator();
-    if (note) add(t("ui.node_tool_rename"), "pencil", () => this.renameNode(node, note.title));
     add(t("ui.structure_and_links"), "git-fork", () => this.openNodePanel(node, "structure"));
     const hasChildren = map.nodes.some((item) => item.parentId === node.id);
     if (hasChildren && !node.collapsed) add(t("ui.select_subtopics"), "list-checks", () => this.selectSubtopics(node));
@@ -60939,7 +61088,7 @@ ${request.requirements}` : preset.text,
       case "ai-explore":
         return run(editable && !!selected, () => this.openNextStep(selected));
       case "rename":
-        return run(editable && !!note, () => this.renameNode(selected, note.title));
+        return run(editable && !!note, () => this.startCardTitleEdit(selected, { select: true }));
       case "open-details":
         return run(!!selected, () => this.openDetails(selected));
       case "zoom-fit":
@@ -61225,7 +61374,7 @@ ${request.requirements}` : preset.text,
     this.settleCardHeights();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -61282,11 +61431,18 @@ ${request.requirements}` : preset.text,
       this.inlineName = null;
     if (((_l = this.inlineName) == null ? void 0 : _l.target) === "map" && !this.map) this.inlineName = null;
     this.inlineNameInput = null;
+    (_m = this.suspendInlineSummary) == null ? void 0 : _m.call(this);
+    if (this.inlineSummary && !((_n = this.map) == null ? void 0 : _n.nodes.some((node) => {
+      var _a3;
+      return node.id === ((_a3 = this.inlineSummary) == null ? void 0 : _a3.id);
+    })))
+      this.inlineSummary = null;
+    this.inlineSummaryInput = null;
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
-    const mapName = (_n = (_m = this.map) == null ? void 0 : _m.title) != null ? _n : "Visual Agent Map";
-    if (this.map && ((_o = this.inlineName) == null ? void 0 : _o.target) === "map") {
+    const mapName = (_p = (_o = this.map) == null ? void 0 : _o.title) != null ? _p : "Visual Agent Map";
+    if (this.map && ((_q = this.inlineName) == null ? void 0 : _q.target) === "map") {
       const field = this.createInlineNameInput(switcher, "vam-map-title-input", t("ui.rename_mind_map"), (value) => {
         var _a3;
         const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
@@ -61342,8 +61498,8 @@ ${request.requirements}` : preset.text,
         (event) => this.openMapActions(event)
       );
     }
-    const selectedNode = (_p = this.map) == null ? void 0 : _p.nodes.find((node) => node.id === this.selection.state.selected);
-    if (aimEnabled() && ((_q = this.map) == null ? void 0 : _q.aim)) {
+    const selectedNode = (_r = this.map) == null ? void 0 : _r.nodes.find((node) => node.id === this.selection.state.selected);
+    if (aimEnabled() && ((_s = this.map) == null ? void 0 : _s.aim)) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
       const data = this.map.aim;
@@ -61359,19 +61515,19 @@ ${request.requirements}` : preset.text,
       let stateText;
       let stateClass;
       if (this.aimBusy) {
-        const activeTitle = (_t = (_s = this.notes.get((_r = this.aimActiveQuestionNodeId) != null ? _r : "")) == null ? void 0 : _s.title) != null ? _t : this.map.title;
+        const activeTitle = (_v = (_u = this.notes.get((_t = this.aimActiveQuestionNodeId) != null ? _t : "")) == null ? void 0 : _u.title) != null ? _v : this.map.title;
         const planning = this.aimActivityKind === "planning";
         stateText = this.aimActivityKind === "clarifying" ? t("ui.aim_preparing_clarification") : this.aimProgress ? this.aimStageText() : t(planning ? "ui.aim_status_planning_0" : "ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (runningBranch) {
-        const activeTitle = (_v = (_u = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _u.title) != null ? _v : this.map.title;
+        const activeTitle = (_x = (_w = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _w.title) != null ? _x : this.map.title;
         stateText = t("ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (!questions.length) {
         stateText = t("ui.aim_status_ready");
         stateClass = "idea";
       } else if (pendingQuestion) {
-        stateText = t("ui.aim_status_waiting_answer_0", (_x = (_w = this.notes.get(pendingQuestion.id)) == null ? void 0 : _w.title) != null ? _x : "");
+        stateText = t("ui.aim_status_waiting_answer_0", (_z = (_y = this.notes.get(pendingQuestion.id)) == null ? void 0 : _y.title) != null ? _z : "");
         stateClass = "idea";
       } else if (data.branches.some((branch) => branch.results.some((result) => result.kind === "conclusion"))) {
         stateText = t("ui.aim_status_complete");
@@ -61391,7 +61547,7 @@ ${request.requirements}` : preset.text,
           var _a3;
           (_a3 = this.aimController) == null ? void 0 : _a3.abort();
         });
-        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_z = (_y = this.aimProgress) == null ? void 0 : _y.branchId) != null ? _z : null };
+        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_B = (_A = this.aimProgress) == null ? void 0 : _A.branchId) != null ? _B : null };
         const steer = this.button(
           statusbar,
           t("ui.aim_steer"),
@@ -61412,9 +61568,9 @@ ${request.requirements}` : preset.text,
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if (!aimEnabled() && ((_A = this.map) == null ? void 0 : _A.aim))
+    if (!aimEnabled() && ((_C = this.map) == null ? void 0 : _C.aim))
       this.contentEl.createDiv({ cls: "vam-aim-attribution", text: t("ui.aim_paused_notice"), attr: { role: "note" } });
-    if (aimEnabled() && ((_B = this.map) == null ? void 0 : _B.aim)) {
+    if (aimEnabled() && ((_D = this.map) == null ? void 0 : _D.aim)) {
       const data = this.map.aim;
       const isAnswered = (node) => data.branches.some((branch) => branch.questionNodeId === node.id);
       const pending2 = this.map.nodes.find((node) => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -61468,10 +61624,10 @@ ${request.requirements}` : preset.text,
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
     }
-    if ((_C = this.deletedMap) == null ? void 0 : _C.deleted)
+    if ((_E = this.deletedMap) == null ? void 0 : _E.deleted)
       this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
     const startingSelection = this.startingTasks.get(this.selectionTaskKey());
-    if (startingSelection && !(((_D = this.integrationTask) == null ? void 0 : _D.mapPath) === this.path && this.integrationTask.state === "running")) {
+    if (startingSelection && !(((_F = this.integrationTask) == null ? void 0 : _F.mapPath) === this.path && this.integrationTask.state === "running")) {
       const state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
@@ -61522,7 +61678,7 @@ ${request.requirements}` : preset.text,
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
-      if ((_E = this.deletedMap) == null ? void 0 : _E.deleted)
+      if ((_G = this.deletedMap) == null ? void 0 : _G.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
     }
@@ -61533,7 +61689,7 @@ ${request.requirements}` : preset.text,
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    if (((_F = this.map) == null ? void 0 : _F.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
+    if (((_H = this.map) == null ? void 0 : _H.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
@@ -61616,7 +61772,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_G = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _G.focus({ preventScroll: true });
+        (_I = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _I.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -61625,9 +61781,9 @@ ${request.requirements}` : preset.text,
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_H = this.stageEl.querySelector(
+        (_J = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _H.focus({ preventScroll: true });
+        )) == null ? void 0 : _J.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -61646,6 +61802,7 @@ ${request.requirements}` : preset.text,
     restoreChatFocus();
     keepMapFocus();
     this.focusInlineName();
+    this.focusInlineSummary();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
@@ -61744,7 +61901,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -62017,19 +62174,6 @@ ${request.requirements}` : preset.text,
           icon: "git-fork",
           action: () => this.whenEditing(() => this.openNodePanel(node, "structure"))
         });
-        if (note)
-          more.push({
-            title: t("ui.node_tool_rename"),
-            icon: "pencil",
-            action: () => this.whenEditing(
-              () => new NameModal(
-                this.app,
-                t("ui.rename_topic"),
-                note.title,
-                (title2) => this.enqueue(() => this.noteChange(node, { title: title2 }))
-              ).open()
-            )
-          });
         if (!node.collapsed && this.map.nodes.some((item) => item.parentId === node.id))
           more.push({
             title: t("ui.select_subtopics"),
@@ -62110,15 +62254,22 @@ ${request.requirements}` : preset.text,
       this.paintCardNameEdit(card, node, note);
     }
     if (note && !this.selection.state.multiSelectMode && !this.aimLive())
-      card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node, note.title));
-    if ((_D = research == null ? void 0 : research.preview) == null ? void 0 : _D.summary)
+      card.addEventListener("dblclick", (event) => this.onCardDoubleClick(event, card, title, node));
+    const textEditable = !!note && this.cardTextEditable();
+    if (textEditable && ((_D = this.inlineSummary) == null ? void 0 : _D.id) === node.id) this.paintCardSummaryEdit(card, node);
+    else if ((_E = research == null ? void 0 : research.preview) == null ? void 0 : _E.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
-    else if (!note || !isPlaceholder(note.summary))
-      card.createEl("p", {
+    else if (!note || !isPlaceholder(note.summary)) {
+      const summaryText2 = card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_E = note == null ? void 0 : note.summary) != null ? _E : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_G = note == null ? void 0 : note.summary) != null ? _G : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
+      if (textEditable) summaryText2.addClass("is-inline-editable");
+    }
+    if (textEditable && !((_H = research == null ? void 0 : research.preview) == null ? void 0 : _H.summary) && ((_I = this.inlineSummary) == null ? void 0 : _I.id) !== node.id && isPlaceholder(note.summary))
+      card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
+    else if (((_J = this.inlineSummary) == null ? void 0 : _J.id) === node.id && !textEditable) this.inlineSummary = null;
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
@@ -62132,7 +62283,7 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    if (node.aimKind === "conclusion" && aimEnabled() && ((_G = this.map) == null ? void 0 : _G.aim)) {
+    if (node.aimKind === "conclusion" && aimEnabled() && ((_K = this.map) == null ? void 0 : _K.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -62145,7 +62296,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && aimEnabled() && ((_H = this.map) == null ? void 0 : _H.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -62181,11 +62332,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && aimEnabled() && ((_I = this.map) == null ? void 0 : _I.aim)) {
+    if (node.aimKind === "question" && aimEnabled() && ((_M = this.map) == null ? void 0 : _M.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_K = (_J = node.aimQuestion) == null ? void 0 : _J.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _K : branch.answerSnapshot.selections;
+        const labels = (_O = (_N = node.aimQuestion) == null ? void 0 : _N.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _O : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -62228,11 +62379,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && aimEnabled() && ((_L = this.map) == null ? void 0 : _L.aim)) {
+    if (node.aimKind === "answer" && aimEnabled() && ((_P = this.map) == null ? void 0 : _P.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_N = (_M = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _M.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _N : branch.answerSnapshot.selections;
+        const labels = (_R = (_Q = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _Q.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _R : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -62240,8 +62391,8 @@ ${request.requirements}` : preset.text,
         });
       }
     }
-    this.enableDrag(card, node);
-    if (!this.selection.state.multiSelectMode && !((_O = this.map) == null ? void 0 : _O.aim) && !node.aimKind) {
+    this.enableDrag(card, node, (point, wasSelected) => this.openCardTextEditor(point, card, node, wasSelected));
+    if (!this.selection.state.multiSelectMode && !((_S = this.map) == null ? void 0 : _S.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -62254,8 +62405,10 @@ ${request.requirements}` : preset.text,
         this.applySelectionChange(this.selection.toggleByClick(node.id));
         return;
       }
+      const wasSelected = this.selection.state.selected === node.id;
       this.selectMapNode(node);
       if (this.plugin.detailsShown()) this.openDetails(node);
+      this.openCardTextEditor(event, card, node, wasSelected);
     });
     card.addEventListener("keydown", (event) => {
       var _a3, _b3, _c2;
@@ -62297,7 +62450,7 @@ ${request.requirements}` : preset.text,
       if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !this.aimLive()) {
         if (event.defaultPrevented) return;
         event.preventDefault();
-        this.renameNode(node, note.title);
+        this.startCardTitleEdit(node, { select: true });
         return;
       }
       if (event.key === "Enter") {
@@ -63162,16 +63315,25 @@ ${request.requirements}` : preset.text,
     preview.style.top = `${spot.top}px`;
   }
   refreshCard(node, redrawEdges = true) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const card = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
     if (!card || !note) return;
     const title = card.querySelector(".vam-card-title");
     title == null ? void 0 : title.setAttr("title", note.title);
     title == null ? void 0 : title.setText(note.title);
     let summary = card.querySelector(".vam-card-summary");
-    if (isPlaceholder(note.summary)) summary == null ? void 0 : summary.remove();
-    else {
-      if (!summary && title) {
+    const addLine = card.querySelector(".vam-card-summary-add");
+    const typing = ((_b2 = this.inlineSummary) == null ? void 0 : _b2.id) === node.id;
+    const editable = this.cardTextEditable();
+    if (isPlaceholder(note.summary)) {
+      summary == null ? void 0 : summary.remove();
+      if (!addLine && !typing && editable && title) {
+        const line = card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
+        title.after(line);
+      }
+    } else {
+      addLine == null ? void 0 : addLine.remove();
+      if (!summary && title && !typing) {
         summary = createEl("p", { cls: "vam-card-summary" });
         title.after(summary);
         this.arrangeCardCover(card);
@@ -63179,6 +63341,7 @@ ${request.requirements}` : preset.text,
       summary == null ? void 0 : summary.setText(note.summary);
       summary == null ? void 0 : summary.setAttr("title", note.summary);
       summary == null ? void 0 : summary.removeClass("is-preview");
+      if (editable) summary == null ? void 0 : summary.addClass("is-inline-editable");
     }
     const header = card.querySelector(".vam-node-header");
     const status = card.querySelector(".vam-node-header > .vam-status:not(.vam-aim-question-status)");
@@ -63193,7 +63356,7 @@ ${request.requirements}` : preset.text,
           cls: `vam-status vam-status-${note.status}`,
           text: topicStatusLabel(note.status, this.plugin.settings.language)
         });
-    } else if (!this.isMerging(node.id) && !this.plugin.topicRuns.isBusy(node.path) && !((_b2 = this.plugin.quickExpandPending) == null ? void 0 : _b2.has(node.path)) && !this.isResearchQueued(node)) {
+    } else if (!this.isMerging(node.id) && !this.plugin.topicRuns.isBusy(node.path) && !((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) && !this.isResearchQueued(node)) {
       const label = note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
       if (showsToResearch(this.topicKindOf(node.id), note.status, this.progressDone(node.id)))
@@ -63211,7 +63374,7 @@ ${request.requirements}` : preset.text,
     const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
       const strength = this.hypothesisStrengthOf(node.id), leaning = this.hypothesisLeaningOf(node.id);
-      const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_c = cardLabels.get(card)) == null ? void 0 : _c.textContent;
+      const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (header) {
@@ -70000,10 +70163,11 @@ ${addition}` : addition });
       this.enqueue(() => this.resizeCard(node.id, change2));
     });
   }
-  enableDrag(card, node) {
+  enableDrag(card, node, onPlainClick) {
     card.addEventListener("pointerdown", (event) => {
       var _a2, _b2, _c;
-      if (event.target.closest("button, .vam-card-title-input") || event.button !== 0 || !this.map) return;
+      if (event.target.closest("button, .vam-card-title-input, .vam-card-summary-input") || event.button !== 0 || !this.map)
+        return;
       const selecting = this.selection.state.multiSelectMode;
       this.clearHoverTimer();
       (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
@@ -70011,6 +70175,7 @@ ${addition}` : addition });
       (_b2 = this.dragCleanup) == null ? void 0 : _b2.call(this);
       const currentNode = this.map.nodes.find((item) => item.id === node.id);
       if (!currentNode) return;
+      const wasSelected = this.selection.state.selected === node.id;
       this.dragging = true;
       this.dragOrigin = { id: this.map.id, path: this.path };
       const start = { x: event.clientX, y: event.clientY }, origin = { x: currentNode.x, y: currentNode.y };
@@ -70224,6 +70389,7 @@ ${addition}` : addition });
           this.applySelectionChange(this.selection.click(node.id));
           if (aimEnabled() && ((_d = this.map) == null ? void 0 : _d.aim) && node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
+          onPlainClick == null ? void 0 : onPlainClick(e, wasSelected);
         }
       };
       this.dragCleanup = settle;

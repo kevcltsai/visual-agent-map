@@ -633,14 +633,18 @@ export function arrangeNewTree(
  * children change places with each other in the array, which is the order every arrangement lays them out in; every other
  * card keeps its index. An unknown id, a card that is not a child of `parentId` or `movedId === beforeId` returns `nodes` itself.
  */
-export function reorderSiblings<T extends { id: string; parentId?: string | null }>(
+export function reorderSiblings<T extends { id: string; parentId?: string | null; afterTextId?: string }>(
   nodes: T[],
   parentId: string,
   movedId: string,
   beforeId: string
 ): T[] {
   if (movedId === beforeId) return nodes;
-  const slots = nodes.flatMap((node, index) => (node.parentId === parentId ? [index] : []));
+  // Topics that follow a text block are siblings of each other only, never of the block's own topic's direct children.
+  const group = nodes.find(node => node.id === movedId)?.afterTextId;
+  const slots = nodes.flatMap((node, index) =>
+    node.parentId === parentId && node.afterTextId === group ? [index] : []
+  );
   const kids = slots.map(index => nodes[index]);
   const moved = kids.find(node => node.id === movedId);
   if (!moved || !kids.some(node => node.id === beforeId)) return nodes;
@@ -659,13 +663,17 @@ export function reorderSiblings<T extends { id: string; parentId?: string | null
  * their index. An id that is not a child of `parentId`, a repeated id, fewer than two ids, or an order that already holds
  * returns `nodes` itself.
  */
-export function orderSiblings<T extends { id: string; parentId?: string | null }>(
+export function orderSiblings<T extends { id: string; parentId?: string | null; afterTextId?: string }>(
   nodes: T[],
   parentId: string,
   orderedIds: readonly string[]
 ): T[] {
   if (orderedIds.length < 2 || new Set(orderedIds).size !== orderedIds.length) return nodes;
-  const slots = nodes.flatMap((node, index) => (node.parentId === parentId ? [index] : []));
+  // The listed ids are ordered among the siblings that share the first one's text block (or none); a mixed list changes nothing.
+  const group = nodes.find(node => node.id === orderedIds[0])?.afterTextId;
+  const slots = nodes.flatMap((node, index) =>
+    node.parentId === parentId && node.afterTextId === group ? [index] : []
+  );
   const listed = new Set(orderedIds);
   const wanted = orderedIds.map(id => slots.map(index => nodes[index]).find(node => node.id === id));
   if (wanted.some(node => !node)) return nodes;

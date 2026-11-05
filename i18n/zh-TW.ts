@@ -789,6 +789,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.text_node_removed": "已刪除文字區塊。",
   "ui.text_node_promote": "轉成議題卡",
   "ui.text_node_promote_label": "把這個文字區塊轉成議題卡",
+  "ui.text_node_add_topic_label": "在這段文字後面新增議題",
   "ui.text_node_promoted": "已把文字區塊轉成議題卡。",
   "ui.text_node_select_topic": "請先選取一個議題。",
   "ui.text_node_add_multiselect": "請先結束多選模式，再新增文字區塊。",

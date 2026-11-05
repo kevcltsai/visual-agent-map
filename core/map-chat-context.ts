@@ -88,6 +88,8 @@ export interface MapChatUserText {
   text: string;
   /** Topic ids the note is linked to; sent as `linkedTo` with each title taken from the outline (unknown ids are left out). */
   links?: string[];
+  /** Ids of the topics that follow this text block (they hang on the same topic and sit after the block); omitted when none. */
+  followedBy?: string[];
 }
 /**
  * A summary bracket (summary-bracket P1): the user's conclusion over neighbouring children of one topic. Read-only context,
@@ -390,10 +392,14 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
             ...(item.parentId === null ? { unattached: true } : {}),
             readOnly: true,
             text: item.text,
-            ...linkedTo(item.links)
+            ...linkedTo(item.links),
+            ...(item.followedBy?.length ? { followedBy: item.followedBy } : {})
           })),
           userTextsNote:
-            "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
+            "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted." +
+            (input.userTexts.some(item => item.followedBy?.length)
+              ? " followedBy lists the topics that come after that text in the reading order; read the text as leading into them."
+              : "")
         }
       : {}),
     ...(input.summaries?.length

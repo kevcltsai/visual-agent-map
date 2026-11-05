@@ -1864,6 +1864,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-text-node-input, .vam-view .vam-text-node-input:focus, .vam-view .vam-text-node-input:hover { display: block; width: 100%; box-sizing: border-box; min-height: 0; margin: 0; padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; outline: none; resize: none; overflow: hidden; font: inherit; line-height: inherit; color: inherit; user-select: text; }
 .vam-view .vam-text-node-promote { display: none; position: absolute; left: 0; top: 100%; z-index: 1; font-size: var(--font-ui-smaller); white-space: nowrap; }
 .vam-view .vam-text-node:hover .vam-text-node-promote, .vam-view .vam-text-node:focus-within .vam-text-node-promote { display: inline-block; }
+/* The + of a text block that hangs on a topic: same behaviour as the card's +, to the right of the block (past its width handle). */
+.vam-view .vam-text-node > .vam-text-add { position: absolute; right: -32px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 50%; background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); font-size: var(--font-ui-medium); line-height: 1; opacity: 0; transition: opacity 120ms ease-out; z-index: 2; pointer-events: none; }
+.vam-view .vam-text-node > .vam-text-add:hover { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); border-color: var(--interactive-accent); }
+.vam-view .vam-text-node:hover > .vam-text-add, .vam-view .vam-text-node:focus-within > .vam-text-add, .vam-view .vam-text-node.is-selected > .vam-text-add { opacity: 1; pointer-events: auto; }
+.vam-view .vam-stage[data-presenting] .vam-text-node > .vam-text-add { display: none; }
+@media (prefers-reduced-motion: reduce) { .vam-view .vam-text-node > .vam-text-add { transition: none; } }
 .vam-view .vam-text-edge { opacity: 0.8; }
 .vam-view .vam-text-link { fill: none; stroke: var(--text-muted); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.8; pointer-events: none; }
 .vam-view .vam-text-node.is-free { cursor: grab; }

@@ -7,6 +7,7 @@ import {
   type MapNode
 } from "../../../map-graph";
 import { arrangeMap } from "../../../map-layout";
+import { withTextParents } from "../../../map-graph";
 import { fitViewport, focusViewport, insetFromRects, type MapViewport } from "../../visual-map/viewport-inset";
 import type { ShareNodePayload, ShareNodeTranslation, SharePayload } from "../share-format";
 import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui";
@@ -233,6 +234,13 @@ export function startViewer(doc: Document): void {
             : []
       });
     }
+  }
+  // A topic that follows a text block (text-then-topic): the link counts only when that block is in the payload on the same parent.
+  for (const item of data.nodes) {
+    const node = item && typeof item.id === "string" ? byId.get(item.id) : undefined;
+    if (!node || typeof item.afterTextId !== "string" || !node.parentId) continue;
+    if (texts.some(text => text.id === item.afterTextId && text.parentId === node.parentId))
+      node.afterTextId = item.afterTextId;
   }
   // Summary brackets (summary-bracket): plain text and one SVG path per bracket; the run is the payload's member list.
   const sideOf = (value: unknown): SummarySide | null =>
@@ -614,7 +622,10 @@ export function startViewer(doc: Document): void {
   function drawEdges(): void {
     edges.replaceChildren();
     for (const node of nodes) {
-      const parent = node.parentId ? cards.get(node.parentId) : undefined;
+      // A topic that follows a drawn text block gets its line from the block.
+      const parent =
+        (node.afterTextId ? textEls.get(node.afterTextId) : undefined) ??
+        (node.parentId ? cards.get(node.parentId) : undefined);
       const child = cards.get(node.id);
       if (!parent || !child) continue;
       const path = doc.createElementNS(SVG_NS, "path");
@@ -849,11 +860,48 @@ export function startViewer(doc: Document): void {
     }
   }
   function layout(): void {
-    const arranged = arrangeMap(nodes, undefined, id => cards.get(id)?.offsetHeight);
-    arranged.forEach((placed, index) => {
-      nodes[index].x = placed.x;
-      nodes[index].y = placed.y;
-    });
+    // A text block that has topics after it takes part as a node (its drawn size), so those topics land after it and clear of it.
+    const leading = texts.filter(
+      text => text.parentId && textEls.has(text.id) && nodes.some(node => node.afterTextId === text.id)
+    );
+    if (!leading.length) {
+      const arranged = arrangeMap(nodes, undefined, id => cards.get(id)?.offsetHeight);
+      arranged.forEach((placed, index) => {
+        nodes[index].x = placed.x;
+        nodes[index].y = placed.y;
+      });
+    } else {
+      const leaves: MapNode[] = leading.map(text => {
+        const parent = byId.get(text.parentId as string)!;
+        const el = textEls.get(text.id)!;
+        return {
+          id: text.id,
+          path: "",
+          parentId: parent.id,
+          x: parent.x + text.dx,
+          y: parent.y + text.dy,
+          collapsed: false,
+          width: el.offsetWidth || undefined
+        };
+      });
+      const virtual = withTextParents(
+        [...nodes, ...leaves],
+        new Map(leading.map(text => [text.id, text.parentId as string]))
+      );
+      const heightOf = (id: string): number | undefined => (cards.get(id) ?? textEls.get(id))?.offsetHeight;
+      const arranged = arrangeMap(virtual, undefined, heightOf);
+      arranged.slice(0, nodes.length).forEach((placed, index) => {
+        nodes[index].x = placed.x;
+        nodes[index].y = placed.y;
+      });
+      // Only x and y are taken back (a virtual parentId stays out of the nodes); the block's offset to its topic follows.
+      leading.forEach((text, index) => {
+        const placed = arranged[nodes.length + index];
+        const parent = byId.get(text.parentId as string)!;
+        text.dx = placed.x - parent.x;
+        text.dy = placed.y - parent.y;
+      });
+    }
     for (const id of cards.keys()) place(id);
     markClipped();
   }

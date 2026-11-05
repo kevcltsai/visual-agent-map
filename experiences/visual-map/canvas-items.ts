@@ -840,6 +840,8 @@ export function removeLinksTo(
 export interface SummaryNode {
   id: string;
   parentId: string | null;
+  /** A topic that follows a text block is not a sibling a bracket can frame (it hangs after the block, not in the row). */
+  afterTextId?: string;
 }
 export type SummaryRefusal =
   "invalid" | "duplicate" | "root" | "cross-parent" | "not-adjacent" | "too-many" | "unknown";
@@ -848,7 +850,7 @@ export type SummaryResult =
 
 const isSummary = (item: CanvasItem): item is SummaryItem => item.kind === "summary";
 const childIds = (nodes: readonly SummaryNode[], parentId: string): string[] =>
-  nodes.filter(n => n.parentId === parentId).map(n => n.id);
+  nodes.filter(n => n.parentId === parentId && !n.afterTextId).map(n => n.id);
 
 /**
  * Whether `members` can be framed together: valid ids, none a root, all children of one parent, and (among that parent's
@@ -869,6 +871,7 @@ export function checkSummaryMembers(
     const node = byId.get(id);
     if (!node) return { ok: false, reason: "unknown" };
     if (node.parentId === null || !byId.has(node.parentId)) return { ok: false, reason: "root" };
+    if (node.afterTextId) return { ok: false, reason: "invalid" };
     if (parentId === null) parentId = node.parentId;
     else if (parentId !== node.parentId) return { ok: false, reason: "cross-parent" };
   }

@@ -103,21 +103,22 @@ export const bySiblingAxis =
  * along the sibling axis `axisOf` names for that parent (null keeps the array order there, e.g. a timeline's first level, a
  * balanced or radial root). Every other card keeps its index; ties keep array order. Returns `nodes` itself when nothing moves.
  */
-export function alignSiblingsToScreen<T extends { id: string; parentId: string | null; x: number; y: number }>(
-  nodes: readonly T[],
-  axisOf: (parentId: string | null, firstChildId: string) => "x" | "y" | null
-): T[] {
+export function alignSiblingsToScreen<
+  T extends { id: string; parentId: string | null; x: number; y: number; afterTextId?: string }
+>(nodes: readonly T[], axisOf: (parentId: string | null, firstChildId: string) => "x" | "y" | null): T[] {
+  // Topics that follow a text block sort among themselves, not with the direct children of the same topic.
   const slots = new Map<string | null, number[]>();
   nodes.forEach((node, index) => {
-    const list = slots.get(node.parentId);
+    const key = node.afterTextId && node.parentId ? `${node.parentId}\u0000${node.afterTextId}` : node.parentId;
+    const list = slots.get(key);
     if (list) list.push(index);
-    else slots.set(node.parentId, [index]);
+    else slots.set(key, [index]);
   });
   const result = nodes.slice();
   let moved = false;
-  for (const [parentId, list] of slots) {
+  for (const list of slots.values()) {
     if (list.length < 2) continue;
-    const axis = axisOf(parentId, nodes[list[0]].id);
+    const axis = axisOf(nodes[list[0]].parentId, nodes[list[0]].id);
     if (!axis) continue;
     const order = list.map(index => nodes[index]).sort(bySiblingAxis(axis));
     list.forEach((index, place) => {

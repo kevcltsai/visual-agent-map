@@ -788,6 +788,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.text_node_removed": "已删除文字节点。",
   "ui.text_node_promote": "转成议题卡",
   "ui.text_node_promote_label": "把这个文字节点转成议题卡",
+  "ui.text_node_add_topic_label": "在这段文字后面新增议题",
   "ui.text_node_promoted": "已把文字节点转成议题卡。",
   "ui.text_node_select_topic": "请先选中一个议题。",
   "ui.text_node_add_multiselect": "请先结束多选模式，再添加文字节点。",

@@ -350,6 +350,19 @@ integrationTest('hypothesis-evidence: a structure-review merge that lands two re
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
 });
+integrationTest('annotated image: merging two topics that one anchor points at keeps one anchor relation and the merge notice counts it; undo restores both', async () => {
+  const h = await heHarness();
+  const image = relations => ({ id: 'g1', kind: 'annotated-image', path: 'a/b.png', x: 1, y: 2, w: 30, h: 40, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }], relations });
+  h.mapDoc.canvasItems = [image([heRel('supports', 'p1', h.ids.f1), heRel('related', 'p1', h.ids.f2)])];
+  await h.repo.saveMap(h.path, h.mapDoc); h.view.map = await h.repo.readMap(h.path); await h.view.hydrate();
+  const original = plain((await h.saved()).canvasItems);
+  await h.mergeKeys(['f1', 'f2']);
+  const merged = await h.mergedId();
+  assert.deepEqual(plain((await h.saved()).canvasItems), [image([heRel('supports', 'p1', merged)])]);
+  assert.ok(h.notices.some(text => /duplicate relation|重複的關係/.test(text)), JSON.stringify(h.notices));
+  await h.view.travel(false);
+  assert.deepEqual(plain((await h.saved()).canvasItems), original);
+});
 integrationTest('hypothesis-evidence: a prerequisite that becomes a self link after a merge is deleted; the key goes when nothing is left', async () => {
   const h = await heHarness();
   await h.relate([heRel('prerequisite', h.ids.f1, h.ids.f2)]);

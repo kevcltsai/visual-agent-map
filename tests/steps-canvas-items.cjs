@@ -93,3 +93,14 @@ test('counter-example 8: pruneBoundaries removes a boundary whose members all va
   assert.deepEqual(out.map(i => i.id ?? i.kind), ['i1', 'partial', 'sticky']);
   assert.deepEqual(plain(ci.pruneBoundaries(items, ['n1'])).length, 3);
 });
+
+test('annotated-image: sits beside the other kinds without changing them; move and resize treat it like an image', () => {
+  const ann = { id: 'g1', kind: 'annotated-image', path: 'attachments/g.png', x: 10, y: 20, w: 100, h: 50, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }] };
+  const items = [img(), boundary(), ann];
+  assert.deepEqual(sanitize(items), items);
+  assert.equal(sanitize([ann, { ...ann, x: 99 }]).length, 1, 'duplicate id');
+  assert.deepEqual(plain(ci.pruneBoundaries(items, new Set(['n1']))).map(i => i.id), ['i1', 'b1', 'g1']);
+  assert.deepEqual(plain(ci.moveItem(items, 'g1', 5, 5))[2], { ...ann, x: 15, y: 25 });
+  assert.deepEqual(plain(ci.resizeKeepRatio(items, 'g1', 200))[2], { ...ann, w: 200, h: 100 });
+  assert.deepEqual(plain(ci.removeItem(items, 'g1')), [img(), boundary()]);
+});

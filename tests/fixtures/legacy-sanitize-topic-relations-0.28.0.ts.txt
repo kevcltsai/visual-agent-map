@@ -1,0 +1,109 @@
+// Cut from map-model.ts at tag 0.28.0 (identical in 0.29.0 and 0.30.0): sanitizeTopicRelations and what it needs.
+// Types and the debug log are stubbed so this file has no imports; the code below is verbatim.
+type MapDocument = { nodes: { id: string }[]; topicRelations?: unknown };
+type LogLevel = "debug" | "info" | "warn" | "error";
+const debugLog = { appendLog(_level: LogLevel, _message: string): void {} };
+export type TopicRelationKind = "supports" | "contradicts" | "verifies" | "derives_from" | "related" | "prerequisite";
+export interface TopicRelation {
+  kind: TopicRelationKind;
+  from: string;
+  to: string;
+  /** Optional single-line note, written through `normalizeRelationDescription`; read back as stored. */
+  description?: string;
+}
+const TOPIC_RELATION_KINDS: readonly string[] = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
+export const RELATION_DESCRIPTION_MAX_LENGTH = 200;
+/** A pair of topics, in either order and of any kind, holds at most one relation (decision #37), so this is the key. */
+const relationKey = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
+  r.from > r.to ? `${r.to}\0${r.from}` : `${r.from}\0${r.to}`;
+const copyRelation = (r: TopicRelation, from = r.from, to = r.to): TopicRelation => {
+  const out: TopicRelation = { kind: r.kind, from, to };
+  if (r.description !== undefined) out.description = r.description;
+  return out;
+};
+type RelationLogger = (level: LogLevel, message: string) => void;
+
+/** True for the kinds that must not form a cycle among links of their own kind. */
+export function isAcyclicKind(kind: TopicRelationKind): boolean {
+  return kind === "derives_from" || kind === "prerequisite";
+}
+
+/** Single line, collapsed whitespace, at most 200 characters; undefined when nothing is left. */
+export function normalizeRelationDescription(text: string): string | undefined {
+  const flat = String(text).replace(/\s+/g, " ").trim();
+  if (!flat) return undefined;
+  return Array.from(flat).slice(0, RELATION_DESCRIPTION_MAX_LENGTH).join("").trim() || undefined;
+}
+
+/**
+ * Drops what cannot be a relation: a non-list value (the whole key), malformed entries, unknown kinds, endpoints that
+ * are not topics, self links and a second relation on a pair of topics already linked (any kind, either direction;
+ * the first in list order stays, decision #37). A description that is not a string is
+ * removed but its relation is kept; a string description is kept as written. Derivation and prerequisite cycles are
+ * kept (a hand-written loop still opens). Logs warns with counts only; removes the key when nothing is left. Never throws.
+ */
+export function sanitizeTopicRelations(
+  map: MapDocument,
+  log: RelationLogger = (l, m) => debugLog.appendLog(l, m)
+): void {
+  const raw: unknown = (map as { topicRelations?: unknown }).topicRelations;
+  if (raw === undefined) return;
+  if (!Array.isArray(raw)) {
+    delete map.topicRelations;
+    log("warn", "Ignored topicRelations: not a list.");
+    return;
+  }
+  const ids = new Set(map.nodes.map(n => n?.id));
+  const seen = new Set<string>();
+  const kept: TopicRelation[] = [];
+  let dropped = 0;
+  let droppedDescriptions = 0;
+  for (const item of raw as unknown[]) {
+    const r = item as Partial<TopicRelation> | null;
+    if (
+      !r ||
+      typeof r !== "object" ||
+      typeof r.kind !== "string" ||
+      !TOPIC_RELATION_KINDS.includes(r.kind) ||
+      typeof r.from !== "string" ||
+      typeof r.to !== "string" ||
+      !ids.has(r.from) ||
+      !ids.has(r.to) ||
+      r.from === r.to
+    ) {
+      dropped++;
+      continue;
+    }
+    const clean: TopicRelation = { kind: r.kind, from: r.from, to: r.to };
+    const key = relationKey(clean);
+    if (seen.has(key)) {
+      dropped++;
+      continue;
+    }
+    seen.add(key);
+    if (typeof r.description === "string") clean.description = r.description;
+    else if ("description" in r) droppedDescriptions++;
+    kept.push(clean);
+  }
+  if (dropped)
+    log("warn", `Dropped ${dropped} invalid topic relation${dropped === 1 ? "" : "s"} while reading the map.`);
+  if (droppedDescriptions)
+    log(
+      "warn",
+      `Dropped ${droppedDescriptions} invalid topic relation description${droppedDescriptions === 1 ? "" : "s"} while reading the map.`
+    );
+  if (kept.length) map.topicRelations = kept;
+  else delete map.topicRelations;
+}
+/** Replaces the relations; an empty list removes the key. Every write goes through here. */
+export function setTopicRelations(map: MapDocument, list: TopicRelation[]): void {
+  if (list.length) map.topicRelations = list.map(r => copyRelation(r));
+  else delete map.topicRelations;
+}

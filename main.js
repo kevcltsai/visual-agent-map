@@ -17587,6 +17587,17 @@ var TEXT_LIMIT = 2e3;
 var PARENT_ID_LIMIT = 200;
 var LINK_LIMIT = 20;
 var SUMMARY_MEMBER_LIMIT = 50;
+var NOTE_LIMIT = 200;
+var ANCHOR_LIMIT = 200;
+var ANCHOR_RELATION_LIMIT = 2e3;
+var ANCHOR_RELATION_KINDS = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
 var isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var finite = (v) => typeof v === "number" && Number.isFinite(v);
 function isSafeImagePath(path) {
@@ -17601,6 +17612,88 @@ function cleanImage(raw) {
   if (typeof id !== "string" || !ID.test(id) || !isSafeImagePath(path)) return null;
   if (!finite(x) || !finite(y) || !finite(w) || !finite(h) || w <= 0 || h <= 0) return null;
   return { id, kind: "image", path, x, y, w, h };
+}
+function cleanNote(value) {
+  if (typeof value !== "string") return void 0;
+  const flat = value.replace(CONTROL_ALL, " ").trim().slice(0, NOTE_LIMIT).trim();
+  return flat ? flat : void 0;
+}
+var clamp01 = (v) => Math.min(1, Math.max(0, v));
+function cleanAnchor(raw) {
+  if (!isRecord(raw)) return null;
+  const { id, at } = raw;
+  if (typeof id !== "string" || !ID.test(id) || !isRecord(at) || typeof at.kind !== "string") return null;
+  let clean4;
+  if (at.kind === "image-2d") {
+    if (!finite(at.x) || !finite(at.y)) return null;
+    clean4 = { kind: "image-2d", x: clamp01(at.x), y: clamp01(at.y) };
+  } else clean4 = at;
+  const anchor = { id, at: clean4 };
+  const note = cleanNote(raw.note);
+  if (note !== void 0) anchor.note = note;
+  return anchor;
+}
+var relationPair = (r) => r.from > r.to ? `${r.to}\0${r.from}` : `${r.from}\0${r.to}`;
+function cleanAnchorRelation(raw, anchorIds) {
+  if (!isRecord(raw)) return null;
+  const { kind, from, to, description } = raw;
+  if (typeof kind !== "string" || !ANCHOR_RELATION_KINDS.includes(kind)) return null;
+  if (typeof from !== "string" || typeof to !== "string" || !ID.test(from) || !ID.test(to)) return null;
+  if (anchorIds.has(from) === anchorIds.has(to)) return null;
+  const out = { kind, from, to };
+  if (typeof description === "string") out.description = description;
+  return out;
+}
+var warnDropped = (tally) => {
+  if (!tally.dropped) return;
+  console.warn(
+    `Dropped ${tally.dropped} invalid annotated-image entr${tally.dropped === 1 ? "y" : "ies"} while reading the map.`
+  );
+};
+function cleanAnnotatedImage(raw, tally) {
+  const base = cleanImage({ ...raw, kind: "image" });
+  if (!base) return null;
+  const item = {
+    id: base.id,
+    kind: "annotated-image",
+    path: base.path,
+    x: base.x,
+    y: base.y,
+    w: base.w,
+    h: base.h,
+    anchors: []
+  };
+  const note = cleanNote(raw.note);
+  if (note !== void 0) item.note = note;
+  const anchors = [];
+  const anchorIds = /* @__PURE__ */ new Set();
+  const rawAnchors = Array.isArray(raw.anchors) ? raw.anchors : [];
+  if (raw.anchors !== void 0 && !Array.isArray(raw.anchors)) tally.dropped++;
+  for (const entry of rawAnchors) {
+    const anchor = anchors.length >= ANCHOR_LIMIT ? null : cleanAnchor(entry);
+    if (!anchor || anchorIds.has(anchor.id)) {
+      tally.dropped++;
+      continue;
+    }
+    anchorIds.add(anchor.id);
+    anchors.push(anchor);
+  }
+  item.anchors = anchors;
+  const relations = [];
+  const pairs = /* @__PURE__ */ new Set();
+  const rawRelations = Array.isArray(raw.relations) ? raw.relations : [];
+  if (raw.relations !== void 0 && !Array.isArray(raw.relations)) tally.dropped++;
+  for (const entry of rawRelations) {
+    const relation = relations.length >= ANCHOR_RELATION_LIMIT ? null : cleanAnchorRelation(entry, anchorIds);
+    if (!relation || pairs.has(relationPair(relation))) {
+      tally.dropped++;
+      continue;
+    }
+    pairs.add(relationPair(relation));
+    relations.push(relation);
+  }
+  if (relations.length) item.relations = relations;
+  return item;
 }
 function cleanBoundary(raw) {
   const { id, members, label } = raw;
@@ -17652,6 +17745,7 @@ function sanitizeCanvasItems(raw) {
   if (!Array.isArray(raw)) return [];
   const out = [];
   const seen = /* @__PURE__ */ new Set();
+  const tally = { dropped: 0 };
   for (const entry of raw) {
     if (!isRecord(entry) || typeof entry.kind !== "string") continue;
     let item;
@@ -17659,15 +17753,19 @@ function sanitizeCanvasItems(raw) {
     else if (entry.kind === "boundary") item = cleanBoundary(entry);
     else if (entry.kind === "text") item = cleanTextItem(entry);
     else if (entry.kind === "summary") item = cleanSummary(entry);
-    else item = entry;
+    else if (entry.kind === "annotated-image") {
+      item = cleanAnnotatedImage(entry, tally);
+      if (!item) tally.dropped++;
+    } else item = entry;
     if (!item) continue;
-    if (item.kind === "image" || item.kind === "boundary" || item.kind === "text" || item.kind === "summary") {
+    if (item.kind === "image" || item.kind === "boundary" || item.kind === "text" || item.kind === "summary" || item.kind === "annotated-image") {
       const id = item.id;
       if (seen.has(id)) continue;
       seen.add(id);
     }
     out.push(item);
   }
+  warnDropped(tally);
   return out;
 }
 function addImage(items, image) {
@@ -17675,7 +17773,7 @@ function addImage(items, image) {
   if (!clean4 || items.some((i) => i.kind === "image" && i.id === clean4.id)) return [...items];
   return [...items, clean4];
 }
-var isImage = (item, id) => item.kind === "image" && item.id === id;
+var isImage = (item, id) => (item.kind === "image" || item.kind === "annotated-image") && item.id === id;
 function moveItem(items, id, dx, dy) {
   if (!finite(dx) || !finite(dy)) return [...items];
   return items.map((item) => isImage(item, id) ? { ...item, x: item.x + dx, y: item.y + dy } : item);
@@ -17693,6 +17791,29 @@ function removeItem(items, id) {
   return items.filter((item) => !(isRecord(item) && item.id === id));
 }
 var isText = (item) => item.kind === "text";
+var isAnnotatedImage = (item) => item.kind === "annotated-image";
+var withRelations = (image, relations) => {
+  const { relations: _old, ...rest } = image;
+  return relations.length ? { ...rest, relations } : rest;
+};
+function pruneAnnotatedImages(items, nodeIds) {
+  let dropped = 0;
+  const out = items.map((item) => {
+    var _a2, _b2;
+    if (!isAnnotatedImage(item)) return item;
+    const anchors = item.anchors.filter((a) => !nodeIds.has(a.id));
+    const anchorIds = new Set(anchors.map((a) => a.id));
+    const relations = ((_a2 = item.relations) != null ? _a2 : []).filter((r) => {
+      const topic = anchorIds.has(r.from) ? r.to : anchorIds.has(r.to) ? r.from : null;
+      return topic !== null && nodeIds.has(topic);
+    });
+    const lost = item.anchors.length - anchors.length + ((_b2 = item.relations) != null ? _b2 : []).length - relations.length;
+    if (!lost) return item;
+    dropped += lost;
+    return withRelations({ ...item, anchors }, relations);
+  });
+  return dropped ? { items: out, dropped } : { items: [...items], dropped: 0 };
+}
 function addTextNode(items, text11) {
   const clean4 = cleanTextItem({ ...text11, kind: "text" });
   if (!clean4 || items.some((i) => i.id === clean4.id)) return [...items];
@@ -20228,6 +20349,16 @@ function parseMap(content, log) {
     map.viewport = { x: 40, y: 40, zoom: 1 };
   map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
   sanitizeTopicRelations(map, log);
+  if (map.canvasItems) {
+    const pruned = pruneAnnotatedImages(map.canvasItems, ids);
+    if (pruned.dropped) {
+      map.canvasItems = pruned.items;
+      (log != null ? log : (l, m) => debugLog.appendLog(l, m))(
+        "warn",
+        `Dropped ${pruned.dropped} dangling annotated-image anchor${pruned.dropped === 1 ? "" : "s"} or relation${pruned.dropped === 1 ? "" : "s"} while reading the map.`
+      );
+    }
+  }
   return map;
 }
 function validateAimMap(map) {

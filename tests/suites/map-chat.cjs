@@ -2423,6 +2423,19 @@ integrationTest('hypothesis-evidence: delete_topic from the map chat removes the
     eq((await h.repo.readMap(MAP)).topicRelations, stored, `branch ${branch}: undo brings the removed links back with the cards`);
   }
 });
+integrationTest('annotated image: delete_topic from the map chat drops the anchor relations of the removed cards only; anchors stay; undo brings them back', async () => {
+  const h = await harness();
+  const keep = { kind: 'related', from: 'p2', to: h.ids.root };
+  h.view.map.canvasItems = [{ id: 'g1', kind: 'annotated-image', path: 'a/b.png', x: 1, y: 2, w: 30, h: 40, anchors: [{ id: 'p1', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }, { id: 'p2', at: { kind: 'image-2d', x: 0.2, y: 0.2 } }], relations: [{ kind: 'supports', from: 'p1', to: h.ids.a }, keep] }];
+  await h.repo.saveMap(MAP, h.view.map); h.view.map = await h.repo.readMap(MAP);
+  const stored = plain(h.view.map.canvasItems);
+  const lines = await apply(h, [{ kind: 'delete_topic', nodeId: h.ids.a, branch: false }]);
+  eq(lines.map(l => l.status), ['done']);
+  const saved = plain((await h.repo.readMap(MAP)).canvasItems);
+  eq(saved[0].relations, [keep]); eq(saved[0].anchors, stored[0].anchors);
+  await h.view.travel(false);
+  eq(plain((await h.repo.readMap(MAP)).canvasItems), stored);
+});
 integrationTest('B1 plan: exactly 15 actions are applied at once, with no plan card', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'adding', actions: Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });

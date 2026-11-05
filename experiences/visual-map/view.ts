@@ -199,9 +199,9 @@ import {
   RELATION_DESCRIPTION_MAX_LENGTH,
   parentIdsForNode,
   removeNodes,
-  removeTopicRelationsFor,
+  removeRelationsForTopics,
   relationAllowed,
-  retargetTopicRelations,
+  retargetRelationsToTopic,
   setTopicRelations,
   supersededAimNodeIds,
   type TopicRelation,
@@ -6034,12 +6034,12 @@ export class VisualAgentMapView extends ItemView {
             }
         map.nodes = removeNodes(map.nodes, node.id, branch);
         if (adopterId) {
-          removeTopicRelationsFor(
+          removeRelationsForTopics(
             map,
             [...ids].filter(id => id !== node.id)
           );
-          this.takeRetargetDrops(retargetTopicRelations(map, [node.id], adopterId));
-        } else removeTopicRelationsFor(map, ids);
+          this.takeRetargetDrops(retargetRelationsToTopic(map, [node.id], adopterId));
+        } else removeRelationsForTopics(map, ids);
         this.dropTextLinks(map, ids);
         if (adopterId && adopted.size) {
           const adopter = map.nodes.find(item => item.id === adopterId);
@@ -6591,7 +6591,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.flatMap(item => (item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]));
-          this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
+          this.takeRetargetDrops(retargetRelationsToTopic(map, ids, merged.id));
           if (adopted.size) this.arrangeBranch(map, merged.id, adopted, undefined);
         })
         .commit({ label: t("ui.merge_topics_history") });
@@ -6693,7 +6693,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
-          this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
+          this.takeRetargetDrops(retargetRelationsToTopic(map, ids, target.id));
           if (adopted.size) this.arrangeBranch(map, target.id, adopted, undefined);
         })
         .commit({ label: t("ui.merge_topics_history") });
@@ -8492,7 +8492,7 @@ export class VisualAgentMapView extends ItemView {
           map.viewport = clone(viewport);
           const prior = clone(map);
           map.nodes = map.nodes.filter(node => !ids.has(node.id));
-          removeTopicRelationsFor(map, ids);
+          removeRelationsForTopics(map, ids);
           this.dropTextLinks(map, ids);
           this.removeAimReferences(map, ids, prior.nodes);
         })
@@ -9210,6 +9210,8 @@ export class VisualAgentMapView extends ItemView {
       id = crypto.randomUUID(),
       removed = new Set(branch.map(node => node.id)),
       texts = new Map<string, string>();
+    // Set by the source map's edit; a retried edit overwrites it, so the Notice counts one run.
+    let droppedImageRelations = 0;
     const assertSource = (sourceMap: MapDocument): void => {
       const problem = cutSourceProblem(sourceMap, record, resolveCrossSource(payload, record, sourceMap));
       if (problem)
@@ -9245,11 +9247,13 @@ export class VisualAgentMapView extends ItemView {
           // The transaction hands over Map.md as it reads it at commit: a change made since the checks stops here.
           assertSource(map);
           map.nodes = map.nodes.filter(node => !removed.has(node.id));
-          removeTopicRelationsFor(map, removed);
+          droppedImageRelations = removeRelationsForTopics(map, removed).droppedAnchorRelations;
           this.dropTextLinks(map, removed);
         });
       },
       finish: async entry => {
+        if (droppedImageRelations > 0)
+          new Notice(t("ui.cross_cut_dropped_image_relations_0", String(droppedImageRelations)));
         ledgerFor(plugin).push({
           id,
           paths: [from, into],

@@ -757,6 +757,7 @@ var en = {
   "ui.relation_gone": "This relation no longer exists.",
   "ui.merge_dropped_cycles_0": "Removed {0} derives-from or prerequisite link(s) that would form a cycle",
   "ui.merge_dropped_same_pair_0": "Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)",
+  "ui.cross_cut_dropped_image_relations_0": "Removed {0} image relation(s) with the cut topics.",
   "ui.relation_label_full_0_1_2": "{0}: {1} \u2192 {2}",
   "ui.relation_label_full_related_0_1_2": "{0}: {1} \u2014 {2}",
   "ui.collapse_levels": "Collapse or expand the whole map",
@@ -3387,6 +3388,7 @@ var zhCN = {
   "ui.relation_gone": "\u8FD9\u4E2A\u5173\u7CFB\u5DF2\u4E0D\u5B58\u5728\u3002",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u6761\u4F1A\u5F62\u6210\u73AF\u7684\u63A8\u5BFC\u6216\u524D\u7F6E\u77E5\u8BC6",
   "ui.merge_dropped_same_pair_0": "\u5DF2\u79FB\u9664 {0} \u6761\u91CD\u590D\u7684\u5173\u7CFB\uFF08\u540C\u4E00\u5BF9\u8BAE\u9898\u53EA\u4FDD\u7559\u4E00\u6761\uFF09",
+  "ui.cross_cut_dropped_image_relations_0": "\u5DF2\u79FB\u9664 {0} \u6761\u56FE\u7247\u5173\u7CFB",
   "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
   "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
   "ui.collapse_levels": "\u6298\u53E0\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
@@ -6017,6 +6019,7 @@ var zhTW = {
   "ui.relation_gone": "\u9019\u500B\u95DC\u4FC2\u5DF2\u4E0D\u5B58\u5728\u3002",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u689D\u6703\u5F62\u6210\u74B0\u7684\u63A8\u5C0E\u6216\u524D\u7F6E\u77E5\u8B58",
   "ui.merge_dropped_same_pair_0": "\u5DF2\u79FB\u9664 {0} \u689D\u91CD\u8907\u7684\u95DC\u4FC2\uFF08\u540C\u4E00\u5C0D\u8B70\u984C\u53EA\u4FDD\u7559\u4E00\u689D\uFF09",
+  "ui.cross_cut_dropped_image_relations_0": "\u5DF2\u79FB\u9664 {0} \u689D\u5716\u7247\u95DC\u4FC2",
   "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
   "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u958B\u6574\u5F35\u5FC3\u667A\u5716",
@@ -17814,6 +17817,42 @@ function pruneAnnotatedImages(items, nodeIds) {
   });
   return dropped ? { items: out, dropped } : { items: [...items], dropped: 0 };
 }
+function removeAnchorRelationsForTopics(items, topicIds) {
+  let dropped = 0;
+  const out = items.map((item) => {
+    if (!isAnnotatedImage(item) || !item.relations) return item;
+    const rest = item.relations.filter((r) => !topicIds.has(r.from) && !topicIds.has(r.to));
+    if (rest.length === item.relations.length) return item;
+    dropped += item.relations.length - rest.length;
+    return withRelations(item, rest);
+  });
+  return { items: out, dropped };
+}
+function retargetAnchorRelations(items, fromIds, toId) {
+  let droppedSamePair = 0;
+  const out = items.map((item) => {
+    if (!isAnnotatedImage(item) || !item.relations) return item;
+    if (!item.relations.some((r) => fromIds.has(r.from) || fromIds.has(r.to))) return item;
+    const seen = /* @__PURE__ */ new Set();
+    const next = [];
+    for (const r of item.relations) {
+      const moved = {
+        ...r,
+        from: fromIds.has(r.from) ? toId : r.from,
+        to: fromIds.has(r.to) ? toId : r.to
+      };
+      const key2 = relationPair(moved);
+      if (seen.has(key2)) {
+        droppedSamePair++;
+        continue;
+      }
+      seen.add(key2);
+      next.push(moved);
+    }
+    return withRelations(item, next);
+  });
+  return { items: out, droppedSamePair };
+}
 function addTextNode(items, text11) {
   const clean4 = cleanTextItem({ ...text11, kind: "text" });
   if (!clean4 || items.some((i) => i.id === clean4.id)) return [...items];
@@ -20197,6 +20236,23 @@ function retargetTopicRelations(map, fromIds, toId) {
     map,
     kept.map((k) => k.r)
   );
+  return result;
+}
+function removeRelationsForTopics(map, topicIds) {
+  const ids = new Set(topicIds);
+  removeTopicRelationsFor(map, ids);
+  if (!map.canvasItems) return { droppedAnchorRelations: 0 };
+  const result = removeAnchorRelationsForTopics(map.canvasItems, ids);
+  if (result.dropped) map.canvasItems = result.items;
+  return { droppedAnchorRelations: result.dropped };
+}
+function retargetRelationsToTopic(map, fromIds, toId) {
+  const merged = new Set(fromIds);
+  const result = retargetTopicRelations(map, merged, toId);
+  if (!map.canvasItems) return result;
+  const anchors = retargetAnchorRelations(map.canvasItems, merged, toId);
+  map.canvasItems = anchors.items;
+  result.droppedSamePair += anchors.droppedSamePair;
   return result;
 }
 function clearQuestionConvergenceEdges(map) {
@@ -25514,6 +25570,16 @@ ${body}`;
           if (typeof next.parentId === "string") next.parentId = fresh(next.parentId);
           if (Array.isArray(next.members)) next.members = freshIds(next.members);
           if (Array.isArray(next.links)) next.links = freshIds(next.links);
+          if (next.kind === "annotated-image" && Array.isArray(next.relations)) {
+            const anchors = new Set(
+              (Array.isArray(next.anchors) ? next.anchors : []).map((anchor) => anchor.id)
+            );
+            next.relations = next.relations.map((relation) => ({
+              ...relation,
+              from: anchors.has(relation.from) ? relation.from : fresh(relation.from),
+              to: anchors.has(relation.to) ? relation.to : fresh(relation.to)
+            }));
+          }
           return next;
         });
     });
@@ -57311,12 +57377,12 @@ ${request.requirements}` : preset.text,
       }
       map.nodes = removeNodes(map.nodes, node.id, branch);
       if (adopterId) {
-        removeTopicRelationsFor(
+        removeRelationsForTopics(
           map,
           [...ids].filter((id) => id !== node.id)
         );
-        this.takeRetargetDrops(retargetTopicRelations(map, [node.id], adopterId));
-      } else removeTopicRelationsFor(map, ids);
+        this.takeRetargetDrops(retargetRelationsToTopic(map, [node.id], adopterId));
+      } else removeRelationsForTopics(map, ids);
       this.dropTextLinks(map, ids);
       if (adopterId && adopted.size) {
         const adopter = map.nodes.find((item) => item.id === adopterId);
@@ -57801,7 +57867,7 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.flatMap((item) => item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]);
-        this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
+        this.takeRetargetDrops(retargetRelationsToTopic(map, ids, merged.id));
         if (adopted.size) this.arrangeBranch(map, merged.id, adopted, void 0);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -57875,7 +57941,7 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.filter((item) => !ids.has(item.id));
-        this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
+        this.takeRetargetDrops(retargetRelationsToTopic(map, ids, target.id));
         if (adopted.size) this.arrangeBranch(map, target.id, adopted, void 0);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -59580,7 +59646,7 @@ ${request.requirements}` : preset.text,
         map.viewport = clone(viewport);
         const prior = clone(map);
         map.nodes = map.nodes.filter((node) => !ids.has(node.id));
-        removeTopicRelationsFor(map, ids);
+        removeRelationsForTopics(map, ids);
         this.dropTextLinks(map, ids);
         this.removeAimReferences(map, ids, prior.nodes);
       }).commit();
@@ -60209,6 +60275,7 @@ ${request.requirements}` : preset.text,
   /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
   crossCutOf(payload, record, branch) {
     const plugin = this.plugin, repo = plugin.repo, from = record.sourceMapPath, into = this.path, id = crypto.randomUUID(), removed = new Set(branch.map((node) => node.id)), texts2 = /* @__PURE__ */ new Map();
+    let droppedImageRelations = 0;
     const assertSource = (sourceMap) => {
       const problem = cutSourceProblem(sourceMap, record, resolveCrossSource(payload, record, sourceMap));
       if (problem)
@@ -60238,11 +60305,13 @@ ${request.requirements}` : preset.text,
         tx.editMap(from, (map) => {
           assertSource(map);
           map.nodes = map.nodes.filter((node) => !removed.has(node.id));
-          removeTopicRelationsFor(map, removed);
+          droppedImageRelations = removeRelationsForTopics(map, removed).droppedAnchorRelations;
           this.dropTextLinks(map, removed);
         });
       },
       finish: async (entry) => {
+        if (droppedImageRelations > 0)
+          new import_obsidian34.Notice(t("ui.cross_cut_dropped_image_relations_0", String(droppedImageRelations)));
         ledgerFor(plugin).push({
           id,
           paths: [from, into],

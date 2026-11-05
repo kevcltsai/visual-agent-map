@@ -66,8 +66,9 @@ test('a card at the origin sits below the toolbar after the initial viewport, fo
 });
 
 const notices = [];
+const shown = [];
 function makeView() {
-  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, Notice: class { constructor(message) { notices.push(message); } } } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, Notice: class { constructor(message) { notices.push(message); shown.push(this); } hide() { this.hidden = true; } } } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
   const writes = [];
   const view = Object.create(VisualAgentMapView.prototype);
   view.selection = new (load('experiences/visual-map/topic-selection.ts').TopicSelection)();
@@ -169,6 +170,28 @@ test('Bug bash E #24: Show all says so when the 25% floor keeps cards off screen
   // the shared fit helper keeps its signature and floor (the sharing viewer uses it)
   const inset = load('experiences/visual-map/viewport-inset.ts');
   assert.equal(inset.fitViewport({ minX: 0, minY: 0, maxX: 9000, maxY: 9000 }, { width: 1000, height: 600 }, 0).zoom, 0.25);
+});
+
+test('Persona 13: the off-screen notice judges the real canvas, so cards only the toolbar insets squeeze do not trigger it', () => {
+  const { view, nodes } = makeView(); nodes[1].y = 1900; // 2080px tall: the inset-reduced fit area needs < 25%, but the whole canvas holds it at 25%
+  notices.length = 0;
+  view.fit();
+  const vp = view.map.viewport;
+  assert.equal(vp.zoom, 0.25);
+  assert.ok(vp.y >= 0 && (nodes[1].y + 180) * vp.zoom + vp.y <= 600 + 1e-6, 'every card is inside the 600px canvas');
+  assert.deepEqual(notices, [], 'no notice while all cards are on screen');
+  nodes[1].y = 3000; // now a card really is below the canvas
+  view.fit();
+  assert.equal(notices.length, 1, 'a card truly off screen still says so');
+});
+
+test('Persona 13: pressing Show all twice leaves one visible notice', () => {
+  const { view, nodes } = makeView();
+  nodes[1].x = 6000; nodes[1].y = 3000;
+  notices.length = 0; shown.length = 0;
+  view.fit();
+  view.fit();
+  assert.equal(shown.filter(n => !n.hidden).length, 1, 'the earlier notice is hidden before the next shows');
 });
 
 test('Bug bash E #13: in a narrow pane the toolbar actions wrap inside the pane and the zoom controls stay inside its left edge', () => {

@@ -310,7 +310,7 @@ import {
   chooseCardToolsSpot,
   clearToolbar,
   type CanvasInsets,
-  fitIsClamped,
+  anyBoxOffscreen,
   fitViewport,
   focusViewport,
   initialViewport,
@@ -1009,6 +1009,7 @@ export class VisualAgentMapView extends ItemView {
    * reaches the run and no request is sent; the entry goes away once the run is accepted or ends.
    */
   private startingTasks = new Map<string, AbortController>();
+  private disclosureSeq = 0;
   /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
   private quickOutlines = new Map<
     string,
@@ -12766,7 +12767,12 @@ export class VisualAgentMapView extends ItemView {
     heading.createEl("strong", {
       text: mode === "structure" ? t("ui.structure_and_links") : t("ui.expansion_suggestions")
     });
-    if (note) panel.createEl("p", { cls: "vam-inspector-topic", text: t("ui.topic_0", note.title) });
+    // The card settings dialog is titled "This card" and the subtitle is just the card's name.
+    if (note)
+      panel.createEl("p", {
+        cls: "vam-inspector-topic",
+        text: mode === "structure" ? note.title : t("ui.topic_0", note.title)
+      });
     if (note) {
       if (mode === "proposals") this.renderPendingProposals(panel, node, note, close, host);
       if (mode === "structure") {
@@ -12807,16 +12813,20 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
-    // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
+    // Order (ticket 41): what it is (type), how far to trust it (strength), who it relates to; then the folded
+    // "Appearance" and "Layout" groups; then the AI lock; then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
-    if (note) this.renderMarkerSection(panel, node);
-    if (note) this.renderLinkSection(panel, node);
-    if (note) this.renderColorSection(panel, node);
-    if (note) this.renderStyleSection(panel, node);
-    if (note) this.renderCoverSection(panel, node);
-    if (note) this.renderAiLockSection(panel, node);
-    this.renderBranchLayoutSection(panel, node);
-    const relationship = panel.createDiv("vam-inspector-section");
+    if (note) {
+      const look = this.renderDisclosure(panel, t("ui.card_group_appearance"));
+      this.renderMarkerSection(look, node);
+      this.renderLinkSection(look, node);
+      this.renderColorSection(look, node);
+      this.renderStyleSection(look, node);
+      this.renderCoverSection(look, node);
+    }
+    const layout = this.renderDisclosure(panel, t("ui.card_group_layout"));
+    this.renderBranchLayoutSection(layout, node);
+    const relationship = layout.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
       cls: "vam-topic-tree-heading vam-section-heading"
@@ -12837,6 +12847,7 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
+    if (note) this.renderAiLockSection(panel, node);
     const actions = (host ?? panel).createDiv("vam-next-actions");
     if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
@@ -12875,6 +12886,25 @@ export class VisualAgentMapView extends ItemView {
         });
       });
     };
+  }
+  /** A folded group: a button with `aria-expanded` that shows or hides its body. Every control inside stays in the DOM. Returns the body. */
+  private renderDisclosure(parent: HTMLElement, label: string): HTMLElement {
+    const group = parent.createDiv("vam-disclosure");
+    const toggle = group.createEl("button", { text: label, cls: "vam-disclosure-toggle" });
+    toggle.type = "button";
+    const body = group.createDiv("vam-disclosure-body");
+    body.id = `vam-disclosure-${++this.disclosureSeq}`;
+    body.hidden = true;
+    toggle.setAttr("aria-expanded", "false");
+    toggle.setAttr("aria-controls", body.id);
+    let open = false;
+    toggle.addEventListener("click", () => {
+      open = !open;
+      toggle.setAttr("aria-expanded", String(open));
+      toggle.toggleClass("is-open", open);
+      body.hidden = !open;
+    });
+    return body;
   }
   private renderPendingProposals(
     panel: HTMLElement,
@@ -13078,39 +13108,61 @@ export class VisualAgentMapView extends ItemView {
       );
     }, false);
   }
-  /** The six relation kinds as a menu; `pick` gets the chosen one. */
-  private openRelationKindMenu(event: MouseEvent, pick: (kind: TopicRelationKind) => void): void {
-    const menu = this.newMenu();
-    for (const kind of RELATION_KINDS)
-      menu.addItem(item =>
-        item
-          .setTitle(t(RELATION_NAME_KEY[kind]))
-          .setIcon("link")
-          .onClick(() => pick(kind))
-      );
-    menu.showAtMouseEvent(event);
-  }
-  /** Opens the picker for the other end (B) of a `kind` relation that starts at `node` (A); with no legal target it only says so. */
-  private chooseRelationTarget(node: MapNode, kind: TopicRelationKind, onAdded?: () => void): void {
-    if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalRelationTargets(this.map, kind, node.id));
-    if (!legal.size) {
-      new Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
-      return;
-    }
-    new TopicTreeModal(
-      this.app,
-      t("ui.add_relation_title_0", t(RELATION_NAME_KEY[kind])),
-      t("ui.add_relation_description"),
-      this.map.nodes,
-      target => this.notes.get(target.id)?.title ?? target.path,
-      target => legal.has(target.id),
-      target =>
-        this.enqueue(async () => {
-          await this.addRelation(node.id, target.id, kind);
-          onAdded?.();
-        })
-    ).open();
+  /**
+   * "This card [relation ▾] → [another card ▾] [Add]": one sentence adds a relation A -> B. The card list holds only
+   * legal targets (never this card itself, never a card already linked to it, never a cycle), so it is refilled when
+   * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
+   */
+  private renderRelationAddRow(
+    parent: HTMLElement,
+    node: MapNode,
+    onAdded: () => void,
+    exposeFirst: (control: HTMLElement) => void
+  ): void {
+    const row = parent.createDiv("vam-relation-add");
+    row.setAttr("role", "group");
+    row.setAttr("aria-label", t("ui.relation_add_row"));
+    row.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
+    const kindSelect = row.createEl("select", { cls: "dropdown vam-relation-add-kind" });
+    kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+    for (const kind of RELATION_KINDS) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+    exposeFirst(kindSelect);
+    row.createSpan({ text: "→", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
+    const targetSelect = row.createEl("select", { cls: "dropdown vam-relation-add-target" });
+    targetSelect.setAttr("aria-label", t("ui.relation_target_label"));
+    const add = row.createEl("button", { text: t("ui.relation_add_submit"), cls: "mod-cta" });
+    add.type = "button";
+    const currentKind = (): TopicRelationKind => (kindSelect.value as TopicRelationKind) || RELATION_KINDS[0];
+    const fill = (): void => {
+      targetSelect.empty();
+      const legal = this.map ? new Set(legalRelationTargets(this.map, currentKind(), node.id)) : new Set<string>();
+      const targets = (this.map?.nodes ?? []).filter(item => item.id !== node.id && legal.has(item.id));
+      targetSelect.createEl("option", {
+        text: targets.length
+          ? t("ui.relation_pick_card")
+          : t("ui.no_relation_target_0", t(RELATION_NAME_KEY[currentKind()])),
+        value: ""
+      });
+      for (const target of targets)
+        targetSelect.createEl("option", { text: this.notes.get(target.id)?.title ?? target.path, value: target.id });
+      targetSelect.value = "";
+      targetSelect.disabled = !targets.length;
+      add.disabled = true;
+    };
+    fill();
+    kindSelect.addEventListener("change", fill);
+    targetSelect.addEventListener("change", () => {
+      add.disabled = !targetSelect.value;
+    });
+    add.addEventListener("click", () => {
+      const toId = targetSelect.value;
+      if (!toId) return;
+      const kind = currentKind();
+      this.enqueue(async () => {
+        await this.addRelation(node.id, toId, kind);
+        onAdded();
+      });
+    });
   }
   /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
   private relationRowText(link: TopicRelation, selfId: string): string {
@@ -13925,6 +13977,12 @@ export class VisualAgentMapView extends ItemView {
       });
       choice.setAttr("aria-pressed", String(locked));
       if (locked) choice.addClass("is-pressed");
+      // The row says the state it is in now, not only what the button would do.
+      group.createSpan({
+        cls: "vam-ai-lock-state",
+        text: t(locked ? "ui.ai_lock_state_on" : "ui.ai_lock_state_off"),
+        attr: { role: "status", "aria-live": "polite" }
+      });
       if (focus) choice.focus();
     };
     paint();
@@ -14198,7 +14256,7 @@ export class VisualAgentMapView extends ItemView {
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
     const editByPair = new Map<string, HTMLElement>();
-    let addRelationButton: HTMLElement | null = null;
+    let addRelationControl: HTMLElement | null = null;
     const paint = (focusStrength = false, focusKind = false, focusAdd = false): void => {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
@@ -14272,7 +14330,7 @@ export class VisualAgentMapView extends ItemView {
           // After the editor closes, focus goes to this pair's edit button as last painted (a pair has one relation),
           // or to "Add relation…" when the relation was deleted.
           const edit = this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
-            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationButton)?.focus())
+            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationControl)?.focus())
           );
           editByPair.set(pair, edit);
           this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
@@ -14283,16 +14341,16 @@ export class VisualAgentMapView extends ItemView {
           );
         }
       } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
-      const addRelation = body.createEl("button", { text: t("ui.add_relation") });
-      addRelationButton = addRelation;
-      addRelation.addEventListener("click", event => {
-        event.stopPropagation();
-        this.openRelationKindMenu(event, kind =>
-          this.chooseRelationTarget(node, kind, () => paint(false, false, true))
-        );
-      });
-      // Repainting replaced the button that started the flow; a keyboard user lands back on its replacement.
-      if (focusAdd) addRelation.focus();
+      this.renderRelationAddRow(
+        body,
+        node,
+        () => paint(false, false, true),
+        kindControl => {
+          addRelationControl = kindControl;
+        }
+      );
+      // Repainting replaced the control that started the flow; a keyboard user lands back on its replacement.
+      if (focusAdd) addRelationControl?.focus();
     };
     paint();
   }
@@ -16472,6 +16530,7 @@ export class VisualAgentMapView extends ItemView {
     this.transform();
     if (persist) this.saveViewport();
   }
+  private fitNotice: Notice | null = null;
   private fit(): void {
     if (!this.map || !this.viewportEl) return;
     const nodes = this.canvasNodes();
@@ -16510,10 +16569,12 @@ export class VisualAgentMapView extends ItemView {
     this.transform();
     this.saveViewport();
     // The zoom floor keeps text readable; when it holds some cards off screen, say so instead of hiding them silently.
-    if (fitIsClamped(fitBounds, fitSize, fitInset)) {
+    // Judged against the real canvas (not the area inside the toolbar insets), and one notice at a time.
+    if (anyBoxOffscreen(boxes, this.map.viewport, fitSize)) {
       const hint = t("ui.fit_clamped");
       this.announcer?.setText(hint);
-      new Notice(hint);
+      this.fitNotice?.hide();
+      this.fitNotice = new Notice(hint);
     }
   }
   private setupPan(): void {

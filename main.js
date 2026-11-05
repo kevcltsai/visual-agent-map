@@ -706,15 +706,21 @@ var en = {
   "ui.hypothesis_strong": "Strong",
   "ui.hypothesis_strength": "Strength",
   "ui.relations_heading": "Relations",
+  "ui.card_group_appearance": "Appearance",
+  "ui.card_group_layout": "Layout",
+  "ui.relation_add_row": "Add a relation",
+  "ui.relation_this_card": "This card",
+  "ui.relation_target_label": "Other card",
+  "ui.relation_pick_card": "Choose another card\u2026",
+  "ui.relation_add_submit": "Add",
+  "ui.ai_lock_state_off": "Off: AI can change this card",
+  "ui.ai_lock_state_on": "On: AI will not change this card",
   "ui.relation_name_supports": "Supports",
   "ui.relation_name_contradicts": "Contradicts",
   "ui.relation_name_verifies": "Verifies",
   "ui.relation_name_derives_from": "Derives from",
   "ui.relation_name_related": "Related",
   "ui.relation_name_prerequisite": "Prerequisite",
-  "ui.add_relation": "Add relation\u2026",
-  "ui.add_relation_title_0": "Add relation: {0}",
-  "ui.add_relation_description": "Choose the topic at the other end (B). This topic is A.",
   "ui.no_relation_target_0": "There is no topic this one can be linked to with \u201C{0}\u201D.",
   "ui.relation_row_out_0_1": "{0} \u2192 {1}",
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
@@ -1089,7 +1095,7 @@ var en = {
   "ui.note_missing": "Note missing",
   "ui.open_details_in_right_sidebar": "Open details in right sidebar",
   "ui.collapse": "Collapse",
-  "ui.node_tool_links": "Structure",
+  "ui.node_tool_links": "This card",
   "ui.node_tool_rename": "Rename",
   "ui.node_tool_details": "Details",
   "ui.select_subtopics": "Select subtopics",
@@ -1134,7 +1140,7 @@ var en = {
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "This node's note is missing. Relink an unassigned note or remove it from the map.",
   "ui.relink_note": "Relink note",
   "ui.use_this_note": "Use this note",
-  "ui.structure_and_links": "Structure and links",
+  "ui.structure_and_links": "This card",
   "ui.parent_topic": "Parent topic",
   "ui.parent_topic_link": "Parent topic / link",
   "ui.no_parent_root_topic": "No parent (root topic)",
@@ -3246,15 +3252,21 @@ var zhCN = {
   "ui.hypothesis_strong": "\u5F3A",
   "ui.hypothesis_strength": "\u5F3A\u5EA6",
   "ui.relations_heading": "\u5173\u7CFB",
+  "ui.card_group_appearance": "\u5916\u89C2",
+  "ui.card_group_layout": "\u7248\u9762",
+  "ui.relation_add_row": "\u6DFB\u52A0\u5173\u7CFB",
+  "ui.relation_this_card": "\u8FD9\u5F20\u5361",
+  "ui.relation_target_label": "\u53E6\u4E00\u5F20\u5361",
+  "ui.relation_pick_card": "\u9009\u53E6\u4E00\u5F20\u5361\u2026",
+  "ui.relation_add_submit": "\u52A0\u5165",
+  "ui.ai_lock_state_off": "\u5173\u95ED\uFF1AAI \u53EF\u4EE5\u4FEE\u6539\u8FD9\u5F20\u5361",
+  "ui.ai_lock_state_on": "\u5F00\u542F\uFF1AAI \u4E0D\u4F1A\u4FEE\u6539\u8FD9\u5F20\u5361",
   "ui.relation_name_supports": "\u652F\u6301",
   "ui.relation_name_contradicts": "\u53CD\u9A73",
   "ui.relation_name_verifies": "\u9A8C\u8BC1",
   "ui.relation_name_derives_from": "\u63A8\u5BFC",
   "ui.relation_name_related": "\u76F8\u5173",
   "ui.relation_name_prerequisite": "\u524D\u7F6E\u77E5\u8BC6",
-  "ui.add_relation": "\u6DFB\u52A0\u5173\u7CFB\u2026",
-  "ui.add_relation_title_0": "\u6DFB\u52A0\u5173\u7CFB\uFF1A{0}",
-  "ui.add_relation_description": "\u9009\u62E9\u53E6\u4E00\u7AEF\u7684\u8BAE\u9898\uFF08B\uFF09\u3002\u672C\u8BAE\u9898\u662F A\u3002",
   "ui.no_relation_target_0": "\u6CA1\u6709\u53EF\u4EE5\u7528\u201C{0}\u201D\u94FE\u63A5\u7684\u8BAE\u9898\u3002",
   "ui.relation_row_out_0_1": "{0} \u2192 {1}",
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
@@ -3629,7 +3641,7 @@ var zhCN = {
   "ui.note_missing": "\u7B14\u8BB0\u4E0D\u5B58\u5728",
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u4FA7\u680F\u6253\u5F00\u8BE6\u60C5",
   "ui.collapse": "\u6298\u53E0",
-  "ui.node_tool_links": "\u7ED3\u6784",
+  "ui.node_tool_links": "\u8FD9\u5F20\u5361",
   "ui.node_tool_rename": "\u6539\u540D",
   "ui.node_tool_details": "\u8BE6\u60C5",
   "ui.select_subtopics": "\u9009\u62E9\u5B50\u8BAE\u9898",
@@ -3674,7 +3686,7 @@ var zhCN = {
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8BAE\u9898\u7684\u7B14\u8BB0\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u94FE\u63A5\u672A\u5F52\u7C7B\u7B14\u8BB0\u6216\u4ECE\u56FE\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u94FE\u63A5\u7B14\u8BB0",
   "ui.use_this_note": "\u4F7F\u7528\u8FD9\u4EFD\u7B14\u8BB0",
-  "ui.structure_and_links": "\u7ED3\u6784\u4E0E\u94FE\u63A5",
+  "ui.structure_and_links": "\u8FD9\u5F20\u5361",
   "ui.parent_topic": "\u6240\u5C5E\u7236\u8BAE\u9898",
   "ui.parent_topic_link": "\u7236\u8BAE\u9898\uFF0F\u94FE\u63A5",
   "ui.no_parent_root_topic": "\u65E0\u7236\u8BAE\u9898\uFF08\u6839\u8BAE\u9898\uFF09",
@@ -5786,15 +5798,21 @@ var zhTW = {
   "ui.hypothesis_strong": "\u5F37",
   "ui.hypothesis_strength": "\u5F37\u5EA6",
   "ui.relations_heading": "\u95DC\u4FC2",
+  "ui.card_group_appearance": "\u5916\u89C0",
+  "ui.card_group_layout": "\u7248\u9762",
+  "ui.relation_add_row": "\u65B0\u589E\u95DC\u4FC2",
+  "ui.relation_this_card": "\u9019\u5F35\u5361",
+  "ui.relation_target_label": "\u53E6\u4E00\u5F35\u5361",
+  "ui.relation_pick_card": "\u9078\u53E6\u4E00\u5F35\u5361\u2026",
+  "ui.relation_add_submit": "\u52A0\u5165",
+  "ui.ai_lock_state_off": "\u95DC\u9589\uFF1AAI \u53EF\u4EE5\u4FEE\u6539\u9019\u5F35\u5361",
+  "ui.ai_lock_state_on": "\u958B\u555F\uFF1AAI \u4E0D\u6703\u4FEE\u6539\u9019\u5F35\u5361",
   "ui.relation_name_supports": "\u652F\u6301",
   "ui.relation_name_contradicts": "\u53CD\u99C1",
   "ui.relation_name_verifies": "\u9A57\u8B49",
   "ui.relation_name_derives_from": "\u63A8\u5C0E",
   "ui.relation_name_related": "\u76F8\u95DC",
   "ui.relation_name_prerequisite": "\u524D\u7F6E\u77E5\u8B58",
-  "ui.add_relation": "\u65B0\u589E\u95DC\u4FC2\u2026",
-  "ui.add_relation_title_0": "\u65B0\u589E\u95DC\u4FC2\uFF1A{0}",
-  "ui.add_relation_description": "\u9078\u64C7\u53E6\u4E00\u7AEF\u7684\u8B70\u984C\uFF08B\uFF09\u3002\u672C\u8B70\u984C\u662F A\u3002",
   "ui.no_relation_target_0": "\u6C92\u6709\u53EF\u4EE5\u7528\u300C{0}\u300D\u9023\u7D50\u7684\u8B70\u984C\u3002",
   "ui.relation_row_out_0_1": "{0} \u2192 {1}",
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
@@ -6169,7 +6187,7 @@ var zhTW = {
   "ui.note_missing": "\u7B46\u8A18\u4E0D\u5B58\u5728",
   "ui.open_details_in_right_sidebar": "\u5728\u53F3\u5074\u6B04\u958B\u555F\u8A73\u60C5",
   "ui.collapse": "\u6536\u5408",
-  "ui.node_tool_links": "\u7D50\u69CB",
+  "ui.node_tool_links": "\u9019\u5F35\u5361",
   "ui.node_tool_rename": "\u6539\u540D",
   "ui.node_tool_details": "\u8A73\u60C5",
   "ui.select_subtopics": "\u9078\u53D6\u5B50\u8B70\u984C",
@@ -6214,7 +6232,7 @@ var zhTW = {
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8B70\u984C\u7684\u7B46\u8A18\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u9023\u7D50\u672A\u6B78\u985E\u7B46\u8A18\u6216\u5F9E\u5716\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u9023\u7D50\u7B46\u8A18",
   "ui.use_this_note": "\u4F7F\u7528\u9019\u4EFD\u7B46\u8A18",
-  "ui.structure_and_links": "\u7D50\u69CB\u8207\u9023\u7D50",
+  "ui.structure_and_links": "\u9019\u5F35\u5361",
   "ui.parent_topic": "\u6240\u5C6C\u6BCD\u8B70\u984C",
   "ui.parent_topic_link": "\u6BCD\u8B70\u984C\uFF0F\u9023\u7D50",
   "ui.no_parent_root_topic": "\u7121\u6BCD\u8B70\u984C\uFF08\u6839\u8B70\u984C\uFF09",
@@ -31892,12 +31910,12 @@ function focusViewport(viewport, point, size, inset) {
   };
 }
 var FIT_MIN_ZOOM = 0.25;
-function fitIsClamped(bounds, size, inset) {
-  const box = normalizeInset(inset);
-  const availableWidth = Math.max(1, size.width - box.left - box.right);
-  const availableHeight = Math.max(1, size.height - box.top - box.bottom);
-  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
-  return Math.min((availableWidth - 80) / w, (availableHeight - 80) / h) < FIT_MIN_ZOOM;
+function anyBoxOffscreen(boxes, viewport, size) {
+  const eps = 1;
+  return boxes.some((b) => {
+    const left = b.x * viewport.zoom + viewport.x, top = b.y * viewport.zoom + viewport.y;
+    return left < -eps || top < -eps || left + b.w * viewport.zoom > size.width + eps || top + b.h * viewport.zoom > size.height + eps;
+  });
 }
 function fitViewport(bounds, size, inset, maxZoom = 1.2) {
   const box = normalizeInset(inset);
@@ -51517,6 +51535,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
      * reaches the run and no request is sent; the entry goes away once the run is accepted or ends.
      */
     __publicField(this, "startingTasks", /* @__PURE__ */ new Map());
+    __publicField(this, "disclosureSeq", 0);
     /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
     __publicField(this, "quickOutlines", /* @__PURE__ */ new Map());
     /** The AI structure review that hid its window. The view owns it: Stop, the result and the highlights. */
@@ -51697,6 +51716,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "toolsZoom", null);
     /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
     __publicField(this, "toolbarClearedFor", null);
+    __publicField(this, "fitNotice", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
@@ -62350,7 +62370,11 @@ ${request.requirements}` : preset.text,
     heading.createEl("strong", {
       text: mode === "structure" ? t("ui.structure_and_links") : t("ui.expansion_suggestions")
     });
-    if (note) panel.createEl("p", { cls: "vam-inspector-topic", text: t("ui.topic_0", note.title) });
+    if (note)
+      panel.createEl("p", {
+        cls: "vam-inspector-topic",
+        text: mode === "structure" ? note.title : t("ui.topic_0", note.title)
+      });
     if (note) {
       if (mode === "proposals") this.renderPendingProposals(panel, node, note, close, host);
       if (mode === "structure") {
@@ -62392,14 +62416,17 @@ ${request.requirements}` : preset.text,
     }
     if (mode !== "structure") return;
     if (note) this.renderHypothesisSection(panel, node, close);
-    if (note) this.renderMarkerSection(panel, node);
-    if (note) this.renderLinkSection(panel, node);
-    if (note) this.renderColorSection(panel, node);
-    if (note) this.renderStyleSection(panel, node);
-    if (note) this.renderCoverSection(panel, node);
-    if (note) this.renderAiLockSection(panel, node);
-    this.renderBranchLayoutSection(panel, node);
-    const relationship = panel.createDiv("vam-inspector-section");
+    if (note) {
+      const look = this.renderDisclosure(panel, t("ui.card_group_appearance"));
+      this.renderMarkerSection(look, node);
+      this.renderLinkSection(look, node);
+      this.renderColorSection(look, node);
+      this.renderStyleSection(look, node);
+      this.renderCoverSection(look, node);
+    }
+    const layout = this.renderDisclosure(panel, t("ui.card_group_layout"));
+    this.renderBranchLayoutSection(layout, node);
+    const relationship = layout.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
       cls: "vam-topic-tree-heading vam-section-heading"
@@ -62423,6 +62450,7 @@ ${request.requirements}` : preset.text,
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
+    if (note) this.renderAiLockSection(panel, node);
     const actions = (host != null ? host : panel).createDiv("vam-next-actions");
     if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
@@ -62461,6 +62489,25 @@ ${request.requirements}` : preset.text,
         });
       });
     };
+  }
+  /** A folded group: a button with `aria-expanded` that shows or hides its body. Every control inside stays in the DOM. Returns the body. */
+  renderDisclosure(parent, label) {
+    const group = parent.createDiv("vam-disclosure");
+    const toggle = group.createEl("button", { text: label, cls: "vam-disclosure-toggle" });
+    toggle.type = "button";
+    const body = group.createDiv("vam-disclosure-body");
+    body.id = `vam-disclosure-${++this.disclosureSeq}`;
+    body.hidden = true;
+    toggle.setAttr("aria-expanded", "false");
+    toggle.setAttr("aria-controls", body.id);
+    let open = false;
+    toggle.addEventListener("click", () => {
+      open = !open;
+      toggle.setAttr("aria-expanded", String(open));
+      toggle.toggleClass("is-open", open);
+      body.hidden = !open;
+    });
+    return body;
   }
   renderPendingProposals(panel, node, note, close, host) {
     var _a2;
@@ -62650,38 +62697,55 @@ ${request.requirements}` : preset.text,
       );
     }, false);
   }
-  /** The six relation kinds as a menu; `pick` gets the chosen one. */
-  openRelationKindMenu(event, pick) {
-    const menu = this.newMenu();
-    for (const kind of RELATION_KINDS2)
-      menu.addItem(
-        (item) => item.setTitle(t(RELATION_NAME_KEY[kind])).setIcon("link").onClick(() => pick(kind))
-      );
-    menu.showAtMouseEvent(event);
-  }
-  /** Opens the picker for the other end (B) of a `kind` relation that starts at `node` (A); with no legal target it only says so. */
-  chooseRelationTarget(node, kind, onAdded) {
-    if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalRelationTargets(this.map, kind, node.id));
-    if (!legal.size) {
-      new import_obsidian34.Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
-      return;
-    }
-    new TopicTreeModal(
-      this.app,
-      t("ui.add_relation_title_0", t(RELATION_NAME_KEY[kind])),
-      t("ui.add_relation_description"),
-      this.map.nodes,
-      (target) => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
-      },
-      (target) => legal.has(target.id),
-      (target) => this.enqueue(async () => {
-        await this.addRelation(node.id, target.id, kind);
-        onAdded == null ? void 0 : onAdded();
-      })
-    ).open();
+  /**
+   * "This card [relation ▾] → [another card ▾] [Add]": one sentence adds a relation A -> B. The card list holds only
+   * legal targets (never this card itself, never a card already linked to it, never a cycle), so it is refilled when
+   * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
+   */
+  renderRelationAddRow(parent, node, onAdded, exposeFirst) {
+    const row = parent.createDiv("vam-relation-add");
+    row.setAttr("role", "group");
+    row.setAttr("aria-label", t("ui.relation_add_row"));
+    row.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
+    const kindSelect = row.createEl("select", { cls: "dropdown vam-relation-add-kind" });
+    kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+    for (const kind of RELATION_KINDS2) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+    exposeFirst(kindSelect);
+    row.createSpan({ text: "\u2192", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
+    const targetSelect = row.createEl("select", { cls: "dropdown vam-relation-add-target" });
+    targetSelect.setAttr("aria-label", t("ui.relation_target_label"));
+    const add = row.createEl("button", { text: t("ui.relation_add_submit"), cls: "mod-cta" });
+    add.type = "button";
+    const currentKind = () => kindSelect.value || RELATION_KINDS2[0];
+    const fill2 = () => {
+      var _a2, _b2, _c, _d;
+      targetSelect.empty();
+      const legal = this.map ? new Set(legalRelationTargets(this.map, currentKind(), node.id)) : /* @__PURE__ */ new Set();
+      const targets = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []).filter((item) => item.id !== node.id && legal.has(item.id));
+      targetSelect.createEl("option", {
+        text: targets.length ? t("ui.relation_pick_card") : t("ui.no_relation_target_0", t(RELATION_NAME_KEY[currentKind()])),
+        value: ""
+      });
+      for (const target of targets)
+        targetSelect.createEl("option", { text: (_d = (_c = this.notes.get(target.id)) == null ? void 0 : _c.title) != null ? _d : target.path, value: target.id });
+      targetSelect.value = "";
+      targetSelect.disabled = !targets.length;
+      add.disabled = true;
+    };
+    fill2();
+    kindSelect.addEventListener("change", fill2);
+    targetSelect.addEventListener("change", () => {
+      add.disabled = !targetSelect.value;
+    });
+    add.addEventListener("click", () => {
+      const toId = targetSelect.value;
+      if (!toId) return;
+      const kind = currentKind();
+      this.enqueue(async () => {
+        await this.addRelation(node.id, toId, kind);
+        onAdded();
+      });
+    });
   }
   /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
   relationRowText(link, selfId) {
@@ -63445,6 +63509,11 @@ ${request.requirements}` : preset.text,
       });
       choice2.setAttr("aria-pressed", String(locked));
       if (locked) choice2.addClass("is-pressed");
+      group.createSpan({
+        cls: "vam-ai-lock-state",
+        text: t(locked ? "ui.ai_lock_state_on" : "ui.ai_lock_state_off"),
+        attr: { role: "status", "aria-live": "polite" }
+      });
       if (focus) choice2.focus();
     };
     paint();
@@ -63711,7 +63780,7 @@ ${request.requirements}` : preset.text,
     const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section3.createDiv("vam-hypothesis-body");
     const editByPair = /* @__PURE__ */ new Map();
-    let addRelationButton = null;
+    let addRelationControl = null;
     const paint = (focusStrength = false, focusKind = false, focusAdd = false) => {
       var _a2, _b2, _c, _d;
       body.empty();
@@ -63784,7 +63853,7 @@ ${request.requirements}` : preset.text,
             t("ui.edit_relation_0", text11),
             () => this.openRelationEditor(link, paint, () => {
               var _a3, _b3;
-              return (_b3 = (_a3 = editByPair.get(pair6)) != null ? _a3 : addRelationButton) == null ? void 0 : _b3.focus();
+              return (_b3 = (_a3 = editByPair.get(pair6)) != null ? _a3 : addRelationControl) == null ? void 0 : _b3.focus();
             })
           );
           editByPair.set(pair6, edit);
@@ -63799,16 +63868,15 @@ ${request.requirements}` : preset.text,
           );
         }
       } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
-      const addRelation = body.createEl("button", { text: t("ui.add_relation") });
-      addRelationButton = addRelation;
-      addRelation.addEventListener("click", (event) => {
-        event.stopPropagation();
-        this.openRelationKindMenu(
-          event,
-          (kind) => this.chooseRelationTarget(node, kind, () => paint(false, false, true))
-        );
-      });
-      if (focusAdd) addRelation.focus();
+      this.renderRelationAddRow(
+        body,
+        node,
+        () => paint(false, false, true),
+        (kindControl) => {
+          addRelationControl = kindControl;
+        }
+      );
+      if (focusAdd) addRelationControl == null ? void 0 : addRelationControl.focus();
     };
     paint();
   }
@@ -65830,17 +65898,17 @@ ${note.detail.trim()}` : "",
     if (persist) this.saveViewport();
   }
   fit() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!this.map || !this.viewportEl) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
     const boxes = nodes.map((n) => {
-      var _a3, _b3, _c, _d;
+      var _a3, _b3, _c2, _d;
       return {
         x: n.x,
         y: n.y,
         w: (_a3 = n.width) != null ? _a3 : CARD_WIDTH,
-        h: (_d = (_c = (_b3 = this.stageEl) == null ? void 0 : _b3.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _c.offsetHeight) != null ? _d : 180
+        h: (_d = (_c2 = (_b3 = this.stageEl) == null ? void 0 : _b3.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _c2.offsetHeight) != null ? _d : 180
       };
     });
     for (const item of (_a2 = this.map.canvasItems) != null ? _a2 : []) {
@@ -65866,10 +65934,11 @@ ${note.detail.trim()}` : "",
     this.map.viewport = fitViewport(fitBounds, fitSize, fitInset);
     this.transform();
     this.saveViewport();
-    if (fitIsClamped(fitBounds, fitSize, fitInset)) {
+    if (anyBoxOffscreen(boxes, this.map.viewport, fitSize)) {
       const hint = t("ui.fit_clamped");
       (_b2 = this.announcer) == null ? void 0 : _b2.setText(hint);
-      new import_obsidian34.Notice(hint);
+      (_c = this.fitNotice) == null ? void 0 : _c.hide();
+      this.fitNotice = new import_obsidian34.Notice(hint);
     }
   }
   setupPan() {

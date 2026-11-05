@@ -31900,12 +31900,12 @@ function focusViewport(viewport, point, size, inset) {
   };
 }
 var FIT_MIN_ZOOM = 0.25;
-function fitIsClamped(bounds, size, inset) {
-  const box = normalizeInset(inset);
-  const availableWidth = Math.max(1, size.width - box.left - box.right);
-  const availableHeight = Math.max(1, size.height - box.top - box.bottom);
-  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
-  return Math.min((availableWidth - 80) / w, (availableHeight - 80) / h) < FIT_MIN_ZOOM;
+function anyBoxOffscreen(boxes, viewport, size) {
+  const eps = 1;
+  return boxes.some((b) => {
+    const left = b.x * viewport.zoom + viewport.x, top = b.y * viewport.zoom + viewport.y;
+    return left < -eps || top < -eps || left + b.w * viewport.zoom > size.width + eps || top + b.h * viewport.zoom > size.height + eps;
+  });
 }
 function fitViewport(bounds, size, inset, maxZoom = 1.2) {
   const box = normalizeInset(inset);
@@ -51702,6 +51702,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "toolsZoom", null);
     /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
     __publicField(this, "toolbarClearedFor", null);
+    __publicField(this, "fitNotice", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
@@ -65860,17 +65861,17 @@ ${note.detail.trim()}` : "",
     if (persist) this.saveViewport();
   }
   fit() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!this.map || !this.viewportEl) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
     const boxes = nodes.map((n) => {
-      var _a3, _b3, _c, _d;
+      var _a3, _b3, _c2, _d;
       return {
         x: n.x,
         y: n.y,
         w: (_a3 = n.width) != null ? _a3 : CARD_WIDTH,
-        h: (_d = (_c = (_b3 = this.stageEl) == null ? void 0 : _b3.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _c.offsetHeight) != null ? _d : 180
+        h: (_d = (_c2 = (_b3 = this.stageEl) == null ? void 0 : _b3.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _c2.offsetHeight) != null ? _d : 180
       };
     });
     for (const item of (_a2 = this.map.canvasItems) != null ? _a2 : []) {
@@ -65896,10 +65897,11 @@ ${note.detail.trim()}` : "",
     this.map.viewport = fitViewport(fitBounds, fitSize, fitInset);
     this.transform();
     this.saveViewport();
-    if (fitIsClamped(fitBounds, fitSize, fitInset)) {
+    if (anyBoxOffscreen(boxes, this.map.viewport, fitSize)) {
       const hint = t("ui.fit_clamped");
       (_b2 = this.announcer) == null ? void 0 : _b2.setText(hint);
-      new import_obsidian34.Notice(hint);
+      (_c = this.fitNotice) == null ? void 0 : _c.hide();
+      this.fitNotice = new import_obsidian34.Notice(hint);
     }
   }
   setupPan() {

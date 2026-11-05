@@ -82,6 +82,28 @@ export function fitIsClamped(
   return Math.min((availableWidth - 80) / w, (availableHeight - 80) / h) < FIT_MIN_ZOOM;
 }
 
+/**
+ * True when some box would be (even partly) outside the real canvas after the viewport is applied. Judged against the
+ * whole canvas, not the area left inside the toolbar insets: a card behind a floating toolbar is still on screen.
+ */
+export function anyBoxOffscreen(
+  boxes: { x: number; y: number; w: number; h: number }[],
+  viewport: MapViewport,
+  size: { width: number; height: number }
+): boolean {
+  const eps = 1;
+  return boxes.some(b => {
+    const left = b.x * viewport.zoom + viewport.x,
+      top = b.y * viewport.zoom + viewport.y;
+    return (
+      left < -eps ||
+      top < -eps ||
+      left + b.w * viewport.zoom > size.width + eps ||
+      top + b.h * viewport.zoom > size.height + eps
+    );
+  });
+}
+
 /** Show-all viewport: the bounds are fitted and centred in the area left inside the inset. */
 export function fitViewport(
   bounds: { minX: number; minY: number; maxX: number; maxY: number },

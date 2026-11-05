@@ -41920,6 +41920,27 @@ function mergeRelevanceTiers(parts) {
     for (const entry of list != null ? list : []) merged.set(entry.id, entry.tier);
   return merged;
 }
+function floorSuggestedTiers(tree, previous, items, pins, suggested) {
+  if (!suggested.size) return [...items];
+  const nodes = new Map(tree.map((node) => [node.id, node]));
+  const merged = mergeRelevanceTiers({ previous, items, pins });
+  const pinned = new Set(pins.map((pin) => pin.id));
+  const bounds = relevancePinBounds(tree, pins).bounds;
+  return items.map((item) => {
+    var _a2, _b2, _c;
+    if (!suggested.has(item.id) || pinned.has(item.id) || merged.get(item.id) !== "side") return item;
+    const parentId = (_b2 = (_a2 = nodes.get(item.id)) == null ? void 0 : _a2.parentId) != null ? _b2 : null;
+    const parent = parentId === null ? void 0 : nodes.get(parentId);
+    if (!parent) return item;
+    if (parent.parentId !== null) {
+      const parentTier = merged.get(parent.id);
+      if (!parentTier || TIER_RANK[parentTier] < TIER_RANK.support) return item;
+    }
+    const max = (_c = bounds.get(item.id)) == null ? void 0 : _c.max;
+    if (max && TIER_RANK[max] < TIER_RANK.support) return item;
+    return { ...item, tier: "support" };
+  });
+}
 function relevanceSetupUnchanged(draft, saved) {
   var _a2, _b2;
   const goal = normalizeRelevanceGoal(draft.goal);
@@ -57067,9 +57088,10 @@ ${request.requirements}` : preset.text,
     this.render();
     let added = 0;
     let skipped2 = 0;
+    const addedIds = /* @__PURE__ */ new Set();
     try {
       await this.plugin.mutate(async () => {
-        var _a3;
+        var _a3, _b3, _c2;
         if (!this.goalSuggestCurrent(task)) {
           skipped2 = picked.length;
           return;
@@ -57083,8 +57105,10 @@ ${request.requirements}` : preset.text,
               skipped2++;
               continue;
             }
+            const known = new Set(this.map.nodes.map((node) => node.id));
             await this.addNode(parent, item.title, false, false);
             added++;
+            for (const node of (_c2 = (_b3 = this.map) == null ? void 0 : _b3.nodes) != null ? _c2 : []) if (!known.has(node.id)) addedIds.add(node.id);
           }
           if (added) await this.plugin.rebuildDerivedData();
         } finally {
@@ -57107,7 +57131,7 @@ ${request.requirements}` : preset.text,
       { goal, context: this.relevanceContext },
       this.relevanceAiGrades().length > 0
     );
-    void this.submitRelevanceGoal(goal, context, mode);
+    void this.submitRelevanceGoal(goal, context, mode, addedIds);
   }
   /** True when the suggestion no longer fits the map as it is now. */
   goalSuggestStale(item, task, parent, fresh) {
@@ -57536,7 +57560,7 @@ ${request.requirements}` : preset.text,
    * whole map is graded and the result is written in one step. Nothing is written when the AI is declined, stopped,
    * fails or returns anything but exactly one valid grade for every card.
    */
-  async submitRelevanceGoal(raw, contextRaw, planned = "full") {
+  async submitRelevanceGoal(raw, contextRaw, planned = "full", suggested) {
     var _a2, _b2, _c;
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === void 0 ? void 0 : normalizeRelevanceContext(contextRaw);
@@ -57564,6 +57588,7 @@ ${request.requirements}` : preset.text,
     let basis = [];
     let mode = planned;
     let pins = [];
+    let previousGrades = [];
     const repairs = [];
     try {
       await this.plugin.mutate(async () => {
@@ -57621,16 +57646,18 @@ ${request.requirements}` : preset.text,
             this.paintRelevanceReceived(run);
           }
         };
+        previousGrades = mode === "recalibrate" ? this.relevanceAiGrades() : [];
         result = mode === "recalibrate" ? await this.plugin.relevanceGrade.recalibrate(
-          { ...request, previous: this.relevanceAiGrades() },
+          { ...request, previous: previousGrades },
           run.controller.signal,
           hooks
         ) : await this.plugin.relevanceGrade.grade(request, run.controller.signal, hooks);
       });
       if (!this.relevanceRunIsCurrent(run, mapPath)) return;
       if (!started) return this.finishRelevance(run, mapPath, "declined", t("ui.relevance_not_started"));
-      const graded = result;
-      if (!graded) return;
+      const answered = result;
+      if (!answered) return;
+      const graded = (suggested == null ? void 0 : suggested.size) ? { ...answered, items: floorSuggestedTiers(basis, previousGrades, answered.items, pins, suggested) } : answered;
       const paintedBefore = this.paintCount;
       await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, graded, { mode, pins, repairs }));
       if (this.paintCount === paintedBefore) this.refreshRelevance();

@@ -184,6 +184,39 @@ export function mergeRelevanceTiers(parts: {
   return merged;
 }
 
+/**
+ * The floor for cards the goal-suggest list just added: a suggested card the model graded "side" is raised to
+ * "support" when its merged parent is a top-level card or at least "support". Never lowers a card, never touches a
+ * pinned or a non-suggested card, and leaves a card under a "side" (or ungraded) parent alone, because a card never
+ * ranks above its parent. Lives only in this call; nothing is stored.
+ */
+export function floorSuggestedTiers<T extends RelevancePin>(
+  tree: ReadonlyArray<PinTreeNode>,
+  previous: Iterable<RelevancePin>,
+  items: ReadonlyArray<T>,
+  pins: ReadonlyArray<RelevancePin>,
+  suggested: ReadonlySet<string>
+): T[] {
+  if (!suggested.size) return [...items];
+  const nodes = new Map(tree.map(node => [node.id, node]));
+  const merged = mergeRelevanceTiers({ previous, items, pins });
+  const pinned = new Set(pins.map(pin => pin.id));
+  const bounds = relevancePinBounds(tree, pins).bounds;
+  return items.map(item => {
+    if (!suggested.has(item.id) || pinned.has(item.id) || merged.get(item.id) !== "side") return item;
+    const parentId = nodes.get(item.id)?.parentId ?? null;
+    const parent = parentId === null ? undefined : nodes.get(parentId);
+    if (!parent) return item;
+    if (parent.parentId !== null) {
+      const parentTier = merged.get(parent.id);
+      if (!parentTier || TIER_RANK[parentTier] < TIER_RANK.support) return item;
+    }
+    const max = bounds.get(item.id)?.max;
+    if (max && TIER_RANK[max] < TIER_RANK.support) return item;
+    return { ...item, tier: "support" as const };
+  });
+}
+
 // ---- Which button the panel offers -------------------------------------------------------------------------
 
 export interface RelevanceSetupDraft {

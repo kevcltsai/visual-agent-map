@@ -434,7 +434,13 @@ import {
   clampMapChatWidth,
   isChatNarrow
 } from "../../core/map-chat-layout";
-import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
+import {
+  floorSuggestedTiers,
+  relevanceMode,
+  relevanceModeAfterWrite,
+  type RelevanceMode,
+  type RelevancePin
+} from "./relevance-pins";
 import { createAimMap } from "../aim/create-map";
 import { aimEnabled } from "../aim/availability";
 import {
@@ -3929,6 +3935,7 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     let added = 0;
     let skipped = 0;
+    const addedIds = new Set<string>();
     try {
       await this.plugin.mutate(async () => {
         if (!this.goalSuggestCurrent(task)) {
@@ -3944,8 +3951,10 @@ export class VisualAgentMapView extends ItemView {
               skipped++;
               continue;
             }
+            const known = new Set(this.map.nodes.map(node => node.id));
             await this.addNode(parent, item.title, false, false);
             added++;
+            for (const node of this.map?.nodes ?? []) if (!known.has(node.id)) addedIds.add(node.id);
           }
           if (added) await this.plugin.rebuildDerivedData();
         } finally {
@@ -3969,7 +3978,8 @@ export class VisualAgentMapView extends ItemView {
       { goal, context: this.relevanceContext },
       this.relevanceAiGrades().length > 0
     );
-    void this.submitRelevanceGoal(goal, context, mode);
+    // The cards just added are the ones the grade may not leave at "side" (a floor for this call only).
+    void this.submitRelevanceGoal(goal, context, mode, addedIds);
   }
   /** True when the suggestion no longer fits the map as it is now. */
   private goalSuggestStale(
@@ -4405,7 +4415,12 @@ export class VisualAgentMapView extends ItemView {
    * whole map is graded and the result is written in one step. Nothing is written when the AI is declined, stopped,
    * fails or returns anything but exactly one valid grade for every card.
    */
-  private async submitRelevanceGoal(raw: string, contextRaw?: string, planned: RelevanceMode = "full"): Promise<void> {
+  private async submitRelevanceGoal(
+    raw: string,
+    contextRaw?: string,
+    planned: RelevanceMode = "full",
+    suggested?: ReadonlySet<string>
+  ): Promise<void> {
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
@@ -4432,6 +4447,7 @@ export class VisualAgentMapView extends ItemView {
     let basis: StructureNode[] = [];
     let mode: RelevanceMode = planned;
     let pins: RelevancePin[] = [];
+    let previousGrades: RelevancePin[] = [];
     const repairs: string[] = [];
     try {
       await this.plugin.mutate(async () => {
@@ -4498,10 +4514,11 @@ export class VisualAgentMapView extends ItemView {
             this.paintRelevanceReceived(run);
           }
         };
+        previousGrades = mode === "recalibrate" ? this.relevanceAiGrades() : [];
         result =
           mode === "recalibrate"
             ? await this.plugin.relevanceGrade.recalibrate(
-                { ...request, previous: this.relevanceAiGrades() },
+                { ...request, previous: previousGrades },
                 run.controller.signal,
                 hooks
               )
@@ -4509,8 +4526,11 @@ export class VisualAgentMapView extends ItemView {
       });
       if (!this.relevanceRunIsCurrent(run, mapPath)) return;
       if (!started) return this.finishRelevance(run, mapPath, "declined", t("ui.relevance_not_started"));
-      const graded = result;
-      if (!graded) return;
+      const answered: RelevanceGradeResult | undefined = result;
+      if (!answered) return;
+      const graded = suggested?.size
+        ? { ...answered, items: floorSuggestedTiers(basis, previousGrades, answered.items, pins, suggested) }
+        : answered;
       // Writing the notes makes the view synchronize, which repaints when a note changed (the run is already "done"
       // by then); repaint here only when it did not, so a run costs one repaint after the write.
       const paintedBefore = this.paintCount;

@@ -540,3 +540,37 @@ test('recalibrate progress: reports the changes received so far, with no total',
     assert.deepEqual(seen, [{ received: 0 }, { received: 1 }], 'a null tier is not a change');
   }
 });
+
+// ---- pure: the floor for cards the goal-suggest list just added -----------------------------------------------
+
+const floor = (previous, list, pinList, ...ids) => plain(pins.floorSuggestedTiers(tree, previous, list, pinList, new Set(ids)));
+const tierMap = list => Object.fromEntries(list.map(e => [e.id, e.tier]));
+
+test('floor: a suggested card graded side under a support parent is raised to support (counter-example 1, pure)', () => {
+  assert.deepEqual(tierMap(floor([pin('a', 'support')], [pin('a1', 'side')], [], 'a1')), { a1: 'support' });
+  assert.deepEqual(tierMap(floor([pin('a', 'core')], [pin('a1', 'side')], [], 'a1')), { a1: 'support' }, 'only up to support, never core');
+});
+test('floor: without suggested ids nothing changes (counter-example 2)', () => {
+  assert.deepEqual(tierMap(floor([pin('a', 'support')], [pin('a1', 'side')], [])), { a1: 'side' });
+  assert.deepEqual(tierMap(floor([pin('a', 'support')], [pin('a1', 'side'), pin('b1', 'side')], [], 'a1')), { a1: 'support', b1: 'side' }, 'a card that was not suggested stays');
+});
+test('floor: a side parent (previous, pinned, or lowered by the model in the same reply) keeps the child at side (counter-examples 3, 4)', () => {
+  assert.deepEqual(tierMap(floor([pin('a', 'side')], [pin('a1', 'side')], [], 'a1')), { a1: 'side' }, 'previous side parent');
+  assert.deepEqual(tierMap(floor([], [pin('a1', 'side')], [pin('a', 'side')], 'a1')), { a1: 'side' }, 'pinned side parent');
+  assert.deepEqual(tierMap(floor([pin('a', 'support')], [pin('a', 'side'), pin('a1', 'side')], [], 'a1')), { a: 'side', a1: 'side' }, 'parent lowered in the same reply');
+  assert.deepEqual(tierMap(floor([], [pin('a1', 'side')], [], 'a1')), { a1: 'side' }, 'an ungraded non-top-level parent is not a floor');
+});
+test('floor: core and support answers are not lowered, a pinned card is not touched (counter-example 5)', () => {
+  assert.deepEqual(tierMap(floor([pin('a', 'core')], [pin('a1', 'core')], [], 'a1')), { a1: 'core' });
+  assert.deepEqual(tierMap(floor([pin('a', 'core')], [pin('a1', 'support')], [], 'a1')), { a1: 'support' });
+  assert.deepEqual(tierMap(floor([pin('a', 'core')], [pin('a1', 'side')], [pin('a1', 'side')], 'a1')), { a1: 'side' }, 'pinned');
+});
+test('floor: a card under a top-level card is floored (counter-example 6)', () => {
+  assert.deepEqual(tierMap(floor([], [pin('a', 'side'), pin('b', 'core')], [], 'a')), { a: 'support', b: 'core' });
+});
+test('floor: the input items are not mutated and extra fields are kept', () => {
+  const input = [{ id: 'a1', tier: 'side', anchor: 'x' }];
+  const out = pins.floorSuggestedTiers(tree, [pin('a', 'support')], input, [], new Set(['a1']));
+  assert.deepEqual(plain(out), [{ id: 'a1', tier: 'support', anchor: 'x' }]);
+  assert.equal(input[0].tier, 'side');
+});

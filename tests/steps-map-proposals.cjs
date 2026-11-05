@@ -147,9 +147,23 @@ test('outline summary: a heading without a summary rejects the whole reply (root
 test('outline summary: a misplaced > line is a non-heading line, never a summary', () => {
   failsWith('> before\n# Root\n> r', 'non_heading');
   failsWith('# Root\n> r\n> second\n', 'non_heading');
-  failsWith('# Root\n\n> r\n', 'non_heading');
+  failsWith('# Root\n\nprose\n> r\n', 'non_heading');
+  failsWith('# Root\n> r\n\n- bullet\n', 'non_heading');
   failsWith('# Root\n> r\n## A\n> a\nplain prose\n', 'non_heading');
   failsWith('# Root\n> r\n- bullet\n> x\n', 'non_heading');
+});
+
+test('outline summary: a blank line between a heading and its > line is still rejected, but as a missing summary (retried)', () => {
+  failsWith('# Root\n\n> r\n', 'missing_summary');
+  failsWith('# Root\n> r\n## A\n\n\n> a\n', 'missing_summary');
+});
+
+test('outline service: a blank line before the summary is retried once like a missing summary', async () => {
+  const replies = ['# Root\n> r\n## A\n\n> a', withSummaries];
+  const fx = serviceFixture(() => replies.shift());
+  const service = new outline.OutlineGenerationService(outline.providerOutlineRunner(aiCallsFor(outline, fx.options, fx.active)));
+  const result = await service.generate(outlineRequest(), new AbortController().signal);
+  assert.equal(fx.calls.length, 2); assert.deepEqual([...result.nodes.map(node => node.summary)], ['r', 'a']);
 });
 
 test('outline summary: injection-looking summary text is cleaned to one safe line', () => {
@@ -204,6 +218,32 @@ test('outline summaries: the bank finds each summary again by heading path; edit
   const reviewed = [{ index: 0, title: 'A', level: 1, parent: null, line: 0 }, { index: 1, title: 'X', level: 2, parent: 0, line: 0 }, { index: 2, title: 'B', level: 1, parent: null, line: 0 }, { index: 3, title: 'X', level: 2, parent: 2, line: 0 }];
   assert.deepEqual([...strict.applyOutlineSummaries(reviewed, below).map(node => node.summary)], ['a', 'ax', 'b', 'bx'], 'quick explore paths start below the dropped root');
   assert.equal(strict.applyOutlineSummaries(typed, new Map()), typed);
+});
+
+test('outline summaries: a renamed ancestor keeps the summaries of untouched descendants by unique title; the renamed heading stays empty', () => {
+  const strict = load('experiences/visual-map/outline-import.ts', { obsidian });
+  const generated = outline.parseOutlineReply('# Root\n> r\n## A\n> a\n### X\n> ax\n### Y\n> ay\n## B\n> b\n', 'en').nodes;
+  const sum = nodes => [...strict.applyOutlineSummaries(nodes, strict.outlineSummaryBank(generated)).map(node => node.summary)];
+  // text box: only the root renamed
+  assert.deepEqual(sum(strict.parseOutline('# New root\n## A\n### X\n### Y\n## B\n').nodes), [undefined, 'a', 'ax', 'ay', 'b']);
+  // review list (quick explore, root dropped): ancestor A renamed
+  const below = strict.outlineSummaryBank(generated, true);
+  const reviewed = [{ index: 0, title: 'A2', level: 1, parent: null, line: 0 }, { index: 1, title: 'X', level: 2, parent: 0, line: 0 }, { index: 2, title: 'Y', level: 2, parent: 0, line: 0 }, { index: 3, title: 'B', level: 1, parent: null, line: 0 }];
+  assert.deepEqual([...strict.applyOutlineSummaries(reviewed, below).map(node => node.summary)], [undefined, 'ax', 'ay', 'b']);
+  // a title that is not unique in the generated outline is not matched by title
+  const dup = outline.parseOutlineReply('# Root\n> r\n## A\n> a\n### X\n> ax1\n## B\n> b\n### X\n> ax2\n', 'en').nodes;
+  const moved = strict.parseOutline('# Root\n## A2\n### X\n## B2\n### X\n').nodes;
+  assert.deepEqual([...strict.applyOutlineSummaries(moved, strict.outlineSummaryBank(dup)).map(node => node.summary)], ['r', undefined, undefined, undefined, undefined]);
+  // one generated summary is never handed to two headings
+  const twice = strict.parseOutline('# Root\n## A\n## Z\n### X\n### X\n').nodes;
+  assert.deepEqual([...strict.applyOutlineSummaries(twice, strict.outlineSummaryBank(generated)).map(node => node.summary)], ['r', 'a', undefined, 'ax', undefined]);
+});
+
+test('outline summaries: same-parent same-title siblings take their own summaries in order', () => {
+  const strict = load('experiences/visual-map/outline-import.ts', { obsidian });
+  const generated = outline.parseOutlineReply('# Root\n> r\n## A\n> first A\n## A\n> second A\n', 'en').nodes;
+  const typed = strict.parseOutline('# Root\n## A\n## A\n').nodes;
+  assert.deepEqual([...strict.applyOutlineSummaries(typed, strict.outlineSummaryBank(generated)).map(node => node.summary)], ['r', 'first A', 'second A']);
 });
 
 test('a pasted outline with > lines parses exactly as before (parseOutline is not relaxed)', () => {

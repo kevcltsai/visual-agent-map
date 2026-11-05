@@ -2606,7 +2606,7 @@ export const en = {
   "error.outline_generate_invalid": "The AI outline could not be used: {0}",
   "error.outline_generate_no_headings": "The AI returned no Markdown headings.",
   "error.outline_generate_non_heading":
-    "The AI returned text that is not a heading ({0} lines); only headings are accepted.",
+    'The AI returned text that is not a heading ({0} lines); only headings, each followed by one "> summary" line, are accepted.',
   "error.outline_generate_missing_summary":
     "The AI outline has {0} heading(s) without a summary; every heading needs one.",
   "error.outline_generate_too_many": "The AI outline has {0} headings; the limit is {1}.",

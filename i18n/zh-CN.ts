@@ -2431,7 +2431,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "error.outline_generate_stopped": "大纲生成已停止。",
   "error.outline_generate_invalid": "无法使用 AI 的大纲：{0}",
   "error.outline_generate_no_headings": "AI 没有返回任何 Markdown 标题。",
-  "error.outline_generate_non_heading": "AI 返回了非标题的文字（{0} 行）；只接受标题。",
+  "error.outline_generate_non_heading":
+    "AI 返回了非标题的文字（{0} 行）；只接受标题，且每个标题下一行须为一行“> 摘要”。",
   "error.outline_generate_missing_summary": "AI 的大纲有 {0} 个标题没有摘要；每个标题都需要摘要。",
   "error.outline_generate_too_many": "AI 的大纲有 {0} 个标题，上限是 {1} 个。",
   "error.structure_review_empty": "没有可查看的内容：所选分支没有卡片。",

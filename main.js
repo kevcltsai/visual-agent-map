@@ -2445,7 +2445,7 @@ var en = {
   "error.outline_generate_stopped": "Outline generation stopped.",
   "error.outline_generate_invalid": "The AI outline could not be used: {0}",
   "error.outline_generate_no_headings": "The AI returned no Markdown headings.",
-  "error.outline_generate_non_heading": "The AI returned text that is not a heading ({0} lines); only headings are accepted.",
+  "error.outline_generate_non_heading": 'The AI returned text that is not a heading ({0} lines); only headings, each followed by one "> summary" line, are accepted.',
   "error.outline_generate_missing_summary": "The AI outline has {0} heading(s) without a summary; every heading needs one.",
   "error.outline_generate_too_many": "The AI outline has {0} headings; the limit is {1}.",
   "error.structure_review_empty": "There is nothing to review: the selected branch has no cards.",
@@ -5146,7 +5146,7 @@ var zhCN = {
   "error.outline_generate_stopped": "\u5927\u7EB2\u751F\u6210\u5DF2\u505C\u6B62\u3002",
   "error.outline_generate_invalid": "\u65E0\u6CD5\u4F7F\u7528 AI \u7684\u5927\u7EB2\uFF1A{0}",
   "error.outline_generate_no_headings": "AI \u6CA1\u6709\u8FD4\u56DE\u4EFB\u4F55 Markdown \u6807\u9898\u3002",
-  "error.outline_generate_non_heading": "AI \u8FD4\u56DE\u4E86\u975E\u6807\u9898\u7684\u6587\u5B57\uFF08{0} \u884C\uFF09\uFF1B\u53EA\u63A5\u53D7\u6807\u9898\u3002",
+  "error.outline_generate_non_heading": "AI \u8FD4\u56DE\u4E86\u975E\u6807\u9898\u7684\u6587\u5B57\uFF08{0} \u884C\uFF09\uFF1B\u53EA\u63A5\u53D7\u6807\u9898\uFF0C\u4E14\u6BCF\u4E2A\u6807\u9898\u4E0B\u4E00\u884C\u987B\u4E3A\u4E00\u884C\u201C> \u6458\u8981\u201D\u3002",
   "error.outline_generate_missing_summary": "AI \u7684\u5927\u7EB2\u6709 {0} \u4E2A\u6807\u9898\u6CA1\u6709\u6458\u8981\uFF1B\u6BCF\u4E2A\u6807\u9898\u90FD\u9700\u8981\u6458\u8981\u3002",
   "error.outline_generate_too_many": "AI \u7684\u5927\u7EB2\u6709 {0} \u4E2A\u6807\u9898\uFF0C\u4E0A\u9650\u662F {1} \u4E2A\u3002",
   "error.structure_review_empty": "\u6CA1\u6709\u53EF\u67E5\u770B\u7684\u5185\u5BB9\uFF1A\u6240\u9009\u5206\u652F\u6CA1\u6709\u5361\u7247\u3002",
@@ -7847,7 +7847,7 @@ var zhTW = {
   "error.outline_generate_stopped": "\u5927\u7DB1\u751F\u6210\u5DF2\u505C\u6B62\u3002",
   "error.outline_generate_invalid": "\u7121\u6CD5\u4F7F\u7528 AI \u7684\u5927\u7DB1\uFF1A{0}",
   "error.outline_generate_no_headings": "AI \u6C92\u6709\u56DE\u50B3\u4EFB\u4F55 Markdown \u6A19\u984C\u3002",
-  "error.outline_generate_non_heading": "AI \u56DE\u50B3\u4E86\u975E\u6A19\u984C\u7684\u6587\u5B57\uFF08{0} \u884C\uFF09\uFF1B\u53EA\u63A5\u53D7\u6A19\u984C\u3002",
+  "error.outline_generate_non_heading": "AI \u56DE\u50B3\u4E86\u975E\u6A19\u984C\u7684\u6587\u5B57\uFF08{0} \u884C\uFF09\uFF1B\u53EA\u63A5\u53D7\u6A19\u984C\uFF0C\u4E14\u6BCF\u500B\u6A19\u984C\u4E0B\u4E00\u884C\u9808\u70BA\u4E00\u884C\u300C> \u6458\u8981\u300D\u3002",
   "error.outline_generate_missing_summary": "AI \u7684\u5927\u7DB1\u6709 {0} \u500B\u6A19\u984C\u6C92\u6709\u6458\u8981\uFF1B\u6BCF\u500B\u6A19\u984C\u90FD\u9700\u8981\u6458\u8981\u3002",
   "error.outline_generate_too_many": "AI \u7684\u5927\u7DB1\u6709 {0} \u500B\u6A19\u984C\uFF0C\u4E0A\u9650\u662F {1} \u500B\u3002",
   "error.structure_review_empty": "\u6C92\u6709\u53EF\u6AA2\u8996\u7684\u5167\u5BB9\uFF1A\u6240\u9078\u5206\u652F\u6C92\u6709\u5361\u7247\u3002",
@@ -42303,22 +42303,47 @@ function outlinePathKeys(nodes, dropSingleRoot) {
     return JSON.stringify(paths[node.index]);
   });
 }
+var TITLE_KEY = "t:";
+var PATH_KEY = "p:";
 function outlineSummaryBank(nodes, dropSingleRoot = false) {
   const bank = /* @__PURE__ */ new Map();
+  const add = (key2, summary) => {
+    var _a2;
+    return bank.set(key2, [...(_a2 = bank.get(key2)) != null ? _a2 : [], summary]);
+  };
   const keys = outlinePathKeys(nodes, dropSingleRoot);
   nodes.forEach((node, index) => {
     const key2 = keys[index];
-    if (key2 !== null && node.summary) bank.set(key2, node.summary);
+    if (key2 === null || !node.summary) return;
+    add(PATH_KEY + key2, node.summary);
+    add(TITLE_KEY + node.title, node.summary);
   });
   return bank;
 }
 function applyOutlineSummaries(nodes, bank) {
   if (!bank.size) return nodes;
   const keys = outlinePathKeys(nodes, false);
+  const taken = /* @__PURE__ */ new Map();
+  const titlesUsed = /* @__PURE__ */ new Set();
   return nodes.map((node, index) => {
     var _a2;
     const key2 = keys[index];
-    const summary = (_a2 = node.summary) != null ? _a2 : key2 === null ? void 0 : bank.get(key2);
+    let summary = node.summary;
+    if (!summary && key2 !== null) {
+      const list = bank.get(PATH_KEY + key2);
+      if (list) {
+        const at = (_a2 = taken.get(key2)) != null ? _a2 : 0;
+        taken.set(key2, at + 1);
+        summary = list[at];
+        if (summary) titlesUsed.add(node.title);
+      } else {
+        const byTitle = bank.get(TITLE_KEY + node.title);
+        if ((byTitle == null ? void 0 : byTitle.length) === 1 && !titlesUsed.has(node.title)) {
+          summary = byTitle[0];
+          titlesUsed.add(node.title);
+        }
+      }
+    }
     return summary ? { ...node, summary } : node;
   });
 }
@@ -42359,10 +42384,10 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
         // A node's own note text, when the file had one, is its Detail as written; otherwise a root gets the import log.
         node.body ? { detail: node.body, researchMode: "local" } : top ? { detail: rootDetail, researchMode: "local" } : { researchMode: "local" }
       );
-      const summary = cleanOutlineSummary(node.summary);
-      if (summary) await repository.updateNote(note.path, { summary });
       note.parentId = top ? parentId : created[node.parent].id;
       created.push(note);
+      const summary = cleanOutlineSummary(node.summary);
+      if (summary) await repository.updateNote(note.path, { summary });
     } catch (error) {
       return { created, failure: errorText(error) };
     }
@@ -82702,6 +82727,7 @@ function splitSummaries(text11) {
   const kept = [];
   const summaries = [];
   let afterHeading = false;
+  let gap = false;
   for (const line of text11.split("\n")) {
     const quote2 = REPLY_SUMMARY.exec(line);
     if (quote2 && afterHeading) {
@@ -82709,6 +82735,11 @@ function splitSummaries(text11) {
       afterHeading = false;
       continue;
     }
+    if (quote2 && gap) {
+      gap = false;
+      continue;
+    }
+    gap = (afterHeading || gap) && line.trim() === "";
     afterHeading = REPLY_HEADING.test(line);
     if (afterHeading) summaries.push(void 0);
     kept.push(line);

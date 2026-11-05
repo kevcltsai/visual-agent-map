@@ -444,6 +444,7 @@ import {
   createOutlineMap,
   limitOutline,
   OUTLINE_NODE_LIMIT,
+  type OutlineSummaryBank,
   OUTLINE_TITLE_LIMIT,
   outlineSummaryBank,
   type OutlineNode
@@ -1299,11 +1300,11 @@ export class VisualAgentMapView extends ItemView {
     inputs: OutlineDraftInputs;
     markdown?: string;
     /** The AI's summaries by heading path: the outline box only keeps headings, so the import finds them again here. */
-    summaries?: Map<string, string>;
+    summaries?: OutlineSummaryBank;
     message?: string;
   } | null = null;
   /** The summaries of each parent's latest quick outline (by heading path below its root), used when the reviewed list is created. */
-  private quickOutlineSummaries = new Map<string, Map<string, string>>();
+  private quickOutlineSummaries = new Map<string, OutlineSummaryBank>();
   private synthesisTasks = new Map<
     string,
     {
@@ -3121,7 +3122,7 @@ export class VisualAgentMapView extends ItemView {
     return stylePickerFor(this.app, this.plugin);
   }
   /** Adds an outline to the open map: under the selected topic, else as a new tree. A new map starts from + New mind map. */
-  openOutlineImport(prefill?: OutlineDraftPrefill, summaries?: ReadonlyMap<string, string>): void {
+  openOutlineImport(prefill?: OutlineDraftPrefill, summaries?: ReadonlyMap<string, string[]>): void {
     const target = prefill ? this.reopenedImportTarget(prefill.inputs) : this.outlineImportTarget();
     if (target.map !== "editable") {
       new Notice(target.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map"));

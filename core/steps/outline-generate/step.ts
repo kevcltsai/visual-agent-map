@@ -98,6 +98,7 @@ function splitSummaries(text: string): { text: string; summaries: (string | unde
   const kept: string[] = [];
   const summaries: (string | undefined)[] = [];
   let afterHeading = false;
+  let gap = false; // blank line(s) right after a heading line
   for (const line of text.split("\n")) {
     const quote = REPLY_SUMMARY.exec(line);
     if (quote && afterHeading) {
@@ -105,6 +106,12 @@ function splitSummaries(text: string): { text: string; summaries: (string | unde
       afterHeading = false;
       continue;
     }
+    if (quote && gap) {
+      // Heading, blank line, `>`: still rejected, but as a missing summary so the retry runs (the heading stays without one).
+      gap = false;
+      continue;
+    }
+    gap = (afterHeading || gap) && line.trim() === "";
     afterHeading = REPLY_HEADING.test(line);
     if (afterHeading) summaries.push(undefined);
     kept.push(line);

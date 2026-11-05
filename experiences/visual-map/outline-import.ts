@@ -300,27 +300,56 @@ function outlinePathKeys(nodes: OutlineNode[], dropSingleRoot: boolean): (string
     return JSON.stringify(paths[node.index]);
   });
 }
+/** Summaries by heading path (a list per path, for same-title siblings) and by title (`t:` keys, for renamed ancestors). */
+export type OutlineSummaryBank = Map<string, string[]>;
+const TITLE_KEY = "t:";
+const PATH_KEY = "p:";
 /**
  * The AI's summaries by title path, so they can find their headings again after the outline went through a text box or a
- * review list that only keeps titles. `dropSingleRoot`: the outline's own root is not created (quick explore), so paths
- * start below it.
+ * review list that only keeps titles. A path that no longer matches (an ancestor was renamed) falls back to the title,
+ * only when that title is unique in the generated outline. `dropSingleRoot`: the outline's own root is not created
+ * (quick explore), so paths start below it.
  */
-export function outlineSummaryBank(nodes: OutlineNode[], dropSingleRoot = false): Map<string, string> {
-  const bank = new Map<string, string>();
+export function outlineSummaryBank(nodes: OutlineNode[], dropSingleRoot = false): OutlineSummaryBank {
+  const bank: OutlineSummaryBank = new Map();
+  const add = (key: string, summary: string) => bank.set(key, [...(bank.get(key) ?? []), summary]);
   const keys = outlinePathKeys(nodes, dropSingleRoot);
   nodes.forEach((node, index) => {
     const key = keys[index];
-    if (key !== null && node.summary) bank.set(key, node.summary);
+    if (key === null || !node.summary) return;
+    add(PATH_KEY + key, node.summary);
+    add(TITLE_KEY + node.title, node.summary);
   });
   return bank;
 }
-/** The nodes with the banked summary of their title path; a heading the user typed or renamed has none and stays empty. */
-export function applyOutlineSummaries(nodes: OutlineNode[], bank: ReadonlyMap<string, string>): OutlineNode[] {
+/**
+ * The nodes with the banked summary of their title path (same-path siblings take theirs in order); when the path has
+ * none, the summary of the same title if that title is unique in the generated outline. A heading the user typed or
+ * renamed has none and stays empty.
+ */
+export function applyOutlineSummaries(nodes: OutlineNode[], bank: ReadonlyMap<string, string[]>): OutlineNode[] {
   if (!bank.size) return nodes;
   const keys = outlinePathKeys(nodes, false);
+  const taken = new Map<string, number>();
+  const titlesUsed = new Set<string>();
   return nodes.map((node, index) => {
     const key = keys[index];
-    const summary = node.summary ?? (key === null ? undefined : bank.get(key));
+    let summary = node.summary;
+    if (!summary && key !== null) {
+      const list = bank.get(PATH_KEY + key);
+      if (list) {
+        const at = taken.get(key) ?? 0;
+        taken.set(key, at + 1);
+        summary = list[at];
+        if (summary) titlesUsed.add(node.title);
+      } else {
+        const byTitle = bank.get(TITLE_KEY + node.title);
+        if (byTitle?.length === 1 && !titlesUsed.has(node.title)) {
+          summary = byTitle[0];
+          titlesUsed.add(node.title);
+        }
+      }
+    }
     return summary ? { ...node, summary } : node;
   });
 }
@@ -401,10 +430,11 @@ async function createOutlineNotes(
             : { researchMode: "local" }
       );
       // The summary goes through the same write as a chat card's (frontmatter, Current Summary and the preview together).
+      note.parentId = top ? parentId : created[node.parent!].id;
+      // Pushed first: if the summary write throws, the caller's rollback still finds (and removes) this note.
+      created.push(note);
       const summary = cleanOutlineSummary(node.summary);
       if (summary) await repository.updateNote(note.path, { summary });
-      note.parentId = top ? parentId : created[node.parent!].id;
-      created.push(note);
     } catch (error) {
       return { created, failure: errorText(error) };
     }

@@ -846,6 +846,11 @@ const RELATION_LABEL_NOTE_MAX = 60;
 const TEXT_NODE_HEIGHT = 28;
 /** Width guess for a text block that is not drawn yet (an automatic block is as wide as its text, at most this). */
 const TEXT_NODE_WIDTH = TEXT_AUTO_WIDTH_MAX;
+/** What an automatic block's width will roughly be before it is drawn: its longest line (CJK counts double) plus padding and border, within the automatic limits. */
+function estimateTextWidth(text: string): number {
+  const line = Math.max(0, ...text.split(/\r?\n/).map(part => Array.from(part).reduce((sum, ch) => sum + (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 6.5), 0)));
+  return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
+}
 function depthOf(nodes: MapNode[], id: string): number {
   const byId = new Map(nodes.map(node => [node.id, node]));
   let depth = 0;
@@ -866,6 +871,20 @@ interface AnchorLine {
 const anchorLineKey = (imageId: string, anchorId: string, topicId: string): string =>
   `anchor:${imageId}:${anchorId}:${topicId}`;
 const BOUNDARY_PAD = 16;
+/**
+ * The lines of an exported text block. The block's real horizontal padding + border is 14, and the exporter's width guess runs wider than
+ * the browser's, so the text is widened until it needs no more lines than the screen shows: a fitted one-line block never loses its text.
+ */
+function textBlockLines(text: string, boxWidth: number, boxHeight: number, lineHeight: number): string[] {
+  const shown = Math.max(1, Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19)));
+  let room = Math.max(1, boxWidth - 14);
+  let lines = wrapText(text, room);
+  for (let tries = 0; lines.length > shown && tries < 40; tries++) {
+    room *= 1.1;
+    lines = wrapText(text, room);
+  }
+  return lines;
+}
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -1316,6 +1335,13 @@ export class VisualAgentMapView extends ItemView {
     (this.isTextId(id)
       ? this.textEls.get(id)?.offsetHeight || TEXT_NODE_HEIGHT
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
+  /** A text block's width for the layout: as drawn, else the stored one, else a guess from its text (a block not drawn yet). */
+  private textWidthOf = (id: string): number | undefined => {
+    const drawn = this.textEls.get(id)?.offsetWidth;
+    if (drawn) return drawn;
+    const item = (this.map?.canvasItems ?? []).find((entry): entry is TextItem => entry.kind === "text" && entry.id === id);
+    return item ? (item.width ?? estimateTextWidth(item.text)) : undefined;
+  };
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
   private textEls = new Map<string, HTMLElement>();
   /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
@@ -1395,7 +1421,7 @@ export class VisualAgentMapView extends ItemView {
       supersededAimNodeIds(map),
       this.cardHeightOf,
       layoutOf(map),
-      options
+      { ...options, widthOf: this.textWidthOf }
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -1409,7 +1435,8 @@ export class VisualAgentMapView extends ItemView {
       newIds,
       this.cardHeightOf,
       minTop,
-      layoutOf(map)
+      layoutOf(map),
+      this.textWidthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -8977,7 +9004,8 @@ export class VisualAgentMapView extends ItemView {
       if (!owner) {
         // No topic selected: a free block in the middle of the view (canvas-text-node decision #4).
         const center = this.stagePoint(null);
-        await this.addFreeText(center && { x: center.x - TEXT_NODE_WIDTH / 2, y: center.y });
+        // The new block shows the placeholder, as wide as that text; centre on that, not on the 300 limit.
+        await this.addFreeText(center && { x: center.x - estimateTextWidth(t("ui.text_node_placeholder")) / 2, y: center.y });
         return;
       }
       const id = `txt-${randomUUID().slice(0, 8)}`;
@@ -11467,7 +11495,7 @@ export class VisualAgentMapView extends ItemView {
         y: box.y,
         w: box.width,
         h: box.height,
-        title: wrapText(body?.textContent ?? "", box.width - 28),
+        title: textBlockLines(body?.textContent ?? "", box.width, box.height, parseFloat(computed(body ?? el).lineHeight)),
         plain: true,
         textColor: colorOf(computed(body ?? el).color)
       });

@@ -162,7 +162,8 @@ test('canvas-text-node: add without a selection makes a free text block in the v
   assert.equal(items.length, 1);
   assert.equal(items[0].parentId, undefined, 'a free block has no parent');
   assert.equal(items[0].links, undefined);
-  assert.deepEqual([items[0].x, items[0].y], [250, 300]);
+  // The block shows the short placeholder ("Text", about 42 wide), so it is centred on that, not on the 300 limit (old x was 250).
+  assert.deepEqual([items[0].x, items[0].y], [379, 300]);
   assert.equal(h.view.history.past.length, past + 1);
   assert.ok(h.textEl(items[0].id).hasClass('is-free'));
   assert.ok(find(h.textEl(items[0].id), i => i.tag === 'textarea'), 'the editor opens at once');
@@ -525,6 +526,24 @@ test('text-node-width: the handle is a separator with range; not drawn when the 
   h.view.presentation = {};
   h.view.render();
   assert.equal(handleOf(h)('t1'), undefined, 'no handle while presenting');
+});
+
+test('text-node-width: no handle in an AIM map or in selection mode (the map cannot edit canvas items); it is there again afterwards', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id }), free()]);
+  assert.ok(handleOf(h)('t1') && handleOf(h)('f1'), 'editable map has handles');
+  h.view.map.aim = { branches: [] };
+  h.view.render();
+  assert.equal(handleOf(h)('t1'), undefined, 'AIM attached');
+  assert.equal(handleOf(h)('f1'), undefined, 'AIM free');
+  delete h.view.map.aim;
+  h.view.selection.toggleMultiSelect();
+  assert.equal(h.view.selection.state.multiSelectMode, true);
+  h.view.render();
+  assert.equal(handleOf(h)('t1'), undefined, 'selection mode attached');
+  assert.equal(handleOf(h)('f1'), undefined, 'selection mode free');
+  h.view.selection.toggleMultiSelect();
+  h.view.render();
+  assert.ok(handleOf(h)('t1'), 'handle back');
 });
 
 test('text-node-width: a drag writes once on release (clamped), one undo step; undo restores automatic width', async () => {

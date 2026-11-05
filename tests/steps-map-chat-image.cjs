@@ -235,6 +235,26 @@ test('image-safe actions alone do not add image_other_actions', () => {
   const preview = planFor(safe, parents, { imageMode: 'preview', imageAttached: true });
   assert.deepEqual(plain(preview.reasons), ['image_preview']);
 });
+test('F-a B3 direct mode with a picture: 37 safe actions (12 anchors, 13 topics, 12 links) are not a plan; the same 37 in preview are', () => {
+  const thirtySeven = [
+    ...Array.from({ length: 12 }, (_, i) => ({ ...anchorAction, ref: `p${i}` })),
+    ...Array.from({ length: 13 }, (_, i) => ({ kind: 'add_child', parentId: '', title: `T${i}`, summary: '', ref: `n${i}` })),
+    ...Array.from({ length: 12 }, (_, i) => ({ ...linkAction, anchorId: `anchor:p${i}` }))
+  ];
+  assert.equal(thirtySeven.length, 37);
+  assert.equal(planFor(thirtySeven, parents, { imageMode: 'direct', imageAttached: true }), null);
+  const preview = planFor(thirtySeven, parents, { imageMode: 'preview', imageAttached: true });
+  assert.deepEqual(plain(preview.reasons), ['many_actions', 'image_preview']);
+  // One action outside the safe list brings both reasons back.
+  const mixed = planFor([...thirtySeven, { kind: 'rename_topic', nodeId: 'a', title: 'T' }], parents, { imageMode: 'direct', imageAttached: true });
+  assert.deepEqual(plain(mixed.reasons), ['many_actions', 'image_other_actions']);
+  // No picture sent: the old limit stands, in either mode.
+  for (const imageMode of ['direct', 'preview', undefined]) {
+    const plain37 = planFor(thirtySeven, parents, { imageMode, imageAttached: false });
+    assert.ok(plain37.reasons.includes('many_actions'), String(imageMode));
+  }
+  assert.ok(planFor(thirtySeven, parents, { imageMode: 'direct' }).reasons.includes('many_actions'), 'imageAttached missing');
+});
 test('the three older reasons keep their behaviour and come first', () => {
   const many = Array.from({ length: 16 }, () => anchorAction);
   const plan = planFor([...many, { kind: 'create_map', title: 'M' }], parents, { imageMode: 'preview', imageAttached: true });

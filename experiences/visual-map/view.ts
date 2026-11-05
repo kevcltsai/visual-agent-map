@@ -19585,12 +19585,19 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Undoes exactly the reply when it is the newest undo step; otherwise nothing changes and the Notice says how to undo in order. */
   private async undoChatReply(entry: TransactionEntry): Promise<"undone" | "later"> {
-    if (this.chatApplying || !this.isNewestUndoStep(entry)) {
+    const later = (): "later" => {
       if (this.chatReplyUndoState(entry) !== "undone") new Notice(t("ui.map_chat_undo_reply_later"));
       return "later";
-    }
-    await this.travel(false);
-    return "undone";
+    };
+    if (this.chatApplying || !this.isNewestUndoStep(entry)) return later();
+    // Through the write queue like Mod+Z: an undo outside it saves Map.md as an outside edit, and changed() clears the history.
+    let undone = false;
+    await this.plugin.mutate(async () => {
+      if (this.chatApplying || !this.isNewestUndoStep(entry)) return;
+      await this.travel(false);
+      undone = true;
+    });
+    return undone ? "undone" : later();
   }
   /** What the finished turn tells the panel: the picture it sent ("AI looked at this picture") and, when applied directly, the undo step. */
   private markChatTurn(origin: MapChatOrigin, request: { imageDataUrl?: string }, written?: TransactionEntry): void {
@@ -20175,7 +20182,12 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     void this.sendMapChat(
-      { text: texts.join("\n\n"), chips: [], selectedIds: this.chatSelectionIds() },
+      {
+        text: texts.join("\n\n"),
+        chips: [],
+        selectedIds: this.chatSelectionIds(),
+        ...(this.chatImageId ? { imageId: this.chatImageId } : {})
+      },
       texts.join("\n")
     );
   }

@@ -90,7 +90,12 @@ export function planFor(
 ): MapChatPlan | null {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons: MapChatPlanReason[] = [];
-  if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT) reasons.push("many_actions");
+  // A picture turn applied directly may place many anchors, links and topics at once (decision #14): they only add, and one undo takes them all back.
+  const imageAddsOnly =
+    options.imageMode === "direct" &&
+    options.imageAttached === true &&
+    actions.every(action => IMAGE_SAFE_KINDS.has(action.kind));
+  if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly) reasons.push("many_actions");
   let research = 0;
   let calls = 0;
   let imageSearches = 0;

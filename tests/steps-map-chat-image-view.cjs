@@ -71,11 +71,20 @@ async function harness({ items, caps = { imageInput: { maxEdgePx: 1568, maxBytes
     activeTasks: new Map(), quickExpandPending: new Set(), abortChartJobs() {}, addChartsAfterWrite() {}, views: () => [], modelLabel: id => id,
     currentModelChoice() { return { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }; },
     aiCalls: { capabilitiesFor: () => control.caps },
-    mutate(work) { queue = queue.then(work); return queue; },
+    // Like main.ts: a write made inside mutate() raises `writing`, and a vault modify event is passed to the view only when it is 0.
+    writing: 0,
+    mutate(work) { queue = queue.then(async () => { plugin.writing++; try { await work(); } finally { plugin.writing--; } }); return queue; },
     confirmAiUsage: async (model, run) => { control.confirms++; control.calls.push('confirm'); await run(); return true; },
     mapChat: { chat: async (request, signal, onReply, onProgress) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply, onProgress); } }
   });
   const view = new VisualAgentMapView({ app }, plugin);
+  // The outside-edit path of the view (changed() reloads the map and clears the history), recorded instead of run.
+  control.outsideEdits = [];
+  view.changed = file => control.outsideEdits.push(file.path);
+  for (const name of ['modify', 'process']) {
+    const original = app.vault[name]?.bind(app.vault);
+    if (original) app.vault[name] = async (file, ...rest) => { const result = await original(file, ...rest); if (!plugin.writing) view.changed(file); return result; };
+  }
   view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = dom.element('div'); view.stageEl = dom.element('div');
   view.render = () => {}; view.focusNode = () => {}; view.drawEdges = () => {}; view.updateHistoryButtons = () => {}; view.fit = () => {}; view.relocateMapChat = () => {};
   const chat = fakeChat(control);
@@ -283,6 +292,32 @@ test('send: a reply that arrives after Stop writes nothing', async () => {
   assert.equal(h.chat.plans.length, 0, 'and no plan was offered');
 });
 
+test('send (M9): Stop, then a second message at once, then the first reply comes back late: the first writes nothing and offers no plan; the second is untouched', async () => {
+  for (const imageMode of ['direct', 'preview']) {
+    const h = await harness();
+    h.plugin.settings.mapChatImageMode = imageMode;
+    h.select('img1');
+    const replies = [deferred(), deferred()];
+    h.control.reply = () => replies[h.control.requests.length - 1].promise;
+    h.chat.draft = 'first';
+    const first = h.view.sendMapChat();
+    await until(() => h.control.requests.length === 1);
+    h.view.stopMapChat();
+    h.chat.draft = 'second';
+    const second = h.view.sendMapChat();
+    await until(() => h.control.requests.length === 2);
+    replies[0].resolve({ reply: 'late', actions: [...anchorAction, link('anchor:p1', h.ids.a)], rejected: [] });
+    await first;
+    assert.equal((await h.image()).anchors.length, 1, `${imageMode}: the first reply wrote no anchor`);
+    assert.equal(h.chat.plans.length, 0, `${imageMode}: and offered no plan`);
+    assert.equal(h.view.history.undoEntry, undefined, `${imageMode}: no undo step`);
+    assert.equal(h.chat.calls.some(c => c[0] === 'finish' && c[1] === 'late'), false, 'the late text is not shown');
+    replies[1].resolve({ reply: 'second answer', actions: [], rejected: [] });
+    await second;
+    assert.equal(h.chat.calls.some(c => c[0] === 'finish' && c[1] === 'second answer'), true, 'the second message finishes normally');
+  }
+});
+
 test('send: a retry reads the picture again (origin carries only the id)', async () => {
   const h = await harness();
   h.select('img1');
@@ -456,6 +491,58 @@ test('P4a undo (counter-example): the button undoes one step only while the repl
   await h.view.travel(true);
   assert.equal(host.replyUndoState(token), 'top', 'redo brings the button back');
   assert.equal((await h.image()).anchors.length, 2);
+});
+
+test('F-a B2 undo button goes through the write queue: the save raises no outside-edit reload, so the history survives, redo works and the button is disabled', async () => {
+  const h = await harness();
+  h.plugin.settings.mapChatImageMode = 'direct'; h.select('img1');
+  h.control.reply = async () => ({ reply: 'Placed', actions: placeAnchor, rejected: [] });
+  await h.send('place');
+  const host = h.view.chatHost(); const token = h.chat.marks.at(-1).replyUndo.token;
+  h.control.outsideEdits.length = 0;
+  assert.equal(await host.undoReply(token), 'undone');
+  assert.equal((await h.image()).anchors.length, 1, 'the anchor of the reply is gone');
+  assert.deepEqual(plain(h.control.outsideEdits), [], 'the undo save is VAM\'s own write: no modify event reaches changed(), which would clear the history');
+  assert.equal(h.view.history.canRedo, true, 'the history is intact, so redo is possible');
+  assert.equal(host.replyUndoState(token), 'undone', 'the button is disabled');
+  await h.plugin.mutate(async () => { await h.view.travel(true); });
+  assert.equal(host.replyUndoState(token), 'top', 'redo brings the button back');
+  assert.equal((await h.image()).anchors.length, 2);
+});
+
+test('F-a B2 the top-of-stack check runs inside the queue: a step pushed while the undo waits is not undone', async () => {
+  const h = await harness();
+  h.plugin.settings.mapChatImageMode = 'direct'; h.select('img1');
+  h.control.reply = async () => ({ reply: 'Placed', actions: placeAnchor, rejected: [] });
+  await h.send('place');
+  const host = h.view.chatHost(); const token = h.chat.marks.at(-1).replyUndo.token;
+  const gate = deferred();
+  const busy = h.plugin.mutate(() => gate.promise);
+  const pressed = host.undoReply(token);
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'later edit' });
+  gate.resolve(); await busy;
+  assert.equal(await pressed, 'later');
+  assert.equal(h.view.history.undoEntry.label, 'later edit');
+  assert.equal((await h.image()).anchors.length, 2, 'the reply was not undone');
+});
+
+test('F-a M1 a follow-up that waited is sent with the picture the chip still shows', async () => {
+  const h = await harness(); h.select('img1');
+  h.chat.takeQueued = () => h.chat.pendingSteers.splice(0);
+  h.chat.pendingSteers = ['and the brisket?'];
+  h.view.flushSteers(true);
+  await until(() => h.control.requests.length === 1);
+  assert.equal(h.chat.turnsList.at(-1).origin.imageId, 'img1', 'the origin carries the picture');
+  assert.match(h.control.requests[0].imageDataUrl ?? '', DATA_URL, 'the model gets the picture');
+  assert.equal(h.control.requests[0].context.selectedImage.id, 'img1');
+  // No chip, no picture.
+  const g = await harness();
+  g.chat.takeQueued = () => g.chat.pendingSteers.splice(0);
+  g.chat.pendingSteers = ['plain follow-up'];
+  g.view.flushSteers(true);
+  await until(() => g.control.requests.length === 1);
+  assert.equal('imageId' in g.chat.turnsList.at(-1).origin, false);
+  assert.equal(g.control.requests[0].imageDataUrl, undefined);
 });
 
 // ---- P4b: the dashed preview dots on the canvas ------------------------------------------------------------------------

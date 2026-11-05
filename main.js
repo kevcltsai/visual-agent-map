@@ -1599,6 +1599,7 @@ var en = {
   "ui.map_chat_note_images_failed_0": "The picture search failed: {0}",
   "ui.map_chat_note_images_stopped": "The picture search was stopped.",
   "ui.map_chat_note_inserted_0": "(inserted into {0})",
+  "ui.map_chat_note_steer": "Added while the AI was answering",
   "ui.structure_review_entry_label": "AI structure suggestions:",
   "ui.structure_review_entry_map": "What to strengthen or cut? (whole map)",
   "ui.structure_review_entry_branch": "What to strengthen or cut? (this branch)",
@@ -4300,6 +4301,7 @@ var zhCN = {
   "ui.map_chat_note_images_failed_0": "\u627E\u56FE\u5931\u8D25\uFF1A{0}",
   "ui.map_chat_note_images_stopped": "\u5DF2\u505C\u6B62\u627E\u56FE\u3002",
   "ui.map_chat_note_inserted_0": "\uFF08\u5DF2\u63D2\u5165\u201C{0}\u201D\uFF09",
+  "ui.map_chat_note_steer": "\u4E2D\u9014\u8865\u5145",
   "ui.structure_review_entry_label": "AI \u7ED3\u6784\u5EFA\u8BAE\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u6574\u5F20\u56FE\uFF09",
   "ui.structure_review_entry_branch": "\u54EA\u91CC\u8BE5\u52A0\u5F3A\u6216\u5220\u51CF\uFF1F\uFF08\u8FD9\u4E2A\u5206\u652F\uFF09",
@@ -7001,6 +7003,7 @@ var zhTW = {
   "ui.map_chat_note_images_failed_0": "\u627E\u5716\u5931\u6557\uFF1A{0}",
   "ui.map_chat_note_images_stopped": "\u5DF2\u505C\u6B62\u627E\u5716\u3002",
   "ui.map_chat_note_inserted_0": "\uFF08\u5DF2\u63D2\u5165\u300C{0}\u300D\uFF09",
+  "ui.map_chat_note_steer": "\u4E2D\u9014\u88DC\u5145",
   "ui.structure_review_entry_label": "AI \u7D50\u69CB\u5EFA\u8B70\uFF1A",
   "ui.structure_review_entry_map": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u6574\u5F35\u5716\uFF09",
   "ui.structure_review_entry_branch": "\u54EA\u88E1\u8A72\u52A0\u5F37\u6216\u522A\u6E1B\uFF1F\uFF08\u9019\u500B\u5206\u652F\uFF09",
@@ -35603,9 +35606,15 @@ function transcriptMarkdown(input2) {
 ${escapeLine(labels.saved)}: ${localStamp(input2.savedAt)}`
   ];
   input2.turns.forEach((turn, index) => {
+    var _a2;
     parts.push("---");
     parts.push(`## ${index + 1}. ${escapeLine(labels.you)}`);
     parts.push(escapeMultiline(turn.question));
+    const steers = ((_a2 = turn.steers) != null ? _a2 : []).filter((text11) => text11.trim());
+    if (steers.length) {
+      parts.push(`**${escapeLine(labels.steer)}**`);
+      parts.push(steers.map((text11) => escapeMultiline(text11)).join("\n\n"));
+    }
     const refs = turn.refs.map(refMarkdown).filter(Boolean);
     if (refs.length) parts.push(`${escapeLine(labels.references)}: ${refs.join(", ")}`);
     parts.push(`### ${escapeLine(labels.ai)}`);
@@ -35864,12 +35873,17 @@ var MapChatPanel = class {
   }
   /** Finished question and answer turns, oldest first, for the next request. */
   turns() {
+    var _a2;
     const turns = [];
     for (let at = 0; at + 1 < this.messages.length; at += 2) {
       const question = this.messages[at];
       const answer = this.messages[at + 1];
       if (answer.streaming || answer.error || !answer.text.trim()) continue;
-      turns.push({ role: "user", text: question.text }, { role: "assistant", text: answer.text });
+      const steered = ((_a2 = question.steers) != null ? _a2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text);
+      turns.push(
+        { role: "user", text: [question.text, ...steered].join("\n\n") },
+        { role: "assistant", text: answer.text }
+      );
     }
     return turns;
   }
@@ -72997,7 +73011,7 @@ ${addition}` : addition });
   }
   /** What the chat window gets of a saved turn: the vault paths of the cards and notes it named, and the picture candidates. */
   chatTranscriptTurn(turn) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const { question, answer } = turn;
     const refs = [];
     const seen = /* @__PURE__ */ new Set();
@@ -73016,11 +73030,12 @@ ${addition}` : addition });
     for (const id of (_d = (_c = question.origin) == null ? void 0 : _c.selectedIds) != null ? _d : []) topic(id);
     return {
       question: question.text,
+      steers: ((_e = question.steers) != null ? _e : []).filter((steer) => steer.state === "live").map((steer) => steer.text),
       refs,
       answer: answer.text,
       lines: answer.lines.map((line) => settledLine(line).text),
       ...answer.plan ? { plan: answer.plan.state } : {},
-      images: ((_e = answer.images) != null ? _e : []).map((block) => ({
+      images: ((_f = answer.images) != null ? _f : []).map((block) => ({
         nodeTitle: block.nodeTitle,
         query: block.query,
         state: block.state,
@@ -73055,6 +73070,7 @@ ${addition}` : addition });
         map: t("ui.map_chat_note_map"),
         saved: t("ui.map_chat_note_saved"),
         you: t("ui.map_chat_role_you"),
+        steer: t("ui.map_chat_note_steer"),
         ai: t("ui.map_chat_role_ai"),
         references: t("ui.map_chat_note_references"),
         results: t("ui.map_chat_note_results"),

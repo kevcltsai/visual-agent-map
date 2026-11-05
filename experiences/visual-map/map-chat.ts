@@ -460,7 +460,12 @@ export class MapChatPanel {
       const question = this.messages[at];
       const answer = this.messages[at + 1];
       if (answer.streaming || answer.error || !answer.text.trim()) continue;
-      turns.push({ role: "user", text: question.text }, { role: "assistant", text: answer.text });
+      // Follow-ups that went into the turn are part of what the user asked: joined by a blank line, no tag.
+      const steered = (question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text);
+      turns.push(
+        { role: "user", text: [question.text, ...steered].join("\n\n") },
+        { role: "assistant", text: answer.text }
+      );
     }
     return turns;
   }

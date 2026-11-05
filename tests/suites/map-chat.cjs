@@ -222,6 +222,15 @@ test('map chat: while the AI works Stop is shown with a visible status, the repl
   eq(f.panel.turns(), [{ role: 'user', text: 'ask' }, { role: 'assistant', text: 'final answer' }]);
 });
 
+test('map chat steer B3: history joins the question and the delivered steers with a blank line; queued ones are left out', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('ask');
+  f.panel.addSteer('also this', 'live'); f.panel.addSteer('later', 'queued'); f.panel.addSteer('and that', 'live');
+  f.panel.finish('final answer', []);
+  eq(f.panel.turns(), [{ role: 'user', text: 'ask\n\nalso this\n\nand that' }, { role: 'assistant', text: 'final answer' }]);
+  eq(f.panel.completedTurns()[0].question.text, 'ask', 'the saved turn keeps the bare question; steers are separate');
+});
+
 test('map chat: a failed or stopped turn shows its own text and does not become history', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   f.panel.begin('one'); f.panel.fail('It broke');

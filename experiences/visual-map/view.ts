@@ -21500,6 +21500,7 @@ export class VisualAgentMapView extends ItemView {
     for (const id of question.origin?.selectedIds ?? []) topic(id);
     return {
       question: question.text,
+      steers: (question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text),
       refs,
       answer: answer.text,
       lines: answer.lines.map(line => settledLine(line).text),
@@ -21540,6 +21541,7 @@ export class VisualAgentMapView extends ItemView {
         map: t("ui.map_chat_note_map"),
         saved: t("ui.map_chat_note_saved"),
         you: t("ui.map_chat_role_you"),
+        steer: t("ui.map_chat_note_steer"),
         ai: t("ui.map_chat_role_ai"),
         references: t("ui.map_chat_note_references"),
         results: t("ui.map_chat_note_results"),

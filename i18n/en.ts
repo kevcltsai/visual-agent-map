@@ -1631,6 +1631,7 @@ export const en = {
   "ui.map_chat_note_images_failed_0": "The picture search failed: {0}",
   "ui.map_chat_note_images_stopped": "The picture search was stopped.",
   "ui.map_chat_note_inserted_0": "(inserted into {0})",
+  "ui.map_chat_note_steer": "Added while the AI was answering",
   "ui.structure_review_entry_label": "AI structure suggestions:",
   "ui.structure_review_entry_map": "What to strengthen or cut? (whole map)",
   "ui.structure_review_entry_branch": "What to strengthen or cut? (this branch)",

@@ -1548,6 +1548,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_note_images_failed_0": "找图失败：{0}",
   "ui.map_chat_note_images_stopped": "已停止找图。",
   "ui.map_chat_note_inserted_0": "（已插入“{0}”）",
+  "ui.map_chat_note_steer": "中途补充",
   "ui.structure_review_entry_label": "AI 结构建议：",
   "ui.structure_review_entry_map": "哪里该加强或删减？（整张图）",
   "ui.structure_review_entry_branch": "哪里该加强或删减？（这个分支）",

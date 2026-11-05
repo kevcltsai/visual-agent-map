@@ -46,7 +46,7 @@ test('B3 file name: the first sentence ends at the cut before illegal characters
 
 // ---- serialization ----------------------------------------------------------------------------------------------------
 const labels = {
-  title: 'Map chat', map: 'Map', saved: 'Saved', you: 'You', ai: 'AI', references: 'References', results: 'Results',
+  title: 'Map chat', map: 'Map', saved: 'Saved', you: 'You', steer: 'Added while answering', ai: 'AI', references: 'References', results: 'Results',
   planPending: 'Plan: waiting for a decision', planApplied: 'Plan: applied', planCancelled: 'Plan: cancelled',
   images: 'Picture candidates for {0}', imagesSearching: 'Searching: {0}', imagesNone: 'No loadable picture was found', imagesFailed: 'Search failed: {0}', imagesStopped: 'Search stopped',
   inserted: '(inserted into {0})'
@@ -237,6 +237,15 @@ test('B3-fix the key splitter leaves wikilink targets alone', () => {
 });
 
 // ---- persona ticket 16: the conversation lives in memory only, so closing the view with unsaved turns must warn ----------
+test('B3 steer: delivered follow-ups sit under the question, labelled and escaped; none means no label', () => {
+  const out = render([turn({ steers: ['and **green**', '![[secret]] <b>x</b>'] })]);
+  assert.match(out, /## 1\. You\n\nWhat is tea\\\?\n\n\*\*Added while answering\*\*\n\nand \\\*\\\*green\\\*\\\*\n\n/);
+  assert.ok(out.includes('\\!\\[\\[secret\\]\\] \\<b\\>x\\<\\/b\\>'), 'embed and html are plain text');
+  assert.ok(!out.includes('![['), 'no embed'); assert.ok(!/<b>/.test(out), 'no html tag');
+  assert.ok(!render([turn()]).includes('Added while answering'), 'no steers, no label');
+  assert.ok(!render([turn({ steers: ['  '] })]).includes('Added while answering'), 'blank steer ignored');
+});
+
 test('persona-16: closing warns only when finished turns exist that were not saved as a note', () => {
   assert.equal(hasUnsavedChat(0, 0), false, 'an empty chat has nothing to lose');
   assert.equal(hasUnsavedChat(2, 0), true, 'never saved');

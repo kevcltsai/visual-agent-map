@@ -272,6 +272,8 @@ export interface TranscriptImages {
 }
 export interface TranscriptTurn {
   question: string;
+  /** Follow-ups typed while the reply was made (only those that reached the AI), oldest first. */
+  steers?: string[];
   refs: TranscriptRef[];
   answer: string;
   /** Result lines exactly as the window shows them. */
@@ -285,6 +287,8 @@ export interface TranscriptLabels {
   map: string;
   saved: string;
   you: string;
+  /** Heading of the follow-ups typed while the AI was answering. */
+  steer: string;
   ai: string;
   references: string;
   results: string;
@@ -345,6 +349,11 @@ export function transcriptMarkdown(input: TranscriptInput): string {
     parts.push("---");
     parts.push(`## ${index + 1}. ${escapeLine(labels.you)}`);
     parts.push(escapeMultiline(turn.question));
+    const steers = (turn.steers ?? []).filter(text => text.trim());
+    if (steers.length) {
+      parts.push(`**${escapeLine(labels.steer)}**`);
+      parts.push(steers.map(text => escapeMultiline(text)).join("\n\n"));
+    }
     const refs = turn.refs.map(refMarkdown).filter(Boolean);
     if (refs.length) parts.push(`${escapeLine(labels.references)}: ${refs.join(", ")}`);
     parts.push(`### ${escapeLine(labels.ai)}`);

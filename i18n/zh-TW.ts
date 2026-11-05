@@ -1550,6 +1550,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_note_images_failed_0": "找圖失敗：{0}",
   "ui.map_chat_note_images_stopped": "已停止找圖。",
   "ui.map_chat_note_inserted_0": "（已插入「{0}」）",
+  "ui.map_chat_note_steer": "中途補充",
   "ui.structure_review_entry_label": "AI 結構建議：",
   "ui.structure_review_entry_map": "哪裡該加強或刪減？（整張圖）",
   "ui.structure_review_entry_branch": "哪裡該加強或刪減？（這個分支）",

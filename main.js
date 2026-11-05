@@ -28519,11 +28519,14 @@ function isEntry(value) {
   if (!isRecord3(value)) return false;
   return typeof value.at === "string" && !Number.isNaN(Date.parse(value.at)) && isAction(value.action) && (value.mapPath === void 0 || typeof value.mapPath === "string") && (value.topic === void 0 || typeof value.topic === "string") && (value.provider === "claude" || value.provider === "codex") && typeof value.model === "string" && isTokens(value) && typeof value.estimated === "boolean" && (value.durationMs === void 0 || isCount(value.durationMs));
 }
+var isFolded = (value) => isTokens(value) && (value.estimated === void 0 || value.estimated === true);
+var isMaps = (value) => isRecord3(value) && Object.values(value).every(
+  (actions) => isRecord3(actions) && Object.entries(actions).every(([key2, tokens2]) => isAction(key2) && isFolded(tokens2))
+);
 function isBucket(value) {
-  if (!isRecord3(value) || !isRecord3(value.maps)) return false;
-  return Object.values(value.maps).every(
-    (actions) => isRecord3(actions) && Object.entries(actions).every(([key2, tokens2]) => isAction(key2) && isTokens(tokens2))
-  );
+  if (!isRecord3(value) || !isMaps(value.maps)) return false;
+  if (value.providers === void 0) return true;
+  return isRecord3(value.providers) && Object.entries(value.providers).every(([key2, maps]) => (key2 === "claude" || key2 === "codex") && isMaps(maps));
 }
 function localDayStart(now = Date.now()) {
   const date = new Date(now);
@@ -28605,7 +28608,7 @@ var AiUsageStore = class {
   }
   /**
    * Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all, and one provider
-   * or both. Folded months do not record the provider, so a provider filter counts detail rows only.
+   * or both. Folded months keep a per-provider breakdown; months folded before it existed count under Total only.
    */
   totals(query = {}) {
     if (this.loadError) return { status: "unreadable" };
@@ -28652,6 +28655,7 @@ var AiUsageStore = class {
     await this.writes;
   }
   each(query, visit) {
+    var _a2;
     const { mapPath, since, provider } = query;
     for (const entry of this.entries) {
       if (mapPath !== void 0 && entry.mapPath !== mapPath) continue;
@@ -28659,18 +28663,20 @@ var AiUsageStore = class {
       if (since !== void 0 && Date.parse(entry.at) < since) continue;
       visit(entry.action, entry, entry.estimated);
     }
-    if (provider !== void 0) return;
     for (const [key2, bucket] of Object.entries(this.monthly)) {
       if (since !== void 0 && monthStartOf(key2) < since) continue;
-      for (const [path, actions] of Object.entries(bucket.maps)) {
+      const maps = provider === void 0 ? bucket.maps : (_a2 = bucket.providers) == null ? void 0 : _a2[provider];
+      if (!maps) continue;
+      for (const [path, actions] of Object.entries(maps)) {
         if (mapPath !== void 0 && path !== mapPath) continue;
-        for (const [action, tokens2] of Object.entries(actions)) visit(action, tokens2, false);
+        for (const [action, tokens2] of Object.entries(actions))
+          if (tokens2) visit(action, tokens2, tokens2.estimated === true);
       }
     }
   }
   /** Folds rows older than the detail window into their month. */
   compact() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const cutoff = this.now() - USAGE_DETAIL_DAYS * 864e5;
     const keep = [];
     for (const entry of this.entries) {
@@ -28680,10 +28686,14 @@ var AiUsageStore = class {
         continue;
       }
       const bucket = (_c = (_a2 = this.monthly)[_b2 = monthKey(time)]) != null ? _c : _a2[_b2] = { maps: {} };
-      const actions = (_g = (_e = bucket.maps)[_f = (_d = entry.mapPath) != null ? _d : ""]) != null ? _g : _e[_f] = {};
-      const tokens2 = (_i = actions[_h = entry.action]) != null ? _i : actions[_h] = ZERO();
-      tokens2.inputTokens += entry.inputTokens;
-      tokens2.outputTokens += entry.outputTokens;
+      const perProvider = (_g = (_e = (_d = bucket.providers) != null ? _d : bucket.providers = {})[_f = entry.provider]) != null ? _g : _e[_f] = {};
+      for (const maps of [bucket.maps, perProvider]) {
+        const actions = (_j = maps[_i = (_h = entry.mapPath) != null ? _h : ""]) != null ? _j : maps[_i] = {};
+        const tokens2 = (_l = actions[_k = entry.action]) != null ? _l : actions[_k] = ZERO();
+        tokens2.inputTokens += entry.inputTokens;
+        tokens2.outputTokens += entry.outputTokens;
+        if (entry.estimated) tokens2.estimated = true;
+      }
     }
     this.entries = keep;
   }

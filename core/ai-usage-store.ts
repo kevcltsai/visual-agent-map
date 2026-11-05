@@ -33,10 +33,17 @@ export type UsageQuery<T> = { status: "ready"; value: T } | { status: "unreadabl
 /** Details older than this are folded into `monthly`. */
 export const USAGE_DETAIL_DAYS = 90;
 
-type ActionTokens = Partial<Record<UsageAction, UsageTokens>>;
-/** One month of folded-away details: per map path ("" = no map) and action. */
+/** Folded tokens; `estimated` is set when any folded row was an estimate. */
+type FoldedTokens = UsageTokens & { estimated?: true };
+type ActionTokens = Partial<Record<UsageAction, FoldedTokens>>;
+/**
+ * One month of folded-away details: per map path ("" = no map) and action, for both providers together in `maps`
+ * and per provider in `providers`. `providers` is optional so buckets folded before it existed still load; such
+ * months count under Total only.
+ */
 interface MonthlyBucket {
   maps: Record<string, ActionTokens>;
+  providers?: Partial<Record<UsageProvider, Record<string, ActionTokens>>>;
 }
 interface UsageFile {
   version: 1;
@@ -68,10 +75,21 @@ function isEntry(value: unknown): value is UsageEntry {
   );
 }
 
+const isFolded = (value: unknown): boolean =>
+  isTokens(value) &&
+  ((value as { estimated?: unknown }).estimated === undefined || (value as { estimated?: unknown }).estimated === true);
+const isMaps = (value: unknown): boolean =>
+  isRecord(value) &&
+  Object.values(value).every(
+    actions => isRecord(actions) && Object.entries(actions).every(([key, tokens]) => isAction(key) && isFolded(tokens))
+  );
+
 function isBucket(value: unknown): value is MonthlyBucket {
-  if (!isRecord(value) || !isRecord(value.maps)) return false;
-  return Object.values(value.maps).every(
-    actions => isRecord(actions) && Object.entries(actions).every(([key, tokens]) => isAction(key) && isTokens(tokens))
+  if (!isRecord(value) || !isMaps(value.maps)) return false;
+  if (value.providers === undefined) return true;
+  return (
+    isRecord(value.providers) &&
+    Object.entries(value.providers).every(([key, maps]) => (key === "claude" || key === "codex") && isMaps(maps))
   );
 }
 
@@ -174,7 +192,7 @@ export class AiUsageStore {
 
   /**
    * Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all, and one provider
-   * or both. Folded months do not record the provider, so a provider filter counts detail rows only.
+   * or both. Folded months keep a per-provider breakdown; months folded before it existed count under Total only.
    */
   totals(query: { mapPath?: string; since?: number; provider?: UsageProvider } = {}): UsageQuery<UsageSum> {
     if (this.loadError) return { status: "unreadable" };
@@ -242,14 +260,16 @@ export class AiUsageStore {
       if (since !== undefined && Date.parse(entry.at) < since) continue;
       visit(entry.action, entry, entry.estimated);
     }
-    // Folded months keep no provider (the file format is fixed), so they cannot be attributed to one.
-    if (provider !== undefined) return;
     // A folded month counts when it starts at or after `since`; it only ever holds rows older than the detail window.
+    // With a provider filter only that provider's breakdown counts (months folded before it existed have none).
     for (const [key, bucket] of Object.entries(this.monthly)) {
       if (since !== undefined && monthStartOf(key) < since) continue;
-      for (const [path, actions] of Object.entries(bucket.maps)) {
+      const maps = provider === undefined ? bucket.maps : bucket.providers?.[provider];
+      if (!maps) continue;
+      for (const [path, actions] of Object.entries(maps)) {
         if (mapPath !== undefined && path !== mapPath) continue;
-        for (const [action, tokens] of Object.entries(actions)) visit(action as UsageAction, tokens, false);
+        for (const [action, tokens] of Object.entries(actions))
+          if (tokens) visit(action as UsageAction, tokens, tokens.estimated === true);
       }
     }
   }
@@ -265,10 +285,14 @@ export class AiUsageStore {
         continue;
       }
       const bucket = (this.monthly[monthKey(time)] ??= { maps: {} });
-      const actions = (bucket.maps[entry.mapPath ?? ""] ??= {});
-      const tokens = (actions[entry.action] ??= ZERO());
-      tokens.inputTokens += entry.inputTokens;
-      tokens.outputTokens += entry.outputTokens;
+      const perProvider = ((bucket.providers ??= {})[entry.provider] ??= {});
+      for (const maps of [bucket.maps, perProvider]) {
+        const actions = (maps[entry.mapPath ?? ""] ??= {});
+        const tokens: FoldedTokens = (actions[entry.action] ??= ZERO());
+        tokens.inputTokens += entry.inputTokens;
+        tokens.outputTokens += entry.outputTokens;
+        if (entry.estimated) tokens.estimated = true;
+      }
     }
     this.entries = keep;
   }

@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
-const { test, integrationTest, load, core, plain, obsidian, DEFAULT_SETTINGS, normalizeReasoningLevel } = require('../support.cjs');
+const { test, integrationTest, load, core, plain, obsidian, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, TFile } = require('../support.cjs');
+const dom = require('../support-dom.cjs');
 test('model inheritance distinguishes CLI default from absent parent and copies once', () => {
   assert.equal(core.inheritModel(undefined, 'root-model'), 'root-model');
   assert.equal(core.inheritModel('', 'root-model'), '');
@@ -440,12 +441,12 @@ const valueOf = page => typeof page.displayValue === 'function' ? page.displayVa
 const statusOf = page => typeof page.status === 'function' ? page.status() : page.status;
 const pageNamed = (tab, name) => allPages(tab.getSettingDefinitions()).find(p => p.name === name);
 
-test('settings page: five top-level groups in order, eleven rows, three top-level pages and no nested page', () => {
+test('settings page: five top-level groups in order, twelve rows, three top-level pages and no nested page', () => {
   const { tab } = groupedTab();
   const defs = tab.getSettingDefinitions();
   assert.ok(defs.every(d => d.type === 'group'), 'the top level holds only groups');
   assert.deepEqual(plain(defs.map(d => d.heading)), ['General', 'AI', 'Notes', 'Map', 'Advanced']);
-  assert.equal(defs.reduce((n, d) => n + d.items.length, 0), 11);
+  assert.equal(defs.reduce((n, d) => n + d.items.length, 0), 12);
   assert.deepEqual(plain(pagesOf(defs).map(p => p.name)), ['AI connection', 'Note style', 'Advanced and troubleshooting']);
   const note = pageNamed(tab, 'Note style');
   assert.deepEqual(plain(pagesOf(note.items).map(p => p.name)), [], 'the "By topic type" sub-page is gone (grilling Q11)');
@@ -459,7 +460,7 @@ test('settings page: every control and saved key is still reachable after the re
   assert.ok(rows.some(r => r.control && r.control.key === 'claudePath'));
   assert.equal(rows.filter(r => r.render && MODEL_ROW.test(r.name)).length, 1);
   const names = rows.map(r => r.name);
-  for (const name of ['Interface language', 'Hover preview size', 'Mind Maps folder', 'AIM folder', 'Record AI exchanges', 'Add diagrams after research', 'Reconnect existing Workspace', 'File location', 'Topic', 'AIM conclusion note']) assert.ok(names.includes(name), `${name} is on the page`);
+  for (const name of ['Interface language', 'Hover preview size', 'Mind Maps folder', 'AIM folder', 'Record AI exchanges', 'Save map AI conversations', 'Add diagrams after research', 'Reconnect existing Workspace', 'File location', 'Topic', 'AIM conclusion note']) assert.ok(names.includes(name), `${name} is on the page`);
 });
 
 test('settings page: the two sub-page intro rows render with an empty name and the sentence as the description, and stay out of search', () => {
@@ -671,5 +672,106 @@ test('UX B2: the AI usage notice says in plain words what is sent where and whos
     assert.match(intro, /your message/); assert.match(intro, /current map/); assert.match(intro, service); assert.match(intro, allowance);
     assert.deepEqual(buttons.map(b => [b.text, b.cta]), [['Cancel', false], ['Agree and send', true]]);
     buttons[1].click(); assert.deepEqual(answers, [true], 'agreeing still answers yes, once');
+  }
+});
+
+// Map chat records switch (A2, A10)
+test('mapChatRecords defaults off and sanitizes', () => {
+  const Main = load('main.ts', { obsidian });
+  assert.equal(DEFAULT_SETTINGS.mapChatRecords, false);
+  assert.equal(Main.settingsFromSaved(null).mapChatRecords, false);
+  assert.equal(Main.settingsFromSaved({}).mapChatRecords, false);
+  for (const bad of ['true', 1, 'yes', null, {}, [], 0]) assert.equal(Main.settingsFromSaved({ mapChatRecords: bad }).mapChatRecords, false, String(bad));
+  assert.equal(Main.settingsFromSaved({ mapChatRecords: false }).mapChatRecords, false);
+  assert.equal(Main.settingsFromSaved({ mapChatRecords: true }).mapChatRecords, true);
+});
+test('turning records off asks keep/delete with count N', async () => {
+  const notices = [];
+  const Modal = dom.makeModal();
+  const modals = [];
+  const { turnMapChatRecordsOff } = load('ui/modals/map-chat-records-off-modal.ts', { obsidian: { ...obsidian, Modal: class extends Modal { constructor(a) { super(a); modals.push(this); } }, Notice: dom.makeNotice(notices) } });
+  const rec = (root, n) => `${root}/Chats/records/20261106-0000${String(n).padStart(2, '0')}-abc12${n}.jsonl`;
+  const build = async () => {
+    const { app, trashed, files } = fixture('en');
+    app.vault.getFiles = () => Array.from(files.values()).filter(f => f instanceof TFile);
+    const paths = [
+      rec('Agent Workspace/Mind Maps/Alpha', 1), rec('Agent Workspace/Mind Maps/Alpha', 2),
+      rec('Agent Workspace/Mind Maps/Gone', 3) // Map.md deleted, folder and records still there
+    ];
+    for (const path of paths) await app.vault.create(path, '{"v":1}\n');
+    // Counter-examples: never deleted
+    const keepers = ['Agent Workspace/Mind Maps/Alpha/Chats/records/notes.md', 'Agent Workspace/Mind Maps/Alpha/Chats/other.jsonl', 'Agent Workspace/Mind Maps/Alpha/Chats/records/bad-name.jsonl', 'Agent Workspace/Mind Maps/Alpha/Map.md', '.obsidian/Chats/records/20261106-000001-abc123.jsonl'];
+    for (const path of keepers) await app.vault.create(path, 'x');
+    return { app, trashed, paths };
+  };
+  const writer = () => { const w = { enabled: true, idles: 0, setEnabled(on) { w.enabled = on; }, async idle() { w.idles++; } }; return w; };
+  const tick = () => new Promise(resolve => setImmediate(resolve));
+  const clickBy = (modal, text) => dom.findAll(modal.modalEl, i => i.tag === 'button').find(b => b.text.startsWith(text)).click();
+
+  // keep: default focus is on Keep, files untouched, writers stopped
+  {
+    const { app, trashed, paths } = await build();
+    const w = writer();
+    const pending = turnMapChatRecordsOff({ app, writers: [w] });
+    await tick();
+    assert.equal(modals.length, 1);
+    const m = modals[0];
+    assert.equal(w.enabled, false);
+    assert.match(m.contentEl.children[0].text, /3 conversations/);
+    const buttons = dom.findAll(m.modalEl, i => i.tag === 'button');
+    assert.deepEqual(buttons.map(b => b.text), ['Keep', 'Delete 3 conversations']);
+    assert.equal(dom.focusedNow(), buttons[0]);
+    clickBy(m, 'Keep');
+    assert.deepEqual(plain(await pending), { deleted: 0, failed: 0 });
+    assert.deepEqual(trashed, []);
+    assert.ok(paths.every(p => app.vault.getAbstractFileByPath(p)));
+  }
+  // Escape / closing the dialog keeps too
+  {
+    modals.length = 0;
+    const { app, trashed } = await build();
+    const pending = turnMapChatRecordsOff({ app, writers: [] });
+    await tick();
+    modals[0].close();
+    assert.deepEqual(plain(await pending), { deleted: 0, failed: 0 });
+    assert.deepEqual(trashed, []);
+  }
+  // delete: only the 3 record files go to trashFile, after the writers' queues drained; the others stay
+  {
+    modals.length = 0;
+    const { app, trashed, paths } = await build();
+    const w = writer();
+    const vaultDelete = []; app.vault.delete = async f => { vaultDelete.push(f.path); };
+    const pending = turnMapChatRecordsOff({ app, writers: [w] });
+    await tick();
+    clickBy(modals[0], 'Delete 3');
+    assert.deepEqual(plain(await pending), { deleted: 3, failed: 0 });
+    assert.deepEqual(plain([...trashed].sort()), plain([...paths].sort()));
+    assert.deepEqual(vaultDelete, []);
+    assert.ok(w.idles >= 2);
+  }
+  // switched back on while the dialog was open: nothing is deleted
+  {
+    modals.length = 0;
+    const { app, trashed } = await build();
+    let off = true;
+    const pending = turnMapChatRecordsOff({ app, writers: [], stillOff: () => off });
+    await tick();
+    off = false;
+    clickBy(modals[0], 'Delete 3');
+    await pending;
+    assert.deepEqual(trashed, []);
+  }
+  // N=0: no dialog; an unrelated .md / other .jsonl does not count
+  {
+    modals.length = 0;
+    const { app, trashed, files } = fixture('en');
+    app.vault.getFiles = () => Array.from(files.values()).filter(f => f instanceof TFile);
+    for (const path of ['A/Chats/records/notes.md', 'A/Chats/other.jsonl', 'A/Chats/records/bad-name.jsonl', 'A/Chats/records/sub/20261106-000001-abc123.jsonl']) await app.vault.create(path, 'x');
+    const w = writer();
+    assert.deepEqual(plain(await turnMapChatRecordsOff({ app, writers: [w] })), { deleted: 0, failed: 0 });
+    assert.equal(modals.length, 0);
+    assert.equal(w.enabled, false);
+    assert.deepEqual(trashed, []);
   }
 });

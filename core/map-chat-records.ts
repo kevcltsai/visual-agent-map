@@ -168,6 +168,11 @@ export function isRecordFilePath(path: string): boolean {
   return isRecordId(match[2]);
 }
 
+/** The record files among some vault files: only paths {@link isRecordFilePath} accepts (a `.md` or any other `.jsonl` beside them is never one). */
+export function recordFilesIn<T extends { path: string }>(files: readonly T[]): T[] {
+  return files.filter(file => isRecordFilePath(file.path));
+}
+
 // ---- writing ----
 
 /** One line of the file, newline included, with `v:1` first. */

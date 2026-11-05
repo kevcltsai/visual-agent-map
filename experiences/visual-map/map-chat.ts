@@ -1384,7 +1384,8 @@ export class MapChatPanel {
    * there is no finished turn or the map has no folder to save into.
    */
   /** "New conversation" exists only while records are on; it waits (aria-disabled) while a turn runs. */
-  private refreshNewButton(): void {
+  refreshNewButton(): void {
+    if (!this.built) return;
     const on = this.host.recordsEnabled?.() === true;
     if (!on) {
       this.newEl?.remove();

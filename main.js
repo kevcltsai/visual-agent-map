@@ -36842,6 +36842,7 @@ ${typed}` : draft;
   /** "New conversation" exists only while records are on; it waits (aria-disabled) while a turn runs. */
   refreshNewButton() {
     var _a2, _b2, _c;
+    if (!this.built) return;
     const on = ((_b2 = (_a2 = this.host).recordsEnabled) == null ? void 0 : _b2.call(_a2)) === true;
     if (!on) {
       (_c = this.newEl) == null ? void 0 : _c.remove();
@@ -72256,6 +72257,11 @@ ${note.detail.trim()}` : "",
     }
     return this.chatRecords;
   }
+  /** The settings switch for conversation records was flipped: the panel shows or hides what depends on it. */
+  refreshChatRecordsSwitch() {
+    var _a2;
+    (_a2 = this.chat) == null ? void 0 : _a2.refreshNewButton();
+  }
   /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn. */
   chatRecordSaved() {
     var _a2, _b2;
@@ -86050,10 +86056,15 @@ ${t("ui.organize_link_wait_hint")}`;
     if (this.settings.mapChatRecords === on) return;
     this.settings.mapChatRecords = on;
     await this.saveSettings();
+    const refreshViews = () => {
+      for (const view of this.views()) view.refreshChatRecordsSwitch();
+    };
     if (on) {
       for (const writer of this.mapChatRecordWriters) writer.setEnabled(true);
+      refreshViews();
       return;
     }
+    refreshViews();
     await turnMapChatRecordsOff({
       app: this.app,
       writers: this.mapChatRecordWriters,

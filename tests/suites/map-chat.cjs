@@ -385,6 +385,9 @@ async function harness({ aim = false, document = false, empty = false, realRende
     saveSettings: async () => { control.saves = (control.saves ?? 0) + 1; },
     // The real plugin's methods (main.ts) on this stand-in, so the view is tested against the shipped current-model logic.
     currentModelListeners: new Set(),
+    mapChatRecordWriters: new Set(),
+    // The real switch on a stand-in whose `views` lists the one view under test (the plugin's own `views` is the other windows) and whose vault holds no record file (the keep/delete question is tested with the modal).
+    setMapChatRecords: on => realPlugin.prototype.setMapChatRecords.call({ settings, app: { vault: { getFiles: () => [] } }, mapChatRecordWriters: plugin.mapChatRecordWriters, saveSettings: plugin.saveSettings, views: () => [ctx.view] }, on),
     setCurrentModel: model => realPlugin.prototype.setCurrentModel.call(plugin, model),
     subscribeCurrentModel: listener => realPlugin.prototype.subscribeCurrentModel.call(plugin, listener),
     availableModels: () => control.claudeReady ? ['gpt-6-luna', 'claude:sonnet', 'claude:haiku'] : ['gpt-6-luna'], modelLabel: id => `label(${id})`,
@@ -6080,6 +6083,16 @@ integrationTest('map chat records: A1 records off writes nothing', async () => {
   eq(h.control.writers, [], 'no writer was made or registered'); assert.equal(h.view.chatRecords, null);
   assert.equal(unsavedNotice(h).length, 1, 'closing still says the chat is not kept');
   const f = await harness(); await f.view.hydrate(); const c = f.open(); assert.equal(find(c.headEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-new')), undefined, 'no New conversation button');
+});
+
+integrationTest('map chat records: A1 flipping the switch with the side window open shows and hides the New conversation button at once', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const button = () => find(chat.headEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-new'));
+  assert.equal(button(), undefined);
+  await h.plugin.setMapChatRecords(true);
+  assert.ok(button(), 'on: the button appears without a repaint');
+  await h.plugin.setMapChatRecords(false);
+  assert.equal(button(), undefined, 'off: the button goes away without a repaint');
 });
 
 integrationTest('map chat records: A4 records failed, stopped, resent turns and undo/redo of a reply as events', async () => {

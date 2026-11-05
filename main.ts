@@ -1724,10 +1724,16 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (this.settings.mapChatRecords === on) return;
     this.settings.mapChatRecords = on;
     await this.saveSettings();
+    // The side window of every open map shows or hides its "New conversation" button without waiting for a repaint.
+    const refreshViews = (): void => {
+      for (const view of this.views()) view.refreshChatRecordsSwitch();
+    };
     if (on) {
       for (const writer of this.mapChatRecordWriters) writer.setEnabled(true);
+      refreshViews();
       return;
     }
+    refreshViews();
     await turnMapChatRecordsOff({
       app: this.app,
       writers: this.mapChatRecordWriters,

@@ -19754,6 +19754,10 @@ export class VisualAgentMapView extends ItemView {
     }
     return this.chatRecords;
   }
+  /** The settings switch for conversation records was flipped: the panel shows or hides what depends on it. */
+  refreshChatRecordsSwitch(): void {
+    this.chat?.refreshNewButton();
+  }
   /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn. */
   private chatRecordSaved(): boolean {
     const writer = this.chatRecords;

@@ -1149,7 +1149,7 @@ var en = {
   "ui.usage_button_today_0": "Token usage: today {0}",
   "ui.usage_button_unavailable": "Token usage: unavailable",
   "ui.usage_panel_title": "Token usage",
-  "ui.usage_panel_providers": "Claude \xB7 Codex",
+  "ui.usage_filter_label": "Filter by provider",
   "ui.usage_totals": "TOTALS",
   "ui.usage_this_map": "This mind map",
   "ui.usage_today": "Today",
@@ -1168,7 +1168,8 @@ var en = {
   "ui.usage_minutes_seconds_01": "{0} min {1} s",
   "ui.usage_empty": "No AI requests recorded for this mind map yet.",
   "ui.usage_unreadable": "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
-  "ui.usage_footer": "Counts only requests sent by VAM. Numbers are reported by the AI service. Values marked ~ are estimates, shown only when the AI service did not report usage. No money amounts are shown, because subscription plans are not charged per request.",
+  "ui.usage_footer_scope": "Counts only AI requests sent by VAM.",
+  "ui.usage_footer_estimates": "Values marked ~ are estimates.",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "The map or parent topic changed while AI was running. No subtopics were created.",
   "ui.create_subtopics_after_confirmation_without_running_research": "Create subtopics after confirmation without running research",
@@ -3851,7 +3852,7 @@ var zhCN = {
   "ui.usage_button_today_0": "Token \u7528\u91CF\uFF1A\u4ECA\u5929 {0}",
   "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u65E0\u6CD5\u8BFB\u53D6",
   "ui.usage_panel_title": "Token \u7528\u91CF",
-  "ui.usage_panel_providers": "Claude\u30FBCodex",
+  "ui.usage_filter_label": "\u6309\u670D\u52A1\u7B5B\u9009",
   "ui.usage_totals": "\u603B\u91CF",
   "ui.usage_this_map": "\u8FD9\u5F20\u5FC3\u667A\u56FE",
   "ui.usage_today": "\u4ECA\u5929",
@@ -3870,7 +3871,8 @@ var zhCN = {
   "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
   "ui.usage_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709 AI \u8BF7\u6C42\u8BB0\u5F55\u3002",
   "ui.usage_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u7528\u91CF\u6570\u636E\uFF0C\u6240\u4EE5\u4E0D\u663E\u793A\u6570\u5B57\u3002\u63D2\u4EF6\u6587\u4EF6\u5939\u91CC\u7684 ai-usage.json \u5DF2\u539F\u6837\u4FDD\u7559\u3002",
-  "ui.usage_footer": "\u53EA\u8BA1\u7B97 VAM \u53D1\u51FA\u7684\u8BF7\u6C42\u3002\u6570\u5B57\u7531 AI \u670D\u52A1\u56DE\u62A5\u3002\u6807\u201C\u7EA6\u201D\u7684\u662F AI \u670D\u52A1\u6CA1\u6709\u56DE\u62A5\u7528\u91CF\u65F6\u7684\u4F30\u8BA1\u503C\u3002\u4E0D\u663E\u793A\u91D1\u989D\uFF0C\u56E0\u4E3A\u8BA2\u9605\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8BF7\u6C42\u6536\u8D39\u3002",
+  "ui.usage_footer_scope": "\u53EA\u8BA1\u7B97 VAM \u53D1\u51FA\u7684 AI \u8BF7\u6C42\u3002",
+  "ui.usage_footer_estimates": "\u6807\u201C\u7EA6\u201D\u7684\u662F\u4F30\u7B97\u503C\u3002",
   "ui.expansion_failed": "\u5C55\u5F00\u5931\u8D25",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u56FE\u6216\u7236\u8BAE\u9898\u5728 AI \u8FD0\u884C\u671F\u95F4\u5DF2\u53D8\u66F4\uFF0C\u672A\u521B\u5EFA\u5B50\u8BAE\u9898\u3002",
   "ui.create_subtopics_after_confirmation_without_running_research": "\u786E\u8BA4\u540E\u53EA\u521B\u5EFA\u5B50\u8BAE\u9898\uFF0C\u4E0D\u8FD0\u884C\u7814\u7A76",
@@ -6553,7 +6555,7 @@ var zhTW = {
   "ui.usage_button_today_0": "Token \u7528\u91CF\uFF1A\u4ECA\u5929 {0}",
   "ui.usage_button_unavailable": "Token \u7528\u91CF\uFF1A\u7121\u6CD5\u8B80\u53D6",
   "ui.usage_panel_title": "Token \u7528\u91CF",
-  "ui.usage_panel_providers": "Claude\u30FBCodex",
+  "ui.usage_filter_label": "\u4F9D\u670D\u52D9\u7BE9\u9078",
   "ui.usage_totals": "\u7E3D\u91CF",
   "ui.usage_this_map": "\u9019\u5F35\u5FC3\u667A\u5716",
   "ui.usage_today": "\u4ECA\u5929",
@@ -6572,7 +6574,8 @@ var zhTW = {
   "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
   "ui.usage_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709 AI \u8ACB\u6C42\u7D00\u9304\u3002",
   "ui.usage_unreadable": "\u7121\u6CD5\u8B80\u53D6\u7528\u91CF\u8CC7\u6599\uFF0C\u6240\u4EE5\u4E0D\u986F\u793A\u6578\u5B57\u3002\u5916\u639B\u8CC7\u6599\u593E\u88E1\u7684 ai-usage.json \u5DF2\u539F\u6A23\u4FDD\u7559\u3002",
-  "ui.usage_footer": "\u53EA\u8A08\u7B97 VAM \u9001\u51FA\u7684\u8ACB\u6C42\u3002\u6578\u5B57\u7531 AI \u670D\u52D9\u56DE\u5831\u3002\u6A19\u300C\u7D04\u300D\u7684\u662F AI \u670D\u52D9\u6C92\u6709\u56DE\u5831\u7528\u91CF\u6642\u7684\u4F30\u8A08\u503C\u3002\u4E0D\u986F\u793A\u91D1\u984D\uFF0C\u56E0\u70BA\u8A02\u95B1\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8ACB\u6C42\u6536\u8CBB\u3002",
+  "ui.usage_footer_scope": "\u53EA\u8A08\u7B97 VAM \u767C\u51FA\u7684 AI \u8ACB\u6C42\u3002",
+  "ui.usage_footer_estimates": "\u6A19\u300C\u7D04\u300D\u7684\u662F\u4F30\u7B97\u503C\u3002",
   "ui.expansion_failed": "\u5C55\u958B\u5931\u6557",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u5716\u6216\u6BCD\u8B70\u984C\u5728 AI \u57F7\u884C\u671F\u9593\u5DF2\u8B8A\u66F4\uFF0C\u672A\u5EFA\u7ACB\u5B50\u8B70\u984C\u3002",
   "ui.create_subtopics_after_confirmation_without_running_research": "\u78BA\u8A8D\u5F8C\u53EA\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u4E0D\u57F7\u884C\u7814\u7A76",
@@ -21276,8 +21279,8 @@ var History = class {
    * Drops the entries pushed since `mark`, so work done in between leaves no undo step; entries from before the mark stay.
    * When the history was cleared since the mark, every entry now in it was pushed after the mark and is dropped.
    */
-  discardSince(mark) {
-    const start = mark.epoch === this.epoch ? Math.max(0, mark.length - (this.dropped - mark.dropped)) : 0;
+  discardSince(mark2) {
+    const start = mark2.epoch === this.epoch ? Math.max(0, mark2.length - (this.dropped - mark2.dropped)) : 0;
     if (start < this.past.length) this.past.splice(start);
   }
   /**
@@ -21285,9 +21288,9 @@ var History = class {
    * nothing when the history was cleared since the mark, or when fewer than two entries were pushed. Each entry's
    * undo/redo is read when it runs, so later patches to an entry (a wrapper replaced after push) still apply.
    */
-  collapseSince(mark, label) {
-    if (mark.epoch !== this.epoch) return;
-    const start = Math.max(0, mark.length - (this.dropped - mark.dropped));
+  collapseSince(mark2, label) {
+    if (mark2.epoch !== this.epoch) return;
+    const start = Math.max(0, mark2.length - (this.dropped - mark2.dropped));
     if (this.past.length - start < 2) return;
     const all = this.past.splice(start);
     const entries = all.filter((entry) => !this.solo.has(entry));
@@ -28653,11 +28656,14 @@ function isEntry(value) {
   if (!isRecord3(value)) return false;
   return typeof value.at === "string" && !Number.isNaN(Date.parse(value.at)) && isAction(value.action) && (value.mapPath === void 0 || typeof value.mapPath === "string") && (value.topic === void 0 || typeof value.topic === "string") && (value.provider === "claude" || value.provider === "codex") && typeof value.model === "string" && isTokens(value) && typeof value.estimated === "boolean" && (value.durationMs === void 0 || isCount(value.durationMs));
 }
+var isFolded = (value) => isTokens(value) && (value.estimated === void 0 || value.estimated === true);
+var isMaps = (value) => isRecord3(value) && Object.values(value).every(
+  (actions) => isRecord3(actions) && Object.entries(actions).every(([key2, tokens2]) => isAction(key2) && isFolded(tokens2))
+);
 function isBucket(value) {
-  if (!isRecord3(value) || !isRecord3(value.maps)) return false;
-  return Object.values(value.maps).every(
-    (actions) => isRecord3(actions) && Object.entries(actions).every(([key2, tokens2]) => isAction(key2) && isTokens(tokens2))
-  );
+  if (!isRecord3(value) || !isMaps(value.maps)) return false;
+  if (value.providers === void 0) return true;
+  return isRecord3(value.providers) && Object.entries(value.providers).every(([key2, maps]) => (key2 === "claude" || key2 === "codex") && isMaps(maps));
 }
 function localDayStart(now = Date.now()) {
   const date = new Date(now);
@@ -28737,30 +28743,35 @@ var AiUsageStore = class {
       this.onError(error);
     }
   }
-  /** Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all. */
+  /**
+   * Input and output tokens since `since` (ms, inclusive; absent = all time), for one map or all, and one provider
+   * or both. Folded months keep a per-provider breakdown; months folded before it existed count under Total only.
+   */
   totals(query = {}) {
     if (this.loadError) return { status: "unreadable" };
     const sum2 = ZERO();
-    this.each(query, (_action, tokens2) => {
+    this.each(query, (_action, tokens2, estimated) => {
       sum2.inputTokens += tokens2.inputTokens;
       sum2.outputTokens += tokens2.outputTokens;
+      if (estimated) sum2.estimated = true;
     });
     return { status: "ready", value: sum2 };
   }
-  /** Tokens of one map per action (all five keys present); sums to `totals({ mapPath, since })`. */
-  byAction(mapPath, since) {
+  /** Tokens of one map per action (all five keys present); sums to `totals({ mapPath, since, provider })`. */
+  byAction(mapPath, since, provider) {
     if (this.loadError) return { status: "unreadable" };
     const result = Object.fromEntries(USAGE_ACTIONS.map((action) => [action, ZERO()]));
-    this.each({ mapPath, since }, (action, tokens2) => {
+    this.each({ mapPath, since, provider }, (action, tokens2, estimated) => {
       result[action].inputTokens += tokens2.inputTokens;
       result[action].outputTokens += tokens2.outputTokens;
+      if (estimated) result[action].estimated = true;
     });
     return { status: "ready", value: result };
   }
-  /** The newest `limit` detail rows of one map (all maps when absent), newest first. */
-  recent(mapPath, limit = 10) {
+  /** The newest `limit` detail rows of one map (all maps when absent) and one provider (both when absent), newest first. */
+  recent(mapPath, limit = 10, provider) {
     if (this.loadError) return { status: "unreadable" };
-    const rows2 = this.entries.filter((entry) => mapPath === void 0 || entry.mapPath === mapPath).sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit).map((entry) => ({ ...entry }));
+    const rows2 = this.entries.filter((entry) => mapPath === void 0 || entry.mapPath === mapPath).filter((entry) => provider === void 0 || entry.provider === provider).sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit).map((entry) => ({ ...entry }));
     return { status: "ready", value: rows2 };
   }
   /** Called after every recorded call and after load (also when load failed). Returns the unsubscribe function. */
@@ -28781,23 +28792,28 @@ var AiUsageStore = class {
     await this.writes;
   }
   each(query, visit) {
-    const { mapPath, since } = query;
+    var _a2;
+    const { mapPath, since, provider } = query;
     for (const entry of this.entries) {
       if (mapPath !== void 0 && entry.mapPath !== mapPath) continue;
+      if (provider !== void 0 && entry.provider !== provider) continue;
       if (since !== void 0 && Date.parse(entry.at) < since) continue;
-      visit(entry.action, entry);
+      visit(entry.action, entry, entry.estimated);
     }
     for (const [key2, bucket] of Object.entries(this.monthly)) {
       if (since !== void 0 && monthStartOf(key2) < since) continue;
-      for (const [path, actions] of Object.entries(bucket.maps)) {
+      const maps = provider === void 0 ? bucket.maps : (_a2 = bucket.providers) == null ? void 0 : _a2[provider];
+      if (!maps) continue;
+      for (const [path, actions] of Object.entries(maps)) {
         if (mapPath !== void 0 && path !== mapPath) continue;
-        for (const [action, tokens2] of Object.entries(actions)) visit(action, tokens2);
+        for (const [action, tokens2] of Object.entries(actions))
+          if (tokens2) visit(action, tokens2, tokens2.estimated === true);
       }
     }
   }
   /** Folds rows older than the detail window into their month. */
   compact() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const cutoff = this.now() - USAGE_DETAIL_DAYS * 864e5;
     const keep = [];
     for (const entry of this.entries) {
@@ -28807,10 +28823,14 @@ var AiUsageStore = class {
         continue;
       }
       const bucket = (_c = (_a2 = this.monthly)[_b2 = monthKey(time)]) != null ? _c : _a2[_b2] = { maps: {} };
-      const actions = (_g = (_e = bucket.maps)[_f = (_d = entry.mapPath) != null ? _d : ""]) != null ? _g : _e[_f] = {};
-      const tokens2 = (_i = actions[_h = entry.action]) != null ? _i : actions[_h] = ZERO();
-      tokens2.inputTokens += entry.inputTokens;
-      tokens2.outputTokens += entry.outputTokens;
+      const perProvider = (_g = (_e = (_d = bucket.providers) != null ? _d : bucket.providers = {})[_f = entry.provider]) != null ? _g : _e[_f] = {};
+      for (const maps of [bucket.maps, perProvider]) {
+        const actions = (_j = maps[_i = (_h = entry.mapPath) != null ? _h : ""]) != null ? _j : maps[_i] = {};
+        const tokens2 = (_l = actions[_k = entry.action]) != null ? _l : actions[_k] = ZERO();
+        tokens2.inputTokens += entry.inputTokens;
+        tokens2.outputTokens += entry.outputTokens;
+        if (entry.estimated) tokens2.estimated = true;
+      }
     }
     this.entries = keep;
   }
@@ -28860,6 +28880,9 @@ var clock = (iso) => {
 };
 var actionLabel = (action) => t(`ui.usage_action_${action}`);
 var sum = (tokens2) => tokens2.inputTokens + tokens2.outputTokens;
+var mark = (count, estimated) => estimated ? t("ui.usage_estimated_0", formatTokens(count)) : formatTokens(count);
+var FILTERS = ["total", "claude", "codex"];
+var FILTER_LABEL = { total: "Total", claude: "Claude", codex: "Codex" };
 var UsageControl = class {
   constructor(store, mapPath) {
     this.store = store;
@@ -28872,6 +28895,7 @@ var UsageControl = class {
     __publicField(this, "parts", null);
     __publicField(this, "doc", null);
     __publicField(this, "isOpen", false);
+    __publicField(this, "filter", "total");
     __publicField(this, "onKey", (event) => {
       var _a2;
       if (event.key !== "Escape" || !this.isOpen) return;
@@ -28935,6 +28959,7 @@ var UsageControl = class {
     var _a2;
     if (!this.overlay || this.isOpen) return;
     this.isOpen = true;
+    this.filter = "total";
     (_a2 = this.button) == null ? void 0 : _a2.setAttr("aria-expanded", "true");
     this.attachPanel();
     this.refresh();
@@ -29003,7 +29028,24 @@ var UsageControl = class {
     root.setAttr("tabindex", "0");
     const head = root.createEl("h3", { cls: "vam-usage-title" });
     head.createSpan({ text: t("ui.usage_panel_title") });
-    head.createSpan({ cls: "vam-usage-faint", text: t("ui.usage_panel_providers") });
+    const group = head.createSpan({ cls: "vam-usage-filter" });
+    group.setAttr("role", "radiogroup");
+    group.setAttr("aria-label", t("ui.usage_filter_label"));
+    const filters = /* @__PURE__ */ new Map();
+    for (const value of FILTERS) {
+      const radio = group.createEl("button", { cls: "vam-usage-filter-option", text: FILTER_LABEL[value] });
+      radio.setAttr("type", "button");
+      radio.setAttr("role", "radio");
+      radio.addEventListener("click", () => this.select(value, false));
+      filters.set(value, radio);
+    }
+    group.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.select(FILTERS[(FILTERS.indexOf(this.filter) + step + FILTERS.length) % FILTERS.length], true);
+    });
     const error = root.createEl("p", { cls: "vam-usage-error", text: t("ui.usage_unreadable") });
     error.setAttr("role", "status");
     error.hidden = true;
@@ -29051,7 +29093,11 @@ var UsageControl = class {
       row.hidden = true;
       rows2.push({ row, time, action, node, tokens: tokens2, duration });
     }
-    root.createDiv({ cls: "vam-usage-foot", text: t("ui.usage_footer") });
+    const foot = root.createDiv({ cls: "vam-usage-foot" });
+    foot.createDiv({ text: t("ui.usage_footer_scope") });
+    const footEstimates = foot.createDiv({ text: t("ui.usage_footer_estimates") });
+    footEstimates.hidden = true;
+    this.markFilters(filters);
     return {
       root,
       sections: [totalsSection, barsSection, recentSection],
@@ -29061,19 +29107,41 @@ var UsageControl = class {
       bars,
       barsBox,
       rows: rows2,
-      recentBox
+      recentBox,
+      filters,
+      footEstimates
     };
+  }
+  /** Picks one provider view; the chosen radio gets the focus when the choice came from the keyboard. */
+  select(value, focus) {
+    var _a2;
+    this.filter = value;
+    const parts = this.parts;
+    if (!parts) return;
+    this.markFilters(parts.filters);
+    if (focus) (_a2 = parts.filters.get(value)) == null ? void 0 : _a2.focus();
+    this.fillPanel(parts);
+  }
+  markFilters(filters) {
+    for (const [value, radio] of filters) {
+      const on = value === this.filter;
+      radio.setAttr("aria-checked", String(on));
+      radio.setAttr("tabindex", on ? "0" : "-1");
+      radio.toggleClass("is-selected", on);
+    }
   }
   fillPanel(parts) {
     const path = this.mapPath();
-    const map = this.store.totals({ mapPath: path });
-    const today = this.store.totals({ since: localDayStart() });
-    const month = this.store.totals({ since: localMonthStart() });
-    const actions = this.store.byAction(path);
-    const recent = this.store.recent(path, RECENT_ROWS);
+    const provider = this.filter === "total" ? void 0 : this.filter;
+    const map = this.store.totals({ mapPath: path, provider });
+    const today = this.store.totals({ since: localDayStart(), provider });
+    const month = this.store.totals({ since: localMonthStart(), provider });
+    const actions = this.store.byAction(path, void 0, provider);
+    const recent = this.store.recent(path, RECENT_ROWS, provider);
     if (map.status === "unreadable" || today.status === "unreadable" || month.status === "unreadable" || actions.status === "unreadable" || recent.status === "unreadable") {
       parts.error.hidden = false;
       parts.empty.hidden = true;
+      parts.footEstimates.hidden = true;
       for (const section3 of parts.sections) section3.hidden = true;
       this.place();
       return;
@@ -29081,7 +29149,7 @@ var UsageControl = class {
     parts.error.hidden = true;
     for (const section3 of parts.sections) section3.hidden = false;
     const total2 = (cell, tokens2) => {
-      cell.strong.setText(formatTokens(sum(tokens2)));
+      cell.strong.setText(mark(sum(tokens2), tokens2.estimated));
       cell.input.setText(t("ui.usage_in_0", formatTokens(tokens2.inputTokens)));
       cell.output.setText(t("ui.usage_out_0", formatTokens(tokens2.outputTokens)));
     };
@@ -29092,15 +29160,19 @@ var UsageControl = class {
     parts.empty.hidden = !noUsage;
     parts.sections[1].hidden = noUsage;
     parts.sections[2].hidden = noUsage;
+    let anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
     const biggest = Math.max(0, ...USAGE_ACTIONS.map((action) => sum(actions.value[action])));
     for (const action of USAGE_ACTIONS) {
       const used = sum(actions.value[action]);
       const bar = parts.bars.get(action);
       bar.row.hidden = used === 0;
       bar.fill.style.setProperty("width", `${biggest ? Math.max(2, Math.round(used / biggest * 100)) : 0}%`);
-      bar.value.setText(formatTokens(used));
+      bar.value.setText(mark(used, actions.value[action].estimated));
+      if (!noUsage && used > 0 && actions.value[action].estimated) anyEstimate = true;
     }
     parts.rows.forEach((slot, index) => this.fillRow(slot, recent.value[index]));
+    if (!noUsage && recent.value.some((entry) => entry.estimated)) anyEstimate = true;
+    parts.footEstimates.hidden = !anyEstimate;
     this.place();
   }
   fillRow(slot, entry) {
@@ -29853,21 +29925,21 @@ function stripNoteStyleComments(text11) {
     let at = 0;
     let touched = false;
     while (at < line.length) {
-      const mark = line.indexOf(COMMENT_MARK, at);
+      const mark2 = line.indexOf(COMMENT_MARK, at);
       if (open !== void 0) {
         touched = true;
-        if (mark < 0) break;
+        if (mark2 < 0) break;
         open = void 0;
-        at = mark + COMMENT_MARK.length;
+        at = mark2 + COMMENT_MARK.length;
       } else {
-        if (mark < 0) {
+        if (mark2 < 0) {
           kept += line.slice(at);
           break;
         }
-        kept += line.slice(at, mark);
+        kept += line.slice(at, mark2);
         open = index + 1;
         touched = true;
-        at = mark + COMMENT_MARK.length;
+        at = mark2 + COMMENT_MARK.length;
       }
     }
     out.push(touched && !kept.trim() ? "" : kept);
@@ -33866,9 +33938,9 @@ var TopicRuns = class {
             if (JSON.stringify(latest2.documents) !== options.recordedSources()) throw changed();
             if (options.signal.aborted) throw aborted2();
             if (options.closed()) throw changed();
-            const mark = options.applying();
+            const mark2 = options.applying();
             await this.ports.mutate()(() => options.write(result2));
-            options.written(mark);
+            options.written(mark2);
           } catch (error) {
             if (!options.current()) return;
             options.draftFailed(error);
@@ -35379,12 +35451,12 @@ function parseBlocks(lines, depth = 0, starts, budget) {
     starts == null ? void 0 : starts.push(at);
     const open = isFenceOpen(line);
     if (open) {
-      const mark = open[1][0];
+      const mark2 = open[1][0];
       const length = open[1].length;
       const body = [];
       for (at++; at < lines.length; at++) {
         const close = FENCE_CLOSE.exec(lines[at]);
-        if (close && close[1][0] === mark && close[1].length >= length) {
+        if (close && close[1][0] === mark2 && close[1].length >= length) {
           at++;
           break;
         }
@@ -35700,8 +35772,8 @@ function inlineMarkdown(nodes) {
         break;
       case "fmt": {
         const inner = inlineMarkdown(node.c);
-        const mark = node.tag === "strong" ? "**" : node.tag === "del" ? "~~" : "*";
-        out += inner.trim() ? `${mark}${inner}${mark}` : inner;
+        const mark2 = node.tag === "strong" ? "**" : node.tag === "del" ? "~~" : "*";
+        out += inner.trim() ? `${mark2}${inner}${mark2}` : inner;
         break;
       }
       case "wiki":
@@ -41928,18 +42000,18 @@ var MARKDOWN_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*(markdown|md)?[ \t]*$/i;
 function outlineTitle(raw) {
   let code = 57344;
   while (raw.includes(String.fromCharCode(code))) code++;
-  const mark = String.fromCharCode(code);
+  const mark2 = String.fromCharCode(code);
   const kept = [];
   const protectedText = raw.replace(
     /\\([!-/:-@[-`{-~])|(?<!`)(`+)(?!`)([\s\S]*?[^`])\2(?!`)/g,
     (_match, character, _ticks, content) => {
       var _a2;
       kept.push((_a2 = character != null ? character : content) != null ? _a2 : "");
-      return `${mark}${kept.length - 1}${mark}`;
+      return `${mark2}${kept.length - 1}${mark2}`;
     }
   );
   const plain = protectedText.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2").replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\*\*(?=\S)(.+?)(?<=\S)\*\*/g, "$1").replace(/(^|[^\p{L}\p{N}_])__(?=\S)(.+?)(?<=\S)__(?![\p{L}\p{N}_])/gu, "$1$2").replace(/\*(?=\S)(.+?)(?<=\S)\*/g, "$1").replace(/(^|[^\p{L}\p{N}_])_(?=\S)(.+?)(?<=\S)_(?![\p{L}\p{N}_])/gu, "$1$2");
-  return plain.replace(new RegExp(`${mark}(\\d+)${mark}`, "g"), (_match, index) => kept[Number(index)]).trim();
+  return plain.replace(new RegExp(`${mark2}(\\d+)${mark2}`, "g"), (_match, index) => kept[Number(index)]).trim();
 }
 function unwrapFencedOutline(lines) {
   const firstContent = lines.findIndex((line) => line.trim() !== "");
@@ -42923,8 +42995,8 @@ function styleChoiceField(parent, options) {
   };
   const paintLine = () => {
     text11.replaceChildren();
-    const mark = "";
-    const [before, after = ""] = t("ui.note_style_line_0", mark).split(mark);
+    const mark2 = "";
+    const [before, after = ""] = t("ui.note_style_line_0", mark2).split(mark2);
     if (before) text11.createSpan({ text: before });
     text11.createEl("strong", { text: nameNow() });
     if (after) text11.createSpan({ text: after });
@@ -43182,7 +43254,7 @@ var OutlineImportModal = class extends import_obsidian25.Modal {
       input2.addEventListener("change", () => {
         if (!input2.checked) return;
         this.placement = option.kind;
-        for (const mark of marks) mark.label.toggleClass("is-checked", mark.kind === this.placement);
+        for (const mark2 of marks) mark2.label.toggleClass("is-checked", mark2.kind === this.placement);
         this.syncModelLabel();
       });
       const text11 = label.createDiv("vam-outline-option-text");
@@ -56857,7 +56929,7 @@ ${request.requirements}` : preset.text,
           return;
         }
         const fresh = await this.freshNotesOf(picked.map((item) => item.parentId));
-        const mark = this.history.mark();
+        const mark2 = this.history.mark();
         try {
           for (const item of picked) {
             const parent = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === item.parentId);
@@ -56870,7 +56942,7 @@ ${request.requirements}` : preset.text,
           }
           if (added) await this.plugin.rebuildDerivedData();
         } finally {
-          this.history.collapseSince(mark, t("ui.goal_suggest_history_label"));
+          this.history.collapseSince(mark2, t("ui.goal_suggest_history_label"));
           this.updateHistoryButtons();
         }
       });
@@ -58124,7 +58196,7 @@ ${request.requirements}` : preset.text,
    */
   async applyCardEdit(node, frame, look, width, text11) {
     var _a2;
-    const mark = this.history.mark();
+    const mark2 = this.history.mark();
     try {
       const entry = await this.changeTopicCoverFrame(node, frame, look, width);
       if (!entry) return;
@@ -58133,7 +58205,7 @@ ${request.requirements}` : preset.text,
       if (text11.summary !== void 0) patch.summary = text11.summary;
       if (Object.keys(patch).length) await this.noteChange(node, patch);
     } finally {
-      this.history.collapseSince(mark, t("ui.topic_cover_frame_title"));
+      this.history.collapseSince(mark2, t("ui.topic_cover_frame_title"));
       this.updateHistoryButtons();
     }
   }
@@ -60527,7 +60599,7 @@ ${request.requirements}` : preset.text,
       dot.addEventListener("pointerdown", (event) => event.stopPropagation());
       dot.addEventListener("click", (event) => event.stopPropagation());
       const ref = `${image.id}\0${anchor.id}`;
-      const mark = (on) => {
+      const mark2 = (on) => {
         if (on) this.hoverAnchor = ref;
         else if (this.hoverAnchor === ref) this.hoverAnchor = null;
         else return;
@@ -60539,7 +60611,7 @@ ${request.requirements}` : preset.text,
         ["focus", true],
         ["blur", false]
       ])
-        dot.addEventListener(name2, () => mark(on));
+        dot.addEventListener(name2, () => mark2(on));
       if (!editable) continue;
       dot.addEventListener("keydown", (event) => {
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
@@ -63268,12 +63340,12 @@ ${request.requirements}` : preset.text,
       throw result.error;
     }
     if (result.reason === "wrong-state" || result.reason === "unknown") {
-      const mark = this.history.mark();
+      const mark2 = this.history.mark();
       if (direction === "undo") {
         this.history.redo();
-        this.history.discardSince(mark);
+        this.history.discardSince(mark2);
       } else {
-        this.history.discardSince({ ...mark, length: mark.length - 1 });
+        this.history.discardSince({ ...mark2, length: mark2.length - 1 });
       }
     }
   }
@@ -66000,13 +66072,13 @@ ${request.requirements}` : preset.text,
     if (!this.map || !this.relationsEnabled()) return;
     const count = anchorRelationsForTopic((_b2 = this.map.canvasItems) != null ? _b2 : [], id).length;
     if (!count) return;
-    const text11 = t("ui.card_image_relations_0", count), mark = card.createDiv({ cls: "vam-image-relations-mark" });
-    cardImageRelationMarks.set(card, mark);
-    mark.setAttr("aria-label", text11);
-    const icon = mark.createSpan({ cls: "vam-image-relations-mark-icon" });
+    const text11 = t("ui.card_image_relations_0", count), mark2 = card.createDiv({ cls: "vam-image-relations-mark" });
+    cardImageRelationMarks.set(card, mark2);
+    mark2.setAttr("aria-label", text11);
+    const icon = mark2.createSpan({ cls: "vam-image-relations-mark-icon" });
     icon.setAttr("aria-hidden", "true");
     (0, import_obsidian37.setIcon)(icon, "map-pin");
-    mark.createSpan({ cls: "vam-image-relations-mark-text", text: text11 });
+    mark2.createSpan({ cls: "vam-image-relations-mark-text", text: text11 });
   }
   paintCardMarkers(card, header, id) {
     var _a2, _b2;
@@ -66026,8 +66098,8 @@ ${request.requirements}` : preset.text,
       row.setAttr("aria-hidden", "true");
       cardMarkerRows.set(card, row);
       for (const marker5 of markers) {
-        const mark = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker5) });
-        mark.dataset.marker = marker5;
+        const mark2 = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker5) });
+        mark2.dataset.marker = marker5;
       }
       card.dataset.markerText = text11;
     } else {
@@ -77571,8 +77643,8 @@ var OutlineView = class extends import_obsidian42.ItemView {
         );
         const row2 = button.createSpan("vam-markers");
         for (const id of marks) {
-          const mark = row2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
-          mark.dataset.marker = id;
+          const mark2 = row2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+          mark2.dataset.marker = id;
         }
       }
       const linkCount = readTopicLinks({ "topic-links": this.links.get(node.id) }).length;
@@ -77826,11 +77898,11 @@ function fenceRanges(lines, offsets, html) {
   for (let i = 0; i < lines.length; i++) {
     const open = FENCE_OPEN3.exec(lines[i]);
     if (!open || inHtml(i)) continue;
-    const mark = open[1];
-    if (mark[0] === "`" && open[2].includes("`")) continue;
+    const mark2 = open[1];
+    if (mark2[0] === "`" && open[2].includes("`")) continue;
     for (let j = i + 1; j < lines.length; j++) {
       const run = FENCE_LINE.exec(lines[j]);
-      if (run && run[1][0] === mark[0] && run[1].length >= mark.length && lines[j].slice(run[0].length).trim() === "") {
+      if (run && run[1][0] === mark2[0] && run[1].length >= mark2.length && lines[j].slice(run[0].length).trim() === "") {
         ranges.push({ start: offsets[i], end: offsets[j] + lines[j].length });
         i = j;
         break;

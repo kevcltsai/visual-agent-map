@@ -1142,7 +1142,7 @@ export const en = {
   "ui.usage_button_today_0": "Token usage: today {0}",
   "ui.usage_button_unavailable": "Token usage: unavailable",
   "ui.usage_panel_title": "Token usage",
-  "ui.usage_panel_providers": "Claude · Codex",
+  "ui.usage_filter_label": "Filter by provider",
   "ui.usage_totals": "TOTALS",
   "ui.usage_this_map": "This mind map",
   "ui.usage_today": "Today",
@@ -1162,8 +1162,8 @@ export const en = {
   "ui.usage_empty": "No AI requests recorded for this mind map yet.",
   "ui.usage_unreadable":
     "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
-  "ui.usage_footer":
-    "Counts only requests sent by VAM. Numbers are reported by the AI service. Values marked ~ are estimates, shown only when the AI service did not report usage. No money amounts are shown, because subscription plans are not charged per request.",
+  "ui.usage_footer_scope": "Counts only AI requests sent by VAM.",
+  "ui.usage_footer_estimates": "Values marked ~ are estimates.",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "The map or parent topic changed while AI was running. No subtopics were created.",

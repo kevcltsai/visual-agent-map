@@ -90,6 +90,31 @@ test('usage store: details older than 90 days fold into their month without chan
   assert.equal(ok(store.recent('A/map.vam', 10)).length, 1);
 });
 
+test('usage store: a folded month keeps its provider split and its estimate mark; an old bucket without one counts under Total only', async () => {
+  const file = tempFile();
+  const now = new Date(2026, 10, 5, 12, 0).getTime();
+  const old = new Date(now - 91 * 86_400_000);
+  const store = newStore(file, { now: () => now });
+  await store.load();
+  store.record(row({ at: old.toISOString(), provider: 'claude', inputTokens: 500, outputTokens: 50 }));
+  store.record(row({ at: old.toISOString(), provider: 'codex', model: 'gpt-6-luna', inputTokens: 70, outputTokens: 7, estimated: true }));
+  await store.flush();
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).entries.length, 0, 'both rows were folded');
+  same(ok(store.totals({ mapPath: 'A/map.vam', provider: 'claude' })), { inputTokens: 500, outputTokens: 50 });
+  same(ok(store.totals({ mapPath: 'A/map.vam', provider: 'codex' })), { inputTokens: 70, outputTokens: 7, estimated: true });
+  same(ok(store.totals({ mapPath: 'A/map.vam' })), { inputTokens: 570, outputTokens: 57, estimated: true });
+  assert.equal(ok(store.byAction('A/map.vam', undefined, 'codex')).research.inputTokens, 70);
+
+  const legacyFile = tempFile();
+  const key = `${old.getFullYear()}-${String(old.getMonth() + 1).padStart(2, '0')}`;
+  fs.writeFileSync(legacyFile, JSON.stringify({ version: 1, entries: [], monthly: { [key]: { maps: { 'A/map.vam': { research: { inputTokens: 9, outputTokens: 1 } } } } } }));
+  const legacy = newStore(legacyFile, { now: () => now });
+  await legacy.load();
+  assert.equal(legacy.status, 'ready', 'a bucket folded before the provider split still loads');
+  same(ok(legacy.totals({ mapPath: 'A/map.vam' })), { inputTokens: 9, outputTokens: 1 });
+  same(ok(legacy.totals({ mapPath: 'A/map.vam', provider: 'claude' })), { inputTokens: 0, outputTokens: 0 });
+});
+
 test('usage store: a corrupt file is kept byte for byte, persistence stops, and queries say unreadable, not zero', async () => {
   const file = tempFile();
   const garbage = '{"version":1,"entries":[oops';
@@ -107,7 +132,17 @@ test('usage store: a corrupt file is kept byte for byte, persistence stops, and 
 });
 
 test('usage store: a file with a wrong shape or an invalid row is also unreadable', async () => {
-  for (const content of ['[]', JSON.stringify({ version: 1, entries: [{ at: 'x' }], monthly: {} }), JSON.stringify({ version: 2, entries: [], monthly: {} })]) {
+  const tokens = { inputTokens: 1, outputTokens: 1 };
+  const month = providers => JSON.stringify({ version: 1, entries: [], monthly: { '2026-01': { maps: { '': { research: tokens } }, providers } } });
+  for (const content of [
+    '[]',
+    JSON.stringify({ version: 1, entries: [{ at: 'x' }], monthly: {} }),
+    JSON.stringify({ version: 2, entries: [], monthly: {} }),
+    month({ gemini: { '': { research: tokens } } }),
+    month([]),
+    month(null),
+    JSON.stringify({ version: 1, entries: [], monthly: { '2026-01': { maps: { '': { research: { ...tokens, estimated: false } } } } } })
+  ]) {
     const file = tempFile();
     fs.writeFileSync(file, content);
     const store = newStore(file);
@@ -378,4 +413,31 @@ test('an unreadable usage store reports its error once, not on every record', as
   assert.equal(errors.length, 1);
   store.record(row()); store.record(row()); store.record(row());
   assert.equal(errors.length, 2, 'one for the load, one for the first dropped call');
+});
+
+test('usage store provider filter: totals, byAction and recent narrow to one provider; no filter keeps every row', async () => {
+  const store = newStore(tempFile());
+  store.record(row({ provider: 'claude', inputTokens: 100, outputTokens: 10 }));
+  store.record(row({ provider: 'codex', model: 'codex:x', action: 'expand', inputTokens: 40, outputTokens: 4, estimated: true }));
+  store.record(row({ provider: 'codex', model: 'codex:x', action: 'expand', inputTokens: 1, outputTokens: 1 }));
+  same(ok(store.totals()), { inputTokens: 141, outputTokens: 15, estimated: true });
+  same(ok(store.totals({ provider: 'claude' })), { inputTokens: 100, outputTokens: 10 }, 'no estimate: the flag is absent');
+  same(ok(store.totals({ provider: 'codex' })), { inputTokens: 41, outputTokens: 5, estimated: true });
+  same(ok(store.totals({ provider: 'codex', mapPath: 'B/none' })), { inputTokens: 0, outputTokens: 0 }, 'nothing matches: zero, ready');
+  const by = ok(store.byAction('A/map.vam', undefined, 'codex'));
+  same(by.expand, { inputTokens: 41, outputTokens: 5, estimated: true });
+  same(by.research, { inputTokens: 0, outputTokens: 0 });
+  same(ok(store.byAction('A/map.vam', undefined, 'claude')).expand, { inputTokens: 0, outputTokens: 0 });
+  assert.equal(ok(store.byAction('A/map.vam')).expand.estimated, true);
+  same(ok(store.recent('A/map.vam', 10, 'codex')).map(e => e.provider), ['codex', 'codex']);
+  assert.equal(ok(store.recent('A/map.vam', 10)).length, 3);
+  assert.equal(ok(store.recent('A/map.vam', 10, 'claude')).length, 1);
+});
+
+test('usage store provider filter: an unreadable store stays unreadable under every filter', async () => {
+  const file = tempFile();
+  fs.writeFileSync(file, '{ not json');
+  const broken = newStore(file);
+  await broken.load();
+  for (const result of [broken.totals({ provider: 'codex' }), broken.byAction('A/map.vam', undefined, 'codex'), broken.recent('A/map.vam', 10, 'codex')]) same(result, { status: 'unreadable' });
 });

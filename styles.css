@@ -173,7 +173,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-relation-description-text { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-relation-tools { display: flex; flex: none; gap: 2px; }
 .vam-relation-tools .clickable-icon { width: 28px; height: 28px; }
-.vam-topic-modal .vam-section-heading { display: block; margin: 24px 0 8px; font-size: var(--font-ui-small); font-weight: 600; }
+.vam-topic-modal .vam-section-heading { display: block; margin: 16px 0 8px; font-size: var(--font-ui-small); font-weight: 600; }
 .vam-topic-modal .vam-hypothesis-section > .vam-hypothesis-body > .vam-section-heading:first-child, .vam-topic-modal .vam-inspector-topic + .vam-inspector-section > .vam-section-heading:first-child { margin-top: 0; }
 .vam-topic-modal .vam-inspector-section { margin: 0; }
 .vam-topic-modal .vam-inspector-section > .vam-hint, .vam-topic-modal .vam-relation-empty { margin: 8px 0 0; }
@@ -456,6 +456,18 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .vam-inspector-heading strong { font-size: var(--font-ui-medium); }
 .vam-inspector-topic { margin: -8px 0 14px; color: var(--text-muted); }
+/* Card settings (ticket 41): the add-relation sentence, the folded groups and the AI lock state. Classes below are not collected by the share viewer. */
+.vam-topic-modal .vam-relation-list { max-height: 9em; overflow-y: auto; }
+.vam-topic-modal .vam-relation-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.vam-topic-modal .vam-relation-add-target { flex: 1 1 10em; min-width: 0; }
+.vam-topic-modal .vam-relation-add-arrow { color: var(--text-muted); }
+.vam-topic-modal .vam-disclosure { margin-top: 8px; border-top: 1px solid var(--background-modifier-border); }
+.vam-topic-modal .vam-disclosure-toggle { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 6px; background: transparent; box-shadow: none; font-weight: 600; justify-content: flex-start; }
+.vam-topic-modal .vam-disclosure-toggle::before { content: "▸"; display: inline-block; }
+.vam-topic-modal .vam-disclosure-toggle.is-open::before { content: "▾"; }
+.vam-topic-modal .vam-disclosure-body[hidden] { display: none; }
+.vam-topic-modal .vam-ai-lock-state { grid-column: 1 / -1; color: var(--text-muted); font-size: var(--font-ui-small); }
+
 .vam-inspector-section { margin: 14px 0 0; }
 .vam-inspector-proposals { margin: 0; }
 .vam-field { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }

@@ -38,9 +38,10 @@ export type TopicRunKind =
 /** The i18n key of the Stop button on a card: expanding (proposing subtopics) is not research. */
 export function stopLabelKey(
   kind: TopicRunKind | undefined,
-  quickExpandPending: boolean
+  quickExpandPending: boolean,
+  startingExpand = false
 ): "ui.stop_expand" | "ui.stop_research" {
-  return quickExpandPending || kind === "proposeChildren" ? "ui.stop_expand" : "ui.stop_research";
+  return startingExpand || quickExpandPending || kind === "proposeChildren" ? "ui.stop_expand" : "ui.stop_research";
 }
 
 /** The part of the AI task service the chart step uses. */

@@ -100,7 +100,7 @@ export const zhTW: Record<TranslationKey, string> = {
     "找不到 Claude Code CLI。請安裝並檢查設定的路徑。",
   "ui.claude_usage_notice": "送到 Claude 之前",
   "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses":
-    "為了回答，VAM 會把你的訊息、目前地圖中這項工作需要的內容（以及你附上的筆記）透過這台電腦上登入的 Claude Code 送到 Claude，並使用你的 Claude 帳號額度；可用多少依你的 Claude 方案而定。",
+    "為了回答，VAM 會把你的訊息、目前心智圖中這項工作需要的內容（以及你附上的筆記）透過這台電腦上登入的 Claude Code 送到 Claude，並使用你的 Claude 帳號額度；可用多少依你的 Claude 方案而定。",
   "ui.install_and_connect_claude_code": "安裝並連接 Claude Code",
   "ui.claude_code_is_only_needed_for_ai_tasks": "只有 AI 任務需要 Claude Code；你仍可建立及編輯心智圖。",
   "ui.install_claude_code_and_sign_in_with_your_claude_account": "安裝 Claude Code，並使用 Claude 帳號登入：",
@@ -366,7 +366,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.card_height_label": "卡片高度",
   "ui.codex_allowance_notice": "送到 Codex 之前",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u":
-    "為了回答，VAM 會把你的訊息、目前地圖中這項工作需要的內容（以及你附上的筆記）透過你登入的 Codex 帳號送到 Codex，並使用該帳號的 Codex 額度；可用多少依你的 ChatGPT 方案而定。",
+    "為了回答，VAM 會把你的訊息、目前心智圖中這項工作需要的內容（以及你附上的筆記）透過你登入的 Codex 帳號送到 Codex，並使用該帳號的 Codex 額度；可用多少依你的 ChatGPT 方案而定。",
   "ui.understand_and_run": "同意並送出",
   "ui.install_and_connect_codex": "安裝並連接 Codex",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "開啟官方 Codex CLI 安裝指南並完成安裝：",
@@ -1778,7 +1778,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.recipe_notice_changed": "檔案在編輯期間被改過，請重新開啟。沒有覆寫任何內容。",
   "ui.recipe_notice_failed": "無法存檔這個筆記風格，沒有覆寫任何內容。",
   "ui.note_style_maps_notice_0":
-    "筆記風格改成依議題類型決定。這些地圖原本設的風格不再使用：{0}。想讓某個議題沿用，請在議題上按右鍵選擇。",
+    "筆記風格改成依議題類型決定。這些心智圖原本設的風格不再使用：{0}。想讓某個議題沿用，請在議題上按右鍵選擇。",
   "ui.note_style_maps_notice_default_0": "原本的預設模板已改成「一般議題」的筆記風格：{0}。",
   "ui.note_style_migrate_failed": "筆記風格轉換沒有完成，下次開啟時會再試一次；原本的設定都還在。",
   "ui.note_style_legacy_0_1": "舊設定（{0} · {1}）",

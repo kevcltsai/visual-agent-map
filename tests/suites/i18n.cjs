@@ -379,3 +379,21 @@ test('Synthesize intro does not promise a nonexistent next step for the content 
     assert.match(text, /3/, lang);
   }
 });
+test('checkZhTwMapTerms flags 節點/地圖/Workspace in zh-TW ui.* strings only', async () => {
+  const { pathToFileURL } = require('node:url');
+  const { checkZhTwMapTerms } = await import(pathToFileURL(path.join(root, 'scripts', 'check-i18n.mjs')).href);
+  const zh = entries => checkZhTwMapTerms({ en: {}, 'zh-TW': entries });
+  const mapProblem = zh({ 'ui.x': '開啟地圖' });
+  assert.equal(mapProblem.length, 1, 'ui.x with 地圖 is reported');
+  assert.deepEqual({ language: mapProblem[0].language, key: mapProblem[0].key }, { language: 'zh-TW', key: 'ui.x' });
+  assert.match(mapProblem[0].reason, /地圖.*心智圖/);
+  assert.match(zh({ 'ui.n': '新增節點' })[0].reason, /節點/);
+  assert.deepEqual(zh({ 'ui.aim_x': '地圖' }), [], 'ui.aim_* is exempt');
+  assert.deepEqual(zh({ 'detail.x': '節點', 'coffee.y': '地圖' }), [], 'non-ui. keys are exempt');
+  assert.deepEqual(zh({ 'ui.y': '放在 Agent Workspace/ 下' }), [], 'Agent Workspace/ is allowed');
+  const workspace = zh({ 'ui.z': '開啟 Workspace' });
+  assert.equal(workspace.length, 1, 'bare Workspace is reported');
+  assert.equal(workspace[0].key, 'ui.z'); assert.match(workspace[0].reason, /Workspace.*工作區/);
+  assert.deepEqual(checkZhTwMapTerms({ en: { 'ui.x': '地圖 節點 Workspace' }, 'zh-CN': { 'ui.x': '地图 地圖' } }), [], 'only zh-TW is checked');
+  assert.deepEqual(checkZhTwMapTerms({ en: {} }), [], 'no zh-TW dictionary: nothing to check');
+});

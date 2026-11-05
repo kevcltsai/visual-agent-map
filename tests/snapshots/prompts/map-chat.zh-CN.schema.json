@@ -133,6 +133,7 @@
           "strength": {
             "type": "string",
             "enum": [
+              "none",
               "weak",
               "medium",
               "strong",

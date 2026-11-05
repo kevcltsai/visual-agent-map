@@ -52,7 +52,11 @@ import {
   readAiLocked,
   readTopicKind,
   readHypothesisStrength,
+  readHypothesisLeaning,
+  readRawHypothesisStrength,
+  resolveHypothesisWrite,
   type HypothesisStrength,
+  type HypothesisLeaning,
   type TopicKind,
   readRelevanceGoal,
   normalizeRelevanceGoal,
@@ -123,7 +127,9 @@ export interface Note {
   aiLocked?: true;
   /** From `topic-kind` frontmatter; set only for a hypothesis (absent = ordinary topic). */
   topicKind?: Exclude<TopicKind, "topic">;
-  /** From `hypothesis-strength`; set only for a hypothesis (missing or invalid reads as weak). */
+  /** From `hypothesis-leaning`; set only for a hypothesis (missing or invalid reads as undecided). */
+  hypothesisLeaning?: HypothesisLeaning;
+  /** From `hypothesis-strength`; set only for a hypothesis (missing or invalid reads as none; weak when the leaning is supported or refuted and the stored strength is none). */
   hypothesisStrength?: HypothesisStrength;
   /** From `topic-markers` frontmatter, whitelisted ids only; absent when there are none. */
   markers?: TopicMarker[];
@@ -1553,7 +1559,9 @@ export class Repository {
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
       ...(readAiLocked(fm) ? { aiLocked: true as const } : {}),
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
-      ...(readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {}),
+      ...(readTopicKind(fm) === "hypothesis"
+        ? { hypothesisLeaning: readHypothesisLeaning(fm), hypothesisStrength: readHypothesisStrength(fm) }
+        : {}),
       ...(readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {}),
       ...(readTopicLinks(fm).length ? { links: readTopicLinks(fm) } : {}),
       ...(readTopicColor(fm) ? { color: readTopicColor(fm) } : {}),
@@ -1720,6 +1728,9 @@ export class Repository {
       topicKind?: TopicKind;
       /** Deprecated alias of `topicKind: "hypothesis"`, kept per decision #30. */
       hypothesis?: true;
+      /** A hypothesis's starting leaning and strength (default undecided and none); ignored for other kinds. */
+      hypothesisLeaning?: HypothesisLeaning;
+      hypothesisStrength?: HypothesisStrength;
     } = {},
     onCreate?: (path: string) => void
   ): Promise<MapNode> {
@@ -1727,6 +1738,13 @@ export class Repository {
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const id = crypto.randomUUID();
     const kind: TopicKind = initial.topicKind ?? (initial.hypothesis ? "hypothesis" : "topic");
+    const hypothesisValues =
+      kind === "hypothesis"
+        ? resolveHypothesisWrite(
+            { leaning: "undecided", strength: "none" },
+            { leaning: initial.hypothesisLeaning, strength: initial.hypothesisStrength }
+          )
+        : undefined;
     const metadata = {
       "agent-map-node": true,
       "node-id": id,
@@ -1741,7 +1759,9 @@ export class Repository {
       ...(modelSource === "manual" ? { "reasoning-level": initial.reasoning ?? this.settings.cliReasoning } : {}),
       ...(initial.researchMode ? { "research-mode": initial.researchMode } : {}),
       ...(kind !== "topic" ? { "topic-kind": kind } : {}),
-      ...(kind === "hypothesis" ? { "hypothesis-strength": "weak" } : {}),
+      ...(hypothesisValues
+        ? { "hypothesis-leaning": hypothesisValues.leaning, "hypothesis-strength": hypothesisValues.strength }
+        : {}),
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -1903,8 +1923,8 @@ export class Repository {
   }
 
   /**
-   * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-strength` stays, `updated` is not
-   * bumped, nothing rebuilds.
+   * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-leaning` and `hypothesis-strength`
+   * stay (and are not added), `updated` is not bumped, nothing rebuilds.
    */
   async writeTopicKind(path: string, kind: TopicKind): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
@@ -2007,11 +2027,40 @@ export class Repository {
     });
   }
 
-  /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */
+  /**
+   * Sets a hypothesis note's `hypothesis-strength`: no other key changes, `updated` is not bumped, nothing rebuilds. A none
+   * under a supported or refuted leaning is written as weak (the strength is at least weak when the evidence leans).
+   */
   async writeHypothesisStrength(path: string, strength: HypothesisStrength): Promise<void> {
-    await this.app.vault.process(this.file(path), content =>
-      setFrontmatterKeys(content, { "hypothesis-strength": strength })
-    );
+    await this.app.vault.process(this.file(path), content => {
+      const fm = frontmatter(content),
+        current = {
+          leaning: readHypothesisLeaning(fm) ?? "undecided",
+          strength: readRawHypothesisStrength(fm) ?? "none"
+        };
+      return setFrontmatterKeys(content, {
+        "hypothesis-strength": resolveHypothesisWrite(current, { strength }).strength
+      });
+    });
+  }
+
+  /**
+   * Sets a hypothesis note's `hypothesis-leaning`; when the new leaning is supported or refuted and the stored strength is
+   * none or missing, the same write sets the strength to weak. No other key changes, `updated` is not bumped, nothing rebuilds.
+   */
+  async writeHypothesisLeaning(path: string, leaning: HypothesisLeaning): Promise<void> {
+    await this.app.vault.process(this.file(path), content => {
+      const fm = frontmatter(content),
+        current = {
+          leaning: readHypothesisLeaning(fm) ?? "undecided",
+          strength: readRawHypothesisStrength(fm) ?? "none"
+        },
+        next = resolveHypothesisWrite(current, { leaning });
+      return setFrontmatterKeys(content, {
+        "hypothesis-leaning": next.leaning,
+        ...(next.strength !== current.strength ? { "hypothesis-strength": next.strength } : {})
+      });
+    });
   }
 
   /**

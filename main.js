@@ -700,7 +700,14 @@ var en = {
   "ui.add_subtopic_menu": "Add subtopic\u2026",
   "ui.add_kind_0": "Add {0}",
   "ui.new_kind_0": "New {0}",
-  "ui.hypothesis_tag_0": "Hypothesis \xB7 {0}",
+  "ui.hypothesis_tag_undecided": "Hypothesis \xB7 Undecided",
+  "ui.hypothesis_tag_0_1": "Hypothesis \xB7 {0} \xB7 {1}",
+  "ui.hypothesis_none": "None",
+  "ui.hypothesis_leaning": "Leaning",
+  "ui.hypothesis_supported": "Supported",
+  "ui.hypothesis_undecided": "Undecided",
+  "ui.hypothesis_refuted": "Refuted",
+  "ui.hypothesis_none_disabled": "With a leaning, strength is at least Weak",
   "ui.hypothesis_weak": "Weak",
   "ui.hypothesis_medium": "Medium",
   "ui.hypothesis_strong": "Strong",
@@ -3240,7 +3247,14 @@ var zhCN = {
   "ui.add_subtopic_menu": "\u6DFB\u52A0\u5B50\u8BAE\u9898\u2026",
   "ui.add_kind_0": "\u6DFB\u52A0{0}",
   "ui.new_kind_0": "\u65B0{0}",
-  "ui.hypothesis_tag_0": "\u5047\u8BBE\u30FB{0}",
+  "ui.hypothesis_tag_undecided": "\u5047\u8BBE\u30FB\u672A\u5B9A",
+  "ui.hypothesis_tag_0_1": "\u5047\u8BBE\u30FB{0}\u30FB{1}",
+  "ui.hypothesis_none": "\u65E0",
+  "ui.hypothesis_leaning": "\u503E\u5411",
+  "ui.hypothesis_supported": "\u88AB\u652F\u6301",
+  "ui.hypothesis_undecided": "\u672A\u5B9A",
+  "ui.hypothesis_refuted": "\u88AB\u53CD\u9A73",
+  "ui.hypothesis_none_disabled": "\u6709\u503E\u5411\u65F6\u5F3A\u5EA6\u81F3\u5C11\u4E3A\u5F31",
   "ui.hypothesis_weak": "\u5F31",
   "ui.hypothesis_medium": "\u4E2D",
   "ui.hypothesis_strong": "\u5F3A",
@@ -5780,7 +5794,14 @@ var zhTW = {
   "ui.add_subtopic_menu": "\u65B0\u589E\u5B50\u8B70\u984C\u2026",
   "ui.add_kind_0": "\u65B0\u589E{0}",
   "ui.new_kind_0": "\u65B0{0}",
-  "ui.hypothesis_tag_0": "\u5047\u8A2D\u30FB{0}",
+  "ui.hypothesis_tag_undecided": "\u5047\u8A2D\u30FB\u672A\u5B9A",
+  "ui.hypothesis_tag_0_1": "\u5047\u8A2D\u30FB{0}\u30FB{1}",
+  "ui.hypothesis_none": "\u7121",
+  "ui.hypothesis_leaning": "\u50BE\u5411",
+  "ui.hypothesis_supported": "\u88AB\u652F\u6301",
+  "ui.hypothesis_undecided": "\u672A\u5B9A",
+  "ui.hypothesis_refuted": "\u88AB\u53CD\u99C1",
+  "ui.hypothesis_none_disabled": "\u6709\u50BE\u5411\u6642\u5F37\u5EA6\u81F3\u5C11\u70BA\u5F31",
   "ui.hypothesis_weak": "\u5F31",
   "ui.hypothesis_medium": "\u4E2D",
   "ui.hypothesis_strong": "\u5F37",
@@ -22821,15 +22842,33 @@ function readRelevanceContext(fm) {
   return typeof context === "string" ? normalizeRelevanceContext(context) : void 0;
 }
 var TOPIC_KINDS = ["topic", "action", "atomic", "hypothesis", "evidence", "conclusion"];
-var HYPOTHESIS_STRENGTHS = ["weak", "medium", "strong"];
+var HYPOTHESIS_STRENGTHS = ["none", "weak", "medium", "strong"];
+var HYPOTHESIS_LEANINGS = ["supported", "undecided", "refuted"];
 function readTopicKind(fm) {
   const value = fm["topic-kind"];
   return typeof value === "string" && TOPIC_KINDS.includes(value) ? value : "topic";
 }
-function readHypothesisStrength(fm) {
+function readHypothesisLeaning(fm) {
+  if (readTopicKind(fm) !== "hypothesis") return void 0;
+  const value = fm["hypothesis-leaning"];
+  return typeof value === "string" && HYPOTHESIS_LEANINGS.includes(value) ? value : "undecided";
+}
+function readRawHypothesisStrength(fm) {
   if (readTopicKind(fm) !== "hypothesis") return void 0;
   const value = fm["hypothesis-strength"];
-  return typeof value === "string" && HYPOTHESIS_STRENGTHS.includes(value) ? value : "weak";
+  return typeof value === "string" && HYPOTHESIS_STRENGTHS.includes(value) ? value : "none";
+}
+function consistentStrength(leaning, strength) {
+  return leaning !== "undecided" && strength === "none" ? "weak" : strength;
+}
+function readHypothesisStrength(fm) {
+  const raw = readRawHypothesisStrength(fm), leaning = readHypothesisLeaning(fm);
+  return raw === void 0 || leaning === void 0 ? void 0 : consistentStrength(leaning, raw);
+}
+function resolveHypothesisWrite(current, change2) {
+  var _a2, _b2;
+  const leaning = (_a2 = change2.leaning) != null ? _a2 : current.leaning;
+  return { leaning, strength: consistentStrength(leaning, (_b2 = change2.strength) != null ? _b2 : current.strength) };
 }
 
 // repository.ts
@@ -23857,7 +23896,7 @@ var Repository = class {
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
       ...readAiLocked(fm) ? { aiLocked: true } : {},
       ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
-      ...readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {},
+      ...readTopicKind(fm) === "hypothesis" ? { hypothesisLeaning: readHypothesisLeaning(fm), hypothesisStrength: readHypothesisStrength(fm) } : {},
       ...readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {},
       ...readTopicLinks(fm).length ? { links: readTopicLinks(fm) } : {},
       ...readTopicColor(fm) ? { color: readTopicColor(fm) } : {},
@@ -23995,6 +24034,10 @@ ${localizeHeadings(withReferenceLinks(body, fm, language2), writtenHeadingSet(co
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const id = crypto.randomUUID();
     const kind = (_a2 = initial.topicKind) != null ? _a2 : initial.hypothesis ? "hypothesis" : "topic";
+    const hypothesisValues = kind === "hypothesis" ? resolveHypothesisWrite(
+      { leaning: "undecided", strength: "none" },
+      { leaning: initial.hypothesisLeaning, strength: initial.hypothesisStrength }
+    ) : void 0;
     const metadata = {
       "agent-map-node": true,
       "node-id": id,
@@ -24009,7 +24052,7 @@ ${localizeHeadings(withReferenceLinks(body, fm, language2), writtenHeadingSet(co
       ...modelSource === "manual" ? { "reasoning-level": (_b2 = initial.reasoning) != null ? _b2 : this.settings.cliReasoning } : {},
       ...initial.researchMode ? { "research-mode": initial.researchMode } : {},
       ...kind !== "topic" ? { "topic-kind": kind } : {},
-      ...kind === "hypothesis" ? { "hypothesis-strength": "weak" } : {},
+      ...hypothesisValues ? { "hypothesis-leaning": hypothesisValues.leaning, "hypothesis-strength": hypothesisValues.strength } : {},
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -24145,8 +24188,8 @@ ${body}`);
     return { goal: readRelevanceGoal(fm), level: readRelevanceLevel(fm), context: readRelevanceContext(fm) };
   }
   /**
-   * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-strength` stays, `updated` is not
-   * bumped, nothing rebuilds.
+   * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-leaning` and `hypothesis-strength`
+   * stay (and are not added), `updated` is not bumped, nothing rebuilds.
    */
   async writeTopicKind(path, kind) {
     await this.app.vault.process(
@@ -24240,12 +24283,38 @@ ${body}`);
       return Object.keys(values).length ? setFrontmatterKeys(content, values) : content;
     });
   }
-  /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */
+  /**
+   * Sets a hypothesis note's `hypothesis-strength`: no other key changes, `updated` is not bumped, nothing rebuilds. A none
+   * under a supported or refuted leaning is written as weak (the strength is at least weak when the evidence leans).
+   */
   async writeHypothesisStrength(path, strength) {
-    await this.app.vault.process(
-      this.file(path),
-      (content) => setFrontmatterKeys(content, { "hypothesis-strength": strength })
-    );
+    await this.app.vault.process(this.file(path), (content) => {
+      var _a2, _b2;
+      const fm = frontmatter(content), current = {
+        leaning: (_a2 = readHypothesisLeaning(fm)) != null ? _a2 : "undecided",
+        strength: (_b2 = readRawHypothesisStrength(fm)) != null ? _b2 : "none"
+      };
+      return setFrontmatterKeys(content, {
+        "hypothesis-strength": resolveHypothesisWrite(current, { strength }).strength
+      });
+    });
+  }
+  /**
+   * Sets a hypothesis note's `hypothesis-leaning`; when the new leaning is supported or refuted and the stored strength is
+   * none or missing, the same write sets the strength to weak. No other key changes, `updated` is not bumped, nothing rebuilds.
+   */
+  async writeHypothesisLeaning(path, leaning) {
+    await this.app.vault.process(this.file(path), (content) => {
+      var _a2, _b2;
+      const fm = frontmatter(content), current = {
+        leaning: (_a2 = readHypothesisLeaning(fm)) != null ? _a2 : "undecided",
+        strength: (_b2 = readRawHypothesisStrength(fm)) != null ? _b2 : "none"
+      }, next = resolveHypothesisWrite(current, { leaning });
+      return setFrontmatterKeys(content, {
+        "hypothesis-leaning": next.leaning,
+        ...next.strength !== current.strength ? { "hypothesis-strength": next.strength } : {}
+      });
+    });
   }
   /**
    * Sets or removes only the relevance keys of a note's frontmatter (`relevance-tier`, `relevance-manual`, and the
@@ -31791,13 +31860,23 @@ function renderRelevanceTagButton(parent, tier, label, ariaLabel, open, disabled
 
 // experiences/visual-map/hypothesis-label.ts
 var STRENGTH_LABEL = {
+  none: "ui.hypothesis_none",
   weak: "ui.hypothesis_weak",
   medium: "ui.hypothesis_medium",
   strong: "ui.hypothesis_strong"
 };
-function renderHypothesisTag(parent, strength, text11) {
+var LEANING_LABEL = {
+  supported: "ui.hypothesis_supported",
+  undecided: "ui.hypothesis_undecided",
+  refuted: "ui.hypothesis_refuted"
+};
+function hypothesisTagText(leaning, strength, translate2) {
+  return leaning === "undecided" && strength === "none" ? translate2("ui.hypothesis_tag_undecided") : translate2("ui.hypothesis_tag_0_1", translate2(LEANING_LABEL[leaning]), translate2(STRENGTH_LABEL[strength]));
+}
+function renderHypothesisTag(parent, leaning, strength, text11) {
   const tag = parent.createSpan({ cls: "vam-hypothesis-tag", text: text11 });
   tag.dataset.strength = strength;
+  tag.dataset.leaning = leaning;
   return tag;
 }
 
@@ -60730,9 +60809,9 @@ ${request.requirements}` : preset.text,
     }
     if (kind !== "topic") {
       card.dataset.topicKind = kind;
-      const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
-      if (strength) renderHypothesisTag(header, strength, kindText);
+      const strength = this.hypothesisStrengthOf(node.id), leaning = this.hypothesisLeaningOf(node.id);
+      const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
+      if (strength && leaning) renderHypothesisTag(header, leaning, strength, kindText);
       else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
       const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
@@ -61556,10 +61635,14 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c;
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
     if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return void 0;
-    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.hypothesisStrength) != null ? _c : "weak";
+    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.hypothesisStrength) != null ? _c : "none";
   }
-  hypothesisTagText(strength) {
-    return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
+  /** The leaning to show on a card: only a hypothesis on an ordinary map has one. */
+  hypothesisLeaningOf(id) {
+    var _a2, _b2, _c;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return void 0;
+    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.hypothesisLeaning) != null ? _c : "undecided";
   }
   /** The markers to show for a topic: only whitelisted ids, in the fixed order (an AIM card shows them too). */
   markersOf(id) {
@@ -62022,8 +62105,8 @@ ${request.requirements}` : preset.text,
     }
     const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
-      const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_c = cardLabels.get(card)) == null ? void 0 : _c.textContent;
+      const strength = this.hypothesisStrengthOf(node.id), leaning = this.hypothesisLeaningOf(node.id);
+      const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_c = cardLabels.get(card)) == null ? void 0 : _c.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (header) {
@@ -62530,6 +62613,16 @@ ${request.requirements}` : preset.text,
     const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeHypothesisStrength(path, strength)).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
     }).commit({ deferRebuild: true, label: t("ui.hypothesis_strength") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Sets a hypothesis's leaning: the note's frontmatter (plus a weak strength when a none must lift) and Map.md in one undoable step. */
+  async changeHypothesisLeaning(node, leaning) {
+    if (!this.map || !this.relationsEnabled() || !this.isHypothesis(node.id)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeHypothesisLeaning(path, leaning)).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
@@ -63625,8 +63718,8 @@ ${request.requirements}` : preset.text,
     const body = section3.createDiv("vam-hypothesis-body");
     const editByPair = /* @__PURE__ */ new Map();
     let addRelationButton = null;
-    const paint = (focusStrength = false, focusKind = false, focusAdd = false) => {
-      var _a2, _b2, _c, _d;
+    const paint = (focusStrength = false, focusKind = false, focusAdd = false, focusLeaning) => {
+      var _a2, _b2, _c, _d, _e, _f;
       body.empty();
       const currentKind = this.topicKindOf(node.id);
       body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
@@ -63649,7 +63742,28 @@ ${request.requirements}` : preset.text,
         }
       }
       if (currentKind === "hypothesis") {
-        const current = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.hypothesisStrength) != null ? _b2 : "weak";
+        const current = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.hypothesisStrength) != null ? _b2 : "none", currentLeaning = (_d = (_c = this.notes.get(node.id)) == null ? void 0 : _c.hypothesisLeaning) != null ? _d : "undecided";
+        body.createEl("strong", {
+          text: t("ui.hypothesis_leaning"),
+          cls: "vam-topic-tree-heading vam-section-heading"
+        });
+        const leanings = body.createDiv("vam-hypothesis-leanings vam-choice-group");
+        leanings.setAttr("role", "group");
+        leanings.setAttr("aria-label", t("ui.hypothesis_leaning"));
+        for (const option of HYPOTHESIS_LEANINGS) {
+          const choice2 = this.button(leanings, t(LEANING_LABEL[option]), () => {
+            if (option === currentLeaning) return;
+            this.enqueue(async () => {
+              await this.changeHypothesisLeaning(node, option);
+              paint(false, false, false, option);
+            });
+          });
+          choice2.setAttr("aria-pressed", String(option === currentLeaning));
+          if (option === currentLeaning) {
+            choice2.addClass("is-pressed");
+            if (focusLeaning === option) choice2.focus();
+          }
+        }
         body.createEl("strong", {
           text: t("ui.hypothesis_strength"),
           cls: "vam-topic-tree-heading vam-section-heading"
@@ -63658,14 +63772,21 @@ ${request.requirements}` : preset.text,
         group.setAttr("role", "group");
         group.setAttr("aria-label", t("ui.hypothesis_strength"));
         for (const option of HYPOTHESIS_STRENGTHS) {
+          const blocked = option === "none" && currentLeaning !== "undecided";
           const choice2 = this.button(group, t(STRENGTH_LABEL[option]), () => {
-            if (option === current) return;
+            if (blocked || option === current) return;
             this.enqueue(async () => {
               await this.changeHypothesisStrength(node, option);
               paint(true);
             });
           });
           choice2.setAttr("aria-pressed", String(option === current));
+          if (blocked) {
+            choice2.setAttr("aria-disabled", "true");
+            choice2.addClass("is-disabled");
+            choice2.setAttr("aria-description", t("ui.hypothesis_none_disabled"));
+            choice2.setAttr("title", t("ui.hypothesis_none_disabled"));
+          }
           if (option === current) {
             choice2.addClass("is-pressed");
             if (focusStrength) choice2.focus();
@@ -63673,7 +63794,7 @@ ${request.requirements}` : preset.text,
         }
       }
       editByPair.clear();
-      const links = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter((r) => r.from === node.id || r.to === node.id);
+      const links = ((_f = (_e = this.map) == null ? void 0 : _e.topicRelations) != null ? _f : []).filter((r) => r.from === node.id || r.to === node.id);
       body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
       if (links.length) {
         const list = body.createEl("ul", { cls: "vam-relation-list" });

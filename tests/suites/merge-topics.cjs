@@ -466,6 +466,14 @@ integrationTest('hypothesis-evidence: sibling merge with a strong hypothesis fir
   const raw = h.contents.get(note.path);
   assert.match(raw, /topic-kind: hypothesis/); assert.match(raw, /hypothesis-strength: strong/);
 });
+integrationTest('hypothesis-leaning: a sibling merge with a hypothesis that has no stored strength first gives an undecided hypothesis with strength none, both keys written', async () => {
+  const h = await heHarness();
+  h.notes.hyp.y = 1; await h.relate([]); await h.view.hydrate();
+  const note = await heKindOf(h, ['hyp', 'f1']);
+  assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'none'); assert.equal(note.hypothesisLeaning, 'undecided');
+  const raw = h.contents.get(note.path);
+  assert.match(raw, /hypothesis-leaning: undecided/); assert.match(raw, /hypothesis-strength: none/);
+});
 integrationTest('hypothesis-evidence: sibling merge follows reading order, not selection order: an ordinary topic first gives an ordinary topic with no topic-kind key', async () => {
   const h = await heHarness();
   h.notes.f1.y = 1; h.notes.hyp.y = 500; await h.relate([]);

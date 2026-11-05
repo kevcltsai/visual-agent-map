@@ -1084,7 +1084,7 @@ test('chat 03: a reply of step version 6 (no topicKind or strength keys) still p
 test('chat 03: the schema has topicKind and strength as required enums, and both prompts forbid a type in the title', () => {
   const items = MAP_CHAT_SCHEMA.properties.actions.items;
   assert.deepEqual(plain(items.properties.topicKind.enum), ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion', '']);
-  assert.deepEqual(plain(items.properties.strength.enum), ['weak', 'medium', 'strong', '']);
+  assert.deepEqual(plain(items.properties.strength.enum), ['none', 'weak', 'medium', 'strong', '']);
   assert.ok(items.required.includes('topicKind') && items.required.includes('strength'));
   const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
   assert.match(render('en'), /Never express a topic type through the title/);

@@ -289,10 +289,12 @@ import {
   normalizeRelevanceLevel,
   RELEVANCE_CONTEXT_MAX_LENGTH,
   RELEVANCE_GOAL_MAX_LENGTH,
+  HYPOTHESIS_LEANINGS,
   HYPOTHESIS_STRENGTHS,
   readAiLocked,
   TOPIC_KINDS,
   RELEVANCE_LEVELS,
+  type HypothesisLeaning,
   type HypothesisStrength,
   type NoteRelevance,
   type RelevanceLevel,
@@ -300,7 +302,7 @@ import {
   type TopicKind
 } from "../../note-values";
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
-import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
+import { hypothesisTagText, LEANING_LABEL, renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
 import {
   bottomInsetFromRects,
@@ -11043,9 +11045,11 @@ export class VisualAgentMapView extends ItemView {
     // A hypothesis: quiet "Hypothesis · strength" tag; every non-ordinary type sets `data-topic-kind` and is named in the card's accessible name.
     if (kind !== "topic") {
       card.dataset.topicKind = kind;
-      const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
-      if (strength) renderHypothesisTag(header, strength, kindText);
+      const strength = this.hypothesisStrengthOf(node.id),
+        leaning = this.hypothesisLeaningOf(node.id);
+      const kindText =
+        strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
+      if (strength && leaning) renderHypothesisTag(header, leaning, strength, kindText);
       // The other typed cards name their type in the same quiet tag, coloured by the type's hue (decision 35); an ordinary topic shows none.
       else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
       const named = cardLabels.get(card)?.textContent;
@@ -11962,10 +11966,13 @@ export class VisualAgentMapView extends ItemView {
   private hypothesisStrengthOf(id: string): HypothesisStrength | undefined {
     const node = this.map?.nodes.find(item => item.id === id);
     if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return undefined;
-    return this.notes.get(id)?.hypothesisStrength ?? "weak";
+    return this.notes.get(id)?.hypothesisStrength ?? "none";
   }
-  private hypothesisTagText(strength: HypothesisStrength): string {
-    return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
+  /** The leaning to show on a card: only a hypothesis on an ordinary map has one. */
+  private hypothesisLeaningOf(id: string): HypothesisLeaning | undefined {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!this.relationsEnabled() || !node || isAimNode(node) || !this.isHypothesis(id)) return undefined;
+    return this.notes.get(id)?.hypothesisLeaning ?? "undecided";
   }
   /** The markers to show for a topic: only whitelisted ids, in the fixed order (an AIM card shows them too). */
   private markersOf(id: string): TopicMarker[] {
@@ -12444,8 +12451,10 @@ export class VisualAgentMapView extends ItemView {
     // The label above was rewritten from the title and status; a typed topic keeps its type (a hypothesis its strength) in the accessible name.
     const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
-      const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey),
+      const strength = this.hypothesisStrengthOf(node.id),
+        leaning = this.hypothesisLeaningOf(node.id);
+      const kindText =
+          strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey),
         named = cardLabels.get(card)?.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
@@ -12984,6 +12993,19 @@ export class VisualAgentMapView extends ItemView {
         map.viewport = clone(viewport);
       })
       .commit({ deferRebuild: true, label: t("ui.hypothesis_strength") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Sets a hypothesis's leaning: the note's frontmatter (plus a weak strength when a none must lift) and Map.md in one undoable step. */
+  private async changeHypothesisLeaning(node: MapNode, leaning: HypothesisLeaning): Promise<void> {
+    if (!this.map || !this.relationsEnabled() || !this.isHypothesis(node.id)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisLeaning(path, leaning))
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.hypothesis_leaning") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
@@ -14139,7 +14161,12 @@ export class VisualAgentMapView extends ItemView {
     const body = section.createDiv("vam-hypothesis-body");
     const editByPair = new Map<string, HTMLElement>();
     let addRelationButton: HTMLElement | null = null;
-    const paint = (focusStrength = false, focusKind = false, focusAdd = false): void => {
+    const paint = (
+      focusStrength = false,
+      focusKind = false,
+      focusAdd = false,
+      focusLeaning?: HypothesisLeaning
+    ): void => {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
       body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
@@ -14163,7 +14190,30 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       if (currentKind === "hypothesis") {
-        const current = this.notes.get(node.id)?.hypothesisStrength ?? "weak";
+        const current = this.notes.get(node.id)?.hypothesisStrength ?? "none",
+          currentLeaning = this.notes.get(node.id)?.hypothesisLeaning ?? "undecided";
+        body.createEl("strong", {
+          text: t("ui.hypothesis_leaning"),
+          cls: "vam-topic-tree-heading vam-section-heading"
+        });
+        const leanings = body.createDiv("vam-hypothesis-leanings vam-choice-group");
+        leanings.setAttr("role", "group");
+        leanings.setAttr("aria-label", t("ui.hypothesis_leaning"));
+        for (const option of HYPOTHESIS_LEANINGS) {
+          const choice = this.button(leanings, t(LEANING_LABEL[option]), () => {
+            if (option === currentLeaning) return;
+            this.enqueue(async () => {
+              await this.changeHypothesisLeaning(node, option);
+              paint(false, false, false, option);
+            });
+          });
+          choice.setAttr("aria-pressed", String(option === currentLeaning));
+          if (option === currentLeaning) {
+            choice.addClass("is-pressed");
+            // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
+            if (focusLeaning === option) choice.focus();
+          }
+        }
         body.createEl("strong", {
           text: t("ui.hypothesis_strength"),
           cls: "vam-topic-tree-heading vam-section-heading"
@@ -14172,14 +14222,22 @@ export class VisualAgentMapView extends ItemView {
         group.setAttr("role", "group");
         group.setAttr("aria-label", t("ui.hypothesis_strength"));
         for (const option of HYPOTHESIS_STRENGTHS) {
+          // With a leaning, strength is at least weak: "none" stays visible but disabled, with the reason.
+          const blocked = option === "none" && currentLeaning !== "undecided";
           const choice = this.button(group, t(STRENGTH_LABEL[option]), () => {
-            if (option === current) return;
+            if (blocked || option === current) return;
             this.enqueue(async () => {
               await this.changeHypothesisStrength(node, option);
               paint(true);
             });
           });
           choice.setAttr("aria-pressed", String(option === current));
+          if (blocked) {
+            choice.setAttr("aria-disabled", "true");
+            choice.addClass("is-disabled");
+            choice.setAttr("aria-description", t("ui.hypothesis_none_disabled"));
+            choice.setAttr("title", t("ui.hypothesis_none_disabled"));
+          }
           if (option === current) {
             choice.addClass("is-pressed");
             // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.

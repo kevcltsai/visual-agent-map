@@ -1028,6 +1028,8 @@ export class VisualAgentMapView extends ItemView {
    * reaches the run and no request is sent; the entry goes away once the run is accepted or ends.
    */
   private startingTasks = new Map<string, AbortController>();
+  /** Keys in `startingTasks` whose run is an expansion (its Stop reads "Stop expanding"). */
+  private startingExpand = new Set<string>();
   private disclosureSeq = 0;
   /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
   private quickOutlines = new Map<
@@ -2072,6 +2074,7 @@ export class VisualAgentMapView extends ItemView {
     this.synthesisTasks.clear();
     for (const controller of this.startingTasks.values()) controller.abort();
     this.startingTasks.clear();
+    this.startingExpand.clear();
     for (const task of this.mergeTasks.values()) task.controller.abort();
     this.mergeTasks.clear();
     this.dropMapBackground();
@@ -11216,7 +11219,13 @@ export class VisualAgentMapView extends ItemView {
     ) {
       this.button(
         header,
-        t(stopLabelKey(this.plugin.topicRuns.runKind(node.path), !!this.plugin.quickExpandPending?.has(node.path))),
+        t(
+          stopLabelKey(
+            this.plugin.topicRuns.runKind(node.path),
+            !!this.plugin.quickExpandPending?.has(node.path),
+            this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
+          )
+        ),
         () => (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
       );
     }
@@ -12667,13 +12676,18 @@ export class VisualAgentMapView extends ItemView {
     // The map this run started on: a result that lands after a map switch belongs to that map, not the open one.
     const mapPath = this.path;
     return {
-      begin: controller => {
+      begin: (controller, kind) => {
         own = controller;
         this.startingTasks.set(key, controller);
+        if (kind === "expand") this.startingExpand.add(key);
+        else this.startingExpand.delete(key);
         this.render();
       },
       end: () => {
-        if (own && this.startingTasks.get(key) === own) this.startingTasks.delete(key);
+        if (own && this.startingTasks.get(key) === own) {
+          this.startingTasks.delete(key);
+          this.startingExpand.delete(key);
+        }
         own = undefined;
         if (!this.closed) this.render();
       },
@@ -12799,6 +12813,12 @@ export class VisualAgentMapView extends ItemView {
               ? () => (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
               : undefined,
           background: this.backgroundHooks(node.path, node),
+          stopKey: () =>
+            stopLabelKey(
+              this.plugin.topicRuns.runKind(node.path),
+              !!this.plugin.quickExpandPending?.has(node.path),
+              this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
+            ),
           quickOutline: this.quickOutline(node),
           pendingOutline: ((): PendingOutline | undefined => {
             const waiting = this.quickOutlines.get(node.path);

@@ -98,7 +98,7 @@ export interface SynthesisObserver {
  * `end` hands over to the view's own task state (accepted) or clears it (the run ended without being accepted).
  */
 export interface BackgroundHooks {
-  begin: (controller: AbortController) => void;
+  begin: (controller: AbortController, kind?: "research" | "expand") => void;
   end: () => void;
   /**
    * A result finished while the dialog is closed and has no task state of its own to announce it. A Quick research passes
@@ -170,6 +170,8 @@ export interface NextStepSettings extends OutputLanguageMemory, AiModeMemory {
   /** 「檢視整張圖」 (root topic) or 「檢視這個分支」 (subtopic): opens the AI structure review instead of a step. */
   structureReview?: { label: string; open: () => void };
   background?: BackgroundHooks;
+  /** The i18n key of this dialog's Stop while a run is going (expanding reads "Stop expanding"). */
+  stopKey?: () => "ui.stop_expand" | "ui.stop_research";
 }
 export interface QuickOutline {
   presets: { id: string; name: string }[];
@@ -426,12 +428,12 @@ export class NextStepModal extends Modal {
    * Hides the dialog once AI starts: usage confirmed, settings saved and sources ready (so a validation error still
    * shows in the dialog). The view takes over Stop for `controller` until the provider accepts the request.
    */
-  private detach(controller: AbortController): void {
+  private detach(controller: AbortController, kind: "research" | "expand" = "research"): void {
     this.detached = true;
     // Stop before the provider took the pre-started process leaves nothing waiting.
     controller.signal.addEventListener("abort", () => this.plugin.releaseWarmClaude?.(), { once: true });
     this.backgroundBegan = true;
-    this.background?.begin(controller);
+    this.background?.begin(controller, kind);
     this.close();
   }
   private endBackground(): void {
@@ -1094,7 +1096,7 @@ export class NextStepModal extends Modal {
       running.createSpan({ text: t("ui.ai_running_ai") });
       if (this.modelSettings.stop)
         running
-          .createEl("button", { text: t("ui.stop_research") })
+          .createEl("button", { text: t(this.modelSettings.stopKey?.() ?? "ui.stop_research") })
           .addEventListener("click", () => this.modelSettings?.stop?.());
     }
     // What this run will do, in one line; the details are under Adjust.
@@ -1345,7 +1347,7 @@ export class NextStepModal extends Modal {
         await this.rememberMode(mode);
         if (this.dead(controller)) return;
         // Usage confirmed, settings saved and sources ready: hide the dialog; the card shows running and Stop.
-        this.detach(controller);
+        this.detach(controller, "expand");
         const generated = await quickOutline.generate(request, signal);
         if (signal.aborted || (this.closed && !this.detached)) return;
         const { nodes, dropped } = limitOutline(generated, bounds);

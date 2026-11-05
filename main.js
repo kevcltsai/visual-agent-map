@@ -31302,8 +31302,8 @@ function runStyleLabelText(label, language2) {
 
 // experiences/visual-map/topic-run.ts
 var CHART_JOB_LIMIT = 3;
-function stopLabelKey(kind, quickExpandPending) {
-  return quickExpandPending || kind === "proposeChildren" ? "ui.stop_expand" : "ui.stop_research";
+function stopLabelKey(kind, quickExpandPending, startingExpand = false) {
+  return startingExpand || quickExpandPending || kind === "proposeChildren" ? "ui.stop_expand" : "ui.stop_research";
 }
 var TopicRuns = class {
   constructor(ports) {
@@ -42738,7 +42738,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
    * Hides the dialog once AI starts: usage confirmed, settings saved and sources ready (so a validation error still
    * shows in the dialog). The view takes over Stop for `controller` until the provider accepts the request.
    */
-  detach(controller) {
+  detach(controller, kind = "research") {
     var _a2;
     this.detached = true;
     controller.signal.addEventListener("abort", () => {
@@ -42746,7 +42746,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
       return (_b2 = (_a3 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a3);
     }, { once: true });
     this.backgroundBegan = true;
-    (_a2 = this.background) == null ? void 0 : _a2.begin(controller);
+    (_a2 = this.background) == null ? void 0 : _a2.begin(controller, kind);
     this.close();
   }
   endBackground() {
@@ -43255,7 +43255,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
     (_a2 = status()) == null ? void 0 : _a2.setText(t("ui.quick_outline_review_hint"));
   }
   onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
     this.modalEl.addClass("vam-next-modal");
     const selection = this.selectionFlow;
     this.titleEl.setText(t(selection ? "ui.confirm_topic_synthesis" : "ui.how_would_you_like_to_explore_next"));
@@ -43344,7 +43344,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
       const running = this.contentEl.createDiv("vam-next-running");
       running.createSpan({ text: t("ui.ai_running_ai") });
       if (this.modelSettings.stop)
-        running.createEl("button", { text: t("ui.stop_research") }).addEventListener("click", () => {
+        running.createEl("button", { text: t((_i = (_h = (_g = this.modelSettings).stopKey) == null ? void 0 : _h.call(_g)) != null ? _i : "ui.stop_research") }).addEventListener("click", () => {
           var _a3, _b3;
           return (_b3 = (_a3 = this.modelSettings) == null ? void 0 : _a3.stop) == null ? void 0 : _b3.call(_a3);
         });
@@ -43440,7 +43440,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
         }
       });
     });
-    const quickOutline = (_g = this.modelSettings) == null ? void 0 : _g.quickOutline;
+    const quickOutline = (_j = this.modelSettings) == null ? void 0 : _j.quickOutline;
     expandPanel.createEl("p", { text: t("ui.quick_outline_mode_hint") });
     const limits = expandPanel.createDiv("vam-quick-limits");
     const numberField = (label, initial, max) => {
@@ -43478,7 +43478,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
     presetLabel.createSpan({ text: t("ui.outline_ai_preset") });
     const presetSelect = presetLabel.createEl("select");
     presetSelect.setAttr("aria-label", t("ui.outline_ai_preset"));
-    for (const preset of (_h = quickOutline == null ? void 0 : quickOutline.presets) != null ? _h : [])
+    for (const preset of (_k = quickOutline == null ? void 0 : quickOutline.presets) != null ? _k : [])
       presetSelect.createEl("option", { value: preset.id, text: preset.name });
     const shallowLabel = adjustFor.expand.createEl("label", { cls: "vam-field vam-next-toggle" });
     const shallow = shallowLabel.createEl("input", { type: "checkbox" });
@@ -43497,8 +43497,8 @@ var NextStepModal = class extends import_obsidian26.Modal {
     });
     const reviewButton = actions.createEl("button", { text: "" });
     const expandButton = actions.createEl("button", { text: t("ui.expand"), cls: "mod-cta" });
-    expandButton.dataset.topicRun = (_i = expandButton.textContent) != null ? _i : "";
-    expandButton.disabled = !!((_j = this.modelSettings) == null ? void 0 : _j.running) || !quickOutline;
+    expandButton.dataset.topicRun = (_l = expandButton.textContent) != null ? _l : "";
+    expandButton.disabled = !!((_m = this.modelSettings) == null ? void 0 : _m.running) || !quickOutline;
     expandPanel.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
     expandPanel.createDiv("vam-next-result");
     const syncExpand = () => {
@@ -43585,7 +43585,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
         };
         await this.rememberMode(mode);
         if (this.dead(controller)) return;
-        this.detach(controller);
+        this.detach(controller, "expand");
         const generated = await quickOutline.generate(request, signal);
         if (signal.aborted || this.closed && !this.detached) return;
         const { nodes, dropped } = limitOutline(generated, bounds);
@@ -43601,7 +43601,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
         this.outlineReview(expandPanel, nodes, expandButton, quickOutline.create, options, dropped);
       });
     });
-    const pendingDirections = selection ? selection.pending : (_k = this.modelSettings) == null ? void 0 : _k.synthesisPending;
+    const pendingDirections = selection ? selection.pending : (_n = this.modelSettings) == null ? void 0 : _n.synthesisPending;
     synthesizePanel.createEl("p", {
       text: selection ? t("ui.synthesize_0_source_topics_ai_reads_their_full_knowledge_and", selection.names.length) : this.childrenCount ? t("ui.ai_suggests_synthesis_angles_first_the_parent_topic_changes") : t("ui.this_topic_has_no_direct_subtopics_you_can_choose_other_note")
     });
@@ -43616,7 +43616,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
     }
     synthesisContentSelect = renderSynthesisContent(
       adjustFor.synthesize,
-      (_o = (_n = selection == null ? void 0 : selection.names) != null ? _n : (_m = (_l = this.modelSettings) == null ? void 0 : _l.sources) == null ? void 0 : _m.synthesisTopics) != null ? _o : []
+      (_r = (_q = selection == null ? void 0 : selection.names) != null ? _q : (_p = (_o = this.modelSettings) == null ? void 0 : _o.sources) == null ? void 0 : _p.synthesisTopics) != null ? _r : []
     );
     const stageTwoHint = adjustFor.synthesize.createEl("p", {
       cls: "vam-hint vam-next-synth-fixed",
@@ -43627,10 +43627,10 @@ var NextStepModal = class extends import_obsidian26.Modal {
     const synthStatus = synthesizePanel.createEl("p", { cls: "vam-next-status", attr: { "aria-live": "polite" } });
     const synthResult = synthesizePanel.createDiv("vam-next-result");
     const suggestButton = actions.createEl("button", { text: t("ui.get_synthesis_suggestions_first"), cls: "mod-cta" });
-    suggestButton.dataset.topicRun = (_p = suggestButton.textContent) != null ? _p : "";
+    suggestButton.dataset.topicRun = (_s = suggestButton.textContent) != null ? _s : "";
     const skipButton = actions.createEl("button", { text: t("ui.synthesis_skip_suggestions") });
     const draftButton = actions.createEl("button", { text: t("ui.get_synthesis_draft"), cls: "mod-cta" });
-    for (const button of [suggestButton, skipButton, draftButton]) button.disabled = !!((_q = this.modelSettings) == null ? void 0 : _q.running);
+    for (const button of [suggestButton, skipButton, draftButton]) button.disabled = !!((_t = this.modelSettings) == null ? void 0 : _t.running);
     let stage = pendingDirections ? "directions" : "setup";
     let frozenSummary = "";
     const syncSynthesisStage = () => {
@@ -43808,8 +43808,8 @@ var NextStepModal = class extends import_obsidian26.Modal {
     languageSelect.value = defaultOutputLanguage(
       this.plugin.settings.language,
       this.topic,
-      (_r = this.modelSettings) == null ? void 0 : _r.contentLanguage,
-      (_s = this.info) == null ? void 0 : _s.outputLanguage
+      (_u = this.modelSettings) == null ? void 0 : _u.contentLanguage,
+      (_v = this.info) == null ? void 0 : _v.outputLanguage
     );
     languageSelect.setAttr("aria-label", t("ui.output_language"));
     languageSelect.addEventListener("change", () => {
@@ -43817,7 +43817,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
     });
     const style = styleChoiceField(compactSettings, {
       styles: stylePickerFor(this.app, this.plugin),
-      current: (_u = (_t = this.info) == null ? void 0 : _t.currentStyle) != null ? _u : "",
+      current: (_x = (_w = this.info) == null ? void 0 : _w.currentStyle) != null ? _x : "",
       changed: () => refreshSummary()
     });
     const noteStyle = style.style;
@@ -43859,7 +43859,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
     else checkName();
     syncExpand();
     show(initialMode);
-    const waitingOutline = (_v = this.modelSettings) == null ? void 0 : _v.pendingOutline;
+    const waitingOutline = (_y = this.modelSettings) == null ? void 0 : _y.pendingOutline;
     if (waitingOutline && quickOutline) {
       shallow.checked = !!waitingOutline.options.shallowResearch;
       if (waitingOutline.bounds) {
@@ -43887,7 +43887,7 @@ var NextStepModal = class extends import_obsidian26.Modal {
       );
     }
     (titleInput != null ? titleInput : cardFor[initialMode]).focus();
-    ((_w = this.renderModelSettings(adjustBody)) != null ? _w : adjustBody).createEl("p", {
+    ((_z = this.renderModelSettings(adjustBody)) != null ? _z : adjustBody).createEl("p", {
       text: t("ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it"),
       cls: "vam-hint"
     });
@@ -52490,6 +52490,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
      * reaches the run and no request is sent; the entry goes away once the run is accepted or ends.
      */
     __publicField(this, "startingTasks", /* @__PURE__ */ new Map());
+    /** Keys in `startingTasks` whose run is an expansion (its Stop reads "Stop expanding"). */
+    __publicField(this, "startingExpand", /* @__PURE__ */ new Set());
     __publicField(this, "disclosureSeq", 0);
     /** Quick outlines generated while their dialog was closed, keyed by node path; kept in memory until created. */
     __publicField(this, "quickOutlines", /* @__PURE__ */ new Map());
@@ -53481,6 +53483,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     this.synthesisTasks.clear();
     for (const controller2 of this.startingTasks.values()) controller2.abort();
     this.startingTasks.clear();
+    this.startingExpand.clear();
     for (const task of this.mergeTasks.values()) task.controller.abort();
     this.mergeTasks.clear();
     this.dropMapBackground();
@@ -61865,7 +61868,13 @@ ${request.requirements}` : preset.text,
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
-        t(stopLabelKey(this.plugin.topicRuns.runKind(node.path), !!((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)))),
+        t(
+          stopLabelKey(
+            this.plugin.topicRuns.runKind(node.path),
+            !!((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)),
+            this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
+          )
+        ),
         () => {
           var _a3, _b3;
           return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.topicRuns.taskController(node.path)) == null ? void 0 : _b3.abort();
@@ -63198,13 +63207,18 @@ ${request.requirements}` : preset.text,
     let own2;
     const mapPath = this.path;
     return {
-      begin: (controller) => {
+      begin: (controller, kind) => {
         own2 = controller;
         this.startingTasks.set(key2, controller);
+        if (kind === "expand") this.startingExpand.add(key2);
+        else this.startingExpand.delete(key2);
         this.render();
       },
       end: () => {
-        if (own2 && this.startingTasks.get(key2) === own2) this.startingTasks.delete(key2);
+        if (own2 && this.startingTasks.get(key2) === own2) {
+          this.startingTasks.delete(key2);
+          this.startingExpand.delete(key2);
+        }
         own2 = void 0;
         if (!this.closed) this.render();
       },
@@ -63325,6 +63339,14 @@ ${request.requirements}` : preset.text,
             return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.topicRuns.taskController(node.path)) == null ? void 0 : _b3.abort();
           } : void 0,
           background: this.backgroundHooks(node.path, node),
+          stopKey: () => {
+            var _a3;
+            return stopLabelKey(
+              this.plugin.topicRuns.runKind(node.path),
+              !!((_a3 = this.plugin.quickExpandPending) == null ? void 0 : _a3.has(node.path)),
+              this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
+            );
+          },
           quickOutline: this.quickOutline(node),
           pendingOutline: (() => {
             const waiting = this.quickOutlines.get(node.path);

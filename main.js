@@ -639,8 +639,6 @@ var en = {
   "ui.card_edit_summary_label": "Card summary",
   "ui.card_edit_summary_placeholder": "Add a summary",
   "ui.card_summary_add_hint": "Click to add a summary\u2026",
-  "ui.card_edit_title_keys": "Enter or click elsewhere saves \xB7 Esc cancels",
-  "ui.card_edit_summary_keys": "Enter or click elsewhere saves \xB7 Shift+Enter new line \xB7 Esc cancels",
   "ui.card_edit_picture_position": "Picture position",
   "ui.card_edit_position_top": "Top",
   "ui.card_edit_position_bottom": "Bottom",
@@ -3350,8 +3348,6 @@ var zhCN = {
   "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
   "ui.card_edit_summary_placeholder": "\u6DFB\u52A0\u6458\u8981",
   "ui.card_summary_add_hint": "\u70B9\u8FD9\u91CC\u52A0\u6458\u8981\u2026",
-  "ui.card_edit_title_keys": "Enter \u6216\u70B9\u522B\u5904\uFF1D\u4FDD\u5B58\u3000Esc\uFF1D\u53D6\u6D88",
-  "ui.card_edit_summary_keys": "Enter \u6216\u70B9\u522B\u5904\uFF1D\u4FDD\u5B58\u3000Shift+Enter\uFF1D\u6362\u884C\u3000Esc\uFF1D\u53D6\u6D88",
   "ui.card_edit_picture_position": "\u56FE\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -6061,8 +6057,6 @@ var zhTW = {
   "ui.card_edit_summary_label": "\u5361\u7247\u6458\u8981",
   "ui.card_edit_summary_placeholder": "\u52A0\u4E0A\u6458\u8981",
   "ui.card_summary_add_hint": "\u9EDE\u9019\u88E1\u52A0\u6458\u8981\u2026",
-  "ui.card_edit_title_keys": "Enter \u6216\u9EDE\u5225\u8655\uFF1D\u5132\u5B58\u3000Esc\uFF1D\u53D6\u6D88",
-  "ui.card_edit_summary_keys": "Enter \u6216\u9EDE\u5225\u8655\uFF1D\u5132\u5B58\u3000Shift+Enter\uFF1D\u63DB\u884C\u3000Esc\uFF1D\u53D6\u6D88",
   "ui.card_edit_picture_position": "\u5716\u7247\u4F4D\u7F6E",
   "ui.card_edit_position_top": "\u4E0A",
   "ui.card_edit_position_bottom": "\u4E0B",
@@ -27448,7 +27442,7 @@ var SIDE_OUTSIDE = [
   "vam-card-more"
 ];
 var SUMMARY_ANCHORS = ["vam-card-summary", "vam-card-summary-input", "vam-card-summary-add"];
-var FIELD_ADJUNCTS = ["vam-card-title-input", "vam-sr-only", "vam-card-edit-hint"];
+var FIELD_ADJUNCTS = ["vam-card-title-input", "vam-sr-only"];
 var POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
 var hasCls = (el, cls) => {
   var _a2, _b2, _c;
@@ -55670,14 +55664,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   }
   /** Draws the card title's field in place of the title text. */
   paintCardNameEdit(card, node, note) {
-    var _a2;
     const input2 = this.createInlineNameInput(card, "vam-card-title-input", "", (value) => {
       const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
       if (!name2 || name2 === note.title) this.render();
       else this.enqueue(() => this.noteChange(node, { title: name2 }));
     });
     this.nameEditField(card, input2, `vam-edit-label-${node.id}`, t("ui.rename_topic"));
-    if (!((_a2 = this.inlineName) == null ? void 0 : _a2.created)) card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_title_keys") });
     return input2;
   }
   /** True while a card's title or summary may be typed in place: not presenting, not picking cards, not in a live AIM run. */
@@ -55777,7 +55769,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     });
     area.addEventListener("blur", () => finish(true));
     this.inlineSummaryInput = area;
-    card.createDiv({ cls: "vam-card-edit-hint", text: t("ui.card_edit_summary_keys") });
     return area;
   }
   /**

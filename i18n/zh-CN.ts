@@ -552,8 +552,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.card_edit_summary_label": "卡片摘要",
   "ui.card_edit_summary_placeholder": "添加摘要",
   "ui.card_summary_add_hint": "点这里加摘要…",
-  "ui.card_edit_title_keys": "Enter 或点别处＝保存　Esc＝取消",
-  "ui.card_edit_summary_keys": "Enter 或点别处＝保存　Shift+Enter＝换行　Esc＝取消",
   "ui.card_edit_picture_position": "图片位置",
   "ui.card_edit_position_top": "上",
   "ui.card_edit_position_bottom": "下",

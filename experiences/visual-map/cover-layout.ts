@@ -153,7 +153,7 @@ const SIDE_OUTSIDE = [
 /** What ends a card's text, first match wins: the summary, the open summary field, the add-summary line. */
 const SUMMARY_ANCHORS = ["vam-card-summary", "vam-card-summary-input", "vam-card-summary-add"];
 /** Siblings that belong to the field just before them while a title or summary is being edited. */
-const FIELD_ADJUNCTS = ["vam-card-title-input", "vam-sr-only", "vam-card-edit-hint"];
+const FIELD_ADJUNCTS = ["vam-card-title-input", "vam-sr-only"];
 const POSITION_CLASSES = ["has-cover-bottom", "has-cover-left", "has-cover-right"];
 
 // Only classList and children are read, so lighter stand-in elements (and cards without a cover) are left alone.

@@ -610,6 +610,7 @@ test('goal stack: the one z rule is on the goal host (above the overlay chat 12 
   for (const cls of ['vam-relevance-panel', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /z-index/, `.${cls} sets no z-index of its own`);
   // Only .vam-goal-attachment places a panel under the goal; the panels set no top of their own.
   for (const cls of ['vam-relevance-panel', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /(^|[\s;])top:/, `.${cls} sets no top (.vam-goal-attachment does)`);
+  assert.match(rule('.vam-map-tools'), /--vam-tools-max: 100%; max-width: min\(calc\(100% - 24px\), var\(--vam-tools-max\)\)/, 'the tool group is capped by --vam-tools-max (default: no cap), which the view sets when the icons float over its row');
   assert.match(rule('.vam-goal-attachment'), /top: calc\(100% \+ 6px \+ var\(--vam-goal-attach-clear, 0px\)\)/);
   // The narrow layout: the attachment's side margins and the icons kept shown while a panel is open, without any z-index.
   const narrowBlock = css.match(/@container vam-goal-host \(max-width: 600px\) \{([\s\S]*?)\n\}/)?.[1];

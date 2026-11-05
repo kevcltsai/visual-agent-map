@@ -633,6 +633,24 @@ test('chooseCardToolsSpot: a card in the top-left corner pans clear of the canva
   const boxed = inset.chooseCardToolsSpot({ card: free, row: { left: 550, right: 770 }, size, others: walls, controls, visible });
   assert.ok(boxed.overlap > 0);
 });
+test('chooseCardToolsSpot: a row above or below keeps touching its own card; a tight gap above sends it beside the card, not slid off', () => {
+  // Measured in Obsidian at 40% (2026-11-06): 9.5px between this card and the one above, a card down-left, a 171x32 row.
+  const visible = { left: -400, right: 1400, top: -200, bottom: 900 };
+  const card = { left: 0, top: 100, right: 110, bottom: 145 };
+  const others = [
+    { left: 0, top: 50, right: 110, bottom: 90.5 },
+    { left: 0, top: 155, right: 110, bottom: 200 },
+    { left: -142, top: 124, right: -32, bottom: 162 }
+  ];
+  const size = { width: 171, height: 32 };
+  const row = { left: card.right - 4 - size.width, right: card.right - 4 };
+  const spot = inset.chooseCardToolsSpot({ card, row, size, others, controls: [], visible });
+  assert.equal(spot.overlap, 0);
+  if (spot.side === 'top' || spot.side === 'bottom') {
+    const shared = Math.min(spot.rect.right, card.right) - Math.max(spot.rect.left, card.left);
+    assert.ok(shared >= 32, `row on ${spot.side} shares ${shared}px with its card`);
+  } else assert.equal(spot.side, 'right', 'the free side beside the card');
+});
 test('card tools: only AI explore, Details and More float; More holds fold, structure, rename, select subtopics and add text', () => {
   const view = read('experiences/visual-map/view.ts');
   assert.match(view, /private openCardMoreMenu\(/);
@@ -647,6 +665,10 @@ test('card tools: only AI explore, Details and More float; More holds fold, stru
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-left \{/);
   // A row beside the card keeps an invisible bridge over the gap, so the pointer does not leave the card on the way to it.
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-left::after \{ left: 100%; \}/);
+  // Leaving the card hides the row only after a moment, and it stays clickable meanwhile (visibility, not pointer-events, hides it).
+  assert.match(css, /\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*opacity: 0; visibility: hidden;[^}]*visibility 0s linear 300ms/);
+  assert.doesNotMatch(css, /\.vam-node > \.vam-node-tools \{ position: absolute;[^}]*pointer-events: none/);
+  assert.match(css, /\.vam-node\.is-selected > \.vam-node-tools \{ opacity: 1; visibility: visible; transform: none; transition-delay: 0s; \}/);
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-right::after \{ right: 100%; \}/);
   assert.match(css, /is-side-right::after \{ content: ""; position: absolute;[^}]*width: calc\(var\(--vam-tools-gap, 4px\) \+ 6px\)/);
 });

@@ -297,7 +297,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
 /* Secondary tools wait for intent (hover, keyboard focus or selection) in a toolbar over the card's top edge: they take
    no space in the card, so showing or hiding them never moves its content. */
-.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
+.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity 120ms ease-out 180ms, transform 120ms ease-out 180ms, visibility 0s linear 300ms; width: max-content; scale: max(1, calc(1 / var(--vam-zoom, 1))); transform-origin: right bottom; }
 .vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; transform-origin: left bottom; }
 .vam-node > .vam-node-tools { --vam-tools-inset: 0px; --vam-tools-gap: 4px; }
 .vam-node > .vam-node-tools.is-below { bottom: auto; top: calc(100% - 6px - var(--vam-tools-inset, 0px)); transform-origin: right top; transform: translateY(-4px); }
@@ -311,7 +311,8 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node > .vam-node-tools.is-side-right::after { right: 100%; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
 /* In select mode every picked card is selected, so only hover and focus show a card's tools there. */
-.vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; pointer-events: auto; transform: none; }
+.vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+/* The row hides a moment after the pointer leaves its card (it stays clickable meanwhile), so a pointer crossing bare canvas to reach a row beside or above the card still gets there. */
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-node-tools > .vam-ai-explore { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-weight: 600; }
@@ -512,7 +513,9 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
   /* Same selector weight as the scan animation rule above, otherwise that rule keeps winning. */
   .vam-status-running::before, .vam-node:not([data-aim-kind])[data-status="running"]::after { animation: none; }
   .vam-node:not([data-aim-kind])[data-status="running"]::after { background: var(--interactive-accent); }
-  .vam-node, .vam-node .vam-add-child, .vam-node > .vam-node-tools { transition: none; }
+  .vam-node, .vam-node .vam-add-child { transition: none; }
+  /* No motion, but the row still waits a moment before it hides. */
+  .vam-node > .vam-node-tools { transition: visibility 0s linear 300ms; }
 }
 .theme-dark .vam-viewport { background-color: var(--background-primary); }
 .theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }

@@ -346,7 +346,9 @@ import { hypothesisTagText, LEANING_LABEL, renderHypothesisTag, STRENGTH_LABEL }
 import { relevanceDisplayNodes } from "./relevance-order";
 import {
   bottomInsetFromRects,
+  FLOATING_LAYER_SELECTORS,
   INSET_GAP,
+  sharesHorizontalSpace,
   cardToolsPlacement,
   chooseCardToolsSpot,
   clearToolbar,
@@ -3706,7 +3708,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (task.state === "confirming") return;
-    const panel = bar.createDiv("vam-goal-suggest");
+    const panel = bar.createDiv("vam-goal-suggest vam-goal-attachment");
     this.goalSuggestPanelEl = panel;
     if (task.state === "running") {
       panel.addClass("is-running");
@@ -3889,6 +3891,7 @@ export class VisualAgentMapView extends ItemView {
     this.relevancePanelOpen = false;
     this.relevanceDraft = null;
     this.relevanceButtonEl?.setAttr("aria-expanded", "false");
+    this.placeMapTools();
     if (refocus) this.relevanceButtonEl?.focus();
   }
   /** Open the goal panel under the toolbar button (no-op while a grading run is going). */
@@ -3926,7 +3929,7 @@ export class VisualAgentMapView extends ItemView {
       context: this.relevanceContext ?? ""
     });
     const panel = tools.createDiv({
-      cls: "vam-relevance-panel",
+      cls: "vam-relevance-panel vam-goal-attachment",
       attr: { id: this.relevancePanelId, role: "dialog", "aria-label": t("ui.relevance_panel_label") }
     });
     this.relevancePanelEl = panel;
@@ -4031,6 +4034,7 @@ export class VisualAgentMapView extends ItemView {
       doc.addEventListener("pointerdown", outside, true);
       this.relevancePanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
     }
+    this.placeMapTools();
     if (focus) {
       input.focus();
       input.select();
@@ -4108,6 +4112,7 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesOpen = false;
     this.mapSourcesPickerOpen = false;
     this.mapSourcesButtonEl?.setAttr("aria-expanded", "false");
+    this.placeMapTools();
     if (refocus) this.mapSourcesButtonEl?.focus();
   }
   private drawMapSourcesPanelEl(focus: MapSourcesPanelFocus): void {
@@ -4152,7 +4157,7 @@ export class VisualAgentMapView extends ItemView {
       doc.addEventListener("pointerdown", outside, true);
       this.mapSourcesPanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
     }
-    this.placeMapSourcesPanel(panel);
+    this.placeMapTools();
   }
   /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
   private placeMapSourcesPanel(panel: HTMLElement): void {
@@ -13299,10 +13304,10 @@ export class VisualAgentMapView extends ItemView {
     }
     (this.cardEls.get(target.id) ?? card)?.focus({ preventScroll: true });
   }
-  /** Screen rectangles of the floating controls that cover part of the canvas (toolbar, zoom controls, hint). */
+  /** Screen rectangles of the floating layers that cover part of the canvas (FLOATING_LAYER_SELECTORS). */
   private floatingControlRects(): { left: number; top: number; right: number; bottom: number }[] {
     const rects = [];
-    for (const selector of [".vam-map-tools", ".vam-goal-bar", ".vam-zoom-controls", ".vam-canvas-hint"]) {
+    for (const selector of FLOATING_LAYER_SELECTORS) {
       const rect = this.contentEl?.querySelector?.<HTMLElement>(selector)?.getBoundingClientRect?.();
       if (rect && rect.right > rect.left && rect.bottom > rect.top) rects.push(rect);
     }
@@ -18764,35 +18769,44 @@ export class VisualAgentMapView extends ItemView {
    * so it moves to the window's right edge, as it sits beside a docked window.
    */
   private placeMapTools(): void {
-    this.placeGoalBar();
+    const bar = this.placeGoalBar();
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
     if (!tools) return;
     // The canvas starts after the 44px edge the laid-over window leaves in place.
     const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
     tools.style.left = left > 0 ? `${left}px` : "";
+    // Last: the stack reads where the bar and the tools are horizontally.
+    this.layoutTopStack(bar);
   }
   /**
-   * The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. The tool
-   * group sits right below the bar (following its real height, also when the goal wraps), so an opened toolbar never covers it.
+   * The goal bar centres on the canvas the user can see: the laid-over chat window takes its width off the left. Returns the
+   * bar (null without one); layoutTopStack then places everything that hangs below it.
    */
-  private placeGoalBar(): void {
+  private placeGoalBar(): HTMLElement | null {
     const bar = this.contentEl?.querySelector<HTMLElement>(".vam-goal-bar") ?? null;
-    this.syncToolsBelowGoalBar(bar);
     this.watchToolPlacement(bar);
-    if (!bar) return;
+    if (!bar) return null;
     const covered = this.chat?.isOverlay ? Math.max(0, this.chat.overlayWidth - CHAT_RAIL_WIDTH) : 0;
     bar.style.setProperty("--vam-goal-inset", `${covered}px`);
+    return bar;
+  }
+  /** The panel hanging under the goal bar (edit panel or suggestion list; at most one is open), if it is on screen. */
+  private goalAttachmentEl(): HTMLElement | null {
+    const el = this.relevanceBarEl?.querySelector<HTMLElement>(".vam-goal-attachment") ?? null;
+    return el && el.isConnected !== false ? el : null;
   }
   /**
-   * The tools follow the bar's height, the suggestion card's height and the canvas size (a collapsing sidebar changes it
-   * without any chat event), so those, the zoom bar and the hint are watched; the watch is dropped when the view closes.
+   * Every layer that decides the stack is watched: bar, attachment, tools, sources panel, canvas, zoom bar and hint (a
+   * collapsing sidebar changes the canvas without any chat event). The watch is dropped when the view closes.
    */
   private watchToolPlacement(bar: HTMLElement | null): void {
-    const panel = this.goalSuggestPanelEl;
     const q = (selector: string) => this.contentEl?.querySelector?.<HTMLElement>(selector) ?? null;
+    const sources = this.mapSourcesPanelEl;
     const targets = [
       bar,
-      panel?.isConnected === false ? null : panel,
+      this.goalAttachmentEl(),
+      q(".vam-map-tools"),
+      sources?.isConnected === false ? null : sources,
       this.viewportEl,
       q(".vam-zoom-controls"),
       q(".vam-canvas-hint")
@@ -18813,35 +18827,48 @@ export class VisualAgentMapView extends ItemView {
   }
   private goalBarObserver: ResizeObserver | null = null;
   private goalBarObserved: HTMLElement[] = [];
+  /** The attachment the tools were last pushed below; they stay there while it is open (see layoutTopStack). */
+  private toolsStackedFor: HTMLElement | null = null;
   /**
-   * With a goal bar the tools sit GOAL_BAR_TOOLS_GAP below it, or below the suggestion card while that is open (it hangs
-   * under the bar exactly where the tools would be); without a bar they keep the stylesheet's top.
+   * The one place that stacks the top of the canvas: goal bar, then the panel hanging under it (height limited, it scrolls),
+   * then the tool group (below the panel only where the two share horizontal space; otherwise GOAL_BAR_TOOLS_GAP under the
+   * bar), then the sources panel hanging from the tools (height limited). Without a bar the tools keep the stylesheet's top.
    */
-  private syncToolsBelowGoalBar(bar: HTMLElement | null): void {
+  private layoutTopStack(bar: HTMLElement | null): void {
     const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools");
     if (!tools?.style) return;
     let bottom = bar ? bar.offsetTop + bar.offsetHeight : 0;
-    const panel = this.goalSuggestPanelEl;
-    if (bar && panel && panel.isConnected !== false) {
-      // The card must fit the visible canvas: its max-height is what is left under the bar and above the floating controls
-      // at the bottom (the rows scroll, the footer stays).
-      const room = this.goalSuggestRoom(bar, bottom, tools.offsetHeight);
-      if (room !== null && typeof panel.style?.setProperty === "function") {
-        panel.style.setProperty("--vam-goal-suggest-max", `${room}px`);
+    const attachment = bar ? this.goalAttachmentEl() : null;
+    bar?.toggleClass?.("has-attachment", !!attachment);
+    if (bar && attachment) {
+      // The suggestion list always pushes the tools below it (as before); another panel only where they would meet. The
+      // tools widen on hover, so once pushed they stay below until the panel closes (no flicker between the two places).
+      const stacked =
+        attachment.hasClass?.("vam-goal-suggest") === true ||
+        this.toolsStackedFor === attachment ||
+        sharesHorizontalSpace(attachment, tools);
+      this.toolsStackedFor = stacked ? attachment : null;
+      const room = this.attachRoom(bar, bottom, stacked ? tools.offsetHeight : 0);
+      if (room !== null && typeof attachment.style?.setProperty === "function") {
+        attachment.style.setProperty("--vam-goal-attach-max", `${room}px`);
       }
-      bottom += GOAL_SUGGEST_GAP + panel.offsetHeight;
+      if (stacked) bottom += GOAL_SUGGEST_GAP + attachment.offsetHeight;
+    } else {
+      this.toolsStackedFor = null;
     }
     tools.style.top = bottom > 0 ? `${bottom + GOAL_BAR_TOOLS_GAP}px` : "";
+    const sources = this.mapSourcesPanelEl;
+    const open = !!sources && sources.isConnected !== false;
+    tools.toggleClass?.("has-panel", open);
+    if (!open || !sources) return;
+    this.placeMapSourcesPanel(sources);
+    const room = this.sourcesRoom(tools);
+    if (room !== null && typeof sources.style?.setProperty === "function") {
+      sources.style.setProperty("--vam-sources-max", `${room}px`);
+    }
   }
-  /**
-   * Height the suggestion card may take under the goal bar: down to the top of the lowest bottom control (zoom bar with the
-   * status-bar clearance, or the canvas hint), kept INSET_GAP clear, minus the tool group that hangs under the card. Measured on screen, so the overlay and the viewport
-   * need not share an origin. Null when the canvas is not laid out.
-   */
-  private goalSuggestRoom(bar: HTMLElement, barBottom: number, toolsHeight: number): number | null {
-    const overlay = bar.parentElement;
-    const canvasHeight = overlay?.clientHeight ?? 0;
-    if (!(canvasHeight > 0)) return null;
+  /** Screen y the panels under the top stack must stay above: the zoom bar (with the status bar) or the hint, INSET_GAP clear. */
+  private bottomLimit(overlay: HTMLElement | null | undefined, canvasHeight: number): number {
     const overlayRect = overlay?.getBoundingClientRect?.();
     const canvas = this.viewportEl?.getBoundingClientRect?.();
     const hint = this.contentEl?.querySelector<HTMLElement>(".vam-canvas-hint")?.getBoundingClientRect?.();
@@ -18850,10 +18877,30 @@ export class VisualAgentMapView extends ItemView {
       canvas ? bottomInsetFromRects(canvas.bottom, hint) : 0,
       INSET_GAP
     );
-    const limit = (canvas ? canvas.bottom : (overlayRect?.bottom ?? canvasHeight)) - clear;
+    return (canvas ? canvas.bottom : (overlayRect?.bottom ?? canvasHeight)) - clear;
+  }
+  /**
+   * Height the panel under the goal bar may take: down to the top of the lowest bottom control, kept INSET_GAP clear, minus
+   * the tool group when that hangs under the panel (`toolsHeight`, else 0). Measured on screen, so the overlay and the
+   * viewport need not share an origin. Null when the canvas is not laid out.
+   */
+  private attachRoom(bar: HTMLElement, barBottom: number, toolsHeight: number): number | null {
+    const overlay = bar.parentElement;
+    const canvasHeight = overlay?.clientHeight ?? 0;
+    if (!(canvasHeight > 0)) return null;
+    const overlayRect = overlay?.getBoundingClientRect?.();
+    const canvas = this.viewportEl?.getBoundingClientRect?.();
+    const limit = this.bottomLimit(overlay, canvasHeight);
     const barBottomOnScreen = (overlayRect ? overlayRect.top : canvas ? canvas.top : 0) + barBottom;
-    // The tool group sits under the card, so its height and gap are kept free as well.
     return Math.max(0, limit - barBottomOnScreen - GOAL_SUGGEST_GAP - GOAL_BAR_TOOLS_GAP - (toolsHeight || 0));
+  }
+  /** Height the sources panel may take: from the tools' bottom edge (plus the gap) down to the same limit. */
+  private sourcesRoom(tools: HTMLElement): number | null {
+    const overlay = tools.parentElement;
+    const canvasHeight = overlay?.clientHeight ?? 0;
+    const toolsRect = tools.getBoundingClientRect?.();
+    if (!(canvasHeight > 0) || !toolsRect) return null;
+    return Math.max(0, this.bottomLimit(overlay, canvasHeight) - toolsRect.bottom - GOAL_SUGGEST_GAP);
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {

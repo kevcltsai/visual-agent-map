@@ -380,13 +380,13 @@ test('goal suggest: the card scrolls its rows inside the canvas height and keeps
   // A tall bar (long goal, narrow canvas): 12 + 295 tall in a 774px canvas.
   Object.assign(bar, { offsetTop: 12, offsetHeight: 295, parentElement: { clientHeight: 774 } });
   panel.offsetHeight = 300;
-  h.view.syncToolsBelowGoalBar(bar);
-  assert.equal(panel.style['--vam-goal-suggest-max'], `${774 - 307 - 6 - 8 - 8}px`, 'max-height is the room under the bar minus the card gap, the tools gap and the inset gap (no zoom bar laid out)');
+  h.view.layoutTopStack(bar);
+  assert.equal(panel.style['--vam-goal-attach-max'], `${774 - 307 - 6 - 8 - 8}px`, 'max-height is the room under the bar minus the card gap, the tools gap and the inset gap (no zoom bar laid out)');
   Object.assign(bar, { offsetHeight: 100, parentElement: { clientHeight: 500 } });
-  h.view.syncToolsBelowGoalBar(bar);
-  assert.equal(panel.style['--vam-goal-suggest-max'], `${500 - 112 - 6 - 8 - 8}px`, 'follows the canvas size');
+  h.view.layoutTopStack(bar);
+  assert.equal(panel.style['--vam-goal-attach-max'], `${500 - 112 - 6 - 8 - 8}px`, 'follows the canvas size');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
-  assert.match(css, /\.vam-goal-suggest \{[^}]*max-height: var\(--vam-goal-suggest-max/);
+  assert.match(css, /\.vam-goal-suggest \{[^}]*max-height: var\(--vam-goal-attach-max/);
   assert.match(css, /\.vam-goal-suggest-rows \{[^}]*overflow-y: auto/);
   assert.match(css, /\.vam-goal-suggest-foot \{ flex: none; \}/);
 });
@@ -408,23 +408,185 @@ test('goal suggest: on a narrow canvas the card stops above the zoom bar and the
   Object.assign(bar, { offsetTop: 12, offsetHeight: 295, parentElement: { clientHeight: 774, getBoundingClientRect: () => canvas } });
   bar.getBoundingClientRect = () => rect(12, 12, 348, 307);
   tools.offsetHeight = 36; panel.offsetHeight = 300;
-  h.view.syncToolsBelowGoalBar(bar);
-  const max = parseInt(panel.style['--vam-goal-suggest-max'], 10);
+  h.view.layoutTopStack(bar);
+  const max = parseInt(panel.style['--vam-goal-attach-max'], 10);
   const cardTop = 307 + 6;
   assert.ok(cardTop + max + 8 + 36 <= 640 - INSET_GAP, `the card's bottom (${cardTop + max}) stays above the hint (top 640) with the gap`);
   assert.ok(cardTop + max + 8 + 36 <= 697 - INSET_GAP, `the card's bottom stays above the zoom bar (top 697) with the gap`);
   // Without the hint the zoom bar alone limits it.
   hint.getBoundingClientRect = () => rect(0, 0, 0, 0);
-  h.view.syncToolsBelowGoalBar(bar);
-  assert.equal(cardTop + parseInt(panel.style['--vam-goal-suggest-max'], 10) + 8 + 36, 697 - INSET_GAP, 'the card, the tools gap and the tools end at the zoom bar minus the gap');
+  h.view.layoutTopStack(bar);
+  assert.equal(cardTop + parseInt(panel.style['--vam-goal-attach-max'], 10) + 8 + 36, 697 - INSET_GAP, 'the card, the tools gap and the tools end at the zoom bar minus the gap');
   // Generic check: the bar, the card at its max height, the tools and every other floating control do not overlap.
-  const cardHeight = parseInt(panel.style['--vam-goal-suggest-max'], 10);
+  const cardHeight = parseInt(panel.style['--vam-goal-attach-max'], 10);
   panel.offsetHeight = cardHeight;
-  h.view.syncToolsBelowGoalBar(bar);
+  h.view.layoutTopStack(bar);
   const toolsTop = parseInt(tools.style.top, 10);
   tools.getBoundingClientRect = () => rect(12, toolsTop, 200, toolsTop + 36);
   const { rectsIntersect } = load('experiences/visual-map/viewport-inset.ts');
   const rects = [['card', rect(12, cardTop, 348, cardTop + cardHeight)], ...h.view.floatingControlRects().map((r, n) => ['control ' + n, r])];
   assert.equal(rects.length, 4, 'tools, bar and zoom bar are counted besides the card (the hint is empty)');
   for (let a = 0; a < rects.length; a++) for (let b = a + 1; b < rects.length; b++) assert.ok(!rectsIntersect(rects[a][1], rects[b][1]), `${rects[a][0]} overlaps ${rects[b][0]}`);
+});
+
+// ---- Goal-banner P5e: the top stack (goal bar, its attachment, the tool group, the sources panel) in every state x width ----
+// The geometry below is a stand-in for CSS: every rect is derived from what the view writes (style.top / left / width, --vam-*
+// variables, classes), so a view that stops writing the right value fails here. The compared rects come from the view's own
+// floatingControlRects(), so a layer missing from the shared list is missing from the check too.
+const R = (left, top, right, bottom) => ({ left, top, right, bottom, width: right - left, height: bottom - top });
+const px = value => { const n = parseFloat(value); return Number.isFinite(n) ? n : null; };
+const CANVAS_H = 774, CANVAS_LEFT = 100;
+const WIDTHS = [
+  { name: '360', width: 360, chat: 0 },
+  { name: '640 + chat overlay', width: 640, chat: 200 },
+  { name: '936', width: 936, chat: 0 }
+];
+const STATES = [
+  { name: 'none' },
+  { name: 'suggest list at its tallest', attachment: 'suggest', content: 900 },
+  { name: 'edit panel, short goal', attachment: 'edit', content: 110 },
+  { name: 'edit panel, long wrapped goal', attachment: 'edit', content: 110, goalHeight: 150 },
+  { name: 'sources panel', sources: 500 },
+  { name: 'suggest list + tools hover', attachment: 'suggest', content: 900, hover: true },
+  { name: 'edit panel + tools hover', attachment: 'edit', content: 110, hover: true },
+  { name: 'sources panel + tools hover', sources: 500, hover: true }
+];
+
+async function stackRig(width, chat, state) {
+  const h = await harness();
+  const view = h.view;
+  const canvas = R(CANVAS_LEFT, 0, CANVAS_LEFT + width, CANVAS_H);
+  const overlay = { clientHeight: CANVAS_H, getBoundingClientRect: () => canvas };
+  view.viewportEl = { getBoundingClientRect: () => canvas };
+  view.chat = chat ? { isOverlay: true, overlayWidth: 44 + chat } : null;
+  if (state.attachment === 'suggest') await h.open();
+  else if (state.attachment === 'edit') view.editRelevanceGoal();
+  const bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar'));
+  const goalHeight = state.goalHeight ?? 62;
+  const barRect = () => {
+    const inset = px(bar.style['--vam-goal-inset']) ?? 0;
+    const w = Math.min(460, width - 24 - inset);
+    const centre = CANVAS_LEFT + width / 2 + inset / 2;
+    return R(centre - w / 2, 12, centre + w / 2, 12 + goalHeight);
+  };
+  Object.assign(bar, { offsetTop: 12, offsetHeight: goalHeight, parentElement: overlay, getBoundingClientRect: barRect });
+  const tools = element('div'); tools.addClass('vam-map-tools'); h.rootEl.appendChild(tools);
+  tools.offsetHeight = 36; tools.parentElement = overlay;
+  const toolsRect = () => { const left = CANVAS_LEFT + (px(tools.style.left) ?? 12), top = px(tools.style.top) ?? 12; return R(left, top, left + (state.hover ? 246 : 165), top + 36); };
+  tools.getBoundingClientRect = toolsRect;
+  const zoom = element('div'); zoom.addClass('vam-zoom-controls'); h.rootEl.appendChild(zoom);
+  zoom.getBoundingClientRect = () => R(canvas.right - 12 - 198, 697, canvas.right - 12, 737);
+  const hint = element('div'); hint.addClass('vam-canvas-hint'); h.rootEl.appendChild(hint);
+  hint.getBoundingClientRect = () => width === 360 ? R(canvas.left + 12, 640, canvas.left + 132, 700) : R(canvas.left + 12, 704, canvas.left + 190, 744);
+  const attachment = find(h.rootEl, i => hasCls(i, 'vam-goal-attachment'));
+  if (state.attachment) {
+    assert.ok(attachment, `${state.attachment} panel carries vam-goal-attachment`);
+    const attachRect = () => { const b = barRect(), top = b.bottom + 6; return R(b.left, top, b.right, top + attachment.offsetHeight); };
+    Object.defineProperty(attachment, 'offsetHeight', { get() { const max = px(this.style['--vam-goal-attach-max']); return max === null ? state.content : Math.min(state.content, max); } });
+    attachment.getBoundingClientRect = attachRect;
+  }
+  let sources = null;
+  if (state.sources) {
+    const button = element('button'); tools.appendChild(button);
+    sources = element('div', 'vam-map-sources-panel'); tools.appendChild(sources);
+    Object.assign(view, { mapSourcesToolsEl: tools, mapSourcesButtonEl: button, mapSourcesPanelEl: sources, mapSourcesOpen: true });
+    button.getBoundingClientRect = () => { const t = toolsRect(); return R(t.left + (state.hover ? 110 : 35), t.top + 3, t.right - 3, t.bottom - 3); };
+    Object.defineProperty(sources, 'offsetHeight', { get() { const max = px(this.style['--vam-sources-max']); return max === null ? state.sources : Math.min(state.sources, max); } });
+    sources.getBoundingClientRect = () => { const t = toolsRect(), top = t.bottom + 6, left = t.left + (px(sources.style.left) ?? 0) + 1; return R(left, top, left + (px(sources.style.width) ?? 440), top + sources.offsetHeight); };
+  }
+  view.placeMapTools();
+  const labelled = [['bar', barRect()], ['tools', toolsRect()], ['zoom', zoom.getBoundingClientRect()], ['hint', hint.getBoundingClientRect()]];
+  if (state.attachment) labelled.push(['attachment', attachment.getBoundingClientRect()]);
+  if (sources) labelled.push(['sources panel', sources.getBoundingClientRect()]);
+  return { h, view, bar, tools, canvas, labelled, attachment, sources };
+}
+
+test('goal stack: in every state and width no floating layer overlaps another, and all stay on the canvas', async () => {
+  const { rectsIntersect } = load('experiences/visual-map/viewport-inset.ts');
+  const parentChild = new Set(['bar|attachment', 'tools|sources panel']);
+  for (const w of WIDTHS) for (const state of STATES) {
+    const where = `${w.name} / ${state.name}`;
+    const { view, canvas, labelled } = await stackRig(w.width, w.chat, state);
+    const name = rect => labelled.find(([, r]) => JSON.stringify(r) === JSON.stringify(rect))?.[0];
+    const seen = view.floatingControlRects().map(rect => ({ rect, label: name(rect) }));
+    assert.ok(seen.every(s => s.label), `${where}: floatingControlRects returned a rect that is no known layer`);
+    assert.equal(seen.map(s => s.label).sort().join(), labelled.map(([label]) => label).sort().join(), `${where}: floatingControlRects lists every layer that is on screen`);
+    for (let a = 0; a < seen.length; a++) {
+      assert.ok(seen[a].rect.left >= canvas.left && seen[a].rect.right <= canvas.right && seen[a].rect.top >= canvas.top && seen[a].rect.bottom <= canvas.bottom, `${where}: ${seen[a].label} stays on the canvas ${JSON.stringify(seen[a].rect)}`);
+      for (let b = a + 1; b < seen.length; b++) {
+        if (parentChild.has(`${seen[a].label}|${seen[b].label}`) || parentChild.has(`${seen[b].label}|${seen[a].label}`)) continue;
+        assert.ok(!rectsIntersect(seen[a].rect, seen[b].rect), `${where}: ${seen[a].label} ${JSON.stringify(seen[a].rect)} overlaps ${seen[b].label} ${JSON.stringify(seen[b].rect)}`);
+      }
+    }
+    // Whatever hangs under the bar (the attachment, the tools, the sources panel) ends above the zoom bar and the hint, INSET_GAP clear.
+    const limit = Math.min(...labelled.filter(([l]) => l === 'zoom' || l === 'hint').map(([, r]) => r.top)) - INSET_GAP;
+    for (const [label, rect] of labelled.filter(([l]) => ['attachment', 'tools', 'sources panel'].includes(l))) assert.ok(rect.bottom <= limit, `${where}: ${label} bottom ${rect.bottom} clears the bottom controls (limit ${limit})`);
+  }
+});
+
+test('goal stack: the 936px canvas keeps its look: tools 8px under the goal bar, sources button always in the tool group', async () => {
+  const { tools, bar } = await stackRig(936, 0, { name: 'none' });
+  assert.equal(tools.style.top, `${12 + 62 + 8}px`, 'tools sit GOAL_BAR_TOOLS_GAP under the bar');
+  const { tools: tallTools } = await stackRig(936, 0, { name: 'wrapped', goalHeight: 150 });
+  assert.equal(tallTools.style.top, `${12 + 150 + 8}px`, 'and follow a wrapped goal');
+  const edit = await stackRig(936, 0, { name: 'edit', attachment: 'edit', content: 110 });
+  assert.equal(edit.tools.style.top, `${12 + 62 + 8}px`, 'a panel that does not reach the tools leaves them where they are');
+  assert.ok(edit.bar.hasClass('has-attachment'), 'the bar that carries an attachment is marked');
+  assert.ok(!bar.hasClass('has-attachment'), 'and an idle bar is not');
+});
+
+test('goal stack: the layer list is complete: every absolutely positioned layer the overlay and the goal bar draw is in FLOATING_LAYER_SELECTORS', async () => {
+  const { FLOATING_LAYER_SELECTORS } = load('experiences/visual-map/viewport-inset.ts');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  // Class names whose rule (outside @media) sets position: absolute.
+  const absolute = new Set();
+  for (const [, selectors, body] of css.matchAll(/^([^{}@\n][^{}\n]*)\{([^{}]*)\}/gm)) {
+    if (!/position:\s*absolute/.test(body)) continue;
+    for (const part of selectors.split(',')) { const m = part.trim().match(/^\.([\w-]+)$/); if (m) absolute.add(m[1]); }
+  }
+  const listed = new Set(FLOATING_LAYER_SELECTORS.map(s => s.replace(/^\./, '')));
+  for (const needed of ['vam-map-tools', 'vam-goal-bar', 'vam-goal-attachment', 'vam-map-sources-panel', 'vam-zoom-controls', 'vam-canvas-hint']) assert.ok(listed.has(needed), `${needed} is in the list`);
+  // Visually hidden helpers are not layers.
+  const notLayers = new Set(['vam-sr-only']);
+  for (const state of STATES) {
+    const { h, tools, sources } = await stackRig(936, 0, state);
+    for (const el of [...findAll(h.rootEl, () => true), ...(sources ? [sources] : []), tools]) {
+      const classes = (el.cls ?? '').split(/\s+/).filter(Boolean);
+      for (const cls of classes) {
+        if (!absolute.has(cls) || notLayers.has(cls) || !/^vam-(goal|relevance|map-sources-panel|map-tools|zoom|canvas-hint)/.test(cls)) continue;
+        assert.ok(listed.has(cls) || classes.some(c => listed.has(c)), `${state.name}: .${cls} is positioned absolute under the overlay or the goal bar but is not in FLOATING_LAYER_SELECTORS`);
+      }
+    }
+  }
+  // Every goal-bar attachment is also marked as one.
+  for (const [cls, state] of [['vam-goal-suggest', STATES[1]], ['vam-relevance-panel', STATES[2]]]) {
+    const { h } = await stackRig(936, 0, state);
+    assert.ok(find(h.rootEl, i => hasCls(i, cls) && hasCls(i, 'vam-goal-attachment')), `.${cls} is a vam-goal-attachment`);
+  }
+});
+
+test('goal stack: only one attachment is open at a time (opening the list closes the editor)', async () => {
+  const h = await harness();
+  h.view.editRelevanceGoal();
+  assert.ok(find(h.rootEl, i => hasCls(i, 'vam-relevance-panel')), 'the editor is open');
+  await h.open();
+  assert.ok(!find(h.rootEl, i => hasCls(i, 'vam-relevance-panel')), 'the editor closed');
+  assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-goal-attachment')).length, 1);
+});
+
+test('goal stack: CSS gives an open attachment and an open sources panel a z-index above the mini tool group, and bounds their height', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => { const m = css.match(new RegExp(`^${selector.replace(/[.\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm')); assert.ok(m, `${selector} rule exists`); return m[1]; };
+  const z = body => Number(body.match(/z-index:\s*(\d+)/)?.[1]);
+  const mini = z(rule('.vam-tools-mini'));
+  assert.ok(z(rule('.vam-goal-bar.has-attachment')) > mini, 'the goal bar with an attachment is above .vam-tools-mini');
+  assert.ok(z(rule('.vam-map-tools.has-panel')) > mini, 'the tool group with a panel is above .vam-tools-mini');
+  assert.ok(z(rule('.vam-goal-bar.has-attachment')) < 6, 'below the selection bar (6)');
+  assert.match(rule('.vam-relevance-panel'), /max-height:\s*var\(--vam-goal-attach-max, none\)/);
+  assert.match(rule('.vam-relevance-panel'), /overflow-y:\s*auto/);
+  assert.match(rule('.vam-goal-suggest'), /max-height:\s*var\(--vam-goal-attach-max, none\)/);
+  assert.match(rule('.vam-map-sources-panel'), /max-height:\s*var\(--vam-sources-max, none\)/);
+  assert.match(rule('.vam-map-sources-panel'), /overflow-y:\s*auto/);
+  // Children of the attachment never outrank layers outside the bar: its stacking context decides, so no z-index inside it.
+  for (const cls of ['vam-relevance-panel', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /z-index/, `.${cls} sets no z-index of its own`);
 });

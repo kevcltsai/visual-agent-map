@@ -189,6 +189,31 @@ export function rectsIntersect(a: ScreenRect, b: ScreenRect): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
+/**
+ * Every layer that floats over the canvas. One list for the stack layout's watch, for the rects cards avoid, and for the tests,
+ * so a new layer is added in one place. `.vam-goal-attachment` is whichever panel hangs under the goal bar (edit panel,
+ * suggestions); `.vam-map-sources-panel` hangs from the tool group.
+ */
+export const FLOATING_LAYER_SELECTORS = [
+  ".vam-map-tools",
+  ".vam-goal-bar",
+  ".vam-goal-attachment",
+  ".vam-map-sources-panel",
+  ".vam-zoom-controls",
+  ".vam-canvas-hint"
+] as const;
+
+/** True when the two elements share horizontal range on screen; true as well when either has no measurable box. */
+export function sharesHorizontalSpace(
+  a: { getBoundingClientRect?: () => { left: number; right: number } },
+  b: { getBoundingClientRect?: () => { left: number; right: number } }
+): boolean {
+  const first = a.getBoundingClientRect?.();
+  const second = b.getBoundingClientRect?.();
+  if (!first || !second) return true;
+  return first.left < second.right && second.left < first.right;
+}
+
 /** A card the user cannot fully see: outside the canvas, or under one of the floating controls (`covers`). */
 export function isObscured(rect: ScreenRect, view: ScreenRect, covers: ScreenRect[]): boolean {
   if (rect.left < view.left || rect.right > view.right || rect.top < view.top || rect.bottom > view.bottom) return true;

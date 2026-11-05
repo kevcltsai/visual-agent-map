@@ -4604,7 +4604,7 @@ test('goal bar: canvasInset, canvasInsets, floatingControlRects and topsUnderToo
   view.contentEl = { querySelector: query('.vam-goal-bar') };
   assert.deepEqual([...view.topsUnderToolbar(1)], [], 'without the bar the same card is clear');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /for \(const selector of \["\.vam-map-tools", "\.vam-goal-bar", "\.vam-zoom-controls", "\.vam-canvas-hint"\]\)/);
+  assert.match(source, /for \(const selector of FLOATING_LAYER_SELECTORS\)/);
 });
 
 test('goal bar: styles keep it above the cards, centred on the visible canvas, wrapping (no ellipsis), icons only on hover or focus, theme variables only', () => {
@@ -4633,13 +4633,13 @@ test('goal bar: the tool group is placed right below the bar and follows its hei
   const { view } = viewportFixture();
   const tools = { style: {} }; const bar = { offsetTop: 12, offsetHeight: 62, style: { setProperty() {} }, ownerDocument: null };
   view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
-  view.placeGoalBar();
+  view.placeMapTools();
   assert.equal(tools.style.top, '82px', 'bar bottom (74) + 8px gap');
-  bar.offsetHeight = 140; view.placeGoalBar();
+  bar.offsetHeight = 140; view.placeMapTools();
   assert.equal(tools.style.top, '160px', 'a wrapped, taller bar pushes the tools down with it');
-  for (const height of [62, 140]) { bar.offsetHeight = height; view.placeGoalBar(); const barBottom = bar.offsetTop + bar.offsetHeight; assert.ok(parseInt(tools.style.top, 10) > barBottom, `tools start below the bar (${height})`); }
+  for (const height of [62, 140]) { bar.offsetHeight = height; view.placeMapTools(); const barBottom = bar.offsetTop + bar.offsetHeight; assert.ok(parseInt(tools.style.top, 10) > barBottom, `tools start below the bar (${height})`); }
   view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : null) };
-  view.placeGoalBar();
+  view.placeMapTools();
   assert.equal(tools.style.top, '', 'no goal bar (AIM or empty map): today\'s top');
 });
 
@@ -4654,18 +4654,18 @@ test('goal bar: tools sit below the open suggestion card, and follow canvas, bar
   view.contentEl = { querySelector: s => (s === '.vam-map-tools' ? tools : s === '.vam-goal-bar' ? bar : null) };
   view.placeMapTools();
   assert.equal(tools.style.top, '82px');
-  assert.equal(watchers.length, 1); assert.deepEqual([...watchers[0].targets], [bar, canvas], 'the bar and the canvas are watched');
+  assert.equal(watchers.length, 1); assert.deepEqual([...watchers[0].targets], [bar, tools, canvas], 'the bar, the tools and the canvas are watched');
   // Canvas resize (sidebar collapsed): the same placement runs again with the new bar height.
   bar.offsetHeight = 100; watchers[0].fn();
   assert.equal(tools.style.top, '120px', 'a canvas resize re-places the tools');
   // The suggestion card hangs 6px under the bar: the tools go below the card and follow its height.
-  const card = { offsetHeight: 200, isConnected: true };
-  view.goalSuggestPanelEl = card; view.placeMapTools();
+  const card = { offsetHeight: 200, isConnected: true, hasClass: c => c === 'vam-goal-suggest' };
+  view.relevanceBarEl = { querySelector: () => card }; view.placeMapTools();
   assert.equal(tools.style.top, String(12 + 100 + 6 + 200 + 8) + 'px', 'below the card, nothing is covered');
   assert.ok(watchers.at(-1).targets.includes(card) && watchers[0].disconnected, 'the card is watched too (the old watch was dropped)');
   card.offsetHeight = 320; watchers.at(-1).fn();
   assert.equal(tools.style.top, String(12 + 100 + 6 + 320 + 8) + 'px', 'a taller card pushes the tools further down');
-  view.goalSuggestPanelEl = null; view.placeMapTools();
+  view.relevanceBarEl = { querySelector: () => null }; view.placeMapTools();
   assert.equal(tools.style.top, '120px', 'card closed: back below the bar');
   const live = watchers.at(-1); assert.equal(live.disconnected, false);
   await view.onClose();

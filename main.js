@@ -69249,6 +69249,7 @@ ${request.requirements}` : preset.text,
     var _a2;
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
+    const languageSource = this.batchLanguageSource();
     const placed = /* @__PURE__ */ new Map();
     for (const child of children) {
       const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === child.id);
@@ -69268,7 +69269,8 @@ ${request.requirements}` : preset.text,
         pendingOptions,
         pendingOptions.researchMode !== "local",
         void 0,
-        gate
+        gate,
+        languageSource
       ),
       () => {
         const state = this.plugin.expansionBatches.get(parent.path);
@@ -69286,10 +69288,14 @@ ${request.requirements}` : preset.text,
       signal
     );
   }
-  async researchChild(child, batchSignal, accepted, choices, charts = true, onResult, gate) {
+  /** The map's language inputs as they are when a batch starts: a copy, so a later map switch cannot change the batch. */
+  batchLanguageSource() {
+    return this.map ? { title: this.map.title, outputLanguage: this.map.outputLanguage } : void 0;
+  }
+  async researchChild(child, batchSignal, accepted, choices, charts = true, onResult, gate, languageSource) {
     var _a2, _b2, _c;
     const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
-    const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
+    const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : cardOutputLanguage(languageSource != null ? languageSource : this.map, this.plugin.settings.language, note.title);
     const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage2);
     let started = false;
     let failure;
@@ -69351,6 +69357,7 @@ ${request.requirements}` : preset.text,
    */
   async startMultiResearch(request, retryBatchKey, onSettled) {
     if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
+    const languageSource = this.batchLanguageSource();
     const key2 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key2)) {
       new import_obsidian37.Notice(t("ui.multi_research_already_running"));
@@ -69438,7 +69445,8 @@ ${request.requirements}` : preset.text,
                   web.searches += result.retrievals;
                   if (!result.retrievals) web.withoutSearch++;
                 },
-                gate
+                gate,
+                languageSource
               );
               return void 0;
             },

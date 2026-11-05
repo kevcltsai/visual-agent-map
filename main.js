@@ -52678,6 +52678,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     __publicField(this, "renderingCard", false);
     /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
     __publicField(this, "restoringFocus", false);
+    /** True only while a repaint opens a card title/summary field or hands focus back from one: the tool row must not pan the canvas then. */
+    __publicField(this, "keepCanvasOnFieldRestore", false);
     /** A focus restore was skipped because another window was active; done when this window is focused again. */
     __publicField(this, "focusRestorePending", false);
     /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
@@ -53461,6 +53463,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     const input2 = this.inlineNameInput;
     if (!input2 || !input2.isConnected || !this.inlineName) return;
     this.restoringFocus = true;
+    this.keepCanvasOnFieldRestore = true;
     try {
       input2.focus({ preventScroll: true });
       if (this.inlineName.fresh) (_a2 = input2.select) == null ? void 0 : _a2.call(input2);
@@ -53470,6 +53473,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       }
     } finally {
       this.restoringFocus = false;
+      this.keepCanvasOnFieldRestore = false;
     }
   }
   /** After a repaint: the live summary field takes focus with the caret where the click was (or at the end). */
@@ -53478,6 +53482,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     const area = this.inlineSummaryInput;
     if (!area || !area.isConnected || !this.inlineSummary) return;
     this.restoringFocus = true;
+    this.keepCanvasOnFieldRestore = true;
     try {
       area.focus({ preventScroll: true });
       const at = Math.min((_a2 = this.inlineSummary.caret) != null ? _a2 : area.value.length, area.value.length);
@@ -53485,6 +53490,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       this.growSummaryInput(area);
     } finally {
       this.restoringFocus = false;
+      this.keepCanvasOnFieldRestore = false;
     }
   }
   growSummaryInput(area) {
@@ -53594,7 +53600,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       release2();
       this.inlineSummary = null;
       this.inlineSummaryInput = null;
-      if (keepFocus) this.focusNodeId = node.id;
+      if (keepFocus) {
+        this.focusNodeId = node.id;
+        this.keepCanvasOnFieldRestore = true;
+      }
       if (!save || value === state.original.trim()) this.render();
       else this.enqueue(() => this.noteChange(node, { summary: value }));
     };
@@ -61797,6 +61806,7 @@ ${request.requirements}` : preset.text,
       }
       this.focusNodeId = null;
     }
+    this.keepCanvasOnFieldRestore = false;
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
@@ -62766,7 +62776,7 @@ ${request.requirements}` : preset.text,
     }
     if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
     if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);
-    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.restoringFocus) {
+    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.keepCanvasOnFieldRestore) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,

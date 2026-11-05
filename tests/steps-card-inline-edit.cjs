@@ -146,10 +146,14 @@ test('leaving the field (blur) saves like Enter', async () => {
 
 test('negative: a drag (pointer moved) that ends on the title or summary never opens a field, even when the click event follows', async () => {
   const h = await harness(); await withSummary(h, 'leaf', 'some summary'); place(h, 'leaf');
+  // The click follows the release at once (no await between), so the 250ms click-suppress window cannot lapse in between; the window is asserted open.
   for (const spot of [centre(TITLE), centre(SUMMARY)]) {
-    press(h, 'leaf', spot, { moveTo: { x: spot.x + 80, y: spot.y + 80 } }); await tick(); await tick(); place(h, 'leaf');
+    place(h, 'leaf');
+    press(h, 'leaf', spot, { moveTo: { x: spot.x + 80, y: spot.y + 80 } });
+    assert.ok(h.view.suppressClickUntil > Date.now(), 'the click-suppress window is open when the click arrives');
     h.card('leaf').handlers.get('click')({ target: h.card('leaf'), clientX: spot.x, clientY: spot.y, metaKey: false, ctrlKey: false });
     assert.equal(nothingOpen(h, 'leaf'), true, 'no field after a drag');
+    await tick(); await tick();
   }
 });
 
@@ -286,6 +290,19 @@ test('F1 regression: opening and closing the title or summary field (Esc, Enter,
     place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); const area = summaryField(h, 'leaf'); area.value = 'changed'; keys(area, 'Enter'); await tick(); await tick();
     assert.equal(at(), before, 'Enter on the summary (saved)');
     place(h, 'leaf'); press(h, 'leaf', centre(SUMMARY)); summaryField(h, 'leaf').handlers.get('blur')(); await tick(); await tick(); assert.equal(at(), before, 'blur');
+  } finally { make.onFocus = null; }
+});
+
+test('negative (F1 consumers): a plain focus restore that is not a field open/close (Alt+arrow reorder, delete moving focus, restoreMapFocus) still pans the canvas so the tool row fits', async () => {
+  const h = await harness(); await withSummary(h, 'leaf', 'some summary'); place(h, 'leaf'); const card = jam(h);
+  try {
+    const at = () => JSON.stringify(h.view.map.viewport); const start = at();
+    // What render's focusNodeId restore does: focus the card while restoringFocus is set (but no field is opening or closing).
+    h.view.restoringFocus = true; try { card.handlers.get('focusin')({ target: card }); } finally { h.view.restoringFocus = false; }
+    assert.notEqual(at(), start, 'the restored focus on a jammed card pans');
+    // The field open/close repaint keeps the canvas still, and clears its flag afterwards.
+    for (let i = 0; i < 4; i++) card.handlers.get('focusin')({ target: card }); const settled = at(); press(h, 'leaf', centre(TITLE)); keys(titleField(h, 'leaf'), 'Escape'); assert.equal(at(), settled, 'field open and close do not pan');
+    assert.equal(h.view.keepCanvasOnFieldRestore, false, 'the flag is cleared');
   } finally { make.onFocus = null; }
 });
 

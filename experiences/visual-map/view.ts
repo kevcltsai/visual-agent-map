@@ -1266,6 +1266,8 @@ export class VisualAgentMapView extends ItemView {
   private renderingCard = false;
   /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
   private restoringFocus = false;
+  /** True only while a repaint opens a card title/summary field or hands focus back from one: the tool row must not pan the canvas then. */
+  private keepCanvasOnFieldRestore = false;
   private onMapWindowFocus(): void {
     if (!this.focusRestorePending) return;
     this.focusRestorePending = false;
@@ -2006,6 +2008,7 @@ export class VisualAgentMapView extends ItemView {
     const input = this.inlineNameInput;
     if (!input || !input.isConnected || !this.inlineName) return;
     this.restoringFocus = true;
+    this.keepCanvasOnFieldRestore = true;
     try {
       input.focus({ preventScroll: true });
       // `fresh` lasts until the user types or clicks in the field: a repaint or the second focus after addNode
@@ -2017,6 +2020,7 @@ export class VisualAgentMapView extends ItemView {
       }
     } finally {
       this.restoringFocus = false;
+      this.keepCanvasOnFieldRestore = false;
     }
   }
   /** After a repaint: the live summary field takes focus with the caret where the click was (or at the end). */
@@ -2024,6 +2028,7 @@ export class VisualAgentMapView extends ItemView {
     const area = this.inlineSummaryInput;
     if (!area || !area.isConnected || !this.inlineSummary) return;
     this.restoringFocus = true;
+    this.keepCanvasOnFieldRestore = true;
     try {
       area.focus({ preventScroll: true });
       const at = Math.min(this.inlineSummary.caret ?? area.value.length, area.value.length);
@@ -2031,6 +2036,7 @@ export class VisualAgentMapView extends ItemView {
       this.growSummaryInput(area);
     } finally {
       this.restoringFocus = false;
+      this.keepCanvasOnFieldRestore = false;
     }
   }
   private growSummaryInput(area: HTMLTextAreaElement): void {
@@ -2143,7 +2149,10 @@ export class VisualAgentMapView extends ItemView {
       this.inlineSummary = null;
       this.inlineSummaryInput = null;
       // Enter or Esc hands the keyboard back to the card (leaving by click or Tab goes where the user went).
-      if (keepFocus) this.focusNodeId = node.id;
+      if (keepFocus) {
+        this.focusNodeId = node.id;
+        this.keepCanvasOnFieldRestore = true; // the repaint that hands focus back must not pan (consumed by render)
+      }
       if (!save || value === state.original.trim()) this.render();
       else this.enqueue(() => this.noteChange(node, { summary: value }));
     };
@@ -11044,6 +11053,7 @@ export class VisualAgentMapView extends ItemView {
       }
       this.focusNodeId = null;
     }
+    this.keepCanvasOnFieldRestore = false;
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
@@ -12183,7 +12193,7 @@ export class VisualAgentMapView extends ItemView {
     // A framing action (Show all) is mid-way: its viewport is the answer, so the row stays where it fits instead of moving the canvas.
     // Likewise a repaint putting focus back (opening or closing a card's title/summary field redraws the card, which is taller
     // or shorter by the field and its hint): the user did not navigate, so the canvas must stay where it is.
-    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.restoringFocus) {
+    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport && !this.keepCanvasOnFieldRestore) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,

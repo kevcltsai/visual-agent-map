@@ -1075,7 +1075,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.usage_this_map": "這張心智圖",
   "ui.usage_today": "今天",
   "ui.usage_this_month": "本月",
-  "ui.usage_in_out_01": "輸入 {0}・輸出 {1}",
+  "ui.usage_in_0": "輸入 {0}",
+  "ui.usage_out_0": "輸出 {0}",
   "ui.usage_by_action": "這張心智圖・依動作",
   "ui.usage_action_research": "研究",
   "ui.usage_action_expand": "展開",
@@ -1089,7 +1090,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.usage_empty": "這張心智圖還沒有 AI 請求紀錄。",
   "ui.usage_unreadable": "無法讀取用量資料，所以不顯示數字。外掛資料夾裡的 ai-usage.json 已原樣保留。",
   "ui.usage_footer":
-    "數字由 AI 服務回報。標「約」的是 Codex 的估計值，它不回報實際用量。不顯示金額，因為訂閱方案不是每次請求收費。",
+    "數字由 AI 服務回報。標「約」的是 AI 服務沒有回報用量時的估計值。不顯示金額，因為訂閱方案不是每次請求收費。",
   "ui.expansion_failed": "展開失敗",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "心智圖或母議題在 AI 執行期間已變更，未建立子議題。",

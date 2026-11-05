@@ -18,7 +18,7 @@ import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
 import type { CodexAppServerRuntime, CodexWebSearchEvent } from "../ai/runtime/codex-app-server";
 import type { ClaudeCodeCliRuntime } from "../ai/runtime/claude-code-cli";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
-import { estimateUsageTokens, type AiUsageStore, type UsageAction } from "./ai-usage-store";
+import type { AiUsageStore, UsageAction } from "./ai-usage-store";
 import type { ResearchObserver, ResearchStageName } from "../ai/research-observer";
 import type { AiRuntimeId, RuntimeTaskControls } from "./ai-runtime";
 import { prepareStep } from "./step-runner";
@@ -96,27 +96,6 @@ function usageActionOf(context: TaskContext, role?: TaskStepRole): UsageAction {
   return "research";
 }
 
-/** The prompt text a runtime request carries (Codex: the text inputs; Claude's request has none, so nothing to estimate from). */
-function promptTextOf(request: unknown): string {
-  const input = (request as { input?: unknown } | null)?.input;
-  if (!Array.isArray(input)) return "";
-  return input
-    .map((item: { type?: unknown; text?: unknown } | null) =>
-      item?.type === "text" && typeof item.text === "string" ? item.text : ""
-    )
-    .join("\n");
-}
-
-/** Captures what one provider call reports, then records it once with `end`. Nothing here may fail the call. */
-interface UsageProbe {
-  /** The controls to merge into the call's `task`: they chain the caller's own `onRequest` / `onMilestones`. */
-  hooks(
-    own: Pick<RuntimeTaskControls, "onRequest" | "onMilestones">
-  ): Pick<RuntimeTaskControls, "onRequest" | "onMilestones">;
-  /** Records the call (once). `reply` is the raw answer when there was one. */
-  end(reply?: string): void;
-}
-
 export class AiTaskService {
   constructor(private readonly options: AiTaskServiceOptions) {}
 
@@ -133,61 +112,6 @@ export class AiTaskService {
     observer?: ResearchObserver
   ): Promise<AiResult> {
     return this.execute(input, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer);
-  }
-
-  /** Starts counting one provider call for the usage store; `end` records it exactly once, on success or failure. */
-  beginUsage(info: {
-    action: UsageAction;
-    topic?: string;
-    mapPath?: string;
-    provider: AiRuntimeId;
-    model: string;
-  }): UsageProbe {
-    const started = Date.now();
-    let reported: { inputTokens: number; outputTokens: number } | undefined;
-    let prompt = "";
-    let ended = false;
-    return {
-      hooks: own => ({
-        onRequest: request => {
-          own.onRequest?.(request);
-          prompt += promptTextOf(request);
-        },
-        onMilestones: data => {
-          own.onMilestones?.(data);
-          if (data.usage)
-            reported = { inputTokens: data.usage.inputTokens ?? 0, outputTokens: data.usage.outputTokens ?? 0 };
-        }
-      }),
-      end: reply => {
-        if (ended) return;
-        ended = true;
-        try {
-          const store = this.options.usage?.();
-          if (!store) return;
-          // Real numbers when the provider reported them; otherwise a Codex call is counted from its text (estimated).
-          const tokens =
-            reported ??
-            (info.provider === "codex" && (prompt || reply)
-              ? { inputTokens: estimateUsageTokens(prompt), outputTokens: estimateUsageTokens(reply ?? "") }
-              : undefined);
-          if (!tokens || (tokens.inputTokens === 0 && tokens.outputTokens === 0)) return;
-          store.record({
-            action: info.action,
-            ...(info.mapPath ? { mapPath: info.mapPath } : {}),
-            ...(info.topic ? { topic: info.topic } : {}),
-            provider: info.provider,
-            model: info.model,
-            ...tokens,
-            estimated: !reported,
-            durationMs: Date.now() - started
-          });
-        } catch (error) {
-          // Counting is best effort: a failing store never changes the task's result.
-          console.warn("Visual Agent Map token usage", error);
-        }
-      }
-    };
   }
 
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
@@ -320,23 +244,8 @@ export class AiTaskService {
         }
       };
       const calls = this.callsIn(pluginDirectory, exchanges);
-      const sendOnce = async (setup?: AttemptSetup): Promise<{ raw: string }> => {
-        const usage = this.beginUsage({
-          action: usageActionOf(context, role),
-          topic: context.title,
-          mapPath: context.usageMapPath,
-          provider,
-          model
-        });
-        let reply: string | undefined;
-        try {
-          reply = await sendRaw(setup, usage);
-          return { raw: reply };
-        } finally {
-          usage.end(reply);
-        }
-      };
-      const sendRaw = async (setup: AttemptSetup | undefined, usage: UsageProbe): Promise<string> =>
+      const sendOnce = async (setup?: AttemptSetup): Promise<{ raw: string }> => ({ raw: await sendRaw(setup) });
+      const sendRaw = async (setup: AttemptSetup | undefined): Promise<string> =>
         calls.run(
           step,
           {
@@ -347,6 +256,7 @@ export class AiTaskService {
             taskName: "ai-task",
             signal: setup?.signal ?? signal ?? new AbortController().signal,
             localCodex: context.researchMode === "local",
+            usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
             requestLog: "request",
             // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
             entryEnd: "caller",
@@ -354,8 +264,7 @@ export class AiTaskService {
             task: {
               ...controls,
               onWebSearchEvent: webHook,
-              ...(setup ? setup.hooks : {}),
-              ...usage.hooks({ onRequest: controls.onRequest })
+              ...(setup ? setup.hooks : {})
             },
             ...(setup
               ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply }
@@ -686,6 +595,7 @@ export class AiTaskService {
           claude: () => this.options.claudeRuntime(pluginDirectory),
           codex: local => this.options.codexRuntime(pluginDirectory, local)
         }),
+      ...(this.options.usage ? { usage: this.options.usage } : {}),
       exchanges: () => (exchanges && this.options.exchangeLoggingEnabled() ? exchanges : null)
     });
   }
@@ -772,14 +682,6 @@ export class AiTaskService {
       return detail;
     };
     const calls = this.callsIn(pluginDirectory, exchanges);
-    const usage = this.beginUsage({
-      action: "other",
-      topic: input.title,
-      mapPath: input.usageMapPath,
-      provider,
-      model
-    });
-    let reply: string | undefined;
     try {
       return await calls.run(
         step,
@@ -791,6 +693,7 @@ export class AiTaskService {
           taskName: "chart",
           signal: signal ?? new AbortController().signal,
           localCodex: true,
+          usage: { action: "other", mapPath: input.usageMapPath },
           requestLog: "request",
           stopped: () => new DOMException("Aborted", "AbortError"),
           failMessage: error =>
@@ -801,12 +704,10 @@ export class AiTaskService {
             timeoutMessage: translate(this.options.language(), "ui.ai_task_exceeded_0_minutes", 3),
             webSearch: false,
             textOnly: true,
-            searchBudget: 0,
-            ...usage.hooks({})
+            searchBudget: 0
           }
         },
         async (raw, exchange) => {
-          reply = raw;
           if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
           const charts = step.parse(raw);
           const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
@@ -824,8 +725,6 @@ export class AiTaskService {
       if (aborted(error)) throw error;
       warn(codeOf(error));
       return detail;
-    } finally {
-      usage.end(reply);
     }
   }
 

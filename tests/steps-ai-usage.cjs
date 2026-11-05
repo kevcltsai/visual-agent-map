@@ -286,3 +286,76 @@ test('without a usage store the call runs and nothing is recorded', async () => 
   });
   assert.equal((await service.askModel(context(), 'gpt-6-luna', 'low')).summary, 'S');
 });
+
+// ---- AiCalls is the one place a call is recorded ----
+const { loadSource } = require('./support-replay.cjs');
+const S = require('./support.cjs');
+const shared = loadSource(`
+export { providerOutlineRunner } from "./core/outline-generation-service";
+export { providerReframeRunner } from "./core/reframing-service";
+export { prepareStep } from "./core/step-runner";
+export { AiCalls } from "./core/ai-calls";
+export { aiRuntimeForModel } from "./core/ai-runtime-service";
+export { outlineGenerateStep } from "./core/steps/outline-generate/step";
+export { reframeStep, REFRAME_SCHEMA } from "./core/steps/reframe/step";
+`, { obsidian: S.obsidian });
+
+function sharedCalls(reply, { report, records }) {
+  const runtime = () => ({ runTask: async (_prompt, _model, _effort, _schema, controls) => { if (report) controls.onMilestones(report); return reply; } });
+  return new shared.AiCalls({
+    runtimeFor: model => shared.aiRuntimeForModel(model, { claude: runtime, codex: runtime }),
+    exchanges: () => null,
+    usage: () => ({ record: entry => records.push(entry) })
+  });
+}
+
+test('a provider-step call (outline) is recorded exactly once, under its map path', async () => {
+  const records = [];
+  const calls = sharedCalls('# Root\n## A', { report: { usage: { inputTokens: 70, outputTokens: 9 } }, records });
+  const request = { topic: 'Sleep', presetText: 'Make a tree for {research topic}.', language: 'en', model: 'claude:sonnet', reasoning: 'low', usageMapPath: 'A/map.vam' };
+  await shared.providerOutlineRunner(calls)(request, new AbortController().signal, shared.prepareStep(shared.outlineGenerateStep, request));
+  assert.equal(records.length, 1, 'one call, one entry');
+  same([records[0].action, records[0].mapPath, records[0].inputTokens, records[0].outputTokens, records[0].estimated, records[0].provider], ['other', 'A/map.vam', 70, 9, false, 'claude']);
+});
+
+test('a reframe call is recorded exactly once', async () => {
+  const records = [];
+  const reply = JSON.stringify({ question: 'What distinguishes these?', context: 'Open tensions remain.', rationale: 'Test it.' });
+  const calls = sharedCalls(reply, { report: { usage: { inputTokens: 40, outputTokens: 6 } }, records });
+  const request = { targetCore: 'understand', source: 'Candidate', question: 'Explore this', context: '', language: 'en', model: 'claude:sonnet', reasoning: 'low' };
+  const prepared = shared.prepareStep(shared.reframeStep, request);
+  await shared.providerReframeRunner(calls)(request, prepared.prompt, shared.REFRAME_SCHEMA, new AbortController().signal, prepared);
+  assert.equal(records.length, 1);
+  same([records[0].action, records[0].inputTokens, records[0].outputTokens], ['other', 40, 6]);
+});
+
+test('an AiTaskService task goes through AiCalls and is still recorded exactly once', async () => {
+  const h = rig({ handler: call => { call.controls.onMilestones({ usage: { inputTokens: 120, outputTokens: 45 } }); return GOOD; } });
+  await h.service.askModel(context({ mode: 'decompose' }), 'claude:sonnet', 'low');
+  assert.equal(h.records.length, 1);
+  same([h.records[0].action, h.records[0].mapPath], ['expand', 'A/map.vam']);
+});
+
+test('a data: URL reply (image generation) is never estimated as output; only the input is', async () => {
+  const records = [];
+  const runtime = () => ({ capabilities: { id: 'codex', imageGeneration: true }, runTask: async (_p, _m, _e, _s, controls) => { controls.onRequest({ input: [{ type: 'text', text: 'abcdefgh' }] }); return 'data:image/png;base64,' + 'A'.repeat(4000); } });
+  const calls = new shared.AiCalls({
+    runtimeFor: model => shared.aiRuntimeForModel(model, { claude: runtime, codex: runtime }),
+    exchanges: () => null, usage: () => ({ record: entry => records.push(entry) })
+  });
+  const prepared = shared.prepareStep(shared.outlineGenerateStep, { topic: 't', presetText: 'p {research topic}', language: 'en', model: 'gpt-6-luna', reasoning: 'low' });
+  await calls.run(prepared, { model: 'gpt-6-luna', effort: 'low', topic: 'Markdown selection', taskName: 'markdown-context', signal: new AbortController().signal, localCodex: true, usage: { action: 'writeback' }, task: { generateImage: false } }, raw => raw);
+  assert.equal(records.length, 1);
+  same([records[0].action, records[0].estimated, records[0].outputTokens, records[0].inputTokens], ['writeback', true, 0, estimateUsageTokens('abcdefgh')]);
+});
+
+test('an unreadable usage store reports its error once, not on every record', async () => {
+  const file = tempFile();
+  fs.writeFileSync(file, '{ not json');
+  const errors = [];
+  const store = newStore(file, { errors });
+  await store.load();
+  assert.equal(errors.length, 1);
+  store.record(row()); store.record(row()); store.record(row());
+  assert.equal(errors.length, 2, 'one for the load, one for the first dropped call');
+});

@@ -313,7 +313,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly aiCalls = new AiCalls({
     runtimeFor: model => this.aiRuntime.runtimeFor(model),
     exchanges: () => (this.settings.aiExchangeLoggingEnabled ? this.exchanges : null),
-    releaseWarm: () => this.aiRuntime.releaseWarm()
+    releaseWarm: () => this.aiRuntime.releaseWarm(),
+    usage: () => this.usage
   });
   readonly activeTasks = this.aiCalls.activeTasks;
   /** Background chart steps (running and queued), keyed by note path; owned by {@link topicRuns}. */
@@ -2081,44 +2082,32 @@ export default class VisualAgentMapPlugin extends Plugin {
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
       this.currentModelChoice().reasoning
     );
-    // Selected-text AI writes into a note: its tokens count as "writeback". Counting never changes the result.
-    const usage = this.aiTasks.beginUsage({
-      action: "writeback",
-      topic: "Markdown selection",
-      provider: this.runtimeIdFor(model),
-      model
-    });
-    let reply: string | undefined;
-    try {
-      reply = await this.aiCalls.run(
-        prepared,
-        {
-          model,
-          effort,
-          topic: "Markdown selection",
-          taskName: "markdown-context",
-          signal,
-          localCodex: !webSearch,
-          task: {
-            textOnly: !webSearch && !generateImage,
-            webSearchOnly: webSearch,
-            generateImage,
-            imageDataUrl,
-            searchBudget: webSearch ? 4 : 0,
-            // Drawing takes longer than a text reply.
-            ...(generateImage ? { timeoutMs: 6 * 60 * 1000 } : {}),
-            ...usage.hooks({})
-          }
-        },
-        (raw, exchange) => {
-          if (exchange.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-          return raw;
+    // Selected-text AI writes into a note: its tokens count as "writeback".
+    return await this.aiCalls.run(
+      prepared,
+      {
+        model,
+        effort,
+        topic: "Markdown selection",
+        taskName: "markdown-context",
+        signal,
+        localCodex: !webSearch,
+        usage: { action: "writeback" },
+        task: {
+          textOnly: !webSearch && !generateImage,
+          webSearchOnly: webSearch,
+          generateImage,
+          imageDataUrl,
+          searchBudget: webSearch ? 4 : 0,
+          // Drawing takes longer than a text reply.
+          ...(generateImage ? { timeoutMs: 6 * 60 * 1000 } : {})
         }
-      );
-      return reply;
-    } finally {
-      usage.end(reply);
-    }
+      },
+      (raw, exchange) => {
+        if (exchange.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+        return raw;
+      }
+    );
   }
   async openCoffeeHandoff(session: CoffeeSession, sourcePath: string, insightId?: string): Promise<void> {
     try {

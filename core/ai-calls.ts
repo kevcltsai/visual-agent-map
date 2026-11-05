@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import { t } from "../i18n";
+import { estimateUsageTokens, type AiUsageStore, type UsageAction } from "./ai-usage-store";
 import type { AiRuntime, AiRuntimeCapabilities, AiRuntimePrewarmOptions, RuntimeTaskControls } from "./ai-runtime";
 import { StepRunner, stepLabel, type PreparedStep, type StepProvider } from "./step-runner";
 
@@ -19,6 +20,8 @@ export interface AiCallsOptions {
   activeTasks?: Map<string, AbortController>;
   /** Drops a pre-started process; {@link AiCalls.prewarm} calls it for a runtime that cannot pre-start. Nothing to drop when absent. */
   releaseWarm?(): void;
+  /** Where each call's token usage is recorded (always on, unlike the exchange log). Absent or null: not recorded. */
+  usage?: () => Pick<AiUsageStore, "record"> | null;
 }
 
 export interface AiCallOptions {
@@ -47,8 +50,8 @@ export interface AiCallOptions {
   /** Facts the caller knows about this call; the runtime's own measurements win. */
   extraMilestones?: () => AiMilestones;
   /**
-   * Default true. False: AiCalls injects no `onMilestones` (a caller's own one is still forwarded) and writes no
-   * milestones event.
+   * Default true. False: AiCalls writes no milestones event and injects no `onMilestones` (a caller's own one is still
+   * forwarded), except to read the usage a usage store records.
    */
   milestones?: boolean;
   /** Controls forwarded to the runtime; `onMilestones` and `onRequest` are chained, not replaced. */
@@ -57,6 +60,8 @@ export interface AiCallOptions {
   onBegin?: (id: string) => void;
   /** The failed entry's message when the call throws; the error's own message when absent. Unused with `entryEnd: "caller"`. */
   failMessage?: (error: unknown) => string;
+  /** What the usage store files this call under; `action` defaults to "other". Every call is recorded exactly once, here. */
+  usage?: { action?: UsageAction; mapPath?: string };
   /** "caller": AiCalls writes neither `completed` nor `failed`; the caller ends the entry by id after later work. */
   entryEnd?: "calls" | "caller";
 }
@@ -79,6 +84,17 @@ export interface AiCallRequest {
   schema?: unknown;
   /** `stepId@version` for the exchange log; the entry has no step field when absent. */
   step?: string;
+}
+
+/** The prompt text a runtime request carries (Codex: the text inputs; Claude's request has none). */
+function promptTextOf(request: unknown): string {
+  const input = (request as { input?: unknown } | null)?.input;
+  if (!Array.isArray(input)) return "";
+  return input
+    .map((item: { type?: unknown; text?: unknown } | null) =>
+      item?.type === "text" && typeof item.text === "string" ? item.text : ""
+    )
+    .join("\n");
 }
 
 /**
@@ -168,6 +184,11 @@ export class AiCalls {
     const log = (): AiCallExchangeSink | null | undefined => (started ? this.options.exchanges() : undefined);
     const id = options.exchangeId ?? randomUUID();
     const milestones: AiMilestones = {};
+    const startedMs = Date.now();
+    let reportedUsage: { inputTokens: number; outputTokens: number } | undefined;
+    let reply: string | undefined;
+    let sentText = "";
+    let provider: "claude" | "codex" | undefined;
     let milestonesWritten = false;
     const writeMilestones = (): void => {
       if (milestonesWritten || options.milestones === false) return;
@@ -208,21 +229,29 @@ export class AiCalls {
       });
       if (started) options.onBegin?.(id);
       const runtime = this.options.runtimeFor(options.model);
+      provider = runtime.capabilities.id;
       options.validate?.(runtime);
       const task = options.task ?? {};
       const controls: RuntimeTaskControls = {
         ...task,
         signal: controller.signal,
-        ...(options.milestones === false
+        // Needed by the usage record even when no milestones event is written (`milestones: false`).
+        ...(options.milestones === false && !this.options.usage
           ? {}
           : {
               onMilestones: (data: AiMilestones): void => {
                 task.onMilestones?.(data);
-                Object.assign(milestones, data);
+                if (data.usage)
+                  reportedUsage = {
+                    inputTokens: data.usage.inputTokens ?? 0,
+                    outputTokens: data.usage.outputTokens ?? 0
+                  };
+                if (options.milestones !== false) Object.assign(milestones, data);
               }
             }),
         onRequest: (data: unknown): void => {
           task.onRequest?.(data);
+          sentText += promptTextOf(data);
           log()?.sent(
             id,
             JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
@@ -238,6 +267,7 @@ export class AiCalls {
         controls,
         localCodex: options.localCodex
       });
+      reply = raw;
       if (controller.signal.aborted) throw stopped();
       options.afterReply?.();
       milestones.receivedAt = new Date().toISOString();
@@ -257,8 +287,48 @@ export class AiCalls {
         );
       throw error;
     } finally {
+      this.recordUsage(sentText || call.prompt, options, provider, reportedUsage, reply, startedMs);
       options.signal.removeEventListener("abort", abort);
       if (this.activeTasks.get(key) === controller) this.activeTasks.delete(key);
+    }
+  }
+
+  /** Records one call in the usage store (once, success or failure). Counting is best effort and never changes the call's result. */
+  private recordUsage(
+    prompt: string,
+    options: AiCallOptions,
+    provider: "claude" | "codex" | undefined,
+    reported: { inputTokens: number; outputTokens: number } | undefined,
+    reply: string | undefined,
+    startedMs: number
+  ): void {
+    try {
+      const store = this.options.usage?.();
+      if (!store || !provider) return;
+      // Real numbers when the provider reported them; otherwise a Codex call is counted from its text (estimated).
+      // A generated image comes back as a data: URL, which says nothing about output tokens: only the input is estimated.
+      const imageReply = !!options.task?.generateImage || (reply ?? "").startsWith("data:");
+      const tokens =
+        reported ??
+        (provider === "codex" && (prompt || reply)
+          ? {
+              inputTokens: estimateUsageTokens(prompt),
+              outputTokens: imageReply ? 0 : estimateUsageTokens(reply ?? "")
+            }
+          : undefined);
+      if (!tokens || (tokens.inputTokens === 0 && tokens.outputTokens === 0)) return;
+      store.record({
+        action: options.usage?.action ?? "other",
+        ...(options.usage?.mapPath ? { mapPath: options.usage.mapPath } : {}),
+        ...(options.topic ? { topic: options.topic } : {}),
+        provider,
+        model: options.model,
+        ...tokens,
+        estimated: !reported,
+        durationMs: Date.now() - startedMs
+      });
+    } catch (error) {
+      console.warn("Visual Agent Map token usage", error);
     }
   }
 }

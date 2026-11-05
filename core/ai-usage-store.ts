@@ -151,8 +151,11 @@ export class AiUsageStore {
     try {
       if (this.disposed) return;
       if (this.loadError) {
-        this.writeError = this.loadError;
-        this.onError(this.loadError);
+        // The load already reported it; the first dropped call reports once more (as the save error), later ones are silent.
+        if (!this.writeError) {
+          this.writeError = this.loadError;
+          this.onError(this.loadError);
+        }
         return;
       }
       this.entries.push({ ...entry, at: entry.at ?? new Date(this.now()).toISOString() });

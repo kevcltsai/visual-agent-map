@@ -35,7 +35,7 @@ function rig(store) {
   mount();
   const button = () => find(bar, i => i.tag === 'button');
   const panel = () => find(overlay, i => i.attrs.role === 'dialog');
-  const key = name => { let prevented = false; doc.fire('keydown', { key: name, preventDefault() { prevented = true; }, stopPropagation() {} }); return prevented; };
+  const key = (name, target = panel()) => { let prevented = false; let stopped = false; doc.fire('keydown', { key: name, target, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } }); return name === 'Escape' && !prevented !== !stopped ? 'mixed' : prevented; };
   return { control, overlay, bar, doc, button, panel, mount, key };
 }
 const texts = root => findAll(root, i => i.text).map(i => i.text);
@@ -67,6 +67,8 @@ test('click opens the panel; Esc, an outside press and a second click close it a
   assert.equal(h.key('Escape'), true);
   assert.equal(h.panel(), undefined); assert.equal(h.button().attrs['aria-expanded'], 'false'); assert.equal(dom.focusedNow(), h.button());
   h.button().click();
+  assert.equal(h.key('Escape', element('div')), false, 'Escape from elsewhere (an editor, a dialog) is not swallowed');
+  assert.ok(h.panel(), 'and the panel stays open');
   h.doc.fire('pointerdown', { target: h.panel() }); assert.ok(h.panel(), 'a press inside stays open');
   h.doc.fire('pointerdown', { target: element('div') }); assert.equal(h.panel(), undefined, 'a press outside closes');
   h.button().click(); h.button().click(); assert.equal(h.panel(), undefined, 'the button toggles');
@@ -82,7 +84,7 @@ test('panel shows totals, only the actions with usage, the recent rows with 約 
   const h = rig(store);
   h.button().click();
   const all = texts(h.panel());
-  for (const expected of ['Token usage', 'This mind map', 'Today', 'This month', '1.6k', '6.6k', 'In 1.3k · Out 300', '~400', '18 s', '9 s', 'Sleep', 'REM']) assert.ok(all.includes(expected), expected + ' in ' + all.join('|'));
+  for (const expected of ['Token usage', 'This mind map', 'Today', 'This month', '1.6k', '6.6k', 'In 1.3k', 'Out 300', '~400', '18 s', '9 s', 'Sleep', 'REM']) assert.ok(all.includes(expected), expected + ' in ' + all.join('|'));
   const shown = findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text);
   assert.deepEqual(shown, ['Research', 'Expand']);
   assert.equal(findAll(h.panel(), i => i.tag === 'tr' && !i.hidden).length, 2, 'only this map\'s two requests');

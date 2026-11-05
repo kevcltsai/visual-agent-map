@@ -80,6 +80,7 @@
 .vam-usage-totals > div { padding: 6px 8px; border-radius: var(--radius-s); background: var(--background-secondary); min-width: 0; }
 .vam-usage-totals small { display: block; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-usage-totals strong { font-size: var(--font-ui-medium); font-variant-numeric: tabular-nums; }
+.vam-usage-totals em span { display: block; white-space: nowrap; }
 .vam-usage-totals em { display: block; font-style: normal; color: var(--text-faint); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
 .vam-usage-bars { display: grid; gap: 5px; }
 .vam-usage-bar { display: grid; grid-template-columns: 64px 1fr 44px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }

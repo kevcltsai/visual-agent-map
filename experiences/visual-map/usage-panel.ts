@@ -41,7 +41,9 @@ const sum = (tokens: UsageTokens): number => tokens.inputTokens + tokens.outputT
 
 interface TotalCell {
   strong: HTMLElement;
-  detail: HTMLElement;
+  /** Input and output, one line each. */
+  input: HTMLElement;
+  output: HTMLElement;
 }
 interface BarRow {
   row: HTMLElement;
@@ -186,6 +188,10 @@ export class UsageControl {
 
   private readonly onKey = (event: KeyboardEvent): void => {
     if (event.key !== "Escape" || !this.isOpen) return;
+    // Only Escape pressed in the panel or on the usage button closes it; anywhere else it belongs to whoever has the focus.
+    const inside = (node: Node | null | undefined): boolean =>
+      !!node && !!(this.parts?.root.contains(node) || this.button?.contains(node));
+    if (!inside(event.target as Node | null) && !inside(this.doc?.activeElement)) return;
     event.preventDefault();
     event.stopPropagation();
     this.close(true);
@@ -230,7 +236,9 @@ export class UsageControl {
     const cell = (label: string): TotalCell => {
       const box = grid.createDiv();
       box.createEl("small", { text: label });
-      return { strong: box.createEl("strong"), detail: box.createEl("em") };
+      const strong = box.createEl("strong");
+      const detail = box.createEl("em");
+      return { strong, input: detail.createSpan(), output: detail.createSpan() };
     };
     const cells = {
       map: cell(t("ui.usage_this_map")),
@@ -308,7 +316,9 @@ export class UsageControl {
     for (const section of parts.sections) section.hidden = false;
     const total = (cell: TotalCell, tokens: UsageTokens): void => {
       cell.strong.setText(formatTokens(sum(tokens)));
-      cell.detail.setText(t("ui.usage_in_out_01", formatTokens(tokens.inputTokens), formatTokens(tokens.outputTokens)));
+      // Input and output on two lines of their own, so a narrow panel never wraps in the middle of a phrase.
+      cell.input.setText(t("ui.usage_in_0", formatTokens(tokens.inputTokens)));
+      cell.output.setText(t("ui.usage_out_0", formatTokens(tokens.outputTokens)));
     };
     total(parts.cells.map, map.value);
     total(parts.cells.today, today.value);

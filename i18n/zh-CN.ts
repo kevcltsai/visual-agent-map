@@ -1073,7 +1073,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.usage_this_map": "这张心智图",
   "ui.usage_today": "今天",
   "ui.usage_this_month": "本月",
-  "ui.usage_in_out_01": "输入 {0}・输出 {1}",
+  "ui.usage_in_0": "输入 {0}",
+  "ui.usage_out_0": "输出 {0}",
   "ui.usage_by_action": "这张心智图・按动作",
   "ui.usage_action_research": "研究",
   "ui.usage_action_expand": "展开",
@@ -1087,7 +1088,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.usage_empty": "这张心智图还没有 AI 请求记录。",
   "ui.usage_unreadable": "无法读取用量数据，所以不显示数字。插件文件夹里的 ai-usage.json 已原样保留。",
   "ui.usage_footer":
-    "数字由 AI 服务回报。标“约”的是 Codex 的估计值，它不回报实际用量。不显示金额，因为订阅方案不是每次请求收费。",
+    "数字由 AI 服务回报。标“约”的是 AI 服务没有回报用量时的估计值。不显示金额，因为订阅方案不是每次请求收费。",
   "ui.expansion_failed": "展开失败",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "心智图或父议题在 AI 运行期间已变更，未创建子议题。",

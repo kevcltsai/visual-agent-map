@@ -2986,6 +2986,7 @@ export class VisualAgentMapView extends ItemView {
             const result = await this.plugin.outlineGeneration.generate(
               {
                 ...forService,
+                ...this.usageMapField(),
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
@@ -3111,6 +3112,7 @@ export class VisualAgentMapView extends ItemView {
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
           {
+            ...this.usageMapField(),
             topic: note.title,
             presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
             language: request.language,
@@ -3252,6 +3254,7 @@ export class VisualAgentMapView extends ItemView {
               {
                 rootQuestion,
                 nodes,
+                ...this.usageMapField(),
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
                 model,
@@ -3763,7 +3766,8 @@ export class VisualAgentMapView extends ItemView {
           language: settings.language,
           model,
           reasoning: gradeReasoning,
-          ...(pins.length ? { pins } : {})
+          ...(pins.length ? { pins } : {}),
+          ...this.usageMapField()
         };
         const hooks = {
           onRepair: (_round: number, kind: string) => {
@@ -5994,11 +5998,11 @@ export class VisualAgentMapView extends ItemView {
       this.researchTick = null;
     }
   }
-  /** The progress key of this map's multi-select synthesis or AI merge (a name no Vault path can have). */
   /** The map a request's token usage is counted under (this view's map file). */
   private usageMapField(): { usageMapPath?: string } {
     return this.path ? { usageMapPath: this.path } : {};
   }
+  /** The progress key of this map's multi-select synthesis or AI merge (a name no Vault path can have). */
   private taskProgressKey(kind: "integration" | "merge", mapPath = this.path): string {
     return `${TASK_PROGRESS_PREFIX}${kind}:${mapPath}`;
   }
@@ -18650,7 +18654,7 @@ export class VisualAgentMapView extends ItemView {
     const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request: MapChatRequest;
     try {
-      request = await this.buildChatRequest(message, chat, origin);
+      request = { ...(await this.buildChatRequest(message, chat, origin)), ...this.usageMapField() };
     } catch (error) {
       abandon(this.closed ? undefined : errorMessage(error));
       return;

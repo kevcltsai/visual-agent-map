@@ -1147,7 +1147,8 @@ var en = {
   "ui.usage_this_map": "This mind map",
   "ui.usage_today": "Today",
   "ui.usage_this_month": "This month",
-  "ui.usage_in_out_01": "In {0} \xB7 Out {1}",
+  "ui.usage_in_0": "In {0}",
+  "ui.usage_out_0": "Out {0}",
   "ui.usage_by_action": "THIS MIND MAP \xB7 BY ACTION",
   "ui.usage_action_research": "Research",
   "ui.usage_action_expand": "Expand",
@@ -1160,7 +1161,7 @@ var en = {
   "ui.usage_minutes_seconds_01": "{0} min {1} s",
   "ui.usage_empty": "No AI requests recorded for this mind map yet.",
   "ui.usage_unreadable": "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
-  "ui.usage_footer": "Numbers are reported by the AI service. Values marked ~ are Codex estimates, because it does not report actual usage. No money amounts are shown, because subscription plans are not charged per request.",
+  "ui.usage_footer": "Numbers are reported by the AI service. Values marked ~ are estimates, shown only when the AI service did not report usage. No money amounts are shown, because subscription plans are not charged per request.",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "The map or parent topic changed while AI was running. No subtopics were created.",
   "ui.create_subtopics_after_confirmation_without_running_research": "Create subtopics after confirmation without running research",
@@ -3852,7 +3853,8 @@ var zhCN = {
   "ui.usage_this_map": "\u8FD9\u5F20\u5FC3\u667A\u56FE",
   "ui.usage_today": "\u4ECA\u5929",
   "ui.usage_this_month": "\u672C\u6708",
-  "ui.usage_in_out_01": "\u8F93\u5165 {0}\u30FB\u8F93\u51FA {1}",
+  "ui.usage_in_0": "\u8F93\u5165 {0}",
+  "ui.usage_out_0": "\u8F93\u51FA {0}",
   "ui.usage_by_action": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u30FB\u6309\u52A8\u4F5C",
   "ui.usage_action_research": "\u7814\u7A76",
   "ui.usage_action_expand": "\u5C55\u5F00",
@@ -3865,7 +3867,7 @@ var zhCN = {
   "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
   "ui.usage_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709 AI \u8BF7\u6C42\u8BB0\u5F55\u3002",
   "ui.usage_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u7528\u91CF\u6570\u636E\uFF0C\u6240\u4EE5\u4E0D\u663E\u793A\u6570\u5B57\u3002\u63D2\u4EF6\u6587\u4EF6\u5939\u91CC\u7684 ai-usage.json \u5DF2\u539F\u6837\u4FDD\u7559\u3002",
-  "ui.usage_footer": "\u6570\u5B57\u7531 AI \u670D\u52A1\u56DE\u62A5\u3002\u6807\u201C\u7EA6\u201D\u7684\u662F Codex \u7684\u4F30\u8BA1\u503C\uFF0C\u5B83\u4E0D\u56DE\u62A5\u5B9E\u9645\u7528\u91CF\u3002\u4E0D\u663E\u793A\u91D1\u989D\uFF0C\u56E0\u4E3A\u8BA2\u9605\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8BF7\u6C42\u6536\u8D39\u3002",
+  "ui.usage_footer": "\u6570\u5B57\u7531 AI \u670D\u52A1\u56DE\u62A5\u3002\u6807\u201C\u7EA6\u201D\u7684\u662F AI \u670D\u52A1\u6CA1\u6709\u56DE\u62A5\u7528\u91CF\u65F6\u7684\u4F30\u8BA1\u503C\u3002\u4E0D\u663E\u793A\u91D1\u989D\uFF0C\u56E0\u4E3A\u8BA2\u9605\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8BF7\u6C42\u6536\u8D39\u3002",
   "ui.expansion_failed": "\u5C55\u5F00\u5931\u8D25",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u56FE\u6216\u7236\u8BAE\u9898\u5728 AI \u8FD0\u884C\u671F\u95F4\u5DF2\u53D8\u66F4\uFF0C\u672A\u521B\u5EFA\u5B50\u8BAE\u9898\u3002",
   "ui.create_subtopics_after_confirmation_without_running_research": "\u786E\u8BA4\u540E\u53EA\u521B\u5EFA\u5B50\u8BAE\u9898\uFF0C\u4E0D\u8FD0\u884C\u7814\u7A76",
@@ -6557,7 +6559,8 @@ var zhTW = {
   "ui.usage_this_map": "\u9019\u5F35\u5FC3\u667A\u5716",
   "ui.usage_today": "\u4ECA\u5929",
   "ui.usage_this_month": "\u672C\u6708",
-  "ui.usage_in_out_01": "\u8F38\u5165 {0}\u30FB\u8F38\u51FA {1}",
+  "ui.usage_in_0": "\u8F38\u5165 {0}",
+  "ui.usage_out_0": "\u8F38\u51FA {0}",
   "ui.usage_by_action": "\u9019\u5F35\u5FC3\u667A\u5716\u30FB\u4F9D\u52D5\u4F5C",
   "ui.usage_action_research": "\u7814\u7A76",
   "ui.usage_action_expand": "\u5C55\u958B",
@@ -6570,7 +6573,7 @@ var zhTW = {
   "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
   "ui.usage_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709 AI \u8ACB\u6C42\u7D00\u9304\u3002",
   "ui.usage_unreadable": "\u7121\u6CD5\u8B80\u53D6\u7528\u91CF\u8CC7\u6599\uFF0C\u6240\u4EE5\u4E0D\u986F\u793A\u6578\u5B57\u3002\u5916\u639B\u8CC7\u6599\u593E\u88E1\u7684 ai-usage.json \u5DF2\u539F\u6A23\u4FDD\u7559\u3002",
-  "ui.usage_footer": "\u6578\u5B57\u7531 AI \u670D\u52D9\u56DE\u5831\u3002\u6A19\u300C\u7D04\u300D\u7684\u662F Codex \u7684\u4F30\u8A08\u503C\uFF0C\u5B83\u4E0D\u56DE\u5831\u5BE6\u969B\u7528\u91CF\u3002\u4E0D\u986F\u793A\u91D1\u984D\uFF0C\u56E0\u70BA\u8A02\u95B1\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8ACB\u6C42\u6536\u8CBB\u3002",
+  "ui.usage_footer": "\u6578\u5B57\u7531 AI \u670D\u52D9\u56DE\u5831\u3002\u6A19\u300C\u7D04\u300D\u7684\u662F AI \u670D\u52D9\u6C92\u6709\u56DE\u5831\u7528\u91CF\u6642\u7684\u4F30\u8A08\u503C\u3002\u4E0D\u986F\u793A\u91D1\u984D\uFF0C\u56E0\u70BA\u8A02\u95B1\u65B9\u6848\u4E0D\u662F\u6BCF\u6B21\u8ACB\u6C42\u6536\u8CBB\u3002",
   "ui.expansion_failed": "\u5C55\u958B\u5931\u6557",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt": "\u5FC3\u667A\u5716\u6216\u6BCD\u8B70\u984C\u5728 AI \u57F7\u884C\u671F\u9593\u5DF2\u8B8A\u66F4\uFF0C\u672A\u5EFA\u7ACB\u5B50\u8B70\u984C\u3002",
   "ui.create_subtopics_after_confirmation_without_running_research": "\u78BA\u8A8D\u5F8C\u53EA\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u4E0D\u57F7\u884C\u7814\u7A76",
@@ -28249,8 +28252,10 @@ var AiUsageStore = class {
     try {
       if (this.disposed) return;
       if (this.loadError) {
-        this.writeError = this.loadError;
-        this.onError(this.loadError);
+        if (!this.writeError) {
+          this.writeError = this.loadError;
+          this.onError(this.loadError);
+        }
         return;
       }
       this.entries.push({ ...entry, at: (_a2 = entry.at) != null ? _a2 : new Date(this.now()).toISOString() });
@@ -28397,7 +28402,13 @@ var UsageControl = class {
     __publicField(this, "doc", null);
     __publicField(this, "isOpen", false);
     __publicField(this, "onKey", (event) => {
+      var _a2;
       if (event.key !== "Escape" || !this.isOpen) return;
+      const inside2 = (node) => {
+        var _a3, _b2;
+        return !!node && !!(((_a3 = this.parts) == null ? void 0 : _a3.root.contains(node)) || ((_b2 = this.button) == null ? void 0 : _b2.contains(node)));
+      };
+      if (!inside2(event.target) && !inside2((_a2 = this.doc) == null ? void 0 : _a2.activeElement)) return;
       event.preventDefault();
       event.stopPropagation();
       this.close(true);
@@ -28531,7 +28542,9 @@ var UsageControl = class {
     const cell = (label) => {
       const box = grid.createDiv();
       box.createEl("small", { text: label });
-      return { strong: box.createEl("strong"), detail: box.createEl("em") };
+      const strong = box.createEl("strong");
+      const detail = box.createEl("em");
+      return { strong, input: detail.createSpan(), output: detail.createSpan() };
     };
     const cells = {
       map: cell(t("ui.usage_this_map")),
@@ -28598,7 +28611,8 @@ var UsageControl = class {
     for (const section3 of parts.sections) section3.hidden = false;
     const total2 = (cell, tokens2) => {
       cell.strong.setText(formatTokens(sum(tokens2)));
-      cell.detail.setText(t("ui.usage_in_out_01", formatTokens(tokens2.inputTokens), formatTokens(tokens2.outputTokens)));
+      cell.input.setText(t("ui.usage_in_0", formatTokens(tokens2.inputTokens)));
+      cell.output.setText(t("ui.usage_out_0", formatTokens(tokens2.outputTokens)));
     };
     total2(parts.cells.map, map.value);
     total2(parts.cells.today, today.value);
@@ -37320,6 +37334,13 @@ function isSearchNotPerformed(error) {
 
 // core/ai-calls.ts
 var import_node_crypto7 = require("node:crypto");
+function promptTextOf(request) {
+  const input2 = request == null ? void 0 : request.input;
+  if (!Array.isArray(input2)) return "";
+  return input2.map(
+    (item) => (item == null ? void 0 : item.type) === "text" && typeof item.text === "string" ? item.text : ""
+  ).join("\n");
+}
 var AiCalls = class {
   constructor(options) {
     this.options = options;
@@ -37392,6 +37413,11 @@ var AiCalls = class {
     const log = () => started ? this.options.exchanges() : void 0;
     const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto7.randomUUID)();
     const milestones = {};
+    const startedMs = Date.now();
+    let reportedUsage;
+    let reply;
+    let sentText = "";
+    let provider;
     let milestonesWritten = false;
     const writeMilestones = () => {
       var _a3, _b3;
@@ -37433,21 +37459,29 @@ var AiCalls = class {
       });
       if (started) (_c = options.onBegin) == null ? void 0 : _c.call(options, id);
       const runtime = this.options.runtimeFor(options.model);
+      provider = runtime.capabilities.id;
       (_d = options.validate) == null ? void 0 : _d.call(options, runtime);
       const task = (_e = options.task) != null ? _e : {};
       const controls = {
         ...task,
         signal: controller.signal,
-        ...options.milestones === false ? {} : {
+        // Needed by the usage record even when no milestones event is written (`milestones: false`).
+        ...options.milestones === false && !this.options.usage ? {} : {
           onMilestones: (data) => {
-            var _a3;
+            var _a3, _b3, _c2;
             (_a3 = task.onMilestones) == null ? void 0 : _a3.call(task, data);
-            Object.assign(milestones, data);
+            if (data.usage)
+              reportedUsage = {
+                inputTokens: (_b3 = data.usage.inputTokens) != null ? _b3 : 0,
+                outputTokens: (_c2 = data.usage.outputTokens) != null ? _c2 : 0
+              };
+            if (options.milestones !== false) Object.assign(milestones, data);
           }
         },
         onRequest: (data) => {
           var _a3, _b3;
           (_a3 = task.onRequest) == null ? void 0 : _a3.call(task, data);
+          sentText += promptTextOf(data);
           (_b3 = log()) == null ? void 0 : _b3.sent(
             id,
             JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
@@ -37463,6 +37497,7 @@ var AiCalls = class {
         controls,
         localCodex: options.localCodex
       });
+      reply = raw;
       if (controller.signal.aborted) throw stopped();
       (_f = options.afterReply) == null ? void 0 : _f.call(options);
       milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -37482,8 +37517,35 @@ var AiCalls = class {
         );
       throw error;
     } finally {
+      this.recordUsage(sentText || call.prompt, options, provider, reportedUsage, reply, startedMs);
       options.signal.removeEventListener("abort", abort);
       if (this.activeTasks.get(key2) === controller) this.activeTasks.delete(key2);
+    }
+  }
+  /** Records one call in the usage store (once, success or failure). Counting is best effort and never changes the call's result. */
+  recordUsage(prompt, options, provider, reported, reply, startedMs) {
+    var _a2, _b2, _c, _d, _e, _f;
+    try {
+      const store = (_b2 = (_a2 = this.options).usage) == null ? void 0 : _b2.call(_a2);
+      if (!store || !provider) return;
+      const imageReply = !!((_c = options.task) == null ? void 0 : _c.generateImage) || (reply != null ? reply : "").startsWith("data:");
+      const tokens2 = reported != null ? reported : provider === "codex" && (prompt || reply) ? {
+        inputTokens: estimateUsageTokens(prompt),
+        outputTokens: imageReply ? 0 : estimateUsageTokens(reply != null ? reply : "")
+      } : void 0;
+      if (!tokens2 || tokens2.inputTokens === 0 && tokens2.outputTokens === 0) return;
+      store.record({
+        action: (_e = (_d = options.usage) == null ? void 0 : _d.action) != null ? _e : "other",
+        ...((_f = options.usage) == null ? void 0 : _f.mapPath) ? { mapPath: options.usage.mapPath } : {},
+        ...options.topic ? { topic: options.topic } : {},
+        provider,
+        model: options.model,
+        ...tokens2,
+        estimated: !reported,
+        durationMs: Date.now() - startedMs
+      });
+    } catch (error) {
+      console.warn("Visual Agent Map token usage", error);
     }
   }
 };
@@ -38246,12 +38308,17 @@ var ClaudeTranscriptFacts = class {
     this.structured = true;
   }
   read(item) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     if (!item || typeof item !== "object") return;
     const record = item;
     if (record.type === "result") {
-      const input2 = (_a2 = record.usage) == null ? void 0 : _a2.input_tokens;
-      const output = (_b2 = record.usage) == null ? void 0 : _b2.output_tokens;
+      const parts = [
+        (_a2 = record.usage) == null ? void 0 : _a2.input_tokens,
+        (_b2 = record.usage) == null ? void 0 : _b2.cache_creation_input_tokens,
+        (_c = record.usage) == null ? void 0 : _c.cache_read_input_tokens
+      ].filter((value) => typeof value === "number");
+      const input2 = parts.length ? parts.reduce((total2, value) => total2 + value, 0) : void 0;
+      const output = (_d = record.usage) == null ? void 0 : _d.output_tokens;
       if (typeof input2 === "number" || typeof output === "number")
         this.usage = {
           ...typeof input2 === "number" ? { inputTokens: input2 } : {},
@@ -38261,13 +38328,13 @@ var ClaudeTranscriptFacts = class {
     }
     if (record.parent_tool_use_id) return;
     if (record.type === "assistant") {
-      for (const block of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : []) {
+      for (const block of (_f = (_e = record.message) == null ? void 0 : _e.content) != null ? _f : []) {
         if (block.type === "tool_use" && block.name === "StructuredOutput") this.structured = true;
         else if (!this.fromStream && block.type === "text" && !this.structured && typeof block.text === "string") {
           this.texts.push(block.text.slice(0, TEXT_KEEP_CHARS));
         }
       }
-    } else if (record.type === "user" && JSON.stringify((_e = record.message) != null ? _e : "").includes("structured-output-enforce"))
+    } else if (record.type === "user" && JSON.stringify((_g = record.message) != null ? _g : "").includes("structured-output-enforce"))
       this.enforce = true;
   }
   /** A record was lost (an unreadable line): what came before a tool call can no longer be claimed either way. */
@@ -39857,64 +39924,12 @@ function usageActionOf(context, role) {
   if (context.mode === "synthesize" || context.mode === "merge") return "synthesize";
   return "research";
 }
-function promptTextOf(request) {
-  const input2 = request == null ? void 0 : request.input;
-  if (!Array.isArray(input2)) return "";
-  return input2.map(
-    (item) => (item == null ? void 0 : item.type) === "text" && typeof item.text === "string" ? item.text : ""
-  ).join("\n");
-}
 var AiTaskService = class {
   constructor(options) {
     this.options = options;
   }
   async askModel(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer) {
     return this.execute(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer);
-  }
-  /** Starts counting one provider call for the usage store; `end` records it exactly once, on success or failure. */
-  beginUsage(info) {
-    const started = Date.now();
-    let reported;
-    let prompt = "";
-    let ended = false;
-    return {
-      hooks: (own2) => ({
-        onRequest: (request) => {
-          var _a2;
-          (_a2 = own2.onRequest) == null ? void 0 : _a2.call(own2, request);
-          prompt += promptTextOf(request);
-        },
-        onMilestones: (data) => {
-          var _a2, _b2, _c;
-          (_a2 = own2.onMilestones) == null ? void 0 : _a2.call(own2, data);
-          if (data.usage)
-            reported = { inputTokens: (_b2 = data.usage.inputTokens) != null ? _b2 : 0, outputTokens: (_c = data.usage.outputTokens) != null ? _c : 0 };
-        }
-      }),
-      end: (reply) => {
-        var _a2, _b2;
-        if (ended) return;
-        ended = true;
-        try {
-          const store = (_b2 = (_a2 = this.options).usage) == null ? void 0 : _b2.call(_a2);
-          if (!store) return;
-          const tokens2 = reported != null ? reported : info.provider === "codex" && (prompt || reply) ? { inputTokens: estimateUsageTokens(prompt), outputTokens: estimateUsageTokens(reply != null ? reply : "") } : void 0;
-          if (!tokens2 || tokens2.inputTokens === 0 && tokens2.outputTokens === 0) return;
-          store.record({
-            action: info.action,
-            ...info.mapPath ? { mapPath: info.mapPath } : {},
-            ...info.topic ? { topic: info.topic } : {},
-            provider: info.provider,
-            model: info.model,
-            ...tokens2,
-            estimated: !reported,
-            durationMs: Date.now() - started
-          });
-        } catch (error) {
-          console.warn("Visual Agent Map token usage", error);
-        }
-      }
-    };
   }
   /** `role` names the two reference rounds so they are logged as their own steps; every other request is a task or AIM step. */
   async execute(input2, model, reasoning, signal, onExchange, onRequestAccepted, onWebSearchEvent, observer, role) {
@@ -40002,23 +40017,8 @@ var AiTaskService = class {
         }
       };
       const calls = this.callsIn(pluginDirectory, exchanges);
-      const sendOnce = async (setup) => {
-        const usage = this.beginUsage({
-          action: usageActionOf(context, role),
-          topic: context.title,
-          mapPath: context.usageMapPath,
-          provider,
-          model
-        });
-        let reply;
-        try {
-          reply = await sendRaw(setup, usage);
-          return { raw: reply };
-        } finally {
-          usage.end(reply);
-        }
-      };
-      const sendRaw = async (setup, usage) => {
+      const sendOnce = async (setup) => ({ raw: await sendRaw(setup) });
+      const sendRaw = async (setup) => {
         var _a3, _b3, _c2;
         return calls.run(
           step,
@@ -40030,6 +40030,7 @@ var AiTaskService = class {
             taskName: "ai-task",
             signal: (_c2 = (_b3 = setup == null ? void 0 : setup.signal) != null ? _b3 : signal) != null ? _c2 : new AbortController().signal,
             localCodex: context.researchMode === "local",
+            usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
             requestLog: "request",
             // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
             entryEnd: "caller",
@@ -40037,8 +40038,7 @@ var AiTaskService = class {
             task: {
               ...controls,
               onWebSearchEvent: webHook,
-              ...setup ? setup.hooks : {},
-              ...usage.hooks({ onRequest: controls.onRequest })
+              ...setup ? setup.hooks : {}
             },
             ...setup ? { exchangeId: setup.exchangeId, extraMilestones: setup.extraMilestones, afterReply: setup.afterReply } : {},
             onBegin: (id) => {
@@ -40342,6 +40342,7 @@ var AiTaskService = class {
         claude: () => this.options.claudeRuntime(pluginDirectory),
         codex: (local) => this.options.codexRuntime(pluginDirectory, local)
       }),
+      ...this.options.usage ? { usage: this.options.usage } : {},
       exchanges: () => exchanges && this.options.exchangeLoggingEnabled() ? exchanges : null
     });
   }
@@ -40409,14 +40410,6 @@ var AiTaskService = class {
       return detail;
     };
     const calls = this.callsIn(pluginDirectory, exchanges);
-    const usage = this.beginUsage({
-      action: "other",
-      topic: input2.title,
-      mapPath: input2.usageMapPath,
-      provider,
-      model
-    });
-    let reply;
     try {
       return await calls.run(
         step,
@@ -40428,6 +40421,7 @@ var AiTaskService = class {
           taskName: "chart",
           signal: signal != null ? signal : new AbortController().signal,
           localCodex: true,
+          usage: { action: "other", mapPath: input2.usageMapPath },
           requestLog: "request",
           stopped: () => new DOMException("Aborted", "AbortError"),
           failMessage: (error) => aborted(error) ? error instanceof Error ? error.message : String(error) : notAdded(codeOf(error)),
@@ -40437,12 +40431,10 @@ var AiTaskService = class {
             timeoutMessage: translate(this.options.language(), "ui.ai_task_exceeded_0_minutes", 3),
             webSearch: false,
             textOnly: true,
-            searchBudget: 0,
-            ...usage.hooks({})
+            searchBudget: 0
           }
         },
         async (raw, exchange) => {
-          reply = raw;
           if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
           const charts = step.parse(raw);
           const applied = await applyCharts(detail, charts, { remaining, parses: this.options.mermaidParses });
@@ -40460,8 +40452,6 @@ var AiTaskService = class {
       if (aborted(error)) throw error;
       warn(codeOf(error));
       return detail;
-    } finally {
-      usage.end(reply);
     }
   }
   async extractReferenceFindings(context, model, reasoning, signal, onRequestAccepted) {
@@ -45971,39 +45961,43 @@ var StructureReviewModal = class extends import_obsidian29.Modal {
 // core/provider-step-runner.ts
 var stepEffort = (reasoning) => reasoning === "auto" ? "low" : reasoning;
 function providerStepRunner(aiCalls, config) {
-  return (request, signal, prepared, onStructuredJson, hooks) => aiCalls.run(
-    prepared,
-    {
-      model: request.model,
-      effort: stepEffort(request.reasoning),
-      topic: config.topic(request),
-      taskName: config.name,
-      signal,
-      localCodex: true,
-      stopped: config.stopped,
-      validate: (runtime) => {
-        if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
-          throw new Error("Unsupported Claude model");
+  return (request, signal, prepared, onStructuredJson, hooks) => {
+    var _a2;
+    return aiCalls.run(
+      prepared,
+      {
+        model: request.model,
+        effort: stepEffort(request.reasoning),
+        topic: config.topic(request),
+        taskName: config.name,
+        signal,
+        localCodex: true,
+        usage: { mapPath: (_a2 = config.mapPath) == null ? void 0 : _a2.call(config, request) },
+        stopped: config.stopped,
+        validate: (runtime) => {
+          if (runtime.capabilities.id === "claude" && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model))
+            throw new Error("Unsupported Claude model");
+        },
+        task: {
+          textOnly: true,
+          searchBudget: 0,
+          ...config.stream ? { stream: true } : {},
+          ...config.lastMessageOnly ? { resolveLast: true } : {},
+          ...config.stream && onStructuredJson ? { onStructuredJson } : {},
+          ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
+          ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
+          ...(hooks == null ? void 0 : hooks.onStreamMode) ? { onStreamMode: hooks.onStreamMode } : {},
+          ...(hooks == null ? void 0 : hooks.onText) && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model) ? { onText: hooks.onText } : {}
+        }
       },
-      task: {
-        textOnly: true,
-        searchBudget: 0,
-        ...config.stream ? { stream: true } : {},
-        ...config.lastMessageOnly ? { resolveLast: true } : {},
-        ...config.stream && onStructuredJson ? { onStructuredJson } : {},
-        ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
-        ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
-        ...(hooks == null ? void 0 : hooks.onStreamMode) ? { onStreamMode: hooks.onStreamMode } : {},
-        ...(hooks == null ? void 0 : hooks.onText) && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model) ? { onText: hooks.onText } : {}
+      (raw, exchange) => {
+        if (exchange.signal.aborted) throw config.stopped();
+        prepared.parse(raw);
+        exchange.parsed();
+        return raw;
       }
-    },
-    (raw, exchange) => {
-      if (exchange.signal.aborted) throw config.stopped();
-      prepared.parse(raw);
-      exchange.parsed();
-      return raw;
-    }
-  );
+    );
+  };
 }
 
 // core/steps/structure-review/language.en.md
@@ -46253,6 +46247,7 @@ function providerStructureReviewRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "structure-review",
     topic: (request) => `Structure review \xB7 ${request.rootQuestion.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new StructureReviewError("stopped", "Structure review stopped")
   });
 }
@@ -46969,6 +46964,7 @@ function providerRelevanceGradeRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "relevance-grade",
     topic: (request) => `Relevance ${"previous" in request ? "recalibrate" : "grade"} \xB7 ${request.goal.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new RelevanceGradeError("stopped", "Relevance grading stopped"),
     stream: true
   });
@@ -55755,6 +55751,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
             const result = await this.plugin.outlineGeneration.generate(
               {
                 ...forService,
+                ...this.usageMapField(),
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
@@ -55869,6 +55866,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
         const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
           {
+            ...this.usageMapField(),
             topic: note.title,
             presetText: request.requirements ? `${preset.text}
 
@@ -56004,6 +56002,7 @@ ${request.requirements}` : preset.text,
               {
                 rootQuestion,
                 nodes,
+                ...this.usageMapField(),
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
                 model,
@@ -56484,7 +56483,8 @@ ${request.requirements}` : preset.text,
           language: settings.language,
           model,
           reasoning: gradeReasoning,
-          ...pins.length ? { pins } : {}
+          ...pins.length ? { pins } : {},
+          ...this.usageMapField()
         };
         const hooks = {
           onRepair: (_round, kind) => {
@@ -58530,11 +58530,11 @@ ${request.requirements}` : preset.text,
       this.researchTick = null;
     }
   }
-  /** The progress key of this map's multi-select synthesis or AI merge (a name no Vault path can have). */
   /** The map a request's token usage is counted under (this view's map file). */
   usageMapField() {
     return this.path ? { usageMapPath: this.path } : {};
   }
+  /** The progress key of this map's multi-select synthesis or AI merge (a name no Vault path can have). */
   taskProgressKey(kind, mapPath = this.path) {
     return `${TASK_PROGRESS_PREFIX}${kind}:${mapPath}`;
   }
@@ -70242,7 +70242,7 @@ ${note.detail.trim()}` : "",
     const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request;
     try {
-      request = await this.buildChatRequest(message, chat, origin);
+      request = { ...await this.buildChatRequest(message, chat, origin), ...this.usageMapField() };
     } catch (error) {
       abandon(this.closed ? void 0 : errorMessage(error));
       return;
@@ -81130,6 +81130,7 @@ function providerOutlineRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "outline-generate",
     topic: (request) => `Outline \xB7 ${request.topic.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new OutlineGenerateError("stopped", "Outline generation stopped")
   });
 }
@@ -81266,6 +81267,7 @@ function providerMapChatRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "map-chat",
     topic: (request) => `Map chat \xB7 ${request.message.trim().slice(0, 80)}`,
+    mapPath: (request) => request.usageMapPath,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),
     stream: true,
     lastMessageOnly: true
@@ -82659,7 +82661,8 @@ var VisualAgentMapPlugin = class extends import_obsidian47.Plugin {
     __publicField(this, "aiCalls", new AiCalls({
       runtimeFor: (model) => this.aiRuntime.runtimeFor(model),
       exchanges: () => this.settings.aiExchangeLoggingEnabled ? this.exchanges : null,
-      releaseWarm: () => this.aiRuntime.releaseWarm()
+      releaseWarm: () => this.aiRuntime.releaseWarm(),
+      usage: () => this.usage
     }));
     __publicField(this, "activeTasks", this.aiCalls.activeTasks);
     /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
@@ -84314,43 +84317,31 @@ ${t("ui.organize_link_wait_hint")}`;
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
       this.currentModelChoice().reasoning
     );
-    const usage = this.aiTasks.beginUsage({
-      action: "writeback",
-      topic: "Markdown selection",
-      provider: this.runtimeIdFor(model),
-      model
-    });
-    let reply;
-    try {
-      reply = await this.aiCalls.run(
-        prepared,
-        {
-          model,
-          effort,
-          topic: "Markdown selection",
-          taskName: "markdown-context",
-          signal,
-          localCodex: !webSearch,
-          task: {
-            textOnly: !webSearch && !generateImage,
-            webSearchOnly: webSearch,
-            generateImage,
-            imageDataUrl,
-            searchBudget: webSearch ? 4 : 0,
-            // Drawing takes longer than a text reply.
-            ...generateImage ? { timeoutMs: 6 * 60 * 1e3 } : {},
-            ...usage.hooks({})
-          }
-        },
-        (raw, exchange) => {
-          if (exchange.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
-          return raw;
+    return await this.aiCalls.run(
+      prepared,
+      {
+        model,
+        effort,
+        topic: "Markdown selection",
+        taskName: "markdown-context",
+        signal,
+        localCodex: !webSearch,
+        usage: { action: "writeback" },
+        task: {
+          textOnly: !webSearch && !generateImage,
+          webSearchOnly: webSearch,
+          generateImage,
+          imageDataUrl,
+          searchBudget: webSearch ? 4 : 0,
+          // Drawing takes longer than a text reply.
+          ...generateImage ? { timeoutMs: 6 * 60 * 1e3 } : {}
         }
-      );
-      return reply;
-    } finally {
-      usage.end(reply);
-    }
+      },
+      (raw, exchange) => {
+        if (exchange.signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+        return raw;
+      }
+    );
   }
   async openCoffeeHandoff(session, sourcePath, insightId) {
     try {

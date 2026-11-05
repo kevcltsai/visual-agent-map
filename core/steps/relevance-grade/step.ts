@@ -38,6 +38,8 @@ export const RELEVANCE_GRADE_TOKEN_BUDGET = 32_000;
 export const RELEVANCE_GOAL_MAX_LENGTH = 200;
 
 export interface RelevanceGradeRequest {
+  /** Trusted: the map file this request belongs to, for token-usage accounting only; never serialized into a prompt. */
+  usageMapPath?: string;
   /** What the learner wants to achieve; sent as a JSON string and treated as untrusted data. */
   goal: string;
   /** How much the learner already knows; sent as a JSON string, or `null` when not given. Untrusted data. */

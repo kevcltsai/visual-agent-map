@@ -1142,7 +1142,8 @@ export const en = {
   "ui.usage_this_map": "This mind map",
   "ui.usage_today": "Today",
   "ui.usage_this_month": "This month",
-  "ui.usage_in_out_01": "In {0} · Out {1}",
+  "ui.usage_in_0": "In {0}",
+  "ui.usage_out_0": "Out {0}",
   "ui.usage_by_action": "THIS MIND MAP · BY ACTION",
   "ui.usage_action_research": "Research",
   "ui.usage_action_expand": "Expand",
@@ -1157,7 +1158,7 @@ export const en = {
   "ui.usage_unreadable":
     "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
   "ui.usage_footer":
-    "Numbers are reported by the AI service. Values marked ~ are Codex estimates, because it does not report actual usage. No money amounts are shown, because subscription plans are not charged per request.",
+    "Numbers are reported by the AI service. Values marked ~ are estimates, shown only when the AI service did not report usage. No money amounts are shown, because subscription plans are not charged per request.",
   "ui.expansion_failed": "Expansion failed",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "The map or parent topic changed while AI was running. No subtopics were created.",

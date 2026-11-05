@@ -5983,6 +5983,25 @@ test('map chat records: restored plan, images, retry and choices are inert', () 
   assert.match(visibleText(f.parts.log()), /Undone reply stays/);
 });
 
+test('map chat records: F2 a restored plan card shows what became of it: waiting, cancelled or applied with its results', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  const turn = extra => ({ message: 'research all', reply: 'Plan ready.', lines: [], modelLabel: 'Claude Sonnet', stalePlan: true, ...extra });
+  const card = () => find(f.parts.log(), i => hasClass(i, 'vam-map-chat-plan'));
+  const check = (extra, cls, title) => {
+    f.panel.restore(restoredConversation({ turns: [turn(extra)] }));
+    const c = card(); assert.ok(hasClass(c, cls), `card is ${cls}`); assert.ok(hasClass(c, 'is-stale'));
+    assert.equal(c.attrs['aria-label'], title); assert.ok(visibleText(c).includes('No longer valid'));
+    for (const b of findAll(c, i => i.tag === 'button')) assert.equal(b.attrs['aria-disabled'], 'true');
+    assert.equal(f.panel.pendingPlan(), null, 'a restored card never waits for an answer'); assert.equal(f.panel.hintEl.hidden, true);
+  };
+  check({}, 'is-pending', 'Plan to review');
+  check({ planState: 'cancelled', planLines: [] }, 'is-cancelled', 'Cancelled plan');
+  check({ planState: 'applied', planLines: [{ status: 'done', text: 'Researched A' }, { status: 'failed', text: 'B failed' }] }, 'is-applied', 'Applied plan');
+  assert.match(visibleText(f.parts.log()), /Researched A/); assert.match(visibleText(f.parts.log()), /B failed/, 'the results of the applied plan are listed');
+  check({ planState: 'stopped', planLines: [{ status: 'done', text: 'Half done' }] }, 'is-applied', 'Applied plan');
+  assert.match(visibleText(f.parts.log()), /Half done/);
+});
+
 test('map chat records: record text with HTML restores as plain text', () => {
   const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
   const evil = '<img src=x onerror=alert(1)> and <script>alert(2)</script>';
@@ -6121,6 +6140,17 @@ integrationTest('map chat records: A5 a record with a failed turn shows only the
   assert.equal(odd.contents.get(old), before, 'the unknown-version file is left as it was');
   eq(recordFiles(odd).length, 2, 'a new file was opened');
   void path;
+});
+
+integrationTest('map chat records: F2 a restored waiting plan is not cancelled or recorded by the next send', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate();
+  const planned = [rec('conversation', { id: REC_ID, startedAt: REC_AT, mapPath: MAP, mapId: 'map-a', pluginVersion: '1' }), rec('turn_start', { turn: 1, at: REC_AT, message: 'research all' }),
+    rec('turn_end', { turn: 1, at: REC_AT, status: 'plan', raw: null, reply: 'Plan ready.', lines: [], modelLabel: '' })];
+  const path = await seedRecord(h, planned); const chat = h.open(); await until(() => chat.hasMessages);
+  assert.equal(chat.pendingPlan(), null);
+  await sendOne(h, 'something else', 'ok'); await recordIdle(h);
+  assert.equal(recordLines(h, path).some(l => l.type === 'plan'), false, 'no plan line was written for the restored card');
+  assert.ok(find(chat.logEl, i => hasClass(i, 'vam-map-chat-plan') && hasClass(i, 'is-pending') && hasClass(i, 'is-stale')), 'the card stays as it was');
 });
 
 integrationTest('map chat records: A6 new conversation starts a new file; the old one is untouched and the next open restores the new one', async () => {

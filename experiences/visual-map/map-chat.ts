@@ -200,6 +200,10 @@ export interface MapChatRestoredConversation {
     lines: { status: string; text: string }[];
     modelLabel: string;
     stalePlan: boolean;
+    /** What became of the plan card: no line (undefined) = it was still waiting; stopped counts as applied. */
+    planState?: "applied" | "cancelled" | "stopped";
+    /** The result lines the applied plan wrote. */
+    planLines?: { status: string; text: string }[];
     images?: { state: string; items: { title: string; sourceUrl: string }[]; inserted: number[] };
   }[];
 }
@@ -1042,7 +1046,8 @@ export class MapChatPanel {
   }
   /** The plan card still waiting for an answer, if any. */
   pendingPlan(): MapChatPlanCard | null {
-    return this.messages.find(message => message.plan?.state === "pending")?.plan ?? null;
+    // A restored card (stale) never waits for an answer, even when it shows the state it was left in.
+    return this.messages.find(message => message.plan?.state === "pending" && !message.plan.stale)?.plan ?? null;
   }
   /** A plan was applied or cancelled: its buttons stop working; `lines` (the result of applying) join its message. */
   settlePlan(plan: MapChatPlanCard, state: "applied" | "cancelled", lines?: MapChatLine[]): void {
@@ -1144,16 +1149,28 @@ export class MapChatPanel {
         modelLabel: turn.modelLabel || undefined,
         stale: true
       };
-      if (turn.stalePlan)
+      if (turn.stalePlan) {
+        // What the plan was left as: waiting (no plan line), cancelled, or applied (stopped midway counts) with its result lines.
+        if (turn.planState && turn.planState !== "cancelled" && turn.planLines?.length)
+          answer.lines = [
+            ...answer.lines,
+            ...turn.planLines.map(line => ({
+              status: (line.status === "skipped" || line.status === "failed"
+                ? line.status
+                : "done") as MapChatLine["status"],
+              text: line.text
+            }))
+          ];
         answer.plan = {
           reasons: [],
           items: [],
           estimate: "",
-          state: "cancelled",
+          state: !turn.planState ? "pending" : turn.planState === "cancelled" ? "cancelled" : "applied",
           stale: true,
           apply() {},
           cancel() {}
         };
+      }
       if (turn.images) {
         const states = ["ready", "empty", "failed", "stopped"] as const;
         const state = states.find(name => name === turn.images!.state) ?? "stopped";

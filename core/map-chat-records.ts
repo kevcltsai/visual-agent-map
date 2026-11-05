@@ -299,6 +299,8 @@ export interface RestoredTurn {
   /** A plan card is shown as no longer usable (always true for `plan`). */
   stalePlan: boolean;
   planState?: RecordPlanLine["state"];
+  /** The result lines of the applied plan. */
+  planLines?: RecordLineItem[];
   rejected?: unknown[];
   images?: RestoredImages;
   /** The reply was undone and not redone (it still shows, like it does in memory). */
@@ -321,7 +323,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   const starts = new Map<number, RecordTurnStartLine>();
   const order: number[] = [];
   const ends = new Map<number, RecordTurnEndLine>();
-  const plans = new Map<number, RecordPlanLine["state"]>();
+  const plans = new Map<number, { state: RecordPlanLine["state"]; lines: RecordLineItem[] }>();
   const images = new Map<number, RestoredImages>();
   const undone = new Map<number, boolean>();
   for (const line of lines) {
@@ -336,7 +338,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     } else if (line.type === "turn_end") {
       ends.set(line.turn, line);
     } else if (line.type === "plan") {
-      plans.set(line.turn, line.state);
+      plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
     } else if (line.type === "images") {
       images.set(line.turn, { state: line.state, items: line.items ?? [], inserted: line.inserted ?? [] });
     } else if (line.type === "event") {
@@ -359,7 +361,8 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       modelLabel: typeof end.modelLabel === "string" ? end.modelLabel : "",
       status: end.status,
       stalePlan: end.status === "plan",
-      planState: plans.get(number),
+      planState: plans.get(number)?.state,
+      planLines: plans.get(number)?.lines,
       rejected: end.rejected,
       images: images.get(number),
       undone: undone.get(number) === true,

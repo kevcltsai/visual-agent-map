@@ -36507,7 +36507,7 @@ ${typed}` : draft;
     var _a2, _b2;
     return (_b2 = (_a2 = this.messages.find((message) => {
       var _a3;
-      return ((_a3 = message.plan) == null ? void 0 : _a3.state) === "pending";
+      return ((_a3 = message.plan) == null ? void 0 : _a3.state) === "pending" && !message.plan.stale;
     })) == null ? void 0 : _a2.plan) != null ? _b2 : null;
   }
   /** A plan was applied or cancelled: its buttons stop working; `lines` (the result of applying) join its message. */
@@ -36600,7 +36600,7 @@ ${typed}` : draft;
    * line on top saying when it was. Plan cards, picture candidates, retry and option lists are shown as no longer valid.
    */
   restore(conversation) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     if (this.working) return;
     this.reset();
     this.conversationId = conversation.id;
@@ -36616,21 +36616,30 @@ ${typed}` : draft;
         modelLabel: turn.modelLabel || void 0,
         stale: true
       };
-      if (turn.stalePlan)
+      if (turn.stalePlan) {
+        if (turn.planState && turn.planState !== "cancelled" && ((_a2 = turn.planLines) == null ? void 0 : _a2.length))
+          answer.lines = [
+            ...answer.lines,
+            ...turn.planLines.map((line) => ({
+              status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
+              text: line.text
+            }))
+          ];
         answer.plan = {
           reasons: [],
           items: [],
           estimate: "",
-          state: "cancelled",
+          state: !turn.planState ? "pending" : turn.planState === "cancelled" ? "cancelled" : "applied",
           stale: true,
           apply() {
           },
           cancel() {
           }
         };
+      }
       if (turn.images) {
         const states = ["ready", "empty", "failed", "stopped"];
-        const state = (_a2 = states.find((name2) => name2 === turn.images.state)) != null ? _a2 : "stopped";
+        const state = (_b2 = states.find((name2) => name2 === turn.images.state)) != null ? _b2 : "stopped";
         answer.images = [
           {
             query: "",
@@ -36659,7 +36668,7 @@ ${typed}` : draft;
     }
     this.renderLog(true);
     this.renderHint();
-    (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
+    (_d = (_c = this.host).stateChanged) == null ? void 0 : _d.call(_c);
   }
   /** "New conversation": clears the panel and tells the view to start a new record. Nothing happens while a turn runs (Stop first). */
   startNewConversation() {
@@ -41768,7 +41777,7 @@ function pickLatest(files) {
   return best;
 }
 function restoreConversation(id, lines) {
-  var _a2, _b2;
+  var _a2, _b2, _c, _d;
   let mapPath = null;
   let mapId = null;
   const starts = /* @__PURE__ */ new Map();
@@ -41789,7 +41798,7 @@ function restoreConversation(id, lines) {
     } else if (line.type === "turn_end") {
       ends.set(line.turn, line);
     } else if (line.type === "plan") {
-      plans.set(line.turn, line.state);
+      plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
     } else if (line.type === "images") {
       images.set(line.turn, { state: line.state, items: (_a2 = line.items) != null ? _a2 : [], inserted: (_b2 = line.inserted) != null ? _b2 : [] });
     } else if (line.type === "event") {
@@ -41812,7 +41821,8 @@ function restoreConversation(id, lines) {
       modelLabel: typeof end.modelLabel === "string" ? end.modelLabel : "",
       status: end.status,
       stalePlan: end.status === "plan",
-      planState: plans.get(number),
+      planState: (_c = plans.get(number)) == null ? void 0 : _c.state,
+      planLines: (_d = plans.get(number)) == null ? void 0 : _d.lines,
       rejected: end.rejected,
       images: images.get(number),
       undone: undone.get(number) === true,

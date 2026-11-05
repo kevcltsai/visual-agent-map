@@ -16,6 +16,7 @@ import {
   type TranslationKey,
   type UiLanguage
 } from "../../i18n";
+import { isPlaceholderMapTitle, isPlaceholderTopicTitle, PLACEHOLDER_MAP_NAMES } from "../../core/default-names";
 import { hanScriptVotes } from "../../i18n/han-fold";
 import { LATIN_TEXT_DETECTION } from "../../i18n/languages";
 
@@ -117,11 +118,13 @@ export function detectAimContentLanguage(text: string): DetectedLanguage | undef
  * decides. A language the letters settle (ja, ko, ar, th, vi, Simplified or Traditional characters) is used as is;
  * Han text that settles nothing follows the interface (a Simplified Chinese interface keeps writing Simplified
  * Chinese); text with letters nothing recognises (Latin, Cyrillic...) gets the follow-the-input row; no letters in any
- * source gives the interface language. No AI call. A manual choice and a map's remembered language rank above this and
+ * source gives the interface language. A default name ("New topic 5", "Untitled mind map") counts as no text. No AI call. A manual choice and a map's remembered language rank above this and
  * are applied by the callers.
  */
 export function chooseAimContentLanguage(uiLanguage: UiLanguage, ...sources: (string | undefined)[]): ContentLanguage {
   for (const source of sources) {
+    // A default name ("New topic 5", "Untitled mind map") was not written by the user: it says nothing about their language.
+    if (isPlaceholderText(source ?? "")) continue;
     const signal = signalOf(source ?? "");
     if (signal === undefined) continue;
     if (signal === UNDECIDED_HAN) return contentLocale("zh-TW", uiLanguage);
@@ -129,6 +132,10 @@ export function chooseAimContentLanguage(uiLanguage: UiLanguage, ...sources: (st
   }
   return uiLanguage;
 }
+
+/** Whether `text` is one of the default names VAM gives a card or map the user did not name yet (any interface language). */
+const isPlaceholderText = (text: string): boolean =>
+  isPlaceholderTopicTitle(text) || isPlaceholderMapTitle(text, PLACEHOLDER_MAP_NAMES);
 
 /** The language to write in for a piece of selected text; same rule as {@link chooseAimContentLanguage}. */
 export function selectionOutputLanguage(uiLanguage: UiLanguage, selected: string): ContentLanguage {

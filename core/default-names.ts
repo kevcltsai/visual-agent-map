@@ -24,3 +24,11 @@ export function isPlaceholderMapTitle(title: string, placeholders: readonly stri
 
 /** The placeholder map name in every interface language (the values of `ui.untitled_mind_map`): a map that still has one was never named by the user. */
 export const PLACEHOLDER_MAP_NAMES: readonly string[] = ["Untitled mind map", "未命名心智圖", "未命名心智图"];
+
+/** The default name of a new topic card in every interface language (the values of `ui.new_topic`). */
+export const PLACEHOLDER_TOPIC_NAMES: readonly string[] = ["New topic", "新議題", "新议题"];
+
+/** True when `title` is a default topic name ("New topic", "New topic 5", "新議題 2"...): the card was never named, so its title says nothing about the user's language. */
+export function isPlaceholderTopicTitle(title: string): boolean {
+  return isPlaceholderMapTitle(title, PLACEHOLDER_TOPIC_NAMES);
+}

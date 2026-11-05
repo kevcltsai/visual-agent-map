@@ -5,20 +5,15 @@ import type { MapChatTurn } from "../../core/map-chat-context";
 import { renderChatMarkdown } from "../../core/map-chat-render";
 import { hasUnsavedChat } from "../../core/map-chat-transcript";
 import {
-  chatSuggestionKeys,
   clampMapChatWidth,
   countChatLines,
   splitChatLines,
-  MAP_CHAT_EXAMPLE_KEYS,
-  MAP_CHAT_OPEN_ENDED_KEYS,
-  chatSuggestionFill,
   MAP_CHAT_LINES_FOLD_ABOVE,
   MAP_CHAT_WIDTH_DEFAULT,
   MAP_CHAT_WIDTH_MAX,
   MAP_CHAT_WIDTH_MIN,
   MAP_CHAT_WIDTH_STEP,
-  type ChatLineCounts,
-  type ChatSuggestionContext
+  type ChatLineCounts
 } from "../../core/map-chat-layout";
 
 /** What the user attached to the next message. Topic chips come from a dragged card; snippets and files from a drop. */
@@ -223,8 +218,6 @@ export interface MapChatHost {
   widths?(setWidth: number): { docked: number; overlay: number } | null;
   /** The user is resizing the side window; `commit` is false while the handle is still being dragged. */
   setWidth?(width: number, commit: boolean): void;
-  /** What the map looks like now, to pick the suggested messages. */
-  suggestions?(): Pick<ChatSuggestionContext, "selected" | "hasTopics">;
   /** "Retry" on a failed turn: send the same question again. */
   retry?(origin: MapChatOrigin): void;
   /** The conversation's state changed (a turn started or ended, a plan appeared or was settled); the canvas may say so. */
@@ -313,10 +306,7 @@ export class MapChatPanel {
   private guideEl!: HTMLElement;
   private hintEl!: HTMLElement;
   private logEl!: HTMLElement;
-  private suggestEl!: HTMLElement;
   private emptyMapEl!: HTMLButtonElement;
-  private suggestKey = "";
-  private suggestInHero = false;
   private resizerEl!: HTMLElement;
   private liveEl!: HTMLElement;
   private stopResizing: (() => void) | null = null;
@@ -447,7 +437,6 @@ export class MapChatPanel {
     if (visible && visible !== this.dismissedNote) this.dismissedNote = null;
     this.noteChip = visible && visible !== this.dismissedNote ? visible : null;
     this.renderChips();
-    this.renderSuggestions();
   }
   attachments(): MapChatChip[] {
     return this.chips.map(chip => ({ ...chip }));
@@ -646,10 +635,9 @@ export class MapChatPanel {
     if (target) target.focus();
     else this.inputEl.focus();
   }
-  /** The selection changed: repaint the reference chips and the suggestions. */
+  /** The selection changed: repaint the reference chips. */
   refreshSelection(): void {
     this.renderChips();
-    this.renderSuggestions();
   }
 
   /** A turn starts: the user's text, an empty answer, and the busy state (the view starts in "preparing"). */
@@ -993,7 +981,7 @@ export class MapChatPanel {
     last.plan = plan;
     this.renderLog();
     this.renderHint();
-    // The hint line (and the suggestions) change the log's height after it was laid out, so the end moved: a plan is
+    // The hint line change the log's height after it was laid out, so the end moved: a plan is
     // something to answer, so the card's buttons are brought into view now and again once the new height is final.
     this.scrollToEnd();
     this.scrollToEndWhenSettled();
@@ -1143,7 +1131,7 @@ export class MapChatPanel {
     // A map that has content opens the window onto an empty log: one line says what it is for.
     this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
     // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says each progress stage name once as it changes, then the whole turn once when it ends.
-    // Not `aria-label`: Obsidian shows an aria-label as a hover tooltip, and this one would cover the suggestions below the log.
+    // Not `aria-label`: Obsidian shows an aria-label as a hover tooltip, and this one would cover the chips below the log.
     const logLabelId = `${this.id}-log-label`;
     this.logLabelEl = this.bodyEl.createSpan({
       cls: "vam-map-chat-log-label",
@@ -1169,9 +1157,7 @@ export class MapChatPanel {
     this.logEl.addEventListener("keydown", event => {
       if (event.key === "Enter") openInternal(event, event.target);
     });
-    // Suggested messages (examples on the opening screen). Tab order: these, the chips, the message field, the controls.
-    this.suggestEl = this.bodyEl.createDiv({ cls: "vam-map-chat-suggest", attr: { role: "group" } });
-    // Opening screen only: a secondary way in that needs no model. Placed after the examples when the screen is the opening one.
+    // Opening screen only: a secondary way in that needs no model. Tab order: the chips, the message field, the controls.
     this.emptyMapEl = this.bodyEl.createEl("button", {
       cls: "vam-map-chat-empty-map",
       text: t("ui.create_an_empty_mind_map"),
@@ -1187,21 +1173,22 @@ export class MapChatPanel {
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
     const form = this.bodyEl.createDiv("vam-map-chat-form");
-    this.inputEl = form.createEl("textarea", {
+    // The send / stop key sits inside the message box, bottom right: one box, one key at a time (↵ when idle, ■ while working).
+    const box = form.createDiv("vam-map-chat-composer");
+    this.inputEl = box.createEl("textarea", {
       cls: "vam-map-chat-input",
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
-    const side = form.createDiv("vam-map-chat-side");
-    this.sendEl = side.createEl("button", {
-      cls: "vam-map-chat-send mod-cta",
-      text: t("ui.map_chat_send"),
-      attr: { "aria-label": t("ui.map_chat_send") }
+    this.sendEl = box.createEl("button", {
+      cls: "vam-map-chat-send",
+      attr: { type: "button", "aria-label": t("ui.map_chat_send") }
     });
-    this.stopEl = side.createEl("button", {
+    setIcon(this.sendEl, "corner-down-left");
+    this.stopEl = box.createEl("button", {
       cls: "vam-map-chat-stop",
-      text: t("ui.map_chat_stop"),
-      attr: { "aria-label": t("ui.map_chat_stop") }
+      attr: { type: "button", "aria-label": t("ui.map_chat_stop") }
     });
+    setIcon(this.stopEl, "square");
     this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
@@ -1287,9 +1274,7 @@ export class MapChatPanel {
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
     this.inputEl.setAttr("placeholder", t("ui.map_chat_input_placeholder"));
-    this.sendEl.setText(t("ui.map_chat_send"));
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
-    this.stopEl.setText(t("ui.map_chat_stop"));
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
     this.applyOpen();
@@ -1498,53 +1483,6 @@ export class MapChatPanel {
     this.applyOpen();
   }
 
-  // ---- suggested messages -----------------------------------------------------------------------------------------
-
-  /**
-   * Puts `text` into the message field in place of what was there and gives it the keyboard, with the cursor at the end (where an
-   * open-ended suggestion is finished). Sending is always the user's own act.
-   */
-  private fill(text: string, openEnded = false): void {
-    const value = chatSuggestionFill(text, openEnded);
-    this.inputEl.value = value;
-    this.inputEl.focus();
-    this.inputEl.setSelectionRange(value.length, value.length);
-  }
-  private renderSuggestions(): void {
-    if (!this.built) return;
-    const hero = this.hero;
-    const keys = hero
-      ? [...MAP_CHAT_EXAMPLE_KEYS]
-      : this.host.suggestions
-        ? chatSuggestionKeys({ ...this.host.suggestions(), hasNote: !!this.noteChip })
-        : [];
-    // Repaint only when something changed: a rebuilt button would take the keyboard focus away from a reader tabbing through.
-    const signature = [hero ? "hero" : "side", ...keys.map(key => t(key))].join("\u0001");
-    if (signature === this.suggestKey && hero === this.suggestInHero) return;
-    this.suggestKey = signature;
-    if (hero !== this.suggestInHero) {
-      this.suggestInHero = hero;
-      // The opening screen reads: title, message field, examples. The window reads: suggestions, chips, message field.
-      this.suggestEl.remove();
-      this.bodyEl.insertBefore(this.suggestEl, hero ? null : this.chipsEl);
-    }
-    this.suggestEl.empty();
-    this.suggestEl.setAttr("aria-label", t(hero ? "ui.map_chat_examples_label" : "ui.map_chat_suggestions_label"));
-    this.suggestEl.toggleClass("is-examples", hero);
-    this.suggestEl.hidden = keys.length === 0;
-    for (const key of keys) {
-      const text = t(key);
-      const openEnded = MAP_CHAT_OPEN_ENDED_KEYS.includes(key);
-      const button = this.suggestEl.createEl("button", {
-        cls: hero ? "vam-map-chat-example" : "vam-map-chat-suggestion",
-        // An open-ended suggestion is visibly unfinished: the user completes it in the field.
-        text: openEnded ? `${text}…` : text,
-        attr: { type: "button" }
-      });
-      button.addEventListener("click", () => this.fill(text, openEnded));
-    }
-  }
-
   private onDragOver(event: DragEvent): void {
     if (!event.dataTransfer) return;
     event.preventDefault();
@@ -1609,7 +1547,6 @@ export class MapChatPanel {
     // The opening screen asks for a topic; the side window talks about the map in front of it.
     this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
     this.applyWidth();
-    this.renderSuggestions();
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);

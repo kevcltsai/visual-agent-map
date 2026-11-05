@@ -1505,24 +1505,6 @@ var en = {
   "ui.map_chat_choose_label_0_1_2": "{0} ({1}) #{2}",
   "ui.map_chat_log_label": "Conversation",
   "ui.map_chat_hero_title": "What do you want to research or organize?",
-  "ui.map_chat_examples_label": "Examples to start from",
-  "ui.map_chat_example_research": "Research the coffee industry: players, supply chain, trends",
-  "ui.map_chat_example_learn": "Plan a three-month route to learn basic Japanese",
-  "ui.map_chat_example_decide": "Compare renting and buying a home: costs, risks, timing",
-  "ui.map_chat_suggestions_label": "Suggested messages",
-  "ui.map_chat_suggest_empty_build": "Build a three-level topic tree about",
-  "ui.map_chat_suggest_empty_new_map": "Create a new map about",
-  "ui.map_chat_suggest_empty_from_note": "Build a map from the open note",
-  "ui.map_chat_suggest_all_missing": "What is missing from this map?",
-  "ui.map_chat_suggest_all_layout": "Arrange the whole map",
-  "ui.map_chat_suggest_all_collapse": "Collapse every branch below the first level",
-  "ui.map_chat_suggest_one_expand": "Add three subtopics under the selected topic",
-  "ui.map_chat_suggest_one_research": "Research the selected topic",
-  "ui.map_chat_suggest_one_summary": "Rewrite the summary of the selected topic",
-  "ui.map_chat_suggest_many_compare": "Compare the selected topics",
-  "ui.map_chat_suggest_many_integrate": "Integrate the selected topics into one",
-  "ui.map_chat_suggest_many_group": "Group the selected topics under a new topic",
-  "ui.map_chat_suggest_note_add": "Add what the open note says to the map",
   "ui.map_chat_width_label": "AI chat width (arrow keys change it)",
   "ui.map_chat_open_unread": "Open AI chat (new reply)",
   "ui.map_chat_live_done_0": "AI replied: {0}",
@@ -4218,24 +4200,6 @@ var zhCN = {
   "ui.map_chat_choose_label_0_1_2": "{0}\uFF08{1}\uFF09#{2}",
   "ui.map_chat_log_label": "\u5BF9\u8BDD\u8BB0\u5F55",
   "ui.map_chat_hero_title": "\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48\uFF1F",
-  "ui.map_chat_examples_label": "\u53EF\u4EE5\u4ECE\u8FD9\u4E9B\u5F00\u59CB",
-  "ui.map_chat_example_research": "\u7814\u7A76\u5496\u5561\u4EA7\u4E1A\uFF1A\u4E3B\u8981\u53C2\u4E0E\u8005\u3001\u4F9B\u5E94\u94FE\u4E0E\u8D8B\u52BF",
-  "ui.map_chat_example_learn": "\u89C4\u5212\u4E09\u4E2A\u6708\u5B66\u4F1A\u57FA\u7840\u65E5\u6587\u7684\u5B66\u4E60\u8DEF\u7EBF",
-  "ui.map_chat_example_decide": "\u6BD4\u8F83\u79DF\u623F\u548C\u4E70\u623F\uFF1A\u6210\u672C\u3001\u98CE\u9669\u4E0E\u65F6\u673A",
-  "ui.map_chat_suggestions_label": "\u5EFA\u8BAE\u6307\u4EE4",
-  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C42\u7684\u8BAE\u9898\u6811\uFF0C\u4E3B\u9898\u662F",
-  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F20\u5730\u56FE\uFF0C\u4E3B\u9898\u662F",
-  "ui.map_chat_suggest_empty_from_note": "\u7528\u5F53\u524D\u6253\u5F00\u7684\u7B14\u8BB0\u5EFA\u7ACB\u5730\u56FE",
-  "ui.map_chat_suggest_all_missing": "\u8FD9\u5F20\u56FE\u8FD8\u7F3A\u4EC0\u4E48\uFF1F",
-  "ui.map_chat_suggest_all_layout": "\u6574\u7406\u5E76\u91CD\u65B0\u6392\u7248\u6574\u5F20\u56FE",
-  "ui.map_chat_suggest_all_collapse": "\u628A\u7B2C\u4E00\u5C42\u4EE5\u4E0B\u7684\u5206\u652F\u90FD\u6536\u8D77\u6765",
-  "ui.map_chat_suggest_one_expand": "\u5728\u9009\u53D6\u7684\u8BAE\u9898\u5E95\u4E0B\u52A0\u4E09\u4E2A\u5B50\u8BAE\u9898",
-  "ui.map_chat_suggest_one_research": "\u7814\u7A76\u9009\u53D6\u7684\u8BAE\u9898",
-  "ui.map_chat_suggest_one_summary": "\u6539\u5199\u9009\u53D6\u8BAE\u9898\u7684\u6458\u8981",
-  "ui.map_chat_suggest_many_compare": "\u6BD4\u8F83\u9009\u53D6\u7684\u8FD9\u51E0\u4E2A\u8BAE\u9898",
-  "ui.map_chat_suggest_many_integrate": "\u628A\u9009\u53D6\u7684\u8BAE\u9898\u6574\u5408\u6210\u4E00\u4E2A",
-  "ui.map_chat_suggest_many_group": "\u628A\u9009\u53D6\u7684\u8BAE\u9898\u5F52\u5230\u4E00\u4E2A\u65B0\u8BAE\u9898\u5E95\u4E0B",
-  "ui.map_chat_suggest_note_add": "\u628A\u5F53\u524D\u6253\u5F00\u7684\u7B14\u8BB0\u5185\u5BB9\u8865\u8FDB\u5730\u56FE",
   "ui.map_chat_width_label": "AI \u5BF9\u8BDD\u5BBD\u5EA6\uFF08\u65B9\u5411\u952E\u53EF\u8C03\u6574\uFF09",
   "ui.map_chat_open_unread": "\u6253\u5F00 AI \u5BF9\u8BDD\uFF08\u6709\u65B0\u56DE\u590D\uFF09",
   "ui.map_chat_live_done_0": "AI \u5DF2\u56DE\u590D\uFF1A{0}",
@@ -6931,24 +6895,6 @@ var zhTW = {
   "ui.map_chat_choose_label_0_1_2": "{0}\uFF08{1}\uFF09#{2}",
   "ui.map_chat_log_label": "\u5C0D\u8A71\u7D00\u9304",
   "ui.map_chat_hero_title": "\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC\uFF1F",
-  "ui.map_chat_examples_label": "\u53EF\u4EE5\u5F9E\u9019\u4E9B\u958B\u59CB",
-  "ui.map_chat_example_research": "\u7814\u7A76\u5496\u5561\u7522\u696D\uFF1A\u4E3B\u8981\u53C3\u8207\u8005\u3001\u4F9B\u61C9\u93C8\u8207\u8DA8\u52E2",
-  "ui.map_chat_example_learn": "\u898F\u5283\u4E09\u500B\u6708\u5B78\u6703\u57FA\u790E\u65E5\u6587\u7684\u5B78\u7FD2\u8DEF\u7DDA",
-  "ui.map_chat_example_decide": "\u6BD4\u8F03\u79DF\u623F\u548C\u8CB7\u623F\uFF1A\u6210\u672C\u3001\u98A8\u96AA\u8207\u6642\u6A5F",
-  "ui.map_chat_suggestions_label": "\u5EFA\u8B70\u6307\u4EE4",
-  "ui.map_chat_suggest_empty_build": "\u5EFA\u7ACB\u4E00\u68F5\u4E09\u5C64\u7684\u8B70\u984C\u6A39\uFF0C\u4E3B\u984C\u662F",
-  "ui.map_chat_suggest_empty_new_map": "\u65B0\u5EFA\u4E00\u5F35\u5FC3\u667A\u5716\uFF0C\u4E3B\u984C\u662F",
-  "ui.map_chat_suggest_empty_from_note": "\u7528\u76EE\u524D\u958B\u8457\u7684\u7B46\u8A18\u5EFA\u7ACB\u5FC3\u667A\u5716",
-  "ui.map_chat_suggest_all_missing": "\u9019\u5F35\u5716\u9084\u7F3A\u4EC0\u9EBC\uFF1F",
-  "ui.map_chat_suggest_all_layout": "\u6574\u7406\u4E26\u91CD\u65B0\u6392\u7248\u6574\u5F35\u5716",
-  "ui.map_chat_suggest_all_collapse": "\u628A\u7B2C\u4E00\u5C64\u4EE5\u4E0B\u7684\u5206\u652F\u90FD\u6536\u8D77\u4F86",
-  "ui.map_chat_suggest_one_expand": "\u5728\u9078\u53D6\u7684\u8B70\u984C\u5E95\u4E0B\u52A0\u4E09\u500B\u5B50\u8B70\u984C",
-  "ui.map_chat_suggest_one_research": "\u7814\u7A76\u9078\u53D6\u7684\u8B70\u984C",
-  "ui.map_chat_suggest_one_summary": "\u6539\u5BEB\u9078\u53D6\u8B70\u984C\u7684\u6458\u8981",
-  "ui.map_chat_suggest_many_compare": "\u6BD4\u8F03\u9078\u53D6\u7684\u9019\u5E7E\u500B\u8B70\u984C",
-  "ui.map_chat_suggest_many_integrate": "\u628A\u9078\u53D6\u7684\u8B70\u984C\u6574\u5408\u6210\u4E00\u500B",
-  "ui.map_chat_suggest_many_group": "\u628A\u9078\u53D6\u7684\u8B70\u984C\u6B78\u5230\u4E00\u500B\u65B0\u8B70\u984C\u5E95\u4E0B",
-  "ui.map_chat_suggest_note_add": "\u628A\u76EE\u524D\u958B\u8457\u7684\u7B46\u8A18\u5167\u5BB9\u88DC\u9032\u5FC3\u667A\u5716",
   "ui.map_chat_width_label": "AI \u5C0D\u8A71\u5BEC\u5EA6\uFF08\u65B9\u5411\u9375\u53EF\u8ABF\u6574\uFF09",
   "ui.map_chat_open_unread": "\u958B\u555F AI \u5C0D\u8A71\uFF08\u6709\u65B0\u56DE\u8986\uFF09",
   "ui.map_chat_live_done_0": "AI \u5DF2\u56DE\u8986\uFF1A{0}",
@@ -23400,24 +23346,6 @@ function chatDockedWidth(paneWidth, setWidth, inspector = 0) {
 function chatOverlayWidth(paneWidth, setWidth) {
   return Math.max(MAP_CHAT_WIDTH_MIN, Math.min(setWidth, paneWidth - MAP_CHAT_OVERLAY_MARGIN));
 }
-function chatSuggestionKeys(context) {
-  const keys = !context.hasTopics ? ["ui.map_chat_example_research", "ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"] : context.selected > 1 ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"] : context.selected === 1 ? ["ui.map_chat_suggest_one_expand", "ui.map_chat_suggest_one_research", "ui.map_chat_suggest_one_summary"] : ["ui.map_chat_suggest_all_missing", "ui.map_chat_suggest_all_layout", "ui.map_chat_suggest_all_collapse"];
-  if (context.hasNote)
-    keys.push(context.hasTopics ? "ui.map_chat_suggest_note_add" : "ui.map_chat_suggest_empty_from_note");
-  return keys;
-}
-var MAP_CHAT_OPEN_ENDED_KEYS = [
-  "ui.map_chat_suggest_empty_build",
-  "ui.map_chat_suggest_empty_new_map"
-];
-function chatSuggestionFill(text11, openEnded) {
-  return openEnded && /[A-Za-z]$/.test(text11) ? `${text11} ` : text11;
-}
-var MAP_CHAT_EXAMPLE_KEYS = [
-  "ui.map_chat_example_research",
-  "ui.map_chat_example_learn",
-  "ui.map_chat_example_decide"
-];
 var noteSet = (notes) => notes === void 0 ? [] : typeof notes === "string" ? [notes] : notes;
 function splitChatLines(lines, notes) {
   const texts2 = noteSet(notes);
@@ -35784,10 +35712,7 @@ var MapChatPanel = class {
     __publicField(this, "guideEl");
     __publicField(this, "hintEl");
     __publicField(this, "logEl");
-    __publicField(this, "suggestEl");
     __publicField(this, "emptyMapEl");
-    __publicField(this, "suggestKey", "");
-    __publicField(this, "suggestInHero", false);
     __publicField(this, "resizerEl");
     __publicField(this, "liveEl");
     __publicField(this, "stopResizing", null);
@@ -35914,7 +35839,6 @@ var MapChatPanel = class {
     if (visible && visible !== this.dismissedNote) this.dismissedNote = null;
     this.noteChip = visible && visible !== this.dismissedNote ? visible : null;
     this.renderChips();
-    this.renderSuggestions();
   }
   attachments() {
     return this.chips.map((chip) => ({ ...chip }));
@@ -36104,10 +36028,9 @@ var MapChatPanel = class {
     if (target) target.focus();
     else this.inputEl.focus();
   }
-  /** The selection changed: repaint the reference chips and the suggestions. */
+  /** The selection changed: repaint the reference chips. */
   refreshSelection() {
     this.renderChips();
-    this.renderSuggestions();
   }
   /** A turn starts: the user's text, an empty answer, and the busy state (the view starts in "preparing"). */
   begin(userText, origin, keepDraft = false, stage = "waiting") {
@@ -36622,7 +36545,6 @@ ${typed}` : draft;
     this.logEl.addEventListener("keydown", (event) => {
       if (event.key === "Enter") openInternal(event, event.target);
     });
-    this.suggestEl = this.bodyEl.createDiv({ cls: "vam-map-chat-suggest", attr: { role: "group" } });
     this.emptyMapEl = this.bodyEl.createEl("button", {
       cls: "vam-map-chat-empty-map",
       text: t("ui.create_an_empty_mind_map"),
@@ -36641,21 +36563,21 @@ ${typed}` : draft;
     this.hintEl.hidden = true;
     this.statusEl = this.bodyEl.createDiv({ cls: "vam-map-chat-status", attr: { role: "status" } });
     const form = this.bodyEl.createDiv("vam-map-chat-form");
-    this.inputEl = form.createEl("textarea", {
+    const box = form.createDiv("vam-map-chat-composer");
+    this.inputEl = box.createEl("textarea", {
       cls: "vam-map-chat-input",
       attr: { rows: "3", "aria-label": t("ui.map_chat_input_label"), placeholder: t("ui.map_chat_input_placeholder") }
     });
-    const side = form.createDiv("vam-map-chat-side");
-    this.sendEl = side.createEl("button", {
-      cls: "vam-map-chat-send mod-cta",
-      text: t("ui.map_chat_send"),
-      attr: { "aria-label": t("ui.map_chat_send") }
+    this.sendEl = box.createEl("button", {
+      cls: "vam-map-chat-send",
+      attr: { type: "button", "aria-label": t("ui.map_chat_send") }
     });
-    this.stopEl = side.createEl("button", {
+    (0, import_obsidian24.setIcon)(this.sendEl, "corner-down-left");
+    this.stopEl = box.createEl("button", {
       cls: "vam-map-chat-stop",
-      text: t("ui.map_chat_stop"),
-      attr: { "aria-label": t("ui.map_chat_stop") }
+      attr: { type: "button", "aria-label": t("ui.map_chat_stop") }
     });
+    (0, import_obsidian24.setIcon)(this.stopEl, "square");
     this.sendEl.addEventListener("click", () => this.sendPressed());
     this.stopEl.addEventListener("click", () => this.host.stop());
     this.inputEl.addEventListener("compositionstart", () => {
@@ -36738,9 +36660,7 @@ ${typed}` : draft;
     this.chipsEl.setAttr("aria-label", t("ui.map_chat_references"));
     this.inputEl.setAttr("aria-label", t("ui.map_chat_input_label"));
     this.inputEl.setAttr("placeholder", t("ui.map_chat_input_placeholder"));
-    this.sendEl.setText(t("ui.map_chat_send"));
     this.sendEl.setAttr("aria-label", t("ui.map_chat_send"));
-    this.stopEl.setText(t("ui.map_chat_stop"));
     this.stopEl.setAttr("aria-label", t("ui.map_chat_stop"));
     this.resizerEl.setAttr("aria-label", t("ui.map_chat_width_label"));
     this.applyOpen();
@@ -36927,45 +36847,6 @@ ${typed}` : draft;
     this.unread = true;
     this.applyOpen();
   }
-  // ---- suggested messages -----------------------------------------------------------------------------------------
-  /**
-   * Puts `text` into the message field in place of what was there and gives it the keyboard, with the cursor at the end (where an
-   * open-ended suggestion is finished). Sending is always the user's own act.
-   */
-  fill(text11, openEnded = false) {
-    const value = chatSuggestionFill(text11, openEnded);
-    this.inputEl.value = value;
-    this.inputEl.focus();
-    this.inputEl.setSelectionRange(value.length, value.length);
-  }
-  renderSuggestions() {
-    if (!this.built) return;
-    const hero = this.hero;
-    const keys = hero ? [...MAP_CHAT_EXAMPLE_KEYS] : this.host.suggestions ? chatSuggestionKeys({ ...this.host.suggestions(), hasNote: !!this.noteChip }) : [];
-    const signature = [hero ? "hero" : "side", ...keys.map((key2) => t(key2))].join("");
-    if (signature === this.suggestKey && hero === this.suggestInHero) return;
-    this.suggestKey = signature;
-    if (hero !== this.suggestInHero) {
-      this.suggestInHero = hero;
-      this.suggestEl.remove();
-      this.bodyEl.insertBefore(this.suggestEl, hero ? null : this.chipsEl);
-    }
-    this.suggestEl.empty();
-    this.suggestEl.setAttr("aria-label", t(hero ? "ui.map_chat_examples_label" : "ui.map_chat_suggestions_label"));
-    this.suggestEl.toggleClass("is-examples", hero);
-    this.suggestEl.hidden = keys.length === 0;
-    for (const key2 of keys) {
-      const text11 = t(key2);
-      const openEnded = MAP_CHAT_OPEN_ENDED_KEYS.includes(key2);
-      const button = this.suggestEl.createEl("button", {
-        cls: hero ? "vam-map-chat-example" : "vam-map-chat-suggestion",
-        // An open-ended suggestion is visibly unfinished: the user completes it in the field.
-        text: openEnded ? `${text11}\u2026` : text11,
-        attr: { type: "button" }
-      });
-      button.addEventListener("click", () => this.fill(text11, openEnded));
-    }
-  }
   onDragOver(event) {
     if (!event.dataTransfer) return;
     event.preventDefault();
@@ -37027,7 +36908,6 @@ ${typed}` : draft;
     this.heroTitleEl.toggleClass("is-hidden", !hero);
     this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
     this.applyWidth();
-    this.renderSuggestions();
     const showEmptyMap = hero && !!this.host.createEmptyMap;
     this.emptyMapEl.hidden = !showEmptyMap;
     this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
@@ -70854,13 +70734,6 @@ ${note.detail.trim()}` : "",
         this.plugin.settings.mapChatWidth = clampMapChatWidth(width);
         void this.plugin.saveSettings();
         this.syncChatNarrow();
-      },
-      suggestions: () => {
-        var _a2, _b2;
-        return {
-          selected: this.chatSelectionIds().length,
-          hasTopics: ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.length) != null ? _b2 : 0) > 0
-        };
       },
       insertImage: (images, item) => this.chatInsertImage(images, item),
       canSave: () => !this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true },

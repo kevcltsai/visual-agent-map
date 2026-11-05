@@ -10346,6 +10346,8 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     this.paint();
+    // Outside paint(): the paint tail is pinned by the view.ts wiring tests (34, 42).
+    this.settleCardHeights();
   }
   private paint(): void {
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
@@ -10801,7 +10803,6 @@ export class VisualAgentMapView extends ItemView {
     this.focusInlineName();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
-    this.settleCardHeights();
     restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
@@ -17801,6 +17802,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.renderPending || this.closed) return;
     this.renderPending = false;
     this.paint();
+    this.settleCardHeights();
   }
   /**
    * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be

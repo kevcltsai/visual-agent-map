@@ -60166,6 +60166,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     this.paint();
+    this.settleCardHeights();
   }
   paint() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H;
@@ -60591,7 +60592,6 @@ ${request.requirements}` : preset.text,
     this.focusInlineName();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
-    this.settleCardHeights();
     restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
@@ -67063,6 +67063,7 @@ ${note.detail.trim()}` : "",
     if (!this.renderPending || this.closed) return;
     this.renderPending = false;
     this.paint();
+    this.settleCardHeights();
   }
   /**
    * Applies what a chat reply asked for, once, in order. Every write is its own `plugin.mutate` (the queue cannot be

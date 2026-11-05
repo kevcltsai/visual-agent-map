@@ -645,6 +645,10 @@ test('card tools: only AI explore, Details and More float; More holds fold, stru
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-below \{[^}]*top: calc\(100% - 6px/);
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-right \{/);
   assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-left \{/);
+  // A row beside the card keeps an invisible bridge over the gap, so the pointer does not leave the card on the way to it.
+  assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-left::after \{ left: 100%; \}/);
+  assert.match(css, /\.vam-node > \.vam-node-tools\.is-side-right::after \{ right: 100%; \}/);
+  assert.match(css, /is-side-right::after \{ content: ""; position: absolute;[^}]*width: calc\(var\(--vam-tools-gap, 4px\) \+ 6px\)/);
 });
 test('selection bar: nothing before the first card is picked; then a narrow bottom bar whose main button follows the count', () => {
   const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A' }], ['b', { title: 'B' }]]), map: { nodes: [] } });

@@ -75871,6 +75871,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node > .vam-node-tools:not(.is-below):not(.is-side-left):not(.is-side-right) { bottom: calc(100% - 6px - var(--vam-tools-inset, 0px)); }
 .vam-node > .vam-node-tools.is-side-right { bottom: auto; top: 6px; right: auto; left: calc(100% + var(--vam-tools-gap, 4px)); margin-left: 0; transform-origin: left top; transform: translateX(-4px); }
 .vam-node > .vam-node-tools.is-side-left { bottom: auto; top: 6px; left: auto; right: calc(100% + var(--vam-tools-gap, 4px)); transform-origin: right top; transform: translateX(4px); }
+.vam-node > .vam-node-tools.is-side-left::after, .vam-node > .vam-node-tools.is-side-right::after { content: ""; position: absolute; top: -4px; bottom: -4px; width: calc(var(--vam-tools-gap, 4px) + 6px); }
+.vam-node > .vam-node-tools.is-side-left::after { left: 100%; }
+.vam-node > .vam-node-tools.is-side-right::after { right: 100%; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }

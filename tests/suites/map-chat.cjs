@@ -3605,7 +3605,7 @@ integrationTest('map chat merge: summary-only cards run the AI merge under the c
   h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
   h.plugin.askModel = async context => { asks.push(context.mode); return { summary: 'Body needs rest. Mind needs calm.', detail: 'Body needs rest.\n\nMind needs calm.', visualReferences: [], suggestions: [{ title: 'AI picked name' }] }; };
   const lines = await apply(h, [
-    lookAct([h.ids.a, h.ids.b], { color: 'red' }),
+    lookAct([h.ids.a, h.ids.b, h.ids.c], { color: 'red' }),
     { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }
   ]);
   eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
@@ -3618,7 +3618,8 @@ integrationTest('map chat merge: summary-only cards run the AI merge under the c
   assert.match(merged[0].detail, /Mind needs calm/);
   assert.equal(merged[0].color, 'red', 'the colour both sources share stays on the merged card');
 });
-// Persona 17: the reply's recolour and the AI merge it started (written later) are one undo step, one redo step.
+// Persona 17: the reply's recolour and the AI merge it started (written later) are one undo step, one redo step. The recolour
+// names the two merge sources (which take it onto the merged card, F20) and a third card, which is written with the reply.
 const mergeReply = async h => {
   await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
   await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
@@ -3626,18 +3627,18 @@ const mergeReply = async h => {
   h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
   h.plugin.askModel = async () => ({ summary: 'Body needs rest. Mind needs calm.', detail: 'Body needs rest.\n\nMind needs calm.', visualReferences: [], suggestions: [{ title: 'AI picked name' }] });
   await apply(h, [
-    lookAct([h.ids.a, h.ids.b], { color: 'red' }),
+    lookAct([h.ids.a, h.ids.b, h.ids.c], { color: 'red' }),
     { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }
   ]);
   await h.view.mergeTasks.get(h.view.path)?.run; await tick();
 };
 integrationTest('persona 17: a chat reply that recolours and then AI-merges is one undo step and one redo step', async () => {
   const h = await harness({ viaSync: false }); await h.view.hydrate();
-  const before = (await h.saved()).map(n => n.id).sort(); const colourBefore = (await h.note('a')).color;
+  const before = (await h.saved()).map(n => n.id).sort(); const colourBefore = (await h.note('c')).color;
   await mergeReply(h);
   assert.equal(h.view.history.undoEntry.label, 'AI chat reply'); assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1);
   await h.view.travel(false);
-  eq((await h.saved()).map(n => n.id).sort(), before, 'both source cards are back after one undo'); assert.equal((await h.note('a')).color, colourBefore, 'and the colour is back too');
+  eq((await h.saved()).map(n => n.id).sort(), before, 'both source cards are back after one undo'); assert.equal((await h.note('c')).color, colourBefore, 'and the colour is back too');
   assert.equal(h.view.history.canUndo, false, 'nothing is left to undo');
   await h.view.travel(true);
   assert.equal(h.view.history.canRedo, false, 'one redo takes the whole reply back');
@@ -3652,10 +3653,46 @@ integrationTest('persona 17: when another step was pushed before the merge lands
   await h.view.hydrate();
   h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
   h.plugin.askModel = async () => { h.view.history.push(foreignEntry('later edit', log)); return { summary: 'S.', detail: 'D.', visualReferences: [], suggestions: [] }; };
-  await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red' }), { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }]);
+  await apply(h, [lookAct([h.ids.a, h.ids.b, h.ids.c], { color: 'red' }), { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }]);
   await h.view.mergeTasks.get(h.view.path)?.run; await tick();
   assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1, 'the reply keeps its own step');
   assert.ok(h.view.history.past.length >= 3, 'the merge is a separate step above the reply and the other edit');
+});
+// F20 (Lane L, 2026-11-05): the model named only the FIRST source in set_appearance (as the live reply did), the colour was
+// written before the background merge, and "all sources share the colour" never held. The asked colour must end on the merged
+// card (not written to the sources, which the merge parks in Unassigned).
+integrationTest('map chat merge: a colour asked for one source in the same reply lands on the merged card, not on the parked sources', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
+  await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
+  await h.view.hydrate();
+  const sourcePaths = [h.node('a').path, h.node('b').path];
+  h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
+  h.plugin.askModel = async () => { await new Promise(resolve => setTimeout(resolve, 30)); return { summary: 'Body needs rest. Mind needs calm.', detail: 'Body needs rest.\n\nMind needs calm.', visualReferences: [], suggestions: [] }; };
+  const lines = await apply(h, [
+    { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false },
+    lookAct([h.ids.a], { color: 'red' })
+  ]);
+  eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
+  eq((await h.note('a')).color ?? null, null, 'the source that goes to Unassigned is not coloured');
+  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  const merged = [], parked = [];
+  for (const n of await h.saved()) { const note = await h.repo.readNote(n.path); if (note.title === 'Nothing to Fear') merged.push(note); }
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].color, 'red', 'the merged card is red');
+  for (const key of sourcePaths.map(path => path.split('/').pop())) {
+    for (const k of [...h.contents.keys()].filter(k => k.endsWith('/' + key))) parked.push((await h.repo.readNote(k)).color ?? null);
+  }
+  assert.ok(parked.length >= 2 && parked.every(c => c === null), 'the parked sources do not carry the colour: ' + JSON.stringify(parked));
+});
+integrationTest('map chat merge: when the merge is skipped, the cards named for the colour get it after all', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const lines = await apply(h, [
+    lookAct([h.ids.a, h.ids.b], { color: 'red' }),
+    { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: ' ', goal: '', direction: '', mode: '', images: false }
+  ]);
+  eq(lines[1].status, 'skipped', JSON.stringify(lines));
+  eq([(await h.note('a')).color, (await h.note('b')).color], ['red', 'red']);
 });
 integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
   const h = await harness(); await h.view.hydrate();

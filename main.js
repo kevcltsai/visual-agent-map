@@ -37517,7 +37517,7 @@ var AiCalls = class {
         );
       throw error;
     } finally {
-      this.recordUsage(sentText || call.prompt, options, provider, reportedUsage, reply, startedMs);
+      this.recordUsage(sentText, options, provider, reportedUsage, reply, startedMs);
       options.signal.removeEventListener("abort", abort);
       if (this.activeTasks.get(key2) === controller) this.activeTasks.delete(key2);
     }

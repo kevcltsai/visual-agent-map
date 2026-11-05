@@ -183,6 +183,12 @@ test('Codex without a usage report is estimated from the prompt and the reply an
   same([real.records[0].inputTokens, real.records[0].outputTokens, real.records[0].estimated], [900, 80, false]);
 });
 
+test('a Codex call that fails before anything is sent records nothing (no estimate from the unsent prompt)', async () => {
+  const h = rig({ handler: () => { throw new Error('app-server did not start'); } });
+  await assert.rejects(h.service.askModel(context(), 'gpt-6-luna', 'low'));
+  assert.equal(h.records.length, 0);
+});
+
 test('Claude without a usage report records nothing (no prompt text to estimate from)', async () => {
   const h = rig({ handler: () => GOOD });
   await h.service.askModel(context(), 'claude:sonnet', 'low');

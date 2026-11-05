@@ -287,7 +287,7 @@ export class AiCalls {
         );
       throw error;
     } finally {
-      this.recordUsage(sentText || call.prompt, options, provider, reportedUsage, reply, startedMs);
+      this.recordUsage(sentText, options, provider, reportedUsage, reply, startedMs);
       options.signal.removeEventListener("abort", abort);
       if (this.activeTasks.get(key) === controller) this.activeTasks.delete(key);
     }

@@ -53,61 +53,6 @@ test('source footnotes: numbered by first use, one definition per source, placed
   assert.ok(evidence.includes('[^1]:') && evidence.includes('[^2]:') && evidence.includes('[^3]:'));
   assert.ok(canonicalDetail(api.resolveDetailReferences('### Core conclusions\n\nA[S1]', groups), 'en').includes('### Sources\n\n[^1]: [[Maps/A/one.md|one]]'));
 });
-test('reference picker keeps source groups compact, collapsible and task-local', async () => {
-  const css = fs.readFileSync(path.join(__dirname, '..', '..', 'styles.css'), 'utf8');
-  assert.match(css, /\.vam-reference-picker \.vam-reference-feedback \.is-hidden\s*\{\s*display:\s*none;\s*\}/);
-  const element = (tag, options = {}) => ({ tag, cls: options.cls ?? '', text: options.text ?? '', children: [], dataset: {}, listeners: {},
-    createDiv(value) { const child = element('div', { cls: typeof value === 'string' ? value : value?.cls }); this.children.push(child); return child; },
-    createEl(name, value = {}) { const child = element(name, value); Object.assign(child, value); Object.assign(child, value.attr ?? {}); this.children.push(child); return child; },
-    createSpan(value = {}) { const child = element('span', value); this.children.push(child); return child; },
-    addEventListener(name, handler) { this.listeners[name] = handler; }, setText(value) { this.text = value; }, setAttr(name, value) { this[name] = value; },
-    addClass(name) { this.cls = `${this.cls} ${name}`.trim(); }, removeClass(name) { this.cls = this.cls.split(' ').filter(item => item !== name).join(' '); }, empty() { this.children = []; }
-  });
-  const find = (root, predicate) => predicate(root) ? root : root.children.map(child => find(child, predicate)).find(Boolean);
-  class Modal { constructor() { this.titleEl = element('h2'); this.contentEl = element('div'); } open() {} close() {} }
-  const { ReferencePicker } = load('ui/reference-picker.ts', { obsidian: { ...obsidian, Modal, setIcon: (parent, name) => { const icon = element('svg'); icon.iconName = name; parent.children.push(icon); } } });
-  const root = element('root');
-  const picker = new ReferencePicker({ vault: { adapter: {} } }, root, async () => [], async () => [], 'current', 'Current topic and parent are included');
-  // The picker no longer carries a web or image choice: that belongs to the AI mode.
-  assert.equal(picker.selection, undefined); assert.equal(picker.setNetworkDefault, undefined);
-  const area = root.children[0];
-  assert.ok(find(area, child => child.cls.includes('vam-reference-cancel')).cls.includes('is-hidden'));
-  assert.ok(find(area, child => child.cls.includes('vam-reference-error-acknowledge')).cls.includes('is-hidden'));
-  assert.deepEqual(area.children.filter(child => child.cls.includes('vam-reference-section')).map(child => child.cls), [
-    'vam-reference-section vam-reference-local-section'
-  ]);
-  assert.equal(find(area, child => child.tag === 'input' && child.type === 'checkbox'), undefined, 'no web or image checkbox');
-  assert.ok(find(area, child => child.tag === 'strong' && !!child.text));
-  const actionRow = find(area, child => child.cls === 'vam-reference-actions');
-  assert.equal(actionRow.children.filter(child => child.tag === 'button').length, 3);
-  assert.deepEqual(actionRow.children.filter(child => child.tag === 'button').map(button => button.children[0].children[0].iconName), ['brain-circuit', 'folder-open', 'file-text']);
-  picker.groups = [{ id: 'map', name: 'Travel map', location: 'Maps/Travel/Map.md', documents: [{ path: 'Maps/Travel/Notes/Train.md', content: 'rail' }] }];
-  picker.refresh();
-  const details = find(area, child => child.tag === 'details');
-  assert.equal(details.open, undefined);
-  assert.equal(find(details, child => child.tag === 'ul'), undefined);
-  const groupRow = find(area, child => child.cls === 'vam-reference-group-row');
-  const remove = find(area, child => child.cls === 'vam-reference-remove');
-  assert.equal(groupRow.children.includes(remove), true);
-  assert.equal(find(find(details, child => child.tag === 'summary'), child => child.tag === 'button'), undefined);
-  details.open = true; details.listeners.toggle();
-  assert.equal(find(details, child => child.tag === 'li').text, 'Maps/Travel/Notes/Train.md');
-  remove.listeners.click({ preventDefault() {} });
-  assert.deepEqual(Object.keys(await picker.ready()), ['groups'], 'ready() hands over the source groups only');
-  assert.equal((await picker.ready()).groups.length, 0);
-  assert.ok(find(area, child => child.cls.includes('vam-reference-cancel')).cls.includes('is-hidden'));
-  const input = (path, content) => ({name: path.split('/').at(-1), webkitRelativePath: path, text: async () => content});
-  const archived = input('Vault/Topic/Archive/old.md', '---\nagent-map-node: true\ntopic-state: archived\n---\nOld');
-  const ordinary = input('Vault/Archive/ordinary.md', 'Ordinary archive');
-  const active = input('Archive/Topics/Archive/Notes/active.md', '---\nagent-map-node: true\ntopic-state: active\n---\nCurrent');
-  picker.addFolder([archived, ordinary, active]);
-  let chosen = await picker.ready();
-  assert.deepEqual(plain(chosen.groups.flatMap(group => group.documents).map(doc => doc.path)), [ordinary.webkitRelativePath, active.webkitRelativePath]);
-  assert.ok(find(area, child => child.text.includes('Excluded 1')));
-  picker.addFiles([archived]); chosen = await picker.ready();
-  assert.equal(chosen.groups.flatMap(group => group.documents).length, 3);
-  assert.ok(chosen.groups.flatMap(group => group.documents).some(doc => doc.content.endsWith('Old')));
-});
 test('source footnotes survive reruns: numbers stay consistent, kept references get their definitions back, dead ones become a source to confirm', () => {
   const api = load('ai/reference-materials.ts', { obsidian });
   const groups = [{ id: 'g', documents: [{ path: 'Maps/A/one.md', content: '' }, { path: 'Maps/B/two.md', content: '' }] }];

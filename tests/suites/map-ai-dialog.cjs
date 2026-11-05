@@ -563,7 +563,7 @@ integrationTest('one-click dialog: model and effort are saved once when a run st
   assert.ok(findAll(failing.modal.contentEl, i => hasCls(i, 'vam-next-status')).some(i => /disk full/.test(i.text)));
 });
 // The sources belong to the map (toolbar panel); the task dialog has no data-source section, hint or text in any step.
-const NO_SOURCE_SECTION = /vam-next-source-details|vam-reference-/;
+const NO_SOURCE_SECTION = /vam-next-source-(?:details)|vam-reference-/;
 const assertNoSourceSection = (root, where) => {
   assert.equal(findAll(root, i => NO_SOURCE_SECTION.test(i.cls ?? '')).length, 0, `${where}: no source section`);
   assert.equal(findAll(root, i => /Data sources|資料來源/.test(i.text ?? '')).length, 0, `${where}: no data-source text`);

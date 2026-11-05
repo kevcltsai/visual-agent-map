@@ -660,6 +660,49 @@ test('F-b B4 (counter-example): clicking a card that is already selected still e
   assert.equal(h.control.requests[0].context.selectedImage, undefined);
 });
 
+test('F-b F2 (counter-example): pressing the title of a card that is already selected, through the real pointer handler, ends the picture selection', async () => {
+  const h = await harness();
+  const node = h.view.map.nodes.find(n => n.id === h.ids.a);
+  h.view.applySelectionChange(h.view.selection.selectIfChanged(node.id));
+  h.view.setChatImage('img1');
+  const events = new Map();
+  const titleEl = { closest: () => null };
+  const card = { style: {}, offsetLeft: 0, offsetTop: 0, offsetWidth: 300, offsetHeight: 100, setPointerCapture() {}, addEventListener: (name, fn) => events.set(name, fn), removeEventListener: name => events.delete(name) };
+  // The real plain-click callback; the title field itself is not what is under test, so the editor start is recorded.
+  h.chat.setDropHighlight = () => {}; h.chat.hitTest = () => false;
+  const edits = [];
+  // The editor's repaint can hand focus back to the picture that had it, which selects the picture again (its focus listener).
+  h.view.startCardTitleEdit = (n, at) => { edits.push([n.id, at]); h.view.setChatImage('img1'); };
+  h.view.cardTextEditable = () => true; h.view.notes.set(node.id, h.view.notes.get(node.id) ?? { title: 'Ribeye' });
+  card.querySelector = sel => sel === '.vam-card-title' ? { isConnected: true, contains: () => false, getBoundingClientRect: () => ({ left: 0, right: 300, top: 0, bottom: 100 }) } : null;
+  h.view.caretOffsetAt = () => 0;
+  h.view.enableDrag(card, node, (point, wasSelected) => h.view.openCardTextEditor(point, card, node, wasSelected));
+  events.get('pointerdown')({ target: titleEl, button: 0, pointerId: 1, clientX: 5, clientY: 5 });
+  events.get('pointerup')({ type: 'pointerup', target: titleEl, clientX: 5, clientY: 5 });
+  assert.equal(edits.length, 1, 'the title opened for typing');
+  assert.equal(h.view.chatImage(), null, 'the press on the selected card cleared the picture');
+});
+
+test('F-b Esc (counter-example): Esc on a focused picture clears the chip and moves focus to the map, so no focus ring is left; Esc elsewhere leaves focus alone', async () => {
+  const h = await harness();
+  const doc = h.view.contentEl.ownerDocument = { activeElement: null, querySelector: () => null };
+  const focused = []; h.view.contentEl.getAttribute = () => '0'; h.view.contentEl.contains = () => true; h.view.contentEl.querySelectorAll = () => [];
+  h.view.contentEl.focus = opts => { focused.push(opts); doc.activeElement = h.view.contentEl; };
+  const pic = { tagName: 'DIV', getAttribute: () => null, classList: { contains: c => c === 'vam-canvas-image', item: () => null }, closest: () => null, isConnected: true };
+  doc.activeElement = pic;
+  h.view.setChatImage('img1');
+  const esc = target => { let stopped = 0; h.view.onMapKeydown({ key: 'Escape', target, defaultPrevented: false, preventDefault() {}, stopPropagation() { stopped++; } }); return stopped; };
+  assert.equal(esc(pic), 1);
+  assert.equal(h.view.chatImage(), null, 'the chip is gone');
+  assert.equal(focused.length, 1, 'focus moved off the picture to the map');
+  assert.equal(doc.activeElement, h.view.contentEl);
+  // Another focused element (a card) keeps its focus: only a picture without a chip must lose its ring.
+  const card = { tagName: 'DIV', getAttribute: () => null, classList: { contains: () => false, item: () => null }, closest: () => null };
+  doc.activeElement = card;
+  esc(card);
+  assert.equal(focused.length, 1, 'no extra focus move');
+});
+
 test('F-b M7: clicking or focusing a picture selects it again after Esc cleared it, and the outline follows the chip', async () => {
   const h = await harness(); const el = canvas(h);
   const fire = (target, name) => { for (const fn of target.listeners[name] ?? []) fn({ target }); };

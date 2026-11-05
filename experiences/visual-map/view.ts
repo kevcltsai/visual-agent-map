@@ -1813,6 +1813,11 @@ export class VisualAgentMapView extends ItemView {
       if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
       this.applySelectionChange(this.selection.escape());
       this.clearChatImage();
+      // The picture lost its chip, so it must not keep a focus ring either: focus goes to the map itself, as a lost focus does.
+      if (target?.classList?.contains("vam-canvas-image") && this.contentEl.ownerDocument.activeElement === target) {
+        if (this.contentEl.getAttribute("tabindex") === null) this.contentEl.tabIndex = -1;
+        this.contentEl.focus({ preventScroll: true });
+      }
       // Claimed here: unhandled, Obsidian answers Esc by activating another leaf and the next key edits that note.
       event.preventDefault();
       event.stopPropagation();
@@ -2522,6 +2527,9 @@ export class VisualAgentMapView extends ItemView {
     } else if (add && hit(add)) {
       this.startCardSummaryEdit(node, 0);
     } else return false;
+    // Opening a card's text is choosing that card: the editor's repaint can hand focus back to a picture (which selects it
+    // again), so the picture ends here, after the repaint.
+    this.clearChatImage();
     return true;
   }
   async onClose(): Promise<void> {

@@ -55402,6 +55402,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     }
   }
   onMapKeydown(event) {
+    var _a2;
     const target = event.target;
     if (target == null ? void 0 : target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
     if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
@@ -55423,6 +55424,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
       this.applySelectionChange(this.selection.escape());
       this.clearChatImage();
+      if (((_a2 = target == null ? void 0 : target.classList) == null ? void 0 : _a2.contains("vam-canvas-image")) && this.contentEl.ownerDocument.activeElement === target) {
+        if (this.contentEl.getAttribute("tabindex") === null) this.contentEl.tabIndex = -1;
+        this.contentEl.focus({ preventScroll: true });
+      }
       event.preventDefault();
       event.stopPropagation();
       this.restoreMapFocus(anchor);
@@ -56110,6 +56115,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     } else if (add && hit(add)) {
       this.startCardSummaryEdit(node, 0);
     } else return false;
+    this.clearChatImage();
     return true;
   }
   async onClose() {

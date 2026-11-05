@@ -1,4 +1,5 @@
 import {
+  cardOutputLanguage,
   defaultOutputLanguage,
   existingNoteLanguage,
   mapChatLanguageSources,
@@ -2785,6 +2786,7 @@ export class VisualAgentMapView extends ItemView {
     const remembered = rememberedOutputLanguage(this.map);
     return {
       ...(remembered ? { outputLanguage: remembered } : {}),
+      ...(this.map?.title ? { mapTitle: this.map.title } : {}),
       rememberOutputLanguage: language =>
         this.plugin.mutate(() =>
           this.mapChange(map => {
@@ -2823,7 +2825,7 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
-        const outputLanguage = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+        const outputLanguage = cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
         await this.runAgent(node, undefined, message => new Notice(message), {
           task: researchTopicTask(outputLanguage, note.title),
           referenceGroups: [],
@@ -14558,7 +14560,7 @@ export class VisualAgentMapView extends ItemView {
         async (options, focus, done, failed, accepted) => {
           const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
           const taskLanguage =
-            options.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
+            options.outputLanguage ?? cardOutputLanguage(this.map, this.plugin.settings.language, latest.title);
           const task = researchTopicTask(taskLanguage, latest.title);
           const runStyle = await this.detailTemplateFor(
             node,
@@ -17130,7 +17132,7 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<void> {
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
-      choices.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+      choices.outputLanguage ?? cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
     const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage);
     let started = false;
     let failure: string | undefined;
@@ -21906,7 +21908,8 @@ export class VisualAgentMapView extends ItemView {
             this.plugin.settings.language,
             note.title,
             existingNoteLanguage(note),
-            this.outputLanguageMemory().outputLanguage
+            this.outputLanguageMemory().outputLanguage,
+            this.map?.title
           ),
           limits
         },
@@ -21928,7 +21931,8 @@ export class VisualAgentMapView extends ItemView {
           this.plugin.settings.language,
           note.title,
           existingNoteLanguage(note),
-          this.outputLanguageMemory().outputLanguage
+          this.outputLanguageMemory().outputLanguage,
+          this.map?.title
         )
       });
     } catch (error) {
@@ -21970,7 +21974,13 @@ export class VisualAgentMapView extends ItemView {
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);
       const options = chatSynthesisOptions({
-        outputLanguage: defaultOutputLanguage(settings.language, note.title, existingNoteLanguage(note), remembered)
+        outputLanguage: defaultOutputLanguage(
+          settings.language,
+          note.title,
+          existingNoteLanguage(note),
+          remembered,
+          map.title
+        )
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
         this.startSynthesis(node, options, message, failed, accepted)

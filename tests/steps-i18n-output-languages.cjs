@@ -14,7 +14,7 @@ const i18n = load('i18n.ts');
 const { LANGUAGES, OUTPUT_LANGUAGES } = load('i18n/languages.ts');
 const content = load('experiences/aim/content-language.ts');
 const result = load('ai/result-utils.ts');
-const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, noteLanguageFromBody, mapChatLanguageSources } = content;
+const { detectAimContentLanguage, chooseAimContentLanguage, resolveAimContentLanguage, selectionOutputLanguage, defaultOutputLanguage, outputLanguageForMap, cardOutputLanguage, noteLanguageFromBody, mapChatLanguageSources } = content;
 // The clause without an anchor (nothing to quote), then the anchored one that names and quotes the user's own text (D-2026-10-94).
 const CLAUSE_EN = "the language in which the user's own text (topic, question or selection) is written (not the language of these instructions or of the fixed headings)";
 const CLAUSE_ZH = '使用者自己輸入的文字（主題、問題或選取文字）所使用的語言（不是這些指示或固定標題的語言）';
@@ -449,7 +449,7 @@ test('output languages: a manual choice in the task menu is saved on the map whe
   const modals = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/modals.ts'), 'utf8');
   assert.match(modals, /this\.manualOutputLanguage = languageSelect\.value as ContentLanguage/);
   assert.match(modals, /this\.info\?\.rememberOutputLanguage/);
-  assert.match(modals, /defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*this\.topic,\s*this\.modelSettings\?\.contentLanguage,\s*this\.info\?\.outputLanguage\s*\)/);
+  assert.match(modals, /defaultOutputLanguage\(\s*this\.plugin\.settings\.language,\s*this\.topic,\s*this\.modelSettings\?\.contentLanguage,\s*this\.info\?\.outputLanguage,\s*this\.info\?\.mapTitle\s*\)/);
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal((view.match(/\.\.\.this\.outputLanguageMemory\(\)/g) ?? []).length, 2, 'topic dialog and selection synthesis dialog');
   assert.match(view, /map\.outputLanguage = language/);
@@ -476,7 +476,7 @@ test('output languages: no existing prompt snapshot changed (the new languages a
 test('output languages: the single-card task line and the selection AI use the resolved output language and the selected text (D-2026-10-94)', () => {
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   // Single card (B2): the dialog's language, else the map's, never the interface language (the batch path reads the same way).
-  assert.match(view, /const taskLanguage =\s+options\.outputLanguage \?\? outputLanguageForMap\(this\.map, this\.plugin\.settings\.language, latest\.title\);\s+const task = researchTopicTask\(taskLanguage, latest\.title\);/);
+  assert.match(view, /const taskLanguage =\s+options\.outputLanguage \?\? cardOutputLanguage\(this\.map, this\.plugin\.settings\.language, latest\.title\);\s+const task = researchTopicTask\(taskLanguage, latest\.title\);/);
   assert.equal(view.includes('researchTopicTask(this.plugin.settings.language'), false);
   // The "no conclusion yet" summary placeholder of the synthesis prompts is written in the output language's note language.
   // The selection synthesis's two steps (directions and draft) both build their context from the run options (04b).
@@ -638,4 +638,41 @@ test('note-style-editorial K1: the new standard section names are recognised nex
   assert.equal(result.normalizeOutputScriptHeadings('### 来源\n\nd', 'zh-CN', { id: 'custom-1' }), '### 来源\n\nd');
   // en output has no differing note language
   assert.equal(result.normalizeOutputScriptHeadings('### Sources\n\nd', 'en', undefined), '### Sources\n\nd');
+});
+
+test('card output language follows the map title when the card title is Latin (decision 2026-11-06-card-language#1)', () => {
+  const zhMap = { title: 'pstack 技能解析' };
+  for (const title of ['sharpen', 'how', 'why', 'figure-it-out', 'show-me-your-work', 'pstack（Cursor plugins）']) {
+    assert.equal(cardOutputLanguage(zhMap, 'zh-TW', title), 'zh-TW', title);
+    assert.equal(cardOutputLanguage(zhMap, 'en', title), 'zh-TW', `${title} (en UI)`);
+  }
+  assert.equal(cardOutputLanguage({ title: 'pstack 技能解析' }, 'zh-CN', 'sharpen'), 'zh-CN');
+  assert.equal(cardOutputLanguage({ title: '这个项目的软件设计' }, 'zh-TW', 'sharpen'), 'zh-CN');
+  assert.equal(cardOutputLanguage({ title: 'ひらがなで書いた計画です' }, 'en', 'sharpen'), 'ja');
+  // Not overridden.
+  assert.equal(cardOutputLanguage({ outputLanguage: 'en', title: 'pstack 技能解析' }, 'zh-TW', 'sharpen'), 'en');
+  assert.equal(cardOutputLanguage(zhMap, 'zh-TW', 'ひらがなで書いた計画です'), 'ja');
+  assert.equal(cardOutputLanguage({ title: 'The Roman Empire' }, 'zh-TW', '中文標題'), 'zh-TW');
+  // Unchanged behaviour.
+  assert.equal(cardOutputLanguage({ title: 'The Roman Empire' }, 'en', 'La vie en rose'), 'same-as-input');
+  assert.equal(cardOutputLanguage({ title: 'Ancient Egypt' }, 'en', 'How to plan the trip'), 'en');
+  assert.equal(cardOutputLanguage({ title: 'Ancient Egypt' }, 'en', 'Plan a trip'), chooseAimContentLanguage('en', 'Plan a trip'));
+  for (const title of ['Untitled mind map', '未命名心智圖']) assert.equal(cardOutputLanguage({ title }, 'en', 'sharpen'), 'same-as-input', title);
+  assert.equal(cardOutputLanguage(undefined, 'en', 'sharpen'), 'same-as-input');
+  assert.equal(cardOutputLanguage(null, 'zh-TW', 'sharpen'), chooseAimContentLanguage('zh-TW', 'sharpen'));
+  // Map chat still follows what is typed.
+  assert.equal(outputLanguageForMap({ title: 'pstack 技能解析' }, 'zh-TW', ...mapChatLanguageSources('Please explain the plan')), 'en');
+  // Dialog default.
+  assert.equal(defaultOutputLanguage('zh-TW', 'sharpen', undefined, undefined, 'pstack 技能解析'), 'zh-TW');
+  assert.equal(defaultOutputLanguage('zh-TW', 'sharpen', undefined, 'ja', 'pstack 技能解析'), 'ja');
+  assert.equal(defaultOutputLanguage('zh-TW', 'sharpen', 'en', undefined, 'pstack 技能解析'), 'zh-TW', 'zh-TW UI, English note: guard falls back to the UI language');
+  assert.equal(defaultOutputLanguage('en', 'sharpen', 'en', undefined, 'pstack 技能解析'), 'en', 'English note: guard falls back to the UI language');
+  assert.equal(defaultOutputLanguage('en', 'sharpen', 'zh-TW', undefined, 'pstack 技能解析'), 'zh-TW');
+});
+
+test('card output language call sites use cardOutputLanguage with the map title', () => {
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.equal((view.match(/cardOutputLanguage\(this\.map, this\.plugin\.settings\.language, (?:note|latest)\.title\)/g) ?? []).length, 3);
+  assert.equal((view.match(/outputLanguageForMap\(/g) ?? []).length, 4);
+  assert.equal((view.match(/this\.map\?\.title/g) ?? []).length >= 1, true);
 });

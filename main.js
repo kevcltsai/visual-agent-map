@@ -17770,11 +17770,24 @@ function existingNoteLanguage(note) {
   var _a2;
   return (_a2 = note.contentLanguage) != null ? _a2 : noteLanguageFromBody(note.detail);
 }
-function defaultOutputLanguage(ui, topic, noteLanguage, remembered) {
+function defaultOutputLanguage(ui, topic, noteLanguage, remembered, mapTitle) {
   if (isContentLanguage(remembered)) return remembered;
-  const chosen = chooseAimContentLanguage(ui, topic);
+  const chosen = cardLanguageFromTitles(ui, topic, mapTitle);
   if (noteLanguage !== void 0 && noteLanguageOf(chosen) !== noteLanguage) return ui;
   return chosen;
+}
+function cardLanguageFromTitles(uiLanguage, cardTitle, mapTitle) {
+  const chosen = chooseAimContentLanguage(uiLanguage, cardTitle);
+  if (chosen !== LATIN_TEXT_DETECTION.language && chosen !== FOLLOW_INPUT_ID) return chosen;
+  if (!mapTitle || isPlaceholderText(mapTitle)) return chosen;
+  const signal = signalOf(mapTitle);
+  if (signal === void 0 || signal === LATIN_TEXT_DETECTION.language || signal === FOLLOW_INPUT_ID) return chosen;
+  if (signal === UNDECIDED_HAN) return contentLocale("zh-TW", uiLanguage);
+  return signal;
+}
+function cardOutputLanguage(map, uiLanguage, title) {
+  var _a2;
+  return (_a2 = rememberedOutputLanguage(map)) != null ? _a2 : cardLanguageFromTitles(uiLanguage, title, map == null ? void 0 : map.title);
 }
 function rememberedOutputLanguage(map) {
   const value = map == null ? void 0 : map.outputLanguage;
@@ -45020,7 +45033,7 @@ var NextStepModal = class extends import_obsidian29.Modal {
     (_a2 = status()) == null ? void 0 : _a2.setText(t("ui.quick_outline_review_hint"));
   }
   onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
     this.modalEl.addClass("vam-next-modal");
     const selection = this.selectionFlow;
     this.titleEl.setText(t(selection ? "ui.confirm_topic_synthesis" : "ui.how_would_you_like_to_explore_next"));
@@ -45569,7 +45582,8 @@ var NextStepModal = class extends import_obsidian29.Modal {
       this.plugin.settings.language,
       this.topic,
       (_u = this.modelSettings) == null ? void 0 : _u.contentLanguage,
-      (_v = this.info) == null ? void 0 : _v.outputLanguage
+      (_v = this.info) == null ? void 0 : _v.outputLanguage,
+      (_w = this.info) == null ? void 0 : _w.mapTitle
     );
     languageSelect.setAttr("aria-label", t("ui.output_language"));
     languageSelect.addEventListener("change", () => {
@@ -45577,7 +45591,7 @@ var NextStepModal = class extends import_obsidian29.Modal {
     });
     const style = styleChoiceField(compactSettings, {
       styles: stylePickerFor(this.app, this.plugin),
-      current: (_x = (_w = this.info) == null ? void 0 : _w.currentStyle) != null ? _x : "",
+      current: (_y = (_x = this.info) == null ? void 0 : _x.currentStyle) != null ? _y : "",
       changed: () => refreshSummary()
     });
     const noteStyle = style.style;
@@ -45619,7 +45633,7 @@ var NextStepModal = class extends import_obsidian29.Modal {
     else checkName();
     syncExpand();
     show(initialMode);
-    const waitingOutline = (_y = this.modelSettings) == null ? void 0 : _y.pendingOutline;
+    const waitingOutline = (_z = this.modelSettings) == null ? void 0 : _z.pendingOutline;
     if (waitingOutline && quickOutline) {
       shallow.checked = !!waitingOutline.options.shallowResearch;
       if (waitingOutline.bounds) {
@@ -45647,7 +45661,7 @@ var NextStepModal = class extends import_obsidian29.Modal {
       );
     }
     (titleInput != null ? titleInput : cardFor[initialMode]).focus();
-    ((_z = this.renderModelSettings(adjustBody)) != null ? _z : adjustBody).createEl("p", {
+    ((_A = this.renderModelSettings(adjustBody)) != null ? _A : adjustBody).createEl("p", {
       text: t("ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it"),
       cls: "vam-hint"
     });
@@ -55960,9 +55974,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   }
   /** What the next-step dialogs need to preselect and record this map's output language (D-2026-10-88). */
   outputLanguageMemory() {
+    var _a2;
     const remembered = rememberedOutputLanguage(this.map);
     return {
       ...remembered ? { outputLanguage: remembered } : {},
+      ...((_a2 = this.map) == null ? void 0 : _a2.title) ? { mapTitle: this.map.title } : {},
       rememberOutputLanguage: (language2) => this.plugin.mutate(
         () => this.mapChange((map) => {
           map.outputLanguage = language2;
@@ -56001,7 +56017,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
-        const outputLanguage2 = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+        const outputLanguage2 = cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
         await this.runAgent(node, void 0, (message) => new import_obsidian37.Notice(message), {
           task: researchTopicTask(outputLanguage2, note.title),
           referenceGroups: [],
@@ -66860,7 +66876,7 @@ ${request.requirements}` : preset.text,
         async (options, focus, done, failed, accepted) => {
           var _a3, _b3, _c2;
           const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
-          const taskLanguage = (_b3 = options.outputLanguage) != null ? _b3 : outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
+          const taskLanguage = (_b3 = options.outputLanguage) != null ? _b3 : cardOutputLanguage(this.map, this.plugin.settings.language, latest.title);
           const task = researchTopicTask(taskLanguage, latest.title);
           const runStyle = await this.detailTemplateFor(
             node,
@@ -69273,7 +69289,7 @@ ${request.requirements}` : preset.text,
   async researchChild(child, batchSignal, accepted, choices, charts = true, onResult, gate) {
     var _a2, _b2, _c;
     const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
-    const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+    const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
     const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage2);
     let started = false;
     let failure;
@@ -73617,7 +73633,7 @@ ${addition}` : addition });
    * while the outline is generated.
    */
   async chatExpand(parent, direction) {
-    var _a2;
+    var _a2, _b2, _c;
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
       new import_obsidian37.Notice(t("ui.ai_running_ai"));
       return;
@@ -73643,7 +73659,8 @@ ${addition}` : addition });
             this.plugin.settings.language,
             note.title,
             existingNoteLanguage(note),
-            this.outputLanguageMemory().outputLanguage
+            this.outputLanguageMemory().outputLanguage,
+            (_b2 = this.map) == null ? void 0 : _b2.title
           ),
           limits
         },
@@ -73664,7 +73681,8 @@ ${addition}` : addition });
           this.plugin.settings.language,
           note.title,
           existingNoteLanguage(note),
-          this.outputLanguageMemory().outputLanguage
+          this.outputLanguageMemory().outputLanguage,
+          (_c = this.map) == null ? void 0 : _c.title
         )
       });
     } catch (error) {
@@ -73699,7 +73717,13 @@ ${addition}` : addition });
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);
       const options2 = chatSynthesisOptions({
-        outputLanguage: defaultOutputLanguage(settings.language, note.title, existingNoteLanguage(note), remembered)
+        outputLanguage: defaultOutputLanguage(
+          settings.language,
+          note.title,
+          existingNoteLanguage(note),
+          remembered,
+          map.title
+        )
       });
       return this.launchChatTask(
         note.model,

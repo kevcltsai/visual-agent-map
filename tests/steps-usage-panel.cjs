@@ -11,7 +11,7 @@ const dom = require('./support-dom.cjs');
 const { obsidian } = require('./support.cjs');
 
 const { AiUsageStore } = load('core/ai-usage-store.ts');
-const { UsageControl, formatTokens, formatDuration } = load('experiences/visual-map/usage-panel.ts', { obsidian });
+const { UsageControl, formatTokens } = load('experiences/visual-map/usage-panel.ts', { obsidian });
 const { element, find, findAll } = dom;
 
 const MAP = 'A/map.vam';
@@ -42,7 +42,6 @@ const texts = root => findAll(root, i => i.text).map(i => i.text);
 
 test('formatTokens: whole under 1000, one decimal k to 99999 (never 100.0k), whole k from 100k', () => {
   assert.deepEqual([0, 7, 999, 1000, 1234, 12400, 99949, 99999, 100000, 312000, 312600].map(formatTokens), ['0', '7', '999', '1.0k', '1.2k', '12.4k', '99.9k', '99.9k', '100k', '312k', '313k']);
-  assert.equal(formatDuration(18000), '18 s'); assert.equal(formatDuration(65000), '1 min 5 s'); assert.equal(formatDuration(undefined), '–');
 });
 
 test('the button is the first control of the zoom bar with a label, haspopup dialog and aria-expanded', async () => {
@@ -75,7 +74,7 @@ test('click opens the panel; Esc, an outside press and a second click close it a
   assert.equal(h.doc.listeners.keydown.length + h.doc.listeners.pointerdown.length, 0, 'closed: no document listeners are left');
 });
 
-test('panel shows totals, only the actions with usage, the recent rows with 約 for estimates, and the footer', async () => {
+test('panel shows totals, only the actions with usage, no request history, and the footer', async () => {
   const { store } = await newStore([
     { action: 'research', inputTokens: 1000, outputTokens: 200, topic: 'Sleep', durationMs: 18000 },
     { action: 'expand', inputTokens: 300, outputTokens: 100, topic: 'REM', estimated: true, durationMs: 9000 },
@@ -84,10 +83,11 @@ test('panel shows totals, only the actions with usage, the recent rows with 約 
   const h = rig(store);
   h.button().click();
   const all = texts(h.panel());
-  for (const expected of ['Token usage', 'This mind map', 'Today', 'This month', '~1.6k', '~6.6k', 'In 1.3k', 'Out 300', '~400', '18 s', '9 s', 'Sleep', 'REM']) assert.ok(all.includes(expected), expected + ' in ' + all.join('|'));
+  for (const expected of ['Token usage', 'This mind map', 'Today', 'This month', '~1.6k', '~6.6k', 'In 1.3k', 'Out 300', '~400']) assert.ok(all.includes(expected), expected + ' in ' + all.join('|'));
+  for (const gone of ['18 s', '9 s', 'Sleep', 'REM', 'LAST 10 REQUESTS']) assert.ok(!all.includes(gone), gone + ' (history) must not be shown');
   const shown = findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text);
   assert.deepEqual(shown, ['Research', 'Expand']);
-  assert.equal(findAll(h.panel(), i => i.tag === 'tr' && !i.hidden).length, 2, 'only this map\'s two requests');
+  assert.equal(findAll(h.panel(), i => i.tag === 'tr').length, 0, 'no request-history table');
   assert.ok(all.includes('Counts only AI requests sent by VAM.'));
   assert.ok(all.includes('Values marked ~ are estimates.'));
 });
@@ -121,7 +121,7 @@ test('no usage yet: zeros and one empty-state sentence, no bars or request table
   const empty = find(h.panel(), i => i.cls === 'vam-usage-empty');
   assert.equal(empty.hidden, false);
   const sections = findAll(h.panel(), i => i.cls === 'vam-usage-section');
-  assert.deepEqual(sections.map(s => s.hidden), [false, true, true]);
+  assert.deepEqual(sections.map(s => s.hidden), [false, true]);
   assert.equal(find(h.panel(), i => i.tag === 'strong').text, '0');
 });
 
@@ -165,7 +165,6 @@ const checked = h => radios(h).filter(r => r.attrs['aria-checked'] === 'true').m
 const pick = (h, label) => radios(h).find(r => r.text === label).click();
 const foot = h => find(h.panel(), i => i.cls === 'vam-usage-foot').children;
 const strongs = h => findAll(h.panel(), i => i.tag === 'strong').map(i => i.text);
-const shownRows = h => findAll(h.panel(), i => i.tag === 'tr' && !i.hidden).length;
 const mixed = [
   { provider: 'claude', inputTokens: 1000, outputTokens: 200, topic: 'C1' },
   { provider: 'codex', model: 'codex:x', action: 'expand', inputTokens: 300, outputTokens: 100, topic: 'X1', estimated: true },
@@ -198,18 +197,15 @@ test('arrow keys move the choice (wrapping) and the focus; other keys do nothing
   assert.equal(press('a'), false); assert.deepEqual(checked(h), ['Codex']);
 });
 
-test('the filter narrows totals, actions and recent rows; the zoom-bar number stays Total', async () => {
+test('the filter narrows totals and actions; the zoom-bar number stays Total', async () => {
   const h = rig((await newStore(mixed)).store);
   h.button().click();
-  assert.equal(shownRows(h), 3);
   pick(h, 'Claude');
   assert.equal(strongs(h)[0], '1.2k');
-  assert.equal(shownRows(h), 1);
   assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text), ['Research']);
   assert.equal(find(h.button(), i => i.cls === 'vam-usage-number').text, '1.7k');
   assert.equal(h.button().attrs['aria-label'], 'Token usage: today 1.7k');
   pick(h, 'Codex');
-  assert.equal(shownRows(h), 2);
   assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-bar' && !i.hidden).map(i => i.children[0].text), ['Expand']);
 });
 
@@ -220,7 +216,7 @@ test('counter-example: Codex chosen with no Codex records shows zeros and the em
   assert.equal(find(h.panel(), i => i.cls === 'vam-usage-error').hidden, true);
   assert.equal(find(h.panel(), i => i.cls === 'vam-usage-empty').hidden, false);
   assert.deepEqual(strongs(h), ['0', '0', '0']);
-  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-section').map(s => s.hidden), [false, true, true]);
+  assert.deepEqual(findAll(h.panel(), i => i.cls === 'vam-usage-section').map(s => s.hidden), [false, true]);
 });
 
 test('counter-example: Claude chosen, panel closed and opened again: back on Total', async () => {
@@ -228,7 +224,6 @@ test('counter-example: Claude chosen, panel closed and opened again: back on Tot
   h.button().click(); pick(h, 'Claude'); assert.deepEqual(checked(h), ['Claude']);
   h.button().click(); h.button().click();
   assert.deepEqual(checked(h), ['Total']);
-  assert.equal(shownRows(h), 3);
 });
 
 test('counter-example: footer line 2 only while a shown number is estimated; line 1 always', async () => {
@@ -245,13 +240,11 @@ test('counter-example: footer line 2 only while a shown number is estimated; lin
   pick(h, 'Codex'); assert.equal(foot(h)[1].hidden, false);
 });
 
-test('estimated sums get the 約 mark (totals, action bars) and so do estimated recent rows', async () => {
+test('estimated sums get the 約 mark (totals, action bars)', async () => {
   const h = rig((await newStore(mixed)).store);
   h.button().click(); pick(h, 'Codex');
   const all = texts(h.panel());
   assert.ok(all.includes('~500'), 'totals / bar with an estimated part: ' + all.join('|'));
-  assert.ok(all.includes('~400'), 'estimated recent row');
-  assert.ok(all.includes('100'), 'real recent row stays plain');
   pick(h, 'Claude');
   assert.ok(!texts(h.panel()).some(text => text.startsWith('~')));
 });

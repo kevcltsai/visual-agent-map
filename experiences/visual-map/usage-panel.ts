@@ -6,13 +6,11 @@ import {
   localMonthStart,
   type AiUsageStore,
   type UsageAction,
-  type UsageEntry,
   type UsageProvider,
   type UsageSum,
   type UsageTokens
 } from "../../core/ai-usage-store";
 
-const RECENT_ROWS = 10;
 /** Gap between the zoom bar and the panel above it. */
 const PANEL_GAP = 8;
 
@@ -23,20 +21,6 @@ export function formatTokens(count: number): string {
   if (n < 100_000) return `${(Math.floor(n / 100) / 10).toFixed(1)}k`;
   return `${Math.round(n / 1000)}k`;
 }
-
-/** A call's length: "18 s", "1 min 5 s"; nothing known gives a dash. */
-export function formatDuration(ms: number | undefined): string {
-  if (ms === undefined || !Number.isFinite(ms) || ms < 0) return "–";
-  const seconds = Math.max(1, Math.round(ms / 1000));
-  if (seconds < 60) return t("ui.usage_seconds_0", String(seconds));
-  return t("ui.usage_minutes_seconds_01", String(Math.floor(seconds / 60)), String(seconds % 60));
-}
-
-const clock = (iso: string): string => {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "–";
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-};
 
 const actionLabel = (action: UsageAction): string => t(`ui.usage_action_${action}`);
 const sum = (tokens: UsageTokens): number => tokens.inputTokens + tokens.outputTokens;
@@ -61,14 +45,6 @@ interface BarRow {
   fill: HTMLElement;
   value: HTMLElement;
 }
-interface RecentRow {
-  row: HTMLElement;
-  time: HTMLElement;
-  action: HTMLElement;
-  node: HTMLElement;
-  tokens: HTMLElement;
-  duration: HTMLElement;
-}
 interface PanelParts {
   root: HTMLElement;
   sections: HTMLElement[];
@@ -77,8 +53,6 @@ interface PanelParts {
   cells: { map: TotalCell; today: TotalCell; month: TotalCell };
   bars: Map<UsageAction, BarRow>;
   barsBox: HTMLElement;
-  rows: RecentRow[];
-  recentBox: HTMLElement;
   filters: Map<UsageFilter, HTMLElement>;
   footEstimates: HTMLElement;
 }
@@ -298,22 +272,6 @@ export class UsageControl {
       row.hidden = true;
     }
 
-    const recentSection = root.createDiv({ cls: "vam-usage-section" });
-    recentSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_recent") });
-    const recentBox = recentSection.createEl("table", { cls: "vam-usage-recent" });
-    const rows: RecentRow[] = [];
-    for (let index = 0; index < RECENT_ROWS; index++) {
-      const row = recentBox.createEl("tr");
-      const time = row.createEl("td", { cls: "vam-usage-faint" });
-      const what = row.createEl("td");
-      const action = what.createSpan();
-      const node = what.createSpan({ cls: "vam-usage-node" });
-      const tokens = row.createEl("td", { cls: "vam-usage-muted" });
-      const duration = row.createEl("td", { cls: "vam-usage-muted" });
-      row.hidden = true;
-      rows.push({ row, time, action, node, tokens, duration });
-    }
-
     const foot = root.createDiv({ cls: "vam-usage-foot" });
     foot.createDiv({ text: t("ui.usage_footer_scope") });
     const footEstimates = foot.createDiv({ text: t("ui.usage_footer_estimates") });
@@ -321,14 +279,12 @@ export class UsageControl {
     this.markFilters(filters);
     return {
       root,
-      sections: [totalsSection, barsSection, recentSection],
+      sections: [totalsSection, barsSection],
       empty,
       error,
       cells,
       bars,
       barsBox,
-      rows,
-      recentBox,
       filters,
       footEstimates
     };
@@ -360,13 +316,11 @@ export class UsageControl {
     const today = this.store.totals({ since: localDayStart(), provider });
     const month = this.store.totals({ since: localMonthStart(), provider });
     const actions = this.store.byAction(path, undefined, provider);
-    const recent = this.store.recent(path, RECENT_ROWS, provider);
     if (
       map.status === "unreadable" ||
       today.status === "unreadable" ||
       month.status === "unreadable" ||
-      actions.status === "unreadable" ||
-      recent.status === "unreadable"
+      actions.status === "unreadable"
     ) {
       parts.error.hidden = false;
       parts.empty.hidden = true;
@@ -387,10 +341,9 @@ export class UsageControl {
     total(parts.cells.today, today.value);
     total(parts.cells.month, month.value);
 
-    const noUsage = sum(map.value) === 0 && recent.value.length === 0;
+    const noUsage = sum(map.value) === 0;
     parts.empty.hidden = !noUsage;
     parts.sections[1].hidden = noUsage;
-    parts.sections[2].hidden = noUsage;
     let anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
     const biggest = Math.max(0, ...USAGE_ACTIONS.map(action => sum(actions.value[action])));
     for (const action of USAGE_ACTIONS) {
@@ -401,22 +354,7 @@ export class UsageControl {
       bar.value.setText(mark(used, actions.value[action].estimated));
       if (!noUsage && used > 0 && actions.value[action].estimated) anyEstimate = true;
     }
-    parts.rows.forEach((slot, index) => this.fillRow(slot, recent.value[index]));
-    if (!noUsage && recent.value.some(entry => entry.estimated)) anyEstimate = true;
     parts.footEstimates.hidden = !anyEstimate;
     this.place();
-  }
-
-  private fillRow(slot: RecentRow, entry: UsageEntry | undefined): void {
-    slot.row.hidden = !entry;
-    if (!entry) return;
-    const count = formatTokens(entry.inputTokens + entry.outputTokens);
-    slot.time.setText(clock(entry.at));
-    slot.action.setText(actionLabel(entry.action));
-    slot.node.setText(entry.topic ?? "");
-    slot.node.hidden = !entry.topic;
-    slot.tokens.setText(entry.estimated ? t("ui.usage_estimated_0", count) : count);
-    slot.tokens.toggleClass("is-estimated", entry.estimated);
-    slot.duration.setText(formatDuration(entry.durationMs));
   }
 }

@@ -1161,10 +1161,7 @@ var en = {
   "ui.usage_action_synthesize": "Synthesize",
   "ui.usage_action_writeback": "Write to note",
   "ui.usage_action_other": "Other",
-  "ui.usage_recent": "LAST 10 REQUESTS",
   "ui.usage_estimated_0": "~{0}",
-  "ui.usage_seconds_0": "{0} s",
-  "ui.usage_minutes_seconds_01": "{0} min {1} s",
   "ui.usage_empty": "No AI requests recorded for this mind map yet.",
   "ui.usage_unreadable": "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",
   "ui.usage_footer_scope": "Counts only AI requests sent by VAM.",
@@ -3870,10 +3867,7 @@ var zhCN = {
   "ui.usage_action_synthesize": "\u6574\u5408",
   "ui.usage_action_writeback": "\u5199\u56DE\u7B14\u8BB0",
   "ui.usage_action_other": "\u5176\u4ED6",
-  "ui.usage_recent": "\u6700\u8FD1 10 \u6B21\u8BF7\u6C42",
   "ui.usage_estimated_0": "\u7EA6 {0}",
-  "ui.usage_seconds_0": "{0} \u79D2",
-  "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
   "ui.usage_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u8FD8\u6CA1\u6709 AI \u8BF7\u6C42\u8BB0\u5F55\u3002",
   "ui.usage_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u7528\u91CF\u6570\u636E\uFF0C\u6240\u4EE5\u4E0D\u663E\u793A\u6570\u5B57\u3002\u63D2\u4EF6\u6587\u4EF6\u5939\u91CC\u7684 ai-usage.json \u5DF2\u539F\u6837\u4FDD\u7559\u3002",
   "ui.usage_footer_scope": "\u53EA\u8BA1\u7B97 VAM \u53D1\u51FA\u7684 AI \u8BF7\u6C42\u3002",
@@ -6579,10 +6573,7 @@ var zhTW = {
   "ui.usage_action_synthesize": "\u6574\u5408",
   "ui.usage_action_writeback": "\u5BEB\u56DE\u7B46\u8A18",
   "ui.usage_action_other": "\u5176\u4ED6",
-  "ui.usage_recent": "\u6700\u8FD1 10 \u6B21\u8ACB\u6C42",
   "ui.usage_estimated_0": "\u7D04 {0}",
-  "ui.usage_seconds_0": "{0} \u79D2",
-  "ui.usage_minutes_seconds_01": "{0} \u5206 {1} \u79D2",
   "ui.usage_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u9084\u6C92\u6709 AI \u8ACB\u6C42\u7D00\u9304\u3002",
   "ui.usage_unreadable": "\u7121\u6CD5\u8B80\u53D6\u7528\u91CF\u8CC7\u6599\uFF0C\u6240\u4EE5\u4E0D\u986F\u793A\u6578\u5B57\u3002\u5916\u639B\u8CC7\u6599\u593E\u88E1\u7684 ai-usage.json \u5DF2\u539F\u6A23\u4FDD\u7559\u3002",
   "ui.usage_footer_scope": "\u53EA\u8A08\u7B97 VAM \u767C\u51FA\u7684 AI \u8ACB\u6C42\u3002",
@@ -28924,7 +28915,6 @@ var AiUsageStore = class {
 };
 
 // experiences/visual-map/usage-panel.ts
-var RECENT_ROWS = 10;
 var PANEL_GAP = 8;
 function formatTokens(count) {
   const n = Math.max(0, Math.round(Number.isFinite(count) ? count : 0));
@@ -28932,17 +28922,6 @@ function formatTokens(count) {
   if (n < 1e5) return `${(Math.floor(n / 100) / 10).toFixed(1)}k`;
   return `${Math.round(n / 1e3)}k`;
 }
-function formatDuration(ms) {
-  if (ms === void 0 || !Number.isFinite(ms) || ms < 0) return "\u2013";
-  const seconds = Math.max(1, Math.round(ms / 1e3));
-  if (seconds < 60) return t("ui.usage_seconds_0", String(seconds));
-  return t("ui.usage_minutes_seconds_01", String(Math.floor(seconds / 60)), String(seconds % 60));
-}
-var clock = (iso) => {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "\u2013";
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-};
 var actionLabel = (action) => t(`ui.usage_action_${action}`);
 var sum = (tokens2) => tokens2.inputTokens + tokens2.outputTokens;
 var mark = (count, estimated) => estimated ? t("ui.usage_estimated_0", formatTokens(count)) : formatTokens(count);
@@ -29143,21 +29122,6 @@ var UsageControl = class {
       bars.set(action, { row, name: name2, fill: fill2, value: row.createSpan({ cls: "vam-usage-muted" }) });
       row.hidden = true;
     }
-    const recentSection = root.createDiv({ cls: "vam-usage-section" });
-    recentSection.createDiv({ cls: "vam-usage-heading", text: t("ui.usage_recent") });
-    const recentBox = recentSection.createEl("table", { cls: "vam-usage-recent" });
-    const rows2 = [];
-    for (let index = 0; index < RECENT_ROWS; index++) {
-      const row = recentBox.createEl("tr");
-      const time = row.createEl("td", { cls: "vam-usage-faint" });
-      const what = row.createEl("td");
-      const action = what.createSpan();
-      const node = what.createSpan({ cls: "vam-usage-node" });
-      const tokens2 = row.createEl("td", { cls: "vam-usage-muted" });
-      const duration = row.createEl("td", { cls: "vam-usage-muted" });
-      row.hidden = true;
-      rows2.push({ row, time, action, node, tokens: tokens2, duration });
-    }
     const foot = root.createDiv({ cls: "vam-usage-foot" });
     foot.createDiv({ text: t("ui.usage_footer_scope") });
     const footEstimates = foot.createDiv({ text: t("ui.usage_footer_estimates") });
@@ -29165,14 +29129,12 @@ var UsageControl = class {
     this.markFilters(filters);
     return {
       root,
-      sections: [totalsSection, barsSection, recentSection],
+      sections: [totalsSection, barsSection],
       empty,
       error,
       cells,
       bars,
       barsBox,
-      rows: rows2,
-      recentBox,
       filters,
       footEstimates
     };
@@ -29202,8 +29164,7 @@ var UsageControl = class {
     const today = this.store.totals({ since: localDayStart(), provider });
     const month = this.store.totals({ since: localMonthStart(), provider });
     const actions = this.store.byAction(path, void 0, provider);
-    const recent = this.store.recent(path, RECENT_ROWS, provider);
-    if (map.status === "unreadable" || today.status === "unreadable" || month.status === "unreadable" || actions.status === "unreadable" || recent.status === "unreadable") {
+    if (map.status === "unreadable" || today.status === "unreadable" || month.status === "unreadable" || actions.status === "unreadable") {
       parts.error.hidden = false;
       parts.empty.hidden = true;
       parts.footEstimates.hidden = true;
@@ -29221,10 +29182,9 @@ var UsageControl = class {
     total2(parts.cells.map, map.value);
     total2(parts.cells.today, today.value);
     total2(parts.cells.month, month.value);
-    const noUsage = sum(map.value) === 0 && recent.value.length === 0;
+    const noUsage = sum(map.value) === 0;
     parts.empty.hidden = !noUsage;
     parts.sections[1].hidden = noUsage;
-    parts.sections[2].hidden = noUsage;
     let anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
     const biggest = Math.max(0, ...USAGE_ACTIONS.map((action) => sum(actions.value[action])));
     for (const action of USAGE_ACTIONS) {
@@ -29235,23 +29195,8 @@ var UsageControl = class {
       bar.value.setText(mark(used, actions.value[action].estimated));
       if (!noUsage && used > 0 && actions.value[action].estimated) anyEstimate = true;
     }
-    parts.rows.forEach((slot, index) => this.fillRow(slot, recent.value[index]));
-    if (!noUsage && recent.value.some((entry) => entry.estimated)) anyEstimate = true;
     parts.footEstimates.hidden = !anyEstimate;
     this.place();
-  }
-  fillRow(slot, entry) {
-    var _a2;
-    slot.row.hidden = !entry;
-    if (!entry) return;
-    const count = formatTokens(entry.inputTokens + entry.outputTokens);
-    slot.time.setText(clock(entry.at));
-    slot.action.setText(actionLabel(entry.action));
-    slot.node.setText((_a2 = entry.topic) != null ? _a2 : "");
-    slot.node.hidden = !entry.topic;
-    slot.tokens.setText(entry.estimated ? t("ui.usage_estimated_0", count) : count);
-    slot.tokens.toggleClass("is-estimated", entry.estimated);
-    slot.duration.setText(formatDuration(entry.durationMs));
   }
 };
 
@@ -40841,8 +40786,8 @@ var AiTaskService = class {
    */
   async sendObserved(observer, taskSignal, accepted, send) {
     var _a2;
-    const clock2 = (_a2 = this.options.clock) != null ? _a2 : realClock2;
-    const iso = () => new Date(clock2.now()).toISOString();
+    const clock = (_a2 = this.options.clock) != null ? _a2 : realClock2;
+    const iso = () => new Date(clock.now()).toISOString();
     const safe = (callback) => {
       try {
         callback();
@@ -40867,7 +40812,7 @@ var AiTaskService = class {
       const live = () => !controller.signal.aborted && !resendRequested;
       const disarm = () => {
         if (timer === void 0) return;
-        clock2.clearTimeout(timer);
+        clock.clearTimeout(timer);
         timer = void 0;
       };
       const resend = () => {
@@ -40881,7 +40826,7 @@ var AiTaskService = class {
       const arm = () => {
         disarm();
         if (!watching || firstEvent || !live()) return;
-        timer = clock2.setTimeout(() => {
+        timer = clock.setTimeout(() => {
           timer = void 0;
           if (firstEvent || !live()) return;
           extra.slowShownAt = iso();
@@ -59617,7 +59562,7 @@ ${request.requirements}` : preset.text,
     const progress = this.aimProgress;
     if (!progress) return "";
     const elapsed = Math.round((Date.now() - progress.startedAt) / 1e3);
-    const clock2 = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+    const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
     const targets = [...progress.targets.values()];
     const stage = progress.stage === "research" && targets.length ? t(
       "ui.aim_stage_research_0_1",
@@ -59626,7 +59571,7 @@ ${request.requirements}` : preset.text,
     ) : t((_a2 = AIM_STAGE_KEYS[progress.stage]) != null ? _a2 : "ui.aim_stage_research");
     const model = this.aimBranchModels.get(progress.branchId);
     const shown = model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(model)) : stage;
-    return t("ui.aim_stage_with_elapsed_0_1", shown, clock2);
+    return t("ui.aim_stage_with_elapsed_0_1", shown, clock);
   }
   /** One-second tick: rewrite only the progress texts; stop when the run is over. */
   paintAimProgress() {
@@ -59715,8 +59660,8 @@ ${request.requirements}` : preset.text,
   }
   researchElapsedText(startedAt) {
     const seconds = Math.max(0, Math.round((Date.now() - startedAt) / 1e3));
-    const clock2 = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-    return t("ui.aim_stage_with_elapsed_0_1", "", clock2);
+    const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    return t("ui.aim_stage_with_elapsed_0_1", "", clock);
   }
   trackResearchElapsed(element, startedAt) {
     this.researchElapsed.set(element, startedAt);
@@ -82470,8 +82415,8 @@ var realClock3 = {
   clearTimeout: (handle) => window.clearTimeout(handle)
 };
 var ResearchProgressStore = class {
-  constructor(clock2 = realClock3) {
-    this.clock = clock2;
+  constructor(clock = realClock3) {
+    this.clock = clock;
     __publicField(this, "entries", /* @__PURE__ */ new Map());
     __publicField(this, "listeners", /* @__PURE__ */ new Set());
     __publicField(this, "lastNotified", /* @__PURE__ */ new Map());

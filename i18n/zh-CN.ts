@@ -1472,8 +1472,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_plan_group_research_0": "研究与 AI 作业（{0}）",
   "ui.map_chat_plan_group_view_0": "地图与画面（{0}）",
   "ui.map_chat_hero_placeholder": "用一句话说说你想研究或整理什么",
-  "ui.map_chat_empty_log":
-    "还没有对话。AI 可以建立或扩充这张地图、研究其中的议题，或重新整理布局。",
+  "ui.map_chat_empty_log": "还没有对话。AI 可以建立或扩充这张地图、研究其中的议题，或重新整理布局。",
   "ui.map_chat_canvas_building": "正在建立地图…",
   "ui.map_chat_canvas_consent": "等待你确认使用额度。同意后才会开始建立地图。",
   "ui.map_chat_canvas_plan": "确认计划后，地图会出现在这里",

@@ -1474,8 +1474,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_plan_group_research_0": "研究與 AI 作業（{0}）",
   "ui.map_chat_plan_group_view_0": "心智圖與畫面（{0}）",
   "ui.map_chat_hero_placeholder": "用一句話說說你想研究或整理什麼",
-  "ui.map_chat_empty_log":
-    "還沒有對話。AI 可以建立或擴充這張心智圖、研究其中的議題，或重新整理版面。",
+  "ui.map_chat_empty_log": "還沒有對話。AI 可以建立或擴充這張心智圖、研究其中的議題，或重新整理版面。",
   "ui.map_chat_canvas_building": "正在建立心智圖…",
   "ui.map_chat_canvas_consent": "等待你確認使用額度。同意後才會開始建立心智圖。",
   "ui.map_chat_canvas_plan": "確認計畫後，心智圖會出現在這裡",

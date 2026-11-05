@@ -744,7 +744,7 @@ test('turning records off asks keep/delete with count N', async () => {
     const vaultDelete = []; app.vault.delete = async f => { vaultDelete.push(f.path); };
     const pending = turnMapChatRecordsOff({ app, writers: [w] });
     await tick();
-    clickBy(modals[0], 'Delete 3');
+    clickBy(modals[0], 'Delete conversations (3)');
     assert.deepEqual(plain(await pending), { deleted: 3, failed: 0 });
     assert.deepEqual(plain([...trashed].sort()), plain([...paths].sort()));
     assert.deepEqual(vaultDelete, []);
@@ -758,7 +758,7 @@ test('turning records off asks keep/delete with count N', async () => {
     const pending = turnMapChatRecordsOff({ app, writers: [], stillOff: () => off });
     await tick();
     off = false;
-    clickBy(modals[0], 'Delete 3');
+    clickBy(modals[0], 'Delete conversations (3)');
     await pending;
     assert.deepEqual(trashed, []);
   }

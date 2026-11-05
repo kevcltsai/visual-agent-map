@@ -19640,6 +19640,14 @@ export class VisualAgentMapView extends ItemView {
       entry.status = "queued";
       this.chat?.setSteerState(entry.steer, "queued");
     }
+    // What is no longer delivered must not ride along with a retry of the question.
+    this.syncSteerOrigin(state);
+  }
+  /** A retry after a failure asks the question with the follow-ups that went in, and only those. */
+  private syncSteerOrigin(state: ChatSteerState): void {
+    state.origin.text = [state.question, ...state.entries.filter(e => e.status === "delivered").map(e => e.text)].join(
+      "\n\n"
+    );
   }
   /** A new attempt has a new way in: what the earlier one took is handed over again, once, and what waited for it goes in. */
   private bindSteerHandler(state: ChatSteerState, handler: (text: string) => Promise<void>): void {
@@ -19672,11 +19680,7 @@ export class VisualAgentMapView extends ItemView {
         }
         if (!current()) return;
         entry.status = "delivered";
-        // A retry after a failure asks the question with what was added.
-        state.origin.text = [
-          state.question,
-          ...state.entries.filter(e => e.status === "delivered").map(e => e.text)
-        ].join("\n\n");
+        this.syncSteerOrigin(state);
       });
     }
   }

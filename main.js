@@ -71371,6 +71371,13 @@ ${note.detail.trim()}` : "",
       entry.status = "queued";
       (_a2 = this.chat) == null ? void 0 : _a2.setSteerState(entry.steer, "queued");
     }
+    this.syncSteerOrigin(state);
+  }
+  /** A retry after a failure asks the question with the follow-ups that went in, and only those. */
+  syncSteerOrigin(state) {
+    state.origin.text = [state.question, ...state.entries.filter((e) => e.status === "delivered").map((e) => e.text)].join(
+      "\n\n"
+    );
   }
   /** A new attempt has a new way in: what the earlier one took is handed over again, once, and what waited for it goes in. */
   bindSteerHandler(state, handler) {
@@ -71404,10 +71411,7 @@ ${note.detail.trim()}` : "",
         }
         if (!current()) return;
         entry.status = "delivered";
-        state.origin.text = [
-          state.question,
-          ...state.entries.filter((e) => e.status === "delivered").map((e) => e.text)
-        ].join("\n\n");
+        this.syncSteerOrigin(state);
       });
     }
   }

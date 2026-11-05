@@ -5998,6 +5998,19 @@ integrationTest('map chat steer B-1: the CLI rejects the stream flags after a st
   assert.equal(chat.transcript().map(m => m.text).filter(m => m === 'extra').length, 1, 'one message, no duplicate bubble');
 });
 
+integrationTest('map chat steer B-1 retry: after json-fallback queued a delivered steer, a failure puts it back in the field and Retry asks the bare question (no double send)', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); let n = 0; const raw = h.control.reply;
+  h.control.reply = async (...args) => { n++; if (n === 2) return { reply: 'retried', actions: [], rejected: [] }; args[3]({ kind: 'stream-mode', mode: 'stream-json' }); return raw(...args); };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('extra'); pressEnter(chat); await tick(); await tick();
+  eq(s.handled, ['extra']);
+  s.progress({ kind: 'stream-mode', mode: 'json-fallback' }); await tick();
+  s.fail = true; s.gate.resolve(); await sending.catch(() => {}); await tick();
+  assert.equal(chat.draft, 'extra', 'back in the field'); assert.equal(h.control.requests.length, 1, 'nothing auto-sent');
+  h.type(''); const retry = findAll(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry'))[0]; assert.ok(retry, 'retry offered');
+  retry.click(); await until(() => h.control.requests.length === 2 && !chat.isBusy);
+  assert.equal(h.control.requests[1].message, 'go', 'the retry does not carry the steer that is back in the field');
+});
+
 integrationTest('map chat steer N6/C7/C8: Stop and a failure leave the follow-ups that did not go in in the field, send nothing, keep the ones that did, and Retry asks with them', async () => {
   for (const how of ['stop', 'fail']) {
     const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); let n = 0; const raw = h.control.reply;

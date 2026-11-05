@@ -18,7 +18,27 @@ export const MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
 /** A reply that adds this many cards or more is followed by one automatic layout and a move of the view to the new cards. */
 export const MAP_CHAT_AUTO_LAYOUT_MIN_NEW = 5;
 
-export type MapChatPlanReason = "many_actions" | "many_research" | "new_map";
+/**
+ * `image_preview`: the reply places or links anchors and the user chose to see image changes first. `image_other_actions`: a turn
+ * that sent an image also asked for something besides the image-safe actions; the picture is untrusted input, so this is
+ * a plan in either mode.
+ */
+export type MapChatPlanReason = "many_actions" | "many_research" | "new_map" | "image_preview" | "image_other_actions";
+
+/** "AI changes to an image: show me first" or "apply at once"; the setting `mapChatImageMode`. */
+export type MapChatImageMode = "preview" | "direct";
+
+/** The only actions a turn that sent an image may do without a plan (in "direct" mode). */
+const IMAGE_SAFE_KINDS: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAction["kind"]>([
+  "add_anchor",
+  "link_anchor",
+  "add_child",
+  "add_relation",
+  "focus_topic",
+  "auto_layout",
+  "collapse_topic",
+  "expand_topic"
+]);
 
 export interface MapChatPlan {
   /** Every condition that holds, in a fixed order. */
@@ -66,7 +86,7 @@ export const mapChatCallsPerTask = (diagrams: boolean): number => (diagrams ? 2 
 export function planFor(
   actions: readonly MapChatAction[],
   context: PlanContext,
-  options: { diagrams?: boolean; mapAiMode?: MapAiMode } = {}
+  options: { diagrams?: boolean; mapAiMode?: MapAiMode; imageMode?: MapChatImageMode; imageAttached?: boolean } = {}
 ): MapChatPlan | null {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons: MapChatPlanReason[] = [];
@@ -118,6 +138,13 @@ export function planFor(
   }
   if (research >= MAP_CHAT_PLAN_RESEARCH_LIMIT) reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
+  if (
+    options.imageMode === "preview" &&
+    actions.some(action => action.kind === "add_anchor" || action.kind === "link_anchor")
+  )
+    reasons.push("image_preview");
+  if (options.imageAttached && actions.some(action => !IMAGE_SAFE_KINDS.has(action.kind)))
+    reasons.push("image_other_actions");
   return reasons.length ? { reasons, estimatedCalls: calls } : null;
 }
 

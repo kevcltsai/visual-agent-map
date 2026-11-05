@@ -326,6 +326,7 @@ import {
 } from "./note-style-picker";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import { placeHoverPreview, previewMetrics } from "../../ui/preview-utils";
+import { fitImageForInput } from "../../ui/fit-image-input";
 import {
   normalizeRelevanceContext,
   normalizeRelevanceGoal,
@@ -402,7 +403,7 @@ import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCo
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { aiLockBlock, aiLockedError, isAiLockedError, type AiLockOp, type AiLockReason } from "../../core/ai-lock";
-import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
+import { MAP_CHAT_ANCHOR_PREFIX, MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
   chatResearchMode,
@@ -412,6 +413,7 @@ import {
   matchMapTitle,
   planFor,
   researchTargetsOf,
+  type MapChatImageMode,
   type MapChatPlan,
   type MapChatPlanReason
 } from "../../core/map-chat-plan";
@@ -958,6 +960,8 @@ type ChatOutcome =
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 interface ChatRun {
   refs: Map<string, string>;
+  /** `ref` of an `add_anchor` of this reply -> the real anchor id it was given (for the `link_anchor`s that name `anchor:<ref>`). */
+  anchors?: Map<string, string>;
   created: string[];
   /** A card was (or may have been) written without rebuilding the derived data; one rebuild at the end of the reply does it. */
   ownershipDirty?: boolean;
@@ -1104,6 +1108,12 @@ export class VisualAgentMapView extends ItemView {
   private chatTaskKey: string | null = null;
   /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
   private chatPlanToken = 0;
+  /**
+   * The canvas image the next chat message is about: the last one focused or clicked (D7). Cleared by choosing a card, a click on
+   * the empty canvas, Esc, deleting the image and opening another map. Only the id is kept; the picture is read when a message is sent.
+   */
+  private chatImageId: string | null = null;
+  private chatImageListeners = new Set<() => void>();
   /** True while the conversation itself switches maps (create_map, open_map): the conversation goes along instead of restarting. */
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
@@ -1690,6 +1700,7 @@ export class VisualAgentMapView extends ItemView {
       // A pending cut ends with this Esc as well; the selection is cleared exactly as before.
       if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
       this.applySelectionChange(this.selection.escape());
+      this.clearChatImage();
       // Claimed here: unhandled, Obsidian answers Esc by activating another leaf and the next key edits that note.
       event.preventDefault();
       event.stopPropagation();
@@ -7739,7 +7750,10 @@ export class VisualAgentMapView extends ItemView {
         img.addEventListener("error", placeholder);
       }
       if (annotated) this.renderAnchors(el, annotated, editable);
-      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("focus", () => {
+        el.addClass("is-selected");
+        this.setChatImage(image.id);
+      });
       el.addEventListener("blur", () => el.removeClass("is-selected"));
       if (!editable) continue;
       const handle = el.createDiv("vam-canvas-image-handle");
@@ -9879,6 +9893,7 @@ export class VisualAgentMapView extends ItemView {
   /** Removes the reference only; the image file stays in the Vault. */
   private async removeCanvasItem(id: string): Promise<void> {
     this.focusItemId = null;
+    if (this.chatImageId === id) this.clearChatImage();
     await this.changeCanvasItems(id, items => removeItem(items, id));
   }
   private async removeSelected(): Promise<void> {
@@ -13515,6 +13530,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Mode changed: render the whole map. Only the selection changed: repaint the touched cards, bar and outline. */
   applySelectionChange(change: SelectionChange): void {
+    // Choosing a card ends the picture selection of the chat (D7).
+    if (change.touched.length) this.clearChatImage();
     if (change.multiSelectModeChanged) {
       if (!this.closed) this.render();
       return;
@@ -15822,6 +15839,9 @@ export class VisualAgentMapView extends ItemView {
       case "add_relation":
       case "remove_relation":
         return check("write", [real(action.fromId), real(action.toId)]);
+      // An anchor relation is written to the card's note like a topic relation; its anchor end is no card.
+      case "link_anchor":
+        return check("write", [real(action.nodeId)]);
       case "delete_topic":
         return check("remove", [action.nodeId]);
       case "edit_md_file": {
@@ -18633,6 +18653,8 @@ export class VisualAgentMapView extends ItemView {
       }
       if (intent !== "pan") return;
       if (event.button === 1) event.preventDefault();
+      // A press on a picture selects that picture for the chat; on the empty canvas it clears the picture selection.
+      const pressedImage = target.closest<HTMLElement>(".vam-canvas-image")?.dataset.itemId;
       const x = event.clientX,
         y = event.clientY,
         origin = { ...this.map.viewport };
@@ -18658,6 +18680,8 @@ export class VisualAgentMapView extends ItemView {
             this.selection.clickEmpty();
             this.syncRelationClasses();
           } else this.applySelectionChange(this.selection.clickEmpty());
+          if (pressedImage) this.setChatImage(pressedImage);
+          else this.clearChatImage();
         }
       };
       viewport.addEventListener("pointermove", move);
@@ -18691,6 +18715,8 @@ export class VisualAgentMapView extends ItemView {
       this.chat.restoreOpen(normalizeMapChatOpen(this.plugin.settings.mapChatOpen));
     }
     if (this.chatMapId !== this.map.id) {
+      // The picture the chat was about belongs to the map it was on.
+      this.clearChatImage();
       if (this.chatCarryOver) {
         // The conversation opened this map itself (create_map, open_map): it goes along and its running turn goes on.
         this.chatMapId = this.map.id;
@@ -19195,7 +19221,104 @@ export class VisualAgentMapView extends ItemView {
       ...(seen.detailHash !== undefined ? { detailHash: contentHash(now.detail) } : {})
     };
   }
-  private async buildChatRequest(message: string, chat: MapChatPanel, origin: MapChatOrigin): Promise<MapChatRequest> {
+  /**
+   * The canvas image the chat is about now, or null (none chosen, or it is gone from the map). `note` is untrusted text: only
+   * setText / aria may show it. For the chat panel's chip; `watchChatImage` tells it when this changes.
+   */
+  chatImage(): { id: string; kind: "annotated" | "plain"; note: string; name: string } | null {
+    const id = this.chatImageId;
+    const item = id ? (this.map?.canvasItems ?? []).find(entry => entry.id === id) : undefined;
+    if (!item || (item.kind !== "image" && !isAnnotatedImage(item))) return null;
+    const image = item as ImageItem | AnnotatedImageItem;
+    return {
+      id: image.id,
+      kind: isAnnotatedImage(image) ? "annotated" : "plain",
+      note: isAnnotatedImage(image) ? (image.note ?? "") : "",
+      name: image.path.split("/").pop() ?? image.path
+    };
+  }
+  /** Calls `listener` whenever the picture selection of the chat changes; returns the way to stop. */
+  watchChatImage(listener: () => void): () => void {
+    this.chatImageListeners.add(listener);
+    return () => this.chatImageListeners.delete(listener);
+  }
+  private setChatImage(id: string): void {
+    if (this.chatImageId === id) return;
+    this.chatImageId = id;
+    for (const listener of [...this.chatImageListeners]) listener();
+  }
+  private clearChatImage(): void {
+    if (this.chatImageId === null) return;
+    this.chatImageId = null;
+    for (const listener of [...this.chatImageListeners]) listener();
+  }
+  /** The undo step of the reply applied last (undefined when it wrote nothing): the chat's "undo this reply" button acts on it. */
+  chatReplyEntry(): TransactionEntry | undefined {
+    return this.chatReplyStep?.entry;
+  }
+  /** True when `entry` is the newest undo step of this view, so one undo takes back exactly that reply and nothing else. */
+  isNewestUndoStep(entry: TransactionEntry): boolean {
+    return (this.history.undoEntry as unknown) === entry;
+  }
+  /** "AI changes to a picture: show me first" or "apply at once". Until the setting exists (the chat panel's switch) it is always "preview". */
+  private chatImageMode(): MapChatImageMode {
+    return "preview";
+  }
+  /** The selected picture for the context, as the file is now. A picture that is gone from the map is simply not selected. */
+  private chatSelectedImage(
+    imageId: string | undefined
+  ): { selected: NonNullable<Parameters<typeof buildMapChatContext>[0]["selectedImage"]>; path: string } | null {
+    const item = imageId ? (this.map?.canvasItems ?? []).find(entry => entry.id === imageId) : undefined;
+    if (!item || (item.kind !== "image" && !isAnnotatedImage(item))) return null;
+    const image = item as ImageItem | AnnotatedImageItem;
+    if (!isAnnotatedImage(image))
+      return { selected: { id: image.id, kind: "plain", imageAttached: false }, path: image.path };
+    return {
+      selected: {
+        id: image.id,
+        kind: "annotated",
+        note: image.note ?? "",
+        anchors: image.anchors.filter(isImage2dAnchor).map(anchor => ({
+          id: anchor.id,
+          x: anchor.at.x,
+          y: anchor.at.y,
+          ...(anchor.note ? { note: anchor.note } : {})
+        })),
+        relations: (image.relations ?? []).map(link => ({
+          kind: link.kind,
+          from: link.from,
+          to: link.to,
+          ...(link.description ? { description: link.description } : {})
+        })),
+        imageAttached: false
+      },
+      path: image.path
+    };
+  }
+  /** The picture file as a data URL fitted to what the model's runtime accepts. Throws a sentence for the user when it cannot. */
+  private async readChatImage(path: string, model: string, signal: AbortSignal): Promise<string> {
+    const limits = this.plugin.aiCalls.capabilitiesFor(model).imageInput;
+    if (!limits) throw new Error(t("ui.map_chat_image_unsupported"));
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) throw new Error(t("ui.map_chat_image_unreadable"));
+    let loaded: string;
+    try {
+      const data = await this.app.vault.readBinary(file);
+      const mime = sniffImage(data);
+      if (!mime) throw new Error("not an image");
+      loaded = toDataUri(mime, data);
+    } catch {
+      throw new Error(t("ui.map_chat_image_unreadable"));
+    }
+    if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
+    return fitImageForInput(loaded, limits, signal);
+  }
+  private async buildChatRequest(
+    message: string,
+    chat: MapChatPanel,
+    origin: MapChatOrigin,
+    signal: AbortSignal = new AbortController().signal
+  ): Promise<MapChatRequest> {
     const map = this.map!;
     const settings = this.plugin.settings;
     const byId = new Map(map.nodes.map(node => [node.id, node]));
@@ -19287,6 +19410,13 @@ export class VisualAgentMapView extends ItemView {
       .then(() => this.plugin.repo.topics())
       .then(topics => topics.map(topic => topic.title))
       .catch(() => [] as string[]);
+    // The selected picture: its words go into the context; the picture itself (an annotated one only) travels beside it, once.
+    const picture = this.chatSelectedImage(origin.imageId);
+    let imageDataUrl: string | undefined;
+    if (picture?.selected.kind === "annotated") {
+      imageDataUrl = await this.readChatImage(picture.path, settings.cliModel, signal);
+      picture.selected.imageAttached = true;
+    }
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapTitles,
@@ -19306,11 +19436,13 @@ export class VisualAgentMapView extends ItemView {
       aim: !this.relationsEnabled(),
       relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
-      history: chat.turns()
+      history: chat.turns(),
+      ...(picture ? { selectedImage: picture.selected } : {})
     });
     return {
       message,
       context,
+      ...(imageDataUrl ? { imageDataUrl } : {}),
       language: settings.language,
       contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
       model: settings.cliModel,
@@ -19343,7 +19475,9 @@ export class VisualAgentMapView extends ItemView {
     const origin: MapChatOrigin = again ?? {
       text: message,
       chips: chat.attachments(),
-      selectedIds: this.chatSelectionIds()
+      selectedIds: this.chatSelectionIds(),
+      // Only the id: the picture is read again (a retry too) when the request is built, and never kept.
+      ...(this.chatImageId ? { imageId: this.chatImageId } : {})
     };
     // Where this turn is anchored. A create_map / open_map of the turn itself moves it (see applyMapChatActions).
     const anchor = { path: this.path, id: this.map.id as string | undefined };
@@ -19360,12 +19494,16 @@ export class VisualAgentMapView extends ItemView {
       if (reason !== undefined) new Notice(reason);
     };
     // Stop while preparing is the user's own act: the send is taken back like any early end, without a Notice.
-    const stopPreparing = (): void => abandon();
+    const preparing = new AbortController();
+    const stopPreparing = (): void => {
+      preparing.abort();
+      abandon();
+    };
     this.chatPrepAbandon = stopPreparing;
     const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request: MapChatRequest;
     try {
-      request = { ...(await this.buildChatRequest(message, chat, origin)), ...this.usageMapField() };
+      request = { ...(await this.buildChatRequest(message, chat, origin, preparing.signal)), ...this.usageMapField() };
     } catch (error) {
       abandon(this.closed ? undefined : errorMessage(error));
       return;
@@ -19490,7 +19628,9 @@ export class VisualAgentMapView extends ItemView {
               const plan = result.actions.length
                 ? planFor(result.actions, request.context, {
                     diagrams: this.plugin.settings.addDiagramsAfterResearch,
-                    mapAiMode: this.map?.aiMode
+                    mapAiMode: this.map?.aiMode,
+                    imageMode: this.chatImageMode(),
+                    imageAttached: !!request.imageDataUrl
                   })
                 : null;
               if (plan) {
@@ -19566,6 +19706,10 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_plan_reason_many_research_0", researchTargetsOf(result.actions, selectedCount));
       case "new_map":
         return t("ui.map_chat_plan_reason_new_map");
+      case "image_preview":
+        return t("ui.map_chat_plan_reason_image_preview");
+      case "image_other_actions":
+        return t("ui.map_chat_plan_reason_image_other_actions");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
@@ -19691,6 +19835,7 @@ export class VisualAgentMapView extends ItemView {
     const titles = new Map<string, string>();
     for (const action of actions)
       if (action.kind === "add_child" && action.ref) titles.set(`${MAP_CHAT_NEW_PREFIX}${action.ref}`, action.title);
+      else if (action.kind === "add_anchor") titles.set(`${MAP_CHAT_ANCHOR_PREFIX}${action.ref}`, action.note);
     return titles;
   }
   private chatActionLabel(action: MapChatAction, refTitles?: ReadonlyMap<string, string>): string {
@@ -19755,6 +19900,22 @@ export class VisualAgentMapView extends ItemView {
         );
       case "remove_relation":
         return t("ui.map_chat_do_remove_relation_0_1", title(action.fromId), title(action.toId));
+      case "add_anchor":
+        return action.note ? t("ui.map_chat_do_add_anchor_0", action.note) : t("ui.map_chat_do_add_anchor_empty");
+      case "link_anchor": {
+        const anchorNote =
+          refTitles?.get(action.anchorId) ||
+          findAnnotatedImage(this.map?.canvasItems ?? [], action.imageId)?.anchors.find(
+            anchor => anchor.id === action.anchorId
+          )?.note ||
+          t("ui.map_chat_anchor_unnamed");
+        return t(
+          "ui.map_chat_do_link_anchor_0_1_2",
+          anchorNote,
+          title(action.nodeId),
+          t(RELATION_NAME_KEY[action.relationKind])
+        );
+      }
       case "set_appearance":
         return action.nodeIds.length === 1
           ? t("ui.map_chat_do_appearance_0", title(action.nodeIds[0]))
@@ -20501,6 +20662,9 @@ export class VisualAgentMapView extends ItemView {
       case "add_relation":
       case "remove_relation":
         return this.chatChangeRelation(action, real);
+      case "add_anchor":
+      case "link_anchor":
+        return this.chatChangeAnchor(action, real, run);
       case "set_appearance":
         return this.chatSetAppearance(action, real, run);
       case "collapse_topic":
@@ -20773,6 +20937,73 @@ export class VisualAgentMapView extends ItemView {
       }
       const description = action.description ? normalizeRelationDescription(action.description) : undefined;
       setTopicRelations(map, [...list, description ? { ...link, description } : link]);
+    }, false);
+    return box.refused ? skipped(box.refused) : { status: "done" };
+  }
+  /**
+   * add_anchor / link_anchor: the same Map.md write as an anchor placed or linked by hand (`addAnchor`, `addAnchorRelation`),
+   * checked again against the map being edited, so a picture that was deleted, turned back into an ordinary one, already full or
+   * a pair that already has a relation skips only that item. The anchor id is made here (never taken from the reply) and does not
+   * collide with a card or an anchor of the picture. Never on an AIM map.
+   */
+  private async chatChangeAnchor(
+    action: Extract<MapChatAction, { kind: "add_anchor" | "link_anchor" }>,
+    real: (id: string) => string | null,
+    run: ChatRun
+  ): Promise<ChatOutcome> {
+    if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
+    const items = this.map.canvasItems ?? [];
+    const image = findAnnotatedImage(items, action.imageId);
+    if (!image)
+      return skipped(
+        items.some(item => item.id === action.imageId && item.kind === "image")
+          ? "ui.map_chat_skip_image_plain"
+          : "ui.map_chat_skip_image_gone"
+      );
+    if (action.kind === "add_anchor") {
+      if (image.anchors.length >= ANCHOR_LIMIT) return skipped("ui.map_chat_skip_anchor_limit");
+      const taken = new Set([...this.map.nodes.map(node => node.id), ...image.anchors.map(anchor => anchor.id)]);
+      let anchorId: string;
+      do anchorId = `anc-${randomUUID().slice(0, 8)}`;
+      while (taken.has(anchorId));
+      const box: { refused: TranslationKey | null } = { refused: null };
+      await this.mapChange(map => {
+        const current = findAnnotatedImage(map.canvasItems ?? [], action.imageId);
+        if (!current) box.refused = "ui.map_chat_skip_image_gone";
+        else if (current.anchors.length >= ANCHOR_LIMIT) box.refused = "ui.map_chat_skip_anchor_limit";
+        else
+          map.canvasItems = addAnchor(map.canvasItems ?? [], action.imageId, {
+            id: anchorId,
+            at: { kind: "image-2d", x: action.x, y: action.y },
+            ...(action.note ? { note: action.note } : {})
+          });
+      }, false);
+      if (box.refused) return skipped(box.refused);
+      (run.anchors ??= new Map()).set(action.ref, anchorId);
+      return { status: "done" };
+    }
+    const anchorId = action.anchorId.startsWith(MAP_CHAT_ANCHOR_PREFIX)
+      ? run.anchors?.get(action.anchorId.slice(MAP_CHAT_ANCHOR_PREFIX.length))
+      : action.anchorId;
+    // An anchor of this reply that was never placed (skipped) has nothing to link.
+    if (!anchorId || !image.anchors.some(anchor => anchor.id === anchorId))
+      return skipped("ui.map_chat_skip_anchor_gone");
+    const nodeId = real(action.nodeId);
+    if (nodeId === null) return skipped("ui.map_chat_skip_parent_missing");
+    if (!this.map.nodes.some(node => node.id === nodeId)) return skipped("ui.map_chat_skip_topic_gone");
+    const link: AnchorRelation = {
+      kind: action.relationKind,
+      from: anchorId,
+      to: nodeId,
+      ...(action.description ? { description: action.description } : {})
+    };
+    if (!anchorRelationAllowed(image, link)) return skipped("ui.map_chat_skip_relation_not_allowed");
+    const box: { refused: TranslationKey | null } = { refused: null };
+    await this.mapChange(map => {
+      const current = findAnnotatedImage(map.canvasItems ?? [], action.imageId);
+      if (!current) box.refused = "ui.map_chat_skip_image_gone";
+      else if (!anchorRelationAllowed(current, link)) box.refused = "ui.map_chat_skip_relation_not_allowed";
+      else map.canvasItems = addAnchorRelation(map.canvasItems ?? [], action.imageId, link);
     }, false);
     return box.refused ? skipped(box.refused) : { status: "done" };
   }

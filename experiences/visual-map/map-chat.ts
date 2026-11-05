@@ -75,6 +75,8 @@ export interface MapChatOrigin {
   text: string;
   chips: MapChatChip[];
   selectedIds: string[];
+  /** The canvas image that was selected when the message was sent (a retry reads it again); never the picture itself. */
+  imageId?: string;
 }
 
 /** A reply that waits for the user's yes: what it would do, what it costs, and the two buttons. */

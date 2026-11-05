@@ -5475,3 +5475,109 @@ test('hypothesis-leaning: the guard message names topic-kind, hypothesis-leaning
     for (const key of ['topic-kind', 'hypothesis-leaning', 'hypothesis-strength']) assert.ok(line[1].includes(key), `${lang} ${key}`);
   }
 });
+
+// ---- hypothesis-leaning (P3): the chat writes a hypothesis's leaning ----------------------------------------------------
+const hypNote = async (h, key, values = {}) => {
+  await h.repo.writeTopicKind(h.node(key).path, 'hypothesis');
+  if (values.leaning) await h.repo.writeHypothesisLeaning(h.node(key).path, values.leaning);
+  if (values.strength) await h.repo.writeHypothesisStrength(h.node(key).path, values.strength);
+  await h.view.hydrate();
+};
+const setKind = (nodeIds, extra) => ({ kind: 'set_topic_kind', nodeIds, topicKind: 'hypothesis', ...extra });
+integrationTest('hypothesis-leaning: S15 a send on an ordinary map tells the model a hypothesis leaning and strength; an AIM map sends neither', async () => {
+  const h = await harness(); await hypNote(h, 'a', { leaning: 'refuted', strength: 'medium' });
+  h.open(); h.type('q'); await h.view.sendMapChat();
+  const node = JSON.parse(h.control.requests[0].context.json).outline.find(n => n.id === h.ids.a);
+  assert.equal(node.leaning, 'refuted'); assert.equal(node.strength, 'medium');
+  const aim = await harness(); await hypNote(aim, 'a', { leaning: 'supported' }); aim.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; await aim.view.hydrate();
+  aim.open(); aim.type('q'); await aim.view.sendMapChat();
+  const sent = JSON.parse(aim.control.requests[0].context.json).outline;
+  assert.equal(sent.some(n => 'leaning' in n || 'strength' in n), false);
+});
+integrationTest('hypothesis-leaning: S18 set_topic_kind to hypothesis starts undecided and none without writing the keys; leaning and strength are written when given', async () => {
+  const h = await harness();
+  await apply(h, [setKind([h.ids.a], {})]);
+  const bare = h.contents.get(h.node('a').path);
+  assert.doesNotMatch(bare, /hypothesis-leaning|hypothesis-strength/, 'nothing is backfilled');
+  const a = await h.note('a'); assert.equal(a.hypothesisLeaning, 'undecided'); assert.equal(a.hypothesisStrength, 'none');
+  await apply(h, [setKind([h.ids.b], { leaning: 'supported', strength: 'medium' }), setKind([h.ids.c], { leaning: 'refuted' })]);
+  const b = await h.note('b'); assert.equal(b.hypothesisLeaning, 'supported'); assert.equal(b.hypothesisStrength, 'medium');
+  const c = await h.note('c'); assert.equal(c.hypothesisLeaning, 'refuted'); assert.equal(c.hypothesisStrength, 'weak', 'a leaning lifts a missing strength to weak');
+});
+integrationTest('hypothesis-leaning: S18 strength none next to a leaning is written as weak; an empty leaning or strength keeps the value', async () => {
+  const h = await harness(); await hypNote(h, 'a', { leaning: 'supported', strength: 'strong' }); await hypNote(h, 'b');
+  const lines = await apply(h, [setKind([h.ids.a], { leaning: '', strength: '' }), setKind([h.ids.b], { leaning: 'supported', strength: 'none' })]);
+  eq(lines.map(l => l.status), ['done', 'done']);
+  const a = await h.note('a'); assert.equal(a.hypothesisLeaning, 'supported'); assert.equal(a.hypothesisStrength, 'strong', 'empty keeps');
+  const b = await h.note('b'); assert.equal(b.hypothesisLeaning, 'supported'); assert.equal(b.hypothesisStrength, 'weak');
+  assert.match(h.contents.get(h.node('b').path), /hypothesis-strength: "?weak/);
+});
+integrationTest('hypothesis-leaning: S18 a value equal to the effective one rewrites nothing and opens no undo step; a non-hypothesis ignores the leaning', async () => {
+  const h = await harness(); await hypNote(h, 'a', { leaning: 'supported', strength: 'weak' });
+  const before = h.contents.get(h.node('a').path), c = h.contents.get(h.node('c').path);
+  const undo = h.view.history.undoEntry;
+  await apply(h, [setKind([h.ids.a], { leaning: 'supported', strength: 'weak' }), { kind: 'set_topic_kind', nodeIds: [h.ids.c], topicKind: 'topic', leaning: 'refuted' }]);
+  assert.equal(h.contents.get(h.node('a').path), before); assert.equal(h.contents.get(h.node('c').path), c);
+  assert.doesNotMatch(h.contents.get(h.node('c').path), /hypothesis-leaning/);
+  assert.equal(h.view.history.undoEntry?.label === 'AI chat reply', false, 'no write, no reply step'); void undo;
+});
+integrationTest('hypothesis-leaning: S18 a stored none under a supported leaning reads as weak, so setting weak writes nothing', async () => {
+  const h = await harness(); await hypNote(h, 'a');
+  h.contents.set(h.node('a').path, h.contents.get(h.node('a').path).replace(/(topic-kind: "?hypothesis"?\n)/, '$1hypothesis-leaning: supported\n'));
+  await h.view.hydrate();
+  assert.equal((await h.note('a')).hypothesisStrength, 'weak');
+  const before = h.contents.get(h.node('a').path);
+  await apply(h, [setKind([h.ids.a], { strength: 'weak' })]);
+  assert.equal(h.contents.get(h.node('a').path), before);
+});
+integrationTest('hypothesis-leaning: S18 a reply that sets leaning on several cards is one undo step, and undo and redo restore the notes', async () => {
+  const h = await harness(); await hypNote(h, 'a'); await hypNote(h, 'b');
+  const before = [h.contents.get(h.node('a').path), h.contents.get(h.node('b').path)];
+  await apply(h, [setKind([h.ids.a, h.ids.b], { leaning: 'refuted', strength: 'strong' })]);
+  const after = [h.contents.get(h.node('a').path), h.contents.get(h.node('b').path)];
+  assert.notDeepEqual(after, before); assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.deepEqual([h.contents.get(h.node('a').path), h.contents.get(h.node('b').path)], before, 'undo restores');
+  await h.view.travel(true);
+  assert.deepEqual([h.contents.get(h.node('a').path), h.contents.get(h.node('b').path)], after, 'redo restores');
+});
+integrationTest('hypothesis-leaning: S18 the write changes only frontmatter; title, body, parent and relations stay', async () => {
+  const h = await harness(); h.view.map.topicRelations = [{ kind: 'supports', from: h.ids.b, to: h.ids.a }];
+  const before = h.contents.get(h.node('a').path), parents = JSON.stringify((await h.saved()).map(n => [n.id, n.parentId]));
+  await apply(h, [setKind([h.ids.a], { leaning: 'supported', strength: 'strong' })]);
+  assert.equal(body(h.contents.get(h.node('a').path)), body(before));
+  assert.equal(JSON.stringify((await h.saved()).map(n => [n.id, n.parentId])), parents);
+  eq(h.view.map.topicRelations, [{ kind: 'supports', from: h.ids.b, to: h.ids.a }]);
+});
+integrationTest('hypothesis-leaning: S19 add_child writes topicKind, leaning and strength at creation (a none strength under a leaning is weak)', async () => {
+  const h = await harness();
+  await apply(h, [
+    { kind: 'add_child', parentId: h.ids.a, title: 'Claim', summary: 's', topicKind: 'hypothesis', leaning: 'supported', strength: 'medium' },
+    { kind: 'add_child', parentId: h.ids.a, title: 'Claim2', summary: 's', topicKind: 'hypothesis', leaning: 'refuted', strength: 'none' },
+    { kind: 'add_child', parentId: h.ids.a, title: 'Claim3', summary: 's', topicKind: 'hypothesis' }
+  ]);
+  const read = async title => h.repo.readNote(h.view.map.nodes.find(n => h.view.notes.get(n.id)?.title === title).path);
+  const one = await read('Claim'); assert.equal(one.hypothesisLeaning, 'supported'); assert.equal(one.hypothesisStrength, 'medium');
+  const two = await read('Claim2'); assert.equal(two.hypothesisLeaning, 'refuted'); assert.equal(two.hypothesisStrength, 'weak');
+  const three = await read('Claim3'); assert.equal(three.hypothesisLeaning, 'undecided'); assert.equal(three.hypothesisStrength, 'none');
+});
+integrationTest('hypothesis-leaning: S20 set_topic_kind with a leaning skips an AIM card and a card being merged, and writes nothing', async () => {
+  const aim = await harness({ aim: true }); const aimBefore = aim.contents.get(aim.node('a').path);
+  const aimLines = await apply(aim, [setKind([aim.ids.a], { leaning: 'supported' })]);
+  eq(aimLines.map(l => l.status), ['skipped']); assert.equal(aim.contents.get(aim.node('a').path), aimBefore);
+  const h = await harness(); await hypNote(h, 'a');
+  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
+  const before = h.contents.get(h.node('a').path);
+  const lines = await apply(h, [setKind([h.ids.a], { leaning: 'refuted' })]);
+  eq(lines.map(l => l.status), ['skipped']); assert.equal(h.contents.get(h.node('a').path), before);
+});
+integrationTest('hypothesis-leaning: S25 the result row names the leaning and strength the action gives, and only those', async () => {
+  const h = await harness();
+  const lines = await apply(h, [setKind([h.ids.a], { leaning: 'supported', strength: 'weak' }), setKind([h.ids.b], { leaning: 'refuted' }), setKind([h.ids.c], { strength: 'strong' }), setKind([h.ids.root], {})]);
+  eq(lines.map(l => l.text), [
+    'Done: Set the type of “Body” to Hypothesis (Supported · Weak)',
+    'Done: Set the type of “Mind” to Hypothesis (Refuted)',
+    'Done: Set the type of “REM” to Hypothesis (Strong)',
+    'Done: Set the type of “Sleep” to Hypothesis'
+  ], JSON.stringify(lines.map(l => l.text)));
+});

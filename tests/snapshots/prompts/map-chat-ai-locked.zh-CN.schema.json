@@ -130,6 +130,15 @@
               ""
             ]
           },
+          "leaning": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "undecided",
+              "refuted",
+              ""
+            ]
+          },
           "strength": {
             "type": "string",
             "enum": [
@@ -285,6 +294,7 @@
           "images",
           "otherProvider",
           "topicKind",
+          "leaning",
           "strength",
           "fromId",
           "toId",

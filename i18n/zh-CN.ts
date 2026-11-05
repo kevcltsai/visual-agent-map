@@ -1296,6 +1296,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_skip_relation_not_allowed": "心智图不允许这条关系",
   "ui.map_chat_skip_relation_missing": "这两张议题之间没有关系",
   "ui.map_chat_kind_with_strength_0_1": "{0}（{1}）",
+  "ui.map_chat_kind_part_separator": "・",
   "ui.map_chat_do_ask_kind_0": "提供选项：要怎么把议题变成{0}",
   "ui.map_chat_kind_choice_prompt_0": "要怎么把这些议题变成{0}？",
   "ui.map_chat_kind_choice_type_only": "只改类型",

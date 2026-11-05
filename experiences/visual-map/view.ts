@@ -292,6 +292,7 @@ import {
   HYPOTHESIS_LEANINGS,
   HYPOTHESIS_STRENGTHS,
   readAiLocked,
+  resolveHypothesisWrite,
   TOPIC_KINDS,
   RELEVANCE_LEVELS,
   type HypothesisLeaning,
@@ -14319,7 +14320,8 @@ export class VisualAgentMapView extends ItemView {
     rebuildDerivedData = true,
     focus = true,
     kind: TopicKind = "topic",
-    keyboardFocus = false
+    keyboardFocus = false,
+    hypothesisStart: { leaning?: HypothesisLeaning; strength?: HypothesisStrength } = {}
   ): Promise<void> {
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
@@ -14346,7 +14348,16 @@ export class VisualAgentMapView extends ItemView {
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local", ...(typed ? { topicKind: kind } : {}) }
+      {
+        researchMode: "local",
+        ...(typed ? { topicKind: kind } : {}),
+        ...(typed && kind === "hypothesis"
+          ? {
+              ...(hypothesisStart.leaning ? { hypothesisLeaning: hypothesisStart.leaning } : {}),
+              ...(hypothesisStart.strength ? { hypothesisStrength: hypothesisStart.strength } : {})
+            }
+          : {})
+      }
     );
     // The child is inherited: its reasoning is resolved at read time (manual ancestor, else current), never written.
     node.parentId = parent?.id ?? null;
@@ -17035,7 +17046,8 @@ export class VisualAgentMapView extends ItemView {
     };
     // Type and strength come from the same readers the cards use, so an AIM map (and an AIM card) reads as an ordinary topic.
     const outline: MapChatOutlineNode[] = this.onScreenSiblingOrder(map).map(node => {
-      const strength = this.hypothesisStrengthOf(node.id);
+      const strength = this.hypothesisStrengthOf(node.id),
+        leaning = this.hypothesisLeaningOf(node.id);
       return {
         id: node.id,
         title: titleOf(node),
@@ -17043,6 +17055,7 @@ export class VisualAgentMapView extends ItemView {
         parentId: node.parentId,
         depth: depthOf(node),
         kind: this.topicKindOf(node.id),
+        ...(leaning ? { leaning } : {}),
         ...(strength ? { strength } : {}),
         // The appearance the card shows (whitelisted values only); the context leaves it out on an AIM map.
         ...(isAimNode(node)
@@ -17541,7 +17554,7 @@ export class VisualAgentMapView extends ItemView {
       case "focus_topic":
         return t("ui.map_chat_do_focus_0", title(action.nodeId));
       case "set_topic_kind": {
-        const kind = this.chatKindText(action.topicKind, action.strength);
+        const kind = this.chatKindText(action.topicKind, action.strength, action.leaning);
         return action.nodeIds.length === 1
           ? t("ui.map_chat_do_set_kind_0_1", title(action.nodeIds[0]), kind)
           : t("ui.map_chat_do_set_kind_many_0_1", action.nodeIds.length, kind);
@@ -17603,11 +17616,14 @@ export class VisualAgentMapView extends ItemView {
     return this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
   }
   /** "Hypothesis" or "Hypothesis (Strong)" in the language of the UI. */
-  private chatKindText(kind: TopicKind, strength?: HypothesisStrength): string {
+  private chatKindText(kind: TopicKind, strength?: HypothesisStrength, leaning?: HypothesisLeaning): string {
     const name = t(`ui.topic_kind_${kind}`);
-    return kind === "hypothesis" && strength
-      ? t("ui.map_chat_kind_with_strength_0_1", name, t(STRENGTH_LABEL[strength]))
-      : name;
+    if (kind !== "hypothesis" || (!strength && !leaning)) return name;
+    // Only the values the action gives, in the card tag's order and separator: "Hypothesis (Supported · Weak)".
+    const parts = [leaning ? t(LEANING_LABEL[leaning]) : "", strength ? t(STRENGTH_LABEL[strength]) : ""].filter(
+      Boolean
+    );
+    return t("ui.map_chat_kind_with_strength_0_1", name, parts.join(t("ui.map_chat_kind_part_separator")));
   }
   /**
    * An ask_topic_kind of a reply: the three ways to read it are offered under the answer and nothing happens until one is
@@ -18211,21 +18227,17 @@ export class VisualAgentMapView extends ItemView {
         // a card that was written before the action failed is covered too.
         if (run.deferRebuild) run.ownershipDirty = true;
         // The type is written when the note is created, like "+ Topic" of that type (the parser dropped it on an AIM map).
-        await this.addNode(parent, action.title, !run.deferRebuild, false, action.topicKind ?? "topic");
+        // Its leaning and strength go in the same creation (initial values), not a write after it.
+        await this.addNode(parent, action.title, !run.deferRebuild, false, action.topicKind ?? "topic", false, {
+          leaning: action.leaning,
+          strength: action.strength
+        });
         const created = this.map?.nodes.find(item => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
         run.created.push(created.id);
         run.notes?.add(created.id);
         if (action.ref) run.refs.set(action.ref, created.id);
         if (action.summary) await this.noteChange(created, { summary: action.summary });
-        // A new hypothesis starts weak; another strength goes into its frontmatter before the reply's undo check is taken.
-        if (
-          action.topicKind === "hypothesis" &&
-          action.strength &&
-          action.strength !== "weak" &&
-          this.relationsEnabled()
-        )
-          await this.plugin.repo.writeHypothesisStrength(created.path, action.strength);
         return done;
       }
       case "set_topic_kind":
@@ -18519,14 +18531,30 @@ export class VisualAgentMapView extends ItemView {
     let changes = 0;
     for (const node of typed) {
       const kindChanges = this.topicKindOf(node.id) !== kind;
-      const strength = kind === "hypothesis" ? action.strength : undefined;
-      const strengthChanges = !!strength && this.hypothesisStrengthOf(node.id) !== strength;
-      if (!kindChanges && !strengthChanges) continue;
+      const hypothesis = kind === "hypothesis";
+      // A card that becomes a hypothesis starts undecided with strength none (nothing is written for what is not given);
+      // a hypothesis is compared by the values it shows now, and the values written are the consistent ones.
+      const current: { leaning: HypothesisLeaning; strength: HypothesisStrength } =
+        !kindChanges && hypothesis
+          ? {
+              leaning: this.hypothesisLeaningOf(node.id) ?? "undecided",
+              strength: this.hypothesisStrengthOf(node.id) ?? "none"
+            }
+          : { leaning: "undecided", strength: "none" };
+      const target = resolveHypothesisWrite(current, {
+        leaning: hypothesis ? action.leaning : undefined,
+        strength: hypothesis ? action.strength : undefined
+      });
+      const leaningWrite = hypothesis && !!action.leaning && (kindChanges || target.leaning !== current.leaning);
+      const strengthWrite =
+        hypothesis && !!action.strength && (kindChanges || leaningWrite || target.strength !== current.strength);
+      if (!kindChanges && !leaningWrite && !strengthWrite) continue;
       changes++;
       run?.notes?.add(node.id);
       transaction.rewriteNote(node.path, async path => {
         if (kindChanges) await this.plugin.repo.writeTopicKind(path, kind);
-        if (strength && strengthChanges) await this.plugin.repo.writeHypothesisStrength(path, strength);
+        if (leaningWrite) await this.plugin.repo.writeHypothesisLeaning(path, target.leaning);
+        if (strengthWrite) await this.plugin.repo.writeHypothesisStrength(path, target.strength);
       });
     }
     if (!changes) return { status: "done" };

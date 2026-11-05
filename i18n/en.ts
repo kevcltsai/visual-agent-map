@@ -1371,6 +1371,7 @@ export const en = {
   "ui.map_chat_skip_relation_not_allowed": "the map does not allow that relation",
   "ui.map_chat_skip_relation_missing": "the two topics hold no relation",
   "ui.map_chat_kind_with_strength_0_1": "{0} ({1})",
+  "ui.map_chat_kind_part_separator": " · ",
   "ui.map_chat_do_ask_kind_0": "Offer choices for turning the topics into {0}",
   "ui.map_chat_kind_choice_prompt_0": "How should these topics become {0}?",
   "ui.map_chat_kind_choice_type_only": "Change the type only",

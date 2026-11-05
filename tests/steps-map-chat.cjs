@@ -400,8 +400,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 13 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 13);
+test('C1: the style is not part of the action schema, and the step version is 14 (the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 14);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -1349,4 +1349,93 @@ test('add_child summary turns a plain source path of a shown note into a wikilin
 test('add_child summary is untouched when no note was shown', () => {
   const result = parse(reply(item('add_child', { title: 'A', summary: 'source: Reading/X.md' })));
   assert.equal(result.actions[0].summary, 'source: Reading/X.md');
+});
+
+// ---- hypothesis-leaning (P3): the chat reads and writes a hypothesis's leaning ---------------------------------------------
+test('hypothesis-leaning: S15 the outline carries leaning and strength (strength none too) only next to a hypothesis', () => {
+  const typed = [
+    { id: 'r', title: 'Root', summary: '', parentId: null, depth: 0, kind: 'topic', leaning: 'supported' },
+    { id: 'h', title: 'H', summary: '', parentId: 'r', depth: 1, kind: 'hypothesis', leaning: 'refuted', strength: 'weak' },
+    { id: 'n', title: 'N', summary: '', parentId: 'r', depth: 1, kind: 'hypothesis', leaning: 'undecided', strength: 'none' },
+    { id: 'e', title: 'E', summary: '', parentId: 'r', depth: 1, kind: 'evidence', leaning: 'supported', strength: 'weak' }
+  ];
+  const sent = JSON.parse(buildMapChatContext(input({ outline: typed })).json).outline;
+  const of = id => sent.find(n => n.id === id);
+  assert.equal(of('h').leaning, 'refuted'); assert.equal(of('h').strength, 'weak');
+  assert.equal(of('n').leaning, 'undecided'); assert.equal(of('n').strength, 'none', 'none is sent too');
+  assert.equal('leaning' in of('e') || 'strength' in of('e'), false, 'only a hypothesis has them');
+  assert.equal('leaning' in of('r'), false);
+});
+test('hypothesis-leaning: S16 an AIM map sends no leaning or strength, even when given', () => {
+  const typed = outline.map(node => ({ ...node, kind: 'hypothesis', leaning: 'supported', strength: 'medium' }));
+  const sent = JSON.parse(context({ outline: typed, aim: true }).json);
+  assert.equal(sent.outline.some(n => 'kind' in n || 'leaning' in n || 'strength' in n), false);
+});
+test('hypothesis-leaning: S17 the schema requires leaning as a three-value enum plus empty, and strength keeps none', () => {
+  const items = MAP_CHAT_SCHEMA.properties.actions.items;
+  assert.deepEqual(plain(items.properties.leaning.enum), ['supported', 'undecided', 'refuted', '']);
+  assert.deepEqual(plain(items.properties.strength.enum), ['none', 'weak', 'medium', 'strong', '']);
+  assert.ok(items.required.includes('leaning'));
+});
+test('hypothesis-leaning: S18 set_topic_kind keeps leaning and strength, empty means keep, none is allowed', () => {
+  const got = parse(reply(
+    item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', leaning: 'supported', strength: 'none' }),
+    item('set_topic_kind', { nodeIds: ['b'], topicKind: 'hypothesis', leaning: '', strength: '' }),
+    item('set_topic_kind', { nodeIds: ['a1'], topicKind: 'hypothesis', leaning: ' refuted ' })
+  ));
+  assert.deepEqual(got.actions, [
+    { kind: 'set_topic_kind', nodeIds: ['a'], topicKind: 'hypothesis', leaning: 'supported', strength: 'none' },
+    { kind: 'set_topic_kind', nodeIds: ['b'], topicKind: 'hypothesis' },
+    { kind: 'set_topic_kind', nodeIds: ['a1'], topicKind: 'hypothesis', leaning: 'refuted' }
+  ]);
+});
+test('hypothesis-leaning: S18 an unknown leaning is bad_value; a leaning next to another type is ignored', () => {
+  const got = parse(reply(
+    item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', leaning: 'maybe' }),
+    item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', leaning: 'Supported' }),
+    item('set_topic_kind', { nodeIds: ['a1'], topicKind: 'evidence', leaning: 'supported' }),
+    item('add_child', { parentId: 'a', title: 'X', topicKind: 'hypothesis', leaning: 'bogus' })
+  ));
+  assert.deepEqual(got.actions, [{ kind: 'set_topic_kind', nodeIds: ['a1'], topicKind: 'evidence' }]);
+  assert.deepEqual(codes(got), ['0:bad_value', '1:bad_value', '3:bad_value']);
+});
+test('hypothesis-leaning: S19 add_child carries topicKind, leaning and strength; a plain topic carries none; an AIM map drops them', () => {
+  const got = parse(reply(
+    item('add_child', { parentId: 'a', title: 'Claim', topicKind: 'hypothesis', leaning: 'supported', strength: 'medium' }),
+    item('add_child', { parentId: 'a', title: 'Plain', topicKind: 'topic', leaning: 'supported' }),
+    item('add_child', { parentId: 'a', title: 'Ev', topicKind: 'evidence', leaning: 'refuted' })
+  ));
+  assert.deepEqual(got.actions, [
+    { kind: 'add_child', parentId: 'a', title: 'Claim', summary: '', topicKind: 'hypothesis', leaning: 'supported', strength: 'medium' },
+    { kind: 'add_child', parentId: 'a', title: 'Plain', summary: '' },
+    { kind: 'add_child', parentId: 'a', title: 'Ev', summary: '', topicKind: 'evidence' }
+  ]);
+  const aim = parse(reply(item('add_child', { parentId: 'a', title: 'New', topicKind: 'hypothesis', leaning: 'supported' })), context({ aim: true }));
+  assert.deepEqual(aim.actions, [{ kind: 'add_child', parentId: 'a', title: 'New', summary: '' }]);
+  assert.deepEqual(codes(aim), ['0:no_topic_kinds']);
+});
+test('hypothesis-leaning: S18 an AIM map drops set_topic_kind with a leaning', () => {
+  const got = parse(reply(item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', leaning: 'supported' })), context({ aim: true }));
+  assert.deepEqual(got.actions, []); assert.deepEqual(codes(got), ['0:no_topic_kinds']);
+});
+test('hypothesis-leaning: S21 both prompts explain leaning (three values) and strength (four values) as evidence, not probability, and keep the old rules', () => {
+  const render = language => mapChatStep.render({ message: 'hi', context: context(), language, model: 'm', reasoning: 'low' });
+  const en = render('en'), zh = render('zh-TW');
+  for (const text of [en, zh]) {
+    for (const word of ['supported', 'undecided', 'refuted', 'none', 'weak', 'medium', 'strong', 'leaning']) assert.ok(text.includes(word), word);
+    assert.ok(text.includes('"leaning":""'), 'the JSON shape names leaning');
+  }
+  assert.match(en, /where the evidence points/); assert.match(en, /neither is the probability/);
+  assert.match(zh, /證據往哪指/); assert.match(zh, /兩者都不是這個主張為真的機率/);
+  assert.match(en, /go one step only/); assert.match(en, /Never express a topic type through the title/);
+  assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
+});
+test('hypothesis-leaning: S21 the step version is 14, and a step-13 reply without a leaning key still parses', () => {
+  assert.equal(mapChatStep.version, 14);
+  const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
+  const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
+  assert.deepEqual(parse(reply(old, oldAdd)).actions, [
+    { kind: 'set_topic_kind', nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' },
+    { kind: 'add_child', parentId: 'a', title: 'Old', summary: '', topicKind: 'hypothesis' }
+  ]);
 });

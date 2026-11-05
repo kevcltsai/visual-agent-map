@@ -1,5 +1,5 @@
 import { normalizeVaultPath } from "./map-chat-guard";
-import type { HypothesisStrength, TopicKind } from "../note-values";
+import type { HypothesisLeaning, HypothesisStrength, TopicKind } from "../note-values";
 import type { TopicRelationKind } from "../map-model";
 import type { TopicColor, TopicStyle } from "../topic-colors";
 import type { TopicMarker } from "../topic-markers";
@@ -37,6 +37,8 @@ export interface MapChatOutlineNode {
   depth: number;
   /** The card's topic type; "topic" (or absent) is an ordinary topic and is not sent. Dropped on an AIM map. */
   kind?: TopicKind;
+  /** A hypothesis's leaning; sent only next to `kind: "hypothesis"`. Dropped on an AIM map. */
+  leaning?: HypothesisLeaning;
   /** A hypothesis's strength; sent only next to `kind: "hypothesis"`. Dropped on an AIM map. */
   strength?: HypothesisStrength;
   /** The card's colour; absent (the default) is not sent. Dropped on an AIM map. */
@@ -202,10 +204,18 @@ const clip = (value: string, limit: number): string => {
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}…` : text;
 };
 
-/** `kind` only for a type other than an ordinary topic, `strength` only for a hypothesis; nothing on an AIM map. */
-const kindFields = (node: MapChatOutlineNode, aim: boolean): { kind?: TopicKind; strength?: HypothesisStrength } => {
+/** `kind` only for a type other than an ordinary topic, `leaning` and `strength` only for a hypothesis; nothing on an AIM map. */
+const kindFields = (
+  node: MapChatOutlineNode,
+  aim: boolean
+): { kind?: TopicKind; leaning?: HypothesisLeaning; strength?: HypothesisStrength } => {
   if (aim || !node.kind || node.kind === "topic") return {};
-  return { kind: node.kind, ...(node.kind === "hypothesis" && node.strength ? { strength: node.strength } : {}) };
+  const hypothesis = node.kind === "hypothesis";
+  return {
+    kind: node.kind,
+    ...(hypothesis && node.leaning ? { leaning: node.leaning } : {}),
+    ...(hypothesis && node.strength ? { strength: node.strength } : {})
+  };
 };
 
 /**

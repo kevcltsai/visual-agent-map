@@ -1299,6 +1299,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_skip_relation_not_allowed": "心智圖不允許這條關係",
   "ui.map_chat_skip_relation_missing": "這兩張議題之間沒有關係",
   "ui.map_chat_kind_with_strength_0_1": "{0}（{1}）",
+  "ui.map_chat_kind_part_separator": "・",
   "ui.map_chat_do_ask_kind_0": "提供選項：要怎麼把議題變成{0}",
   "ui.map_chat_kind_choice_prompt_0": "要怎麼把這些議題變成{0}？",
   "ui.map_chat_kind_choice_type_only": "只改類型",

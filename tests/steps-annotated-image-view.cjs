@@ -89,7 +89,7 @@ test('annotated image: accent class, title bar with pill, note and anchor count,
   const el = h.imageEl();
   assert.ok(el.hasClass('is-annotated'));
   assert.equal(el.attrs['aria-label'], 'Annotated image: Cow scan');
-  assert.equal(el.attrs.role, 'img');
+  assert.equal(el.attrs.role, 'group');
   assert.equal(el.tabIndex, 0);
   const b = bar(el);
   assert.equal(find(b, i => i.hasClass('vam-annotated-pill')).children.map(c => c.text).join(''), 'Annotated image');

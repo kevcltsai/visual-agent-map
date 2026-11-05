@@ -921,6 +921,9 @@ var en = {
   "ui.anchor_label_empty": "Anchor (no note)",
   "ui.anchor_links": "Linked to {0} topic(s)",
   "ui.anchor_unlinked": "Not linked to any topic",
+  "ui.anchor_relation_end_0": "Annotated image \xB7 {0}",
+  "ui.anchor_relation_end_empty": "Annotated image \xB7 anchor",
+  "ui.card_image_relations_0": "{0} image relation(s)",
   "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse",
   "ui.anchor_place_cancelled": "Placing cancelled",
   "ui.anchor_no_note_notice": "This image has no note yet. The AI cannot see pictures; add one sentence on what it is and what to research.",
@@ -3585,6 +3588,9 @@ var zhCN = {
   "ui.anchor_label_empty": "\u951A\u70B9\uFF08\u65E0\u8BF4\u660E\uFF09",
   "ui.anchor_links": "\u8FDE\u5230 {0} \u4E2A\u8BAE\u9898",
   "ui.anchor_unlinked": "\u5C1A\u672A\u8FDE\u5230\u8BAE\u9898",
+  "ui.anchor_relation_end_0": "\u6807\u6CE8\u56FE\u30FB{0}",
+  "ui.anchor_relation_end_empty": "\u6807\u6CE8\u56FE\u30FB\u951A\u70B9",
+  "ui.card_image_relations_0": "{0} \u4E2A\u56FE\u7247\u5173\u7CFB",
   "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 \u79FB\u52A8\u3001Shift \u79FB\u52A8\u8F83\u8FDC\u3001Enter \u653E\u4E0B\u3001Esc \u53D6\u6D88\u3001\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u9F20\u6807\u70B9",
   "ui.anchor_place_cancelled": "\u5DF2\u53D6\u6D88\u653E\u951A\u70B9",
   "ui.anchor_no_note_notice": "\u8FD9\u5F20\u6807\u6CE8\u56FE\u8FD8\u6CA1\u6709\u8BF4\u660E\u3002AI \u770B\u4E0D\u5230\u56FE\u7247\uFF0C\u5EFA\u8BAE\u8865\u4E00\u53E5\u201C\u8FD9\u662F\u4EC0\u4E48\u56FE\u3001\u8981\u7814\u7A76\u4EC0\u4E48\u201D\u3002",
@@ -6249,6 +6255,9 @@ var zhTW = {
   "ui.anchor_label_empty": "\u9328\u9EDE\uFF08\u7121\u8AAA\u660E\uFF09",
   "ui.anchor_links": "\u9023\u5230 {0} \u500B\u8B70\u984C",
   "ui.anchor_unlinked": "\u5C1A\u672A\u9023\u5230\u8B70\u984C",
+  "ui.anchor_relation_end_0": "\u6A19\u8A3B\u5716\u30FB{0}",
+  "ui.anchor_relation_end_empty": "\u6A19\u8A3B\u5716\u30FB\u9328\u9EDE",
+  "ui.card_image_relations_0": "{0} \u500B\u5716\u7247\u95DC\u4FC2",
   "ui.anchor_place_hint": "\u2190 \u2191 \u2192 \u2193 \u79FB\u52D5\u3001Shift \u79FB\u52D5\u8F03\u9060\u3001Enter \u653E\u4E0B\u3001Esc \u53D6\u6D88\u3001\u4E5F\u53EF\u4EE5\u76F4\u63A5\u7528\u6ED1\u9F20\u9EDE",
   "ui.anchor_place_cancelled": "\u5DF2\u53D6\u6D88\u653E\u9328\u9EDE",
   "ui.anchor_no_note_notice": "\u9019\u5F35\u6A19\u8A3B\u5716\u9084\u6C92\u6709\u8AAA\u660E\u3002AI \u770B\u4E0D\u5230\u5716\u7247\uFF0C\u5EFA\u8B70\u88DC\u4E00\u53E5\u300C\u9019\u662F\u4EC0\u9EBC\u5716\u3001\u8981\u7814\u7A76\u4EC0\u9EBC\u300D\u3002",
@@ -17994,6 +18003,19 @@ function addAnchorRelation(items, imageId, relation) {
     return withRelations(img, [...(_a2 = img.relations) != null ? _a2 : [], clean4]);
   });
 }
+function anchorRelationsForTopic(items, topicId) {
+  var _a2;
+  const out = [];
+  for (const item of items) {
+    if (!isAnnotatedImage(item)) continue;
+    const anchors = anchorIdsOf(item);
+    for (const relation of (_a2 = item.relations) != null ? _a2 : []) {
+      if (relation.from !== topicId && relation.to !== topicId) continue;
+      out.push({ imageId: item.id, anchorId: anchors.has(relation.from) ? relation.from : relation.to, relation });
+    }
+  }
+  return out;
+}
 function pruneAnnotatedImages(items, nodeIds) {
   let dropped = 0;
   const out = items.map((item) => {
@@ -26306,6 +26328,33 @@ function relationPathData(a, b, axis = void 0) {
 }
 function relationLabelPoint(a, b, axis = void 0) {
   const { p1, c1, c2, p2 } = curveOf(a, b, axis);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}
+function pointToBoxCurve(point, box, pointIsFrom) {
+  const horizontal = axisGap(point.x, 0, box.x, box.width), vertical = axisGap(point.y, 0, box.y, box.height);
+  const centre = centreOf(box);
+  let edge, gap;
+  if (horizontal <= 0 && vertical <= 0) {
+    edge = { ...centre, nx: 0, ny: 0 };
+    gap = 0;
+  } else if (horizontal >= vertical) {
+    const rightOf = point.x > centre.x;
+    edge = { x: rightOf ? box.x + box.width : box.x, y: centre.y, nx: rightOf ? 1 : -1, ny: 0 };
+    gap = horizontal;
+  } else {
+    const below = point.y > centre.y;
+    edge = { x: centre.x, y: below ? box.y + box.height : box.y, nx: 0, ny: below ? 1 : -1 };
+    gap = vertical;
+  }
+  const length = gap > 0 ? controlLength(gap) : 0, run = Math.hypot(edge.x - point.x, edge.y - point.y) || 1, near = { x: point.x + (edge.x - point.x) / run * length, y: point.y + (edge.y - point.y) / run * length }, far = { x: edge.x + edge.nx * length, y: edge.y + edge.ny * length };
+  return pointIsFrom ? { p1: { x: point.x, y: point.y }, c1: near, c2: far, p2: { x: edge.x, y: edge.y } } : { p1: { x: edge.x, y: edge.y }, c1: far, c2: near, p2: { x: point.x, y: point.y } };
+}
+function pointToBoxPathData(point, box, pointIsFrom) {
+  const { p1, c1, c2, p2 } = pointToBoxCurve(point, box, pointIsFrom);
+  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+}
+function pointToBoxLabelPoint(point, box, pointIsFrom) {
+  const { p1, c1, c2, p2 } = pointToBoxCurve(point, box, pointIsFrom);
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
 function treeEdgePathData(parent, child, direction, depth = 1) {
@@ -52851,6 +52900,7 @@ function depthOf(nodes, id) {
   for (let node = byId.get(id); (node == null ? void 0 : node.parentId) && depth < nodes.length; node = byId.get(node.parentId)) depth++;
   return depth;
 }
+var anchorLineKey = (imageId, anchorId, topicId) => `anchor:${imageId}:${anchorId}:${topicId}`;
 var BOUNDARY_PAD = 16;
 var boxOf = (card) => ({
   x: card.offsetLeft,
@@ -53106,6 +53156,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian35.Ite
     /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
     __publicField(this, "hoverRelation", null);
     __publicField(this, "previewRelation", null);
+    /**
+     * The anchor lines drawn now, by key `anchor:<imageId>:<anchorId>:<topicId>` (also a key of `relationEls`; no NUL in it,
+     * so the topic-relation code that splits a key on NUL never matches one). View state only, rebuilt by `drawRelations`.
+     */
+    __publicField(this, "anchorLinks", /* @__PURE__ */ new Map());
+    /** The anchor under the pointer or focus (`imageId NUL anchorId`): its lines are highlighted like a selected topic's. */
+    __publicField(this, "hoverAnchor", null);
     /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
     __publicField(this, "relationEndIds", /* @__PURE__ */ new Set());
     /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
@@ -58433,7 +58490,7 @@ ${request.requirements}` : preset.text,
       const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = annotated ? t("ui.annotated_image_label", annotated.note || name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
       this.canvasImageEls.set(image.id, el);
-      el.setAttr("role", "img");
+      el.setAttr("role", annotated ? "group" : "img");
       el.setAttr("aria-label", label);
       el.tabIndex = 0;
       el.style.left = `${image.x}px`;
@@ -58519,6 +58576,20 @@ ${request.requirements}` : preset.text,
       dot.setAttr("aria-describedby", tip.id);
       dot.addEventListener("pointerdown", (event) => event.stopPropagation());
       dot.addEventListener("click", (event) => event.stopPropagation());
+      const ref = `${image.id}\0${anchor.id}`;
+      const mark = (on) => {
+        if (on) this.hoverAnchor = ref;
+        else if (this.hoverAnchor === ref) this.hoverAnchor = null;
+        else return;
+        this.syncRelationClasses();
+      };
+      for (const [name2, on] of [
+        ["pointerenter", true],
+        ["pointerleave", false],
+        ["focus", true],
+        ["blur", false]
+      ])
+        dot.addEventListener(name2, () => mark(on));
       if (!editable) continue;
       dot.addEventListener("keydown", (event) => {
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
@@ -61727,6 +61798,7 @@ ${request.requirements}` : preset.text,
     const edges = [];
     for (const el of Array.from((_o = (_n = this.edgesEl) == null ? void 0 : _n.children) != null ? _o : [])) {
       if (((_p = el.tagName) == null ? void 0 : _p.toLowerCase()) !== "path") continue;
+      if (el.getAttribute("data-anchor-relation") !== null) continue;
       const d = el.getAttribute("d");
       const style = computed(el);
       const stroke = colorOf(style.stroke);
@@ -63067,6 +63139,7 @@ ${request.requirements}` : preset.text,
         text: (_E = note == null ? void 0 : note.summary) != null ? _E : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
         attr: { title: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
+    this.paintCardImageRelations(card, node.id);
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
@@ -63838,6 +63911,23 @@ ${request.requirements}` : preset.text,
    * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
    * name. Safe to call again: the old symbols and the old name part are replaced.
    */
+  /**
+   * "N image relations" at the foot of a topic card: a map-pin icon and muted text, only when an anchor of some annotated
+   * image is related to the topic (and never on an AIM map). The text is a count, so it is plain text and nothing else.
+   */
+  paintCardImageRelations(card, id) {
+    var _a2;
+    for (const old of Array.from(card.querySelectorAll(".vam-image-relations-mark"))) old.remove();
+    if (!this.map || !this.relationsEnabled()) return;
+    const count = anchorRelationsForTopic((_a2 = this.map.canvasItems) != null ? _a2 : [], id).length;
+    if (!count) return;
+    const text11 = t("ui.card_image_relations_0", count), mark = card.createDiv({ cls: "vam-image-relations-mark" });
+    mark.setAttr("aria-label", text11);
+    const icon = mark.createSpan({ cls: "vam-image-relations-mark-icon" });
+    icon.setAttr("aria-hidden", "true");
+    (0, import_obsidian35.setIcon)(icon, "map-pin");
+    mark.createSpan({ cls: "vam-image-relations-mark-text", text: text11 });
+  }
   paintCardMarkers(card, header, id) {
     var _a2, _b2;
     const old = cardMarkerRows.get(card);
@@ -71246,6 +71336,9 @@ ${addition}` : addition });
       if (!group.has(fromId) && !group.has(toId)) continue;
       if (boxFor(fromId) && boxFor(toId)) linked.push({ key: key2, fromId, toId });
     }
+    const anchored = [];
+    for (const [key2, line] of this.anchorLinks)
+      if (group.has(line.topicId) && boxFor(line.topicId)) anchored.push({ key: key2, line });
     const spineIds = /* @__PURE__ */ new Set();
     for (const id of group.keys()) {
       const parentId = (_c = nodes.find((item) => item.id === id)) == null ? void 0 : _c.parentId;
@@ -71278,6 +71371,10 @@ ${addition}` : addition });
           (_a3 = this.relationHitEls.get(link.key)) == null ? void 0 : _a3.setAttribute("d", d);
           (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
+        }
+        for (const { key: key2, line } of anchored) {
+          const box = shifted(line.topicId, dx, dy);
+          if (box) this.placeAnchorLine(key2, line, box);
         }
         for (const edge of tree) {
           const path = this.edgeEls.get(edge.key);
@@ -71331,6 +71428,7 @@ ${addition}` : addition });
       const other = this.cardEls.get(fromId === id ? toId : fromId);
       if (other) linked.push({ key: key2, dragIsFrom: fromId === id, far: boxOf(other) });
     }
+    const anchored = [...this.anchorLinks].filter(([, line]) => line.topicId === id);
     const dragged = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === id);
     const spineId = this.spineEls.has(id) ? id : (dragged == null ? void 0 : dragged.parentId) && this.spineEls.has(dragged.parentId) ? dragged.parentId : null;
     const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
@@ -71347,6 +71445,7 @@ ${addition}` : addition });
           (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
+        for (const [key2, line] of anchored) this.placeAnchorLine(key2, line, { x, y, ...size });
         for (const edge of touching2) {
           const path = this.edgeEls.get(edge.key);
           if (!path) continue;
@@ -71510,11 +71609,18 @@ ${addition}` : addition });
     this.relationPainted.clear();
     this.relationExpanded.clear();
     if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
+    this.anchorLinks.clear();
     const links = [];
     for (const relation of (_a2 = this.map.topicRelations) != null ? _a2 : []) {
       const from = this.cardEls.get(relation.from), to = this.cardEls.get(relation.to);
       if (!from || !to) continue;
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
+    }
+    for (const [key2, anchor, relation] of this.anchorLinesToDraw()) {
+      const card = this.cardEls.get(anchor.topicId);
+      if (!card) continue;
+      this.anchorLinks.set(key2, anchor);
+      links.push({ from: card, to: card, key: key2, kind: relation.kind, relation, anchor });
     }
     if (!links.length) return;
     const defs = createSvg("defs");
@@ -71523,12 +71629,13 @@ ${addition}` : addition });
     this.edgesEl.appendChild(defs);
     const axis = relationAxisFor(layoutOf(this.map).direction);
     for (const link of links) {
-      const d = relationPathData(boxOf(link.from), boxOf(link.to), axis), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
+      const d = this.relationLinkPath(link, axis), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
       const path = createSvg("path");
       path.setAttribute("d", d);
       if (marker5) path.setAttribute("marker-end", marker5);
       path.addClass("vam-relation");
       path.addClass(`vam-relation-${link.kind}`);
+      if (link.anchor) path.setAttribute("data-anchor-relation", "");
       this.edgesEl.appendChild(path);
       this.relationEls.set(link.key, path);
       this.relationData.set(link.key, link.relation);
@@ -71537,12 +71644,14 @@ ${addition}` : addition });
         gap.setAttribute("d", d);
         if (marker5) gap.setAttribute("marker-end", marker5);
         gap.addClass("vam-relation-gap");
+        if (link.anchor) gap.setAttribute("data-anchor-relation", "");
         this.edgesEl.appendChild(gap);
         this.relationGapEls.set(link.key, gap);
       }
       const hit = createSvg("path");
       hit.setAttribute("d", d);
       hit.addClass("vam-relation-hit");
+      if (link.anchor) hit.setAttribute("data-anchor-relation", "");
       const key2 = link.key;
       hit.addEventListener("pointerdown", (event) => {
         event.stopPropagation();
@@ -71553,7 +71662,7 @@ ${addition}` : addition });
         event.stopPropagation();
         this.selection.selectRelation(key2);
         this.syncRelationClasses();
-        this.openRelationEditor(link.relation);
+        if (!link.anchor) this.openRelationEditor(link.relation);
       });
       hit.addEventListener("pointerenter", () => {
         this.hoverRelation = key2;
@@ -71569,13 +71678,53 @@ ${addition}` : addition });
     for (const link of links) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
+      if (link.anchor) label.setAttribute("data-anchor-relation", "");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to), axis));
+      this.placeRelationLabel(
+        link.key,
+        link.anchor ? pointToBoxLabelPoint(link.anchor.point, boxOf(link.to), link.anchor.fromAnchor) : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
+      );
     }
     this.selection.pruneRelation(new Set(this.relationEls.keys()));
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
+  }
+  /** Moves one anchor line (all its parts and its label) to meet a topic card that stands at `box`. */
+  placeAnchorLine(key2, line, box) {
+    var _a2, _b2, _c;
+    const d = pointToBoxPathData(line.point, box, line.fromAnchor);
+    (_a2 = this.relationEls.get(key2)) == null ? void 0 : _a2.setAttribute("d", d);
+    (_b2 = this.relationHitEls.get(key2)) == null ? void 0 : _b2.setAttribute("d", d);
+    (_c = this.relationGapEls.get(key2)) == null ? void 0 : _c.setAttribute("d", d);
+    this.placeRelationLabel(key2, pointToBoxLabelPoint(line.point, box, line.fromAnchor));
+  }
+  relationLinkPath(link, axis) {
+    return link.anchor ? pointToBoxPathData(link.anchor.point, boxOf(link.to), link.anchor.fromAnchor) : relationPathData(boxOf(link.from), boxOf(link.to), axis);
+  }
+  /**
+   * Every anchor relation that can be drawn: its anchor has a 2D position (map units from the image's data, so a missing
+   * picture file does not matter), and the other end is an id. The caller skips a topic that is not on screen.
+   */
+  anchorLinesToDraw() {
+    var _a2, _b2, _c, _d;
+    const out = [];
+    for (const item of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []) {
+      if (!isAnnotatedImage(item)) continue;
+      for (const relation of (_c = item.relations) != null ? _c : []) {
+        const anchor = item.anchors.find((a) => a.id === relation.from || a.id === relation.to);
+        if (!anchor || !isImage2dAnchor(anchor)) continue;
+        const point = { x: item.x + anchor.at.x * item.w, y: item.y + anchor.at.y * item.h };
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+        const fromAnchor = anchor.id === relation.from, topicId = fromAnchor ? relation.to : relation.from;
+        out.push([
+          anchorLineKey(item.id, anchor.id, topicId),
+          { imageId: item.id, anchorId: anchor.id, topicId, point, fromAnchor, anchorNote: (_d = anchor.note) != null ? _d : "" },
+          relation
+        ]);
+      }
+    }
+    return out;
   }
   /**
    * An arrowhead whose tip sits exactly on the end of the line (`refX` is the tip), so it stops at the card edge. The
@@ -71616,9 +71765,9 @@ ${addition}` : addition });
       return;
     }
     label.textContent = "";
-    const titleOf = (id) => {
+    const anchored = this.anchorLinks.get(key2), titleOf = (id) => {
       var _a2, _b2;
-      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+      return anchored && id === anchored.anchorId ? anchored.anchorNote ? t("ui.anchor_relation_end_0", anchored.anchorNote) : t("ui.anchor_relation_end_empty") : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
     }, at = this.relationLabelAt.get(key2), head = createSvg("tspan");
     head.textContent = t(
       link.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
@@ -71656,8 +71805,9 @@ ${addition}` : addition });
     if (this.selection.state.selected) chosen.add(this.selection.state.selected);
     const ends = /* @__PURE__ */ new Set();
     for (const [key2, path] of this.relationEls) {
-      const [fromId, toId] = key2.split("\0");
-      const related = chosen.has(fromId) || chosen.has(toId), active = key2 === this.selection.state.selectedRelation || key2 === this.previewRelation;
+      const anchored = this.anchorLinks.get(key2);
+      const [fromId, toId] = anchored ? [anchored.topicId, anchored.topicId] : key2.split("\0");
+      const related = chosen.has(fromId) || chosen.has(toId) || !!anchored && this.hoverAnchor === `${anchored.imageId}\0${anchored.anchorId}`, active = key2 === this.selection.state.selectedRelation || key2 === this.previewRelation;
       path.toggleClass("is-related", related);
       path.toggleClass("is-dimmed", chosen.size > 0 && !related);
       path.toggleClass("is-selected", active);

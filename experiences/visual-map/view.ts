@@ -34,6 +34,7 @@ import {
   updateTextNode,
   addAnchor,
   addAnchorRelation,
+  anchorRelationsForTopic,
   ANCHOR_LIMIT,
   convertToAnnotatedImage,
   convertToPlainImage,
@@ -113,6 +114,8 @@ export { formatIssuesPatch };
 import {
   fishboneSpinePathData,
   relationAxisFor,
+  pointToBoxLabelPoint,
+  pointToBoxPathData,
   relationLabelPoint,
   relationPathData,
   treeEdgePathData,
@@ -759,6 +762,19 @@ function depthOf(nodes: MapNode[], id: string): number {
   for (let node = byId.get(id); node?.parentId && depth < nodes.length; node = byId.get(node.parentId)) depth++;
   return depth;
 }
+/** One anchor relation as drawn: where it starts (the anchor, map units) and which topic it meets. */
+interface AnchorLine {
+  imageId: string;
+  anchorId: string;
+  topicId: string;
+  point: { x: number; y: number };
+  /** True when the relation runs from the anchor to the topic (the arrowhead is on the card). */
+  fromAnchor: boolean;
+  /** The anchor's note, for the label. */
+  anchorNote: string;
+}
+const anchorLineKey = (imageId: string, anchorId: string, topicId: string): string =>
+  `anchor:${imageId}:${anchorId}:${topicId}`;
 const BOUNDARY_PAD = 16;
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
@@ -1150,6 +1166,13 @@ export class VisualAgentMapView extends ItemView {
   /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
   private hoverRelation: string | null = null;
   private previewRelation: string | null = null;
+  /**
+   * The anchor lines drawn now, by key `anchor:<imageId>:<anchorId>:<topicId>` (also a key of `relationEls`; no NUL in it,
+   * so the topic-relation code that splits a key on NUL never matches one). View state only, rebuilt by `drawRelations`.
+   */
+  private anchorLinks = new Map<string, AnchorLine>();
+  /** The anchor under the pointer or focus (`imageId NUL anchorId`): its lines are highlighted like a selected topic's. */
+  private hoverAnchor: string | null = null;
   /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
   private relationEndIds = new Set<string>();
   /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
@@ -6891,7 +6914,8 @@ export class VisualAgentMapView extends ItemView {
         el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
       this.canvasImageEls.set(image.id, el);
-      el.setAttr("role", "img");
+      // An annotated image holds focusable anchors, which an `img` role would flatten to presentation: it is a group.
+      el.setAttr("role", annotated ? "group" : "img");
       el.setAttr("aria-label", label);
       el.tabIndex = 0;
       el.style.left = `${image.x}px`;
@@ -6980,6 +7004,21 @@ export class VisualAgentMapView extends ItemView {
       // A click on an anchor never selects or drags the image.
       dot.addEventListener("pointerdown", event => event.stopPropagation());
       dot.addEventListener("click", event => event.stopPropagation());
+      // Pointing at or focusing an anchor highlights the lines that leave it, like selecting a topic does for its own.
+      const ref = `${image.id}\u0000${anchor.id}`;
+      const mark = (on: boolean): void => {
+        if (on) this.hoverAnchor = ref;
+        else if (this.hoverAnchor === ref) this.hoverAnchor = null;
+        else return;
+        this.syncRelationClasses();
+      };
+      for (const [name, on] of [
+        ["pointerenter", true],
+        ["pointerleave", false],
+        ["focus", true],
+        ["blur", false]
+      ] as const)
+        dot.addEventListener(name, () => mark(on));
       if (!editable) continue;
       dot.addEventListener("keydown", event => {
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
@@ -10469,6 +10508,8 @@ export class VisualAgentMapView extends ItemView {
     const edges: SceneEdge[] = [];
     for (const el of Array.from(this.edgesEl?.children ?? [])) {
       if (el.tagName?.toLowerCase() !== "path") continue;
+      // Anchor lines are a view of the image notes, not of the map picture: the export has none of them.
+      if (el.getAttribute("data-anchor-relation") !== null) continue;
       const d = el.getAttribute("d");
       const style = computed(el);
       const stroke = colorOf(style.stroke);
@@ -11931,6 +11972,7 @@ export class VisualAgentMapView extends ItemView {
         text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
         attr: { title: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
+    this.paintCardImageRelations(card, node.id);
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
@@ -12769,6 +12811,23 @@ export class VisualAgentMapView extends ItemView {
    * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
    * name. Safe to call again: the old symbols and the old name part are replaced.
    */
+  /**
+   * "N image relations" at the foot of a topic card: a map-pin icon and muted text, only when an anchor of some annotated
+   * image is related to the topic (and never on an AIM map). The text is a count, so it is plain text and nothing else.
+   */
+  private paintCardImageRelations(card: HTMLElement, id: string): void {
+    for (const old of Array.from(card.querySelectorAll(".vam-image-relations-mark"))) old.remove();
+    if (!this.map || !this.relationsEnabled()) return;
+    const count = anchorRelationsForTopic(this.map.canvasItems ?? [], id).length;
+    if (!count) return;
+    const text = t("ui.card_image_relations_0", count),
+      mark = card.createDiv({ cls: "vam-image-relations-mark" });
+    mark.setAttr("aria-label", text);
+    const icon = mark.createSpan({ cls: "vam-image-relations-mark-icon" });
+    icon.setAttr("aria-hidden", "true");
+    setIcon(icon, "map-pin");
+    mark.createSpan({ cls: "vam-image-relations-mark-text", text });
+  }
   private paintCardMarkers(card: HTMLElement, header: HTMLElement, id: string): void {
     const old = cardMarkerRows.get(card);
     cardMarkerRows.delete(card);
@@ -20769,6 +20828,10 @@ export class VisualAgentMapView extends ItemView {
       if (!group.has(fromId) && !group.has(toId)) continue;
       if (boxFor(fromId) && boxFor(toId)) linked.push({ key, fromId, toId });
     }
+    // An anchor line stays on its anchor (the image does not move); only its card end follows.
+    const anchored: { key: string; line: AnchorLine }[] = [];
+    for (const [key, line] of this.anchorLinks)
+      if (group.has(line.topicId) && boxFor(line.topicId)) anchored.push({ key, line });
     // Each fishbone spine touched by a member (the head, or a first-level topic of the head) follows the move.
     const spineIds = new Set<string>();
     for (const id of group.keys()) {
@@ -20801,6 +20864,10 @@ export class VisualAgentMapView extends ItemView {
           this.relationHitEls.get(link.key)?.setAttribute("d", d);
           this.relationGapEls.get(link.key)?.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
+        }
+        for (const { key, line } of anchored) {
+          const box = shifted(line.topicId, dx, dy);
+          if (box) this.placeAnchorLine(key, line, box);
         }
         for (const edge of tree) {
           const path = this.edgeEls.get(edge.key);
@@ -20861,6 +20928,7 @@ export class VisualAgentMapView extends ItemView {
       const other = this.cardEls.get(fromId === id ? toId : fromId);
       if (other) linked.push({ key, dragIsFrom: fromId === id, far: boxOf(other) });
     }
+    const anchored = [...this.anchorLinks].filter(([, line]) => line.topicId === id);
     // A fishbone spine ends at the leftmost bone joint, so dragging the head or one of its first-level topics moves it.
     const dragged = this.map?.nodes.find(node => node.id === id);
     const spineId = this.spineEls.has(id)
@@ -20886,6 +20954,7 @@ export class VisualAgentMapView extends ItemView {
           this.relationGapEls.get(link.key)?.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationLabelPoint(from, to, axis));
         }
+        for (const [key, line] of anchored) this.placeAnchorLine(key, line, { x, y, ...size });
         for (const edge of touching) {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
           const path = this.edgeEls.get(edge.key);
@@ -21065,18 +21134,27 @@ export class VisualAgentMapView extends ItemView {
     this.relationPainted.clear();
     this.relationExpanded.clear();
     if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
+    this.anchorLinks.clear();
     const links: {
       from: HTMLElement;
       to: HTMLElement;
       key: string;
       kind: TopicRelation["kind"];
       relation: TopicRelation;
+      anchor?: AnchorLine;
     }[] = [];
     for (const relation of this.map.topicRelations ?? []) {
       const from = this.cardEls.get(relation.from),
         to = this.cardEls.get(relation.to);
       if (!from || !to) continue;
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
+    }
+    // Anchor lines come after the topic lines, so a map without them draws exactly what it did.
+    for (const [key, anchor, relation] of this.anchorLinesToDraw()) {
+      const card = this.cardEls.get(anchor.topicId);
+      if (!card) continue;
+      this.anchorLinks.set(key, anchor);
+      links.push({ from: card, to: card, key, kind: relation.kind, relation, anchor });
     }
     if (!links.length) return;
     const defs = createSvg("defs");
@@ -21086,7 +21164,7 @@ export class VisualAgentMapView extends ItemView {
     // In a map that grows sideways the lines lean to the left and right edges, in one that grows up or down to the ends.
     const axis = relationAxisFor(layoutOf(this.map).direction);
     for (const link of links) {
-      const d = relationPathData(boxOf(link.from), boxOf(link.to), axis),
+      const d = this.relationLinkPath(link, axis),
         marker =
           link.kind === "related"
             ? null
@@ -21096,6 +21174,8 @@ export class VisualAgentMapView extends ItemView {
       if (marker) path.setAttribute("marker-end", marker);
       path.addClass("vam-relation");
       path.addClass(`vam-relation-${link.kind}`);
+      // Marks the lines the PNG/SVG export leaves out (the three parts of an anchor line, and its label below).
+      if (link.anchor) path.setAttribute("data-anchor-relation", "");
       this.edgesEl.appendChild(path);
       this.relationEls.set(link.key, path);
       this.relationData.set(link.key, link.relation);
@@ -21105,6 +21185,7 @@ export class VisualAgentMapView extends ItemView {
         gap.setAttribute("d", d);
         if (marker) gap.setAttribute("marker-end", marker);
         gap.addClass("vam-relation-gap");
+        if (link.anchor) gap.setAttribute("data-anchor-relation", "");
         this.edgesEl.appendChild(gap);
         this.relationGapEls.set(link.key, gap);
       }
@@ -21112,6 +21193,7 @@ export class VisualAgentMapView extends ItemView {
       const hit = createSvg("path");
       hit.setAttribute("d", d);
       hit.addClass("vam-relation-hit");
+      if (link.anchor) hit.setAttribute("data-anchor-relation", "");
       const key = link.key;
       hit.addEventListener("pointerdown", event => {
         // A press on a line is not a press on the empty canvas: no pan, no marquee, no clearing of the selection.
@@ -21124,7 +21206,8 @@ export class VisualAgentMapView extends ItemView {
         event.stopPropagation();
         this.selection.selectRelation(key);
         this.syncRelationClasses();
-        this.openRelationEditor(link.relation);
+        // TODO(P4b): an anchor line opens the anchor relation editor here (it is not a topic relation).
+        if (!link.anchor) this.openRelationEditor(link.relation);
       });
       hit.addEventListener("pointerenter", () => {
         this.hoverRelation = key;
@@ -21140,14 +21223,60 @@ export class VisualAgentMapView extends ItemView {
     for (const link of links) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
+      if (link.anchor) label.setAttribute("data-anchor-relation", "");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to), axis));
+      this.placeRelationLabel(
+        link.key,
+        link.anchor
+          ? pointToBoxLabelPoint(link.anchor.point, boxOf(link.to), link.anchor.fromAnchor)
+          : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
+      );
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
     this.selection.pruneRelation(new Set(this.relationEls.keys()));
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
+  }
+  /** Moves one anchor line (all its parts and its label) to meet a topic card that stands at `box`. */
+  private placeAnchorLine(key: string, line: AnchorLine, box: RelationBox): void {
+    const d = pointToBoxPathData(line.point, box, line.fromAnchor);
+    this.relationEls.get(key)?.setAttribute("d", d);
+    this.relationHitEls.get(key)?.setAttribute("d", d);
+    this.relationGapEls.get(key)?.setAttribute("d", d);
+    this.placeRelationLabel(key, pointToBoxLabelPoint(line.point, box, line.fromAnchor));
+  }
+  private relationLinkPath(
+    link: { from: HTMLElement; to: HTMLElement; anchor?: AnchorLine },
+    axis: ReturnType<typeof relationAxisFor>
+  ): string {
+    return link.anchor
+      ? pointToBoxPathData(link.anchor.point, boxOf(link.to), link.anchor.fromAnchor)
+      : relationPathData(boxOf(link.from), boxOf(link.to), axis);
+  }
+  /**
+   * Every anchor relation that can be drawn: its anchor has a 2D position (map units from the image's data, so a missing
+   * picture file does not matter), and the other end is an id. The caller skips a topic that is not on screen.
+   */
+  private anchorLinesToDraw(): [string, AnchorLine, TopicRelation][] {
+    const out: [string, AnchorLine, TopicRelation][] = [];
+    for (const item of this.map?.canvasItems ?? []) {
+      if (!isAnnotatedImage(item)) continue;
+      for (const relation of item.relations ?? []) {
+        const anchor = item.anchors.find(a => a.id === relation.from || a.id === relation.to);
+        if (!anchor || !isImage2dAnchor(anchor)) continue;
+        const point = { x: item.x + anchor.at.x * item.w, y: item.y + anchor.at.y * item.h };
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+        const fromAnchor = anchor.id === relation.from,
+          topicId = fromAnchor ? relation.to : relation.from;
+        out.push([
+          anchorLineKey(item.id, anchor.id, topicId),
+          { imageId: item.id, anchorId: anchor.id, topicId, point, fromAnchor, anchorNote: anchor.note ?? "" },
+          relation
+        ]);
+      }
+    }
+    return out;
   }
   /**
    * An arrowhead whose tip sits exactly on the end of the line (`refX` is the tip), so it stops at the card edge. The
@@ -21192,7 +21321,13 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     label.textContent = "";
-    const titleOf = (id: string): string => this.notes.get(id)?.title ?? id,
+    const anchored = this.anchorLinks.get(key),
+      titleOf = (id: string): string =>
+        anchored && id === anchored.anchorId
+          ? anchored.anchorNote
+            ? t("ui.anchor_relation_end_0", anchored.anchorNote)
+            : t("ui.anchor_relation_end_empty")
+          : (this.notes.get(id)?.title ?? id),
       at = this.relationLabelAt.get(key),
       head = createSvg("tspan");
     head.textContent = t(
@@ -21235,8 +21370,12 @@ export class VisualAgentMapView extends ItemView {
     if (this.selection.state.selected) chosen.add(this.selection.state.selected);
     const ends = new Set<string>();
     for (const [key, path] of this.relationEls) {
-      const [fromId, toId] = key.split("\u0000");
-      const related = chosen.has(fromId) || chosen.has(toId),
+      const anchored = this.anchorLinks.get(key);
+      const [fromId, toId] = anchored ? [anchored.topicId, anchored.topicId] : key.split("\u0000");
+      const related =
+          chosen.has(fromId) ||
+          chosen.has(toId) ||
+          (!!anchored && this.hoverAnchor === `${anchored.imageId}\u0000${anchored.anchorId}`),
         active = key === this.selection.state.selectedRelation || key === this.previewRelation;
       path.toggleClass("is-related", related);
       path.toggleClass("is-dimmed", chosen.size > 0 && !related);

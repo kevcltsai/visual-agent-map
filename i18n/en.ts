@@ -896,6 +896,9 @@ export const en = {
   "ui.anchor_label_empty": "Anchor (no note)",
   "ui.anchor_links": "Linked to {0} topic(s)",
   "ui.anchor_unlinked": "Not linked to any topic",
+  "ui.anchor_relation_end_0": "Annotated image · {0}",
+  "ui.anchor_relation_end_empty": "Annotated image · anchor",
+  "ui.card_image_relations_0": "{0} image relation(s)",
   "ui.anchor_place_hint":
     "← ↑ → ↓ to move, Shift to move further, Enter to place, Esc to cancel, or just click with the mouse",
   "ui.anchor_place_cancelled": "Placing cancelled",

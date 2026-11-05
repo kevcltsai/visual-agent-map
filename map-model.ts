@@ -20,13 +20,15 @@ import {
   CARD_WIDTH,
   clampCardHeight,
   clampCardWidth,
+  branchSize,
+  childIndex,
   descendants,
   parentIdsForNode,
   visibleNodes,
   type AimNodeKind,
   type MapNode
 } from "./map-graph";
-export { applyCollapseLevel, descendants, parentIdsForNode, visibleNodes };
+export { applyCollapseLevel, branchSize, childIndex, descendants, parentIdsForNode, visibleNodes };
 export type { AimNodeKind, MapNode };
 export interface MapDocument {
   version: 1;

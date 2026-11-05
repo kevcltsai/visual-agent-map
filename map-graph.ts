@@ -54,23 +54,44 @@ export function parentIdsForNode(node: MapNode): string[] {
   return [...(node.parentId ? [node.parentId] : []), ...convergenceParents.filter(id => id !== node.parentId)];
 }
 
-export function descendants(nodes: MapNode[], id: string): Set<string> {
-  const found = new Set<string>();
+/** Children of each parent id, in `nodes` order. One pass, so walking a branch never rescans the whole map. */
+export function childIndex(nodes: readonly MapNode[]): Map<string, MapNode[]> {
+  const index = new Map<string, MapNode[]>();
+  for (const node of nodes) {
+    const key = node.parentId ?? "";
+    const list = index.get(key);
+    if (list) list.push(node);
+    else index.set(key, [node]);
+  }
+  return index;
+}
+export function walkDescendants(index: Map<string, MapNode[]>, id: string, found: Set<string>): void {
   const pending = [id];
   while (pending.length) {
-    const parent = pending.pop();
-    for (const node of nodes) {
-      if (node.parentId === parent && node.id !== id && !found.has(node.id)) {
+    const parent = pending.pop()!;
+    for (const node of index.get(parent) ?? []) {
+      if (node.id !== id && !found.has(node.id)) {
         found.add(node.id);
         pending.push(node.id);
       }
     }
   }
+}
+/** How many topics sit under `id`, from a prebuilt child index. */
+export function branchSize(index: Map<string, MapNode[]>, id: string): number {
+  const found = new Set<string>();
+  walkDescendants(index, id, found);
+  return found.size;
+}
+export function descendants(nodes: MapNode[], id: string): Set<string> {
+  const found = new Set<string>();
+  walkDescendants(childIndex(nodes), id, found);
   return found;
 }
 export function visibleNodes(nodes: MapNode[]): MapNode[] {
+  const index = childIndex(nodes);
   const hidden = new Set<string>();
-  for (const node of nodes) if (node.collapsed) for (const id of descendants(nodes, node.id)) hidden.add(id);
+  for (const node of nodes) if (node.collapsed && !hidden.has(node.id)) walkDescendants(index, node.id, hidden);
   return nodes.filter(node => !hidden.has(node.id));
 }
 /**

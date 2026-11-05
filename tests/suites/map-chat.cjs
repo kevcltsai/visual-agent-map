@@ -3301,7 +3301,7 @@ integrationTest('B1 fix 20 and 24: the opening screen asks for a topic and hides
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); assert.match(css, /\.has-chat-hero \.vam-empty \{ display: none; \}/);
   hero.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); hero.type('Coffee'); await hero.view.sendMapChat(); assert.match(chat.inputEl.attrs.placeholder, /^Ask a question, or ask the AI to change the map/);
   const h = await harness(); await h.view.hydrate(); const side = h.open();
-  assert.equal(side.guideEl.hidden, false); assert.equal(side.guideEl.text, 'No messages yet. The AI can build or extend this map, research its topics, or rearrange it. Try one of these, or type your own:'); assert.equal(side.logEl.hidden, true);
+  assert.equal(side.guideEl.hidden, false); assert.equal(side.guideEl.text, 'No messages yet. The AI can build or extend this map, research its topics, or rearrange it.'); assert.equal(side.logEl.hidden, true);
   side.begin('q'); assert.equal(side.guideEl.hidden, true); assert.equal(side.logEl.hidden, false);
 });
 

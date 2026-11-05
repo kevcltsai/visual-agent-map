@@ -1067,7 +1067,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.usage_button_today_0": "Token 用量：今天 {0}",
   "ui.usage_button_unavailable": "Token 用量：无法读取",
   "ui.usage_panel_title": "Token 用量",
-  "ui.usage_panel_providers": "Claude・Codex",
+  "ui.usage_filter_label": "按服务筛选",
   "ui.usage_totals": "总量",
   "ui.usage_this_map": "这张心智图",
   "ui.usage_today": "今天",
@@ -1086,8 +1086,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.usage_minutes_seconds_01": "{0} 分 {1} 秒",
   "ui.usage_empty": "这张心智图还没有 AI 请求记录。",
   "ui.usage_unreadable": "无法读取用量数据，所以不显示数字。插件文件夹里的 ai-usage.json 已原样保留。",
-  "ui.usage_footer":
-    "只计算 VAM 发出的请求。数字由 AI 服务回报。标“约”的是 AI 服务没有回报用量时的估计值。不显示金额，因为订阅方案不是每次请求收费。",
+  "ui.usage_footer_scope": "只计算 VAM 发出的 AI 请求。",
+  "ui.usage_footer_estimates": "标“约”的是估算值。",
   "ui.expansion_failed": "展开失败",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "心智图或父议题在 AI 运行期间已变更，未创建子议题。",

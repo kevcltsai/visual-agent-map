@@ -1069,7 +1069,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.usage_button_today_0": "Token 用量：今天 {0}",
   "ui.usage_button_unavailable": "Token 用量：無法讀取",
   "ui.usage_panel_title": "Token 用量",
-  "ui.usage_panel_providers": "Claude・Codex",
+  "ui.usage_filter_label": "依服務篩選",
   "ui.usage_totals": "總量",
   "ui.usage_this_map": "這張心智圖",
   "ui.usage_today": "今天",
@@ -1088,8 +1088,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.usage_minutes_seconds_01": "{0} 分 {1} 秒",
   "ui.usage_empty": "這張心智圖還沒有 AI 請求紀錄。",
   "ui.usage_unreadable": "無法讀取用量資料，所以不顯示數字。外掛資料夾裡的 ai-usage.json 已原樣保留。",
-  "ui.usage_footer":
-    "只計算 VAM 送出的請求。數字由 AI 服務回報。標「約」的是 AI 服務沒有回報用量時的估計值。不顯示金額，因為訂閱方案不是每次請求收費。",
+  "ui.usage_footer_scope": "只計算 VAM 發出的 AI 請求。",
+  "ui.usage_footer_estimates": "標「約」的是估算值。",
   "ui.expansion_failed": "展開失敗",
   "ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt":
     "心智圖或母議題在 AI 執行期間已變更，未建立子議題。",

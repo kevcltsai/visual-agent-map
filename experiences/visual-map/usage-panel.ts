@@ -7,6 +7,8 @@ import {
   type AiUsageStore,
   type UsageAction,
   type UsageEntry,
+  type UsageProvider,
+  type UsageSum,
   type UsageTokens
 } from "../../core/ai-usage-store";
 
@@ -38,6 +40,14 @@ const clock = (iso: string): string => {
 
 const actionLabel = (action: UsageAction): string => t(`ui.usage_action_${action}`);
 const sum = (tokens: UsageTokens): number => tokens.inputTokens + tokens.outputTokens;
+/** A count, with the "approximately" mark when any estimated value went into it. */
+const mark = (count: number, estimated: boolean | undefined): string =>
+  estimated ? t("ui.usage_estimated_0", formatTokens(count)) : formatTokens(count);
+
+/** The panel's provider filter; every panel opens on "total" (never remembered). */
+type UsageFilter = "total" | UsageProvider;
+const FILTERS: readonly UsageFilter[] = ["total", "claude", "codex"];
+const FILTER_LABEL: Record<UsageFilter, string> = { total: "Total", claude: "Claude", codex: "Codex" };
 
 interface TotalCell {
   strong: HTMLElement;
@@ -69,6 +79,8 @@ interface PanelParts {
   barsBox: HTMLElement;
   rows: RecentRow[];
   recentBox: HTMLElement;
+  filters: Map<UsageFilter, HTMLElement>;
+  footEstimates: HTMLElement;
 }
 
 /**
@@ -85,6 +97,7 @@ export class UsageControl {
   private parts: PanelParts | null = null;
   private doc: Document | null = null;
   private isOpen = false;
+  private filter: UsageFilter = "total";
 
   constructor(
     private readonly store: AiUsageStore,
@@ -135,6 +148,7 @@ export class UsageControl {
   openPanel(): void {
     if (!this.overlay || this.isOpen) return;
     this.isOpen = true;
+    this.filter = "total";
     this.button?.setAttr("aria-expanded", "true");
     this.attachPanel();
     this.refresh();
@@ -224,7 +238,29 @@ export class UsageControl {
     root.setAttr("tabindex", "0");
     const head = root.createEl("h3", { cls: "vam-usage-title" });
     head.createSpan({ text: t("ui.usage_panel_title") });
-    head.createSpan({ cls: "vam-usage-faint", text: t("ui.usage_panel_providers") });
+    const group = head.createSpan({ cls: "vam-usage-filter" });
+    group.setAttr("role", "radiogroup");
+    group.setAttr("aria-label", t("ui.usage_filter_label"));
+    const filters = new Map<UsageFilter, HTMLElement>();
+    for (const value of FILTERS) {
+      const radio = group.createEl("button", { cls: "vam-usage-filter-option", text: FILTER_LABEL[value] });
+      radio.setAttr("type", "button");
+      radio.setAttr("role", "radio");
+      radio.addEventListener("click", () => this.select(value, false));
+      filters.set(value, radio);
+    }
+    group.addEventListener("keydown", (event: KeyboardEvent) => {
+      const step =
+        event.key === "ArrowRight" || event.key === "ArrowDown"
+          ? 1
+          : event.key === "ArrowLeft" || event.key === "ArrowUp"
+            ? -1
+            : 0;
+      if (!step) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.select(FILTERS[(FILTERS.indexOf(this.filter) + step + FILTERS.length) % FILTERS.length], true);
+    });
 
     const error = root.createEl("p", { cls: "vam-usage-error", text: t("ui.usage_unreadable") });
     error.setAttr("role", "status");
@@ -278,7 +314,11 @@ export class UsageControl {
       rows.push({ row, time, action, node, tokens, duration });
     }
 
-    root.createDiv({ cls: "vam-usage-foot", text: t("ui.usage_footer") });
+    const foot = root.createDiv({ cls: "vam-usage-foot" });
+    foot.createDiv({ text: t("ui.usage_footer_scope") });
+    const footEstimates = foot.createDiv({ text: t("ui.usage_footer_estimates") });
+    footEstimates.hidden = true;
+    this.markFilters(filters);
     return {
       root,
       sections: [totalsSection, barsSection, recentSection],
@@ -288,17 +328,39 @@ export class UsageControl {
       bars,
       barsBox,
       rows,
-      recentBox
+      recentBox,
+      filters,
+      footEstimates
     };
+  }
+
+  /** Picks one provider view; the chosen radio gets the focus when the choice came from the keyboard. */
+  private select(value: UsageFilter, focus: boolean): void {
+    this.filter = value;
+    const parts = this.parts;
+    if (!parts) return;
+    this.markFilters(parts.filters);
+    if (focus) parts.filters.get(value)?.focus();
+    this.fillPanel(parts);
+  }
+
+  private markFilters(filters: Map<UsageFilter, HTMLElement>): void {
+    for (const [value, radio] of filters) {
+      const on = value === this.filter;
+      radio.setAttr("aria-checked", String(on));
+      radio.setAttr("tabindex", on ? "0" : "-1");
+      radio.toggleClass("is-selected", on);
+    }
   }
 
   private fillPanel(parts: PanelParts): void {
     const path = this.mapPath();
-    const map = this.store.totals({ mapPath: path });
-    const today = this.store.totals({ since: localDayStart() });
-    const month = this.store.totals({ since: localMonthStart() });
-    const actions = this.store.byAction(path);
-    const recent = this.store.recent(path, RECENT_ROWS);
+    const provider = this.filter === "total" ? undefined : this.filter;
+    const map = this.store.totals({ mapPath: path, provider });
+    const today = this.store.totals({ since: localDayStart(), provider });
+    const month = this.store.totals({ since: localMonthStart(), provider });
+    const actions = this.store.byAction(path, undefined, provider);
+    const recent = this.store.recent(path, RECENT_ROWS, provider);
     if (
       map.status === "unreadable" ||
       today.status === "unreadable" ||
@@ -308,14 +370,15 @@ export class UsageControl {
     ) {
       parts.error.hidden = false;
       parts.empty.hidden = true;
+      parts.footEstimates.hidden = true;
       for (const section of parts.sections) section.hidden = true;
       this.place();
       return;
     }
     parts.error.hidden = true;
     for (const section of parts.sections) section.hidden = false;
-    const total = (cell: TotalCell, tokens: UsageTokens): void => {
-      cell.strong.setText(formatTokens(sum(tokens)));
+    const total = (cell: TotalCell, tokens: UsageSum): void => {
+      cell.strong.setText(mark(sum(tokens), tokens.estimated));
       // Input and output on two lines of their own, so a narrow panel never wraps in the middle of a phrase.
       cell.input.setText(t("ui.usage_in_0", formatTokens(tokens.inputTokens)));
       cell.output.setText(t("ui.usage_out_0", formatTokens(tokens.outputTokens)));
@@ -328,15 +391,19 @@ export class UsageControl {
     parts.empty.hidden = !noUsage;
     parts.sections[1].hidden = noUsage;
     parts.sections[2].hidden = noUsage;
+    let anyEstimate = !!(map.value.estimated || today.value.estimated || month.value.estimated);
     const biggest = Math.max(0, ...USAGE_ACTIONS.map(action => sum(actions.value[action])));
     for (const action of USAGE_ACTIONS) {
       const used = sum(actions.value[action]);
       const bar = parts.bars.get(action)!;
       bar.row.hidden = used === 0;
       bar.fill.style.setProperty("width", `${biggest ? Math.max(2, Math.round((used / biggest) * 100)) : 0}%`);
-      bar.value.setText(formatTokens(used));
+      bar.value.setText(mark(used, actions.value[action].estimated));
+      if (!noUsage && used > 0 && actions.value[action].estimated) anyEstimate = true;
     }
     parts.rows.forEach((slot, index) => this.fillRow(slot, recent.value[index]));
+    if (!noUsage && recent.value.some(entry => entry.estimated)) anyEstimate = true;
+    parts.footEstimates.hidden = !anyEstimate;
     this.place();
   }
 

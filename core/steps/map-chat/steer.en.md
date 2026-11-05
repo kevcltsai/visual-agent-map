@@ -1,0 +1,1 @@
+The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message together with this addition. Do not use anything you output earlier in this turn; the reply you give now replaces it.

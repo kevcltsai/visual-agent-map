@@ -39065,10 +39065,11 @@ var ClaudeCodeCliRuntime = class {
     let args = claudeTaskArgs(model, effort, outputSchema, webSearch);
     const image = controls.imageDataUrl ? claudeImageSource(controls.imageDataUrl) : null;
     const observed = !!outputSchema && controls.stream === true && !image && !fallback && !this.streamUnsupported;
+    const steerable = !!controls.onSteer && (!!controls.onText && !outputSchema || observed || !!image) && !fallback && !this.streamUnsupported;
     if (controls.onText && !outputSchema) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--include-partial-messages");
-      if (controls.onSteer || image) args.push("--input-format", "stream-json");
+      if (steerable || image) args.push("--input-format", "stream-json");
     } else if (image) {
       args[args.indexOf("json")] = "stream-json";
       args.push("--input-format", "stream-json");
@@ -39077,9 +39078,9 @@ var ClaudeCodeCliRuntime = class {
       args.push("--include-partial-messages");
     }
     const pool = this.options.warmPool;
-    const warmArgs = pool && observed && !controls.onSteer ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
-    const warm = warmArgs ? pool.take(this.warmKey(warmArgs)) : null;
-    if (warmArgs && warm) args = warmArgs;
+    const warmArgs = (pool || steerable) && observed ? claudeWarmArgs(model, effort, outputSchema, webSearch) : null;
+    const warm = warmArgs && pool ? pool.take(this.warmKey(warmArgs)) : null;
+    if (warmArgs && (warm || steerable)) args = warmArgs;
     if (outputSchema && controls.stream === true) {
       try {
         (_e = controls.onStreamMode) == null ? void 0 : _e.call(controls, observed ? "stream-json" : fallback ? "json-fallback" : "json");
@@ -39123,7 +39124,7 @@ var ClaudeCodeCliRuntime = class {
         reject2(error instanceof Error ? error : new Error(String(error)));
         return;
       }
-      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer || image || warm);
+      let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(steerable || image || warm);
       let streamBuffer = "", streamText = "", currentText = "", finalResult = "";
       const streaming = !!controls.onText && !outputSchema || !!image || observed;
       const activity = new ClaudeWebActivity(controls.onWebSearchEvent);
@@ -39317,7 +39318,7 @@ var ClaudeCodeCliRuntime = class {
       (_e2 = (_d2 = child.stdin).on) == null ? void 0 : _e2.call(_d2, "error", () => {
       });
       try {
-        if (controls.onSteer || image || warm) {
+        if (steerable || image || warm) {
           const sendInput = (text11, accepted2, withImage = false) => {
             if (!inputOpen || settled) throw new Error("This Coffee Tables response has already ended.");
             const content = [...withImage && image ? [{ type: "image", source: image }] : [], { type: "text", text: text11 }];
@@ -39333,9 +39334,10 @@ var ClaudeCodeCliRuntime = class {
             });
           };
           sendInput(prompt, markAccepted, true);
-          (_f2 = controls.onSteer) == null ? void 0 : _f2.call(controls, async (text11) => {
-            sendInput(text11);
-          });
+          if (steerable)
+            (_f2 = controls.onSteer) == null ? void 0 : _f2.call(controls, async (text11) => {
+              sendInput(text11);
+            });
         } else if (controls.onAccepted || observer) {
           child.stdin.end(prompt, (error) => {
             if (error) {
@@ -40868,6 +40870,9 @@ var language_en_default2 = "Write the reply, and every title, summary, note text
 // core/steps/map-chat/language.zh.md
 var language_zh_default2 = "\u56DE\u8986\uFF0C\u4EE5\u53CA\u4F60\u7522\u751F\u7684\u6240\u6709\u6A19\u984C\u3001\u6458\u8981\u3001\u7B46\u8A18\u6587\u5B57\u8207\u65B0\u6A94\u6848\u6587\u5B57\uFF0C\u8ACB\u4EE5{{language}}\u64B0\u5BEB\u3002\n";
 
+// core/steps/map-chat/steer.en.md
+var steer_en_default = "The user has added the following to the request you are answering right now: {{text}}. Treat it as part of that same request, not a new one. Reply once, in the same JSON format as before: `reply` and `actions` must cover the original message together with this addition. Do not use anything you output earlier in this turn; the reply you give now replaces it.\n";
+
 // core/steps/map-chat/prompt.en.md
 var prompt_en_default6 = `You are the assistant inside a research mind map. The user is talking to you about the map. Answer the user's message in "reply", and, only when the user asked for a change or an action, list actions in "actions". Actions are applied for the user after your reply, in the order you list them: the user's message is the confirmation, except that a long list, a new map or research on many cards is first shown to the user as a plan to approve. Never ask the user in "reply" to approve, confirm or apply anything: the app shows its own Apply and Cancel buttons when a plan is needed, and otherwise the actions simply run. Never say a change has already been made: "reply" only says what you are going to do; the result list the user sees afterwards says what was done. Use future or intention wording ("I'll add ...", "Here is what I will do: ..."), not "I added" or "done". When the user only asks a question, return an empty "actions" list.
 
@@ -41410,6 +41415,9 @@ function parseMapChat(raw, context) {
     }
   });
   return { reply: body.reply, actions, rejected };
+}
+function renderMapChatSteer(text11) {
+  return renderTemplate(steer_en_default, { text: JSON.stringify(text11) });
 }
 var mapChatStep = {
   id: "map-chat",
@@ -46042,6 +46050,7 @@ function providerStepRunner(aiCalls, config) {
           ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
           ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
           ...(hooks == null ? void 0 : hooks.onStreamMode) ? { onStreamMode: hooks.onStreamMode } : {},
+          ...(hooks == null ? void 0 : hooks.onSteer) ? { onSteer: hooks.onSteer } : {},
           ...(hooks == null ? void 0 : hooks.onText) && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model) ? { onText: hooks.onText } : {}
         }
       },
@@ -82198,8 +82207,11 @@ var MapChatService = class {
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
    * `rejected`. Claude streams the StructuredOutput JSON; Codex streams its message text (only growing). Other providers never call `onReply`.
    * `onProgress` gets the runtime's model events (never after a stop); it only drives a display.
+   * `onSteer` receives a function that adds the user's follow-up text to the running turn (the text is wrapped in the steer
+   * template here); it rejects when the turn can no longer take one or after a stop. A steer restarts the reply, so the reply
+   * shown so far is forgotten and a shorter new reply replaces it.
    */
-  async chat(request, signal, onReply, onProgress) {
+  async chat(request, signal, onReply, onProgress, onSteer) {
     const stopped = () => new MapChatError("stopped", "Map chat stopped");
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(mapChatStep, request);
@@ -82218,8 +82230,15 @@ var MapChatService = class {
       shown = text11;
       onReply(text11);
     } : void 0;
-    const hooks = onProgress || onText ? {
+    const hooks = onProgress || onText || onSteer ? {
       ...onText ? { onText } : {},
+      ...onSteer ? {
+        onSteer: (steer) => onSteer(async (text11) => {
+          if (signal.aborted) throw stopped();
+          shown = "";
+          await steer(renderMapChatSteer(text11));
+        })
+      } : {},
       ...onProgress ? {
         onFirstEvent: () => {
           if (!signal.aborted) onProgress({ kind: "first-event" });

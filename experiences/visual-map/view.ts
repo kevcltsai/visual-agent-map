@@ -11976,7 +11976,8 @@ export class VisualAgentMapView extends ItemView {
     if (spot.inset) tools.style.setProperty("--vam-tools-inset", `${spot.inset / zoom}px`);
     // `translate` moves the row in card units before the counter-scale, so it does not disturb the reveal transform.
     if (spot.slide) tools.style.setProperty("translate", `${spot.slide / zoom}px 0`);
-    if ((spot.pan.dx || spot.pan.dy) && this.map) {
+    // A framing action (Show all) is mid-way: its viewport is the answer, so the row stays where it fits instead of moving the canvas.
+    if ((spot.pan.dx || spot.pan.dy) && this.map && !this.framingViewport) {
       this.map.viewport = {
         ...this.map.viewport,
         x: this.map.viewport.x + spot.pan.dx,
@@ -16713,6 +16714,8 @@ export class VisualAgentMapView extends ItemView {
     if (persist) this.saveViewport();
   }
   private fitNotice: Notice | null = null;
+  /** True while a framing action (fit) applies its viewport: tool-row placement must not pan the canvas then. */
+  private framingViewport = false;
   private fit(): void {
     if (!this.map || !this.viewportEl) return;
     const nodes = this.canvasNodes();
@@ -16748,7 +16751,13 @@ export class VisualAgentMapView extends ItemView {
     const fitSize = { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight };
     const fitInset = this.canvasInsets();
     this.map.viewport = fitViewport(fitBounds, fitSize, fitInset);
-    this.transform();
+    // transform() re-aligns the selected card's tool row, which may pan the canvas: not while the fitted viewport is being applied.
+    this.framingViewport = true;
+    try {
+      this.transform();
+    } finally {
+      this.framingViewport = false;
+    }
     this.saveViewport();
     // The zoom floor keeps text readable; when it holds some cards off screen, say so instead of hiding them silently.
     // Judged against the real canvas (not the area inside the toolbar insets), and one notice at a time.

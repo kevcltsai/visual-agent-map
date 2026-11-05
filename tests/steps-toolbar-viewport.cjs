@@ -672,3 +672,44 @@ test('selection bar: nothing before the first card is picked; then a narrow bott
   assert.match(css, /^\.vam-selection-bar\.is-empty \{ display: none; \}/m);
   assert.match(css, /^\.vam-canvas\.has-selection-bar \{ padding-bottom: 44px;/m);
 });
+
+// F13b: Show all with a card selected whose tool row can only sit beside it (docked chat, canvas 640 wide at left 384).
+function fitWithToolsFixture() {
+  const { view } = makeView();
+  const canvas = { left: 384, top: 126, right: 1024, bottom: 800 };
+  const nodes = [{ id: 'c1', x: 0, y: 0 }, { id: 'c2', x: 0, y: 180 }, { id: 'c3', x: 0, y: 360 }, { id: 'c0', x: -360, y: 180 }]
+    .map(n => ({ ...n, path: n.id + '.md', parentId: null }));
+  view.map = { nodes, viewport: { x: 0, y: 0, zoom: 1 } };
+  view.canvasNodes = () => nodes;
+  delete view.transform; // the real transform: it re-aligns the open tool row, which can pan
+  view.textEls = new Map(); view.summaryEls = new Map();
+  view.viewportEl = { clientWidth: 640, clientHeight: 674, getBoundingClientRect: () => canvas };
+  view.stageEl = { style: { setProperty() {} }, querySelector: () => null, setAttribute() {}, removeAttribute() {} };
+  view.contentEl = { querySelector: () => null };
+  view.canvasInsets = () => ({ top: 0, right: 0, bottom: 0, left: 0 });
+  view.announcer = null;
+  const style = { removeProperty() {}, setProperty() {} };
+  const tools = { style, toggleClass() {}, getBoundingClientRect: () => ({ width: 173, height: 32 }) };
+  const rectOf = node => { const v = view.map.viewport; const left = canvas.left + node.x * v.zoom + v.x, top = canvas.top + node.y * v.zoom + v.y; return { left, top, right: left + 280 * v.zoom, bottom: top + 180 * v.zoom, width: 280 * v.zoom, height: 180 * v.zoom }; };
+  for (const node of nodes) view.cardEls.set(node.id, { isConnected: true, getBoundingClientRect: () => rectOf(node), querySelector: () => tools });
+  view.selection.setSelected('c2');
+  view.setupFloating = null;
+  return { view, canvas, nodes, rectOf };
+}
+test('F13b: Show all keeps the fitted viewport when the selected card tool row would pan the canvas, and every card stays inside it', () => {
+  const { view, canvas, nodes, rectOf } = fitWithToolsFixture();
+  const fitted = inset.fitViewport({ minX: -360, minY: 0, maxX: 280, maxY: 540 }, { width: 640, height: 674 }, { top: 0, right: 0, bottom: 0, left: 0 });
+  view.fit();
+  assert.deepEqual({ ...view.map.viewport }, { ...fitted }, 'the viewport is the one fit computed');
+  for (const node of nodes) {
+    const r = rectOf(node);
+    assert.ok(r.left >= canvas.left && r.right <= canvas.right && r.top >= canvas.top && r.bottom <= canvas.bottom, `card ${node.id} inside the canvas`);
+  }
+});
+test('F13b: a user selection (not a framing action) still pans a card clear of the toolbar tool row', () => {
+  const { view } = fitWithToolsFixture();
+  view.map.viewport = { ...inset.fitViewport({ minX: -360, minY: 0, maxX: 280, maxY: 540 }, { width: 640, height: 674 }, { top: 0, right: 0, bottom: 0, left: 0 }) };
+  const before = view.map.viewport.x;
+  view.alignCardTools(view.cardEls.get('c2'));
+  assert.notEqual(view.map.viewport.x, before, 'the canvas still pans outside a framing action');
+});

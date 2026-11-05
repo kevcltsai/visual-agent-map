@@ -19615,6 +19615,16 @@ function cardsOverlapAny(nodes, ids, heightOf) {
   }
   return false;
 }
+function cardsChangedHeight(seen, now) {
+  const changed = /* @__PURE__ */ new Set();
+  if (!seen.size) return changed;
+  for (const [id, height] of now) {
+    const before = seen.get(id);
+    if (!(height > 0)) continue;
+    if (before === void 0 || height > before + 1) changed.add(id);
+  }
+  return changed;
+}
 
 // map-model.ts
 var TOPIC_RELATION_KINDS = [
@@ -51679,6 +51689,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
     /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
     __publicField(this, "unbindClipboard", null);
+    /** Heights (canvas units) the cards had at the last check, and the map they belong to. */
+    __publicField(this, "heightsSeen", /* @__PURE__ */ new Map());
+    __publicField(this, "heightsSeenMap", null);
+    __publicField(this, "settling", false);
     /** The zoom the selected card's tool row was last fitted at. */
     __publicField(this, "toolsZoom", null);
     /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
@@ -60558,6 +60572,7 @@ ${request.requirements}` : preset.text,
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
+    this.settleCardHeights();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   emptyCanvasState() {
@@ -61628,6 +61643,28 @@ ${request.requirements}` : preset.text,
     if (!id || !this.map) return;
     this.fitKindShape(card, this.topicKindOf(id));
     this.drawEdges();
+    this.settleCardHeights();
+  }
+  /**
+   * A layout runs before a card is drawn at its final size: a cover's picture arrives later, a diamond's padding is fitted after
+   * the card is built. A card that ended up taller than it was and now covers another gets the map laid out again with the real
+   * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
+   */
+  settleCardHeights() {
+    if (!this.map || this.closed) return;
+    const now = /* @__PURE__ */ new Map();
+    for (const [id, card] of this.cardEls) now.set(id, card.offsetHeight);
+    const first = this.heightsSeenMap !== this.map.id;
+    const grew = cardsChangedHeight(first ? /* @__PURE__ */ new Map() : this.heightsSeen, now);
+    this.heightsSeenMap = this.map.id;
+    this.heightsSeen = now;
+    if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
+    if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+    this.settling = true;
+    void this.mapChange((map) => this.tidyAfterResize(map, grew), false).catch(() => {
+    }).finally(() => {
+      this.settling = false;
+    });
   }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   releaseCovers() {

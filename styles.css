@@ -82,7 +82,6 @@
 .vam-usage-panel:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-usage-panel[hidden], .vam-usage-panel [hidden] { display: none; }
 .vam-usage-title { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
-.vam-usage-faint { color: var(--text-faint); font-weight: var(--font-normal); font-size: var(--font-ui-smaller); }
 .vam-usage-filter { display: inline-flex; padding: 2px; border-radius: var(--radius-s); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); }
 .vam-usage-filter-option { all: unset; box-sizing: border-box; padding: 2px 9px; border-radius: 4px; font-size: max(11px, var(--font-ui-smaller)); font-weight: var(--font-medium); color: var(--text-muted); cursor: pointer; }
 .vam-usage-filter-option.is-selected { background: var(--background-primary); color: var(--interactive-accent); font-weight: var(--font-bold); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
@@ -101,12 +100,6 @@
 .vam-usage-bar > span:last-child { text-align: right; }
 .vam-usage-fill-track { height: 8px; }
 .vam-usage-fill { height: 8px; border-radius: 4px; background: var(--interactive-accent); }
-.vam-usage-recent { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.vam-usage-recent td { padding: 4px 0; border-top: 1px solid var(--background-modifier-border); vertical-align: top; }
-.vam-usage-recent td:nth-child(1) { width: 42px; }
-.vam-usage-recent td:nth-child(n+3) { padding-left: 8px; text-align: right; white-space: nowrap; }
-.vam-usage-node { display: block; color: var(--text-faint); font-size: max(11px, var(--font-ui-smaller)); }
-.vam-usage-recent td.is-estimated { color: var(--text-warning, var(--color-orange)); }
 .vam-usage-empty, .vam-usage-error { margin: 0; color: var(--text-muted); }
 .vam-usage-error { color: var(--text-error); }
 .vam-usage-foot { padding-top: 8px; border-top: 1px solid var(--background-modifier-border); color: var(--text-faint); font-size: max(11px, var(--font-ui-smaller)); line-height: 1.5; }

@@ -1154,10 +1154,7 @@ export const en = {
   "ui.usage_action_synthesize": "Synthesize",
   "ui.usage_action_writeback": "Write to note",
   "ui.usage_action_other": "Other",
-  "ui.usage_recent": "LAST 10 REQUESTS",
   "ui.usage_estimated_0": "~{0}",
-  "ui.usage_seconds_0": "{0} s",
-  "ui.usage_minutes_seconds_01": "{0} min {1} s",
   "ui.usage_empty": "No AI requests recorded for this mind map yet.",
   "ui.usage_unreadable":
     "Usage data could not be read, so no numbers are shown. The file ai-usage.json in the plugin folder was kept as it is.",

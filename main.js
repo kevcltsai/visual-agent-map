@@ -571,7 +571,7 @@ var en = {
   "ui.map_sources_unreadable_row": "Unreadable; tasks skip it",
   "ui.map_sources_remove_0": 'Remove "{0}"',
   "ui.map_sources_none": "No data sources yet.",
-  "ui.map_sources_added_0": "Added {0}",
+  "ui.map_sources_added_0": 'Added "{0}"',
   "ui.map_sources_removed_0": "Removed {0}",
   "ui.map_sources_already_added_0": '"{0}" is already added',
   "ui.map_sources_added_one_0": 'Added "{0}"',
@@ -3281,7 +3281,7 @@ var zhCN = {
   "ui.map_sources_unreadable_row": "\u8BFB\u4E0D\u5230\uFF0C\u4EFB\u52A1\u4F1A\u7565\u8FC7",
   "ui.map_sources_remove_0": "\u79FB\u9664 \u3008{0}\u3009",
   "ui.map_sources_none": "\u8FD8\u6CA1\u6709\u6570\u636E\u6E90\u3002",
-  "ui.map_sources_added_0": "\u5DF2\u52A0\u5165 {0}",
+  "ui.map_sources_added_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
   "ui.map_sources_removed_0": "\u5DF2\u79FB\u9664 {0}",
   "ui.map_sources_already_added_0": "\u3008{0}\u3009\u5DF2\u7ECF\u52A0\u5165\u8FC7\u4E86",
   "ui.map_sources_added_one_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
@@ -5991,7 +5991,7 @@ var zhTW = {
   "ui.map_sources_unreadable_row": "\u8B80\u4E0D\u5230\uFF0C\u4EFB\u52D9\u6703\u7565\u904E",
   "ui.map_sources_remove_0": "\u79FB\u9664 \u3008{0}\u3009",
   "ui.map_sources_none": "\u9084\u6C92\u6709\u8CC7\u6599\u4F86\u6E90\u3002",
-  "ui.map_sources_added_0": "\u5DF2\u52A0\u5165 {0}",
+  "ui.map_sources_added_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
   "ui.map_sources_removed_0": "\u5DF2\u79FB\u9664 {0}",
   "ui.map_sources_already_added_0": "\u3008{0}\u3009\u5DF2\u7D93\u52A0\u5165\u904E\u4E86",
   "ui.map_sources_added_one_0": "\u5DF2\u52A0\u5165\u3008{0}\u3009",
@@ -28246,7 +28246,7 @@ async function searchItems(host) {
   return [...others, ...folders, ...files];
 }
 function drawMapSourcesPanel(parent, host, focus) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e;
   const session = (_a2 = host.session) != null ? _a2 : host.session = newMapSourcesSession();
   const panel = parent.createDiv({
     cls: "vam-map-sources-panel",
@@ -28261,7 +28261,7 @@ function drawMapSourcesPanel(parent, host, focus) {
   });
   const dropMain = zone.createSpan({ cls: "vam-map-sources-drop-main" });
   const dropSub = zone.createSpan({ cls: "vam-map-sources-drop-sub", attr: { id: hintId } });
-  const dropResult = zone.createDiv({ cls: "vam-map-sources-drop-result", attr: { "aria-live": "polite" } });
+  const dropResult = zone.createDiv({ cls: "vam-map-sources-drop-result" });
   let hover = null;
   const paint = () => {
     const rejected = hover === null && session.rejected.length > 0;
@@ -28284,6 +28284,7 @@ function drawMapSourcesPanel(parent, host, focus) {
   };
   repaint();
   const commit = async (items, outside) => {
+    var _a3;
     const mapPaths = (await host.mapItems().catch(() => [])).map((item) => item.mapPath);
     const lines = outside.map((name2) => t("ui.map_sources_reject_line_0", name2, t("ui.map_sources_reject_outside")));
     const accepted = [];
@@ -28302,7 +28303,9 @@ function drawMapSourcesPanel(parent, host, focus) {
     session.fresh = accepted.map(sourceKey);
     session.added = !accepted.length ? "" : accepted.length === 1 ? t("ui.map_sources_added_one_0", mapSourceName(host.app, accepted[0])) : t("ui.map_sources_added_many_0", accepted.length);
     repaint();
-    for (const source of accepted) host.add(source);
+    const spoken = [session.added, ...lines].filter(Boolean).join(" ");
+    if (spoken) (_a3 = host.announce) == null ? void 0 : _a3.call(host, spoken);
+    for (const source of accepted) host.add(source, true);
   };
   const accept = (event) => {
     event.preventDefault();
@@ -28315,6 +28318,11 @@ function drawMapSourcesPanel(parent, host, focus) {
   zone.addEventListener("dragover", accept);
   zone.addEventListener("dragleave", (event) => {
     if (event.relatedTarget && zone.contains(event.relatedTarget)) return;
+    hover = null;
+    repaint();
+  });
+  (_b2 = host.onDragEnd) == null ? void 0 : _b2.call(host, () => {
+    if (hover === null) return;
     hover = null;
     repaint();
   });
@@ -28350,7 +28358,7 @@ function drawMapSourcesPanel(parent, host, focus) {
     row.toggleClass("is-new", fresh(source) >= 0);
     (0, import_obsidian15.setIcon)(row.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), ICONS[source.kind]);
     row.createSpan({ cls: "vam-map-sources-name", text: name2, attr: { title: source.path, dir: "auto" } });
-    const meta = !status.exists ? t("ui.map_sources_unreadable_row") : source.kind === "folder" ? t("ui.map_sources_folder_count_0", (_b2 = status.count) != null ? _b2 : 0) : t(KIND_LABELS[source.kind]);
+    const meta = !status.exists ? t("ui.map_sources_unreadable_row") : source.kind === "folder" ? t("ui.map_sources_folder_count_0", (_c = status.count) != null ? _c : 0) : t(KIND_LABELS[source.kind]);
     row.createSpan({ cls: "vam-map-sources-meta", text: meta });
     const remove = row.createEl("button", {
       cls: "vam-map-sources-remove",
@@ -28381,9 +28389,9 @@ function drawMapSourcesPanel(parent, host, focus) {
       return;
     host.close(false);
   });
-  (_c = host.panelCreated) == null ? void 0 : _c.call(host, panel);
+  (_d = host.panelCreated) == null ? void 0 : _d.call(host, panel);
   if (focus) {
-    const target = "search" in focus ? search : (_d = removers[focus.remove]) != null ? _d : search;
+    const target = "search" in focus ? search : (_e = removers[focus.remove]) != null ? _e : search;
     target.focus();
   }
   return panel;
@@ -56695,6 +56703,7 @@ ${request.requirements}` : preset.text,
     this.mapSourcesPanelCleanup = null;
     (_b2 = this.mapSourcesPanelEl) == null ? void 0 : _b2.remove();
     const mapPath = this.path;
+    const panelCleanups = [];
     const panel = drawMapSourcesPanel(
       tools,
       {
@@ -56703,7 +56712,18 @@ ${request.requirements}` : preset.text,
         sources: this.mapSources,
         currentMapPath: mapPath,
         mapItems: () => this.plugin.repo.mapSwitcherItems(),
-        add: (source) => this.changeMapSources(mapPath, "add", source),
+        add: (source, quiet) => this.changeMapSources(mapPath, "add", source, quiet),
+        announce: (text11) => {
+          var _a3;
+          return (_a3 = this.announcer) == null ? void 0 : _a3.setText(text11);
+        },
+        onDragEnd: (handler) => {
+          var _a3;
+          const doc2 = (_a3 = this.contentEl) == null ? void 0 : _a3.ownerDocument;
+          if (!(doc2 == null ? void 0 : doc2.addEventListener)) return;
+          doc2.addEventListener("dragend", handler, true);
+          panelCleanups.push(() => doc2.removeEventListener("dragend", handler, true));
+        },
         remove: (source) => this.changeMapSources(mapPath, "remove", source),
         close: (refocus) => this.closeMapSourcesPanel(refocus),
         setPickerOpen: (open) => {
@@ -56730,8 +56750,9 @@ ${request.requirements}` : preset.text,
         this.closeMapSourcesPanel(false);
       };
       doc.addEventListener("pointerdown", outside, true);
-      this.mapSourcesPanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
+      panelCleanups.push(() => doc.removeEventListener("pointerdown", outside, true));
     }
+    this.mapSourcesPanelCleanup = () => panelCleanups.forEach((clean4) => clean4());
     this.placeMapSourcesPanel(panel);
   }
   /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
@@ -56751,7 +56772,7 @@ ${request.requirements}` : preset.text,
    * Adds or removes one source through the view mutation queue. The list is re-read inside the queue, so a repeated
    * add (same kind and path) writes nothing, and the write only touches `map-sources`.
    */
-  changeMapSources(mapPath, change2, source) {
+  changeMapSources(mapPath, change2, source, quiet = false) {
     const name2 = mapSourceName(this.app, source);
     this.enqueue(async () => {
       var _a2, _b2;
@@ -56761,7 +56782,7 @@ ${request.requirements}` : preset.text,
         const current = await this.plugin.repo.readMapSources(mapPath);
         const at = current.findIndex((item) => sameMapSource(item, source));
         if (change2 === "add" && at >= 0) {
-          (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.map_sources_already_added_0", name2));
+          if (!quiet) (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.map_sources_already_added_0", name2));
         } else if (change2 === "remove" && at < 0) {
           this.mapSources = current;
         } else {
@@ -56769,7 +56790,8 @@ ${request.requirements}` : preset.text,
           await this.plugin.repo.writeMapSources(mapPath, next);
           this.mapSources = next;
           if (change2 === "remove") focus = { remove: at };
-          (_b2 = this.announcer) == null ? void 0 : _b2.setText(t(change2 === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name2));
+          if (!quiet || change2 === "remove")
+            (_b2 = this.announcer) == null ? void 0 : _b2.setText(t(change2 === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name2));
         }
       } catch (error) {
         new import_obsidian37.Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));

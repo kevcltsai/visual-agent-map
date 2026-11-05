@@ -22,7 +22,12 @@ export interface MapSourcesPanelHost {
   currentMapPath: string;
   /** The other maps' rows (the panel drops the current map itself). */
   mapItems(): Promise<MapSwitcherItem[]>;
-  add(source: MapSource): void;
+  /** `quiet` = a drop or pick that the panel announces once itself through `announce`; no per-item announcement. */
+  add(source: MapSource, quiet?: boolean): void;
+  /** Speaks one message through the view's persistent live region (it survives the redraw an add causes). */
+  announce?(text: string): void;
+  /** Listens for a drag ending anywhere (Esc, drop elsewhere); the host removes the listener with the panel. */
+  onDragEnd?(handler: () => void): void;
   remove(source: MapSource): void;
   /** Esc inside the panel. */
   close(refocusButton: boolean): void;
@@ -301,7 +306,7 @@ export function drawMapSourcesPanel(
   });
   const dropMain = zone.createSpan({ cls: "vam-map-sources-drop-main" });
   const dropSub = zone.createSpan({ cls: "vam-map-sources-drop-sub", attr: { id: hintId } });
-  const dropResult = zone.createDiv({ cls: "vam-map-sources-drop-result", attr: { "aria-live": "polite" } });
+  const dropResult = zone.createDiv({ cls: "vam-map-sources-drop-result" });
   let hover: string | null = null;
   const paint = (): void => {
     const rejected = hover === null && session.rejected.length > 0;
@@ -353,7 +358,11 @@ export function drawMapSourcesPanel(
         ? t("ui.map_sources_added_one_0", mapSourceName(host.app, accepted[0]))
         : t("ui.map_sources_added_many_0", accepted.length);
     repaint();
-    for (const source of accepted) host.add(source);
+    // One announcement per drop: the success summary and the rejection reasons together, through the host's persistent
+    // live region (the result node is replaced by the redraw an add causes, so it is not a live region itself).
+    const spoken = [session.added, ...lines].filter(Boolean).join(" ");
+    if (spoken) host.announce?.(spoken);
+    for (const source of accepted) host.add(source, true);
   };
 
   const accept = (event: DragEvent): void => {
@@ -367,6 +376,12 @@ export function drawMapSourcesPanel(
   zone.addEventListener("dragover", accept);
   zone.addEventListener("dragleave", (event: DragEvent) => {
     if (event.relatedTarget && zone.contains(event.relatedTarget as Node)) return;
+    hover = null;
+    repaint();
+  });
+  // A cancelled drag (Esc) may not send dragleave to the zone; dragend always reaches the document.
+  host.onDragEnd?.(() => {
+    if (hover === null) return;
     hover = null;
     repaint();
   });

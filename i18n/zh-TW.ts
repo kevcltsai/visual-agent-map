@@ -480,7 +480,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_sources_unreadable_row": "讀不到，任務會略過",
   "ui.map_sources_remove_0": "移除 〈{0}〉",
   "ui.map_sources_none": "還沒有資料來源。",
-  "ui.map_sources_added_0": "已加入 {0}",
+  "ui.map_sources_added_0": "已加入〈{0}〉",
   "ui.map_sources_removed_0": "已移除 {0}",
   "ui.map_sources_already_added_0": "〈{0}〉已經加入過了",
   "ui.map_sources_added_one_0": "已加入〈{0}〉",

@@ -529,7 +529,7 @@ export const en = {
   "ui.map_sources_unreadable_row": "Unreadable; tasks skip it",
   "ui.map_sources_remove_0": 'Remove "{0}"',
   "ui.map_sources_none": "No data sources yet.",
-  "ui.map_sources_added_0": "Added {0}",
+  "ui.map_sources_added_0": 'Added "{0}"',
   "ui.map_sources_removed_0": "Removed {0}",
   "ui.map_sources_already_added_0": '"{0}" is already added',
   "ui.map_sources_added_one_0": 'Added "{0}"',

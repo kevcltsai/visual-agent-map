@@ -3742,6 +3742,7 @@ export class VisualAgentMapView extends ItemView {
     this.mapSourcesPanelCleanup = null;
     this.mapSourcesPanelEl?.remove();
     const mapPath = this.path;
+    const panelCleanups: Array<() => void> = [];
     const panel = drawMapSourcesPanel(
       tools,
       {
@@ -3750,7 +3751,14 @@ export class VisualAgentMapView extends ItemView {
         sources: this.mapSources,
         currentMapPath: mapPath,
         mapItems: () => this.plugin.repo.mapSwitcherItems(),
-        add: source => this.changeMapSources(mapPath, "add", source),
+        add: (source, quiet) => this.changeMapSources(mapPath, "add", source, quiet),
+        announce: text => this.announcer?.setText(text),
+        onDragEnd: handler => {
+          const doc = this.contentEl?.ownerDocument;
+          if (!doc?.addEventListener) return;
+          doc.addEventListener("dragend", handler, true);
+          panelCleanups.push(() => doc.removeEventListener("dragend", handler, true));
+        },
         remove: source => this.changeMapSources(mapPath, "remove", source),
         close: refocus => this.closeMapSourcesPanel(refocus),
         setPickerOpen: open => {
@@ -3781,8 +3789,9 @@ export class VisualAgentMapView extends ItemView {
         this.closeMapSourcesPanel(false);
       };
       doc.addEventListener("pointerdown", outside, true);
-      this.mapSourcesPanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
+      panelCleanups.push(() => doc.removeEventListener("pointerdown", outside, true));
     }
+    this.mapSourcesPanelCleanup = () => panelCleanups.forEach(clean => clean());
     this.placeMapSourcesPanel(panel);
   }
   /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
@@ -3802,7 +3811,7 @@ export class VisualAgentMapView extends ItemView {
    * Adds or removes one source through the view mutation queue. The list is re-read inside the queue, so a repeated
    * add (same kind and path) writes nothing, and the write only touches `map-sources`.
    */
-  private changeMapSources(mapPath: string, change: "add" | "remove", source: MapSource): void {
+  private changeMapSources(mapPath: string, change: "add" | "remove", source: MapSource, quiet = false): void {
     const name = mapSourceName(this.app, source);
     this.enqueue(async () => {
       if (this.closed || this.path !== mapPath) return;
@@ -3811,7 +3820,7 @@ export class VisualAgentMapView extends ItemView {
         const current = await this.plugin.repo.readMapSources(mapPath);
         const at = current.findIndex(item => sameMapSource(item, source));
         if (change === "add" && at >= 0) {
-          this.announcer?.setText(t("ui.map_sources_already_added_0", name));
+          if (!quiet) this.announcer?.setText(t("ui.map_sources_already_added_0", name));
         } else if (change === "remove" && at < 0) {
           this.mapSources = current;
         } else {
@@ -3819,7 +3828,8 @@ export class VisualAgentMapView extends ItemView {
           await this.plugin.repo.writeMapSources(mapPath, next);
           this.mapSources = next;
           if (change === "remove") focus = { remove: at };
-          this.announcer?.setText(t(change === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name));
+          if (!quiet || change === "remove")
+            this.announcer?.setText(t(change === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name));
         }
       } catch (error) {
         new Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));

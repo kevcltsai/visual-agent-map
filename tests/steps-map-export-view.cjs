@@ -258,7 +258,27 @@ test('Markdown is the whole outline, collapsed branches included, saved as .md',
   await h.view.exportMap('md', 'vault');
   await h.settle();
   assert.deepEqual(created(h), [`${MEDIA}/Export- Map-.md`]);
-  assert.equal(new TextDecoder().decode(h.contents.get(`${MEDIA}/Export- Map-.md`)), '- Root\n  - Child <b>\n');
+  assert.equal(new TextDecoder().decode(h.contents.get(`${MEDIA}/Export- Map-.md`)), '# Root\n## Child <b>\n');
+});
+
+test('persona 15: Markdown carries summaries, follows the on-screen order, and imports back', async () => {
+  const h = await harness();
+  const { repo } = h;
+  const second = h.view.map.nodes[1];
+  h.view.notes.get(h.root.id).summary = 'Why this map';
+  h.view.notes.get(second.id).summary = 'The child\nsummary';
+  const third = { ...second, id: 'zz-third', parentId: h.root.id, y: -500 };
+  h.view.notes.set(third.id, { ...h.view.notes.get(second.id), title: 'Above', summary: '' });
+  second.y = 500;
+  h.view.map.nodes.push(third);
+  await h.view.exportMap('md', 'vault');
+  await h.settle();
+  const text = new TextDecoder().decode(h.contents.get(`${MEDIA}/Export- Map-.md`));
+  assert.ok(text.includes('> Why this map') && text.includes('> The child summary'), text);
+  assert.ok(text.indexOf('Above') < text.indexOf('Child <b>'), 'the card higher on screen comes first');
+  const parsed = load('experiences/visual-map/outline-import.ts', { obsidian }).parseOutline(text);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.errors)), []);
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.nodes.map(n => [n.title, n.parent]))), [['Root', null], ['Above', 0], ['Child <b>', 0]]);
 });
 
 test('PNG goes through the injected canvas at the limit-approved scale', async () => {
@@ -544,4 +564,30 @@ test('card editor 03: a card with its picture at the bottom or beside the text e
   rootEl.addClass('has-cover-bottom');
   const bottom = (await h.view.collectExportScene(() => true)).scene.cards.find(c => c.cover);
   assert.equal(bottom.titleAt.y, 58, 'bottom: the title above the picture');
+});
+
+test('persona 32: a card that shows a summary exports it (lines clamped like the screen); a card without one draws none', async () => {
+  const h = await harness();
+  const rootEl = h.view.cardEls.get(h.root.id);
+  const summary = rootEl.createDiv('vam-card-summary');
+  summary.text = 'First summary sentence that keeps going well past one line of the card width here';
+  Object.assign(summary, { offsetLeft: 14, offsetTop: 60, offsetWidth: 140 });
+  summary.computed = style({ color: 'rgb(90, 90, 90)', fontSize: '12px', '-webkit-line-clamp': '3' });
+  const scene = (await h.view.collectExportScene(() => true)).scene;
+  const rootCard = scene.cards.find(c => c.x === 100);
+  assert.ok(rootCard.summary, 'the summary is in the scene');
+  assert.equal(rootCard.summary.lines.length, 3, 'clamped to the screen line count');
+  assert.match(rootCard.summary.lines[2], /…$/);
+  const svg = ex.buildMapSvg(scene);
+  assert.match(svg, /First summary/, 'drawn in the PNG source');
+  assert.match(svg, /fill="rgb\(90, 90, 90\)"/);
+  assert.equal(scene.cards.find(c => c.x === 500).summary, undefined, 'no summary element: nothing drawn');
+});
+
+test('persona 32: latin words are not cut in the middle when the title wraps', () => {
+  const lines = JSON.parse(JSON.stringify(ex.wrapText('Manage your subscription plan', 120)));
+  assert.ok(lines.every(l => !/subsc$|^ription/.test(l.trim())), `got ${JSON.stringify(lines)}`);
+  assert.ok(lines.some(l => l.includes('subscription')));
+  assert.deepEqual(JSON.parse(JSON.stringify(ex.wrapText('abcdefghij', 35))), ['abcde', 'fghij'], 'a word wider than a line is still cut');
+  assert.deepEqual(JSON.parse(JSON.stringify(ex.wrapText('中文標題很長很長', 39))), ['中文標', '題很長', '很長']);
 });

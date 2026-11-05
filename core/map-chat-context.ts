@@ -1,5 +1,5 @@
 import { normalizeVaultPath } from "./map-chat-guard";
-import type { HypothesisStrength, TopicKind } from "../note-values";
+import type { HypothesisLeaning, HypothesisStrength, TopicKind } from "../note-values";
 import type { TopicRelationKind } from "../map-model";
 import type { TopicColor, TopicStyle } from "../topic-colors";
 import type { TopicMarker } from "../topic-markers";
@@ -37,6 +37,8 @@ export interface MapChatOutlineNode {
   depth: number;
   /** The card's topic type; "topic" (or absent) is an ordinary topic and is not sent. Dropped on an AIM map. */
   kind?: TopicKind;
+  /** A hypothesis's leaning; sent only next to `kind: "hypothesis"`. Dropped on an AIM map. */
+  leaning?: HypothesisLeaning;
   /** A hypothesis's strength; sent only next to `kind: "hypothesis"`. Dropped on an AIM map. */
   strength?: HypothesisStrength;
   /** The card's colour; absent (the default) is not sent. Dropped on an AIM map. */
@@ -153,6 +155,8 @@ export interface MapChatContext {
   noEditableMap: boolean;
   /** An AIM map: a reply's topic types are skipped (see {@link MapChatContextInput.aim}). */
   aim: boolean;
+  /** Vault paths of the notes the user showed the chat (open note, attached files): a new card's plain-text mention of one becomes a wikilink. */
+  sourcePaths?: string[];
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;
   /** The relations sent (none on an AIM map), for the parser's checks of a relation the reply adds or removes. */
@@ -200,10 +204,18 @@ const clip = (value: string, limit: number): string => {
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}…` : text;
 };
 
-/** `kind` only for a type other than an ordinary topic, `strength` only for a hypothesis; nothing on an AIM map. */
-const kindFields = (node: MapChatOutlineNode, aim: boolean): { kind?: TopicKind; strength?: HypothesisStrength } => {
+/** `kind` only for a type other than an ordinary topic, `leaning` and `strength` only for a hypothesis; nothing on an AIM map. */
+const kindFields = (
+  node: MapChatOutlineNode,
+  aim: boolean
+): { kind?: TopicKind; leaning?: HypothesisLeaning; strength?: HypothesisStrength } => {
   if (aim || !node.kind || node.kind === "topic") return {};
-  return { kind: node.kind, ...(node.kind === "hypothesis" && node.strength ? { strength: node.strength } : {}) };
+  const hypothesis = node.kind === "hypothesis";
+  return {
+    kind: node.kind,
+    ...(hypothesis && node.leaning ? { leaning: node.leaning } : {}),
+    ...(hypothesis && node.strength ? { strength: node.strength } : {})
+  };
 };
 
 /**
@@ -406,6 +418,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     selectedCount: input.selected.length,
     noEditableMap: !!input.noEditableMap,
     aim: !!input.aim,
+    sourcePaths: [...input.files.map(file => file.path), ...(input.activeFile ? [input.activeFile.path] : [])],
     parents: Object.fromEntries(input.outline.map(node => [node.id, node.parentId])),
     relations: relations.map(link => ({ kind: link.kind, from: link.from, to: link.to })),
     mdHashes: hashes,

@@ -224,16 +224,21 @@ test('frames cannot be changed on an AIM map; in selection mode they are drawn b
   assert.equal((await sel.onDisk()).length, 1, 'but not removable there');
 });
 
-test('the selection bar offers "Add frame" for the selected topics', async () => {
+test('the selection bar offers "Add frame" for the selected topics, in its More menu', async () => {
   const h = await harness();
+  const entriesOf = () => {
+    let listed = [];
+    h.view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, setDisabled(v) { it.disabled = v; return chain; }, setChecked() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); listed.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+    const more = find(h.view.renderSelectionBar(element('div')), i => i.tag === 'button' && i.attrs?.['aria-label'] === 'More actions for the selected topics');
+    if (!more) return null;
+    more.click(); return listed;
+  };
   h.view.selection.replaceMulti([h.ids.root, h.ids.child]);
-  const bar = h.view.renderSelectionBar(element('div'));
-  const add = find(bar, i => i.tag === 'button' && i.text === 'Add frame');
-  assert.ok(add, 'button present');
+  const add = entriesOf().find(i => i.title === 'Add frame');
+  assert.ok(add, 'entry present');
   assert.ok(!add.disabled);
   h.view.selection.replaceMulti([]);
-  const empty = find(h.view.renderSelectionBar(element('div')), i => i.tag === 'button' && i.text === 'Add frame');
-  assert.equal(empty.disabled, true);
+  assert.equal(entriesOf(), null, 'no topic picked: no bar content, so no frame entry either');
 });
 
 test('the label dialog may be left blank only when asked to; the default still refuses an empty name', () => {
@@ -251,4 +256,20 @@ test('the label dialog may be left blank only when asked to; the default still r
   };
   assert.deepEqual(run(undefined), { saved: [], disabled: true });
   assert.deepEqual(run({ allowEmpty: true }), { saved: [''], disabled: false });
+});
+
+test('ticket 31: a frame stops short of a neighbouring non-member card, and the label chip is painted over the cards, not under them', async () => {
+  const saved = { ...BOX.third };
+  BOX.third = { x: 790, y: 40, w: 280, h: 80 }; // 10px right of the child card, which is the frame's right edge (780)
+  try {
+    const h = await harness(ids => [frame([ids.root, ids.child])]);
+    h.view.render();
+    const [f] = frames(h);
+    assert.equal(f.style.left, '84px');
+    assert.equal(f.style.width, '701px', 'right padding is half the 10px gap (5), not 16');
+  } finally { BOX.third = saved; }
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.doesNotMatch(css.match(/^\.vam-boundaries \{[^}]*\}/m)[0], /z-index/, 'the layer makes no stacking context');
+  assert.match(css.match(/^\.vam-boundary-label \{[^}]*\}/m)[0], /z-index: 2/);
+  assert.match(css.match(/^\.vam-boundary::before \{[^}]*\}/m)[0], /z-index: -2/);
 });

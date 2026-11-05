@@ -394,7 +394,10 @@ test('P4b: the topic panel offers the cover toggle, aria-pressed while the cover
   const source = read('experiences/visual-map/view.ts');
   const menu = source.match(/private openTopicMenu\([\s\S]*?\n  }\n/)[0];
   assert.doesNotMatch(menu, /changeTopicCover|topic_cover/, 'the "+ Topic" menu is for adding topics only');
-  assert.match(source, /if \(note\) this\.renderCoverSection\(panel, node\);/);
+  // Ticket 41: the cover switch lives in the folded "Appearance" group of the card window.
+  const appearance = source.match(/const look = this\.renderDisclosure\(panel, t\("ui\.card_group_appearance"\)\);[\s\S]*?\n    }\n/)[0];
+  assert.match(appearance, /this\.renderCoverSection\(look, node\);/, 'the cover switch is inside the Appearance group');
+  assert.doesNotMatch(source, /this\.renderCoverSection\(panel, node\)/, 'not outside the folded group');
   const panelOf = async (text, editable = true) => {
     const h = await coverHarness(text);
     const calls = [];

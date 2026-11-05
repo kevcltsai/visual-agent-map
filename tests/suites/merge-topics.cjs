@@ -466,6 +466,14 @@ integrationTest('hypothesis-evidence: sibling merge with a strong hypothesis fir
   const raw = h.contents.get(note.path);
   assert.match(raw, /topic-kind: hypothesis/); assert.match(raw, /hypothesis-strength: strong/);
 });
+integrationTest('hypothesis-leaning: a sibling merge with a hypothesis that has no stored strength first gives an undecided hypothesis with strength none, both keys written', async () => {
+  const h = await heHarness();
+  h.notes.hyp.y = 1; await h.relate([]); await h.view.hydrate();
+  const note = await heKindOf(h, ['hyp', 'f1']);
+  assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'none'); assert.equal(note.hypothesisLeaning, 'undecided');
+  const raw = h.contents.get(note.path);
+  assert.match(raw, /hypothesis-leaning: undecided/); assert.match(raw, /hypothesis-strength: none/);
+});
 integrationTest('hypothesis-evidence: sibling merge follows reading order, not selection order: an ordinary topic first gives an ordinary topic with no topic-kind key', async () => {
   const h = await heHarness();
   h.notes.f1.y = 1; h.notes.hyp.y = 500; await h.relate([]);
@@ -543,4 +551,43 @@ integrationTest('hypothesis-evidence: the full selected-line label comes from i1
     assert.equal(translate(lang, 'ui.relation_label_full_0_1_2', 'N', 'A', 'B'), `N${colon}A → B`, lang);
     assert.equal(translate(lang, 'ui.relation_label_full_related_0_1_2', 'N', 'A', 'B'), `N${colon}A — B`, lang);
   }
+});
+
+integrationTest('hypothesis-leaning: a sibling merge with a supported hypothesis first gives a supported hypothesis with its strength, both keys in the one created file', async () => {
+  const h = await heHarness();
+  h.notes.hyp.y = 1; await h.relate([]); await h.repo.writeHypothesisLeaning(h.notes.hyp.path, 'refuted'); await h.repo.writeHypothesisStrength(h.notes.hyp.path, 'strong'); await h.view.hydrate();
+  const note = await heKindOf(h, ['hyp', 'f1']);
+  assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisLeaning, 'refuted'); assert.equal(note.hypothesisStrength, 'strong');
+  const raw = h.contents.get(note.path);
+  assert.match(raw, /hypothesis-leaning: refuted/); assert.match(raw, /hypothesis-strength: strong/);
+});
+integrationTest('hypothesis-leaning: a sibling merge follows the first in reading order: a hypothesis second does not lend its leaning to an ordinary first topic', async () => {
+  const h = await heHarness();
+  h.notes.f1.y = 1; h.notes.hyp.y = 500; await h.relate([]); await h.repo.writeHypothesisLeaning(h.notes.hyp.path, 'supported'); await h.view.hydrate();
+  const note = await heKindOf(h, ['hyp', 'f1']);
+  assert.equal(note.topicKind, undefined); assert.equal(note.hypothesisLeaning, undefined);
+  assert.doesNotMatch(h.contents.get(note.path), /hypothesis-leaning|hypothesis-strength/);
+});
+integrationTest('hypothesis-leaning: a leaning left on a non-hypothesis first source is not carried into the merged topic', async () => {
+  const h = await heHarness();
+  h.notes.f1.y = 1; h.notes.f2.y = 500; await h.relate([]);
+  h.contents.set(h.notes.f1.path, h.contents.get(h.notes.f1.path).replace('---\n', '---\nhypothesis-leaning: supported\nhypothesis-strength: strong\n')); await h.view.hydrate();
+  const note = await heKindOf(h, ['f1', 'f2']);
+  assert.equal(note.topicKind, undefined); assert.equal(note.hypothesisLeaning, undefined);
+  assert.doesNotMatch(h.contents.get(note.path), /hypothesis-leaning|hypothesis-strength/);
+});
+integrationTest('hypothesis-leaning: a parent-mode merge and an adopter keep their own leaning and strength whatever the others hold', async () => {
+  const h = await heHarness();
+  await h.repo.writeHypothesisLeaning(h.notes.hyp.path, 'supported'); await h.repo.writeHypothesisStrength(h.notes.hyp.path, 'medium');
+  await h.repo.writeHypothesisLeaning(h.notes.hyp2.path, 'refuted'); await h.repo.writeHypothesisStrength(h.notes.hyp2.path, 'strong');
+  h.mapDoc.nodes.find(n => n.id === h.ids.hyp2).parentId = h.ids.hyp;
+  await h.relate([]);
+  const check = await h.mergeKeys(['hyp', 'hyp2']);
+  assert.equal(check.targetId, h.ids.hyp);
+  let parent = await h.repo.readNote(h.notes.hyp.path, await h.saved());
+  assert.equal(parent.hypothesisLeaning, 'supported'); assert.equal(parent.hypothesisStrength, 'medium');
+  await h.view.travel(false);
+  await h.view.removeToUnassigned(h.notes.f1, false, h.ids.hyp2);
+  const adopter = await h.repo.readNote(h.notes.hyp2.path, await h.saved());
+  assert.equal(adopter.hypothesisLeaning, 'refuted'); assert.equal(adopter.hypothesisStrength, 'strong');
 });

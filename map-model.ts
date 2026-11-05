@@ -1121,6 +1121,10 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
   private owning = 0;
   /** Entries that stay a step of their own when collapseSince folds the ones around them (a closed group's step). */
   private solo = new WeakSet<object>();
+  /** True while a group is open (a chat reply is being applied). */
+  get grouping(): boolean {
+    return this.grouped !== null;
+  }
   get canUndo(): boolean {
     return this.past.length > 0;
   }
@@ -1186,6 +1190,12 @@ export class History<T extends { undo: () => Promise<void>; redo: () => Promise<
   pushSolo(entry: T): void {
     this.solo.add(entry);
     this.push(entry);
+  }
+  /** Removes `entry` when it is the newest undo step (nothing else changes); false when it is not. */
+  dropTop(entry: T): boolean {
+    if (this.past[this.past.length - 1] !== entry) return false;
+    this.past.pop();
+    return true;
   }
   /** Ends the group and returns what it collected, oldest first (empty when nothing was pushed or the history was cleared). */
   closeGroup(): T[] {

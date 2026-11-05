@@ -80,8 +80,10 @@ export function readRelevanceContext(fm: Record<string, unknown>): string | unde
 
 export type TopicKind = "topic" | "action" | "atomic" | "hypothesis" | "evidence" | "conclusion";
 export const TOPIC_KINDS: readonly TopicKind[] = ["topic", "action", "atomic", "hypothesis", "evidence", "conclusion"];
-export type HypothesisStrength = "weak" | "medium" | "strong";
-export const HYPOTHESIS_STRENGTHS: readonly HypothesisStrength[] = ["weak", "medium", "strong"];
+export type HypothesisStrength = "none" | "weak" | "medium" | "strong";
+export const HYPOTHESIS_STRENGTHS: readonly HypothesisStrength[] = ["none", "weak", "medium", "strong"];
+export type HypothesisLeaning = "supported" | "undecided" | "refuted";
+export const HYPOTHESIS_LEANINGS: readonly HypothesisLeaning[] = ["supported", "undecided", "refuted"];
 /** `topic-kind` is one of the six kinds; a missing or invalid value (wrong case, number, list) is an ordinary topic. */
 export function readTopicKind(fm: Record<string, unknown>): TopicKind {
   const value = fm["topic-kind"];
@@ -89,11 +91,40 @@ export function readTopicKind(fm: Record<string, unknown>): TopicKind {
     ? (value as TopicKind)
     : "topic";
 }
-/** A hypothesis's strength; missing or invalid reads as weak. A non-hypothesis has none, whatever the key says. */
-export function readHypothesisStrength(fm: Record<string, unknown>): HypothesisStrength | undefined {
+/** A hypothesis's leaning (which way the evidence points); missing or invalid reads as undecided. A non-hypothesis has none, whatever the key says. */
+export function readHypothesisLeaning(fm: Record<string, unknown>): HypothesisLeaning | undefined {
+  if (readTopicKind(fm) !== "hypothesis") return undefined;
+  const value = fm["hypothesis-leaning"];
+  return typeof value === "string" && (HYPOTHESIS_LEANINGS as readonly string[]).includes(value)
+    ? (value as HypothesisLeaning)
+    : "undecided";
+}
+/** The stored strength of a hypothesis, leaning not applied: missing or invalid reads as none. A non-hypothesis has none, whatever the key says. */
+export function readRawHypothesisStrength(fm: Record<string, unknown>): HypothesisStrength | undefined {
   if (readTopicKind(fm) !== "hypothesis") return undefined;
   const value = fm["hypothesis-strength"];
   return typeof value === "string" && (HYPOTHESIS_STRENGTHS as readonly string[]).includes(value)
     ? (value as HypothesisStrength)
-    : "weak";
+    : "none";
+}
+/** A leaning of supported or refuted needs at least weak evidence: a none strength under such a leaning reads and is written as weak. */
+export function consistentStrength(leaning: HypothesisLeaning, strength: HypothesisStrength): HypothesisStrength {
+  return leaning !== "undecided" && strength === "none" ? "weak" : strength;
+}
+/** The strength to show: the stored one, read as weak when the hypothesis leans one way but the stored strength is none or missing. Reading never writes. */
+export function readHypothesisStrength(fm: Record<string, unknown>): HypothesisStrength | undefined {
+  const raw = readRawHypothesisStrength(fm),
+    leaning = readHypothesisLeaning(fm);
+  return raw === undefined || leaning === undefined ? undefined : consistentStrength(leaning, raw);
+}
+/**
+ * What a write leaves in the file: the new leaning and strength (a change omitted keeps the current value), the strength
+ * lifted to weak when the leaning is supported or refuted and the strength is none. Pure; both write paths share it.
+ */
+export function resolveHypothesisWrite(
+  current: { leaning: HypothesisLeaning; strength: HypothesisStrength },
+  change: { leaning?: HypothesisLeaning; strength?: HypothesisStrength }
+): { leaning: HypothesisLeaning; strength: HypothesisStrength } {
+  const leaning = change.leaning ?? current.leaning;
+  return { leaning, strength: consistentStrength(leaning, change.strength ?? current.strength) };
 }

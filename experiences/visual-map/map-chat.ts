@@ -3,6 +3,7 @@ import { t } from "../../i18n";
 import type { ImageCandidate } from "../../core/image-candidates";
 import type { MapChatTurn } from "../../core/map-chat-context";
 import { renderChatMarkdown } from "../../core/map-chat-render";
+import { hasUnsavedChat } from "../../core/map-chat-transcript";
 import {
   chatSuggestionKeys,
   clampMapChatWidth,
@@ -277,6 +278,8 @@ let panelSequence = 0;
 export class MapChatPanel {
   private readonly id = `vam-map-chat-${++panelSequence}`;
   private messages: MapChatMessage[] = [];
+  /** Finished turns already written by "save as a note"; reset with the conversation. */
+  private savedTurnCount = 0;
   private chips: MapChatChip[] = [];
   /** The user's wish: the side window is open (remembered). Whether it shows also depends on `narrow`. */
   private open = false;
@@ -460,6 +463,10 @@ export class MapChatPanel {
     return turns;
   }
   /** Finished question and answer pairs, oldest first: what "save as a note" writes (a streaming or failed answer is left out). */
+  /** True when finished turns exist that no "save as a note" has written (the chat is memory-only, so closing the view drops them). */
+  get hasUnsavedTurns(): boolean {
+    return hasUnsavedChat(this.completedTurns().length, this.savedTurnCount);
+  }
   completedTurns(): MapChatSavedTurn[] {
     const turns: MapChatSavedTurn[] = [];
     for (let at = 0; at + 1 < this.messages.length; at += 2) {
@@ -1052,6 +1059,7 @@ export class MapChatPanel {
     this.cancelFrame();
     this.rows = new WeakMap();
     this.messages = [];
+    this.savedTurnCount = 0;
     this.spokenLater = [];
     this.chips = [];
     this.dismissedNote = null;
@@ -1308,6 +1316,7 @@ export class MapChatPanel {
     try {
       const result = await this.host.saveTranscript(turns);
       // The keyboard stays on the button; the reader is told once.
+      if (result.ok) this.savedTurnCount = turns.length;
       this.announceImages(result.ok ? t("ui.map_chat_saved_0", result.path) : result.reason);
     } finally {
       this.saving = false;
@@ -1872,7 +1881,12 @@ export class MapChatPanel {
     card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
     card.createDiv({
       cls: "vam-map-chat-plan-sentence",
-      text: plan.summary ?? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
+      // Only a plan still waiting says it needs confirmation; an applied or cancelled one just names what it was.
+      text:
+        plan.summary ??
+        (plan.state === "pending"
+          ? t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator")))
+          : plan.reasons.join(t("ui.map_chat_count_separator")))
     });
     const groups = plan.groups ?? (plan.items.length ? [{ label: "", items: plan.items }] : []);
     for (const group of groups) {

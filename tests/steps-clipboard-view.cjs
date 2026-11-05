@@ -361,3 +361,30 @@ test('P4 Copy to…: the copy keeps the "copy" suffix; only a paste keeps the ti
   const kept = await h.repo.duplicateNote(h.map().nodes.find(n => n.id === h.ids.leaf).path, h.map(), MAP, { keepTitle: true });
   assert.match(h.contents.get(kept.path), /title: Leaf\n/);
 });
+
+test('hypothesis-leaning: pasting writes the leaning and strength with the note; an old v1 hypothesis without leaning pastes as undecided; a topic carrying one stays plain', async () => {
+  const h = await harness();
+  h.view.selection.setSelected(h.ids.root);
+  pasteOf(h, { [MIME]: payloadText([
+    { id: 'a', parent: null, title: 'Claim', kind: 'hypothesis', leaning: 'supported', strength: 'medium', body: '' },
+    { id: 'b', parent: 'a', title: 'Old', kind: 'hypothesis', strength: 'strong', body: '' },
+    { id: 'c', parent: 'a', title: 'Plain', kind: 'topic', leaning: 'refuted', body: '' }
+  ]) });
+  await until(() => h.map().nodes.length === 8); await tick(); await tick();
+  const byTitle = title => h.notes().get(h.map().nodes.find(n => h.notes().get(n.id)?.title === title).id);
+  assert.equal(byTitle('Claim').hypothesisLeaning, 'supported'); assert.equal(byTitle('Claim').hypothesisStrength, 'medium');
+  assert.equal(byTitle('Old').hypothesisLeaning, 'undecided'); assert.equal(byTitle('Old').hypothesisStrength, 'strong');
+  assert.equal(byTitle('Plain').hypothesisLeaning, undefined);
+  const plainPath = h.map().nodes.find(n => h.notes().get(n.id)?.title === 'Plain').path;
+  assert.doesNotMatch(h.contents.get(plainPath), /hypothesis-leaning|hypothesis-strength/);
+});
+test('hypothesis-leaning: copying a hypothesis puts its leaning in the private payload', async () => {
+  const h = await harness();
+  const nodeOf = h.map().nodes.find(n => n.id === h.ids.leaf);
+  await h.repo.writeTopicKind(nodeOf.path, 'hypothesis'); await h.repo.writeHypothesisLeaning(nodeOf.path, 'refuted');
+  await h.view.hydrate();
+  const event = copyOf(h, ['leaf']);
+  const copied = parse(event.clipboardData.store.get(MIME)).payload.nodes[0];
+  assert.equal(copied.kind, 'hypothesis'); assert.equal(copied.leaning, 'refuted');
+  assert.equal(event.clipboardData.store.get('text/plain'), '- Leaf', 'the plain outline carries no leaning');
+});

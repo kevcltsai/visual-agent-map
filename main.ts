@@ -6,6 +6,7 @@ import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/t
 import { CoffeeManager } from "./experiences/coffee-tables/engine";
 import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { VisualAgentMapView, VIEW_TYPE, type MapCommandAction } from "./experiences/visual-map/view";
+import { plainFailure } from "./ai/plain-error";
 import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
@@ -435,7 +436,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   recordFailure(context: string, error: unknown): string {
     const message = error instanceof Error ? error.message : String(error);
     this.logs.appendLog("error", `${context}：${message}`);
-    return message;
+    // The notice gets plain words; the raw text above stays in the log.
+    return plainFailure(context, error);
   }
   /**
    * Runs a write after every earlier one. Views re-read the map and its notes afterwards unless the caller states the

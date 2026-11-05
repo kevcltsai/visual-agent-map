@@ -1,4 +1,11 @@
-import { HYPOTHESIS_STRENGTHS, TOPIC_KINDS, type HypothesisStrength, type TopicKind } from "../../note-values";
+import {
+  HYPOTHESIS_LEANINGS,
+  HYPOTHESIS_STRENGTHS,
+  TOPIC_KINDS,
+  type HypothesisLeaning,
+  type HypothesisStrength,
+  type TopicKind
+} from "../../note-values";
 import { normalizeRelationDescription, type TopicRelation, type TopicRelationKind } from "../../map-model";
 import { OUTLINE_TITLE_LIMIT } from "./outline-import";
 
@@ -21,6 +28,7 @@ export interface ClipNode {
   kind: TopicKind;
   body: string;
   strength?: HypothesisStrength;
+  leaning?: HypothesisLeaning;
 }
 export interface ClipRelation {
   kind: TopicRelationKind;
@@ -129,6 +137,13 @@ export function parseClipboard(raw: unknown): ClipboardParse {
         (HYPOTHESIS_STRENGTHS as readonly string[]).includes(strength)
       )
         node.strength = strength as HypothesisStrength;
+      const leaning = own(item, "leaning");
+      if (
+        kind === "hypothesis" &&
+        typeof leaning === "string" &&
+        (HYPOTHESIS_LEANINGS as readonly string[]).includes(leaning)
+      )
+        node.leaning = leaning as HypothesisLeaning;
       nodes.push(node);
     }
 
@@ -203,7 +218,13 @@ export interface ClipboardBuildInput {
   /** Node ids in display order; siblings and roots are sorted by their position here. */
   order: readonly string[];
   selectedIds: readonly string[];
-  noteOf: (id: string) => { title: string; body: string; kind: TopicKind; strength?: HypothesisStrength };
+  noteOf: (id: string) => {
+    title: string;
+    body: string;
+    kind: TopicKind;
+    strength?: HypothesisStrength;
+    leaning?: HypothesisLeaning;
+  };
   relations: readonly TopicRelation[];
   clipId: string;
 }
@@ -248,6 +269,7 @@ export function buildClipboardPayload(input: ClipboardBuildInput): ClipboardPars
       const note = input.noteOf(id);
       const node: ClipNode = { id: clipped, parent, title: note.title, kind: note.kind, body: note.body };
       if (note.strength !== undefined) node.strength = note.strength;
+      if (note.leaning !== undefined) node.leaning = note.leaning;
       nodes.push(node);
       for (const child of [...(children.get(id) ?? [])].sort((a, b) => rank(a) - rank(b))) visit(child, clipped);
     };

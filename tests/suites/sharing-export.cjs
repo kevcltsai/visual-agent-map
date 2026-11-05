@@ -627,3 +627,14 @@ test('share exporter topic-color: a note\'s colour reaches the payload node, a n
   assert.equal('color' in result.payload.nodes[1], false);
   assert.equal(result.payload.version, 1);
 });
+
+test('hypothesis-leaning: the share scrub drops the front-matter block, so hypothesis-leaning and hypothesis-strength never reach a shared page', () => {
+  const root = el('div', {}, [
+    el('div', { class: 'frontmatter-container' }, [el('span', {}, [], 'hypothesis-leaning supported')]),
+    el('div', { class: 'metadata-container' }, [], 'hypothesis-strength: strong'),
+    el('p', {}, [], 'Body')
+  ]);
+  dom.scrubShareTree(root);
+  assert.deepEqual(plain(root.children.map(c => c.localName)), ['p']);
+  assert.ok(!JSON.stringify(plain(tags(root))).includes('hypothesis'));
+});

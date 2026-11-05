@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - **AIM is paused in this version.** Its entry points and settings are hidden; a map built with AIM still opens and edits like any other map, except that card resizing and grading by a goal stay off while AIM is paused. Nothing in your vault is deleted.
+- **Hypothesis leaning.** A hypothesis can now lean supported, undecided or refuted, next to its strength (now starting at none); you can set both by hand, and the map chat can set and read them.
 - **AI lock.** Lock a topic (topic panel, card button or selection bar; `ai-locked: true`) and no AI action changes it, its children or its relations; your own edits still work.
 - **Grading by goal works again with Codex.** The grade request no longer gets refused for a missing `anchor`, and a grading failure now reads as one plain sentence instead of raw error text.
 - **Integrating while a child is being researched.** Synthesizing a topic now waits for its children's running research instead of failing with "The topic changed".

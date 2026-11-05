@@ -1377,9 +1377,17 @@ test('PV2-V7: dragging a first-level topic in a right map, or a detail in a time
   const order = topicOrder(right), others = right.view.map.nodes.filter(n => n.id !== right.named('T3').id).map(n => [n.id, n.x, n.y]);
   const start = { x: right.named('T3').x, y: right.named('T3').y };
   await dragCard(right, 'T3', -700, -400);
-  assert.deepEqual(topicOrder(right), order, 'order unchanged');
+  assert.deepEqual(topicOrder(right), order, 'empty canvas, away from the siblings: order unchanged');
   assert.equal(right.named('T3').x, start.x - 700); assert.equal(right.named('T3').y, start.y - 400);
   assert.deepEqual(plainJson(right.view.map.nodes.filter(n => n.id !== right.named('T3').id).map(n => [n.id, n.x, n.y])), plainJson(others), 'nothing else moved');
+  // persona 11 / decision #3: dropped among its siblings in a right map, a first-level topic takes that place in the order.
+  const among = await harness(timelineTree);
+  const T3 = { x: among.named('T3').x, y: among.named('T3').y };
+  const amongOthers = among.view.map.nodes.filter(n => n.id !== among.named('T3').id).map(n => [n.id, n.x, n.y]);
+  await dragCard(among, 'T3', 0, -400);
+  assert.equal(among.named('T3').x, T3.x); assert.equal(among.named('T3').y, T3.y - 400, 'the card stays where it was dropped');
+  assert.deepEqual(topicOrder(among), ['T1', 'T3', 'T2'], 'order follows the drop');
+  assert.deepEqual(plainJson(among.view.map.nodes.filter(n => n.id !== among.named('T3').id).map(n => [n.id, n.x, n.y])), plainJson(amongOthers), 'nothing else moved');
   const timeline = await harness(timelineTree);
   await timeline.choose(TIMELINE);
   const detail = { x: timeline.named('T1a').x, y: timeline.named('T1a').y }, topics = topicOrder(timeline);

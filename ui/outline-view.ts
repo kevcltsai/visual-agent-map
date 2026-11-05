@@ -125,7 +125,37 @@ export class OutlineView extends ItemView {
       this.query = input.value;
       this.renderTree();
     });
+    // Enter jumps to the first topic whose own title matches: the keyboard path from the search box to the map.
+    input.addEventListener("keydown", event => {
+      if (event.key !== "Enter" || event.isComposing || !this.query.trim()) return;
+      const path = this.firstMatchPath();
+      if (!path) return;
+      event.preventDefault();
+      this.setActive(path);
+      void this.openNote(path);
+    });
     this.renderTree();
+  }
+  /** The first topic, in outline order, whose own title contains the search text (not one that only has a matching child). */
+  private firstMatchPath(): string | null {
+    if (!this.map) return null;
+    const query = foldOutlineSearch(this.query.trim());
+    if (!query) return null;
+    const children = new Map<string | null, MapNode[]>();
+    for (const node of this.map.nodes) children.set(node.parentId, [...(children.get(node.parentId) ?? []), node]);
+    const find = (node: MapNode): string | null => {
+      if (foldOutlineSearch(this.titles.get(node.id) ?? node.path).includes(query)) return node.path;
+      for (const child of children.get(node.id) ?? []) {
+        const found = find(child);
+        if (found) return found;
+      }
+      return null;
+    };
+    for (const root of children.get(null) ?? []) {
+      const found = find(root);
+      if (found) return found;
+    }
+    return null;
   }
   private renderCoffee(): void {
     this.contentEl.createEl("h4", { text: t("ui.coffee_segments") });

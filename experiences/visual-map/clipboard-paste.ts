@@ -1,4 +1,4 @@
-import type { HypothesisStrength, TopicKind } from "../../note-values";
+import type { HypothesisLeaning, HypothesisStrength, TopicKind } from "../../note-values";
 import type { TopicRelationKind } from "../../map-model";
 import type { ClipboardPayload } from "./clipboard";
 
@@ -10,6 +10,7 @@ export interface PasteItem {
   kind: TopicKind;
   body: string;
   strength?: HypothesisStrength;
+  leaning?: HypothesisLeaning;
 }
 export interface PasteRelation {
   kind: TopicRelationKind;
@@ -67,6 +68,7 @@ export function planPaste(payload: ClipboardPayload): PastePlan {
         body: n.body
       };
       if (n.strength !== undefined) item.strength = n.strength;
+      if (n.leaning !== undefined) item.leaning = n.leaning;
       return item;
     });
     const relations: PasteRelation[] = [];

@@ -13,7 +13,14 @@ import {
 } from "../../../map-model";
 import { TOPIC_COLORS, TOPIC_STYLES, type TopicColor, type TopicStyle } from "../../../topic-colors";
 import { TOPIC_MARKERS, TOPIC_MARKER_GROUPS, type TopicMarker } from "../../../topic-markers";
-import { HYPOTHESIS_STRENGTHS, TOPIC_KINDS, type HypothesisStrength, type TopicKind } from "../../../note-values";
+import {
+  HYPOTHESIS_LEANINGS,
+  HYPOTHESIS_STRENGTHS,
+  TOPIC_KINDS,
+  type HypothesisLeaning,
+  type HypothesisStrength,
+  type TopicKind
+} from "../../../note-values";
 import languageEn from "./language.en.md";
 import languageZh from "./language.zh.md";
 import templateEn from "./prompt.en.md";
@@ -43,7 +50,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "add_relation",
   "remove_relation",
   "set_appearance",
-  "rename_map"
+  "rename_map",
+  "reorder_topics"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -69,7 +77,7 @@ export const MAP_CHAT_TOKEN_BUDGET = 150_000;
 export type MapChatAction =
   /**
    * `parentId` "" = a new root card; `new:<ref>` = a card created earlier in this reply. `ref` names this card for later actions
-   * (absent = none). `topicKind` (absent = an ordinary topic) and `strength` (only with a hypothesis) are its type.
+   * (absent = none). `topicKind` (absent = an ordinary topic), `leaning` and `strength` (only with a hypothesis) are its type.
    */
   | {
       kind: "add_child";
@@ -78,6 +86,7 @@ export type MapChatAction =
       summary: string;
       ref?: string;
       topicKind?: TopicKind;
+      leaning?: HypothesisLeaning;
       strength?: HypothesisStrength;
     }
   | { kind: "rename_topic"; nodeId: string; title: string }
@@ -88,6 +97,8 @@ export type MapChatAction =
    * parent; without it the card goes under `newParentId` as before.
    */
   | { kind: "move_topic"; nodeId: string; newParentId: string; beforeId?: string }
+  /** Puts the listed children of `parentId` in this order (first to last) among their siblings; the cards stay under `parentId`. */
+  | { kind: "reorder_topics"; parentId: string; nodeIds: string[] }
   | { kind: "delete_topic"; nodeId: string; branch: boolean }
   | { kind: "edit_md_file"; path: string; find: string; replace: string }
   | { kind: "create_md_file"; path: string; content: string }
@@ -123,9 +134,15 @@ export type MapChatAction =
   | { kind: "focus_topic"; nodeId: string }
   /**
    * Sets the topic type of one or more cards: only the note's frontmatter, never the title, the note body, the id, the parent or
-   * the relations. `strength` (only with a hypothesis; absent = keep it, or weak for a card that becomes one) is its strength.
+   * the relations. `leaning` and `strength` (only with a hypothesis; absent = keep it, or undecided and none for a card that becomes one) are its evidence state.
    */
-  | { kind: "set_topic_kind"; nodeIds: string[]; topicKind: TopicKind; strength?: HypothesisStrength }
+  | {
+      kind: "set_topic_kind";
+      nodeIds: string[];
+      topicKind: TopicKind;
+      leaning?: HypothesisLeaning;
+      strength?: HypothesisStrength;
+    }
   /**
    * The user's words could mean only the type, or also new content (for example "make it atomic knowledge": a new type, or one
    * single concept). Nothing is applied: the view offers the choices under the answer and acts on the one the user picks.
@@ -177,7 +194,7 @@ export type MapChatRejectCode =
   | "relation_not_allowed"
   /** A remove_relation for two cards that hold no relation. */
   | "unknown_relation"
-  /** A move_topic whose `beforeId` is not a child of the target parent (at that point of the reply). */
+  /** A move_topic whose `beforeId`, or a reorder_topics card, is not a child of the target parent (at that point of the reply). */
   | "not_sibling"
   /** An appearance change on a map whose cards have none to edit (AIM). */
   | "no_appearance";
@@ -246,6 +263,7 @@ export const MAP_CHAT_SCHEMA = {
           images: { type: "boolean" },
           otherProvider: { type: "boolean" },
           topicKind: { type: "string", enum: [...TOPIC_KINDS, ""] },
+          leaning: { type: "string", enum: [...HYPOTHESIS_LEANINGS, ""] },
           strength: { type: "string", enum: [...HYPOTHESIS_STRENGTHS, ""] },
           fromId: STRING,
           toId: STRING,
@@ -281,6 +299,7 @@ export const MAP_CHAT_SCHEMA = {
           "images",
           "otherProvider",
           "topicKind",
+          "leaning",
           "strength",
           "fromId",
           "toId",
@@ -307,6 +326,27 @@ class Dropped extends Error {
 }
 
 /**
+ * A new card's summary that names a note the user showed the chat by its path ("source: Reading/Notes.md") gets a wikilink
+ * ("[[Reading/Notes]]") instead, so the source can be clicked and the note lists the card as a backlink. Text already inside
+ * a wikilink is left alone.
+ */
+export function linkSources(summary: string, paths: readonly string[] | undefined): string {
+  if (!summary || !paths?.length) return summary;
+  let out = summary;
+  for (const path of paths) {
+    if (!/\.md$/i.test(path)) continue;
+    const target = path.replace(/\.md$/i, "");
+    const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp("`?" + escaped + "`?", "g");
+    out = out
+      .split(/(\[\[[^\]]*\]\])/)
+      .map(part => (part.startsWith("[[") ? part : part.replace(pattern, `[[${target}]]`)))
+      .join("");
+  }
+  return out;
+}
+
+/**
  * Parser. A reply that is not a JSON object with a string `reply` and an `actions` array rejects the whole reply with
  * {@link MapChatError}. Inside `actions` each item is judged alone: one that is not an object, has an unknown kind, names a
  * card that is not in the supplied context, misses a field its kind needs, or would put a card under itself is dropped and
@@ -323,6 +363,7 @@ class Dropped extends Error {
 export function parseMapChat(
   raw: string,
   context: Pick<MapChatContext, "nodeIds" | "parents"> & {
+    sourcePaths?: readonly string[];
     noEditableMap?: boolean;
     aim?: boolean;
     relations?: readonly MapChatRelation[];
@@ -395,6 +436,12 @@ export function parseMapChat(
         if (given && !(HYPOTHESIS_STRENGTHS as readonly string[]).includes(given)) throw new Dropped("bad_value");
         return kind === "hypothesis" ? (given as HypothesisStrength | "") : "";
       };
+      /** A hypothesis leaning; "" when none. An unknown one drops the item; one next to another type is ignored. */
+      const leaning = (kind: TopicKind | ""): HypothesisLeaning | "" => {
+        const given = text("leaning", false);
+        if (given && !(HYPOTHESIS_LEANINGS as readonly string[]).includes(given)) throw new Dropped("bad_value");
+        return kind === "hypothesis" ? (given as HypothesisLeaning | "") : "";
+      };
       /** One card id: a supplied card, or (when `allowNew`) a `new:` ref an earlier kept item defined. */
       const resolve = (id: string, allowNew: boolean): string => {
         if (id.startsWith(MAP_CHAT_NEW_PREFIX)) {
@@ -426,6 +473,7 @@ export function parseMapChat(
           if (ref && (!REF_FORMAT.test(ref) || refs.has(ref))) throw new Dropped("bad_ref");
           const typed = topicKind();
           const power = strength(typed);
+          const lean = leaning(typed);
           // An AIM map has no types: the card is still added, as an ordinary topic, and its type is counted as skipped.
           const keepType = !context.aim && typed !== "" && typed !== "topic";
           if (context.aim && typed !== "" && typed !== "topic") rejected.push({ index, code: "no_topic_kinds" });
@@ -433,9 +481,10 @@ export function parseMapChat(
             kind: "add_child",
             parentId,
             title,
-            summary: text("summary", false),
+            summary: linkSources(text("summary", false), context.sourcePaths),
             ...(ref ? { ref } : {}),
             ...(keepType ? { topicKind: typed as TopicKind } : {}),
+            ...(keepType && lean ? { leaning: lean } : {}),
             ...(keepType && power ? { strength: power } : {})
           });
           if (ref) {
@@ -463,6 +512,15 @@ export function parseMapChat(
           if (beforeId && (beforeId === nodeId || parents[beforeId] !== newParentId)) throw new Dropped("not_sibling");
           actions.push({ kind: "move_topic", nodeId, newParentId, ...(beforeId ? { beforeId } : {}) });
           parents[nodeId] = newParentId;
+          break;
+        }
+        case "reorder_topics": {
+          const parentId = resolve(text("parentId"), true);
+          const nodeIds = list("nodeIds");
+          if (nodeIds.length < 2) throw new Dropped("missing_field");
+          // Every listed card must already sit under the parent (as the earlier items of this reply left them).
+          if (nodeIds.some(id => parents[id] !== parentId)) throw new Dropped("not_sibling");
+          actions.push({ kind: "reorder_topics", parentId, nodeIds });
           break;
         }
         case "delete_topic":
@@ -565,7 +623,14 @@ export function parseMapChat(
             break;
           }
           const power = strength(typed);
-          actions.push({ kind: "set_topic_kind", nodeIds, topicKind: typed, ...(power ? { strength: power } : {}) });
+          const lean = leaning(typed);
+          actions.push({
+            kind: "set_topic_kind",
+            nodeIds,
+            topicKind: typed,
+            ...(lean ? { leaning: lean } : {}),
+            ...(power ? { strength: power } : {})
+          });
           break;
         }
         case "set_appearance": {
@@ -646,7 +711,7 @@ export function parseMapChat(
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 13,
+  version: 15,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

@@ -35,7 +35,8 @@
               "add_relation",
               "remove_relation",
               "set_appearance",
-              "rename_map"
+              "rename_map",
+              "reorder_topics"
             ]
           },
           "nodeId": {
@@ -130,9 +131,19 @@
               ""
             ]
           },
+          "leaning": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "undecided",
+              "refuted",
+              ""
+            ]
+          },
           "strength": {
             "type": "string",
             "enum": [
+              "none",
               "weak",
               "medium",
               "strong",
@@ -284,6 +295,7 @@
           "images",
           "otherProvider",
           "topicKind",
+          "leaning",
           "strength",
           "fromId",
           "toId",

@@ -188,21 +188,23 @@ export class ShareModal extends Modal {
     this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
     this.fullSetting = new Setting(this.contentEl)
       .setName(t("share.option_full_name"))
-      .setDesc(t("share.option_full_desc"))
+      .setDesc(t(this.includeDetail ? "share.option_full_desc_on" : "share.option_full_desc"))
       .addToggle(toggle => {
         this.fullToggle = toggle;
         toggle.setValue(this.includeDetail).onChange(value => {
           this.includeDetail = value;
+          this.fullSetting.setDesc(t(value ? "share.option_full_desc_on" : "share.option_full_desc"));
           this.restart();
         });
       });
     this.imagesSetting = new Setting(this.contentEl)
       .setName(t("share.option_images_name"))
-      .setDesc(t("share.option_images_desc"))
+      .setDesc(t(this.includeImages ? "share.option_images_desc_on" : "share.option_images_desc"))
       .addToggle(toggle => {
         this.imagesToggle = toggle;
         toggle.setValue(this.includeImages).onChange(value => {
           this.includeImages = value;
+          this.imagesSetting.setDesc(t(value ? "share.option_images_desc_on" : "share.option_images_desc"));
           this.restart();
         });
       });
@@ -578,8 +580,10 @@ export class ShareModal extends Modal {
             ? t("share.translate_estimate_cached")
             : t(
                 "share.translate_estimate_0_1_2",
-                estimate.calls,
-                estimate.minutes,
+                estimate.calls === 1 ? t("share.translate_calls_one") : t("share.translate_calls_0", estimate.calls),
+                estimate.minutes === 1
+                  ? t("share.translate_minutes_one")
+                  : t("share.translate_minutes_0", estimate.minutes),
                 host.modelLabel(this.resolvedModel())
               )
         );

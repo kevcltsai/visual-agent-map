@@ -339,7 +339,7 @@ integrationTest('saved integration is not offered for retry when derived-data re
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [first, second], viewport: { x: 0, y: 0, zoom: 1 } };
   await app.vault.create(mapPath, core.serializeMap(mapDoc));
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const plugin = { abortChartJobs: () => {}, addChartsAfterWrite: () => {}, repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => { throw new Error('refresh unavailable'); }, askModel: async () => ({ summary: 'Combined', detail: 'Combined knowledge', suggestions: [] }) };
+  const plugin = { abortChartJobs: () => {}, addChartsAfterWrite: () => {}, repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async paths => { if (!paths) throw new Error('refresh unavailable'); }, askModel: async () => ({ summary: 'Combined', detail: 'Combined knowledge', suggestions: [] }) };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.focusNode = () => {};
   await view.createIntegratedNode('Combined', [first, second], 'Compare', '');
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
@@ -1924,14 +1924,14 @@ integrationTest('switching the interface language never rewrites an existing not
   }
 });
 // ---- hypothesis-evidence: topic-kind and hypothesis-strength frontmatter ----
-test('hypothesis-evidence: readTopicKind and readHypothesisStrength treat invalid values as ordinary topic / weak', () => {
+test('hypothesis-evidence: readTopicKind and readHypothesisStrength treat invalid values as ordinary topic / none', () => {
   const { readTopicKind, readHypothesisStrength } = load('note-values.ts');
   assert.equal(readTopicKind({}), 'topic');
   for (const bad of ['Hypothesis', 'fact', '', 5, null, ['hypothesis']]) assert.equal(readTopicKind({ 'topic-kind': bad }), 'topic');
   assert.equal(readTopicKind({ 'topic-kind': 'hypothesis' }), 'hypothesis');
-  assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis' }), 'weak', 'missing strength is weak');
-  for (const bad of ['huge', '', 2, null, ['strong']]) assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': bad }), 'weak');
-  for (const ok of ['weak', 'medium', 'strong']) assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': ok }), ok);
+  assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis' }), 'none', 'missing strength is none');
+  for (const bad of ['huge', '', 2, null, ['strong']]) assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': bad }), 'none');
+  for (const ok of ['none', 'weak', 'medium', 'strong']) assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': ok }), ok);
   assert.equal(readHypothesisStrength({ 'hypothesis-strength': 'strong' }), undefined, 'a non-hypothesis ignores a strength');
   assert.equal(readHypothesisStrength({ 'topic-kind': 'bogus', 'hypothesis-strength': 'strong' }), undefined);
 });
@@ -1941,8 +1941,8 @@ integrationTest('hypothesis-evidence: createNote writes the hypothesis keys only
   assert.doesNotMatch(contents.get(plainNote.path), /topic-kind|hypothesis-strength/, 'an ordinary topic writes neither key');
   const read = await repo.readNote(plainNote.path); assert.equal(read.topicKind, undefined); assert.equal(read.hypothesisStrength, undefined);
   const h = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { hypothesis: true });
-  assert.match(contents.get(h.path), /topic-kind: hypothesis/); assert.match(contents.get(h.path), /hypothesis-strength: weak/);
-  const note = await repo.readNote(h.path); assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'weak');
+  assert.match(contents.get(h.path), /topic-kind: hypothesis/); assert.match(contents.get(h.path), /hypothesis-strength: none/); assert.match(contents.get(h.path), /hypothesis-leaning: undecided/);
+  const note = await repo.readNote(h.path); assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'none'); assert.equal(note.hypothesisLeaning, 'undecided');
 });
 integrationTest('hypothesis-evidence: writeHypothesisStrength changes only its key, keeps updated, and survives note updates', async () => {
   const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
@@ -1950,12 +1950,12 @@ integrationTest('hypothesis-evidence: writeHypothesisStrength changes only its k
   const before = contents.get(h.path); const updated = (await repo.readNote(h.path)).updated;
   await repo.writeHypothesisStrength(h.path, 'strong');
   const after = contents.get(h.path);
-  assert.equal(after, before.replace('hypothesis-strength: weak', 'hypothesis-strength: "strong"'), 'only that line changes');
+  assert.equal(after, before.replace('hypothesis-strength: none', 'hypothesis-strength: "strong"'), 'only that line changes');
   assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'strong'); assert.equal((await repo.readNote(h.path)).updated, updated);
   await repo.updateNote(h.path, { status: 'completed' });
   const kept = await repo.readNote(h.path); assert.equal(kept.topicKind, 'hypothesis'); assert.equal(kept.hypothesisStrength, 'strong');
   contents.set(h.path, after.replace('"strong"', 'bogus'));
-  assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'weak', 'an invalid stored strength reads as weak');
+  assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'none', 'an invalid stored strength reads as none');
 });
 // ---- hypothesis-evidence (V1.6 P9): six topic kinds in notes ----
 const HE_KINDS = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
@@ -1966,9 +1966,9 @@ test('hypothesis-evidence: readTopicKind reads the six kinds and treats fact / n
   for (const bad of ['fact', 'Action', 'topic ', 5, null, true, ['action'], {}]) assert.equal(readTopicKind({ 'topic-kind': bad }), 'topic');
   assert.equal(readTopicKind({}), 'topic');
 });
-test('hypothesis-evidence: hypothesis-strength maybe reads as weak, and only a hypothesis has a strength', () => {
+test('hypothesis-evidence: hypothesis-strength maybe reads as none, and only a hypothesis has a strength', () => {
   const { readHypothesisStrength } = load('note-values.ts');
-  assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': 'maybe' }), 'weak');
+  assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': 'maybe' }), 'none');
   for (const kind of ['topic', 'action', 'atomic', 'evidence', 'conclusion']) assert.equal(readHypothesisStrength({ 'topic-kind': kind, 'hypothesis-strength': 'strong' }), undefined, kind);
 });
 integrationTest('hypothesis-evidence: createNote writes topic-kind for each of the six kinds; only a hypothesis gets a strength', async () => {
@@ -1976,10 +1976,10 @@ integrationTest('hypothesis-evidence: createNote writes topic-kind for each of t
   for (const kind of HE_KINDS) {
     const n = await repo.createNote(`K ${kind}`, 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: kind });
     const text = contents.get(n.path);
-    if (kind === 'topic') assert.doesNotMatch(text, /topic-kind|hypothesis-strength/, 'an ordinary topic writes neither key');
+    if (kind === 'topic') assert.doesNotMatch(text, /topic-kind|hypothesis-strength|hypothesis-leaning/, 'an ordinary topic writes neither key');
     else assert.match(text, new RegExp(`^topic-kind: ${kind}$`, 'm'));
-    if (kind === 'hypothesis') assert.match(text, /^hypothesis-strength: weak$/m);
-    else assert.doesNotMatch(text, /hypothesis-strength/, kind);
+    if (kind === 'hypothesis') { assert.match(text, /^hypothesis-strength: none$/m); assert.match(text, /^hypothesis-leaning: undecided$/m); }
+    else assert.doesNotMatch(text, /hypothesis-strength|hypothesis-leaning/, kind);
   }
 });
 integrationTest('hypothesis-evidence: readNote returns topicKind for the five non-ordinary kinds and strength only for a hypothesis', async () => {
@@ -1988,7 +1988,7 @@ integrationTest('hypothesis-evidence: readNote returns topicKind for the five no
     const n = await repo.createNote(`R ${kind}`, 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: kind });
     const read = await repo.readNote(n.path);
     assert.equal(read.topicKind, kind === 'topic' ? undefined : kind, kind);
-    assert.equal(read.hypothesisStrength, kind === 'hypothesis' ? 'weak' : undefined, kind);
+    assert.equal(read.hypothesisStrength, kind === 'hypothesis' ? 'none' : undefined, kind);
   }
 });
 integrationTest('hypothesis-evidence: writeTopicKind to topic removes only the topic-kind line, every other byte and updated stay', async () => {
@@ -2016,12 +2016,111 @@ integrationTest('hypothesis-evidence: writeTopicKind changes only its line; hypo
   assert.equal(back.topicKind, 'hypothesis'); assert.equal(back.hypothesisStrength, 'strong', 'the strength came back'); assert.equal(back.updated, updated);
   assert.equal(contents.get(n.path).replace('topic-kind: "hypothesis"', 'topic-kind: hypothesis'), start, 'back to the start, byte for byte (setFrontmatterKeys only adds quotes on the rewritten line)');
 });
-integrationTest('hypothesis-evidence: switching to a hypothesis without a strength line does not add one and reads weak', async () => {
+integrationTest('hypothesis-evidence: switching to a hypothesis without a strength line does not add one and reads none', async () => {
   const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
   const n = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'atomic' });
   await repo.writeTopicKind(n.path, 'hypothesis');
   assert.doesNotMatch(contents.get(n.path), /hypothesis-strength/);
-  assert.equal((await repo.readNote(n.path)).hypothesisStrength, 'weak');
+  assert.equal((await repo.readNote(n.path)).hypothesisStrength, 'none');
+  assert.doesNotMatch(contents.get(n.path), /hypothesis-leaning/); assert.equal((await repo.readNote(n.path)).hypothesisLeaning, 'undecided');
+});
+// ---- hypothesis-leaning (P1): leaning key, strength none, consistency rule ----
+test('hypothesis-leaning: readHypothesisLeaning reads the three values, treats missing or invalid as undecided, and ignores a non-hypothesis', () => {
+  const { readHypothesisLeaning, HYPOTHESIS_LEANINGS, HYPOTHESIS_STRENGTHS } = load('note-values.ts');
+  assert.deepEqual([...HYPOTHESIS_LEANINGS], ['supported', 'undecided', 'refuted']);
+  assert.deepEqual([...HYPOTHESIS_STRENGTHS], ['none', 'weak', 'medium', 'strong']);
+  const h = { 'topic-kind': 'hypothesis' };
+  assert.equal(readHypothesisLeaning(h), 'undecided');
+  for (const bad of ['Supported', 'maybe', '', 3, null, ['refuted']]) assert.equal(readHypothesisLeaning({ ...h, 'hypothesis-leaning': bad }), 'undecided');
+  for (const ok of ['supported', 'undecided', 'refuted']) assert.equal(readHypothesisLeaning({ ...h, 'hypothesis-leaning': ok }), ok);
+  for (const kind of ['topic', 'action', 'atomic', 'evidence', 'conclusion']) assert.equal(readHypothesisLeaning({ 'topic-kind': kind, 'hypothesis-leaning': 'supported' }), undefined, kind);
+  assert.equal(readHypothesisLeaning({ 'hypothesis-leaning': 'supported' }), undefined);
+});
+test('hypothesis-leaning: a leaning with strength none or missing reads as weak; undecided keeps any strength', () => {
+  const { readHypothesisStrength } = load('note-values.ts');
+  const h = { 'topic-kind': 'hypothesis' };
+  for (const leaning of ['supported', 'refuted']) {
+    assert.equal(readHypothesisStrength({ ...h, 'hypothesis-leaning': leaning }), 'weak', `${leaning} + missing`);
+    assert.equal(readHypothesisStrength({ ...h, 'hypothesis-leaning': leaning, 'hypothesis-strength': 'none' }), 'weak', `${leaning} + none`);
+    assert.equal(readHypothesisStrength({ ...h, 'hypothesis-leaning': leaning, 'hypothesis-strength': 'strong' }), 'strong');
+  }
+  for (const strength of ['none', 'weak', 'medium', 'strong']) assert.equal(readHypothesisStrength({ ...h, 'hypothesis-leaning': 'undecided', 'hypothesis-strength': strength }), strength, `undecided + ${strength}`);
+  assert.equal(readHypothesisStrength({ ...h, 'hypothesis-leaning': 'bogus' }), 'none', 'an invalid leaning is undecided');
+});
+test('hypothesis-leaning: resolveHypothesisWrite lifts none to weak only under a leaning', () => {
+  const { resolveHypothesisWrite } = load('note-values.ts'); const plain = value => JSON.parse(JSON.stringify(value));
+  assert.deepEqual(plain(resolveHypothesisWrite({ leaning: 'undecided', strength: 'none' }, { leaning: 'supported' })), { leaning: 'supported', strength: 'weak' });
+  assert.deepEqual(plain(resolveHypothesisWrite({ leaning: 'undecided', strength: 'medium' }, { leaning: 'refuted' })), { leaning: 'refuted', strength: 'medium' });
+  assert.deepEqual(plain(resolveHypothesisWrite({ leaning: 'supported', strength: 'weak' }, { strength: 'none' })), { leaning: 'supported', strength: 'weak' });
+  assert.deepEqual(plain(resolveHypothesisWrite({ leaning: 'undecided', strength: 'strong' }, { strength: 'none' })), { leaning: 'undecided', strength: 'none' });
+  assert.deepEqual(plain(resolveHypothesisWrite({ leaning: 'refuted', strength: 'strong' }, { leaning: 'undecided' })), { leaning: 'undecided', strength: 'strong' });
+});
+integrationTest('hypothesis-leaning: createNote writes undecided and none for a hypothesis only, honours an initial leaning, lifts none to weak', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const h = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'hypothesis' });
+  assert.match(contents.get(h.path), /^hypothesis-leaning: undecided$/m); assert.match(contents.get(h.path), /^hypothesis-strength: none$/m);
+  const s = await repo.createNote('Claim 2', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'hypothesis', hypothesisLeaning: 'supported' });
+  const read = await repo.readNote(s.path); assert.equal(read.hypothesisLeaning, 'supported'); assert.equal(read.hypothesisStrength, 'weak');
+  assert.match(contents.get(s.path), /^hypothesis-strength: weak$/m, 'written as weak, not none');
+  const m = await repo.createNote('Claim 3', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'hypothesis', hypothesisStrength: 'strong' });
+  assert.equal((await repo.readNote(m.path)).hypothesisLeaning, 'undecided'); assert.equal((await repo.readNote(m.path)).hypothesisStrength, 'strong');
+  const e = await repo.createNote('Ev', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'evidence', hypothesisLeaning: 'refuted', hypothesisStrength: 'strong' });
+  assert.doesNotMatch(contents.get(e.path), /hypothesis-/, 'a non-hypothesis writes neither key');
+});
+integrationTest('hypothesis-leaning: writeHypothesisLeaning changes only the leaning and, if strength was none or missing, the strength in the same write', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const h = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'hypothesis' });
+  const start = contents.get(h.path); const updated = (await repo.readNote(h.path)).updated;
+  const lines = text => text.split('\n').filter(l => !/^hypothesis-(leaning|strength):/.test(l)).join('\n');
+  await repo.writeHypothesisLeaning(h.path, 'supported');
+  let note = await repo.readNote(h.path);
+  assert.equal(note.hypothesisLeaning, 'supported'); assert.equal(note.hypothesisStrength, 'weak'); assert.equal(note.updated, updated);
+  assert.match(contents.get(h.path), /hypothesis-strength: "?weak"?/, 'strength written to weak in the same write');
+  assert.equal(lines(contents.get(h.path)), lines(start), 'no other line changes');
+  await repo.writeHypothesisStrength(h.path, 'medium');
+  await repo.writeHypothesisLeaning(h.path, 'refuted');
+  assert.match(contents.get(h.path), /hypothesis-strength: "?medium"?/, 'a real strength is kept');
+  await repo.writeHypothesisLeaning(h.path, 'undecided');
+  note = await repo.readNote(h.path); assert.equal(note.hypothesisLeaning, 'undecided'); assert.equal(note.hypothesisStrength, 'medium');
+  await repo.writeHypothesisStrength(h.path, 'none');
+  assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'none', 'undecided accepts none');
+  await repo.writeHypothesisLeaning(h.path, 'supported');
+  await repo.writeHypothesisStrength(h.path, 'none');
+  assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'weak', 'a none written under a leaning becomes weak');
+  assert.match(contents.get(h.path), /hypothesis-strength: "?weak"?/);
+});
+integrationTest('hypothesis-leaning: writeHypothesisLeaning on a note with no strength key writes weak; going undecided adds no strength key', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const n = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'atomic' });
+  await repo.writeTopicKind(n.path, 'hypothesis');
+  await repo.writeHypothesisLeaning(n.path, 'undecided');
+  assert.doesNotMatch(contents.get(n.path), /hypothesis-strength/); assert.match(contents.get(n.path), /hypothesis-leaning/);
+  await repo.writeHypothesisLeaning(n.path, 'refuted');
+  assert.match(contents.get(n.path), /hypothesis-strength: "?weak"?/);
+});
+integrationTest('hypothesis-leaning: switching the type keeps both keys and never adds them; a non-hypothesis ignores a stored leaning', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const h = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'hypothesis', hypothesisLeaning: 'refuted' });
+  await repo.writeTopicKind(h.path, 'evidence');
+  assert.match(contents.get(h.path), /hypothesis-leaning: refuted/); assert.match(contents.get(h.path), /hypothesis-strength: weak/);
+  const asEvidence = await repo.readNote(h.path); assert.equal(asEvidence.hypothesisLeaning, undefined); assert.equal(asEvidence.hypothesisStrength, undefined);
+  await repo.writeTopicKind(h.path, 'hypothesis');
+  assert.equal((await repo.readNote(h.path)).hypothesisLeaning, 'refuted');
+  const a = await repo.createNote('Atom', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'atomic' });
+  await repo.writeTopicKind(a.path, 'hypothesis');
+  assert.doesNotMatch(contents.get(a.path), /hypothesis-leaning|hypothesis-strength/, 'switching to hypothesis adds nothing');
+});
+integrationTest('hypothesis-leaning: reading an old 0.29 hypothesis note writes nothing and keeps weak', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const h = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'hypothesis' });
+  contents.set(h.path, contents.get(h.path).replace(/^hypothesis-leaning:.*\n/m, '').replace('hypothesis-strength: none', 'hypothesis-strength: weak'));
+  const before = contents.get(h.path);
+  const note = await repo.readNote(h.path);
+  assert.equal(note.hypothesisStrength, 'weak'); assert.equal(note.hypothesisLeaning, 'undecided');
+  await repo.readNote(h.path);
+  assert.equal(contents.get(h.path), before, 'reading writes nothing');
+  contents.set(h.path, before.replace(/^hypothesis-strength:.*\n/m, ''));
+  assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'none', 'only a missing strength key turns into none');
 });
 integrationTest('topic-markers: readNote reads only whitelisted ids and a note without markers has no markers field', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);

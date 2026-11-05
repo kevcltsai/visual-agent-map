@@ -383,7 +383,7 @@ body { margin: 0; width: 2400px; height: 1400px; background: var(--background-pr
 </style></head><body><div class="vam-viewport" style="width:2400px;height:1400px"><div class="vam-stage">${KIND_IDS.map((kind, row) => KIND_STATES.map(([state, attrs, extra], col) => {
   const kindAttr = kind === 'topic' ? '' : ` data-topic-kind="${kind}"`;
   // decision 35 B1: every typed card carries the tag (a hypothesis with its strength, the others with the type name).
-  const tagHtml = kind === 'hypothesis' ? '<span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span>' : kind === 'topic' ? '' : `<span class="vam-hypothesis-tag vam-kind-tag">${kind}</span>`;
+  const tagHtml = kind === 'hypothesis' ? '<span class="vam-hypothesis-tag" data-strength="weak" data-leaning="supported">Hypothesis · Supported · Weak</span>' : kind === 'topic' ? '' : `<span class="vam-hypothesis-tag vam-kind-tag">${kind}</span>`;
   return `<div class="vam-node${extra}"${kindAttr} ${attrs} data-case="${kind}|${state}" style="left:${20 + col * 330}px;top:${20 + row * 220}px;padding:28px 40px">${shapeMarkup(kind)}<div class="vam-node-header">${tagHtml}</div><h3 class="vam-card-title" title="Title">Title of the topic</h3><p class="vam-card-summary">A short summary of the topic.</p></div>`;
 }).join('')).join('')}</div></div></body></html>`;
 const KIND_PROBE = `(() => {
@@ -487,7 +487,7 @@ body { margin: 0; width: 1200px; height: 9000px; background: var(--background-pr
 .vam-node { width: 280px; }
 </style></head><body><div class="vam-viewport" style="width:2400px;height:9000px"><div class="vam-stage">${COLOR_IDS.flatMap((color, c) => KIND_IDS.map((kind, row) => COLOR_STATES.map(([state, attrs, extra], col) => {
   const kindAttr = kind === 'topic' ? '' : ` data-topic-kind="${kind}"`;
-  const tagHtml = kind === 'hypothesis' ? '<span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span>' : kind === 'topic' ? '' : `<span class="vam-hypothesis-tag vam-kind-tag">${kind}</span>`;
+  const tagHtml = kind === 'hypothesis' ? '<span class="vam-hypothesis-tag" data-strength="weak" data-leaning="supported">Hypothesis · Supported · Weak</span>' : kind === 'topic' ? '' : `<span class="vam-hypothesis-tag vam-kind-tag">${kind}</span>`;
   return `<div class="vam-node${extra}"${kindAttr} data-topic-color="${color}" ${attrs} data-case="${kind}|${state}|${color}" style="left:${20 + col * 330}px;top:${20 + (c * KIND_IDS.length + row) * 220}px;padding:28px 40px">${shapeMarkup(kind)}<div class="vam-node-header">${tagHtml}</div><h3 class="vam-card-title" title="Title">Title of the topic</h3><p class="vam-card-summary">A short summary of the topic.</p></div>`;
 })).flat()).join('')}</div></div></body></html>`;
 const COLOR_PROBE = `(() => {

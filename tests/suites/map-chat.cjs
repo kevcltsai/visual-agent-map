@@ -2905,6 +2905,14 @@ integrationTest('B1 ui: the plan card has a one-sentence description, actions gr
   await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
 });
 
+integrationTest('persona-07 ui: an applied plan no longer says it needs confirmation', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
+  h.type('many'); await h.view.sendMapChat(); planButton(h, 'apply').click();
+  await until(() => h.view.chat.pendingPlan() === null && !h.view.chatApplying);
+  const text = visibleText(planCard(h)[0]); assert.doesNotMatch(text, /needs your confirmation/); assert.match(text, /Plan applied/);
+});
+
 integrationTest('B1 ui: a cancelled plan keeps the focus in the field and the card says nothing changed', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'plan', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
@@ -3609,6 +3617,45 @@ integrationTest('map chat merge: summary-only cards run the AI merge under the c
   assert.equal(merged[0].summary, 'Body needs rest. Mind needs calm.');
   assert.match(merged[0].detail, /Mind needs calm/);
   assert.equal(merged[0].color, 'red', 'the colour both sources share stays on the merged card');
+});
+// Persona 17: the reply's recolour and the AI merge it started (written later) are one undo step, one redo step.
+const mergeReply = async h => {
+  await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
+  await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
+  await h.view.hydrate();
+  h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
+  h.plugin.askModel = async () => ({ summary: 'Body needs rest. Mind needs calm.', detail: 'Body needs rest.\n\nMind needs calm.', visualReferences: [], suggestions: [{ title: 'AI picked name' }] });
+  await apply(h, [
+    lookAct([h.ids.a, h.ids.b], { color: 'red' }),
+    { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }
+  ]);
+  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+};
+integrationTest('persona 17: a chat reply that recolours and then AI-merges is one undo step and one redo step', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const before = (await h.saved()).map(n => n.id).sort(); const colourBefore = (await h.note('a')).color;
+  await mergeReply(h);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply'); assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1);
+  await h.view.travel(false);
+  eq((await h.saved()).map(n => n.id).sort(), before, 'both source cards are back after one undo'); assert.equal((await h.note('a')).color, colourBefore, 'and the colour is back too');
+  assert.equal(h.view.history.canUndo, false, 'nothing is left to undo');
+  await h.view.travel(true);
+  assert.equal(h.view.history.canRedo, false, 'one redo takes the whole reply back');
+  const titles = []; for (const n of await h.saved()) titles.push((await h.repo.readNote(n.path)).title);
+  assert.ok(titles.includes('Nothing to Fear'), 'the merged card is back after redo'); assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+});
+integrationTest('persona 17: when another step was pushed before the merge lands, the merge stays its own step', async () => {
+  const h = await harness({ viaSync: false }); await h.view.hydrate();
+  const log = [];
+  await h.repo.updateNote(h.node('a').path, { summary: 'Body needs rest.' });
+  await h.repo.updateNote(h.node('b').path, { summary: 'Mind needs calm.' });
+  await h.view.hydrate();
+  h.plugin.currentModelChoice = () => ({ model: 'claude:sonnet' });
+  h.plugin.askModel = async () => { h.view.history.push(foreignEntry('later edit', log)); return { summary: 'S.', detail: 'D.', visualReferences: [], suggestions: [] }; };
+  await apply(h, [lookAct([h.ids.a, h.ids.b], { color: 'red' }), { kind: 'run_map_action', action: 'merge', nodeIds: [h.ids.a, h.ids.b], title: 'Nothing to Fear', goal: '', direction: '', mode: '', images: false }]);
+  await h.view.mergeTasks.get(h.view.path)?.run; await tick();
+  assert.equal(h.view.history.past.filter(e => e.label === 'AI chat reply').length, 1, 'the reply keeps its own step');
+  assert.ok(h.view.history.past.length >= 3, 'the merge is a separate step above the reply and the other edit');
 });
 integrationTest('B2 merge: a merge still locked by an AI merge is skipped with the locked reason', async () => {
   const h = await harness(); await h.view.hydrate();
@@ -4840,9 +4887,12 @@ integrationTest('bug bash #27: the Rename tool on a card opens a dialog titled �
   view.stageEl = element('div'); view.viewportEl = element('div');
   view.labelCard = () => {}; // the card's accessible-name bookkeeping needs a real DOM; the tools do not
   view.renderNode(node);
-  const rename = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-rename-tool')); assert.ok(rename, 'the card has a Rename tool');
-  assert.equal(rename.text, '改名', 'the tool itself is in zh-TW');
-  rename.click(); await tick();
+  const more = find(view.cardEls.get(node.id), i => hasClass(i, 'vam-more-tool')); assert.ok(more, 'the card has a More tool');
+  assert.equal(more.text, '⋯ 更多', 'the tool itself is in zh-TW');
+  const entries = [];
+  view.newMenu = () => { const m = { addItem(build) { const it = {}; const chain = { setTitle(t) { it.title = t; return chain; }, setIcon() { return chain; }, onClick(fn) { it.fn = fn; return chain; } }; build(chain); entries.push(it); return m; }, addSeparator() { return m; }, showAtMouseEvent() {} }; return m; };
+  more.click(); const rename = entries.find(e => e.title === '改名'); assert.ok(rename, 'More lists Rename, in zh-TW');
+  rename.fn(); await tick();
   assert.ok((h.control.modals ?? []).length === 1, 'one dialog opened');
   assert.equal(h.control.modals[0].titleText, '重新命名');
 });
@@ -5308,6 +5358,32 @@ integrationTest('chat 07: in a timeline map a first-level topic is reordered alo
   assert.equal(h.contents.get(MAP), before);
 });
 
+integrationTest('persona 23: one reorder_topics action sorts the five siblings, Map.md and the layout follow, and Undo takes it back in one step', async () => {
+  const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
+  const before = h.contents.get(MAP);
+  const order = ['Dusk', 'Noon', 'Mind', 'Dawn', 'Body'];
+  const lines = await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: order.map(title => ids[title]) }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  assert.equal(lines[0].text, 'Done: Put 5 topics under “Sleep” in a new order');
+  eq(await kidsOf(h, h.ids.root), order);
+  const ys = (await h.saved()).filter(n => n.parentId === h.ids.root).sort((l, r) => l.y - r.y).map(n => h.view.notes.get(n.id)?.title);
+  eq(ys, order);
+  await h.view.travel(false);
+  eq(await kidsOf(h, h.ids.root), ['Body', 'Mind', 'Dawn', 'Noon', 'Dusk']);
+  assert.equal(h.contents.get(MAP), before, 'Map.md is back byte for byte');
+  assert.equal(h.view.history.canUndo, false, 'one step');
+});
+integrationTest('persona 23: reorder_topics of some siblings keeps the others in their places, and a card that moved away since is skipped without a write', async () => {
+  const h = await harness(); await h.view.hydrate(); const ids = await fiveUnderRoot(h);
+  eq((await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: [ids.Noon, ids.Body] }])).map(l => l.status), ['done']);
+  eq(await kidsOf(h, h.ids.root), ['Noon', 'Mind', 'Dawn', 'Body', 'Dusk']);
+  await apply(h, [{ kind: 'move_topic', nodeId: ids.Dusk, newParentId: h.ids.a }]);
+  const before = h.contents.get(MAP);
+  const lines = await apply(h, [{ kind: 'reorder_topics', parentId: h.ids.root, nodeIds: [ids.Dusk, ids.Mind] }]);
+  eq(lines.map(l => l.status), ['skipped'], JSON.stringify(lines));
+  assert.equal(h.contents.get(MAP), before);
+});
+
 // ---- chat 08: the AI chat sets the appearance ------------------------------------------------------------------------------
 const lookAct = (nodeIds, fields = {}) => ({ kind: 'set_appearance', nodeIds, ...fields });
 const looksOf = async (h, key) => { const note = await h.note(key); return { color: note.color ?? null, markers: note.markers ?? [], style: note.style ?? [] }; };
@@ -5400,4 +5476,272 @@ integrationTest('chat 08: Undo takes back every appearance change of one reply i
   assert.equal(h.view.history.canUndo, false, 'one step');
   await h.view.travel(true);
   assert.equal(await state(), after);
+});
+
+test('hypothesis-leaning: edit_md_file cannot add, change or remove hypothesis-leaning, bare or quoted; quote style alone is not a change', () => {
+  const refused = { ok: false, code: 'hypothesis_frontmatter_changed' };
+  const plainNote = heNote(''), hypothesis = heNote('topic-kind: hypothesis\nhypothesis-leaning: undecided\nhypothesis-strength: none\n');
+  eq(heEdit(plainNote, heNote('hypothesis-leaning: supported\n')), refused, 'add a leaning');
+  eq(heEdit(plainNote, heNote('"hypothesis-leaning": supported\n')), refused, 'add a double-quoted leaning');
+  eq(heEdit(plainNote, heNote("'hypothesis-leaning': supported\n")), refused, 'add a single-quoted leaning');
+  eq(heEdit(hypothesis, hypothesis.replace('undecided', 'refuted')), refused, 'change the leaning');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided', '"hypothesis-leaning": refuted')), refused, 'change it through a double-quoted key');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided', "'hypothesis-leaning': refuted")), refused, 'change it through a single-quoted key');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided\n', '')), refused, 'remove the leaning');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided', 'hypothesis-leaning: undecided\nhypothesis-leaning: undecided')), refused, 'a duplicated leaning');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-leaning: undecided', "'hypothesis-leaning': undecided")), { ok: true }, 'quote style alone is not a change');
+  eq(heEdit(hypothesis, hypothesis.replace('Body', 'Changed body')), { ok: true }, 'body edits are still allowed');
+});
+test('hypothesis-leaning: the guard message names topic-kind, hypothesis-leaning and hypothesis-strength in all three languages', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const source = fs.readFileSync(path.join(__dirname, '..', '..', 'i18n', `${lang}.ts`), 'utf8');
+    const line = source.match(/"ui\.map_chat_guard_hypothesis_frontmatter_changed":\s*\n?\s*"([^"]*)"/);
+    assert.ok(line, lang);
+    for (const key of ['topic-kind', 'hypothesis-leaning', 'hypothesis-strength']) assert.ok(line[1].includes(key), `${lang} ${key}`);
+  }
+});
+
+// ---- hypothesis-leaning (P3): the chat writes a hypothesis's leaning ----------------------------------------------------
+const hypNote = async (h, key, values = {}) => {
+  await h.repo.writeTopicKind(h.node(key).path, 'hypothesis');
+  if (values.leaning) await h.repo.writeHypothesisLeaning(h.node(key).path, values.leaning);
+  if (values.strength) await h.repo.writeHypothesisStrength(h.node(key).path, values.strength);
+  await h.view.hydrate();
+};
+const setKind = (nodeIds, extra) => ({ kind: 'set_topic_kind', nodeIds, topicKind: 'hypothesis', ...extra });
+integrationTest('hypothesis-leaning: S15 a send on an ordinary map tells the model a hypothesis leaning and strength; an AIM map sends neither', async () => {
+  const h = await harness(); await hypNote(h, 'a', { leaning: 'refuted', strength: 'medium' });
+  h.open(); h.type('q'); await h.view.sendMapChat();
+  const node = JSON.parse(h.control.requests[0].context.json).outline.find(n => n.id === h.ids.a);
+  assert.equal(node.leaning, 'refuted'); assert.equal(node.strength, 'medium');
+  const aim = await harness(); await hypNote(aim, 'a', { leaning: 'supported' }); aim.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; await aim.view.hydrate();
+  aim.open(); aim.type('q'); await aim.view.sendMapChat();
+  const sent = JSON.parse(aim.control.requests[0].context.json).outline;
+  assert.equal(sent.some(n => 'leaning' in n || 'strength' in n), false);
+});
+integrationTest('hypothesis-leaning: S18 set_topic_kind to hypothesis starts undecided and none without writing the keys; leaning and strength are written when given', async () => {
+  const h = await harness();
+  await apply(h, [setKind([h.ids.a], {})]);
+  const bare = h.contents.get(h.node('a').path);
+  assert.doesNotMatch(bare, /hypothesis-leaning|hypothesis-strength/, 'nothing is backfilled');
+  const a = await h.note('a'); assert.equal(a.hypothesisLeaning, 'undecided'); assert.equal(a.hypothesisStrength, 'none');
+  await apply(h, [setKind([h.ids.b], { leaning: 'supported', strength: 'medium' }), setKind([h.ids.c], { leaning: 'refuted' })]);
+  const b = await h.note('b'); assert.equal(b.hypothesisLeaning, 'supported'); assert.equal(b.hypothesisStrength, 'medium');
+  const c = await h.note('c'); assert.equal(c.hypothesisLeaning, 'refuted'); assert.equal(c.hypothesisStrength, 'weak', 'a leaning lifts a missing strength to weak');
+});
+integrationTest('hypothesis-leaning: S18 strength none next to a leaning is written as weak; an empty leaning or strength keeps the value', async () => {
+  const h = await harness(); await hypNote(h, 'a', { leaning: 'supported', strength: 'strong' }); await hypNote(h, 'b');
+  const lines = await apply(h, [setKind([h.ids.a], { leaning: '', strength: '' }), setKind([h.ids.b], { leaning: 'supported', strength: 'none' })]);
+  eq(lines.map(l => l.status), ['done', 'done']);
+  const a = await h.note('a'); assert.equal(a.hypothesisLeaning, 'supported'); assert.equal(a.hypothesisStrength, 'strong', 'empty keeps');
+  const b = await h.note('b'); assert.equal(b.hypothesisLeaning, 'supported'); assert.equal(b.hypothesisStrength, 'weak');
+  assert.match(h.contents.get(h.node('b').path), /hypothesis-strength: "?weak/);
+});
+integrationTest('hypothesis-leaning: S18 a value equal to the effective one rewrites nothing and opens no undo step; a non-hypothesis ignores the leaning', async () => {
+  const h = await harness(); await hypNote(h, 'a', { leaning: 'supported', strength: 'weak' });
+  const before = h.contents.get(h.node('a').path), c = h.contents.get(h.node('c').path);
+  const undo = h.view.history.undoEntry;
+  await apply(h, [setKind([h.ids.a], { leaning: 'supported', strength: 'weak' }), { kind: 'set_topic_kind', nodeIds: [h.ids.c], topicKind: 'topic', leaning: 'refuted' }]);
+  assert.equal(h.contents.get(h.node('a').path), before); assert.equal(h.contents.get(h.node('c').path), c);
+  assert.doesNotMatch(h.contents.get(h.node('c').path), /hypothesis-leaning/);
+  assert.equal(h.view.history.undoEntry?.label === 'AI chat reply', false, 'no write, no reply step'); void undo;
+});
+integrationTest('hypothesis-leaning: S18 a stored none under a supported leaning reads as weak, so setting weak writes nothing', async () => {
+  const h = await harness(); await hypNote(h, 'a');
+  h.contents.set(h.node('a').path, h.contents.get(h.node('a').path).replace(/(topic-kind: "?hypothesis"?\n)/, '$1hypothesis-leaning: supported\n'));
+  await h.view.hydrate();
+  assert.equal((await h.note('a')).hypothesisStrength, 'weak');
+  const before = h.contents.get(h.node('a').path);
+  await apply(h, [setKind([h.ids.a], { strength: 'weak' })]);
+  assert.equal(h.contents.get(h.node('a').path), before);
+});
+integrationTest('hypothesis-leaning: S18 a reply that sets leaning on several cards is one undo step, and undo and redo restore the notes', async () => {
+  const h = await harness(); await hypNote(h, 'a'); await hypNote(h, 'b');
+  const before = [h.contents.get(h.node('a').path), h.contents.get(h.node('b').path)];
+  await apply(h, [setKind([h.ids.a, h.ids.b], { leaning: 'refuted', strength: 'strong' })]);
+  const after = [h.contents.get(h.node('a').path), h.contents.get(h.node('b').path)];
+  assert.notDeepEqual(after, before); assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.deepEqual([h.contents.get(h.node('a').path), h.contents.get(h.node('b').path)], before, 'undo restores');
+  await h.view.travel(true);
+  assert.deepEqual([h.contents.get(h.node('a').path), h.contents.get(h.node('b').path)], after, 'redo restores');
+});
+integrationTest('hypothesis-leaning: S18 the write changes only frontmatter; title, body, parent and relations stay', async () => {
+  const h = await harness(); h.view.map.topicRelations = [{ kind: 'supports', from: h.ids.b, to: h.ids.a }];
+  const before = h.contents.get(h.node('a').path), parents = JSON.stringify((await h.saved()).map(n => [n.id, n.parentId]));
+  await apply(h, [setKind([h.ids.a], { leaning: 'supported', strength: 'strong' })]);
+  assert.equal(body(h.contents.get(h.node('a').path)), body(before));
+  assert.equal(JSON.stringify((await h.saved()).map(n => [n.id, n.parentId])), parents);
+  eq(h.view.map.topicRelations, [{ kind: 'supports', from: h.ids.b, to: h.ids.a }]);
+});
+integrationTest('hypothesis-leaning: S19 add_child writes topicKind, leaning and strength at creation (a none strength under a leaning is weak)', async () => {
+  const h = await harness();
+  await apply(h, [
+    { kind: 'add_child', parentId: h.ids.a, title: 'Claim', summary: 's', topicKind: 'hypothesis', leaning: 'supported', strength: 'medium' },
+    { kind: 'add_child', parentId: h.ids.a, title: 'Claim2', summary: 's', topicKind: 'hypothesis', leaning: 'refuted', strength: 'none' },
+    { kind: 'add_child', parentId: h.ids.a, title: 'Claim3', summary: 's', topicKind: 'hypothesis' }
+  ]);
+  const read = async title => h.repo.readNote(h.view.map.nodes.find(n => h.view.notes.get(n.id)?.title === title).path);
+  const one = await read('Claim'); assert.equal(one.hypothesisLeaning, 'supported'); assert.equal(one.hypothesisStrength, 'medium');
+  const two = await read('Claim2'); assert.equal(two.hypothesisLeaning, 'refuted'); assert.equal(two.hypothesisStrength, 'weak');
+  const three = await read('Claim3'); assert.equal(three.hypothesisLeaning, 'undecided'); assert.equal(three.hypothesisStrength, 'none');
+});
+integrationTest('hypothesis-leaning: S20 set_topic_kind with a leaning skips an AIM card and a card being merged, and writes nothing', async () => {
+  const aim = await harness({ aim: true }); const aimBefore = aim.contents.get(aim.node('a').path);
+  const aimLines = await apply(aim, [setKind([aim.ids.a], { leaning: 'supported' })]);
+  eq(aimLines.map(l => l.status), ['skipped']); assert.equal(aim.contents.get(aim.node('a').path), aimBefore);
+  const h = await harness(); await hypNote(h, 'a');
+  h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' });
+  const before = h.contents.get(h.node('a').path);
+  const lines = await apply(h, [setKind([h.ids.a], { leaning: 'refuted' })]);
+  eq(lines.map(l => l.status), ['skipped']); assert.equal(h.contents.get(h.node('a').path), before);
+});
+integrationTest('hypothesis-leaning: S25 the result row names the leaning and strength the action gives, and only those', async () => {
+  const h = await harness();
+  const lines = await apply(h, [setKind([h.ids.a], { leaning: 'supported', strength: 'weak' }), setKind([h.ids.b], { leaning: 'refuted' }), setKind([h.ids.c], { strength: 'strong' }), setKind([h.ids.root], {})]);
+  eq(lines.map(l => l.text), [
+    'Done: Set the type of “Body” to Hypothesis (Supported · Weak)',
+    'Done: Set the type of “Mind” to Hypothesis (Refuted)',
+    'Done: Set the type of “REM” to Hypothesis (Strong)',
+    'Done: Set the type of “Sleep” to Hypothesis'
+  ], JSON.stringify(lines.map(l => l.text)));
+});
+
+// ---- persona 12: the layout follows a reply that changes card sizes or moves a card away --------------------------------
+const coverAny = (nodes, heightOf) => {
+  const found = [];
+  for (const a of nodes) for (const b of nodes) if (a.id < b.id && Math.abs(a.x - b.x) < 280 && a.y < b.y + heightOf(b.id) && b.y < a.y + heightOf(a.id)) found.push([a.id, b.id]);
+  return found;
+};
+integrationTest('persona 12: a summary that makes a card taller does not leave it covering the card below; with no overlap nothing moves', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const heights = { default: 180 }; h.view.cardHeightOf = id => heights[id] ?? heights.default;
+  const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const quiet = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'short' }]);
+  eq(quiet.map(l => l.status), ['done']);
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), before, 'cards that still fit stay where the user left them');
+  heights[h.ids.a] = 520; // the summary made Body much taller: it now covers Mind
+  assert.ok(coverAny(h.view.map.nodes, id => heights[id] ?? 180).length > 0, 'precondition: the grown card covers another');
+  const lines = await apply(h, [{ kind: 'update_summary', nodeId: h.ids.a, summary: 'A long summary '.repeat(40) }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  eq(coverAny(h.view.map.nodes, id => heights[id] ?? 180), [], 'nothing overlaps after the reply');
+  eq(coverAny(await h.saved(), id => heights[id] ?? 180), [], 'and the saved map is the same');
+});
+integrationTest('persona 12: moving a card to another branch closes the place it left, in the old branch only', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.cardHeightOf = () => 180;
+  await apply(h, [{ kind: 'add_child', parentId: h.ids.a, title: 'Second', summary: '' }, { kind: 'add_child', parentId: h.ids.a, title: 'Third', summary: '' }]);
+  const kids = () => h.view.map.nodes.filter(n => n.parentId === h.ids.a).sort((x, y) => x.y - y.y);
+  eq(kids().length, 3);
+  const [first, second, third] = kids();
+  const mind = h.view.map.nodes.find(n => n.id === h.ids.b); const mindAt = [mind.x, mind.y];
+  const lines = await apply(h, [{ kind: 'move_topic', nodeId: second.id, newParentId: h.ids.b }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const left = kids(); eq(left.map(n => n.id), [first.id, third.id]);
+  assert.equal(left[1].y - left[0].y, 180 + 24, 'the two cards that stayed are one gap apart, no hole where the third one moved from');
+});
+
+// ---- persona 27: a card drawn taller than the layout assumed (cover picture, diamond frame) -------------------------------
+const layoutApi = load('map-layout.ts');
+const stack = n => Array.from({ length: n + 1 }, (_, i) => ({ id: 'n' + i, parentId: i ? 'n0' : null, x: i ? 360 : 80, y: 80, width: undefined, collapsed: false }));
+test('persona 27: cards whose drawn height grew past what the layout assumed are found, at tight, standard and loose spacing', () => {
+  // Three diamonds laid out while each was ~70 high (before the shape padding) end up 141 high; with a cover, 96 + 8 more.
+  for (const spacing of ['compact', 'standard', 'spacious']) {
+    const guessed = () => 70;
+    const laid = layoutApi.arrangeMap(stack(3), undefined, guessed, { direction: 'right', spacing });
+    const real = id => (id === 'n0' ? 180 : 141);
+    const seen = new Map(laid.map(n => [n.id, guessed()]));
+    const now = new Map(laid.map(n => [n.id, real(n.id)]));
+    const grew = layoutApi.cardsChangedHeight(seen, now);
+    assert.ok(grew.has('n1') && grew.has('n2') && grew.has('n3'), spacing + ': the grown cards are reported');
+    assert.ok(layoutApi.cardsOverlapAny(laid, grew, real), spacing + ': precondition: they cover each other at the guessed layout');
+    const again = layoutApi.arrangeMap(laid, undefined, real, { direction: 'right', spacing });
+    assert.equal(layoutApi.cardsOverlapAny(again, new Set(again.map(n => n.id)), real), false, spacing + ': laid out with real heights nothing overlaps');
+  }
+  assert.equal(layoutApi.cardsChangedHeight(new Map(), new Map([['a', 300]])).size, 0, 'the first paint of a map reports nothing');
+  assert.equal(layoutApi.cardsChangedHeight(new Map([['a', 300]]), new Map([['a', 200]])).size, 0, 'a card that shrank is not reported');
+});
+integrationTest('persona 27: a card that grows after the layout (cover picture arrived) and now covers another is laid out again; opening moves nothing', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  h.view.cardEls = new Map(h.view.map.nodes.map(n => [n.id, { get offsetHeight() { return heights[n.id]; } }]));
+  const where = () => JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const before = where();
+  h.view.settleCardHeights(); await tick(); await tick();
+  assert.equal(where(), before, 'the first look only records heights');
+  heights[h.ids.a] = 520; // the cover picture arrived
+  assert.ok(coverAny(h.view.map.nodes, id => heights[id]).length > 0, 'precondition: the taller card covers another');
+  h.view.settleCardHeights(); await until(() => coverAny(h.view.map.nodes, id => heights[id]).length === 0);
+  eq(coverAny(await h.saved(), id => heights[id]), [], 'the saved map has no overlap either');
+});
+
+// ---- persona 27b: the height settling writes through the queue, and never inside a chat reply's step -----------------------
+const fakeCards = (h, heights) => { h.view.cardEls = new Map(h.view.map.nodes.map(n => [n.id, { get offsetHeight() { return heights[n.id]; } }])); };
+const undoSteps = h => h.view.history.past.length;
+// Every Map.md transaction takes a moment to commit (a real vault is slower than the fake one), so two that overlap really overlap.
+const slowCommits = (h, ms = 15) => {
+  const probe = { running: 0, most: 0 };
+  const begin = h.view.beginMapTransaction.bind(h.view);
+  h.view.beginMapTransaction = (...args) => { const tx = begin(...args); const commit = tx.commit.bind(tx); tx.commit = async (...c) => { probe.running++; probe.most = Math.max(probe.most, probe.running); try { await new Promise(r => setTimeout(r, ms)); return await commit(...c); } finally { probe.running--; } }; return tx; };
+  return probe;
+};
+integrationTest('persona 27b: a reply while a card has grown (cover arrived) stays one undo step; the settling adds none inside it', async () => {
+  const h = await harness({ viaSync: false, realRender: true }); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  fakeCards(h, heights); h.view.settleCardHeights(); await tick();
+  const steps = undoSteps(h); slowCommits(h, 60);
+  heights[h.ids.a] = 520; // a cover picture arrives while the reply is being applied
+  const lines = await apply(h, [{ kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 'What we dream' }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines)); await tick(); await tick();
+  assert.equal(undoSteps(h), steps + 1, 'the reply is one undo step, the settling did not add a step under or over it');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.equal(undoSteps(h), steps, 'one Undo takes back the whole reply');
+  assert.equal((await h.saved()).length, 4, 'the child is gone again');
+});
+integrationTest('persona 27b: what a reply wrote is still in Map.md after the settling; never two Map.md writes at once', async () => {
+  const h = await harness({ viaSync: false, realRender: true }); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  fakeCards(h, heights); h.view.settleCardHeights(); await tick();
+  const probe = slowCommits(h);
+  heights[h.ids.a] = 520;
+  const lines = await apply(h, [
+    { kind: 'update_summary', nodeId: h.ids.a, summary: 'A long summary '.repeat(40) },
+    { kind: 'add_child', parentId: h.ids.b, title: 'Dreams', summary: 'What we dream' }
+  ]);
+  eq(lines.map(l => l.status), ['done', 'done'], JSON.stringify(lines));
+  h.view.render(); await tick(); await tick(); await tick();
+  assert.equal(probe.most, 1, 'Map.md transactions never ran at the same time');
+  const saved = await h.saved();
+  assert.ok(saved.some(n => n.parentId === h.ids.b), 'the child the reply added is still in the saved map');
+  assert.equal(saved.length, 5);
+  eq(coverAny(saved, id => heights[id] ?? 180), [], 'and nothing overlaps');
+  assert.equal(JSON.stringify(saved.map(n => [n.id, n.x, n.y])), JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), 'the saved map is the one on screen');
+});
+integrationTest('persona 27b: the settling waits for the queue; a write already running is not read over', async () => {
+  const h = await harness({ viaSync: false, realRender: true }); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  fakeCards(h, heights); h.view.settleCardHeights(); await tick();
+  heights[h.ids.a] = 520;
+  let release; const gate = new Promise(r => { release = r; });
+  const busy = h.view.plugin.mutate(async () => { await gate; });
+  const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  h.view.settleCardHeights(); await tick(); await tick();
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), before, 'nothing is written while another job holds the queue');
+  release(); await busy; await until(() => coverAny(h.view.map.nodes, id => heights[id]).length === 0);
+});
+integrationTest('persona 27b: a card drawn for the first time that covers nothing writes nothing; one that covers another is laid out', async () => {
+  const h = await harness({ viaSync: false, realRender: true }); await h.view.hydrate();
+  const heights = {}; for (const n of h.view.map.nodes) heights[n.id] = 180;
+  fakeCards(h, heights); h.view.settleCardHeights(); await tick();
+  const steps = undoSteps(h); const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const fresh = { ...h.view.map.nodes[0], id: 'fresh', parentId: null, x: 2000, y: 2000, path: 'x.md' };
+  h.view.map.nodes.push(fresh); heights.fresh = 300; fakeCards(h, heights);
+  h.view.settleCardHeights(); await tick(); await tick();
+  assert.equal(undoSteps(h), steps, 'no write, no undo step'); assert.equal(JSON.stringify(h.view.map.nodes.slice(0, -1).map(n => [n.id, n.x, n.y])), before);
+  const over = { ...fresh, id: 'over', x: h.view.map.nodes[1].x, y: h.view.map.nodes[1].y + 40 }; h.view.map.nodes.push(over); heights.over = 300; fakeCards(h, heights);
+  const stepsBefore = undoSteps(h);
+  h.view.settleCardHeights(); await until(() => undoSteps(h) === stepsBefore + 1);
+  eq(coverAny(h.view.map.nodes.filter(n => n.id !== 'fresh'), id => heights[id] ?? 180), [], 'the card that covered another is laid out again');
 });

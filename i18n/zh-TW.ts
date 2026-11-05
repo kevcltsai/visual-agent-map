@@ -1273,6 +1273,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.title_problem_fence": "標題不能包含三個反引號（```），否則整份筆記會變成程式碼區塊。",
   "ui.title_problem_brackets": "標題不能包含 [[ 或 ]]，否則會弄壞筆記的連結。",
   "ui.multi_research_start_0": "開始研究 {0} 個議題",
+  "ui.multi_research_mode_downgrade_0": "其中 {0} 個議題上次用標準，這次會改用快速。",
   "ui.topic_0": "議題：{0}",
   "ui.moved_under_0": "已移到「{0}」底下。",
   "ui.became_root_topic": "已成為根議題。",

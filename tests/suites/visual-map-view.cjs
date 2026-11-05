@@ -643,7 +643,20 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   const radios = (root) => { const out = []; const visit = n => { if (n.type === 'radio' || (n.attrs && n.attrs.role === 'radio')) out.push(n); n.children.forEach(visit); }; visit(root); return out; };
   assert.equal(radios(modal.contentEl).length, 0, 'no depth or mode radio');
   const rows = dom.findAll(modal.contentEl, i => i.cls === 'vam-multi-research-topic').map(row => row.children.map(c => c.text));
-  assert.deepEqual(rows, [['Alpha', 'Quick'], ['Beta', 'Standard']]);
+  assert.deepEqual(rows, [['Alpha'], ['Beta']], 'the list shows names only; the mode is one switch at the top');
+  assert.equal(find(modal.contentEl, i => /vam-multi-research-mode\b(?!-note)/.test(i.cls ?? '') && !/-note/.test(i.cls)), undefined, 'no per-row mode label');
+  // The switch sits above the topic list and is the same component as the single-topic dialog.
+  const kids = modal.contentEl.children;
+  const modeSet = kids.findIndex(c => /vam-ai-mode-set/.test(c.cls)), topicList = kids.findIndex(c => /vam-integration-sources/.test(c.cls));
+  assert.ok(modeSet >= 0 && modeSet < topicList, 'mode switch comes before the topic list');
+  const modeButton = text => find(modal.contentEl, i => i.tag === 'button' && i.text === text);
+  const note = () => find(modal.contentEl, i => /vam-multi-research-mode-note/.test(i.cls ?? ''));
+  // Opened on Quick with one Standard topic: the reminder is shown; Standard hides it; back to Quick shows it again.
+  assert.ok(modeButton('Quick') && modeButton('Standard'));
+  assert.equal(note().hidden, false); assert.match(note().text, /1 of these topics last used Standard and will use Quick this time\./);
+  modeButton('Standard').listeners.click(); assert.equal(note().hidden, true);
+  modeButton('Quick').listeners.click(); assert.equal(note().hidden, false);
+  modeButton('Standard').listeners.click();
   const model = () => find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model'); assert.equal(model().value, '');
   assert.deepEqual(plain(model().children.map(c => c.value)), ['']);
   models = [{ id: 'm1', label: 'Model One' }, { id: 'm2', label: 'Model Two' }]; changed();
@@ -658,7 +671,7 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   const start = find(modal.modalEl, i => i.tag === 'button' && i.text === 'Start research (2)');
   start.listeners.click(); start.listeners.click();
   assert.equal(modal.closed, 1); assert.equal(requests.length, 1); modal.onClose(); assert.equal(unwatched, 1);
-  assert.deepEqual(plain(requests[0]), { requirements: '' }, 'the request carries no mode: each topic runs in its own note\'s mode');
+  assert.deepEqual(plain(requests[0]), { requirements: '', researchMode: 'research', researchDepth: 'normal', imageSearch: true }, 'Standard: the request overrides every topic with web search and images');
   const second = []; const m2 = new mod.MultiResearchModal({}, ['A'], { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, r => second.push(r), { styles }); m2.open();
   find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model').value = 'm1';
   // A style file is picked in the one-line choice itself.
@@ -666,7 +679,19 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   const style2 = find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style for this run'); style2.value = 'file:Alpha style'; style2.listeners.change();
   find(m2.contentEl, i => i.tag === 'textarea').value = '  only 2025  ';
   find(m2.modalEl, i => i.tag === 'button' && i.text === 'Start research (1)').listeners.click();
-  assert.deepEqual(plain(second[0]), { requirements: 'only 2025', model: 'm1', noteStyle: 'file:Alpha style' });
+  assert.deepEqual(plain(second[0]), { requirements: 'only 2025', researchMode: 'local', researchDepth: 'normal', imageSearch: false, model: 'm1', noteStyle: 'file:Alpha style' }, 'default is Quick');
+  assert.equal(find(m2.contentEl, i => /vam-multi-research-mode-note/.test(i.cls ?? '')).hidden, true, 'no modes given: no reminder');
+  // The remembered mode of the map is what the dialog opens on; all topics Quick or Standard chosen: no reminder.
+  const third = []; const m3 = new mod.MultiResearchModal({}, ['A', 'B'], { list: () => [], watch: () => () => {} }, r => third.push(r), { styles }, ['quick', 'standard'], 'standard'); m3.open();
+  assert.equal(find(m3.contentEl, i => /vam-multi-research-mode-note/.test(i.cls ?? '')).hidden, true, 'opened on Standard: no reminder');
+  find(m3.modalEl, i => i.tag === 'button' && i.text === 'Start research (2)').listeners.click();
+  assert.equal(third[0].researchMode, 'research'); assert.equal(third[0].imageSearch, true);
+  const m4 = new mod.MultiResearchModal({}, ['A', 'B'], { list: () => [], watch: () => () => {} }, () => {}, { styles }, ['quick', 'quick']); m4.open();
+  assert.equal(find(m4.contentEl, i => /vam-multi-research-mode-note/.test(i.cls ?? '')).hidden, true, 'no Standard topic: no reminder');
+  // Cancel: nothing submitted.
+  const m5 = []; const cancelled = new mod.MultiResearchModal({}, ['A'], { list: () => [], watch: () => () => {} }, r => m5.push(r), { styles }); cancelled.open();
+  find(cancelled.modalEl, i => i.tag === 'button' && i.text === 'Cancel').listeners.click();
+  assert.equal(m5.length, 0); assert.equal(cancelled.closed, 1);
 });
 test('card shows a Format not met badge with the issues as tooltip', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });

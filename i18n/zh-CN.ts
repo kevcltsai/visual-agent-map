@@ -1271,6 +1271,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.title_problem_fence": "标题不能包含三个反引号（```），否则整份笔记会变成代码块。",
   "ui.title_problem_brackets": "标题不能包含 [[ 或 ]]，否则会弄坏笔记的链接。",
   "ui.multi_research_start_0": "开始研究 {0} 个议题",
+  "ui.multi_research_mode_downgrade_0": "其中 {0} 个议题上次用标准，这次会改用快速。",
   "ui.topic_0": "议题：{0}",
   "ui.moved_under_0": "已移到“{0}”底下。",
   "ui.became_root_topic": "已成为根议题。",

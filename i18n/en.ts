@@ -1347,6 +1347,7 @@ export const en = {
   "ui.title_problem_fence": "A title cannot contain three backticks (```); they would turn the note into a code block.",
   "ui.title_problem_brackets": "A title cannot contain [[ or ]]; they would break the note's links.",
   "ui.multi_research_start_0": "Start research ({0})",
+  "ui.multi_research_mode_downgrade_0": "{0} of these topics last used Standard and will use Quick this time.",
   "ui.topic_0": "Topic: {0}",
   "ui.moved_under_0": "Moved under “{0}”.",
   "ui.became_root_topic": "Now a root topic.",

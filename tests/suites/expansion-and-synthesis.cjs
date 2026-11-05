@@ -1165,6 +1165,45 @@ integrationTest('multi research runs selected topics in the background with the 
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
   assert.equal(h.plugin.activeTasks.has(h.key), false);
 });
+integrationTest('multi research dialog: Standard runs every topic as research with images even when its note stored local; Quick runs standard notes as local', async () => {
+  for (const [picked, stored, expected] of [['research', 'local', 'auto'], ['local', 'research', 'off']]) {
+    const h = await multiResearchHarness(['A', 'B']);
+    for (const n of h.nodes) await h.repo.updateNote(n.path, { researchMode: stored });
+    h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+    await h.view.startMultiResearch({ researchMode: picked, researchDepth: 'normal', requirements: '', imageSearch: picked === 'research' });
+    await until(() => h.runs.length === 2);
+    for (const run of h.runs) { assert.equal(run.options.researchMode, picked); assert.equal(run.options.visualMode, expected); }
+    h.finish.get('A')(); h.finish.get('B')();
+  }
+});
+integrationTest('multi research without a mode override (retry with another provider) keeps each topic on its own stored mode', async () => {
+  const h = await multiResearchHarness(['A', 'B']);
+  await h.repo.updateNote(h.nodes[0].path, { researchMode: 'research' }); await h.repo.updateNote(h.nodes[1].path, { researchMode: 'local' });
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  await h.view.retryWithOtherProvider(h.nodes, 'model-b');
+  await until(() => h.runs.length === 2);
+  assert.equal(h.runs.find(r => r.title === 'A').options.researchMode, 'research'); assert.equal(h.runs.find(r => r.title === 'A').options.visualMode, 'auto');
+  assert.equal(h.runs.find(r => r.title === 'B').options.researchMode, 'local');
+  h.finish.get('A')(); h.finish.get('B')();
+});
+integrationTest('multi research dialog opens on the map\'s remembered mode, remembers the pick on start without clearing the selection, and remembers nothing on cancel', async () => {
+  const h = await multiResearchHarness(['A', 'B']);
+  h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id, researchMode: 'local' }]));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  h.view.openMultiResearch();
+  assert.equal(h.opened[0].initialMode, 'quick', 'no remembered mode: Quick');
+  h.view.map.aiMode = 'standard'; h.view.openMultiResearch();
+  assert.equal(h.opened[1].initialMode, 'standard');
+  // Cancel (close without submit): the map keeps its mode and nothing starts.
+  h.opened[1].close?.(); assert.equal(h.view.map.aiMode, 'standard'); assert.equal(h.runs.length, 0);
+  // Quick picked from the dialog: remembered, selection survives the map write, and both topics really start.
+  // As the existing aiModeMemory test: the map write is a stub that applies the change and must not clear the selection.
+  h.view.mapChange = async change => { change(h.view.map); };
+  h.opened[1].submit({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
+  await until(() => h.runs.length === 2);
+  assert.equal(h.view.map.aiMode, 'quick'); assert.equal(h.runs.length, h.nodes.length);
+  h.finish.get('A')(); h.finish.get('B')();
+});
 integrationTest('multi research without an explicit language answers each topic in its own title language', async () => {
   const h = await multiResearchHarness(['要如何在陽台養香草', 'Balcony herbs']);
   h.view.selection.replaceMulti(h.nodes.map(n => n.id));

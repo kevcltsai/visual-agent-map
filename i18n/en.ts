@@ -1543,9 +1543,9 @@ export const en = {
   "ui.map_chat_plan_reason_many_actions_0": "{0} actions",
   "ui.map_chat_plan_reason_many_research_0": "Starts research on {0} topics",
   "ui.map_chat_plan_reason_new_map": "Creates a new map and opens it",
-  "ui.map_chat_plan_reason_image_preview": "Places or links anchors on the picture.",
+  "ui.map_chat_plan_reason_image_preview": "Places or links anchors on the picture",
   "ui.map_chat_plan_reason_image_other_actions":
-    "This question came with a picture, and the reply wants more than anchors and new topics. The picture is not trusted.",
+    "This question came with a picture, and the reply wants more than anchors and new topics. The picture is not trusted",
   "ui.map_chat_do_add_anchor_0": "Place an anchor: “{0}”",
   "ui.map_chat_do_add_anchor_empty": "Place an anchor (no note)",
   "ui.map_chat_do_link_anchor_0_1_2": "Link anchor “{0}” to “{1}” ({2})",

@@ -338,7 +338,7 @@ test('plan: "show me first" offers a plan for anchors and writes nothing; Apply 
   await h.send('place anchors');
   assert.equal(h.chat.plans.length, 1);
   const card = h.chat.plans[0];
-  assert.deepEqual(plain(card.reasons), ['Places or links anchors on the picture.']);
+  assert.deepEqual(plain(card.reasons), ['Places or links anchors on the picture']);
   assert.equal((await h.image()).anchors.length, 1, 'nothing written yet');
   card.apply();
   await until(() => h.chat.calls.filter(c => c[0] === 'settle').length >= 2);

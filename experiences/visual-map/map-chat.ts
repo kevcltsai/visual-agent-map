@@ -1135,7 +1135,14 @@ export class MapChatPanel {
    */
   restore(conversation: MapChatRestoredConversation): void {
     if (this.working) return;
-    this.reset();
+    // Only the messages are replaced: the draft and the references the user added while the record was read stay.
+    this.cancelFrame();
+    this.rows = new WeakMap();
+    this.messages = [];
+    this.savedTurnCount = 0;
+    this.restoredText = "";
+    this.spokenLater = [];
+    this.unread = false;
     this.conversationId = conversation.id;
     for (const turn of conversation.turns) {
       this.messages.push({ role: "user", text: turn.message, lines: [] });
@@ -1201,6 +1208,7 @@ export class MapChatPanel {
       );
     }
     this.renderLog(true);
+    this.refreshNote();
     this.renderHint();
     this.host.stateChanged?.();
   }

@@ -36602,7 +36602,13 @@ ${typed}` : draft;
   restore(conversation) {
     var _a2, _b2, _c, _d;
     if (this.working) return;
-    this.reset();
+    this.cancelFrame();
+    this.rows = /* @__PURE__ */ new WeakMap();
+    this.messages = [];
+    this.savedTurnCount = 0;
+    this.restoredText = "";
+    this.spokenLater = [];
+    this.unread = false;
     this.conversationId = conversation.id;
     for (const turn of conversation.turns) {
       this.messages.push({ role: "user", text: turn.message, lines: [] });
@@ -36667,6 +36673,7 @@ ${typed}` : draft;
       );
     }
     this.renderLog(true);
+    this.refreshNote();
     this.renderHint();
     (_d = (_c = this.host).stateChanged) == null ? void 0 : _d.call(_c);
   }

@@ -6002,6 +6002,29 @@ test('map chat records: F2 a restored plan card shows what became of it: waiting
   assert.match(visibleText(f.parts.log()), /Half done/);
 });
 
+test('map chat records: F3 restore replaces only the messages; the draft, the dropped references and the note chip stay', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  f.showNote('Notes/Visible.md');
+  f.parts.input().value = 'half typed'; drop(f.panel.el, '[[Note]]'); drop(f.panel.el, 'some words');
+  const before = f.panel.attachments();
+  f.panel.restore(restoredConversation());
+  assert.equal(f.parts.input().value, 'half typed', 'the draft stays');
+  eq(f.panel.attachments(), before, 'dropped references and the note chip are still attached');
+  assert.equal(f.panel.currentNote(), 'Notes/Visible.md'); assert.ok(f.panel.hasMessages);
+  assert.ok(visibleText(f.parts.chips()).includes('Visible'), 'the chips are still drawn');
+});
+
+integrationTest('map chat records: F3 a draft typed and a reference added while the record is read survive the restore and go with the next request', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate();
+  await seedRecord(h, sampleRecord());
+  const chat = h.open(); h.type('typing while it loads'); chat.chips.push({ kind: 'topic', id: h.ids.a });
+  await until(() => chat.hasMessages);
+  assert.equal(chat.inputEl.value, 'typing while it loads'); eq(chat.attachments(), [{ kind: 'topic', id: h.ids.a }]);
+  await h.view.sendMapChat(); await recordIdle(h);
+  assert.equal(h.control.requests.at(-1).message, 'typing while it loads');
+  assert.equal(JSON.parse(h.control.requests.at(-1).context.json).references.length, 1, 'the reference reaches the request');
+});
+
 test('map chat records: record text with HTML restores as plain text', () => {
   const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
   const evil = '<img src=x onerror=alert(1)> and <script>alert(2)</script>';

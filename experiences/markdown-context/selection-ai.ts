@@ -752,8 +752,7 @@ class SelectionAiPanel extends Component {
           const verdict = await mermaidSyntax(code);
           if (controller.signal.aborted || !this.isOpen) return;
           if (verdict === "invalid") throw new Error(t("ui.context_ai_invalid_diagram"));
-          if (verdict === "unavailable")
-            console.warn("Visual Agent Map: the Mermaid parser is unavailable; the diagram was not syntax-checked.");
+          if (verdict === "unavailable") console.warn("Visual Agent Map diagram check skipped");
           this.previewChild = new Component();
           this.previewChild.load();
           await MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);

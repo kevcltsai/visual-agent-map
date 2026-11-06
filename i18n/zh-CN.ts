@@ -963,6 +963,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.relevance_recalibrate_button": "重新校准",
   "ui.relevance_pins_note_0": "保留你设置的 {0} 张",
   "ui.relevance_unpin_all": "全部交还 AI",
+  "ui.relevance_unpin_all_0": "全部交还 AI（{0} 张）",
   "ui.relevance_unpin_all_history_label": "交还 AI",
   "ui.relevance_recalibrated_0_1": "依你的 {0} 个设置调整了 {1} 张",
   "ui.relevance_recalibrate_none": "没有需要调整的卡",

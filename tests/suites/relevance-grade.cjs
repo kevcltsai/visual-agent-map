@@ -35,7 +35,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   await repo.rebuildDerivedData();
   const notices = [], opened = [], menus = [], tips = new Map();
   // Records each menu (items with title, checked state and click handler, separators) and each tooltip.
-  class Menu { constructor() { this.items = []; menus.push(this); } addItem(cb) { const it = { separator: false }; this.items.push(it); cb({ setTitle(v) { it.title = v; return this; }, setChecked(v) { it.checked = v; return this; }, setIcon(v) { it.icon = v; return this; }, onClick(fn) { it.click = fn; return this; } }); return this; } addSeparator() { this.items.push({ separator: true }); return this; } showAtPosition(pos) { this.pos = pos; return this; } }
+  class Menu { constructor() { this.items = []; menus.push(this); } addItem(cb) { const it = { separator: false }; this.items.push(it); cb({ setTitle(v) { it.title = v; return this; }, setChecked(v) { it.checked = v; return this; }, setIcon(v) { it.icon = v; return this; }, setWarning() { return this; }, onClick(fn) { it.click = fn; return this; } }); return this; } addSeparator() { this.items.push({ separator: true }); return this; } showAtPosition(pos) { this.pos = pos; return this; } }
   const Base = dom.makeModal();
   class Modal extends Base { open() { opened.push(this); super.open(); } }
   const ctx = {};
@@ -1199,6 +1199,40 @@ integrationTest('relevance pins: when every gradable card is pinned a grade send
   assert.equal(h.control.calls.length, 0, 'no AI request');
   assert.equal(h.barText(), 'Graded 0 topics, 0 changed (0 skipped) Kept 4 you set.');
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Goal');
+});
+
+// Goal header P2 (counter-example 18): the "More mind map actions" menu carries the hand-back entry, with the count, only for a gradable map with pins that is not being graded.
+integrationTest('relevance pins: the More menu offers "Hand all back to AI (N cards)" only with pins, not while grading and not on an AIM map; it hands them back in one undo step without an AI call', async () => {
+  const h = await harness();
+  await h.enter('Goal'); await h.settled();
+  const titles = () => { h.view.openMapActions(); return h.menus.at(-1).items.filter(i => !i.separator).map(i => i.title); };
+  const entry = /^Hand all back to AI/;
+  assert.ok(!titles().some(x => entry.test(x)), 'no pins: no entry');
+  await pinNote(h, 'a', 'side'); await pinNote(h, 'c', 'core');
+  const before = { a: rawNote(h, 'a'), c: rawNote(h, 'c'), b: rawNote(h, 'b') };
+  assert.ok(titles().includes('Hand all back to AI (2 cards)'), 'pins: the entry shows the count');
+  // While this map is being graded: no entry.
+  h.plugin.relevanceGrades.set(MAP, { status: 'running', token: 99, owner: {}, controller: new AbortController(), goal: 'g' });
+  assert.ok(!titles().some(x => entry.test(x)), 'grading: no entry');
+  h.plugin.relevanceGrades.delete(MAP);
+  // An AIM map is not gradable: no entry even with pinned notes.
+  const real = h.view.map; h.view.map = { ...real, aim: { runs: [] } };
+  assert.ok(!titles().some(x => entry.test(x)), 'AIM map: no entry');
+  h.view.map = real;
+  // Choosing it: one mutation, one undo step, no AI call; the old popover row is still there until P3.
+  const past = h.view.history.past.length, calls = h.control.calls.length;
+  h.view.openMapActions();
+  h.menus.at(-1).items.find(i => entry.test(i.title)).click(); await afterWrite();
+  for (const key of ['a', 'c']) assert.equal(await h.relevanceOf(key), undefined, `${key} handed back`);
+  assert.equal(rawNote(h, 'b'), before.b, 'an AI grade stays');
+  assert.equal(h.view.history.past.length, past + 1, 'one undo step'); assert.equal(h.control.calls.length, calls, 'no AI call');
+  await h.view.travel(false); await afterWrite();
+  for (const key of ['a', 'c']) assert.equal(rawNote(h, key), before[key], `${key} pinned again by undo`);
+  const { translate } = load('i18n.ts');
+  assert.equal(translate('zh-TW', 'ui.relevance_unpin_all_0', 3), '全部交還 AI（3 張）');
+  assert.equal(translate('zh-CN', 'ui.relevance_unpin_all_0', 3), '全部交还 AI（3 张）');
+  assert.equal(translate('en', 'ui.relevance_unpin_all'), 'Hand all back to AI', 'the existing wording is unchanged');
+  assert.equal(translate('zh-TW', 'ui.relevance_unpin_all'), '全部交還 AI');
 });
 
 integrationTest('relevance pins: Hand all back to AI removes every pin in one mutation and one undo step; the AI grades stay', async () => {

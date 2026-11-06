@@ -1024,6 +1024,7 @@ export const en = {
   "ui.relevance_recalibrate_button": "Recalibrate",
   "ui.relevance_pins_note_0": "Keeping the {0} you set",
   "ui.relevance_unpin_all": "Hand all back to AI",
+  "ui.relevance_unpin_all_0": "Hand all back to AI ({0} cards)",
   "ui.relevance_unpin_all_history_label": "Hand back to AI",
   "ui.relevance_recalibrated_0_1": "Adjusted {1} topics based on your {0} settings",
   "ui.relevance_recalibrate_none": "No topics needed adjusting",

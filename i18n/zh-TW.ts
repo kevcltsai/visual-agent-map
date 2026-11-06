@@ -964,6 +964,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.relevance_recalibrate_button": "重新校準",
   "ui.relevance_pins_note_0": "保留你設定的 {0} 張",
   "ui.relevance_unpin_all": "全部交還 AI",
+  "ui.relevance_unpin_all_0": "全部交還 AI（{0} 張）",
   "ui.relevance_unpin_all_history_label": "交還 AI",
   "ui.relevance_recalibrated_0_1": "依你的 {0} 個設定調整了 {1} 張",
   "ui.relevance_recalibrate_none": "沒有需要調整的卡",

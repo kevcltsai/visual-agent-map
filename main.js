@@ -1046,6 +1046,7 @@ var en = {
   "ui.relevance_recalibrate_button": "Recalibrate",
   "ui.relevance_pins_note_0": "Keeping the {0} you set",
   "ui.relevance_unpin_all": "Hand all back to AI",
+  "ui.relevance_unpin_all_0": "Hand all back to AI ({0} cards)",
   "ui.relevance_unpin_all_history_label": "Hand back to AI",
   "ui.relevance_recalibrated_0_1": "Adjusted {1} topics based on your {0} settings",
   "ui.relevance_recalibrate_none": "No topics needed adjusting",
@@ -3746,6 +3747,7 @@ var zhCN = {
   "ui.relevance_recalibrate_button": "\u91CD\u65B0\u6821\u51C6",
   "ui.relevance_pins_note_0": "\u4FDD\u7559\u4F60\u8BBE\u7F6E\u7684 {0} \u5F20",
   "ui.relevance_unpin_all": "\u5168\u90E8\u4EA4\u8FD8 AI",
+  "ui.relevance_unpin_all_0": "\u5168\u90E8\u4EA4\u8FD8 AI\uFF08{0} \u5F20\uFF09",
   "ui.relevance_unpin_all_history_label": "\u4EA4\u8FD8 AI",
   "ui.relevance_recalibrated_0_1": "\u4F9D\u4F60\u7684 {0} \u4E2A\u8BBE\u7F6E\u8C03\u6574\u4E86 {1} \u5F20",
   "ui.relevance_recalibrate_none": "\u6CA1\u6709\u9700\u8981\u8C03\u6574\u7684\u5361",
@@ -6446,6 +6448,7 @@ var zhTW = {
   "ui.relevance_recalibrate_button": "\u91CD\u65B0\u6821\u6E96",
   "ui.relevance_pins_note_0": "\u4FDD\u7559\u4F60\u8A2D\u5B9A\u7684 {0} \u5F35",
   "ui.relevance_unpin_all": "\u5168\u90E8\u4EA4\u9084 AI",
+  "ui.relevance_unpin_all_0": "\u5168\u90E8\u4EA4\u9084 AI\uFF08{0} \u5F35\uFF09",
   "ui.relevance_unpin_all_history_label": "\u4EA4\u9084 AI",
   "ui.relevance_recalibrated_0_1": "\u4F9D\u4F60\u7684 {0} \u500B\u8A2D\u5B9A\u8ABF\u6574\u4E86 {1} \u5F35",
   "ui.relevance_recalibrate_none": "\u6C92\u6709\u9700\u8981\u8ABF\u6574\u7684\u5361",
@@ -64469,6 +64472,7 @@ ${request.requirements}` : preset.text,
   }
   /** The header's "More mind map actions": an Obsidian menu under the button, each entry a verb. */
   openMapActions(event) {
+    var _a2;
     const menu = this.newMenu();
     const add = (title, icon, action, warning = false) => {
       menu.addItem((item) => {
@@ -64482,6 +64486,9 @@ ${request.requirements}` : preset.text,
     if (this.map && !this.aimLive())
       add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
+    const pins = this.relevanceGradeable() ? this.relevancePinList().length : 0;
+    if (pins > 0 && ((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) !== "running")
+      add(t("ui.relevance_unpin_all_0", pins), "rotate-ccw", () => this.unpinAllRelevance());
     menu.addSeparator();
     add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
     if (this.map) {

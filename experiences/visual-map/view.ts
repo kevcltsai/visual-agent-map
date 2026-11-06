@@ -11950,6 +11950,10 @@ export class VisualAgentMapView extends ItemView {
     if (this.map && !this.aimLive())
       add(t("ui.organize"), "folder-tree", () => this.enqueue(() => this.openOrganizer()));
     add(t("ui.repair_missing_mind_map"), "wrench", () => this.enqueue(() => this.repairMissingTopic()));
+    // Hand every hand-set tier back to the AI: only for a gradable map that has pins, and not while it is being graded.
+    const pins = this.relevanceGradeable() ? this.relevancePinList().length : 0;
+    if (pins > 0 && this.plugin.relevanceGrades.get(this.path)?.status !== "running")
+      add(t("ui.relevance_unpin_all_0", pins), "rotate-ccw", () => this.unpinAllRelevance());
     menu.addSeparator();
     add(t("ui.keyboard_shortcuts"), "keyboard", () => this.openKeyboardShortcuts());
     if (this.map) {

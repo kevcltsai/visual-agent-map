@@ -1701,7 +1701,10 @@ export function renderProposalList(
   // first-level, so it neither shows a parent hint nor blocks creation. Keyed and typed rows are left alone.
   const batchTitles = new Set(suggestions.map(item => item.title));
   suggestions = suggestions.map(item =>
-    item.key === undefined && !item.kind && item.parentTitle && (item.parentTitle === item.title || !batchTitles.has(item.parentTitle))
+    item.key === undefined &&
+    !item.kind &&
+    item.parentTitle &&
+    (item.parentTitle === item.title || !batchTitles.has(item.parentTitle))
       ? { ...item, parentTitle: "" }
       : item
   );

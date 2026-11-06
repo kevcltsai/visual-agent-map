@@ -31,7 +31,9 @@ function fakeChat(control) {
     markTurn(extra) { chat.marks.push(extra); }, refreshReplyUndo() {},
     completedTurns: () => [], conversationId: undefined,
     takeQueued: () => [], takeSteerTexts: () => [], addSteer: () => ({}), setSteerState() {}, restoreDraft(texts) { chat.calls.push(['restore', texts]); },
-    setApplying() {}, focusInput() {}, reset() {}
+    setApplying() {}, focusInput() {}, reset() {},
+    // The continuation hooks of the panel (P3): this fake only has to take the calls.
+    hasQueuedSteers: () => false, setChainWaiting() {}, endChain() {}, beginAutoRound(_round, _max, _remaining, origin) { return chat.begin('auto', origin, false, 'preparing'); }
   };
   return chat;
 }

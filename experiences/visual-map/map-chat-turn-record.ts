@@ -1,4 +1,4 @@
-import type { RecordEventKind, RecordLineInput, RecordTurnStatus } from "../../core/map-chat-records";
+import type { RecordEventKind, RecordLineInput, RecordLineItem, RecordTurnStatus } from "../../core/map-chat-records";
 import type { MapChatImages, MapChatLine, MapChatMessage } from "./map-chat";
 import { settledLine } from "./map-chat";
 import type { MapChatRecordWriter } from "./map-chat-record-writer";
@@ -12,10 +12,10 @@ export interface TurnEndFields {
   error?: { text: string; technical: string };
 }
 
-const plainLines = (lines: MapChatLine[]): { status: string; text: string }[] =>
+const plainLines = (lines: MapChatLine[]): RecordLineItem[] =>
   lines.map(line => {
     const settled = settledLine(line);
-    return { status: settled.status, text: settled.text };
+    return { status: settled.status, text: settled.text, ...(settled.basis ? { basis: settled.basis } : {}) };
   });
 
 /**
@@ -54,8 +54,8 @@ export class MapChatTurnRecord {
       this.log(error instanceof Error ? error.message : String(error));
     }
   }
-  event(kind: RecordEventKind): void {
-    this.write({ type: "event", turn: this.turn, kind });
+  event(kind: RecordEventKind, extra: { reason?: string; round?: number; remaining?: string } = {}): void {
+    this.write({ type: "event", turn: this.turn, kind, ...extra });
   }
   /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */
   end(status: RecordTurnStatus, fields: TurnEndFields = {}): boolean {
@@ -81,6 +81,14 @@ export class MapChatTurnRecord {
   /** What became of the plan card of this turn. */
   plan(state: "applied" | "cancelled" | "stopped", lines: MapChatLine[] = []): void {
     this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
+  }
+  /**
+   * The result lines of the turn changed after its end (an expansion that failed): the answer's lines as they are now. Before the
+   * end nothing is written: a `lines` line ahead of `turn_end` would make a restore show those partial lines for the whole turn.
+   */
+  relines(): void {
+    if (!this.ended) return;
+    this.write({ type: "lines", turn: this.turn, lines: plainLines(this.answer.lines) });
   }
   /** The state of a picture search of this turn (`extraInserted`: the candidate being inserted right now). */
   images(block: MapChatImages, extraInserted?: unknown): void {

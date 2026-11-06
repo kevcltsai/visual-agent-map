@@ -57,7 +57,7 @@ function makeView(existing, mapOverrides = {}) {
   const calls = [], opened = [], items = [];
   class Menu { addItem(fn) { const item = { title: '', setTitle(t) { this.title = t; return this; }, setIcon() { return this; }, onClick(f) { this.fn = f; return this; }, setWarning() { return this; } }; fn(item); items.push(item); } addSeparator() {} showAtPosition() {} showAtMouseEvent() {} }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Menu } }, { createFragment: dom.createFragment });
-  const plugin = { settings: { ...DEFAULT_SETTINGS, language: 'en' }, repo: { topics: async () => existing.map(t => ({ title: t })), duplicateMap: async (p, t) => { calls.push([p, t]); return `${t}/Map.md`; } }, mutate: async w => w() };
+  const plugin = { settings: { ...DEFAULT_SETTINGS, language: 'en' }, repo: { topics: async () => existing.map(t => ({ title: t })), duplicateMap: async (p, t) => { calls.push([p, t]); return `${t}/Map.md`; } }, mutate: async w => w(), openMapInNewTab: async p => { opened.push(p); } };
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.openMapInMutation = async p => { opened.push(p); };
   view.map = { id: 'm', title: 'Trip', nodes: [], ...mapOverrides }; view.path = 'Agent Workspace/Mind Maps/Trip/Map.md';

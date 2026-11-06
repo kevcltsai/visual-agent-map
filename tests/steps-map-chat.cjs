@@ -7,7 +7,7 @@ const { estimateTokens } = load('ai/context-builder.ts');
 const { MAP_CHAT_TOKEN_BUDGET, renderMapChatSteer, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
-const { planFor, matchMapTitle, chatResearchRequest, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_FIND_IMAGES_LIMIT } = load('core/map-chat-plan.ts');
+const { planFor, matchMapTitle, chatResearchRequest, chatResearchMode, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_FIND_IMAGES_LIMIT } = load('core/map-chat-plan.ts');
 const { guardMapChatWrite, normalizeVaultPath, applyMdEdit } = load('core/map-chat-guard.ts');
 const mapChatService = loadWithAiCalls('core/map-chat-service.ts');
 const { partialReply, MapChatService, providerMapChatRunner } = mapChatService;
@@ -432,8 +432,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 16 (version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 16);
+test('C1: the style is not part of the action schema, and the step version is 18 (version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 18);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -682,15 +682,18 @@ test('B1/B2 plan: the estimate counts research and synthesis (main call plus dia
   assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y', 'z'] })]), 3, 'no map mode = Quick: one call each, no diagram call');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], mode: 'quick' })], 0, standard), 1, 'a named Quick beats the map Standard');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], mode: 'standard' })], 0, { mapAiMode: 'quick' }), 2, 'a named Standard beats the map Quick');
-  assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 2, 'expand: one outline call per card');
-  assert.equal(estimate([run('expand')], 4), 4, 'no targets = the selection');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })]), 2, 'needsWeb with no map mode: Standard, research plus diagram call');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true, mode: 'quick' })], 0, standard), 1, 'a named Quick beats needsWeb');
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })], 0, { mapAiMode: 'quick', diagrams: false }), 1, 'needsWeb with diagrams off: no diagram call');
+  assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 4, 'expand: two outline calls per card (the ask-again when a summary is missing is counted, R1 L3)');
+  assert.equal(estimate([run('expand')], 4), 8, 'no targets = the selection');
   assert.equal(estimate([run('rate_by_goal')]), 1);
   assert.equal(estimate([run('merge')]), 1);
   assert.equal(estimate([run('synthesize')]), 2, 'B2: an integration starts at once, so it is a call (and its diagram call), not 0');
   assert.equal(estimate([run('synthesize', { nodeIds: ['x', 'y'] })]), 2, 'several cards are still one integration');
   assert.equal(estimate([run('synthesize')], 0, { diagrams: false }), 1);
   assert.equal(estimate([{ kind: 'collapse_topic', nodeId: 'x' }, { kind: 'auto_layout' }, { kind: 'focus_topic', nodeId: 'x' }, { kind: 'rename_topic', nodeId: 'x', title: 'T' }]), 0);
-  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('rate_by_goal'), run('merge')], 0, standard), 7);
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('rate_by_goal'), run('merge')], 0, standard), 8);
 });
 test('B1 open_map matching: exact first, then contains; case, spacing and Traditional/Simplified are ignored; none, one and many are told apart', () => {
   const maps = [{ title: 'Coffee industry' }, { title: '咖啡產業' }, { title: 'Coffee' }, { title: 'Tea' }];
@@ -755,6 +758,32 @@ test('D-231 counterexample (old data): a step-v4 reply with depth "deep", "norma
   assert.deepEqual(bad.rejected, [{ index: 0, code: 'bad_value' }], 'an invalid old depth is still dropped');
   assert.equal(parse(legacyReply({ depth: 'deep', mode: 'quick' })).actions[0].mode, 'quick', 'when mode is present, mode wins');
 });
+test('P1 needsWeb: strict schema field; only a boolean true counts; a missing field (older reply) or the string "true" is false; other actions ignore it', () => {
+  const entry = MAP_CHAT_SCHEMA.properties.actions.items;
+  assert.deepEqual(plain(entry.properties.needsWeb), { type: 'boolean' }); assert.ok(entry.required.includes('needsWeb'));
+  assert.equal(parse(reply(researchItem({ needsWeb: true }))).actions[0].needsWeb, true);
+  for (const value of ['true', 1, 'yes', null, false, undefined]) assert.equal(parse(reply(researchItem({ needsWeb: value }))).actions[0].needsWeb, undefined, String(value));
+  assert.equal(parse(reply(researchItem())).actions[0].needsWeb, undefined, 'an older reply has no needsWeb: parses, false');
+  assert.equal(parse(reply(item('run_map_action', { action: 'expand', nodeIds: ['a'], needsWeb: true }))).actions[0].needsWeb, undefined, 'only a research reads it');
+});
+test('P1 research mode order: named mode > needsWeb (Standard) > map mode > Quick; the user saying quick stays quick', () => {
+  const act = (fields = {}) => parse(reply(researchItem(fields))).actions[0];
+  const web = { needsWeb: true };
+  assert.equal(chatResearchMode(act(web), undefined), 'standard');
+  assert.equal(chatResearchMode(act(web), 'quick'), 'standard', 'needsWeb beats the remembered Quick');
+  assert.equal(chatResearchMode(act({ ...web, mode: 'quick' }), 'standard'), 'quick', 'the user said quick: still quick');
+  assert.equal(chatResearchMode(act(), 'standard'), 'standard', 'only "research" and no web signal: the remembered mode');
+  assert.equal(chatResearchMode(act(), 'quick'), 'quick'); assert.equal(chatResearchMode(act(), undefined), 'quick');
+  assert.equal(chatResearchMode(act({ needsWeb: 'true' }), 'quick'), 'quick', 'the string "true" is not a web signal');
+  const ask = chatResearchRequest(act(web), 'quick', mode => aiModeOptions(mode, 'research'));
+  assert.equal(ask.mapAiMode, 'standard'); assert.equal(ask.researchMode, 'research');
+});
+test('P1 prompt (zh and en): complete is defined, later steps are not promised, the old "building a tree needs no research" is gone, needsWeb is described', () => {
+  const en = mapChatStep.render(request({ language: 'en' })), zh = mapChatStep.render(request({ language: 'zh-TW' }));
+  for (const pattern of [/Complete means complete/, /every item that the source lists must get a card/, /never promise any other later step/, /Continuing: "remaining"/, /"remaining":""\}/, /build only the root card, add research_standard for it as the last action/, /needsWeb \(research_standard only/, /"images":false,"needsWeb":false/]) assert.match(en, pattern, String(pattern));
+  for (const pattern of [/「完整」要完整/, /來源列出的每一項都要有議題/, /不可承諾其他之後的步驟/, /接續："remaining"/, /"remaining":""\}/, /只建根議題，並把 research_standard 放在最後一個動作/, /needsWeb（只用於 research_standard/, /"images":false,"needsWeb":false/]) assert.match(zh, pattern, String(pattern));
+  for (const text of [en, zh]) assert.doesNotMatch(text, /單純建樹或擴充樹不需要|building or extending a tree on its own never needs it/);
+});
 test('D-231 mode resolution: a named mode > the map mode > Quick; the all-new-cards rule is gone', () => {
   const action = (fields = {}) => parse(reply(researchItem(fields))).actions[0];
   const ask = (fields, mapMode) => chatResearchRequest(action(fields), mapMode, mode => aiModeOptions(mode, 'research'));
@@ -776,9 +805,9 @@ test('B2 plan counterexample: researching 9 cards the reply created needs no pla
 });
 test('B2 prompt: research options, "research only when asked", headless integration and the structure-tidy rules are in both languages', () => {
   const en = mapChatStep.render(request({ language: 'en' }));
-  for (const pattern of [/mode \(research_standard only/, /images \(research_standard only/, /extra requirements for the research/, /add research_standard only when the user asked for research/, /"new:<ref>" in the nodeIds of research_standard/, /no dialog opens/, /multi-level outline expansion/, /quick research/, /standard research/, /use only move_topic, run_map_action with merge, rename_topic and delete_topic/, /Prefer merging and moving/, /"mode":"","images":false/]) assert.match(en, pattern, String(pattern));
+  for (const pattern of [/mode \(research_standard only/, /images \(research_standard only/, /extra requirements for the research/, /add research_standard when the user asked for research/, /"new:<ref>" in the nodeIds of research_standard/, /no dialog opens/, /multi-level outline expansion/, /quick research/, /standard research/, /use only move_topic, run_map_action with merge, rename_topic and delete_topic/, /Prefer merging and moving/, /"mode":"","images":false/]) assert.match(en, pattern, String(pattern));
   const zh = mapChatStep.render(request({ language: 'zh-TW' }));
-  for (const pattern of [/mode（只用於 research_standard/, /images（只用於 research_standard/, /只有使用者要求研究或查資料時才加 research_standard/, /不會開對話框/, /多層大綱展開/, /快速研究/, /標準研究/, /只用 move_topic、run_map_action 的 merge、rename_topic 與 delete_topic/, /優先用合併與移動/, /"mode":"","images":false/]) assert.match(zh, pattern, String(pattern));
+  for (const pattern of [/mode（只用於 research_standard/, /images（只用於 research_standard/, /使用者要求研究或查資料時加 research_standard/, /不會開對話框/, /多層大綱展開/, /快速研究/, /標準研究/, /只用 move_topic、run_map_action 的 merge、rename_topic 與 delete_topic/, /優先用合併與移動/, /"mode":"","images":false/]) assert.match(zh, pattern, String(pattern));
   for (const text of [en, zh]) assert.doesNotMatch(text, /open the synthesis dialog|開啟選取議題的整合|開啟整合對話框/i);
 });
 test('B2 structure tidy: no action kind or run action opens the structure-review window', () => {
@@ -1504,8 +1533,8 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(en, /go one step only/); assert.match(en, /Never express a topic type through the title/);
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
-test('hypothesis-leaning: S21 the step version is 16 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 16);
+test('hypothesis-leaning: S21 the step version is 18 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
+  assert.equal(mapChatStep.version, 18);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [

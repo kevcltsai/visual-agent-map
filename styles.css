@@ -66,7 +66,6 @@
 .vam-tools-select-icon svg { width: 18px; height: 18px; }
 .vam-tools-select-label { display: none; white-space: nowrap; }
 .vam-tools-mini:hover .vam-tools-select-label, .vam-tools-mini:focus-within .vam-tools-select-label, .vam-tools-mini.is-open .vam-tools-select-label { display: inline; }
-.vam-empty .vam-empty-add { margin-top: 12px; }
 /* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
 .vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
@@ -680,6 +679,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-integration-sources strong { color: var(--text-normal); }
 .vam-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(440px, calc(100% - 24px)); margin: 0; padding: 24px; color: var(--text-muted); text-align: center; line-height: 1.8; pointer-events: none; }
 .vam-empty button { pointer-events: auto; }
+.vam-empty.is-add-first { top: 12px; left: 12px; transform: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: auto; max-width: calc(100% - 24px); padding: 0; text-align: left; line-height: 1.4; }
 .vam-empty-state { margin: auto; padding: 32px; max-width: 520px; text-align: center; }
 .vam-empty-state p { color: var(--text-muted); line-height: 1.6; }
 .vam-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
@@ -888,6 +888,21 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-chat-skeleton { display: flex; gap: 12px; }
 .vam-chat-skeleton-card { width: 120px; height: 56px; border: 1px dashed var(--background-modifier-border); border-radius: var(--radius-m); }
 .vam-map-chat-msg.is-user { background: var(--background-modifier-hover); }
+/* An automatic round has no question of the user's: its row is the separator between two rounds. */
+.vam-map-chat-msg.is-auto { background: transparent; padding: 4px 8px; border-top: 1px solid var(--background-modifier-border); border-radius: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-auto-title { color: var(--text-normal); font-weight: var(--font-semibold); }
+.vam-map-chat-auto-note, .vam-map-chat-auto-left { overflow-wrap: anywhere; }
+/* What the results were built from (read, never "checked"): under the results, so a folded list still shows it. */
+.vam-map-chat-basis { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-basis-line { overflow-wrap: anywhere; }
+.vam-map-chat-basis-line strong { color: var(--text-normal); font-weight: var(--font-bold); }
+/* The waiting row and the sentence that ends a continuation. */
+.vam-map-chat-chain-wait, .vam-map-chat-chain-note { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-map-chat-chain-wait-elapsed { font-variant-numeric: tabular-nums; }
+.vam-map-chat-chain-note { color: var(--text-normal); }
+/* While the chain waits the field takes a message and Stop sits beside Send. */
+.vam-map-chat.is-chain-waiting .vam-map-chat-composer button.vam-map-chat-stop { right: 40px; }
+.vam-map-chat.is-chain-waiting .vam-map-chat-composer .vam-map-chat-steer-hint { right: 74px; }
 .vam-map-chat-steer { align-self: flex-end; display: flex; flex-direction: column; gap: 1px; max-width: 85%; margin-top: 4px; padding: 4px 8px; border-radius: var(--radius-s); background: var(--background-modifier-hover); border: 1px solid var(--background-modifier-border); }
 .vam-map-chat-steer-tag { font-size: var(--font-ui-smaller); color: var(--text-accent); }
 .vam-map-chat-steer.is-queued { border-style: dashed; }

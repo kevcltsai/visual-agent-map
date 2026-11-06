@@ -4,6 +4,9 @@
  * The writer lives in experiences/visual-map/map-chat-record-writer.ts; this file has the format, the path whitelist and the reading.
  */
 
+import { parseChatBasis, type MapChatBasis } from "./map-chat-basis";
+import { MAP_CHAT_CHAIN_END_REASONS, type MapChatChainEndReason } from "./map-chat-chain";
+
 export const RECORD_VERSION = 1;
 export const RECORDS_SUBPATH = "Chats/records";
 
@@ -11,6 +14,8 @@ export type RecordTurnStatus = "done" | "plan" | "failed" | "stopped" | "aborted
 export interface RecordLineItem {
   status: string;
   text: string;
+  /** What a new or expanded card was built from (read back through `parseChatBasis`; added fields only, the schema stays v1). */
+  basis?: MapChatBasis;
 }
 export interface RecordOriginChip {
   kind: string;
@@ -47,6 +52,12 @@ export interface RecordTurnStartLine extends RecordLineBase {
     context?: unknown;
   };
   backfilled?: true;
+  /** An automatic round of a continuation (its `message` is the user's original message, not something said again). */
+  auto?: true;
+  /** The round of the continuation, from 1 (present on an automatic round). */
+  round?: number;
+  /** What the previous round said was still to do (an automatic round; shown on its separator when the conversation is opened again). */
+  remaining?: string;
 }
 export interface RecordTurnEndLine extends RecordLineBase {
   type: "turn_end";
@@ -68,6 +79,12 @@ export interface RecordPlanLine extends RecordLineBase {
   state: "applied" | "cancelled" | "stopped";
   lines: RecordLineItem[];
 }
+/** The result lines of the turn as they are now: later work changed them (an expansion that failed replaces its start line). The last one wins over `turn_end.lines`. */
+export interface RecordLinesLine extends RecordLineBase {
+  type: "lines";
+  turn: number;
+  lines: RecordLineItem[];
+}
 export interface RecordImagesLine extends RecordLineBase {
   type: "images";
   turn: number;
@@ -75,11 +92,16 @@ export interface RecordImagesLine extends RecordLineBase {
   items: { title: string; sourceUrl: string }[];
   inserted: number[];
 }
-export type RecordEventKind = "resend" | "undo" | "redo" | "undo_refused";
+/** `research_started` marks that the conversation started web research (it keeps the plan allow-list on after a restore). */
+export type RecordEventKind = "resend" | "undo" | "redo" | "undo_refused" | "chain_end" | "research_started";
 export interface RecordEventLine extends RecordLineBase {
   type: "event";
   turn: number;
   kind: RecordEventKind;
+  /** `chain_end`: why the continuation ended, the round it ended in and what was still to do. */
+  reason?: string;
+  round?: number;
+  remaining?: string;
 }
 export interface RecordMovedLine extends RecordLineBase {
   type: "moved";
@@ -92,6 +114,7 @@ export type RecordLine =
   | RecordTurnEndLine
   | RecordPlanLine
   | RecordImagesLine
+  | RecordLinesLine
   | RecordEventLine
   | RecordMovedLine;
 /** A line as the caller hands it over: no `v`, and `at` is filled in by the writer. */
@@ -317,6 +340,14 @@ export interface RestoredTurn {
   /** The reply was undone and not redone (it still shows, like it does in memory). */
   undone: boolean;
   backfilled: boolean;
+  /** An automatic round: shown as one, not as something the user said. */
+  auto: boolean;
+  /** The round of an automatic round, when the record says it (2 and up). */
+  round?: number;
+  /** What the automatic round's separator said was left (plain text; capped). */
+  remaining?: string;
+  /** How the continuation that ended with this turn ended (known reasons only; its words are the panel's). */
+  chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
 }
 export interface RestoredConversation {
   id: string;
@@ -325,6 +356,19 @@ export interface RestoredConversation {
   turns: RestoredTurn[];
   /** The time of the last finished turn, for "restored <M/D HH:mm>" (the UI formats it); null with no turn. */
   restoredAt: string | null;
+  /** The file says this conversation started web research (an older file has no mark: false). */
+  startedResearch: boolean;
+}
+
+/** Result lines read back from a file: the basis keeps its known shape only (a hand-edited file cannot put anything else on screen). */
+function restoredItems(items: unknown): RecordLineItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((item: RecordLineItem) => {
+    const basis = parseChatBasis(item?.basis);
+    const copy = { ...item };
+    delete copy.basis;
+    return basis ? { ...copy, basis } : copy;
+  });
 }
 
 /** The turns a conversation can show again: only `turn_end` with status done or plan. Failed, stopped and aborted turns stay in the file only. */
@@ -336,7 +380,10 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   const ends = new Map<number, RecordTurnEndLine>();
   const plans = new Map<number, { state: RecordPlanLine["state"]; lines: RecordLineItem[] }>();
   const images = new Map<number, RestoredImages>();
+  const current = new Map<number, RecordLineItem[]>();
   const undone = new Map<number, boolean>();
+  const chainEnds = new Map<number, { reason: MapChatChainEndReason; round: number; remaining: string }>();
+  let startedResearch = false;
   for (const line of lines) {
     if (line.type === "conversation") {
       mapPath = typeof line.mapPath === "string" ? line.mapPath : mapPath;
@@ -350,14 +397,49 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       ends.set(line.turn, line);
     } else if (line.type === "plan") {
       plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
+    } else if (line.type === "lines") {
+      // Read in file order: a `lines` row after the turn's `plan` row is the complete result (a failure after the plan was applied),
+      // so it replaces the plan's lines; one written before it (during the apply) stays the turn's own lines.
+      if (Array.isArray(line.lines)) {
+        const plan = plans.get(line.turn);
+        if (plan) plan.lines = line.lines;
+        else current.set(line.turn, line.lines);
+      }
     } else if (line.type === "images") {
       images.set(line.turn, { state: line.state, items: line.items ?? [], inserted: line.inserted ?? [] });
     } else if (line.type === "event") {
       if (line.kind === "undo") undone.set(line.turn, true);
       else if (line.kind === "redo") undone.set(line.turn, false);
+      else if (line.kind === "research_started") startedResearch = true;
+      else if (line.kind === "chain_end") {
+        // A hand-edited file cannot put anything but a known reason on screen; the words are the panel's, the rest is plain text.
+        const reason = (MAP_CHAT_CHAIN_END_REASONS as readonly unknown[]).find(item => item === line.reason);
+        if (reason && reason !== "map_changed")
+          chainEnds.set(line.turn, {
+            reason: reason as MapChatChainEndReason,
+            round: Number.isInteger(line.round) && line.round! >= 1 ? Math.min(line.round!, 99) : 1,
+            remaining: typeof line.remaining === "string" ? line.remaining.slice(0, 1000) : ""
+          });
+      }
     }
   }
   const turns: RestoredTurn[] = [];
+  // A chain ends on the turn the record was on, which may be a failed or stopped one (not restored): its sentence goes to the
+  // closest earlier turn that comes back (never over one that has its own), or is dropped with no such turn (decision #19).
+  const carried = new Map<number, { reason: MapChatChainEndReason; round: number; remaining: string }>();
+  {
+    let previous: number | null = null;
+    for (const number of order) {
+      const end = ends.get(number);
+      const comes = !!starts.get(number) && !!end && (end.status === "done" || end.status === "plan");
+      if (comes) previous = number;
+      else if (chainEnds.has(number)) {
+        // Decision #19: with no earlier turn that comes back, the sentence is dropped (a lone one has no context).
+        if (previous !== null && !chainEnds.has(previous) && !carried.has(previous))
+          carried.set(previous, chainEnds.get(number)!);
+      }
+    }
+  }
   for (const number of order) {
     const start = starts.get(number);
     const end = ends.get(number);
@@ -368,18 +450,35 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       message: start.message,
       origin: start.origin,
       reply: typeof end.reply === "string" ? end.reply : "",
-      lines: Array.isArray(end.lines) ? end.lines : [],
+      lines: restoredItems(current.get(number) ?? end.lines),
       modelLabel: typeof end.modelLabel === "string" ? end.modelLabel : "",
       status: end.status,
       stalePlan: end.status === "plan",
       planState: plans.get(number)?.state,
-      planLines: plans.get(number)?.lines,
+      planLines: plans.get(number) ? restoredItems(plans.get(number)?.lines) : undefined,
       rejected: end.rejected,
       steers: Array.isArray(end.steers) ? end.steers.filter((item): item is string => typeof item === "string") : [],
       images: images.get(number),
       undone: undone.get(number) === true,
-      backfilled: start.backfilled === true
+      backfilled: start.backfilled === true,
+      auto: start.auto === true,
+      ...(start.auto === true && typeof start.round === "number" && Number.isInteger(start.round) && start.round >= 2
+        ? { round: start.round }
+        : {}),
+      ...(start.auto === true && typeof start.remaining === "string" && start.remaining.trim()
+        ? { remaining: start.remaining.slice(0, 1000) }
+        : {}),
+      ...(chainEnds.has(number) || carried.has(number)
+        ? { chainEnd: chainEnds.get(number) ?? carried.get(number) }
+        : {})
     });
   }
-  return { id, mapPath, mapId, turns, restoredAt: turns.length ? turns[turns.length - 1].at : null };
+  return {
+    id,
+    mapPath,
+    mapId,
+    turns,
+    restoredAt: turns.length ? turns[turns.length - 1].at : null,
+    startedResearch
+  };
 }

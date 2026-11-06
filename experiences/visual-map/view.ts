@@ -382,6 +382,7 @@ import {
   type MapChatChip,
   type MapChatHost,
   type MapChatImageItem,
+  type MapChatChainOrigin,
   type MapChatImages,
   type MapChatInsertResult,
   type MapChatLine,
@@ -391,7 +392,9 @@ import {
   type MapChatSavedTurn,
   type MapChatSteer,
   type MapChatTurnHandle,
-  settledLine
+  settledLine,
+  chatResultLines,
+  expandFailureLine
 } from "./map-chat";
 import { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
 import {
@@ -402,7 +405,32 @@ import {
 } from "../../core/map-chat-transcript";
 import { loadableImages } from "../../ui/image-candidates";
 import {
+  MAP_CHAT_CHAIN_WAIT_MS,
+  chainEndNeedsNotice,
+  finishRound,
+  finishWait,
+  interrupt as interruptChainState,
+  pauseForPlan,
+  planChainOf,
+  startChain,
+  type MapChatChainDecision,
+  type MapChatChainEndReason,
+  type MapChatChainInterrupt,
+  type MapChatChainState,
+  type MapChatWaitEnd
+} from "../../core/map-chat-chain";
+import {
+  chatBasisFor,
+  createdParentsOf,
+  basisSummary,
+  expandBasisOf,
+  type MapChatBasis
+} from "../../core/map-chat-basis";
+import {
   buildMapChatContext,
+  pendingResearchCount,
+  type MapChatContinuationInput,
+  type MapChatResearchNote,
   type MapChatSummary,
   type MapChatUserText,
   contentHash,
@@ -1042,6 +1070,89 @@ interface ResearchWebTally {
   counted: number;
   withoutSearch: number;
 }
+/** One card of research or expansion work a continuation waited for, and how it came out. */
+interface ChatWorkTopic {
+  id: string;
+  title: string;
+  status: "succeeded" | "failed" | "stopped";
+  error?: string;
+}
+/** How a research batch that the chat started came out. Told exactly once, whichever way the batch ends (or never starts). */
+export type ChatResearchOutcome =
+  | { kind: "not_started" }
+  | { kind: "settled"; succeeded: number; failed: number; stopped: number; topics: ChatWorkTopic[] };
+/** How one expansion the chat started came out. */
+type ChatExpandOutcome = { status: "succeeded" } | { status: "failed"; reason: string } | { status: "stopped" };
+/** The work one reply started that a continuation may wait for, and the handle that stops it. */
+interface ChatRoundWork {
+  /** Aborted by Stop: work not started yet is not started, and a running expansion stops. */
+  controller: AbortController;
+  /** One promise per research action, each settling once. */
+  research: Promise<ChatResearchOutcome>[];
+  researchTargets: number;
+  /** The batch keys (one per map) of the research, to stop what is running. */
+  researchKeys: Set<string>;
+  /** Ids of the cards the round created (the chain keeps them: its later rounds may rewrite and research those without a plan). */
+  created: string[];
+  expand: { id: string; title: string; path: string; done: Promise<ChatExpandOutcome> }[];
+  /** An integration, a merge or a rating started: a continuation does not wait for these and ends. */
+  otherBackground: boolean;
+}
+const newChatWork = (): ChatRoundWork => ({
+  controller: new AbortController(),
+  research: [],
+  researchTargets: 0,
+  researchKeys: new Set(),
+  created: [],
+  expand: [],
+  otherBackground: false
+});
+/** What `applyMapChatActions` is given beyond the reply: the context the basis is judged by and where the started work is collected. */
+interface ChatApplyOptions {
+  context?: Pick<MapChatContext, "basis" | "parents">;
+  work?: ChatRoundWork;
+}
+/** What a finished round hands to its chain: the reply, what was applied, and the work it started. */
+interface ChatRoundEnd {
+  result: MapChatResult;
+  context: Pick<MapChatContext, "research">;
+  lines: MapChatLine[];
+  work: ChatRoundWork;
+  anchor: { path: string; id: string | undefined };
+}
+/** One automatic continuation of a chat message, owned by the view (at most one). Lives in memory only. */
+interface ChatChainRun {
+  /** Tells this chain from an earlier one in a late event or a retry. */
+  seq: number;
+  state: MapChatChainState;
+  /** The map the chain belongs to; a create or open the chain performs moves it. */
+  anchor: { path: string; id: string | undefined };
+  /** The message every round asks: the user's words plus the follow-ups that went into earlier rounds. */
+  message: string;
+  /** The turn of the round in flight, or of the last one. */
+  turn: MapChatTurnHandle | null;
+  record: MapChatTurnRecord | null;
+  /** What the latest reply said was still to do (known before the round has ended). */
+  replyRemaining: string;
+  lastResults: MapChatContinuationInput["lastResults"];
+  /** Cards the chain's rounds created so far (real ids). */
+  createdIds: Set<string>;
+  /** The chips of the user's message (not the follow-ups'): every round of the chain is built with them. */
+  chips: MapChatChip[];
+  /** What the work waited for came to, for the next round. */
+  waited: MapChatContinuationInput["research"];
+  /** Lines about failed work, for the notice at the end. */
+  details: string[];
+  /** Research that went on after some of it failed (the next round says so on its separator). */
+  partial: { failed: number; succeeded: number } | null;
+  work: ChatRoundWork | null;
+  timer: number | null;
+  /** The panel was told that the chain waits (and must be told that it does not). */
+  waitShown: boolean;
+}
+/** The lines of research and expansions that did not work out, one line each, for the end notice of a chain. */
+const chainWorkDetail = (item: { title: string; status: string; error?: string }): string =>
+  item.error ? `${item.title}: ${item.error}` : item.title;
 /** The lines that say how many web searches a research batch made; a topic with none is a warning of its own. */
 function researchWebLines(web: ResearchWebTally): MapChatLine[] {
   if (!web.counted) return [];
@@ -1051,7 +1162,7 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
 }
 /** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
 type ChatOutcome =
-  | { status: "done"; images?: MapChatImages; skippedCards?: number }
+  | { status: "done"; images?: MapChatImages; skippedCards?: number; basis?: MapChatBasis }
   | { status: "skipped" | "failed"; reason: string; created?: boolean };
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 interface ChatRun {
@@ -1268,6 +1379,22 @@ export class VisualAgentMapView extends ItemView {
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
+  /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
+  private chatChain: ChatChainRun | null = null;
+  private chatChainSeq = 0;
+  /** Cards this conversation researched (a `research_standard` that really started) and how each came out; reset with the conversation. */
+  private chatResearched = new Map<string, { title: string; status: "succeeded" | "failed" | "stopped" }>();
+  /**
+   * This conversation has started web research (a `research_standard` that really began, the first card of a batch included);
+   * only a new conversation clears it, and a restored record sets it again. Any turn of it may read web text (decision #17).
+   */
+  private chatStartedResearch = false;
+  /** The record conversation whose file already carries the `research_started` mark (kept apart from the flag: the record may have been off when research began). */
+  private chatResearchMarkedIn: string | null = null;
+  /** Research notes an earlier round already sent whole (they go last when the budget is short). */
+  private chatResearchSent = new Set<string>();
+  /** Counts conversations: the result of research another conversation started is not recorded in this one. */
+  private chatConversation = 0;
   /** The follow-ups of the turn that is running (or ran last). */
   private chatSteer: ChatSteerState | null = null;
   /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
@@ -1653,6 +1780,8 @@ export class VisualAgentMapView extends ItemView {
   /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
   private menuClosedByKey = false;
   private closed = false;
+  /** The map a state change is opening: a new tab's default map must not race it (see onOpen). */
+  private requestedFile: string | null = null;
   private aimViewEpoch = 0;
   /**
    * Whether `map` is an AIM map this view treats as one: its AIM controls, status bar and edit locks apply. While AIM is hidden
@@ -1738,9 +1867,48 @@ export class VisualAgentMapView extends ItemView {
   getState(): Record<string, unknown> {
     return { file: this.path };
   }
+  /** A map is on its way to this tab (the tab was opened for it, or a state change is opening it): the default map must not open. */
+  private mapOpenPending(): boolean {
+    return Boolean(this.requestedFile) || Boolean(this.leaf && this.plugin.pendingTabMaps?.has(this.leaf));
+  }
+  /** The map this tab shows, or the one a state change has asked it to open and has not finished opening. */
+  targetPath(): string | null {
+    return this.requestedFile ?? this.path;
+  }
+  /**
+   * Whether replacing this tab's map now would stop something: closing or switching a map aborts these (see
+   * {@link dropMapBackground}, abortRelevanceGrade, abortMapChat and the map-change branch of the chat mount).
+   */
+  hasRunningWork(): boolean {
+    if (this.chatController || this.chatApplying || this.chatImageSearches.size) return true;
+    // The chat's preparing stage (before its controller exists) is stopped by a map change too.
+    if (this.chat?.isBusy || this.chatPrepAbandon) return true;
+    for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
+    if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
+    if (this.aimBusy || this.aimController) return true;
+    if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
+    if (this.startedRelevance && this.path) {
+      const run = this.plugin.relevanceGrades.get(this.path);
+      if (run?.owner === this && run.status === "running") return true;
+    }
+    const runs = this.plugin.topicRuns,
+      batches = this.plugin.expansionCoordinator;
+    return (this.map?.nodes ?? []).some(
+      node =>
+        runs.isBusy(node.path) ||
+        this.plugin.quickExpandPending?.has(node.path) ||
+        batches.isRunning(node.path) ||
+        batches.isQueued(node.path)
+    );
+  }
   async setState(state: Record<string, unknown>, result: { history: boolean; layout?: boolean }): Promise<void> {
     if (typeof state.file === "string" && state.file !== this.path) {
-      await this.openMap(state.file);
+      this.requestedFile = state.file;
+      try {
+        await this.openMap(state.file);
+      } finally {
+        this.requestedFile = null;
+      }
       // Another map in the same tab: ask the workspace to redraw the tab and the window title, which names the map.
       result.layout = true;
     }
@@ -1757,6 +1925,7 @@ export class VisualAgentMapView extends ItemView {
     this.registerEvent(
       workspace.on("active-leaf-change", leaf => {
         if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        this.drawWhenShown();
         this.chat?.refreshNote();
         this.syncStatusBarClearance();
       })
@@ -1766,6 +1935,7 @@ export class VisualAgentMapView extends ItemView {
       workspace.on("layout-change", () => {
         this.chat?.refreshNote();
         this.syncStatusBarClearance();
+        this.drawWhenShown();
       })
     );
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
@@ -1834,7 +2004,7 @@ export class VisualAgentMapView extends ItemView {
     this.registerDomEvent(this.contentEl, "focusin", event => this.trackMapFocus(event.target));
     await this.plugin.ready;
     if (this.closed || this.aimViewEpoch !== epoch) return;
-    if (!this.path) {
+    if (!this.path && !this.mapOpenPending()) {
       if (!this.plugin.repo.workspaceExists()) this.render();
       else {
         const files = await this.plugin.repo.mapFiles();
@@ -1849,11 +2019,13 @@ export class VisualAgentMapView extends ItemView {
               continue;
             }
             if (this.closed || this.aimViewEpoch !== epoch) return;
+            if (this.mapOpenPending()) return;
             if (!candidate.aim) {
               defaultPath = file.path;
               break;
             }
           }
+          if (this.mapOpenPending() || this.path) return;
           await this.openMap(defaultPath);
         } else this.render();
       }
@@ -3039,6 +3211,7 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
     }
     if (path !== this.path) {
+      this.cameraWhenShown = null;
       this.stopAimProgress();
       this.mapSourcesOpen = false;
       this.dropGoalEdit();
@@ -3132,20 +3305,35 @@ export class VisualAgentMapView extends ItemView {
     }));
     new AimStartModal(
       this.app,
-      input =>
-        this.plugin.mutate(async () => {
+      async input => {
+        const pending: { created: Awaited<ReturnType<typeof createAimMap>> | null } = { created: null };
+        await this.plugin.mutate(async () => {
           if (!isCurrent()) return;
           await this.plugin.repo.ensureWorkspace();
           if (!isCurrent()) return;
           const created = await createAimMap(this.plugin.repo, input.model, input);
           await this.plugin.rebuildDerivedData();
           if (!isCurrent()) return;
+          const hasMap = Boolean(this.map);
+          if (hasMap) {
+            // A map is open: the new one gets its own tab, opened after this mutation (the tab opens its map through mutate).
+            pending.created = created;
+            return;
+          }
           await this.openMapInMutation(created.mapPath);
           if (!isCurrent() || this.path !== created.mapPath || this.map?.id !== created.map.id) return;
           this.selection.setSelected(created.root.id);
           this.render();
           this.focusNode(created.root);
-        }),
+        });
+        const created = pending.created;
+        if (!created) return;
+        const view = await this.plugin.openMapInNewTab(created.mapPath);
+        if (!view || view.closed || view.path !== created.mapPath || view.map?.id !== created.map.id) return;
+        view.selection.setSelected(created.root.id);
+        view.render();
+        view.focusNode(created.root);
+      },
       modelChoices,
       configuredModel,
       defaultReasoning,
@@ -3294,14 +3482,8 @@ export class VisualAgentMapView extends ItemView {
             ? this.map?.nodes.find(node => node.id === (request.placement as { parentId: string }).parentId)
             : undefined;
         // AI lock: no outline for a locked parent, read fresh so a lock set meanwhile counts; refused before any AI.
-        if (
-          parent &&
-          this.aiLockReason(
-            "addChild",
-            [parent.id],
-            new Map([[parent.id, await this.plugin.repo.readNote(parent.path, this.map ?? undefined)]])
-          )
-        ) {
+        const parentNote = parent ? await this.plugin.repo.readNote(parent.path, this.map ?? undefined) : undefined;
+        if (parent && parentNote && this.aiLockReason("addChild", [parent.id], new Map([[parent.id, parentNote]]))) {
           new Notice(t("ui.ai_locked_notice"));
           throw new Error(t("ui.ai_locked_notice"));
         }
@@ -3313,6 +3495,17 @@ export class VisualAgentMapView extends ItemView {
         });
         const { placement: _placement, ...forService } = request;
         void _placement;
+        // Under a card whose own title is the topic (the user did not change it): the new subtopics follow the card's note and do not
+        // repeat its current subtopics (quoted as data). A changed topic is a different subject, so nothing of the card is carried.
+        const carry =
+          parent && parentNote && request.topic.trim() === parentNote.title.trim()
+            ? {
+                noteDetail: parentNote.detail,
+                existingChildren: (this.map?.nodes ?? [])
+                  .filter(item => item.parentId === parent.id)
+                  .map(item => this.notes.get(item.id)?.title ?? "")
+              }
+            : {};
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) stops the run; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -3335,6 +3528,7 @@ export class VisualAgentMapView extends ItemView {
             const result = await this.plugin.outlineGeneration.generate(
               {
                 ...forService,
+                ...carry,
                 ...this.usageMapField(),
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
@@ -3471,7 +3665,12 @@ export class VisualAgentMapView extends ItemView {
             language: request.language,
             model: used.model,
             reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
-            limits: request.limits
+            limits: request.limits,
+            // The card's own note and its current subtopics, so the new subtopics follow the note and do not repeat (quoted as data).
+            noteDetail: note.detail,
+            existingChildren: (this.map?.nodes ?? [])
+              .filter(item => item.parentId === node.id)
+              .map(item => this.notes.get(item.id)?.title ?? "")
           },
           signal
         );
@@ -5804,14 +6003,29 @@ export class VisualAgentMapView extends ItemView {
     }
     // From here on the map exists: failures only notify and never reject, so the import window closes.
     let opened = true;
+    // The view that shows the new map: this one when it had no map, else a new tab (the shallow research below runs there).
+    let newTabView: VisualAgentMapView | null = null;
     try {
+      let inNewTab = false as boolean;
       await this.plugin.mutate(async () => {
         // A style chosen in the window shaped the root note and the research only: nothing is written to the map (#44).
         // Notes and Map.md were written directly; derive their Reference Links (map, parent, children) like any map change.
         await this.plugin.rebuildDerivedData();
+        if (this.map) {
+          inNewTab = true;
+          return;
+        }
         await this.openMapInMutation(result.mapPath);
         if (!this.closed && this.path === result.mapPath) this.fit();
       });
+      if (inNewTab) {
+        const view = await this.plugin.openMapInNewTab(result.mapPath);
+        if (!view || view.path !== result.mapPath) opened = false;
+        else {
+          newTabView = view;
+          if (!view.closed && view.path === result.mapPath) view.fit();
+        }
+      }
     } catch {
       opened = false; // mutate() has already shown the Notice.
     }
@@ -5819,12 +6033,13 @@ export class VisualAgentMapView extends ItemView {
     if (result.failure || !opened || !request.shallowResearch || result.nodes.length < 2) return;
     const root = result.nodes.find(node => node.parentId === null);
     if (!root) return;
+    const target: VisualAgentMapView = newTabView ?? this;
     const children = result.nodes.filter(node => node.parentId !== null);
     // The import window closes once the topics exist: the research runs in the background (Stop is on the batch badge)
     // and an error becomes a Notice instead of keeping the window waiting.
     void this.plugin
       .confirmAiUsage(model, () =>
-        this.startShallowResearch(
+        target.startShallowResearch(
           root,
           children,
           {
@@ -6047,11 +6262,18 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "New map": an untitled empty map opens at once (no name is asked); the first message names it, the title renames it. */
   private openNewMindMapModal(): void {
-    this.enqueue(async () => {
-      const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
-      const title = uniqueDefaultName(t("ui.untitled_mind_map"), titles);
-      await this.openMapInMutation(await this.plugin.repo.createMap(title));
-    });
+    let created = "";
+    void this.plugin
+      .mutate(async () => {
+        const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+        const title = uniqueDefaultName(t("ui.untitled_mind_map"), titles);
+        const mapPath = await this.plugin.repo.createMap(title);
+        // With a map open the new one gets its own tab (after this mutation), so this tab's work is not stopped.
+        if (this.map) created = mapPath;
+        else await this.openMapInMutation(mapPath);
+      })
+      .then(() => (created ? this.plugin.openMapInNewTab(created) : undefined))
+      .catch(error => errorNotice(error));
   }
   async planAimQuestion(
     parentNodeId: string,
@@ -6738,12 +6960,19 @@ export class VisualAgentMapView extends ItemView {
   private openMapSwitcher(): void {
     this.enqueue(async () => {
       const items = await this.plugin.repo.mapSwitcherItems();
-      this.openMapModal(
-        new MapSwitcherModal(this.app, items, this.path, item =>
-          this.enqueue(() => this.openMapInMutation(item.mapPath))
-        )
-      );
+      this.openMapModal(new MapSwitcherModal(this.app, items, this.path, item => this.switchToMap(item.mapPath)));
     });
+  }
+  /**
+   * Choosing a map in the switcher: a map that is open in another tab is shown there; while this tab has running work the map
+   * opens in a new tab (swapping would stop that work); otherwise it replaces this tab's map.
+   */
+  private switchToMap(path: string): void {
+    const open = path === this.path ? undefined : this.plugin.findMapLeaf(path);
+    if (open) void this.plugin.showLeaf(open);
+    else if (path !== this.path && this.hasRunningWork())
+      void this.plugin.openMapInNewTab(path).catch(error => errorNotice(error));
+    else this.enqueue(() => this.openMapInMutation(path));
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   private openNewMapMenu(event: MouseEvent): void {
@@ -12302,16 +12531,21 @@ export class VisualAgentMapView extends ItemView {
   private duplicateCurrentMap(): void {
     if (!this.map) return;
     const source = this.path;
-    this.enqueue(async () => {
-      if (!this.map || this.path !== source) return;
-      try {
-        const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
-        const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
-        await this.openMapInMutation(await this.plugin.repo.duplicateMap(source, title));
-      } catch (error) {
-        errorNotice(error);
-      }
-    });
+    let copy = "";
+    void this.plugin
+      .mutate(async () => {
+        if (!this.map || this.path !== source) return;
+        try {
+          const titles = (await this.plugin.repo.topics()).map(topic => topic.title);
+          const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
+          copy = await this.plugin.repo.duplicateMap(source, title);
+        } catch (error) {
+          errorNotice(error);
+        }
+      })
+      // Outside the mutation: the new tab opens its map through mutate.
+      .then(() => (copy ? this.plugin.openMapInNewTab(copy) : undefined))
+      .catch(error => errorNotice(error));
   }
   /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
   private async renameMapTo(title: string): Promise<void> {
@@ -12496,6 +12730,30 @@ export class VisualAgentMapView extends ItemView {
       ])
     );
   }
+  /** True while the tab is in the background (display:none): its boxes measure 0, so nothing is measured or saved from them then. */
+  private hiddenTab(): boolean {
+    const el = this.contentEl as { isShown?: () => boolean } | undefined;
+    return typeof el?.isShown === "function" && !el.isShown();
+  }
+  /** Draws again what a hidden tab drew without measures (see paint), then runs the camera move it was asked for, once it can be seen. */
+  private drawWhenShown(): void {
+    if (this.closed || this.hiddenTab()) return;
+    if (this.renderWhenShown) {
+      this.renderWhenShown = false;
+      this.render();
+    }
+    const camera = this.cameraWhenShown;
+    this.cameraWhenShown = null;
+    camera?.();
+  }
+  private renderWhenShown = false;
+  /** The last camera move (fit, focus) asked of a hidden tab: its pane measures 0, so it waits for drawWhenShown. */
+  private cameraWhenShown: (() => void) | null = null;
+  private holdCamera(move: () => void): boolean {
+    if (!this.hiddenTab()) return false;
+    this.cameraWhenShown = move;
+    return true;
+  }
   private render(): void {
     // A batch of chat writes repaints once, when it is done.
     if (this.renderHold > 0 && !this.closed) {
@@ -12507,6 +12765,8 @@ export class VisualAgentMapView extends ItemView {
     this.settleCardHeights();
   }
   private paint(): void {
+    // A hidden tab paints like any other (outline, title, canvas), so its other consumers stay live; its measures are 0, so it paints again when shown.
+    if (!this.closed && this.hiddenTab()) this.renderWhenShown = true;
     // Repainting would replace the dragged card and drop its pointer capture, so wait for the drop (a closed view still ends the drag below).
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -13010,6 +13270,7 @@ export class VisualAgentMapView extends ItemView {
     const state = this.emptyCanvasState();
     box.toggleClass("is-building", state === "building");
     box.toggleClass("is-waiting", state === "plan" || state === "consent");
+    box.toggleClass("is-add-first", state === "idle" && !this.aimLive());
     if (state === "building") {
       // Three faint card outlines, no motion: the map is on its way.
       box.createSpan({ text: t("ui.map_chat_canvas_building") });
@@ -13029,9 +13290,10 @@ export class VisualAgentMapView extends ItemView {
       box.createSpan({ text: t("ui.aim_empty_map_hint") });
       return;
     }
-    // The toolbar no longer adds topics, so the empty canvas carries the one button for it, in the middle.
-    box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
+    // The toolbar no longer adds topics, so the empty canvas carries the one button for it, in the top-left corner: a picture
+    // placed in the middle of the canvas must stay uncovered.
     const add = box.createEl("button", { cls: "mod-cta vam-empty-add", text: t("ui.add_first_topic") });
+    box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
     add.addEventListener("click", event => {
       event.stopPropagation();
       // The menu opens under the button, also when the click came from the keyboard.
@@ -14250,7 +14512,7 @@ export class VisualAgentMapView extends ItemView {
    * heights; when nothing is covered nothing moves. The first paint of a map only records heights (opening never moves a card).
    */
   private settleCardHeights(): void {
-    if (!this.map || this.closed || !this.cardEls) return;
+    if (!this.map || this.closed || !this.cardEls || this.hiddenTab()) return;
     // A chat reply lays out its own cards (resized / arranged / placed) inside its undo step; looking now would also record
     // heights it has not finished with. Nothing is recorded, so the first render after the reply compares against the old ones.
     if (this.renderHold > 0 || this.history.grouping) return;
@@ -17374,7 +17636,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Camera on the parent and its new children (current zoom kept, or smaller if they do not fit), saved like a pan. */
   private frameBranch(ids: string[]): void {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.frameBranch(ids))) return;
     const shown = this.map.nodes.filter(node => ids.includes(node.id));
     if (!shown.length) return;
     const bounds = {
@@ -17581,11 +17843,46 @@ export class VisualAgentMapView extends ItemView {
   /**
    * `onSettled` (the chat's research) hears once how the batch's web activity came out, when the batch has ended: searches made,
    * topics that were counted, and how many of those made none.
+   *
+   * `onOutcome` (a continuation waiting for the research) hears exactly once, on every path: `not_started` (the usage notice was
+   * refused, nothing was left to run, a batch was already running, `signal` was aborted before the start, or the start failed) or
+   * `settled` when the batch has ended. Without it nothing changes. `signal` stops a batch that has not started yet (a batch that
+   * runs is stopped through its key, see `stopMultiResearch`).
    */
   async startMultiResearch(
     request: MultiResearchRequest,
     retryBatchKey?: string,
-    onSettled?: (web: ResearchWebTally) => void
+    onSettled?: (web: ResearchWebTally) => void,
+    onOutcome?: (outcome: ChatResearchOutcome) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    let told = false;
+    const tell = (outcome: ChatResearchOutcome): void => {
+      if (told) return;
+      told = true;
+      try {
+        onOutcome?.(outcome);
+      } catch (error) {
+        errorNotice(error);
+      }
+    };
+    let batchStarted = false;
+    try {
+      await this.runMultiResearch(request, retryBatchKey, onSettled, tell, signal, () => {
+        batchStarted = true;
+      });
+    } finally {
+      // Every way out that never started a batch tells it; a started one tells itself when it ends.
+      if (!batchStarted) tell({ kind: "not_started" });
+    }
+  }
+  private async runMultiResearch(
+    request: MultiResearchRequest,
+    retryBatchKey: string | undefined,
+    onSettled: ((web: ResearchWebTally) => void) | undefined,
+    tell: (outcome: ChatResearchOutcome) => void,
+    signal: AbortSignal | undefined,
+    markStarted: () => void
   ): Promise<void> {
     if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const languageSource = this.batchLanguageSource();
@@ -17622,6 +17919,8 @@ export class VisualAgentMapView extends ItemView {
           new Notice(t("ui.multi_research_already_running"));
           return;
         }
+        // Stop pressed on the continuation while the usage notice was open: nothing is started.
+        if (signal?.aborted) return;
         const busy = (node: MapNode): boolean =>
           this.plugin.topicRuns.isBusy(node.path) ||
           this.plugin.quickExpandPending.has(node.path) ||
@@ -17664,10 +17963,13 @@ export class VisualAgentMapView extends ItemView {
           this.plugin.expansionBatches.delete(retryBatchKey);
         let reported = false;
         let skipped = 0;
+        // How each card of the batch came out (the cards that never ran when the batch was stopped are filled in at the end).
+        const topics = new Map<string, ChatWorkTopic>();
         // Web activity of the topics that finished: Research mode only (a local run searches nothing, so it has nothing to report).
         const web: ResearchWebTally = { searches: 0, counted: 0, withoutSearch: 0 };
         try {
           const gate = { shown: false };
+          markStarted();
           await this.plugin.expansionCoordinator.start(
             key,
             nodes,
@@ -17677,22 +17979,38 @@ export class VisualAgentMapView extends ItemView {
                 accepted();
                 return "skipped";
               }
-              const choices = choicesFor(await this.plugin.repo.readNote(child.path, this.map ?? undefined));
-              await this.researchChild(
-                child,
-                batchSignal,
-                accepted,
-                choices,
-                choices.mapAiMode !== "quick",
-                result => {
-                  if (choices.researchMode !== "research" || result.retrievals === undefined) return;
-                  web.counted++;
-                  web.searches += result.retrievals;
-                  if (!result.retrievals) web.withoutSearch++;
-                },
-                gate,
-                languageSource
-              );
+              const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
+              const choices = choicesFor(note);
+              try {
+                await this.researchChild(
+                  child,
+                  batchSignal,
+                  accepted,
+                  choices,
+                  choices.mapAiMode !== "quick",
+                  result => {
+                    if (choices.researchMode !== "research" || result.retrievals === undefined) return;
+                    web.counted++;
+                    web.searches += result.retrievals;
+                    if (!result.retrievals) web.withoutSearch++;
+                  },
+                  gate,
+                  languageSource
+                );
+              } catch (error) {
+                topics.set(child.id, {
+                  id: child.id,
+                  title: note.title,
+                  status: batchSignal.aborted ? "stopped" : "failed",
+                  error: errorMessage(error)
+                });
+                throw error;
+              }
+              topics.set(child.id, {
+                id: child.id,
+                title: note.title,
+                status: batchSignal.aborted ? "stopped" : "succeeded"
+              });
               return undefined;
             },
             () => {
@@ -17712,12 +18030,30 @@ export class VisualAgentMapView extends ItemView {
                   ].join(" ")
                 );
                 onSettled?.(web);
+                const stopped = state.status === "stopped";
+                for (const node of nodes)
+                  if (stopped && !topics.has(node.id))
+                    topics.set(node.id, {
+                      id: node.id,
+                      title: this.notes.get(node.id)?.title ?? node.path,
+                      status: "stopped"
+                    });
+                tell({
+                  kind: "settled",
+                  succeeded: state.succeeded,
+                  failed: state.failures.length,
+                  stopped: stopped ? Math.max(0, state.total - state.succeeded - state.failures.length - skipped) : 0,
+                  topics: [...topics.values()]
+                });
               }
               if (!this.closed) this.render();
-            }
+            },
+            signal
           );
         } catch {
-          // Launch rejection from the coordinator (stopped or all failed) is reported by the summary Notice.
+          // Launch rejection from the coordinator (stopped or all failed) is reported by the summary Notice. A start that failed
+          // before the batch existed has not told its outcome yet (a batch that ran has: telling twice changes nothing).
+          tell({ kind: "not_started" });
         }
       });
     } catch (error) {
@@ -18991,6 +19327,9 @@ export class VisualAgentMapView extends ItemView {
     this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   private saveViewport(): void {
+    // A hidden pane measures 0: nothing is requested from it (a camera move asked meanwhile is replayed when the tab is shown).
+    // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
+    if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
@@ -19176,6 +19515,11 @@ export class VisualAgentMapView extends ItemView {
       this.map.viewport = viewport;
       return;
     }
+    // A hidden pane has no toolbar to measure: the first paint that can see it does this.
+    if (this.hiddenTab()) {
+      this.map.viewport = viewport;
+      return;
+    }
     this.toolbarClearedFor = this.path;
     this.map.viewport = clearToolbar(viewport, inset, this.topsUnderToolbar(this.map.viewport.zoom));
   }
@@ -19218,6 +19562,14 @@ export class VisualAgentMapView extends ItemView {
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
   private focusNode(target: MapNode, persist = true): void {
     if (!this.map || !this.viewportEl) return;
+    const id = target.id;
+    if (
+      this.holdCamera(() => {
+        const node = this.map?.nodes.find(item => item.id === id);
+        if (node) this.focusNode(node, persist);
+      })
+    )
+      return;
     // Centre on where the card is drawn, which differs from its saved position while sorted by relevance.
     const node = this.relevanceSortOn() ? (this.canvasNodes().find(item => item.id === target.id) ?? target) : target;
     this.map.viewport = focusViewport(
@@ -19233,7 +19585,7 @@ export class VisualAgentMapView extends ItemView {
   /** True while a framing action (fit) applies its viewport: tool-row placement must not pan the canvas then. */
   private framingViewport = false;
   private fit(): void {
-    if (!this.map || !this.viewportEl) return;
+    if (!this.map || !this.viewportEl || this.holdCamera(() => this.fit())) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
     // Free text blocks (canvas-text-node decision #8) count too: fit must not hide what the user placed.
@@ -19409,6 +19761,7 @@ export class VisualAgentMapView extends ItemView {
         this.chatPlanToken++;
         this.clearChatPreview();
         this.chat.reset();
+        this.resetChatResearch();
         this.chatMapId = this.map.id;
         this.startChatRecords();
       }
@@ -19467,12 +19820,31 @@ export class VisualAgentMapView extends ItemView {
     this.placeMapTools();
   }
   /** Opening screen: the keyboard starts in the message field, once per map, unless it is in another pane. */
+  focusChatHero(): void {
+    this.focusChatHeroOnce();
+  }
   private focusChatHeroOnce(): void {
     const chat = this.chat;
     if (!chat?.isHero || !this.map || this.chatHeroFocusedFor === this.map.id) return;
-    this.chatHeroFocusedFor = this.map.id;
-    const active = this.contentEl.ownerDocument?.activeElement ?? null;
-    if (!active || active === this.contentEl.ownerDocument?.body || this.contentEl.contains(active)) chat.focusInput();
+    // A tab that is not shown yet cannot take focus: the once is kept for when it is.
+    if (this.hiddenTab()) return;
+    const doc = this.contentEl.ownerDocument;
+    const active = doc?.activeElement ?? null;
+    // Focus in another pane the user can see is theirs to keep. Focus left in a hidden pane (the tab just switched away from) is not.
+    const heldElsewhere =
+      active &&
+      active !== doc?.body &&
+      !this.contentEl.contains(active) &&
+      (active as { isShown?: () => boolean }).isShown?.() !== false;
+    if (heldElsewhere) {
+      // Focus in a visible pane stays theirs: the once is used up, so a later repaint cannot take it when the focus falls to BODY.
+      this.chatHeroFocusedFor = this.map.id;
+      return;
+    }
+    chat.focusInput();
+    // The once is used up only when the keyboard really moved into the pane.
+    const now = doc?.activeElement ?? null;
+    if (now && this.contentEl.contains(now)) this.chatHeroFocusedFor = this.map.id;
   }
   /** The pane's width and what the topic panel takes of it; null while the pane has no size yet (not shown, or a test). */
   private chatPaneWidths(): { pane: number; inspector: number } | null {
@@ -19736,6 +20108,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
+    this.drawWhenShown();
     this.syncChatNarrow();
     this.fitKindShapes();
     this.syncStatusBarClearance();
@@ -20148,6 +20521,7 @@ export class VisualAgentMapView extends ItemView {
     origin: MapChatOrigin,
     signal: AbortSignal = new AbortController().signal
   ): Promise<MapChatRequest> {
+    const continuation = origin.chain?.continuation;
     const map = this.map!;
     const settings = this.plugin.settings;
     const byId = new Map(map.nodes.map(node => [node.id, node]));
@@ -20199,6 +20573,29 @@ export class VisualAgentMapView extends ItemView {
         ...failureOf(node.id)
       };
     });
+    // The whole text of the research this conversation ran, as the notes are now (never `this.notes`: a card may have been written
+    // since), so a message after the research (or the next round of a continuation) builds on what it found.
+    const researchNotes: MapChatResearchNote[] = [];
+    // A researched card that is also selected is sent from the same fresh read (the view's own copy may not have caught up with the
+    // research that just wrote it), so its text is never lost to a stale empty one.
+    const freshDetail = new Map<string, string>();
+    for (const [id, info] of this.chatResearched) {
+      const node = info.status === "succeeded" ? byId.get(id) : undefined;
+      if (!node) continue;
+      try {
+        const note = await this.plugin.repo.readNote(node.path, map);
+        freshDetail.set(id, note.detail);
+        researchNotes.push({
+          id,
+          title: titleOf(node),
+          path: node.path,
+          detail: note.detail,
+          sentBefore: this.chatResearchSent.has(id)
+        });
+      } catch {
+        // The note cannot be read now: it is left out like a card that is gone.
+      }
+    }
     const ref = (id: string): MapChatTopicRef | null => {
       const node = byId.get(id);
       return node
@@ -20206,7 +20603,7 @@ export class VisualAgentMapView extends ItemView {
             id,
             title: titleOf(node),
             summary: summaryOf(id),
-            detail: this.notes.get(id)?.detail ?? "",
+            detail: freshDetail.get(id) ?? this.notes.get(id)?.detail ?? "",
             path: node.path,
             ...failureOf(id)
           }
@@ -20266,7 +20663,9 @@ export class VisualAgentMapView extends ItemView {
       relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns(),
-      ...(picture ? { selectedImage: picture.selected } : {})
+      ...(picture ? { selectedImage: picture.selected } : {}),
+      ...(researchNotes.length ? { researchNotes } : {}),
+      ...(continuation ? { continuation } : {})
     });
     return {
       message,
@@ -20306,6 +20705,9 @@ export class VisualAgentMapView extends ItemView {
     // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
+    // The user speaking ends the continuation that is running, waiting for work or waiting for a plan: the text is a new message.
+    const autoOrigin = again?.chain;
+    if (!autoOrigin) this.interruptChain(this.chatChain, "user_took_over");
     // The turn has its own copy: follow-ups that go in are added to it, and a copy keeps the earlier turn's retry as it was.
     const origin: MapChatOrigin = again
       ? { ...again }
@@ -20318,23 +20720,35 @@ export class VisualAgentMapView extends ItemView {
         };
     // Where this turn is anchored. A create_map / open_map of the turn itself moves it (see applyMapChatActions).
     const anchor = { path: this.path, id: this.map.id as string | undefined };
+    // The continuation this round belongs to: a message of the user's starts a new one; an automatic round (or the retry of one)
+    // goes on with the chain it came from, at the round it was.
+    const run = this.chainForRound(autoOrigin, anchor, message);
+    run.chips = [...origin.chips];
     // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
     // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
     const draft = chat.draft;
-    const turn = chat.begin(message, origin, Boolean(again), "preparing");
+    const turn = autoOrigin
+      ? chat.beginAutoRound(run.state.round, run.state.maxRounds, run.state.remaining, origin, run.partial ?? undefined)
+      : chat.begin(message, origin, Boolean(again), "preparing");
+    run.turn = turn;
     let sent = false;
     // Takes the turn back and puts the draft into the field again (a retry has no draft to put back). `reason`
     // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
-    const abandon = (reason?: string): void => {
+    // `ends` is why the continuation (if one was running) ends with it.
+    const abandon = (reason?: string, ends: MapChatChainInterrupt = "map_changed"): void => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-      if (!chat.retract(turn, again ? restore : draft)) return;
-      if (reason !== undefined) new Notice(reason);
+      // Take the turn back first: the end sentence goes under the last reply, which must be the one before this round, not the
+      // round that is being taken back (its sentence would go with it).
+      const retracted = chat.retract(turn, again ? restore : draft);
+      this.interruptChain(run, ends);
+      if (!retracted) return;
+      if (reason !== undefined && (!autoOrigin || ends === "failed")) new Notice(reason);
     };
     // Stop while preparing is the user's own act: the send is taken back like any early end, without a Notice.
     const preparing = new AbortController();
     const stopPreparing = (): void => {
       preparing.abort();
-      abandon();
+      abandon(undefined, "stopped");
     };
     this.chatPrepAbandon = stopPreparing;
     const steerState: ChatSteerState = {
@@ -20354,7 +20768,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       request = { ...(await this.buildChatRequest(message, chat, origin, preparing.signal)), ...this.usageMapField() };
     } catch (error) {
-      abandon(this.closed ? undefined : errorMessage(error));
+      abandon(this.closed ? undefined : errorMessage(error), "failed");
       return;
     }
     // Stop, closing the view or a map switch while the request was being built: no usage notice, no setup guide.
@@ -20382,6 +20796,7 @@ export class VisualAgentMapView extends ItemView {
           if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
           // Conversation record (switch on): the turn is written from here, not before (a send taken back leaves no trace).
           const record = this.beginChatRecord(chat, turn, request, origin);
+          run.record = record;
           // The follow-ups that went into this turn are written with its end (queued ones become the next turn).
           if (record)
             record.steerTexts = () => steerState.entries.filter(e => e.status === "delivered").map(e => e.text);
@@ -20493,31 +20908,49 @@ export class VisualAgentMapView extends ItemView {
               if (outcome === null) continue;
               if (!alive()) return;
               const result: MapChatResult = outcome;
+              // The research notes this request carried are "sent before" for the next round (they go last when the budget is short).
+              // Only a reply that came back counts: a request that failed read nothing, so a retry still owes them.
+              for (const id of request.context.research?.sent ?? []) this.chatResearchSent.add(id);
               // Follow-ups still being handed over settle first; later ones wait for the next message. The ones that went in are
               // part of the message the plan and the actions are applied for.
               await this.closeSteers(steerState);
               if (!alive()) return;
               const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
+              // The follow-ups that went into this round are part of the message every later round asks.
+              run.message = fullMessage;
+              run.replyRemaining = result.remaining;
               const plan = result.actions.length
                 ? planFor(result.actions, request.context, {
                     diagrams: this.plugin.settings.addDiagramsAfterResearch,
                     mapAiMode: this.map?.aiMode,
                     imageMode: this.chatImageMode(),
-                    imageAttached: !!request.imageDataUrl
+                    imageAttached: !!request.imageDataUrl,
+                    chain: planChainOf(run.state),
+                    chatStartedResearch: this.chatStartedResearch,
+                    trusted: {
+                      createdIds: run.createdIds,
+                      researchedIds: new Set(
+                        [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
+                      )
+                    }
                   })
                 : null;
               if (plan) {
                 // Nothing is touched until the user applies the plan.
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
+                  this.showUnreadResearch(chat, turn, request.context);
                   this.markChatTurn(origin, request);
+                  // The continuation stops where it is until the plan is applied (it goes on) or cancelled (it ends).
+                  run.state = pauseForPlan(run.state);
                   this.offerChatPlan(
                     result,
                     plan,
                     request.context,
                     { path: anchor.path, id: anchor.id },
                     fullMessage,
-                    record
+                    record,
+                    run
                   );
                   if (record?.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
                     this.chatRecordLogged.add(turn.assistant);
@@ -20528,21 +20961,25 @@ export class VisualAgentMapView extends ItemView {
               }
               // A pure answer has nothing to apply: the reader is not told "applying" for it.
               if (result.actions.length) chat.setStage("applying");
+              const work = newChatWork();
+              run.work = work;
               const lines = await this.applyMapChatActions(
                 { ...result, message: fullMessage },
                 request.context,
                 alive,
-                anchor
+                anchor,
+                { context: request.context, work }
               );
               if (alive() && chat.isBusy) {
                 // Read at once: the next reply's step replaces `chatReplyEntry`.
                 const entry = this.chatReplyEntry();
-                chat.finish(result.reply, lines);
+                const shown = chat.finish(result.reply, lines);
+                this.showUnreadResearch(chat, turn, request.context);
                 this.markChatTurn(origin, request, entry);
-                if (record?.end("done", { reply: result.reply, lines, rejected: result.rejected }))
+                if (record?.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
                   this.chatRecordLogged.add(turn.assistant);
-                // Waiting follow-ups are the next message, sent once.
-                this.flushSteers(true);
+                // The round is over: the continuation goes on, waits or ends; follow-ups that waited are the next message instead.
+                this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
               }
               return;
             } catch (error) {
@@ -20559,6 +20996,7 @@ export class VisualAgentMapView extends ItemView {
                   error: { text: failure.text, technical: failure.technical ?? "" }
                 });
                 this.returnSteers(steerState);
+                this.interruptChain(run, "failed");
               }
               return;
             } finally {
@@ -20576,11 +21014,25 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       // Only a failure before the request went out is taken back; once sent, the turn reports its own failures.
       if (sent) throw error;
-      abandon(this.closed ? undefined : errorMessage(error));
+      abandon(this.closed ? undefined : errorMessage(error), "failed");
       return;
     }
     // The AI is not ready (it said why itself) or the usage notice was declined.
-    if (!went && !sent) abandon(this.closed ? undefined : notSent());
+    if (!went && !sent) abandon(this.closed ? undefined : notSent(), "not_ready");
+  }
+  /** Research notes of the conversation that this round did not read (no room, or too long) are told under its results. */
+  private showUnreadResearch(
+    chat: MapChatPanel,
+    turn: MapChatTurnHandle,
+    context: Pick<MapChatContext, "research">
+  ): void {
+    // A note read in an earlier round only did not fit again: it is not unread, so the screen does not say "next round".
+    const deferred = (context.research?.deferred ?? []).filter(note => !note.sentBefore);
+    if (deferred.length)
+      chat.setUnreadNotes(
+        turn,
+        deferred.map(note => ({ title: note.title, oversize: note.oversize === true }))
+      );
   }
   /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
   private steerMapChat(): void {
@@ -20702,6 +21154,258 @@ export class VisualAgentMapView extends ItemView {
       texts.join("\n")
     );
   }
+  // ---- automatic continuation (the chain) ---------------------------------------------------------------------------------
+
+  /**
+   * The chain a round belongs to. A message of the user's starts a new one (round 1); an automatic round goes on with the chain it
+   * came from. A retry of a failed automatic round finds no live chain (it ended as `failed`) and takes the round again from the
+   * state saved in its origin, without counting it twice.
+   */
+  private chainForRound(
+    origin: MapChatChainOrigin | undefined,
+    anchor: { path: string; id: string | undefined },
+    message: string
+  ): ChatChainRun {
+    const live = this.chatChain;
+    if (origin && live && live.seq === origin.seq && live.state.phase === "round") {
+      live.anchor = anchor;
+      live.message = message;
+      live.replyRemaining = origin.continuation.remaining;
+      return live;
+    }
+    // A retry of an old failed round while another chain is still alive (waiting, with its timer): that chain ends first.
+    if (live) this.interruptChain(live, "user_took_over");
+    const run: ChatChainRun = {
+      seq: ++this.chatChainSeq,
+      state: origin ? { ...origin.state, phase: "round" } : startChain(),
+      anchor,
+      message,
+      turn: null,
+      record: null,
+      replyRemaining: origin?.continuation.remaining ?? "",
+      lastResults: origin?.continuation.lastResults ?? [],
+      createdIds: new Set(origin?.createdIds ?? []),
+      chips: [],
+      waited: origin?.continuation.research ?? [],
+      details: [],
+      partial: null,
+      work: null,
+      timer: null,
+      waitShown: false
+    };
+    this.chatChain = run;
+    return run;
+  }
+  /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
+  private chainShows(run: ChatChainRun): boolean {
+    return run.state.round >= 2 || !!run.replyRemaining || !!run.state.remaining;
+  }
+  /** Ends the chain from the outside (Stop, a new message, a failure, a map change): the first ending wins, a later one changes nothing. */
+  private interruptChain(run: ChatChainRun | null, reason: MapChatChainInterrupt): void {
+    if (!run) return;
+    const step = interruptChainState(run.state, reason);
+    if (step.decision.kind !== "end") return;
+    run.state = step.state;
+    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining);
+  }
+  /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
+  private endChatChain(run: ChatChainRun, reason: MapChatChainEndReason, remaining: string): void {
+    if (this.chatChain === run) this.chatChain = null;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    run.timer = null;
+    run.state = { ...run.state, phase: "ended" };
+    if (this.closed) return;
+    const chat = this.chat;
+    if (run.waitShown) chat?.setChainWaiting(null);
+    run.waitShown = false;
+    if (!this.chainShows(run)) return;
+    this.chatLastRecord?.event("chain_end", { reason, round: run.state.round, remaining });
+    // "Done" is told only to a chain that went on by itself (round 2 on): a single round that finished adds nothing.
+    if (chat && (chainEndNeedsNotice(reason) || (reason === "done" && run.state.round >= 2)))
+      chat.endChain(reason, remaining, run.details.length ? run.details : undefined);
+  }
+  /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
+  private stopChainWork(run: ChatChainRun): void {
+    const work = run.work;
+    if (!work) return;
+    // The controller reaches the expansions (chatExpand listens to it) and the research that has not started.
+    work.controller.abort();
+    for (const key of work.researchKeys) this.plugin.expansionCoordinator.stop(key);
+  }
+  /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
+  private finishChatRound(run: ChatChainRun, round: ChatRoundEnd): void {
+    // Follow-ups that waited are the user speaking: the chain ends and they are sent once as the next message.
+    if (this.chat?.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
+    else this.advanceChain(run, round);
+    this.flushSteers(true);
+  }
+  private advanceChain(run: ChatChainRun, round: ChatRoundEnd): void {
+    if (this.chatChain !== run || run.state.phase === "ended") return;
+    run.partial = null;
+    for (const id of round.work.created) run.createdIds.add(id);
+    run.lastResults = chatResultLines(round.lines).map(line => ({ text: line.text, status: line.status }));
+    run.anchor = { path: round.anchor.path, id: round.anchor.id };
+    const step = finishRound(run.state, {
+      remaining: round.result.remaining,
+      researchDeferred: pendingResearchCount(round.context),
+      actions: round.result.actions.map((action, index) => ({
+        kind: action.kind,
+        done: round.lines[index]?.status === "done"
+      })),
+      started: {
+        research: round.work.researchTargets,
+        expand: round.work.expand.length,
+        otherBackground: round.work.otherBackground
+      }
+    });
+    run.state = step.state;
+    this.followChainDecision(run, step.decision, round.work);
+  }
+  private followChainDecision(run: ChatChainRun, decision: MapChatChainDecision, work: ChatRoundWork | null): void {
+    if (decision.kind === "end") this.endChatChain(run, decision.reason, decision.remaining);
+    else if (decision.kind === "wait" && work) this.waitForChain(run, decision.waitFor, work);
+    else if (decision.kind === "next") this.startNextRound(run, decision.round, decision.remaining);
+  }
+  /** Waits for the research and expansions the round started; the 30 minutes only end the chain, never the work. */
+  private waitForChain(run: ChatChainRun, waitFor: ("research" | "expand")[], work: ChatRoundWork): void {
+    const chat = this.chat;
+    const research = waitFor.includes("research") ? work.research : [];
+    const expand = waitFor.includes("expand") ? work.expand : [];
+    const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand.length, settled: 0 };
+    chat?.setChainWaiting(waiting, run.state.remaining);
+    run.waitShown = true;
+    const progress = (by: number): void => {
+      if (this.chatChain !== run || run.state.phase !== "waiting") return;
+      waiting.settled = Math.min(waiting.total, waiting.settled + by);
+      this.chat?.setChainWaiting(waiting, run.state.remaining);
+    };
+    run.timer = window.setTimeout(() => {
+      run.timer = null;
+      this.settleChainWait(run, { timedOut: true }, []);
+    }, MAP_CHAT_CHAIN_WAIT_MS);
+    let researched: ChatResearchOutcome | undefined;
+    const waited: ChatWorkTopic[] = [];
+    let expandSucceeded = 0;
+    let expandFailed = 0;
+    const pending: Promise<void>[] = [];
+    if (research.length)
+      pending.push(
+        Promise.all(research).then(outcomes => {
+          const settled = outcomes.flatMap(outcome => (outcome.kind === "settled" ? [outcome] : []));
+          researched = settled.length
+            ? {
+                kind: "settled",
+                succeeded: settled.reduce((sum, outcome) => sum + outcome.succeeded, 0),
+                failed: settled.reduce((sum, outcome) => sum + outcome.failed, 0),
+                stopped: settled.reduce((sum, outcome) => sum + outcome.stopped, 0),
+                topics: settled.flatMap(outcome => outcome.topics)
+              }
+            : { kind: "not_started" };
+          if (researched.kind === "settled") waited.push(...researched.topics);
+          progress(work.researchTargets);
+        })
+      );
+    for (const item of expand)
+      pending.push(
+        item.done.then(outcome => {
+          if (outcome.status === "succeeded") expandSucceeded++;
+          else if (outcome.status === "failed") expandFailed++;
+          waited.push({
+            id: item.id,
+            title: item.title,
+            status: outcome.status,
+            ...(outcome.status === "failed" ? { error: outcome.reason } : {})
+          });
+          progress(1);
+        })
+      );
+    void Promise.all(pending).then(() =>
+      this.settleChainWait(
+        run,
+        {
+          ...(researched ? { research: researched } : {}),
+          ...(expand.length ? { expand: { succeeded: expandSucceeded, failed: expandFailed } } : {})
+        },
+        waited
+      )
+    );
+  }
+  /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
+  private settleChainWait(run: ChatChainRun, end: MapChatWaitEnd, waited: ChatWorkTopic[]): void {
+    if (this.chatChain !== run || run.state.phase !== "waiting") return;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    run.timer = null;
+    const chat = this.chat;
+    if (
+      this.closed ||
+      !chat ||
+      this.path !== run.anchor.path ||
+      this.map?.id !== run.anchor.id ||
+      (run.turn !== null && !chat.hasTurn(run.turn))
+    ) {
+      this.interruptChain(run, "map_changed");
+      return;
+    }
+    chat.setChainWaiting(null);
+    run.waitShown = false;
+    run.waited = waited.map(item => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      ...(item.error ? { error: item.error } : {})
+    }));
+    run.details = waited.filter(item => item.status !== "succeeded").map(chainWorkDetail);
+    const step = finishWait(run.state, end);
+    run.state = step.state;
+    // Research that partly failed and goes on is told on the separator of the next round (it is not an ending).
+    run.partial =
+      step.decision.kind === "next" &&
+      end.research?.kind === "settled" &&
+      end.research.failed > 0 &&
+      end.research.succeeded > 0
+        ? { failed: end.research.failed, succeeded: end.research.succeeded }
+        : null;
+    this.followChainDecision(run, step.decision, null);
+  }
+  /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
+  private startNextRound(run: ChatChainRun, round: number, remaining: string): void {
+    const chat = this.chat;
+    if (
+      this.closed ||
+      !chat ||
+      this.path !== run.anchor.path ||
+      this.map?.id !== run.anchor.id ||
+      (run.turn !== null && !chat.hasTurn(run.turn))
+    ) {
+      this.interruptChain(run, "map_changed");
+      return;
+    }
+    if (chat.isBusy || this.chatApplying) {
+      this.interruptChain(run, "user_took_over");
+      return;
+    }
+    const origin: MapChatOrigin = {
+      text: run.message,
+      // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
+      // a picture is sent with the first round only and a follow-up adds no chip.
+      chips: [...run.chips],
+      selectedIds: this.chatSelectionIds(),
+      chain: {
+        seq: run.seq,
+        state: run.state,
+        createdIds: [...run.createdIds],
+        continuation: {
+          round,
+          maxRounds: run.state.maxRounds,
+          remaining,
+          lastResults: run.lastResults,
+          research: run.waited
+        }
+      }
+    };
+    run.work = null;
+    void this.sendMapChat(origin).catch(error => errorNotice(error));
+  }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   private supersedeChatPlan(): void {
     const pending = this.chat?.pendingPlan() ?? null;
@@ -20715,32 +21419,44 @@ export class VisualAgentMapView extends ItemView {
   private planReasonText(
     reason: MapChatPlanReason,
     result: Pick<MapChatResult, "actions">,
-    selectedCount: number
+    selectedCount: number,
+    /** Research targets the earlier rounds of the continuation started (the plan counts the whole chain). */
+    researchSoFar = 0
   ): string {
     switch (reason) {
       case "many_actions":
         return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
       case "many_research":
-        // The same count the plan was judged by (a selection made earlier in the reply counts).
-        return t("ui.map_chat_plan_reason_many_research_0", researchTargetsOf(result.actions, selectedCount));
+        // The same count the plan was judged by: the whole continuation (earlier rounds too), and a selection made earlier in the reply.
+        return t(
+          "ui.map_chat_plan_reason_many_research_0",
+          researchTargetsOf(result.actions, selectedCount) + researchSoFar
+        );
       case "new_map":
         return t("ui.map_chat_plan_reason_new_map");
       case "image_preview":
         return t("ui.map_chat_plan_reason_image_preview");
       case "image_other_actions":
         return t("ui.map_chat_plan_reason_image_other_actions");
+      case "auto_round_other_actions":
+        // Reachable from round 2 of a continuation.
+        return t("ui.map_chat_plan_reason_auto_round_other_actions");
+      case "research_text_other_actions":
+        return t("ui.map_chat_plan_reason_research_text_other_actions");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
   private offerChatPlan(
     result: MapChatResult,
     plan: MapChatPlan,
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "selectedCount">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research">,
     anchor: { path: string; id: string | undefined },
     /** The user's message: an integration in the plan takes it as its direction when the plan is applied, as it would have at once. */
     message: string,
     /** The turn's conversation record (switch on): what becomes of the card is written to it. */
-    record: MapChatTurnRecord | null = null
+    record: MapChatTurnRecord | null = null,
+    /** The continuation the round belongs to: it goes on after Apply and ends when the card is cancelled. */
+    run: ChatChainRun | null = null
   ): void {
     const chat = this.chat;
     if (!chat) return;
@@ -20772,7 +21488,9 @@ export class VisualAgentMapView extends ItemView {
       ...(plan.reasons.some(reason => reason === "image_preview" || reason === "image_other_actions")
         ? { openGroups: true }
         : {}),
-      reasons: plan.reasons.map(reason => this.planReasonText(reason, result, baseline.selectedCount)),
+      reasons: plan.reasons.map(reason =>
+        this.planReasonText(reason, result, baseline.selectedCount, run?.state.researchTargets ?? 0)
+      ),
       items,
       groups,
       estimate: plan.estimatedCalls
@@ -20781,13 +21499,14 @@ export class VisualAgentMapView extends ItemView {
       // Undo takes the plan's changes back; only the AI work it starts is said to stay.
       aiWork: result.actions.some(action => action.kind === "run_map_action"),
       state: "pending",
-      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor),
+      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
       cancel: () => {
         if (token !== this.chatPlanToken) return;
         this.chatPlanToken++;
         this.clearChatPreview();
         this.chat?.settlePlan(card, "cancelled");
         this.chatPlanRecords.get(card)?.plan("cancelled");
+        this.interruptChain(run, "plan_cancelled");
       }
     };
     if (record) this.chatPlanRecords.set(card, record);
@@ -20797,8 +21516,9 @@ export class VisualAgentMapView extends ItemView {
     card: MapChatPlanCard,
     token: number,
     result: MapChatResult & { message?: string },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
-    anchor: { path: string; id: string | undefined }
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "basis" | "parents" | "research">,
+    anchor: { path: string; id: string | undefined },
+    run: ChatChainRun | null = null
   ): Promise<void> {
     const chat = this.chat;
     if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
@@ -20806,6 +21526,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
       this.chatPlanToken++;
       this.clearChatPreview();
+      this.interruptChain(run, "map_changed");
       const skip: MapChatLine[] = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
       chat.settlePlan(card, "cancelled", skip);
       this.chatPlanRecords.get(card)?.plan("cancelled", skip);
@@ -20816,14 +21537,18 @@ export class VisualAgentMapView extends ItemView {
     // The dashed dots give way to the real anchors the writes make.
     this.clearChatPreview();
     chat.settlePlan(card, "applied");
+    // Expansions that fail while the plan is still being applied wait in the panel and join the result lines below.
     // The window shows that it is working, and Stop ends the rest of the plan.
     chat.setApplying(true);
     const stopped = (): boolean => token !== this.chatPlanToken;
     let lines: MapChatLine[];
+    const work = newChatWork();
+    if (run) run.work = work;
+    const live = { path: anchor.path, id: anchor.id };
     try {
-      lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, {
-        path: anchor.path,
-        id: anchor.id
+      lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, live, {
+        context: baseline,
+        work
       });
     } catch (error) {
       lines = [{ status: "failed", text: errorMessage(error) }];
@@ -20832,8 +21557,17 @@ export class VisualAgentMapView extends ItemView {
       chat.setApplying(false);
     }
     if (!this.closed) {
-      chat.settlePlan(card, "applied", lines);
+      // The lines as shown (failures that came in meanwhile merged): the screen, the record and the chain's next round agree.
+      lines = chat.settlePlan(card, "applied", lines) ?? lines;
       this.chatPlanRecords.get(card)?.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
+      if (run) {
+        // Stop ends the continuation (and the work it started); otherwise the round is over like any other.
+        if (stopped()) {
+          if (this.chainShows(run)) this.stopChainWork(run);
+          this.interruptChain(run, "stopped");
+        } else if (chat.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
+        else this.advanceChain(run, { result, context: baseline, lines, work, anchor: live });
+      }
       // Follow-ups typed while the plan was applied: sent once, unless Stop ended it.
       this.flushSteers(!stopped());
     }
@@ -20940,6 +21674,13 @@ export class VisualAgentMapView extends ItemView {
         type: "turn_start",
         turn: number,
         message: origin.text,
+        ...(origin.chain
+          ? {
+              auto: true as const,
+              round: origin.chain.state.round,
+              ...(origin.chain.continuation.remaining.trim() ? { remaining: origin.chain.continuation.remaining } : {})
+            }
+          : {}),
         origin: { chips, selectedIds: [...origin.selectedIds] },
         request: {
           step: { id: mapChatStep.id, version: mapChatStep.version },
@@ -20952,11 +21693,28 @@ export class VisualAgentMapView extends ItemView {
         }
       });
       this.chatLastRecord = record;
+      // Research began while the record was off: the mark goes in with the first turn written after it came back on.
+      this.markResearchRecorded(record);
       return record;
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
       return null;
     }
+  }
+  /** Writes the `research_started` mark once per record conversation, and only while the record is on (otherwise the next turn writes it). */
+  private markResearchRecorded(record: MapChatTurnRecord | null): void {
+    const writer = this.chatRecords;
+    if (!this.chatStartedResearch || !record || !writer || this.plugin.settings.mapChatRecords !== true) return;
+    if (writer.conversationId !== record.conversationId || this.chatResearchMarkedIn === record.conversationId) return;
+    this.chatResearchMarkedIn = record.conversationId;
+    record.event("research_started");
+  }
+  /** A new conversation (another map, "New conversation"): the research of the old one is no longer this one's, and results still to come are not recorded. */
+  private resetChatResearch(): void {
+    this.chatConversation++;
+    this.chatResearched.clear();
+    this.chatResearchSent.clear();
+    this.chatStartedResearch = false;
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
@@ -20972,6 +21730,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {
+    this.interruptChain(this.chatChain, "user_took_over");
+    this.resetChatResearch();
     this.chatPlanToken++;
     this.chatRecordEpoch++;
     this.chatRecordTurnSeq = 0;
@@ -21032,12 +21792,18 @@ export class VisualAgentMapView extends ItemView {
     const restored = restoreConversation(latest.id, latest.parsed.lines);
     chat.restore(restored);
     if (chat.conversationId !== restored.id) return;
+    // The file says this conversation started research: its turns keep the allow-list (an older file has no mark: false).
+    if (restored.startedResearch) {
+      this.chatStartedResearch = true;
+      this.chatResearchMarkedIn = restored.id;
+    }
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath(latest.path ?? "");
     writer.resume(
       latest.id,
       handle instanceof TFile ? handle : (latest.path ?? ""),
       this.chatRecordTarget(),
-      latest.parsed.cleanEnd
+      latest.parsed.cleanEnd,
+      restored.startedResearch
     );
     // Every turn number of the file is taken: a late result of one of them can never be written again.
     const numbers = latest.parsed.lines.flatMap((line: RecordLine) =>
@@ -21063,10 +21829,20 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   private stopMapChat(): void {
+    const run = this.chatChain;
+    // Waiting for the research or expansions of a continuation: no request runs. Stop ends the wait and the work the chain started;
+    // what was written stays.
+    if (run?.state.phase === "waiting") {
+      this.stopChainWork(run);
+      this.interruptChain(run, "stopped");
+      this.chat?.focusInput();
+      return;
+    }
     // A plan being applied has no request to abort: the plan's number moves on, what is done stays and the rest is skipped.
     if (this.chatApplying && !this.chatController) {
       this.chatPlanToken++;
       this.chatPlanStopped = true;
+      if (run && this.chainShows(run)) this.stopChainWork(run);
       this.chat?.focusInput();
       return;
     }
@@ -21076,17 +21852,22 @@ export class VisualAgentMapView extends ItemView {
       this.chat?.focusInput();
       return;
     }
+    // A reply of a continuation that already started research or expansions: Stop stops those too.
+    if (run && this.chainShows(run)) this.stopChainWork(run);
     this.releaseChatTask();
     controller.abort();
     // Before the panel marks the answer stopped: the record keeps the text that had streamed in.
     this.endChatRecord("stopped");
     this.chat?.markStopped();
+    this.interruptChain(run, "stopped");
     // Follow-ups that did not go in are not sent after a stop: they are in the field again.
     if (this.chatSteer) this.returnSteers(this.chatSteer);
     this.chat?.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
   private abortMapChat(): void {
+    // The continuation ends; the research and expansions it started go on (a map switch or a close is not a Stop).
+    this.interruptChain(this.chatChain, "map_changed");
     this.chatPlanToken++;
     this.clearChatPreview();
     const controller = this.chatController;
@@ -21317,6 +22098,7 @@ export class VisualAgentMapView extends ItemView {
     if (outcome.status === "done")
       return {
         status: "done",
+        ...(outcome.basis ? { basis: outcome.basis } : {}),
         text:
           t("ui.map_chat_line_done_0", label) +
           (outcome.skippedCards
@@ -21408,7 +22190,9 @@ export class VisualAgentMapView extends ItemView {
     },
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
     alive: () => boolean = () => true,
-    anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id }
+    anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id },
+    /** A continuation's round: the context the basis of new cards is judged by, and where the work the reply starts is collected. */
+    options: ChatApplyOptions = {}
   ): Promise<MapChatLine[]> {
     const touched = new Set<string>([anchor.path]);
     // The turn this reply belongs to (switch on): undo and redo of its writes are noted in that turn's conversation.
@@ -21421,7 +22205,8 @@ export class VisualAgentMapView extends ItemView {
     const later: number[] = [];
     const run: ChatRun = {
       refs: new Map(),
-      created: [],
+      // Shared with the round's work, which hands the ids to its chain.
+      created: options.work?.created ?? [],
       notes: new Set(),
       files: new Set(),
       parked: new Set(),
@@ -21669,8 +22454,15 @@ export class VisualAgentMapView extends ItemView {
               };
             }
             outcome = resolved
-              ? await this.runChatSelection(resolved.action, result.message ?? "", laterBatch, asked)
+              ? await this.runChatSelection(resolved.action, result.message ?? "", laterBatch, asked, options.work)
               : skipped("ui.map_chat_skip_parent_missing");
+            if (
+              options.work &&
+              outcome.status === "done" &&
+              resolved?.action.kind === "run_map_action" &&
+              ["synthesize", "merge", "rate_by_goal"].includes(resolved.action.action)
+            )
+              options.work.otherBackground = true;
             // A merge that did not happen leaves the cards where they are: they get the colour after all.
             if (outcome.status !== "done" && mine.length && same()) {
               const merged = new Set(mine.flatMap(entry => entry.ids));
@@ -21690,6 +22482,15 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       lines[index] = this.chatLine(label, outcome);
+    }
+    // What each new card was built from, judged from what this round was shown (never asked of the model).
+    if (options.context) {
+      const created = createdParentsOf(result.actions);
+      for (const [index, action] of result.actions.entries()) {
+        const line = lines[index];
+        if (action.kind === "add_child" && line?.status === "done")
+          line.basis = chatBasisFor(options.context.basis, action.parentId || null, options.context.parents, created);
+      }
     }
     const all = [...lines];
     if (result.rejected.length)
@@ -22490,7 +23291,9 @@ export class VisualAgentMapView extends ItemView {
     /** What the later actions of this reply have started so far. */
     batch: { imageSearches: number } = { imageSearches: 0 },
     /** The appearance the reply asked for the cards this merge takes: it goes to the merged card. */
-    held?: TopicAppearanceChange
+    held?: TopicAppearanceChange,
+    /** Where the research and expansions this action starts are collected, for a continuation to wait for. */
+    work?: ChatRoundWork
   ): Promise<ChatOutcome> {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -22538,20 +23341,52 @@ export class VisualAgentMapView extends ItemView {
               )
             )
           : null;
-        launch(
-          this.startMultiResearch(
-            {
-              ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
-              ...(retryModel ? { model: retryModel } : {})
-            },
-            undefined,
-            web => {
-              const lines = researchWebLines(web);
-              if (lines.length && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
-                chat.appendLines(lines);
-            }
-          )
-        );
+        const researchIds = [...this.selection.state.multiSelected];
+        const conversation = this.chatConversation;
+        const key = this.multiResearchKey();
+        // From here on any turn of this conversation may read web text (decision #17): set before the first card is written, and
+        // kept in the record so a reopened conversation keeps it.
+        this.chatStartedResearch = true;
+        this.markResearchRecorded(this.chatLastRecord);
+        // Told once (see startMultiResearch), whichever way the batch ends or never starts; the conversation remembers what
+        // it researched, and the continuation (if any) waits on the same promise.
+        const outcome = new Promise<ChatResearchOutcome>(resolve => {
+          const settle = (result: ChatResearchOutcome): void => {
+            if (result.kind === "settled" && conversation === this.chatConversation)
+              for (const topic of result.topics) {
+                // A later attempt that did not work out does not undo the research that did (its text is still in the note).
+                if (topic.status !== "succeeded" && this.chatResearched.get(topic.id)?.status === "succeeded") continue;
+                // Newest research last: a card researched again moves to the end.
+                this.chatResearched.delete(topic.id);
+                this.chatResearched.set(topic.id, { title: topic.title, status: topic.status });
+              }
+            resolve(result);
+          };
+          Promise.resolve(
+            this.startMultiResearch(
+              {
+                ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
+                ...(retryModel ? { model: retryModel } : {})
+              },
+              undefined,
+              web => {
+                const lines = researchWebLines(web);
+                if (lines.length && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
+                  chat.appendLines(lines);
+              },
+              settle,
+              work?.controller.signal
+            )
+          ).catch(error => {
+            errorNotice(error);
+            settle({ kind: "not_started" });
+          });
+        });
+        if (work) {
+          work.research.push(outcome);
+          work.researchTargets += researchIds.length;
+          work.researchKeys.add(key);
+        }
         return { status: "done" };
       }
       case "expand": {
@@ -22562,13 +23397,74 @@ export class VisualAgentMapView extends ItemView {
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
         // The chat request is the confirmation of the changes, not of the AI call: each parent asks for its own model's
         // usage notice first, like the expand button. The subtopics are then added without the review window.
-        for (const parent of parents)
-          launch(
-            this.plugin.repo
-              .readNote(parent.path, this.map ?? undefined)
-              .then(note => this.plugin.confirmAiUsage(note.model, () => this.chatExpand(parent, action.direction)))
-          );
-        return { status: "done" };
+        const infos = await Promise.all(
+          parents.map(async parent => ({
+            parent,
+            note: await this.plugin.repo.readNote(parent.path, this.map ?? undefined)
+          }))
+        );
+        const expandChat = this.chat;
+        const expandTurns = expandChat?.transcript().length ?? 0;
+        const expandRecord = this.chatLastRecord;
+        const cards = infos.map(({ parent, note }) => ({
+          id: parent.id,
+          title: note.title,
+          hasNote: !!note.detail.trim(),
+          existingChildren: map.nodes.filter(node => node.parentId === parent.id).length
+        }));
+        const allBasis = expandBasisOf(cards);
+        // The basis counts only the expansions that did not fail: a failure takes its card out of it.
+        let liveBasis: MapChatBasis | null = allBasis;
+        const failedIds = new Set<string>();
+        for (const { parent, note } of infos) {
+          const done = new Promise<ChatExpandOutcome>(resolve => {
+            Promise.resolve(
+              this.plugin.confirmAiUsage(note.model, async () => {
+                if (work?.controller.signal.aborted) {
+                  resolve({ status: "stopped" });
+                  return;
+                }
+                const outcome = (await this.chatExpand(parent, action.direction, work?.controller.signal)) ?? {
+                  status: "succeeded" as const
+                };
+                resolve(outcome);
+              })
+            ).then(
+              went => {
+                // Declined or not ready: nothing started (a started run has already told its own outcome).
+                if (!went) resolve({ status: "failed", reason: t("ui.map_chat_skip_not_started") });
+              },
+              error => {
+                errorNotice(error);
+                resolve({ status: "failed", reason: errorMessage(error) });
+              }
+            );
+          }).then(outcome => {
+            // A failure of an expansion that started with this reply is a result line of it, like the search count of research.
+            // The basis is judged by the expansions that did not fail; with none left the failure replaces the start line.
+            if (
+              outcome.status === "failed" &&
+              expandChat &&
+              this.chat === expandChat &&
+              !this.closed &&
+              expandChat.transcript().length === expandTurns
+            ) {
+              failedIds.add(parent.id);
+              if (liveBasis)
+                liveBasis = expandChat.settleExpandFailure(
+                  liveBasis,
+                  expandBasisOf(cards.filter(card => !failedIds.has(card.id))),
+                  expandFailureLine(note.title, outcome.reason)
+                );
+              else expandChat.appendLines([expandFailureLine(note.title, outcome.reason)]);
+              // The record keeps the turn's lines as they are on screen now (a restore shows the same).
+              expandRecord?.relines();
+            }
+            return outcome;
+          });
+          work?.expand.push({ id: parent.id, title: note.title, path: parent.path, done });
+        }
+        return { status: "done", ...(allBasis ? { basis: allBasis } : {}) };
       }
       case "synthesize":
         return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message);
@@ -22850,8 +23746,19 @@ export class VisualAgentMapView extends ItemView {
       else refs.push({ kind: "snippet", path: chip.path, title: "", text: chip.text });
     }
     for (const id of question.origin?.selectedIds ?? []) topic(id);
+    // What the cards of the turn were built from: one plain line per distinct basis (escaped when the note is written).
+    const basisLabels = {
+      research: t("ui.map_chat_note_basis_research_0", "{0}"),
+      note: t("ui.map_chat_note_basis_note_0", "{0}"),
+      outline: t("ui.map_chat_note_basis_outline")
+    };
+    const basis = [
+      ...new Set(answer.lines.flatMap(line => (line.basis ? [basisSummary(line.basis, basisLabels)] : [])))
+    ];
     return {
       question: question.text,
+      ...(question.auto ? { auto: true } : {}),
+      ...(basis.length ? { basis } : {}),
       steers: (question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text),
       refs,
       answer: answer.text,
@@ -22893,6 +23800,7 @@ export class VisualAgentMapView extends ItemView {
         map: t("ui.map_chat_note_map"),
         saved: t("ui.map_chat_note_saved"),
         you: t("ui.map_chat_role_you"),
+        auto: t("ui.map_chat_role_auto"),
         steer: t("ui.map_chat_note_steer"),
         ai: t("ui.map_chat_role_ai"),
         references: t("ui.map_chat_note_references"),
@@ -22940,12 +23848,16 @@ export class VisualAgentMapView extends ItemView {
    * written without a research (`research-mode: local`, no task text). Like the dialog's run, the card shows running and Stop
    * while the outline is generated.
    */
-  private async chatExpand(parent: MapNode, direction: string): Promise<void> {
+  private async chatExpand(parent: MapNode, direction: string, signal?: AbortSignal): Promise<ChatExpandOutcome> {
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
       new Notice(t("ui.ai_running_ai"));
-      return;
+      return { status: "failed", reason: t("ui.ai_running_ai") };
     }
+    if (signal?.aborted) return { status: "stopped" };
     const controller = new AbortController();
+    // Stop on a continuation reaches the expansion it started.
+    const stopWithOwner = (): void => controller.abort();
+    signal?.addEventListener("abort", stopWithOwner, { once: true });
     this.plugin.running.add(parent.path);
     this.plugin.quickExpandPending.add(parent.path);
     this.plugin.activeTasks.set(parent.path, controller);
@@ -22954,7 +23866,7 @@ export class VisualAgentMapView extends ItemView {
       const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
       if (note.aiLocked) {
         new Notice(t("ui.ai_locked_notice"));
-        return;
+        return { status: "failed", reason: t("ui.ai_locked_notice") };
       }
       const outline = this.quickOutline(parent);
       const limits = { levels: CHAT_EXPAND_LEVELS, maxTopics: CHAT_EXPAND_MAX_TOPICS };
@@ -22973,12 +23885,12 @@ export class VisualAgentMapView extends ItemView {
         },
         controller.signal
       );
-      if (controller.signal.aborted || this.closed) return;
+      if (controller.signal.aborted || this.closed) return { status: "stopped" };
       const { nodes } = limitOutline(generated, limits);
       const items = outlineProposals(nodes);
       if (!items.length) {
         new Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
-        return;
+        return { status: "failed", reason: t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to") };
       }
       // The parent may have been removed while the AI worked; the writer then refuses and says so.
       await outline.create(proposalOutline(items), {
@@ -22993,9 +23905,13 @@ export class VisualAgentMapView extends ItemView {
           this.map?.title
         )
       });
+      return { status: "succeeded" };
     } catch (error) {
-      if (!controller.signal.aborted) new Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
+      if (controller.signal.aborted) return { status: "stopped" };
+      new Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
+      return { status: "failed", reason: errorMessage(error) };
     } finally {
+      signal?.removeEventListener("abort", stopWithOwner);
       if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
       this.plugin.running.delete(parent.path);
       this.plugin.quickExpandPending.delete(parent.path);

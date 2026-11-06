@@ -943,7 +943,7 @@ test('R2: after a reply that makes a ring no card is selected (what addNode sele
   assert.ok(old.view.selection.state.selected, 'the reply that made no ring keeps selecting its new branch root');
 });
 
-test('R2/M1 style: the anchor lines are heavier and nearer the text colour; a quiet ring label is hidden unless expanded', () => {
+test('R2/M1 style: the anchor lines are heavier and in the accent colour; a quiet ring label is hidden unless expanded', () => {
   const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
   assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.vam-relation-derives_from\) \{ --vam-relation-width: 2\.25px; \}/);
   assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.is-selected\) \{ stroke: var\(--interactive-accent\); \}/);

@@ -30066,38 +30066,126 @@ function assign(cost) {
   return rows2;
 }
 var clamp012 = (v) => Math.min(1, Math.max(0, v));
-function uncross(points, slots, cost, picked) {
-  const line = (i, j) => ({
+var FIXED_CROSSING_WEIGHT = 1e3;
+var UNCROSS_MAX_MOVES = 40;
+var UNCROSS_MAX_NODES = 1e3;
+var lineBetween = (p, s) => ({
+  x1: p[0],
+  y1: p[1],
+  x2: s.ax,
+  y2: s.ay
+});
+function countCrossings(points, slots, fixedLines, picked) {
+  let fixed2 = 0;
+  let ring = 0;
+  const lines = picked.map((j, i) => ({
     x1: points[i][0],
     y1: points[i][1],
     x2: slots[j].ax,
     y2: slots[j].ay
-  });
-  const crossings = () => {
-    let count2 = 0;
-    for (let a = 0; a < picked.length; a++)
-      for (let b = a + 1; b < picked.length; b++) if (segmentsCross(line(a, picked[a]), line(b, picked[b]))) count2++;
-    return count2;
-  };
-  for (let round3 = 0, before = crossings(); before > 0 && round3 < 100; round3++) {
-    let improved = false;
-    for (let a = 0; a < picked.length && !improved; a++)
-      for (let b = a + 1; b < picked.length && !improved; b++) {
-        if (!segmentsCross(line(a, picked[a]), line(b, picked[b]))) continue;
-        if (cost[a][picked[b]] >= CROSSING_PENALTY || cost[b][picked[a]] >= CROSSING_PENALTY) continue;
-        [picked[a], picked[b]] = [picked[b], picked[a]];
-        const after = crossings();
-        if (after < before) {
-          before = after;
-          improved = true;
-        } else [picked[a], picked[b]] = [picked[b], picked[a]];
-      }
-    if (!improved) break;
+  }));
+  for (let a = 0; a < lines.length; a++) {
+    for (const f of fixedLines) if (segmentsCross(lines[a], f)) fixed2++;
+    for (let b = a + 1; b < lines.length; b++) if (segmentsCross(lines[a], lines[b])) ring++;
   }
-  return crossings();
+  return { fixed: fixed2, ring };
 }
-var CROSSING_PENALTY = 1e6;
-var CROSSING_GROW_STEPS = 12;
+function uncross(points, slots, fixedLines, picked) {
+  const n = picked.length;
+  const count2 = slots.length;
+  const lines = points.map((p) => slots.map((s) => lineBetween(p, s)));
+  const length = points.map((p, i) => slots.map((_, j) => Math.hypot(lines[i][j].x2 - p[0], lines[i][j].y2 - p[1])));
+  const hitsFixed = lines.map((row) => row.map((l) => fixedLines.filter((f) => segmentsCross(l, f)).length));
+  const cache = new Uint8Array(n * count2 * n * count2);
+  const crossing = (a, sa, b, sb) => {
+    const key2 = ((a * count2 + sa) * n + b) * count2 + sb;
+    if (!cache[key2]) {
+      const value = segmentsCross(lines[a][sa], lines[b][sb]) ? 2 : 1;
+      cache[key2] = value;
+      cache[((b * count2 + sb) * n + a) * count2 + sa] = value;
+    }
+    return cache[key2] === 2;
+  };
+  const cardCost = (a, skip) => {
+    let c = hitsFixed[a][picked[a]] * FIXED_CROSSING_WEIGHT;
+    for (let b = 0; b < n; b++) if (b !== a && b !== skip && crossing(a, picked[a], b, picked[b])) c++;
+    return c;
+  };
+  const descend = () => {
+    var _a2, _b2;
+    const owner = /* @__PURE__ */ new Map();
+    picked.forEach((j, i) => owner.set(j, i));
+    for (let move = 0; move < UNCROSS_MAX_MOVES; move++) {
+      let bestCross = 0;
+      let bestLength = -1e-9;
+      let bestA = -1;
+      let bestSlot = -1;
+      for (let a = 0; a < n; a++) {
+        const from2 = picked[a];
+        for (let to = 0; to < count2; to++) {
+          if (to === from2) continue;
+          const b2 = (_a2 = owner.get(to)) != null ? _a2 : -1;
+          const before = cardCost(a, -1) + (b2 >= 0 ? cardCost(b2, a) : 0);
+          picked[a] = to;
+          if (b2 >= 0) picked[b2] = from2;
+          const after = cardCost(a, -1) + (b2 >= 0 ? cardCost(b2, a) : 0);
+          picked[a] = from2;
+          if (b2 >= 0) picked[b2] = to;
+          const dCross = after - before;
+          const dLength = length[a][to] + (b2 >= 0 ? length[b2][from2] : 0) - length[a][from2] - (b2 >= 0 ? length[b2][to] : 0);
+          if (dCross < bestCross || dCross === bestCross && dLength < bestLength) {
+            bestCross = dCross;
+            bestLength = dLength;
+            bestA = a;
+            bestSlot = to;
+          }
+        }
+      }
+      if (bestA < 0) return;
+      const from = picked[bestA];
+      const b = (_b2 = owner.get(bestSlot)) != null ? _b2 : -1;
+      picked[bestA] = bestSlot;
+      owner.set(bestSlot, bestA);
+      if (b >= 0) {
+        picked[b] = from;
+        owner.set(from, b);
+      } else owner.delete(from);
+    }
+  };
+  const crossings = () => {
+    let c = 0;
+    for (let a = 0; a < n; a++) {
+      c += hitsFixed[a][picked[a]] * FIXED_CROSSING_WEIGHT;
+      for (let b = a + 1; b < n; b++) if (crossing(a, picked[a], b, picked[b])) c++;
+    }
+    return c;
+  };
+  if (crossings() === 0) return;
+  let nodes = 0;
+  const found = new Array(n).fill(-1);
+  const search = (domains2, left) => {
+    if (!left) return true;
+    if (++nodes > UNCROSS_MAX_NODES) return false;
+    let a = -1;
+    for (let i = 0; i < n; i++) if (found[i] < 0 && (a < 0 || domains2[i].length < domains2[a].length)) a = i;
+    for (const slot of [...domains2[a]].sort((x, y) => length[a][x] - length[a][y] || x - y)) {
+      const next = domains2.map(
+        (domain, i) => found[i] >= 0 || i === a ? domain : domain.filter((s) => s !== slot && !crossing(a, slot, i, s))
+      );
+      if (next.every((domain, i) => found[i] >= 0 || i === a || domain.length)) {
+        found[a] = slot;
+        if (search(next, left - 1)) return true;
+        found[a] = -1;
+      }
+      if (nodes > UNCROSS_MAX_NODES) return false;
+    }
+    return false;
+  };
+  const domains = lines.map((row, i) => row.map((_, j) => j).filter((j) => hitsFixed[i][j] === 0));
+  if (domains.every((domain) => domain.length) && search(domains, n)) for (let i = 0; i < n; i++) picked[i] = found[i];
+  descend();
+}
+var CROSSING_GROW_STEPS = 20;
 function solveRing(image, members, fixedLines = []) {
   const cell = {
     w: members.reduce((m, c) => Math.max(m, cardW(c)), 0) || CARD_WIDTH,
@@ -30107,21 +30195,23 @@ function solveRing(image, members, fixedLines = []) {
     (c) => [image.x + clamp012(c.anchorX) * image.w, image.y + clamp012(c.anchorY) * image.h]
   );
   let { slots, clearance } = ringSlots(image, members.length, cell, RING_MARGIN, fixedLines);
-  let picked = [];
+  let best = null;
   for (let step = 0; ; step++) {
-    const cost = points.map(
-      (p) => slots.map((s) => {
-        const length = Math.hypot(p[0] - s.ax, p[1] - s.ay);
-        const line = { x1: p[0], y1: p[1], x2: s.ax, y2: s.ay };
-        return fixedLines.some((fixed2) => segmentsCross(line, fixed2)) ? length + CROSSING_PENALTY : length;
-      })
-    );
-    picked = assign(cost);
-    const crossed = fixedLines.length ? uncross(points, slots, cost, picked) : 0;
-    if (!fixedLines.length || crossed === 0 && picked.every((j, i) => cost[i][j] < CROSSING_PENALTY) || step >= CROSSING_GROW_STEPS)
+    const cost = points.map((p) => slots.map((s) => Math.hypot(p[0] - s.ax, p[1] - s.ay)));
+    if (!fixedLines.length) {
+      best = { slots, clearance, picked: assign(cost), score: 0 };
       break;
+    }
+    const picked2 = assign(cost);
+    uncross(points, slots, fixedLines, picked2);
+    const found = countCrossings(points, slots, fixedLines, picked2);
+    const score = found.fixed * FIXED_CROSSING_WEIGHT + found.ring;
+    if (!best || score < best.score) best = { slots, clearance, picked: picked2, score };
+    if (best.score === 0 || step >= CROSSING_GROW_STEPS) break;
     ({ slots, clearance } = ringSlots(image, members.length, cell, image.x - clearance.x + RING_GROW, fixedLines));
   }
+  ({ slots, clearance } = best);
+  const picked = best.picked;
   const cards = members.map((c, i) => {
     const slot = slots[picked[i]];
     const rect2 = ringCardRect(slot, cardW(c), cardH(c));

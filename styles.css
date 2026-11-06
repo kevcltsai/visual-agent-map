@@ -1909,7 +1909,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-anchor-pick-row button { flex: 1 1 auto; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-anchor-pick-taken { flex: 0 0 auto; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-view .vam-relation[data-anchor-relation] { transition: opacity 0.12s ease, stroke-width 0.12s ease; }
-/* Anchor lines are the first thing seen on a picture: heavier than a topic line and nearly the text colour, so they hold on a light picture. */
+/* Anchor lines are the first thing seen on a picture: heavier than a topic line and in the accent colour, so they hold on a light picture. */
 .vam-view .vam-relation[data-anchor-relation]:not(.vam-relation-derives_from) { --vam-relation-width: 2.25px; }
 .vam-view .vam-relation[data-anchor-relation]:not(.is-selected) { stroke: var(--interactive-accent); }
 /* A ring line of the plain "related" kind says nothing the line does not: its name shows only when the line is hovered or selected. */

@@ -446,3 +446,22 @@ test('R1: one more ring member (placed alone, the others stay) is not put on or 
   });
   assert.deepEqual(againstFixed(image, cards, fixed), []);
 });
+
+// B1 (review round 2): the ring is placed again after it moved off other cards, up to three times (map-layout-text.ts, solveRings).
+// With two existing topics linked to the picture, the first position of a big ring lies on them and the next on them again.
+const LV2 = [[0.37, 0.44], [0.45, 0.48], [0.52, 0.44], [0.51, 0.51], [0.61, 0.46], [0.32, 0.53], [0.39, 0.53], [0.6, 0.52], [0.585, 0.6], [0.33, 0.73], [0.32, 0.65], [0.47, 0.58]];
+test('B1: with two existing topics linked to the picture, solving the ring again after it moved leaves no ring card on them and none on another', () => {
+  const [i, j] = [0, 8];
+  const rows = LV2.map((at, k) => [`a${k}`, `t${k}`, at]);
+  const ringRows = rows.filter((_, k) => k !== i && k !== j);
+  const pic = picture(ringRows, { x: -260, y: 429.6, w: 720, h: 532.8 });
+  for (const [k, topic] of [[i, 'e1'], [j, 'e2']]) {
+    pic.anchors.push({ id: rows[k][0], at: { kind: 'image-2d', x: rows[k][2][0], y: rows[k][2][1] } });
+    pic.relations.push({ kind: 'related', from: rows[k][0], to: topic });
+  }
+  const map = doc([node('e1', null, 0, 0), node('e2', null, 360, 0), ...ringRows.map(r => node(r[1], null, 5000, 5000))], [pic]);
+  bare(map).solveRingsIn(map, { enlarge: false });
+  const rects = map.nodes.map(n => ({ id: n.id, ...rect(n) }));
+  for (let a = 0; a < rects.length; a++) for (let b = a + 1; b < rects.length; b++) assert.equal(hit(rects[a], rects[b]), false, `${rects[a].id}|${rects[b].id}`);
+  for (const r of rects) assert.equal(hit(r, imageOf(map)), false, `${r.id} is clear of the picture`);
+});

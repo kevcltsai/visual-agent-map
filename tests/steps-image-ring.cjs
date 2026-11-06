@@ -272,14 +272,17 @@ test('R1: with an existing card above the picture, no ring card is on a fixed li
   assert.deepEqual(plain(ring.solveRing(RIMG, inputs, [])), plain(blind), 'no fixed lines: the result is unchanged');
 });
 
-test('R1: random existing cards above the picture (1-2 fixed lines): 0 cards on a line, 0 crossings', () => {
+// Round 64 has no crossing-free placement within the ring sizes the solver tries; pinned with its exact count.
+const KNOWN_UNSOLVED = [{ round: 64, crossed: 1 }];
+test('R1: random existing cards on any side of the picture (1-2 fixed lines): 0 cards on a line, 0 line crossings but the pinned rounds', () => {
   const random = lcg(11);
+  const unsolved = [];
   for (let round = 0; round < 80; round++) {
     const n = 1 + Math.floor(random() * 12);
     const inputs = toCards(Array.from({ length: n }, () => [random(), random()]), () => ({ w: 280, h: 110 + Math.floor(random() * 80) }));
     const fixed = [];
     for (let k = 0, m = 1 + Math.floor(random() * 2); k < m; k++) {
-      const side = 0; // the shape of the live sample: existing cards above the picture
+      const side = Math.floor(random() * 4); // all four sides of the picture, not only the live sample's "above"
       const card = [
         { x: RIMG.x + random() * 400, y: RIMG.y - 300 - random() * 100, w: 280, h: 110 },
         { x: RIMG.x + random() * 400, y: RIMG.y + RIMG.h + 150 + random() * 100, w: 280, h: 110 },
@@ -289,12 +292,60 @@ test('R1: random existing cards above the picture (1-2 fixed lines): 0 cards on 
       fixed.push(ring.ringLine(RIMG, random(), random(), card));
     }
     const layout = ring.solveRing(RIMG, inputs, fixed);
-    // Against the fixed lines (violations of one card): never. Two ring lines crossing each other, which a fixed line can force
-    // in rare crowded cases, and `pairing` (not the shortest matching) are not about the fixed lines and are left out here.
-    const bad = viol(RIMG, withStates(layout, inputs), { memberCount: n, fixedLines: fixed }).filter(v => v.ids.length <= 1);
-    assert.deepEqual(bad, [], `round ${round}`);
+    // Against the fixed lines (violations of one card): never. `pairing` (not the shortest matching) is expected with fixed
+    // lines, as in placeNewMember. Two ring lines crossing each other are counted: a few random rounds have no crossing-free
+    // placement within the ring sizes the solver tries, so the number of those rounds is pinned (KNOWN_UNSOLVED) instead of
+    // dropping the check; a change in either direction fails and has to be looked at.
+    const found = viol(RIMG, withStates(layout, inputs), { memberCount: n, fixedLines: fixed });
+    assert.deepEqual(found.filter(v => v.ids.length <= 1), [], `round ${round}`);
+    const crossed = found.filter(v => v.code === 'crossing' && v.ids.length === 2).length;
+    if (crossed) unsolved.push({ round, crossed });
     assert.deepEqual(againstFixed(RIMG, withStates(layout, inputs), fixed), [], `round ${round} (independent check)`);
   }
+  assert.deepEqual(unsolved, KNOWN_UNSOLVED);
+});
+
+// B1 (review round 2): two existing topics linked to the picture, every pair of the real anchor sets as those two. The
+// lv2 anchors are copied here from the live map (12 anchors, picture 720x532.8, existing cards at (0,0) and (360,0)).
+const LV2 = [[0.37, 0.44], [0.45, 0.48], [0.52, 0.44], [0.51, 0.51], [0.61, 0.46], [0.32, 0.53], [0.39, 0.53], [0.6, 0.52], [0.585, 0.6], [0.33, 0.73], [0.32, 0.65], [0.47, 0.58]];
+// One pair has no crossing-free placement within the ring sizes the solver tries (a search for it needs a margin of 1,104 against
+// the 864 that is the most solveRing grows to); it is pinned with its exact count, so a change either way fails.
+const KNOWN_B1_LIMIT = { 'mockup11 fixed 5,6': 2 };
+test('B1: real anchor sets with any 2 of them linked to existing cards: 0 crossings between ring lines (but the pinned pair), none with a fixed line, no card on a line', () => {
+  const image = { x: -260, y: 429.6, w: 720, h: 532.8 };
+  const existing = [{ x: 0, y: 0, w: 280, h: 100 }, { x: 360, y: 0, w: 280, h: 100 }];
+  const crossedAt = {};
+  for (const [name, anchors] of Object.entries({ claude12: fixture.claude12, luna12: fixture.luna12, mockup11: fixture.mockup11, lv2: LV2 }))
+    for (let i = 0; i < anchors.length; i++)
+      for (let j = i + 1; j < anchors.length; j++) {
+        const fixed = [ring.ringLine(image, ...anchors[i], existing[0]), ring.ringLine(image, ...anchors[j], existing[1])];
+        const inputs = toCards(anchors.filter((_, k) => k !== i && k !== j), () => ({ w: 280, h: 100 }));
+        const cards = withStates(ring.solveRing(image, inputs, fixed), inputs);
+        const found = viol(image, cards, { memberCount: inputs.length, fixedLines: fixed }).filter(v => v.code !== 'pairing' && v.code !== 'crossing');
+        assert.deepEqual(found, [], `${name} fixed ${i},${j}`);
+        assert.deepEqual(againstFixed(image, cards, fixed), [], `${name} fixed ${i},${j} (independent check)`);
+        const lines = cards.map(c => ring.ringLine(image, c.anchorX, c.anchorY, c));
+        let crossed = 0;
+        for (let a = 0; a < lines.length; a++) for (let b = a + 1; b < lines.length; b++) if (segCross(lines[a], lines[b])) crossed++;
+        if (crossed) crossedAt[`${name} fixed ${i},${j}`] = crossed;
+      }
+  assert.deepEqual(crossedAt, KNOWN_B1_LIMIT);
+});
+
+// B1: 20 cards and two fixed lines that no placement within the tried ring sizes (up to a margin of 864) can keep clear of all
+// crossings (an independent randomised search found none either). The ring sizes differ in what is left, so the result of
+// the one with the fewest crossings (no ring line over a fixed line, then fewest between ring lines) has to be kept, not the last, largest ring.
+test('B1: when no ring size gets rid of every crossing, the placement with the fewest is kept (none over a fixed line, 13 between ring lines)', () => {
+  const image = { x: 100, y: 400, w: 716, h: 512 };
+  const rows = [[0.327, 0.558, 170], [0.386, 0.442, 167], [0.153, 0.144, 117], [0.471, 0.657, 175], [0.335, 0.706, 113], [0.588, 0.997, 179], [0.373, 0.989, 177], [0.423, 0.342, 156], [0.236, 0.855, 114], [0.4, 0.875, 124], [0.031, 0.904, 171], [0.488, 0.493, 145], [0.411, 0.129, 136], [0.529, 0.819, 138], [0.249, 0.383, 187], [0.704, 0.988, 157], [0.729, 0.315, 160], [0.85, 0.337, 115], [0.411, 0.979, 114], [0.181, 0.476, 184]];
+  const fixed = [{ x1: 502.5, y1: 725, x2: 475.7, y2: 173.1 }, { x1: 138.2, y1: 709, x2: 522.9, y2: 126.1 }];
+  const inputs = rows.map(([x, y, h], i) => ({ id: `t${i}`, anchorX: x, anchorY: y, w: 280, h }));
+  const cards = withStates(ring.solveRing(image, inputs, fixed), inputs);
+  assert.deepEqual(againstFixed(image, cards, fixed), []);
+  const lines = cards.map(c => ring.ringLine(image, c.anchorX, c.anchorY, c));
+  let crossed = 0;
+  for (let a = 0; a < lines.length; a++) for (let b = a + 1; b < lines.length; b++) if (segCross(lines[a], lines[b])) crossed++;
+  assert.equal(crossed, 13);
 });
 
 test('R1: a member added later is not put on a fixed line either', () => {

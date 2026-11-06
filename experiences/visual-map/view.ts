@@ -1553,6 +1553,14 @@ export class VisualAgentMapView extends ItemView {
     if (!text?.parentId || !followers.size) return;
     this.arrangeBranch(map, text.parentId, followers, undefined, widthOf);
   }
+  /**
+   * After a branch became a top-level tree (`arrangeNewTree` knows no text), lays out again the blocks hanging on its topics
+   * that have followers, so the line from a block to its followers does not run across the map.
+   */
+  private relayoutBlocksOf(map: MapDocument, branch: Set<string>): void {
+    const blocks = (map.canvasItems ?? []).filter((item): item is TextItem => item.kind === "text");
+    for (const block of blocks) if (block.parentId && branch.has(block.parentId)) this.relayoutFollowers(map, block.id);
+  }
   /** The map's child index while a paint draws its cards; null otherwise. */
   private paintChildIndex: Map<string, MapNode[]> | null = null;
   /** Card measurements waiting for the paint to finish building every card; null outside a paint. */
@@ -5064,7 +5072,14 @@ export class VisualAgentMapView extends ItemView {
       const moving = map.nodes.find(item => item.id === node.id);
       const target = map.nodes.find(item => item.id === parent.id);
       const next = map.nodes.find(item => item.id === before.id);
-      if (!moving || !target || next?.parentId !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
+      if (
+        !moving ||
+        !target ||
+        next?.parentId !== parent.id ||
+        next.afterTextId ||
+        !canParent(map.nodes, node.id, parent.id)
+      )
+        return;
       // The children of the new parent first take the order on screen (what the model was told), so the reorder keeps what was seen.
       map.nodes = this.onScreenSiblingOrder(map);
       const oldParentId = map.nodes.find(item => item.id === node.id)?.parentId ?? null;
@@ -10387,6 +10402,7 @@ export class VisualAgentMapView extends ItemView {
       } else {
         for (const root of roots)
           map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id)!, this.cardHeightOf, layoutOf(map));
+        for (const root of roots) this.relayoutBlocksOf(map, branchOf.get(root.id)!);
       }
     });
     this.selection.afterMove(clearSelection);
@@ -14912,7 +14928,10 @@ export class VisualAgentMapView extends ItemView {
           if (parent) {
             parent.collapsed = false;
             this.arrangeBranch(map, parent.id, branch, undefined);
-          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
+          } else {
+            map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
+            this.relayoutBlocksOf(map, branch);
+          }
         });
       });
     };
@@ -16840,7 +16859,8 @@ export class VisualAgentMapView extends ItemView {
             const minTop = siblings.length
               ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
               : undefined;
-            this.arrangeBranch(map, owner.id, new Set([node.id]), minTop);
+            // Grown from the block itself, so the block and the topics already after it stay where they are.
+            this.arrangeBranch(map, node.afterTextId ? node.afterTextId : owner.id, new Set([node.id]), minTop);
           } else if (!parent) {
             const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
             if (roots.length)
@@ -21165,7 +21185,9 @@ export class VisualAgentMapView extends ItemView {
           if (beforeId === null) return skipped("ui.map_chat_skip_parent_missing");
           const before = nodeOf(beforeId);
           if (!before) return gone;
-          if (before.id === node.id || before.parentId !== parent.id) return skipped("ui.map_chat_skip_not_sibling");
+          // The moved card becomes a direct child, so only a direct child of the parent can stand behind it.
+          if (before.id === node.id || before.parentId !== parent.id || before.afterTextId)
+            return skipped("ui.map_chat_skip_not_sibling");
           if (!(await this.chatMoveBefore(node, parent, before))) return skipped("ui.map_chat_skip_not_sibling");
         } else await this.moveTopic(node, parent);
         await this.chatTopicAccept(node.id, baseline.topicHashes);
@@ -21180,7 +21202,9 @@ export class VisualAgentMapView extends ItemView {
         if (!parent || kids.some(kid => !kid)) return gone;
         if (this.isMerging(parent.id) || kids.some(kid => this.isMerging(kid!.id)))
           return skipped("ui.map_chat_skip_merge_locked");
-        if (kids.some(kid => kid!.parentId !== parent.id)) return skipped("ui.map_chat_skip_not_sibling");
+        // Topics after a text block and direct children are not siblings of each other: a mixed list orders nothing.
+        if (kids.some(kid => kid!.parentId !== parent.id || kid!.afterTextId !== kids[0]!.afterTextId))
+          return skipped("ui.map_chat_skip_not_sibling");
         await this.chatReorderChildren(parent, ids as string[]);
         return done;
       }
@@ -22592,9 +22616,10 @@ export class VisualAgentMapView extends ItemView {
         !this.map.aim &&
         layoutOf(this.map).direction === "timeline" &&
         [...group.keys()].some(id => {
-          const parentId = this.map?.nodes.find(item => item.id === id)?.parentId;
-          const parent = parentId ? this.map?.nodes.find(item => item.id === parentId) : undefined;
-          return !!parent && !parent.parentId;
+          const item = this.map?.nodes.find(n => n.id === id);
+          const parent = item?.parentId ? this.map?.nodes.find(n => n.id === item.parentId) : undefined;
+          // A topic after a text block is no first-level topic: its drag only changes the place.
+          return !!parent && !parent.parentId && !item?.afterTextId;
         });
       let warned = false;
       // Released over the AI chat window the card is a reference to add, not something to move.

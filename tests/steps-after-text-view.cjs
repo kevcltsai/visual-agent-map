@@ -405,3 +405,74 @@ test('chat context: a text block lists the topics that follow it; the field and 
   assert.match(parsed.userTextsNote, /must not be rewritten or deleted/);
   assert.match(parsed.userTextsNote, /followedBy/);
 });
+
+// ledger R1: each + on a block drifted the block and every follower down (minTop was applied to the whole block).
+for (const direction of ['right', 'left', 'balanced']) {
+  test(`add: ${direction}: after 3 or more followers the block and the first follower stay put and the followers are evenly stacked`, async () => {
+    const h = await harness(({ root }) => [txt({ parentId: root.id, x: 420, y: 80, text: 'hello' })]);
+    h.view.map.layout = { direction };
+    await h.repo.saveMap(h.view.path, h.view.map);
+    h.view.map = await h.repo.readMap(h.view.path);
+    h.view.cardHeightOf = id => (id === 't1' ? 28 : 180);
+    const placed = [];
+    for (const title of ['C1', 'C2', 'C3', 'C4']) {
+      await h.addFollower(title);
+      await h.settle();
+      const t = h.view.map.canvasItems.find(i => i.id === 't1');
+      const followers = h.view.map.nodes.filter(n => n.afterTextId === 't1').sort((a, b) => a.y - b.y);
+      placed.push({ ty: t.y, tx: t.x, first: followers[0]?.y, firstX: followers[0]?.x, ys: followers.map(n => n.y) });
+    }
+    for (const p of placed.slice(1)) {
+      assert.equal(p.ty, placed[0].ty, 'the block does not move');
+      assert.equal(p.tx, placed[0].tx);
+      assert.equal(p.first, placed[0].first, 'the first follower does not move');
+    }
+    const ys = placed[3].ys;
+    assert.equal(ys.length, 4);
+    const steps = ys.slice(1).map((y, i) => y - ys[i]);
+    assert.ok(steps.every(s => s === steps[0] && s >= 180), `evenly stacked: ${steps}`);
+    // The fixture's direct child sits on the block's spot; only the followers must be clear of everything.
+    const follower = new Set(h.view.map.nodes.filter(n => n.afterTextId).map(n => n.id));
+    assert.deepEqual(overlaps(h).filter(pair => pair.split('/').some(id => follower.has(id))), []);
+    assertSaved(h.raw(), direction);
+  });
+}
+
+// ledger R1: the chat said "done" for reorders and moves that changed nothing.
+test('chat: reorder_topics with a follower and a direct child, or a move_topic before a follower, is skipped and changes nothing', async () => {
+  const h = await harness();
+  await h.addFollower('C1');
+  await h.addFollower('C2');
+  const [c1, c2] = [h.node('C1'), h.node('C2')];
+  const apply = action => h.view.applyChatWrite(action, { mdHashes: {}, topicHashes: {} }, () => true);
+  const before = h.state();
+  const mixed = await apply({ kind: 'reorder_topics', parentId: h.root.id, nodeIds: [c1.id, h.child.id] });
+  assert.equal(mixed.status, 'skipped', 'a follower and a direct child are not siblings');
+  const moved = await apply({ kind: 'move_topic', nodeId: h.child.id, newParentId: h.root.id, beforeId: c1.id });
+  assert.equal(moved.status, 'skipped', 'a follower is not a place among the direct children');
+  assert.equal(h.state(), before, 'nothing changed');
+  // Two followers of the same block still reorder, and the moved card stays a follower.
+  const ok = await apply({ kind: 'reorder_topics', parentId: h.root.id, nodeIds: [c2.id, c1.id] });
+  assert.equal(ok.status, 'done');
+  assert.deepEqual(plain(h.view.map.nodes.filter(n => n.afterTextId).map(n => n.id)), [c2.id, c1.id]);
+});
+
+// ledger R1: a block's followers lay out against the block; moving the topic to the top level must take the block along.
+test('move to top level: the block hanging on the moved topic and its followers land next to it, not left behind', async () => {
+  const h = await harness(({ child }) => [txt({ parentId: child.id, x: 760, y: 80, text: 'hello' })]);
+  h.view.cardHeightOf = id => (id === 't1' ? 28 : 180);
+  await h.view.addNode(h.child, 'C1', true, false, 'topic', false, {}, 't1');
+  await h.view.addNode(h.child, 'C2', true, false, 'topic', false, {}, 't1');
+  await h.view.hydrate();
+  // Park the branch far away first, so a left-behind block would be obvious.
+  await h.view.moveBranches([h.view.map.nodes.find(n => n.id === h.child.id)], null);
+  await h.settle();
+  const child = h.view.map.nodes.find(n => n.id === h.child.id);
+  const t = h.view.map.canvasItems.find(i => i.id === 't1');
+  const followers = h.view.map.nodes.filter(n => n.afterTextId === 't1');
+  assert.equal(followers.length, 2);
+  assert.ok(Math.abs(t.x - child.x) <= 700 && Math.abs(t.y - child.y) <= 400, `block ${t.x},${t.y} near its topic ${child.x},${child.y}`);
+  for (const f of followers) assert.ok(f.x > t.x && Math.abs(f.y - t.y) < 600, `follower ${f.x},${f.y} right of the block ${t.x},${t.y}`);
+  assert.deepEqual(overlaps(h).filter(pair => pair.includes('t1')), []);
+  assertSaved(h.raw(), 'top level');
+});

@@ -861,9 +861,13 @@ export function startViewer(doc: Document): void {
   }
   function layout(): void {
     // A text block that has topics after it takes part as a node (its drawn size), so those topics land after it and clear of it.
-    const leading = texts.filter(
-      text => text.parentId && textEls.has(text.id) && nodes.some(node => node.afterTextId === text.id)
+    // Under a topic that has such followers, its other text blocks take part too, or the followers could land on them.
+    const followed = new Set(
+      texts
+        .filter(text => text.parentId && textEls.has(text.id) && nodes.some(node => node.afterTextId === text.id))
+        .map(text => text.parentId)
     );
+    const leading = texts.filter(text => text.parentId && textEls.has(text.id) && followed.has(text.parentId));
     if (!leading.length) {
       const arranged = arrangeMap(nodes, undefined, id => cards.get(id)?.offsetHeight);
       arranged.forEach((placed, index) => {

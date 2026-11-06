@@ -1269,7 +1269,11 @@ test('sharing viewer text-then-topic: topics after a text block hang from it, cl
     const data = payload();
     // heat has a text block with two topics after it (and a child of the first), plus its two ordinary children.
     const base = { x: 0, y: 0, collapsed: false, status: 'idea', summary: '' };
-    data.textNodes = [{ id: 'lead', parentId: 'heat', text: 'A lead-in note that is fairly long for a block', x: 600, y: 80 }];
+    // A second block on the same topic has no topic after it, but must not be left for the followers to land on.
+    data.textNodes = [
+      { id: 'lead', parentId: 'heat', text: 'A lead-in note that is fairly long for a block', x: 600, y: 80 },
+      { id: 'aside', parentId: 'heat', text: 'An aside that follows no topic', x: 600, y: 140 }
+    ];
     data.nodes.push(
       { ...base, id: 'after1', parentId: 'heat', afterTextId: 'lead', title: 'After one' },
       { ...base, id: 'after2', parentId: 'heat', afterTextId: 'lead', title: 'After two' },
@@ -1310,7 +1314,7 @@ test('sharing viewer text-then-topic: topics after a text block hang from it, cl
       return { opened, auto, folded };
     });
     for (const [name, shot] of [['open', report.opened], ['Auto layout', report.auto]]) {
-      assert.equal(shot.texts.length, 1, `${name}: the block is drawn`);
+      assert.equal(shot.texts.length, 2, `${name}: both blocks are drawn`);
       const text = shot.texts[0];
       assert.deepEqual(shot.hits, [], `${name}: nothing overlaps`);
       for (const id of ['after1', 'after2']) {

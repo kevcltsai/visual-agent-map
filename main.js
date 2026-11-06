@@ -54397,6 +54397,10 @@ function estimateTextWidth(text11) {
   );
   return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
 }
+function lineKind(nodes, fromId, childId, direction) {
+  var _a2;
+  return direction === "fishbone" && ((_a2 = nodes.find((node) => node.id === childId)) == null ? void 0 : _a2.afterTextId) === fromId ? "radial" : direction;
+}
 function depthOf(nodes, id) {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   let depth = 0;
@@ -54952,7 +54956,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     const text11 = ((_a2 = map.canvasItems) != null ? _a2 : []).find((item) => item.kind === "text" && item.id === textId);
     const followers = this.followersOf(map, textId);
     if (!(text11 == null ? void 0 : text11.parentId) || !followers.size) return;
-    this.arrangeBranch(map, text11.parentId, followers, void 0, widthOf);
+    this.arrangeBranch(map, textId, followers, void 0, widthOf);
   }
   /**
    * After a branch became a top-level tree (`arrangeNewTree` knows no text), lays out again the blocks hanging on its topics
@@ -74582,7 +74586,13 @@ ${addition}` : addition });
       const [parentId, childId] = key2.split("\0");
       if (!group.has(parentId) && !group.has(childId)) continue;
       if (!boxFor(parentId) || !boxFor(childId)) continue;
-      tree.push({ key: key2, parentId, childId, direction: directionOf(parentId), depth: depthOf(nodes, childId) });
+      tree.push({
+        key: key2,
+        parentId,
+        childId,
+        direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
+        depth: depthOf(nodes, childId)
+      });
     }
     const linked = [];
     for (const key2 of this.relationEls.keys()) {
@@ -74686,7 +74696,7 @@ ${addition}` : addition });
       if (!other) continue;
       touching2.push({
         key: key2,
-        direction: directionOf(parentId),
+        direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
         depth: depthOf(nodes, childId),
         dragIsParent: parentId === id,
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
@@ -74791,7 +74801,7 @@ ${addition}` : addition });
         if (!parent || !child) continue;
         if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
-        const direction = directionOf(parentId);
+        const direction = lineKind(allNodes, sourceId, node.id, directionOf(parentId));
         path.setAttribute(
           "d",
           direction === "right" ? edgePathData(

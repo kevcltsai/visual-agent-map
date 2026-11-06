@@ -1831,7 +1831,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-anchor-pick-row { display: flex; align-items: center; gap: 10px; }
 .vam-anchor-pick-row button { flex: 1 1 auto; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-anchor-pick-taken { flex: 0 0 auto; font-size: var(--font-ui-smaller); color: var(--text-muted); }
-@media (prefers-reduced-motion: reduce) { .vam-view .vam-text-node > .vam-text-add { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .vam-view .vam-text-node > .vam-text-add.vam-text-add { transition: none; } }
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-map-search { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); padding: 4px 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-view .vam-map-search-input { width: 180px; min-width: 0; flex: 1 1 auto; }
@@ -1855,7 +1855,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-text-node { position: absolute; box-sizing: border-box; width: max-content; min-width: 32px; max-width: 300px; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text-normal); font-size: var(--font-ui-small); line-height: 1.45; cursor: text; user-select: none; }
 .vam-view .vam-text-node.has-width { max-width: none; }
 .vam-view .vam-text-node-measure { position: absolute; left: 0; top: 0; visibility: hidden; white-space: pre; pointer-events: none; font: inherit; line-height: inherit; }
-.vam-view .vam-text-resize { position: absolute; top: 3px; right: -5px; bottom: 3px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
+.vam-view .vam-text-resize { z-index: 3; position: absolute; top: 3px; right: -5px; bottom: 3px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
 .vam-view .vam-text-node:hover > .vam-text-resize, .vam-view .vam-text-node:focus-within > .vam-text-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-view .vam-text-resize:hover, .vam-view .vam-text-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
 .vam-view .vam-stage[data-presenting] .vam-text-resize { display: none; }
@@ -1867,8 +1867,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-text-node:hover .vam-text-node-promote, .vam-view .vam-text-node:focus-within .vam-text-node-promote { display: inline-block; }
 /* The + of a text block that hangs on a topic: same behaviour as the card's +, to the right of the block (past its width handle). */
 .vam-view .vam-text-node > .vam-text-add { position: absolute; right: -32px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 50%; background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); font-size: var(--font-ui-medium); line-height: 1; opacity: 0; transition: opacity 120ms ease-out; z-index: 2; pointer-events: none; }
-/* Invisible bridge over the 3px between the width handle and the +, so a slow move from the text keeps the + reachable. */
-.vam-view .vam-text-node > .vam-text-add::before { content: ""; position: absolute; right: 100%; top: 0; bottom: 0; width: 3px; pointer-events: auto; }
+/* Invisible bridge between the width handle and the + (4px, overlapping the handle's edge, which sits above it), so a slow move from the text keeps the + reachable. */
+.vam-view .vam-text-node > .vam-text-add::before { content: ""; position: absolute; right: 100%; top: 0; bottom: 0; width: 4px; pointer-events: auto; }
 .vam-view .vam-text-node > .vam-text-add:hover { color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); border-color: var(--interactive-accent); }
 .vam-view .vam-text-node:hover > .vam-text-add, .vam-view .vam-text-node:focus-within > .vam-text-add, .vam-view .vam-text-node.is-selected > .vam-text-add { opacity: 1; pointer-events: auto; }
 .vam-view .vam-stage[data-presenting] .vam-text-node > .vam-text-add { display: none; }

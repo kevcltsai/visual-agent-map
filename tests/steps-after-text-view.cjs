@@ -372,8 +372,14 @@ test('share: the payload keeps the link only for a block in the payload on the s
   assert.deepEqual(withBracket.summaries[0].members, ['d', 'e'], 'the follower is not in the row the bracket frames');
 });
 
-test('fishbone: a follower line counts the block as one more level, and the spine joins only first-level topics', async () => {
-  const geometry = load('experiences/visual-map/relation-geometry.ts');
+// CONTRACT CHANGE (Acceptance: the line to a follower starts on the block): the old assertions locked the P->T bone rib
+// (treeEdgePathData(..., 'fishbone', 2)), which never touches the block. A fishbone follower line is now the straight line T -> C.
+const onBox = (d, b, end = false) => {
+  const [x, y] = (end ? d.match(/([\d.-]+) ([\d.-]+)$/) : d.match(/^M ([\d.-]+) ([\d.-]+)/)).slice(1).map(Number);
+  const inX = x >= b.x - 0.01 && x <= b.x + b.width + 0.01, inY = y >= b.y - 0.01 && y <= b.y + b.height + 0.01;
+  return (inX && (Math.abs(y - b.y) < 0.01 || Math.abs(y - b.y - b.height) < 0.01)) || (inY && (Math.abs(x - b.x) < 0.01 || Math.abs(x - b.x - b.width) < 0.01));
+};
+async function fishboneHarness() {
   const h = await harness();
   await h.addFollower('C1');
   const c1 = h.node('C1');
@@ -384,13 +390,37 @@ test('fishbone: a follower line counts the block as one more level, and the spin
   h.view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
   h.view.drawEdges();
   const box = id => { const e = h.view.cardEls.get(id) ?? h.textEl(id); return { x: e.offsetLeft, y: e.offsetTop, width: e.offsetWidth, height: e.offsetHeight }; };
+  return { h, c1, box };
+}
+
+test('fishbone: the follower line is the straight line from the block to the follower, and the spine joins only first-level topics', async () => {
+  const geometry = load('experiences/visual-map/relation-geometry.ts');
+  const { h, c1, box } = await fishboneHarness();
   const drawn = h.view.edgeEls.get(`t1\u0000${c1.id}`).attrs.d;
-  assert.equal(drawn, geometry.treeEdgePathData(box('t1'), box(c1.id), 'fishbone', 2), 'root -> text -> follower: the follower is level 2');
-  assert.notEqual(drawn, geometry.treeEdgePathData(box('t1'), box(c1.id), 'fishbone', 1), 'not level 1 (the topic itself)');
-  // The spine: first-level topics of the head only.
+  assert.equal(drawn, geometry.relationPathData(box('t1'), box(c1.id)), 'a straight line T -> C, as radial draws it');
+  assert.ok(onBox(drawn, box('t1')), `the line starts on the block's box: ${drawn}`);
+  assert.notEqual(drawn, geometry.treeEdgePathData(box('t1'), box(c1.id), 'fishbone', 2), 'not the rib that never touches the block');
   h.view.canvasNodes = () => h.view.map.nodes;
   const spine = h.view.spineBoxes(h.root.id);
   assert.deepEqual(plain(spine.topics.map(topic => topic.id)), [h.child.id], 'the follower is not a bone of the spine');
+});
+
+test('fishbone: while dragging the follower, its block or the group, the line keeps starting on the block', async () => {
+  const { h, c1, box } = await fishboneHarness();
+  const key = `t1\u0000${c1.id}`;
+  const size = { offsetWidth: 100, offsetHeight: 50 };
+  h.view.dragEdges(c1.id, size).update(900, 300);
+  assert.ok(onBox(h.view.edgeEls.get(key).attrs.d, box('t1')), `drag C: ${h.view.edgeEls.get(key).attrs.d}`);
+  assert.ok(onBox(h.view.edgeEls.get(key).attrs.d, { x: 900, y: 300, width: 100, height: 50 }, true), 'and ends on the dragged C');
+  h.view.drawEdges();
+  h.view.dragEdges('t1', size).update(300, 20);
+  assert.ok(onBox(h.view.edgeEls.get(key).attrs.d, { x: 300, y: 20, width: 100, height: 50 }), `drag T: ${h.view.edgeEls.get(key).attrs.d}`);
+  h.view.drawEdges();
+  h.view.groupDragEdges(new Map([[c1.id, h.view.cardEls.get(c1.id)]])).update(50, 80);
+  assert.ok(onBox(h.view.edgeEls.get(key).attrs.d, box('t1')), `group drag C: ${h.view.edgeEls.get(key).attrs.d}`);
+  h.view.drawEdges();
+  h.view.groupDragEdges(new Map([['t1', h.textEl('t1')], [c1.id, h.view.cardEls.get(c1.id)]])).update(50, 80);
+  assert.ok(onBox(h.view.edgeEls.get(key).attrs.d, { ...box('t1'), x: 450, y: 180 }), `group drag T and C: ${h.view.edgeEls.get(key).attrs.d}`);
 });
 
 test('chat context: a text block lists the topics that follow it; the field and its note appear only then', () => {
@@ -476,3 +506,52 @@ test('move to top level: the block hanging on the moved topic and its followers 
   assert.deepEqual(overlaps(h).filter(pair => pair.includes('t1')), []);
   assertSaved(h.raw(), 'top level');
 });
+
+// ledger R2: the reduced-motion rule sits before the "Map search" comment (scope tests read from there to the end), so it loses
+// to the base rule by source order unless its selector is more specific. A real browser showed transition: opacity 120ms.
+test('css: the + reduced-motion rule beats the base rule it sits above, and the hover bridge overlaps the width handle without covering it', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  const scopeStart = css.indexOf('/* Map search (Mod+F)');
+  const media = /@media \(prefers-reduced-motion: reduce\) \{\s*([^{]*\.vam-text-add[^{]*)\{\s*transition:\s*none;?\s*\}\s*\}/.exec(css);
+  assert.ok(media, 'reduced-motion rule for .vam-text-add exists');
+  assert.ok(media.index < scopeStart, 'it stays above the first scoped block');
+  const weight = selector => (selector.match(/\.[\w-]+|\[[^\]]+\]|:[\w-]+/g) ?? []).length;
+  const bases = [...css.matchAll(/^([^@/{}\n][^{\n]*\.vam-text-add[^{\n]*)\{([^}]*)\}/gm)].filter(m => /transition:/.test(m[2]) && !m[1].includes('::'));
+  assert.ok(bases.length >= 1, 'the base rule that sets the transition');
+  for (const base of bases) {
+    const baseWeight = weight(base[1].trim()), reducedWeight = weight(media[1].trim());
+    assert.ok(reducedWeight > baseWeight || (reducedWeight === baseWeight && media.index > base.index), `reduced-motion (${reducedWeight}) beats the base rule (${baseWeight}) ${base[1].trim()}`);
+  }
+  const bridge = /\.vam-text-add::before \{[^}]*width:\s*(\d+(?:\.\d+)?)px/.exec(css);
+  assert.ok(bridge && Number(bridge[1]) >= 4, `the bridge is wider than the 3px that left a hole: ${bridge?.[1]}`);
+  const z = rule => Number(new RegExp(`${rule}[^{]*\\{[^}]*z-index:\\s*(\\d+)`).exec(css)?.[1] ?? 0);
+  assert.ok(z('\\.vam-view \\.vam-text-resize ') > z('\\.vam-text-node > \\.vam-text-add '), 'the width handle stays above the + bridge where they overlap');
+});
+
+// ledger R2: widening or editing a block re-arranged from its topic, so the block itself moved (the + keeps it still).
+for (const direction of ['right', 'left', 'balanced', 'down', 'up']) {
+  test(`resize and edit: ${direction}: the block stays where it is and its followers move clear of it`, async () => {
+    const h = await harness(({ root }) => [txt({ parentId: root.id, x: 420, y: 300, text: 'short' })]);
+    h.view.map.layout = { direction };
+    await h.repo.saveMap(h.view.path, h.view.map);
+    h.view.map = await h.repo.readMap(h.view.path);
+    h.view.cardHeightOf = id => (id === 't1' ? 28 : 180);
+    await h.addFollower('C1');
+    await h.addFollower('C2');
+    await h.settle();
+    const at = () => { const t = h.view.map.canvasItems.find(i => i.id === 't1'); return [t.x, t.y]; };
+    const before = at();
+    const from = h.view.textWidthOf('t1') ?? 60;
+    // Widening itself may anchor the block's far edge (textAnchoredX, existing behaviour); the layout adds no move of its own.
+    const anchored = [h.view.textAnchoredX('t1', from, 560), before[1]];
+    await h.view.resizeText('t1', 560, from);
+    await h.settle();
+    assert.deepEqual(at(), anchored, `the block did not move when it was widened ${JSON.stringify(h.view.map.nodes.map(n => [n.x, n.y, n.afterTextId]))}`);
+    const widened = at();
+    await h.view.saveTextItem('t1', 'a much longer text '.repeat(10));
+    await h.settle();
+    assert.deepEqual(at(), widened, 'the block did not move when its text changed');
+    assert.deepEqual(overlaps(h).filter(s => s.includes('t1')), [], 'followers clear of the wider block');
+    assertSaved(h.raw(), direction);
+  });
+}

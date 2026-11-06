@@ -902,6 +902,17 @@ function estimateTextWidth(text: string): number {
   );
   return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
 }
+/**
+ * The arrangement a tree line is drawn in. In a fishbone the line from a text block to the topic that follows it is a
+ * straight line between the two boxes (like a radial line): the block hangs beside its topic's bone, so a rib on the bone
+ * would never touch the block.
+ */
+function lineKind(nodes: MapNode[], fromId: string, childId: string, direction: string): string {
+  return direction === "fishbone" && nodes.find(node => node.id === childId)?.afterTextId === fromId
+    ? "radial"
+    : direction;
+}
+
 function depthOf(nodes: MapNode[], id: string): number {
   const byId = new Map(nodes.map(node => [node.id, node]));
   let depth = 0;
@@ -1551,7 +1562,8 @@ export class VisualAgentMapView extends ItemView {
     const text = (map.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === textId);
     const followers = this.followersOf(map, textId);
     if (!text?.parentId || !followers.size) return;
-    this.arrangeBranch(map, text.parentId, followers, undefined, widthOf);
+    // Grown from the block, as the + does: the block stays where it is and only what follows it moves.
+    this.arrangeBranch(map, textId, followers, undefined, widthOf);
   }
   /**
    * After a branch became a top-level tree (`arrangeNewTree` knows no text), lays out again the blocks hanging on its topics
@@ -22856,7 +22868,13 @@ export class VisualAgentMapView extends ItemView {
       const [parentId, childId] = key.split("\u0000");
       if (!group.has(parentId) && !group.has(childId)) continue;
       if (!boxFor(parentId) || !boxFor(childId)) continue;
-      tree.push({ key, parentId, childId, direction: directionOf(parentId), depth: depthOf(nodes, childId) });
+      tree.push({
+        key,
+        parentId,
+        childId,
+        direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
+        depth: depthOf(nodes, childId)
+      });
     }
     const linked: { key: string; fromId: string; toId: string }[] = [];
     for (const key of this.relationEls.keys()) {
@@ -22966,7 +22984,7 @@ export class VisualAgentMapView extends ItemView {
       if (!other) continue;
       touching.push({
         key,
-        direction: directionOf(parentId),
+        direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
         depth: depthOf(nodes, childId),
         dragIsParent: parentId === id,
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
@@ -23095,7 +23113,7 @@ export class VisualAgentMapView extends ItemView {
         if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
         // The edge follows its parent's arrangement, which a branch of its own may change.
-        const direction = directionOf(parentId) as LayoutKind;
+        const direction = lineKind(allNodes, sourceId, node.id, directionOf(parentId)) as LayoutKind;
         path.setAttribute(
           "d",
           direction === "right"

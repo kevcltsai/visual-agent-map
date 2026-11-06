@@ -487,13 +487,7 @@ import {
   clampMapChatWidth,
   isChatNarrow
 } from "../../core/map-chat-layout";
-import {
-  floorSuggestedTiers,
-  relevanceMode,
-  relevanceModeAfterWrite,
-  type RelevanceMode,
-  type RelevancePin
-} from "./relevance-pins";
+import { raiseParents, type RelevancePin } from "./relevance-pins";
 import { createAimMap } from "../aim/create-map";
 import { aimEnabled } from "../aim/availability";
 import {
@@ -545,18 +539,17 @@ import {
   type StructureSuggestion
 } from "../../core/structure-review-service";
 import type {
-  RelevanceGradeChange,
-  RelevanceGradeItem,
-  RelevanceGradeOutcome,
-  RelevanceReceived,
-  RelevanceGradeResult,
-  RelevanceGradeRun
-} from "../../core/relevance-grade-service";
-import {
-  RELEVANCE_GRADE_SCHEMA,
-  RELEVANCE_RECALIBRATE_SCHEMA,
-  relevanceFailureDetail
-} from "../../core/relevance-grade-service";
+  GoalRecommendChange,
+  GoalRecommendItem,
+  GoalRecommendOutcome,
+  GoalRecommendReceived,
+  GoalRecommendRequest,
+  GoalRecommendResult,
+  GoalRecommendRun,
+  GoalRecommendScope,
+  GoalRecommendSuggestion
+} from "../../core/goal-recommend-service";
+import { GOAL_RECOMMEND_SCHEMA, goalRecommendFailureDetail } from "../../core/goal-recommend-service";
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
@@ -4111,16 +4104,13 @@ export class VisualAgentMapView extends ItemView {
       running || !goal || busy
     );
     spark.setAttr("data-goal-action", "suggest");
-    const mode: RelevanceMode = relevanceMode(
-      { goal: goal ?? "", context: this.relevanceContext ?? "" },
-      { goal, context: this.relevanceContext },
-      this.relevanceAiGrades().length > 0
-    );
+    // The icon rates the map again for the saved goal: only what should change once the map has AI tiers, every card before.
+    const recalibrating = this.relevanceAiGrades().length > 0;
     icon(
       "refresh",
-      t(mode === "recalibrate" ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button"),
+      t(recalibrating ? "ui.relevance_recalibrate_button" : "ui.relevance_grade_button"),
       () => {
-        if (goal) void this.submitRelevanceGoal(goal, this.relevanceContext ?? "", mode);
+        if (goal) void this.submitRelevanceGoal(goal, this.relevanceContext ?? "");
       },
       running || !goal || busy
     );
@@ -4232,7 +4222,7 @@ export class VisualAgentMapView extends ItemView {
   private warmGoalEdit(edit: GoalEditState): void {
     if (edit.warmed || !this.relevanceGradeable() || !this.goalEditSetup(edit).changed) return;
     edit.warmed = true;
-    this.prewarmRelevance("full");
+    this.prewarmRelevance();
   }
   /** Reads the fields back into the edit state, ahead of a repaint that drops them; remembers whether the keyboard was in them. */
   private captureGoalEdit(): void {
@@ -4371,8 +4361,7 @@ export class VisualAgentMapView extends ItemView {
     // A save started by a press elsewhere or Tab leaves the keyboard where the user went; Enter sends it to the Stop button.
     this.holdFocusOnGrade = how !== "enter";
     try {
-      // A changed setup is always graded in full; "recalibrate" is the icon's job.
-      void this.submitRelevanceGoal(setup.goal, setup.context ?? "", "full");
+      void this.submitRelevanceGoal(setup.goal, setup.context ?? "");
     } finally {
       this.holdFocusOnGrade = false;
     }
@@ -4552,7 +4541,12 @@ export class VisualAgentMapView extends ItemView {
     if (!began && this.goalSuggestCurrent(task)) this.endGoalSuggest(task, { refocus: true });
   }
   /** Locked parents are dropped (counted in a Notice); an empty rest says so and closes; otherwise the list opens. */
-  private showGoalSuggestions(task: GoalSuggestTask, suggestions: GoalTopicSuggestion[], unusable: number): void {
+  private showGoalSuggestions(
+    task: GoalSuggestTask,
+    suggestions: GoalTopicSuggestion[],
+    unusable: number,
+    takeFocus = true
+  ): void {
     const kept = suggestions.filter(item => !this.aiLockReason("addChild", [item.parentId]));
     const locked = suggestions.length - kept.length;
     if (locked) new Notice(t("ui.ai_locked_suggestions_skipped_0", locked));
@@ -4575,7 +4569,7 @@ export class VisualAgentMapView extends ItemView {
     task.suggestions = kept;
     task.checked = new Set(kept.map((_, index) => index));
     task.state = "ready";
-    task.focus = "list";
+    task.focus = takeFocus ? "list" : null;
     this.render();
   }
   /** The card under the bar: "Suggesting…" with Stop, or the checkable list with Skip and Add. Model text goes in as text only. */
@@ -4692,7 +4686,6 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     let added = 0;
     let skipped = 0;
-    const addedIds = new Set<string>();
     try {
       await this.plugin.mutate(async () => {
         if (!this.goalSuggestCurrent(task)) {
@@ -4708,12 +4701,10 @@ export class VisualAgentMapView extends ItemView {
               skipped++;
               continue;
             }
-            const known = new Set(this.map.nodes.map(node => node.id));
             await this.addNode(parent, item.title, false, false);
             added++;
             // The AI's one-line summary is the new card's summary, written like a chat card's.
             await this.noteChange(this.map.nodes.at(-1)!, { summary: item.summary });
-            for (const node of this.map?.nodes ?? []) if (!known.has(node.id)) addedIds.add(node.id);
           }
           if (added) await this.plugin.rebuildDerivedData();
         } finally {
@@ -4731,14 +4722,8 @@ export class VisualAgentMapView extends ItemView {
     this.announcer?.setText(t("ui.goal_suggest_added_0", added));
     const goal = this.relevanceGoal;
     if (!goal) return;
-    const context = this.relevanceContext ?? "";
-    const mode = relevanceMode(
-      { goal, context },
-      { goal, context: this.relevanceContext },
-      this.relevanceAiGrades().length > 0
-    );
-    // The cards just added are the ones the grade may not leave at "side" (a floor for this call only).
-    void this.submitRelevanceGoal(goal, context, mode, addedIds);
+    // Until the add path stops asking again (the list rework), the cards just added are rated by one more request.
+    void this.submitRelevanceGoal(goal, this.relevanceContext ?? "");
   }
   /** True when the suggestion no longer fits the map as it is now. */
   private goalSuggestStale(
@@ -4758,13 +4743,9 @@ export class VisualAgentMapView extends ItemView {
    * Starts the Claude CLI for the grade an edited goal would run (no model call; a Codex model starts nothing). The
    * very same command the run uses, so sending only has to write the prompt.
    */
-  private prewarmRelevance(mode: RelevanceMode): void {
+  private prewarmRelevance(): void {
     const { model, reasoning } = this.plugin.currentModelChoice();
-    this.plugin.prewarmClaudeStep?.(
-      model,
-      reasoning,
-      mode === "recalibrate" ? RELEVANCE_RECALIBRATE_SCHEMA : RELEVANCE_GRADE_SCHEMA
-    );
+    this.plugin.prewarmClaudeStep?.(model, reasoning, GOAL_RECOMMEND_SCHEMA);
   }
   // ---- Map data sources: toolbar button and panel ---------------------------------------------------------------
   /**
@@ -4955,7 +4936,7 @@ export class VisualAgentMapView extends ItemView {
     // A panel with a picker list open stays as it is; it is redrawn with the next change.
     if (this.mapSourcesOpen && !this.mapSourcesPickerOpen) this.drawMapSourcesPanelEl(null);
   }
-  private relevanceRunIsCurrent(run: RelevanceGradeRun, mapPath: string): boolean {
+  private relevanceRunIsCurrent(run: GoalRecommendRun, mapPath: string): boolean {
     return (
       !this.closed &&
       this.path === mapPath &&
@@ -4973,7 +4954,7 @@ export class VisualAgentMapView extends ItemView {
     run.controller.abort();
   }
   private finishRelevance(
-    run: RelevanceGradeRun,
+    run: GoalRecommendRun,
     mapPath: string,
     status: "failed" | "declined",
     message: string
@@ -5011,24 +4992,21 @@ export class VisualAgentMapView extends ItemView {
       this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar button")?.focus();
   }
   /**
-   * Enter in the goal field. The goal is saved first (its own undo step), then, after the usage confirmation, the
-   * whole map is graded and the result is written in one step. Nothing is written when the AI is declined, stopped,
-   * fails or returns anything but exactly one valid grade for every card.
+   * Enter in the goal field, the goal icon, or the chat's `rate_by_goal`. The goal is saved first (its own undo step),
+   * then, after the usage confirmation, ONE request recommends new cards and rates the map. The scope is decided by the
+   * repository (a changed setup, or a map without AI tiers, asks for every card; otherwise only what should change).
+   * Nothing is written when the AI is declined, stopped, fails or returns a reply the strict parser refuses; there is no
+   * repair round and no second call. The recommended cards open as a list once the tiers are written.
    */
-  private async submitRelevanceGoal(
-    raw: string,
-    contextRaw?: string,
-    planned: RelevanceMode = "full",
-    suggested?: ReadonlySet<string>
-  ): Promise<void> {
+  private async submitRelevanceGoal(raw: string, contextRaw?: string): Promise<void> {
     const goal = normalizeRelevanceGoal(raw);
     const context = contextRaw === undefined ? undefined : normalizeRelevanceContext(contextRaw);
     const mapPath = this.path;
     if (!goal || !this.relevanceGradeable()) return;
     if (this.plugin.relevanceGrades.get(mapPath)?.status === "running") return;
-    // Grading takes over the spot under the bar: an open list or a waiting suggestion call is dropped.
+    // The run takes over the spot under the bar: an open list or a waiting suggestion call is dropped.
     if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
-    const run: RelevanceGradeRun = {
+    const run: GoalRecommendRun = {
       token: ++relevanceRunToken,
       owner: this,
       controller: new AbortController(),
@@ -5043,22 +5021,18 @@ export class VisualAgentMapView extends ItemView {
     run.controller.signal.addEventListener("abort", () => this.plugin.releaseWarmClaude?.(), { once: true });
     this.refreshRelevance(true);
     const settings = this.plugin.settings;
-    let result: RelevanceGradeResult | undefined;
+    let result: GoalRecommendResult | undefined;
     let basis: StructureNode[] = [];
-    let mode: RelevanceMode = planned;
+    let scope: GoalRecommendScope = "all";
     let pins: RelevancePin[] = [];
-    let previousGrades: RelevancePin[] = [];
-    const repairs: string[] = [];
     try {
       await this.plugin.mutate(async () => {
         const { previous, next, setupChanged } = await this.plugin.repo.writeRelevanceGoal(mapPath, goal, context);
         if (this.path !== mapPath) return;
         this.relevanceGoal = goal;
         this.relevanceContext = context;
-        // The repository has the last word: a setup that changed after all is graded in full.
-        mode = relevanceModeAfterWrite(planned, setupChanged);
-        // The pre-started process was for the planned mode's schema; another mode starts cold.
-        if (mode !== planned) this.plugin.releaseWarmClaude?.();
+        // The repository has the last word: a changed setup, or a map with no AI tier yet, is rated in full.
+        scope = setupChanged || !this.relevanceAiGrades().length ? "all" : "current";
         // Goal and context are one undo step; none changed means nothing to undo.
         if (!setupChanged) return;
         this.history.push({
@@ -5068,10 +5042,9 @@ export class VisualAgentMapView extends ItemView {
         });
         this.updateHistoryButtons();
       });
-      const { model, reasoning: gradeReasoning } = this.plugin.currentModelChoice();
-      // The run stays "running" (the map is locked and Stop works) but the bar must not claim grading while the
-      // usage notice waits for an answer.
-      // Only a notice that really opens needs the bar to say so; otherwise this is not repainted at all.
+      const { model, reasoning } = this.plugin.currentModelChoice();
+      // The run stays "running" (the map is locked and Stop works) but the bar must not claim recommending while the
+      // usage notice waits for an answer. Only a notice that really opens needs the bar to say so.
       if (this.plugin.usageNoticePending?.(model)) {
         run.awaitingUsage = true;
         this.refreshRelevance();
@@ -5086,79 +5059,102 @@ export class VisualAgentMapView extends ItemView {
           this.refreshRelevance();
         }
         basis = buildStructureReviewNodes(this.map.nodes, id => this.describeForReview(id));
-        // Pinned (hand-set) cards are the learner's: the AI sees them as anchors and never grades them.
+        // Pinned (hand-set) and locked cards are the learner's: the AI sees them as anchors and never rates them.
         pins = this.relevancePinList();
-        const request = {
+        const lockedIds = basis
+          .filter(node => node.parentId !== null && this.notes.get(node.id)?.aiLocked)
+          .map(node => node.id);
+        const request: GoalRecommendRequest = {
           goal,
           ...(context ? { context } : {}),
           nodes: basis,
           language: settings.language,
+          contentLanguage: outputLanguageForMap(this.map, settings.language, this.map.title),
           model,
-          reasoning: gradeReasoning,
+          reasoning,
           ...(pins.length ? { pins } : {}),
+          ...(lockedIds.length ? { lockedIds } : {}),
+          scope,
+          // Scope `all` sends no earlier tier: the model rates every card from scratch.
+          ...(scope === "current" ? { current: this.relevanceAiGrades() } : {}),
           ...this.usageMapField()
         };
         const hooks = {
-          onRepair: (_round: number, kind: string) => {
-            repairs.push(kind);
-            if (!this.relevanceRunIsCurrent(run, mapPath)) return;
-            run.repairing = true;
-            // A repair request answers from the start again.
-            run.received = undefined;
-            this.refreshRelevance();
-          },
           // Text only: the count changes in place, the map is not repainted for it.
-          onProgress: (progress: RelevanceReceived | null) => {
+          onProgress: (progress: GoalRecommendReceived | null) => {
             if (!this.relevanceRunIsCurrent(run, mapPath)) return;
             run.received = progress ?? undefined;
-            this.paintRelevanceReceived(run);
+            this.paintGoalRecommendReceived(run);
           }
         };
-        previousGrades = mode === "recalibrate" ? this.relevanceAiGrades() : [];
-        result =
-          mode === "recalibrate"
-            ? await this.plugin.relevanceGrade.recalibrate(
-                { ...request, previous: previousGrades },
-                run.controller.signal,
-                hooks
-              )
-            : await this.plugin.relevanceGrade.grade(request, run.controller.signal, hooks);
+        result = await this.plugin.goalRecommend.recommend(request, run.controller.signal, hooks);
       });
       if (!this.relevanceRunIsCurrent(run, mapPath)) return;
       if (!started) return this.finishRelevance(run, mapPath, "declined", t("ui.relevance_not_started"));
-      const answered: RelevanceGradeResult | undefined = result;
+      const answered: GoalRecommendResult | undefined = result;
       if (!answered) return;
-      const graded = suggested?.size
-        ? { ...answered, items: floorSuggestedTiers(basis, previousGrades, answered.items, pins, suggested) }
-        : answered;
       // Writing the notes makes the view synchronize, which repaints when a note changed (the run is already "done"
       // by then); repaint here only when it did not, so a run costs one repaint after the write.
       const paintedBefore = this.paintCount;
-      await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, graded, { mode, pins, repairs }));
+      await this.plugin.mutate(() => this.applyRelevanceGrade(run, mapPath, basis, answered, { scope, pins }));
       if (this.paintCount === paintedBefore) this.refreshRelevance();
+      this.openRecommendations(run, mapPath, answered.suggestions);
     } catch (error) {
       this.finishRelevance(
         run,
         mapPath,
         "failed",
-        t("ui.relevance_failed_0", relevanceFailureDetail(error, this.plugin.settings.language))
+        t("ui.relevance_failed_0", goalRecommendFailureDetail(error, this.plugin.settings.language))
       );
     }
   }
   /**
-   * Writes the grades as one undo step. Each card is checked against what the AI was shown: a card deleted, renamed
-   * or moved meanwhile is skipped (its old grade stays), and cards added meanwhile are not in the result so they stay
-   * ungraded. A note that cannot be written is counted; the undo step covers only the notes actually written.
+   * Hands the recommended cards to the list once the run has written its tiers. Only the view that started the run, still
+   * on the same map, opens it; a stopped, failed or late run, a closed view or another map opens nothing. The keyboard
+   * moves to the list only when it was on the status bar, the goal bar or the page itself.
+   */
+  private openRecommendations(run: GoalRecommendRun, mapPath: string, suggestions: GoalRecommendSuggestion[]): void {
+    if (!suggestions.length) return;
+    if (this.closed || this.path !== mapPath || run.owner !== this || run.status !== "done") return;
+    if (this.plugin.relevanceGrades.get(mapPath) !== run || run.controller.signal.aborted) return;
+    if (this.goalSuggestTask || this.presentation) return;
+    const task: GoalSuggestTask = {
+      mapPath,
+      token: ++goalSuggestSeq,
+      controller: new AbortController(),
+      state: "confirming",
+      suggestions: [],
+      basis: new Map(),
+      checked: new Set(),
+      focus: null
+    };
+    this.goalSuggestTask = task;
+    this.showGoalSuggestions(task, suggestions, 0, this.focusIsFreeForList());
+  }
+  /** True when the keyboard is on the status bar, the goal bar or the page body: the list may take it. */
+  private focusIsFreeForList(): boolean {
+    const doc = this.contentEl?.ownerDocument;
+    const active = doc?.activeElement ?? null;
+    if (!active || active === doc?.body) return true;
+    const inside = (selector: string): boolean => !!this.contentEl?.querySelector?.(selector)?.contains?.(active);
+    return inside(".vam-relevance-statusbar") || inside(".vam-goal-bar");
+  }
+  /**
+   * Writes the tiers as one undo step. Each card is checked against what the AI was shown: a card deleted, renamed or
+   * moved meanwhile is skipped (its old tier stays), and cards added meanwhile are not in the result so they stay
+   * unrated. A card never ranks below one it holds: the program raises such a parent (any number of levels) in the same
+   * write and the same undo step, unless the parent is hand-set, locked, outside what the AI saw, or changed meanwhile.
+   * A note that cannot be written is counted; the undo step covers only the notes actually written.
    */
   private async applyRelevanceGrade(
-    run: RelevanceGradeRun,
+    run: GoalRecommendRun,
     mapPath: string,
     basis: StructureNode[],
-    graded: RelevanceGradeResult,
-    meta: { mode: RelevanceMode; pins: RelevancePin[]; repairs: string[] }
+    graded: GoalRecommendResult,
+    meta: { scope: GoalRecommendScope; pins: RelevancePin[] }
   ): Promise<void> {
     if (!this.relevanceRunIsCurrent(run, mapPath) || !this.map) return;
-    const items: RelevanceGradeItem[] = graded.items;
+    const items: GoalRecommendItem[] = graded.items;
     run.writing = true;
     run.received = undefined;
     const startedAt = Date.now();
@@ -5177,17 +5173,24 @@ export class VisualAgentMapView extends ItemView {
         return note ? { title: note.title, summary: "", status: "" } : undefined;
       }).map(node => [node.id, node])
     );
+    // Parent before child, over every card the map holds now (not only the ones the AI saw).
+    const tree = buildStructureReviewNodes(this.map.nodes, () => undefined).map(node => ({
+      id: node.id,
+      parentId: node.parentId
+    }));
     const pathOf = new Map(this.map.nodes.map(node => [node.id, node.path]));
     const byId = new Map(items.map(item => [item.id, item]));
     const titleOf = new Map(basis.map(base => [base.id, base.title]));
     const pinned = new Set(meta.pins.map(pin => pin.id));
-    const outcome: RelevanceGradeOutcome = {
+    const outcome: GoalRecommendOutcome = {
       graded: 0,
       changes: [],
       skipped: 0,
       failed: 0,
       pinned: 0,
-      mode: meta.mode,
+      scope: meta.scope,
+      raised: 0,
+      recommended: graded.suggestions.length,
       pins: meta.pins.map(pin => ({ id: pin.id, title: titleOf.get(pin.id) ?? "", tier: pin.tier })),
       conflicts: (graded.conflicts ?? []).map(conflict => ({
         ancestor: titleOf.get(conflict.ancestorId) ?? "",
@@ -5200,19 +5203,20 @@ export class VisualAgentMapView extends ItemView {
       ...(graded.unchangedIgnored ? { unchangedIgnored: graded.unchangedIgnored } : {})
     };
     try {
+      // Which cards the AI may write: seen by the AI, unchanged since, not locked, not hand-set.
+      const writable = new Set<string>();
       for (const base of basis) {
-        const item = byId.get(base.id);
-        if (!item) continue;
+        if (base.parentId === null) continue;
         const now = current.get(base.id),
-          note = fresh.get(base.id),
-          path = pathOf.get(base.id);
-        if (!now || !note || !path || now.title !== base.title || now.parentId !== base.parentId) {
-          outcome.skipped++;
+          note = fresh.get(base.id);
+        const item = byId.get(base.id);
+        if (!now || !note || !pathOf.get(base.id) || now.title !== base.title || now.parentId !== base.parentId) {
+          if (item) outcome.skipped++;
           continue;
         }
         if (note.aiLocked) {
           // AI lock: a locked card keeps its tier, like a hand-set one, and is counted as skipped.
-          outcome.skipped++;
+          if (item) outcome.skipped++;
           continue;
         }
         if (note.relevance?.manual) {
@@ -5220,22 +5224,41 @@ export class VisualAgentMapView extends ItemView {
           pinned.add(base.id);
           continue;
         }
-        const after = { tier: item.tier };
+        writable.add(base.id);
+      }
+      // Merged result: what the notes hold now, plus the AI's tier for every card it may write.
+      const merged = new Map<string, RelevanceTier>();
+      for (const [id, note] of fresh) if (note.relevance) merged.set(id, note.relevance.tier);
+      for (const item of items) if (writable.has(item.id)) merged.set(item.id, item.tier);
+      // Everything else is frozen: its tier stays, though the height of what it holds still passes up.
+      const frozen = new Set(tree.filter(node => !writable.has(node.id)).map(node => node.id));
+      const raised = raiseParents(tree, merged, frozen);
+      for (const base of basis) {
+        if (!writable.has(base.id)) continue;
+        const item = byId.get(base.id);
+        const lift = raised.get(base.id);
+        const tier = lift ?? item?.tier;
+        if (!tier) continue;
+        const note = fresh.get(base.id) as Note;
+        const path = pathOf.get(base.id) as string;
+        const after = { tier };
         const before = note.relevance ? { tier: note.relevance.tier } : undefined;
         if (before && before.tier === after.tier) {
-          outcome.graded++;
+          if (item) outcome.graded++;
           continue;
         }
         try {
           await repo.writeRelevance(path, after);
-          outcome.graded++;
+          if (item) outcome.graded++;
+          if (lift) outcome.raised++;
           outcome.changes.push({
             id: base.id,
             path,
             title: note.title,
             before,
             after,
-            ...(item.anchor ? { anchor: item.anchor } : {})
+            ...(item?.anchor && !lift ? { anchor: item.anchor } : {}),
+            ...(lift ? { raised: true } : {})
           });
         } catch (error) {
           outcome.failed++;
@@ -5246,7 +5269,7 @@ export class VisualAgentMapView extends ItemView {
       outcome.pinned = pinned.size;
       this.plugin.logs.appendLog(
         "info",
-        `Relevance ${meta.mode}: repairs ${meta.repairs.length}${meta.repairs.length ? ` (${[...new Set(meta.repairs)].join(", ")})` : ""}, pinned ${pinned.size}, pinnedIgnored ${graded.pinnedIgnored ?? 0}, anchorsDropped ${graded.anchorsDropped ?? 0}, unchangedIgnored ${graded.unchangedIgnored ?? 0}, written ${outcome.changes.length}, failed ${outcome.failed}, skipped ${outcome.skipped}, ${Date.now() - startedAt} ms`
+        `Relevance ${meta.scope}: raised ${outcome.raised}, suggestions ${graded.suggestions.length}, suggestionsDropped ${graded.dropped.length}, pinned ${pinned.size}, pinnedIgnored ${graded.pinnedIgnored ?? 0}, anchorsDropped ${graded.anchorsDropped ?? 0}, unchangedIgnored ${graded.unchangedIgnored ?? 0}, written ${outcome.changes.length}, failed ${outcome.failed}, skipped ${outcome.skipped}, ${Date.now() - startedAt} ms`
       );
       if (outcome.changes.length) {
         const changes = outcome.changes;
@@ -5267,7 +5290,7 @@ export class VisualAgentMapView extends ItemView {
    * Undo or redo a grading run. A note is only put back when it still holds exactly what the run wrote (or, for redo,
    * what it replaced); a note the owner edited since is left alone and counted in a Notice.
    */
-  private async restoreRelevance(changes: RelevanceGradeChange[], direction: "undo" | "redo"): Promise<void> {
+  private async restoreRelevance(changes: GoalRecommendChange[], direction: "undo" | "redo"): Promise<void> {
     let skipped = 0;
     const same = (a: NoteRelevance | undefined, b: NoteRelevance | undefined): boolean =>
       a === b || (!!a && !!b && a.tier === b.tier && !!a.manual === !!b.manual);
@@ -5390,17 +5413,11 @@ export class VisualAgentMapView extends ItemView {
     bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.relevance_history_label") });
     const outcome = run.outcome;
     const text = running
-      ? t(
-          run.awaitingUsage
-            ? "ui.relevance_awaiting_usage"
-            : run.repairing
-              ? "ui.relevance_repairing"
-              : "ui.relevance_running"
-        )
+      ? t(run.awaitingUsage ? "ui.relevance_awaiting_usage" : "ui.relevance_running")
       : run.status === "done" && outcome
         ? [
             this.relevanceDoneText(outcome),
-            outcome.pinned && outcome.mode !== "recalibrate" ? t("ui.relevance_pinned_kept_0", outcome.pinned) : "",
+            outcome.pinned && outcome.scope !== "current" ? t("ui.relevance_pinned_kept_0", outcome.pinned) : "",
             outcome.failed ? t("ui.relevance_write_failed_0", outcome.failed) : ""
           ]
             .filter(Boolean)
@@ -5418,7 +5435,7 @@ export class VisualAgentMapView extends ItemView {
       const received = bar.createSpan({ cls: "vam-relevance-received" });
       received.setAttr("aria-hidden", "true");
       this.relevanceReceivedEl = received;
-      this.paintRelevanceReceived(run);
+      this.paintGoalRecommendReceived(run);
       if (run.startedAt !== undefined) {
         const elapsed = bar.createSpan({
           cls: "vam-research-elapsed vam-relevance-elapsed",
@@ -5444,7 +5461,7 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
-  private paintRelevanceReceived(run: RelevanceGradeRun): void {
+  private paintGoalRecommendReceived(run: GoalRecommendRun): void {
     const element = this.relevanceReceivedEl;
     if (!element) return;
     const progress = run.received;
@@ -5455,16 +5472,16 @@ export class VisualAgentMapView extends ItemView {
       : "";
     element.setText(text ? t("ui.aim_stage_with_elapsed_0_1", "", text) : "");
   }
-  /** The status line of a finished run: a recalibration counts its moves against the pins; a full grade counts cards. */
-  private relevanceDoneText(outcome: RelevanceGradeOutcome): string {
-    if (outcome.mode !== "recalibrate")
-      return t("ui.relevance_done_0_1_2", outcome.graded, outcome.changes.length, outcome.skipped);
-    if (!outcome.changes.length) return t("ui.relevance_recalibrate_none");
-    return outcome.pinned
-      ? t("ui.relevance_recalibrated_0_1", outcome.pinned, outcome.changes.length)
-      : t("ui.relevance_done_0_1_2", outcome.graded, outcome.changes.length, outcome.skipped);
+  /** The status line of a finished run: the cards whose tier changed (raised parents included), then the new cards offered. */
+  private relevanceDoneText(outcome: GoalRecommendOutcome): string {
+    return [
+      t("ui.relevance_updated_0", outcome.changes.length),
+      outcome.recommended ? t("ui.relevance_recommended_0", outcome.recommended) : ""
+    ]
+      .filter(Boolean)
+      .join(", ");
   }
-  private openRelevanceSummary(run: RelevanceGradeRun): void {
+  private openRelevanceSummary(run: GoalRecommendRun): void {
     const outcome = run.outcome;
     new RelevanceSummaryModal(this.app, {
       rows: (outcome?.changes ?? []).map(change => ({

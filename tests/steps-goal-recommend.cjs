@@ -95,7 +95,7 @@ test('parser: more than 8 suggestions is refused whole with code too_many; exact
   const many = n => Array.from({ length: n }, (_, i) => sug('a', `Topic ${i}`));
   const error = errorOf(() => parse(reply(fullItems(), many(9))));
   assert.equal(error.code, 'too_many');
-  assert.equal(error.message, translate('en', 'error.goal_topic_suggest_too_many', 9, 8));
+  assert.equal(error.message, translate('en', 'error.goal_recommend_too_many', 9, 8));
   assert.equal(parse(reply(fullItems(), many(8))).suggestions.length, 8);
 });
 
@@ -197,7 +197,7 @@ test('N14: a runner that fails is not retried; Stop before or during the call re
   assert.equal(calls, 1);
   const before = new AbortController(); before.abort();
   const { state, service } = counting(reply(fullItems()));
-  await assert.rejects(run(service, {}, before.signal), e => e.code === 'stopped' && e.message === translate('en', 'error.relevance_grade_stopped'));
+  await assert.rejects(run(service, {}, before.signal), e => e.code === 'stopped' && e.message === translate('en', 'error.goal_recommend_stopped'));
   assert.equal(state.calls, 0);
   const during = new AbortController();
   const late = new rec.GoalRecommendService(async () => { calls++; during.abort(); return reply(fullItems()); });

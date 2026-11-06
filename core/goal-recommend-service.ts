@@ -1,4 +1,4 @@
-import { translate, uiLocale } from "../i18n";
+import { translate, uiLocale, type ContentLanguage } from "../i18n";
 import type { AiCalls } from "./ai-calls";
 import { providerStepRunner, type ProviderStepRunner } from "./provider-step-runner";
 import { prepareStep } from "./step-runner";
@@ -52,6 +52,85 @@ export interface GoalRecommendHooks {
   onProgress?: (progress: GoalRecommendReceived | null) => void;
 }
 
+/**
+ * The words after "Recommending failed." on the status bar. Messages the step wrote for the learner pass through; anything
+ * else (a provider refusal, a stack of JSON, schema text) becomes one plain sentence. The raw text still reaches the log
+ * through the exchange log.
+ */
+export function goalRecommendFailureDetail(error: unknown, language: ContentLanguage): string {
+  if (error instanceof GoalRecommendError || (error as { name?: unknown } | null)?.name === "GoalRecommendError")
+    return (error as Error).message;
+  const message = (error as { message?: unknown } | null)?.message;
+  const text = (typeof message === "string" ? message : "").trim();
+  const technical = /[{}[\]]|schema|json|required|properties|invalid_request|\$\.|\bat \S+:\d+/i.test(text);
+  if (!text || technical || text.length > 140) return translate(uiLocale(language), "error.goal_recommend_unavailable");
+  return text;
+}
+
+/** A card whose tier a run changed (or set for the first time), with the values needed to undo or redo it. */
+export interface GoalRecommendChange {
+  id: string;
+  path: string;
+  title: string;
+  before: { tier: GoalRecommendItem["tier"] } | undefined;
+  after: { tier: GoalRecommendItem["tier"] };
+  /** The pinned card this change follows from, when the AI named one. */
+  anchor?: string;
+  /** True when the tier was raised by the program because a card below it ranks higher; the AI did not say it. */
+  raised?: boolean;
+}
+export interface GoalRecommendOutcome {
+  /** Cards rated successfully, changed or not. */
+  graded: number;
+  changes: GoalRecommendChange[];
+  /** Cards left alone because they were deleted, renamed or moved while the AI worked. */
+  skipped: number;
+  /** Cards whose note could not be written. */
+  failed: number;
+  /** Hand-set (pinned) cards kept as they are. */
+  pinned: number;
+  /** Which request this was; set by the repository's `setupChanged` and the presence of AI tiers, nothing else. */
+  scope?: GoalRecommendScope;
+  /** Cards whose tier the program raised so no card ranks below one it holds (counted in `changes` too). */
+  raised: number;
+  /** New cards the AI recommended and the list can offer. */
+  recommended: number;
+  pins?: Array<{ id: string; title: string; tier: GoalRecommendItem["tier"] }>;
+  conflicts?: Array<{
+    ancestor: string;
+    ancestorTier: GoalRecommendItem["tier"];
+    descendant: string;
+    descendantTier: GoalRecommendItem["tier"];
+  }>;
+  pinnedIgnored?: number;
+  anchorsDropped?: number;
+  unchangedIgnored?: number;
+}
+/**
+ * The one recommend run a map can have at a time. It lives on the plugin, keyed by map path, so a second view of the same
+ * map cannot start another; the view that started it only displays it and aborts it when it closes.
+ */
+export interface GoalRecommendRun {
+  token: number;
+  owner: object;
+  controller: AbortController;
+  goal: string;
+  status: "running" | "stopped" | "failed" | "declined" | "done";
+  /** Localized reason shown in the status bar for stopped, failed and declined runs. */
+  message?: string;
+  outcome?: GoalRecommendOutcome;
+  /** True once the notes are being written; Stop no longer applies because nothing can be half-applied. */
+  writing?: boolean;
+  /** When the model request began (after the usage notice was answered); the status bar counts seconds from here. */
+  startedAt?: number;
+  /** Tiers received so far (Claude streaming only); shown in the status bar, never persisted. */
+  received?: GoalRecommendReceived;
+  /** True while the AI usage notice is waiting for the user's answer. */
+  awaitingUsage?: boolean;
+  /** The history entry that undoes this run, so the status bar only offers Undo while it is still the latest. */
+  historyEntry?: object;
+}
+
 export function buildGoalRecommendPrompt(request: GoalRecommendRequest): string {
   return goalRecommendStep.render(request);
 }
@@ -81,7 +160,7 @@ export class GoalRecommendService {
     hooks: GoalRecommendHooks = {}
   ): Promise<GoalRecommendResult> {
     const stopped = (): GoalRecommendError =>
-      new GoalRecommendError("stopped", translate(uiLocale(request.language), "error.relevance_grade_stopped"));
+      new GoalRecommendError("stopped", translate(uiLocale(request.language), "error.goal_recommend_stopped"));
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(goalRecommendStep, request);
     const total = request.scope === "all" ? goalRecommendRequired(request).length : undefined;

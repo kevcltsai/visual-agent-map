@@ -3,7 +3,11 @@ import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import { providerForModel } from "../../../ai/providers/provider";
 import type { ReasoningLevel } from "../../../ai/types";
 import type { RelevanceTier } from "../../../note-values";
-import { relevancePinBounds, type PinConflict, type RelevancePin } from "../../../experiences/visual-map/relevance-pins";
+import {
+  relevancePinBounds,
+  type PinConflict,
+  type RelevancePin
+} from "../../../experiences/visual-map/relevance-pins";
 import { positionIds } from "../../short-ids";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import { sanitizeGeneratedTitle } from "../../title-safety";
@@ -67,12 +71,7 @@ export interface GoalRecommendSuggestion {
   suggestedTier: "core" | "support";
 }
 export type GoalRecommendDropCode =
-  | "unknown_parent"
-  | "empty_title"
-  | "title_too_long"
-  | "duplicate_title"
-  | "empty_summary"
-  | "side_tier";
+  "unknown_parent" | "empty_title" | "title_too_long" | "duplicate_title" | "empty_summary" | "side_tier";
 export interface GoalRecommendDrop {
   index: number;
   code: GoalRecommendDropCode;
@@ -142,7 +141,7 @@ export const GOAL_RECOMMEND_SCHEMA = {
 };
 
 const invalid = (locale: ContentLanguage, detail: string): GoalRecommendError =>
-  new GoalRecommendError("invalid", translate(locale, "error.relevance_grade_invalid", detail), detail);
+  new GoalRecommendError("invalid", translate(locale, "error.goal_recommend_invalid", detail), detail);
 
 /** Titles compare equal when they differ only in case or whitespace. */
 export const goalRecommendTitleKey = (title: string): string => title.replace(/\s+/g, " ").trim().toLowerCase();
@@ -180,7 +179,9 @@ const currentTiers = (request: GoalRecommendRequest): Map<string, RelevanceTier>
   const frozen = frozenSet(request);
   const gradable = new Set(recommendGradableNodes(request.nodes).map(node => node.id));
   return new Map(
-    (request.current ?? []).filter(entry => gradable.has(entry.id) && !frozen.has(entry.id)).map(entry => [entry.id, entry.tier])
+    (request.current ?? [])
+      .filter(entry => gradable.has(entry.id) && !frozen.has(entry.id))
+      .map(entry => [entry.id, entry.tier])
   );
 };
 
@@ -224,7 +225,7 @@ export function parseGoalRecommend(raw: string, request: GoalRecommendRequest): 
   if (body.suggestions.length > GOAL_RECOMMEND_MAX_SUGGESTIONS)
     throw new GoalRecommendError(
       "too_many",
-      translate(locale, "error.goal_topic_suggest_too_many", body.suggestions.length, GOAL_RECOMMEND_MAX_SUGGESTIONS),
+      translate(locale, "error.goal_recommend_too_many", body.suggestions.length, GOAL_RECOMMEND_MAX_SUGGESTIONS),
       `suggestions ${body.suggestions.length}`
     );
   const ids = positionIds(tree.map(node => node.id));
@@ -341,7 +342,9 @@ const promptCards = (request: GoalRecommendRequest) => {
     summary: node.summary,
     parentId: node.parentId === null ? null : label(node.parentId),
     depth: node.depth,
-    ...(request.scope === "current" && node.parentId !== null ? { tier: pins.get(node.id) ?? tiers.get(node.id) ?? null } : {}),
+    ...(request.scope === "current" && node.parentId !== null
+      ? { tier: pins.get(node.id) ?? tiers.get(node.id) ?? null }
+      : {}),
     ...(pins.has(node.id) ? { pinned: pins.get(node.id) } : {}),
     ...(locked.has(node.id) ? { locked: true } : {})
   }));
@@ -387,9 +390,9 @@ export const goalRecommendStep: StepDefinition<GoalRecommendRequest, GoalRecomme
   policy: (prompt, request) => {
     const locale = uiLocale(request.language);
     if (!request.nodes.length || !request.goal.trim())
-      throw new GoalRecommendError("empty", translate(locale, "error.relevance_grade_empty"));
+      throw new GoalRecommendError("empty", translate(locale, "error.goal_recommend_empty"));
     if (estimateTokens(prompt + JSON.stringify(GOAL_RECOMMEND_SCHEMA)) > GOAL_RECOMMEND_TOKEN_BUDGET)
-      throw new GoalRecommendError("over_budget", translate(locale, "error.relevance_grade_over_budget"));
+      throw new GoalRecommendError("over_budget", translate(locale, "error.goal_recommend_over_budget"));
   },
   parse: (raw, request) => parseGoalRecommend(raw, request)
 };

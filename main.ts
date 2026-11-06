@@ -129,10 +129,10 @@ import { StructureReviewService, providerStructureReviewRunner } from "./core/st
 import { GoalTopicSuggestService, providerGoalTopicSuggestRunner } from "./core/goal-topic-suggest-service";
 import { MapChatService, providerMapChatRunner } from "./core/map-chat-service";
 import {
-  RelevanceGradeService,
-  providerRelevanceGradeRunner,
-  type RelevanceGradeRun
-} from "./core/relevance-grade-service";
+  GoalRecommendService,
+  providerGoalRecommendRunner,
+  type GoalRecommendRun
+} from "./core/goal-recommend-service";
 import { receiveVisualMapHandoff } from "./experiences/visual-map/handoff";
 import { openCoffeeResearchHandoff } from "./experiences/coffee-tables/handoff-modal";
 import { MarkdownSelectionAi } from "./experiences/markdown-context/selection-ai";
@@ -407,12 +407,12 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly structureReview = new StructureReviewService(providerStructureReviewRunner(this.aiCalls));
   readonly goalTopicSuggest = new GoalTopicSuggestService(providerGoalTopicSuggestRunner(this.aiCalls));
   readonly mapChat = new MapChatService(providerMapChatRunner(this.aiCalls));
-  readonly relevanceGrade = new RelevanceGradeService(providerRelevanceGradeRunner(this.aiCalls));
+  readonly goalRecommend = new GoalRecommendService(providerGoalRecommendRunner(this.aiCalls));
   /** Translated share text kept for this Obsidian session only (never written to disk); emptied on unload. */
   readonly shareTranslationCache = new ShareTranslationCache();
   readonly shareTranslate = new ShareTranslateService(providerShareTranslateRunner(this.aiCalls));
   /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
-  readonly relevanceGrades = new Map<string, RelevanceGradeRun>();
+  readonly relevanceGrades = new Map<string, GoalRecommendRun>();
   exchanges: AiExchangeLog | null = null;
   /** Token usage of every provider call (`ai-usage.json`); null until onload has the plugin folder. Views query and subscribe to it. */
   usage: AiUsageStore | null = null;

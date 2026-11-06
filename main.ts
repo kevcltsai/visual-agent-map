@@ -58,6 +58,7 @@ import {
   type StyleKind
 } from "./ai/note-style-recipe";
 import { ChoiceModal } from "./ui/modals/choice-modal";
+import { turnMapChatRecordsOff, type MapChatRecordsSwitch } from "./ui/modals/map-chat-records-off-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import {
@@ -76,6 +77,7 @@ import {
   normalizeReasoningLevel,
   normalizeMapChatWidth,
   normalizeMapChatOpen,
+  normalizeMapChatImageMode,
   rebaseMapNotePaths,
   resolveMapFolders,
   type Note,
@@ -277,6 +279,8 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     cliModel: migratedChatModel(saved) || saved?.cliModel || DEFAULT_SETTINGS.cliModel,
     mapChatWidth: normalizeMapChatWidth(saved?.mapChatWidth),
     mapChatOpen: normalizeMapChatOpen(saved?.mapChatOpen),
+    mapChatImageMode: normalizeMapChatImageMode(saved?.mapChatImageMode),
+    mapChatRecords: saved?.mapChatRecords === true,
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
     previewScale:
       saved?.previewScale !== undefined
@@ -1703,6 +1707,40 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+  /**
+   * Writers of the open map views, so the settings switch reaches them. view.ts calls `registerMapChatRecordWriter` when it makes
+   * its writer (and the returned function when it closes), and creates the writer only while `settings.mapChatRecords`.
+   * Each registered writer gets `setEnabled(false)` the moment the switch goes off and `setEnabled(true)` when it goes on.
+   */
+  private readonly mapChatRecordWriters = new Set<MapChatRecordsSwitch>();
+  registerMapChatRecordWriter(writer: MapChatRecordsSwitch): () => void {
+    this.mapChatRecordWriters.add(writer);
+    writer.setEnabled(this.settings.mapChatRecords);
+    return () => {
+      this.mapChatRecordWriters.delete(writer);
+    };
+  }
+  /** The settings switch "save map AI conversations". Off: writers stop, then the owner chooses to keep or delete the saved records. */
+  async setMapChatRecords(on: boolean): Promise<void> {
+    if (this.settings.mapChatRecords === on) return;
+    this.settings.mapChatRecords = on;
+    await this.saveSettings();
+    // The side window of every open map shows or hides its "New conversation" button without waiting for a repaint.
+    const refreshViews = (): void => {
+      for (const view of this.views()) view.refreshChatRecordsSwitch();
+    };
+    if (on) {
+      for (const writer of this.mapChatRecordWriters) writer.setEnabled(true);
+      refreshViews();
+      return;
+    }
+    refreshViews();
+    await turnMapChatRecordsOff({
+      app: this.app,
+      writers: this.mapChatRecordWriters,
+      stillOff: () => !this.settings.mapChatRecords
+    });
   }
   async changeLanguage(value: unknown): Promise<boolean> {
     const next = uiLocale(value);

@@ -1,14 +1,15 @@
 import { App, Modal } from "obsidian";
 import { t } from "../../i18n";
 import type { ResearchDepth, ResearchMode } from "../../ai/types";
-import type { MapAiMode } from "./ai-mode";
-import { modelField, styleChoiceField, type FieldLinks, type ModelChoices } from "./research-fields";
+import { aiModeOptions, DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
+import { aiModeField, modelField, styleChoiceField, type FieldLinks, type ModelChoices } from "./research-fields";
 import { modalActions } from "../../ui/modals/action-bar";
 
 export interface MultiResearchRequest {
   /**
-   * Overrides for every started topic; only the map AI chat sets them. The dialog leaves them out, so each topic runs in the
-   * mode its own note stores (Quick or Standard) with the matching depth and image setting.
+   * Overrides for every started topic; the dialog (its Quick/Standard switch) and the map AI chat set them. Only the
+   * "retry with another provider" start leaves them out, so each topic then runs in the mode its own note stores (Quick or
+   * Standard) with the matching depth and image setting.
    */
   researchMode?: ResearchMode;
   researchDepth?: ResearchDepth;
@@ -34,8 +35,10 @@ export class MultiResearchModal extends Modal {
     private models: ModelChoices,
     private submit: (request: MultiResearchRequest) => void,
     private links: FieldLinks = {},
-    /** The mode each listed topic will run in (parallel to `names`), shown beside its name. */
-    private modes: MapAiMode[] = []
+    /** The mode each listed topic last used (parallel to `names`); only counted for the "will use Quick" reminder. */
+    private modes: MapAiMode[] = [],
+    /** The mode the switch opens on (the map's remembered mode). */
+    private initialMode: MapAiMode = DEFAULT_MAP_AI_MODE
   ) {
     super(app);
   }
@@ -43,18 +46,26 @@ export class MultiResearchModal extends Modal {
   onOpen(): void {
     this.titleEl.setText(t("ui.multi_research_title"));
     this.contentEl.createEl("p", { text: t("ui.multi_research_intro", this.names.length), cls: "vam-modal-intro" });
+    let mode: MapAiMode = this.initialMode;
+    const standardTopics = this.modes.filter(item => item === "standard").length;
+    let paintNote = (): void => {};
+    aiModeField(this.contentEl, {
+      initial: mode,
+      onChange: next => {
+        mode = next;
+        paintNote();
+      }
+    });
+    // The reminder sits right under the switch, before the topic list.
+    const note = this.contentEl.createEl("p", { cls: "vam-multi-research-mode-note" });
+    paintNote = (): void => {
+      note.setText(t("ui.multi_research_mode_downgrade_0", standardTopics));
+      note.hidden = !(mode === "quick" && standardTopics > 0);
+    };
+    paintNote();
     const topics = this.contentEl.createDiv("vam-integration-sources");
     topics.createEl("strong", { text: t("ui.multi_research_topics") });
-    this.names.forEach((name, index) => {
-      const row = topics.createDiv({ cls: "vam-multi-research-topic" });
-      row.createSpan({ text: name });
-      const mode = this.modes[index];
-      if (mode)
-        row.createSpan({
-          cls: "vam-multi-research-mode",
-          text: t(mode === "quick" ? "ui.quick" : "ui.standard")
-        });
-    });
+    for (const name of this.names) topics.createDiv({ cls: "vam-multi-research-topic" }).createSpan({ text: name });
     const model = modelField(this.contentEl, this.models, t("ui.multi_research_current_model"), this.links.repair);
     this.unwatch = model.dispose;
     const style = styleChoiceField(this.contentEl, {
@@ -77,7 +88,11 @@ export class MultiResearchModal extends Modal {
     start.addEventListener("click", () => {
       if (this.submitted) return;
       this.submitted = true;
+      const options = aiModeOptions(mode, "research");
       const request: MultiResearchRequest = {
+        researchMode: options.researchMode,
+        researchDepth: options.researchDepth,
+        imageSearch: mode === "standard",
         requirements: requirements.value.trim(),
         ...(model.value() ? { model: model.value() } : {}),
         ...(style.style() ? { noteStyle: style.style() } : {})

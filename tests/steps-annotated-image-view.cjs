@@ -583,7 +583,7 @@ test('first anchor on an image without a note: a Notice, once per image', async 
     h.view.render();
   };
   await place();
-  assert.deepEqual(h.notices, ['This image has no note yet. The AI cannot see pictures; add one sentence on what it is and what to research.']);
+  assert.deepEqual(h.notices, ['This image has no note yet. Research and expansion cannot see pictures; add one sentence on what it is and what to research.']);
   await place();
   assert.equal(h.notices.length, 1, 'only once');
   const withNote = await harness([annotated({ note: 'has note' })]);

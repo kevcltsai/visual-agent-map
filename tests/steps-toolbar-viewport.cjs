@@ -651,6 +651,38 @@ test('chooseCardToolsSpot: a row above or below keeps touching its own card; a t
     assert.ok(shared >= 32, `row on ${spot.side} shares ${shared}px with its card`);
   } else assert.equal(spot.side, 'right', 'the free side beside the card');
 });
+test('chooseCardToolsSpot: a card above the bottom-right zoom controls pans up, never off the bottom of the canvas', () => {
+  const inset = load('experiences/visual-map/viewport-inset.ts');
+  const visible = { left: 684, right: 1900, top: 127, bottom: 1200 };
+  const zoom = { left: 1602, top: 1123, right: 1888, bottom: 1163 };
+  const card = { left: 1484, right: 1624, top: 1100, bottom: 1141 };
+  const spot = inset.chooseCardToolsSpot({ card, row: { left: 1451, right: 1624 }, size: { width: 173, height: 34 }, others: [], controls: [zoom], visible });
+  const moved = { left: card.left + spot.pan.dx, right: card.right + spot.pan.dx, top: card.top + spot.pan.dy, bottom: card.bottom + spot.pan.dy };
+  assert.ok(moved.bottom <= visible.bottom && moved.top >= visible.top, `card stays on the canvas: ${JSON.stringify(moved)}`);
+  assert.ok(moved.right <= visible.right && moved.left >= visible.left, `card stays on the canvas: ${JSON.stringify(moved)}`);
+  assert.equal(inset.rectsIntersect(moved, zoom), false, 'and clear of the controls');
+  assert.equal(inset.rectsIntersect(spot.rect, zoom), false, 'with its tool row');
+  // Down still wins near the top of the canvas (the toolbar case), so the old behaviour stays where it fits.
+  const tools = { left: 700, top: 139, right: 1500, bottom: 201 };
+  const high = { left: 1000, right: 1140, top: 150, bottom: 190 };
+  const under = inset.chooseCardToolsSpot({ card: high, row: { left: 967, right: 1140 }, size: { width: 173, height: 34 }, others: [], controls: [tools], visible });
+  assert.ok(under.pan.dy > 0, 'a card under the top toolbar still pans down');
+});
+// A full repaint hands focus back to the selected card, whose focusin measures the tool row. On a stage without its transform the
+// card reads at scale 1 with no pan, so the row "needed" a pan of thousands of pixels and the whole map left the canvas (owner, 2026-11-06).
+test('a repaint gives the new stage its viewport before any card is drawn or focused', () => {
+  const view = read('experiences/visual-map/view.ts');
+  const paint = view.slice(view.indexOf('private paint(): void {'), view.indexOf('private renderMapTools('));
+  const stage = paint.indexOf('this.stageEl = this.viewportEl.createDiv("vam-stage")');
+  const applied = paint.indexOf('this.applyStageTransform()');
+  const firstFocus = paint.indexOf('.focus({ preventScroll: true })', stage);
+  const firstCard = paint.indexOf('this.renderNode(', stage);
+  assert.ok(stage >= 0 && firstFocus > stage && firstCard > stage, 'paint still has the steps this test orders');
+  assert.ok(applied > stage, 'the stage gets its transform in paint');
+  assert.ok(applied < firstFocus && applied < firstCard, 'before a card is drawn or focused');
+  assert.match(view, /private applyStageTransform\(\): void \{[\s\S]*?style\.transform = `translate\(\$\{x\}px, \$\{y\}px\) scale\(\$\{zoom\}\)`/);
+  assert.match(view, /private applyStageTransform\(\): void \{[\s\S]*?--vam-zoom/, 'the tool row counter-scale is measured right too');
+});
 test('card tools: only AI explore, Details and More float; More holds fold, structure, rename, select subtopics and add text', () => {
   const view = read('experiences/visual-map/view.ts');
   assert.match(view, /private openCardMoreMenu\(/);

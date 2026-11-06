@@ -84,6 +84,11 @@ export function normalizeMapChatOpen(value: unknown): boolean {
   return value !== false;
 }
 
+/** Saved choice of the map chat for AI changes to a picture: "preview" (show me first) unless saved as "direct". */
+export function normalizeMapChatImageMode(value: unknown): "preview" | "direct" {
+  return value === "direct" ? "direct" : "preview";
+}
+
 export type Status = "idea" | "running" | "completed" | "error";
 export type ModelSource = "workspace" | "inherited" | "manual";
 export type TopicState = "active" | "unassigned" | "archived" | "inbox";
@@ -146,6 +151,8 @@ export interface Note {
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
+  /** Save every map AI conversation as a record file in the map folder (off by default). */
+  mapChatRecords: boolean;
   detailTemplates: DetailTemplate[];
   defaultDetailTemplateId?: string;
   /** Workspace default note style: `style:<file name>`, an old template id, or a built-in style id. Absent = defaultDetailTemplateId. */
@@ -184,6 +191,8 @@ export interface Settings {
   mapChatWidth: number;
   /** Whether the side window was open when the map was last used; remembered between sessions. */
   mapChatOpen: boolean;
+  /** The chat's switch "AI changes to a picture": show a preview first, or apply at once. Remembered between sessions. */
+  mapChatImageMode: "preview" | "direct";
   cliReasoning: ReasoningLevel;
   previewSize?: "small" | "medium" | "large";
   previewScale: number;
@@ -294,6 +303,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cliModel: FALLBACK_MODEL,
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
   mapChatOpen: true,
+  mapChatImageMode: "preview",
+  mapChatRecords: false,
   cliReasoning: "low",
   previewScale: 120,
   models: "",

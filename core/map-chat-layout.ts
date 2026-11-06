@@ -79,6 +79,8 @@ export const CHAT_PLAN_GROUP_ORDER: readonly ChatPlanGroup[] = ["create", "chang
 export function chatPlanGroupOf(kind: MapChatAction["kind"]): ChatPlanGroup {
   switch (kind) {
     case "add_child":
+    case "add_anchor":
+    case "link_anchor":
     case "create_md_file":
     case "create_map":
       return "create";

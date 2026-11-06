@@ -3,7 +3,8 @@ import { instructionLanguageOf, type ContentLanguage } from "../../../i18n";
 import type { ReasoningLevel } from "../../../ai/types";
 import { languageVariables } from "../_shared/fragments";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
-import type { MapChatContext, MapChatRelation } from "../../map-chat-context";
+import { ANCHOR_LIMIT, ANCHOR_RELATION_LIMIT, NOTE_LIMIT } from "../../../experiences/visual-map/canvas-items";
+import type { MapChatContext, MapChatImageScope, MapChatRelation } from "../../map-chat-context";
 import {
   RELATION_DESCRIPTION_MAX_LENGTH,
   TOPIC_RELATION_KINDS,
@@ -52,7 +53,9 @@ export const MAP_CHAT_ACTION_KINDS = [
   "remove_relation",
   "set_appearance",
   "rename_map",
-  "reorder_topics"
+  "reorder_topics",
+  "add_anchor",
+  "link_anchor"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -70,6 +73,8 @@ export type MapChatResearchMode = (typeof MAP_CHAT_RESEARCH_MODES)[number];
 /** The depths of reply version 5 and earlier: still accepted, and read as Standard (D-2026-10-231). */
 const LEGACY_RESEARCH_DEPTHS = ["fast", "normal", "deep"] as const;
 export const MAP_CHAT_MAX_ACTIONS = 100;
+/** Prefix of a temporary id a reply gives to an anchor it places itself; `ref: "p1"` on `add_anchor` is named `anchor:p1` by later `link_anchor`s. */
+export const MAP_CHAT_ANCHOR_PREFIX = "anchor:";
 /** Prefix of a temporary id a reply gives to a card it creates itself; `ref: "n1"` is named `new:n1` by later actions. */
 export const MAP_CHAT_NEW_PREFIX = "new:";
 const REF_FORMAT = /^[A-Za-z0-9_-]{1,40}$/;
@@ -175,6 +180,24 @@ export type MapChatAction =
       removeMarkers?: (TopicMarker | "all")[];
       formats?: TopicStyle[];
       removeFormats?: (TopicStyle | "all")[];
+    }
+  /**
+   * Places one anchor on the selected annotated image `imageId` at the relative position `x`, `y` (0-1) with a one-line `note`
+   * (at most {@link NOTE_LIMIT} characters, "" = none). `ref` names it for later `link_anchor`s as `anchor:<ref>`; the view
+   * makes the real anchor id.
+   */
+  | { kind: "add_anchor"; imageId: string; ref: string; x: number; y: number; note: string }
+  /**
+   * Links one anchor of that image (`anchorId`: an existing anchor id or `anchor:<ref>`) to a card (`nodeId`: an existing card or
+   * `new:<ref>`) with `relationKind` and an optional one-line `description`. The relation runs from the anchor to the card.
+   */
+  | {
+      kind: "link_anchor";
+      imageId: string;
+      anchorId: string;
+      nodeId: string;
+      relationKind: TopicRelationKind;
+      description?: string;
     };
 
 export type MapChatRejectCode =
@@ -198,7 +221,9 @@ export type MapChatRejectCode =
   /** A move_topic whose `beforeId`, or a reorder_topics card, is not a child of the target parent (at that point of the reply). */
   | "not_sibling"
   /** An appearance change on a map whose cards have none to edit (AIM). */
-  | "no_appearance";
+  | "no_appearance"
+  /** An anchor action whose `imageId` is not the annotated image selected in this turn (none selected, an ordinary image, or another image). */
+  | "no_image";
 export interface MapChatRejection {
   index: number;
   code: MapChatRejectCode;
@@ -229,6 +254,8 @@ export interface MapChatRequest {
   contentLanguage?: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
+  /** Trusted: the selected image as a data URL, for the runtime's image input only; never serialized into a prompt, never stored. */
+  imageDataUrl?: string;
 }
 
 const STRING = { type: "string" };
@@ -276,7 +303,12 @@ export const MAP_CHAT_SCHEMA = {
           markers: { type: "array", items: { type: "string", enum: [...TOPIC_MARKERS] } },
           removeMarkers: { type: "array", items: { type: "string", enum: [...TOPIC_MARKERS, "all"] } },
           formats: { type: "array", items: { type: "string", enum: [...TOPIC_STYLES] } },
-          removeFormats: { type: "array", items: { type: "string", enum: [...TOPIC_STYLES, "all"] } }
+          removeFormats: { type: "array", items: { type: "string", enum: [...TOPIC_STYLES, "all"] } },
+          imageId: STRING,
+          anchorId: STRING,
+          x: { type: "number" },
+          y: { type: "number" },
+          note: STRING
         },
         required: [
           "kind",
@@ -312,7 +344,12 @@ export const MAP_CHAT_SCHEMA = {
           "markers",
           "removeMarkers",
           "formats",
-          "removeFormats"
+          "removeFormats",
+          "imageId",
+          "anchorId",
+          "x",
+          "y",
+          "note"
         ]
       }
     }
@@ -370,6 +407,7 @@ export function parseMapChat(
     noEditableMap?: boolean;
     aim?: boolean;
     relations?: readonly MapChatRelation[];
+    selectedImage?: MapChatImageScope;
   }
 ): MapChatResult {
   let value: unknown;
@@ -393,8 +431,13 @@ export function parseMapChat(
     from: link.from,
     to: link.to
   }));
-  const samePair = (link: TopicRelation, a: string, b: string): boolean =>
+  const samePair = (link: { from: string; to: string }, a: string, b: string): boolean =>
     (link.from === a && link.to === b) || (link.from === b && link.to === a);
+  // The selected image as the reply goes: its anchors and relations, plus those earlier kept actions add (for the limits and the pair check).
+  const shown = context.selectedImage;
+  const anchorRefs = new Set<string>();
+  let anchorCount = shown?.anchorIds.length ?? 0;
+  const anchorLinks: { from: string; to: string }[] = [...(shown?.relations ?? [])];
   let created = false;
   const underOrSame = (id: string, ancestor: string): boolean => {
     for (let at: string | null | undefined = id, hops = 0; at && hops < 10_000; at = parents[at], hops++)
@@ -467,6 +510,17 @@ export function parseMapChat(
         throw new Dropped("unknown_kind");
       if (context.noEditableMap && !created && kind !== "create_map" && kind !== "open_map")
         throw new Dropped("bad_value");
+      /** The one annotated image a reply may act on: the one selected in this turn. */
+      const image = (): void => {
+        if (!shown || shown.kind !== "annotated" || text("imageId") !== shown.id) throw new Dropped("no_image");
+        if (context.aim) throw new Dropped("no_relations");
+      };
+      /** A coordinate: a finite number, clamped to 0-1 (the canvas's own rule for an anchor). */
+      const unit = (key: string): number => {
+        const field = item[key];
+        if (typeof field !== "number" || !Number.isFinite(field)) throw new Dropped("bad_value");
+        return Math.min(1, Math.max(0, field));
+      };
       switch (kind as MapChatActionKind) {
         case "add_child": {
           const given = text("parentId", false);
@@ -693,6 +747,50 @@ export function parseMapChat(
           actions.push({ kind: "add_relation", fromId, toId, relationKind, ...(description ? { description } : {}) });
           break;
         }
+        case "add_anchor": {
+          image();
+          const ref = text("ref");
+          if (!REF_FORMAT.test(ref) || anchorRefs.has(ref)) throw new Dropped("bad_ref");
+          const x = unit("x"),
+            y = unit("y");
+          // The same cleaning as the canvas's own note: control characters become spaces, one line, at most NOTE_LIMIT characters.
+          const note = [...rawText("note")]
+            .map(char => (char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 ? " " : char))
+            .join("")
+            .trim()
+            .slice(0, NOTE_LIMIT)
+            .trim();
+          if (anchorCount >= ANCHOR_LIMIT) throw new Dropped("too_many");
+          anchorCount++;
+          anchorRefs.add(ref);
+          actions.push({ kind: "add_anchor", imageId: text("imageId"), ref, x, y, note });
+          break;
+        }
+        case "link_anchor": {
+          image();
+          const anchorId = text("anchorId");
+          if (anchorId.startsWith(MAP_CHAT_ANCHOR_PREFIX)) {
+            if (!anchorRefs.has(anchorId.slice(MAP_CHAT_ANCHOR_PREFIX.length))) throw new Dropped("bad_ref");
+          } else if (!shown?.anchorIds.includes(anchorId)) throw new Dropped("unknown_node");
+          const nodeId = node("nodeId", true);
+          const kindGiven = text("relationKind");
+          if (!(TOPIC_RELATION_KINDS as readonly string[]).includes(kindGiven)) throw new Dropped("bad_value");
+          const description = text("description", false).replace(/\s+/g, " ");
+          if ([...description].length > RELATION_DESCRIPTION_MAX_LENGTH) throw new Dropped("bad_value");
+          if (anchorLinks.length >= ANCHOR_RELATION_LIMIT) throw new Dropped("too_many");
+          // A pair holds at most one relation, of any kind and in either direction.
+          if (anchorLinks.some(link => samePair(link, anchorId, nodeId))) throw new Dropped("relation_not_allowed");
+          anchorLinks.push({ from: anchorId, to: nodeId });
+          actions.push({
+            kind: "link_anchor",
+            imageId: text("imageId"),
+            anchorId,
+            nodeId,
+            relationKind: kindGiven as TopicRelationKind,
+            ...(description ? { description } : {})
+          });
+          break;
+        }
         case "remove_relation": {
           const fromId = node("fromId", true),
             toId = node("toId", true);
@@ -722,7 +820,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 15,
+  version: 16,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

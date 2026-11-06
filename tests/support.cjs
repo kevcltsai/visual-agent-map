@@ -140,7 +140,7 @@ const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, Menu:
 };
 const { Repository, DEFAULT_SETTINGS, normalizeReasoningLevel } = load('repository.ts', { obsidian });
 function fixture(language = 'zh-TW', options = {}) {
-  const files = new Map(), contents = new Map();
+  const files = new Map(), contents = new Map(), trashed = [];
   const attach = item => { const folderPath = item.path.split('/').slice(0, -1).join('/'); item.parent = files.get(folderPath) || null; // Obsidian's vault tree hides dot-files and dot-folders; the adapter (disk) listing below still reports them.
     if (item.parent instanceof TFolder && !item.name.startsWith('.') && !item.parent.children.includes(item)) item.parent.children.push(item); };
   const renameTree = (from, to) => { const entries = Array.from(files.entries()).filter(([p]) => p === from || p.startsWith(`${from}/`)).sort((a, b) => a[0].length - b[0].length); for (const [old, item] of entries) { files.delete(old); if (item.parent?.children) item.parent.children = item.parent.children.filter(child => child !== item); const next = `${to}${old.slice(from.length)}`; item.path = next; item.name = next.split('/').at(-1); if (item instanceof TFile) { item.basename = item.name.replace(/\.md$/, ''); item.stat.mtime = Date.now(); const content = contents.get(old); contents.delete(old); contents.set(next, content); } files.set(next, item); } for (const [, item] of entries) attach(item); };
@@ -152,20 +152,24 @@ function fixture(language = 'zh-TW', options = {}) {
     create: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     createBinary: async (p, content) => { assert.equal(files.has(p), false); const file = new TFile(p); files.set(p, file); contents.set(p, content); attach(file); return file; },
     process: async (file, change) => { contents.set(file.path, change(contents.get(file.path))); },
+    // Like Vault.append: it does not throw for a handle whose file is gone (trashed), it writes the path again as a new file holding only `data`.
+    append: async (file, data) => { if (!files.has(file.path)) { files.set(file.path, file); contents.set(file.path, ''); attach(file); } contents.set(file.path, (contents.get(file.path) ?? '') + data); },
     // Moves without touching any link, like Obsidian's Vault.rename.
     rename: async (item, target) => renameTree(item.path, target),
     adapter: {
       exists: async p => files.has(p),
       mkdir: async p => { if (files.has(p)) throw new Error(`Folder already exists: ${p}`); const folder = new TFolder(p); files.set(p, folder); attach(folder); },
+      append: async (p, data) => { if (!files.has(p)) throw new Error(`Missing file: ${p}`); contents.set(p, (contents.get(p) ?? '') + data); },
+      rename: async (from, to) => renameTree(from, to),
       list: async p => ({ files: [...files.values()].filter(file => file instanceof TFile && file.parent?.path === p).map(file => file.path), folders: [...files.values()].filter(file => file instanceof TFolder && file.parent?.path === p).map(file => file.path) }),
       read: async p => { if (!contents.has(p)) throw new Error(`Missing file: ${p}`); return contents.get(p); },
       write: async (p, value) => { if (!files.has(p)) { const file = new TFile(p); files.set(p, file); attach(file); } contents.set(p, value); },
       process: async (p, change) => { if (!contents.has(p)) throw new Error(`Missing file: ${p}`); const next = change(contents.get(p)); contents.set(p, next); return next; }
     }
-  }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; const block = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]; return { frontmatter: block ? obsidian.parseYaml(block) : {} }; }, getFirstLinkpathDest: link => { const key = link.replace(/\.md$/, ''); return Array.from(files.values()).find(file => file instanceof TFile && (file.basename === key || file.path.replace(/\.md$/, '') === key)) || null; } }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async () => {} } };
+  }, metadataCache: { getFileCache: file => { const text = contents.get(file.path) || ''; const block = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]; return { frontmatter: block ? obsidian.parseYaml(block) : {} }; }, getFirstLinkpathDest: link => { const key = link.replace(/\.md$/, ''); return Array.from(files.values()).find(file => file instanceof TFile && (file.basename === key || file.path.replace(/\.md$/, '') === key)) || null; } }, fileManager: { renameFile: async (item, target) => renameTree(item.path, target), trashFile: async item => { trashed.push(item.path); } } };
   // Opt-in link index: resolvedLinks is computed from the current text (frontmatter and body wikilinks), like Obsidian's.
   if (options.linkIndex) Object.defineProperty(app.metadataCache, 'resolvedLinks', { configurable: true, get: () => { const index = {}; for (const [path, text] of contents) { if (!(files.get(path) instanceof TFile) || !path.endsWith('.md')) continue; for (const match of String(text).matchAll(/!?\[\[([^\]|#\n]+)/g)) { const dest = app.metadataCache.getFirstLinkpathDest(match[1].trim()); if (!dest) continue; index[path] ||= {}; index[path][dest.path] = (index[path][dest.path] || 0) + 1; } } return index; } });
-  return { app, contents, files, repo: new (options.Repository ?? Repository)(app, { ...DEFAULT_SETTINGS, language }) };
+  return { app, contents, files, trashed, repo: new (options.Repository ?? Repository)(app, { ...DEFAULT_SETTINGS, language }) };
 }
 async function topicNote(repo, title = '題目', model = 'model-a', id = 'map-a') {
   const mapDoc = { id, title: id, version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };

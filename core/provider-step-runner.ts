@@ -20,6 +20,8 @@ export interface ProviderStepHooks {
   onStreamMode?: (mode: "stream-json" | "json" | "json-fallback") => void;
   /** Receives a function that adds a user message to the running turn (Claude: stdin; Codex: `turn/steer`). It rejects once the turn can no longer take one. */
   onSteer?: (steer: (text: string) => Promise<void>) => void;
+  /** The model's raw output, right before it is parsed (so also for a reply that then fails to parse); never after a stop. Called once per output. */
+  onRaw?: (raw: string) => void;
 }
 
 /**
@@ -37,7 +39,10 @@ export type ProviderStepRunner<Request, Output> = (
   hooks?: ProviderStepHooks
 ) => Promise<string>;
 
-export function providerStepRunner<Request extends { model: string; reasoning: ReasoningLevel }, Output>(
+export function providerStepRunner<
+  Request extends { model: string; reasoning: ReasoningLevel; imageDataUrl?: string },
+  Output
+>(
   aiCalls: AiCalls,
   config: {
     name: string;
@@ -70,6 +75,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
         task: {
           textOnly: true,
           searchBudget: 0,
+          ...(request.imageDataUrl ? { imageDataUrl: request.imageDataUrl } : {}),
           ...(config.stream ? { stream: true } : {}),
           ...(config.lastMessageOnly ? { resolveLast: true } : {}),
           ...(config.stream && onStructuredJson ? { onStructuredJson } : {}),
@@ -84,6 +90,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
       },
       (raw, exchange) => {
         if (exchange.signal.aborted) throw config.stopped();
+        hooks?.onRaw?.(raw);
         prepared.parse(raw);
         exchange.parsed();
         return raw;

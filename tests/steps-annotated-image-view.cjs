@@ -1074,19 +1074,35 @@ test('counter-example (preview anchor): a preview span without data-anchor-id st
 test('counter-example (image blank area): right-click outside any anchor keeps the four-item image menu', async () => {
   const h = await harness(withRelations);
   h.view.render();
-  assert.equal(h.contextMenu().items.length, 4);
+  assert.deepEqual(h.contextMenu().items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
 });
 
-test('regression: deleting the image keeps every topic on the map', async () => {
-  const h = await harness(withRelations);
-  h.view.render();
-  const nodes = h.view.map.nodes.length;
-  assert.ok(nodes > 0);
+test('regression: deleting the image from its menu keeps every topic of a ringed map', async () => {
+  const h = await ringHarness();
+  const ids = Object.values(h.ids), before = plain(h.view.map.nodes.map(n => n.id));
+  assert.ok(ids.length >= 6);
   h.pick(h.contextMenu(), 'Delete').fn();
   await h.settle();
-  assert.equal(await h.onDisk(), undefined);
-  assert.equal(h.view.map.nodes.length, nodes);
-  assert.equal((await h.repo.readMap(MAP)).nodes.length, nodes);
+  assert.equal((await h.onDisk()).some(i => i.kind === 'annotated-image'), false);
+  for (const map of [h.view.map, await h.repo.readMap(MAP)]) {
+    assert.deepEqual(plain(map.nodes.map(n => n.id)), before);
+    for (const id of ids) assert.ok(map.nodes.some(n => n.id === id), id);
+  }
+});
+
+test('counter-example (right press on an anchor): button 2 starts no drag and moves nothing, and the anchor menu opens', async () => {
+  const h = await dragHarness();
+  const before = h.fileText();
+  press(h.dot(), 1100, 550, { button: 2 });
+  h.dot().fire('pointermove', { clientX: 1180, clientY: 590 });
+  const menu = anchorMenu(h);
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.deepEqual(menu.items.map(i => h.titleOf(i)), ['Edit anchor…', 'Delete anchor']);
+  assert.equal(h.dot().style.left, '50%');
+  assert.equal(h.dot().style.top, '50%');
+  assert.equal(h.fileText(), before);
+  assert.equal(docListeners(h), 0);
 });
 
 test('counter-example (modes): in place mode or topic-pick mode a right-click on an anchor keeps the image menu', async () => {
@@ -1099,4 +1115,237 @@ test('counter-example (modes): in place mode or topic-pick mode a right-click on
     const menu = anchorMenu(h);
     assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)'], mode);
   }
+});
+
+// ---- anchor drag: an existing anchor moves with the mouse; the screen follows at once, Map.md is written on release -------------
+/** An annotated image whose element is 200x100 at (1000, 500) on screen, with a fake document for the Esc listener. */
+async function dragHarness(over = {}, items) {
+  const h = await harness(root => items?.(root) ?? [annotated({ note: 'n', anchors: [at('a1', 0.5, 0.5, 'cow')], ...over })]);
+  h.doc = element('div');
+  h.view.contentEl.ownerDocument = h.doc;
+  h.view.render();
+  h.imageEl().getBoundingClientRect = () => ({ left: 1000, top: 500, width: 200, height: 100 });
+  h.dot = () => anchorsOf(h.imageEl())[0];
+  h.anchorOnDisk = async () => (await h.onDisk())[0].anchors[0].at;
+  return h;
+}
+const press = (dot, x = 1100, y = 550, extra = {}) => dot.fire('pointerdown', { button: 0, clientX: x, clientY: y, pointerId: 7, ...extra });
+const docListeners = h => Object.values(h.doc.listeners).flat().length;
+
+test('anchor drag: the dot follows the pointer, release writes once as one undo step and the focus stays on the anchor', async () => {
+  const h = await dragHarness();
+  const entries = h.view.history.past.length;
+  const imageLeft = h.imageEl().style.left;
+  const before = h.fileText();
+  assert.ok(h.dot().hasClass('is-draggable'));
+  press(h.dot());
+  h.dot().fire('pointermove', { clientX: 1150, clientY: 575 });
+  assert.equal(h.dot().style.left, '75%');
+  assert.equal(h.dot().style.top, '75%');
+  assert.ok(h.dot().hasClass('is-dragging'));
+  assert.equal(h.fileText(), before, 'nothing is written while dragging');
+  assert.equal(h.imageEl().style.left, imageLeft, 'the picture stays');
+  assert.equal(h.view.map.canvasItems[0].x, 100);
+  h.dot().fire('pointerup', {});
+  assert.ok(!h.dot().hasClass('is-dragging'));
+  await h.settle();
+  assert.deepEqual(await h.anchorOnDisk(), { kind: 'image-2d', x: 0.75, y: 0.75 });
+  assert.equal(h.view.history.past.length, entries + 1);
+  assert.equal(h.dot().focused, true);
+  assert.equal(docListeners(h), 0, 'no document listener is left');
+  await h.view.history.undoEntry.undo();
+  assert.deepEqual(await h.anchorOnDisk(), { kind: 'image-2d', x: 0.5, y: 0.5 });
+});
+
+test('anchor drag: the lines of the dragged anchor are redrawn with the live point; a cancel puts them back', async () => {
+  const h = await dragHarness({}, root => [annotated({ anchors: [at('a1', 0.5, 0.5), at('a2', 0.1, 0.1)], relations: [{ kind: 'supports', from: root, to: 'a1' }] })]);
+  const rootId = h.view.map.nodes[0].id;
+  const path = () => ({ d: '', setAttribute(k, v) { this[k] = v; }, toggleClass() {} });
+  h.view.cardEls = new Map([[rootId, Object.assign(element('div'), { offsetLeft: 900, offsetTop: 700, offsetWidth: 100, offsetHeight: 50 })]]);
+  h.view.textEls = new Map();
+  const key = `anchor:img1:a1:${rootId}`, other = `anchor:img1:a2:${rootId}`;
+  h.view.anchorLinks = new Map([[key, { imageId: 'img1', anchorId: 'a1', topicId: rootId, point: { x: 200, y: 100 }, fromAnchor: false, anchorNote: '' }], [other, { imageId: 'img1', anchorId: 'a2', topicId: rootId, point: { x: 120, y: 60 }, fromAnchor: false, anchorNote: '' }]]);
+  h.view.relationEls = new Map([[key, path()], [other, path()]]);
+  h.view.placeAnchorLine(key, h.view.anchorLinks.get(key), { x: 900, y: 700, width: 100, height: 50 });
+  const first = h.view.relationEls.get(key).d;
+  assert.notEqual(first, '');
+  const imageLeft = h.imageEl().style.left;
+  press(h.dot());
+  h.dot().fire('pointermove', { clientX: 1200, clientY: 600 });
+  const moved = h.view.relationEls.get(key).d;
+  assert.notEqual(moved, first, 'the line follows');
+  assert.equal(h.view.relationEls.get(other).d, '', 'another anchor line is not touched');
+  assert.equal(h.view.hoverAnchor, `img1\u0000a1`, 'the lines get the emphasis');
+  const card = h.view.cardEls.get(rootId), nodeBefore = [h.view.map.nodes[0].x, h.view.map.nodes[0].y];
+  assert.equal(card.style.left, undefined, 'the linked card is not moved');
+  assert.deepEqual([h.view.map.nodes[0].x, h.view.map.nodes[0].y], nodeBefore);
+  assert.equal(h.imageEl().style.left, imageLeft, 'the picture is not moved');
+  assert.deepEqual(h.view.anchorLinks.get(key).point, { x: 200, y: 100 }, 'the stored line is not changed');
+  h.dot().fire('pointercancel', {});
+  assert.equal(h.view.relationEls.get(key).d, first);
+});
+
+test('counter-example (click, under 3px): the anchor stays, nothing is written, no history entry', async () => {
+  const h = await dragHarness();
+  const entries = h.view.history.past.length, before = h.fileText();
+  press(h.dot());
+  h.dot().fire('pointermove', { clientX: 1101, clientY: 551 });
+  assert.equal(h.dot().style.left, '50%');
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+  assert.equal(docListeners(h), 0);
+});
+
+test('counter-example (cancel): Esc, pointercancel and lostpointercapture restore the dot, write nothing and leave the selection alone', async () => {
+  for (const how of ['Escape', 'pointercancel', 'lostpointercapture']) {
+    const h = await dragHarness();
+    const entries = h.view.history.past.length, before = h.fileText();
+    h.view.selection.click(h.view.map.nodes[0].id);
+    assert.equal(h.view.selection.state.selected, h.view.map.nodes[0].id);
+    press(h.dot());
+    h.dot().fire('pointermove', { clientX: 1180, clientY: 590 });
+    assert.equal(h.dot().style.left, '90%', how);
+    let stopped = false;
+    if (how === 'Escape') h.doc.fire('keydown', { key: 'Escape', stopPropagation() { stopped = true; } });
+    else h.dot().fire(how, {});
+    assert.equal(stopped, how === 'Escape', how);
+    assert.equal(h.dot().style.left, '50%', how);
+    assert.equal(h.dot().style.top, '50%', how);
+    assert.ok(!h.dot().hasClass('is-dragging'), how);
+    h.dot().fire('pointerup', {});
+    await h.settle();
+    assert.equal(h.fileText(), before, how);
+    assert.equal(h.view.history.past.length, entries, how);
+    assert.equal(h.view.selection.state.selected, h.view.map.nodes[0].id, how);
+    assert.equal(docListeners(h), 0, how);
+  }
+});
+
+test('counter-example (out of range): dragging past the picture clamps the anchor to 0 and 1', async () => {
+  const h = await dragHarness();
+  press(h.dot());
+  h.dot().fire('pointermove', { clientX: 5000, clientY: -300 });
+  assert.equal(h.dot().style.left, '100%');
+  assert.equal(h.dot().style.top, '0%');
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.deepEqual(await h.anchorOnDisk(), { kind: 'image-2d', x: 1, y: 0 });
+});
+
+test('counter-example (read-only): selection mode and AIM anchors have no drag, no grab class and write nothing', async () => {
+  for (const mode of ['selection', 'aim']) {
+    const h = await harness([annotated({ anchors: [at('a1', 0.5, 0.5)] })]);
+    h.doc = element('div');
+    h.view.contentEl.ownerDocument = h.doc;
+    if (mode === 'selection') h.view.selection.toggleMultiSelect();
+    else h.view.aimLive = () => true;
+    h.view.render();
+    h.imageEl().getBoundingClientRect = () => ({ left: 1000, top: 500, width: 200, height: 100 });
+    const [dot] = anchorsOf(h.imageEl());
+    const before = h.fileText();
+    assert.ok(!dot.hasClass('is-draggable'), mode);
+    assert.equal(dot.listeners.pointerdown.length, 1, `${mode}: only the stopPropagation listener`);
+    press(dot);
+    dot.fire('pointermove', { clientX: 1180, clientY: 590 });
+    dot.fire('pointerup', {});
+    await h.settle();
+    assert.equal(dot.style.left, '50%', mode);
+    assert.equal(h.fileText(), before, mode);
+    assert.equal(docListeners(h), 0, mode);
+  }
+});
+
+test('counter-example (other buttons): a right or middle press does not start a drag', async () => {
+  for (const button of [1, 2]) {
+    const h = await dragHarness();
+    const before = h.fileText();
+    press(h.dot(), 1100, 550, { button });
+    h.dot().fire('pointermove', { clientX: 1180, clientY: 590 });
+    h.dot().fire('pointerup', {});
+    await h.settle();
+    assert.equal(h.dot().style.left, '50%', String(button));
+    assert.equal(h.fileText(), before, String(button));
+    assert.equal(docListeners(h), 0, String(button));
+  }
+});
+
+test('counter-example (repaint mid-drag): the old dot writes nothing and leaves no document listener', async () => {
+  const h = await dragHarness();
+  const entries = h.view.history.past.length, before = h.fileText();
+  const old = h.dot();
+  press(old);
+  old.fire('pointermove', { clientX: 1180, clientY: 590 });
+  assert.equal(docListeners(h), 1);
+  h.view.render();
+  assert.equal(docListeners(h), 0);
+  assert.equal(h.view.hoverAnchor, null, 'the emphasis does not outlive the drag');
+  old.fire('pointermove', { clientX: 1190, clientY: 595 });
+  old.fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+  assert.equal(h.dot().style.left, '50%', 'the new dot is where the data says');
+});
+
+test('counter-example (repaint on focus): a dot replaced by the press starts no drag and does not throw', async () => {
+  const h = await dragHarness();
+  const entries = h.view.history.past.length, before = h.fileText();
+  const old = h.dot();
+  old.focus = () => { old.isConnected = false; };
+  old.setPointerCapture = () => { throw new Error('setPointerCapture on a detached dot'); };
+  assert.doesNotThrow(() => press(old));
+  assert.equal(h.view.anchorDragCancel, null);
+  assert.equal(docListeners(h), 0);
+  old.fire('pointermove', { clientX: 1180, clientY: 590 });
+  old.fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+});
+
+test('anchor drag: Esc while pressed but not yet moved 3px is not swallowed, and the release is still a click', async () => {
+  const h = await dragHarness();
+  const entries = h.view.history.past.length, before = h.fileText();
+  press(h.dot());
+  h.dot().fire('pointermove', { clientX: 1101, clientY: 550 });
+  let stopped = false;
+  h.doc.fire('keydown', { key: 'Escape', stopPropagation() { stopped = true; } });
+  assert.equal(stopped, false);
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+  assert.equal(docListeners(h), 0);
+});
+
+test('anchor drag: a left press focuses the anchor (preventDefault would otherwise skip it), a right press does not', async () => {
+  const h = await dragHarness();
+  press(h.dot(), 1100, 550, { button: 2 });
+  assert.ok(!h.dot().focused);
+  press(h.dot());
+  assert.equal(h.dot().focused, true);
+  h.dot().fire('pointerup', {});
+});
+
+test('anchor drag: ending exactly where it started writes nothing and adds no history entry', async () => {
+  const h = await dragHarness();
+  const entries = h.view.history.past.length, before = h.fileText();
+  press(h.dot());
+  h.dot().fire('pointermove', { clientX: 1180, clientY: 590 });
+  h.dot().fire('pointermove', { clientX: 1100, clientY: 550 });
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+});
+
+test('anchor drag: the written position is rounded to 0.001', async () => {
+  const h = await dragHarness();
+  press(h.dot());
+  h.dot().fire('pointermove', { clientX: 1150.8, clientY: 575.23 });
+  h.dot().fire('pointerup', {});
+  await h.settle();
+  assert.deepEqual(await h.anchorOnDisk(), { kind: 'image-2d', x: 0.754, y: 0.752 });
 });

@@ -66,7 +66,6 @@
 .vam-tools-select-icon svg { width: 18px; height: 18px; }
 .vam-tools-select-label { display: none; white-space: nowrap; }
 .vam-tools-mini:hover .vam-tools-select-label, .vam-tools-mini:focus-within .vam-tools-select-label, .vam-tools-mini.is-open .vam-tools-select-label { display: inline; }
-.vam-empty .vam-empty-add { margin-top: 12px; }
 /* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
 .vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
@@ -653,6 +652,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-integration-sources strong { color: var(--text-normal); }
 .vam-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(440px, calc(100% - 24px)); margin: 0; padding: 24px; color: var(--text-muted); text-align: center; line-height: 1.8; pointer-events: none; }
 .vam-empty button { pointer-events: auto; }
+.vam-empty.is-add-first { top: 12px; left: 12px; transform: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: auto; max-width: calc(100% - 24px); padding: 0; text-align: left; line-height: 1.4; }
 .vam-empty-state { margin: auto; padding: 32px; max-width: 520px; text-align: center; }
 .vam-empty-state p { color: var(--text-muted); line-height: 1.6; }
 .vam-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }

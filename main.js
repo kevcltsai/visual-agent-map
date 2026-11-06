@@ -66576,6 +66576,7 @@ ${request.requirements}` : preset.text,
     const state = this.emptyCanvasState();
     box.toggleClass("is-building", state === "building");
     box.toggleClass("is-waiting", state === "plan" || state === "consent");
+    box.toggleClass("is-add-first", state === "idle" && !this.aimLive());
     if (state === "building") {
       box.createSpan({ text: t("ui.map_chat_canvas_building") });
       const skeleton = box.createDiv({ cls: "vam-chat-skeleton", attr: { "aria-hidden": "true" } });
@@ -66594,8 +66595,8 @@ ${request.requirements}` : preset.text,
       box.createSpan({ text: t("ui.aim_empty_map_hint") });
       return;
     }
-    box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
     const add = box.createEl("button", { cls: "mod-cta vam-empty-add", text: t("ui.add_first_topic") });
+    box.createDiv({ text: t("ui.this_mind_map_has_no_topics_click_topic_to_create_the_first") });
     add.addEventListener("click", (event) => {
       var _a2;
       event.stopPropagation();

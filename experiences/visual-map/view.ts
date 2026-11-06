@@ -1648,6 +1648,10 @@ export class VisualAgentMapView extends ItemView {
   private hoverTopic: string | null = null;
   /** The drawn anchor dots (`imageId NUL anchorId`), so a repaint can mark the ones whose lines are emphasised. */
   private anchorDots = new Map<string, HTMLElement>();
+  /** Ends the running anchor drag; `restore` puts its dot and lines back (false when the dot is already gone). */
+  private anchorDragCancel: ((restore: boolean) => void) | null = null;
+  /** The anchor that gets the keyboard focus on the next paint (set when a drag settles). */
+  private focusAnchorRef: string | null = null;
   /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
   private relationEndIds = new Set<string>();
   /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
@@ -3050,6 +3054,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
     this.hoverCard?.remove();
     this.dragCleanup?.();
+    this.anchorDragCancel?.(false);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -8550,6 +8555,8 @@ export class VisualAgentMapView extends ItemView {
    * they paint behind the cards. A file that cannot be found shows a named placeholder; the item stays in the map.
    */
   private renderCanvasItems(): void {
+    // A repaint replaces the dragged dot, so its events would never arrive: drop the drag without writing.
+    this.anchorDragCancel?.(false);
     const stage = this.stageEl,
       items = this.map?.canvasItems ?? [];
     if (!stage || (!items?.length && !this.pendingSummary)) {
@@ -8641,6 +8648,7 @@ export class VisualAgentMapView extends ItemView {
     this.renderBoundaries(stage, items, editable);
     this.renderSummaries(stage, items);
     this.focusItemId = null;
+    this.focusAnchorRef = null;
   }
   /** The anchors of one annotated image. Only anchors with a 2D position are drawn; the others stay in the data untouched. */
   private renderAnchors(el: HTMLElement, image: AnnotatedImageItem, editable: boolean): void {
@@ -8688,7 +8696,13 @@ export class VisualAgentMapView extends ItemView {
         ["blur", false]
       ] as const)
         dot.addEventListener(name, () => mark(on));
+      if (this.focusAnchorRef === ref) {
+        this.focusAnchorRef = null;
+        dot.focus({ preventScroll: true });
+      }
       if (!editable) continue;
+      dot.addClass("is-draggable");
+      this.enableAnchorDrag(dot, el, image, anchor.id, anchor.at, ref);
       dot.addEventListener("keydown", event => {
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
         if (event.key === "Enter") {
@@ -8703,6 +8717,103 @@ export class VisualAgentMapView extends ItemView {
       });
     }
     this.paintAnchorPreview(el, image, image.note || (image.path.split("/").pop() ?? image.path));
+  }
+  /**
+   * Drags an existing anchor with the mouse. The dot and the lines that leave it follow the pointer on screen only; Map.md is
+   * written once on release (one undo step). Esc, pointercancel, lostpointercapture, a repaint or closing the view drop the
+   * drag without writing. A press that moves less than 3px is a click.
+   */
+  private enableAnchorDrag(
+    dot: HTMLElement,
+    el: HTMLElement,
+    image: AnnotatedImageItem,
+    anchorId: string,
+    origin: { x: number; y: number },
+    ref: string
+  ): void {
+    dot.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
+      event.preventDefault();
+      this.anchorDragCancel?.(true);
+      const start = { x: event.clientX, y: event.clientY },
+        doc = this.contentEl?.ownerDocument;
+      let active = false,
+        done = false,
+        to = { x: origin.x, y: origin.y };
+      const lines = (): [string, AnchorLine][] =>
+        [...this.anchorLinks].filter(([, line]) => line.imageId === image.id && line.anchorId === anchorId);
+      const paint = (at: { x: number; y: number }): void => {
+        dot.style.left = `${Math.round(at.x * 1e6) / 1e4}%`;
+        dot.style.top = `${Math.round(at.y * 1e6) / 1e4}%`;
+        for (const [key, line] of lines()) {
+          const end = this.lineEndEl(line.topicId);
+          if (end)
+            this.placeAnchorLine(
+              key,
+              { ...line, point: { x: image.x + at.x * image.w, y: image.y + at.y * image.h } },
+              boxOf(end)
+            );
+        }
+      };
+      const move = (e: PointerEvent): void => {
+        if (done) return;
+        if (!active && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
+        const rect = el.getBoundingClientRect();
+        if (!(rect.width > 0 && rect.height > 0)) return;
+        if (!active) {
+          active = true;
+          dot.addClass("is-dragging");
+          // The lines of this anchor take the same emphasis as when it is pointed at.
+          this.hoverAnchor = ref;
+          this.syncRelationClasses();
+        }
+        const clamp = (n: number): number => Math.min(1, Math.max(0, n));
+        to = { x: clamp((e.clientX - rect.left) / rect.width), y: clamp((e.clientY - rect.top) / rect.height) };
+        paint(to);
+      };
+      const settle = (): void => {
+        done = true;
+        if (this.anchorDragCancel === cancelRef) this.anchorDragCancel = null;
+        dot.removeEventListener("pointermove", move);
+        dot.removeEventListener("pointerup", up);
+        dot.removeEventListener("pointercancel", cancel);
+        dot.removeEventListener("lostpointercapture", cancel);
+        doc?.removeEventListener("keydown", esc, true);
+        dot.removeClass("is-dragging");
+      };
+      const cancelRef = (restore: boolean): void => {
+        if (done) return;
+        settle();
+        if (restore && active) paint(origin);
+      };
+      const cancel = (): void => cancelRef(dot.isConnected !== false);
+      const esc = (e: KeyboardEvent): void => {
+        if (e.key !== "Escape") return;
+        e.preventDefault();
+        e.stopPropagation();
+        cancelRef(true);
+      };
+      const up = (): void => {
+        if (done) return;
+        const write = active && dot.isConnected !== false && this.canEditCanvasItems();
+        settle();
+        if (!write) {
+          if (active) paint(origin);
+          return;
+        }
+        this.focusAnchorRef = ref;
+        dot.focus({ preventScroll: true });
+        const at = { x: to.x, y: to.y };
+        this.enqueue(() => this.changeCanvasItems(image.id, items => updateAnchor(items, image.id, anchorId, { at })));
+      };
+      this.anchorDragCancel = cancelRef;
+      dot.setPointerCapture?.(event.pointerId);
+      dot.addEventListener("pointermove", move);
+      dot.addEventListener("pointerup", up);
+      dot.addEventListener("pointercancel", cancel);
+      dot.addEventListener("lostpointercapture", cancel);
+      doc?.addEventListener("keydown", esc, true);
+    });
   }
   /** The anchors the pending plan would place on this image (none once the plan is settled or replaced). */
   private previewAnchorsOf(imageId: string): { x: number; y: number; note: string }[] {

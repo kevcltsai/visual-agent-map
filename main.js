@@ -57211,6 +57211,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "hoverTopic", null);
     /** The drawn anchor dots (`imageId NUL anchorId`), so a repaint can mark the ones whose lines are emphasised. */
     __publicField(this, "anchorDots", /* @__PURE__ */ new Map());
+    /** Ends the running anchor drag; `restore` puts its dot and lines back (false when the dot is already gone). */
+    __publicField(this, "anchorDragCancel", null);
+    /** The anchor that gets the keyboard focus on the next paint (set when a drag settles). */
+    __publicField(this, "focusAnchorRef", null);
     /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
     __publicField(this, "relationEndIds", /* @__PURE__ */ new Set());
     /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
@@ -58496,7 +58500,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     return true;
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     this.closeTopicLinkMenu();
     this.closed = true;
     this.closeMapSearch(false);
@@ -58563,6 +58567,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
     (_l = this.hoverCard) == null ? void 0 : _l.remove();
     (_m = this.dragCleanup) == null ? void 0 : _m.call(this);
+    (_n = this.anchorDragCancel) == null ? void 0 : _n.call(this, false);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -63677,8 +63682,9 @@ ${request.requirements}` : preset.text,
    * they paint behind the cards. A file that cannot be found shows a named placeholder; the item stays in the map.
    */
   renderCanvasItems() {
-    var _a2, _b2, _c, _d, _e;
-    const stage = this.stageEl, items = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [];
+    var _a2, _b2, _c, _d, _e, _f;
+    (_a2 = this.anchorDragCancel) == null ? void 0 : _a2.call(this, false);
+    const stage = this.stageEl, items = (_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : [];
     if (!stage || !(items == null ? void 0 : items.length) && !this.pendingSummary) {
       if (this.linkingTextId) this.cancelLinking(false);
       if (this.placing) this.cancelPlacing(false);
@@ -63695,7 +63701,7 @@ ${request.requirements}` : preset.text,
     this.canvasImageEls = /* @__PURE__ */ new Map();
     for (const item of items) {
       if (item.kind !== "image" && !isAnnotatedImage(item) || !layer) continue;
-      const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = annotated ? this.annotatedLabel(annotated, name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
+      const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_d = image.path.split("/").pop()) != null ? _d : image.path, label = annotated ? this.annotatedLabel(annotated, name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
       this.canvasImageEls.set(image.id, el);
       el.setAttr("role", annotated ? "group" : "img");
@@ -63706,7 +63712,7 @@ ${request.requirements}` : preset.text,
       el.style.width = `${image.w}px`;
       el.style.height = `${image.h}px`;
       const file = this.app.vault.getAbstractFileByPath(image.path);
-      const source = file instanceof import_obsidian37.TFile ? (_e = (_d = this.app.vault).getResourcePath) == null ? void 0 : _e.call(_d, file) : void 0;
+      const source = file instanceof import_obsidian37.TFile ? (_f = (_e = this.app.vault).getResourcePath) == null ? void 0 : _f.call(_e, file) : void 0;
       if (annotated) this.renderAnnotatedBar(el, annotated, name2);
       let picture = null;
       const placeholder2 = () => {
@@ -63756,6 +63762,7 @@ ${request.requirements}` : preset.text,
     this.renderBoundaries(stage, items, editable);
     this.renderSummaries(stage, items);
     this.focusItemId = null;
+    this.focusAnchorRef = null;
   }
   /** The anchors of one annotated image. Only anchors with a 2D position are drawn; the others stay in the data untouched. */
   renderAnchors(el, image, editable) {
@@ -63800,7 +63807,13 @@ ${request.requirements}` : preset.text,
         ["blur", false]
       ])
         dot.addEventListener(name2, () => mark2(on));
+      if (this.focusAnchorRef === ref) {
+        this.focusAnchorRef = null;
+        dot.focus({ preventScroll: true });
+      }
       if (!editable) continue;
+      dot.addClass("is-draggable");
+      this.enableAnchorDrag(dot, el, image, anchor.id, anchor.at, ref);
       dot.addEventListener("keydown", (event) => {
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
         if (event.key === "Enter") {
@@ -63815,6 +63828,92 @@ ${request.requirements}` : preset.text,
       });
     }
     this.paintAnchorPreview(el, image, image.note || ((_b2 = image.path.split("/").pop()) != null ? _b2 : image.path));
+  }
+  /**
+   * Drags an existing anchor with the mouse. The dot and the lines that leave it follow the pointer on screen only; Map.md is
+   * written once on release (one undo step). Esc, pointercancel, lostpointercapture, a repaint or closing the view drop the
+   * drag without writing. A press that moves less than 3px is a click.
+   */
+  enableAnchorDrag(dot, el, image, anchorId, origin, ref) {
+    dot.addEventListener("pointerdown", (event) => {
+      var _a2, _b2, _c;
+      if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
+      event.preventDefault();
+      (_a2 = this.anchorDragCancel) == null ? void 0 : _a2.call(this, true);
+      const start = { x: event.clientX, y: event.clientY }, doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
+      let active = false, done = false, to = { x: origin.x, y: origin.y };
+      const lines = () => [...this.anchorLinks].filter(([, line]) => line.imageId === image.id && line.anchorId === anchorId);
+      const paint = (at) => {
+        dot.style.left = `${Math.round(at.x * 1e6) / 1e4}%`;
+        dot.style.top = `${Math.round(at.y * 1e6) / 1e4}%`;
+        for (const [key2, line] of lines()) {
+          const end = this.lineEndEl(line.topicId);
+          if (end)
+            this.placeAnchorLine(
+              key2,
+              { ...line, point: { x: image.x + at.x * image.w, y: image.y + at.y * image.h } },
+              boxOf(end)
+            );
+        }
+      };
+      const move = (e) => {
+        if (done) return;
+        if (!active && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
+        const rect2 = el.getBoundingClientRect();
+        if (!(rect2.width > 0 && rect2.height > 0)) return;
+        if (!active) {
+          active = true;
+          dot.addClass("is-dragging");
+          this.hoverAnchor = ref;
+          this.syncRelationClasses();
+        }
+        const clamp2 = (n) => Math.min(1, Math.max(0, n));
+        to = { x: clamp2((e.clientX - rect2.left) / rect2.width), y: clamp2((e.clientY - rect2.top) / rect2.height) };
+        paint(to);
+      };
+      const settle = () => {
+        done = true;
+        if (this.anchorDragCancel === cancelRef) this.anchorDragCancel = null;
+        dot.removeEventListener("pointermove", move);
+        dot.removeEventListener("pointerup", up);
+        dot.removeEventListener("pointercancel", cancel);
+        dot.removeEventListener("lostpointercapture", cancel);
+        doc == null ? void 0 : doc.removeEventListener("keydown", esc, true);
+        dot.removeClass("is-dragging");
+      };
+      const cancelRef = (restore) => {
+        if (done) return;
+        settle();
+        if (restore && active) paint(origin);
+      };
+      const cancel = () => cancelRef(dot.isConnected !== false);
+      const esc = (e) => {
+        if (e.key !== "Escape") return;
+        e.preventDefault();
+        e.stopPropagation();
+        cancelRef(true);
+      };
+      const up = () => {
+        if (done) return;
+        const write = active && dot.isConnected !== false && this.canEditCanvasItems();
+        settle();
+        if (!write) {
+          if (active) paint(origin);
+          return;
+        }
+        this.focusAnchorRef = ref;
+        dot.focus({ preventScroll: true });
+        const at = { x: to.x, y: to.y };
+        this.enqueue(() => this.changeCanvasItems(image.id, (items) => updateAnchor(items, image.id, anchorId, { at })));
+      };
+      this.anchorDragCancel = cancelRef;
+      (_c = dot.setPointerCapture) == null ? void 0 : _c.call(dot, event.pointerId);
+      dot.addEventListener("pointermove", move);
+      dot.addEventListener("pointerup", up);
+      dot.addEventListener("pointercancel", cancel);
+      dot.addEventListener("lostpointercapture", cancel);
+      doc == null ? void 0 : doc.addEventListener("keydown", esc, true);
+    });
   }
   /** The anchors the pending plan would place on this image (none once the plan is settled or replaced). */
   previewAnchorsOf(imageId) {

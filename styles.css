@@ -2015,6 +2015,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-anchor:hover, .vam-view .vam-anchor:focus-visible { transform: scale(1.35); outline: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-view .vam-anchor-tip { position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 3; display: none; flex-direction: column; gap: 2px; width: max-content; max-width: 240px; padding: 4px 8px; transform: translateX(-50%); font-size: var(--font-ui-smaller); line-height: 1.4; text-align: left; white-space: normal; overflow-wrap: anywhere; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 4px; box-shadow: var(--shadow-s); pointer-events: none; }
 .vam-view .vam-anchor:hover .vam-anchor-tip, .vam-view .vam-anchor:focus-visible .vam-anchor-tip { display: flex; }
+.vam-view .vam-anchor.is-draggable { cursor: grab; touch-action: none; }
+.vam-view .vam-anchor.is-draggable.is-dragging { cursor: grabbing; }
+.vam-view .vam-anchor.is-dragging .vam-anchor-tip { display: none; }
 .vam-view .vam-anchor-tip-links { color: var(--text-muted); }
 .vam-view .vam-anchor-crosshair { position: absolute; z-index: 2; width: 28px; height: 28px; margin: -14px 0 0 -14px; pointer-events: none; border: 2px solid var(--interactive-accent); border-radius: 50%; background: linear-gradient(var(--interactive-accent), var(--interactive-accent)) center / 2px 100% no-repeat, linear-gradient(var(--interactive-accent), var(--interactive-accent)) center / 100% 2px no-repeat; }
 .vam-view .is-placing .vam-canvas-image { cursor: crosshair; }

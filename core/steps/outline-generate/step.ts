@@ -221,13 +221,11 @@ export const outlineGenerateStep: StepDefinition<OutlineGenerateRequest, Outline
     if (!request.topic.trim())
       throw new OutlineGenerateError("empty_topic", translate(locale, "error.outline_generate_empty_topic"));
     if (estimateTokens(prompt) > OUTLINE_GENERATE_TOKEN_BUDGET) {
-      // A request with a note or subtopics is refused whole (never truncated, never retried with the title only). The string is the
-      // over-budget one until the UI has its own wording.
+      // A request with a note or subtopics is refused whole (never truncated, never retried with the title only), with its own wording.
       const { note, children } = noteInputs(request);
-      throw new OutlineGenerateError(
-        note || children.length ? "note_too_long" : "over_budget",
-        translate(locale, "error.outline_generate_over_budget")
-      );
+      if (note || children.length)
+        throw new OutlineGenerateError("note_too_long", translate(locale, "error.outline_generate_note_too_long"));
+      throw new OutlineGenerateError("over_budget", translate(locale, "error.outline_generate_over_budget"));
     }
   },
   parse: (raw, request) => parseOutlineReply(raw, request.language)

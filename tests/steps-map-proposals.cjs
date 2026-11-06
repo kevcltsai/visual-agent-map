@@ -70,7 +70,7 @@ test('outline prompt with a note: the note and existing subtopics are quoted unt
 
 test('note too long: refused with note_too_long before any provider call, nothing truncated, not the missing_summary retry; no note keeps over_budget', async () => {
   const huge = 'n'.repeat(OUTLINE_GENERATE_TOKEN_BUDGET * 4 + 1);
-  assert.throws(() => prepareStep(outlineGenerateStep, outlineRequest({ noteDetail: huge })), error => error.name === 'OutlineGenerateError' && error.code === 'note_too_long' && error.message === translate('en', 'error.outline_generate_over_budget'));
+  assert.throws(() => prepareStep(outlineGenerateStep, outlineRequest({ noteDetail: huge })), error => error.name === 'OutlineGenerateError' && error.code === 'note_too_long' && error.message === translate('en', 'error.outline_generate_note_too_long') && error.message !== translate('en', 'error.outline_generate_over_budget'));
   assert.throws(() => prepareStep(outlineGenerateStep, outlineRequest({ existingChildren: ['c'.repeat(OUTLINE_GENERATE_TOKEN_BUDGET * 4 + 1)] })), error => error.code === 'note_too_long');
   assert.throws(() => prepareStep(outlineGenerateStep, outlineRequest({ noteDetail: '  ', presetText: 'x'.repeat(OUTLINE_GENERATE_TOKEN_BUDGET * 4 + 1) })), error => error.code === 'over_budget', 'a blank note is not a note input');
   const fx = serviceFixture('# Root\n> r');

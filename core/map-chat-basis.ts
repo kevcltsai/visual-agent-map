@@ -134,3 +134,63 @@ export function basisSummary(basis: MapChatBasis, labels: BasisLabels, titleLimi
   const shown = titles.slice(0, titleLimit).join(", ") + (titles.length > titleLimit ? ", …" : "");
   return (basis.kind === "research" ? labels.research : labels.note).replace(/\{0\}/g, () => shown);
 }
+
+const SUMMARY_TITLE_LIMIT = 60;
+const oneLine = (value: string): string => {
+  const flat = value.replace(/\s+/g, " ").trim();
+  const chars = [...flat];
+  return chars.length > SUMMARY_TITLE_LIMIT ? `${chars.slice(0, SUMMARY_TITLE_LIMIT - 1).join("")}…` : flat;
+};
+
+/**
+ * One line of the basis block shown under a reply's results (decided by the program; "read", never "checked").
+ * - `cards`: the new cards (add_child) that were built from the same notes, counted: a research note, another note, or the titles only
+ *   (no whole note of the parent chain was read; `alsoRead` is not a basis and is not listed here).
+ * - `expand`: one expanded card, with the notes it was read from (its own, or none = only the title) and how many subtopics it had.
+ */
+export type BasisSummaryEntry =
+  | { type: "cards"; kind: "research" | "note"; titles: string[]; count: number }
+  | { type: "cards"; kind: "outline_only"; titles: []; count: number }
+  | { type: "expand"; kind: "note"; titles: string[]; existingChildren: number }
+  | { type: "expand"; kind: "outline_only"; titles: []; existingChildren: number };
+
+/**
+ * The basis block of one reply: the bases of its result lines gathered into the fewest lines. Cards of the same kind and the same
+ * sources are one entry with a count (first appearance first); every expansion is its own entry (it names its card). Pure: the same
+ * lines always give the same entries, with no mention of anything that was not read. Titles are untrusted text, cut to one line.
+ */
+export function summarizeBasis(bases: readonly MapChatBasis[]): BasisSummaryEntry[] {
+  const entries: BasisSummaryEntry[] = [];
+  const cardIndex = new Map<string, number>();
+  for (const basis of bases) {
+    const titles =
+      basis.kind === "outline_only"
+        ? []
+        : basis.sources
+            .map(source => oneLine(source.title))
+            .filter((title, at, all) => title && all.indexOf(title) === at);
+    // A note basis that names no readable title (a hand-edited file) says nothing about what was read: it counts as titles only.
+    const kind = basis.kind === "outline_only" || !titles.length ? "outline_only" : basis.kind;
+    if (basis.existingChildren !== undefined) {
+      entries.push(
+        kind === "outline_only"
+          ? { type: "expand", kind, titles: [], existingChildren: basis.existingChildren }
+          : { type: "expand", kind: "note", titles, existingChildren: basis.existingChildren }
+      );
+      continue;
+    }
+    const key = kind === "outline_only" ? kind : `${kind}\u0001${titles.join("\u0001")}`;
+    const at = cardIndex.get(key);
+    if (at !== undefined) {
+      (entries[at] as { count: number }).count++;
+      continue;
+    }
+    cardIndex.set(key, entries.length);
+    entries.push(
+      kind === "outline_only"
+        ? { type: "cards", kind, titles: [], count: 1 }
+        : { type: "cards", kind, titles, count: 1 }
+    );
+  }
+  return entries;
+}

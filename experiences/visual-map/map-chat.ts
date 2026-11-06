@@ -1,13 +1,15 @@
 import { Keymap, setIcon } from "obsidian";
 import { t } from "../../i18n";
 import type { ImageCandidate } from "../../core/image-candidates";
-import type { MapChatBasis } from "../../core/map-chat-basis";
+import { summarizeBasis, type BasisSummaryEntry, type MapChatBasis } from "../../core/map-chat-basis";
 import type { MapChatContinuationInput, MapChatTurn } from "../../core/map-chat-context";
-import type {
-  MapChatChainEndReason,
-  MapChatChainPanel,
-  MapChatChainState,
-  MapChatChainWaiting
+import {
+  MAP_CHAT_CHAIN_MAX_ROUNDS,
+  MAP_CHAT_CHAIN_WAIT_MS,
+  type MapChatChainEndReason,
+  type MapChatChainPanel,
+  type MapChatChainState,
+  type MapChatChainWaiting
 } from "../../core/map-chat-chain";
 import { renderChatMarkdown } from "../../core/map-chat-render";
 import { hasUnsavedChat } from "../../core/map-chat-transcript";
@@ -195,6 +197,8 @@ export interface MapChatMessage {
   role: "user" | "assistant";
   /** On a user message: an automatic round of a continuation, not something the user said. Its `text` is only the label that history and notes show. */
   auto?: true;
+  /** On an automatic round's question: what its separator row says (the round and what is left). A restored round may know only its number. */
+  autoInfo?: MapChatAutoInfo;
   /** On a user message: the question and references it was sent with. */
   origin?: MapChatOrigin;
   /** On a user message: the follow-ups typed while its reply was being made, oldest first (shown under the question). */
@@ -220,6 +224,19 @@ export interface MapChatMessage {
   replyUndo?: { token: object };
   /** Restored from a saved conversation: Retry (if it ever shows) is no longer valid. */
   stale?: boolean;
+  /** On an assistant message: the sentence that told why the automatic continuation ended after this reply (in memory only). */
+  chainNote?: { reason: MapChatChainEndReason; text: string };
+  /** On an assistant message: research notes of the conversation this round did not read (in memory only). */
+  unread?: { title: string; oversize: boolean }[];
+}
+
+/** What the separator row of an automatic round shows. */
+export interface MapChatAutoInfo {
+  round?: number;
+  maxRounds: number;
+  remaining?: string;
+  /** Research that went on after some of it failed: how many cards failed and how many notes the round is built on. */
+  partial?: { failed: number; succeeded: number };
 }
 
 /** A saved conversation as {@link MapChatPanel.restore} takes it (core `restoreConversation` returns this shape). */
@@ -235,8 +252,9 @@ export interface MapChatRestoredConversation {
     stalePlan: boolean;
     /** The follow-ups that went into the turn (shown as live ones, so the next request carries them too). */
     steers?: string[];
-    /** An automatic round of a continuation. */
+    /** An automatic round of a continuation, and its round number when the record has it. */
     auto?: boolean;
+    round?: number;
     /** What became of the plan card: no line (undefined) = it was still waiting; stopped counts as applied. */
     planState?: "applied" | "cancelled" | "stopped";
     /** The result lines the applied plan wrote. */
@@ -384,6 +402,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   private width = MAP_CHAT_WIDTH_DEFAULT;
   private busy = false;
   private chainWaitingState: MapChatChainWaiting | null = null;
+  /** What the continuation still has to do, as the waiting row says it. */
+  private chainWaitingLeft = "";
+  /** When the wait began (the seconds count from there), the timer that rewrites them, and the two texts that change. */
+  private chainWaitingSince = 0;
+  private chainWaitingTimer: { cancel: () => void } | null = null;
+  private chainWaitingEls: { label: HTMLElement; elapsed: HTMLElement } | null = null;
+  /** The round and the limit of the continuation in flight (1 and the default for an ordinary message). */
+  private chainRound = 1;
+  private chainMax = MAP_CHAT_CHAIN_MAX_ROUNDS;
   /** A confirmed plan is being applied: the window shows it is working and can stop it. */
   private applying = false;
   private composing = false;
@@ -762,7 +789,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     origin?: MapChatOrigin,
     keepDraft = false,
     stage: MapChatStage = "waiting",
-    auto = false
+    auto = false,
+    autoInfo?: MapChatAutoInfo
   ): MapChatTurnHandle {
     // A list of maps to pick from belongs to the message before; a new message ends its choices.
     const retired = this.messages.flatMap(message =>
@@ -774,8 +802,12 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       text: userText,
       lines: [],
       ...(origin ? { origin } : {}),
-      ...(auto ? { auto: true as const } : {})
+      ...(auto ? { auto: true as const, ...(autoInfo ? { autoInfo } : {}) } : {})
     };
+    if (!auto) {
+      this.chainRound = 1;
+      this.chainMax = MAP_CHAT_CHAIN_MAX_ROUNDS;
+    }
     const modelLabel = this.replyModelLabel();
     const assistant: MapChatMessage = {
       role: "assistant",
@@ -798,23 +830,192 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /**
    * An automatic round of a continuation begins: the same turn as {@link begin} (preparing, busy, an answer to fill), but its
-   * question is not the user's. The question row is not shown and its text is the label history and notes use. The round number,
-   * limit and what is left are for the presentation of P4; nothing new is shown yet.
+   * question is not the user's. Its row is a separator ("Automatic continuation · round 2 of 8", what is left, and, after research
+   * that partly failed, what the round is built on); its text is the label history and notes use. The reader hears the round
+   * once, with the stage that opens it.
    */
-  beginAutoRound(_round: number, _maxRounds: number, _remaining: string, origin: MapChatOrigin): MapChatTurnHandle {
-    return this.begin(t("ui.map_chat_role_auto"), origin, true, "preparing", true);
+  beginAutoRound(
+    round: number,
+    maxRounds: number,
+    remaining: string,
+    origin: MapChatOrigin,
+    partial?: { failed: number; succeeded: number }
+  ): MapChatTurnHandle {
+    this.chainRound = round;
+    this.chainMax = maxRounds;
+    const handle = this.begin(t("ui.map_chat_role_auto"), origin, true, "preparing", true, {
+      round,
+      maxRounds,
+      remaining,
+      ...(partial ? { partial } : {})
+    });
+    if (this.built && this.stage)
+      this.liveEl.setText(`${t("ui.map_chat_auto_round_0_1", round, maxRounds)}. ${this.stageLabel(this.stage.kind)}`);
+    return handle;
   }
-  /** The chain waits for the research and expands it started (null: it does not). Stored for P4; shows nothing yet. */
-  setChainWaiting(state: MapChatChainWaiting | null): void {
+  /**
+   * The chain waits for the research and expands it started (null: it does not). The row under the last reply says how far they are
+   * and what is left; the field takes a message (sending takes over) and Stop ends the wait and the work. The reader hears the wait
+   * once when it begins; the seconds are never read.
+   */
+  setChainWaiting(state: MapChatChainWaiting | null, remaining = ""): void {
+    const was = this.chainWaitingState !== null;
     this.chainWaitingState = state ? { ...state, kinds: [...state.kinds] } : null;
+    this.chainWaitingLeft = state ? remaining : "";
+    if (state && !was) {
+      this.chainWaitingSince = this.clockNow();
+      this.startWaitTimer();
+    } else if (!state) this.stopWaitTimer();
+    this.renderLog();
+    this.paintWait();
+    this.renderBusy();
+    if (state && !was) this.announce(t("ui.map_chat_chain_wait_live_0", this.waitWord(state)));
   }
   /** What the chain waits for now, or null. */
   get chainWaiting(): MapChatChainWaiting | null {
     return this.chainWaitingState;
   }
-  /** The chain ended for a reason other than being done: P4 tells the user why and what was left. Nothing is shown yet. */
-  endChain(_reason: MapChatChainEndReason, _remaining: string, _details?: string[]): void {
+  private waitWord(state: MapChatChainWaiting): string {
+    const research = state.kinds.includes("research");
+    const expand = state.kinds.includes("expand");
+    return t(
+      research && expand
+        ? "ui.map_chat_chain_kind_both"
+        : expand
+          ? "ui.map_chat_chain_kind_expand"
+          : "ui.map_chat_chain_kind_research"
+    );
+  }
+  private startWaitTimer(): void {
+    if (!this.built || this.chainWaitingTimer) return;
+    const win =
+      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
+    if (typeof win?.setInterval !== "function") return;
+    const id = win.setInterval(() => this.paintWait(), 1000);
+    this.chainWaitingTimer = { cancel: () => win.clearInterval?.(id) };
+  }
+  private stopWaitTimer(): void {
+    this.chainWaitingTimer?.cancel();
+    this.chainWaitingTimer = null;
+    this.chainWaitingEls = null;
+  }
+  /** Rewrites the two texts of the waiting row that is on screen (never the row). */
+  private paintWait(): void {
+    const els = this.chainWaitingEls;
+    const state = this.chainWaitingState;
+    if (!els || !state) return;
+    els.label.setText(t("ui.map_chat_chain_wait_label_0_1_2", this.waitWord(state), state.settled, state.total));
+    const seconds = Math.max(0, Math.round((this.clockNow() - this.chainWaitingSince) / 1000));
+    els.elapsed.setText(
+      t("ui.map_chat_stage_elapsed_0", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`)
+    );
+  }
+  /**
+   * The continuation ended for a reason other than a quiet "done" after one round: a sentence under the last reply says why and,
+   * where it applies, what was left. "Done" is told only for a chain of two rounds or more. A map change says nothing (the
+   * conversation goes with it).
+   */
+  endChain(reason: MapChatChainEndReason, remaining: string, details?: string[]): void {
+    const was = this.chainWaitingState !== null;
     this.chainWaitingState = null;
+    this.chainWaitingLeft = "";
+    this.stopWaitTimer();
+    const last = this.messages.at(-1);
+    if (reason === "map_changed" || !last || last.role !== "assistant") {
+      if (was) {
+        this.renderLog();
+        this.renderBusy();
+      }
+      return;
+    }
+    const text = this.chainEndText(reason, remaining, details, last);
+    last.chainNote = { reason, text };
+    this.renderLog();
+    this.renderBusy();
+    this.announce(text);
+    if (reason !== "stopped" && reason !== "user_took_over" && reason !== "plan_cancelled") this.markUnread();
+  }
+  /** Sentences joined: a space between Latin sentences, none after a Chinese full stop. */
+  private joinSentences(...parts: string[]): string {
+    return parts
+      .filter(Boolean)
+      .reduce(
+        (out, part) =>
+          !out ? part : /[\u3000-\u303f\uff00-\uffef\u4e00-\u9fff]$/.test(out) ? out + part : `${out} ${part}`,
+        ""
+      );
+  }
+  private chainEndText(
+    reason: MapChatChainEndReason,
+    remaining: string,
+    details: string[] | undefined,
+    last: MapChatMessage
+  ): string {
+    // One sentence's tail is cut so a model's "..." or full stop does not double the one the template ends with.
+    const bare = (value: string): string => clip(value, 200).replace(/[\s.。!！?？…]+$/u, "");
+    const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare(remaining)) : "";
+    const why = (details ?? []).length
+      ? t(
+          "ui.map_chat_chain_reason_0",
+          bare(
+            (details ?? [])
+              .slice(0, 3)
+              .map(item => clip(item, 120))
+              .join(t("ui.map_chat_chain_detail_separator"))
+          )
+        )
+      : "";
+    const say = (key: Parameters<typeof t>[0], ...values: unknown[]): string => t(key, ...values);
+    switch (reason) {
+      case "done":
+        return say("ui.map_chat_chain_end_done_0", this.chainRound);
+      case "no_progress":
+        return this.joinSentences(say("ui.map_chat_chain_end_no_progress"), left);
+      case "max_rounds":
+        return this.joinSentences(
+          say("ui.map_chat_chain_end_max_rounds_0", this.chainMax),
+          left,
+          say("ui.map_chat_chain_end_max_rounds_more")
+        );
+      case "research_failed":
+        return this.joinSentences(say("ui.map_chat_chain_end_research_failed"), why);
+      case "stopped":
+        return say("ui.map_chat_chain_end_stopped");
+      case "user_took_over":
+        return say("ui.map_chat_chain_end_user_took_over");
+      case "research_stopped":
+        return this.joinSentences(say("ui.map_chat_chain_end_research_stopped"), left);
+      case "research_not_started":
+        return this.joinSentences(say("ui.map_chat_chain_end_research_not_started"), why);
+      case "wait_timeout":
+        return say("ui.map_chat_chain_end_wait_timeout_0", Math.round(MAP_CHAT_CHAIN_WAIT_MS / 60000));
+      case "other_background_work":
+        return this.joinSentences(say("ui.map_chat_chain_end_other_background"), left);
+      case "not_ready":
+        return this.joinSentences(say("ui.map_chat_chain_end_not_ready"), left);
+      case "plan_cancelled":
+        return this.joinSentences(say("ui.map_chat_chain_end_plan_cancelled"), left);
+      case "failed":
+        // The retry sentence only where the failed round is still there with its button (a round that never went out is taken back).
+        return this.joinSentences(
+          say("ui.map_chat_chain_end_failed_0", this.chainRound),
+          this.canRetry(last, this.messages[this.messages.indexOf(last) - 1])
+            ? say("ui.map_chat_chain_end_failed_retry")
+            : ""
+        );
+      case "map_changed":
+        return "";
+    }
+  }
+  /**
+   * Research notes of this conversation the round did not read (they did not fit, or are too long to ever be read): one line each
+   * under the results. Only the newest reply carries them; they are not saved.
+   */
+  setUnreadNotes(turn: MapChatTurnHandle, items: { title: string; oversize: boolean }[]): void {
+    if (!this.hasTurn(turn)) return;
+    if (items.length) turn.assistant.unread = items.map(item => ({ title: item.title, oversize: item.oversize }));
+    else delete turn.assistant.unread;
+    this.renderLog();
   }
   /** Follow-ups of the latest question wait for the turn to end (a continuation hands over to them). */
   hasQueuedSteers(): boolean {
@@ -1261,6 +1462,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.busy = false;
     this.applying = false;
     this.chainWaitingState = null;
+    this.chainWaitingLeft = "";
+    this.stopWaitTimer();
+    this.chainRound = 1;
+    this.chainMax = MAP_CHAT_CHAIN_MAX_ROUNDS;
     this.clearStage();
     this.unread = false;
     // A stage name said for the turn that is gone must not stay in the live region.
@@ -1290,13 +1495,24 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.restoredText = "";
     this.spokenLater = [];
     this.unread = false;
+    this.chainWaitingState = null;
+    this.stopWaitTimer();
     this.conversationId = conversation.id;
     for (const turn of conversation.turns) {
       const question: MapChatMessage = {
         role: "user",
         text: turn.auto ? t("ui.map_chat_role_auto") : turn.message,
         lines: [],
-        ...(turn.auto ? { auto: true as const } : {})
+        // The round is known when the record has it; what was left of that round is not kept, so the separator names the round only.
+        ...(turn.auto
+          ? {
+              auto: true as const,
+              autoInfo: {
+                ...(Number.isInteger(turn.round) && turn.round! >= 2 ? { round: turn.round } : {}),
+                maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS
+              }
+            }
+          : {})
       };
       if (turn.steers?.length) question.steers = turn.steers.map((text): MapChatSteer => ({ text, state: "live" }));
       this.messages.push(question);
@@ -2081,7 +2297,15 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
-      message.auto ? "auto" : "",
+      message.auto
+        ? `auto:${message.autoInfo?.round ?? ""}:${message.autoInfo?.maxRounds ?? ""}:${message.autoInfo?.remaining ?? ""}:${message.autoInfo?.partial ? `${message.autoInfo.partial.failed}/${message.autoInfo.partial.succeeded}` : ""}`
+        : "",
+      message.auto
+        ? t("ui.map_chat_auto_round_0_1", "", "") +
+          t("ui.map_chat_role_auto") +
+          t("ui.map_chat_chain_left_0", "") +
+          t("ui.map_chat_chain_partial_0_1", "", "")
+        : "",
       message.stale ? "x" : "",
       t("ui.map_chat_record_stale"),
       t("ui.map_chat_record_stale_short"),
@@ -2096,6 +2320,14 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       message.linesOpen ? "o" : "",
       message.seenImage ? `seen:${message.seenImage.note}` : "",
       message.replyUndo ? "undo" : "",
+      this.chainWaitingState && this.messages.at(-1) === message
+        ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}`
+        : "",
+      message.chainNote ? `chain:${message.chainNote.reason}:${message.chainNote.text}` : "",
+      (message.unread ?? []).map(item => `${item.oversize ? "o" : "d"}:${item.title}`).join("\n"),
+      JSON.stringify(message.lines.map(line => line.basis ?? null)),
+      t("ui.map_chat_basis_title_only"),
+      t("ui.map_chat_chain_wait_tail"),
       t("ui.map_chat_seen_image_0", ""),
       t("ui.map_chat_undo_reply"),
       (message.steers ?? []).map(steer => `${steer.state}:${steer.text}`).join("\n"),
@@ -2177,10 +2409,21 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const row = this.logEl.createDiv({
       cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}${message.auto ? " is-auto" : ""}`
     });
-    // The question of an automatic round is not something the user said: its row is kept (rows follow the messages) but empty and hidden.
+    // The question of an automatic round is not something the user said: its row is the separator between two rounds (rows follow the messages).
     if (message.auto) {
-      row.hidden = true;
-      return { row, body: row.createDiv(), more: null };
+      const info = message.autoInfo;
+      const body = row.createDiv({ cls: "vam-map-chat-auto-title" });
+      body.setText(
+        info?.round ? t("ui.map_chat_auto_round_0_1", info.round, info.maxRounds) : t("ui.map_chat_role_auto")
+      );
+      if (info?.partial)
+        row.createDiv({
+          cls: "vam-map-chat-auto-note",
+          text: t("ui.map_chat_chain_partial_0_1", info.partial.failed, info.partial.succeeded)
+        });
+      if (info?.remaining?.trim())
+        row.createDiv({ cls: "vam-map-chat-auto-left", text: t("ui.map_chat_chain_left_0", info.remaining) });
+      return { row, body, more: null };
     }
     row.createSpan({
       cls: "vam-map-chat-role",
@@ -2196,7 +2439,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
+    this.buildBasis(row, message);
     for (const block of message.images ?? []) this.buildImages(row, block);
+    if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
     if (message.seenImage) {
       // The words stay one plain-text element; the eye sits beside it.
       const line = row.createDiv("vam-map-chat-seen-row");
@@ -2208,6 +2453,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         text: t("ui.map_chat_seen_image_0", clip(message.seenImage.note, 80))
       });
     }
+    if (message.chainNote)
+      row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
     if (message.replyUndo) this.buildReplyUndo(row, message.replyUndo.token);
     // What the AI actually did comes straight after what it said; the buttons that act on the answer come last.
     const asked = this.messages[this.messages.indexOf(message) - 1];
@@ -2227,6 +2474,76 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         });
     }
     return { row, body, more };
+  }
+
+  /**
+   * What the results were built from, gathered under them (so a folded list still shows it) and then the research notes the round
+   * left unread. Plain text only (titles are untrusted); "read", never "checked". The program decides it, not the model.
+   */
+  private buildBasis(row: HTMLElement, message: MapChatMessage): void {
+    const entries = summarizeBasis(message.lines.flatMap(line => (line.basis ? [line.basis] : [])));
+    const unread = message.unread ?? [];
+    if (!entries.length && !unread.length) return;
+    const box = row.createDiv({ cls: "vam-map-chat-basis" });
+    for (const entry of entries) this.buildBasisEntry(box.createDiv("vam-map-chat-basis-line"), entry);
+    for (const item of unread)
+      box.createDiv({
+        cls: "vam-map-chat-basis-line is-unread",
+        text: t(
+          item.oversize ? "ui.map_chat_research_oversize_0" : "ui.map_chat_research_deferred_0",
+          clip(item.title, 60)
+        )
+      });
+  }
+  private buildBasisEntry(line: HTMLElement, entry: BasisSummaryEntry): void {
+    const quoted = (titles: string[]): string =>
+      titles.map(title => t("ui.map_chat_basis_quote_0", title)).join(t("ui.map_chat_basis_title_separator"));
+    if (entry.kind === "outline_only") {
+      // Said in words and in bold, never by colour: no note of this one was read.
+      if (entry.type === "cards") {
+        line.createEl("strong", { text: t("ui.map_chat_basis_title_only_0", entry.count) });
+        line.createSpan({ text: t("ui.map_chat_basis_title_only_hint") });
+      } else {
+        line.createEl("strong", { text: t("ui.map_chat_basis_title_only") });
+        if (entry.existingChildren > 0)
+          line.createSpan({ text: t("ui.map_chat_basis_children_0", entry.existingChildren) });
+      }
+      return;
+    }
+    if (entry.type === "cards")
+      line.setText(
+        t(
+          entry.kind === "research" ? "ui.map_chat_basis_research_0_1" : "ui.map_chat_basis_note_0_1",
+          quoted(entry.titles),
+          entry.count
+        )
+      );
+    else
+      line.setText(
+        entry.existingChildren > 0
+          ? t("ui.map_chat_basis_expand_0_1", quoted(entry.titles), entry.existingChildren)
+          : t("ui.map_chat_basis_expand_0", quoted(entry.titles))
+      );
+  }
+
+  /** The waiting row of a continuation: how far the research and expansions are, the time (hidden from readers), and what is left. */
+  private buildChainWait(row: HTMLElement): void {
+    const box = row.createDiv({ cls: "vam-map-chat-chain-wait", attr: { role: "status" } });
+    const line = box.createDiv("vam-map-chat-chain-wait-line");
+    const label = line.createSpan({ cls: "vam-map-chat-chain-wait-label" });
+    const elapsed = line.createSpan({ cls: "vam-map-chat-chain-wait-elapsed" });
+    elapsed.setAttr("aria-hidden", "true");
+    line.createSpan({
+      cls: "vam-map-chat-chain-wait-tail",
+      text: t("ui.map_chat_stage_elapsed_0", t("ui.map_chat_chain_wait_tail"))
+    });
+    if (this.chainWaitingLeft.trim())
+      box.createDiv({
+        cls: "vam-map-chat-chain-wait-left",
+        text: t("ui.map_chat_chain_left_0", this.chainWaitingLeft)
+      });
+    this.chainWaitingEls = { label, elapsed };
+    this.paintWait();
   }
 
   /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
@@ -2602,16 +2919,20 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (!this.built) return;
     const key = this.working
       ? "ui.map_chat_steer_placeholder"
-      : this.hero
-        ? "ui.map_chat_hero_placeholder"
-        : "ui.map_chat_input_placeholder";
+      : this.chainWaitingState
+        ? "ui.map_chat_chain_wait_placeholder"
+        : this.hero
+          ? "ui.map_chat_hero_placeholder"
+          : "ui.map_chat_input_placeholder";
     this.inputEl.setAttr("placeholder", t(key));
   }
   /** "Enter 補充" beside the stop key while a turn works and the field has text. */
   private renderSteerHint(): void {
     if (!this.built) return;
-    const show = this.working && this.inputEl.value.trim().length > 0;
-    this.steerHintEl.setText(show ? t("ui.map_chat_steer_hint") : "");
+    // While the chain waits, Enter with text sends it as a new message that takes over from the continuation.
+    const taking = !this.working && this.chainWaitingState !== null;
+    const show = (this.working || taking) && this.inputEl.value.trim().length > 0;
+    this.steerHintEl.setText(show ? t(taking ? "ui.map_chat_chain_wait_hint" : "ui.map_chat_steer_hint") : "");
     this.steerHintEl.hidden = !show;
     this.steerHintEl.toggleClass("is-hidden", !show);
     if (this.working) this.inputEl.setAttr("aria-keyshortcuts", "Enter");
@@ -2630,7 +2951,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
     // While the usage notice is open, its own Cancel is the way out: no Stop beside it.
-    const stoppable = this.working && !this.awaitingConsent;
+    const stoppable = (this.working && !this.awaitingConsent) || this.chainWaitingState !== null;
+    this.el.toggleClass("is-chain-waiting", this.chainWaitingState !== null);
     // Hiding the focused Stop drops the keyboard to the page; once the run is over the message field takes it (C-#14).
     const stopHadFocus = !stoppable && !this.stopEl.hidden && this.host.activeElement() === this.stopEl;
     this.stopEl.hidden = !stoppable;

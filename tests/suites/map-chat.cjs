@@ -6847,7 +6847,7 @@ integrationTest('P3 e2e: one message builds a root and researches it, the resear
   const second = contextOf(h.control.requests[1]);
   eq(second.researchNotes.map(n => [n.id, n.detail]), [[rootId, 'RESEARCH TEXT: the pstack list is alpha, beta, gamma.']]);
   eq(second.continuation.round, 2); assert.equal(second.continuation.remaining, 'Add the subtopics from the research'); assert.equal(h.control.requests[1].message, 'make the full knowledge tree');
-  eq(spy.rounds(), [2]); eq(spy.ends(), [], 'done is not told as an end'); assert.equal(spy.waits().at(-1), null, 'the waiting state is cleared');
+  eq(spy.rounds(), [2]); eq(spy.ends(), [['done', '', null]], 'P4: a chain of two rounds or more tells that it is done (once, with nothing left)'); assert.equal(spy.waits().at(-1), null, 'the waiting state is cleared');
   const turns = chat.transcript(); eq(turns.map(m => m.role), ['user', 'assistant', 'user', 'assistant']); eq(turns.map(m => !!m.auto), [false, false, true, false]);
   eq(turns.at(-1).lines.map(l => l.basis?.kind), ['research', 'research']); eq(turns.at(-1).lines[0].basis.sources, [{ id: rootId, title: 'Pstack' }]);
   eq(h.view.map.nodes.filter(n => n.parentId === rootId).length, 2); assert.equal(h.control.requests.length, 2, 'two requests, one message');
@@ -6937,7 +6937,7 @@ integrationTest('P3 race: the plan card of round 1 waits while research of an ea
   chainReplies(h, say('Many cards.', Array.from({ length: 20 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), 'Then the rest'), say('The rest.', [{ kind: 'add_child', parentId: h.ids.root, title: 'Rest', summary: '' }], ''));
   h.type('add many'); await h.view.sendMapChat(); assert.ok(chat.pendingPlan()); assert.equal(h.view.chatChain.state.phase, 'plan');
   settleRun(runs[0]); await tick(); await tick(); assert.equal(h.view.chatChain.state.phase, 'plan', 'the earlier research changes nothing about the paused chain'); assert.equal(h.control.requests.length, 2);
-  planButton(h, 'apply').click(); await until(() => h.control.requests.length === 3 && h.view.chatChain === null); eq(spy.rounds(), [2]); eq(spy.ends(), []);
+  planButton(h, 'apply').click(); await until(() => h.control.requests.length === 3 && h.view.chatChain === null); eq(spy.rounds(), [2]); eq(spy.reasons(), ['done'], 'P4: only the quiet done of a two-round chain is told');
   assert.equal(h.view.chatResearched.get(h.ids.a).status, 'succeeded');
 });
 integrationTest('P3 never told: research that never reports ends the wait after 30 minutes, only the chain ends and the research is not stopped; a repeated report changes nothing', async () => {
@@ -6976,8 +6976,8 @@ integrationTest('P3 A9: from round 2 a reply of only safe actions is applied wit
   chainReplies(h, say('Start.', [addRoot('s', 'Start')], 'Many more'), say('Twenty.', cards(20), 'Delete one'), say('Delete.', [{ kind: 'delete_topic', nodeId: h.ids.c }], 'And more'), say('Last.', [], ''));
   h.type('go'); await h.view.sendMapChat(); await until(() => chat.pendingPlan()); assert.equal(h.control.requests.length, 3); assert.equal(h.view.map.nodes.length, 4 + 1 + 20, 'twenty safe cards went in without a card');
   const before = h.view.map.nodes.length; assert.ok(h.view.map.nodes.some(n => n.id === h.ids.c)); assert.equal(h.view.chatChain.state.phase, 'plan');
-  assert.match(visibleText(planCard(h)[0]), /./); planButton(h, 'apply').click(); await until(() => h.control.requests.length === 4); await until(() => h.view.chatChain === null);
-  assert.equal(h.view.map.nodes.some(n => n.id === h.ids.c), false, 'the delete ran after Apply'); assert.ok(h.view.map.nodes.length < before); eq(spy.reasons(), [], 'no ending was told; the last round had nothing left');
+  assert.match(visibleText(planCard(h)[0]), /The automatic continuation wants to delete or rewrite things; it waits for your confirmation/, 'P4: the plan card of round 2 on says why in its own words'); planButton(h, 'apply').click(); await until(() => h.control.requests.length === 4); await until(() => h.view.chatChain === null);
+  assert.equal(h.view.map.nodes.some(n => n.id === h.ids.c), false, 'the delete ran after Apply'); assert.ok(h.view.map.nodes.length < before); eq(spy.reasons(), ['done'], 'only the quiet done of the chain was told; the last round had nothing left');
   const c = await harness(); await c.view.hydrate(); const cchat = c.open(); const cspy = chainSpy(cchat);
   chainReplies(c, say('Start.', [addRoot('s', 'Start')], 'Delete'), say('Delete.', [{ kind: 'delete_topic', nodeId: c.ids.c }], 'More'));
   c.type('go'); await c.view.sendMapChat(); await until(() => cchat.pendingPlan()); const cancelled = cchat.pendingPlan(); cancelled.cancel(); await chainEnded(cspy);
@@ -6986,7 +6986,7 @@ integrationTest('P3 A9: from round 2 a reply of only safe actions is applied wit
   const six = Array.from({ length: 6 }, (_, i) => `a${i}`); const five = Array.from({ length: 5 }, (_, i) => `b${i}`);
   chainReplies(r, say('Six.', [...six.map(ref => addRoot(ref, ref)), researchAct({ nodeIds: six.map(ref => `new:${ref}`) })], 'Five more'), say('Five.', [...five.map(ref => addRoot(ref, ref)), researchAct({ nodeIds: five.map(ref => `new:${ref}`) })], ''));
   r.type('go'); await r.view.sendMapChat(); settleRun(runs[0]); await until(() => rchat.pendingPlan());
-  assert.match(visibleText(planCard(r)[0]), /Starts research/, 'five targets alone would not ask: the six of round 1 are counted'); assert.equal(runs.length, 1, 'the second research waits for the card'); eq(rspy.rounds(), [2]);
+  assert.match(visibleText(planCard(r)[0]), /Starts research/, 'five targets alone would not ask: the six of round 1 are counted'); assert.match(visibleText(planCard(r)[0]), /Starts research on 11 topics/, 'P4: the card shows the count of the whole chain (6 + 5), not the 5 of this round'); assert.equal(runs.length, 1, 'the second research waits for the card'); eq(rspy.rounds(), [2]);
 });
 integrationTest('P3 A10: every round is one undo step and Undo takes back the newest round only; the follow-up goes into the chain\'s message; the image is for round 1 only; nothing is written twice', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); const base = h.view.map.nodes.length;
@@ -7041,4 +7041,207 @@ integrationTest('P3 records: an automatic round is written with auto and its rou
   eq(restored.turns.map(t => [t.auto, t.status]), [[false, 'done'], [true, 'done']]); eq(restored.turns[1].lines[0].basis.sources, [{ id: rootId, title: 'Pstack' }]);
   const forged = restoreConversation('x', [{ v: 1, type: 'turn_start', turn: 1, at: 'a', message: 'm' }, { v: 1, type: 'turn_end', turn: 1, at: 'a', status: 'done', raw: null, reply: 'r', modelLabel: '', lines: [{ status: 'done', text: 't', basis: { kind: 'research', sources: [{ id: 1, title: 'ok' }, { id: 'a', title: 'good' }], extra: '<script>' } }, { status: 'done', text: 'u', basis: { kind: 'evil' } }] }]);
   eq(forged.turns[0].lines.map(l => l.basis), [{ kind: 'research', sources: [{ id: 'a', title: 'good' }] }, undefined], 'a basis read back from a file keeps only its known shape');
+});
+
+// ---- P4: what the user sees of the automatic continuation and of the basis ----------------------------------------------------
+const { summarizeBasis } = load('core/map-chat-basis.ts');
+const classTexts = (root, name) => findAll(root, i => hasClass(i, name)).map(visibleText);
+const noteOf = (f, name = 'vam-map-chat-chain-note') => classTexts(f.parts.log(), name);
+const autoOrigin = () => ({ text: 'go', chips: [], selectedIds: [] });
+const REMAINING = 'Fill in the review skills';
+const researchBasis = (title, extra = {}) => ({ kind: 'research', sources: [{ id: 'r', title }], ...extra });
+
+test('P4 basis: cards of the same kind and sources are one counted entry; every expand is its own; a title-only card never lists what else was read', () => {
+  const lines = [...Array(26)].map(() => researchBasis('pstack')).concat([...Array(3)].map(() => ({ kind: 'note', sources: [{ id: 't', title: 'tools' }] })));
+  eq(summarizeBasis(lines), [{ type: 'cards', kind: 'research', titles: ['pstack'], count: 26 }, { type: 'cards', kind: 'note', titles: ['tools'], count: 3 }]);
+  const titleOnly = summarizeBasis([...Array(5)].map(() => ({ kind: 'outline_only', alsoRead: [{ path: 'Notes/Other note.md', title: 'Other note' }] })));
+  eq(titleOnly, [{ type: 'cards', kind: 'outline_only', titles: [], count: 5 }]); assert.doesNotMatch(JSON.stringify(titleOnly), /Other note/, 'alsoRead is not a basis');
+  eq(summarizeBasis([{ kind: 'note', sources: [{ id: 'c', title: 'Course' }], existingChildren: 2 }, { kind: 'note', sources: [{ id: 'd', title: 'Other' }], existingChildren: 0 }, { kind: 'outline_only', alsoRead: [], existingChildren: 3 }]),
+    [{ type: 'expand', kind: 'note', titles: ['Course'], existingChildren: 2 }, { type: 'expand', kind: 'note', titles: ['Other'], existingChildren: 0 }, { type: 'expand', kind: 'outline_only', titles: [], existingChildren: 3 }]);
+  eq(summarizeBasis([researchBasis('A'), { kind: 'research', sources: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }] }, researchBasis('A')]), [{ type: 'cards', kind: 'research', titles: ['A'], count: 2 }, { type: 'cards', kind: 'research', titles: ['A', 'B'], count: 1 }], 'a different set of sources is a different line, in order of first appearance');
+  eq(summarizeBasis([{ kind: 'note', sources: [{ id: 'x', title: '  \n ' }] }, { kind: 'research', sources: [] }]), [{ type: 'cards', kind: 'outline_only', titles: [], count: 2 }], 'a basis with no readable title claims no note');
+  assert.equal(summarizeBasis([{ kind: 'note', sources: [{ id: 'x', title: `a\n b  ${'z'.repeat(80)}` }] }])[0].titles[0].length <= 60, true, 'one line, cut');
+  eq(summarizeBasis([]), []);
+});
+
+test('P4 basis: the summary stands under the results, also when the list is short, when it is folded and when it is open; the titles are plain text and a title-only line is bold words', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q');
+  const done = text => ({ status: 'done', text });
+  const lines = [...Array(26)].map((_, i) => ({ ...done(`Added ${i}`), basis: researchBasis('pstack <b>skills</b>') })).concat([1, 2, 3].map(i => ({ ...done(`Tool ${i}`), basis: { kind: 'note', sources: [{ id: 't', title: 'Browser tools' }] } })),
+    [1, 2].map(i => ({ ...done(`Bare ${i}`), basis: { kind: 'outline_only', alsoRead: [{ path: 'Notes/Hidden.md', title: 'Hidden title' }] } })));
+  f.panel.finish('Built.', lines);
+  const basis = () => classTexts(f.parts.log(), 'vam-map-chat-basis-line');
+  eq(basis(), ['Based on research note “pstack <b>skills</b>” (cards: 26)', 'Based on note “Browser tools” (cards: 3)', 'Titles only (cards: 2) (no note was read for these)'], 'folded (31 results): the summary is still there');
+  eq(classTexts(f.parts.log(), 'vam-map-chat-line'), [], 'the long list is folded');
+  const bold = findAll(f.parts.log(), i => i.tag === 'strong'); eq(bold.map(visibleText), ['Titles only (cards: 2)'], 'titles only is bold, not a colour');
+  assert.doesNotMatch(visibleText(f.parts.log()), /Hidden title/); assert.equal(findAll(f.parts.log(), i => i.tag === 'b').length, 0, 'a title is text, never markup');
+  findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-lines-toggle'))[0].click();
+  assert.equal(classTexts(f.parts.log(), 'vam-map-chat-line').length, 31, 'open: every result'); eq(basis().length, 3, 'open: the same three lines');
+  const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('q'); g.panel.finish('Two cards.', [{ ...done('Added A'), basis: researchBasis('Notes') }, { ...done('Added B'), basis: researchBasis('Notes') }]);
+  eq(classTexts(g.parts.log(), 'vam-map-chat-line'), ['Added A', 'Added B']); eq(classTexts(g.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 2)'], 'two lines, not folded: the summary is there too');
+  const none = panelFixture(); none.panel.setOpen(true); none.panel.begin('q'); none.panel.finish('Nothing built.', [done('Selected A')]);
+  eq(classTexts(none.parts.log(), 'vam-map-chat-basis'), [], 'no basis, no block');
+});
+
+test('P4 basis: an expanded card says its note and its existing subtopics, or only the title; Traditional Chinese reads as the mockup', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('q');
+  f.panel.finish('Expanded.', [{ status: 'done', text: 'Expand A', basis: { kind: 'note', sources: [{ id: 'c', title: 'Course design' }], existingChildren: 2 } }, { status: 'done', text: 'Expand B', basis: { kind: 'outline_only', alsoRead: [], existingChildren: 3 } }, { status: 'done', text: 'Expand C', basis: { kind: 'outline_only', alsoRead: [], existingChildren: 0 } }]);
+  eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), ['Based on note “Course design” and 2 existing subtopics', 'Titles only and 3 existing subtopics', 'Titles only']);
+  const z = panelFixture(); z.setLanguage('zh-TW'); z.panel.setOpen(true); z.panel.begin('q');
+  z.panel.finish('好了', [...Array(26)].map(() => ({ status: 'done', text: 'x', basis: researchBasis('pstack 技能解析') })).concat([...Array(3)].map(() => ({ status: 'done', text: 'x', basis: { kind: 'note', sources: [{ id: 't', title: '瀏覽器工具' }] } })), [{ status: 'done', text: 'x', basis: { kind: 'note', sources: [{ id: 'c', title: '課程設計' }], existingChildren: 2 } }, ...[1, 2, 3, 4, 5].map(() => ({ status: 'done', text: 'x', basis: { kind: 'outline_only', alsoRead: [] } }))]));
+  eq(classTexts(z.parts.log(), 'vam-map-chat-basis-line'), ['依據：研究筆記「pstack 技能解析」26 張', '依據：筆記「瀏覽器工具」3 張', '依據：筆記「課程設計」、2 個現有子議題', '只有標題：5 張（沒有讀到這支的筆記）']);
+  z.setLanguage('en');
+});
+
+test('P4 unread research: a note that did not fit is told as read next round, one too long as not read; they stay under the results and are plain text', () => {
+  const f = panelFixture(); f.panel.setOpen(true); const turn = f.panel.begin('q'); f.panel.finish('Built.', [{ status: 'done', text: 'Added A', basis: researchBasis('Notes') }]);
+  f.panel.setUnreadNotes(turn, [{ title: 'Browser tools', oversize: false }, { title: 'Full manual <i>x</i>', oversize: true }]);
+  eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)', '“Browser tools” did not fit this round and is read in the next one.', '“Full manual <i>x</i>” is too long, so it was not read.']);
+  f.panel.setUnreadNotes(turn, []); eq(classTexts(f.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)']);
+  const z = panelFixture(); z.setLanguage('zh-TW'); z.panel.setOpen(true); const zt = z.panel.begin('q'); z.panel.finish('好', []); z.panel.setUnreadNotes(zt, [{ title: '瀏覽器工具', oversize: false }, { title: '完整手冊', oversize: true }]);
+  eq(classTexts(z.parts.log(), 'vam-map-chat-basis-line'), ['「瀏覽器工具」這輪放不下，下一輪讀。', '「完整手冊」太長，沒有讀。']); z.setLanguage('en');
+});
+
+test('P4 round: an automatic round shows a separator with the round and what is left (also in Traditional Chinese), the reader hears the round once, and a restored round shows its separator too', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('go'); f.panel.finish('Started.', []);
+  f.panel.beginAutoRound(2, 8, REMAINING, autoOrigin());
+  const sep = find(f.parts.log(), i => hasClass(i, 'is-auto')); assert.equal(sep.hidden, undefined === sep.hidden ? undefined : false, 'the separator row is shown');
+  eq(classTexts(f.parts.log(), 'vam-map-chat-auto-title'), ['Automatic continuation · round 2 of 8']); eq(classTexts(f.parts.log(), 'vam-map-chat-auto-left'), ['Left to do: Fill in the review skills']);
+  assert.match(f.panel.liveEl.text, /round 2 of 8\. Preparing/, 'one sentence for the round, with the stage that opens it'); eq(f.panel.turns().map(t => t.role), ['user', 'assistant']);
+  f.panel.finish('Done.', []); f.panel.beginAutoRound(3, 8, '', autoOrigin(), { failed: 2, succeeded: 3 });
+  eq(classTexts(f.parts.log(), 'vam-map-chat-auto-left').length, 1, 'no remaining, no line'); eq(classTexts(f.parts.log(), 'vam-map-chat-auto-note'), ['Some research failed (failed: 2, worked: 3), so this round builds only on what worked.']);
+  const z = panelFixture(); z.setLanguage('zh-TW'); z.panel.setOpen(true); z.panel.begin('go'); z.panel.finish('好', []); z.panel.beginAutoRound(2, 8, '依研究結果補齊子議題', autoOrigin(), { failed: 2, succeeded: 3 });
+  eq(classTexts(z.parts.log(), 'vam-map-chat-auto-title'), ['自動接續・第 2／8 輪']); eq(classTexts(z.parts.log(), 'vam-map-chat-auto-left'), ['剩下：依研究結果補齊子議題']); eq(classTexts(z.parts.log(), 'vam-map-chat-auto-note'), ['有 2 張卡研究失敗，只依成功的 3 篇接著做。']); z.setLanguage('en');
+  const r = panelFixture(); r.panel.setOpen(true);
+  r.panel.restore({ id: 'x', restoredAt: null, turns: [{ message: 'go', reply: 'One', lines: [], modelLabel: '', stalePlan: false }, { message: 'go', reply: 'Two', lines: [{ status: 'done', text: 'Added', basis: researchBasis('Notes') }], modelLabel: '', stalePlan: false, auto: true, round: 3 }, { message: 'go', reply: 'Three', lines: [], modelLabel: '', stalePlan: false, auto: true }] });
+  eq(classTexts(r.parts.log(), 'vam-map-chat-auto-title'), ['Automatic continuation · round 3 of 8', 'Automatic continuation'], 'a record with no round names no round'); assert.equal(findAll(r.parts.log(), i => hasClass(i, 'is-auto')).every(row => !row.hidden), true);
+  eq(classTexts(r.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)'], 'the basis comes back with the lines');
+});
+
+test('P4 wait: the row says how far, what is left and the seconds (hidden from readers); Send stays, Stop appears, Enter takes over; the reader hears the wait once and the seconds never', async () => {
+  const s = stageFixture(); const { f } = s; f.panel.begin('go'); f.panel.finish('Started the research.', []);
+  const row = () => find(f.parts.log(), i => hasClass(i, 'vam-map-chat-chain-wait'));
+  f.panel.setChainWaiting({ kinds: ['research'], total: 5, settled: 2 }, REMAINING);
+  assert.equal(row().attrs.role, 'status'); eq(classTexts(f.parts.log(), 'vam-map-chat-chain-wait-label'), ['Researching 2/5']); eq(classTexts(f.parts.log(), 'vam-map-chat-chain-wait-left'), ['Left to do: Fill in the review skills']);
+  const elapsed = find(row(), i => hasClass(i, 'vam-map-chat-chain-wait-elapsed')); assert.equal(elapsed.attrs['aria-hidden'], 'true'); assert.equal(elapsed.text, ' · 0:00');
+  assert.equal(visibleText(find(row(), i => hasClass(i, 'vam-map-chat-chain-wait-line'))), 'Researching 2/5 · 0:00 · It continues on its own when this is done');
+  assert.equal(f.panel.liveEl.text, 'Researching. It continues on its own when this is done.');
+  assert.equal(f.parts.stop().hidden, false, 'Stop is offered while the chain waits'); assert.equal(f.parts.send().hidden, false, 'Send stays: sending takes over'); assert.equal(f.panel.isBusy, false);
+  assert.equal(f.parts.input().attrs.placeholder, 'Want to change direction? Sending takes over from here.');
+  s.tickSeconds(72); assert.equal(elapsed.text, ' · 1:12'); const same = row();
+  f.panel.setChainWaiting({ kinds: ['research'], total: 5, settled: 3 }, REMAINING); assert.equal(row(), same, 'progress rewrites the text, not the row'); eq(classTexts(f.parts.log(), 'vam-map-chat-chain-wait-label'), ['Researching 3/5']); assert.equal(f.panel.liveEl.text, 'Researching. It continues on its own when this is done.', 'progress and seconds are not announced');
+  f.parts.input().value = 'try another angle'; f.parts.input().fire('input'); assert.equal(find(f.panel.el, i => hasClass(i, 'vam-map-chat-steer-hint')).text, 'Enter to send and take over');
+  key(f.parts.input(), { key: 'Enter' }); assert.equal(f.calls.send, 1, 'Enter with text sends it (the view takes over)'); assert.equal(f.calls.stop, 0);
+  f.parts.stop().click(); assert.equal(f.calls.stop, 1, 'Stop goes to the host');
+  f.panel.setChainWaiting({ kinds: ['expand'], total: 2, settled: 0 }, ''); eq(classTexts(f.parts.log(), 'vam-map-chat-chain-wait-label'), ['Expanding 0/2']); eq(classTexts(f.parts.log(), 'vam-map-chat-chain-wait-left'), [], 'nothing left, no line');
+  f.panel.setChainWaiting({ kinds: ['research', 'expand'], total: 3, settled: 0 }, ''); eq(classTexts(f.parts.log(), 'vam-map-chat-chain-wait-label'), ['Researching and expanding 0/3']);
+  f.panel.setChainWaiting(null); assert.equal(row(), undefined, 'the row goes'); assert.equal(f.parts.stop().hidden, true); assert.equal(s.intervals.size, 0, 'the timer is cleared'); assert.equal(f.parts.input().attrs.placeholder.startsWith('Ask a question'), true);
+  assert.equal(find(f.panel.el, i => hasClass(i, 'vam-map-chat-steer-hint')).text, '');
+  f.panel.setChainWaiting({ kinds: ['research'], total: 1, settled: 0 }, 'x'); f.panel.reset(); assert.equal(s.intervals.size, 0, 'a reset clears the timer too'); assert.equal(f.panel.chainWaiting, null);
+  const z = panelFixture(); z.setLanguage('zh-TW'); z.panel.setOpen(true); z.panel.begin('go'); z.panel.finish('好', []); z.panel.setChainWaiting({ kinds: ['research'], total: 5, settled: 0 }, '依研究結果補齊子議題');
+  assert.equal(visibleText(find(z.parts.log(), i => hasClass(i, 'vam-map-chat-chain-wait-line'))), '研究中 0／5・0:00・完成後會自動接著做'); eq(classTexts(z.parts.log(), 'vam-map-chat-chain-wait-left'), ['剩下：依研究結果補齊子議題']); assert.equal(z.parts.input().attrs.placeholder, '要改方向嗎？送出後由你接手。'); z.setLanguage('en');
+});
+
+test('P4 end: every way a continuation ends has its own sentence under the last reply, with what was left and the reasons where they apply (English and Traditional Chinese)', () => {
+  const table = [
+    ['done', '', undefined, 'Done after 2 rounds.', '已做完，共 2 輪。'],
+    ['no_progress', REMAINING, undefined, 'This round made no new progress, so it stops here. Left to do: Fill in the review skills.', '這一輪沒有新進度，先停在這裡。剩下：Fill in the review skills。'],
+    ['max_rounds', `${REMAINING}.`, undefined, 'It ran all 8 rounds, so it stops here. Left to do: Fill in the review skills. To go on, say “continue”.', '已跑滿 8 輪，先停在這裡。剩下：Fill in the review skills。要繼續就說「繼續」。'],
+    ['research_failed', REMAINING, ['Pstack: no connection', 'Tools: quota'], 'The research did not work, so the subtopics were not filled in. Reason: Pstack: no connection; Tools: quota.', '研究沒有成功，所以沒有接著補子議題。原因：Pstack: no connection；Tools: quota。'],
+    ['stopped', REMAINING, undefined, 'Stopped, and the research stopped with it. The cards already made stay.', '已停止，研究也一起停了。建好的卡都留著。'],
+    ['user_took_over', REMAINING, undefined, 'Now following your new message; the automatic continuation ends here.', '已改照你的新訊息做，剛才的自動接續到此結束。'],
+    ['research_stopped', REMAINING, undefined, 'The research was stopped, so it did not go on. Left to do: Fill in the review skills.', '研究已停止，沒有接著做。剩下：Fill in the review skills。'],
+    ['research_not_started', REMAINING, ['A batch is already running'], 'The research did not start, so it did not go on. Reason: A batch is already running.', '研究沒有開始，所以沒有接著做。原因：A batch is already running。'],
+    ['research_not_started', REMAINING, undefined, 'The research did not start, so it did not go on.', '研究沒有開始，所以沒有接著做。'],
+    ['wait_timeout', REMAINING, undefined, 'The research has not finished after 30 minutes, so it does not go on. The research is still running.', '研究超過 30 分鐘還沒結束，先不接著做。研究還在跑。'],
+    ['other_background_work', REMAINING, undefined, 'This round started an integration, merge or prioritizing, and it does not go on by itself after that. Left to do: Fill in the review skills.', '這一輪開始了整合、合併或分級，完成後不會自動接著做。剩下：Fill in the review skills。'],
+    ['not_ready', REMAINING, undefined, 'The AI is not ready to use, so it stops here. Left to do: Fill in the review skills.', 'AI 還不能用，先停在這裡。剩下：Fill in the review skills。'],
+    ['plan_cancelled', REMAINING, undefined, 'The plan was cancelled, so the automatic continuation ends here. Left to do: Fill in the review skills.', '計畫已取消，自動接續到此結束。剩下：Fill in the review skills。']
+  ];
+  for (const language of ['en', 'zh-TW']) {
+    for (const [reason, remaining, details, en, zh] of table) {
+      const f = panelFixture(); f.setLanguage(language); f.panel.setOpen(true); f.panel.begin('go'); f.panel.finish('Started.', []); f.panel.beginAutoRound(2, 8, 'x', autoOrigin()); f.panel.finish('More.', []);
+      f.panel.endChain(reason, remaining, details);
+      eq(noteOf(f), [language === 'en' ? en : zh], `${language} ${reason}`); assert.equal(f.panel.liveEl.text, language === 'en' ? en : zh, `${language} ${reason}: the reader hears it once`);
+      assert.ok(hasClass(find(f.parts.log(), i => hasClass(i, 'vam-map-chat-chain-note')), `is-${reason}`));
+    }
+  }
+  const silent = panelFixture(); silent.panel.setOpen(true); silent.panel.begin('go'); silent.panel.finish('Started.', []); silent.panel.endChain('map_changed', 'x'); eq(noteOf(silent), [], 'a map change says nothing');
+  const nothing = panelFixture(); nothing.panel.setOpen(true); nothing.panel.endChain('no_progress', 'x'); eq(noteOf(nothing), [], 'no reply, nothing to put it under');
+  const wait = panelFixture(); wait.panel.setOpen(true); wait.panel.begin('go'); wait.panel.finish('Started.', []); wait.panel.setChainWaiting({ kinds: ['research'], total: 1, settled: 0 }, 'x'); wait.panel.endChain('stopped', 'x');
+  assert.equal(wait.panel.chainWaiting, null); assert.equal(wait.parts.stop().hidden, true, 'ending the chain ends the wait'); assert.equal(findAll(wait.parts.log(), i => hasClass(i, 'vam-map-chat-chain-wait')).length, 0);
+});
+
+test('P4 end: a failed round says its number and, when its Retry button is there, that Retry picks up from it; a round that never went out is taken back and promises no retry', () => {
+  const f = panelFixture({ retry() {} }); f.panel.setOpen(true); f.panel.begin('go', autoOrigin()); f.panel.finish('One.', []);
+  f.panel.beginAutoRound(3, 8, 'More', autoOrigin()); f.panel.fail('The AI chat failed.', 'The AI chat failed.');
+  f.panel.endChain('failed', 'More'); eq(noteOf(f), ['Round 3 failed. Retry picks up from this round.']);
+  const retry = find(f.parts.log(), i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry')); assert.ok(retry, 'the existing Retry button is there');
+  const g = panelFixture({ retry() {} }); g.panel.setOpen(true); g.panel.begin('go', autoOrigin()); g.panel.finish('One.', []);
+  const handle = g.panel.beginAutoRound(2, 8, 'More', autoOrigin()); g.panel.retract(handle); g.panel.endChain('failed', 'More'); eq(noteOf(g), ['Round 2 failed.']);
+  const z = panelFixture({ retry() {} }); z.setLanguage('zh-TW'); z.panel.setOpen(true); z.panel.begin('go', autoOrigin()); z.panel.finish('一', []); z.panel.beginAutoRound(3, 8, '更多', autoOrigin()); z.panel.fail('失敗', '失敗'); z.panel.endChain('failed', '更多');
+  eq(noteOf(z), ['第 3 輪失敗了。按重試會從這一輪接著做。']); z.setLanguage('en');
+});
+
+test('P4 end: the tail of what was left and the reasons is cut to one clean sentence (no doubled full stop, no more than three reasons, long ones clipped)', () => {
+  const f = panelFixture(); f.panel.setOpen(true); f.panel.begin('go'); f.panel.finish('Started.', []);
+  f.panel.endChain('research_failed', '', ['a: 1', 'b: 2', 'c: 3', 'd: 4']); eq(noteOf(f), ['The research did not work, so the subtopics were not filled in. Reason: a: 1; b: 2; c: 3.']);
+  const g = panelFixture(); g.panel.setOpen(true); g.panel.begin('go'); g.panel.finish('Started.', []); g.panel.endChain('no_progress', `${'long '.repeat(80)}...`);
+  assert.ok(noteOf(g)[0].length < 280); assert.doesNotMatch(noteOf(g)[0], /\.\.\./); assert.doesNotMatch(noteOf(g)[0], /\.\.$/);
+});
+
+integrationTest('P4 view: the full flow is on screen - the wait row, Stop, the separator of round 2, the basis of its cards and the closing sentence; a single round says nothing extra', async () => {
+  const h = await harness(); await h.view.hydrate(); const { chat, runs } = await researchChain(h);
+  const log = () => chat.logEl; const waitRow = () => find(log(), i => hasClass(i, 'vam-map-chat-chain-wait'));
+  assert.equal(visibleText(find(waitRow(), i => hasClass(i, 'vam-map-chat-chain-wait-line'))).startsWith('Researching 0/1 · 0:'), true); eq(classTexts(log(), 'vam-map-chat-chain-wait-left'), ['Left to do: Add the subtopics from the research']);
+  assert.equal(chat.stopEl.hidden, false); assert.equal(chat.sendEl.hidden, false); assert.equal(chat.inputEl.attrs.placeholder, 'Want to change direction? Sending takes over from here.');
+  const rootId = runs[0].ids[0]; await h.repo.updateNote(h.view.map.nodes.find(n => n.id === rootId).path, { detail: 'RESEARCH TEXT' });
+  chainReplies(h, say('Added.', [{ kind: 'add_child', parentId: rootId, title: 'Alpha', summary: 'a' }, { kind: 'add_child', parentId: rootId, title: 'Beta', summary: 'b' }], ''));
+  settleRun(runs[0]); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
+  assert.equal(waitRow(), undefined, 'the wait row is gone'); assert.equal(chat.stopEl.hidden, true);
+  eq(classTexts(log(), 'vam-map-chat-auto-title'), ['Automatic continuation · round 2 of 8']); eq(classTexts(log(), 'vam-map-chat-auto-left'), ['Left to do: Add the subtopics from the research']);
+  eq(classTexts(log(), 'vam-map-chat-basis-line'), ['Titles only (cards: 1) (no note was read for these)', 'Based on research note “Pstack” (cards: 2)']); eq(noteOf({ parts: { log } }), ['Done after 2 rounds.']);
+  const one = await harness(); await one.view.hydrate(); const ochat = one.open(); chainReplies(one, say('Built it.', [addRoot('q', 'Quick')], '')); one.type('go'); await one.view.sendMapChat();
+  eq(noteOf({ parts: { log: () => ochat.logEl } }), [], 'one round that finished adds no closing line'); eq(classTexts(ochat.logEl, 'vam-map-chat-auto-title'), []);
+});
+
+integrationTest('P4 view: Stop while the chain waits ends it with its sentence and stops the work; typing and pressing Enter takes over; a failed round and partly failed research are told', async () => {
+  const h = await harness(); await h.view.hydrate(); const { chat, runs } = await researchChain(h);
+  chat.stopEl.click(); await until(() => h.view.chatChain === null);
+  eq(noteOf({ parts: { log: () => chat.logEl } }), ['Stopped, and the research stopped with it. The cards already made stay.']); assert.equal(chat.chainWaiting, null); assert.equal(chat.stopEl.hidden, true);
+  const t = await harness(); await t.view.hydrate(); const tchat = (await researchChain(t)).chat;
+  chainReplies(t, say('Following you.', [], '')); t.type('use a different angle'); key(tchat.inputEl, { key: 'Enter' }); await until(() => t.control.requests.length === 2 && !tchat.isBusy);
+  const notes = classTexts(tchat.logEl, 'vam-map-chat-chain-note'); eq(notes, ['Now following your new message; the automatic continuation ends here.']); assert.equal(tchat.chainWaiting, null);
+  const x = await harness(); await x.view.hydrate(); const { chat: xchat, runs: xruns } = await researchChain(x, { second: async () => { throw new Error('model exploded'); } });
+  settleRun(xruns[0]); await until(() => x.view.chatChain === null && x.control.requests.length === 2);
+  eq(noteOf({ parts: { log: () => xchat.logEl } }), ['Round 2 failed. Retry picks up from this round.']); assert.ok(find(xchat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry')), 'the existing Retry button');
+  const p = await harness(); await p.view.hydrate(); const pchat = p.open(); const pruns = researchStub(p);
+  chainReplies(p, say('Two roots.', [addRoot('a', 'One'), addRoot('b', 'Two'), researchAct({ nodeIds: ['new:a', 'new:b'] })], 'Build under both'), say('Under the good one.', [], ''));
+  p.type('go'); await p.view.sendMapChat(); const [first, second] = pruns[0].ids;
+  pruns[0].onOutcome({ kind: 'settled', succeeded: 1, failed: 1, stopped: 0, topics: [{ id: first, title: 'One', status: 'succeeded' }, { id: second, title: 'Two', status: 'failed', error: 'no connection' }] });
+  await until(() => p.control.requests.length === 2 && p.view.chatChain === null);
+  eq(classTexts(pchat.logEl, 'vam-map-chat-auto-note'), ['Some research failed (failed: 1, worked: 1), so this round builds only on what worked.']);
+});
+
+integrationTest('P4 view: research notes that did not fit or are too long are told under the round that left them out', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const runs = researchStub(h);
+  chainReplies(h, say('Root and research.', [addRoot('r', 'Pstack'), researchAct({ nodeIds: ['new:r'] })], 'Fill in'), say('Added.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); const rootId = runs[0].ids[0];
+  await h.repo.updateNote(h.view.map.nodes.find(n => n.id === rootId).path, { detail: 'x'.repeat(80_001) });
+  settleRun(runs[0]); await until(() => h.control.requests.length === 2 && h.view.chatChain === null);
+  eq(contextOf(h.control.requests[1]).researchDeferred.map(d => d.oversize === true), [true]);
+  eq(classTexts(chat.logEl, 'vam-map-chat-basis-line'), ['Titles only (cards: 1) (no note was read for these)', '“Pstack” is too long, so it was not read.']);
+});
+
+test('P4 expand: a note too long to expand has its own sentence in every language, and the saved note carries the result line as it reads', () => {
+  const { translate } = load('i18n.ts');
+  eq(['en', 'zh-TW', 'zh-CN'].map(l => translate(l, 'error.outline_generate_note_too_long')), ["This card's note is too long to expand.", '這張卡的筆記太長，無法展開', '这张卡的笔记太长，无法展开']);
+  assert.notEqual(translate('en', 'error.outline_generate_note_too_long'), translate('en', 'error.outline_generate_over_budget'));
+});
+
+test('P4 records: a restored automatic round carries its round number only when the record has a sound one (2 and up, a whole number)', () => {
+  const { restoreConversation } = load('core/map-chat-records.ts');
+  const turn = (n, extra) => [{ v: 1, type: 'turn_start', turn: n, at: 'a', message: 'm', ...extra }, { v: 1, type: 'turn_end', turn: n, at: 'a', status: 'done', raw: null, reply: 'r', modelLabel: '', lines: [] }];
+  const restored = restoreConversation('x', [...turn(1, {}), ...turn(2, { auto: true, round: 2 }), ...turn(3, { auto: true, round: 1 }), ...turn(4, { auto: true, round: 2.5 }), ...turn(5, { auto: true, round: '3' }), ...turn(6, { auto: true }), ...turn(7, { round: 4 })]);
+  eq(restored.turns.map(t => [t.auto, t.round ?? null]), [[false, null], [true, 2], [true, null], [true, null], [true, null], [true, null], [false, null]]);
 });

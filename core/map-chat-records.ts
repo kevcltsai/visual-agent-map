@@ -331,6 +331,8 @@ export interface RestoredTurn {
   backfilled: boolean;
   /** An automatic round: shown as one, not as something the user said. */
   auto: boolean;
+  /** The round of an automatic round, when the record says it (2 and up). */
+  round?: number;
 }
 export interface RestoredConversation {
   id: string;
@@ -404,7 +406,10 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       images: images.get(number),
       undone: undone.get(number) === true,
       backfilled: start.backfilled === true,
-      auto: start.auto === true
+      auto: start.auto === true,
+      ...(start.auto === true && typeof start.round === "number" && Number.isInteger(start.round) && start.round >= 2
+        ? { round: start.round }
+        : {})
     });
   }
   return { id, mapPath, mapId, turns, restoredAt: turns.length ? turns[turns.length - 1].at : null };

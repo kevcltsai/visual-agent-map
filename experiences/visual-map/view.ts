@@ -1135,6 +1135,8 @@ interface ChatChainRun {
   waited: MapChatContinuationInput["research"];
   /** Lines about failed work, for the notice at the end. */
   details: string[];
+  /** Research that went on after some of it failed (the next round says so on its separator). */
+  partial: { failed: number; succeeded: number } | null;
   work: ChatRoundWork | null;
   timer: number | null;
   /** The panel was told that the chain waits (and must be told that it does not). */
@@ -20276,7 +20278,7 @@ export class VisualAgentMapView extends ItemView {
     // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
     const draft = chat.draft;
     const turn = autoOrigin
-      ? chat.beginAutoRound(run.state.round, run.state.maxRounds, run.state.remaining, origin)
+      ? chat.beginAutoRound(run.state.round, run.state.maxRounds, run.state.remaining, origin, run.partial ?? undefined)
       : chat.begin(message, origin, Boolean(again), "preparing");
     run.turn = turn;
     let sent = false;
@@ -20476,6 +20478,7 @@ export class VisualAgentMapView extends ItemView {
                 // Nothing is touched until the user applies the plan.
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
+                  this.showUnreadResearch(chat, turn, request.context);
                   this.markChatTurn(origin, request);
                   // The continuation stops where it is until the plan is applied (it goes on) or cancelled (it ends).
                   run.state = pauseForPlan(run.state);
@@ -20510,6 +20513,7 @@ export class VisualAgentMapView extends ItemView {
                 // Read at once: the next reply's step replaces `chatReplyEntry`.
                 const entry = this.chatReplyEntry();
                 chat.finish(result.reply, lines);
+                this.showUnreadResearch(chat, turn, request.context);
                 this.markChatTurn(origin, request, entry);
                 if (record?.end("done", { reply: result.reply, lines, rejected: result.rejected }))
                   this.chatRecordLogged.add(turn.assistant);
@@ -20554,6 +20558,19 @@ export class VisualAgentMapView extends ItemView {
     }
     // The AI is not ready (it said why itself) or the usage notice was declined.
     if (!went && !sent) abandon(this.closed ? undefined : notSent(), "not_ready");
+  }
+  /** Research notes of the conversation that this round did not read (no room, or too long) are told under its results. */
+  private showUnreadResearch(
+    chat: MapChatPanel,
+    turn: MapChatTurnHandle,
+    context: Pick<MapChatContext, "research">
+  ): void {
+    const deferred = context.research?.deferred ?? [];
+    if (deferred.length)
+      chat.setUnreadNotes(
+        turn,
+        deferred.map(note => ({ title: note.title, oversize: note.oversize === true }))
+      );
   }
   /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
   private steerMapChat(): void {
@@ -20705,6 +20722,7 @@ export class VisualAgentMapView extends ItemView {
       lastResults: origin?.continuation.lastResults ?? [],
       waited: origin?.continuation.research ?? [],
       details: [],
+      partial: null,
       work: null,
       timer: null,
       waitShown: false
@@ -20736,7 +20754,8 @@ export class VisualAgentMapView extends ItemView {
     run.waitShown = false;
     if (!this.chainShows(run)) return;
     this.chatLastRecord?.event("chain_end", { reason, round: run.state.round, remaining });
-    if (chat && chainEndNeedsNotice(reason))
+    // "Done" is told only to a chain that went on by itself (round 2 on): a single round that finished adds nothing.
+    if (chat && (chainEndNeedsNotice(reason) || (reason === "done" && run.state.round >= 2)))
       chat.endChain(reason, remaining, run.details.length ? run.details : undefined);
   }
   /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
@@ -20756,6 +20775,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private advanceChain(run: ChatChainRun, round: ChatRoundEnd): void {
     if (this.chatChain !== run || run.state.phase === "ended") return;
+    run.partial = null;
     run.lastResults = round.lines.map(line => ({ text: line.text, status: line.status }));
     run.anchor = { path: round.anchor.path, id: round.anchor.id };
     const step = finishRound(run.state, {
@@ -20785,12 +20805,12 @@ export class VisualAgentMapView extends ItemView {
     const research = waitFor.includes("research") ? work.research : [];
     const expand = waitFor.includes("expand") ? work.expand : [];
     const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand.length, settled: 0 };
-    chat?.setChainWaiting(waiting);
+    chat?.setChainWaiting(waiting, run.state.remaining);
     run.waitShown = true;
     const progress = (by: number): void => {
       if (this.chatChain !== run || run.state.phase !== "waiting") return;
       waiting.settled = Math.min(waiting.total, waiting.settled + by);
-      this.chat?.setChainWaiting(waiting);
+      this.chat?.setChainWaiting(waiting, run.state.remaining);
     };
     run.timer = window.setTimeout(() => {
       run.timer = null;
@@ -20870,6 +20890,14 @@ export class VisualAgentMapView extends ItemView {
     run.details = waited.filter(item => item.status !== "succeeded").map(chainWorkDetail);
     const step = finishWait(run.state, end);
     run.state = step.state;
+    // Research that partly failed and goes on is told on the separator of the next round (it is not an ending).
+    run.partial =
+      step.decision.kind === "next" &&
+      end.research?.kind === "settled" &&
+      end.research.failed > 0 &&
+      end.research.succeeded > 0
+        ? { failed: end.research.failed, succeeded: end.research.succeeded }
+        : null;
     this.followChainDecision(run, step.decision, null);
   }
   /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
@@ -20921,14 +20949,19 @@ export class VisualAgentMapView extends ItemView {
   private planReasonText(
     reason: MapChatPlanReason,
     result: Pick<MapChatResult, "actions">,
-    selectedCount: number
+    selectedCount: number,
+    /** Research targets the earlier rounds of the continuation started (the plan counts the whole chain). */
+    researchSoFar = 0
   ): string {
     switch (reason) {
       case "many_actions":
         return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
       case "many_research":
-        // The same count the plan was judged by (a selection made earlier in the reply counts).
-        return t("ui.map_chat_plan_reason_many_research_0", researchTargetsOf(result.actions, selectedCount));
+        // The same count the plan was judged by: the whole continuation (earlier rounds too), and a selection made earlier in the reply.
+        return t(
+          "ui.map_chat_plan_reason_many_research_0",
+          researchTargetsOf(result.actions, selectedCount) + researchSoFar
+        );
       case "new_map":
         return t("ui.map_chat_plan_reason_new_map");
       case "image_preview":
@@ -20936,8 +20969,8 @@ export class VisualAgentMapView extends ItemView {
       case "image_other_actions":
         return t("ui.map_chat_plan_reason_image_other_actions");
       case "auto_round_other_actions":
-        // Reachable from round 2 of a continuation. Own wording comes with P4; until then it reads as the action-count reason.
-        return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
+        // Reachable from round 2 of a continuation.
+        return t("ui.map_chat_plan_reason_auto_round_other_actions");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
@@ -20983,7 +21016,9 @@ export class VisualAgentMapView extends ItemView {
       ...(plan.reasons.some(reason => reason === "image_preview" || reason === "image_other_actions")
         ? { openGroups: true }
         : {}),
-      reasons: plan.reasons.map(reason => this.planReasonText(reason, result, baseline.selectedCount)),
+      reasons: plan.reasons.map(reason =>
+        this.planReasonText(reason, result, baseline.selectedCount, run?.state.researchTargets ?? 0)
+      ),
       items,
       groups,
       estimate: plan.estimatedCalls

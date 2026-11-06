@@ -1410,6 +1410,48 @@ var en = {
   "ui.map_chat_ref_gone": "(removed topic)",
   "ui.map_chat_role_you": "You",
   "ui.map_chat_role_auto": "Automatic continuation",
+  "ui.map_chat_auto_round_0_1": "Automatic continuation \xB7 round {0} of {1}",
+  "ui.map_chat_chain_left_0": "Left to do: {0}",
+  "ui.map_chat_chain_left_end_0": "Left to do: {0}.",
+  "ui.map_chat_chain_partial_0_1": "Some research failed (failed: {0}, worked: {1}), so this round builds only on what worked.",
+  "ui.map_chat_chain_kind_research": "Researching",
+  "ui.map_chat_chain_kind_expand": "Expanding",
+  "ui.map_chat_chain_kind_both": "Researching and expanding",
+  "ui.map_chat_chain_wait_label_0_1_2": "{0} {1}/{2}",
+  "ui.map_chat_chain_wait_tail": "It continues on its own when this is done",
+  "ui.map_chat_chain_wait_live_0": "{0}. It continues on its own when this is done.",
+  "ui.map_chat_chain_wait_placeholder": "Want to change direction? Sending takes over from here.",
+  "ui.map_chat_chain_wait_hint": "Enter to send and take over",
+  "ui.map_chat_chain_detail_separator": "; ",
+  "ui.map_chat_chain_reason_0": "Reason: {0}.",
+  "ui.map_chat_chain_end_done_0": "Done after {0} rounds.",
+  "ui.map_chat_chain_end_no_progress": "This round made no new progress, so it stops here.",
+  "ui.map_chat_chain_end_max_rounds_0": "It ran all {0} rounds, so it stops here.",
+  "ui.map_chat_chain_end_max_rounds_more": "To go on, say \u201Ccontinue\u201D.",
+  "ui.map_chat_chain_end_research_failed": "The research did not work, so the subtopics were not filled in.",
+  "ui.map_chat_chain_end_stopped": "Stopped, and the research stopped with it. The cards already made stay.",
+  "ui.map_chat_chain_end_user_took_over": "Now following your new message; the automatic continuation ends here.",
+  "ui.map_chat_chain_end_research_stopped": "The research was stopped, so it did not go on.",
+  "ui.map_chat_chain_end_research_not_started": "The research did not start, so it did not go on.",
+  "ui.map_chat_chain_end_wait_timeout_0": "The research has not finished after {0} minutes, so it does not go on. The research is still running.",
+  "ui.map_chat_chain_end_other_background": "This round started an integration, merge or prioritizing, and it does not go on by itself after that.",
+  "ui.map_chat_chain_end_not_ready": "The AI is not ready to use, so it stops here.",
+  "ui.map_chat_chain_end_failed_0": "Round {0} failed.",
+  "ui.map_chat_chain_end_failed_retry": "Retry picks up from this round.",
+  "ui.map_chat_chain_end_plan_cancelled": "The plan was cancelled, so the automatic continuation ends here.",
+  "ui.map_chat_plan_reason_auto_round_other_actions": "The automatic continuation wants to delete or rewrite things; it waits for your confirmation",
+  "ui.map_chat_research_deferred_0": "\u201C{0}\u201D did not fit this round and is read in the next one.",
+  "ui.map_chat_research_oversize_0": "\u201C{0}\u201D is too long, so it was not read.",
+  "ui.map_chat_basis_quote_0": "\u201C{0}\u201D",
+  "ui.map_chat_basis_title_separator": ", ",
+  "ui.map_chat_basis_research_0_1": "Based on research note {0} (cards: {1})",
+  "ui.map_chat_basis_note_0_1": "Based on note {0} (cards: {1})",
+  "ui.map_chat_basis_expand_0": "Based on note {0}",
+  "ui.map_chat_basis_expand_0_1": "Based on note {0} and {1} existing subtopics",
+  "ui.map_chat_basis_title_only_0": "Titles only (cards: {0})",
+  "ui.map_chat_basis_title_only_hint": " (no note was read for these)",
+  "ui.map_chat_basis_title_only": "Titles only",
+  "ui.map_chat_basis_children_0": " and {0} existing subtopics",
   "ui.map_chat_role_ai": "AI",
   "ui.map_chat_drop_hint": "Drop to add as a reference",
   "ui.map_chat_rejected_0": "{0} suggested changes were invalid and were ignored.",
@@ -2472,6 +2514,7 @@ var en = {
   "note.source_topic_label": "Source topic: ",
   "error.outline_generate_empty_topic": "Enter a research topic before generating an outline.",
   "error.outline_generate_over_budget": "The topic and preset are too long to send; shorten them.",
+  "error.outline_generate_note_too_long": "This card's note is too long to expand.",
   "error.outline_generate_stopped": "Outline generation stopped.",
   "error.outline_generate_invalid": "The AI outline could not be used: {0}",
   "error.outline_generate_no_headings": "The AI returned no Markdown headings.",
@@ -4153,6 +4196,48 @@ var zhCN = {
   "ui.map_chat_ref_gone": "\uFF08\u5DF2\u79FB\u9664\u7684\u8BAE\u9898\uFF09",
   "ui.map_chat_role_you": "\u4F60",
   "ui.map_chat_role_auto": "\u81EA\u52A8\u63A5\u7EED",
+  "ui.map_chat_auto_round_0_1": "\u81EA\u52A8\u63A5\u7EED\u30FB\u7B2C {0}\uFF0F{1} \u8F6E",
+  "ui.map_chat_chain_left_0": "\u5269\u4E0B\uFF1A{0}",
+  "ui.map_chat_chain_left_end_0": "\u5269\u4E0B\uFF1A{0}\u3002",
+  "ui.map_chat_chain_partial_0_1": "\u6709 {0} \u5F20\u5361\u7814\u7A76\u5931\u8D25\uFF0C\u53EA\u4F9D\u6210\u529F\u7684 {1} \u7BC7\u63A5\u7740\u505A\u3002",
+  "ui.map_chat_chain_kind_research": "\u7814\u7A76\u4E2D",
+  "ui.map_chat_chain_kind_expand": "\u5C55\u5F00\u4E2D",
+  "ui.map_chat_chain_kind_both": "\u7814\u7A76\u4E0E\u5C55\u5F00\u4E2D",
+  "ui.map_chat_chain_wait_label_0_1_2": "{0} {1}\uFF0F{2}",
+  "ui.map_chat_chain_wait_tail": "\u5B8C\u6210\u540E\u4F1A\u81EA\u52A8\u63A5\u7740\u505A",
+  "ui.map_chat_chain_wait_live_0": "{0}\uFF0C\u5B8C\u6210\u540E\u4F1A\u81EA\u52A8\u63A5\u7740\u505A\u3002",
+  "ui.map_chat_chain_wait_placeholder": "\u8981\u6539\u65B9\u5411\u5417\uFF1F\u9001\u51FA\u540E\u7531\u4F60\u63A5\u624B\u3002",
+  "ui.map_chat_chain_wait_hint": "Enter \u9001\u51FA\u5E76\u63A5\u624B",
+  "ui.map_chat_chain_detail_separator": "\uFF1B",
+  "ui.map_chat_chain_reason_0": "\u539F\u56E0\uFF1A{0}\u3002",
+  "ui.map_chat_chain_end_done_0": "\u5DF2\u505A\u5B8C\uFF0C\u5171 {0} \u8F6E\u3002",
+  "ui.map_chat_chain_end_no_progress": "\u8FD9\u4E00\u8F6E\u6CA1\u6709\u65B0\u8FDB\u5EA6\uFF0C\u5148\u505C\u5728\u8FD9\u91CC\u3002",
+  "ui.map_chat_chain_end_max_rounds_0": "\u5DF2\u8DD1\u6EE1 {0} \u8F6E\uFF0C\u5148\u505C\u5728\u8FD9\u91CC\u3002",
+  "ui.map_chat_chain_end_max_rounds_more": "\u8981\u7EE7\u7EED\u5C31\u8BF4\u201C\u7EE7\u7EED\u201D\u3002",
+  "ui.map_chat_chain_end_research_failed": "\u7814\u7A76\u6CA1\u6709\u6210\u529F\uFF0C\u6240\u4EE5\u6CA1\u6709\u63A5\u7740\u8865\u5B50\u8BAE\u9898\u3002",
+  "ui.map_chat_chain_end_stopped": "\u5DF2\u505C\u6B62\uFF0C\u7814\u7A76\u4E5F\u4E00\u8D77\u505C\u4E86\u3002\u5EFA\u597D\u7684\u5361\u90FD\u7559\u7740\u3002",
+  "ui.map_chat_chain_end_user_took_over": "\u5DF2\u6539\u7167\u4F60\u7684\u65B0\u6D88\u606F\u505A\uFF0C\u521A\u624D\u7684\u81EA\u52A8\u63A5\u7EED\u5230\u6B64\u7ED3\u675F\u3002",
+  "ui.map_chat_chain_end_research_stopped": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u6CA1\u6709\u63A5\u7740\u505A\u3002",
+  "ui.map_chat_chain_end_research_not_started": "\u7814\u7A76\u6CA1\u6709\u5F00\u59CB\uFF0C\u6240\u4EE5\u6CA1\u6709\u63A5\u7740\u505A\u3002",
+  "ui.map_chat_chain_end_wait_timeout_0": "\u7814\u7A76\u8D85\u8FC7 {0} \u5206\u949F\u8FD8\u6CA1\u7ED3\u675F\uFF0C\u5148\u4E0D\u63A5\u7740\u505A\u3002\u7814\u7A76\u8FD8\u5728\u8DD1\u3002",
+  "ui.map_chat_chain_end_other_background": "\u8FD9\u4E00\u8F6E\u5F00\u59CB\u4E86\u6574\u5408\u3001\u5408\u5E76\u6216\u5206\u7EA7\uFF0C\u5B8C\u6210\u540E\u4E0D\u4F1A\u81EA\u52A8\u63A5\u7740\u505A\u3002",
+  "ui.map_chat_chain_end_not_ready": "AI \u8FD8\u4E0D\u80FD\u7528\uFF0C\u5148\u505C\u5728\u8FD9\u91CC\u3002",
+  "ui.map_chat_chain_end_failed_0": "\u7B2C {0} \u8F6E\u5931\u8D25\u4E86\u3002",
+  "ui.map_chat_chain_end_failed_retry": "\u6309\u91CD\u8BD5\u4F1A\u4ECE\u8FD9\u4E00\u8F6E\u63A5\u7740\u505A\u3002",
+  "ui.map_chat_chain_end_plan_cancelled": "\u8BA1\u5212\u5DF2\u53D6\u6D88\uFF0C\u81EA\u52A8\u63A5\u7EED\u5230\u6B64\u7ED3\u675F\u3002",
+  "ui.map_chat_plan_reason_auto_round_other_actions": "\u81EA\u52A8\u63A5\u7EED\u8981\u505A\u5220\u9664\u6216\u6539\u5199\uFF0C\u7B49\u4F60\u786E\u8BA4",
+  "ui.map_chat_research_deferred_0": "\u201C{0}\u201D\u8FD9\u8F6E\u653E\u4E0D\u4E0B\uFF0C\u4E0B\u4E00\u8F6E\u8BFB\u3002",
+  "ui.map_chat_research_oversize_0": "\u201C{0}\u201D\u592A\u957F\uFF0C\u6CA1\u6709\u8BFB\u3002",
+  "ui.map_chat_basis_quote_0": "\u201C{0}\u201D",
+  "ui.map_chat_basis_title_separator": "\u3001",
+  "ui.map_chat_basis_research_0_1": "\u4F9D\u636E\uFF1A\u7814\u7A76\u7B14\u8BB0{0}{1} \u5F20",
+  "ui.map_chat_basis_note_0_1": "\u4F9D\u636E\uFF1A\u7B14\u8BB0{0}{1} \u5F20",
+  "ui.map_chat_basis_expand_0": "\u4F9D\u636E\uFF1A\u7B14\u8BB0{0}",
+  "ui.map_chat_basis_expand_0_1": "\u4F9D\u636E\uFF1A\u7B14\u8BB0{0}\u3001{1} \u4E2A\u73B0\u6709\u5B50\u8BAE\u9898",
+  "ui.map_chat_basis_title_only_0": "\u53EA\u6709\u6807\u9898\uFF1A{0} \u5F20",
+  "ui.map_chat_basis_title_only_hint": "\uFF08\u6CA1\u6709\u8BFB\u5230\u8FD9\u652F\u7684\u7B14\u8BB0\uFF09",
+  "ui.map_chat_basis_title_only": "\u53EA\u6709\u6807\u9898",
+  "ui.map_chat_basis_children_0": "\u3001{0} \u4E2A\u73B0\u6709\u5B50\u8BAE\u9898",
   "ui.map_chat_role_ai": "AI",
   "ui.map_chat_drop_hint": "\u677E\u5F00\u5373\u53EF\u52A0\u5165\u5F15\u7528",
   "ui.map_chat_rejected_0": "\u6709 {0} \u9879\u5EFA\u8BAE\u65E0\u6548\uFF0C\u5DF2\u7565\u8FC7\u3002",
@@ -5215,6 +5300,7 @@ var zhCN = {
   "note.source_topic_label": "\u6765\u6E90\u8BAE\u9898\uFF1A",
   "error.outline_generate_empty_topic": "\u8BF7\u5148\u8F93\u5165\u7814\u7A76\u4E3B\u9898\uFF0C\u518D\u751F\u6210\u5927\u7EB2\u3002",
   "error.outline_generate_over_budget": "\u4E3B\u9898\u4E0E\u9884\u8BBE\u592A\u957F\uFF0C\u65E0\u6CD5\u9001\u51FA\uFF1B\u8BF7\u7F29\u77ED\u3002",
+  "error.outline_generate_note_too_long": "\u8FD9\u5F20\u5361\u7684\u7B14\u8BB0\u592A\u957F\uFF0C\u65E0\u6CD5\u5C55\u5F00",
   "error.outline_generate_stopped": "\u5927\u7EB2\u751F\u6210\u5DF2\u505C\u6B62\u3002",
   "error.outline_generate_invalid": "\u65E0\u6CD5\u4F7F\u7528 AI \u7684\u5927\u7EB2\uFF1A{0}",
   "error.outline_generate_no_headings": "AI \u6CA1\u6709\u8FD4\u56DE\u4EFB\u4F55 Markdown \u6807\u9898\u3002",
@@ -6896,6 +6982,48 @@ var zhTW = {
   "ui.map_chat_ref_gone": "\uFF08\u5DF2\u79FB\u9664\u7684\u8B70\u984C\uFF09",
   "ui.map_chat_role_you": "\u4F60",
   "ui.map_chat_role_auto": "\u81EA\u52D5\u63A5\u7E8C",
+  "ui.map_chat_auto_round_0_1": "\u81EA\u52D5\u63A5\u7E8C\u30FB\u7B2C {0}\uFF0F{1} \u8F2A",
+  "ui.map_chat_chain_left_0": "\u5269\u4E0B\uFF1A{0}",
+  "ui.map_chat_chain_left_end_0": "\u5269\u4E0B\uFF1A{0}\u3002",
+  "ui.map_chat_chain_partial_0_1": "\u6709 {0} \u5F35\u5361\u7814\u7A76\u5931\u6557\uFF0C\u53EA\u4F9D\u6210\u529F\u7684 {1} \u7BC7\u63A5\u8457\u505A\u3002",
+  "ui.map_chat_chain_kind_research": "\u7814\u7A76\u4E2D",
+  "ui.map_chat_chain_kind_expand": "\u5C55\u958B\u4E2D",
+  "ui.map_chat_chain_kind_both": "\u7814\u7A76\u8207\u5C55\u958B\u4E2D",
+  "ui.map_chat_chain_wait_label_0_1_2": "{0} {1}\uFF0F{2}",
+  "ui.map_chat_chain_wait_tail": "\u5B8C\u6210\u5F8C\u6703\u81EA\u52D5\u63A5\u8457\u505A",
+  "ui.map_chat_chain_wait_live_0": "{0}\uFF0C\u5B8C\u6210\u5F8C\u6703\u81EA\u52D5\u63A5\u8457\u505A\u3002",
+  "ui.map_chat_chain_wait_placeholder": "\u8981\u6539\u65B9\u5411\u55CE\uFF1F\u9001\u51FA\u5F8C\u7531\u4F60\u63A5\u624B\u3002",
+  "ui.map_chat_chain_wait_hint": "Enter \u9001\u51FA\u4E26\u63A5\u624B",
+  "ui.map_chat_chain_detail_separator": "\uFF1B",
+  "ui.map_chat_chain_reason_0": "\u539F\u56E0\uFF1A{0}\u3002",
+  "ui.map_chat_chain_end_done_0": "\u5DF2\u505A\u5B8C\uFF0C\u5171 {0} \u8F2A\u3002",
+  "ui.map_chat_chain_end_no_progress": "\u9019\u4E00\u8F2A\u6C92\u6709\u65B0\u9032\u5EA6\uFF0C\u5148\u505C\u5728\u9019\u88E1\u3002",
+  "ui.map_chat_chain_end_max_rounds_0": "\u5DF2\u8DD1\u6EFF {0} \u8F2A\uFF0C\u5148\u505C\u5728\u9019\u88E1\u3002",
+  "ui.map_chat_chain_end_max_rounds_more": "\u8981\u7E7C\u7E8C\u5C31\u8AAA\u300C\u7E7C\u7E8C\u300D\u3002",
+  "ui.map_chat_chain_end_research_failed": "\u7814\u7A76\u6C92\u6709\u6210\u529F\uFF0C\u6240\u4EE5\u6C92\u6709\u63A5\u8457\u88DC\u5B50\u8B70\u984C\u3002",
+  "ui.map_chat_chain_end_stopped": "\u5DF2\u505C\u6B62\uFF0C\u7814\u7A76\u4E5F\u4E00\u8D77\u505C\u4E86\u3002\u5EFA\u597D\u7684\u5361\u90FD\u7559\u8457\u3002",
+  "ui.map_chat_chain_end_user_took_over": "\u5DF2\u6539\u7167\u4F60\u7684\u65B0\u8A0A\u606F\u505A\uFF0C\u525B\u624D\u7684\u81EA\u52D5\u63A5\u7E8C\u5230\u6B64\u7D50\u675F\u3002",
+  "ui.map_chat_chain_end_research_stopped": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u6C92\u6709\u63A5\u8457\u505A\u3002",
+  "ui.map_chat_chain_end_research_not_started": "\u7814\u7A76\u6C92\u6709\u958B\u59CB\uFF0C\u6240\u4EE5\u6C92\u6709\u63A5\u8457\u505A\u3002",
+  "ui.map_chat_chain_end_wait_timeout_0": "\u7814\u7A76\u8D85\u904E {0} \u5206\u9418\u9084\u6C92\u7D50\u675F\uFF0C\u5148\u4E0D\u63A5\u8457\u505A\u3002\u7814\u7A76\u9084\u5728\u8DD1\u3002",
+  "ui.map_chat_chain_end_other_background": "\u9019\u4E00\u8F2A\u958B\u59CB\u4E86\u6574\u5408\u3001\u5408\u4F75\u6216\u5206\u7D1A\uFF0C\u5B8C\u6210\u5F8C\u4E0D\u6703\u81EA\u52D5\u63A5\u8457\u505A\u3002",
+  "ui.map_chat_chain_end_not_ready": "AI \u9084\u4E0D\u80FD\u7528\uFF0C\u5148\u505C\u5728\u9019\u88E1\u3002",
+  "ui.map_chat_chain_end_failed_0": "\u7B2C {0} \u8F2A\u5931\u6557\u4E86\u3002",
+  "ui.map_chat_chain_end_failed_retry": "\u6309\u91CD\u8A66\u6703\u5F9E\u9019\u4E00\u8F2A\u63A5\u8457\u505A\u3002",
+  "ui.map_chat_chain_end_plan_cancelled": "\u8A08\u756B\u5DF2\u53D6\u6D88\uFF0C\u81EA\u52D5\u63A5\u7E8C\u5230\u6B64\u7D50\u675F\u3002",
+  "ui.map_chat_plan_reason_auto_round_other_actions": "\u81EA\u52D5\u63A5\u7E8C\u8981\u505A\u522A\u9664\u6216\u6539\u5BEB\uFF0C\u7B49\u4F60\u78BA\u8A8D",
+  "ui.map_chat_research_deferred_0": "\u300C{0}\u300D\u9019\u8F2A\u653E\u4E0D\u4E0B\uFF0C\u4E0B\u4E00\u8F2A\u8B80\u3002",
+  "ui.map_chat_research_oversize_0": "\u300C{0}\u300D\u592A\u9577\uFF0C\u6C92\u6709\u8B80\u3002",
+  "ui.map_chat_basis_quote_0": "\u300C{0}\u300D",
+  "ui.map_chat_basis_title_separator": "\u3001",
+  "ui.map_chat_basis_research_0_1": "\u4F9D\u64DA\uFF1A\u7814\u7A76\u7B46\u8A18{0}{1} \u5F35",
+  "ui.map_chat_basis_note_0_1": "\u4F9D\u64DA\uFF1A\u7B46\u8A18{0}{1} \u5F35",
+  "ui.map_chat_basis_expand_0": "\u4F9D\u64DA\uFF1A\u7B46\u8A18{0}",
+  "ui.map_chat_basis_expand_0_1": "\u4F9D\u64DA\uFF1A\u7B46\u8A18{0}\u3001{1} \u500B\u73FE\u6709\u5B50\u8B70\u984C",
+  "ui.map_chat_basis_title_only_0": "\u53EA\u6709\u6A19\u984C\uFF1A{0} \u5F35",
+  "ui.map_chat_basis_title_only_hint": "\uFF08\u6C92\u6709\u8B80\u5230\u9019\u652F\u7684\u7B46\u8A18\uFF09",
+  "ui.map_chat_basis_title_only": "\u53EA\u6709\u6A19\u984C",
+  "ui.map_chat_basis_children_0": "\u3001{0} \u500B\u73FE\u6709\u5B50\u8B70\u984C",
   "ui.map_chat_role_ai": "AI",
   "ui.map_chat_drop_hint": "\u653E\u958B\u5373\u53EF\u52A0\u5165\u5F15\u7528",
   "ui.map_chat_rejected_0": "\u6709 {0} \u9805\u5EFA\u8B70\u7121\u6548\uFF0C\u5DF2\u7565\u904E\u3002",
@@ -7958,6 +8086,7 @@ var zhTW = {
   "note.source_topic_label": "\u4F86\u6E90\u8B70\u984C\uFF1A",
   "error.outline_generate_empty_topic": "\u8ACB\u5148\u8F38\u5165\u7814\u7A76\u4E3B\u984C\uFF0C\u518D\u751F\u6210\u5927\u7DB1\u3002",
   "error.outline_generate_over_budget": "\u4E3B\u984C\u8207\u9810\u8A2D\u592A\u9577\uFF0C\u7121\u6CD5\u9001\u51FA\uFF1B\u8ACB\u7E2E\u77ED\u3002",
+  "error.outline_generate_note_too_long": "\u9019\u5F35\u5361\u7684\u7B46\u8A18\u592A\u9577\uFF0C\u7121\u6CD5\u5C55\u958B",
   "error.outline_generate_stopped": "\u5927\u7DB1\u751F\u6210\u5DF2\u505C\u6B62\u3002",
   "error.outline_generate_invalid": "\u7121\u6CD5\u4F7F\u7528 AI \u7684\u5927\u7DB1\uFF1A{0}",
   "error.outline_generate_no_headings": "AI \u6C92\u6709\u56DE\u50B3\u4EFB\u4F55 Markdown \u6A19\u984C\u3002",
@@ -19306,18 +19435,18 @@ function mapOutline(nodes, titleOf, summaryOf = () => "", mapTitle = "") {
       children.set(node.parentId, list);
     } else roots.push(node);
   }
-  const oneLine2 = (value) => (value != null ? value : "").replace(/\s+/g, " ").trim();
+  const oneLine3 = (value) => (value != null ? value : "").replace(/\s+/g, " ").trim();
   const lines = [];
   const seen = /* @__PURE__ */ new Set();
   const wrap = roots.length > 1;
-  if (wrap) lines.push(`# ${oneLine2(mapTitle) || "Map"}`);
+  if (wrap) lines.push(`# ${oneLine3(mapTitle) || "Map"}`);
   const walk = (node, depth) => {
     var _a3;
     if (seen.has(node.id)) return;
     seen.add(node.id);
-    const title = oneLine2(titleOf(node.id)) || node.id;
+    const title = oneLine3(titleOf(node.id)) || node.id;
     lines.push(`${"#".repeat(Math.min(6, depth + 1 + (wrap ? 1 : 0)))} ${title}`);
-    const summary = oneLine2(summaryOf(node.id));
+    const summary = oneLine3(summaryOf(node.id));
     if (summary) lines.push("", `> ${summary}`, "");
     for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk(child, depth + 1);
   };
@@ -35473,6 +35602,182 @@ var RelevanceSummaryModal = class extends import_obsidian23.Modal {
 // experiences/visual-map/map-chat.ts
 var import_obsidian24 = require("obsidian");
 
+// core/map-chat-basis.ts
+function ancestors(parentId, parents, created) {
+  const chain = [];
+  const seen = /* @__PURE__ */ new Set();
+  let id = parentId;
+  while (id && !seen.has(id)) {
+    seen.add(id);
+    chain.push(id);
+    id = id.startsWith("new:") ? created[id] : parents[id];
+  }
+  return chain;
+}
+function chatBasisFor(index, parentId, parents, created = {}, existingChildren) {
+  const chain = ancestors(parentId, parents, created).filter(
+    (id) => Object.prototype.hasOwnProperty.call(index.cards, id)
+  );
+  const source = (id) => ({ id, title: index.cards[id].title });
+  const research = chain.filter((id) => index.cards[id].research);
+  const extra = existingChildren === void 0 ? {} : { existingChildren };
+  if (research.length) return { kind: "research", sources: research.map(source), ...extra };
+  if (chain.length) return { kind: "note", sources: chain.map(source), ...extra };
+  return { kind: "outline_only", alsoRead: index.read.map(({ path, title }) => ({ path, title })), ...extra };
+}
+function createdParentsOf(actions) {
+  const created = {};
+  for (const action of actions)
+    if (action.kind === "add_child" && action.ref) created[`new:${action.ref}`] = action.parentId || null;
+  return created;
+}
+function expandBasis(card) {
+  return card.hasNote ? { kind: "note", sources: [{ id: card.id, title: card.title }], existingChildren: card.existingChildren } : { kind: "outline_only", alsoRead: [], existingChildren: card.existingChildren };
+}
+var BASIS_TEXT_LIMIT = 200;
+var BASIS_LIST_LIMIT = 50;
+var text7 = (value) => typeof value === "string" ? [...value].slice(0, BASIS_TEXT_LIMIT).join("") : null;
+var count = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? { existingChildren: value } : {};
+function parseChatBasis(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const raw = value;
+  if (raw.kind === "research" || raw.kind === "note") {
+    if (!Array.isArray(raw.sources)) return void 0;
+    const sources = raw.sources.slice(0, BASIS_LIST_LIMIT).flatMap((item) => {
+      const entry = item != null ? item : {};
+      const id = text7(entry.id);
+      const title = text7(entry.title);
+      return id !== null && title !== null ? [{ id, title }] : [];
+    });
+    return { kind: raw.kind, sources, ...count(raw.existingChildren) };
+  }
+  if (raw.kind === "outline_only") {
+    const alsoRead = (Array.isArray(raw.alsoRead) ? raw.alsoRead : []).slice(0, BASIS_LIST_LIMIT).flatMap((item) => {
+      const entry = item != null ? item : {};
+      const path = text7(entry.path);
+      const title = text7(entry.title);
+      return path !== null && title !== null ? [{ path, title }] : [];
+    });
+    return { kind: "outline_only", alsoRead, ...count(raw.existingChildren) };
+  }
+  return void 0;
+}
+function basisSummary(basis, labels, titleLimit = 5) {
+  if (basis.kind === "outline_only") return labels.outline;
+  const titles = basis.sources.map((source) => source.title.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const shown = titles.slice(0, titleLimit).join(", ") + (titles.length > titleLimit ? ", \u2026" : "");
+  return (basis.kind === "research" ? labels.research : labels.note).replace(/\{0\}/g, () => shown);
+}
+var SUMMARY_TITLE_LIMIT = 60;
+var oneLine2 = (value) => {
+  const flat = value.replace(/\s+/g, " ").trim();
+  const chars = [...flat];
+  return chars.length > SUMMARY_TITLE_LIMIT ? `${chars.slice(0, SUMMARY_TITLE_LIMIT - 1).join("")}\u2026` : flat;
+};
+function summarizeBasis(bases) {
+  const entries = [];
+  const cardIndex = /* @__PURE__ */ new Map();
+  for (const basis of bases) {
+    const titles = basis.kind === "outline_only" ? [] : basis.sources.map((source) => oneLine2(source.title)).filter((title, at2, all) => title && all.indexOf(title) === at2);
+    const kind = basis.kind === "outline_only" || !titles.length ? "outline_only" : basis.kind;
+    if (basis.existingChildren !== void 0) {
+      entries.push(
+        kind === "outline_only" ? { type: "expand", kind, titles: [], existingChildren: basis.existingChildren } : { type: "expand", kind: "note", titles, existingChildren: basis.existingChildren }
+      );
+      continue;
+    }
+    const key2 = kind === "outline_only" ? kind : `${kind}${titles.join("")}`;
+    const at = cardIndex.get(key2);
+    if (at !== void 0) {
+      entries[at].count++;
+      continue;
+    }
+    cardIndex.set(key2, entries.length);
+    entries.push(
+      kind === "outline_only" ? { type: "cards", kind, titles: [], count: 1 } : { type: "cards", kind, titles, count: 1 }
+    );
+  }
+  return entries;
+}
+
+// core/map-chat-chain.ts
+var MAP_CHAT_CHAIN_MAX_ROUNDS = 8;
+var MAP_CHAT_CHAIN_WAIT_MS = 30 * 60 * 1e3;
+var chainEndNeedsNotice = (reason) => reason !== "done";
+var NOT_A_WRITE = /* @__PURE__ */ new Set([
+  "focus_topic",
+  "select_topics",
+  "collapse_topic",
+  "expand_topic",
+  "auto_layout",
+  "ask_topic_kind",
+  "run_map_action"
+]);
+var wroteSomething = (actions) => actions.some((action) => action.done && !NOT_A_WRITE.has(action.kind));
+var startChain = (maxRounds = MAP_CHAT_CHAIN_MAX_ROUNDS) => ({
+  phase: "round",
+  round: 1,
+  maxRounds,
+  remaining: "",
+  researchTargets: 0,
+  wrote: false
+});
+var planChainOf = (state) => ({
+  round: state.round,
+  researchSoFar: state.researchTargets
+});
+var ignored = (state) => ({ state, decision: { kind: "ignored" } });
+var ended = (state, reason, remaining = state.remaining) => ({
+  state: { ...state, phase: "ended", remaining, ended: { reason, remaining } },
+  decision: { kind: "end", reason, remaining }
+});
+var pauseForPlan = (state) => state.phase === "round" ? { ...state, phase: "plan" } : state;
+function interrupt(state, reason) {
+  if (state.phase === "ended") return ignored(state);
+  return ended(state, reason);
+}
+function finishRound(state, end) {
+  if (state.phase !== "round" && state.phase !== "plan") return ignored(state);
+  const remaining = typeof end.remaining === "string" ? end.remaining.trim() : "";
+  const next = {
+    ...state,
+    remaining,
+    researchTargets: state.researchTargets + Math.max(0, end.started.research),
+    wrote: wroteSomething(end.actions)
+  };
+  if (!remaining && end.researchDeferred <= 0) return ended(next, "done");
+  if (end.started.otherBackground) return ended(next, "other_background_work");
+  if (state.round >= state.maxRounds) return ended(next, "max_rounds");
+  const waitFor = [];
+  if (end.started.research > 0) waitFor.push("research");
+  if (end.started.expand > 0) waitFor.push("expand");
+  if (waitFor.length) return { state: { ...next, phase: "waiting" }, decision: { kind: "wait", waitFor } };
+  if (!next.wrote) return ended(next, "no_progress");
+  return startNext(next);
+}
+var startNext = (state) => ({
+  state: { ...state, phase: "round", round: state.round + 1, wrote: false },
+  decision: { kind: "next", round: state.round + 1, remaining: state.remaining }
+});
+function finishWait(state, end) {
+  var _a2, _b2;
+  if (state.phase !== "waiting") return ignored(state);
+  if (end.timedOut) return ended(state, "wait_timeout");
+  const research = end.research;
+  const researchSucceeded = (research == null ? void 0 : research.kind) === "settled" ? research.succeeded : 0;
+  const expandSucceeded = (_b2 = (_a2 = end.expand) == null ? void 0 : _a2.succeeded) != null ? _b2 : 0;
+  if (research) {
+    if (research.kind === "settled" && researchSucceeded === 0) {
+      if (research.stopped > 0) return ended(state, "research_stopped");
+      if (research.failed > 0) return ended(state, "research_failed");
+    }
+    if ((research.kind === "not_started" || researchSucceeded + research.failed + research.stopped === 0) && !state.wrote && expandSucceeded === 0)
+      return ended(state, "research_not_started");
+  }
+  if (!state.wrote && researchSucceeded === 0 && expandSucceeded === 0) return ended(state, "no_progress");
+  return startNext(state);
+}
+
 // core/map-chat-render.ts
 var MAX_INLINE_DEPTH = 4;
 var MAX_QUOTE_DEPTH = 3;
@@ -36279,6 +36584,15 @@ var MapChatPanel = class {
     __publicField(this, "width", MAP_CHAT_WIDTH_DEFAULT);
     __publicField(this, "busy", false);
     __publicField(this, "chainWaitingState", null);
+    /** What the continuation still has to do, as the waiting row says it. */
+    __publicField(this, "chainWaitingLeft", "");
+    /** When the wait began (the seconds count from there), the timer that rewrites them, and the two texts that change. */
+    __publicField(this, "chainWaitingSince", 0);
+    __publicField(this, "chainWaitingTimer", null);
+    __publicField(this, "chainWaitingEls", null);
+    /** The round and the limit of the continuation in flight (1 and the default for an ordinary message). */
+    __publicField(this, "chainRound", 1);
+    __publicField(this, "chainMax", MAP_CHAT_CHAIN_MAX_ROUNDS);
     /** A confirmed plan is being applied: the window shows it is working and can stop it. */
     __publicField(this, "applying", false);
     __publicField(this, "composing", false);
@@ -36638,7 +36952,7 @@ var MapChatPanel = class {
     this.renderChips();
   }
   /** A turn starts: the user's text, an empty answer, and the busy state (the view starts in "preparing"). */
-  begin(userText, origin, keepDraft = false, stage = "waiting", auto = false) {
+  begin(userText, origin, keepDraft = false, stage = "waiting", auto = false, autoInfo) {
     const retired = this.messages.flatMap(
       (message) => message.choices && !message.choices.picked ? [message.choices] : []
     );
@@ -36648,8 +36962,12 @@ var MapChatPanel = class {
       text: userText,
       lines: [],
       ...origin ? { origin } : {},
-      ...auto ? { auto: true } : {}
+      ...auto ? { auto: true, ...autoInfo ? { autoInfo } : {} } : {}
     };
+    if (!auto) {
+      this.chainRound = 1;
+      this.chainMax = MAP_CHAT_CHAIN_MAX_ROUNDS;
+    }
     const modelLabel = this.replyModelLabel();
     const assistant = {
       role: "assistant",
@@ -36672,23 +36990,169 @@ var MapChatPanel = class {
   }
   /**
    * An automatic round of a continuation begins: the same turn as {@link begin} (preparing, busy, an answer to fill), but its
-   * question is not the user's. The question row is not shown and its text is the label history and notes use. The round number,
-   * limit and what is left are for the presentation of P4; nothing new is shown yet.
+   * question is not the user's. Its row is a separator ("Automatic continuation · round 2 of 8", what is left, and, after research
+   * that partly failed, what the round is built on); its text is the label history and notes use. The reader hears the round
+   * once, with the stage that opens it.
    */
-  beginAutoRound(_round, _maxRounds, _remaining, origin) {
-    return this.begin(t("ui.map_chat_role_auto"), origin, true, "preparing", true);
+  beginAutoRound(round3, maxRounds, remaining, origin, partial) {
+    this.chainRound = round3;
+    this.chainMax = maxRounds;
+    const handle = this.begin(t("ui.map_chat_role_auto"), origin, true, "preparing", true, {
+      round: round3,
+      maxRounds,
+      remaining,
+      ...partial ? { partial } : {}
+    });
+    if (this.built && this.stage)
+      this.liveEl.setText(`${t("ui.map_chat_auto_round_0_1", round3, maxRounds)}. ${this.stageLabel(this.stage.kind)}`);
+    return handle;
   }
-  /** The chain waits for the research and expands it started (null: it does not). Stored for P4; shows nothing yet. */
-  setChainWaiting(state) {
+  /**
+   * The chain waits for the research and expands it started (null: it does not). The row under the last reply says how far they are
+   * and what is left; the field takes a message (sending takes over) and Stop ends the wait and the work. The reader hears the wait
+   * once when it begins; the seconds are never read.
+   */
+  setChainWaiting(state, remaining = "") {
+    const was = this.chainWaitingState !== null;
     this.chainWaitingState = state ? { ...state, kinds: [...state.kinds] } : null;
+    this.chainWaitingLeft = state ? remaining : "";
+    if (state && !was) {
+      this.chainWaitingSince = this.clockNow();
+      this.startWaitTimer();
+    } else if (!state) this.stopWaitTimer();
+    this.renderLog();
+    this.paintWait();
+    this.renderBusy();
+    if (state && !was) this.announce(t("ui.map_chat_chain_wait_live_0", this.waitWord(state)));
   }
   /** What the chain waits for now, or null. */
   get chainWaiting() {
     return this.chainWaitingState;
   }
-  /** The chain ended for a reason other than being done: P4 tells the user why and what was left. Nothing is shown yet. */
-  endChain(_reason, _remaining, _details) {
+  waitWord(state) {
+    const research = state.kinds.includes("research");
+    const expand = state.kinds.includes("expand");
+    return t(
+      research && expand ? "ui.map_chat_chain_kind_both" : expand ? "ui.map_chat_chain_kind_expand" : "ui.map_chat_chain_kind_research"
+    );
+  }
+  startWaitTimer() {
+    var _a2, _b2, _c;
+    if (!this.built || this.chainWaitingTimer) return;
+    const win = (_c = (_b2 = this.logEl.win) != null ? _b2 : (_a2 = this.logEl.ownerDocument) == null ? void 0 : _a2.defaultView) != null ? _c : typeof window !== "undefined" ? window : void 0;
+    if (typeof (win == null ? void 0 : win.setInterval) !== "function") return;
+    const id = win.setInterval(() => this.paintWait(), 1e3);
+    this.chainWaitingTimer = { cancel: () => {
+      var _a3;
+      return (_a3 = win.clearInterval) == null ? void 0 : _a3.call(win, id);
+    } };
+  }
+  stopWaitTimer() {
+    var _a2;
+    (_a2 = this.chainWaitingTimer) == null ? void 0 : _a2.cancel();
+    this.chainWaitingTimer = null;
+    this.chainWaitingEls = null;
+  }
+  /** Rewrites the two texts of the waiting row that is on screen (never the row). */
+  paintWait() {
+    const els = this.chainWaitingEls;
+    const state = this.chainWaitingState;
+    if (!els || !state) return;
+    els.label.setText(t("ui.map_chat_chain_wait_label_0_1_2", this.waitWord(state), state.settled, state.total));
+    const seconds = Math.max(0, Math.round((this.clockNow() - this.chainWaitingSince) / 1e3));
+    els.elapsed.setText(
+      t("ui.map_chat_stage_elapsed_0", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`)
+    );
+  }
+  /**
+   * The continuation ended for a reason other than a quiet "done" after one round: a sentence under the last reply says why and,
+   * where it applies, what was left. "Done" is told only for a chain of two rounds or more. A map change says nothing (the
+   * conversation goes with it).
+   */
+  endChain(reason, remaining, details) {
+    const was = this.chainWaitingState !== null;
     this.chainWaitingState = null;
+    this.chainWaitingLeft = "";
+    this.stopWaitTimer();
+    const last = this.messages.at(-1);
+    if (reason === "map_changed" || !last || last.role !== "assistant") {
+      if (was) {
+        this.renderLog();
+        this.renderBusy();
+      }
+      return;
+    }
+    const text12 = this.chainEndText(reason, remaining, details, last);
+    last.chainNote = { reason, text: text12 };
+    this.renderLog();
+    this.renderBusy();
+    this.announce(text12);
+    if (reason !== "stopped" && reason !== "user_took_over" && reason !== "plan_cancelled") this.markUnread();
+  }
+  /** Sentences joined: a space between Latin sentences, none after a Chinese full stop. */
+  joinSentences(...parts) {
+    return parts.filter(Boolean).reduce(
+      (out, part) => !out ? part : /[\u3000-\u303f\uff00-\uffef\u4e00-\u9fff]$/.test(out) ? out + part : `${out} ${part}`,
+      ""
+    );
+  }
+  chainEndText(reason, remaining, details, last) {
+    const bare = (value) => clip2(value, 200).replace(/[\s.。!！?？…]+$/u, "");
+    const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare(remaining)) : "";
+    const why = (details != null ? details : []).length ? t(
+      "ui.map_chat_chain_reason_0",
+      bare(
+        (details != null ? details : []).slice(0, 3).map((item) => clip2(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
+      )
+    ) : "";
+    const say = (key2, ...values) => t(key2, ...values);
+    switch (reason) {
+      case "done":
+        return say("ui.map_chat_chain_end_done_0", this.chainRound);
+      case "no_progress":
+        return this.joinSentences(say("ui.map_chat_chain_end_no_progress"), left);
+      case "max_rounds":
+        return this.joinSentences(
+          say("ui.map_chat_chain_end_max_rounds_0", this.chainMax),
+          left,
+          say("ui.map_chat_chain_end_max_rounds_more")
+        );
+      case "research_failed":
+        return this.joinSentences(say("ui.map_chat_chain_end_research_failed"), why);
+      case "stopped":
+        return say("ui.map_chat_chain_end_stopped");
+      case "user_took_over":
+        return say("ui.map_chat_chain_end_user_took_over");
+      case "research_stopped":
+        return this.joinSentences(say("ui.map_chat_chain_end_research_stopped"), left);
+      case "research_not_started":
+        return this.joinSentences(say("ui.map_chat_chain_end_research_not_started"), why);
+      case "wait_timeout":
+        return say("ui.map_chat_chain_end_wait_timeout_0", Math.round(MAP_CHAT_CHAIN_WAIT_MS / 6e4));
+      case "other_background_work":
+        return this.joinSentences(say("ui.map_chat_chain_end_other_background"), left);
+      case "not_ready":
+        return this.joinSentences(say("ui.map_chat_chain_end_not_ready"), left);
+      case "plan_cancelled":
+        return this.joinSentences(say("ui.map_chat_chain_end_plan_cancelled"), left);
+      case "failed":
+        return this.joinSentences(
+          say("ui.map_chat_chain_end_failed_0", this.chainRound),
+          this.canRetry(last, this.messages[this.messages.indexOf(last) - 1]) ? say("ui.map_chat_chain_end_failed_retry") : ""
+        );
+      case "map_changed":
+        return "";
+    }
+  }
+  /**
+   * Research notes of this conversation the round did not read (they did not fit, or are too long to ever be read): one line each
+   * under the results. Only the newest reply carries them; they are not saved.
+   */
+  setUnreadNotes(turn, items) {
+    if (!this.hasTurn(turn)) return;
+    if (items.length) turn.assistant.unread = items.map((item) => ({ title: item.title, oversize: item.oversize }));
+    else delete turn.assistant.unread;
+    this.renderLog();
   }
   /** Follow-ups of the latest question wait for the turn to end (a continuation hands over to them). */
   hasQueuedSteers() {
@@ -37148,6 +37612,10 @@ ${typed}` : draft;
     this.busy = false;
     this.applying = false;
     this.chainWaitingState = null;
+    this.chainWaitingLeft = "";
+    this.stopWaitTimer();
+    this.chainRound = 1;
+    this.chainMax = MAP_CHAT_CHAIN_MAX_ROUNDS;
     this.clearStage();
     this.unread = false;
     if (this.built) this.liveEl.setText("");
@@ -37176,13 +37644,22 @@ ${typed}` : draft;
     this.restoredText = "";
     this.spokenLater = [];
     this.unread = false;
+    this.chainWaitingState = null;
+    this.stopWaitTimer();
     this.conversationId = conversation.id;
     for (const turn of conversation.turns) {
       const question = {
         role: "user",
         text: turn.auto ? t("ui.map_chat_role_auto") : turn.message,
         lines: [],
-        ...turn.auto ? { auto: true } : {}
+        // The round is known when the record has it; what was left of that round is not kept, so the separator names the round only.
+        ...turn.auto ? {
+          auto: true,
+          autoInfo: {
+            ...Number.isInteger(turn.round) && turn.round >= 2 ? { round: turn.round } : {},
+            maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS
+          }
+        } : {}
       };
       if ((_a2 = turn.steers) == null ? void 0 : _a2.length) question.steers = turn.steers.map((text12) => ({ text: text12, state: "live" }));
       this.messages.push(question);
@@ -37927,16 +38404,17 @@ ${shown}` : t("ui.map_chat_model_label"));
   }
   /** Everything a message row shows; the row is rebuilt only when this changes. */
   rowKey(message) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
-      message.auto ? "auto" : "",
+      message.auto ? `auto:${(_b2 = (_a2 = message.autoInfo) == null ? void 0 : _a2.round) != null ? _b2 : ""}:${(_d = (_c = message.autoInfo) == null ? void 0 : _c.maxRounds) != null ? _d : ""}:${(_f = (_e = message.autoInfo) == null ? void 0 : _e.remaining) != null ? _f : ""}:${((_g = message.autoInfo) == null ? void 0 : _g.partial) ? `${message.autoInfo.partial.failed}/${message.autoInfo.partial.succeeded}` : ""}` : "",
+      message.auto ? t("ui.map_chat_auto_round_0_1", "", "") + t("ui.map_chat_role_auto") + t("ui.map_chat_chain_left_0", "") + t("ui.map_chat_chain_partial_0_1", "", "") : "",
       message.stale ? "x" : "",
       t("ui.map_chat_record_stale"),
       t("ui.map_chat_record_stale_short"),
       message.error ? "e" : "",
-      (_a2 = message.technical) != null ? _a2 : "",
+      (_h = message.technical) != null ? _h : "",
       t("ui.technical_details"),
       t("ui.copy_technical_details"),
       message.streaming ? "s" : "",
@@ -37946,9 +38424,18 @@ ${shown}` : t("ui.map_chat_model_label"));
       message.linesOpen ? "o" : "",
       message.seenImage ? `seen:${message.seenImage.note}` : "",
       message.replyUndo ? "undo" : "",
+      this.chainWaitingState && this.messages.at(-1) === message ? `wait:${this.chainWaitingState.kinds.join(",")}:${this.chainWaitingLeft}:${this.waitWord(this.chainWaitingState)}` : "",
+      message.chainNote ? `chain:${message.chainNote.reason}:${message.chainNote.text}` : "",
+      ((_i = message.unread) != null ? _i : []).map((item) => `${item.oversize ? "o" : "d"}:${item.title}`).join("\n"),
+      JSON.stringify(message.lines.map((line) => {
+        var _a3;
+        return (_a3 = line.basis) != null ? _a3 : null;
+      })),
+      t("ui.map_chat_basis_title_only"),
+      t("ui.map_chat_chain_wait_tail"),
       t("ui.map_chat_seen_image_0", ""),
       t("ui.map_chat_undo_reply"),
-      ((_b2 = message.steers) != null ? _b2 : []).map((steer) => `${steer.state}:${steer.text}`).join("\n"),
+      ((_j = message.steers) != null ? _j : []).map((steer) => `${steer.state}:${steer.text}`).join("\n"),
       t("ui.map_chat_steer_tag_live"),
       t("ui.map_chat_steer_tag_queued"),
       t("ui.map_chat_retry"),
@@ -37958,14 +38445,14 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_plan_title_applied"),
       t("ui.map_chat_plan_title_cancelled"),
       t("ui.map_chat_role_you"),
-      message.role === "assistant" ? (_c = message.modelLabel) != null ? _c : "" : "",
+      message.role === "assistant" ? (_k = message.modelLabel) != null ? _k : "" : "",
       t("ui.map_chat_role_ai"),
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_e = (_d = message.plan.groups) == null ? void 0 : _d.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _e : ""}` : "",
+      message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_m = (_l = message.plan.groups) == null ? void 0 : _l.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _m : ""}` : "",
       message.choices ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
-      ((_f = message.images) != null ? _f : []).map(
+      ((_n = message.images) != null ? _n : []).map(
         (block) => {
           var _a3, _b3;
           return `images:${block.stale ? "stale:" : ""}${block.state}:${(_a3 = block.reason) != null ? _a3 : ""}:${(_b3 = block.notice) != null ? _b3 : ""}:${block.items.map((item) => {
@@ -38010,13 +38497,24 @@ ${shown}` : t("ui.map_chat_model_label"));
     if (stick) this.scrollToEnd();
   }
   buildRow(message) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const row = this.logEl.createDiv({
       cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}${message.auto ? " is-auto" : ""}`
     });
     if (message.auto) {
-      row.hidden = true;
-      return { row, body: row.createDiv(), more: null };
+      const info = message.autoInfo;
+      const body2 = row.createDiv({ cls: "vam-map-chat-auto-title" });
+      body2.setText(
+        (info == null ? void 0 : info.round) ? t("ui.map_chat_auto_round_0_1", info.round, info.maxRounds) : t("ui.map_chat_role_auto")
+      );
+      if (info == null ? void 0 : info.partial)
+        row.createDiv({
+          cls: "vam-map-chat-auto-note",
+          text: t("ui.map_chat_chain_partial_0_1", info.partial.failed, info.partial.succeeded)
+        });
+      if ((_a2 = info == null ? void 0 : info.remaining) == null ? void 0 : _a2.trim())
+        row.createDiv({ cls: "vam-map-chat-auto-left", text: t("ui.map_chat_chain_left_0", info.remaining) });
+      return { row, body: body2, more: null };
     }
     row.createSpan({
       cls: "vam-map-chat-role",
@@ -38026,13 +38524,15 @@ ${shown}` : t("ui.map_chat_model_label"));
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
-    for (const steer of (_a2 = message.steers) != null ? _a2 : []) this.buildSteer(row, steer);
+    for (const steer of (_b2 = message.steers) != null ? _b2 : []) this.buildSteer(row, steer);
     if (message.error && message.technical) this.buildTechnical(row, message.technical);
     if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
-    for (const block of (_b2 = message.images) != null ? _b2 : []) this.buildImages(row, block);
+    this.buildBasis(row, message);
+    for (const block of (_c = message.images) != null ? _c : []) this.buildImages(row, block);
+    if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
     if (message.seenImage) {
       const line = row.createDiv("vam-map-chat-seen-row");
       const eye = line.createSpan("vam-map-chat-seen-icon");
@@ -38043,6 +38543,8 @@ ${shown}` : t("ui.map_chat_model_label"));
         text: t("ui.map_chat_seen_image_0", clip2(message.seenImage.note, 80))
       });
     }
+    if (message.chainNote)
+      row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
     if (message.replyUndo) this.buildReplyUndo(row, message.replyUndo.token);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
@@ -38064,6 +38566,71 @@ ${shown}` : t("ui.map_chat_model_label"));
         });
     }
     return { row, body, more };
+  }
+  /**
+   * What the results were built from, gathered under them (so a folded list still shows it) and then the research notes the round
+   * left unread. Plain text only (titles are untrusted); "read", never "checked". The program decides it, not the model.
+   */
+  buildBasis(row, message) {
+    var _a2;
+    const entries = summarizeBasis(message.lines.flatMap((line) => line.basis ? [line.basis] : []));
+    const unread = (_a2 = message.unread) != null ? _a2 : [];
+    if (!entries.length && !unread.length) return;
+    const box = row.createDiv({ cls: "vam-map-chat-basis" });
+    for (const entry of entries) this.buildBasisEntry(box.createDiv("vam-map-chat-basis-line"), entry);
+    for (const item of unread)
+      box.createDiv({
+        cls: "vam-map-chat-basis-line is-unread",
+        text: t(
+          item.oversize ? "ui.map_chat_research_oversize_0" : "ui.map_chat_research_deferred_0",
+          clip2(item.title, 60)
+        )
+      });
+  }
+  buildBasisEntry(line, entry) {
+    const quoted = (titles) => titles.map((title) => t("ui.map_chat_basis_quote_0", title)).join(t("ui.map_chat_basis_title_separator"));
+    if (entry.kind === "outline_only") {
+      if (entry.type === "cards") {
+        line.createEl("strong", { text: t("ui.map_chat_basis_title_only_0", entry.count) });
+        line.createSpan({ text: t("ui.map_chat_basis_title_only_hint") });
+      } else {
+        line.createEl("strong", { text: t("ui.map_chat_basis_title_only") });
+        if (entry.existingChildren > 0)
+          line.createSpan({ text: t("ui.map_chat_basis_children_0", entry.existingChildren) });
+      }
+      return;
+    }
+    if (entry.type === "cards")
+      line.setText(
+        t(
+          entry.kind === "research" ? "ui.map_chat_basis_research_0_1" : "ui.map_chat_basis_note_0_1",
+          quoted(entry.titles),
+          entry.count
+        )
+      );
+    else
+      line.setText(
+        entry.existingChildren > 0 ? t("ui.map_chat_basis_expand_0_1", quoted(entry.titles), entry.existingChildren) : t("ui.map_chat_basis_expand_0", quoted(entry.titles))
+      );
+  }
+  /** The waiting row of a continuation: how far the research and expansions are, the time (hidden from readers), and what is left. */
+  buildChainWait(row) {
+    const box = row.createDiv({ cls: "vam-map-chat-chain-wait", attr: { role: "status" } });
+    const line = box.createDiv("vam-map-chat-chain-wait-line");
+    const label = line.createSpan({ cls: "vam-map-chat-chain-wait-label" });
+    const elapsed = line.createSpan({ cls: "vam-map-chat-chain-wait-elapsed" });
+    elapsed.setAttr("aria-hidden", "true");
+    line.createSpan({
+      cls: "vam-map-chat-chain-wait-tail",
+      text: t("ui.map_chat_stage_elapsed_0", t("ui.map_chat_chain_wait_tail"))
+    });
+    if (this.chainWaitingLeft.trim())
+      box.createDiv({
+        cls: "vam-map-chat-chain-wait-left",
+        text: t("ui.map_chat_chain_left_0", this.chainWaitingLeft)
+      });
+    this.chainWaitingEls = { label, elapsed };
+    this.paintWait();
   }
   /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
   buildReplyUndo(row, token) {
@@ -38420,15 +38987,16 @@ ${shown}` : t("ui.map_chat_model_label"));
   /** The field's hint: a follow-up while a turn works, the opening screen's ask, or the ordinary one. */
   renderPlaceholder() {
     if (!this.built) return;
-    const key2 = this.working ? "ui.map_chat_steer_placeholder" : this.hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder";
+    const key2 = this.working ? "ui.map_chat_steer_placeholder" : this.chainWaitingState ? "ui.map_chat_chain_wait_placeholder" : this.hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder";
     this.inputEl.setAttr("placeholder", t(key2));
   }
   /** "Enter 補充" beside the stop key while a turn works and the field has text. */
   renderSteerHint() {
     var _a2, _b2, _c, _d;
     if (!this.built) return;
-    const show = this.working && this.inputEl.value.trim().length > 0;
-    this.steerHintEl.setText(show ? t("ui.map_chat_steer_hint") : "");
+    const taking = !this.working && this.chainWaitingState !== null;
+    const show = (this.working || taking) && this.inputEl.value.trim().length > 0;
+    this.steerHintEl.setText(show ? t(taking ? "ui.map_chat_chain_wait_hint" : "ui.map_chat_steer_hint") : "");
     this.steerHintEl.hidden = !show;
     this.steerHintEl.toggleClass("is-hidden", !show);
     if (this.working) this.inputEl.setAttr("aria-keyshortcuts", "Enter");
@@ -38446,7 +39014,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.refreshNewButton();
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
-    const stoppable = this.working && !this.awaitingConsent;
+    const stoppable = this.working && !this.awaitingConsent || this.chainWaitingState !== null;
+    this.el.toggleClass("is-chain-waiting", this.chainWaitingState !== null);
     const stopHadFocus = !stoppable && !this.stopEl.hidden && this.host.activeElement() === this.stopEl;
     this.stopEl.hidden = !stoppable;
     this.stopEl.toggleClass("is-hidden", !stoppable);
@@ -38511,151 +39080,6 @@ async function loadableImages(candidates, signal) {
     )
   );
   return candidates.filter((_, index) => loads[index]);
-}
-
-// core/map-chat-chain.ts
-var MAP_CHAT_CHAIN_MAX_ROUNDS = 8;
-var MAP_CHAT_CHAIN_WAIT_MS = 30 * 60 * 1e3;
-var chainEndNeedsNotice = (reason) => reason !== "done";
-var NOT_A_WRITE = /* @__PURE__ */ new Set([
-  "focus_topic",
-  "select_topics",
-  "collapse_topic",
-  "expand_topic",
-  "auto_layout",
-  "ask_topic_kind",
-  "run_map_action"
-]);
-var wroteSomething = (actions) => actions.some((action) => action.done && !NOT_A_WRITE.has(action.kind));
-var startChain = (maxRounds = MAP_CHAT_CHAIN_MAX_ROUNDS) => ({
-  phase: "round",
-  round: 1,
-  maxRounds,
-  remaining: "",
-  researchTargets: 0,
-  wrote: false
-});
-var planChainOf = (state) => ({
-  round: state.round,
-  researchSoFar: state.researchTargets
-});
-var ignored = (state) => ({ state, decision: { kind: "ignored" } });
-var ended = (state, reason, remaining = state.remaining) => ({
-  state: { ...state, phase: "ended", remaining, ended: { reason, remaining } },
-  decision: { kind: "end", reason, remaining }
-});
-var pauseForPlan = (state) => state.phase === "round" ? { ...state, phase: "plan" } : state;
-function interrupt(state, reason) {
-  if (state.phase === "ended") return ignored(state);
-  return ended(state, reason);
-}
-function finishRound(state, end) {
-  if (state.phase !== "round" && state.phase !== "plan") return ignored(state);
-  const remaining = typeof end.remaining === "string" ? end.remaining.trim() : "";
-  const next = {
-    ...state,
-    remaining,
-    researchTargets: state.researchTargets + Math.max(0, end.started.research),
-    wrote: wroteSomething(end.actions)
-  };
-  if (!remaining && end.researchDeferred <= 0) return ended(next, "done");
-  if (end.started.otherBackground) return ended(next, "other_background_work");
-  if (state.round >= state.maxRounds) return ended(next, "max_rounds");
-  const waitFor = [];
-  if (end.started.research > 0) waitFor.push("research");
-  if (end.started.expand > 0) waitFor.push("expand");
-  if (waitFor.length) return { state: { ...next, phase: "waiting" }, decision: { kind: "wait", waitFor } };
-  if (!next.wrote) return ended(next, "no_progress");
-  return startNext(next);
-}
-var startNext = (state) => ({
-  state: { ...state, phase: "round", round: state.round + 1, wrote: false },
-  decision: { kind: "next", round: state.round + 1, remaining: state.remaining }
-});
-function finishWait(state, end) {
-  var _a2, _b2;
-  if (state.phase !== "waiting") return ignored(state);
-  if (end.timedOut) return ended(state, "wait_timeout");
-  const research = end.research;
-  const researchSucceeded = (research == null ? void 0 : research.kind) === "settled" ? research.succeeded : 0;
-  const expandSucceeded = (_b2 = (_a2 = end.expand) == null ? void 0 : _a2.succeeded) != null ? _b2 : 0;
-  if (research) {
-    if (research.kind === "settled" && researchSucceeded === 0) {
-      if (research.stopped > 0) return ended(state, "research_stopped");
-      if (research.failed > 0) return ended(state, "research_failed");
-    }
-    if ((research.kind === "not_started" || researchSucceeded + research.failed + research.stopped === 0) && !state.wrote && expandSucceeded === 0)
-      return ended(state, "research_not_started");
-  }
-  if (!state.wrote && researchSucceeded === 0 && expandSucceeded === 0) return ended(state, "no_progress");
-  return startNext(state);
-}
-
-// core/map-chat-basis.ts
-function ancestors(parentId, parents, created) {
-  const chain = [];
-  const seen = /* @__PURE__ */ new Set();
-  let id = parentId;
-  while (id && !seen.has(id)) {
-    seen.add(id);
-    chain.push(id);
-    id = id.startsWith("new:") ? created[id] : parents[id];
-  }
-  return chain;
-}
-function chatBasisFor(index, parentId, parents, created = {}, existingChildren) {
-  const chain = ancestors(parentId, parents, created).filter(
-    (id) => Object.prototype.hasOwnProperty.call(index.cards, id)
-  );
-  const source = (id) => ({ id, title: index.cards[id].title });
-  const research = chain.filter((id) => index.cards[id].research);
-  const extra = existingChildren === void 0 ? {} : { existingChildren };
-  if (research.length) return { kind: "research", sources: research.map(source), ...extra };
-  if (chain.length) return { kind: "note", sources: chain.map(source), ...extra };
-  return { kind: "outline_only", alsoRead: index.read.map(({ path, title }) => ({ path, title })), ...extra };
-}
-function createdParentsOf(actions) {
-  const created = {};
-  for (const action of actions)
-    if (action.kind === "add_child" && action.ref) created[`new:${action.ref}`] = action.parentId || null;
-  return created;
-}
-function expandBasis(card) {
-  return card.hasNote ? { kind: "note", sources: [{ id: card.id, title: card.title }], existingChildren: card.existingChildren } : { kind: "outline_only", alsoRead: [], existingChildren: card.existingChildren };
-}
-var BASIS_TEXT_LIMIT = 200;
-var BASIS_LIST_LIMIT = 50;
-var text7 = (value) => typeof value === "string" ? [...value].slice(0, BASIS_TEXT_LIMIT).join("") : null;
-var count = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? { existingChildren: value } : {};
-function parseChatBasis(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
-  const raw = value;
-  if (raw.kind === "research" || raw.kind === "note") {
-    if (!Array.isArray(raw.sources)) return void 0;
-    const sources = raw.sources.slice(0, BASIS_LIST_LIMIT).flatMap((item) => {
-      const entry = item != null ? item : {};
-      const id = text7(entry.id);
-      const title = text7(entry.title);
-      return id !== null && title !== null ? [{ id, title }] : [];
-    });
-    return { kind: raw.kind, sources, ...count(raw.existingChildren) };
-  }
-  if (raw.kind === "outline_only") {
-    const alsoRead = (Array.isArray(raw.alsoRead) ? raw.alsoRead : []).slice(0, BASIS_LIST_LIMIT).flatMap((item) => {
-      const entry = item != null ? item : {};
-      const path = text7(entry.path);
-      const title = text7(entry.title);
-      return path !== null && title !== null ? [{ path, title }] : [];
-    });
-    return { kind: "outline_only", alsoRead, ...count(raw.existingChildren) };
-  }
-  return void 0;
-}
-function basisSummary(basis, labels, titleLimit = 5) {
-  if (basis.kind === "outline_only") return labels.outline;
-  const titles = basis.sources.map((source) => source.title.replace(/\s+/g, " ").trim()).filter(Boolean);
-  const shown = titles.slice(0, titleLimit).join(", ") + (titles.length > titleLimit ? ", \u2026" : "");
-  return (basis.kind === "research" ? labels.research : labels.note).replace(/\{0\}/g, () => shown);
 }
 
 // core/ai-task-service.ts
@@ -42788,7 +43212,8 @@ function restoreConversation(id, lines) {
       images: images.get(number),
       undone: undone.get(number) === true,
       backfilled: start.backfilled === true,
-      auto: start.auto === true
+      auto: start.auto === true,
+      ...start.auto === true && typeof start.round === "number" && Number.isInteger(start.round) && start.round >= 2 ? { round: start.round } : {}
     });
   }
   return { id, mapPath, mapId, turns, restoredAt: turns.length ? turns[turns.length - 1].at : null };
@@ -73700,6 +74125,7 @@ ${note.detail.trim()}` : "",
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
   async sendMapChat(again, restore) {
+    var _a2;
     const chat = this.chat;
     if (chat && !again && this.chatApplying && !chat.isBusy && !this.closed && chat.draft.trim()) {
       this.steerMapChat();
@@ -73720,7 +74146,7 @@ ${note.detail.trim()}` : "",
     const anchor = { path: this.path, id: this.map.id };
     const run = this.chainForRound(autoOrigin, anchor, message);
     const draft = chat.draft;
-    const turn = autoOrigin ? chat.beginAutoRound(run.state.round, run.state.maxRounds, run.state.remaining, origin) : chat.begin(message, origin, Boolean(again), "preparing");
+    const turn = autoOrigin ? chat.beginAutoRound(run.state.round, run.state.maxRounds, run.state.remaining, origin, (_a2 = run.partial) != null ? _a2 : void 0) : chat.begin(message, origin, Boolean(again), "preparing");
     run.turn = turn;
     let sent = false;
     const abandon = (reason, ends = "map_changed") => {
@@ -73764,8 +74190,8 @@ ${note.detail.trim()}` : "",
       went = await this.plugin.confirmAiUsage(
         request.model,
         async () => {
-          var _a2, _b2, _c, _d, _e;
-          if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
+          var _a3, _b2, _c, _d, _e;
+          if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a3 = this.map) == null ? void 0 : _a3.id) !== anchor.id) {
             abandon();
             return;
           }
@@ -73777,12 +74203,12 @@ ${note.detail.trim()}` : "",
           if (record)
             record.steerTexts = () => steerState.entries.filter((e) => e.status === "delivered").map((e) => e.text);
           const openAttempt = () => {
-            var _a3;
+            var _a4;
             const controller = new AbortController();
             const key2 = `map-chat-view:${++mapChatTaskSequence}`;
             this.chatController = controller;
             this.chatTaskKey = key2;
-            (_a3 = this.plugin.activeTasks) == null ? void 0 : _a3.set(key2, controller);
+            (_a4 = this.plugin.activeTasks) == null ? void 0 : _a4.set(key2, controller);
             return {
               controller,
               alive: () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path
@@ -73877,6 +74303,7 @@ ${note.detail.trim()}` : "",
               if (plan) {
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
+                  this.showUnreadResearch(chat, turn, request.context);
                   this.markChatTurn(origin, request);
                   run.state = pauseForPlan(run.state);
                   this.offerChatPlan(
@@ -73907,6 +74334,7 @@ ${note.detail.trim()}` : "",
               if (alive() && chat.isBusy) {
                 const entry = this.chatReplyEntry();
                 chat.finish(result.reply, lines);
+                this.showUnreadResearch(chat, turn, request.context);
                 this.markChatTurn(origin, request, entry);
                 if (record == null ? void 0 : record.end("done", { reply: result.reply, lines, rejected: result.rejected }))
                   this.chatRecordLogged.add(turn.assistant);
@@ -73947,6 +74375,16 @@ ${note.detail.trim()}` : "",
       return;
     }
     if (!went && !sent) abandon(this.closed ? void 0 : notSent(), "not_ready");
+  }
+  /** Research notes of the conversation that this round did not read (no room, or too long) are told under its results. */
+  showUnreadResearch(chat, turn, context) {
+    var _a2, _b2;
+    const deferred = (_b2 = (_a2 = context.research) == null ? void 0 : _a2.deferred) != null ? _b2 : [];
+    if (deferred.length)
+      chat.setUnreadNotes(
+        turn,
+        deferred.map((note) => ({ title: note.title, oversize: note.oversize === true }))
+      );
   }
   /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
   steerMapChat() {
@@ -74094,6 +74532,7 @@ ${note.detail.trim()}` : "",
       lastResults: (_b2 = origin == null ? void 0 : origin.continuation.lastResults) != null ? _b2 : [],
       waited: (_c = origin == null ? void 0 : origin.continuation.research) != null ? _c : [],
       details: [],
+      partial: null,
       work: null,
       timer: null,
       waitShown: false
@@ -74126,7 +74565,7 @@ ${note.detail.trim()}` : "",
     run.waitShown = false;
     if (!this.chainShows(run)) return;
     (_a2 = this.chatLastRecord) == null ? void 0 : _a2.event("chain_end", { reason, round: run.state.round, remaining });
-    if (chat && chainEndNeedsNotice(reason))
+    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run.state.round >= 2))
       chat.endChain(reason, remaining, run.details.length ? run.details : void 0);
   }
   /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
@@ -74145,6 +74584,7 @@ ${note.detail.trim()}` : "",
   }
   advanceChain(run, round3) {
     if (this.chatChain !== run || run.state.phase === "ended") return;
+    run.partial = null;
     run.lastResults = round3.lines.map((line) => ({ text: line.text, status: line.status }));
     run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
     const step = finishRound(run.state, {
@@ -74177,13 +74617,13 @@ ${note.detail.trim()}` : "",
     const research = waitFor.includes("research") ? work.research : [];
     const expand = waitFor.includes("expand") ? work.expand : [];
     const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand.length, settled: 0 };
-    chat == null ? void 0 : chat.setChainWaiting(waiting);
+    chat == null ? void 0 : chat.setChainWaiting(waiting, run.state.remaining);
     run.waitShown = true;
     const progress = (by) => {
       var _a2;
       if (this.chatChain !== run || run.state.phase !== "waiting") return;
       waiting.settled = Math.min(waiting.total, waiting.settled + by);
-      (_a2 = this.chat) == null ? void 0 : _a2.setChainWaiting(waiting);
+      (_a2 = this.chat) == null ? void 0 : _a2.setChainWaiting(waiting, run.state.remaining);
     };
     run.timer = window.setTimeout(() => {
       run.timer = null;
@@ -74236,7 +74676,7 @@ ${note.detail.trim()}` : "",
   }
   /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
   settleChainWait(run, end, waited) {
-    var _a2;
+    var _a2, _b2;
     if (this.chatChain !== run || run.state.phase !== "waiting") return;
     if (run.timer !== null) window.clearTimeout(run.timer);
     run.timer = null;
@@ -74256,6 +74696,7 @@ ${note.detail.trim()}` : "",
     run.details = waited.filter((item) => item.status !== "succeeded").map(chainWorkDetail);
     const step = finishWait(run.state, end);
     run.state = step.state;
+    run.partial = step.decision.kind === "next" && ((_b2 = end.research) == null ? void 0 : _b2.kind) === "settled" && end.research.failed > 0 && end.research.succeeded > 0 ? { failed: end.research.failed, succeeded: end.research.succeeded } : null;
     this.followChainDecision(run, step.decision, null);
   }
   /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
@@ -74300,12 +74741,15 @@ ${note.detail.trim()}` : "",
       (_d = this.chatPlanRecords.get(pending2)) == null ? void 0 : _d.plan("cancelled");
     }
   }
-  planReasonText(reason, result, selectedCount) {
+  planReasonText(reason, result, selectedCount, researchSoFar = 0) {
     switch (reason) {
       case "many_actions":
         return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
       case "many_research":
-        return t("ui.map_chat_plan_reason_many_research_0", researchTargetsOf(result.actions, selectedCount));
+        return t(
+          "ui.map_chat_plan_reason_many_research_0",
+          researchTargetsOf(result.actions, selectedCount) + researchSoFar
+        );
       case "new_map":
         return t("ui.map_chat_plan_reason_new_map");
       case "image_preview":
@@ -74313,7 +74757,7 @@ ${note.detail.trim()}` : "",
       case "image_other_actions":
         return t("ui.map_chat_plan_reason_image_other_actions");
       case "auto_round_other_actions":
-        return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
+        return t("ui.map_chat_plan_reason_auto_round_other_actions");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
@@ -74343,7 +74787,12 @@ ${note.detail.trim()}` : "",
     const card = {
       // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
       ...plan.reasons.some((reason) => reason === "image_preview" || reason === "image_other_actions") ? { openGroups: true } : {},
-      reasons: plan.reasons.map((reason) => this.planReasonText(reason, result, baseline.selectedCount)),
+      reasons: plan.reasons.map(
+        (reason) => {
+          var _a2;
+          return this.planReasonText(reason, result, baseline.selectedCount, (_a2 = run == null ? void 0 : run.state.researchTargets) != null ? _a2 : 0);
+        }
+      ),
       items,
       groups,
       estimate: plan.estimatedCalls ? t("ui.map_chat_plan_calls_0", plan.estimatedCalls) : t("ui.map_chat_plan_calls_none"),
@@ -85617,10 +86066,9 @@ ${renderTemplate(
       throw new OutlineGenerateError("empty_topic", translate(locale, "error.outline_generate_empty_topic"));
     if (estimateTokens(prompt) > OUTLINE_GENERATE_TOKEN_BUDGET) {
       const { note, children } = noteInputs(request);
-      throw new OutlineGenerateError(
-        note || children.length ? "note_too_long" : "over_budget",
-        translate(locale, "error.outline_generate_over_budget")
-      );
+      if (note || children.length)
+        throw new OutlineGenerateError("note_too_long", translate(locale, "error.outline_generate_note_too_long"));
+      throw new OutlineGenerateError("over_budget", translate(locale, "error.outline_generate_over_budget"));
     }
   },
   parse: (raw, request) => parseOutlineReply(raw, request.language)

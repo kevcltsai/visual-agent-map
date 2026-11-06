@@ -861,7 +861,21 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-chat-skeleton { display: flex; gap: 12px; }
 .vam-chat-skeleton-card { width: 120px; height: 56px; border: 1px dashed var(--background-modifier-border); border-radius: var(--radius-m); }
 .vam-map-chat-msg.is-user { background: var(--background-modifier-hover); }
-.vam-map-chat-msg.is-auto { display: none; }
+/* An automatic round has no question of the user's: its row is the separator between two rounds. */
+.vam-map-chat-msg.is-auto { background: transparent; padding: 4px 8px; border-top: 1px solid var(--background-modifier-border); border-radius: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-auto-title { color: var(--text-normal); font-weight: var(--font-semibold); }
+.vam-map-chat-auto-note, .vam-map-chat-auto-left { overflow-wrap: anywhere; }
+/* What the results were built from (read, never "checked"): under the results, so a folded list still shows it. */
+.vam-map-chat-basis { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-basis-line { overflow-wrap: anywhere; }
+.vam-map-chat-basis-line strong { color: var(--text-normal); font-weight: var(--font-bold); }
+/* The waiting row and the sentence that ends a continuation. */
+.vam-map-chat-chain-wait, .vam-map-chat-chain-note { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-map-chat-chain-wait-elapsed { font-variant-numeric: tabular-nums; }
+.vam-map-chat-chain-note { color: var(--text-normal); }
+/* While the chain waits the field takes a message and Stop sits beside Send. */
+.vam-map-chat.is-chain-waiting .vam-map-chat-composer button.vam-map-chat-stop { right: 40px; }
+.vam-map-chat.is-chain-waiting .vam-map-chat-composer .vam-map-chat-steer-hint { right: 74px; }
 .vam-map-chat-steer { align-self: flex-end; display: flex; flex-direction: column; gap: 1px; max-width: 85%; margin-top: 4px; padding: 4px 8px; border-radius: var(--radius-s); background: var(--background-modifier-hover); border: 1px solid var(--background-modifier-border); }
 .vam-map-chat-steer-tag { font-size: var(--font-ui-smaller); color: var(--text-accent); }
 .vam-map-chat-steer.is-queued { border-style: dashed; }

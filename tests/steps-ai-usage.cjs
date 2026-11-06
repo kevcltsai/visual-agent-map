@@ -354,7 +354,7 @@ function sharedCalls(reply, { report, records }) {
 
 test('a provider-step call (outline) is recorded exactly once, under its map path', async () => {
   const records = [];
-  const calls = sharedCalls('# Root\n## A', { report: { usage: { inputTokens: 70, outputTokens: 9 } }, records });
+  const calls = sharedCalls('# Root\n> r\n## A\n> a', { report: { usage: { inputTokens: 70, outputTokens: 9 } }, records });
   const request = { topic: 'Sleep', presetText: 'Make a tree for {research topic}.', language: 'en', model: 'claude:sonnet', reasoning: 'low', usageMapPath: 'A/map.vam' };
   await shared.providerOutlineRunner(calls)(request, new AbortController().signal, shared.prepareStep(shared.outlineGenerateStep, request));
   assert.equal(records.length, 1, 'one call, one entry');

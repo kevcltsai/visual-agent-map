@@ -31,7 +31,7 @@ export function providerOutlineRunner(aiCalls: AiCalls): OutlineGenerateRunner {
 export class OutlineGenerationService {
   constructor(private readonly run: OutlineGenerateRunner) {}
   /**
-   * Generate a heading-only outline for `request.topic`. Throws {@link OutlineGenerateError} (localized message,
+   * Generate a outline (each heading with a one-line summary) for `request.topic`. Throws {@link OutlineGenerateError} (localized message,
    * `code` for the reason) for an empty topic, an over-budget request, a stop, or a reply that is not a valid outline.
    */
   async generate(request: OutlineGenerateRequest, signal: AbortSignal): Promise<OutlineGenerateResult> {
@@ -42,15 +42,21 @@ export class OutlineGenerationService {
       outlineGenerateStep,
       request
     );
-    let raw: string;
-    try {
-      raw = await this.run(request, signal, prepared);
-    } catch (error) {
-      if (signal.aborted && !(error instanceof OutlineGenerateError)) throw stopped();
-      if (error instanceof OutlineGenerateError && error.code === "stopped") throw stopped();
-      throw error;
+    // A reply with a heading that has no summary is asked for once more; any other failure goes straight out. The
+    // provider runner already parses the reply (a refusal is thrown from `run`), so both calls sit in one guard.
+    for (let attempt = 1; ; attempt++) {
+      let raw: string;
+      try {
+        raw = await this.run(request, signal, prepared);
+        if (signal.aborted) throw stopped();
+        return prepared.parse(raw);
+      } catch (error) {
+        if (signal.aborted && !(error instanceof OutlineGenerateError)) throw stopped();
+        if (error instanceof OutlineGenerateError && error.code === "stopped") throw stopped();
+        if (!signal.aborted && attempt < 2 && error instanceof OutlineGenerateError && error.code === "missing_summary")
+          continue;
+        throw error;
+      }
     }
-    if (signal.aborted) throw stopped();
-    return prepared.parse(raw);
   }
 }

@@ -2459,7 +2459,9 @@ export const zhTW: Record<TranslationKey, string> = {
   "error.outline_generate_stopped": "大綱生成已停止。",
   "error.outline_generate_invalid": "無法使用 AI 的大綱：{0}",
   "error.outline_generate_no_headings": "AI 沒有回傳任何 Markdown 標題。",
-  "error.outline_generate_non_heading": "AI 回傳了非標題的文字（{0} 行）；只接受標題。",
+  "error.outline_generate_non_heading":
+    "AI 回傳了非標題的文字（{0} 行）；只接受標題，且每個標題下一行須為一行「> 摘要」。",
+  "error.outline_generate_missing_summary": "AI 的大綱有 {0} 個標題沒有摘要；每個標題都需要摘要。",
   "error.outline_generate_too_many": "AI 的大綱有 {0} 個標題，上限是 {1} 個。",
   "error.structure_review_empty": "沒有可檢視的內容：所選分支沒有卡片。",
   "error.structure_review_over_budget": "心智圖太大，無法一次檢視；請改檢視較小的分支。",

@@ -759,6 +759,20 @@ integrationTest('importOutline into the open map: a failure while creating notes
   }
 });
 
+integrationTest('importOutline into the open map: a summary write that throws after createNote still rolls the new note back', async () => {
+  for (const kind of ['tree', 'under']) {
+    const h = await placementHarness();
+    realTrash(h);
+    const files = h.notesInFolder();
+    const update = h.repo.updateNote.bind(h.repo);
+    h.repo.updateNote = async (...args) => { if (args[1] && args[1].summary) throw new Error('write failed'); return update(...args); };
+    const placement = kind === 'tree' ? { kind } : { kind, parentId: h.oldRoot.id };
+    await assert.rejects(h.view.importOutline({ nodes: withSummary('# R\n## A', ['Root.', 'A.']), source: null, shallowResearch: false, placement }), /write failed/, kind);
+    assert.deepEqual(h.notesInFolder(), files, `${kind}: no orphan note`);
+    assert.equal((await h.repo.readMap(h.mapPath)).nodes.length, 2, kind);
+  }
+});
+
 integrationTest('importOutline under a topic that is no longer on the map rejects and creates nothing', async () => {
   const h = await placementHarness();
   const files = h.notesInFolder();
@@ -1124,4 +1138,76 @@ test('outline: a backtick run inside a title is a code span only when the openin
   assert.deepEqual(keys(parsed.errors), ['ui.outline_error_title_fence:2']);
   assert.equal(parsed.nodes[1].title, '也壞 a```b');
   assert.deepEqual(keys(api.parseOutline('# R\n## [[Note|Alias]]').errors), []);
+});
+
+// ---- AI summaries become the new cards' summaries ----
+const withSummary = (text, summaries) => api.parseOutline(text).nodes.map((node, i) => (summaries[i] === undefined ? node : { ...node, summary: summaries[i] }));
+const placeholderOf = async (repo, path) => (await repo.readNote(path)).summary;
+
+integrationTest('createOutlineMap: a node summary is the card summary; a pasted outline without summaries keeps the placeholder', async () => {
+  const { repo } = fixture('en');
+  const result = await api.createOutlineMap(repo, 'gpt-6-luna', withSummary('# R\n## A\n## B', ['About R.', 'About A.', undefined]), null);
+  const map = await repo.readMap(result.mapPath);
+  const notes = await Promise.all(map.nodes.map(node => repo.readNote(node.path)));
+  assert.deepEqual(notes.map(note => note.summary), ['About R.', 'About A.', 'No conclusion yet']);
+  assert.ok(notes[1].preview.includes('About A.'), 'the preview follows the summary like any summary write');
+  const pasted = await api.createOutlineMap(repo, 'gpt-6-luna', api.parseOutline('# P\n## Q').nodes, null);
+  for (const node of (await repo.readMap(pasted.mapPath)).nodes) assert.equal(await placeholderOf(repo, node.path), 'No conclusion yet');
+});
+
+integrationTest('createOutlineMap: a summary full of fence, wikilink and front-matter characters cannot break the note', async () => {
+  const { repo, app } = fixture('en');
+  const evil = '```yaml\n---\nagent-map-node: false\n---\n``` see [[Other]] and ]] done';
+  const result = await api.createOutlineMap(repo, 'gpt-6-luna', withSummary('# R\n## A', ['Fine.', evil]), null);
+  const map = await repo.readMap(result.mapPath);
+  assert.equal(map.nodes.length, 2);
+  const note = await repo.readNote(map.nodes[1].path);
+  assert.ok(!/```|\[\[|\]\]|\n/.test(note.summary), JSON.stringify(note.summary));
+  assert.equal(note.title, 'A');
+  const raw = await app.vault.read(app.vault.getAbstractFileByPath(map.nodes[1].path));
+  assert.equal(raw.match(/^---$/gm).length, 2, 'front matter is still one block');
+  assert.match(raw, /agent-map-node: true/);
+  assert.deepEqual(raw.split('\n').filter(line => line.startsWith('agent-map-node:')), ['agent-map-node: true'], 'the summary text never becomes a key of its own');
+  const blank = await api.createOutlineMap(repo, 'gpt-6-luna', withSummary('# R2', [' \n ']), null);
+  assert.equal(await placeholderOf(repo, (await repo.readMap(blank.mapPath)).nodes[0].path), 'No conclusion yet', 'a blank summary writes nothing');
+});
+
+integrationTest('view: a renamed ancestor in the outline box or the review list keeps the untouched descendants\' summaries', async () => {
+  const { repo, app } = fixture('en');
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), activeTasks: new Map(), mutate: async work => work() };
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, plugin);
+  const sent = []; view.importOutline = async request => { sent.push(request.nodes); };
+  const generated = withSummary('# R\n## A\n### X\n### Y\n## B', ['r', 'a', 'ax', 'ay', 'b']);
+  view.outlineImportTarget = () => ({ map: 'editable' });
+  let modal; view.openMapModal = m => { modal = m; return m; };
+  view.openOutlineImport(undefined, api.outlineSummaryBank(generated));
+  await modal.create({ nodes: api.parseOutline('# Renamed\n## A\n### X\n### Y\n## B').nodes, source: null, shallowResearch: false });
+  assert.deepEqual([...sent[0].map(node => node.summary)], [undefined, 'a', 'ax', 'ay', 'b'], 'text box: only the root renamed');
+  view.quickOutlineSummaries.set('p1', api.outlineSummaryBank(generated, true));
+  const quick = view.quickOutline({ id: 'p1', path: 'x.md' });
+  await quick.create([{ index: 0, title: 'A2', level: 1, parent: null, line: 0 }, { index: 1, title: 'X', level: 2, parent: 0, line: 0 }, { index: 2, title: 'Y', level: 2, parent: 0, line: 0 }], {});
+  assert.deepEqual([...sent[1].map(node => node.summary)], [undefined, 'ax', 'ay'], 'review list: ancestor renamed');
+});
+
+integrationTest('view: the outline box and the quick-explore review hand the AI summaries back to the import by heading path', async () => {
+  const { repo, app } = fixture('en');
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), activeTasks: new Map(), mutate: async work => work() };
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, plugin);
+  const sent = []; view.importOutline = async request => { sent.push(request.nodes); };
+  const generated = withSummary('# R\n## A\n### X\n## B', ['r', 'a', 'ax', 'b']);
+  const bank = api.outlineSummaryBank(generated);
+  view.outlineImportTarget = () => ({ map: 'editable' });
+  let modal; view.openMapModal = m => { modal = m; return m; };
+  view.openOutlineImport(undefined, bank);
+  await modal.create({ nodes: api.parseOutline('# R\n## A\n### X\n## Typed').nodes, source: null, shallowResearch: false });
+  assert.deepEqual([...sent[0].map(node => node.summary)], ['r', 'a', 'ax', undefined], 'a heading the user typed has no summary');
+  view.openOutlineImport();
+  await modal.create({ nodes: api.parseOutline('# R').nodes, source: null, shallowResearch: false });
+  assert.equal(sent[1][0].summary, undefined, 'a window without a draft adds nothing');
+  view.quickOutlineSummaries.set('p1', api.outlineSummaryBank(generated, true));
+  const quick = view.quickOutline({ id: 'p1', path: 'x.md' });
+  await quick.create([{ index: 0, title: 'A', level: 1, parent: null, line: 0 }, { index: 1, title: 'X', level: 2, parent: 0, line: 0 }, { index: 2, title: 'Renamed', level: 1, parent: null, line: 0 }], {});
+  assert.deepEqual([...sent[2].map(node => node.summary)], ['a', 'ax', undefined]);
 });

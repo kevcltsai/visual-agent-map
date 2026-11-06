@@ -220,6 +220,24 @@ integrationTest('confirmed child batches rebuild derived data only once', async 
   assert.equal(rebuilds, 1);
   assert.equal((await repo.readNote(saved.nodes[1].path)).prompt, 'Task one');
 });
+integrationTest('accepted research suggestions get a summary: the contribution, else the task, else the placeholder (detail unchanged)', async () => {
+  const { repo, app } = fixture('en'), parent = await topicNote(repo, 'Parent', 'a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, attachTopicRuns(withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} })));
+  view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {};
+  const children = await view.createChildBatch(parent, [
+    { title: 'Has contribution', task: 'Ask this', contribution: 'What it adds.\nSecond line [[x]]' },
+    { title: 'Task only', task: 'Why does it matter?', contribution: '' },
+    { title: 'Neither', task: '', contribution: '  ' }
+  ]);
+  const notes = await Promise.all(children.map(child => repo.readNote(child.path)));
+  assert.deepEqual(notes.map(note => note.summary), ['What it adds. Second line [x]', 'Why does it matter?', 'No conclusion yet']);
+  assert.match(notes[0].detail, /What it adds\./, 'the contribution still fills the detail');
+  assert.equal(notes[1].detail.includes('Why does it matter?'), false, 'the task is not copied into the detail');
+});
 integrationTest('two-level child batches attach grandchildren and still rebuild once', async () => {
   const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a'); let rebuilds = 0;
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';

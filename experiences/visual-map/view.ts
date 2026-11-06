@@ -466,10 +466,14 @@ import { createAimMap } from "../aim/create-map";
 import { aimEnabled } from "../aim/availability";
 import {
   addOutlineToMap,
+  applyOutlineSummaries,
+  cleanOutlineSummary,
   createOutlineMap,
   limitOutline,
   OUTLINE_NODE_LIMIT,
+  type OutlineSummaryBank,
   OUTLINE_TITLE_LIMIT,
+  outlineSummaryBank,
   type OutlineNode
 } from "./outline-import";
 import {
@@ -1351,8 +1355,12 @@ export class VisualAgentMapView extends ItemView {
     state: "running" | "done" | "failed" | "stopped";
     inputs: OutlineDraftInputs;
     markdown?: string;
+    /** The AI's summaries by heading path: the outline box only keeps headings, so the import finds them again here. */
+    summaries?: OutlineSummaryBank;
     message?: string;
   } | null = null;
+  /** The summaries of each parent's latest quick outline (by heading path below its root), used when the reviewed list is created. */
+  private quickOutlineSummaries = new Map<string, OutlineSummaryBank>();
   private synthesisTasks = new Map<
     string,
     {
@@ -2966,6 +2974,7 @@ export class VisualAgentMapView extends ItemView {
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
   private dropMapBackground(): void {
     this.quickOutlines.clear();
+    this.quickOutlineSummaries.clear();
     const review = this.structureReviewTask;
     const draft = this.outlineDraftTask;
     this.structureReviewTask = null;
@@ -3182,7 +3191,7 @@ export class VisualAgentMapView extends ItemView {
     return stylePickerFor(this.app, this.plugin);
   }
   /** Adds an outline to the open map: under the selected topic, else as a new tree. A new map starts from + New mind map. */
-  openOutlineImport(prefill?: OutlineDraftPrefill): void {
+  openOutlineImport(prefill?: OutlineDraftPrefill, summaries?: ReadonlyMap<string, string[]>): void {
     const target = prefill ? this.reopenedImportTarget(prefill.inputs) : this.outlineImportTarget();
     if (target.map !== "editable") {
       new Notice(target.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map"));
@@ -3192,7 +3201,10 @@ export class VisualAgentMapView extends ItemView {
     this.openMapModal(
       new OutlineImportModal(
         this.app,
-        request => this.importOutline(request),
+        request =>
+          this.importOutline(
+            summaries?.size ? { ...request, nodes: applyOutlineSummaries(request.nodes, summaries) } : request
+          ),
         this.modelChoices(),
         target,
         placement,
@@ -3300,6 +3312,7 @@ export class VisualAgentMapView extends ItemView {
             if (controller.signal.aborted || this.outlineDraftTask !== own || this.closed) return;
             own.state = "done";
             own.markdown = result.markdown;
+            own.summaries = outlineSummaryBank(result.nodes);
             backgroundResultNotice(t("ui.outline_ai_ready"), {
               label: t("ui.background_review"),
               open: () => this.reopenOutlineDraft(own)
@@ -3323,12 +3336,15 @@ export class VisualAgentMapView extends ItemView {
     if (this.outlineDraftTask !== task || task.state === "running" || this.closed) return;
     this.outlineDraftTask = null;
     this.render();
-    this.openOutlineImport({
-      inputs: task.inputs,
-      ...(task.state === "done" && task.markdown !== undefined
-        ? { markdown: task.markdown }
-        : { message: task.message ?? t("ui.outline_ai_stopped") })
-    });
+    this.openOutlineImport(
+      {
+        inputs: task.inputs,
+        ...(task.state === "done" && task.markdown !== undefined
+          ? { markdown: task.markdown }
+          : { message: task.message ?? t("ui.outline_ai_stopped") })
+      },
+      task.summaries
+    );
   }
   /** The status bars for background AI work on the open map: structure review and AI outline generation. */
   private renderBackgroundBars(parent: HTMLElement): void {
@@ -3424,11 +3440,12 @@ export class VisualAgentMapView extends ItemView {
           },
           signal
         );
+        this.quickOutlineSummaries.set(node.id, outlineSummaryBank(result.nodes, true));
         return result.nodes;
       },
       create: (nodes, options) =>
         this.importOutline({
-          nodes,
+          nodes: applyOutlineSummaries(nodes, this.quickOutlineSummaries.get(node.id) ?? new Map()),
           placement: { kind: "under", parentId: node.id },
           source: null,
           aiGenerated: true,
@@ -4017,6 +4034,8 @@ export class VisualAgentMapView extends ItemView {
             const known = new Set(this.map.nodes.map(node => node.id));
             await this.addNode(parent, item.title, false, false);
             added++;
+            // The AI's one-line summary is the new card's summary, written like a chat card's.
+            await this.noteChange(this.map.nodes.at(-1)!, { summary: item.summary });
             for (const node of this.map?.nodes ?? []) if (!known.has(node.id)) addedIds.add(node.id);
           }
           if (added) await this.plugin.rebuildDerivedData();
@@ -17123,6 +17142,10 @@ export class VisualAgentMapView extends ItemView {
         createdByTitle.set(item.title, child);
         await this.noteChange(child, {
           prompt: item.task,
+          // A suggestion's contribution is the card's summary (the task when there is none); empty only when both are.
+          ...(cleanOutlineSummary(item.contribution) || cleanOutlineSummary(item.task)
+            ? { summary: cleanOutlineSummary(item.contribution) || cleanOutlineSummary(item.task) }
+            : {}),
           detail: researchOptions
             ? ""
             : item.contribution

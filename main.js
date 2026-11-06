@@ -55717,6 +55717,7 @@ function relationPairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 var goalSuggestSeq = 0;
+var CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -72883,7 +72884,7 @@ ${note.detail.trim()}` : "",
     const barRect = (_a2 = bar.getBoundingClientRect) == null ? void 0 : _a2.call(bar);
     const strip3 = actions && box && actionsRect && barRect && actionsRect.width > 0 && actionsRect.top > barRect.bottom ? { left: actionsRect.left, right: actionsRect.right, top: barRect.bottom, bottom: actionsRect.top } : null;
     const boxRect = strip3 ? (_b2 = box == null ? void 0 : box.getBoundingClientRect) == null ? void 0 : _b2.call(box) : void 0;
-    const blocked = !!strip3 && Array.from((_d = (_c = box == null ? void 0 : box.querySelectorAll) == null ? void 0 : _c.call(box, "button, input, textarea, a, [role='button']")) != null ? _d : []).some((el) => {
+    const blocked = !!strip3 && Array.from((_d = (_c = box == null ? void 0 : box.querySelectorAll) == null ? void 0 : _c.call(box, CLICKABLE_SELECTOR)) != null ? _d : []).some((el) => {
       var _a3;
       const rect2 = bar.contains(el) ? null : (_a3 = el.getBoundingClientRect) == null ? void 0 : _a3.call(el);
       return !!rect2 && rectsIntersect(rect2, strip3);

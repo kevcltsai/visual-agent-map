@@ -1185,6 +1185,8 @@ interface ChatSteerState {
   closed: boolean;
 }
 
+/** What takes a click: the strip toward the floating goal icons must not lie over any of it. */
+const CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -19688,7 +19690,7 @@ export class VisualAgentMapView extends ItemView {
     const boxRect = strip ? box?.getBoundingClientRect?.() : undefined;
     const blocked =
       !!strip &&
-      Array.from(box?.querySelectorAll?.<HTMLElement>("button, input, textarea, a, [role='button']") ?? []).some(el => {
+      Array.from(box?.querySelectorAll?.<HTMLElement>(CLICKABLE_SELECTOR) ?? []).some(el => {
         const rect = bar.contains(el) ? null : el.getBoundingClientRect?.();
         return !!rect && rectsIntersect(rect, strip);
       });

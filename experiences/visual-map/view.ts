@@ -9019,7 +9019,15 @@ export class VisualAgentMapView extends ItemView {
   private async resizeText(id: string, width: number | undefined, from: number): Promise<void> {
     // Both boxes are measured, never read from the element: a drag has already put the new width on it, a key press has not.
     const el = this.textEls.get(id);
-    const before = this.textBoxOf(id, { width: from }) ?? { width: from, height: el?.offsetHeight || TEXT_NODE_HEIGHT };
+    // The block as it was is measured at its stored width (a drag cannot change that), never at `from`: for an automatic width
+    // `from` is the rounded offsetWidth, narrower than the real text, and a probe that narrow wraps to one line too many.
+    const stored = (this.map?.canvasItems ?? []).find(
+      (item): item is TextItem => item.kind === "text" && item.id === id
+    );
+    const before = this.textBoxOf(id, { width: stored?.width ?? null }) ?? {
+      width: from,
+      height: el?.offsetHeight || TEXT_NODE_HEIGHT
+    };
     const after = this.textBoxOf(id, { width: width ?? null });
     // Nothing to measure with (no text layer): the drawn block's fitted width, as before.
     const to = width ?? after?.width ?? (el ? fittedTextWidth(el) : from);

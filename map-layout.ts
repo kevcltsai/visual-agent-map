@@ -20,6 +20,10 @@ function textBlockWidth(node: MapNode): number {
 function obstacleWidth(node: MapNode): number {
   return node.path === "" ? Math.max(WIDTH, node.width ?? 0) : WIDTH;
 }
+/** Growing left, a text block narrower than a card keeps its right edge where a card's would be, so the column of what follows it is measured from there; cards and wider blocks give 0. */
+function textParentNarrow(parent: MapNode): number {
+  return parent.path === "" ? Math.max(0, CARD_WIDTH - textBlockWidth(parent)) : 0;
+}
 /** The side a first-level topic stands on now: a text block by its own box, a card by its x against the root's. */
 function knownSide(topic: MapNode, root: MapNode): BalancedSide | undefined {
   return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
@@ -380,8 +384,10 @@ function arrangeVerticalBranch(
 ): MapNode[] {
   const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
-  const rootCentres = roots.map(root => placed.get(root.id)!.x + WIDTH / 2);
-  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : WIDTH / 2;
+  // Under a text block the cards are centred as drawn (CARD_WIDTH wide, like Auto layout); under a card the standard width stays.
+  const cardSpan = parent.path === "" ? CARD_WIDTH : WIDTH;
+  const rootCentres = roots.map(root => placed.get(root.id)!.x + cardSpan / 2);
+  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : cardSpan / 2;
   let shiftX = parent.x + (parent.path === "" ? (parent.width ?? WIDTH) : WIDTH) / 2 - middle;
   // Row 0 of the branch is the roots; they start one row gap below the parent's bottom edge (above its top edge for up).
   const rowGap = COLUMN - WIDTH;
@@ -530,7 +536,7 @@ export function arrangeNewBranch(
   const startX =
     signOf(direction) > 0
       ? parent.x + COLUMN + widthExcess(parent)
-      : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess));
+      : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess)) - textParentNarrow(parent);
   const placed = positions(fresh, roots, startX, 0, false, heightOf, layout);
   const centers = roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;

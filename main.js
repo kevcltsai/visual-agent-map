@@ -20382,6 +20382,9 @@ function obstacleWidth(node) {
   var _a2;
   return node.path === "" ? Math.max(WIDTH, (_a2 = node.width) != null ? _a2 : 0) : WIDTH;
 }
+function textParentNarrow(parent) {
+  return parent.path === "" ? Math.max(0, CARD_WIDTH - textBlockWidth(parent)) : 0;
+}
 function knownSide(topic, root) {
   return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
 }
@@ -20621,8 +20624,9 @@ function arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, la
   var _a2;
   const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
   const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
-  const rootCentres = roots.map((root) => placed.get(root.id).x + WIDTH / 2);
-  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : WIDTH / 2;
+  const cardSpan = parent.path === "" ? CARD_WIDTH : WIDTH;
+  const rootCentres = roots.map((root) => placed.get(root.id).x + cardSpan / 2);
+  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : cardSpan / 2;
   let shiftX = parent.x + (parent.path === "" ? (_a2 = parent.width) != null ? _a2 : WIDTH : WIDTH) / 2 - middle;
   const rowGap = COLUMN - WIDTH;
   const rootTop = Math.min(...roots.map((root) => placed.get(root.id).y));
@@ -20738,7 +20742,7 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout = "r
   if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
   if (direction === "balanced")
     return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout);
-  const startX = signOf(direction) > 0 ? parent.x + COLUMN + widthExcess(parent) : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess));
+  const startX = signOf(direction) > 0 ? parent.x + COLUMN + widthExcess(parent) : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess)) - textParentNarrow(parent);
   const placed = positions(fresh, roots, startX, 0, false, heightOf, layout);
   const centers = roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
@@ -63122,11 +63126,17 @@ ${request.requirements}` : preset.text,
    * `from` is the width before the change; resetting to automatic measures the fitted width for `to`.
    */
   async resizeText(id, width, from) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d, _e;
     const el = this.textEls.get(id);
-    const before = (_a2 = this.textBoxOf(id, { width: from })) != null ? _a2 : { width: from, height: (el == null ? void 0 : el.offsetHeight) || TEXT_NODE_HEIGHT };
+    const stored = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (item) => item.kind === "text" && item.id === id
+    );
+    const before = (_d = this.textBoxOf(id, { width: (_c = stored == null ? void 0 : stored.width) != null ? _c : null })) != null ? _d : {
+      width: from,
+      height: (el == null ? void 0 : el.offsetHeight) || TEXT_NODE_HEIGHT
+    };
     const after = this.textBoxOf(id, { width: width != null ? width : null });
-    const to = (_b2 = width != null ? width : after == null ? void 0 : after.width) != null ? _b2 : el ? fittedTextWidth(el) : from;
+    const to = (_e = width != null ? width : after == null ? void 0 : after.width) != null ? _e : el ? fittedTextWidth(el) : from;
     const x = this.textAnchoredX(id, from, to);
     const follows = this.followersOf(this.map, id).size > 0;
     await this.changeCanvasItems(

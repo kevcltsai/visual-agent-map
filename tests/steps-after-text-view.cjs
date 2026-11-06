@@ -12,9 +12,13 @@ const txt = (over = {}) => ({ id: 't1', kind: 'text', text: 'Hello', parentId: u
 const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); }, appendChild(c) { this.children.push(c); } });
 
 // The text double: width is the inline width, else the text fitted (7px a character plus padding, 32..300); height is 7px plus 20px a line.
+// The real text width is fractional (Chromium: 'hello~~' is 59.188 wide and offsetWidth says 59), so a block measured at its own
+// rounded offsetWidth wraps to a second line; the double has the same 0.4px so that trap is in every probe.
 const textBox = (text, width) => {
-  const w = width ?? Math.min(300, Math.max(32, text.length * 7 + 14));
-  return { w, h: 7 + 20 * Math.max(1, Math.ceil((text.length * 7) / Math.max(1, w - 14))) };
+  const w = width ?? Math.min(300, Math.max(32, Math.round(text.length * 7 + 14.4)));
+  // Automatic width fits the text on one line unless it hit the 300 cap; an inline width wraps at w - 14.
+  const lines = width === undefined && w < 300 ? 1 : Math.ceil((text.length * 7 + 0.4) / Math.max(1, w - 14));
+  return { w, h: 7 + 20 * Math.max(1, lines) };
 };
 // Root (P) with a text block t1 and a direct child "Child"; followers are added by the tests.
 async function harness(build, opts = {}) {
@@ -680,14 +684,16 @@ function checkEdit(h, before, D, label) {
   assert.ok(kids.length >= 1);
   if (D === 'down' || D === 'up') {
     for (const k of kids) assert.equal(D === 'down' ? after[k].y : after[k].y + 180, D === 'down' ? at.y + a.h + 60 : at.y - 60, `${label}: ${k} one row ${D} of the block`);
-    near([(Math.min(...kids.map(k => after[k].x)) + Math.max(...kids.map(k => after[k].x)) + 300) / 2], [at.x + a.w / 2], `${label}: followers centred on the block`);
+    near([(Math.min(...kids.map(k => after[k].x)) + Math.max(...kids.map(k => after[k].x)) + 280) / 2], [at.x + a.w / 2], `${label}: followers (280 wide cards) centred on the block`);
   } else {
     const expected = againstBlock(h);
     for (const k of kids) near([after[k].x, after[k].y], [expected[k].x, expected[k].y], `${label}: ${k} against the block at its drawn size`);
     if (WHOLE.includes(D)) near([at.x, at.y], [expected.t1.x, expected.t1.y], `${label}: the block as the whole layout puts it`);
   }
   if (D === 'right') for (const k of kids) assert.equal(after[k].x, at.x + 360 + Math.max(0, a.w - 280), `${label}: ${k} one column right of the block`);
-  if (D === 'left') for (const k of kids) assert.equal(after[k].x, at.x - 360, `${label}: ${k} one column left of the block`);
+  // Left: the followers of one block share one column (never T.x - 360: a block narrower than a card keeps its right edge, so its
+  // left edge is not where the column is measured from), and the column does not move when only the block's width changes.
+  if (D === 'left') for (const k of kids) assert.equal(after[k].x, after[kids[0]].x, `${label}: ${k} shares the column of ${kids[0]}`);
   assertNoOverlap(h, label);
 }
 async function editCase(D, how) {
@@ -725,12 +731,15 @@ for (const D of DIRS)
     else for (const k of Object.keys(pos0)) assert.deepEqual(s1[k], pos0[k], `${k} stays`);
     if (D === 'down' || D === 'up') {
       assert.equal(D === 'down' ? s1.C1.y : s1.C1.y + 180, D === 'down' ? s1.t1.y + box.h + 60 : s1.t1.y - 60, 'one row from the block');
-      near([s1.C1.x + 150], [s1.t1.x + box.w / 2], 'centred on the block', 1);
+      // Cards are 280 wide; Auto layout's convention is the same, so the offset to the block's centre is what Auto gives (about 0).
+      const ref = reference(h);
+      near([s1.C1.x + 140 - (s1.t1.x + box.w / 2)], [0], 'card centre on the block centre', 1);
+      near([s1.C1.x + 140 - (s1.t1.x + box.w / 2)], [ref.C1.x + 140 - (ref.t1.x + box.w / 2)], 'same offset as Auto layout', 1);
     } else {
       const expected = againstBlock(h, ['C1']);
       near([s1.C1.x, s1.C1.y], [expected.C1.x, expected.C1.y], 'against the block at its drawn size');
       if (D === 'right') assert.equal(s1.C1.x, s1.t1.x + 360 + Math.max(0, box.w - 280));
-      if (D === 'left') assert.equal(s1.C1.x, s1.t1.x - 360);
+      if (D === 'left') assert.equal(s1.C1.x, reference(h).C1.x, 'the column Auto layout uses');
     }
     assert.equal(h.view.history.past.length, past + 1);
     await h.view.addNode(h.owner(), 'C2', true, false, 'topic', false, {}, 't1');
@@ -739,6 +748,25 @@ for (const D of DIRS)
     if (!WHOLE.includes(D)) for (const k of Object.keys(s1)) assert.deepEqual(s2[k], s1[k], `${k} stays when the second topic is added`);
     assertNoOverlap(h, `${D} second`);
     assertSaved(h.raw(), D);
+  });
+
+// Fix 2: in a left map a block narrower than a card keeps its right edge, so its left edge is not where the column starts.
+// Every follower of one block shares the column Auto layout uses, after each +, and widening the block does not move them.
+for (const width of [61, 120, 280, 400])
+  test(`placement: left: a block ${width} wide: followers added with + share the Auto layout column, and widening keeps them there`, async () => {
+    const h = await begin('left', { followers: ['C1'], width });
+    const column = snap(h).C1.x;
+    await h.view.addNode(h.owner(), 'C2', true, false, 'topic', false, {}, 't1');
+    await done(h);
+    assert.equal(snap(h).C2.x, column, 'C2 stands in the column of C1');
+    assert.equal(snap(h).C1.x, column, 'C1 did not move');
+    const ref = reference(h);
+    assert.equal(snap(h).C2.x, ref.C2.x, 'the column Auto layout gives');
+    await h.view.resizeText('t1', width + 20, width);
+    await done(h);
+    const kids = ['C1', 'C2'].map(k => snap(h)[k].x);
+    assert.equal(kids[0], kids[1], 'still one column after widening');
+    if (width + 20 <= 280) assert.equal(kids[0], column, 'widening a narrow block does not move its followers');
   });
 
 // Row "add C" beside a wide text block (under the same topic, or under the neighbouring topic): the obstacle is as wide as it is drawn.
@@ -854,6 +882,31 @@ for (const D of ['right', 'left', 'down', 'up', 'balanced'])
     assert.deepEqual(snap(h), s, 'editing the text moves nothing');
   });
 
+// Fix 1: an auto-width block's rounded offsetWidth is narrower than its text, so a probe at that width wraps. The facing edge must
+// not drift: up keeps the bottom edge exactly, on the first widen and on every reset-then-widen cycle.
+for (const how of ['keyboard', 'drag'])
+  test(`placement: up: from automatic width, widening by ${how} keeps the bottom edge exactly, also over reset-and-widen cycles`, async () => {
+    const h = await begin('up', { text: 'hello~~', followers: ['C1', 'C2'] });
+    const auto0 = textBox('hello~~');
+    assert.equal(textBox('hello~~', auto0.w).h, auto0.h + 20, 'the double: a probe at the rounded width wraps');
+    const t0 = snap(h).t1, bottom = t0.y + auto0.h;
+    const bottomNow = () => { const t = h.view.map.canvasItems.find(i => i.id === 't1'); return t.y + textBox(t.text, t.width).h; };
+    for (let cycle = 0; cycle < 3; cycle++) {
+      const from = h.view.textBoxOf('t1').width;
+      assert.equal(from, auto0.w, `cycle ${cycle}: starts from automatic`);
+      if (how === 'drag') { const el = h.view.textEls.get('t1'); el.style.width = '120px'; el.addClass('has-width'); }
+      await h.view.resizeText('t1', 120, from);
+      await done(h);
+      assert.equal(bottomNow(), bottom, `cycle ${cycle}: bottom edge after widening`);
+      assertNoOverlap(h, `cycle ${cycle} widened`);
+      await h.view.resizeText('t1', undefined, 120);
+      await done(h);
+      assert.equal(bottomNow(), bottom, `cycle ${cycle}: bottom edge after reset`);
+      assertNoOverlap(h, `cycle ${cycle} reset`);
+    }
+    for (const k of ['C1', 'C2']) assert.equal(snap(h)[k].y + 180, snap(h).t1.y - 60, `${k} stays one row above`);
+  });
+
 // The one measurer: from the DOM when drawn, from a hidden block (built and removed in one go) for `as` or an undrawn block.
 test('measure: textBoxOf reads the drawn block, a hypothetical text or width, and a block that is not drawn, and leaves nothing behind', async () => {
   const h = await begin('right', { text: 'hello', followers: [] });
@@ -890,5 +943,21 @@ test('card-only maps: arrangeMap, arrangeNewBranch and arrangeNewTree give the s
     // The text-aware entry points are the same function when no text block is involved.
     assert.deepEqual(plain(layoutText.arrangeMapWithText(base(), [], undefined, heightOf, spec).nodes), plain(all), `${d} arrangeMapWithText`);
     assert.deepEqual(plain(layoutText.arrangeNewTreeWithText(all, [], 'z', new Set(['z', 'z1']), heightOf, spec).nodes), plain(tree), `${d} arrangeNewTreeWithText`);
+  }
+});
+
+// The pin above always has neighbours in the new branch's row, which hide a change of where a lone new branch is centred or started.
+// Here the new cards have the row to themselves, under cards of three widths (hashes of the engine's output on the parent commit).
+test('card-only maps: a new branch with no other card in its row lands exactly as before in all 8 layouts, under cards 280, 100 and 420 wide', () => {
+  const n = (id, parentId, extra = {}) => ({ id, path: `${id}.md`, parentId, x: 0, y: 0, collapsed: false, ...extra });
+  const pinned = { right: '0377d3604a68', left: 'f5df296bcc94', balanced: '0377d3604a68', down: '9d50970b24eb', up: '6025deb1f08b', radial: '7bd364a7b214', timeline: 'ab2f5092a145', fishbone: 'a9483cd53f9a' };
+  for (const d of DIRS) {
+    const spec = { direction: d }, res = [];
+    for (const width of [undefined, 100, 420]) {
+      const all = layoutLib.arrangeMap([n('r', null), n('e', 'r', { width })], undefined, undefined, spec);
+      const branch = layoutLib.arrangeNewBranch([...all, n('f', 'e'), n('g', 'e')], 'e', new Set(['f', 'g']), undefined, undefined, spec);
+      res.push(branch.map(x => [x.id, x.x, x.y]));
+    }
+    assert.equal(crypto.createHash('sha1').update(JSON.stringify(res)).digest('hex').slice(0, 12), pinned[d], d);
   }
 });

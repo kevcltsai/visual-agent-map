@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
 const { loadWithAiCalls, aiCallsFor } = require('./support-ai-calls.cjs');
 const { estimateTokens } = load('ai/context-builder.ts');
-const { replyPromisesWeb, MAP_CHAT_TOKEN_BUDGET, renderMapChatSteer, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
+const { MAP_CHAT_TOKEN_BUDGET, renderMapChatSteer, mapChatStep, parseMapChat, MAP_CHAT_SCHEMA, MAP_CHAT_ACTION_KINDS, MAP_RUN_ACTIONS, MapChatError } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, contentHash, isMdStale, MAP_CHAT_MAP_TITLE_LIMIT } = load('core/map-chat-context.ts');
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
 const { planFor, matchMapTitle, chatResearchRequest, chatResearchMode, MAP_CHAT_PLAN_ACTION_LIMIT, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_FIND_IMAGES_LIMIT } = load('core/map-chat-plan.ts');
@@ -683,7 +683,6 @@ test('B1/B2 plan: the estimate counts research and synthesis (main call plus dia
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], mode: 'quick' })], 0, standard), 1, 'a named Quick beats the map Standard');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], mode: 'standard' })], 0, { mapAiMode: 'quick' }), 2, 'a named Standard beats the map Quick');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })]), 2, 'needsWeb with no map mode: Standard, research plus diagram call');
-  assert.equal(estimate([{ ...run('research_standard', { nodeIds: ['x'] }), webPromised: true }]), 2, 'a web promise in the reply: Standard');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true, mode: 'quick' })], 0, standard), 1, 'a named Quick beats needsWeb');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })], 0, { mapAiMode: 'quick', diagrams: false }), 1, 'needsWeb with diagrams off: no diagram call');
   assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 2, 'expand: one outline call per card');
@@ -766,46 +765,13 @@ test('P1 needsWeb: strict schema field; only a boolean true counts; a missing fi
   for (const value of ['true', 1, 'yes', null, false, undefined]) assert.equal(parse(reply(researchItem({ needsWeb: value }))).actions[0].needsWeb, undefined, String(value));
   assert.equal(parse(reply(researchItem())).actions[0].needsWeb, undefined, 'an older reply has no needsWeb: parses, false');
   assert.equal(parse(reply(item('run_map_action', { action: 'expand', nodeIds: ['a'], needsWeb: true }))).actions[0].needsWeb, undefined, 'only a research reads it');
-  assert.equal(parse(JSON.stringify({ reply: '我會上網研究', actions: [researchItem()] })).actions[0].webPromised, true);
-  assert.equal(parse(JSON.stringify({ reply: '不需要上網', actions: [researchItem()] })).actions[0].webPromised, undefined);
 });
-// Each class has zh-TW, zh-CN and en rows. Precision first: needsWeb is the main signal, so a miss is cheaper than a false hit.
-const PROMISES_WEB = {
-  'zh-TW': ['我會上網研究', '我會上網查', '我會在網路上搜尋這個主題', '在網路上查資料', '會到網路上查', '用網路搜尋', '我會查網路資料', '我會用網路研究這張卡', '需要網路研究', '線上搜尋相關資料', '透過標準研究查找最新資料', '用標準研究上網查證', '這題我不熟，先上網研究', '先建根議題，再上網搜尋'],
-  'zh-CN': ['我会上网研究', '我会在网上搜索', '我会在网络上搜索', '我会查网络资料', '我会用网络研究这张卡', '在线上搜索相关资料', '这题我不熟，先上网查证'],
-  en: ['I will search the web', 'I will do web research', 'I will search online', 'I will look this up online', 'I will search for it on the web', 'I will run a web search', "I'll research this online", 'I will look it up on the internet', 'I will browse the web', 'I will use the web to research', "I'll go online to research this", 'I’ll research this online']
-};
-const NOT_PROMISES_WEB = {
-  'topic words': {
-    'zh-TW': ['我會研究物聯網的安全議題', '研究車聯網的發展', '研究工業互聯網', '研究青少年上網習慣', '整理上網行為的研究'],
-    'zh-CN': ['我会研究物联网安全', '研究互联网金融', '研究车联网的发展', '研究青少年上网习惯'],
-    en: ['I will research the Internet of Things', 'Researching internet protocols for this card', 'I will research online learning', 'I will research online education for this card', 'Research online marketing', 'I will look up online banking', 'Research on the web of trust', 'I will research web search engines', 'Research the web platform APIs', 'I will check the internet connection topic', 'I will research how spiders build on the web']
-  },
-  negation: {
-    'zh-TW': ['我無法上網', '我無法上網查證，先用快速研究', '沒辦法上網', '不需要另外上網', '不必特地上網查', '這次沒有實際上網', '我沒有上網搜尋', '不需上網', '快速研究不會上網', '不需要上網', '無須上網', '不用聯網'],
-    'zh-CN': ['没办法上网', '我无法上网查证', '不需要另外上网', '不必特地上网查', '这次没有实际上网', '不会上网搜索', '没有联网'],
-    en: ['I cannot search the web', 'I am unable to search the web', 'This does not require searching the web', 'no web search', 'Quick research only, no web search needed', 'This uses my own knowledge instead of searching the web', 'Rather than searching the web I will use the note', 'No need to search the web', "I won't need to search the web.", 'without searching the web', 'I will not look it up online', 'web search is not needed']
-  },
-  condition: {
-    'zh-TW': ['先用快速研究；標準研究才會上網', '如需上網請改用標準研究', '要上網的話請說標準研究'],
-    'zh-CN': ['标准研究才会上网', '如需上网请改用标准研究', '要上网的话请说标准研究'],
-    en: ['If you want a web search, ask for standard research', 'Standard research would search the web', 'Only standard research searches the web']
-  },
-  other: { 'zh-TW': ['我會建立三張議題', ''], 'zh-CN': ['我会建立三张议题'], en: ['Adding two subtopics from the note', ''] }
-};
-for (const [language, rows] of Object.entries(PROMISES_WEB))
-  test(`P1 replyPromisesWeb (${language}): a reply that says it will search the web is a promise`, () => { for (const text of rows) assert.equal(replyPromisesWeb(text), true, text); });
-for (const [kind, byLanguage] of Object.entries(NOT_PROMISES_WEB))
-  for (const [language, rows] of Object.entries(byLanguage))
-    test(`P1 replyPromisesWeb (${language}): ${kind} is not a promise`, () => { for (const text of rows) assert.equal(replyPromisesWeb(text), false, text); });
-test('P1 research mode order: named mode > needsWeb or a web promise (Standard) > map mode > Quick; the user saying quick stays quick', () => {
+test('P1 research mode order: named mode > needsWeb (Standard) > map mode > Quick; the user saying quick stays quick', () => {
   const act = (fields = {}) => parse(reply(researchItem(fields))).actions[0];
   const web = { needsWeb: true };
   assert.equal(chatResearchMode(act(web), undefined), 'standard');
   assert.equal(chatResearchMode(act(web), 'quick'), 'standard', 'needsWeb beats the remembered Quick');
   assert.equal(chatResearchMode(act({ ...web, mode: 'quick' }), 'standard'), 'quick', 'the user said quick: still quick');
-  assert.equal(chatResearchMode({ ...act(), webPromised: true }, 'quick'), 'standard', 'the safety net');
-  assert.equal(chatResearchMode({ ...act({ mode: 'quick' }), webPromised: true }, undefined), 'quick');
   assert.equal(chatResearchMode(act(), 'standard'), 'standard', 'only "research" and no web signal: the remembered mode');
   assert.equal(chatResearchMode(act(), 'quick'), 'quick'); assert.equal(chatResearchMode(act(), undefined), 'quick');
   assert.equal(chatResearchMode(act({ needsWeb: 'true' }), 'quick'), 'quick', 'the string "true" is not a web signal');

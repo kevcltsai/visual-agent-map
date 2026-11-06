@@ -127,8 +127,6 @@ export type MapChatAction =
       images: boolean;
       /** research_standard: the model says this research needs the web (unfamiliar or recent topic, or its reply says it will search). Present only when true; a missing or non-boolean-true field in the reply is false. */
       needsWeb?: true;
-      /** research_standard: the safety net, true when the reply text itself promises a web search ({@link replyPromisesWeb}). */
-      webPromised?: true;
       /** research_standard: true = retry the targets on the other provider (this run only); the view honours it only for targets that offer `retryWith`. Present only when true. */
       otherProvider?: true;
     }
@@ -362,57 +360,6 @@ export const MAP_CHAT_SCHEMA = {
   },
   required: ["reply", "actions"]
 };
-
-/**
- * Fixed phrases, per language, that say the reply itself will search the web. Precision first: `needsWeb` is the main signal, so this
- * safety net would rather miss a promise than turn an ordinary reply into standard research. Topic words ("物聯網", "online learning"),
- * negations, conditions and descriptions of what standard research does never match.
- */
-const ZH_VERB = /(?:搜尋|搜索|查詢|查询|查找|查證|查证|檢索|检索|蒐集|搜集|研究|查|找)/.source;
-const ZH_WEB = /(?:網路|网络|網絡|網上|网上|線上|在线|互聯網|互联网)/.source;
-const ZH_NOT_TOPIC = /(?!引擎|習慣|习惯|行為|行为)/.source;
-const WEB_PROMISE_ZH = new RegExp(
-  [
-    /(?:上網|上网)(?:去)?/.source + ZH_VERB,
-    /(?:^|[會会將将先要需去到用透過通过在來来再得就並并]|可以)(?:在|到|用|透過|通过)?/.source +
-      ZH_WEB +
-      /(?:上|裡|里)?(?:去)?/.source +
-      ZH_VERB +
-      ZH_NOT_TOPIC,
-    /(?:查詢|查询|查找|查|搜尋|搜索|檢索|检索)/.source + ZH_WEB + /(?:資料|资料|資訊|资讯|信息|內容|内容)/.source,
-    /(?:透過|通过|用|使用)(?:標準研究|标准研究)(?:上網|上网)?/.source + ZH_VERB
-  ].join("|")
-);
-/** Whole-clause vetoes: negation ("無法上網"), condition ("如需", "的話", "才會") and redirection ("改用標準研究"). */
-const WEB_VETO_ZH =
-  /無法|无法|沒辦法|没办法|沒有|没有|不需|不必|不用|不會|不会|不能|不要|不想|別再|别再|勿|如需|如果|假如|若|的話|的话|才會|才会|才能|才可|才要|改用|請說|请说|請改|请改|未(?!來|来)/;
-const EN_SUBJECT =
-  "\\b(?:I|we)(?:'ll|\\s+will|\\s+am\\s+going\\s+to|'m\\s+going\\s+to|\\s+can|\\s+shall)\\s+(?:(?:also|then|now|first|next|just|go\\s+ahead\\s+and|try\\s+to)\\s+)*";
-const WEB_PROMISE_EN = new RegExp(
-  `${EN_SUBJECT}(?:${[
-    "(?:search|browse)\\s+the\\s+(?:web|internet)\\b(?!\\s+(?:of|connection|protocols?|search\\s+engines?|platform))",
-    "(?:search|research|look(?:\\s+(?:it|this|that|them))?\\s+up|find(?:\\s+out)?)\\s+(?:(?:for|about)\\s+)?(?:(?:it|this|that|them|information|info|details|sources)\\s+)?(?:online(?=\\s*$|\\s+(?:to|for|and|first|before))|on\\s+the\\s+(?:web|internet)\\b(?!\\s+of))",
-    "go\\s+online\\b",
-    "use\\s+the\\s+(?:web|internet)\\s+to\\s+(?:search|research|look|find)",
-    "(?:do|run|perform|conduct)\\s+(?:a\\s+|some\\s+)?(?:web|online|internet)\\s+(?:search|research)\\b(?!\\s+engines?)"
-  ].join("|")})`,
-  "i"
-);
-const WEB_VETO_EN =
-  /\b(?:cannot|unable|won't|will\s+not|not|never|no|without|instead\s+of|rather\s+than|unless|only|if|would|don't|doesn't|need\s+not)\b|n't\b/i;
-/**
- * The safety net behind `needsWeb`: true when a reply's text promises a web search ("我會上網研究", "I'll search the web"). Judged per
- * clause; a clause with a negation, condition or redirection ("不需要上網", "如需上網請改用標準研究", "instead of searching the web") never
- * counts. Pure; fixed phrases only.
- */
-export function replyPromisesWeb(reply: string): boolean {
-  const clauses = reply.replace(/[’‘]/g, "'").split(/[。．.;；!！?？,，、:：\n]+/);
-  for (const clause of clauses) {
-    if (WEB_PROMISE_ZH.test(clause) && !WEB_VETO_ZH.test(clause)) return true;
-    if (WEB_PROMISE_EN.test(clause) && !WEB_VETO_EN.test(clause)) return true;
-  }
-  return false;
-}
 
 const invalid = (detail: string): MapChatError => new MapChatError("invalid", `Map chat reply is not valid: ${detail}`);
 
@@ -695,7 +642,6 @@ export function parseMapChat(
             images: research && mode !== "quick" && flag("images"),
             // Only a boolean `true` counts: a missing field (an older reply) or a string "true" is false.
             ...(research && flag("needsWeb") ? { needsWeb: true as const } : {}),
-            ...(research && replyPromisesWeb(String(body.reply)) ? { webPromised: true as const } : {}),
             ...(research && flag("otherProvider") ? { otherProvider: true as const } : {})
           });
           break;

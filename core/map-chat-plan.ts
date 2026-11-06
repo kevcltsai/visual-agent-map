@@ -209,7 +209,7 @@ export interface ChatResearchRequest {
 }
 /**
  * The mode a research runs in: the mode the user named, then Standard when the model says the research needs the web
- * (`needsWeb`) or its reply promises a web search (`webPromised`, see `replyPromisesWeb`), then the mode the map remembers,
+ * (`needsWeb`, the only signal; the reply text is not scanned), then the mode the map remembers,
  * then Quick (D-2026-10-228, 231; the web rule replaces 228's "no guess at how unfamiliar the topic is", map chat only).
  * Whether the targets are all new cards no longer matters. Decided here, not by the model: it only states the fact.
  */
@@ -218,7 +218,7 @@ export function chatResearchMode(
   mapAiMode: MapAiMode | undefined
 ): MapAiMode {
   if (action.mode) return action.mode;
-  if (action.needsWeb === true || action.webPromised === true) return "standard";
+  if (action.needsWeb === true) return "standard";
   return mapAiMode || "quick";
 }
 /** The research options of a mode (the view hands in `aiModeOptions(mode, "research")`; core does not import an experience). */

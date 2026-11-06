@@ -285,7 +285,7 @@ export interface MapChatRestoredConversation {
     /** What became of the plan card: no line (undefined) = it was still waiting; stopped counts as applied. */
     planState?: "applied" | "cancelled" | "stopped";
     /** The result lines the applied plan wrote. */
-    planLines?: { status: string; text: string }[];
+    planLines?: { status: string; text: string; basis?: MapChatBasis }[];
     images?: { state: string; items: { title: string; sourceUrl: string }[]; inserted: number[] };
   }[];
 }
@@ -1615,7 +1615,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
             ...answer.lines,
             ...turn.planLines.map((line): MapChatLine => ({
               status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
-              text: line.text
+              text: line.text,
+              ...(line.basis ? { basis: line.basis } : {})
             }))
           ];
         answer.plan = {
@@ -1655,15 +1656,6 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         if (text) answer.chainNote = { reason: end.reason, text };
       }
       this.messages.push(answer);
-    }
-    const lone = conversation.chainEnd;
-    if (!conversation.turns.length && lone && lone.reason !== "map_changed") {
-      const note: MapChatMessage = { role: "assistant", text: "", lines: [], stale: true };
-      const text = this.chainEndText(lone.reason, lone.remaining, undefined, note, lone.round, true);
-      if (text) {
-        note.chainNote = { reason: lone.reason, text };
-        this.messages.push(note);
-      }
     }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
     if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {

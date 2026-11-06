@@ -37766,7 +37766,8 @@ ${typed}` : draft;
             ...answer.lines,
             ...turn.planLines.map((line) => ({
               status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
-              text: line.text
+              text: line.text,
+              ...line.basis ? { basis: line.basis } : {}
             }))
           ];
         answer.plan = {
@@ -37806,15 +37807,6 @@ ${typed}` : draft;
         if (text12) answer.chainNote = { reason: end.reason, text: text12 };
       }
       this.messages.push(answer);
-    }
-    const lone = conversation.chainEnd;
-    if (!conversation.turns.length && lone && lone.reason !== "map_changed") {
-      const note = { role: "assistant", text: "", lines: [], stale: true };
-      const text12 = this.chainEndText(lone.reason, lone.remaining, void 0, note, lone.round, true);
-      if (text12) {
-        note.chainNote = { reason: lone.reason, text: text12 };
-        this.messages.push(note);
-      }
     }
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
     if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {
@@ -43318,7 +43310,6 @@ function restoreConversation(id, lines) {
   }
   const turns = [];
   const carried = /* @__PURE__ */ new Map();
-  let orphan;
   {
     let previous = null;
     for (const number of order) {
@@ -43326,8 +43317,8 @@ function restoreConversation(id, lines) {
       const comes = !!starts.get(number) && !!end && (end.status === "done" || end.status === "plan");
       if (comes) previous = number;
       else if (chainEnds.has(number)) {
-        if (previous === null) orphan = chainEnds.get(number);
-        else if (!chainEnds.has(previous) && !carried.has(previous)) carried.set(previous, chainEnds.get(number));
+        if (previous !== null && !chainEnds.has(previous) && !carried.has(previous))
+          carried.set(previous, chainEnds.get(number));
       }
     }
   }
@@ -43364,8 +43355,7 @@ function restoreConversation(id, lines) {
     mapId,
     turns,
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
-    startedResearch,
-    ...!turns.length && orphan ? { chainEnd: orphan } : {}
+    startedResearch
   };
 }
 
@@ -43568,7 +43558,7 @@ var MapChatRecordWriter = class {
     else if (!this.dead() && !conv.pending.length) conv.failed = false;
   }
   async writePending(conv, root, target, retry) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e, _f;
     const configDir = this.deps.configDir;
     const vault = this.deps.app.vault;
     if (!conv.file && conv.adapterPath) {
@@ -43579,6 +43569,7 @@ var MapChatRecordWriter = class {
       conv.held = false;
       return;
     }
+    const hadFile = !!conv.file;
     if (conv.file && (retry || !isFile(vault.getAbstractFileByPath(conv.file.path))))
       conv.file = this.resolve(conv, configDir);
     if (!conv.file) {
@@ -43602,6 +43593,7 @@ var MapChatRecordWriter = class {
         conv.root = root;
         conv.pending = [];
         conv.held = false;
+        if (hadFile) (_f = (_e = this.deps).onRebuilt) == null ? void 0 : _f.call(_e, conv.id);
         return;
       }
       conv.root = root;
@@ -75228,6 +75220,10 @@ ${note.detail.trim()}` : "",
         // The writer calls this once per conversation; the chat itself goes on.
         onFailure: () => {
           new import_obsidian37.Notice(t("ui.map_chat_record_failed"));
+        },
+        // A rebuilt file has lost the `research_started` mark: the next turn writes it again.
+        onRebuilt: (id) => {
+          if (this.chatResearchMarkedIn === id) this.chatResearchMarkedIn = null;
         },
         pluginVersion: (_b2 = (_a2 = this.plugin.manifest) == null ? void 0 : _a2.version) != null ? _b2 : "0.0.0",
         configDir: this.app.vault.configDir

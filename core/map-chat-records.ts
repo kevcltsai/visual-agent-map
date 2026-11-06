@@ -358,8 +358,6 @@ export interface RestoredConversation {
   restoredAt: string | null;
   /** The file says this conversation started web research (an older file has no mark: false). */
   startedResearch: boolean;
-  /** The end of a continuation whose turns cannot come back and with no earlier turn to hang it on: only its sentence shows. */
-  chainEnd?: { reason: MapChatChainEndReason; round: number; remaining: string };
 }
 
 /** Result lines read back from a file: the basis keeps its known shape only (a hand-edited file cannot put anything else on screen). */
@@ -427,9 +425,8 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   }
   const turns: RestoredTurn[] = [];
   // A chain ends on the turn the record was on, which may be a failed or stopped one (not restored): its sentence goes to the
-  // closest earlier turn that comes back (never over one that has its own), or stands alone with no such turn.
+  // closest earlier turn that comes back (never over one that has its own), or is dropped with no such turn (decision #19).
   const carried = new Map<number, { reason: MapChatChainEndReason; round: number; remaining: string }>();
-  let orphan: { reason: MapChatChainEndReason; round: number; remaining: string } | undefined;
   {
     let previous: number | null = null;
     for (const number of order) {
@@ -437,8 +434,9 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       const comes = !!starts.get(number) && !!end && (end.status === "done" || end.status === "plan");
       if (comes) previous = number;
       else if (chainEnds.has(number)) {
-        if (previous === null) orphan = chainEnds.get(number);
-        else if (!chainEnds.has(previous) && !carried.has(previous)) carried.set(previous, chainEnds.get(number)!);
+        // Decision #19: with no earlier turn that comes back, the sentence is dropped (a lone one has no context).
+        if (previous !== null && !chainEnds.has(previous) && !carried.has(previous))
+          carried.set(previous, chainEnds.get(number)!);
       }
     }
   }
@@ -481,7 +479,6 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     mapId,
     turns,
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
-    startedResearch,
-    ...(!turns.length && orphan ? { chainEnd: orphan } : {})
+    startedResearch
   };
 }

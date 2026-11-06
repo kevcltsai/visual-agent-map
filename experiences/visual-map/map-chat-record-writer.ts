@@ -23,6 +23,8 @@ export interface MapChatRecordWriterDeps {
   /** Called at most once per conversation, when a write failed twice (the view shows the Notice `ui.map_chat_record_failed`). */
   onFailure: () => void;
   pluginVersion: string;
+  /** The conversation's file was gone and was made again from the lines still queued (the view writes its once-per-file marks again). */
+  onRebuilt?: (conversationId: string) => void;
   /** The Vault's config folder name (a root with a part named like it is refused (any dot-folder is refused anyway). */
   configDir?: string;
   now?: () => Date;
@@ -291,6 +293,7 @@ export class MapChatRecordWriter {
     }
     // The file was deleted or moved away while this writer held its handle: Vault.append would write the path again as a new
     // file with no header, so the file is looked up again and, when it is gone, made again with the conversation header.
+    const hadFile = !!conv.file;
     if (conv.file && (retry || !isFile(vault.getAbstractFileByPath(conv.file.path))))
       conv.file = this.resolve(conv, configDir);
     if (!conv.file) {
@@ -314,6 +317,7 @@ export class MapChatRecordWriter {
         conv.root = root;
         conv.pending = [];
         conv.held = false;
+        if (hadFile) this.deps.onRebuilt?.(conv.id);
         return;
       }
       conv.root = root;

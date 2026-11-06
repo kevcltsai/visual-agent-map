@@ -21319,6 +21319,10 @@ export class VisualAgentMapView extends ItemView {
         onFailure: () => {
           new Notice(t("ui.map_chat_record_failed"));
         },
+        // A rebuilt file has lost the `research_started` mark: the next turn writes it again.
+        onRebuilt: id => {
+          if (this.chatResearchMarkedIn === id) this.chatResearchMarkedIn = null;
+        },
         pluginVersion: this.plugin.manifest?.version ?? "0.0.0",
         configDir: this.app.vault.configDir
       });

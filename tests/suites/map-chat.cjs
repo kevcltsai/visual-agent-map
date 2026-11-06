@@ -7118,6 +7118,12 @@ test('P4 round: an automatic round shows a separator with the round and what is 
   eq(classTexts(r.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)'], 'the basis comes back with the lines');
 });
 
+test('R7 F5: a plan card applied before the record closed keeps the basis of its result lines on restore', () => {
+  const r = panelFixture(); r.panel.setOpen(true);
+  r.panel.restore({ id: 'x', restoredAt: null, turns: [{ message: 'go', reply: 'One', lines: [], modelLabel: '', stalePlan: true, planState: 'applied', planLines: [{ status: 'done', text: 'Added', basis: researchBasis('Notes') }] }] });
+  eq(classTexts(r.parts.log(), 'vam-map-chat-basis-line'), ['Based on research note “Notes” (cards: 1)'], 'the basis of a plan result line comes back');
+});
+
 test('P4 wait: the row says how far, what is left and the seconds (hidden from readers); Send stays, Stop appears, Enter takes over; the reader hears the wait once and the seconds never', async () => {
   const s = stageFixture(); const { f } = s; f.panel.begin('go'); f.panel.finish('Started the research.', []);
   const row = () => find(f.parts.log(), i => hasClass(i, 'vam-map-chat-chain-wait'));
@@ -7583,6 +7589,39 @@ integrationTest('R6 B-1: research started while the record was off: the mark is 
   chainReplies(g, say('again', [], '')); g.type('more'); await g.view.sendMapChat(); await r5Wait(); await recordIdle(g);
   assert.equal(recordLines(g, recordFiles(g)[0]).filter(l => l.type === 'event' && l.kind === 'research_started').length, 1, 'later turns do not repeat it');
   await reopenAndDelete(lines2);
+});
+integrationTest('R7 F2: research mark, then every record deleted, then the same conversation goes on: the rebuilt file gets the mark again and a reopened conversation still asks before delete', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  const started = await researchChain(h, { remaining: '' }); await until(() => !started.chat.isBusy); await r5Wait(); await recordIdle(h);
+  const [first] = recordFiles(h); assert.equal(recordLines(h, first).filter(l => l.type === 'event' && l.kind === 'research_started').length, 1, 'marked once');
+  // the owner deletes every record while the conversation is open
+  for (const path of allRecordFiles(h)) { h.files.delete(path); h.contents.delete(path); }
+  assert.equal(recordFiles(h).length, 0);
+  chainReplies(h, say('ok', [], '')); h.type('after'); await h.view.sendMapChat(); await r5Wait(); await recordIdle(h);
+  chainReplies(h, say('more', [], '')); h.type('more'); await h.view.sendMapChat(); await r5Wait(); await recordIdle(h);
+  const lines = recordLines(h, recordFiles(h)[0]);
+  assert.equal(lines.filter(l => l.type === 'event' && l.kind === 'research_started').length, 1, 'the rebuilt file has the mark once');
+  const { r, c } = await r6Reopen(lines); assert.equal(r.view.chatStartedResearch, true, 'the mark came back');
+  chainReplies(r, say('Doing.', [r4Del(r.ids.b)], '')); r.type('tidy'); await r.view.sendMapChat(); await r5Wait();
+  assert.ok(c.pendingPlan(), 'a plan card'); assert.ok(r4Has(r, r.ids.b));
+});
+integrationTest('R7 F1: the first turn stopped with a chain_end: nothing is pushed alone on reopen, two sends pair up, earlierTurns are right, no backfilled line, and a second reopen matches the screen', async () => {
+  // Decision #19: the stopped first turn does not come back, and its end sentence is dropped (it used to be pushed as one lone assistant message).
+  const at = REC_AT;
+  const seed = [rec('conversation', { id: REC_ID, startedAt: at, mapPath: MAP, mapId: 'map-a', pluginVersion: '1' }),
+    rec('turn_start', { turn: 1, at, message: 'first' }), rec('turn_end', { turn: 1, at, status: 'stopped', raw: null, reply: 'half', lines: [], modelLabel: '' }),
+    rec('event', { turn: 1, at, kind: 'chain_end', reason: 'stopped', round: 2, remaining: 'More' })];
+  const h = await harness({ records: true }); await h.view.hydrate(); await seedRecord(h, seed, REC_ID); const chat = h.open();
+  await until(() => h.view.chatRecords?.conversationId === REC_ID); await tick(); await tick();
+  eq(chat.transcript().map(m => m.role), [], 'no lone message');
+  await sendOne(h, 'one', 'First answer'); await sendOne(h, 'two', 'Second answer');
+  eq(JSON.parse(h.control.requests[1].context.json).earlierTurns, [{ role: 'user', text: 'one' }, { role: 'assistant', text: 'First answer' }]);
+  const screen = chat.transcript().map(m => [m.role, m.text]);
+  eq(screen.map(x => x[0]), ['user', 'assistant', 'user', 'assistant']);
+  const lines = recordLines(h, `${ROOT_A}/Chats/records/${REC_ID}.jsonl`);
+  assert.equal(lines.some(l => l.backfilled), false, 'nothing backfilled');
+  const { c } = await r6Reopen(lines);
+  eq(c.transcript().map(m => m.role), ['user', 'assistant', 'user', 'assistant']); eq(c.transcript().map(m => m.text), screen.map(x => x[1]));
 });
 integrationTest('R6 B-2: an expansion fails after the plan was applied: the restored lines are the screen (the result once, no old start line), and the plan card has no Apply / Cancel', async () => {
   const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();

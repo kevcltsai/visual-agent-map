@@ -370,10 +370,11 @@ test('the writer never calls plugin.mutate', () => {
 
 test('R6 restore order: a lines row after the plan row is the complete result and replaces the plan lines; one before it stays; the shape of a real record (1 expand + 15 add_child) comes back once', () => {
   const at = '2026-11-06T10:00:00.000Z';
-  const item = (status, text) => ({ status, text });
+  const item = (status, text, basis) => ({ status, text, ...(basis ? { basis } : {}) });
   const start = n => ({ v: 1, type: 'turn_start', turn: n, at, message: 'm' + n });
   const end = (n, status, lines = []) => ({ v: 1, type: 'turn_end', turn: n, at, status, raw: null, reply: 'r', lines, modelLabel: '' });
-  const children = Array.from({ length: 15 }, (_, i) => item('done', `add ${i}`));
+  const basis = { kind: 'research', sources: [{ id: 'a', title: 'Notes' }] };
+  const children = Array.from({ length: 15 }, (_, i) => item('done', `add ${i}`, i === 0 ? basis : undefined));
   const planLines = [item('done', 'expand 1 started'), ...children];
   const lines = [start(1), end(1, 'plan'), { v: 1, type: 'plan', turn: 1, at, state: 'applied', lines: planLines },
     { v: 1, type: 'lines', turn: 1, at, lines: [item('failed', 'expand failed'), ...children] }];
@@ -384,9 +385,11 @@ test('R6 restore order: a lines row after the plan row is the complete result an
   const before = [start(1), end(1, 'plan'), { v: 1, type: 'lines', turn: 1, at, lines: [item('done', 'early')] }, { v: 1, type: 'plan', turn: 1, at, state: 'applied', lines: planLines }];
   const t2 = records.restoreConversation('id', before).turns[0];
   assert.deepEqual(S.plain(t2.lines.map(l => l.text)), ['early']); assert.equal(t2.planLines.length, 16);
+  // R7 F5: the basis of a result line comes back with the plan's lines too
+  assert.deepEqual(S.plain(shown.find(l => l.text === 'add 0').basis), basis); assert.deepEqual(S.plain(t2.planLines.find(l => l.text === 'add 0').basis), basis);
 });
 
-test('R6 chain end of a turn that cannot come back: goes to the closest earlier restorable turn (not over its own), or stands alone', () => {
+test('R6 chain end of a turn that cannot come back: goes to the closest earlier restorable turn (not over its own), or is dropped (decision #19)', () => {
   const at = '2026-11-06T10:00:00.000Z';
   const start = n => ({ v: 1, type: 'turn_start', turn: n, at, message: 'm' + n });
   const end = (n, status) => ({ v: 1, type: 'turn_end', turn: n, at, status, raw: null, reply: 'r', lines: [], modelLabel: '' });
@@ -395,7 +398,10 @@ test('R6 chain end of a turn that cannot come back: goes to the closest earlier 
     const r = records.restoreConversation('id', [start(1), end(1, 'done'), start(2), end(2, reason === 'failed' ? 'failed' : 'stopped'), ev(2, reason)]);
     assert.deepEqual(S.plain(r.turns.map(t => t.chainEnd?.reason)), [reason], reason); assert.equal(r.chainEnd, undefined);
     const alone = records.restoreConversation('id', [start(1), end(1, 'failed'), ev(1, reason)]);
-    assert.equal(alone.turns.length, 0); assert.equal(alone.chainEnd?.reason, reason, reason + ' alone');
+    // Decision #19 (R7 F1): the first turn itself does not come back, so a lone end sentence has nothing to hang on and is dropped
+    // (it used to be a RestoredConversation.chainEnd that the panel pushed as an unpaired assistant message). Not a loosened test:
+    // the product decision changed, and the reverse is asserted here.
+    assert.equal(alone.turns.length, 0); assert.equal('chainEnd' in alone, false, reason + ' alone');
   }
   const own = records.restoreConversation('id', [start(1), end(1, 'done'), ev(1, 'done'), start(2), end(2, 'failed'), ev(2, 'failed')]);
   assert.equal(own.turns[0].chainEnd.reason, 'done', 'a turn keeps its own end');

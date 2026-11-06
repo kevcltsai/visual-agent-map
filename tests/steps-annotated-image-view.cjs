@@ -1169,6 +1169,22 @@ test('counter-example (repaint mid-drag): the old dot writes nothing and leaves 
   assert.equal(h.dot().style.left, '50%', 'the new dot is where the data says');
 });
 
+test('counter-example (repaint on focus): a dot replaced by the press starts no drag and does not throw', async () => {
+  const h = await dragHarness();
+  const entries = h.view.history.past.length, before = h.fileText();
+  const old = h.dot();
+  old.focus = () => { old.isConnected = false; };
+  old.setPointerCapture = () => { throw new Error('setPointerCapture on a detached dot'); };
+  assert.doesNotThrow(() => press(old));
+  assert.equal(h.view.anchorDragCancel, null);
+  assert.equal(docListeners(h), 0);
+  old.fire('pointermove', { clientX: 1180, clientY: 590 });
+  old.fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.fileText(), before);
+  assert.equal(h.view.history.past.length, entries);
+});
+
 test('anchor drag: Esc while pressed but not yet moved 3px is not swallowed, and the release is still a click', async () => {
   const h = await dragHarness();
   const entries = h.view.history.past.length, before = h.fileText();

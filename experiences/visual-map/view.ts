@@ -8738,6 +8738,8 @@ export class VisualAgentMapView extends ItemView {
       event.preventDefault();
       // preventDefault keeps the browser from focusing the button, so a plain click still leaves it focused for Enter / Delete.
       dot.focus({ preventScroll: true });
+      // The focus event can repaint synchronously and replace this dot; capturing the pointer on a detached element throws.
+      if (dot.isConnected === false) return;
       this.anchorDragCancel?.(true);
       const start = { x: event.clientX, y: event.clientY },
         doc = this.contentEl?.ownerDocument;

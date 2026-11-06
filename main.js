@@ -63841,6 +63841,7 @@ ${request.requirements}` : preset.text,
       if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
       event.preventDefault();
       dot.focus({ preventScroll: true });
+      if (dot.isConnected === false) return;
       (_a2 = this.anchorDragCancel) == null ? void 0 : _a2.call(this, true);
       const start = { x: event.clientX, y: event.clientY }, doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
       let active = false, done = false, to = { x: origin.x, y: origin.y };

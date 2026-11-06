@@ -618,7 +618,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-ai-mode > button { margin: 0; border: 0; background: transparent; box-shadow: none; color: var(--text-muted); }
 .vam-ai-mode > button.is-active { background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-normal); }
 .vam-multi-research-topic { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.vam-multi-research-mode { flex: 0 0 auto; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-multi-research-mode-note { margin: 6px 0 8px; padding: 6px 10px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--color-orange) 15%, transparent); color: var(--text-normal); font-size: var(--font-ui-smaller); }
+.vam-multi-research-mode-note[hidden] { display: none; }
 .vam-next-research > p { color: var(--text-muted); }
 .vam-next-research { border-top: 1px solid var(--background-modifier-border); padding-top: 16px; }
 .vam-next-source-summary-row { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; min-width: 0; }

@@ -599,7 +599,7 @@ integrationTest('one AI-mode widget with one default: the Next Step dialog and t
   assert.deepEqual(findAll(modal.contentEl, i => i.tag === 'button' && i.attrs.role === 'radio').map(r => [r.text, r.attrs['aria-checked']]), [['Quick', 'true'], ['Standard', 'false']], 'the outline window starts on Quick');
   const multi = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
   const dialog = new multi.MultiResearchModal({}, ['A'], { list: () => [], watch: () => () => {} }, () => {}); dialog.open();
-  assert.equal(findAll(dialog.contentEl, i => i.type === 'radio' || i.attrs?.role === 'radio').length, 0, 'multi-research has no mode choice of its own');
+  assert.deepEqual(findAll(dialog.contentEl, i => i.tag === 'button' && i.attrs.role === 'radio').map(r => [r.text, r.attrs['aria-checked']]), [['Quick', 'true'], ['Standard', 'false']], 'multi-research shares the same widget (was: no mode choice of its own) and starts on Quick');
 });
 integrationTest('map stylesheet: the AI-mode choice uses JS-toggled classes, so no :has() is left on the map or the AI dialog', () => {
   const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'styles.css'), 'utf8');

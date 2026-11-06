@@ -892,6 +892,8 @@ export const en = {
   "ui.annotated_image_place_anchor": "Place anchor",
   "ui.anchor_new_title": "New anchor",
   "ui.anchor_edit_title": "Edit anchor",
+  "ui.anchor_menu_edit": "Edit anchor…",
+  "ui.anchor_menu_delete": "Delete anchor",
   "ui.anchor_note_label": "Anchor note (optional)",
   "ui.anchor_target_label": "Link this anchor to",
   "ui.anchor_target_new": "Add a new topic (relation: related)",

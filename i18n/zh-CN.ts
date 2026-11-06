@@ -835,6 +835,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.annotated_image_place_anchor": "放置锚点",
   "ui.anchor_new_title": "新锚点",
   "ui.anchor_edit_title": "编辑锚点",
+  "ui.anchor_menu_edit": "编辑锚点…",
+  "ui.anchor_menu_delete": "删除锚点",
   "ui.anchor_note_label": "锚点说明（选填）",
   "ui.anchor_target_label": "这个锚点要连到",
   "ui.anchor_target_new": "新增议题（关系：相关）",

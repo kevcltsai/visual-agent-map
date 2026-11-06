@@ -9190,6 +9190,31 @@ export class VisualAgentMapView extends ItemView {
     bar.createSpan({ text: image.note || name, cls: "vam-annotated-note" });
     bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
   }
+  /** The right-click / Shift+F10 / Menu-key menu of one anchor: edit it, or delete only it (with its relations, one undo step). */
+  private openAnchorMenu(event: MouseEvent, imageId: string, anchorId: string, dot: HTMLElement): void {
+    if (!this.canEditCanvasItems()) return;
+    event.preventDefault();
+    const menu = this.newMenu();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.anchor_menu_edit"))
+        .setIcon("pencil")
+        .onClick(() => this.editAnchorDialog(imageId, anchorId))
+    );
+    menu.addSeparator();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.anchor_menu_delete"))
+        .setIcon("trash-2")
+        .setWarning(true)
+        .onClick(() => this.enqueue(() => this.deleteAnchor(imageId, anchorId)))
+    );
+    // The Menu key and Shift+F10 send a contextmenu event at (0, 0): put the menu beside the anchor.
+    if (event.clientX === 0 && event.clientY === 0) {
+      const box = dot.getBoundingClientRect();
+      menu.showAtPosition({ x: box.left, y: box.bottom });
+    } else menu.showAtMouseEvent(event);
+  }
   /**
    * The right-click / Shift+F10 / Menu-key menu of one image. A plain image offers conversion; an annotated image its own
    * actions. P3b adds "Place anchor" at the marked spot.
@@ -11102,7 +11127,10 @@ export class VisualAgentMapView extends ItemView {
     const target = event.target as Element | null;
     const imageEl = target?.closest?.<HTMLElement>(".vam-canvas-image");
     if (imageEl) {
-      this.openImageMenu(event, imageEl);
+      const dot = target?.closest?.<HTMLElement>(".vam-anchor[data-anchor-id]");
+      const anchorId = dot?.dataset.anchorId;
+      if (dot && anchorId && imageEl.dataset.itemId) this.openAnchorMenu(event, imageEl.dataset.itemId, anchorId, dot);
+      else this.openImageMenu(event, imageEl);
       return;
     }
     if (

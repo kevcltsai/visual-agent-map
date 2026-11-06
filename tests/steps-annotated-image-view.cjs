@@ -996,3 +996,82 @@ test('counter-example (card height not measured yet): the first place uses the d
   await g.view.commitAnchor('img1', { x: 0.5, y: 0.02 }, 'Short', { kind: 'new' });
   assert.equal(again, 0);
 });
+
+// Anchor menu: right-click on a real anchor button offers edit / delete-only-this-anchor.
+const anchorMenu = (h, { keyboard = false, anchorId = 'a1', preview = false } = {}) => {
+  const el = h.imageEl(), before = h.menus.length;
+  const dot = find(h.view.stageEl, i => i.dataset && i.dataset.anchorId === anchorId) ?? { dataset: { anchorId } };
+  dot.getBoundingClientRect = () => ({ left: 11, bottom: 33 });
+  let prevented = false;
+  const closest = sel => (sel === '.vam-canvas-image' ? el : sel === '.vam-anchor[data-anchor-id]' && !preview ? dot : null);
+  h.view.onCanvasContextMenu({ target: { closest }, clientX: keyboard ? 0 : 5, clientY: keyboard ? 0 : 5, preventDefault() { prevented = true; } });
+  return h.menus.length > before ? Object.assign(h.menus.at(-1), { prevented }) : null;
+};
+const withRelations = root => [annotated({ note: 'n', anchors: [anchor('a1'), anchor('a2')], relations: [{ kind: 'related', from: 'a1', to: 'a2' }, { kind: 'supports', from: root, to: 'a2' }] })];
+
+test('anchor menu: right-click on an anchor offers Edit anchor and Delete anchor; the Menu key opens it beside the anchor', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  const menu = anchorMenu(h);
+  assert.deepEqual(menu.items.map(i => h.titleOf(i)), ['Edit anchor…', 'Delete anchor']);
+  assert.equal(menu.items[1].warning, true);
+  assert.equal(menu.prevented, true);
+  assert.equal(menu.mouse, true);
+  assert.deepEqual(plain(anchorMenu(h, { keyboard: true }).at), { x: 11, y: 33 });
+});
+
+test('counter-example (destructive): Delete anchor removes only that anchor and its lines; image, other anchor and topics stay; one undo restores all', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  const nodes = h.view.map.nodes.length, entries = h.view.history.past.length;
+  const before = await h.onDisk();
+  anchorMenu(h).items[1].fn();
+  await h.settle();
+  const [img] = await h.onDisk();
+  assert.equal(img.id, 'img1');
+  assert.deepEqual(img.anchors.map(a => a.id), ['a2']);
+  assert.deepEqual((img.relations ?? []).filter(r => r.from === 'a1' || r.to === 'a1'), []);
+  assert.deepEqual(img.relations, [{ kind: 'supports', from: h.view.map.nodes[0].id, to: 'a2' }]);
+  assert.equal(h.view.map.nodes.length, nodes);
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, nodes);
+  assert.equal(h.view.history.past.length, entries + 1);
+  await h.view.history.undoEntry.undo();
+  assert.deepEqual(await h.onDisk(), before);
+});
+
+test('counter-example (read-only): right-click on an anchor in selection mode or AIM opens no menu and changes nothing', async () => {
+  for (const mode of ['selection', 'aim']) {
+    const h = await harness(withRelations);
+    if (mode === 'selection') h.view.selection.toggleMultiSelect();
+    else h.view.aimLive = () => true;
+    h.view.render();
+    const before = h.fileText();
+    assert.equal(anchorMenu(h), null, mode);
+    assert.equal(h.fileText(), before, mode);
+  }
+});
+
+test('counter-example (preview anchor): a preview span without data-anchor-id still opens the image menu', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  const menu = anchorMenu(h, { preview: true });
+  assert.deepEqual(menu.items.map(i => h.titleOf(i).split(' | ')[0]), ['Place anchor', 'Edit note…', 'Convert back to plain image', 'Delete (with its anchors and relations)']);
+});
+
+test('counter-example (image blank area): right-click outside any anchor keeps the four-item image menu', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  assert.equal(h.contextMenu().items.length, 4);
+});
+
+test('regression: deleting the image keeps every topic on the map', async () => {
+  const h = await harness(withRelations);
+  h.view.render();
+  const nodes = h.view.map.nodes.length;
+  assert.ok(nodes > 0);
+  h.pick(h.contextMenu(), 'Delete').fn();
+  await h.settle();
+  assert.equal(await h.onDisk(), undefined);
+  assert.equal(h.view.map.nodes.length, nodes);
+  assert.equal((await h.repo.readMap(MAP)).nodes.length, nodes);
+});

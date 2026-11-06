@@ -473,7 +473,7 @@ test('#11 real order for other menus: the new-map menu counts as closed by the E
   const fs = require('node:fs'), path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.equal((source.match(/new Menu\(\)/g) ?? []).length, 1, 'only newMenu itself builds a Menu');
-  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 15, 'the other fifteen menus use it (goal banner P3 removed the toolbar topic menu; annotated-image P3a added the image right-click menu; ticket 21 added the add-type list; ticket 39 added the card More and selection More menus) (C2 made More mind map actions one; ticket 41 removed openRelationKindMenu, the relation kind is now a select in the card window)');
+  assert.equal((source.match(/= this\.newMenu\(/g) ?? []).length, 16, 'the other sixteen menus use it (anchor right-click menu added; goal banner P3 removed the toolbar topic menu; annotated-image P3a added the image right-click menu; ticket 21 added the add-type list; ticket 39 added the card More and selection More menus) (C2 made More mind map actions one; ticket 41 removed openRelationKindMenu, the relation kind is now a select in the card window)');
   const card = source.slice(source.indexOf('private onCanvasContextMenu'), source.indexOf('private openCanvasImagePicker'));
   assert.match(card, /this\.newMenu\(cardId\)/, 'the card right-click menu keeps its card as the focus fallback');
 });

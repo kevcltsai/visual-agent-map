@@ -29537,6 +29537,268 @@ var KeyboardShortcutsModal = class extends import_obsidian20.Modal {
   }
 };
 
+// experiences/visual-map/image-ring.ts
+var RING_IMAGE_SIDE = 720;
+var RING_MARGIN = 64;
+var RING_GROW = 40;
+var RING_GAP = LAYOUT_GAP;
+var RING_OBSTACLE_GAP = 80;
+var EPS = 1e-6;
+var cardW = (c) => c.w !== void 0 && c.w > 0 ? c.w : CARD_WIDTH;
+var cardH = (c) => c.h !== void 0 && c.h > 0 ? c.h : DEFAULT_CARD_HEIGHT;
+function ringMembers(items, nodes) {
+  var _a2, _b2;
+  const free = new Set(nodes.filter((n) => n.parentId == null).map((n) => n.id));
+  const claimed = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const item of items) {
+    if (!isAnnotatedImage(item)) continue;
+    const anchors = new Map(item.anchors.map((a) => [a.id, a]));
+    for (const r of (_a2 = item.relations) != null ? _a2 : []) {
+      if (r.ring !== true) continue;
+      const anchorId = anchors.has(r.from) ? r.from : r.to;
+      const topicId = anchorId === r.from ? r.to : r.from;
+      const at = (_b2 = anchors.get(anchorId)) == null ? void 0 : _b2.at;
+      if (!at || at.kind !== "image-2d" || anchors.has(topicId) || !free.has(topicId) || claimed.has(topicId)) continue;
+      claimed.add(topicId);
+      out.push({ imageId: item.id, topicId, anchorId, x: at.x, y: at.y });
+    }
+  }
+  return out;
+}
+function ringImageSize(image) {
+  const longest = Math.max(image.w, image.h);
+  if (!(longest > 0) || longest >= RING_IMAGE_SIDE) return { ...image };
+  const k = RING_IMAGE_SIDE / longest;
+  const w = image.w * k;
+  const h = image.h * k;
+  return { x: image.x + (image.w - w) / 2, y: image.y + (image.h - h) / 2, w, h };
+}
+var expand = (r, m) => ({ x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m });
+function ringSlotsAt(clearance, cell) {
+  const { x: L, y: T } = clearance;
+  const Rr = L + clearance.w;
+  const B = T + clearance.h;
+  const out = [];
+  const perRow = Math.floor(clearance.w / (cell.w + RING_GAP)) + 1;
+  const rowSpan = (perRow - 1) * (cell.w + RING_GAP);
+  for (const [side, ay] of [
+    ["top", T],
+    ["bottom", B]
+  ])
+    for (let i = 0; i < perRow; i++) out.push({ side, ax: (L + Rr) / 2 - rowSpan / 2 + i * (cell.w + RING_GAP), ay });
+  const perColumn = Math.max(0, Math.floor((clearance.h - 2 * RING_GAP + RING_GAP) / (cell.h + RING_GAP)));
+  const columnSpan = (perColumn - 1) * (cell.h + RING_GAP);
+  for (const [side, ax] of [
+    ["left", L],
+    ["right", Rr]
+  ])
+    for (let i = 0; i < perColumn; i++)
+      out.push({ side, ax, ay: (T + B) / 2 - columnSpan / 2 + i * (cell.h + RING_GAP) });
+  return out;
+}
+function ringSlots(image, count, cell, margin = RING_MARGIN) {
+  for (let m = margin; ; m += RING_GROW) {
+    const clearance = expand(image, m);
+    const slots = ringSlotsAt(clearance, cell);
+    if (slots.length >= count) return { slots, clearance };
+  }
+}
+function ringCardRect(slot, w, h) {
+  switch (slot.side) {
+    case "top":
+      return { x: slot.ax - w / 2, y: slot.ay - h, w, h };
+    case "bottom":
+      return { x: slot.ax - w / 2, y: slot.ay, w, h };
+    case "left":
+      return { x: slot.ax - w, y: slot.ay - h / 2, w, h };
+    case "right":
+      return { x: slot.ax, y: slot.ay - h / 2, w, h };
+  }
+}
+var intersects = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+function ringSide(image, card) {
+  const cx = card.x + card.w / 2;
+  const cy = card.y + card.h / 2;
+  const ox = Math.max(image.x - cx, cx - (image.x + image.w), 0);
+  const oy = Math.max(image.y - cy, cy - (image.y + image.h), 0);
+  if (ox > oy) return cx < image.x + image.w / 2 ? "left" : "right";
+  return cy < image.y + image.h / 2 ? "top" : "bottom";
+}
+function ringLine(image, anchorX, anchorY, card) {
+  const side = ringSide(image, card);
+  const end = side === "top" ? [card.x + card.w / 2, card.y + card.h] : side === "bottom" ? [card.x + card.w / 2, card.y] : side === "left" ? [card.x + card.w, card.y + card.h / 2] : [card.x, card.y + card.h / 2];
+  return { x1: image.x + anchorX * image.w, y1: image.y + anchorY * image.h, x2: end[0], y2: end[1] };
+}
+function segmentHitsRect(s, r) {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = s.x2 - s.x1;
+  const dy = s.y2 - s.y1;
+  for (const [p, q] of [
+    [-dx, s.x1 - r.x],
+    [dx, r.x + r.w - s.x1],
+    [-dy, s.y1 - r.y],
+    [dy, r.y + r.h - s.y1]
+  ]) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const t2 = q / p;
+    if (p < 0) {
+      if (t2 > t1) return false;
+      if (t2 > t0) t0 = t2;
+    } else {
+      if (t2 < t0) return false;
+      if (t2 < t1) t1 = t2;
+    }
+  }
+  return t0 <= t1;
+}
+var orient = (ax, ay, bx, by, cx, cy) => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+function segmentsCross(a, b) {
+  const d1 = orient(a.x1, a.y1, a.x2, a.y2, b.x1, b.y1);
+  const d2 = orient(a.x1, a.y1, a.x2, a.y2, b.x2, b.y2);
+  const d3 = orient(b.x1, b.y1, b.x2, b.y2, a.x1, a.y1);
+  const d4 = orient(b.x1, b.y1, b.x2, b.y2, a.x2, a.y2);
+  return d1 * d2 < -EPS && d3 * d4 < -EPS;
+}
+var lengthOf = (s) => Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
+function ringViolations(image, cards, options = {}) {
+  var _a2;
+  const out = [];
+  const lines = cards.map((c) => ringLine(image, c.anchorX, c.anchorY, c));
+  if (options.memberCount !== void 0 && options.memberCount !== cards.length || new Set(cards.map((c) => c.id)).size !== cards.length)
+    out.push({ code: "count", ids: [] });
+  for (let i = 0; i < cards.length; i++) {
+    const a = cards[i];
+    if (intersects(a, image)) out.push({ code: "card-on-image", ids: [a.id] });
+    for (const o of (_a2 = options.others) != null ? _a2 : []) if (intersects(a, o)) out.push({ code: "overlap-other", ids: [a.id] });
+    for (let j = 0; j < cards.length; j++) {
+      if (j === i) continue;
+      const b = cards[j];
+      if (j > i && intersects(a, b)) out.push({ code: "overlap", ids: [a.id, b.id] });
+      if (segmentHitsRect(lines[i], b)) out.push({ code: "line-through-card", ids: [a.id, b.id] });
+      if (j > i && segmentsCross(lines[i], lines[j])) out.push({ code: "crossing", ids: [a.id, b.id] });
+      if (j > i) {
+        const swapped = lengthOf(ringLine(image, a.anchorX, a.anchorY, b)) + lengthOf(ringLine(image, b.anchorX, b.anchorY, a));
+        if (swapped < lengthOf(lines[i]) + lengthOf(lines[j]) - 1e-6) out.push({ code: "pairing", ids: [a.id, b.id] });
+      }
+    }
+  }
+  return out;
+}
+function assign(cost) {
+  const n = cost.length;
+  const m = n ? cost[0].length : 0;
+  const u = new Array(n + 1).fill(0);
+  const v = new Array(m + 1).fill(0);
+  const p = new Array(m + 1).fill(0);
+  const way = new Array(m + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i;
+    let j0 = 0;
+    const minv = new Array(m + 1).fill(Infinity);
+    const used = new Array(m + 1).fill(false);
+    do {
+      used[j0] = true;
+      const i0 = p[j0];
+      let delta = Infinity;
+      let j1 = 0;
+      for (let j = 1; j <= m; j++) {
+        if (used[j]) continue;
+        const cur = cost[i0 - 1][j - 1] - u[i0] - v[j];
+        if (cur < minv[j]) {
+          minv[j] = cur;
+          way[j] = j0;
+        }
+        if (minv[j] < delta) {
+          delta = minv[j];
+          j1 = j;
+        }
+      }
+      for (let j = 0; j <= m; j++) {
+        if (used[j]) {
+          u[p[j]] = u[p[j]] + delta;
+          v[j] = v[j] - delta;
+        } else minv[j] = minv[j] - delta;
+      }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do {
+      const j1 = way[j0];
+      p[j0] = p[j1];
+      j0 = j1;
+    } while (j0);
+  }
+  const rows2 = new Array(n).fill(-1);
+  for (let j = 1; j <= m; j++) if (p[j]) rows2[p[j] - 1] = j - 1;
+  return rows2;
+}
+var clamp012 = (v) => Math.min(1, Math.max(0, v));
+function solveRing(image, members) {
+  const cell = {
+    w: members.reduce((m, c) => Math.max(m, cardW(c)), 0) || CARD_WIDTH,
+    h: members.reduce((m, c) => Math.max(m, cardH(c)), 0) || DEFAULT_CARD_HEIGHT
+  };
+  const { slots, clearance } = ringSlots(image, members.length, cell);
+  const points = members.map(
+    (c) => [image.x + clamp012(c.anchorX) * image.w, image.y + clamp012(c.anchorY) * image.h]
+  );
+  const cost = points.map((p) => slots.map((s) => Math.hypot(p[0] - s.ax, p[1] - s.ay)));
+  const picked = assign(cost);
+  const cards = members.map((c, i) => {
+    const slot = slots[picked[i]];
+    const rect2 = ringCardRect(slot, cardW(c), cardH(c));
+    return {
+      id: c.id,
+      ...rect2,
+      side: slot.side,
+      line: { x1: points[i][0], y1: points[i][1], x2: slot.ax, y2: slot.ay }
+    };
+  });
+  return { clearance, cards };
+}
+function ringBounds(image, cards) {
+  let x0 = image.x;
+  let y0 = image.y;
+  let x1 = image.x + image.w;
+  let y1 = image.y + image.h;
+  for (const c of cards) {
+    x0 = Math.min(x0, c.x);
+    y0 = Math.min(y0, c.y);
+    x1 = Math.max(x1, c.x + c.w);
+    y1 = Math.max(y1, c.y + c.h);
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+function findFreeOffset(footprint, obstacles, gap = RING_OBSTACLE_GAP) {
+  const hits = (dx, dy) => obstacles.some((o) => intersects({ x: footprint.x + dx, y: footprint.y + dy, w: footprint.w, h: footprint.h }, o));
+  if (!hits(0, 0)) return { dx: 0, dy: 0 };
+  const candidates = [];
+  const around = (box, g) => {
+    candidates.push(
+      { dx: box.x - g - footprint.w - footprint.x, dy: 0 },
+      { dx: box.x + box.w + g - footprint.x, dy: 0 },
+      { dx: 0, dy: box.y - g - footprint.h - footprint.y },
+      { dx: 0, dy: box.y + box.h + g - footprint.y }
+    );
+  };
+  for (const o of obstacles) around(o, gap);
+  around(ringBounds(obstacles[0], obstacles), gap);
+  let best = null;
+  let bestCost = Infinity;
+  for (const c of candidates) {
+    const cost = Math.hypot(c.dx, c.dy);
+    if (cost < bestCost && !hits(c.dx, c.dy)) {
+      best = c;
+      bestCost = cost;
+    }
+  }
+  return best != null ? best : { dx: 0, dy: 0 };
+}
+
 // map-layout-text.ts
 function visibleTexts(nodes, items, hidden) {
   const topics = new Map(nodes.map((node) => [node.id, node]));
@@ -29604,6 +29866,266 @@ function arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minT
       placed.filter((node) => !real.has(node.id))
     )
   };
+}
+var OUTWARD = { top: "up", bottom: "down", left: "left", right: "right" };
+var IN_THE_WAY = /* @__PURE__ */ new Set(["overlap", "overlap-other", "line-through-card", "card-on-image", "crossing"]);
+var TEXT_FALLBACK_WIDTH = 160;
+var TEXT_FALLBACK_HEIGHT = 28;
+function ringGroups(nodes, items) {
+  if (!items.some((item) => {
+    var _a2;
+    return isAnnotatedImage(item) && ((_a2 = item.relations) == null ? void 0 : _a2.some((r) => r.ring === true));
+  })) return [];
+  const members = ringMembers(items, nodes);
+  const groups = /* @__PURE__ */ new Map();
+  for (const member of members) {
+    const hit = groups.get(member.imageId);
+    if (hit) hit.members.push(member);
+    else {
+      const image = items.find((item) => isAnnotatedImage(item) && item.id === member.imageId);
+      groups.set(member.imageId, { image, members: [member] });
+    }
+  }
+  return [...groups.values()];
+}
+var nodeRect = (node, heightOf) => {
+  var _a2, _b2, _c;
+  return {
+    x: node.x,
+    y: node.y,
+    w: (_a2 = node.width) != null ? _a2 : CARD_WIDTH,
+    h: (_c = (_b2 = heightOf == null ? void 0 : heightOf(node.id)) != null ? _b2 : node.height) != null ? _c : DEFAULT_CARD_HEIGHT
+  };
+};
+var imageRectOf = (image) => ({ x: image.x, y: image.y, w: image.w, h: image.h });
+function ringTreeIds(nodes, items) {
+  const out = /* @__PURE__ */ new Set();
+  for (const group of ringGroups(nodes, items))
+    for (const member of group.members) {
+      out.add(member.topicId);
+      for (const id of descendants(nodes, member.topicId)) out.add(id);
+    }
+  return out;
+}
+function ringMemberIds(nodes, items) {
+  return new Set(ringGroups(nodes, items).flatMap((group) => group.members.map((member) => member.topicId)));
+}
+function ringOutwardDirections(nodes, items, heightOf) {
+  const out = /* @__PURE__ */ new Map();
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  for (const group of ringGroups(nodes, items))
+    for (const member of group.members) {
+      const node = byId.get(member.topicId);
+      if (node) out.set(member.topicId, OUTWARD[ringSide(imageRectOf(group.image), nodeRect(node, heightOf))]);
+    }
+  return out;
+}
+function directionWithRings(nodes, rings, id, mapDirection) {
+  if (!rings.size) return layoutDirectionFor(nodes, id, mapDirection);
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const layered = allowsBranchLayout(mapDirection);
+  let current = byId.get(id);
+  for (let guard = 0; current && guard < 1e4; guard++) {
+    const ring = rings.get(current.id);
+    if (ring) return ring;
+    const own2 = layered ? branchDirectionOf(current) : void 0;
+    if (own2) return own2;
+    current = current.parentId ? byId.get(current.parentId) : void 0;
+  }
+  return mapDirection;
+}
+var textRect = (item, heightOf, widthOf) => {
+  var _a2, _b2, _c;
+  return {
+    x: item.x,
+    y: item.y,
+    w: (_b2 = (_a2 = widthOf == null ? void 0 : widthOf(item.id)) != null ? _a2 : item.width) != null ? _b2 : TEXT_FALLBACK_WIDTH,
+    h: (_c = heightOf == null ? void 0 : heightOf(item.id)) != null ? _c : TEXT_FALLBACK_HEIGHT
+  };
+};
+function obstacleRects(nodes, items, selfImageId, trees, heightOf, widthOf, hidden, placed) {
+  const shown = visibleNodes(nodes).filter((node) => !trees.has(node.id) && !(hidden == null ? void 0 : hidden.has(node.id)));
+  const shownIds = new Set(shown.map((node) => node.id));
+  const known = new Set(nodes.map((node) => node.id));
+  const out = shown.map((node) => nodeRect(node, heightOf));
+  for (const item of items) {
+    if (item.kind === "text") {
+      const text11 = item;
+      const parent = text11.parentId;
+      if (parent !== void 0 && known.has(parent) && !shownIds.has(parent)) continue;
+      out.push(textRect(text11, heightOf, widthOf));
+    } else if ((item.kind === "image" || isAnnotatedImage(item)) && item.id !== selfImageId) {
+      const { x, y, w, h } = item;
+      if ([x, y, w, h].every(Number.isFinite)) out.push({ x, y, w, h });
+    }
+  }
+  return [...out, ...placed];
+}
+function layoutSubtree(nodes, items, rootId, direction, spacing, heightOf, widthOf) {
+  const ids = /* @__PURE__ */ new Set([rootId, ...descendants(nodes, rootId)]);
+  const sub = nodes.filter((node) => ids.has(node.id));
+  const layout = { direction, ...spacing ? { spacing } : {} };
+  const out = arrangeMapWithText(sub, items, void 0, heightOf, layout, { widthOf });
+  const at = new Map(out.nodes.map((node) => [node.id, node]));
+  const root = at.get(rootId);
+  const cards = /* @__PURE__ */ new Map();
+  const shown = visibleNodes(sub);
+  for (const node of shown) {
+    const spot = at.get(node.id);
+    cards.set(node.id, { dx: spot.x - root.x, dy: spot.y - root.y });
+  }
+  const texts2 = /* @__PURE__ */ new Map();
+  const shownIds = new Set(shown.map((node) => node.id));
+  for (const text11 of visibleTexts(sub, items).filter((item) => shownIds.has(item.parentId))) {
+    const spot = out.items.find((item) => item.id === text11.id && item.kind === "text");
+    texts2.set(text11.id, { dx: spot.x - root.x, dy: spot.y - root.y });
+  }
+  return { cards, texts: texts2 };
+}
+function solveRings(nodes, items, heightOf, widthOf, layout, options = {}) {
+  const groups = ringGroups(nodes, items).filter((group) => !options.imageIds || options.imageIds.has(group.image.id));
+  if (!groups.length) return { nodes, items: [...items] };
+  const spacing = typeof layout === "string" ? void 0 : layout.spacing;
+  const trees = ringTreeIds(nodes, items);
+  const placedRects = [];
+  const movedNodes = /* @__PURE__ */ new Map();
+  const movedTexts = /* @__PURE__ */ new Map();
+  const movedImages = /* @__PURE__ */ new Map();
+  const nodeAt = (id) => {
+    var _a2;
+    return (_a2 = movedNodes.get(id)) != null ? _a2 : nodes.find((node) => node.id === id);
+  };
+  for (const group of groups) {
+    const image = options.enlarge ? ringImageSize(imageRectOf(group.image)) : imageRectOf(group.image);
+    const inputs = group.members.map((member) => {
+      const rect2 = nodeRect(nodeAt(member.topicId), heightOf);
+      return { id: member.topicId, anchorX: member.x, anchorY: member.y, w: rect2.w, h: rect2.h };
+    });
+    const solved = solveRing(image, inputs);
+    const subtrees = solved.cards.map(
+      (card) => layoutSubtree(nodes, items, card.id, OUTWARD[ringSide(image, card)], spacing, heightOf, widthOf)
+    );
+    const footprint = [];
+    solved.cards.forEach((card, i) => {
+      for (const [id, off] of subtrees[i].cards)
+        footprint.push({ ...nodeRect(nodeAt(id), heightOf), x: card.x + off.dx, y: card.y + off.dy });
+      for (const [id, off] of subtrees[i].texts) {
+        const text11 = items.find((item) => item.kind === "text" && item.id === id);
+        footprint.push({ ...textRect(text11, heightOf, widthOf), x: card.x + off.dx, y: card.y + off.dy });
+      }
+    });
+    const obstacles = obstacleRects(
+      nodes,
+      items,
+      group.image.id,
+      trees,
+      heightOf,
+      widthOf,
+      options.hidden,
+      placedRects
+    );
+    const { dx, dy } = findFreeOffset(ringBounds(image, footprint), obstacles);
+    solved.cards.forEach((card, i) => {
+      const old = nodeAt(card.id);
+      const tx = Math.round(card.x + dx);
+      const ty = Math.round(card.y + dy);
+      const sub = subtrees[i];
+      const rootOff = { x: tx - old.x, y: ty - old.y };
+      for (const id of /* @__PURE__ */ new Set([card.id, ...descendants(nodes, card.id)])) {
+        const node = nodeAt(id);
+        const off = sub.cards.get(id);
+        movedNodes.set(
+          id,
+          off ? { ...node, x: tx + off.dx, y: ty + off.dy } : { ...node, x: node.x + rootOff.x, y: node.y + rootOff.y }
+        );
+      }
+      for (const item of items) {
+        if (item.kind !== "text") continue;
+        const text11 = item;
+        const below = text11.parentId !== void 0 && (text11.parentId === card.id || descendants(nodes, card.id).has(text11.parentId));
+        if (!below) continue;
+        const off = sub.texts.get(text11.id);
+        movedTexts.set(
+          text11.id,
+          off ? { x: tx + off.dx, y: ty + off.dy } : { x: text11.x + rootOff.x, y: text11.y + rootOff.y }
+        );
+      }
+    });
+    const finalImage = { ...image, x: image.x + dx, y: image.y + dy };
+    if (finalImage.x !== group.image.x || finalImage.y !== group.image.y || finalImage.w !== group.image.w || finalImage.h !== group.image.h)
+      movedImages.set(group.image.id, { ...group.image, ...finalImage });
+    placedRects.push(finalImage);
+    for (const rect2 of footprint) placedRects.push({ ...rect2, x: rect2.x + dx, y: rect2.y + dy });
+  }
+  return {
+    nodes: nodes.map((node) => {
+      var _a2;
+      return (_a2 = movedNodes.get(node.id)) != null ? _a2 : node;
+    }),
+    items: items.map((item) => {
+      var _a2;
+      if (item.kind === "text") {
+        const spot = movedTexts.get(item.id);
+        return spot ? { ...item, x: Math.round(spot.x), y: Math.round(spot.y) } : item;
+      }
+      return (_a2 = movedImages.get(item.id)) != null ? _a2 : item;
+    })
+  };
+}
+function arrangeMapWithRings(nodes, items, hidden, heightOf, layout, options = {}) {
+  const trees = ringTreeIds(nodes, items);
+  if (!trees.size) return arrangeMapWithText(nodes, items, hidden, heightOf, layout, options);
+  const skipped2 = /* @__PURE__ */ new Set([...hidden != null ? hidden : [], ...trees]);
+  const rest = nodes.every((node) => skipped2.has(node.id)) ? { nodes, items: [...items] } : arrangeMapWithText(nodes, items, skipped2, heightOf, layout, options);
+  return solveRings(rest.nodes, rest.items, heightOf, options.widthOf, layout, { hidden });
+}
+function arrangeNewBranchWithRings(nodes, items, parentId, newIds, heightOf, minTop, layout = "right", widthOf) {
+  const trees = ringTreeIds(nodes, items);
+  if (!trees.size) return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout, widthOf);
+  if (trees.has(parentId)) {
+    let top = nodes.find((node) => node.id === parentId);
+    while (top == null ? void 0 : top.parentId) top = nodes.find((node) => node.id === top.parentId);
+    const direction = top && ringOutwardDirections(nodes, items, heightOf).get(top.id);
+    const spacing = typeof layout === "string" ? void 0 : layout.spacing;
+    const own2 = { direction: direction != null ? direction : "right", ...spacing ? { spacing } : {} };
+    return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, own2, widthOf);
+  }
+  const kind = typeof layout === "string" ? layout : layout.direction;
+  if (kind !== "radial" && kind !== "timeline" && kind !== "fishbone")
+    return arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout, widthOf);
+  const rest = nodes.filter((node) => !trees.has(node.id));
+  const out = arrangeNewBranchWithText(rest, items, parentId, newIds, heightOf, minTop, layout, widthOf);
+  const placed = new Map(out.nodes.map((node) => [node.id, node]));
+  return { nodes: nodes.map((node) => {
+    var _a2;
+    return (_a2 = placed.get(node.id)) != null ? _a2 : node;
+  }), items: out.items };
+}
+function ringImagesInTheWay(nodes, items, heightOf, widthOf, touched, hidden) {
+  var _a2;
+  const out = /* @__PURE__ */ new Set();
+  const groups = ringGroups(nodes, items);
+  if (!groups.length) return out;
+  const trees = ringTreeIds(nodes, items);
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  for (const group of groups) {
+    const cards = group.members.map((member) => ({
+      id: member.topicId,
+      ...nodeRect(byId.get(member.topicId), heightOf),
+      anchorX: member.x,
+      anchorY: member.y
+    }));
+    const others = obstacleRects(nodes, items, group.image.id, trees, heightOf, widthOf, hidden, []);
+    const wholeImage = ((_a2 = touched.images) == null ? void 0 : _a2.has(group.image.id)) === true;
+    const bad = ringViolations(imageRectOf(group.image), cards, { others }).filter(
+      (v) => IN_THE_WAY.has(v.code) && (wholeImage || v.ids.some((id) => {
+        var _a3;
+        return (_a3 = touched.cards) == null ? void 0 : _a3.has(id);
+      }))
+    );
+    if (bad.length) out.add(group.image.id);
+  }
+  return out;
 }
 
 // layouts/navigation.ts
@@ -45710,14 +46232,14 @@ function reasoningLabel(level) {
 var PartialChildBatchError = class extends Error {
 };
 var NextStepModal = class extends import_obsidian29.Modal {
-  constructor(app, topic, childrenCount, pendingCount, plugin, research, expand, synthesize, modelSettings, selectionFlow) {
+  constructor(app, topic, childrenCount, pendingCount, plugin, research, expand2, synthesize, modelSettings, selectionFlow) {
     super(app);
     this.topic = topic;
     this.childrenCount = childrenCount;
     this.pendingCount = pendingCount;
     this.plugin = plugin;
     this.research = research;
-    this.expand = expand;
+    this.expand = expand2;
     this.synthesize = synthesize;
     this.modelSettings = modelSettings;
     this.selectionFlow = selectionFlow;
@@ -55559,19 +56081,20 @@ function appendGoalSvg(parent, kind) {
   parent.appendChild(svg);
 }
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
-function branchDirectionResolver(nodes, mapDirection) {
-  if (!allowsBranchLayout(mapDirection)) return () => mapDirection;
+function branchDirectionResolver(nodes, mapDirection, rings) {
+  const layered = allowsBranchLayout(mapDirection);
+  if (!layered && !(rings == null ? void 0 : rings.size)) return () => mapDirection;
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const known = /* @__PURE__ */ new Map();
   const resolve = (id, seen) => {
-    var _a2;
+    var _a2, _b2;
     const hit = known.get(id);
     if (hit !== void 0) return hit;
     const node = byId.get(id);
     let answer = mapDirection;
     if (node && !seen.has(id)) {
       seen.add(id);
-      answer = (_a2 = branchDirectionOf(node)) != null ? _a2 : node.parentId ? resolve(node.parentId, seen) : mapDirection;
+      answer = (_b2 = (_a2 = rings == null ? void 0 : rings.get(id)) != null ? _a2 : layered ? branchDirectionOf(node) : void 0) != null ? _b2 : node.parentId ? resolve(node.parentId, seen) : mapDirection;
     }
     known.set(id, answer);
     return answer;
@@ -56152,7 +56675,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   arrangeAll(map, options = {}) {
     var _a2;
-    const out = arrangeMapWithText(
+    const out = arrangeMapWithRings(
       map.nodes,
       (_a2 = map.canvasItems) != null ? _a2 : [],
       supersededAimNodeIds(map),
@@ -56166,7 +56689,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
   arrangeBranch(map, parentId, newIds, minTop) {
     var _a2;
-    const out = arrangeNewBranchWithText(
+    const out = arrangeNewBranchWithRings(
       map.nodes,
       (_a2 = map.canvasItems) != null ? _a2 : [],
       parentId,
@@ -56178,6 +56701,39 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /** Nodes of `nodes` with the new cards under `parentId` placed, rings left alone (for callers that only have a node list). */
+  arrangeBranchNodes(parentId, nodes, newIds, minTop) {
+    var _a2, _b2;
+    const rings = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).filter(isAnnotatedImage);
+    return arrangeNewBranchWithRings(nodes, rings, parentId, newIds, this.cardHeightOf, minTop, layoutOf(this.map)).nodes;
+  }
+  /** How ring members grow here (away from their picture); empty without rings. Never stored. */
+  ringDirections(map) {
+    var _a2;
+    return ((_a2 = map == null ? void 0 : map.canvasItems) == null ? void 0 : _a2.length) ? ringOutwardDirections(map.nodes, map.canvasItems, this.cardHeightOf) : /* @__PURE__ */ new Map();
+  }
+  /** `layoutDirectionFor` that knows ring members grow away from their picture. */
+  directionOf(map, id) {
+    return directionWithRings(map.nodes, this.ringDirections(map), id, layoutOf(map).direction);
+  }
+  /** Whether cards that grew (`cards`) or pictures that were resized (`images`) left a ring with a card in the way. */
+  ringTidyNeeded(cards, images) {
+    var _a2;
+    const map = this.map;
+    if (!((_a2 = map == null ? void 0 : map.canvasItems) == null ? void 0 : _a2.length)) return false;
+    return ringImagesInTheWay(map.nodes, map.canvasItems, this.cardHeightOf, this.textWidthOf, { cards, images }).size > 0;
+  }
+  /** Solves the ring of each given picture again (all when none given); cards in the way elsewhere make it move. */
+  solveRingsIn(map, options = {}) {
+    var _a2;
+    if (!((_a2 = map.canvasItems) == null ? void 0 : _a2.length)) return;
+    const out = solveRings(map.nodes, map.canvasItems, this.cardHeightOf, this.textWidthOf, layoutOf(map), {
+      ...options,
+      hidden: supersededAimNodeIds(map)
+    });
+    map.nodes = out.nodes;
+    map.canvasItems = out.items;
   }
   onMapWindowFocus() {
     var _a2, _b2, _c;
@@ -59435,9 +59991,22 @@ ${request.requirements}` : preset.text,
    * (the same layout "Auto layout" does); when nothing overlaps nothing moves, so a position the user set stays. A card that
    * moved away from a parent had its old branch closed up already, at the move.
    */
-  tidyAfterResize(map, resized) {
-    if (!resized.size || !cardsOverlapAny(map.nodes, resized, this.cardHeightOf)) return false;
-    this.arrangeAll(map);
+  tidyAfterResize(map, resized, resizedImages) {
+    var _a2;
+    const items = (_a2 = map.canvasItems) != null ? _a2 : [];
+    const members = ringMemberIds(map.nodes, items);
+    const plain = members.size ? new Set([...resized].filter((id) => !members.has(id))) : resized;
+    if (plain.size && cardsOverlapAny(map.nodes, plain, this.cardHeightOf)) {
+      this.arrangeAll(map);
+      return true;
+    }
+    if (!members.size) return false;
+    const images = ringImagesInTheWay(map.nodes, items, this.cardHeightOf, this.textWidthOf, {
+      cards: resized,
+      images: resizedImages
+    });
+    if (!images.size) return false;
+    this.solveRingsIn(map, { imageIds: images });
     return true;
   }
   /**
@@ -59448,9 +60017,10 @@ ${request.requirements}` : preset.text,
    */
   onScreenSiblingOrder(map, onlyParentId) {
     const base = layoutOf(map).direction;
+    const rings = this.ringDirections(map);
     return alignSiblingsToScreen(map.nodes, (parentId, childId) => {
       if (onlyParentId !== void 0 && parentId !== onlyParentId) return null;
-      const direction = layoutDirectionFor(map.nodes, childId, base);
+      const direction = directionWithRings(map.nodes, rings, childId, base);
       if (direction === "down" || direction === "up") return "x";
       if (direction === "right" || direction === "left") return "y";
       return null;
@@ -59513,9 +60083,11 @@ ${request.requirements}` : preset.text,
    * between them or within one card of the first or last. Anywhere else is empty canvas, where a drop only moves the card.
    */
   droppedAmongSiblings(map, card) {
+    var _a2;
+    if (ringMemberIds(map.nodes, (_a2 = map.canvasItems) != null ? _a2 : []).has(card.id)) return false;
     const others = map.nodes.filter((item) => item.parentId === card.parentId && item.id !== card.id);
     if (!others.length) return false;
-    const direction = layoutDirectionFor(map.nodes, card.id, layoutOf(map).direction);
+    const direction = this.directionOf(map, card.id);
     const vertical = direction === "down" || direction === "up";
     if (!vertical && direction !== "right" && direction !== "left") return false;
     const along = (item) => vertical ? item.x : item.y;
@@ -62886,7 +63458,8 @@ ${request.requirements}` : preset.text,
     if (!this.map || !item.parentId || ((_c = this.textEls.get(id)) == null ? void 0 : _c.hasClass("is-free"))) return item.x;
     let direction = branchDirectionResolver(
       this.map.nodes,
-      layoutOf(this.map).direction
+      layoutOf(this.map).direction,
+      this.ringDirections(this.map)
     )(item.parentId);
     if (direction === "balanced") {
       const byId = new Map(this.map.nodes.map((node) => [node.id, node]));
@@ -63501,7 +64074,7 @@ ${request.requirements}` : preset.text,
       }
     }
     if (!rangeRects.length) return null;
-    const parentCard = rectOf(parentId), direction = layoutDirectionFor(nodes, range[0], layoutOf(this.map).direction);
+    const parentCard = rectOf(parentId), direction = this.directionOf(this.map, range[0]);
     const geometry = bracketGeometry(direction, all, parentCard, rangeRects);
     if (!geometry.ok || text11 === void 0) return geometry;
     const obstacles = [];
@@ -67324,14 +67897,18 @@ ${request.requirements}` : preset.text,
   }
   /** What the canvas draws: visible nodes minus interim AIM results already superseded by their run's conclusion. */
   canvasNodes() {
+    var _a2;
     if (!this.map) return [];
     const superseded = supersededAimNodeIds(this.map);
     const shown = visibleNodes(this.map.nodes);
     const nodes = superseded.size ? shown.filter((node) => !superseded.has(node.id)) : shown;
-    return this.relevanceSortOn() ? relevanceDisplayNodes(nodes, (id) => {
-      var _a2, _b2;
-      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.relevance) == null ? void 0 : _b2.tier;
-    }, superseded, layoutOf(this.map)) : nodes;
+    if (!this.relevanceSortOn()) return nodes;
+    const trees = ringTreeIds(this.map.nodes, (_a2 = this.map.canvasItems) != null ? _a2 : []);
+    const kept = trees.size ? /* @__PURE__ */ new Set([...superseded, ...trees]) : superseded;
+    return relevanceDisplayNodes(nodes, (id) => {
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.relevance) == null ? void 0 : _b2.tier;
+    }, kept, layoutOf(this.map));
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   keyboardNeighbor(node, key2) {
@@ -67345,7 +67922,7 @@ ${request.requirements}` : preset.text,
     const shown = this.canvasNodes();
     const byY = bySiblingAxis("y");
     const byX = bySiblingAxis("x");
-    const direction = layoutDirectionFor(this.map.nodes, node.id, layoutOf(this.map).direction);
+    const direction = this.directionOf(this.map, node.id);
     const byId = new Map(shown.map((item) => [item.id, item]));
     const sideOf2 = (card) => {
       var _a3;
@@ -67656,7 +68233,7 @@ ${request.requirements}` : preset.text,
     this.heightsSeenMap = this.map.id;
     this.heightsSeen = now;
     if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
-    if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+    if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf) && !this.ringTidyNeeded(grew)) return;
     this.settling = true;
     const mapId = this.map.id;
     void this.plugin.mutate(async () => {
@@ -67665,7 +68242,7 @@ ${request.requirements}` : preset.text,
         this.heightsSeen = previous;
         return;
       }
-      if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+      if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf) && !this.ringTidyNeeded(grew)) return;
       await this.mapChange((map) => this.tidyAfterResize(map, grew), false);
     }).catch(() => {
     }).finally(() => {
@@ -70620,14 +71197,7 @@ ${request.requirements}` : preset.text,
         );
         if (!untouched.size) return;
         const current = this.map.nodes;
-        const arranged = arrangeNewBranch(
-          current,
-          parent.id,
-          untouched,
-          this.cardHeightOf,
-          void 0,
-          layoutOf(this.map)
-        );
+        const arranged = this.arrangeBranchNodes(parent.id, current, untouched);
         const target = /* @__PURE__ */ new Map();
         arranged.forEach((n, index) => {
           if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
@@ -74347,7 +74917,7 @@ ${note.detail.trim()}` : "",
       }
       if (resized.size && !arranged && !noNewMap && same() && this.map) {
         this.flushChatRender();
-        if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf)) {
+        if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf) || this.ringTidyNeeded(resized)) {
           try {
             await this.plugin.mutate(
               () => this.history.ownWrites(async () => {
@@ -74508,7 +75078,7 @@ ${note.detail.trim()}` : "",
       const siblings = tops.filter((other) => other.parentId === top.parentId);
       const ids = /* @__PURE__ */ new Set();
       for (const sibling of siblings) for (const id of subtree(sibling.id)) ids.add(id);
-      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf, void 0, layoutOf(this.map));
+      placed = this.arrangeBranchNodes(top.parentId, placed, ids);
       for (const id of ids) done.add(id);
     }
     return placed;
@@ -76353,7 +76923,7 @@ ${addition}` : addition });
   groupDragEdges(group) {
     var _a2, _b2, _c;
     const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
-    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction);
+    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction, this.ringDirections(this.map));
     const base = /* @__PURE__ */ new Map();
     for (const [id, el] of group) base.set(id, boxOf(el));
     const boxFor = (id) => {
@@ -76449,7 +77019,7 @@ ${addition}` : addition });
     const size = { width: card.offsetWidth, height: card.offsetHeight };
     const mapDirection = layoutOf(this.map).direction;
     const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
-    const directionOf = branchDirectionResolver(nodes, mapDirection);
+    const directionOf = branchDirectionResolver(nodes, mapDirection, this.ringDirections(this.map));
     const touching2 = [];
     for (const key2 of this.edgeEls.keys()) {
       const [parentId, childId] = key2.split("\0");
@@ -76552,7 +77122,7 @@ ${addition}` : addition });
     );
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
-    const directionOf = branchDirectionResolver(allNodes, mapDirection);
+    const directionOf = branchDirectionResolver(allNodes, mapDirection, this.ringDirections(this.map));
     const lines = [];
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);

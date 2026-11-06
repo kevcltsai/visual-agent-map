@@ -267,13 +267,11 @@ import {
   clampCardWidth
 } from "../../map-graph";
 import {
-  arrangeNewBranch,
   arrangeNewTree,
   cardsChangedHeight,
   cardsOverlapAny,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
-  layoutDirectionFor,
   layoutOf,
   medianHeight,
   reorderSiblings,
@@ -283,7 +281,16 @@ import {
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
-import { arrangeMapWithText, arrangeNewBranchWithText } from "../../map-layout-text";
+import {
+  arrangeMapWithRings,
+  arrangeNewBranchWithRings,
+  directionWithRings,
+  ringImagesInTheWay,
+  ringMemberIds,
+  ringOutwardDirections,
+  ringTreeIds,
+  solveRings
+} from "../../map-layout-text";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
@@ -845,8 +852,14 @@ function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
 const relevanceSortedMaps = new Set<string>();
 /** Path data for the curve from a parent card's right edge to a child card's left edge. */
 /** `layoutDirectionFor` for many ids at once: builds the id lookup one time and remembers each answer. */
-function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: string) => string {
-  if (!allowsBranchLayout(mapDirection)) return () => mapDirection;
+function branchDirectionResolver(
+  nodes: MapNode[],
+  mapDirection: string,
+  /** Ring members and the way they grow (away from their picture); they win over every branch layout. */
+  rings?: ReadonlyMap<string, string>
+): (id: string) => string {
+  const layered = allowsBranchLayout(mapDirection);
+  if (!layered && !rings?.size) return () => mapDirection;
   const byId = new Map(nodes.map(node => [node.id, node]));
   const known = new Map<string, string>();
   const resolve = (id: string, seen: Set<string>): string => {
@@ -856,7 +869,10 @@ function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: s
     let answer = mapDirection;
     if (node && !seen.has(id)) {
       seen.add(id);
-      answer = branchDirectionOf(node) ?? (node.parentId ? resolve(node.parentId, seen) : mapDirection);
+      answer =
+        rings?.get(id) ??
+        (layered ? branchDirectionOf(node) : undefined) ??
+        (node.parentId ? resolve(node.parentId, seen) : mapDirection);
     }
     known.set(id, answer);
     return answer;
@@ -1552,7 +1568,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
-    const out = arrangeMapWithText(
+    // Pictures with a ring of topics keep their cards out of the arrangement and solve the ring after it.
+    const out = arrangeMapWithRings(
       map.nodes,
       map.canvasItems ?? [],
       supersededAimNodeIds(map),
@@ -1565,7 +1582,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
   private arrangeBranch(map: MapDocument, parentId: string, newIds: Set<string>, minTop?: number): void {
-    const out = arrangeNewBranchWithText(
+    const out = arrangeNewBranchWithRings(
       map.nodes,
       map.canvasItems ?? [],
       parentId,
@@ -1577,6 +1594,40 @@ export class VisualAgentMapView extends ItemView {
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /** Nodes of `nodes` with the new cards under `parentId` placed, rings left alone (for callers that only have a node list). */
+  private arrangeBranchNodes(parentId: string, nodes: MapNode[], newIds: Set<string>, minTop?: number): MapNode[] {
+    const rings = (this.map?.canvasItems ?? []).filter(isAnnotatedImage);
+    return arrangeNewBranchWithRings(nodes, rings, parentId, newIds, this.cardHeightOf, minTop, layoutOf(this.map))
+      .nodes;
+  }
+  /** How ring members grow here (away from their picture); empty without rings. Never stored. */
+  private ringDirections(map: MapDocument | null | undefined): Map<string, string> {
+    return map?.canvasItems?.length
+      ? ringOutwardDirections(map.nodes, map.canvasItems, this.cardHeightOf)
+      : new Map<string, string>();
+  }
+  /** `layoutDirectionFor` that knows ring members grow away from their picture. */
+  private directionOf(map: MapDocument, id: string): string {
+    return directionWithRings(map.nodes, this.ringDirections(map), id, layoutOf(map).direction);
+  }
+  /** Whether cards that grew (`cards`) or pictures that were resized (`images`) left a ring with a card in the way. */
+  private ringTidyNeeded(cards: ReadonlySet<string>, images?: ReadonlySet<string>): boolean {
+    const map = this.map;
+    if (!map?.canvasItems?.length) return false;
+    return (
+      ringImagesInTheWay(map.nodes, map.canvasItems, this.cardHeightOf, this.textWidthOf, { cards, images }).size > 0
+    );
+  }
+  /** Solves the ring of each given picture again (all when none given); cards in the way elsewhere make it move. */
+  private solveRingsIn(map: MapDocument, options: { imageIds?: ReadonlySet<string>; enlarge?: boolean } = {}): void {
+    if (!map.canvasItems?.length) return;
+    const out = solveRings(map.nodes, map.canvasItems, this.cardHeightOf, this.textWidthOf, layoutOf(map), {
+      ...options,
+      hidden: supersededAimNodeIds(map)
+    });
+    map.nodes = out.nodes;
+    map.canvasItems = out.items;
   }
   /** The map's child index while a paint draws its cards; null otherwise. */
   private paintChildIndex: Map<string, MapNode[]> | null = null;
@@ -5091,9 +5142,27 @@ export class VisualAgentMapView extends ItemView {
    * (the same layout "Auto layout" does); when nothing overlaps nothing moves, so a position the user set stays. A card that
    * moved away from a parent had its old branch closed up already, at the move.
    */
-  private tidyAfterResize(map: MapDocument, resized: ReadonlySet<string>): boolean {
-    if (!resized.size || !cardsOverlapAny(map.nodes, resized, this.cardHeightOf)) return false;
-    this.arrangeAll(map);
+  private tidyAfterResize(
+    map: MapDocument,
+    resized: ReadonlySet<string>,
+    resizedImages?: ReadonlySet<string>
+  ): boolean {
+    const items = map.canvasItems ?? [];
+    // A ring card is judged by its ring (below); every other card by the old rule.
+    const members = ringMemberIds(map.nodes, items);
+    const plain = members.size ? new Set([...resized].filter(id => !members.has(id))) : resized;
+    if (plain.size && cardsOverlapAny(map.nodes, plain, this.cardHeightOf)) {
+      this.arrangeAll(map);
+      return true;
+    }
+    if (!members.size) return false;
+    // Only a card really in the way makes a ring solve again; a card the user dragged elsewhere stays where it is.
+    const images = ringImagesInTheWay(map.nodes, items, this.cardHeightOf, this.textWidthOf, {
+      cards: resized,
+      images: resizedImages
+    });
+    if (!images.size) return false;
+    this.solveRingsIn(map, { imageIds: images });
     return true;
   }
   /**
@@ -5104,9 +5173,10 @@ export class VisualAgentMapView extends ItemView {
    */
   private onScreenSiblingOrder(map: MapDocument, onlyParentId?: string): MapNode[] {
     const base = layoutOf(map).direction;
+    const rings = this.ringDirections(map);
     return alignSiblingsToScreen(map.nodes, (parentId, childId) => {
       if (onlyParentId !== undefined && parentId !== onlyParentId) return null;
-      const direction = layoutDirectionFor(map.nodes, childId, base) as LayoutKind;
+      const direction = directionWithRings(map.nodes, rings, childId, base) as LayoutKind;
       if (direction === "down" || direction === "up") return "x";
       if (direction === "right" || direction === "left") return "y";
       return null;
@@ -5170,9 +5240,11 @@ export class VisualAgentMapView extends ItemView {
    * between them or within one card of the first or last. Anywhere else is empty canvas, where a drop only moves the card.
    */
   private droppedAmongSiblings(map: MapDocument, card: MapNode): boolean {
+    // A ring card is placed by hand: dropping it only moves it.
+    if (ringMemberIds(map.nodes, map.canvasItems ?? []).has(card.id)) return false;
     const others = map.nodes.filter(item => item.parentId === card.parentId && item.id !== card.id);
     if (!others.length) return false;
-    const direction = layoutDirectionFor(map.nodes, card.id, layoutOf(map).direction) as LayoutKind;
+    const direction = this.directionOf(map, card.id) as LayoutKind;
     const vertical = direction === "down" || direction === "up";
     if (!vertical && direction !== "right" && direction !== "left") return false;
     const along = (item: MapNode): number => (vertical ? item.x : item.y);
@@ -8832,7 +8904,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !item.parentId || this.textEls.get(id)?.hasClass("is-free")) return item.x;
     let direction: string | undefined = branchDirectionResolver(
       this.map.nodes,
-      layoutOf(this.map).direction
+      layoutOf(this.map).direction,
+      this.ringDirections(this.map)
     )(item.parentId);
     if (direction === "balanced") {
       const byId = new Map(this.map.nodes.map(node => [node.id, node]));
@@ -9454,7 +9527,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!rangeRects.length) return null;
     const parentCard = rectOf(parentId),
-      direction = layoutDirectionFor(nodes, range[0], layoutOf(this.map).direction);
+      direction = this.directionOf(this.map, range[0]);
     const geometry = bracketGeometry(direction, all, parentCard, rangeRects);
     if (!geometry.ok || text === undefined) return geometry;
     // The layout does not make room for a bracket, so its text steps outward past the cards that are not part of the run.
@@ -13721,9 +13794,11 @@ export class VisualAgentMapView extends ItemView {
     const shown = visibleNodes(this.map.nodes);
     const nodes = superseded.size ? shown.filter(node => !superseded.has(node.id)) : shown;
     // A view only: these copies carry display positions and must never be written back to the map.
-    return this.relevanceSortOn()
-      ? relevanceDisplayNodes(nodes, id => this.notes.get(id)?.relevance?.tier, superseded, layoutOf(this.map))
-      : nodes;
+    if (!this.relevanceSortOn()) return nodes;
+    // Ring members and their branches keep the coordinates they have; the sort never folds them into the column.
+    const trees = ringTreeIds(this.map.nodes, this.map.canvasItems ?? []);
+    const kept = trees.size ? new Set([...superseded, ...trees]) : superseded;
+    return relevanceDisplayNodes(nodes, id => this.notes.get(id)?.relevance?.tier, kept, layoutOf(this.map));
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   private keyboardNeighbor(node: MapNode, key: string): MapNode | undefined {
@@ -13737,7 +13812,7 @@ export class VisualAgentMapView extends ItemView {
     const byY = bySiblingAxis("y");
     const byX = bySiblingAxis("x");
     // Cards in a branch with its own arrangement follow that arrangement's keys; timeline, radial and fishbone follow the right map's.
-    const direction = layoutDirectionFor(this.map.nodes, node.id, layoutOf(this.map).direction) as LayoutKind;
+    const direction = this.directionOf(this.map, node.id) as LayoutKind;
     const byId = new Map(shown.map(item => [item.id, item]));
     // In a balanced map a card's half is the half of its first-level topic; the root has none.
     const sideOf = (card: MapNode): NavigationSide => {
@@ -14072,7 +14147,7 @@ export class VisualAgentMapView extends ItemView {
     this.heightsSeenMap = this.map.id;
     this.heightsSeen = now;
     if (!grew.size || this.settling || this.dragging || this.aimLive()) return;
-    if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+    if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf) && !this.ringTidyNeeded(grew)) return;
     this.settling = true;
     const mapId = this.map.id;
     // One write at a time with every other Map.md write: it waits in the plugin queue. With no step of the
@@ -14086,7 +14161,7 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         // What was seen may be stale after the wait (another job moved cards): write only for an overlap that is still there.
-        if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf)) return;
+        if (!cardsOverlapAny(this.map.nodes, grew, this.cardHeightOf) && !this.ringTidyNeeded(grew)) return;
         await this.mapChange(map => this.tidyAfterResize(map, grew), false);
       })
       .catch(() => {
@@ -17217,14 +17292,7 @@ export class VisualAgentMapView extends ItemView {
         );
         if (!untouched.size) return;
         const current = this.map.nodes;
-        const arranged = arrangeNewBranch(
-          current,
-          parent.id,
-          untouched,
-          this.cardHeightOf,
-          undefined,
-          layoutOf(this.map)
-        );
+        const arranged = this.arrangeBranchNodes(parent.id, current, untouched);
         const target = new Map<string, { x: number; y: number }>();
         arranged.forEach((n, index) => {
           if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
@@ -21284,7 +21352,7 @@ export class VisualAgentMapView extends ItemView {
         // The layout measures the cards, so the held repaint comes first. Looked at before any mutate is taken: a reply whose
         // cards still fit writes nothing more (one mutate per action).
         this.flushChatRender();
-        if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf)) {
+        if (cardsOverlapAny(this.map.nodes, resized, this.cardHeightOf) || this.ringTidyNeeded(resized)) {
           try {
             await this.plugin.mutate(() =>
               this.history.ownWrites(async () => {
@@ -21459,7 +21527,7 @@ export class VisualAgentMapView extends ItemView {
       const siblings = tops.filter(other => other.parentId === top.parentId);
       const ids = new Set<string>();
       for (const sibling of siblings) for (const id of subtree(sibling.id)) ids.add(id);
-      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf, undefined, layoutOf(this.map));
+      placed = this.arrangeBranchNodes(top.parentId, placed, ids);
       for (const id of ids) done.add(id);
     }
     return placed;
@@ -23468,7 +23536,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private groupDragEdges(group: Map<string, HTMLElement>): { update: (dx: number, dy: number) => void } {
     const nodes = this.map?.nodes ?? [];
-    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction);
+    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction, this.ringDirections(this.map));
     const base = new Map<string, CardBox>();
     for (const [id, el] of group) base.set(id, boxOf(el));
     const boxFor = (id: string): CardBox | undefined => {
@@ -23566,7 +23634,7 @@ export class VisualAgentMapView extends ItemView {
     const size = { width: card.offsetWidth, height: card.offsetHeight };
     const mapDirection = layoutOf(this.map).direction;
     const nodes = this.map?.nodes ?? [];
-    const directionOf = branchDirectionResolver(nodes, mapDirection);
+    const directionOf = branchDirectionResolver(nodes, mapDirection, this.ringDirections(this.map));
     const touching: {
       key: string;
       direction: string;
@@ -23691,7 +23759,7 @@ export class VisualAgentMapView extends ItemView {
     );
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
-    const directionOf = branchDirectionResolver(allNodes, mapDirection);
+    const directionOf = branchDirectionResolver(allNodes, mapDirection, this.ringDirections(this.map));
     // Lines are collected first and added after every position is read: adding each one before reading the next card's
     // position would make the browser lay out the stage again for every line.
     const lines: SVGPathElement[] = [];

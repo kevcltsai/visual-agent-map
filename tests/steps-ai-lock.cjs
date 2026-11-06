@@ -883,3 +883,49 @@ test('fix M2b: child-topic suggestions: a topic locked while the AI proposes sto
   assert.equal(h.host.pendingSuggestions.has(p.path), false, 'nothing stored');
   assert.ok(failures.some(message => LOCKED_NOTICE.test(message)));
 });
+
+// ---- review count: the options entry hands the review list every pending suggestion ---------------------------------
+const reviewOpts = { ...synthesis, shallowResearch: false };
+const sug = (title, parentTitle) => ({ title, task: `do ${title}`, contribution: '', ...(parentTitle === undefined ? {} : { parentTitle }) });
+
+test('review count: the options entry gets every pending row, orphans included (button N = list N)', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  h.host.pendingSuggestions.set(p.path, [sug('X', 'Ghost'), sug('Y', 'P')]);
+  const found = [];
+  await h.view.proposeChildren(p, reviewOpts, '', items => found.push(items), message => assert.fail(message));
+  assert.equal(found.length, 1);
+  assert.equal(found[0].length, 2, 'both rows reach the list');
+  assert.equal(h.calls.length, 0, 'no AI call');
+});
+
+test('review count: a real parent and child both reach the list with parentTitle kept', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  h.host.pendingSuggestions.set(p.path, [sug('Parent', ''), sug('Child', 'Parent')]);
+  const found = [];
+  await h.view.proposeChildren(p, reviewOpts, '', items => found.push(items), message => assert.fail(message));
+  assert.deepEqual(found[0].map(item => [item.title, item.parentTitle]), [['Parent', ''], ['Child', 'Parent']]);
+});
+
+test('review count: without pending the options entry still calls the AI and opens no empty list', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  let opened = 0;
+  await h.view.proposeChildren(p, reviewOpts, '', () => { opened++; }, () => {});
+  assert.equal(h.calls.length, 1, 'AI called once');
+  assert.equal(opened, 0, 'no list opened');
+});
+
+test('review count: creating an orphan row builds it under the current topic and clears pending', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  h.host.pendingSuggestions.set(p.path, [sug('X', 'Ghost'), sug('Y', 'P')]);
+  let found, create;
+  await h.view.proposeChildren(p, reviewOpts, '', (items, run) => { found = items; create = run; }, message => assert.fail(message));
+  await create(found.map(item => ({ ...item, parentTitle: '' }))); // renderProposalList makes orphan / self-parent rows first-level
+  const kidNodes = h.view.map.nodes.filter(node => node.parentId === p.id);
+  const kids = (await Promise.all(kidNodes.map(node => h.repo.readNote(node.path, h.view.map)))).map(note => note.title).sort();
+  assert.deepEqual(kids, ['X', 'Y']);
+  assert.equal(h.host.pendingSuggestions.has(p.path), false, 'pending cleared');
+});

@@ -72417,7 +72417,7 @@ ${request.requirements}` : preset.text,
         if (options.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
         else this.plugin.pendingResearchOptions.delete(parent.path);
       }
-      present(options ? pending2.filter((item) => !item.parentTitle) : pending2);
+      present(pending2);
       return;
     }
     if (this.plugin.topicRuns.isBusy(parent.path)) {

@@ -17992,7 +17992,7 @@ export class VisualAgentMapView extends ItemView {
         if (options.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
         else this.plugin.pendingResearchOptions.delete(parent.path);
       }
-      present(options ? pending.filter(item => !item.parentTitle) : pending);
+      present(pending);
       return;
     }
     if (this.plugin.topicRuns.isBusy(parent.path)) {

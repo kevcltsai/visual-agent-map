@@ -1081,6 +1081,8 @@ interface ChatRun {
   /** `ref` of an `add_anchor` of this reply -> the real anchor id it was given (for the `link_anchor`s that name `anchor:<ref>`). */
   anchors?: Map<string, string>;
   created: string[];
+  /** Pictures whose `link_anchor` in this reply marked a new top-level topic as a ring member: their rings are placed at the end. */
+  ringImages?: Set<string>;
   /** A card was (or may have been) written without rebuilding the derived data; one rebuild at the end of the reply does it. */
   ownershipDirty?: boolean;
   /** True for a held batch (five cards or more): its cards leave the derived data to the one rebuild at the end. */
@@ -1619,6 +1621,17 @@ export class VisualAgentMapView extends ItemView {
   /** `layoutDirectionFor` that knows ring members grow away from their picture. */
   private directionOf(map: MapDocument, id: string): string {
     return directionWithRings(map.nodes, this.ringDirections(map), id, layoutOf(map).direction);
+  }
+  /** While set, `fit` frames only these cards (a reply's ring), not the whole map. */
+  private fitOnly: ReadonlySet<string> | undefined;
+  /** Frames only `ids` (a reply's ring and what grew from it). */
+  private fitCards(ids: ReadonlySet<string>): void {
+    this.fitOnly = ids;
+    try {
+      this.fit();
+    } finally {
+      this.fitOnly = undefined;
+    }
   }
   /** Whether cards that grew (`cards`) or pictures that were resized (`images`) left a ring with a card in the way. */
   private ringTidyNeeded(cards: ReadonlySet<string>, images?: ReadonlySet<string>): boolean {
@@ -19351,7 +19364,8 @@ export class VisualAgentMapView extends ItemView {
   private framingViewport = false;
   private fit(): void {
     if (!this.map || !this.viewportEl) return;
-    const nodes = this.canvasNodes();
+    const only = this.fitOnly;
+    const nodes = this.canvasNodes().filter(n => !only || only.has(n.id));
     if (!nodes.length) return;
     // Free text blocks (canvas-text-node decision #8) count too: fit must not hide what the user placed.
     const boxes = nodes.map(n => ({
@@ -19360,7 +19374,7 @@ export class VisualAgentMapView extends ItemView {
       w: n.width ?? CARD_WIDTH,
       h: this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`)?.offsetHeight ?? 180
     }));
-    for (const item of this.map.canvasItems ?? []) {
+    for (const item of only ? [] : (this.map.canvasItems ?? [])) {
       if (item.kind !== "text") continue;
       const text = item as TextItem;
       const el = this.textEls.get(text.id);
@@ -19373,7 +19387,7 @@ export class VisualAgentMapView extends ItemView {
       });
     }
     // Summary bracket text (summary-bracket decision #9): it sits beyond the brace tip and would be clipped otherwise.
-    for (const el of this.summaryEls.values()) {
+    for (const el of only ? [] : this.summaryEls.values()) {
       const text = el.querySelector<HTMLElement>(".vam-summary-text");
       const side = (["right", "left", "down", "up"] as const).find(each => el.hasClass(`is-side-${each}`));
       if (!text || !side) continue;
@@ -21557,6 +21571,8 @@ export class VisualAgentMapView extends ItemView {
         run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW &&
         !noNewMap &&
         same() &&
+        // A reply that made a ring places the ring and the other new cards below, never the whole map again.
+        !run.ringImages?.size &&
         !result.actions.some(action => action.kind === "auto_layout")
       ) {
         try {
@@ -21602,16 +21618,38 @@ export class VisualAgentMapView extends ItemView {
       if (!same()) stopped = true;
       // A stop, or an auto_layout that came before the cards, leaves them at the rough spot of a held batch (unmeasured heights).
       // Only those cards are placed, each branch beside its parent; nothing else moves, and no other action of the reply runs.
-      const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];
-      if (rough.length && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
+      // A reply that made a ring did not lay the whole map out either, so its other new cards are placed the same way.
+      const ringed = run.ringImages?.size ? new Set(run.ringImages) : null;
+      const rough = batched && !arranged && (stopped || layoutDone || !!ringed) ? run.created.slice(laidOutCount) : [];
+      if ((rough.length || ringed) && !this.closed && this.path === anchor.path && this.map?.id === anchor.id) {
         try {
           await this.plugin.mutate(() =>
             this.history.ownWrites(async () => {
               if (this.closed || this.path !== anchor.path || this.map?.id !== anchor.id) return;
               this.flushChatRender();
               await this.mapChange(map => {
-                map.nodes = this.placeChatCards(map.nodes, new Set(rough));
+                // The ring first: every other new card is then placed beside it.
+                if (ringed) this.solveRingsIn(map, { imageIds: ringed, enlarge: true });
+                if (rough.length) map.nodes = this.placeChatCards(map.nodes, new Set(rough), map.canvasItems ?? []);
               }, false);
+              if (ringed && !stopped && this.map && !result.actions.some(action => action.kind === "focus_topic")) {
+                const rings = new Set(ringed);
+                const members = new Set(
+                  ringMembers(this.map.canvasItems ?? [], this.map.nodes)
+                    .filter(member => rings.has(member.imageId))
+                    .map(member => member.topicId)
+                );
+                // The whole ring: its cards and what grew from them.
+                for (let grew = true; grew;) {
+                  grew = false;
+                  for (const node of this.map.nodes)
+                    if (node.parentId && members.has(node.parentId) && !members.has(node.id)) {
+                      members.add(node.id);
+                      grew = true;
+                    }
+                }
+                this.fitCards(members);
+              }
             })
           );
         } catch {
@@ -21729,7 +21767,11 @@ export class VisualAgentMapView extends ItemView {
     return fresh.find(node => !node.parentId) ?? fresh[0];
   }
   /** Places the cards a reply made (and only those): each new branch beside its parent, a new tree below the others. */
-  private placeChatCards(nodes: MapNode[], fresh: Set<string>): MapNode[] {
+  private placeChatCards(
+    nodes: MapNode[],
+    fresh: Set<string>,
+    items: CanvasItem[] = this.map?.canvasItems ?? []
+  ): MapNode[] {
     const subtree = (rootId: string): Set<string> => {
       const ids = new Set([rootId]);
       for (let grew = true; grew;) {
@@ -21743,10 +21785,19 @@ export class VisualAgentMapView extends ItemView {
       return ids;
     };
     let placed = nodes;
+    const ringIds = ringMemberIds(nodes, items);
     const tops = nodes.filter(node => fresh.has(node.id) && !(node.parentId && fresh.has(node.parentId)));
     const done = new Set<string>();
     for (const top of tops) {
       if (done.has(top.id)) continue;
+      if (!top.parentId && ringIds.has(top.id)) {
+        // A ring member stays where the ring put it; only what grew from it is placed, growing outward.
+        const ids = subtree(top.id);
+        ids.delete(top.id);
+        if (ids.size) placed = this.arrangeBranchNodes(top.id, placed, ids);
+        for (const id of subtree(top.id)) done.add(id);
+        continue;
+      }
       if (!top.parentId) {
         const ids = subtree(top.id);
         placed = arrangeNewTree(placed, top.id, ids, this.cardHeightOf, layoutOf(this.map));
@@ -22306,14 +22357,30 @@ export class VisualAgentMapView extends ItemView {
       ...(action.description ? { description: action.description } : {})
     };
     if (!anchorRelationAllowed(image, link)) return skipped("ui.map_chat_skip_relation_not_allowed");
-    const box: { refused: TranslationKey | null } = { refused: null };
+    const box: { refused: TranslationKey | null; ring: boolean } = { refused: null, ring: false };
     await this.mapChange(map => {
       const current = findAnnotatedImage(map.canvasItems ?? [], action.imageId);
-      if (!current) box.refused = "ui.map_chat_skip_image_gone";
-      else if (!anchorRelationAllowed(current, link)) box.refused = "ui.map_chat_skip_relation_not_allowed";
-      else map.canvasItems = addAnchorRelation(map.canvasItems ?? [], action.imageId, link);
+      if (!current) {
+        box.refused = "ui.map_chat_skip_image_gone";
+        return;
+      }
+      // A top-level topic this reply made joins the picture's ring; one that already existed, or hangs under a parent, does not.
+      const topic = map.nodes.find(node => node.id === nodeId);
+      const ring =
+        !!topic &&
+        !topic.parentId &&
+        run.created.includes(nodeId) &&
+        !ringMemberIds(map.nodes, map.canvasItems ?? []).has(nodeId);
+      const marked: AnchorRelation = ring ? { ...link, ring: true } : link;
+      if (!anchorRelationAllowed(current, marked)) box.refused = "ui.map_chat_skip_relation_not_allowed";
+      else {
+        map.canvasItems = addAnchorRelation(map.canvasItems ?? [], action.imageId, marked);
+        box.ring = ring;
+      }
     }, false);
-    return box.refused ? skipped(box.refused) : { status: "done" };
+    if (box.refused) return skipped(box.refused);
+    if (box.ring) (run.ringImages ??= new Set()).add(action.imageId);
+    return { status: "done" };
   }
   /**
    * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every

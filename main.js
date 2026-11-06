@@ -56582,6 +56582,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "suspendTextEdit", null);
     /** Draft carried across a repaint; renderTextNodes reopens the editor with it. */
     __publicField(this, "textEditDraft", null);
+    /** While set, `fit` frames only these cards (a reply's ring), not the whole map. */
+    __publicField(this, "fitOnly");
     /** The map's child index while a paint draws its cards; null otherwise. */
     __publicField(this, "paintChildIndex", null);
     /** Card measurements waiting for the paint to finish building every card; null outside a paint. */
@@ -56762,6 +56764,15 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   /** `layoutDirectionFor` that knows ring members grow away from their picture. */
   directionOf(map, id) {
     return directionWithRings(map.nodes, this.ringDirections(map), id, layoutOf(map).direction);
+  }
+  /** Frames only `ids` (a reply's ring and what grew from it). */
+  fitCards(ids) {
+    this.fitOnly = ids;
+    try {
+      this.fit();
+    } finally {
+      this.fitOnly = void 0;
+    }
   }
   /** Whether cards that grew (`cards`) or pictures that were resized (`images`) left a ring with a card in the way. */
   ringTidyNeeded(cards, images) {
@@ -73142,7 +73153,8 @@ ${note.detail.trim()}` : "",
   fit() {
     var _a2, _b2, _c;
     if (!this.map || !this.viewportEl) return;
-    const nodes = this.canvasNodes();
+    const only = this.fitOnly;
+    const nodes = this.canvasNodes().filter((n) => !only || only.has(n.id));
     if (!nodes.length) return;
     const boxes = nodes.map((n) => {
       var _a3, _b3, _c2, _d;
@@ -73153,7 +73165,7 @@ ${note.detail.trim()}` : "",
         h: (_d = (_c2 = (_b3 = this.stageEl) == null ? void 0 : _b3.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _c2.offsetHeight) != null ? _d : 180
       };
     });
-    for (const item of (_a2 = this.map.canvasItems) != null ? _a2 : []) {
+    for (const item of only ? [] : (_a2 = this.map.canvasItems) != null ? _a2 : []) {
       if (item.kind !== "text") continue;
       const text11 = item;
       const el = this.textEls.get(text11.id);
@@ -73165,7 +73177,7 @@ ${note.detail.trim()}` : "",
         h: el.offsetHeight || TEXT_NODE_HEIGHT
       });
     }
-    for (const el of this.summaryEls.values()) {
+    for (const el of only ? [] : this.summaryEls.values()) {
       const text11 = el.querySelector(".vam-summary-text");
       const side = ["right", "left", "down", "up"].find((each) => el.hasClass(`is-side-${each}`));
       if (!text11 || !side) continue;
@@ -75056,7 +75068,7 @@ ${note.detail.trim()}` : "",
    * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)() }) {
-    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
     const record = this.chatLastRecord;
     const same = () => {
@@ -75153,7 +75165,8 @@ ${note.detail.trim()}` : "",
         lines[index] = this.chatLine(label, box.outcome);
       }
       let arranged = false;
-      if (run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same() && !result.actions.some((action) => action.kind === "auto_layout")) {
+      if (run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same() && // A reply that made a ring places the ring and the other new cards below, never the whole map again.
+      !((_a3 = run.ringImages) == null ? void 0 : _a3.size) && !result.actions.some((action) => action.kind === "auto_layout")) {
         try {
           await this.plugin.mutate(
             () => this.history.ownWrites(async () => {
@@ -75187,17 +75200,35 @@ ${note.detail.trim()}` : "",
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
       if (!same()) stopped = true;
-      const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];
-      if (rough.length && !this.closed && this.path === anchor.path && ((_a3 = this.map) == null ? void 0 : _a3.id) === anchor.id) {
+      const ringed = ((_b2 = run.ringImages) == null ? void 0 : _b2.size) ? new Set(run.ringImages) : null;
+      const rough = batched && !arranged && (stopped || layoutDone || !!ringed) ? run.created.slice(laidOutCount) : [];
+      if ((rough.length || ringed) && !this.closed && this.path === anchor.path && ((_c = this.map) == null ? void 0 : _c.id) === anchor.id) {
         try {
           await this.plugin.mutate(
             () => this.history.ownWrites(async () => {
-              var _a4;
+              var _a4, _b3;
               if (this.closed || this.path !== anchor.path || ((_a4 = this.map) == null ? void 0 : _a4.id) !== anchor.id) return;
               this.flushChatRender();
               await this.mapChange((map) => {
-                map.nodes = this.placeChatCards(map.nodes, new Set(rough));
+                var _a5;
+                if (ringed) this.solveRingsIn(map, { imageIds: ringed, enlarge: true });
+                if (rough.length) map.nodes = this.placeChatCards(map.nodes, new Set(rough), (_a5 = map.canvasItems) != null ? _a5 : []);
               }, false);
+              if (ringed && !stopped && this.map && !result.actions.some((action) => action.kind === "focus_topic")) {
+                const rings = new Set(ringed);
+                const members = new Set(
+                  ringMembers((_b3 = this.map.canvasItems) != null ? _b3 : [], this.map.nodes).filter((member) => rings.has(member.imageId)).map((member) => member.topicId)
+                );
+                for (let grew = true; grew; ) {
+                  grew = false;
+                  for (const node of this.map.nodes)
+                    if (node.parentId && members.has(node.parentId) && !members.has(node.id)) {
+                      members.add(node.id);
+                      grew = true;
+                    }
+                }
+                this.fitCards(members);
+              }
             })
           );
         } catch (e) {
@@ -75213,9 +75244,9 @@ ${note.detail.trim()}` : "",
             this.chatReplyStep = await this.pushChatReplyEntry(
               entries,
               anchor.path,
-              (_b2 = run.notes) != null ? _b2 : /* @__PURE__ */ new Set(),
-              (_c = run.files) != null ? _c : /* @__PURE__ */ new Set(),
-              (_d = run.parked) != null ? _d : /* @__PURE__ */ new Set(),
+              (_d = run.notes) != null ? _d : /* @__PURE__ */ new Set(),
+              (_e = run.files) != null ? _e : /* @__PURE__ */ new Set(),
+              (_f = run.parked) != null ? _f : /* @__PURE__ */ new Set(),
               record
             );
         } catch (e) {
@@ -75254,23 +75285,23 @@ ${note.detail.trim()}` : "",
               run
             );
             const mergeIds = (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && resolved.action.action === "merge" ? new Set(resolved.action.nodeIds) : void 0;
-            const mine = mergeIds ? ((_e = run.held) != null ? _e : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
+            const mine = mergeIds ? ((_g = run.held) != null ? _g : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
             let asked;
             for (const entry of mine) {
               const change2 = chatAppearanceChange(entry.action);
               asked = {
                 ...asked,
                 ...change2,
-                addMarkers: [...(_f = asked == null ? void 0 : asked.addMarkers) != null ? _f : [], ...(_g = change2.addMarkers) != null ? _g : []],
-                removeMarkers: [...(_h = asked == null ? void 0 : asked.removeMarkers) != null ? _h : [], ...(_i = change2.removeMarkers) != null ? _i : []],
-                addStyles: [...(_j = asked == null ? void 0 : asked.addStyles) != null ? _j : [], ...(_k = change2.addStyles) != null ? _k : []],
-                removeStyles: [...(_l = asked == null ? void 0 : asked.removeStyles) != null ? _l : [], ...(_m = change2.removeStyles) != null ? _m : []]
+                addMarkers: [...(_h = asked == null ? void 0 : asked.addMarkers) != null ? _h : [], ...(_i = change2.addMarkers) != null ? _i : []],
+                removeMarkers: [...(_j = asked == null ? void 0 : asked.removeMarkers) != null ? _j : [], ...(_k = change2.removeMarkers) != null ? _k : []],
+                addStyles: [...(_l = asked == null ? void 0 : asked.addStyles) != null ? _l : [], ...(_m = change2.addStyles) != null ? _m : []],
+                removeStyles: [...(_n = asked == null ? void 0 : asked.removeStyles) != null ? _n : [], ...(_o = change2.removeStyles) != null ? _o : []]
               };
             }
-            outcome = resolved ? await this.runChatSelection(resolved.action, (_n = result.message) != null ? _n : "", laterBatch, asked) : skipped("ui.map_chat_skip_parent_missing");
+            outcome = resolved ? await this.runChatSelection(resolved.action, (_p = result.message) != null ? _p : "", laterBatch, asked) : skipped("ui.map_chat_skip_parent_missing");
             if (outcome.status !== "done" && mine.length && same()) {
               const merged = new Set(mine.flatMap((entry) => entry.ids));
-              run.mergeSourceIds = new Set([...(_o = run.mergeSourceIds) != null ? _o : []].filter((id) => !merged.has(id)));
+              run.mergeSourceIds = new Set([...(_q = run.mergeSourceIds) != null ? _q : []].filter((id) => !merged.has(id)));
               for (const entry of mine) {
                 const keep = entry.ids;
                 await this.plugin.mutate(async () => {
@@ -75305,7 +75336,7 @@ ${note.detail.trim()}` : "",
     return (_c = fresh.find((node) => !node.parentId)) != null ? _c : fresh[0];
   }
   /** Places the cards a reply made (and only those): each new branch beside its parent, a new tree below the others. */
-  placeChatCards(nodes, fresh) {
+  placeChatCards(nodes, fresh, items = ((_c) => (_c = ((_b2) => (_b2 = this.map) == null ? void 0 : _b2.canvasItems)()) != null ? _c : [])()) {
     const subtree = (rootId) => {
       const ids = /* @__PURE__ */ new Set([rootId]);
       for (let grew = true; grew; ) {
@@ -75319,10 +75350,18 @@ ${note.detail.trim()}` : "",
       return ids;
     };
     let placed = nodes;
+    const ringIds = ringMemberIds(nodes, items);
     const tops = nodes.filter((node) => fresh.has(node.id) && !(node.parentId && fresh.has(node.parentId)));
     const done = /* @__PURE__ */ new Set();
     for (const top of tops) {
       if (done.has(top.id)) continue;
+      if (!top.parentId && ringIds.has(top.id)) {
+        const ids2 = subtree(top.id);
+        ids2.delete(top.id);
+        if (ids2.size) placed = this.arrangeBranchNodes(top.id, placed, ids2);
+        for (const id of subtree(top.id)) done.add(id);
+        continue;
+      }
       if (!top.parentId) {
         const ids2 = subtree(top.id);
         placed = arrangeNewTree(placed, top.id, ids2, this.cardHeightOf, layoutOf(this.map));
@@ -75768,7 +75807,7 @@ ${note.detail.trim()}` : "",
    * collide with a card or an anchor of the picture. Never on an AIM map.
    */
   async chatChangeAnchor(action, real, run) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const items = (_a2 = this.map.canvasItems) != null ? _a2 : [];
     const image = findAnnotatedImage(items, action.imageId);
@@ -75813,15 +75852,26 @@ ${note.detail.trim()}` : "",
       ...action.description ? { description: action.description } : {}
     };
     if (!anchorRelationAllowed(image, link)) return skipped("ui.map_chat_skip_relation_not_allowed");
-    const box = { refused: null };
+    const box = { refused: null, ring: false };
     await this.mapChange((map) => {
-      var _a3, _b3;
+      var _a3, _b3, _c2;
       const current = findAnnotatedImage((_a3 = map.canvasItems) != null ? _a3 : [], action.imageId);
-      if (!current) box.refused = "ui.map_chat_skip_image_gone";
-      else if (!anchorRelationAllowed(current, link)) box.refused = "ui.map_chat_skip_relation_not_allowed";
-      else map.canvasItems = addAnchorRelation((_b3 = map.canvasItems) != null ? _b3 : [], action.imageId, link);
+      if (!current) {
+        box.refused = "ui.map_chat_skip_image_gone";
+        return;
+      }
+      const topic = map.nodes.find((node) => node.id === nodeId);
+      const ring = !!topic && !topic.parentId && run.created.includes(nodeId) && !ringMemberIds(map.nodes, (_b3 = map.canvasItems) != null ? _b3 : []).has(nodeId);
+      const marked = ring ? { ...link, ring: true } : link;
+      if (!anchorRelationAllowed(current, marked)) box.refused = "ui.map_chat_skip_relation_not_allowed";
+      else {
+        map.canvasItems = addAnchorRelation((_c2 = map.canvasItems) != null ? _c2 : [], action.imageId, marked);
+        box.ring = ring;
+      }
     }, false);
-    return box.refused ? skipped(box.refused) : { status: "done" };
+    if (box.refused) return skipped(box.refused);
+    if (box.ring) ((_d = run.ringImages) != null ? _d : run.ringImages = /* @__PURE__ */ new Set()).add(action.imageId);
+    return { status: "done" };
   }
   /**
    * set_topic_kind: the same write as the Topic type menu (`changeTopicKind`, plus the strength of a hypothesis), for every

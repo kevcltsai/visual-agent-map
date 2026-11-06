@@ -8,15 +8,15 @@
 
 Turn a picture on the canvas into an annotated image, drop anchors on it such as "the cow's back", and link each anchor to a topic.
 
-- Right-click a picture and choose "Convert to annotated image…", then "Place anchor" and write a note for each point. An anchor links to topics by any of the six relation kinds, from the picture or from a topic with "Point on an image…".
-- Research and expansion read the image note, anchor notes and relations as text; they do not see the picture. A card shows "N image relations" at its bottom.
-- Sharing and OPML or FreeMind export leave anchors out.
+- Right-click a picture and choose "Convert to annotated image…", then "Place anchor" and write a note for each point. An anchor links to topics by any of the six relation kinds.
+- The picture is the centre of the map: topics you create from anchors sit in a ring around it, with their lines always shown. Select a card and its lines stand out; move the picture and the ring moves with it.
+- Research and expansion read the image note, anchor notes and relations as text; they do not see the picture. Sharing and OPML or FreeMind export leave anchors out.
 
 ### Let the map chat look at a picture
 
-Select an annotated image, ask the map chat "add anchors for the parts in this picture", and the AI looks at it, places anchors with notes, suggests topics and links them.
+Select an annotated image, ask the map chat "add anchors for the parts in this picture", and the AI looks at it, places anchors with notes, creates a topic for each part and links them around the picture.
 
-- The selected image shows in the chat references as "Selected: annotated image · <note>", and the reply says "AI looked at this picture".
+- The selected image shows in the chat references as "Selected: annotated image · <note>", and the reply says "AI looked at this picture". There is no extra parent topic named after the picture.
 - Choose "Show me first" to see a plan with dashed preview points before anything changes, or "Apply directly" and take it back with "Undo this reply". The chat remembers your choice.
 - Works with Claude and Codex. A plain picture is not sent; the AI asks you to convert it to an annotated image first.
 

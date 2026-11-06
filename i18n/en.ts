@@ -845,6 +845,7 @@ export const en = {
   "ui.text_node_removed": "Text node removed.",
   "ui.text_node_promote": "To card",
   "ui.text_node_promote_label": "Turn this text node into a topic card",
+  "ui.text_node_add_topic_label": "Add a topic after this text",
   "ui.text_node_promoted": "Text node turned into a topic card.",
   "ui.text_node_select_topic": "Select a topic first.",
   "ui.text_node_add_multiselect": "Finish selecting topics first, then add a text node.",

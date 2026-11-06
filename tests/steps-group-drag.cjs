@@ -166,6 +166,21 @@ test('timeline: a group with a first-level topic does not move and says why once
   assert.equal(ok.changes.length, 1); assert.deepEqual(ok.saved().c, [840, 0]);
 });
 
+// ledger R1: a topic after a text block is not a first-level topic, even when its real parent is the root.
+test('timeline: a group holding only a topic that follows a text block moves (it is not first-level)', () => {
+  const notes = [];
+  const h = harness({ layout: 'timeline', notes });
+  h.doc.nodes.find(n => n.id === 'b').afterTextId = 'tx';
+  setSelection(h.view, h.view.selection.state.multiSelectMode, ['b']);
+  h.down('b'); h.fire('b', 'pointermove', 40, 0); h.fire('b', 'pointerup', 40, 0);
+  assert.equal(h.changes.length, 1); assert.deepEqual(h.saved().b, [440, 200]);
+  assert.deepEqual(notes, []);
+  const first = harness({ layout: 'timeline', notes: [] });
+  setSelection(first.view, first.view.selection.state.multiSelectMode, ['b']);
+  first.down('b'); first.fire('b', 'pointermove', 40, 0); first.fire('b', 'pointerup', 40, 0);
+  assert.equal(first.changes.length, 0, 'a real first-level topic still cannot move as a group');
+});
+
 test('the map swapped mid-drag ends the drag without writing', () => {
   const h = harness();
   h.down('a'); h.fire('a', 'pointermove', 40, 0);

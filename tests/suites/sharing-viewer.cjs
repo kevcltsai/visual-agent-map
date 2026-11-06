@@ -1259,3 +1259,74 @@ test('sharing viewer card-height: a short card keeps its title and loses the sum
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
 });
+
+test('sharing viewer text-then-topic: topics after a text block hang from it, clear of it on open, fold and Auto layout (headless Chrome)', async t => {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  const chrome = candidates.find(file => fs.existsSync(file));
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-after-'));
+  try {
+    const data = payload();
+    // heat has a text block with two topics after it (and a child of the first), plus its two ordinary children.
+    const base = { x: 0, y: 0, collapsed: false, status: 'idea', summary: '' };
+    // A second block on the same topic has no topic after it, but must not be left for the followers to land on.
+    data.textNodes = [
+      { id: 'lead', parentId: 'heat', text: 'A lead-in note that is fairly long for a block', x: 600, y: 80 },
+      { id: 'aside', parentId: 'heat', text: 'An aside that follows no topic', x: 600, y: 140 }
+    ];
+    data.nodes.push(
+      { ...base, id: 'after1', parentId: 'heat', afterTextId: 'lead', title: 'After one' },
+      { ...base, id: 'after2', parentId: 'heat', afterTextId: 'lead', title: 'After two' },
+      { ...base, id: 'after1kid', parentId: 'after1', title: 'After one child' },
+      // A link to a block on another parent is ignored: this one stays an ordinary child of heat.
+      { ...base, id: 'stray', parentId: 'heat', afterTextId: 'lead-on-water', title: 'Stray' }
+    );
+    const source = path.join(directory, 'payload.json');
+    fs.writeFileSync(source, JSON.stringify(data));
+    const out = path.join(directory, 'after.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const snapshot = `(() => {
+        const box = e => ({ x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight });
+        const cards = Object.fromEntries([...document.querySelectorAll('.vam-node')].map(c => [c.dataset.nodeId, box(c)]));
+        const texts = [...document.querySelectorAll('.vam-text-node')].map(box);
+        const rects = [...Object.entries(cards).map(([id, r]) => ({ id, ...r })), ...texts.map((r, i) => ({ id: 'text' + i, ...r }))];
+        const hits = [];
+        rects.forEach((a, i) => rects.slice(i + 1).forEach(b => { if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) hits.push(a.id + '/' + b.id); }));
+        const edges = [...document.querySelectorAll('.vam-edge')].map(p => p.getAttribute('d'));
+        return { cards, texts, hits, edges };
+      })()`;
+      await wait(600);
+      await evaluate(`document.querySelector('[data-node-id="heat"] .vam-collapse-button')?.click()`);
+      await wait(300);
+      await evaluate(`document.querySelector('[data-node-id="after1"] .vam-collapse-button')?.click()`);
+      await wait(300);
+      const opened = await evaluate(snapshot);
+      await evaluate(`document.querySelector('.vam-layout-button').click()`);
+      await evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(b => b.textContent === 'Auto layout')?.click()`);
+      await wait(300);
+      const auto = await evaluate(snapshot);
+      await evaluate(`document.querySelector('[data-node-id="heat"] .vam-collapse-button')?.click()`);
+      await wait(300);
+      const folded = await evaluate(snapshot);
+      return { opened, auto, folded };
+    });
+    for (const [name, shot] of [['open', report.opened], ['Auto layout', report.auto]]) {
+      assert.equal(shot.texts.length, 2, `${name}: both blocks are drawn`);
+      const text = shot.texts[0];
+      assert.deepEqual(shot.hits, [], `${name}: nothing overlaps`);
+      for (const id of ['after1', 'after2']) {
+        assert.ok(shot.cards[id].x >= text.x + text.w, `${name}: ${id} sits after the block (x ${shot.cards[id].x} vs block end ${text.x + text.w})`);
+        assert.ok(shot.edges.some(d => d.startsWith(`M ${text.x + text.w} `)), `${name}: a line leaves the block`);
+      }
+      assert.ok(shot.cards.after1kid.x > shot.cards.after1.x, `${name}: the child of a follower is further right`);
+      assert.ok(Math.abs(shot.cards.stray.x - shot.cards.maillard.x) < 1, `${name}: the stray is in the column of heat's other children`);
+    }
+    assert.equal(report.folded.texts.length, 0, 'folding heat hides the block');
+    assert.equal(report.folded.cards.after1, undefined, 'and the topics after it');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});

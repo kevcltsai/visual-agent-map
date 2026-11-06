@@ -283,7 +283,12 @@ import {
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
-import { arrangeMapWithText, arrangeNewBranchWithText } from "../../map-layout-text";
+import {
+  arrangeMapWithText,
+  arrangeNewBranchWithText,
+  arrangeNewTreeWithText,
+  type TextWidthOf
+} from "../../map-layout-text";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
@@ -872,13 +877,24 @@ function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
 const relevanceSortedMaps = new Set<string>();
 /** Path data for the curve from a parent card's right edge to a child card's left edge. */
 /** `layoutDirectionFor` for many ids at once: builds the id lookup one time and remembers each answer. */
-function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: string) => string {
+function branchDirectionResolver(
+  nodes: MapNode[],
+  mapDirection: string,
+  /** Text block id -> the topic it hangs on: a block takes the direction of its topic (an unknown id is the whole map's). */
+  texts?: ReadonlyMap<string, string>
+): (id: string) => string {
   if (!allowsBranchLayout(mapDirection)) return () => mapDirection;
   const byId = new Map(nodes.map(node => [node.id, node]));
   const known = new Map<string, string>();
   const resolve = (id: string, seen: Set<string>): string => {
     const hit = known.get(id);
     if (hit !== undefined) return hit;
+    const textParent = texts?.get(id);
+    if (textParent !== undefined && !byId.has(id)) {
+      const answer = resolve(textParent, seen);
+      known.set(id, answer);
+      return answer;
+    }
     const node = byId.get(id);
     let answer = mapDirection;
     if (node && !seen.has(id)) {
@@ -929,6 +945,11 @@ const RELATION_LABEL_MIN_ZOOM = 0.6;
 /** A note shown under an expanded label is cut to this many characters. */
 const RELATION_LABEL_NOTE_MAX = 60;
 /** A card's distance from its root (a root is 0); only the fishbone edge reads it. */
+/** What a layout assumes about text blocks: their widths and the heights of every card and block. */
+interface TextSizes {
+  widthOf: TextWidthOf;
+  heightOf: (id: string) => number | undefined;
+}
 /** A one-line plain text node as drawn (padding + one line); a node not drawn yet takes this so the layout leaves no gap. */
 const TEXT_NODE_HEIGHT = 28;
 /** Width guess for a text block that is not drawn yet (an automatic block is as wide as its text, at most this). */
@@ -949,10 +970,23 @@ function estimateTextWidth(text: string): number {
   );
   return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line + 16)));
 }
+/**
+ * The arrangement a tree line is drawn in. In a fishbone the line from a text block to the topic that follows it is a
+ * straight line between the two boxes (like a radial line): the block hangs beside its topic's bone, so a rib on the bone
+ * would never touch the block.
+ */
+function lineKind(nodes: MapNode[], fromId: string, childId: string, direction: string): string {
+  return direction === "fishbone" && nodes.find(node => node.id === childId)?.afterTextId === fromId
+    ? "radial"
+    : direction;
+}
+
 function depthOf(nodes: MapNode[], id: string): number {
   const byId = new Map(nodes.map(node => [node.id, node]));
   let depth = 0;
-  for (let node = byId.get(id); node?.parentId && depth < nodes.length; node = byId.get(node.parentId)) depth++;
+  // A topic that follows a text block hangs one step lower: its line starts at the block, which hangs on the real parent.
+  for (let node = byId.get(id); node?.parentId && depth < nodes.length; node = byId.get(node.parentId))
+    depth += node.afterTextId ? 2 : 1;
   return depth;
 }
 /** One anchor relation as drawn: where it starts (the anchor, map units) and which topic it meets. */
@@ -1619,19 +1653,53 @@ export class VisualAgentMapView extends ItemView {
     this.cardEls.get(id)?.offsetHeight ||
     // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
     this.map?.nodes.find(node => node.id === id)?.height ||
-    // A text node is no card: its own rendered height, or the default while it is not drawn yet.
+    // A text node is no card: its measured height (drawn, or measured in a hidden copy), else the default.
     (this.isTextId(id)
-      ? this.textEls.get(id)?.offsetHeight || TEXT_NODE_HEIGHT
+      ? this.textBoxOf(id)?.height || TEXT_NODE_HEIGHT
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
-  /** A text block's width for the layout: as drawn, else the stored one, else a guess from its text (a block not drawn yet). */
+  /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
   private textWidthOf = (id: string): number | undefined => {
-    const drawn = this.textEls.get(id)?.offsetWidth;
-    if (drawn) return drawn;
+    const measured = this.textBoxOf(id)?.width;
+    if (measured) return measured;
     const item = (this.map?.canvasItems ?? []).find(
       (entry): entry is TextItem => entry.kind === "text" && entry.id === id
     );
     return item ? (item.width ?? estimateTextWidth(item.text)) : undefined;
   };
+  /**
+   * The one measurer of a text block: its width and height as the browser lays it out. Without `as` a drawn block is read
+   * from the DOM; with `as` (the text or width it is about to have; `width: null` = automatic) or when it is not drawn, a
+   * hidden copy is built in the text layer, read at once and removed, so nothing is painted and no extra undo step is needed.
+   * The copy never reads the drawn block, so a drag that already changed its width cannot change the answer.
+   */
+  private textBoxOf(
+    id: string,
+    as?: { text?: string; width?: number | null }
+  ): { width: number; height: number } | undefined {
+    const drawn = this.textEls.get(id);
+    if (!as && drawn?.offsetWidth && drawn.offsetHeight)
+      return { width: drawn.offsetWidth, height: drawn.offsetHeight };
+    const item = (this.map?.canvasItems ?? []).find(
+      (entry): entry is TextItem => entry.kind === "text" && entry.id === id
+    );
+    const layer = this.stageEl?.querySelector<HTMLElement>(".vam-text-nodes");
+    if (!item || !layer) return undefined;
+    const width = as?.width === undefined ? item.width : (as.width ?? undefined);
+    const probe = layer.createDiv("vam-text-node");
+    try {
+      probe.addClass("vam-text-probe");
+      probe.setAttr("aria-hidden", "true");
+      if (width !== undefined) {
+        probe.style.width = `${width}px`;
+        probe.addClass("has-width");
+      }
+      probe.createDiv({ cls: "vam-text-node-body", text: as?.text ?? item.text });
+      const box = { width: probe.offsetWidth, height: probe.offsetHeight };
+      return box.width && box.height ? box : undefined;
+    } finally {
+      probe.remove();
+    }
+  }
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
   private textEls = new Map<string, HTMLElement>();
   /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
@@ -1716,20 +1784,82 @@ export class VisualAgentMapView extends ItemView {
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
   }
-  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
-  private arrangeBranch(map: MapDocument, parentId: string, newIds: Set<string>, minTop?: number): void {
+  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. `sizes` gives the text sizes the layout is to assume. */
+  private arrangeBranch(
+    map: MapDocument,
+    parentId: string,
+    newIds: Set<string>,
+    minTop?: number,
+    sizes: TextSizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf }
+  ): void {
     const out = arrangeNewBranchWithText(
       map.nodes,
       map.canvasItems ?? [],
       parentId,
       newIds,
-      this.cardHeightOf,
+      sizes.heightOf,
       minTop,
+      layoutOf(map),
+      sizes.widthOf
+    );
+    map.nodes = out.nodes;
+    if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /** A branch became a top-level tree: it is laid out below the rest; a text block with followers inside it goes with it, as it would in Auto layout. */
+  private arrangeTree(map: MapDocument, rootId: string, ids: Set<string>): void {
+    const out = arrangeNewTreeWithText(
+      map.nodes,
+      map.canvasItems ?? [],
+      rootId,
+      ids,
+      this.cardHeightOf,
       layoutOf(map),
       this.textWidthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /**
+   * The topics that follow text block `textId` and everything below them, or an empty set when none follow it. Laid out again
+   * after the block's width, text or place changed, so the topics after it keep clear of it.
+   */
+  private followersOf(map: MapDocument, textId: string): Set<string> {
+    const ids = new Set<string>();
+    for (const node of map.nodes)
+      if (node.afterTextId === textId) {
+        ids.add(node.id);
+        for (const below of descendants(map.nodes, node.id)) ids.add(below);
+      }
+    return ids;
+  }
+  /**
+   * The block's own edit (its width or its text), for a block that has followers: the edge facing its topic stays (right: x;
+   * left: the right edge; down: centre and top; up: centre and bottom), and the followers are laid out against the block at
+   * its new size. The only place this rule lives; `from` and `to` are measured sizes (see `textBoxOf`). Nothing when no
+   * topic follows the block.
+   */
+  private relayoutFollowers(
+    map: MapDocument,
+    textId: string,
+    from: { width: number; height: number },
+    to: { width: number; height: number }
+  ): void {
+    const items = map.canvasItems ?? [];
+    const text = items.find((item): item is TextItem => item.kind === "text" && item.id === textId);
+    const followers = this.followersOf(map, textId);
+    if (!text?.parentId || !followers.size) return;
+    const upward = branchDirectionResolver(map.nodes, layoutOf(map).direction)(text.parentId) === "up";
+    const anchored = {
+      ...text,
+      x: this.textAnchoredX(textId, from.width, to.width),
+      y: upward ? text.y + from.height - to.height : text.y
+    };
+    map.canvasItems = items.map(item => (item === text ? anchored : item));
+    // Grown from the block, as the + does: the block stays where its edge rule put it and only what follows it moves.
+    this.arrangeBranch(map, textId, followers, undefined, {
+      widthOf: id => (id === textId ? to.width : this.textWidthOf(id)),
+      heightOf: id => (id === textId ? to.height : this.cardHeightOf(id))
+    });
   }
   /** The map's child index while a paint draws its cards; null otherwise. */
   private paintChildIndex: Map<string, MapNode[]> | null = null;
@@ -5444,6 +5574,8 @@ export class VisualAgentMapView extends ItemView {
       const moving = map.nodes.find(item => item.id === node.id)!;
       const oldParentId = moving.parentId;
       moving.parentId = parent.id;
+      // A move is explicit: the topic no longer follows a text block (moving it onto its own topic makes it a direct child).
+      delete moving.afterTextId;
       map.nodes.find(item => item.id === parent.id)!.collapsed = false;
       const movedIds = new Set([node.id, ...descendants(map.nodes, node.id)]);
       this.closeGapAt(map, oldParentId, parent.id, movedIds);
@@ -5511,11 +5643,19 @@ export class VisualAgentMapView extends ItemView {
       const moving = map.nodes.find(item => item.id === node.id);
       const target = map.nodes.find(item => item.id === parent.id);
       const next = map.nodes.find(item => item.id === before.id);
-      if (!moving || !target || next?.parentId !== parent.id || !canParent(map.nodes, node.id, parent.id)) return;
+      if (
+        !moving ||
+        !target ||
+        next?.parentId !== parent.id ||
+        next.afterTextId ||
+        !canParent(map.nodes, node.id, parent.id)
+      )
+        return;
       // The children of the new parent first take the order on screen (what the model was told), so the reorder keeps what was seen.
       map.nodes = this.onScreenSiblingOrder(map);
       const oldParentId = map.nodes.find(item => item.id === node.id)?.parentId ?? null;
       moving.parentId = parent.id;
+      delete moving.afterTextId;
       target.collapsed = false;
       map.nodes = reorderSiblings(map.nodes, parent.id, node.id, before.id);
       box.placed = true;
@@ -5556,7 +5696,9 @@ export class VisualAgentMapView extends ItemView {
    * between them or within one card of the first or last. Anywhere else is empty canvas, where a drop only moves the card.
    */
   private droppedAmongSiblings(map: MapDocument, card: MapNode): boolean {
-    const others = map.nodes.filter(item => item.parentId === card.parentId && item.id !== card.id);
+    const others = map.nodes.filter(
+      item => item.parentId === card.parentId && item.afterTextId === card.afterTextId && item.id !== card.id
+    );
     if (!others.length) return false;
     const direction = layoutDirectionFor(map.nodes, card.id, layoutOf(map).direction) as LayoutKind;
     const vertical = direction === "down" || direction === "up";
@@ -5600,7 +5742,7 @@ export class VisualAgentMapView extends ItemView {
    * The "+" of a card and the toolbar's "+ Topic": a list of what to add (the six topic types and a text block). One pick makes
    * it; Enter takes the first row, "Topic". Esc closes the list and adds nothing.
    */
-  private openAddMenu(event: MouseEvent, parent: MapNode | null): void {
+  private openAddMenu(event: MouseEvent, parent: MapNode | null, afterTextId?: string): void {
     if (this.presentation) return;
     const menu = this.newMenu();
     this.drawInDom(menu);
@@ -5609,9 +5751,18 @@ export class VisualAgentMapView extends ItemView {
         item
           .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
           .setIcon(kindIconId(kind))
-          .onClick(() => this.whenEditing(() => this.enqueue(() => this.addNode(parent, undefined, true, true, kind))))
+          .onClick(() =>
+            this.whenEditing(() =>
+              this.enqueue(() =>
+                afterTextId
+                  ? this.addNode(parent, undefined, true, true, kind, false, {}, afterTextId)
+                  : this.addNode(parent, undefined, true, true, kind)
+              )
+            )
+          )
       );
-    if (this.canEditText())
+    // Text after a text block is not offered: only topics follow a block.
+    if (this.canEditText() && !afterTextId)
       menu.addItem(item =>
         item
           .setTitle(t("ui.text_node_add"))
@@ -9067,6 +9218,21 @@ export class VisualAgentMapView extends ItemView {
       });
       promote.addEventListener("keydown", event => event.stopPropagation());
       promote.addEventListener("dblclick", event => event.stopPropagation());
+      // A block that hangs on a topic has a + like a card: it adds a topic that follows the block (not on a free block).
+      if (!free && !this.selection.state.multiSelectMode && !this.aimLive()) {
+        const add = el.createEl("button", {
+          cls: "vam-text-add",
+          text: "+",
+          attr: { type: "button", "aria-label": t("ui.text_node_add_topic_label"), "aria-haspopup": "menu" }
+        });
+        add.addEventListener("click", event => {
+          event.stopPropagation();
+          const owner = this.map?.nodes.find(node => node.id === text.parentId);
+          if (owner) this.openAddMenu(event, owner, text.id);
+        });
+        add.addEventListener("keydown", event => event.stopPropagation());
+        add.addEventListener("dblclick", event => event.stopPropagation());
+      }
       if (free) this.addFreeTextControls(el, text, liveLinks);
       el.addEventListener("keydown", event => {
         if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -9267,13 +9433,36 @@ export class VisualAgentMapView extends ItemView {
    * `from` is the width before the change; resetting to automatic measures the fitted width for `to`.
    */
   private async resizeText(id: string, width: number | undefined, from: number): Promise<void> {
+    // Both boxes are measured, never read from the element: a drag has already put the new width on it, a key press has not.
     const el = this.textEls.get(id);
-    const to = width ?? (el ? fittedTextWidth(el) : from);
+    // The block as it was is measured at its stored width (a drag cannot change that), never at `from`: for an automatic width
+    // `from` is the rounded offsetWidth, narrower than the real text, and a probe that narrow wraps to one line too many.
+    const stored = (this.map?.canvasItems ?? []).find(
+      (item): item is TextItem => item.kind === "text" && item.id === id
+    );
+    const before = this.textBoxOf(id, { width: stored?.width ?? null }) ?? {
+      width: from,
+      height: el?.offsetHeight || TEXT_NODE_HEIGHT
+    };
+    const after = this.textBoxOf(id, { width: width ?? null });
+    // Nothing to measure with (no text layer): the drawn block's fitted width, as before.
+    const to = width ?? after?.width ?? (el ? fittedTextWidth(el) : from);
     const x = this.textAnchoredX(id, from, to);
-    await this.changeCanvasItems(id, items =>
-      setTextNodeWidth(items, id, width).map(entry =>
-        entry.kind === "text" && (entry as TextItem).id === id ? { ...(entry as TextItem), x } : entry
-      )
+    const follows = this.followersOf(this.map!, id).size > 0;
+    await this.changeCanvasItems(
+      id,
+      items =>
+        setTextNodeWidth(items, id, width).map(entry =>
+          // With followers the one rule in `relayoutFollowers` places the block.
+          entry.kind === "text" && (entry as TextItem).id === id && !follows ? { ...(entry as TextItem), x } : entry
+        ),
+      map =>
+        this.relayoutFollowers(
+          map,
+          id,
+          { width: from, height: before.height },
+          { width: to, height: after?.height ?? before.height }
+        )
     );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
@@ -9590,16 +9779,51 @@ export class VisualAgentMapView extends ItemView {
     if (!current) return;
     this.focusItemId = id;
     if (cleanText(value) === null) {
-      this.focusItemId = null;
-      await this.changeCanvasItems(id, items => removeTextNode(items, id));
-      this.announcer?.setText(t("ui.text_node_removed"));
-    } else if (cleanText(value) !== current.text)
-      await this.changeCanvasItems(id, items => updateTextNode(items, id, value));
+      await this.removeTextItem(id);
+    } else if (cleanText(value) !== current.text) {
+      // The block may be wider or taller now: both sizes are measured here, before the DOM has the new text.
+      const text = cleanText(value) as string;
+      const before = this.textBoxOf(id);
+      const after = this.textBoxOf(id, { text });
+      await this.changeCanvasItems(
+        id,
+        items => updateTextNode(items, id, value),
+        // The topics after it are laid out again against the new size in the same step; a block with none keeps its facing edge alone.
+        map => {
+          if (!before || !after) return;
+          if (this.followersOf(map, id).size) {
+            this.relayoutFollowers(map, id, before, after);
+            return;
+          }
+          const x = this.textAnchoredX(id, before.width, after.width);
+          map.canvasItems = (map.canvasItems ?? []).map(item =>
+            item.kind === "text" && (item as TextItem).id === id ? { ...(item as TextItem), x } : item
+          );
+        }
+      );
+    }
   }
+  /**
+   * Deletes a text block. The topics that follow it stay: they are direct children of the block's topic again and are laid
+   * out there. Only the canvas item and those fields change; notes are never touched. One undo step.
+   */
   private async removeTextItem(id: string): Promise<void> {
     this.focusItemId = null;
-    await this.changeCanvasItems(id, items => removeTextNode(items, id));
+    await this.changeCanvasItems(
+      id,
+      items => removeTextNode(items, id),
+      map => this.releaseFollowers(map, id)
+    );
     this.announcer?.setText(t("ui.text_node_removed"));
+  }
+  /** Text block `textId` is gone from `map.canvasItems`: its followers become direct children of the topic and are placed again. */
+  private releaseFollowers(map: MapDocument, textId: string): void {
+    const followers = map.nodes.filter(node => node.afterTextId === textId);
+    if (!followers.length) return;
+    const parentId = followers[0].parentId;
+    const brought = this.followersOf(map, textId);
+    for (const node of followers) delete node.afterTextId;
+    if (parentId && map.nodes.some(node => node.id === parentId)) this.arrangeBranch(map, parentId, brought);
   }
   /**
    * Turns a text node into a topic card (decision #2): the first line (at most 80 characters) is the title, the whole text the
@@ -9616,6 +9840,9 @@ export class VisualAgentMapView extends ItemView {
       .map(line => line.trim())
       .find(Boolean);
     if (!title) return;
+    // The topics after the block become the new card's children: none of them may be a card that is mid-merge.
+    const followerIds = this.map.nodes.filter(node => node.afterTextId === id).map(node => node.id);
+    if (followerIds.length && !this.mergeUnlocked(followerIds)) return;
     const historyMark = this.history.mark();
     try {
       const before = new Set(this.map.nodes.map(node => node.id));
@@ -9630,7 +9857,16 @@ export class VisualAgentMapView extends ItemView {
         if (!map.canvasItems.length) delete map.canvasItems;
         const created = map.nodes.find(node => node.id === child.id);
         if (!created) return;
-        if (parent) this.arrangeBranch(map, parent.id, new Set([created.id]));
+        // The topics that followed the block hang under the new card now (they follow nothing any more).
+        const adopted = new Set<string>([created.id]);
+        for (const node of map.nodes)
+          if (node.afterTextId === id) {
+            node.parentId = created.id;
+            delete node.afterTextId;
+            adopted.add(node.id);
+            for (const below of descendants(map.nodes, node.id)) adopted.add(below);
+          }
+        if (parent) this.arrangeBranch(map, parent.id, adopted);
         else {
           created.x = text.x;
           created.y = text.y;
@@ -9652,8 +9888,10 @@ export class VisualAgentMapView extends ItemView {
       this.map.canvasItems,
       this.map.nodes.map(node => node.id)
     );
-    return attached
-      .filter(text => text.parentId === nodeId)
+    // A topic that follows a text block reads that block first (read-only context, like the topic's own text blocks).
+    const after = this.map.nodes.find(node => node.id === nodeId)?.afterTextId;
+    const first = after ? attached.filter(text => text.id === after) : [];
+    return [...first, ...attached.filter(text => text.parentId === nodeId)]
       .map(text => `- ${text.text.replace(/\n/g, "\n  ")}`)
       .join("\n");
   }
@@ -9690,13 +9928,18 @@ export class VisualAgentMapView extends ItemView {
   private chatUserTexts(): MapChatUserText[] {
     const items = this.map?.canvasItems ?? [];
     const ids = new Set((this.map?.nodes ?? []).map(node => node.id));
+    // The topics that follow each text block, in map order; a map without any adds no field to any text.
+    const followers = new Map<string, string[]>();
+    for (const node of this.map?.nodes ?? [])
+      if (node.afterTextId) followers.set(node.afterTextId, [...(followers.get(node.afterTextId) ?? []), node.id]);
     return items
       .filter((item): item is TextItem => item.kind === "text")
       .map(text => ({
         id: text.id,
         parentId: text.parentId && ids.has(text.parentId) ? text.parentId : null,
         text: text.text,
-        ...(text.links?.length ? { links: text.links } : {})
+        ...(text.links?.length ? { links: text.links } : {}),
+        ...(followers.has(text.id) ? { followedBy: followers.get(text.id) } : {})
       }));
   }
   /** Adds a text node under `parent` (or the selected topic) and opens its editor; one undo step. */
@@ -10310,7 +10553,12 @@ export class VisualAgentMapView extends ItemView {
     handle.addEventListener("pointerdown", event => begin(event, true));
   }
   /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
-  private async changeCanvasItems(id: string, change: (items: readonly CanvasItem[]) => CanvasItem[]): Promise<void> {
+  private async changeCanvasItems(
+    id: string,
+    change: (items: readonly CanvasItem[]) => CanvasItem[],
+    /** Runs on the same map in the same undo step once the items are written (a text block's followers are laid out here). */
+    after?: (map: MapDocument) => void
+  ): Promise<void> {
     if (!this.map || !this.canEditCanvasItems()) return;
     if (!this.map.canvasItems?.some(item => (item as { id?: unknown }).id === id)) return;
     await this.mapChange(map => {
@@ -10324,6 +10572,7 @@ export class VisualAgentMapView extends ItemView {
       const next = pruneBoundaries(dangling.size ? removeLinksTo(changed, dangling) : changed, [...alive]);
       if (next.length) map.canvasItems = next;
       else delete map.canvasItems;
+      after?.(map);
     }, false);
   }
   /** Moves a free image by (dx, dy) in map units. */
@@ -10836,7 +11085,9 @@ export class VisualAgentMapView extends ItemView {
       for (const root of roots) {
         if (target && !canParent(map.nodes, root.id, target.id))
           throw new Error(t("ui.circular_links_are_not_allowed"));
-        map.nodes.find(item => item.id === root.id)!.parentId = target?.id ?? null;
+        const moving = map.nodes.find(item => item.id === root.id)!;
+        moving.parentId = target?.id ?? null;
+        delete moving.afterTextId;
         const branch = new Set([root.id, ...descendants(map.nodes, root.id)]);
         branchOf.set(root.id, branch);
         for (const id of branch) moved.add(id);
@@ -10846,8 +11097,7 @@ export class VisualAgentMapView extends ItemView {
         // One layout for the moved branches under the target, in the same history entry as the move.
         this.arrangeBranch(map, target.id, moved, undefined);
       } else {
-        for (const root of roots)
-          map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id)!, this.cardHeightOf, layoutOf(map));
+        for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id)!);
       }
     });
     this.selection.afterMove(clearSelection);
@@ -15412,13 +15662,17 @@ export class VisualAgentMapView extends ItemView {
         if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
         await this.mapChange(map => {
           if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("ui.circular_links_are_not_allowed"));
-          map.nodes.find(n => n.id === node.id)!.parentId = parentId;
+          const moving = map.nodes.find(n => n.id === node.id)!;
+          moving.parentId = parentId;
+          delete moving.afterTextId;
           const branch = new Set([node.id, ...descendants(map.nodes, node.id)]);
           const parent = parentId ? map.nodes.find(n => n.id === parentId) : undefined;
           if (parent) {
             parent.collapsed = false;
             this.arrangeBranch(map, parent.id, branch, undefined);
-          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
+          } else {
+            this.arrangeTree(map, node.id, branch);
+          }
         });
       });
     };
@@ -17265,7 +17519,9 @@ export class VisualAgentMapView extends ItemView {
     focus = true,
     kind: TopicKind = "topic",
     keyboardFocus = false,
-    hypothesisStart: { leaning?: HypothesisLeaning; strength?: HypothesisStrength } = {}
+    hypothesisStart: { leaning?: HypothesisLeaning; strength?: HypothesisStrength } = {},
+    /** The text block (on `parentNode`) the new topic follows: it is laid out after the block and drawn with its line from it. */
+    afterTextId?: string
   ): Promise<void> {
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
@@ -17327,14 +17583,28 @@ export class VisualAgentMapView extends ItemView {
         map => {
           map.nodes.push(node);
           const owner = parent ? map.nodes.find(n => n.id === parent.id) : undefined;
+          // Only a block that hangs on this very topic can be followed; anything else adds an ordinary child.
+          const follows =
+            owner && afterTextId
+              ? treeTextNodes(
+                  map.canvasItems ?? [],
+                  map.nodes.map(n => n.id)
+                ).attached.find(text => text.id === afterTextId && text.parentId === owner.id)
+              : undefined;
+          if (follows) node.afterTextId = follows.id;
+          else delete node.afterTextId;
           if (owner) {
             owner.collapsed = false;
             // A new sibling goes after the existing ones (not into a gap above them); collisions are then resolved from there.
-            const siblings = map.nodes.filter(n => n.parentId === owner.id && n.id !== node.id);
+            // A topic after a block is only a sibling of the other topics after it; the layout puts it after the block.
+            const siblings = map.nodes.filter(
+              n => n.parentId === owner.id && n.id !== node.id && n.afterTextId === node.afterTextId
+            );
             const minTop = siblings.length
               ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
               : undefined;
-            this.arrangeBranch(map, owner.id, new Set([node.id]), minTop);
+            // Grown from the block itself, so the block and the topics already after it stay where they are.
+            this.arrangeBranch(map, node.afterTextId ? node.afterTextId : owner.id, new Set([node.id]), minTop);
           } else if (!parent) {
             const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
             if (roots.length)
@@ -22822,7 +23092,9 @@ export class VisualAgentMapView extends ItemView {
           if (beforeId === null) return skipped("ui.map_chat_skip_parent_missing");
           const before = nodeOf(beforeId);
           if (!before) return gone;
-          if (before.id === node.id || before.parentId !== parent.id) return skipped("ui.map_chat_skip_not_sibling");
+          // The moved card becomes a direct child, so only a direct child of the parent can stand behind it.
+          if (before.id === node.id || before.parentId !== parent.id || before.afterTextId)
+            return skipped("ui.map_chat_skip_not_sibling");
           if (!(await this.chatMoveBefore(node, parent, before))) return skipped("ui.map_chat_skip_not_sibling");
         } else await this.moveTopic(node, parent);
         await this.chatTopicAccept(node.id, baseline.topicHashes);
@@ -22837,7 +23109,9 @@ export class VisualAgentMapView extends ItemView {
         if (!parent || kids.some(kid => !kid)) return gone;
         if (this.isMerging(parent.id) || kids.some(kid => this.isMerging(kid!.id)))
           return skipped("ui.map_chat_skip_merge_locked");
-        if (kids.some(kid => kid!.parentId !== parent.id)) return skipped("ui.map_chat_skip_not_sibling");
+        // Topics after a text block and direct children are not siblings of each other: a mixed list orders nothing.
+        if (kids.some(kid => kid!.parentId !== parent.id || kid!.afterTextId !== kids[0]!.afterTextId))
+          return skipped("ui.map_chat_skip_not_sibling");
         await this.chatReorderChildren(parent, ids as string[]);
         return done;
       }
@@ -24447,9 +24721,10 @@ export class VisualAgentMapView extends ItemView {
         !this.map.aim &&
         layoutOf(this.map).direction === "timeline" &&
         [...group.keys()].some(id => {
-          const parentId = this.map?.nodes.find(item => item.id === id)?.parentId;
-          const parent = parentId ? this.map?.nodes.find(item => item.id === parentId) : undefined;
-          return !!parent && !parent.parentId;
+          const item = this.map?.nodes.find(n => n.id === id);
+          const parent = item?.parentId ? this.map?.nodes.find(n => n.id === item.parentId) : undefined;
+          // A topic after a text block is no first-level topic: its drag only changes the place.
+          return !!parent && !parent.parentId && !item?.afterTextId;
         });
       let warned = false;
       // Released over the AI chat window the card is a reference to add, not something to move.
@@ -24593,7 +24868,13 @@ export class VisualAgentMapView extends ItemView {
               if (!current) return;
               // A first-level topic dragged in a timeline map is a change of order: re-order, then lay the map out again.
               const root = current.parentId ? map.nodes.find(n => n.id === current.parentId) : undefined;
-              if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId) {
+              if (
+                !map.aim &&
+                layoutOf(map).direction === "timeline" &&
+                root &&
+                !root.parentId &&
+                !current.afterTextId
+              ) {
                 const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
                 map.nodes = reordered;
                 this.arrangeAll(map);
@@ -24642,7 +24923,8 @@ export class VisualAgentMapView extends ItemView {
     if (!found) return null;
     if (found.id === selfId) return null;
     const target = found;
-    if (roots.every(root => root.parentId === target.id)) return null;
+    // A topic that follows a text block can be dropped on its own topic: that makes it a direct child.
+    if (roots.every(root => root.parentId === target.id && !root.afterTextId)) return null;
     const inside = roots.some(root => root.id === target.id || descendants(nodes, root.id).has(target.id));
     return { node: target, invalid: inside || !roots.every(root => canParent(nodes, root.id, target.id)) };
   }
@@ -24661,13 +24943,13 @@ export class VisualAgentMapView extends ItemView {
    */
   private groupDragEdges(group: Map<string, HTMLElement>): { update: (dx: number, dy: number) => void } {
     const nodes = this.map?.nodes ?? [];
-    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction);
+    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction, this.drawnTextParents());
     const base = new Map<string, CardBox>();
     for (const [id, el] of group) base.set(id, boxOf(el));
     const boxFor = (id: string): CardBox | undefined => {
       const known = base.get(id);
       if (known) return known;
-      const el = this.cardEls.get(id);
+      const el = this.lineEndEl(id);
       return el ? boxOf(el) : undefined;
     };
     const shifted = (id: string, dx: number, dy: number): CardBox | undefined => {
@@ -24679,7 +24961,13 @@ export class VisualAgentMapView extends ItemView {
       const [parentId, childId] = key.split("\u0000");
       if (!group.has(parentId) && !group.has(childId)) continue;
       if (!boxFor(parentId) || !boxFor(childId)) continue;
-      tree.push({ key, parentId, childId, direction: directionOf(parentId), depth: depthOf(nodes, childId) });
+      tree.push({
+        key,
+        parentId,
+        childId,
+        direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
+        depth: depthOf(nodes, childId)
+      });
     }
     const linked: { key: string; fromId: string; toId: string }[] = [];
     for (const key of this.relationEls.keys()) {
@@ -24694,9 +24982,10 @@ export class VisualAgentMapView extends ItemView {
     // Each fishbone spine touched by a member (the head, or a first-level topic of the head) follows the move.
     const spineIds = new Set<string>();
     for (const id of group.keys()) {
-      const parentId = nodes.find(item => item.id === id)?.parentId;
+      const member = nodes.find(item => item.id === id);
+      const parentId = member?.parentId;
       if (this.spineEls.has(id)) spineIds.add(id);
-      else if (parentId && this.spineEls.has(parentId)) spineIds.add(parentId);
+      else if (parentId && !member?.afterTextId && this.spineEls.has(parentId)) spineIds.add(parentId);
     }
     const spines = [...spineIds].flatMap(id => {
       const boxes = this.spineBoxes(id);
@@ -24751,6 +25040,20 @@ export class VisualAgentMapView extends ItemView {
       if (!this.closed) this.render();
     }
   }
+  /** The drawn text blocks hanging on a topic: text id -> topic id (the lines of a topic that follows a block start at the block). */
+  private drawnTextParents(): Map<string, string> {
+    const parents = new Map<string, string>();
+    for (const item of this.map?.canvasItems ?? []) {
+      const text = item as TextItem;
+      const el = text.kind === "text" ? this.textEls.get(text.id) : undefined;
+      if (el && text.parentId && !el.classList.contains("is-free")) parents.set(text.id, text.parentId);
+    }
+    return parents;
+  }
+  /** The element a tree line starts or ends at: a card, or the text block a following topic's line starts at. */
+  private lineEndEl(id: string): HTMLElement | undefined {
+    return this.cardEls.get(id) ?? this.textEls.get(id);
+  }
   /**
    * The edges touching one card, with the geometry they need already measured. `update` moves only those edges to
    * the dragged card's new position; every other edge stays untouched.
@@ -24759,7 +25062,7 @@ export class VisualAgentMapView extends ItemView {
     const size = { width: card.offsetWidth, height: card.offsetHeight };
     const mapDirection = layoutOf(this.map).direction;
     const nodes = this.map?.nodes ?? [];
-    const directionOf = branchDirectionResolver(nodes, mapDirection);
+    const directionOf = branchDirectionResolver(nodes, mapDirection, this.drawnTextParents());
     const touching: {
       key: string;
       direction: string;
@@ -24770,11 +25073,11 @@ export class VisualAgentMapView extends ItemView {
     for (const key of this.edgeEls.keys()) {
       const [parentId, childId] = key.split("\u0000");
       if (parentId !== id && childId !== id) continue;
-      const other = this.cardEls.get(parentId === id ? childId : parentId);
+      const other = this.lineEndEl(parentId === id ? childId : parentId);
       if (!other) continue;
       touching.push({
         key,
-        direction: directionOf(parentId),
+        direction: lineKind(nodes, parentId, childId, directionOf(parentId)),
         depth: depthOf(nodes, childId),
         dragIsParent: parentId === id,
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
@@ -24792,7 +25095,7 @@ export class VisualAgentMapView extends ItemView {
     const dragged = this.map?.nodes.find(node => node.id === id);
     const spineId = this.spineEls.has(id)
       ? id
-      : dragged?.parentId && this.spineEls.has(dragged.parentId)
+      : dragged?.parentId && !dragged.afterTextId && this.spineEls.has(dragged.parentId)
         ? dragged.parentId
         : null;
     // Measured once at drag start; `update` swaps in the dragged card's box instead of re-reading the DOM.
@@ -24847,7 +25150,7 @@ export class VisualAgentMapView extends ItemView {
     if (!head || !this.map) return null;
     const topics: { id: string; box: CardBox }[] = [];
     for (const node of this.canvasNodes()) {
-      if (node.parentId !== headId) continue;
+      if (node.parentId !== headId || node.afterTextId) continue;
       const card = this.cardEls.get(node.id);
       if (card) topics.push({ id: node.id, box: boxOf(card) });
     }
@@ -24884,20 +25187,26 @@ export class VisualAgentMapView extends ItemView {
     );
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
-    const directionOf = branchDirectionResolver(allNodes, mapDirection);
+    const directionOf = branchDirectionResolver(allNodes, mapDirection, this.drawnTextParents());
     // Lines are collected first and added after every position is read: adding each one before reading the next card's
     // position would make the browser lay out the stage again for every line.
     const lines: SVGPathElement[] = [];
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
-        const parent = this.cardEls.get(parentId),
+        // A topic that follows a drawn text block gets its line from the block; when the block is not drawn, from the topic.
+        const afterText =
+          parentId === node.parentId && node.afterTextId && this.textEls.has(node.afterTextId)
+            ? node.afterTextId
+            : null;
+        const sourceId = afterText ?? parentId;
+        const parent = afterText ? this.textEls.get(afterText) : this.cardEls.get(parentId),
           child = this.cardEls.get(node.id);
         if (!parent || !child) continue;
         if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
         // The edge follows its parent's arrangement, which a branch of its own may change.
-        const direction = directionOf(parentId) as LayoutKind;
+        const direction = lineKind(allNodes, sourceId, node.id, directionOf(parentId)) as LayoutKind;
         path.setAttribute(
           "d",
           direction === "right"
@@ -24916,7 +25225,7 @@ export class VisualAgentMapView extends ItemView {
         // A mind map's own parent line is drawn lighter than the semantic lines (decision 35); AIM and the share viewer keep the accent line.
         else if (!this.map.aim && parentId === node.parentId) path.setAttribute("data-parent-line", "");
         lines.push(path);
-        this.edgeEls.set(`${parentId}\u0000${node.id}`, path);
+        this.edgeEls.set(`${sourceId}\u0000${node.id}`, path);
       }
     }
     // A text node hangs from its topic by the same kind of line.

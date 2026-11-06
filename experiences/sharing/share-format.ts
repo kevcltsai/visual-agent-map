@@ -91,6 +91,8 @@ export interface ShareNodePayload {
   width?: number;
   /** Optional (card-height): a custom card height, 80-720. Absent means as tall as the content; `version` stays 1. */
   height?: number;
+  /** Optional (text-then-topic): the text block (in `textNodes`, on the same `parentId`) this topic follows. Absent means a direct child; `version` stays 1. */
+  afterTextId?: string;
   status: "idea" | "completed";
   title: string;
   summary: string;
@@ -251,7 +253,8 @@ function shareSummaries(map: MapDocument): ShareSummaryPayload[] {
     const parent = byId.get(raw.parentId);
     if (!text || !parent) continue;
     const picked = new Set(raw.members.filter((id): id is string => typeof id === "string"));
-    const siblings = map.nodes.filter(node => node.parentId === parent.id);
+    // A topic that follows a text block is not in the row a bracket frames.
+    const siblings = map.nodes.filter(node => node.parentId === parent.id && !node.afterTextId);
     const at = siblings.flatMap((node, index) => (picked.has(node.id) ? [index] : []));
     if (!at.length) continue;
     const range = siblings.slice(at[0], at[at.length - 1] + 1);
@@ -320,6 +323,13 @@ export function buildSharePayload(
   });
   const goal = optionalText(options.goal);
   const textNodes = shareTextNodes(map);
+  // Only a follower whose text block is in the payload on the same parent keeps the link; anything else is a direct child.
+  const textParent = new Map(textNodes.map(text => [text.id, text.parentId]));
+  for (const out of nodes) {
+    const textId = map.nodes.find(node => node.id === out.id)?.afterTextId;
+    if (typeof textId === "string" && out.parentId !== null && textParent.get(textId) === out.parentId)
+      out.afterTextId = textId;
+  }
   const summaries = shareSummaries(map);
   return {
     format: SHARE_FORMAT,

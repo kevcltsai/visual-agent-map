@@ -369,6 +369,32 @@ integrationTest('an image generation turn enables only the image tool and resolv
   await assert.rejects(run([]), /did not return an image|沒有回傳圖片/);
   await assert.rejects(run([{ id: 'img-2', type: 'imageGeneration', status: 'failed', result: '', failure: { message: 'content policy' } }]), /content policy/);
 });
+integrationTest('a Codex turn carries the image url, and the request reported to onRequest holds only its length', async () => {
+  const { EventEmitter } = require('node:events'); const sent = [];
+  const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+  const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+  child.stdin = { write: line => {
+    const message = JSON.parse(line.trim()); sent.push(message);
+    if (message.method === 'initialize') emit({ id: message.id, result: {} });
+    else if (message.method === 'config/read') emit({ id: message.id, result: { config: {} } });
+    else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
+    else if (message.method === 'turn/start') {
+      emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
+      emit({ method: 'item/completed', params: { threadId: 'thread-1', item: { type: 'agentMessage', text: 'Done.' } } });
+      emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'completed' } } });
+    } else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: {} });
+  } };
+  const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+  const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+  const url = `data:image/png;base64,${'QUJD'.repeat(50)}`; const reported = [];
+  try { await runtime.runTask('look', 'model', 'low', undefined, { imageDataUrl: url, onRequest: request => reported.push(request) }); } finally { runtime.stop(); }
+  const turn = sent.find(message => message.method === 'turn/start').params;
+  assert.deepEqual(turn.input.map(item => item.type), ['text', 'image']);
+  assert.equal(turn.input[1].url, url, 'Codex itself gets the whole picture');
+  const logged = reported.find(request => request.input);
+  assert.equal(logged.input[1].url, `<image data URL, ${url.length} chars>`);
+  assert.ok(!JSON.stringify(reported).includes('base64,'), 'no picture body in what the log sees');
+});
 integrationTest('cancelling a Codex turn sends interrupt and rejects the result', async () => {
   const { EventEmitter } = require('node:events'); const sent = [], timerDelays = [];
   const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};

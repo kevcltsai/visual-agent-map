@@ -15,7 +15,7 @@ const labelOf = (request, id) => `c${request.nodes.findIndex(n => n.id === id) +
 const gradeAll = request => ({ items: request.nodes.filter(n => n.parentId !== null).map(n => ({ id: labelOf(request, n.id), tier: TITLES[n.title] ?? 'support' })) });
 const recalibrateNew = request => ({ changes: request.nodes.filter(n => n.parentId !== null && !request.previous.some(p => p.id === n.id)).map(n => ({ id: labelOf(request, n.id), tier: 'support', anchor: null })) });
 // The model sees the map parent-first: c1 Sleep (root), c2 Body, c3 REM (under Body), c4 Mind, c5 Dreams
-const TWO = [{ parentId: 'c2', title: 'Sleep stages' }, { parentId: 'c4', title: 'Stress habits' }];
+const TWO = [{ parentId: 'c2', title: 'Sleep stages', summary: 'About it.' }, { parentId: 'c4', title: 'Stress habits', summary: 'About it.' }];
 
 async function harness({ language = 'en' } = {}) {
   const { repo, app, contents } = fixture(language);
@@ -141,7 +141,7 @@ test('goal suggest: the count follows the checked rows and Add is disabled at 0'
 test('goal suggest: model text goes into the DOM as text only (an <img onerror> title stays literal)', async () => {
   const h = await harness();
   const evil = '<img src=x onerror=alert(1)>';
-  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c2', title: evil }] });
+  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c2', title: evil, summary: 'About it.' }] });
   await h.open();
   assert.deepEqual(h.titles(), [evil]);
   assert.equal(findAll(h.rootEl, i => i.tag === 'img').length, 0);
@@ -164,6 +164,7 @@ test('goal suggest: Add writes only the checked cards under their parents as ONE
   assert.equal(created.length, 1);
   assert.equal(created[0].parentId, h.ids.a, 'under Body');
   assert.equal((await h.repo.readNote(created[0].path)).title, 'Sleep stages');
+  assert.equal((await h.repo.readNote(created[0].path)).summary, 'About it.', 'the AI summary is the new card\'s summary, not the placeholder');
   assert.equal(h.view.history.past.length, past + 1, 'the add is one undo step');
   assert.equal(h.panel(), undefined, 'the list closes');
   assert.equal(h.control.gradeCalls[0].step, 'relevance-grade', 'no AI grade yet: a full grade');
@@ -215,7 +216,7 @@ test('goal suggest: Add twice quickly adds once', async () => {
 
 test('goal suggest: a parent deleted, renamed or AI-locked while the list waited is skipped on Add and the count is announced', async () => {
   const h = await harness();
-  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c2', title: 'Sleep stages' }, { parentId: 'c5', title: 'Stress habits' }, { parentId: 'c3', title: 'Light exposure' }] });
+  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c2', title: 'Sleep stages', summary: 'About it.' }, { parentId: 'c5', title: 'Stress habits', summary: 'About it.' }, { parentId: 'c3', title: 'Light exposure', summary: 'About it.' }] });
   await h.open();
   h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.d); // Dreams deleted (in the map file too, so the write finds no outside change)
   await h.repo.saveMap(MAP, h.view.map);
@@ -332,7 +333,7 @@ test('goal suggest: an empty answer says so and closes; an entirely unusable one
   h.control.suggest = async () => JSON.stringify({ suggestions: [] });
   h.spark().click(); await until(() => h.notices.length);
   assert.deepEqual(h.notices, ['No topics to add']); assert.equal(h.panel(), undefined);
-  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c9', title: 'Ghost' }] });
+  h.control.suggest = async () => JSON.stringify({ suggestions: [{ parentId: 'c9', title: 'Ghost', summary: 'About it.' }] });
   h.spark().click(); await until(() => h.notices.length === 2);
   assert.equal(h.notices[1], "The AI's 1 suggestions could not be used. Nothing was changed.");
   assert.equal(h.panel(), undefined);

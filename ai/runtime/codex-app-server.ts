@@ -398,7 +398,15 @@ export class CodexAppServerRuntime {
         sandboxPolicy: { type: "readOnly", networkAccess: false },
         ...(outputSchema ? { outputSchema } : {})
       };
-      controls?.onRequest?.(turnRequest);
+      // The picture stays in the request sent to Codex; whoever watches the request (the exchange log) only gets its length.
+      controls?.onRequest?.({
+        ...turnRequest,
+        input: turnRequest.input.map(item =>
+          item.type === "image" && "url" in item
+            ? { type: "image", url: `<image data URL, ${String(item.url).length} chars>` }
+            : item
+        )
+      });
       const startedTurn = (await this.request("turn/start", turnRequest)) as { turn?: { id?: unknown } };
       state.turnId = typeof startedTurn.turn?.id === "string" ? startedTurn.turn.id : "";
       if (!state.turnId) throw new Error("Codex App Server accepted no turn id.");

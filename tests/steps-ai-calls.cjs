@@ -238,10 +238,29 @@ test('aiRuntimeForModel: Claude gets the id without its prefix; Codex gets the l
   assert.equal(claudeGets, 1); assert.deepEqual(codexGets, [true, false]);
 });
 
-test('capabilities: Claude has no image generation, takes 1568px / 5 MiB images and a fixed effort list; Codex generates images and does not prewarm', () => {
+test('capabilities: Claude has no image generation, takes 1568px / 5 MiB images and a fixed effort list; Codex generates images, takes the same 1568px / 5 MiB images and does not prewarm', () => {
   assert.deepEqual(plain(mod.CLAUDE_CAPABILITIES), { id: 'claude', imageGeneration: false, imageInput: { maxEdgePx: 1568, maxBytes: 5 * 1024 * 1024 }, webSearch: true, prewarm: true, fixedReasoningEfforts: ['low', 'medium', 'high'] });
-  assert.deepEqual(plain(mod.CODEX_CAPABILITIES), { id: 'codex', imageGeneration: true, webSearch: true, prewarm: false });
+  assert.deepEqual(plain(mod.CODEX_CAPABILITIES), { id: 'codex', imageGeneration: true, imageInput: { maxEdgePx: 1568, maxBytes: 5 * 1024 * 1024 }, webSearch: true, prewarm: false });
   assert.equal(mod.aiRuntimeForModel('claude:opus', { claude: () => ({ runTask: async () => '' }), codex: () => ({ runTask: async () => '' }) }).capabilities, mod.CLAUDE_CAPABILITIES);
+});
+
+test('providerStepRunner passes the request imageDataUrl to the task controls and leaves the controls as they were without one', async () => {
+  const { providerStepRunner } = load('core/provider-step-runner.ts');
+  const seen = [];
+  const aiCalls = { run: async (_prepared, options) => { seen.push(options.task); return 'raw'; } };
+  const runner = providerStepRunner(aiCalls, { name: 'map-chat', topic: () => 't', stopped: () => new Error('stopped'), stream: true });
+  const base = { model: 'gpt-6-luna', reasoning: 'low' };
+  await runner({ ...base, imageDataUrl: 'data:image/png;base64,AAAA' }, new AbortController().signal, prepared());
+  await runner(base, new AbortController().signal, prepared());
+  assert.equal(seen[0].imageDataUrl, 'data:image/png;base64,AAAA');
+  assert.deepEqual(plain(seen[1]), { textOnly: true, searchBudget: 0, stream: true }, 'no picture: the controls are exactly what they were');
+  assert.equal('imageDataUrl' in seen[1], false);
+});
+
+test('a runtime without imageInput is told apart by capabilitiesFor(model).imageInput; both shipped runtimes take images', () => {
+  assert.ok(mod.CLAUDE_CAPABILITIES.imageInput && mod.CODEX_CAPABILITIES.imageInput);
+  const calls = new mod.AiCalls({ runtimeFor: () => ({ capabilities: { id: 'codex', imageGeneration: false, webSearch: false, prewarm: false }, run: async () => '' }), exchanges: () => null, activeTasks: new Map() });
+  assert.equal(calls.capabilitiesFor('x').imageInput, undefined);
 });
 
 test('a sink whose begin throws: the original error rejects, nothing stays registered or listening, and the runtime never runs', async () => {

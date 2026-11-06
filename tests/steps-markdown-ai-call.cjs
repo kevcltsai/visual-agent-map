@@ -139,7 +139,7 @@ test('markdown call: Claude cannot draw: refused before any event, image read, d
   assert.equal(h.plugin.activeTasks.size, 0);
 });
 
-test('markdown call: a Claude image over the edge limit or 5 MB is re-encoded; Codex and an image within the limits keep the original', async () => {
+test('markdown call: a Claude or Codex image over the edge limit or 5 MB is re-encoded; an image within the limits keeps the original', async () => {
   const wide = setup({ sizes: { [ORIGINAL]: { w: 3000, h: 2000 } } });
   await wide.plugin.runMarkdownContextAi(wide.prepared(), 'claude:sonnet', new AbortController().signal, image);
   assert.equal(wide.state.runs[0].kind, 'claude');
@@ -149,8 +149,8 @@ test('markdown call: a Claude image over the edge limit or 5 MB is re-encoded; C
 
   const codex = setup({ sizes: { [ORIGINAL]: { w: 3000, h: 2000 } } });
   await codex.plugin.runMarkdownContextAi(codex.prepared(), 'gpt-6-luna', new AbortController().signal, image);
-  assert.equal(codex.state.runs[0].controls.imageDataUrl, ORIGINAL);
-  assert.equal(codex.dom.canvases.length, 0, 'Codex never re-encodes');
+  assert.equal(codex.state.runs[0].controls.imageDataUrl, 'data:image/jpeg;fitted-0.9');
+  assert.deepEqual(codex.dom.canvases[0].calls, [['image/jpeg', 0.9, 1568, 1045]], 'Codex has the same 1568px limit as Claude since it declares imageInput');
 
   const small = setup({ sizes: { [ORIGINAL]: { w: 800, h: 600 } } });
   await small.plugin.runMarkdownContextAi(small.prepared(), 'claude:sonnet', new AbortController().signal, image);

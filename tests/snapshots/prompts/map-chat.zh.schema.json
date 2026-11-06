@@ -36,7 +36,9 @@
               "remove_relation",
               "set_appearance",
               "rename_map",
-              "reorder_topics"
+              "reorder_topics",
+              "add_anchor",
+              "link_anchor"
             ]
           },
           "nodeId": {
@@ -269,6 +271,21 @@
                 "all"
               ]
             }
+          },
+          "imageId": {
+            "type": "string"
+          },
+          "anchorId": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
           }
         },
         "required": [
@@ -305,7 +322,12 @@
           "markers",
           "removeMarkers",
           "formats",
-          "removeFormats"
+          "removeFormats",
+          "imageId",
+          "anchorId",
+          "x",
+          "y",
+          "note"
         ]
       }
     }

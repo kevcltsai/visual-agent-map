@@ -5,11 +5,12 @@ How to suggest:
 - Put each new topic under the existing card where it fits best, in "parentId". A top-level card may be the parent.
 - Do not repeat, reword or split an existing card. Do not propose a title that is already on the map or that you already proposed.
 - Each title is a short plain-text card name (one line, no numbering, no markup).
+- Each suggestion also has a "summary": one plain-text sentence saying what the new card covers and why the goal needs it. Base it only on the given goal, learner context and cards; it must not state any new fact, number or citation. Never leave it empty.
 - Return at most 8 suggestions, the most valuable first. Return an empty list when the map already covers the goal; never pad the list with weak suggestions.
 
 Rules:
 - Every "parentId" must be copied exactly from the supplied cards. Ids are short labels such as "c12"; never write any other id.
-- Return only JSON: {"suggestions":[{"parentId":"","title":""}]}. Do not add other fields, paths, links, citations or new factual claims. All context is supplied; do not inspect files, use tools or search the web.
+- Return only JSON: {"suggestions":[{"parentId":"","title":"","summary":""}]}. Do not add other fields, paths, links or citations, and do not make new factual claims. All context is supplied; do not inspect files, use tools or search the web.
 
 Write in Japanese.
 

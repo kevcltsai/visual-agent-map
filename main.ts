@@ -77,6 +77,7 @@ import {
   normalizeReasoningLevel,
   normalizeMapChatWidth,
   normalizeMapChatOpen,
+  normalizeMapChatImageMode,
   rebaseMapNotePaths,
   resolveMapFolders,
   type Note,
@@ -278,6 +279,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     cliModel: migratedChatModel(saved) || saved?.cliModel || DEFAULT_SETTINGS.cliModel,
     mapChatWidth: normalizeMapChatWidth(saved?.mapChatWidth),
     mapChatOpen: normalizeMapChatOpen(saved?.mapChatOpen),
+    mapChatImageMode: normalizeMapChatImageMode(saved?.mapChatImageMode),
     mapChatRecords: saved?.mapChatRecords === true,
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
     previewScale:

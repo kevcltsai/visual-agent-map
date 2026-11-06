@@ -3,6 +3,7 @@ import { translate, uiLocale, type ContentLanguage } from "../../../i18n";
 import type { ReasoningLevel } from "../../../ai/types";
 import { positionIds } from "../../short-ids";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
+import { sanitizeGeneratedTitle } from "../../title-safety";
 import { inLanguageNaming } from "../_shared/fragments";
 import type { StructureNode } from "../structure-review/step";
 import languageEn from "./language.en.md";
@@ -33,8 +34,11 @@ export interface GoalTopicSuggestRequest {
 export interface GoalTopicSuggestion {
   parentId: string;
   title: string;
+  /** One sentence for the new card's summary; never empty. */
+  summary: string;
 }
-export type GoalTopicDropCode = "unknown_parent" | "empty_title" | "title_too_long" | "duplicate_title";
+export type GoalTopicDropCode =
+  "unknown_parent" | "empty_title" | "title_too_long" | "duplicate_title" | "empty_summary";
 export interface GoalTopicDrop {
   index: number;
   code: GoalTopicDropCode;
@@ -65,9 +69,10 @@ export const GOAL_TOPIC_SUGGEST_SCHEMA = {
         additionalProperties: false,
         properties: {
           parentId: { type: "string", minLength: 1 },
-          title: { type: "string", minLength: 1 }
+          title: { type: "string", minLength: 1 },
+          summary: { type: "string", minLength: 1 }
         },
-        required: ["parentId", "title"]
+        required: ["parentId", "title", "summary"]
       }
     }
   },
@@ -96,11 +101,11 @@ const promptCards = (nodes: ReadonlyArray<StructureNode>) => {
 /**
  * Strict parser. Contract:
  * - A malformed reply rejects the WHOLE response with `GoalTopicSuggestError`: not JSON, not an object with only a
- *   `suggestions` array, an item that is not an object with exactly string `parentId` and `title`, or more than
+ *   `suggestions` array, an item that is not an object with exactly string `parentId`, `title` and `summary`, or more than
  *   {@link GOAL_TOPIC_SUGGEST_MAX_SUGGESTIONS} suggestions. Nothing is coerced or truncated.
  * - A well-formed suggestion that cannot be used is dropped individually and reported in `dropped`: a `parentId` that is
  *   not a short id of the supplied cards (a real id included), an empty title, a title longer than
- *   {@link GOAL_TOPIC_TITLE_LIMIT}, or a title equal (case and whitespace insensitive) to any existing card or to an
+ *   {@link GOAL_TOPIC_TITLE_LIMIT}, an empty summary, or a title equal (case and whitespace insensitive) to any existing card or to an
  *   earlier suggestion.
  * Short ids are turned back into real ids here.
  */
@@ -138,10 +143,11 @@ export function parseGoalTopicSuggest(
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw invalid(locale, where);
     const item = entry as Record<string, unknown>;
     const keys = Object.keys(item);
-    if (keys.length !== 2 || !["parentId", "title"].every(key => keys.includes(key)))
+    if (keys.length !== 3 || !["parentId", "title", "summary"].every(key => keys.includes(key)))
       throw invalid(locale, `${where} keys`);
     if (typeof item.parentId !== "string") throw invalid(locale, `${where} parentId`);
     if (typeof item.title !== "string") throw invalid(locale, `${where} title`);
+    if (typeof item.summary !== "string") throw invalid(locale, `${where} summary`);
     const drop = (code: GoalTopicDropCode): void => {
       dropped.push({ index, code });
     };
@@ -152,8 +158,10 @@ export function parseGoalTopicSuggest(
     if ([...title].length > GOAL_TOPIC_TITLE_LIMIT || /[\r\n]/.test(title)) return drop("title_too_long");
     const key = goalTopicTitleKey(title);
     if (taken.has(key)) return drop("duplicate_title");
+    const summary = sanitizeGeneratedTitle(item.summary.replace(/\s+/g, " ").trim()).trim();
+    if (!summary) return drop("empty_summary");
     taken.add(key);
-    suggestions.push({ parentId, title });
+    suggestions.push({ parentId, title, summary });
   });
   return { suggestions, dropped };
 }
@@ -161,7 +169,7 @@ export function parseGoalTopicSuggest(
 /** Suggest missing topics for a learner goal. Input is titles, summaries and structure only; the reply is strict JSON. */
 export const goalTopicSuggestStep: StepDefinition<GoalTopicSuggestRequest, GoalTopicSuggestResult> = {
   id: "goal-topic-suggest",
-  version: 1,
+  version: 2,
   render: request =>
     renderTemplate(template, {
       languageInstruction: inLanguageNaming(

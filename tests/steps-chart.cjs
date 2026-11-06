@@ -180,7 +180,7 @@ async function askAndChart(service, input, model, effort, ...rest) {
 }
 
 const TASK_REPLY = detail => JSON.stringify({ summary: 'S', detail, suggestions: [], visualReferences: [] });
-function fixture(replies, { parses, logging = true, template, onCall } = {}) {
+function fixture(replies, { parses, syntax, logging = true, template, onCall } = {}) {
   const calls = [];
   const runtime = {
     runTask: async (prompt, model, effort, schema, controls) => {
@@ -197,7 +197,8 @@ function fixture(replies, { parses, logging = true, template, onCall } = {}) {
     pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low',
     exchangeLoggingEnabled: () => logging, exchanges: () => log,
     codexRuntime: () => runtime, claudeRuntime: () => runtime,
-    ...(parses ? { mermaidParses: parses } : {})
+    ...(parses ? { mermaidParses: parses } : {}),
+    ...(syntax ? { mermaidSyntax: syntax } : {})
   });
   const base = { title: 'Topic', summary: 's', rules: '', detail: '', task: 'do', ancestors: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'auto', outputLanguage: 'en', addCharts: true, ...(template ? { detailTemplate: template } : {}) };
   return { calls, log, service, base };
@@ -361,4 +362,22 @@ test('sequenceDiagram: inner quotes or empty quotes are left alone', async () =>
   const r = await apply(NOTE, [draft(P1, body, 'process')]);
   assert.equal(r.ok, true);
   assert.ok(r.detail.includes('```mermaid\n' + body + '\n```'));
+});
+
+test('askModel: a mermaid block the parser rejects is written as text; the rest of the detail is unchanged; an unusable parser keeps everything', async () => {
+  const bad = '```mermaid\npie showTitle\n  title "x"\n  "a" : 3\n```';
+  const detail = `${NOTE}\n\n${bad}\n\nTail.`;
+  const syntax = async code => (/showTitle/.test(code) ? 'invalid' : 'ok');
+  const on = fixture([TASK_REPLY(detail)], { syntax });
+  const off = fixture([TASK_REPLY(detail)], {});
+  const plain = await off.service.askModel({ ...off.base, addCharts: undefined }, 'claude:sonnet', 'low');
+  const checked = await on.service.askModel({ ...on.base, addCharts: undefined }, 'claude:sonnet', 'low');
+  assert.match(plain.detail, /```mermaid\npie showTitle/);
+  assert.equal(checked.detail, plain.detail.replace('```mermaid\npie showTitle', '```text\npie showTitle'));
+  const [kept, warns] = await withWarn(async () => {
+    const down = fixture([TASK_REPLY(detail)], { syntax: async () => 'unavailable' });
+    return down.service.askModel({ ...down.base, addCharts: undefined }, 'claude:sonnet', 'low');
+  });
+  assert.equal(kept.detail, plain.detail);
+  assert.equal(warns.length, 1);
 });

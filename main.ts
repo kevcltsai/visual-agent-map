@@ -121,6 +121,7 @@ import { ResearchProgressStore } from "./experiences/visual-map/research-progres
 import { TopicRuns, type ChartJob } from "./experiences/visual-map/topic-run";
 import type { ResearchObserver } from "./ai/research-observer";
 import { AiTaskService } from "./core/ai-task-service";
+import { mermaidSyntaxCheck } from "./ai/mermaid-safety";
 import { localizedResponseSchema } from "./core/steps/task/schemas";
 import { announceTestOverrides } from "./experiences/aim/flow-limits";
 import { ReframingService, providerReframeRunner } from "./core/reframing-service";
@@ -375,6 +376,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       codexInstalled: () => this.codexDiagnostic().installed
     }
   });
+  /** Syntax check against the runtime parser of Obsidian's `loadMermaid`; shared by AI task results and map chat note edits. */
+  readonly mermaidSyntax = mermaidSyntaxCheck(loadMermaid);
   private readonly aiTaskOptions = {
     pluginDirectory: () => this.pluginDirectory(),
     language: () => this.settings.language,
@@ -385,6 +388,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     diagramsEnabled: () => this.settings.addDiagramsAfterResearch,
     codexRuntime: (directory: string, local: boolean) => this.runtime(directory, local),
     claudeRuntime: (directory: string) => this.claudeCli(directory),
+    mermaidSyntax: this.mermaidSyntax,
     mermaidParses: async (code: string): Promise<boolean> => {
       // The same mermaid Obsidian renders with; a missing or failing parser refuses the diagram rather than trusting it.
       try {

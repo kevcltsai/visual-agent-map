@@ -205,6 +205,7 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
+import { demoteUnparsableMermaid, neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
 import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
@@ -23074,7 +23075,13 @@ export class VisualAgentMapView extends ItemView {
             ? { title: action.title }
             : action.kind === "update_summary"
               ? { summary: action.summary }
-              : { detail: action.detail }
+              : // Model-written note body: same allow-list and parser check as an AI task result (a manual edit never comes here).
+                {
+                  detail: await demoteUnparsableMermaid(
+                    neutralizeUnsafeMermaid(action.detail),
+                    this.plugin.mermaidSyntax
+                  )
+                }
         );
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;

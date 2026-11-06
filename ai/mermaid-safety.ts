@@ -1,11 +1,13 @@
 /**
  * Mermaid blocks in a model-written detail are rendered by Obsidian, so the prompt's limits are enforced here too:
- * only flowchart/graph or a type in DIAGRAM_TYPES, with text labels. A block that breaks a limit (click, link,
+ * only flowchart/graph or a type in DIAGRAM_TYPES, with text labels. `demoteUnparsableMermaid` then asks the runtime
+ * parser (Obsidian's `loadMermaid`, Mermaid or Pele depending on the version) about each remaining block. A block that breaks a limit (click, link,
  * callback or cssClass directives, HTML tags, init/config, URLs, images, icons, styles, sequence actor menus,
  * mindmap icons, C4 links/sprites/tags/styling, quadrant point styling) keeps its text but loses the `mermaid` info
- * string, so Obsidian shows it as plain code and never renders it. An unknown header is neutralized too.
+ * string, so Obsidian shows it as plain code and never renders it. An unknown header is neutralized too; so is a
+ * block the parser rejects (a syntax error would otherwise show as red error text in the note).
  */
-/** Diagram types the mermaid in Obsidian 1.14.4 (11.13.0) detects and draws offline; checked against the bundle 2026-10-19. */
+/** Diagram types the mermaid in Obsidian 1.14.4 (11.13.0) detects and draws offline; checked against the bundle 2026-10-19. Obsidian 1.15 ships Pele instead; the runtime parser check is what guards syntax there. */
 export const DIAGRAM_TYPES: readonly string[] = [
   "sequenceDiagram",
   "classDiagram",
@@ -127,4 +129,85 @@ export function neutralizeUnsafeMermaid(markdown: string): string {
     if (unsafeMermaid(body)) lines[index] = line.replace(/mermaid/i, "text");
   });
   return lines.join("\n");
+}
+
+/** `ok` parses; `invalid` is a real syntax failure; `unavailable` means no parser could be used (nothing is known about the block). */
+export type MermaidVerdict = "ok" | "invalid" | "unavailable";
+export type MermaidSyntaxCheck = (code: string) => Promise<MermaidVerdict>;
+
+/**
+ * A syntax check on top of the parser that `load` returns (Obsidian's `loadMermaid`; the engine is not assumed).
+ * A load failure or a parser without `parse` is `unavailable`; only a rejection from `parse` itself is `invalid`.
+ */
+export function mermaidSyntaxCheck(load: () => Promise<unknown>): MermaidSyntaxCheck {
+  return async code => {
+    let parse: (text: string) => Promise<unknown>;
+    try {
+      const engine = (await load()) as { parse?: unknown } | null | undefined;
+      if (!engine || typeof engine.parse !== "function") return "unavailable";
+      const method = engine.parse as (this: unknown, text: string) => Promise<unknown>;
+      parse = async text => (await method.call(engine, text)) as unknown;
+    } catch {
+      return "unavailable";
+    }
+    try {
+      await parse(code);
+      return "ok";
+    } catch {
+      return "invalid";
+    }
+  };
+}
+
+/**
+ * Turns each mermaid block the parser rejects into a plain `text` block (only its info string changes; every other
+ * character, line break and block stays). The code handed to the parser has the callout, quote and list prefixes removed.
+ * When the parser cannot be used the markdown is returned as it is and one log line is written; no block is demoted.
+ */
+export async function demoteUnparsableMermaid(
+  markdown: string,
+  check: MermaidSyntaxCheck | undefined
+): Promise<string> {
+  if (!check || !/mermaid/i.test(markdown)) return markdown;
+  // Keep every line break as it is: split with the separators kept, and work on the text parts only.
+  const parts = markdown.split(/(\r\n?|\n)/);
+  const at = (line: number): number => line * 2;
+  const count = Math.ceil(parts.length / 2);
+  const demote: number[] = [];
+  for (let index = 0; index < count; index++) {
+    const fence = fenceOf(parts[at(index)]);
+    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) continue;
+    // The fence line's own prefix (indentation, "> ", list marker) is taken off every body line, so relative
+    // indentation (mindmap, kanban) reaches the parser intact; a line without that prefix (lazy quote line) falls back to core().
+    const opening = parts[at(index)];
+    const prefix = opening.slice(0, opening.length - core(opening).length);
+    // A list marker is continued by spaces of the same width.
+    const continued = prefix.replace(/(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t])/g, marker =>
+      " ".repeat(marker.length)
+    );
+    const body: string[] = [];
+    for (let next = index + 1; next < count; next++) {
+      const raw = parts[at(next)];
+      const content = core(raw);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(
+        raw.startsWith(prefix)
+          ? raw.slice(prefix.length)
+          : raw.startsWith(continued)
+            ? raw.slice(continued.length)
+            : content
+      );
+    }
+    if (!body.some(line => line.trim())) continue;
+    const verdict = await check(body.join("\n"));
+    if (verdict === "unavailable") {
+      console.warn("Visual Agent Map: the Mermaid parser is unavailable; diagrams were not syntax-checked.");
+      return markdown;
+    }
+    if (verdict === "invalid") demote.push(index);
+  }
+  if (!demote.length) return markdown;
+  for (const index of demote) parts[at(index)] = parts[at(index)].replace(/mermaid/i, "text");
+  return parts.join("");
 }

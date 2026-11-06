@@ -629,6 +629,20 @@ integrationTest('map chat: F3 - a changed title or parent makes rename, move and
   assert.equal(h.node('c').parentId, h.ids.b);
 });
 
+integrationTest('map chat: edit_topic_note neutralizes an unsafe mermaid block and demotes one the parser rejects; a block that parses is written as is', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.plugin.mermaidSyntax = async code => (/^pie showTitle/.test(code) ? 'invalid' : 'ok');
+  const unsafe = '```mermaid\nflowchart TD\n  A["x"]\n  click A "https://evil.example"\n```';
+  const broken = '```mermaid\npie showTitle\n  title x\n  "a" : 3\n```';
+  const fine = '```mermaid\npie\n  title x\n  "a" : 3\n```';
+  const lines = await apply(h, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: `${unsafe}\n\n${broken}\n\n${fine}` }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const detail = (await h.note('a')).detail;
+  assert.ok(detail.includes(unsafe.replace('```mermaid', '```text')), detail);
+  assert.ok(detail.includes(broken.replace('```mermaid', '```text')), detail);
+  assert.ok(detail.includes(fine), detail);
+});
+
 integrationTest('map chat: F3 - two actions on the same card in one reply are not mistaken for a user edit', async () => {
   const h = await harness(); await h.view.hydrate();
   const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }, { kind: 'update_summary', nodeId: h.ids.a, summary: 'Rhythm' }, { kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'Fresh body' }]);

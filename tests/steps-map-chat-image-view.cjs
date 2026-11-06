@@ -751,3 +751,201 @@ test('F-b M2 (counter-example): a pending plan keeps its dots when the picture s
   assert.ok(v.chatPreview, 'the preview state is still there');
   o.card.cancel(); assert.equal(dots(o.el()).length, 0, 'cancelling ends them');
 });
+
+// ---- P5 (image centre layout): a reply that links new top-level topics to anchors makes a ring ----
+const replayRing = require('./support-replay.cjs').load('experiences/visual-map/image-ring.ts');
+const topChild = (ref, title = ref) => ({ kind: 'add_child', parentId: '', title, ref });
+const fresh = (h, before) => h.view.map.nodes.filter(n => !before.has(n.id));
+const relationsOf = async h => ((await h.image()).relations ?? []);
+const ringClean = (h, imageId = 'img1') => {
+  const map = h.view.map;
+  const image = map.canvasItems.find(i => i.id === imageId);
+  const cards = [];
+  for (const r of image.relations ?? []) {
+    if (r.ring !== true) continue;
+    const n = map.nodes.find(x => x.id === r.to);
+    const at = image.anchors.find(a => a.id === r.from).at;
+    cards.push({ id: n.id, x: n.x, y: n.y, w: n.width ?? 280, h: h.view.cardHeightOf(n.id) ?? 120, anchorX: at.x, anchorY: at.y });
+  }
+  return { cards, violations: replayRing.ringViolations({ x: image.x, y: image.y, w: image.w, h: image.h }, cards, { memberCount: cards.length }) };
+};
+const manyActions = n => [
+  ...Array.from({ length: n }, (_, i) => topChild(`t${i}`, `Part ${i}`)),
+  ...Array.from({ length: n }, (_, i) => addAnchor(`p${i}`, 0.05 + (i % 6) * 0.17, i < 6 ? 0.2 : 0.75, `n${i}`)),
+  ...Array.from({ length: n }, (_, i) => link(`anchor:p${i}`, `new:t${i}`))
+];
+
+test('P5 A13: 12 top-level add_child + 12 add_anchor + 12 link_anchor make 12 ring members, a clean ring, one undo step', async () => {
+  const h = await harness();
+  const before = new Set(h.view.map.nodes.map(n => n.id));
+  const beforeSaved = plain(await h.saved());
+  h.view.history.push({ undo: async () => {}, redo: async () => {}, label: 'earlier' });
+  const lines = await h.apply(manyActions(12));
+  assert.ok(lines.every(l => l.status === 'done'), JSON.stringify(lines));
+  const made = fresh(h, before);
+  assert.equal(made.length, 12);
+  assert.ok(made.every(n => n.parentId === null), '12 top-level topics');
+  const rels = await relationsOf(h);
+  assert.equal(rels.filter(r => r.ring === true).length, 12, 'every new link is marked ring');
+  const { cards, violations } = ringClean(h);
+  assert.equal(cards.length, 12);
+  assert.deepEqual(plain(violations), [], 'ringViolations: none');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+  await h.view.travel(false);
+  assert.deepEqual(plain(await h.saved()), beforeSaved, 'one undo takes the whole reply back');
+  assert.equal(h.view.history.undoEntry.label, 'earlier');
+});
+
+test('P5 (counter-example): 5+ new cards with an existing map never move an existing card (no whole-map layout)', async () => {
+  const h = await harness();
+  const old = plain(h.view.map.nodes.map(n => ({ id: n.id, x: n.x, y: n.y })));
+  await h.apply(manyActions(6));
+  const now = plain(h.view.map.nodes.filter(n => old.some(o => o.id === n.id)).map(n => ({ id: n.id, x: n.x, y: n.y })));
+  assert.deepEqual(now, old, 'existing nodes keep every x, y');
+  assert.equal(ringClean(h).cards.length, 6);
+});
+
+test('P5 (counter-example): old-style reply (root + children) marks no ring and lays out as before', async () => {
+  const h = await harness();
+  const lines = await h.apply([
+    addAnchor('p1', 0.2, 0.3), addAnchor('p2', 0.7, 0.8),
+    topChild('root', 'Cuts'),
+    { kind: 'add_child', parentId: 'new:root', title: 'Rib', ref: 'c1' },
+    { kind: 'add_child', parentId: 'new:root', title: 'Loin', ref: 'c2' },
+    link('anchor:p1', 'new:c1'), link('anchor:p2', 'new:c2')
+  ]);
+  assert.ok(lines.every(l => l.status === 'done'), JSON.stringify(lines));
+  assert.equal((await relationsOf(h)).filter(r => r.ring).length, 0);
+  assert.equal(h.view.map.nodes.filter(n => n.parentId === null).length, 2, 'the old root plus the new one');
+});
+
+test('P5 (counter-example): only add_anchor writes no ring and no card moves', async () => {
+  const h = await harness();
+  const old = plain(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const lines = await h.apply([addAnchor('p1', 0.2, 0.3), addAnchor('p2', 0.7, 0.8)]);
+  assert.deepEqual(statuses(lines), ['done', 'done']);
+  assert.equal((await relationsOf(h)).length, 0);
+  assert.deepEqual(plain(h.view.map.nodes.map(n => [n.id, n.x, n.y])), old);
+});
+
+test('P5 (counter-example): links to an existing topic, or to a new topic under an existing parent, are not ring; new top-level ones are', async () => {
+  const h = await harness();
+  const lines = await h.apply([
+    addAnchor('p1', 0.2, 0.3), addAnchor('p2', 0.5, 0.5), addAnchor('p3', 0.8, 0.8), addAnchor('p4', 0.8, 0.2),
+    topChild('top', 'Top'),
+    { kind: 'add_child', parentId: h.ids.root, title: 'Under', ref: 'u' },
+    link('anchor:p1', h.ids.a), link('anchor:p2', 'new:u'), link('anchor:p3', 'new:top'), link('anchor:p4', h.ids.root)
+  ]);
+  assert.ok(lines.every(l => l.status === 'done'), JSON.stringify(lines));
+  const rels = await relationsOf(h);
+  const ringed = rels.filter(r => r.ring === true);
+  assert.equal(ringed.length, 1, 'only the new top-level topic is a ring member');
+  assert.equal(h.view.map.nodes.find(n => n.id === ringed[0].to).parentId, null);
+  assert.equal(rels.filter(r => !r.ring).length, 3);
+});
+
+test('P5 (counter-example): Stop between add_child and link_anchor: linked cards form the ring, the rest are placed by placeChatCards, nothing is lost, one undo step', async () => {
+  const h = await harness();
+  const before = new Set(h.view.map.nodes.map(n => n.id));
+  const old = plain(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const alive = () => ((h.view.map.canvasItems.find(i => i.id === 'img1').relations ?? []).filter(r => r.ring === true).length < 3);
+  const lines = await h.view.applyMapChatActions({ actions: manyActions(6), rejected: [] }, { mdHashes: {}, topicHashes: {} }, alive);
+  assert.ok(lines.some(l => l.status === 'skipped'), 'the rest is skipped');
+  const made = fresh(h, before);
+  assert.equal(made.length, 6, 'every card written before the stop is kept');
+  assert.equal((await relationsOf(h)).filter(r => r.ring === true).length, 3);
+  assert.deepEqual(plain(ringClean(h).violations), []);
+  assert.deepEqual(plain(h.view.map.nodes.filter(n => before.has(n.id)).map(n => [n.id, n.x, n.y])), old, 'existing cards stay');
+  // No card of the reply covers another.
+  const box = n => ({ x: n.x, y: n.y, w: n.width ?? 280, h: h.view.cardHeightOf(n.id) ?? 120 });
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  for (let i = 0; i < made.length; i++) for (let j = i + 1; j < made.length; j++) assert.ok(!hit(box(made[i]), box(made[j])), `cards ${i} and ${j} apart`);
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply');
+});
+
+test('P5 (counter-example): the picture deleted before the reply applies: no ring, no throw, topics kept', async () => {
+  const h = await harness();
+  await h.edit(items => items.filter(i => i.id !== 'img1'));
+  const lines = await h.apply(manyActions(3));
+  assert.equal(lines.filter(l => l.status === 'done').length, 3, 'the topics are made');
+  assert.ok(lines.slice(3).every(l => l.status === 'skipped'));
+  assert.equal((h.view.map.canvasItems ?? []).some(i => i.kind === 'annotated-image'), false);
+});
+
+test('P5: an explicit auto_layout in the reply lays the whole map out and the ring is solved again', async () => {
+  const h = await harness();
+  const lines = await h.apply([...manyActions(3), { kind: 'auto_layout' }]);
+  assert.ok(lines.every(l => l.status === 'done'), JSON.stringify(lines));
+  assert.equal(ringClean(h).cards.length, 3);
+  assert.deepEqual(plain(ringClean(h).violations), []);
+});
+
+// ---- P5b: a picture that already has a ring keeps its cards when a later reply adds members ----
+const partActions = (from, n) => [
+  ...Array.from({ length: n }, (_, i) => topChild(`t${from + i}`, `Part ${from + i}`)),
+  ...Array.from({ length: n }, (_, i) => addAnchor(`p${from + i}`, 0.1 + ((from + i) % 6) * 0.15, (from + i) < 3 ? 0.2 : 0.75, `n${from + i}`)),
+  ...Array.from({ length: n }, (_, i) => link(`anchor:p${from + i}`, `new:t${from + i}`))
+];
+const boxOf = (h, n) => ({ x: n.x, y: n.y, w: n.width ?? 280, h: h.view.cardHeightOf(n.id) ?? 120 });
+const hitBox = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+test('P5b: a ring that existed before the reply keeps its cards (one dragged by hand); only the 2 new members are placed', async () => {
+  const h = await harness();
+  assert.ok((await h.apply(partActions(0, 3))).every(l => l.status === 'done'));
+  const ringIds = (await relationsOf(h)).filter(r => r.ring === true).map(r => r.to);
+  assert.equal(ringIds.length, 3);
+  { const disk = await h.repo.readMap(MAP); const d = disk.nodes.find(n => n.id === ringIds[1]); d.y -= 40; await h.repo.saveMap(MAP, disk); h.view.map = await h.repo.readMap(MAP); }
+  const old = plain(ringIds.map(id => { const n = h.view.map.nodes.find(x => x.id === id); return [id, n.x, n.y]; }));
+  { const ls = await h.apply(partActions(3, 2)); assert.ok(ls.every(l => l.status === 'done'), JSON.stringify(ls)); }
+  const rels = (await relationsOf(h)).filter(r => r.ring === true);
+  assert.equal(rels.length, 5, 'two more ring members');
+  assert.deepEqual(plain(ringIds.map(id => { const n = h.view.map.nodes.find(x => x.id === id); return [id, n.x, n.y]; })), old, 'old members keep their x, y');
+  const image = h.view.map.canvasItems.find(i => i.id === 'img1');
+  for (const r of rels.filter(r => !ringIds.includes(r.to))) {
+    const n = h.view.map.nodes.find(x => x.id === r.to);
+    assert.ok(!hitBox(boxOf(h, n), { x: image.x, y: image.y, w: image.w, h: image.h }), 'new card does not cover the picture');
+    for (const id of ringIds) assert.ok(!hitBox(boxOf(h, n), boxOf(h, h.view.map.nodes.find(x => x.id === id))), 'new card does not cover an old member');
+  }
+});
+
+test('P5b A7/A13: a new sub-topic under a ring member lands outside that card and never covers the picture', async () => {
+  const h = await harness();
+  assert.ok((await h.apply(partActions(0, 4))).every(l => l.status === 'done'));
+  const ringIds = (await relationsOf(h)).filter(r => r.ring === true).map(r => r.to);
+  const image = h.view.map.canvasItems.find(i => i.id === 'img1');
+  const imageBox = { x: image.x, y: image.y, w: image.w, h: image.h };
+  const before = new Set(h.view.map.nodes.map(n => n.id));
+  const actions = ringIds.map((id, i) => ({ kind: 'add_child', parentId: id, title: `Sub ${i}`, ref: `s${i}` }));
+  assert.ok((await h.apply(actions)).every(l => l.status === 'done'));
+  const subs = fresh(h, before);
+  assert.equal(subs.length, ringIds.length);
+  for (const sub of subs) {
+    const parent = h.view.map.nodes.find(n => n.id === sub.parentId);
+    assert.ok(ringIds.includes(parent.id));
+    assert.ok(!hitBox(boxOf(h, sub), imageBox), 'sub-topic does not cover the picture');
+    assert.ok(!hitBox(boxOf(h, sub), boxOf(h, parent)), 'sub-topic does not cover its parent');
+    for (const id of ringIds) assert.ok(!hitBox(boxOf(h, sub), boxOf(h, h.view.map.nodes.find(x => x.id === id))), 'does not cover a ring card');
+  }
+});
+
+// Review round 1, R2: a selected card dims every other line of the picture to 25%, so a reply that makes a ring selects nothing.
+test('R2: after a reply that makes a ring no card is selected (what addNode selected is cleared too); an old-style reply still selects its branch root', async () => {
+  const h = await harness();
+  await h.apply(manyActions(3));
+  assert.equal(h.view.selection.state.selected, null, 'no selected card');
+  assert.equal(h.view.selection.state.multiSelected.length ?? h.view.selection.state.multiSelected.size, 0);
+  const old = await harness();
+  await old.apply([
+    addAnchor('p1', 0.2, 0.3), topChild('root', 'Cuts'),
+    { kind: 'add_child', parentId: 'new:root', title: 'Rib', ref: 'c1' },
+    link('anchor:p1', 'new:c1')
+  ]);
+  assert.ok(old.view.selection.state.selected, 'the reply that made no ring keeps selecting its new branch root');
+});
+
+test('R2/M1 style: the anchor lines are heavier and in the accent colour; a quiet ring label is hidden unless expanded', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.vam-relation-derives_from\) \{ --vam-relation-width: 2\.25px; \}/);
+  assert.match(css, /\.vam-view \.vam-relation\[data-anchor-relation\]:not\(\.is-selected\) \{ stroke: var\(--interactive-accent\); \}/);
+  assert.match(css, /\.vam-view \.vam-relation-label\.is-ring-quiet:not\(\.is-expanded\) \{ display: none; \}/);
+});

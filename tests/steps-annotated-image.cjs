@@ -8,6 +8,7 @@ const { load } = require('./support.cjs');
 const { loadSource } = require('./support-replay.cjs');
 const ci = load('experiences/visual-map/canvas-items.ts');
 const mm = load('map-model.ts');
+const { buildMapChatContext } = load('core/map-chat-context.ts');
 const plain = value => JSON.parse(JSON.stringify(value));
 const sanitize = raw => plain(ci.sanitizeCanvasItems(raw));
 const anchor = (id, x = 0.5, y = 0.5, extra = {}) => ({ id, at: { kind: 'image-2d', x, y }, ...extra });
@@ -156,6 +157,61 @@ test('A2: 0.28.0 and 0.30.0 canvas-items read a map with annotated images and wr
     assert.deepEqual(sanitize(out), items, `${tag} output reads back the same in the new code`);
     const moved = plain(old.moveItem(items, 'g1', 5, 5));
     assert.deepEqual(moved[0], items[0], `${tag} does not move an annotated image (only plain images)`);
+  }
+});
+
+test('A1: ring is kept only as true; any other value drops the key and keeps the relation', () => {
+  const ringed = img({ relations: [rel('p1', 't1', 'supports', { description: 'd', ring: true })] });
+  assert.deepEqual(sanitize([ringed]), [ringed]);
+  assert.equal(JSON.stringify(sanitize([ringed])), JSON.stringify([ringed]), 'ring comes after description');
+  for (const bad of ['true', 'yes', false, 1, 0, null, {}, [], undefined]) {
+    const out = sanitize([img({ relations: [rel('p1', 't1', 'related', { description: 'd', ring: bad })] })])[0].relations;
+    assert.deepEqual(out, [rel('p1', 't1', 'related', { description: 'd' })], `ring ${JSON.stringify(bad)}`);
+    assert.equal('ring' in out[0], false);
+  }
+});
+
+test('A1: updateAnchorRelation, merge and addAnchorRelation keep ring; a relation without ring stays without', () => {
+  const items = [img({ relations: [rel('p1', 't1', 'supports', { ring: true }), rel('p2', 't2')] })];
+  const edited = plain(ci.updateAnchorRelation(items, 'g1', 'p1', 't1', rel('t1', 'p1', 'related', { description: 'x' })));
+  assert.deepEqual(edited[0].relations[0], rel('t1', 'p1', 'related', { description: 'x', ring: true }), 'kind, direction, description change');
+  const second = plain(ci.updateAnchorRelation(items, 'g1', 'p2', 't2', rel('p2', 't2', 'related')));
+  assert.equal('ring' in second[0].relations[1], false);
+  const forced = plain(ci.updateAnchorRelation(items, 'g1', 'p2', 't2', rel('p2', 't2', 'related', { ring: true })));
+  assert.equal(forced[0].relations[1].ring, true, 'the caller can mark a relation');
+  const stripped = plain(ci.updateAnchorRelation(items, 'g1', 'p1', 't1', rel('p1', 't1', 'supports', { ring: false })));
+  assert.equal(stripped[0].relations[0].ring, true, 'an edit cannot take a topic out of the ring');
+  const merged = ci.retargetAnchorRelations(items, new Set(['t1']), 't3').items;
+  assert.deepEqual(plain(merged)[0].relations[0], rel('p1', 't3', 'supports', { ring: true }));
+  const added = plain(ci.addAnchorRelation([img()], 'g1', rel('p1', 't9', 'related', { ring: true })));
+  assert.equal(added[0].relations[0].ring, true);
+  assert.equal('ring' in plain(ci.addAnchorRelation([img()], 'g1', rel('p1', 't9', 'related', { ring: 'x' })))[0].relations[0], false);
+});
+
+test('A1: parseMap and serializeMap keep ring, version stays 1, and the chat context never carries it', () => {
+  const ringed = img({ relations: [rel('p1', 't1', 'supports', { ring: true }), rel('t2', 'p2', 'related')] });
+  const parsed = parse(doc([ringed]));
+  assert.deepEqual(parsed.canvasItems, [ringed]);
+  assert.equal(parsed.version, 1);
+  const ser = mm.serializeMap(mm.parseMap(mapText(doc([ringed])), () => {}));
+  assert.equal(ser, mm.serializeMap(mm.parseMap(ser, () => {})), 'stable');
+  assert.ok(ser.includes('"ring": true'));
+  const context = buildMapChatContext({
+    mapTitle: 'M', outline: [{ id: 't1', title: 'T', summary: '', parentId: null, depth: 0 }], selected: [], references: [], snippets: [], files: [], activeFile: null, history: [],
+    selectedImage: { id: 'g1', kind: 'annotated', note: '', anchors: [{ id: 'p1', x: 0.1, y: 0.2 }], relations: [{ kind: 'supports', from: 'p1', to: 't1', ring: true }], imageAttached: true }
+  });
+  assert.deepEqual(JSON.parse(context.json).selectedImage.relations, [{ kind: 'supports', from: 'p1', to: 't1' }], 'the relation is in the context, without ring');
+  assert.ok(!/"ring"/.test(context.json) && !/"ring"/.test(JSON.stringify(plain(context))), 'ring is not in the context');
+});
+
+test('A2: 0.28.0 and 0.30.0 canvas-items read a map whose relations carry ring without throwing and write every field back', () => {
+  const items = [img({ anchors: [anchor('p1', 0.1, 0.2), anchor('p2')], relations: [rel('p1', 't1', 'verifies', { description: 'd', ring: true }), rel('t2', 'p2', 'related', { ring: true })] })];
+  for (const [tag, fixture] of [['0.28.0', 'legacy-canvas-items-47c406a.ts.txt'], ['0.30.0', 'legacy-canvas-items-0.30.0.ts.txt']]) {
+    const old = loadSource(legacy(tag, 'experiences/visual-map/canvas-items.ts', fixture));
+    const out = plain(old.sanitizeCanvasItems(items));
+    assert.deepEqual(out, items, `${tag} keeps ring`);
+    assert.equal(JSON.stringify(out), JSON.stringify(items), `${tag} same bytes`);
+    assert.deepEqual(sanitize(out), items, `${tag} output reads back the same in the new code`);
   }
 });
 

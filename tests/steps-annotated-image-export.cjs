@@ -76,3 +76,33 @@ test('the file round trip keeps the image out of the exchange input shape (only 
   assert.equal(exchange.toOpml(input, notes).includes(SECRET), false);
   assert.equal(exchange.toFreeMind(input, notes).includes(SECRET), false);
 });
+
+// P6 (image centre layout, A15): several top-level topics and a ring relation change nothing in the exports.
+const ringMap = withImage => ({
+  id: 'map-x', title: 'Plan', version: 1, viewport: { x: 0, y: 0, zoom: 1 }, topicRelations: [],
+  nodes: [node('r1', null, 0), node('r2', null, 100), node('r3', null, 200)],
+  ...(withImage ? { canvasItems: [{
+    id: 'img1', kind: 'annotated-image', path: 'Pics/a.png', x: 0, y: 0, w: 200, h: 100, note: SECRET,
+    anchors: [{ id: 'a1', at: { kind: 'image-2d', x: 0.2, y: 0.2 }, note: SECRET }, { id: 'a2', at: { kind: 'image-2d', x: 0.8, y: 0.2 } }, { id: 'a3', at: { kind: 'image-2d', x: 0.5, y: 0.9 } }],
+    relations: [{ kind: 'related', from: 'a1', to: 'r1', ring: true }, { kind: 'related', from: 'a2', to: 'r2', ring: true }, { kind: 'related', from: 'a3', to: 'r3', ring: true }]
+  }] } : {})
+});
+const ringNotes = new Map([['r1', { title: 'Part 1', detail: '' }], ['r2', { title: 'Part 2', detail: '' }], ['r3', { title: 'Part 3', detail: '' }]]);
+for (const format of ['opml', 'freemind']) {
+  test(`P6 A15 ${format}: three top-level topics with ring relations export the same as without the picture, all three topics present`, async () => {
+    const { app, contents } = fixture('en');
+    await app.vault.createFolder('Agent Workspace'); await app.vault.createFolder('Agent Workspace/Topics'); await app.vault.createFolder('Agent Workspace/Topics/map-x');
+    const run = async map => contents.get(await io.exportMapExchange(app.vault, { mapPath: 'Agent Workspace/Topics/map-x/Map.md', map, notes: ringNotes, format }));
+    const withImage = await run(ringMap(true));
+    assert.equal(withImage, await run(ringMap(false)));
+    for (const title of ['Part 1', 'Part 2', 'Part 3']) assert.ok(withImage.includes(title), title);
+    assert.equal(/ring/i.test(withImage.replace(/Plan/g, '')), false);
+  });
+}
+test('P6 A15 share payload: ring relations and top-level topics leave no "ring" or picture in the payload', () => {
+  const options = { includeDetail: true, includeImages: true, language: 'en', vamVersion: '0.31.0', exportedAt: '2026-11-05T00:00:00.000Z', assets: {} };
+  const notesById = { r1: { title: 'Part 1' }, r2: { title: 'Part 2' }, r3: { title: 'Part 3' } };
+  const text = share.serializeShareJson(share.buildSharePayload(ringMap(true), notesById, options));
+  assert.equal(text, share.serializeShareJson(share.buildSharePayload(ringMap(false), notesById, options)));
+  for (const word of ['"ring"', 'ring', 'canvasItems', 'img1', SECRET]) assert.equal(text.includes(word), false, word);
+});

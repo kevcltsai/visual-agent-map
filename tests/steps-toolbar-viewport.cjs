@@ -617,6 +617,19 @@ test('chooseCardToolsSpot: with 13 cards at 60%, the selected card\'s tool row c
   }
   assert.ok(legacyCovers >= 3, `the old placement covers neighbours on this map (${legacyCovers} cards)`);
 });
+test('side tool row on the right clears the "+" button (14 card units) at low and high zoom; on the left only the plain 4px', () => {
+  for (const zoom of [0.3, 0.6, 1, 2.5]) {
+    assert.ok(inset.cardToolsSideGap('right', zoom) >= 14, `right gap at ${zoom}`);
+    assert.equal(inset.cardToolsSideGap('right', zoom), 14 + 4 / zoom);
+    assert.equal(inset.cardToolsSideGap('left', zoom), 4 / zoom);
+  }
+  // The spot chooser reserves that width: a row beside the card on the right starts that far from the card edge.
+  const card = { left: 100, right: 300, top: 100, bottom: 200 };
+  const boxed = [{ left: 0, right: 99, top: 90, bottom: 210 }, { left: 120, right: 280, top: 0, bottom: 99 }, { left: 120, right: 280, top: 201, bottom: 300 }];
+  const spot = inset.chooseCardToolsSpot({ card, row: { left: 80, right: 290 }, size: { width: 200, height: 32 }, others: boxed, controls: [], visible: { left: 0, right: 1000, top: 0, bottom: 600 }, rightGap: 14 * 0.5 + 4 });
+  assert.equal(spot.side, 'right');
+  assert.equal(spot.rect.left, card.right + 14 * 0.5 + 4);
+});
 test('chooseCardToolsSpot: a card in the top-left corner pans clear of the canvas toolbar; a free card is not moved', () => {
   const visible = { left: 0, right: 1400, top: 0, bottom: 900 };
   const controls = [{ left: 12, top: 12, right: 330, bottom: 52 }];
@@ -770,4 +783,32 @@ test('F13b: a user selection (not a framing action) still pans a card clear of t
   const before = view.map.viewport.x;
   view.alignCardTools(view.cardEls.get('c2'));
   assert.notEqual(view.map.viewport.x, before, 'the canvas still pans outside a framing action');
+});
+
+// Review round 1, M3: framing a reply's ring with one to three cards must show the picture they circle too.
+test('M3: fitCards on ring cards frames the picture as well, not only the cards (and plain fit-only frames are unchanged)', () => {
+  const { view, nodes } = makeView();
+  nodes[0].x = 0; nodes[0].y = 0; nodes[1].parentId = null; nodes[1].x = 0; nodes[1].y = 800;
+  view.map.canvasItems = [{ id: 'img', kind: 'annotated-image', path: 'a.png', x: 100, y: 100, w: 720, h: 600, anchors: [{ id: 'p', at: { kind: 'image-2d', x: 0.5, y: 0.5 } }], relations: [{ kind: 'related', from: 'p', to: 'b', ring: true }] }];
+  view.fitCards(new Set(['b']));
+  const v = view.map.viewport;
+  const inside = (x, y) => x * v.zoom + v.x >= -1e-6 && x * v.zoom + v.x <= 1000 + 1e-6 && y * v.zoom + v.y >= -1e-6 && y * v.zoom + v.y <= 600 + 1e-6;
+  assert.ok(inside(100, 100) && inside(820, 700), 'both corners of the picture are on screen');
+  assert.ok(inside(0, 800) && inside(280, 980), 'and so is the card');
+  // A card that is no ring member frames only itself, as before.
+  const other = makeView();
+  other.nodes[1].x = 0; other.nodes[1].y = 800;
+  other.view.map.canvasItems = [{ id: 'img', kind: 'annotated-image', path: 'a.png', x: 100, y: 100, w: 720, h: 600, anchors: [], relations: [] }];
+  other.view.fitCards(new Set(['b']));
+  const o = other.view.map.viewport;
+  assert.ok(Math.abs(o.zoom - 1) < 1e-9 || o.zoom > v.zoom, 'the picture is not part of this frame');
+});
+
+test('F5: a tool row beside the card never covers the + button: the + sits above the row and its hover bridge', () => {
+  const number = rule => Number((rule && rule[1]) || NaN);
+  const row = css.match(/\.vam-node > \.vam-node-tools \{[^}]*z-index: (\d+)/);
+  const plus = css.match(/\.vam-node > \.vam-node-tools\.is-side-right ~ \.vam-add-child \{[^}]*z-index: (\d+)/);
+  assert.ok(row, 'the row has a stacking order');
+  assert.ok(plus, 'a row on the right lifts the + button');
+  assert.ok(number(plus) > number(row), 'the + is above the row');
 });

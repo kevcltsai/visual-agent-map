@@ -58,6 +58,8 @@ export interface AnchorRelation {
   from: string;
   to: string;
   description?: string;
+  /** Marks a topic made for this image: it joins the ring of cards around the picture. Only `true` is stored (read-time rules in image-ring.ts). */
+  ring?: true;
 }
 export type AnchorRelationKind = "supports" | "contradicts" | "verifies" | "derives_from" | "related" | "prerequisite";
 /** An image the user turned into an annotated image: it carries anchors (relative 0-1 coordinates) and anchor relations. */
@@ -171,12 +173,13 @@ const relationPair = (r: { from: string; to: string }): string =>
 /** Kind whitelisted, exactly one end an anchor of this image, the other end a well-formed id; description kept when a string. */
 function cleanAnchorRelation(raw: unknown, anchorIds: ReadonlySet<string>): AnchorRelation | null {
   if (!isRecord(raw)) return null;
-  const { kind, from, to, description } = raw;
+  const { kind, from, to, description, ring } = raw;
   if (typeof kind !== "string" || !(ANCHOR_RELATION_KINDS as readonly string[]).includes(kind)) return null;
   if (typeof from !== "string" || typeof to !== "string" || !ID.test(from) || !ID.test(to)) return null;
   if (anchorIds.has(from) === anchorIds.has(to)) return null;
   const out: AnchorRelation = { kind: kind as AnchorRelationKind, from, to };
   if (typeof description === "string") out.description = description;
+  if (ring === true) out.ring = true;
   return out;
 }
 
@@ -538,6 +541,8 @@ export function updateAnchorRelation(
   const old = (image.relations as AnchorRelation[])[index];
   if (!anchorRelationAllowed(image, next, old)) return [...items];
   const clean = cleanAnchorRelation(next, anchorIdsOf(image)) as AnchorRelation;
+  // Editing kind, direction or description must not push the topic out of the ring.
+  if (old.ring === true) clean.ring = true;
   return mapImage(items, imageId, img =>
     withRelations(
       img,

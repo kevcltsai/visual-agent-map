@@ -32,7 +32,7 @@ const parse = (raw, context = ctx(annotated())) => plain(parseMapChat(raw, conte
 const codes = result => result.rejected.map(entry => entry.code);
 
 // ---- A1 contract ----
-test('schema and kinds carry add_anchor and link_anchor with the new required fields; step is version 16', () => {
+test('schema and kinds carry add_anchor and link_anchor with the new required fields; step is version 17', () => {
   assert.ok(MAP_CHAT_ACTION_KINDS.includes('add_anchor') && MAP_CHAT_ACTION_KINDS.includes('link_anchor'));
   const item = MAP_CHAT_SCHEMA.properties.actions.items;
   for (const key of ['imageId', 'anchorId', 'x', 'y']) assert.ok(item.required.includes(key), key);
@@ -40,7 +40,7 @@ test('schema and kinds carry add_anchor and link_anchor with the new required fi
   assert.equal(item.properties.y.type, 'number');
   assert.equal(item.properties.imageId.type, 'string');
   assert.ok(item.properties.kind.enum.includes('add_anchor'));
-  assert.equal(mapChatStep.version, 18);
+  assert.equal(mapChatStep.version, 19);
 });
 test('add_anchor and link_anchor are parsed with clamped coordinates, a cleaned one-line note and anchor refs', () => {
   const result = parse(reply(
@@ -263,4 +263,30 @@ test('the three older reasons keep their behaviour and come first', () => {
 test('the plan card files the anchor actions under create', () => {
   assert.equal(chatPlanGroupOf('add_anchor'), 'create');
   assert.equal(chatPlanGroupOf('link_anchor'), 'create');
+});
+
+// ---- P6 (image centre layout, A14): the prompt asks for one top-level topic per part, no root topic for the picture ----
+test('P6 A14: both prompts drop the "root topic, then a subtopic per part" instruction and ask for one top-level card per part; parentId stays documented', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const dir = path.join(__dirname, '..', 'core', 'steps', 'map-chat');
+  const zh = fs.readFileSync(path.join(dir, 'prompt.zh.md'), 'utf8');
+  const en = fs.readFileSync(path.join(dir, 'prompt.en.md'), 'utf8');
+  assert.equal(zh.includes('先用 add_child 建一個根議題'), false);
+  assert.equal(zh.includes('再為圖上每個部位各建一個子議題'), false);
+  assert.equal(en.includes('first add_child a root topic'), false);
+  assert.equal(en.includes('then add_child one subtopic'), false);
+  assert.ok(zh.includes('為圖上每個部位各建一個頂層議題（add_child，parentId 留空') && zh.includes('不要另建代表整張圖的議題'));
+  assert.ok(en.includes('add_child one top-level card (parentId empty, with a ref) for each part') && en.includes('do not add a card that stands for the whole picture'));
+  assert.ok(zh.includes('地圖已有議題時，優先把錨點連到既有議題'));
+  assert.ok(en.includes('When the map already has cards, prefer linking anchors to the existing cards'));
+  // The parentId field text of add_child (empty string = a new root topic) is unchanged.
+  assert.ok(zh.includes('parentId（既有議題 id；或 "new:<ref>"') && zh.includes('或空字串，表示新的根議題'));
+  assert.ok(en.includes('or an empty string for a new root topic'));
+});
+test('P6: MAP_CHAT_SCHEMA still has add_child parentId as a string and the same action fields', () => {
+  const item = MAP_CHAT_SCHEMA.properties.actions.items;
+  assert.equal(item.properties.parentId.type, 'string');
+  assert.ok(item.required.includes('parentId'));
+  assert.equal(mapChatStep.version, 19);
 });

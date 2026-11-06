@@ -18014,12 +18014,13 @@ function cleanAnchor(raw) {
 var relationPair = (r) => r.from > r.to ? `${r.to}\0${r.from}` : `${r.from}\0${r.to}`;
 function cleanAnchorRelation(raw, anchorIds) {
   if (!isRecord(raw)) return null;
-  const { kind, from, to, description } = raw;
+  const { kind, from, to, description, ring } = raw;
   if (typeof kind !== "string" || !ANCHOR_RELATION_KINDS.includes(kind)) return null;
   if (typeof from !== "string" || typeof to !== "string" || !ID.test(from) || !ID.test(to)) return null;
   if (anchorIds.has(from) === anchorIds.has(to)) return null;
   const out = { kind, from, to };
   if (typeof description === "string") out.description = description;
+  if (ring === true) out.ring = true;
   return out;
 }
 var warnDropped = (tally) => {
@@ -18291,6 +18292,7 @@ function updateAnchorRelation(items, imageId, anchorId, topicId, next) {
   const old = image.relations[index];
   if (!anchorRelationAllowed(image, next, old)) return [...items];
   const clean4 = cleanAnchorRelation(next, anchorIdsOf(image));
+  if (old.ring === true) clean4.ring = true;
   return mapImage(
     items,
     imageId,

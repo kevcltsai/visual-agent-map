@@ -769,6 +769,25 @@ for (const width of [61, 120, 280, 400])
     if (width + 20 <= 280) assert.equal(kids[0], column, 'widening a narrow block does not move its followers');
   });
 
+// In a balanced map a narrow block on the left half stands within the root's deadband by its offset alone. Its side comes from its box,
+// so a follower added with + stays on the block's side and in the column of the others, and widening does not move it across the root.
+for (const text of ['hi', 'hello~~'])
+  test(`placement: balanced: left half, block "${text}": followers added with + share the column, and widening keeps them there`, async () => {
+    const h = await begin('right', { text, followers: ['C1'] });
+    await h.view.mapChange(m => { m.layout = { direction: 'balanced' }; h.view.arrangeAll(m, { reset: true }); }, false);
+    await done(h);
+    const start = snap(h), w = boxOf(h).w;
+    assert.ok(start.C1.x < start.Root.x, 'the deal puts this block and its follower on the left half');
+    await h.view.addNode(h.owner(), 'C2', true, false, 'topic', false, {}, 't1');
+    await done(h);
+    assert.equal(snap(h).C2.x, start.C1.x, 'C2 stands in the column of C1');
+    assert.equal(snap(h).C1.x, start.C1.x, 'C1 did not move');
+    await h.view.resizeText('t1', 120, w);
+    await done(h);
+    assert.equal(snap(h).C1.x, start.C1.x, 'widening does not move C1');
+    assert.equal(snap(h).C2.x, start.C1.x, 'widening does not move C2');
+  });
+
 // Row "add C" beside a wide text block (under the same topic, or under the neighbouring topic): the obstacle is as wide as it is drawn.
 for (const D of DIRS) for (const under of ['root', 'child'])
   test(`placement: ${D}: topics added after a block keep clear of a wide text block under the ${under === 'root' ? 'same topic' : 'neighbouring topic'}`, async () => {

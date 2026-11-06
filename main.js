@@ -20802,7 +20802,7 @@ function branchSide(byId, node) {
   let topic = node;
   while (topic.parentId && ((_a2 = byId.get(topic.parentId)) == null ? void 0 : _a2.parentId)) topic = byId.get(topic.parentId);
   const root = topic.parentId ? byId.get(topic.parentId) : void 0;
-  return root ? sideFromOffset(topic.x - root.x) : void 0;
+  return root ? knownSide(topic, root) : void 0;
 }
 function arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout) {
   var _a2;

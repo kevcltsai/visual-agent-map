@@ -427,7 +427,7 @@ function branchSide(byId: Map<string, MapNode>, node: MapNode): BalancedSide | u
   let topic = node;
   while (topic.parentId && byId.get(topic.parentId)?.parentId) topic = byId.get(topic.parentId)!;
   const root = topic.parentId ? byId.get(topic.parentId) : undefined;
-  return root ? sideFromOffset(topic.x - root.x) : undefined;
+  return root ? knownSide(topic, root) : undefined;
 }
 
 /**

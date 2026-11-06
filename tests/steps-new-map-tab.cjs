@@ -8,19 +8,27 @@ class FuzzySuggestModal { constructor() {} setPlaceholder() {} setInstructions()
 let capturedModal = null;
 class CapturingModal { constructor(app, ...args) { this.app = app; this.args = args; } open() { capturedModal = this; } close() {} }
 
-// A leaf and workspace that follow Obsidian 1.15.0's order (app.js line 215 Leaf.setViewState, line 205 View.open, line 524 Workspace.getLeaf / revealLeaf / setActiveLeaf):
-//   getLeaf("tab") makes an empty leaf, and with the focusNewTab setting it selects (shows) and activates it at once;
-//   setViewState: create the view, await onOpen, THEN setState (a failure is swallowed), THEN setActiveLeaf if `active`, THEN a layout change;
-//   revealLeaf selects (shows) the tab but does not make it the active leaf;
-//   what a shown tab hears (resize, active-leaf-change, layout-change) arrives later, debounced (timers 0, 0 and 10 ms).
-// `events` picks which of the three arrive. A hidden tab's pane is not shown (isShown() false) until it is selected.
+// A leaf and workspace that follow Obsidian 1.15.0's order (checked in the extracted app.js: Leaf.setViewState, Workspace.getLeaf / createLeafInTabGroup / setActiveLeaf, TabGroup.selectTabIndex, the Leaf constructor's ResizeObserver):
+//   getLeaf("tab") reuses the most recently active tab when it is still empty (and then does not activate it); otherwise it makes an empty leaf and,
+//     with the focusNewTab setting, activates it at once;
+//   setViewState has a `working` reentry guard (a call made while one runs returns at once); it creates the view, awaits onOpen, THEN setState
+//     (a failure is swallowed), THEN setActiveLeaf if `active`, THEN a layout change (layout-change event, debounced 10 ms);
+//   setActiveLeaf on the already-active leaf only focuses and returns; otherwise it makes the leaf active, selects its tab and schedules
+//     active-leaf-change (debounced 0 ms);
+//   selectTabIndex is a no-op on the current tab; otherwise it only calls requestSaveLayout and requestResize (no layout-change; the workspace
+//     "resize" event it ends in does not reach a view's onResize);
+//   view.onResize comes from the leaf's own ResizeObserver, debounced 20 ms, when the pane's size changes (0 to real when its tab is shown).
+// So a tab that is shown is told by exactly two paths: the ResizeObserver ('resize-observer') and active-leaf-change. `events` picks which of them
+// arrive. 'layout-change' is not a real show path: it only exercises the handler (HANDLER_ONLY), and is off by default.
+// A hidden tab's pane is not shown (isShown() false) until it is selected.
 // paint() runs for real up to where it reads activeDocument (that read ends it on purpose, like steps-toolbar-viewport.cjs); what the rest of
 // paint builds is modelled by `viewportEl`, which measures 0 while the tab is hidden.
 const STOP = new Error('paint stops here: the part after it is not under test');
-const ALL_EVENTS = ['resize', 'active-leaf-change', 'layout-change'];
+const SHOW_EVENTS = ['resize-observer', 'active-leaf-change'];
+const HANDLER_ONLY = ['layout-change'];
 
-function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false, notices = [], focusNewTab = true, events = ALL_EVENTS } = {}) {
-  const newViews = [], leaves = [], getLeafCalls = [], revealed = [], active = [], viewStates = [], defaultOpens = [], detached = [], handlers = {}, writes = [];
+function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false, notices = [], focusNewTab = true, events = SHOW_EVENTS } = {}) {
+  const newViews = [], leaves = [], allLeaves = [], getLeafCalls = [], revealed = [], active = [], viewStates = [], defaultOpens = [], detached = [], handlers = {}, writes = [];
   const counts = { transform: 0, layouts: 0 };
   const { VisualAgentMapView, default: Plugin } = load('main.ts', { obsidian: { ...obsidian, MarkdownView: class {}, FuzzySuggestModal, Modal: CapturingModal, Notice: dom.makeNotice(notices) } }, {
     createFragment: dom.createFragment, CSS: { escape: x => x },
@@ -29,6 +37,7 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
   }, { define: { activeDocument: 'window.activeDocument' } });
   const plugin = new Plugin();
   const created = [];
+  let clock = 0;
   plugin.settings = { ...DEFAULT_SETTINGS, language: 'en' };
   plugin.repo = realRepo ?? {
     topics: async () => existingTitles.map(title => ({ title })),
@@ -41,20 +50,39 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
   };
   plugin.ready = Promise.resolve();
   if (realRepo) plugin.rebuildDerivedData = async () => {};
-  const emit = (name, delay) => { if (events.includes(name)) setTimeout(() => (handlers[name] ?? []).forEach(cb => cb(workspace.activeLeaf)), delay); };
+  const emit = (name, delay) => setTimeout(() => (handlers[name] ?? []).forEach(cb => cb(workspace.activeLeaf)), delay);
+  let activeEventPending = false;
+  const requestActiveLeafEvents = () => { if (activeEventPending) return; activeEventPending = true; setTimeout(() => { activeEventPending = false; if (events.includes('active-leaf-change')) emit('active-leaf-change', 0); }, 0); };
   const workspace = {
     activeLeaf: null, selected: null,
     getLeavesOfType: () => leaves,
     getLeaf: kind => {
       getLeafCalls.push(kind);
+      // createLeafInTabGroup: the most recently active tab is reused when it is empty (no activation then).
+      const tabs = allLeaves.filter(l => l.attached);
+      let recent = tabs[tabs.length - 1];
+      for (const l of tabs) if (l.activeTime > recent.activeTime) recent = l;
+      if (recent && !recent.view) return recent;
       const leaf = makeLeaf();
       if (focusNewTab) workspace.setActiveLeaf(leaf);
       return leaf;
     },
-    // Selecting a tab shows it: its pane gets a size again, and the workspace tells it later (debounced).
-    selectTab(leaf) { workspace.selected = leaf; emit('resize', 0); emit('layout-change', 10); if (leaf.view && events.includes('resize')) setTimeout(() => leaf.view?.onResize?.(), 0); },
+    // TabGroup.selectTabIndex: nothing on the current tab; otherwise the pane gets a size again (the leaf's ResizeObserver tells the view, debounced 20 ms).
+    selectTab(leaf) {
+      if (workspace.selected === leaf) return;
+      workspace.selected = leaf;
+      emit('resize', 0); // the workspace "resize" event (requestResize): not a view.onResize
+      if (events.includes('layout-change')) emit('layout-change', 10); // handler-only, see the header
+      if (leaf.view && events.includes('resize-observer')) setTimeout(() => leaf.view?.onResize?.(), 20);
+    },
     revealLeaf: async leaf => { revealed.push(leaf); workspace.selectTab(leaf); },
-    setActiveLeaf: (leaf, params) => { active.push([leaf, params]); workspace.activeLeaf = leaf; workspace.selectTab(leaf); emit('active-leaf-change', 0); },
+    setActiveLeaf: (leaf, params) => {
+      if (!leaf.attached) return;
+      active.push([leaf, params]);
+      if (workspace.activeLeaf === leaf) return; // already active: only focuses
+      workspace.activeLeaf = leaf; leaf.activeTime = ++clock;
+      workspace.selectTab(leaf); requestActiveLeafEvents();
+    },
     on: (name, cb) => { (handlers[name] ??= []).push(cb); return {}; },
     requestSaveLayout() {}
   };
@@ -91,11 +119,17 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
   };
   function makeLeaf() {
     const leaf = {
-      app: plugin.app, view: null,
+      app: plugin.app, view: null, attached: true, activeTime: 0, working: false,
       get shown() { return workspace.selected === leaf; },
       getViewState() { return { type: 'visual-agent-map', state: this.view ? this.view.getState() : {} }; },
-      detach() { detached.push(leaf); const i = leaves.indexOf(leaf); if (i >= 0) leaves.splice(i, 1); leaf.view = null; },
+      detach() { detached.push(leaf); leaf.attached = false; const i = leaves.indexOf(leaf); if (i >= 0) leaves.splice(i, 1); leaf.view = null; },
       async setViewState(state) {
+        if (leaf.working) return;
+        leaf.working = true;
+        try { await setViewStateInner(state); } finally { leaf.working = false; }
+      }
+    };
+    const setViewStateInner = async state => {
         viewStates.push(state);
         const result = { history: false, layout: false };
         if (!leaf.view) {
@@ -106,12 +140,12 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
         try { await leaf.view.setState(state.state ?? {}, result); } catch { /* swallowed like Obsidian */ }
         if (state.active) workspace.setActiveLeaf(leaf, { focus: true });
         if (result.layout) { counts.layouts++; emit('layout-change', 10); }
-      }
     };
+    allLeaves.push(leaf);
     return leaf;
   }
   const makeView = (path, { leaf = true } = {}) => {
-    const l = { app: plugin.app, getViewState() { return { type: 'visual-agent-map', state: { file: path } }; } };
+    const l = { app: plugin.app, attached: true, getViewState() { return { type: 'visual-agent-map', state: { file: path } }; } };
     const view = new VisualAgentMapView(l, plugin);
     l.view = view;
     const calls = { openInPlace: [] };
@@ -451,10 +485,19 @@ test('M3 a camera request made while hidden is not saved then, and runs once whe
 
 test('M3 a camera request for a map the tab has since left is dropped', async () => {
   const w = makeWorld({ focusNewTab: false }); const { view, leaf } = await w.hiddenTab();
-  view.fit(); view.path = 'Maps/Other/Map.md'; await view.openMapInMutation('Maps/C/Map.md');
-  const transforms = w.counts.transform; w.writes.length = 0;
+  // The real openMapInMutation (the stub on the view is bypassed): it is the code that drops the request when the path changes.
+  const realOpen = w.VisualAgentMapView.prototype.openMapInMutation;
+  w.plugin.repo.readMap = async path => ({ id: `id-${path}`, title: path, nodes: [{ id: 'n1', x: 100, y: 100 }, { id: 'n2', x: 900, y: 700 }], viewport: { x: 0, y: 0, zoom: 1 } });
+  view.map.nodes.push({ id: 'n1', x: 100, y: 100 }, { id: 'n2', x: 900, y: 700 });
+  view.fit(); // asked while hidden: kept for when the tab is shown
+  assert.equal(typeof view.cameraWhenShown, 'function', 'the request is waiting');
+  await realOpen.call(view, 'Maps/C/Map.md');
+  assert.equal(view.path, 'Maps/C/Map.md');
+  assert.equal(view.cameraWhenShown, null, 'leaving the map dropped the waiting request');
+  w.writes.length = 0; const transforms = w.counts.transform;
   await w.workspace.revealLeaf(leaf); await w.flush();
-  assert.equal(w.counts.transform, transforms, 'the old map\'s request did not move the new one');
+  assert.equal(w.writes.length, 0, 'the old map\'s request did not move or save the new one');
+  assert.equal(w.counts.transform, transforms, 'no camera move ran for the new map');
 });
 
 test('a hidden tab records no card heights', async () => {
@@ -464,8 +507,8 @@ test('a hidden tab records no card heights', async () => {
   assert.equal(view.heightsSeen.size, 0, 'no height 0 recorded');
 });
 
-for (const event of ALL_EVENTS) {
-  test(`a hidden tab draws again when shown: the ${event} event alone is enough`, async () => {
+for (const event of [...SHOW_EVENTS, ...HANDLER_ONLY]) {
+  test(`a hidden tab draws again when shown: the ${event} event alone is enough${HANDLER_ONLY.includes(event) ? ' (handler only, not a real show path)' : ''}`, async () => {
     const w = makeWorld({ focusNewTab: false, events: [event] }); const { view, leaf } = await w.hiddenTab();
     assert.equal(view.renderWhenShown, true); const before = view.paintCount;
     w.workspace.setActiveLeaf(leaf, { focus: true }); await w.flush();
@@ -501,10 +544,10 @@ test('M5 focus left in a hidden pane (the tab just switched away from) does not 
   h.view.focusChatHero(); assert.equal(h.stats.focused, 1, 'used up once the keyboard moved');
 });
 
-test('M5 focus held in a visible pane is not stolen, and the once is kept for later', () => {
+test('M5 focus held in a visible pane is not stolen, now or by a later repaint when the focus falls to BODY', () => {
   const h = heroView({ active: { inside: false, isShown: () => true } });
-  h.view.focusChatHero(); assert.equal(h.stats.focused, 0); assert.notEqual(h.view.chatHeroFocusedFor, h.view.map.id);
-  h.doc.activeElement = h.doc.body; h.view.focusChatHero(); assert.equal(h.stats.focused, 1);
+  h.view.focusChatHero(); assert.equal(h.stats.focused, 0); assert.equal(h.view.chatHeroFocusedFor, h.view.map.id, 'the once is used up');
+  h.doc.activeElement = h.doc.body; h.view.focusChatHero(); assert.equal(h.stats.focused, 0, 'the delayed repaint does not steal the focus');
 });
 
 test('M5 the once is not used up when focusInput did not move the keyboard', () => {
@@ -523,13 +566,14 @@ test('a hidden first paint does not use up the toolbar clearing of the map; the 
   assert.equal(view.toolbarClearedFor, 'Maps/B/Map.md');
 });
 
-test('M3 a viewport save is skipped while the tab is hidden, also one that was already waiting when it got hidden', async () => {
+test('M3 a viewport save scheduled while shown is written even if the tab hides meanwhile; one requested while hidden is not', async () => {
   const w = makeWorld({ focusNewTab: true }); const { view, leaf } = await w.hiddenTab();
   w.writes.length = 0;
-  view.saveViewport();
+  view.saveViewport(); // asked while the pane is shown (it was computed from a sized pane)
   w.workspace.selectTab({}); // another tab is selected: this one is hidden before the waiting save runs
   await w.flush();
-  assert.deepEqual(w.writes, [], 'the waiting save did not run on a hidden pane');
+  assert.equal(w.writes.length, 1, 'the waiting save is written');
+  w.writes.length = 0;
   view.saveViewport(); await w.flush();
   assert.deepEqual(w.writes, [], 'a save asked for while hidden is not scheduled');
   await w.workspace.revealLeaf(leaf); view.saveViewport(); await w.flush();

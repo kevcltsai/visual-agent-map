@@ -18923,11 +18923,12 @@ export class VisualAgentMapView extends ItemView {
     this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   private saveViewport(): void {
+    // A hidden pane measures 0: nothing is requested from it (a camera move asked meanwhile is replayed when the tab is shown).
+    // A save scheduled while the pane was shown was computed from a sized pane, so it is written even if the tab hides within the wait.
+    if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
-      // A hidden pane measures 0: nothing is saved from it (a camera move asked meanwhile is replayed when the tab is shown).
-      if (this.hiddenTab()) return;
       this.queueViewportWrite();
     }, 250);
   }
@@ -19439,7 +19440,11 @@ export class VisualAgentMapView extends ItemView {
       active !== doc?.body &&
       !this.contentEl.contains(active) &&
       (active as { isShown?: () => boolean }).isShown?.() !== false;
-    if (heldElsewhere) return;
+    if (heldElsewhere) {
+      // Focus in a visible pane stays theirs: the once is used up, so a later repaint cannot take it when the focus falls to BODY.
+      this.chatHeroFocusedFor = this.map.id;
+      return;
+    }
     chat.focusInput();
     // The once is used up only when the keyboard really moved into the pane.
     const now = doc?.activeElement ?? null;

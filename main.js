@@ -72193,10 +72193,10 @@ ${note.detail.trim()}` : "",
     (_d = this.zoomLabel) == null ? void 0 : _d.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
   saveViewport() {
+    if (this.hiddenTab()) return;
     if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
     this.viewportTimer = window.setTimeout(() => {
       this.viewportTimer = null;
-      if (this.hiddenTab()) return;
       this.queueViewportWrite();
     }, 250);
   }
@@ -72661,7 +72661,10 @@ ${note.detail.trim()}` : "",
     const doc = this.contentEl.ownerDocument;
     const active = (_a2 = doc == null ? void 0 : doc.activeElement) != null ? _a2 : null;
     const heldElsewhere = active && active !== (doc == null ? void 0 : doc.body) && !this.contentEl.contains(active) && ((_b2 = active.isShown) == null ? void 0 : _b2.call(active)) !== false;
-    if (heldElsewhere) return;
+    if (heldElsewhere) {
+      this.chatHeroFocusedFor = this.map.id;
+      return;
+    }
     chat.focusInput();
     const now = (_c = doc == null ? void 0 : doc.activeElement) != null ? _c : null;
     if (now && this.contentEl.contains(now)) this.chatHeroFocusedFor = this.map.id;

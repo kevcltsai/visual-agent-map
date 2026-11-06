@@ -590,3 +590,44 @@ test('goal stack: CSS gives an open attachment and an open sources panel a z-ind
   // Children of the attachment never outrank layers outside the bar: its stacking context decides, so no z-index inside it.
   for (const cls of ['vam-relevance-panel', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /z-index/, `.${cls} sets no z-index of its own`);
 });
+
+// ---- the tier floor for just-added cards, and no suggestion under a skippable card --------------------------------
+
+const SIDE_FOR_NEW = request => request.nodes.filter(n => n.parentId !== null).map(n => ({ id: labelOf(request, n.id), tier: ['Sleep stages', 'Stress habits'].includes(n.title) ? 'side' : (TITLES[n.title] ?? 'support') }));
+const tierOnDisk = async (h, title) => {
+  const map = await h.repo.readMap(MAP);
+  for (const n of map.nodes) { const note = await h.repo.readNote(n.path); if (note.title === title) return note.relevance?.tier; }
+  return 'missing';
+};
+
+test('goal suggest: a card the AI grades side under a non-side parent is written as support after Add (full grade; counter-examples 1, 7)', async () => {
+  const h = await harness();
+  h.control.grade = async request => request.nodes.length && { items: SIDE_FOR_NEW(request) };
+  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
+  assert.equal(h.control.gradeCalls[0].step, 'relevance-grade');
+  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support', 'under Body (core)');
+  assert.equal(await tierOnDisk(h, 'Stress habits'), 'support', 'under Mind (support)');
+  assert.equal(await tierOnDisk(h, 'REM'), 'side', 'an old card the AI called side stays side');
+});
+
+test('goal suggest: the same floor applies in recalibrate mode (counter-example 7)', async () => {
+  const h = await harness();
+  h.control.grade = async request => ({ changes: request.nodes.filter(n => ['Sleep stages', 'Stress habits'].includes(n.title)).map(n => ({ id: labelOf(request, n.id), tier: 'side', anchor: null })) });
+  h.view.relevanceAiGrades = () => [{ id: h.ids.a, tier: 'core' }, { id: h.ids.b, tier: 'support' }, { id: h.ids.c, tier: 'side' }, { id: h.ids.d, tier: 'support' }];
+  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
+  assert.equal(h.control.gradeCalls[0].step, 'relevance-recalibrate');
+  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support');
+  assert.equal(await tierOnDisk(h, 'Stress habits'), 'support');
+});
+
+test('goal suggest: an ordinary grade without suggested cards leaves side as side, and the floor is not kept (counter-examples 2, 9)', async () => {
+  const h = await harness();
+  h.control.grade = async request => ({ items: SIDE_FOR_NEW(request) });
+  await h.open(); h.addBtn().click(); await until(() => h.control.gradeCalls.length); await h.settled();
+  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'support');
+  await h.view.hydrate();
+  await h.view.submitRelevanceGoal('Sleep better', '', 'full');
+  assert.equal(await tierOnDisk(h, 'Sleep stages'), 'side', 'the next ordinary grade is not floored');
+  assert.equal(await tierOnDisk(h, 'Stress habits'), 'side');
+});
+

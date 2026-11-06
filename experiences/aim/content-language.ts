@@ -192,12 +192,41 @@ export function defaultOutputLanguage(
   ui: UiLanguage,
   topic: string,
   noteLanguage?: NoteLanguage,
-  remembered?: unknown
+  remembered?: unknown,
+  mapTitle?: string
 ): ContentLanguage {
   if (isContentLanguage(remembered)) return remembered;
-  const chosen = chooseAimContentLanguage(ui, topic);
+  const chosen = cardLanguageFromTitles(ui, topic, mapTitle);
   if (noteLanguage !== undefined && noteLanguageOf(chosen) !== noteLanguage) return ui;
   return chosen;
+}
+
+/**
+ * The language for a card's title (decision 2026-11-06-card-language#1): the card title's own result, except that a card
+ * title read as English or follow-the-input takes the language of the map title when its letters settle one (kana,
+ * hangul, Arabic, Thai, Vietnamese, Han). A default or English map title, or one with no decisive letters, changes nothing.
+ */
+function cardLanguageFromTitles(
+  uiLanguage: UiLanguage,
+  cardTitle: string,
+  mapTitle: string | undefined
+): ContentLanguage {
+  const chosen = chooseAimContentLanguage(uiLanguage, cardTitle);
+  if (chosen !== LATIN_TEXT_DETECTION.language && chosen !== FOLLOW_INPUT_ID) return chosen;
+  if (!mapTitle || isPlaceholderText(mapTitle)) return chosen;
+  const signal = signalOf(mapTitle);
+  if (signal === undefined || signal === LATIN_TEXT_DETECTION.language || signal === FOLLOW_INPUT_ID) return chosen;
+  if (signal === UNDECIDED_HAN) return contentLocale("zh-TW", uiLanguage);
+  return signal;
+}
+
+/** The output language of a card run with no dialog: the map's remembered choice, else {@link cardLanguageFromTitles}. */
+export function cardOutputLanguage(
+  map: Pick<MapDocument, "outputLanguage" | "title"> | undefined | null,
+  uiLanguage: UiLanguage,
+  title: string
+): ContentLanguage {
+  return rememberedOutputLanguage(map) ?? cardLanguageFromTitles(uiLanguage, title, map?.title);
 }
 
 /** A map's remembered output language (D-2026-10-88), or undefined when it has none or the stored value is unknown. */

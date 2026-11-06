@@ -881,6 +881,19 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
               options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") }
             }
           },
+          {
+            name: t("ui.settings_map_chat_records_name"),
+            render: setting => {
+              setting
+                .setName(t("ui.settings_map_chat_records_name"))
+                .setDesc(t("ui.settings_map_chat_records_desc"))
+                .addToggle(toggle =>
+                  toggle.setValue(this.plugin.settings.mapChatRecords).onChange(value => {
+                    void this.plugin.setMapChatRecords(value);
+                  })
+                );
+            }
+          },
           aiConnectionPage
         ]
       },

@@ -1,4 +1,5 @@
 import {
+  cardOutputLanguage,
   defaultOutputLanguage,
   existingNoteLanguage,
   mapChatLanguageSources,
@@ -2814,6 +2815,7 @@ export class VisualAgentMapView extends ItemView {
     const remembered = rememberedOutputLanguage(this.map);
     return {
       ...(remembered ? { outputLanguage: remembered } : {}),
+      ...(this.map?.title ? { mapTitle: this.map.title } : {}),
       rememberOutputLanguage: language =>
         this.plugin.mutate(() =>
           this.mapChange(map => {
@@ -2852,7 +2854,7 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
-        const outputLanguage = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+        const outputLanguage = cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
         await this.runAgent(node, undefined, message => new Notice(message), {
           task: researchTopicTask(outputLanguage, note.title),
           referenceGroups: [],
@@ -14667,7 +14669,7 @@ export class VisualAgentMapView extends ItemView {
         async (options, focus, done, failed, accepted) => {
           const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
           const taskLanguage =
-            options.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
+            options.outputLanguage ?? cardOutputLanguage(this.map, this.plugin.settings.language, latest.title);
           const task = researchTopicTask(taskLanguage, latest.title);
           const runStyle = await this.detailTemplateFor(
             node,
@@ -17191,6 +17193,7 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<void> {
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
+    const languageSource = this.batchLanguageSource();
     const placed = new Map<string, { x: number; y: number }>();
     for (const child of children) {
       const node = this.map?.nodes.find(item => item.id === child.id);
@@ -17211,7 +17214,8 @@ export class VisualAgentMapView extends ItemView {
           pendingOptions,
           pendingOptions.researchMode !== "local",
           undefined,
-          gate
+          gate,
+          languageSource
         ),
       () => {
         const state = this.plugin.expansionBatches.get(parent.path);
@@ -17231,6 +17235,10 @@ export class VisualAgentMapView extends ItemView {
       signal
     );
   }
+  /** The map's language inputs as they are when a batch starts: a copy, so a later map switch cannot change the batch. */
+  private batchLanguageSource(): Pick<MapDocument, "title" | "outputLanguage"> | undefined {
+    return this.map ? { title: this.map.title, outputLanguage: this.map.outputLanguage } : undefined;
+  }
   private async researchChild(
     child: MapNode,
     batchSignal: AbortSignal,
@@ -17238,11 +17246,13 @@ export class VisualAgentMapView extends ItemView {
     choices: TaskOptions,
     charts = true,
     onResult?: (result: AiResult) => void,
-    gate?: { shown: boolean }
+    gate?: { shown: boolean },
+    languageSource?: Pick<MapDocument, "title" | "outputLanguage">
   ): Promise<void> {
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
-      choices.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+      choices.outputLanguage ??
+      cardOutputLanguage(languageSource ?? this.map, this.plugin.settings.language, note.title);
     const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage);
     let started = false;
     let failure: string | undefined;
@@ -17310,6 +17320,7 @@ export class VisualAgentMapView extends ItemView {
     onSettled?: (web: ResearchWebTally) => void
   ): Promise<void> {
     if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
+    const languageSource = this.batchLanguageSource();
     const key = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key)) {
       new Notice(t("ui.multi_research_already_running"));
@@ -17411,7 +17422,8 @@ export class VisualAgentMapView extends ItemView {
                   web.searches += result.retrievals;
                   if (!result.retrievals) web.withoutSearch++;
                 },
-                gate
+                gate,
+                languageSource
               );
               return undefined;
             },
@@ -22311,7 +22323,8 @@ export class VisualAgentMapView extends ItemView {
             this.plugin.settings.language,
             note.title,
             existingNoteLanguage(note),
-            this.outputLanguageMemory().outputLanguage
+            this.outputLanguageMemory().outputLanguage,
+            this.map?.title
           ),
           limits
         },
@@ -22333,7 +22346,8 @@ export class VisualAgentMapView extends ItemView {
           this.plugin.settings.language,
           note.title,
           existingNoteLanguage(note),
-          this.outputLanguageMemory().outputLanguage
+          this.outputLanguageMemory().outputLanguage,
+          this.map?.title
         )
       });
     } catch (error) {
@@ -22375,7 +22389,13 @@ export class VisualAgentMapView extends ItemView {
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);
       const options = chatSynthesisOptions({
-        outputLanguage: defaultOutputLanguage(settings.language, note.title, existingNoteLanguage(note), remembered)
+        outputLanguage: defaultOutputLanguage(
+          settings.language,
+          note.title,
+          existingNoteLanguage(note),
+          remembered,
+          map.title
+        )
       });
       return this.launchChatTask(note.model, (failed, accepted) =>
         this.startSynthesis(node, options, message, failed, accepted)

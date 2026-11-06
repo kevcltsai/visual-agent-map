@@ -172,7 +172,7 @@ export class MapChatService {
    * `onSteer` receives a function that adds the user's follow-up text to the running turn (the text is wrapped in the steer
    * template here); it rejects when the turn can no longer take one or after a stop. A steer restarts the reply, so the reply
    * shown so far is forgotten and a shorter new reply replaces it.
-   * `onRaw` is handed to the runner through the hooks and gets the model's raw output right before the runner parses it, once per output (a steer restart or json fallback calls it again, so the last call is the final output), also for a reply that then fails to parse (never after a stop); it only feeds the chat record and cannot break the turn. A runner that does not call `hooks.onRaw` records nothing.
+   * `onRaw` is handed to the runner through the hooks and gets the model's raw output right before the runner parses it, once per chat (a steer restart or json fallback happens inside the runtime before it resolves, so this is the final output), also for a reply that then fails to parse (never after a stop); it only feeds the chat record and cannot break the turn. A runner that does not call `hooks.onRaw` records nothing.
    */
   async chat(
     request: MapChatRequest,

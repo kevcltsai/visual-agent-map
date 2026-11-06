@@ -348,7 +348,9 @@ test('real runner onRaw: a valid reply is reported once, before parse; an observ
   assert.equal(result.reply, 'ok');
   const live = new AbortController();
   const late = rawService(() => { live.abort(); return good; });
-  await assert.rejects(late.chat(request({ model: 'gpt-6-luna' }), live.signal, undefined, undefined, undefined, () => assert.fail('no late raw')), error => error.code === 'stopped');
+  const lateSeen = [];
+  await assert.rejects(late.chat(request({ model: 'gpt-6-luna' }), live.signal, undefined, undefined, undefined, text => lateSeen.push(text)), error => error.code === 'stopped');
+  assert.deepEqual(lateSeen, [], 'a stop reports no raw output');
 });
 test('service hands onRaw to the runner through hooks and guards it (a throwing observer does not break the turn); onRaw alone builds the hooks', async () => {
   let handed;

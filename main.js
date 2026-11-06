@@ -56673,6 +56673,7 @@ function relationPairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 var goalSuggestSeq = 0;
+var NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-actions-button", ".view-action"].join(", ");
 var CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.ItemView {
   constructor(leaf, plugin) {
@@ -59490,7 +59491,7 @@ ${request.requirements}` : preset.text,
       if (event.button !== 0 && event.button !== void 0) return;
       const target = event.target;
       if (!target || ((_b3 = (_a3 = this.relevanceBarEl) == null ? void 0 : _a3.contains) == null ? void 0 : _b3.call(_a3, target))) return;
-      if ((_c = target.closest) == null ? void 0 : _c.call(target, ".menu, .modal-container, .prompt, .vam-map-actions-button, .view-action")) return;
+      if ((_c = target.closest) == null ? void 0 : _c.call(target, NOT_ELSEWHERE_SELECTOR)) return;
       disarm == null ? void 0 : disarm();
       const pressEnded = () => {
         disarm == null ? void 0 : disarm();

@@ -1297,6 +1297,8 @@ interface ChatSteerState {
 }
 
 /** What takes a click: the strip toward the floating goal icons must not lie over any of it. */
+/** Presses here are not "elsewhere" for the goal edit: Obsidian's menus, dialogs and command palette, and the buttons that open a menu. */
+const NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-actions-button", ".view-action"].join(", ");
 const CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
@@ -4289,7 +4291,7 @@ export class VisualAgentMapView extends ItemView {
       if (event.button !== 0 && event.button !== undefined) return;
       const target = event.target as Element | null;
       if (!target || this.relevanceBarEl?.contains?.(target)) return;
-      if (target.closest?.(".menu, .modal-container, .prompt, .vam-map-actions-button, .view-action")) return;
+      if (target.closest?.(NOT_ELSEWHERE_SELECTOR)) return;
       disarm?.();
       const pressEnded = (): void => {
         disarm?.();

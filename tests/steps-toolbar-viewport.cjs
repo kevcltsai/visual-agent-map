@@ -233,6 +233,57 @@ test('an annotated image too far from the cards for the zoom floor gets the off-
   assert.equal(view.map.viewport.zoom, 0.25);
   assert.deepEqual(notices, [translate('en', 'ui.fit_clamped')]);
 });
+
+// Show all frames plain images too: a picture the user placed must not be left off screen.
+const plainImage = (id, x, y, w = 320, h = 237) => ({ kind: 'image', id, path: 'p.png', x, y, w, h });
+
+test('Show all takes in a plain image far to the left of the cards', () => {
+  const { view, nodes } = makeView();
+  nodes[0].x = 500; nodes[0].y = 0;
+  nodes[1].x = 500; nodes[1].y = 200;
+  const image = plainImage('i', -200, 0);
+  view.map.canvasItems = [image];
+  view.fit();
+  assert.ok(inCanvas(image, view.map.viewport), `image inside the canvas at ${JSON.stringify(view.map.viewport)}`);
+});
+
+test('Show all frames a map that has only a plain image', () => {
+  const { view, nodes } = makeView();
+  nodes.length = 0;
+  const image = plainImage('i', 900, 700);
+  view.map.canvasItems = [image];
+  view.fit();
+  assert.ok(inCanvas(image, view.map.viewport), `image inside the canvas at ${JSON.stringify(view.map.viewport)}`);
+});
+
+test('framing a ring leaves out plain images', () => {
+  const plain = makeView(), withImage = makeView();
+  for (const each of [plain, withImage]) {
+    each.nodes[1].y = 300;
+    each.view.fitOnly = new Set(['a', 'b']);
+  }
+  withImage.view.map.canvasItems = [plainImage('other', -3000, -3000)];
+  plain.view.fit(); withImage.view.fit();
+  assert.deepEqual({ ...withImage.view.map.viewport }, { ...plain.view.map.viewport });
+  const lone = makeView();
+  lone.nodes.length = 0;
+  lone.view.fitOnly = new Set(['a']);
+  lone.view.map.canvasItems = [plainImage('other', 900, 700)];
+  const before = { ...lone.view.map.viewport };
+  lone.view.fit();
+  assert.deepEqual({ ...lone.view.map.viewport }, before, 'a ring with no cards frames nothing');
+});
+
+test('a plain image too far from the cards for the zoom floor gets the off-screen notice', () => {
+  const { translate } = load('i18n.ts');
+  const { view, nodes } = makeView();
+  nodes[1].y = 300;
+  view.map.canvasItems = [plainImage('far', -6000, 0)];
+  notices.length = 0;
+  view.fit();
+  assert.equal(view.map.viewport.zoom, 0.25);
+  assert.deepEqual(notices, [translate('en', 'ui.fit_clamped')]);
+});
 test('Persona 13: the off-screen notice judges the real canvas, so cards only the toolbar insets squeeze do not trigger it', () => {
   const { view, nodes } = makeView(); nodes[1].y = 1900; // 2080px tall: the inset-reduced fit area needs < 25%, but the whole canvas holds it at 25%
   notices.length = 0;

@@ -74539,8 +74539,10 @@ ${note.detail.trim()}` : "",
     const only = this.fitOnly;
     if (this.holdCamera(() => only ? this.fitCards(only) : this.fit())) return;
     const nodes = this.canvasNodes().filter((n) => !only || only.has(n.id));
-    const annotatedImages = ((_a2 = this.map.canvasItems) != null ? _a2 : []).filter(isAnnotatedImage);
-    if (!nodes.length && (only || !annotatedImages.length)) return;
+    const images = ((_a2 = this.map.canvasItems) != null ? _a2 : []).filter(
+      (item) => item.kind === "image" || isAnnotatedImage(item)
+    );
+    if (!nodes.length && (only || !images.length)) return;
     const boxes = nodes.map((n) => {
       var _a3, _b3, _c2, _d2;
       return {
@@ -74553,7 +74555,7 @@ ${note.detail.trim()}` : "",
     const ringImageIds = only ? new Set(
       ringMembers((_b2 = this.map.canvasItems) != null ? _b2 : [], this.map.nodes).filter((member) => only.has(member.topicId)).map((member) => member.imageId)
     ) : null;
-    for (const item of annotatedImages)
+    for (const item of images)
       if (!ringImageIds || ringImageIds.has(item.id)) boxes.push({ x: item.x, y: item.y, w: item.w, h: item.h });
     for (const item of only ? [] : (_c = this.map.canvasItems) != null ? _c : []) {
       if (item.kind !== "text") continue;

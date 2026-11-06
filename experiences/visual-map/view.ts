@@ -20304,8 +20304,10 @@ export class VisualAgentMapView extends ItemView {
     const only = this.fitOnly;
     if (this.holdCamera(() => (only ? this.fitCards(only) : this.fit()))) return;
     const nodes = this.canvasNodes().filter(n => !only || only.has(n.id));
-    const annotatedImages = (this.map.canvasItems ?? []).filter(isAnnotatedImage);
-    if (!nodes.length && (only || !annotatedImages.length)) return;
+    const images = (this.map.canvasItems ?? []).filter(
+      (item): item is ImageItem | AnnotatedImageItem => item.kind === "image" || isAnnotatedImage(item)
+    );
+    if (!nodes.length && (only || !images.length)) return;
     // Free text blocks (canvas-text-node decision #8) count too: fit must not hide what the user placed.
     const boxes = nodes.map(n => ({
       x: n.x,
@@ -20313,7 +20315,7 @@ export class VisualAgentMapView extends ItemView {
       w: n.width ?? CARD_WIDTH,
       h: this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`)?.offsetHeight ?? 180
     }));
-    // Show all takes in every annotated image, anchors or not: the first anchor is placed by right-clicking the picture.
+    // Show all takes in every image: a plain one the user placed must stay findable, and an annotated one gets its first anchor by right-clicking the picture.
     // Framing a ring (a reply's cards) takes in only its picture: with one to three cards it would otherwise be cut off.
     const ringImageIds = only
       ? new Set(
@@ -20322,7 +20324,7 @@ export class VisualAgentMapView extends ItemView {
             .map(member => member.imageId)
         )
       : null;
-    for (const item of annotatedImages)
+    for (const item of images)
       if (!ringImageIds || ringImageIds.has(item.id)) boxes.push({ x: item.x, y: item.y, w: item.w, h: item.h });
     for (const item of only ? [] : (this.map.canvasItems ?? [])) {
       if (item.kind !== "text") continue;

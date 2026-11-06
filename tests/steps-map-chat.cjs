@@ -329,6 +329,38 @@ test('service stop: an aborted signal throws MapChatError stopped before and aft
   const failing = new MapChatService(async () => { crash.abort(); throw new Error('killed'); });
   await assert.rejects(failing.chat(request(), crash.signal), error => error.code === 'stopped');
 });
+const rawService = (rawOut, calls = []) => {
+  const runtime = { runTask: async () => (typeof rawOut === 'function' ? rawOut(calls) : rawOut) };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  return new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map())));
+};
+test('invalid reply keeps raw through the real runner: onRaw once with the original string, and the turn still throws invalid', async () => {
+  const seen = [];
+  await assert.rejects(rawService('not json {').chat(request({ model: 'gpt-6-luna' }), new AbortController().signal, undefined, undefined, undefined, raw => seen.push(raw)), error => error.name === 'MapChatError' && error.code === 'invalid');
+  assert.deepEqual(seen, ['not json {']);
+});
+test('real runner onRaw: a valid reply is reported once, before parse; an observer that throws cannot break the turn; a stop reports nothing', async () => {
+  const good = reply();
+  const seen = [];
+  await rawService(good).chat(request({ model: 'gpt-6-luna' }), new AbortController().signal, undefined, undefined, undefined, raw => seen.push(raw));
+  assert.deepEqual(seen, [good]);
+  const result = await rawService(good).chat(request({ model: 'gpt-6-luna' }), new AbortController().signal, undefined, undefined, undefined, () => { throw new Error('observer'); });
+  assert.equal(result.reply, 'ok');
+  const live = new AbortController();
+  const late = rawService(() => { live.abort(); return good; });
+  const lateSeen = [];
+  await assert.rejects(late.chat(request({ model: 'gpt-6-luna' }), live.signal, undefined, undefined, undefined, text => lateSeen.push(text)), error => error.code === 'stopped');
+  assert.deepEqual(lateSeen, [], 'a stop reports no raw output');
+});
+test('service hands onRaw to the runner through hooks and guards it (a throwing observer does not break the turn); onRaw alone builds the hooks', async () => {
+  let handed;
+  const service = new MapChatService(async (_request, _signal, _prepared, _onJson, hooks) => { handed = hooks; hooks.onRaw('x'); return reply(); });
+  assert.equal((await service.chat(request(), new AbortController().signal, undefined, undefined, undefined, () => { throw new Error('observer'); })).reply, 'ok');
+  assert.equal(typeof handed.onRaw, 'function');
+  let plain;
+  await new MapChatService(async (_r, _s, _p, _j, hooks) => { plain = hooks; return reply(); }).chat(request(), new AbortController().signal);
+  assert.equal(plain, undefined, 'no observer: no hooks, nothing changes');
+});
 
 // ---- History.discardSince ----
 const entry = label => ({ label, undo: async () => {}, redo: async () => {} });

@@ -1561,6 +1561,7 @@ var en = {
   "ui.map_chat_line_images_failed_0_1": "Failed: picture search for \u201C{0}\u201D ({1})",
   "ui.map_chat_line_images_stopped_0": "Stopped: picture search for \u201C{0}\u201D",
   "ui.map_chat_images_label_0": "Picture candidates for \u201C{0}\u201D",
+  "ui.map_chat_images_label": "Picture candidates",
   "ui.map_chat_images_searching_0": "Looking for pictures: {0}",
   "ui.map_chat_images_stop": "Stop searching",
   "ui.map_chat_images_ready_0_1": "Found {0} usable pictures. Pick one to insert into \u201C{1}\u201D.",
@@ -2795,6 +2796,18 @@ var en = {
   "ui.settings_note_style_intro": "Pick the note style AI uses for each topic type. A style picked on a topic or for one run still wins.",
   "ui.settings_selection_ai_name": "Show AI button on selected text",
   "ui.settings_selection_ai_desc": "Still available from the command palette when off.",
+  "ui.settings_map_chat_records_name": "Save map AI conversations",
+  "ui.settings_map_chat_records_desc": "Saved in each mind map's folder so you can pick up where you left off, and kept for later analysis. The content includes your notes; VAM does not upload it, but if you sync your vault, the records sync with it.",
+  "ui.map_chat_records_off_title": "Also delete the saved conversations?",
+  "ui.map_chat_records_off_body_0": "Saved conversations: {0}. If you keep them, you can pick them up again after turning this back on.",
+  "ui.map_chat_records_keep": "Keep",
+  "ui.map_chat_records_delete_0": "Delete conversations ({0})",
+  "ui.map_chat_record_failed": "Could not save the conversation record, so this conversation will not be saved for now.",
+  "ui.map_chat_new_conversation": "New conversation",
+  "ui.map_chat_restored_0": "Restored the conversation from {0}",
+  "ui.map_chat_record_stale": "No longer valid: this cannot be applied after reopening. Ask again if you still need it.",
+  "ui.map_chat_record_stale_short": "No longer valid",
+  "ui.map_chat_records_delete_failed_0": "Some conversations could not be deleted ({0}).",
   "ui.settings_diagrams_desc": "Adds up to three Mermaid diagrams after writing.",
   "ui.settings_preview_size_desc": "Size of the preview card when you hover a topic.",
   "ui.settings_map_folder_desc_0": "Inside {0}/. Renaming moves existing files too.",
@@ -4264,6 +4277,7 @@ var zhCN = {
   "ui.map_chat_line_images_failed_0_1": "\u5931\u8D25\uFF1A\u4E3A\u201C{0}\u201D\u627E\u56FE\uFF08{1}\uFF09",
   "ui.map_chat_line_images_stopped_0": "\u5DF2\u505C\u6B62\uFF1A\u4E3A\u201C{0}\u201D\u627E\u56FE",
   "ui.map_chat_images_label_0": "\u201C{0}\u201D\u7684\u5019\u9009\u56FE",
+  "ui.map_chat_images_label": "\u5019\u9009\u56FE",
   "ui.map_chat_images_searching_0": "\u6B63\u5728\u627E\u56FE\uFF1A{0}",
   "ui.map_chat_images_stop": "\u505C\u6B62\u627E\u56FE",
   "ui.map_chat_images_ready_0_1": "\u627E\u5230 {0} \u5F20\u53EF\u7528\u7684\u56FE\uFF0C\u53EF\u9009\u4E00\u5F20\u63D2\u5165\u201C{1}\u201D\u3002",
@@ -5498,6 +5512,18 @@ var zhCN = {
   "ui.settings_note_style_intro": "\u4E3A\u6BCF\u79CD\u8BAE\u9898\u7C7B\u578B\u9009 AI \u5199\u7B14\u8BB0\u7684\u98CE\u683C\u3002\u5728\u8BAE\u9898\u4E0A\u6216\u5355\u6B21\u8FD0\u884C\u65F6\u53E6\u5916\u9009\u7684\u98CE\u683C\uFF0C\u4ECD\u4EE5\u90A3\u8FB9\u4E3A\u51C6\u3002",
   "ui.settings_selection_ai_name": "\u9009\u4E2D\u6587\u5B57\u65F6\u663E\u793A AI \u6309\u94AE",
   "ui.settings_selection_ai_desc": "\u5173\u95ED\u540E\u4ECD\u53EF\u4ECE\u547D\u4EE4\u9762\u677F\u4F7F\u7528\u3002",
+  "ui.settings_map_chat_records_name": "\u4FDD\u5B58\u601D\u7EF4\u5BFC\u56FE AI \u5BF9\u8BDD",
+  "ui.settings_map_chat_records_desc": "\u5B58\u653E\u5728\u6BCF\u5F20\u601D\u7EF4\u5BFC\u56FE\u7684\u6587\u4EF6\u5939\u91CC\uFF0C\u91CD\u65B0\u6253\u5F00\u540E\u53EF\u4EE5\u63A5\u7740\u804A\uFF0C\u4E5F\u7559\u4F5C\u65E5\u540E\u5206\u6790\u3002\u5185\u5BB9\u5305\u542B\u4F60\u7684\u7B14\u8BB0\uFF1BVAM \u4E0D\u4F1A\u4E0A\u4F20\uFF0C\u4F46\u5982\u679C\u4F60\u540C\u6B65\u4E86\u5E93\uFF0C\u8BB0\u5F55\u4F1A\u8DDF\u7740\u540C\u6B65\u3002",
+  "ui.map_chat_records_off_title": "\u4E5F\u8981\u5220\u9664\u5DF2\u4FDD\u5B58\u7684\u5BF9\u8BDD\u5417\uFF1F",
+  "ui.map_chat_records_off_body_0": "\u5F53\u524D\u4FDD\u5B58\u4E86 {0} \u6BB5\u5BF9\u8BDD\u3002\u9009\u201C\u4FDD\u7559\u201D\u7684\u8BDD\uFF0C\u4E4B\u540E\u518D\u6253\u5F00\u5F00\u5173\uFF0C\u8FD8\u80FD\u63A5\u7740\u804A\u3002",
+  "ui.map_chat_records_keep": "\u4FDD\u7559",
+  "ui.map_chat_records_delete_0": "\u5220\u9664 {0} \u6BB5\u5BF9\u8BDD",
+  "ui.map_chat_record_failed": "\u5BF9\u8BDD\u8BB0\u5F55\u5199\u5165\u5931\u8D25\uFF0C\u8FD9\u6BB5\u5BF9\u8BDD\u6682\u65F6\u4E0D\u4F1A\u4FDD\u5B58\u3002",
+  "ui.map_chat_new_conversation": "\u65B0\u5BF9\u8BDD",
+  "ui.map_chat_restored_0": "\u5DF2\u6062\u590D {0} \u7684\u5BF9\u8BDD",
+  "ui.map_chat_record_stale": "\u5DF2\u5931\u6548\uFF1A\u91CD\u65B0\u6253\u5F00\u540E\u4E0D\u80FD\u5E94\u7528\uFF0C\u9700\u8981\u7684\u8BDD\u8BF7\u518D\u8BF4\u4E00\u6B21\u3002",
+  "ui.map_chat_record_stale_short": "\u5DF2\u5931\u6548",
+  "ui.map_chat_records_delete_failed_0": "\u6709 {0} \u6BB5\u5BF9\u8BDD\u65E0\u6CD5\u5220\u9664\u3002",
   "ui.settings_diagrams_desc": "\u5199\u5B8C\u540E\u6700\u591A\u52A0\u4E09\u5F20 Mermaid \u56FE\u3002",
   "ui.settings_preview_size_desc": "\u9F20\u6807\u79FB\u5230\u8BAE\u9898\u65F6\uFF0C\u9884\u89C8\u5361\u7684\u5927\u5C0F\u3002",
   "ui.settings_map_folder_desc_0": "\u5728 {0}/ \u4E0B\u9762\u3002\u6539\u540D\u4F1A\u8FDE\u540C\u65E2\u6709\u6587\u4EF6\u4E00\u8D77\u642C\u3002",
@@ -6967,6 +6993,7 @@ var zhTW = {
   "ui.map_chat_line_images_failed_0_1": "\u5931\u6557\uFF1A\u70BA\u300C{0}\u300D\u627E\u5716\uFF08{1}\uFF09",
   "ui.map_chat_line_images_stopped_0": "\u5DF2\u505C\u6B62\uFF1A\u70BA\u300C{0}\u300D\u627E\u5716",
   "ui.map_chat_images_label_0": "\u300C{0}\u300D\u7684\u5019\u9078\u5716",
+  "ui.map_chat_images_label": "\u5019\u9078\u5716",
   "ui.map_chat_images_searching_0": "\u6B63\u5728\u627E\u5716\uFF1A{0}",
   "ui.map_chat_images_stop": "\u505C\u6B62\u627E\u5716",
   "ui.map_chat_images_ready_0_1": "\u627E\u5230 {0} \u5F35\u53EF\u7528\u7684\u5716\uFF0C\u53EF\u9078\u4E00\u5F35\u63D2\u5165\u300C{1}\u300D\u3002",
@@ -8201,6 +8228,18 @@ var zhTW = {
   "ui.settings_note_style_intro": "\u70BA\u6BCF\u7A2E\u8B70\u984C\u985E\u578B\u9078 AI \u5BEB\u7B46\u8A18\u7684\u98A8\u683C\u3002\u5728\u8B70\u984C\u4E0A\u6216\u55AE\u6B21\u57F7\u884C\u6642\u53E6\u5916\u9078\u7684\u98A8\u683C\uFF0C\u4ECD\u4EE5\u90A3\u908A\u70BA\u6E96\u3002",
   "ui.settings_selection_ai_name": "\u9078\u53D6\u6587\u5B57\u6642\u986F\u793A AI \u6309\u9215",
   "ui.settings_selection_ai_desc": "\u95DC\u9589\u5F8C\u4ECD\u53EF\u5F9E\u547D\u4EE4\u9762\u677F\u4F7F\u7528\u3002",
+  "ui.settings_map_chat_records_name": "\u4FDD\u5B58\u5FC3\u667A\u5716 AI \u5C0D\u8A71",
+  "ui.settings_map_chat_records_desc": "\u5B58\u5728\u6BCF\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u593E\u88E1\uFF0C\u91CD\u65B0\u958B\u555F\u5F8C\u53EF\u4EE5\u63A5\u8457\u804A\uFF0C\u4E5F\u7559\u4F5C\u65E5\u5F8C\u5206\u6790\u3002\u5167\u5BB9\u5305\u542B\u4F60\u7684\u7B46\u8A18\uFF1BVAM \u4E0D\u6703\u4E0A\u50B3\uFF0C\u4F46\u5982\u679C\u4F60\u6709\u540C\u6B65 Vault\uFF0C\u7D00\u9304\u6703\u8DDF\u8457\u540C\u6B65\u3002",
+  "ui.map_chat_records_off_title": "\u4E5F\u8981\u522A\u9664\u5DF2\u4FDD\u5B58\u7684\u5C0D\u8A71\u55CE\uFF1F",
+  "ui.map_chat_records_off_body_0": "\u76EE\u524D\u4FDD\u5B58\u4E86 {0} \u6BB5\u5C0D\u8A71\u3002\u9078\u300C\u4FDD\u7559\u300D\u7684\u8A71\uFF0C\u4E4B\u5F8C\u518D\u6253\u958B\u958B\u95DC\uFF0C\u9084\u80FD\u63A5\u8457\u804A\u3002",
+  "ui.map_chat_records_keep": "\u4FDD\u7559",
+  "ui.map_chat_records_delete_0": "\u522A\u9664 {0} \u6BB5\u5C0D\u8A71",
+  "ui.map_chat_record_failed": "\u5C0D\u8A71\u7D00\u9304\u5BEB\u5165\u5931\u6557\uFF0C\u9019\u6BB5\u5C0D\u8A71\u66AB\u6642\u4E0D\u6703\u4FDD\u5B58\u3002",
+  "ui.map_chat_new_conversation": "\u65B0\u5C0D\u8A71",
+  "ui.map_chat_restored_0": "\u5DF2\u6062\u5FA9 {0} \u7684\u5C0D\u8A71",
+  "ui.map_chat_record_stale": "\u5DF2\u5931\u6548\uFF1A\u91CD\u65B0\u958B\u555F\u5F8C\u4E0D\u80FD\u5957\u7528\uFF0C\u9700\u8981\u7684\u8A71\u8ACB\u518D\u8AAA\u4E00\u6B21\u3002",
+  "ui.map_chat_record_stale_short": "\u5DF2\u5931\u6548",
+  "ui.map_chat_records_delete_failed_0": "\u6709 {0} \u6BB5\u5C0D\u8A71\u7121\u6CD5\u522A\u9664\u3002",
   "ui.settings_diagrams_desc": "\u5BEB\u5B8C\u5F8C\u6700\u591A\u52A0\u4E09\u5F35 Mermaid \u5716\u3002",
   "ui.settings_preview_size_desc": "\u6ED1\u9F20\u79FB\u5230\u8B70\u984C\u6642\uFF0C\u9810\u89BD\u5361\u7684\u5927\u5C0F\u3002",
   "ui.settings_map_folder_desc_0": "\u5728 {0}/ \u5E95\u4E0B\u3002\u6539\u540D\u6703\u9023\u540C\u65E2\u6709\u6A94\u6848\u4E00\u8D77\u642C\u3002",
@@ -18284,8 +18323,8 @@ function treeTextNodes(items, nodeIds) {
   }
   return { attached, orphans };
 }
-function boundaryBounds(nodeIds, rectOf, pad, others = []) {
-  const margin = finite(pad) && pad > 0 ? pad : 0;
+function boundaryBounds(nodeIds, rectOf, pad3, others = []) {
+  const margin = finite(pad3) && pad3 > 0 ? pad3 : 0;
   let left = Infinity;
   let top = Infinity;
   let right = -Infinity;
@@ -24623,6 +24662,7 @@ var DEFAULT_SETTINGS = {
   cliModel: FALLBACK_MODEL,
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
   mapChatOpen: true,
+  mapChatRecords: false,
   cliReasoning: "low",
   previewScale: 120,
   models: "",
@@ -24757,8 +24797,8 @@ function safeName(title) {
 function foldName(value) {
   return value.normalize("NFC").toLowerCase().replace(/ς/g, "\u03C3");
 }
-function foldEntryName(name2, isFile) {
-  const dot = isFile ? name2.lastIndexOf(".") : -1;
+function foldEntryName(name2, isFile2) {
+  const dot = isFile2 ? name2.lastIndexOf(".") : -1;
   return dot > 0 ? `${foldName(name2.slice(0, dot))}.${name2.slice(dot + 1).toLowerCase()}` : foldName(name2);
 }
 function linkAlias(title, fallback) {
@@ -32861,12 +32901,12 @@ var DATE_PREFIX = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}[ \t\u3000:：]*/;
 var FOOTNOTE_REF = /\[\^([^\]\s]+)\]/g;
 var FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:/;
 function formatDate(now) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const pad3 = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad3(now.getMonth() + 1)}-${pad3(now.getDate())}`;
 }
 function formatTime(now) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const pad3 = (value) => String(value).padStart(2, "0");
+  return `${pad3(now.getHours())}${pad3(now.getMinutes())}${pad3(now.getSeconds())}`;
 }
 var placeholderTexts = () => /* @__PURE__ */ new Set([
   ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
@@ -35792,7 +35832,7 @@ function inlineMarkdown(nodes) {
   return out;
 }
 var tidy = (text11) => text11.replace(/^[ \t]+/, "").replace(/\\\n[ \t]+/g, "\\\n");
-var indentOf = (text11, pad, first) => text11.split("\n").map((line, at) => at === 0 ? `${first}${line}` : line ? `${pad}${line}` : line).join("\n");
+var indentOf = (text11, pad3, first) => text11.split("\n").map((line, at) => at === 0 ? `${first}${line}` : line ? `${pad3}${line}` : line).join("\n");
 function listMarkdown(block) {
   return block.items.map((item, index) => {
     const marker5 = block.ordered ? `${index + 1}. ` : "- ";
@@ -36016,6 +36056,13 @@ var MapChatPanel = class {
     __publicField(this, "stopEl");
     __publicField(this, "steerHintEl");
     __publicField(this, "saveEl");
+    /** "New conversation": built only while the host says records are on. */
+    __publicField(this, "newEl", null);
+    /** The "restored <time>" line above the log; null when the panel was not restored. */
+    __publicField(this, "restoredEl");
+    __publicField(this, "restoredText", "");
+    /** The record the conversation is saved in (set by the view); cleared by {@link reset}. */
+    __publicField(this, "conversationId", null);
     /** The note is being written; a second press does nothing. */
     __publicField(this, "saving", false);
     /** The save button reads as disabled (it stays reachable by keyboard, so its title can be read). */
@@ -36733,7 +36780,7 @@ ${typed}` : draft;
     var _a2, _b2;
     return (_b2 = (_a2 = this.messages.find((message) => {
       var _a3;
-      return ((_a3 = message.plan) == null ? void 0 : _a3.state) === "pending";
+      return ((_a3 = message.plan) == null ? void 0 : _a3.state) === "pending" && !message.plan.stale;
     })) == null ? void 0 : _a2.plan) != null ? _b2 : null;
   }
   /** A plan was applied or cancelled: its buttons stop working; `lines` (the result of applying) join its message. */
@@ -36799,6 +36846,8 @@ ${typed}` : draft;
     this.rows = /* @__PURE__ */ new WeakMap();
     this.messages = [];
     this.savedTurnCount = 0;
+    this.conversationId = null;
+    this.restoredText = "";
     this.spokenLater = [];
     this.chips = [];
     this.dismissedNote = null;
@@ -36818,6 +36867,98 @@ ${typed}` : draft;
   }
   focusInput() {
     if (this.built) this.inputEl.focus();
+  }
+  /**
+   * Shows a saved conversation again: its finished turns (their words go through the same reply renderer as live ones), with a
+   * line on top saying when it was. Plan cards, picture candidates, retry and option lists are shown as no longer valid.
+   */
+  restore(conversation) {
+    var _a2, _b2, _c, _d, _e;
+    if (this.working) return;
+    this.cancelFrame();
+    this.rows = /* @__PURE__ */ new WeakMap();
+    this.messages = [];
+    this.savedTurnCount = 0;
+    this.restoredText = "";
+    this.spokenLater = [];
+    this.unread = false;
+    this.conversationId = conversation.id;
+    for (const turn of conversation.turns) {
+      const question = { role: "user", text: turn.message, lines: [] };
+      if ((_a2 = turn.steers) == null ? void 0 : _a2.length) question.steers = turn.steers.map((text11) => ({ text: text11, state: "live" }));
+      this.messages.push(question);
+      const answer = {
+        role: "assistant",
+        text: turn.reply,
+        lines: turn.lines.map((line) => ({
+          status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
+          text: line.text
+        })),
+        modelLabel: turn.modelLabel || void 0,
+        stale: true
+      };
+      if (turn.stalePlan) {
+        if (turn.planState && turn.planState !== "cancelled" && ((_b2 = turn.planLines) == null ? void 0 : _b2.length))
+          answer.lines = [
+            ...answer.lines,
+            ...turn.planLines.map((line) => ({
+              status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
+              text: line.text
+            }))
+          ];
+        answer.plan = {
+          reasons: [],
+          items: [],
+          estimate: "",
+          state: !turn.planState ? "pending" : turn.planState === "cancelled" ? "cancelled" : "applied",
+          stale: true,
+          apply() {
+          },
+          cancel() {
+          }
+        };
+      }
+      if (turn.images) {
+        const states = ["ready", "empty", "failed", "stopped"];
+        const state = (_c = states.find((name2) => name2 === turn.images.state)) != null ? _c : "stopped";
+        answer.images = [
+          {
+            query: "",
+            nodeId: "",
+            nodeTitle: "",
+            mapPath: "",
+            mapId: "",
+            state,
+            stale: true,
+            items: turn.images.items.map((item, index) => ({
+              candidate: { title: item.title, url: "", source: item.sourceUrl },
+              inserted: turn.images.inserted.includes(index) ? item.title : void 0
+            }))
+          }
+        ];
+      }
+      this.messages.push(answer);
+    }
+    const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
+    if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {
+      const pad3 = (value) => String(value).padStart(2, "0");
+      this.restoredText = t(
+        "ui.map_chat_restored_0",
+        `${when.getMonth() + 1}/${when.getDate()} ${pad3(when.getHours())}:${pad3(when.getMinutes())}`
+      );
+    }
+    this.renderLog(true);
+    this.refreshNote();
+    this.renderHint();
+    (_e = (_d = this.host).stateChanged) == null ? void 0 : _e.call(_d);
+  }
+  /** "New conversation": clears the panel and tells the view to start a new record. Nothing happens while a turn runs (Stop first). */
+  startNewConversation() {
+    var _a2, _b2;
+    if (this.working) return;
+    this.reset();
+    (_b2 = (_a2 = this.host).newConversation) == null ? void 0 : _b2.call(_a2);
+    this.focusInput();
   }
   // ---- DOM ------------------------------------------------------------------------------------------------------
   build(parent) {
@@ -36868,6 +37009,8 @@ ${typed}` : draft;
       attr: { role: "heading", "aria-level": "2" }
     });
     this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
+    this.restoredEl = this.bodyEl.createDiv({ cls: "vam-map-chat-restored" });
+    this.restoredEl.hidden = true;
     const logLabelId = `${this.id}-log-label`;
     this.logLabelEl = this.bodyEl.createSpan({
       cls: "vam-map-chat-log-label",
@@ -36973,11 +37116,40 @@ ${typed}` : draft;
    * The save button: hidden on the opening screen, and "disabled" (still reachable by keyboard, so its title can be read) while
    * there is no finished turn or the map has no folder to save into.
    */
+  /** "New conversation" exists only while records are on; it waits (aria-disabled) while a turn runs. */
+  refreshNewButton() {
+    var _a2, _b2, _c;
+    if (!this.built) return;
+    const on = ((_b2 = (_a2 = this.host).recordsEnabled) == null ? void 0 : _b2.call(_a2)) === true;
+    if (!on) {
+      (_c = this.newEl) == null ? void 0 : _c.remove();
+      this.newEl = null;
+      return;
+    }
+    if (!this.newEl) {
+      const label = t("ui.map_chat_new_conversation");
+      const button = this.newEl = this.headEl.createEl("button", {
+        cls: "vam-map-chat-new clickable-icon",
+        attr: { type: "button", "aria-label": label, title: label }
+      });
+      (0, import_obsidian24.setIcon)(button, "square-pen");
+      button.addEventListener("click", () => this.startNewConversation());
+      button.remove();
+      this.headEl.insertBefore(button, this.saveEl);
+    }
+    this.newEl.hidden = this.hero;
+    this.newEl.toggleClass("is-hidden", this.hero);
+    this.newEl.setAttr("aria-disabled", String(this.working));
+    this.newEl.toggleClass("is-disabled", this.working);
+    this.newEl.setAttr("aria-label", t("ui.map_chat_new_conversation"));
+    this.newEl.setAttr("title", t("ui.map_chat_new_conversation"));
+  }
   refreshSave() {
     var _a2, _b2;
     if (!this.built || !this.saveEl) return;
     this.saveEl.hidden = this.hero;
     this.saveEl.toggleClass("is-hidden", this.hero);
+    this.refreshNewButton();
     let why = "";
     if (!this.completedTurns().length) why = t("ui.map_chat_save_empty");
     else if (!this.host.saveTranscript) why = t("ui.map_chat_save_unavailable");
@@ -37303,6 +37475,10 @@ ${typed}` : draft;
     this.guideEl.toggleClass("is-hidden", !empty);
     this.logEl.hidden = empty;
     this.logEl.toggleClass("is-hidden", empty);
+    const restored = !empty && !!this.restoredText;
+    this.restoredEl.setText(restored ? this.restoredText : "");
+    this.restoredEl.hidden = !restored;
+    this.restoredEl.toggleClass("is-hidden", !restored);
   }
   /** Puts the model list back in step with what the view remembers. */
   refreshControls() {
@@ -37374,6 +37550,9 @@ ${shown}` : t("ui.map_chat_model_label"));
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
+      message.stale ? "x" : "",
+      t("ui.map_chat_record_stale"),
+      t("ui.map_chat_record_stale_short"),
       message.error ? "e" : "",
       (_a2 = message.technical) != null ? _a2 : "",
       t("ui.technical_details"),
@@ -37398,12 +37577,12 @@ ${shown}` : t("ui.map_chat_model_label"));
       t("ui.map_chat_overflow_note"),
       t("ui.map_chat_images_source"),
       message.lines.map(settledLine).map((line) => `${line.status}:${line.text}`).join("\n"),
-      message.plan ? `plan:${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_e = (_d = message.plan.groups) == null ? void 0 : _d.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _e : ""}` : "",
-      message.choices ? `choices:${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
+      message.plan ? `plan:${message.plan.stale ? "stale:" : ""}${message.plan.state}:${message.plan.items.length}:${message.plan.estimate}:${(_e = (_d = message.plan.groups) == null ? void 0 : _d.map((group) => `${group.label}${group.danger ? "!" : ""}`).join("|")) != null ? _e : ""}` : "",
+      message.choices ? `choices:${message.choices.stale ? "stale:" : ""}${message.choices.picked}:${message.choices.options.map((o) => o.label).join("|")}` : "",
       ((_f = message.images) != null ? _f : []).map(
         (block) => {
           var _a3, _b3;
-          return `images:${block.state}:${(_a3 = block.reason) != null ? _a3 : ""}:${(_b3 = block.notice) != null ? _b3 : ""}:${block.items.map((item) => {
+          return `images:${block.stale ? "stale:" : ""}${block.state}:${(_a3 = block.reason) != null ? _a3 : ""}:${(_b3 = block.notice) != null ? _b3 : ""}:${block.items.map((item) => {
             var _a4;
             return [item.candidate.url, (_a4 = item.inserted) != null ? _a4 : "", item.broken ? 1 : 0, item.busy ? 1 : 0].join("~");
           }).join(",")}`;
@@ -37474,14 +37653,29 @@ ${shown}` : t("ui.map_chat_model_label"));
         attr: { type: "button" }
       });
       more.disabled = this.working;
-      more.addEventListener("click", () => {
-        if (!this.working) this.handOffFocus(() => {
-          var _a3, _b3;
-          return (_b3 = (_a3 = this.host).retry) == null ? void 0 : _b3.call(_a3, origin);
+      if (message.stale) this.makeInert(more);
+      else
+        more.addEventListener("click", () => {
+          if (!this.working) this.handOffFocus(() => {
+            var _a3, _b3;
+            return (_b3 = (_a3 = this.host).retry) == null ? void 0 : _b3.call(_a3, origin);
+          });
         });
-      });
     }
     return { row, body, more };
+  }
+  /**
+   * A control of a restored conversation: it says it is no longer valid (aria-disabled, the stale class) and does nothing, with
+   * mouse or keyboard. It stays reachable by Tab so its explanation can be read.
+   */
+  makeInert(control) {
+    control.setAttr("aria-disabled", "true");
+    control.addClass("is-stale");
+    control.setAttr("title", t("ui.map_chat_record_stale"));
+    control.addEventListener("click", (event) => event.preventDefault());
+    control.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") event.preventDefault();
+    });
   }
   /** A follow-up under the question: its own small bubble, tagged in words (the tag is text, never colour alone). */
   buildSteer(row, steer) {
@@ -37551,6 +37745,15 @@ ${shown}` : t("ui.map_chat_model_label"));
     );
     card.setAttr("role", "group");
     card.setAttr("aria-label", title);
+    if (plan.stale) {
+      card.addClass("is-stale");
+      card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
+      card.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      const dead = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
+      for (const text11 of [t("ui.map_chat_plan_apply"), t("ui.map_chat_plan_cancel")])
+        this.makeInert(dead.createEl("button", { text: text11, attr: { type: "button" } }));
+      return;
+    }
     card.createDiv({ cls: "vam-map-chat-plan-title", text: title });
     card.createDiv({
       cls: "vam-map-chat-plan-sentence",
@@ -37610,12 +37813,33 @@ ${shown}` : t("ui.map_chat_model_label"));
   buildImages(row, block) {
     const box = row.createDiv({
       cls: `vam-map-chat-images is-${block.state}`,
-      attr: { role: "group", "aria-label": t("ui.map_chat_images_label_0", clip2(block.nodeTitle)) }
+      attr: {
+        role: "group",
+        // A restored block has no card title: the generic name, not "Picture candidates for “”".
+        "aria-label": block.nodeTitle ? t("ui.map_chat_images_label_0", clip2(block.nodeTitle)) : t("ui.map_chat_images_label")
+      }
     });
     const statusText = () => {
       var _a2;
       return block.state === "searching" ? t("ui.map_chat_images_searching_0", clip2(block.query, 80)) : block.state === "ready" ? usableImageCount(block) ? t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip2(block.nodeTitle)) : t("ui.map_chat_images_none") : block.state === "empty" ? t("ui.map_chat_images_none") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip2((_a2 = block.reason) != null ? _a2 : "", 160)) : t("ui.map_chat_images_stopped");
     };
+    if (block.stale) {
+      box.addClass("is-stale");
+      box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      const list = box.createDiv({ cls: "vam-map-chat-images-list", attr: { role: "list" } });
+      for (const item of block.items) {
+        const cell = list.createDiv({ cls: "vam-map-chat-images-item", attr: { role: "listitem" } });
+        const pick = cell.createEl("button", { cls: "vam-map-chat-images-pick", attr: { type: "button" } });
+        pick.createSpan({ cls: "vam-map-chat-images-title", text: clip2(item.candidate.title, 80) });
+        if (item.inserted)
+          pick.createSpan({
+            cls: "vam-map-chat-images-state is-inserted",
+            text: t("ui.map_chat_images_inserted_0", clip2(item.inserted))
+          });
+        this.makeInert(pick);
+      }
+      return;
+    }
     box.createDiv({ cls: "vam-map-chat-images-status", text: statusText() });
     if (block.state === "searching" && block.stop) {
       const stop = box.createEl("button", {
@@ -37749,6 +37973,15 @@ ${shown}` : t("ui.map_chat_model_label"));
     box.setAttr("role", "group");
     box.setAttr("aria-label", choices.prompt);
     box.createDiv({ cls: "vam-map-chat-choices-prompt", text: choices.prompt });
+    if (choices.stale) {
+      box.addClass("is-stale");
+      box.createDiv({ cls: "vam-map-chat-stale-note", text: t("ui.map_chat_record_stale") });
+      for (const option of choices.options)
+        this.makeInert(
+          box.createEl("button", { cls: "vam-map-chat-choice", text: option.label, attr: { type: "button" } })
+        );
+      return;
+    }
     const buttons = [];
     for (const option of choices.options) {
       const button = box.createEl("button", {
@@ -37794,6 +38027,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     this.renderSteerHint();
     this.statusEl.setText(this.applying ? t("ui.map_chat_applying") : "");
     this.el.toggleClass("is-busy", this.working);
+    this.refreshNewButton();
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
     const stoppable = this.working && !this.awaitingConsent;
@@ -41717,6 +41951,583 @@ var mapChatStep = {
   parse: (raw, request) => parseMapChat(raw, request.context)
 };
 
+// core/map-chat-records.ts
+var RECORD_VERSION = 1;
+var RECORDS_SUBPATH = "Chats/records";
+var RecordPathError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "RecordPathError";
+  }
+};
+var ID_PATTERN2 = /^\d{8}-\d{6}-[0-9a-z]{6}$/;
+var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+var pad = (value, width = 2) => String(value).padStart(width, "0");
+var isRecordId = (id) => typeof id === "string" && ID_PATTERN2.test(id);
+function newRecordId(now = /* @__PURE__ */ new Date(), random = Math.random) {
+  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
+  let suffix = "";
+  for (let i = 0; i < 6; i++) suffix += BASE36[Math.min(35, Math.floor(random() * 36))];
+  return `${stamp}-${suffix}`;
+}
+function recordIdTime(id) {
+  const match = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})-/.exec(id);
+  return match ? `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.000Z` : null;
+}
+function assertRecordRoot(root, configDir) {
+  if (typeof root !== "string" || !root) throw new RecordPathError("Record root is empty");
+  if (root.startsWith("/") || /^[a-zA-Z]:/.test(root) || root.includes("\\") || root.includes("\0"))
+    throw new RecordPathError(`Record root is not a Vault-relative path: ${root}`);
+  const banned = configDir ? configDir.toLowerCase() : null;
+  for (const part of root.split("/")) {
+    if (!part || part === "." || part === "..") throw new RecordPathError(`Record root has an unsafe part: ${root}`);
+    if (part.startsWith(".") || part.toLowerCase() === banned)
+      throw new RecordPathError(`Record root is inside a hidden or config folder: ${root}`);
+  }
+  return root;
+}
+function recordsDir(root, configDir) {
+  return `${assertRecordRoot(root, configDir)}/${RECORDS_SUBPATH}`;
+}
+function recordPath(root, id, configDir) {
+  if (!isRecordId(id)) throw new RecordPathError(`Bad record id: ${String(id)}`);
+  return `${recordsDir(root, configDir)}/${id}.jsonl`;
+}
+function isRecordFilePath(path) {
+  const match = /^(.+)\/Chats\/records\/([^/]+)\.jsonl$/.exec(path);
+  if (!match) return false;
+  try {
+    assertRecordRoot(match[1]);
+  } catch (e) {
+    return false;
+  }
+  return isRecordId(match[2]);
+}
+function recordFilesIn(files) {
+  return files.filter((file) => isRecordFilePath(file.path));
+}
+function serializeLine(line) {
+  const { v: _ignored, ...rest } = line;
+  return `${JSON.stringify({ v: RECORD_VERSION, ...rest })}
+`;
+}
+function withValidSteers(line) {
+  if (line.type !== "turn_end" || !("steers" in line)) return line;
+  const steers = line.steers;
+  if (Array.isArray(steers) && steers.every((item) => typeof item === "string")) return line;
+  const { steers: _dropped, ...rest } = line;
+  return rest;
+}
+function parseRecord(text11) {
+  const lines = [];
+  let skipped2 = 0;
+  let unrecoverable = false;
+  for (const part of text11.split("\n")) {
+    const trimmed2 = part.trim();
+    if (!trimmed2) continue;
+    let value;
+    try {
+      value = JSON.parse(trimmed2);
+    } catch (e) {
+      skipped2++;
+      continue;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      skipped2++;
+      continue;
+    }
+    const version = value.v;
+    if (version !== void 0 && version !== RECORD_VERSION) unrecoverable = true;
+    else if (version === RECORD_VERSION && typeof value.type === "string")
+      lines.push(withValidSteers(value));
+    else skipped2++;
+  }
+  return { lines, skipped: skipped2, unrecoverable, cleanEnd: text11 === "" || text11.endsWith("\n") };
+}
+var lineTime = (line) => {
+  const value = line.type === "conversation" ? line.startedAt : line.at;
+  return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
+};
+function lastLineAt(lines) {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const at = lineTime(lines[i]);
+    if (at) return at;
+  }
+  return null;
+}
+var timeOf = (iso) => {
+  const time = Date.parse(iso);
+  return Number.isFinite(time) ? time : 0;
+};
+function pickLatest(files) {
+  var _a2, _b2;
+  let best = null;
+  for (const file of files) {
+    if (!isRecordId(file.id)) continue;
+    const parsed = parseRecord(file.text);
+    if (!parsed.lines.length && !parsed.unrecoverable) continue;
+    const lastAt = (_b2 = (_a2 = lastLineAt(parsed.lines)) != null ? _a2 : recordIdTime(file.id)) != null ? _b2 : "";
+    const candidate = { id: file.id, path: file.path, parsed, lastAt };
+    if (!best) {
+      best = candidate;
+      continue;
+    }
+    const a = timeOf(candidate.lastAt);
+    const b = timeOf(best.lastAt);
+    if (a > b || a === b && candidate.id > best.id) best = candidate;
+  }
+  return best;
+}
+function restoreConversation(id, lines) {
+  var _a2, _b2, _c, _d;
+  let mapPath = null;
+  let mapId = null;
+  const starts = /* @__PURE__ */ new Map();
+  const order = [];
+  const ends = /* @__PURE__ */ new Map();
+  const plans = /* @__PURE__ */ new Map();
+  const images = /* @__PURE__ */ new Map();
+  const undone = /* @__PURE__ */ new Map();
+  for (const line of lines) {
+    if (line.type === "conversation") {
+      mapPath = typeof line.mapPath === "string" ? line.mapPath : mapPath;
+      mapId = typeof line.mapId === "string" ? line.mapId : mapId;
+    } else if (line.type === "moved") {
+      if (typeof line.to === "string") mapPath = line.to;
+    } else if (line.type === "turn_start") {
+      if (!starts.has(line.turn)) order.push(line.turn);
+      starts.set(line.turn, line);
+    } else if (line.type === "turn_end") {
+      ends.set(line.turn, line);
+    } else if (line.type === "plan") {
+      plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
+    } else if (line.type === "images") {
+      images.set(line.turn, { state: line.state, items: (_a2 = line.items) != null ? _a2 : [], inserted: (_b2 = line.inserted) != null ? _b2 : [] });
+    } else if (line.type === "event") {
+      if (line.kind === "undo") undone.set(line.turn, true);
+      else if (line.kind === "redo") undone.set(line.turn, false);
+    }
+  }
+  const turns = [];
+  for (const number of order) {
+    const start = starts.get(number);
+    const end = ends.get(number);
+    if (!start || !end || end.status !== "done" && end.status !== "plan") continue;
+    turns.push({
+      turn: number,
+      at: end.at,
+      message: start.message,
+      origin: start.origin,
+      reply: typeof end.reply === "string" ? end.reply : "",
+      lines: Array.isArray(end.lines) ? end.lines : [],
+      modelLabel: typeof end.modelLabel === "string" ? end.modelLabel : "",
+      status: end.status,
+      stalePlan: end.status === "plan",
+      planState: (_c = plans.get(number)) == null ? void 0 : _c.state,
+      planLines: (_d = plans.get(number)) == null ? void 0 : _d.lines,
+      rejected: end.rejected,
+      steers: Array.isArray(end.steers) ? end.steers.filter((item) => typeof item === "string") : [],
+      images: images.get(number),
+      undone: undone.get(number) === true,
+      backfilled: start.backfilled === true
+    });
+  }
+  return { id, mapPath, mapId, turns, restoredAt: turns.length ? turns[turns.length - 1].at : null };
+}
+
+// experiences/visual-map/map-chat-record-writer.ts
+var isFile = (item) => !!item && !("children" in item);
+var MapChatRecordWriter = class {
+  constructor(deps) {
+    this.deps = deps;
+    __publicField(this, "conv");
+    __publicField(this, "target", null);
+    __publicField(this, "enabled", true);
+    __publicField(this, "closed", false);
+    __publicField(this, "killed", false);
+    __publicField(this, "chain", Promise.resolve());
+    this.conv = this.freshConversation();
+  }
+  /** The current conversation's id (its file name). */
+  get conversationId() {
+    return this.conv.id;
+  }
+  /** The conversation's file exists. */
+  get landed() {
+    return !!this.conv.file || !!this.conv.adapterPath;
+  }
+  /** A write of this conversation failed (and was reported): the chat counts as not saved. */
+  get failed() {
+    return this.conv.failed;
+  }
+  /** The conversation holds lines that only exist in memory, or its writes failed: closing the view should still warn. */
+  get unsaved() {
+    return this.conv.failed || this.conv.held;
+  }
+  setEnabled(on) {
+    this.enabled = on;
+  }
+  /** Where new lines go. A landed conversation keeps its file; use {@link moveTo} to move it. */
+  setTarget(target) {
+    this.target = target;
+  }
+  /** Starts a new conversation (new id, new file at the next line). Work queued for the previous one still goes to the previous file. */
+  newConversation() {
+    this.conv = this.freshConversation();
+  }
+  /**
+   * Continues an existing record (restored on open): later lines are appended to `file`, or, given its path, through the adapter
+   * (a record the Vault index does not list). `cleanEnd` is `parseRecord(text).cleanEnd`.
+   */
+  resume(id, file, target, cleanEnd = true) {
+    this.conv = {
+      ...this.freshConversation(id),
+      file: typeof file === "string" ? null : file,
+      adapterPath: typeof file === "string" ? file : null,
+      root: target.root,
+      mapPath: target.mapPath,
+      mapId: target.mapId,
+      // A cut last line gets a line break first, so the next line is not glued to it.
+      pending: cleanEnd ? [] : ["\n"],
+      ended: /* @__PURE__ */ new Set()
+    };
+    this.target = target;
+  }
+  /** Marks turns as already in the record, so a late line for them is dropped (restored turns). */
+  markEnded(turns) {
+    for (const turn of turns) this.conv.ended.add(turn);
+  }
+  /** Takes one line. Dropped when closed, disposed or off, or when its turn already ended (the turn fence). */
+  write(line) {
+    var _a2;
+    if (this.dead() || this.closed || !this.enabled) return;
+    const conv = this.conv;
+    if (line.type === "turn_start" || line.type === "turn_end") {
+      if (conv.ended.has(line.turn)) return;
+      if (line.type === "turn_end") conv.ended.add(line.turn);
+    }
+    const text11 = serializeLine({ ...line, at: (_a2 = line.at) != null ? _a2 : this.stamp() });
+    const target = this.target;
+    if (!conv.file && !(target == null ? void 0 : target.root)) conv.held = true;
+    void this.enqueue(async () => {
+      conv.pending.push(text11);
+      await this.flush(conv, target);
+    });
+  }
+  /**
+   * The conversation was started with the switch off: writes its finished turns as `turn_start` (`backfilled:true`) plus
+   * `turn_end`, with the visible text only. Turn numbers must not repeat.
+   */
+  backfill(turns) {
+    var _a2;
+    for (const item of turns) {
+      this.write({ type: "turn_start", turn: item.turn, at: item.at, message: item.message, backfilled: true });
+      this.write({
+        type: "turn_end",
+        turn: item.turn,
+        at: item.at,
+        status: "done",
+        raw: null,
+        reply: item.reply,
+        lines: item.lines,
+        modelLabel: item.modelLabel,
+        ...((_a2 = item.steers) == null ? void 0 : _a2.length) ? { steers: item.steers } : {}
+      });
+    }
+  }
+  /**
+   * The conversation's map changed (create_map / open_map). Waits for the lines queued before it, then moves the file to
+   * `<newRoot>/Chats/records` (`vault.rename`) and writes a `moved` line; a conversation with no file yet lands in the new
+   * root. A failure leaves the file where it was and takes the failure path. Resolves true when the file is in the new place.
+   */
+  moveTo(target) {
+    const conv = this.conv;
+    this.target = target;
+    return this.enqueue(async () => {
+      if (!target.root) return false;
+      if (!conv.file && !conv.adapterPath) {
+        conv.mapPath = target.mapPath;
+        conv.mapId = target.mapId;
+        await this.flush(conv, target);
+        return !!conv.file;
+      }
+      if (conv.root === target.root) return true;
+      const from = conv.mapPath;
+      if (!await this.relocate(conv, target.root)) return false;
+      conv.mapPath = target.mapPath;
+      conv.mapId = target.mapId;
+      if (this.dead()) return true;
+      conv.pending.push(serializeLine({ type: "moved", at: this.stamp(), from, to: target.mapPath }));
+      await this.flush(conv, target);
+      return true;
+    }, false);
+  }
+  /** Resolves when everything queued so far has run (also when more was queued meanwhile). */
+  async idle() {
+    let seen;
+    do {
+      seen = this.chain;
+      await seen;
+    } while (seen !== this.chain);
+  }
+  /** The view closed: no new lines; queued ones still run. */
+  close() {
+    this.closed = true;
+  }
+  /** Plugin unload: nothing more is written, queued work included. */
+  dispose() {
+    this.killed = true;
+    this.closed = true;
+  }
+  // ---- internals ----
+  freshConversation(id) {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const now = (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date();
+    return {
+      id: id != null ? id : newRecordId(now, this.deps.random),
+      startedAt: now.toISOString(),
+      file: null,
+      adapterPath: null,
+      root: null,
+      mapPath: (_e = (_d = this.target) == null ? void 0 : _d.mapPath) != null ? _e : "",
+      mapId: (_g = (_f = this.target) == null ? void 0 : _f.mapId) != null ? _g : "",
+      pending: [],
+      held: false,
+      failed: false,
+      notified: false,
+      ended: /* @__PURE__ */ new Set()
+    };
+  }
+  dead() {
+    return this.killed || this.deps.disposed();
+  }
+  stamp() {
+    var _a2, _b2, _c;
+    return ((_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date()).toISOString();
+  }
+  enqueue(task, fallback) {
+    const run = this.chain.then(() => this.dead() ? fallback : task());
+    const safe = run.catch((error) => {
+      this.deps.log("error", `Map chat record: ${errorText(error)}`);
+      return fallback;
+    });
+    this.chain = safe.then(() => void 0);
+    return safe;
+  }
+  /** Writes the pending lines (creating the file, with its `conversation` line, when there is none). Retries once; then reports. */
+  async flush(conv, target) {
+    var _a2, _b2;
+    if (this.dead() || !conv.pending.length) return;
+    const root = (_b2 = (_a2 = conv.root) != null ? _a2 : target == null ? void 0 : target.root) != null ? _b2 : null;
+    if (!root) return;
+    let failure = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await this.writePending(conv, root, target, attempt > 0);
+        failure = null;
+        break;
+      } catch (error) {
+        failure = error;
+      }
+    }
+    if (failure) this.fail(conv, failure);
+    else if (!this.dead() && !conv.pending.length) conv.failed = false;
+  }
+  async writePending(conv, root, target, retry) {
+    var _a2, _b2, _c, _d;
+    const configDir = this.deps.configDir;
+    const vault = this.deps.app.vault;
+    if (!conv.file && conv.adapterPath) {
+      if (this.dead()) return;
+      const count2 = conv.pending.length;
+      await vault.adapter.append(conv.adapterPath, conv.pending.slice(0, count2).join(""));
+      conv.pending.splice(0, count2);
+      conv.held = false;
+      return;
+    }
+    if (conv.file && (retry || !isFile(vault.getAbstractFileByPath(conv.file.path))))
+      conv.file = this.resolve(conv, configDir);
+    if (!conv.file) {
+      const path = recordPath(root, conv.id, configDir);
+      const existing = vault.getAbstractFileByPath(path);
+      if (isFile(existing)) conv.file = existing;
+      else {
+        await this.ensureFolders(root);
+        if (this.dead()) return;
+        const header = serializeLine({
+          type: "conversation",
+          id: conv.id,
+          startedAt: conv.startedAt,
+          mapPath: (_a2 = target == null ? void 0 : target.mapPath) != null ? _a2 : conv.mapPath,
+          mapId: (_b2 = target == null ? void 0 : target.mapId) != null ? _b2 : conv.mapId,
+          pluginVersion: this.deps.pluginVersion
+        });
+        conv.mapPath = (_c = target == null ? void 0 : target.mapPath) != null ? _c : conv.mapPath;
+        conv.mapId = (_d = target == null ? void 0 : target.mapId) != null ? _d : conv.mapId;
+        conv.file = await vault.create(path, header + conv.pending.join(""));
+        conv.root = root;
+        conv.pending = [];
+        conv.held = false;
+        return;
+      }
+      conv.root = root;
+    }
+    if (this.dead()) return;
+    const count = conv.pending.length;
+    await vault.append(conv.file, conv.pending.slice(0, count).join(""));
+    conv.pending.splice(0, count);
+    conv.held = false;
+  }
+  /** The conversation's file as the Vault knows it now: by the handle's own path, then by the path this writer made. */
+  resolve(conv, configDir) {
+    const vault = this.deps.app.vault;
+    if (conv.file) {
+      const byHandle = vault.getAbstractFileByPath(conv.file.path);
+      if (isFile(byHandle)) return byHandle;
+    }
+    if (conv.root) {
+      const byPath = vault.getAbstractFileByPath(recordPath(conv.root, conv.id, configDir));
+      if (isFile(byPath)) return byPath;
+    }
+    return null;
+  }
+  async ensureFolders(root) {
+    const configDir = this.deps.configDir;
+    const vault = this.deps.app.vault;
+    const dir = recordsDir(root, configDir);
+    for (const folder of [`${assertRecordRoot(root, configDir)}/Chats`, dir]) {
+      if (vault.getAbstractFileByPath(folder)) continue;
+      try {
+        await vault.createFolder(folder);
+      } catch (error) {
+        if (!vault.getAbstractFileByPath(folder)) throw error;
+      }
+    }
+  }
+  async relocate(conv, root) {
+    var _a2, _b2, _c;
+    const configDir = this.deps.configDir;
+    const vault = this.deps.app.vault;
+    let failure = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (attempt > 0) conv.file = (_a2 = this.resolve(conv, configDir)) != null ? _a2 : conv.file;
+        const dest = recordPath(root, conv.id, configDir);
+        const here = (_c = (_b2 = conv.file) == null ? void 0 : _b2.path) != null ? _c : conv.adapterPath;
+        if (here === dest) {
+          conv.root = root;
+          return true;
+        }
+        await this.ensureFolders(root);
+        if (this.dead() || !here) return false;
+        if (vault.getAbstractFileByPath(dest) || !conv.file && await vault.adapter.exists(dest))
+          throw new Error(`Record already exists: ${dest}`);
+        if (conv.file) await vault.rename(conv.file, dest);
+        else {
+          await vault.adapter.rename(here, dest);
+          conv.adapterPath = dest;
+        }
+        conv.root = root;
+        return true;
+      } catch (error) {
+        failure = error;
+      }
+    }
+    this.fail(conv, failure);
+    return false;
+  }
+  fail(conv, error) {
+    conv.failed = true;
+    if (conv.notified) return;
+    conv.notified = true;
+    this.deps.log("error", `Map chat record write failed: ${errorText(error)}`);
+    try {
+      this.deps.onFailure();
+    } catch (callbackError) {
+      this.deps.log("error", `Map chat record notice failed: ${errorText(callbackError)}`);
+    }
+  }
+};
+var errorText = (error) => error instanceof Error ? error.message : String(error);
+
+// experiences/visual-map/map-chat-turn-record.ts
+var plainLines = (lines) => lines.map((line) => {
+  const settled = settledLine(line);
+  return { status: settled.status, text: settled.text };
+});
+var MapChatTurnRecord = class {
+  constructor(writer, conversationId, turn, answer, log) {
+    this.writer = writer;
+    this.conversationId = conversationId;
+    this.turn = turn;
+    this.answer = answer;
+    this.log = log;
+    /** The model's raw output of the attempt that is current (set by `onRaw`). */
+    __publicField(this, "raw", null);
+    /** The follow-ups that went into the turn (the view sets it; read when the turn ends, so only the delivered ones count). */
+    __publicField(this, "steerTexts", () => []);
+    __publicField(this, "ended", false);
+  }
+  /** The turn has not written its end yet. */
+  get isOpen() {
+    return !this.ended;
+  }
+  live() {
+    return this.writer.conversationId === this.conversationId;
+  }
+  /** Writes a line of this turn into its own conversation; a failure to build the line is logged, never thrown into the chat. */
+  write(line) {
+    if (!this.live()) return;
+    try {
+      this.writer.write(line);
+    } catch (error) {
+      this.log(error instanceof Error ? error.message : String(error));
+    }
+  }
+  event(kind) {
+    this.write({ type: "event", turn: this.turn, kind });
+  }
+  /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */
+  end(status, fields = {}) {
+    var _a2, _b2, _c, _d;
+    if (this.ended) return false;
+    this.ended = true;
+    const partial = this.answer.streaming ? this.answer.text : "";
+    const steers = this.steerTexts();
+    this.write({
+      type: "turn_end",
+      turn: this.turn,
+      status,
+      ...fields.reason ? { reason: fields.reason } : {},
+      raw: this.raw,
+      reply: (_a2 = fields.reply) != null ? _a2 : partial,
+      lines: plainLines((_b2 = fields.lines) != null ? _b2 : this.answer.lines),
+      modelLabel: (_c = this.answer.modelLabel) != null ? _c : "",
+      ...((_d = fields.rejected) == null ? void 0 : _d.length) ? { rejected: fields.rejected } : {},
+      ...steers.length ? { steers } : {},
+      ...fields.error ? { error: fields.error } : {}
+    });
+    return true;
+  }
+  /** What became of the plan card of this turn. */
+  plan(state, lines = []) {
+    this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
+  }
+  /** The state of a picture search of this turn (`extraInserted`: the candidate being inserted right now). */
+  images(block, extraInserted) {
+    this.write({
+      type: "images",
+      turn: this.turn,
+      state: block.state,
+      items: block.items.map((item) => {
+        var _a2;
+        return { title: item.candidate.title, sourceUrl: (_a2 = item.candidate.source) != null ? _a2 : "" };
+      }),
+      inserted: block.items.flatMap((item, index) => item.inserted || item === extraInserted ? [index] : [])
+    });
+  }
+};
+
 // core/map-chat-plan.ts
 var MAP_CHAT_PLAN_ACTION_LIMIT = 15;
 var MAP_CHAT_FIND_IMAGES_LIMIT = 3;
@@ -42393,13 +43204,13 @@ function applyOutlineSummaries(nodes, bank) {
     return summary ? { ...node, summary } : node;
   });
 }
-function errorText(error) {
+function errorText2(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
 function localDate3(now) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const pad3 = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad3(now.getMonth() + 1)}-${pad3(now.getDate())}`;
 }
 function outlineRootDetail(language2, template2, source, now) {
   var _a2;
@@ -42435,7 +43246,7 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
       const summary = cleanOutlineSummary(node.summary);
       if (summary) await repository.updateNote(note.path, { summary });
     } catch (error) {
-      return { created, failure: errorText(error) };
+      return { created, failure: errorText2(error) };
     }
   }
   return { created };
@@ -42449,7 +43260,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   try {
     map = await repository.readMap(mapPath);
   } catch (error) {
-    throw Object.assign(new Error(errorText(error)), { mapCreated: true });
+    throw Object.assign(new Error(errorText2(error)), { mapCreated: true });
   }
   const rootDetail = outlineRootDetail(language2, detailTemplate, source, now);
   const { created, failure } = await createOutlineNotes(
@@ -42466,7 +43277,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   try {
     await repository.saveMap(mapPath, map);
   } catch (error) {
-    const message = errorText(error);
+    const message = errorText2(error);
     throw Object.assign(
       new Error(
         translate(
@@ -46427,7 +47238,9 @@ function providerStepRunner(aiCalls, config) {
         }
       },
       (raw, exchange) => {
+        var _a3;
         if (exchange.signal.aborted) throw config.stopped();
+        (_a3 = hooks == null ? void 0 : hooks.onRaw) == null ? void 0 : _a3.call(hooks, raw);
         prepared.parse(raw);
         exchange.parsed();
         return raw;
@@ -48850,7 +49663,7 @@ var clarificationRequiredRationale = (language2) => language2 ? renderTemplate(i
 // experiences/aim/planner-review.ts
 var AIM_MAX_RESEARCH_TURNS = DEFAULT_AIM_FLOW_LIMITS.maxResearchTurns;
 var GAP_KINDS = ["searchable", "user_only", "not_decisive"];
-var errorText2 = (error) => error instanceof Error ? error.message : String(error);
+var errorText3 = (error) => error instanceof Error ? error.message : String(error);
 var marker4 = /^\s*<!--\s*aim-review\s+(\{[^\n]*\})\s*-->\s*/;
 function readMarker(detail) {
   const match = detail.match(marker4);
@@ -49003,7 +49816,7 @@ async function parseAimPlannerReviewWithRecovery(original, context, recover) {
           originalSummary,
           preservedBody,
           originalSuggestions: JSON.stringify(original.suggestions),
-          formatError: errorText2(formatError)
+          formatError: errorText3(formatError)
         });
         stated = await recover(task2);
         const statedMarker = readMarker(stated.detail);
@@ -49024,7 +49837,7 @@ async function parseAimPlannerReviewWithRecovery(original, context, recover) {
           originalSummary,
           preservedBody,
           originalSuggestions: JSON.stringify(original.suggestions),
-          formatError: errorText2(formatError)
+          formatError: errorText3(formatError)
         });
         const repaired2 = await recover(task2);
         const repairedMarker = readMarker(repaired2.detail);
@@ -49063,7 +49876,7 @@ ${preservedBody}`,
         originalRationale,
         originalSummary,
         originalBody,
-        formatError: errorText2(formatError),
+        formatError: errorText3(formatError),
         originalSuggestions: JSON.stringify(original.suggestions)
       });
       const repaired2 = await recover(task2);
@@ -49085,7 +49898,7 @@ ${preservedBody}`,
     const preserveDecision = !answeredWithoutTarget && isDecision(originalDecision) ? originalDecision : void 0;
     const task = renderGeneralRepair({
       variant: answeredWithoutTarget ? { kind: "answered-without-target" } : preserveDecision ? { kind: "preserve-decision", decision: preserveDecision } : { kind: "no-decision" },
-      formatError: errorText2(formatError),
+      formatError: errorText3(formatError),
       ...preserveDecision ? {} : {
         context: {
           question: context.question,
@@ -54654,6 +55467,24 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
     __publicField(this, "chatReplyStep");
     /**
+     * Conversation records (the settings switch "save map AI conversations"). The writer exists only after the switch was on at a use
+     * (send, open); with the switch off nothing here runs.
+     */
+    __publicField(this, "chatRecords", null);
+    __publicField(this, "chatRecordsUnregister", null);
+    /** The highest turn number used in the conversation's record. */
+    __publicField(this, "chatRecordTurnSeq", 0);
+    /** Finished answers that are in the record (written, restored or backfilled). */
+    __publicField(this, "chatRecordLogged", /* @__PURE__ */ new WeakSet());
+    /** The record of the newest turn (running or finished): plan results, picture candidates and undo / redo of it go to its conversation. */
+    __publicField(this, "chatLastRecord", null);
+    __publicField(this, "chatPlanRecords", /* @__PURE__ */ new WeakMap());
+    __publicField(this, "chatImageRecords", /* @__PURE__ */ new WeakMap());
+    /** Counts the times the conversation left its map or began anew: a restore that read the files meanwhile is dropped. */
+    __publicField(this, "chatRecordEpoch", 0);
+    /** Stop was pressed while a plan was applying: the plan line says so. */
+    __publicField(this, "chatPlanStopped", false);
+    /**
      * AI actions whose dialog hid itself and whose provider request is not accepted yet, keyed by node path (or
      * `selection:<map path>`). The value is the dialog's controller, so a card or bar Stop pressed before acceptance
      * reaches the run and no request is sent; the entry goes away once the run is accepted or ends.
@@ -55872,7 +56703,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
-    if ((_h = this.chat) == null ? void 0 : _h.hasUnsavedTurns) new import_obsidian37.Notice(t("ui.map_chat_unsaved_on_close"));
+    if (((_h = this.chat) == null ? void 0 : _h.hasUnsavedTurns) && !this.chatRecordSaved()) new import_obsidian37.Notice(t("ui.map_chat_unsaved_on_close"));
+    this.endChatRecord("aborted", { reason: "view_closed" });
+    this.closeChatRecords();
     this.abortMapChat();
     (_i = this.chat) == null ? void 0 : _i.dispose();
     (_j = this.relevancePanelCleanup) == null ? void 0 : _j.call(this);
@@ -71185,7 +72018,7 @@ ${note.detail.trim()}` : "",
    * (messages, draft, chips) lives on the view.
    */
   mountMapChat(workspace, overlay) {
-    var _a2;
+    var _a2, _b2;
     this.chatWorkspaceEl = workspace;
     this.chatOverlayEl = overlay;
     if (!this.map) return;
@@ -71197,15 +72030,18 @@ ${note.detail.trim()}` : "",
       if (this.chatCarryOver) {
         this.chatMapId = this.map.id;
       } else {
+        this.endChatRecord("aborted", { reason: "map_switch" });
         this.abortMapChat();
         this.chatPlanToken++;
         this.chat.reset();
         this.chatMapId = this.map.id;
+        this.startChatRecords();
       }
     }
+    (_a2 = this.chatRecords) == null ? void 0 : _a2.setTarget(this.chatRecordTarget());
     this.syncChatNarrow();
     this.placeChatPanel();
-    (_a2 = this.viewportEl) == null ? void 0 : _a2.addEventListener("pointerdown", () => {
+    (_b2 = this.viewportEl) == null ? void 0 : _b2.addEventListener("pointerdown", () => {
       var _a3;
       return (_a3 = this.chat) == null ? void 0 : _a3.collapseOverlay();
     });
@@ -71553,7 +72389,9 @@ ${note.detail.trim()}` : "",
       },
       insertImage: (images, item) => this.chatInsertImage(images, item),
       canSave: () => !this.map ? { ok: false, reason: t("ui.map_chat_save_unavailable") } : { ok: true },
-      saveTranscript: (turns) => this.saveChatTranscript(turns)
+      saveTranscript: (turns) => this.saveChatTranscript(turns),
+      recordsEnabled: () => this.plugin.settings.mapChatRecords === true,
+      newConversation: () => this.newChatConversation()
     };
   }
   /** The chat's model list: the settings page's list, plus the current model when it has gone from that list. */
@@ -71873,13 +72711,16 @@ ${note.detail.trim()}` : "",
       went = await this.plugin.confirmAiUsage(
         request.model,
         async () => {
-          var _a2, _b2;
+          var _a2, _b2, _c;
           if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
             abandon();
             return;
           }
           sent = true;
           if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+          const record = this.beginChatRecord(chat, turn, request, origin);
+          if (record)
+            record.steerTexts = () => steerState.entries.filter((e) => e.status === "delivered").map((e) => e.text);
           const openAttempt = () => {
             var _a3;
             const controller = new AbortController();
@@ -71920,6 +72761,7 @@ ${note.detail.trim()}` : "",
               if (!alive() || replaced || !watching) return;
               replaced = true;
               stopWatching();
+              record == null ? void 0 : record.event("resend");
               this.releaseChatTask();
               controller.abort();
               steerState.handler = null;
@@ -71953,7 +72795,11 @@ ${note.detail.trim()}` : "",
                   },
                   (handler) => {
                     if (alive()) this.bindSteerHandler(steerState, handler);
-                  }
+                  },
+                  // The model's raw output, kept for the record (only while the switch is on, and never from a stopped or replaced attempt).
+                  record ? (raw) => {
+                    if (alive()) record.raw = raw;
+                  } : void 0
                 ),
                 swapped.then(() => null)
               ]);
@@ -71971,7 +72817,16 @@ ${note.detail.trim()}` : "",
               if (plan) {
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
-                  this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, fullMessage);
+                  this.offerChatPlan(
+                    result,
+                    plan,
+                    request.context,
+                    { path: anchor.path, id: anchor.id },
+                    fullMessage,
+                    record
+                  );
+                  if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
+                    this.chatRecordLogged.add(turn.assistant);
                   this.flushSteers(false);
                 }
                 return;
@@ -71985,6 +72840,8 @@ ${note.detail.trim()}` : "",
               );
               if (alive() && chat.isBusy) {
                 chat.finish(result.reply, lines);
+                if (record == null ? void 0 : record.end("done", { reply: result.reply, lines, rejected: result.rejected }))
+                  this.chatRecordLogged.add(turn.assistant);
                 this.flushSteers(true);
               }
               return;
@@ -71994,6 +72851,12 @@ ${note.detail.trim()}` : "",
               if (alive()) {
                 const failure = this.chatErrorText(error);
                 chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
+                record == null ? void 0 : record.end("failed", {
+                  reason: /time(d)?[\s-]?out/i.test(errorMessage(error)) ? "timeout" : "error",
+                  reply: failure.text,
+                  lines: [],
+                  error: { text: failure.text, technical: (_c = failure.technical) != null ? _c : "" }
+                });
                 this.returnSteers(steerState);
               }
               return;
@@ -72133,10 +72996,13 @@ ${note.detail.trim()}` : "",
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   supersedeChatPlan() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const pending2 = (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.pendingPlan()) != null ? _b2 : null;
     this.chatPlanToken++;
-    if (pending2) (_c = this.chat) == null ? void 0 : _c.settlePlan(pending2, "cancelled");
+    if (pending2) {
+      (_c = this.chat) == null ? void 0 : _c.settlePlan(pending2, "cancelled");
+      (_d = this.chatPlanRecords.get(pending2)) == null ? void 0 : _d.plan("cancelled");
+    }
   }
   planReasonText(reason, result, selectedCount) {
     switch (reason) {
@@ -72149,7 +73015,7 @@ ${note.detail.trim()}` : "",
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
-  offerChatPlan(result, plan, baseline, anchor, message) {
+  offerChatPlan(result, plan, baseline, anchor, message, record = null) {
     const chat = this.chat;
     if (!chat) return;
     const token = ++this.chatPlanToken;
@@ -72176,23 +73042,29 @@ ${note.detail.trim()}` : "",
       state: "pending",
       apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor),
       cancel: () => {
-        var _a2;
+        var _a2, _b2;
         if (token !== this.chatPlanToken) return;
         this.chatPlanToken++;
         (_a2 = this.chat) == null ? void 0 : _a2.settlePlan(card, "cancelled");
+        (_b2 = this.chatPlanRecords.get(card)) == null ? void 0 : _b2.plan("cancelled");
       }
     };
+    if (record) this.chatPlanRecords.set(card, record);
     chat.showPlan(card);
   }
   async applyChatPlan(card, token, result, baseline, anchor) {
+    var _a2, _b2;
     const chat = this.chat;
     if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
     if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
       this.chatPlanToken++;
-      chat.settlePlan(card, "cancelled", [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }]);
+      const skip = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
+      chat.settlePlan(card, "cancelled", skip);
+      (_a2 = this.chatPlanRecords.get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
       return;
     }
     this.chatApplying = true;
+    this.chatPlanStopped = false;
     chat.settlePlan(card, "applied");
     chat.setApplying(true);
     const stopped = () => token !== this.chatPlanToken;
@@ -72208,8 +73080,214 @@ ${note.detail.trim()}` : "",
       this.chatApplying = false;
       chat.setApplying(false);
     }
-    if (!this.closed) chat.settlePlan(card, "applied", lines);
-    if (!this.closed) this.flushSteers(!stopped());
+    if (!this.closed) {
+      chat.settlePlan(card, "applied", lines);
+      (_b2 = this.chatPlanRecords.get(card)) == null ? void 0 : _b2.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
+      this.flushSteers(!stopped());
+    }
+  }
+  // ---- conversation records (the settings switch "save map AI conversations") -----------------------------------------
+  chatRecordTarget() {
+    var _a2, _b2;
+    const managed = isManagedMapPath(this.plugin.settings, this.path);
+    return {
+      root: managed ? this.plugin.repo.topicRoot(this.path) : null,
+      mapPath: this.path,
+      mapId: (_b2 = (_a2 = this.map) == null ? void 0 : _a2.id) != null ? _b2 : ""
+    };
+  }
+  /** This view's writer, made at the first use while the switch is on (and registered, so the switch reaches it); null while it is off. */
+  ensureChatRecords() {
+    var _a2, _b2;
+    if (this.plugin.settings.mapChatRecords !== true || this.closed) return null;
+    if (!this.chatRecords) {
+      const writer = new MapChatRecordWriter({
+        app: this.plugin.repo.app,
+        log: (level, message) => this.plugin.logs.appendLog(level, message),
+        disposed: () => this.plugin.repo.isDisposed(),
+        // The writer calls this once per conversation; the chat itself goes on.
+        onFailure: () => {
+          new import_obsidian37.Notice(t("ui.map_chat_record_failed"));
+        },
+        pluginVersion: (_b2 = (_a2 = this.plugin.manifest) == null ? void 0 : _a2.version) != null ? _b2 : "0.0.0",
+        configDir: this.app.vault.configDir
+      });
+      writer.setTarget(this.chatRecordTarget());
+      this.chatRecords = writer;
+      this.chatRecordsUnregister = this.plugin.registerMapChatRecordWriter(writer);
+    }
+    return this.chatRecords;
+  }
+  /** The settings switch for conversation records was flipped: the panel shows or hides what depends on it. */
+  refreshChatRecordsSwitch() {
+    var _a2;
+    (_a2 = this.chat) == null ? void 0 : _a2.refreshNewButton();
+  }
+  /** Closing the view loses nothing: the switch is on, no write failed, and the record has every finished turn. */
+  chatRecordSaved() {
+    var _a2, _b2;
+    const writer = this.chatRecords;
+    if (!writer || this.plugin.settings.mapChatRecords !== true || writer.unsaved) return false;
+    return (_b2 = (_a2 = this.chat) == null ? void 0 : _a2.completedTurns().every((turn) => this.chatRecordLogged.has(turn.answer))) != null ? _b2 : true;
+  }
+  /** The view closes: the writer takes no new line (what is queued still runs), or none at all once the plugin is unloading. */
+  closeChatRecords() {
+    var _a2;
+    const writer = this.chatRecords;
+    if (!writer) return;
+    (_a2 = this.chatRecordsUnregister) == null ? void 0 : _a2.call(this);
+    this.chatRecordsUnregister = null;
+    if (this.plugin.repo.isDisposed()) writer.dispose();
+    else writer.close();
+  }
+  /** Ends the running turn's record (a no-op when there is none or it already ended). */
+  endChatRecord(status, fields) {
+    const record = this.chatLastRecord;
+    if ((record == null ? void 0 : record.isOpen) && record.end(status, fields)) this.chatRecordLogged.add(record.answer);
+  }
+  /**
+   * The request went out: writes the turn's start (and, for a conversation that began while the switch was off, its finished
+   * turns first). Returns the turn's record, or null with the switch off.
+   */
+  beginChatRecord(chat, turn, request, origin) {
+    const writer = this.ensureChatRecords();
+    if (!writer) return null;
+    try {
+      writer.setTarget(this.chatRecordTarget());
+      const missing = chat.completedTurns().filter((item) => !this.chatRecordLogged.has(item.answer));
+      if (missing.length) {
+        writer.backfill(
+          missing.map((item) => {
+            var _a2, _b2;
+            return {
+              turn: ++this.chatRecordTurnSeq,
+              message: item.question.text,
+              reply: item.answer.text,
+              lines: item.answer.lines.map((line) => ({ status: settledLine(line).status, text: settledLine(line).text })),
+              modelLabel: (_a2 = item.answer.modelLabel) != null ? _a2 : "",
+              steers: ((_b2 = item.question.steers) != null ? _b2 : []).filter((steer) => steer.state === "live").map((steer) => steer.text)
+            };
+          })
+        );
+        for (const item of missing) this.chatRecordLogged.add(item.answer);
+      }
+      chat.conversationId = writer.conversationId;
+      const number = ++this.chatRecordTurnSeq;
+      const record = new MapChatTurnRecord(
+        writer,
+        writer.conversationId,
+        number,
+        turn.assistant,
+        (message) => this.plugin.logs.appendLog("error", `Map chat record: ${message}`)
+      );
+      const chips = origin.chips.map(
+        (chip) => chip.kind === "topic" ? { kind: chip.kind, id: chip.id } : chip.kind === "snippet" ? { kind: chip.kind, path: chip.path, text: chip.text } : { kind: chip.kind, path: chip.path }
+      );
+      record.write({
+        type: "turn_start",
+        turn: number,
+        message: origin.text,
+        origin: { chips, selectedIds: [...origin.selectedIds] },
+        request: {
+          step: { id: mapChatStep.id, version: mapChatStep.version },
+          model: request.model,
+          reasoning: request.reasoning,
+          language: request.language,
+          contentLanguage: request.contentLanguage,
+          message: request.message,
+          context: request.context
+        }
+      });
+      this.chatLastRecord = record;
+      return record;
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+      return null;
+    }
+  }
+  /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
+  startChatRecords() {
+    this.chatRecordEpoch++;
+    this.chatRecordTurnSeq = 0;
+    this.chatLastRecord = null;
+    const writer = this.chatRecords;
+    if (writer) {
+      writer.newConversation();
+      writer.setTarget(this.chatRecordTarget());
+    }
+    if (this.plugin.settings.mapChatRecords === true) void this.restoreChatRecords();
+  }
+  /** "New conversation" (the panel is already empty): the next send starts a new file. */
+  newChatConversation() {
+    this.chatPlanToken++;
+    this.chatRecordEpoch++;
+    this.chatRecordTurnSeq = 0;
+    this.chatLastRecord = null;
+    const writer = this.chatRecords;
+    if (!writer) return;
+    writer.newConversation();
+    writer.setTarget(this.chatRecordTarget());
+  }
+  /** The latest record file of the map's folder, read through the adapter (the Vault index may not list a .jsonl). */
+  async readLatestChatRecord(root) {
+    const adapter = this.plugin.repo.app.vault.adapter;
+    const dir = recordsDir(root, this.app.vault.configDir);
+    if (!await adapter.exists(dir)) return null;
+    const files = [];
+    for (const path of (await adapter.list(dir)).files) {
+      if (!isRecordFilePath(path) || path.slice(0, path.lastIndexOf("/")) !== dir) continue;
+      files.push({
+        id: path.slice(path.lastIndexOf("/") + 1, -".jsonl".length),
+        path,
+        text: await adapter.read(path)
+      });
+    }
+    return pickLatest(files);
+  }
+  /**
+   * Shows the map's latest saved conversation again and goes on writing to its file. Nothing happens when the file's version is
+   * unknown (the next send opens a new file and this one is left as it is), or when the conversation moved on while the files were read.
+   */
+  async restoreChatRecords() {
+    var _a2, _b2, _c;
+    const chat = this.chat;
+    const map = this.map;
+    if (!chat || !map || !isManagedMapPath(this.plugin.settings, this.path)) return;
+    const writer = this.ensureChatRecords();
+    if (!writer) return;
+    const epoch = this.chatRecordEpoch;
+    const mapPath = this.path;
+    let latest;
+    try {
+      latest = await this.readLatestChatRecord(this.plugin.repo.topicRoot(mapPath));
+    } catch (error) {
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
+      return;
+    }
+    if (!latest || latest.parsed.unrecoverable || this.closed || epoch !== this.chatRecordEpoch || chat !== this.chat || chat.hasMessages || chat.isBusy || this.chatApplying || this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== map.id)
+      return;
+    const restored = restoreConversation(latest.id, latest.parsed.lines);
+    chat.restore(restored);
+    if (chat.conversationId !== restored.id) return;
+    const handle = this.plugin.repo.app.vault.getAbstractFileByPath((_b2 = latest.path) != null ? _b2 : "");
+    writer.resume(
+      latest.id,
+      handle instanceof import_obsidian37.TFile ? handle : (_c = latest.path) != null ? _c : "",
+      this.chatRecordTarget(),
+      latest.parsed.cleanEnd
+    );
+    const numbers = latest.parsed.lines.flatMap(
+      (line) => "turn" in line && typeof line.turn === "number" ? [line.turn] : []
+    );
+    writer.markEnded(numbers);
+    this.chatRecordTurnSeq = Math.max(0, ...numbers);
+    for (const item of chat.completedTurns()) this.chatRecordLogged.add(item.answer);
+    this.relocateMapChat();
+  }
+  settleChatImages(chat, block, patch) {
+    var _a2;
+    chat.settleImages(block, patch);
+    (_a2 = this.chatImageRecords.get(block)) == null ? void 0 : _a2.images(block);
   }
   releaseChatTask() {
     var _a2;
@@ -72222,6 +73300,7 @@ ${note.detail.trim()}` : "",
     var _a2, _b2, _c, _d, _e;
     if (this.chatApplying && !this.chatController) {
       this.chatPlanToken++;
+      this.chatPlanStopped = true;
       (_a2 = this.chat) == null ? void 0 : _a2.focusInput();
       return;
     }
@@ -72233,6 +73312,7 @@ ${note.detail.trim()}` : "",
     }
     this.releaseChatTask();
     controller.abort();
+    this.endChatRecord("stopped");
     (_d = this.chat) == null ? void 0 : _d.markStopped();
     if (this.chatSteer) this.returnSteers(this.chatSteer);
     (_e = this.chat) == null ? void 0 : _e.focusInput();
@@ -72517,6 +73597,7 @@ ${note.detail.trim()}` : "",
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)() }) {
     var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
+    const record = this.chatLastRecord;
     const same = () => {
       var _a4;
       return !this.closed && alive() && this.path === anchor.path && ((_a4 = this.map) == null ? void 0 : _a4.id) === anchor.id;
@@ -72673,7 +73754,8 @@ ${note.detail.trim()}` : "",
               anchor.path,
               (_b2 = run.notes) != null ? _b2 : /* @__PURE__ */ new Set(),
               (_c = run.files) != null ? _c : /* @__PURE__ */ new Set(),
-              (_d = run.parked) != null ? _d : /* @__PURE__ */ new Set()
+              (_d = run.parked) != null ? _d : /* @__PURE__ */ new Set(),
+              record
             );
         } catch (e) {
         }
@@ -72902,6 +73984,8 @@ ${note.detail.trim()}` : "",
     this.chatCarryOver = true;
     try {
       await this.openMapInMutation(mapPath);
+      if (!this.closed && this.path === mapPath && this.map && this.chatRecords && this.plugin.settings.mapChatRecords === true)
+        await this.chatRecords.moveTo(this.chatRecordTarget());
     } finally {
       this.chatCarryOver = false;
       if (!this.closed && this.path === mapPath && this.map) {
@@ -73334,12 +74418,15 @@ ${note.detail.trim()}` : "",
    * reply touched with what it left (or what the last undo left): any difference refuses the whole step and nothing is
    * touched. Then the entries run like one (newest first for undo); a failure part-way puts back what already ran.
    */
-  async pushChatReplyEntry(entries, mapPath, noteIds, files, parked = /* @__PURE__ */ new Set()) {
+  async pushChatReplyEntry(entries, mapPath, noteIds, files, parked = /* @__PURE__ */ new Set(), record = null) {
     if (!entries.length) return void 0;
     const fingerprint2 = () => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint2();
     const run = async (redo) => {
-      if (await fingerprint2() !== expected) throw this.chatUndoRefusal();
+      if (await fingerprint2() !== expected) {
+        record == null ? void 0 : record.event("undo_refused");
+        throw this.chatUndoRefusal();
+      }
       const list = redo ? entries : [...entries].reverse();
       const done = [];
       try {
@@ -73355,6 +74442,7 @@ ${note.detail.trim()}` : "",
         throw error;
       }
       expected = await fingerprint2();
+      record == null ? void 0 : record.event(redo ? "redo" : "undo");
     };
     const step = {
       undo: () => run(false),
@@ -73550,10 +74638,11 @@ ${note.detail.trim()}` : "",
             if (this.chatImageSearches.get(key2) !== controller) return;
             this.chatImageSearches.delete(key2);
             controller.abort();
-            chat.settleImages(block, { state: "stopped" });
+            this.settleChatImages(chat, block, { state: "stopped" });
           }
         };
         chat.addImages(block);
+        if (this.chatLastRecord) this.chatImageRecords.set(block, this.chatLastRecord);
         settle({ status: "done", images: block });
         try {
           await this.runImageSearch(block, controller, chat, note.model);
@@ -73579,18 +74668,18 @@ ${note.detail.trim()}` : "",
     const current = () => !this.closed && !controller.signal.aborted && this.chat === chat && sameMap();
     const dropped = () => {
       if (this.closed || controller.signal.aborted || this.chat !== chat) return;
-      chat.settleImages(block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
+      this.settleChatImages(chat, block, { state: "failed", reason: t("ui.map_chat_images_stale_map") });
     };
     try {
       const found = await this.plugin.searchImages(block.query, model, controller.signal);
       if (!current()) return dropped();
       const loadable = (await this.chatProbeImages(found, controller.signal)).slice(0, 6);
       if (!current()) return dropped();
-      if (!loadable.length) chat.settleImages(block, { state: "empty" });
-      else chat.settleImages(block, { state: "ready", items: loadable.map((candidate) => ({ candidate })) });
+      if (!loadable.length) this.settleChatImages(chat, block, { state: "empty" });
+      else this.settleChatImages(chat, block, { state: "ready", items: loadable.map((candidate) => ({ candidate })) });
     } catch (error) {
       if (!current()) return dropped();
-      chat.settleImages(block, { state: "failed", reason: errorMessage(error) });
+      this.settleChatImages(chat, block, { state: "failed", reason: errorMessage(error) });
     }
   }
   /**
@@ -73600,6 +74689,7 @@ ${note.detail.trim()}` : "",
    * write, where nothing else can change the map.
    */
   async chatInsertImage(block, item) {
+    var _a2;
     const fence = () => {
       if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
         return { reason: "ui.map_chat_images_stale_map" };
@@ -73618,14 +74708,14 @@ ${note.detail.trim()}` : "",
     };
     try {
       await this.plugin.mutate(async () => {
-        var _a2;
+        var _a3;
         const again = fence();
         if ("reason" in again) {
           outcome.result = { ok: false, reason: t(again.reason) };
           return;
         }
         try {
-          const note = await this.plugin.repo.readNote(again.node.path, (_a2 = this.map) != null ? _a2 : void 0);
+          const note = await this.plugin.repo.readNote(again.node.path, (_a3 = this.map) != null ? _a3 : void 0);
           if (note.aiLocked) {
             outcome.result = { ok: false, reason: t("ui.ai_locked_notice") };
             return;
@@ -73643,6 +74733,7 @@ ${addition}` : addition });
     } catch (error) {
       return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage(error)) };
     }
+    if (outcome.result.ok) (_a2 = this.chatImageRecords.get(block)) == null ? void 0 : _a2.images(block, item);
     if (outcome.result.ok) await this.chatCoverFromPicture(block, item.candidate).catch(() => void 0);
     return outcome.result;
   }
@@ -75197,14 +76288,14 @@ ${addition}` : addition });
   noticeTopicStyleMissing(node, note, missing) {
     const messages = [];
     const named = (ref) => `${ref.replace(/^(?:builtin|file|style):/, "")}.md`;
-    const isFile = (ref) => ref.startsWith("style:") || ref.startsWith("file:");
+    const isFile2 = (ref) => ref.startsWith("style:") || ref.startsWith("file:");
     if (note.noteStyle && missing.includes(note.noteStyle))
       messages.push(
-        isFile(note.noteStyle) ? t("ui.note_style_file_missing_0", named(note.noteStyle)) : t("ui.detail_template_missing_0", note.noteStyle)
+        isFile2(note.noteStyle) ? t("ui.note_style_file_missing_0", named(note.noteStyle)) : t("ui.detail_template_missing_0", note.noteStyle)
       );
     if (note.detailTemplateId && missing.includes(note.detailTemplateId))
       messages.push(
-        isFile(note.detailTemplateId) ? t("ui.note_style_file_missing_0", named(note.detailTemplateId)) : t("ui.detail_template_missing_0", note.detailTemplateId)
+        isFile2(note.detailTemplateId) ? t("ui.note_style_file_missing_0", named(note.detailTemplateId)) : t("ui.detail_template_missing_0", note.detailTemplateId)
       );
     if (note.toneId && missing.includes(note.toneId)) messages.push(t("ui.note_style_tone_missing_0", note.toneId));
     if (messages.length)
@@ -75408,10 +76499,73 @@ async function applyMathRepair(vault, plan) {
 }
 
 // main.ts
-var import_obsidian48 = require("obsidian");
+var import_obsidian49 = require("obsidian");
+
+// ui/modals/map-chat-records-off-modal.ts
+var import_obsidian38 = require("obsidian");
+var MapChatRecordsOffModal = class extends import_obsidian38.Modal {
+  constructor(app, count, decide) {
+    super(app);
+    this.count = count;
+    this.decide = decide;
+    __publicField(this, "decided", false);
+  }
+  finish(remove) {
+    if (this.decided) return;
+    this.decided = true;
+    this.decide(remove);
+  }
+  onClose() {
+    this.finish(false);
+  }
+  onOpen() {
+    this.titleEl.setText(t("ui.map_chat_records_off_title"));
+    this.contentEl.createEl("p", { text: t("ui.map_chat_records_off_body_0", this.count), cls: "vam-modal-intro" });
+    const actions = modalActions(this);
+    const keep = actions.createEl("button", { text: t("ui.map_chat_records_keep"), cls: "mod-cta" });
+    const remove = actions.createEl("button", {
+      text: t("ui.map_chat_records_delete_0", this.count),
+      cls: "mod-warning"
+    });
+    keep.addEventListener("click", () => {
+      this.finish(false);
+      this.close();
+    });
+    remove.addEventListener("click", () => {
+      this.finish(true);
+      this.close();
+    });
+    keep.focus();
+    window.setTimeout(() => keep.focus(), 0);
+  }
+};
+async function turnMapChatRecordsOff(deps) {
+  var _a2, _b2;
+  const writers = Array.from(deps.writers);
+  for (const writer of writers) writer.setEnabled(false);
+  await Promise.all(writers.map((writer) => writer.idle()));
+  const scan3 = () => recordFilesIn(deps.app.vault.getFiles());
+  const count = scan3().length;
+  if (count === 0) return { deleted: 0, failed: 0 };
+  const ask = (_a2 = deps.ask) != null ? _a2 : (n) => new Promise((resolve) => new MapChatRecordsOffModal(deps.app, n, resolve).open());
+  if (!await ask(count) || ((_b2 = deps.stillOff) == null ? void 0 : _b2.call(deps)) === false) return { deleted: 0, failed: 0 };
+  await Promise.all(writers.map((writer) => writer.idle()));
+  let deleted = 0;
+  let failed = 0;
+  for (const file of scan3()) {
+    try {
+      await deps.app.fileManager.trashFile(file);
+      deleted++;
+    } catch (e) {
+      failed++;
+    }
+  }
+  if (failed) new import_obsidian38.Notice(t("ui.map_chat_records_delete_failed_0", failed));
+  return { deleted, failed };
+}
 
 // ui/modals/prompt-preview-modal.ts
-var import_obsidian38 = require("obsidian");
+var import_obsidian39 = require("obsidian");
 
 // core/blocks/prompt-preview.ts
 var PREVIEW_STEPS = [
@@ -75482,7 +76636,7 @@ var GROUP_KEYS = {
   fixed: "ui.preview_group_fixed",
   input: "ui.preview_group_input"
 };
-var PromptPreviewModal = class extends import_obsidian38.Modal {
+var PromptPreviewModal = class extends import_obsidian39.Modal {
   constructor(app, store, language2, provider, trigger, styleOf) {
     super(app);
     this.store = store;
@@ -75582,7 +76736,7 @@ var PromptPreviewModal = class extends import_obsidian38.Modal {
 };
 
 // ui/settings-tab.ts
-var import_obsidian41 = require("obsidian");
+var import_obsidian42 = require("obsidian");
 
 // ai/note-style-card-voices.ts
 var CARD_VOICES = [
@@ -75624,10 +76778,10 @@ function renderRadioGroup(parent, label, choices, current, pick, idPrefix = "vam
 }
 
 // ui/modals/note-style-manage-modal.ts
-var import_obsidian40 = require("obsidian");
+var import_obsidian41 = require("obsidian");
 
 // ui/modals/note-style-editor-modal.ts
-var import_obsidian39 = require("obsidian");
+var import_obsidian40 = require("obsidian");
 
 // ai/note-style-structure-edit.ts
 function splitStructure(text11) {
@@ -75730,7 +76884,7 @@ var UPDATE_DESC_KEYS = {
 };
 var plainMd = (value) => value.replace(/\s+/g, " ").trim().replace(/[!-/:-@[-`{-~]/g, "\\$&");
 var EXAMPLE_DELAY_MS = 200;
-var NoteStyleEditorModal = class extends import_obsidian39.Modal {
+var NoteStyleEditorModal = class extends import_obsidian40.Modal {
   constructor(app, plugin, options) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     super(app);
@@ -75748,7 +76902,7 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
     /** The voice the style had when the window opened, and whether the source wrote its own voice and format keys. */
     __publicField(this, "voiceKey");
     __publicField(this, "formatRef");
-    __publicField(this, "component", new import_obsidian39.Component());
+    __publicField(this, "component", new import_obsidian40.Component());
     /** The child that owns the sample on screen now; the next picture replaces it, so the children do not pile up. */
     __publicField(this, "exampleChild");
     __publicField(this, "closed", false);
@@ -75772,10 +76926,10 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
     const byRef = (ref) => recipes.find((item) => item.ref === ref);
     const base = (_c = (_b2 = byRef((_a2 = source != null ? source : options.from) != null ? _a2 : void 0)) != null ? _b2 : byRef(KIND_DEFAULT_RECIPE.topic)) != null ? _c : recipes[0];
     const sourceItem = byRef(source);
-    const isFile = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
-    this.existing = isFile ? { ref: sourceItem.ref, text: (_d = store.recipeText(sourceItem.ref)) != null ? _d : "" } : void 0;
+    const isFile2 = (sourceItem == null ? void 0 : sourceItem.kind) === "file";
+    this.existing = isFile2 ? { ref: sourceItem.ref, text: (_d = store.recipeText(sourceItem.ref)) != null ? _d : "" } : void 0;
     this.builtinSource = (sourceItem == null ? void 0 : sourceItem.kind) === "builtin" ? sourceItem.ref : void 0;
-    const name2 = isFile ? sourceItem.name : (_e = options.name) != null ? _e : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
+    const name2 = isFile2 ? sourceItem.name : (_e = options.name) != null ? _e : suggestRecipeName(plugin, sourceItem ? sourceItem.name : base && options.from ? base.name : null);
     this.structureRef = (_f = base == null ? void 0 : base.structure.ref) != null ? _f : "builtin:standard";
     const language2 = plugin.settings.language;
     try {
@@ -75796,7 +76950,7 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
     const { contentEl } = this;
     this.modalEl.addClass("vam-editor-modal");
     this.titleEl.setText(t(this.options.source ? "ui.editor_title_edit" : "ui.editor_title_new"));
-    const nameRow = new import_obsidian39.Setting(contentEl).setName(t("ui.editor_name"));
+    const nameRow = new import_obsidian40.Setting(contentEl).setName(t("ui.editor_name"));
     nameRow.settingEl.addClass("vam-editor-row");
     nameRow.addText((text11) => {
       const input2 = text11.inputEl;
@@ -76185,10 +77339,10 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
     const token = ++this.renderToken;
     const markdown = this.exampleMarkdown();
     const next = host.createDiv({ cls: "vam-editor-example-body" });
-    const child = new import_obsidian39.Component();
+    const child = new import_obsidian40.Component();
     this.component.addChild(child);
     try {
-      await import_obsidian39.MarkdownRenderer.render(this.app, markdown, next, "", child);
+      await import_obsidian40.MarkdownRenderer.render(this.app, markdown, next, "", child);
     } catch (e) {
       next.remove();
       this.component.removeChild(child);
@@ -76247,7 +77401,7 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
       const kindName = (kind) => t(kind === "aim" ? "ui.note_style_kind_aim" : `ui.topic_kind_${kind}`);
       if (switched.length) {
         for (const kind of switched) await this.plugin.setKindStyle(kind, result.ref);
-        new import_obsidian39.Notice(
+        new import_obsidian40.Notice(
           t(
             "ui.recipe_notice_switched_0_1",
             result.ref.slice("file:".length),
@@ -76258,9 +77412,9 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
       if (this.draft.applyAll) {
         const kept = this.kindsWithOwnVoice(result.ref);
         await this.plugin.setGlobalPart("voice", this.draft.voice);
-        new import_obsidian39.Notice(t("ui.editor_apply_notice_0", this.voiceName()));
+        new import_obsidian40.Notice(t("ui.editor_apply_notice_0", this.voiceName()));
         if (kept.length)
-          new import_obsidian39.Notice(t("ui.editor_apply_kept_0", kept.map(kindName).join(t("ui.manage_list_separator"))));
+          new import_obsidian40.Notice(t("ui.editor_apply_kept_0", kept.map(kindName).join(t("ui.manage_list_separator"))));
       }
       this.forceClose = true;
       super.close();
@@ -76300,7 +77454,7 @@ function styleKindName(kind) {
   return kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`);
 }
 var lower5 = (value) => value.toLocaleLowerCase();
-var NoteStyleManageModal = class extends import_obsidian40.Modal {
+var NoteStyleManageModal = class extends import_obsidian41.Modal {
   constructor(app, plugin, initialTab = "recipe", trigger, onClosed) {
     super(app);
     this.plugin = plugin;
@@ -76442,7 +77596,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
     list.empty();
     this.editButtons.clear();
     for (const entry of this.entries()) {
-      const setting = new import_obsidian40.Setting(list);
+      const setting = new import_obsidian41.Setting(list);
       setting.settingEl.addClass("vam-manage-row");
       setting.setName(entry.name);
       if (entry.builtin) setting.nameEl.createSpan({ text: t("ui.block_group_builtin"), cls: "vam-manage-badge" });
@@ -76633,7 +77787,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
       try {
         ref = await this.plugin.noteStyles.duplicateFile(this.category, entry.ref);
       } catch (e) {
-        new import_obsidian40.Notice(t("ui.manage_create_failed"));
+        new import_obsidian41.Notice(t("ui.manage_create_failed"));
       }
       await this.redraw(ref != null ? ref : entry.ref);
     } finally {
@@ -76732,7 +77886,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
     try {
       const result = await this.plugin.noteStyles.trashFiles(this.unusedCopies());
       if (result.failed.length)
-        new import_obsidian40.Notice(t("ui.manage_trash_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+        new import_obsidian41.Notice(t("ui.manage_trash_failed_0", result.failed.join(t("ui.manage_list_separator"))));
       this.trashed = result.trashed.length ? result.trashed : void 0;
       await this.redraw(null);
     } finally {
@@ -76745,7 +77899,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
     try {
       const result = await this.plugin.noteStyles.restoreTrashed(this.trashed);
       if (result.failed.length)
-        new import_obsidian40.Notice(t("ui.manage_undo_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+        new import_obsidian41.Notice(t("ui.manage_undo_failed_0", result.failed.join(t("ui.manage_list_separator"))));
       this.trashed = void 0;
       await this.redraw(null);
     } finally {
@@ -76829,7 +77983,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
     const fromRadio = radio("from", t("ui.manage_add_from"));
     const blankRadio = radio("blank", t("ui.manage_add_blank"));
     let sourceSelect;
-    new import_obsidian40.Setting(form).setName(t("ui.manage_add_source")).addDropdown((dropdown) => {
+    new import_obsidian41.Setting(form).setName(t("ui.manage_add_source")).addDropdown((dropdown) => {
       sourceSelect = dropdown.selectEl;
       dropdown.selectEl.setAttr("aria-label", t("ui.manage_add_source"));
       dropdown.onChange((value) => {
@@ -76840,7 +77994,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
     });
     let nameInput;
     const errorId = `vam-manage-error-${tab}`;
-    new import_obsidian40.Setting(form).setName(t("ui.manage_add_name")).addText((text11) => {
+    new import_obsidian41.Setting(form).setName(t("ui.manage_add_name")).addText((text11) => {
       nameInput = text11.inputEl;
       text11.inputEl.setAttr("aria-label", t("ui.manage_add_name"));
       text11.inputEl.setAttr("aria-describedby", errorId);
@@ -76861,7 +78015,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
       attr: { id: errorId, "aria-live": "polite" }
     });
     let createButton;
-    new import_obsidian40.Setting(form).addButton((button) => {
+    new import_obsidian41.Setting(form).addButton((button) => {
       createButton = button;
       button.setButtonText(t("ui.manage_add_create")).setCta().onClick(() => void create());
     });
@@ -76936,7 +78090,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
         try {
           target = await this.plugin.noteStyles.createPart(tab, from, name2);
         } catch (e) {
-          new import_obsidian40.Notice(t("ui.manage_create_failed"));
+          new import_obsidian41.Notice(t("ui.manage_create_failed"));
         }
         if (target) target = (_a2 = await this.plugin.editNotePart(tab, target)) != null ? _a2 : target;
         if (!target) return;
@@ -76960,7 +78114,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
     check();
   }
 };
-var RenameDialog = class extends import_obsidian40.Modal {
+var RenameDialog = class extends import_obsidian41.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -77024,7 +78178,7 @@ var RenameDialog = class extends import_obsidian40.Modal {
     if (!this.done) this.opts.trigger.focus();
   }
 };
-var ConfirmDialog = class extends import_obsidian40.Modal {
+var ConfirmDialog = class extends import_obsidian41.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -77060,7 +78214,7 @@ var ConfirmDialog = class extends import_obsidian40.Modal {
     if (!this.done) this.opts.trigger.focus();
   }
 };
-var ViewDialog = class extends import_obsidian40.Modal {
+var ViewDialog = class extends import_obsidian41.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -77182,7 +78336,7 @@ function renderNoteLocationSetting(setting, plugin, refresh) {
     });
     setting.addButton(
       (button) => button.setButtonText(t("ui.note_style_folder_choose")).onClick(async () => {
-        const value = (0, import_obsidian41.normalizePath)(input2.trim());
+        const value = (0, import_obsidian42.normalizePath)(input2.trim());
         if (!input2.trim() || value === ".") return;
         settings.noteStylesFolder = value;
         await plugin.saveSettings();
@@ -77412,7 +78566,7 @@ function bindMapFolderInput(plugin, key2, input2) {
   });
 }
 var offersEveryLanguage = (values) => SUPPORTED_LANGUAGES.every((item) => values.includes(item.id));
-var CodexSetupModal = class extends import_obsidian41.Modal {
+var CodexSetupModal = class extends import_obsidian42.Modal {
   constructor(app, executable, recheck) {
     super(app);
     this.executable = executable;
@@ -77436,7 +78590,7 @@ var CodexSetupModal = class extends import_obsidian41.Modal {
       cls: "vam-setup-note"
     });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+    new import_obsidian42.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
       (button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
@@ -77444,7 +78598,7 @@ var CodexSetupModal = class extends import_obsidian41.Modal {
     );
   }
 };
-var AiUsageModal = class extends import_obsidian41.Modal {
+var AiUsageModal = class extends import_obsidian42.Modal {
   constructor(app, provider, resolve) {
     super(app);
     this.provider = provider;
@@ -77465,7 +78619,7 @@ var AiUsageModal = class extends import_obsidian41.Modal {
       this.close();
       this.resolve(confirmed);
     };
-    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
+    new import_obsidian42.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
       (button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true))
     );
   }
@@ -77473,7 +78627,7 @@ var AiUsageModal = class extends import_obsidian41.Modal {
     if (!this.settled) this.resolve(false);
   }
 };
-var ClaudeSetupModal = class extends import_obsidian41.Modal {
+var ClaudeSetupModal = class extends import_obsidian42.Modal {
   constructor(app, executable, url, recheck) {
     super(app);
     this.executable = executable;
@@ -77493,7 +78647,7 @@ var ClaudeSetupModal = class extends import_obsidian41.Modal {
     });
     steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+    new import_obsidian42.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
       (button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
@@ -77501,7 +78655,7 @@ var ClaudeSetupModal = class extends import_obsidian41.Modal {
     );
   }
 };
-var VisualAgentMapSettingTab = class extends import_obsidian41.PluginSettingTab {
+var VisualAgentMapSettingTab = class extends import_obsidian42.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -77778,6 +78932,16 @@ var VisualAgentMapSettingTab = class extends import_obsidian41.PluginSettingTab 
               type: "dropdown",
               key: "cliReasoning",
               options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") }
+            }
+          },
+          {
+            name: t("ui.settings_map_chat_records_name"),
+            render: (setting) => {
+              setting.setName(t("ui.settings_map_chat_records_name")).setDesc(t("ui.settings_map_chat_records_desc")).addToggle(
+                (toggle) => toggle.setValue(this.plugin.settings.mapChatRecords).onChange((value) => {
+                  void this.plugin.setMapChatRecords(value);
+                })
+              );
             }
           },
           aiConnectionPage
@@ -78085,10 +79249,10 @@ var PendingSuggestions = class extends Map {
 };
 
 // ui/outline-view.ts
-var import_obsidian42 = require("obsidian");
+var import_obsidian43 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 var foldOutlineSearch = (text11) => toSimplifiedFold(text11.toLocaleLowerCase().replace(/\u0307/g, ""));
-var OutlineView = class extends import_obsidian42.ItemView {
+var OutlineView = class extends import_obsidian43.ItemView {
   constructor(leaf, openNote) {
     super(leaf);
     this.openNote = openNote;
@@ -78254,7 +79418,7 @@ var OutlineView = class extends import_obsidian42.ItemView {
       if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
       button.addEventListener("click", () => {
         var _a3;
-        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian42.Notice(t("ui.coffee_segment_no_content"));
+        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian43.Notice(t("ui.coffee_segment_no_content"));
       });
     });
   }
@@ -78349,7 +79513,7 @@ var OutlineView = class extends import_obsidian42.ItemView {
 };
 
 // experiences/sharing/share-modal.ts
-var import_obsidian44 = require("obsidian");
+var import_obsidian45 = require("obsidian");
 
 // experiences/sharing/share-format.ts
 var SHARE_FORMAT = "vam-share";
@@ -79778,7 +80942,7 @@ function attachTranslations(payload, options) {
 }
 
 // experiences/sharing/share-exporter.ts
-var import_obsidian43 = require("obsidian");
+var import_obsidian44 = require("obsidian");
 
 // experiences/sharing/share-viewer-dictionaries.ts
 var SHARE_VIEWER_UI_EXTRA = {
@@ -80651,7 +81815,7 @@ async function installWrapper() {
   if (installedWrapper) return;
   installing != null ? installing : installing = (async () => {
     try {
-      const mermaid = await (0, import_obsidian43.loadMermaid)();
+      const mermaid = await (0, import_obsidian44.loadMermaid)();
       const original = mermaid.render;
       if (typeof original === "function" && !installedWrapper) {
         const wrapped = function(id, text11, ...rest) {
@@ -80699,7 +81863,7 @@ var ShareExporter = class {
     __publicField(this, "images", /* @__PURE__ */ new Map());
     __publicField(this, "registry", createAssetRegistry());
     __publicField(this, "ownerPath", /* @__PURE__ */ new Map());
-    __publicField(this, "component", new import_obsidian43.Component());
+    __publicField(this, "component", new import_obsidian44.Component());
     __publicField(this, "container", null);
     __publicField(this, "disposed", false);
     __publicField(this, "forbidden", null);
@@ -80773,13 +81937,13 @@ ${detail}`;
   async renderOne(detail, titles, ticket) {
     const cleaned = cleanShareMarkdown(detail, { titleOf: (target) => titles.get(target), assets: this.registry });
     const host = this.host().createDiv();
-    const child = new import_obsidian43.Component();
+    const child = new import_obsidian44.Component();
     this.component.addChild(child);
     const hasDiagram = /(`{3,}|~{3,})[ \t]*mermaid\b/i.test(cleaned.markdown);
     const capture = hasDiagram ? await captureMermaidSources() : { sources: /* @__PURE__ */ new Map(), restore() {
     } };
     try {
-      await import_obsidian43.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
+      await import_obsidian44.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
       const finished = this.finish(host, capture.sources);
@@ -80808,11 +81972,11 @@ ${detail}`;
     if (this.disposed || signal.aborted) return null;
     const ticket = { generation: 0, signal, isCurrent: () => !signal.aborted && !this.disposed };
     const host = this.host().createDiv();
-    const child = new import_obsidian43.Component();
+    const child = new import_obsidian44.Component();
     this.component.addChild(child);
     try {
       const fence = source.includes("```") ? "~~~~" : "```";
-      await import_obsidian43.MarkdownRenderer.render(this.app, `${fence}mermaid
+      await import_obsidian44.MarkdownRenderer.render(this.app, `${fence}mermaid
 ${source}
 ${fence}`, host, "", child);
       await this.settleMermaid(host, ticket);
@@ -80887,7 +82051,7 @@ ${fence}`, host, "", child);
         pre.after(caption);
       }
     const clean4 = createDiv();
-    clean4.append((0, import_obsidian43.sanitizeHTMLToDom)(host.innerHTML));
+    clean4.append((0, import_obsidian44.sanitizeHTMLToDom)(host.innerHTML));
     unwrapLocalLinks(clean4, () => createSpan());
     scrubShareTree(clean4);
     const slots = Array.from(clean4.querySelectorAll(".vam-mermaid-slot"));
@@ -80913,8 +82077,8 @@ ${fence}`, host, "", child);
     const relative = resolveRelative(folder, entry.ref);
     const candidates = [
       (_c = this.app.metadataCache.getFirstLinkpathDest(entry.ref, fromPath)) == null ? void 0 : _c.path,
-      relative ? (0, import_obsidian43.normalizePath)(relative) : void 0,
-      (0, import_obsidian43.normalizePath)(entry.ref)
+      relative ? (0, import_obsidian44.normalizePath)(relative) : void 0,
+      (0, import_obsidian44.normalizePath)(entry.ref)
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getFileByPath(path) : null;
@@ -80950,7 +82114,7 @@ ${fence}`, host, "", child);
       const folder = this.source.mapPath.split("/").slice(0, -1).join("/");
       this.forbidden = forbiddenStringsFor(
         {
-          vaultPath: adapter instanceof import_obsidian43.FileSystemAdapter ? adapter.getBasePath() : void 0,
+          vaultPath: adapter instanceof import_obsidian44.FileSystemAdapter ? adapter.getBasePath() : void 0,
           vaultName: this.app.vault.getName(),
           mapFolder: folder
         },
@@ -81154,7 +82318,7 @@ function originalLanguage(source, uiLanguage) {
 }
 var UNVERIFIED_LANGUAGES = ["ja", "ko", "es"];
 var AUTO_LANGUAGE = "auto";
-var ShareModal = class extends import_obsidian44.Modal {
+var ShareModal = class extends import_obsidian45.Modal {
   constructor(app, options) {
     var _a2, _b2;
     super(app);
@@ -81210,7 +82374,7 @@ var ShareModal = class extends import_obsidian44.Modal {
   onOpen() {
     this.titleEl.setText(t("share.title"));
     this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
-    this.fullSetting = new import_obsidian44.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t(this.includeDetail ? "share.option_full_desc_on" : "share.option_full_desc")).addToggle((toggle) => {
+    this.fullSetting = new import_obsidian45.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t(this.includeDetail ? "share.option_full_desc_on" : "share.option_full_desc")).addToggle((toggle) => {
       this.fullToggle = toggle;
       toggle.setValue(this.includeDetail).onChange((value) => {
         this.includeDetail = value;
@@ -81218,7 +82382,7 @@ var ShareModal = class extends import_obsidian44.Modal {
         this.restart();
       });
     });
-    this.imagesSetting = new import_obsidian44.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t(this.includeImages ? "share.option_images_desc_on" : "share.option_images_desc")).addToggle((toggle) => {
+    this.imagesSetting = new import_obsidian45.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t(this.includeImages ? "share.option_images_desc_on" : "share.option_images_desc")).addToggle((toggle) => {
       this.imagesToggle = toggle;
       toggle.setValue(this.includeImages).onChange((value) => {
         this.includeImages = value;
@@ -81287,11 +82451,11 @@ var ShareModal = class extends import_obsidian44.Modal {
   openTranslationSection() {
     const host = this.options.translation;
     if (!host) return;
-    new import_obsidian44.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
+    new import_obsidian45.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
     this.contentEl.createEl("p", { text: t("share.translate_intro"), cls: "vam-modal-intro" });
     for (const language2 of SHARE_TRANSLATION_LANGUAGES) {
       const original = language2 === this.sourceLanguage;
-      const setting = new import_obsidian44.Setting(this.contentEl).setName(
+      const setting = new import_obsidian45.Setting(this.contentEl).setName(
         original ? t("share.translate_original_0", this.languageLabel(language2)) : this.languageLabel(language2)
       );
       if (!original && UNVERIFIED_LANGUAGES.includes(language2))
@@ -81304,7 +82468,7 @@ var ShareModal = class extends import_obsidian44.Modal {
             else this.picked.delete(language2);
             if (!value && this.defaultChoice === language2) {
               this.defaultChoice = AUTO_LANGUAGE;
-              new import_obsidian44.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
+              new import_obsidian45.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
             }
             this.renderOpenLanguage();
             this.selectionChanged();
@@ -81314,7 +82478,7 @@ var ShareModal = class extends import_obsidian44.Modal {
     }
     this.openLangEl = this.contentEl.createDiv();
     this.renderOpenLanguage();
-    this.modelSetting = new import_obsidian44.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
+    this.modelSetting = new import_obsidian45.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
       this.modelDropdown = dropdown;
       dropdown.addOption(FOLLOW_DEFAULT_MODEL, t("ui.follow_default_model", host.modelLabel(host.defaultModel())));
       for (const id of host.models()) dropdown.addOption(id, host.modelLabel(id));
@@ -81335,7 +82499,7 @@ var ShareModal = class extends import_obsidian44.Modal {
     if (!container) return;
     container.empty();
     const ids = [String(this.sourceLanguage), ...this.selected()];
-    this.openLangSetting = new import_obsidian44.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
+    this.openLangSetting = new import_obsidian45.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
       this.openLangDropdown = dropdown;
       dropdown.addOption(AUTO_LANGUAGE, t("share.translate_default_auto"));
       for (const id of ids) dropdown.addOption(id, this.languageLabel(id));
@@ -81462,7 +82626,7 @@ var ShareModal = class extends import_obsidian44.Modal {
       this.phase = "done";
       this.estimateMemo = null;
       this.applyTranslation();
-      new import_obsidian44.Notice(t("share.translate_done"));
+      new import_obsidian45.Notice(t("share.translate_done"));
       this.render();
       this.saveButton.focus();
     } catch (error) {
@@ -81505,7 +82669,7 @@ var ShareModal = class extends import_obsidian44.Modal {
     if (choice2 === AUTO_LANGUAGE || choice2 === String(this.sourceLanguage)) return;
     const carried = ((_b2 = (_a2 = this.translationArg()) == null ? void 0 : _a2.pieces) != null ? _b2 : []).map((item) => item.language);
     if (carried.includes(choice2)) return;
-    new import_obsidian44.Notice(
+    new import_obsidian45.Notice(
       t("share.translate_open_dropped_0_1", this.languageLabel(choice2), this.languageLabel(String(this.sourceLanguage)))
     );
   }
@@ -81591,7 +82755,7 @@ var ShareModal = class extends import_obsidian44.Modal {
         row.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
     }
     if (item.status === "incomplete")
-      new import_obsidian44.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
+      new import_obsidian45.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
         (toggle) => toggle.setValue(this.includeIncomplete.has(item.language)).onChange((value) => {
           if (value) this.includeIncomplete.add(item.language);
           else this.includeIncomplete.delete(item.language);
@@ -81713,9 +82877,9 @@ var ShareModal = class extends import_obsidian44.Modal {
     try {
       const write = (_a2 = this.options.writeClipboard) != null ? _a2 : (text11) => navigator.clipboard.writeText(text11);
       await write(publishInstructions());
-      new import_obsidian44.Notice(t("share.publish_done"));
+      new import_obsidian45.Notice(t("share.publish_done"));
     } catch (e) {
-      new import_obsidian44.Notice(t("share.publish_fail"));
+      new import_obsidian45.Notice(t("share.publish_fail"));
       this.publishFallback = true;
       if (!this.closed) this.render();
     }
@@ -81766,12 +82930,12 @@ var ShareModal = class extends import_obsidian44.Modal {
       else {
         const size = formatBytes(result.bytes);
         this.savedText = t(outcome === "saved" ? "share.saved_0_1" : "share.downloaded_0_1", name2, size);
-        new import_obsidian44.Notice(this.savedText);
+        new import_obsidian45.Notice(this.savedText);
       }
     } catch (e) {
       if (!this.closed) {
         this.savedText = "";
-        new import_obsidian44.Notice(t("share.save_failed"));
+        new import_obsidian45.Notice(t("share.save_failed"));
       }
     }
     this.saving = false;
@@ -81780,13 +82944,13 @@ var ShareModal = class extends import_obsidian44.Modal {
 };
 
 // experiences/sharing/share-translate-dom.ts
-var import_obsidian45 = require("obsidian");
+var import_obsidian46 = require("obsidian");
 function obsidianTranslateDom() {
   return {
     parse: (html) => new DOMParser().parseFromString(html, "text/html").body,
     serialize: (root) => root.innerHTML,
     sanitize: (root) => {
-      const clean4 = (0, import_obsidian45.sanitizeHTMLToDom)(root.innerHTML);
+      const clean4 = (0, import_obsidian46.sanitizeHTMLToDom)(root.innerHTML);
       root.replaceChildren(clean4);
     },
     createSpan: () => createSpan(),
@@ -83081,8 +84245,9 @@ var MapChatService = class {
    * `onSteer` receives a function that adds the user's follow-up text to the running turn (the text is wrapped in the steer
    * template here); it rejects when the turn can no longer take one or after a stop. A steer restarts the reply, so the reply
    * shown so far is forgotten and a shorter new reply replaces it.
+   * `onRaw` is handed to the runner through the hooks and gets the model's raw output right before the runner parses it, once per chat (a steer restart or json fallback happens inside the runtime before it resolves, so this is the final output), also for a reply that then fails to parse (never after a stop); it only feeds the chat record and cannot break the turn. A runner that does not call `hooks.onRaw` records nothing.
    */
-  async chat(request, signal, onReply, onProgress, onSteer) {
+  async chat(request, signal, onReply, onProgress, onSteer, onRaw) {
     const stopped = () => new MapChatError("stopped", "Map chat stopped");
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(mapChatStep, request);
@@ -83101,8 +84266,16 @@ var MapChatService = class {
       shown = text11;
       onReply(text11);
     } : void 0;
-    const hooks = onProgress || onText || onSteer ? {
+    const hooks = onProgress || onText || onSteer || onRaw ? {
       ...onText ? { onText } : {},
+      ...onRaw ? {
+        onRaw: (output) => {
+          try {
+            onRaw(output);
+          } catch (e) {
+          }
+        }
+      } : {},
       ...onSteer ? {
         onSteer: (steer) => onSteer(async (text11) => {
           if (signal.aborted) throw stopped();
@@ -83205,10 +84378,10 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
 }
 
 // experiences/markdown-context/selection-ai.ts
-var import_obsidian47 = require("obsidian");
+var import_obsidian48 = require("obsidian");
 
 // experiences/markdown-context/image-translate-action.ts
-var import_obsidian46 = require("obsidian");
+var import_obsidian47 = require("obsidian");
 
 // experiences/markdown-context/steps/image-translate/prompt.md
 var prompt_default9 = "Edit the attached image: create the same image with every piece of visible text translated into {{target}}.\nKeep the layout, illustrations, colors, arrows, icons and style the same; only replace the text, in a matching size and weight that fits each original text area. Do not add, remove or redraw other content. Leave proper names, numbers and units as they are unless they are normally translated.\nGenerate the image with the image generation tool, then reply with one short sentence describing the result in {{target}}.\n";
@@ -83234,7 +84407,7 @@ var languageIdsPattern = () => [...SUPPORTED_LANGUAGES, ...OUTPUT_LANGUAGE_CHOIC
 function imageFileBase(alt) {
   return (alt || "image").replace(/\.(?:png|jpe?g|gif|webp)$/i, "").replace(new RegExp(`-(?:${languageIdsPattern()})(?:[ -]\\d+)?$`), "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
-var ImageTranslateAction = class extends import_obsidian46.Component {
+var ImageTranslateAction = class extends import_obsidian47.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -83315,7 +84488,7 @@ var ImageTranslateAction = class extends import_obsidian46.Component {
     this.target = { view, path: view.file.path, image, token };
     const rect2 = image.getBoundingClientRect();
     const pill = this.app.workspace.containerEl.createEl("button", { cls: "vam-image-action vam-image-action-pill" });
-    (0, import_obsidian46.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
+    (0, import_obsidian47.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
     pill.createSpan({ text: t("ui.image_translate_action") });
     pill.addEventListener("click", () => this.openPopover());
     this.pill = pill;
@@ -83353,7 +84526,7 @@ var ImageTranslateAction = class extends import_obsidian46.Component {
     header.createEl("strong", { text: t("ui.image_translate_action"), attr: { id: titleId } });
     const close = header.createEl("button", { cls: "clickable-icon" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian46.setIcon)(close, "x");
+    (0, import_obsidian47.setIcon)(close, "x");
     close.addEventListener("click", () => this.hide());
     const field = popover.createEl("label", { cls: "vam-image-action-field" });
     field.createSpan({ text: t("ui.image_translate_language") });
@@ -83410,8 +84583,8 @@ var ImageTranslateAction = class extends import_obsidian46.Component {
       text11 = target.view.editor.getValue();
     } catch (e) {
     }
-    if (noteTextAiLocked(text11, import_obsidian46.parseYaml)) {
-      new import_obsidian46.Notice(t("ui.ai_locked_notice"));
+    if (noteTextAiLocked(text11, import_obsidian47.parseYaml)) {
+      new import_obsidian47.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const controller = new AbortController();
@@ -83442,10 +84615,10 @@ var ImageTranslateAction = class extends import_obsidian46.Component {
       const link = this.app.fileManager.generateMarkdownLink(saved, target.path);
       const embed = link.startsWith("!") ? link : `!${link}`;
       const outcome = await this.write(target, note, embed, placement);
-      new import_obsidian46.Notice(t(outcome, saved.path));
+      new import_obsidian47.Notice(t(outcome, saved.path));
       saved = null;
     } catch (error) {
-      if (!controller.signal.aborted) new import_obsidian46.Notice(error instanceof Error ? error.message : String(error));
+      if (!controller.signal.aborted) new import_obsidian47.Notice(error instanceof Error ? error.message : String(error));
       if (saved) await this.app.fileManager.trashFile(saved);
     } finally {
       if (this.running === controller) {
@@ -83463,7 +84636,7 @@ var ImageTranslateAction = class extends import_obsidian46.Component {
     let outcome = "ui.image_translate_appended";
     const edit = (text11) => {
       var _a2, _b2, _c, _d;
-      if (noteTextAiLocked(text11, import_obsidian46.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
+      if (noteTextAiLocked(text11, import_obsidian47.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
       const copies = target.token ? occurrences(text11, target.token.text) : [];
       const at = target.token && copies.length === target.token.count ? copies[target.token.occurrence] : copies.length === 1 ? copies[0] : -1;
       const token = (_b2 = (_a2 = target.token) == null ? void 0 : _a2.text) != null ? _b2 : "";
@@ -83497,7 +84670,7 @@ ${embed}
     };
     const open = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view) => {
       var _a2;
-      return view instanceof import_obsidian46.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
+      return view instanceof import_obsidian47.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
     });
     if (open) {
       const editor = open.editor;
@@ -83668,7 +84841,7 @@ function locateImageToken(view, image, markdown, matches) {
   return rendered.length === matches.length ? toToken(matches[rendered.indexOf(image)]) : null;
 }
 var panelSequence2 = 0;
-var MarkdownSelectionAi = class extends import_obsidian47.Component {
+var MarkdownSelectionAi = class extends import_obsidian48.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -83709,8 +84882,8 @@ var MarkdownSelectionAi = class extends import_obsidian47.Component {
       const image = event.target;
       if (!(image instanceof HTMLImageElement) || !this.options.autoOpen()) return;
       if (image.closest(".vam-context-ai-panel, .vam-image-action")) return;
-      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian47.MarkdownView && candidate.containerEl.contains(image));
-      if (!(view instanceof import_obsidian47.MarkdownView) || !view.file) return;
+      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian48.MarkdownView && candidate.containerEl.contains(image));
+      if (!(view instanceof import_obsidian48.MarkdownView) || !view.file) return;
       const markdown = view.editor.getValue();
       const embeddedPath = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src");
       const tokens2 = [...markdown.matchAll(/!\[\[[^\]\n]+\]\]|!\[[^\]\n]*\]\([^\n]+?\)/g)].filter((match) => {
@@ -83764,9 +84937,9 @@ var MarkdownSelectionAi = class extends import_obsidian47.Component {
     const selection = window.getSelection();
     const range = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null;
     const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find(
-      (candidate) => candidate instanceof import_obsidian47.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
+      (candidate) => candidate instanceof import_obsidian48.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
     );
-    if (!(view instanceof import_obsidian47.MarkdownView) || !view.file) {
+    if (!(view instanceof import_obsidian48.MarkdownView) || !view.file) {
       this.hideLauncher();
       return;
     }
@@ -83808,7 +84981,7 @@ var MarkdownSelectionAi = class extends import_obsidian47.Component {
     }
     this.updateLauncher(this.options.autoOpen());
     if (!this.snapshot) {
-      const view = this.app.workspace.getActiveViewOfType(import_obsidian47.MarkdownView);
+      const view = this.app.workspace.getActiveViewOfType(import_obsidian48.MarkdownView);
       if (!(view == null ? void 0 : view.file) || view.getMode() !== "source") return false;
       const markdown = view.editor.getValue();
       const selected = view.editor.getSelection();
@@ -83846,7 +85019,7 @@ var MarkdownSelectionAi = class extends import_obsidian47.Component {
     this.panel.open();
   }
 };
-var SelectionAiPanel = class extends import_obsidian47.Component {
+var SelectionAiPanel = class extends import_obsidian48.Component {
   constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run) {
     super();
     this.app = app;
@@ -83891,7 +85064,7 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
     this.titleEl.id = titleId;
     const close = header.createEl("button", { cls: "clickable-icon vam-context-ai-close" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian47.setIcon)(close, "x");
+    (0, import_obsidian48.setIcon)(close, "x");
     close.addEventListener("click", () => this.close());
     this.contentEl = this.modalEl.createDiv({ cls: "vam-context-ai-body" });
     this.load();
@@ -83965,7 +85138,7 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
     const preset = (id, icon, label, prompt) => {
       const button = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
       button.dataset.preset = id;
-      (0, import_obsidian47.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
+      (0, import_obsidian48.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
       button.createSpan({ text: label });
       button.addEventListener(
         "click",
@@ -84034,7 +85207,7 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
     const bar = footer.createDiv({ cls: "vam-context-ai-bar" });
     bar.createSpan({
       cls: "vam-context-ai-shortcut",
-      text: t("ui.context_ai_shortcut", import_obsidian47.Platform.isMacOS ? "\u2318" : "Ctrl")
+      text: t("ui.context_ai_shortcut", import_obsidian48.Platform.isMacOS ? "\u2318" : "Ctrl")
     });
     this.stopButton = bar.createEl("button", { text: t("ui.cancel") });
     this.stopButton.addEventListener("click", () => {
@@ -84108,7 +85281,7 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
     if (this.controller) return;
     if (this.noteLocked()) {
       this.status.setText(t("ui.ai_locked_notice"));
-      new import_obsidian47.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian48.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const controller = new AbortController();
@@ -84218,9 +85391,9 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
           result = result.replace(/\r\n?/g, "\n");
           if (!/^```mermaid[ \t]*\n(?:(?!```)[\s\S])+\n```$/.test(result.trim()) || unsafeMermaid(result.trim().split("\n").slice(1, -1)) || /(?:%%\{|@\{|\bimg\s*:|\bimage\s*:|\burl\s*\(|https?:|data:|file:|javascript:)/i.test(result))
             throw new Error(t("ui.context_ai_invalid_diagram"));
-          this.previewChild = new import_obsidian47.Component();
+          this.previewChild = new import_obsidian48.Component();
           this.previewChild.load();
-          await import_obsidian47.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
+          await import_obsidian48.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
         }
       }
       if (controller.signal.aborted || !this.modalEl.isConnected) return;
@@ -84290,13 +85463,13 @@ ${caption.trim()}`;
       current = view.editor.getValue();
     } catch (e) {
     }
-    return noteTextAiLocked(current, import_obsidian47.parseYaml);
+    return noteTextAiLocked(current, import_obsidian48.parseYaml);
   }
   applyResult(result, action, status) {
     var _a2;
     if (this.noteLocked()) {
       status.setText(t("ui.ai_locked_notice"));
-      new import_obsidian47.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian48.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const { view, path, markdown, text: text11, matchAt } = this.snapshot;
@@ -84336,7 +85509,7 @@ ${value}
       editor.replaceRange(addition, end, end);
     }
     this.close();
-    new import_obsidian47.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
+    new import_obsidian48.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
   }
 };
 
@@ -84391,7 +85564,7 @@ function normalizeNoteStyleRecipeMarker(value) {
 }
 function obsidianAppLanguage() {
   try {
-    return typeof import_obsidian48.getLanguage === "function" ? (0, import_obsidian48.getLanguage)() : "en";
+    return typeof import_obsidian49.getLanguage === "function" ? (0, import_obsidian49.getLanguage)() : "en";
   } catch (e) {
     return "en";
   }
@@ -84431,6 +85604,7 @@ function settingsFromSaved(saved, appLocale) {
     cliModel: migratedChatModel(saved) || (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel,
     mapChatWidth: normalizeMapChatWidth(saved == null ? void 0 : saved.mapChatWidth),
     mapChatOpen: normalizeMapChatOpen(saved == null ? void 0 : saved.mapChatOpen),
+    mapChatRecords: (saved == null ? void 0 : saved.mapChatRecords) === true,
     cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning),
     previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize),
     models: "",
@@ -84446,7 +85620,7 @@ function settingsFromSaved(saved, appLocale) {
     canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
   };
 }
-var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
+var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
   constructor() {
     super(...arguments);
     /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
@@ -84514,7 +85688,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
       claudePath: () => this.settings.claudePath,
       clientVersion: () => this.manifest.version || "0.0.0",
       pluginDirectory: () => this.pluginDirectory(),
-      readLocalFile: (path) => import_obsidian48.FileSystemAdapter.readLocalFile(path),
+      readLocalFile: (path) => import_obsidian49.FileSystemAdapter.readLocalFile(path),
       onLog: (level, message) => this.logs.appendLog(level, message),
       checks: {
         refresh: (id) => this.refreshModelDiscovery(id),
@@ -84533,7 +85707,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
       claudeRuntime: (directory) => this.claudeCli(directory),
       mermaidParses: async (code) => {
         try {
-          const mermaid = await (0, import_obsidian48.loadMermaid)();
+          const mermaid = await (0, import_obsidian49.loadMermaid)();
           await mermaid.parse(code);
           return true;
         } catch (e) {
@@ -84593,6 +85767,12 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
     /** The floating "Use AI on selection" button; its text follows the interface language. */
     __publicField(this, "markdownSelectionAi", null);
     __publicField(this, "unreadableReported", /* @__PURE__ */ new Map());
+    /**
+     * Writers of the open map views, so the settings switch reaches them. view.ts calls `registerMapChatRecordWriter` when it makes
+     * its writer (and the returned function when it closes), and creates the writer only while `settings.mapChatRecords`.
+     * Each registered writer gets `setEnabled(false)` the moment the switch goes off and `setEnabled(true)` when it goes on.
+     */
+    __publicField(this, "mapChatRecordWriters", /* @__PURE__ */ new Set());
   }
   /** Background chart steps (running and queued), keyed by note path; owned by {@link topicRuns}. */
   get chartJobs() {
@@ -84716,9 +85896,9 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
     var _a2;
     const view = (_a2 = source != null ? source : this.app.workspace.getActiveViewOfType(VisualAgentMapView)) != null ? _a2 : this.views()[0];
     const snapshot = view == null ? void 0 : view.shareSnapshot();
-    if (!snapshot || snapshot === "none") return void new import_obsidian48.Notice(t("share.unavailable_no_map"));
-    if (snapshot === "aim") return void new import_obsidian48.Notice(t("share.unavailable_aim"));
-    if (snapshot === "empty") return void new import_obsidian48.Notice(t("share.unavailable_empty"));
+    if (!snapshot || snapshot === "none") return void new import_obsidian49.Notice(t("share.unavailable_no_map"));
+    if (snapshot === "aim") return void new import_obsidian49.Notice(t("share.unavailable_aim"));
+    if (snapshot === "empty") return void new import_obsidian49.Notice(t("share.unavailable_empty"));
     new ShareModal(this.app, {
       source: snapshot,
       vamVersion: this.manifest.version || "0.0.0",
@@ -84760,18 +85940,18 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
       this.useOutlineSource(leaf.view);
       return;
     }
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian48.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian49.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
     const path = leaf.view.file.path;
-    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian48.Notice(error instanceof Error ? error.message : String(error)));
+    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian49.Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload() {
-    announceTestOverrides((message) => new import_obsidian48.Notice(message, 0));
+    announceTestOverrides((message) => new import_obsidian49.Notice(message, 0));
     const saved = await this.loadData();
     this.settings = settingsFromSaved(saved, obsidianAppLanguage());
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
-    for (const kind of TOPIC_KINDS) (0, import_obsidian48.addIcon)(kindIconId(kind), kindIconSvg(kind));
+    for (const kind of TOPIC_KINDS) (0, import_obsidian49.addIcon)(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
@@ -84803,11 +85983,11 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
     });
     this.addLocalizedCommand("preview-full-prompt", "ui.command_preview_prompt", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
-    if (this.app.vault.adapter instanceof import_obsidian48.FileSystemAdapter && this.manifest.dir) {
+    if (this.app.vault.adapter instanceof import_obsidian49.FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
       this.exchanges = new AiExchangeLog(
         adapter,
-        (0, import_obsidian48.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
+        (0, import_obsidian49.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.exchange_log_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -84816,13 +85996,13 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
       await this.exchanges.load();
       this.usage = new AiUsageStore(
         adapter,
-        (0, import_obsidian48.normalizePath)(`${this.manifest.dir}/ai-usage.json`),
+        (0, import_obsidian49.normalizePath)(`${this.manifest.dir}/ai-usage.json`),
         (error) => this.logs.appendLog("error", `ai-usage.json: ${error instanceof Error ? error.message : String(error)}`)
       );
       await this.usage.load();
       this.pendingSuggestions = new PendingSuggestions(
         adapter,
-        (0, import_obsidian48.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
+        (0, import_obsidian49.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -84841,7 +86021,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
         await this.saveSettings();
-        if (count) new import_obsidian48.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        if (count) new import_obsidian49.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
       }
     });
     this.ready = initialize;
@@ -84862,7 +86042,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
     this.registerView(COFFEE_TABLES_VIEW_TYPE, (leaf) => new CoffeeTablesView(leaf, this));
     this.buildCoffee();
     const openCoffee = () => {
-      void this.activateCoffeeTables().catch((error) => new import_obsidian48.Notice(String(error)));
+      void this.activateCoffeeTables().catch((error) => new import_obsidian49.Notice(String(error)));
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
     this.coffeeRibbonIcon = coffeeRibbonIcon;
@@ -84879,12 +86059,12 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
           }
           await this.openDetails(this.repo.file(path));
         } catch (error) {
-          new import_obsidian48.Notice(error instanceof Error ? error.message : String(error));
+          new import_obsidian49.Notice(error instanceof Error ? error.message : String(error));
         }
       })
     );
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
-      void this.activateView().catch((error) => new import_obsidian48.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian49.Notice(String(error)));
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
@@ -84902,26 +86082,26 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
       key: "ui.map_chat_toggle_command"
     });
     this.addLocalizedCommand("open-map", "ui.command_open_map", () => {
-      void this.activateView().catch((error) => new import_obsidian48.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian49.Notice(String(error)));
     });
     if (aimEnabled())
       this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.command_new_aim", () => {
         void this.activateView().then(() => {
           var _a2;
           return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
-        }).catch((error) => new import_obsidian48.Notice(String(error)));
+        }).catch((error) => new import_obsidian49.Notice(String(error)));
       });
     this.addLocalizedCommand("import-outline", "ui.command_import_outline", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openOutlineImport();
-      }).catch((error) => new import_obsidian48.Notice(String(error)));
+      }).catch((error) => new import_obsidian49.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline-exchange", "ui.command_import_exchange", () => {
       void this.activateView().then(() => {
         const view = this.views()[0];
         if (view) chooseAndImportExchange(view);
-      }).catch((error) => new import_obsidian48.Notice(String(error)));
+      }).catch((error) => new import_obsidian49.Notice(String(error)));
     });
     this.localizedCommands.push({
       command: this.addCommand({
@@ -84975,7 +86155,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
       });
     this.addLocalizedCommand("share-map", "ui.command_share_map", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
-      void this.activateOutline().catch((error) => new import_obsidian48.Notice(String(error)));
+      void this.activateOutline().catch((error) => new import_obsidian49.Notice(String(error)));
     });
     this.addLocalizedCommand("rebuild-references", "ui.command_refresh_data", () => {
       this.runMutation(() => this.fullRebuild());
@@ -84983,23 +86163,23 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
     this.addLocalizedCommand("normalize-note-filenames", "ui.command_sync_filenames", () => {
       this.runMutation(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian48.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
+        new import_obsidian49.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.command_repair_note_display", () => {
       this.runMutation(async () => {
         await this.repo.ensureNodePresentation();
-        new import_obsidian48.Notice(t("ui.topic_note_display_repaired"));
+        new import_obsidian49.Notice(t("ui.topic_note_display_repaired"));
       });
     });
     this.addLocalizedCommand("fix-math-formulas", "ui.command_fix_math", () => {
       void this.offerFixMathFormulas().catch(
-        (error) => new import_obsidian48.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian49.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("organize-workspace-folders", "ui.command_organize_folders", () => {
       void this.offerOrganizeWorkspaceFolders().catch(
-        (error) => new import_obsidian48.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian49.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("repair-workspace", "ui.command_repair_workspace", () => {
@@ -85032,7 +86212,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
     this.registerNoteStyleEntrypoints();
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof import_obsidian48.TFile && this.isMap(file))
+        if (file instanceof import_obsidian49.TFile && this.isMap(file))
           menu.addItem(
             (item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => {
               void this.activateView(file.path);
@@ -85134,14 +86314,14 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
         this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
       } else if (result.status === "failed") {
         this.logs.appendLog("warn", `Note style conversion failed: ${(_a2 = result.error) != null ? _a2 : "unknown error"}`);
-        new import_obsidian48.Notice(t("ui.note_style_migrate_failed"));
+        new import_obsidian49.Notice(t("ui.note_style_migrate_failed"));
       } else if (result.notify) {
         const maps = result.notify.maps.join(t("ui.list_separator"));
         const text11 = [
           t("ui.note_style_maps_notice_0", maps),
           result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
         ].filter(Boolean).join(" ");
-        new import_obsidian48.Notice(text11, 0);
+        new import_obsidian49.Notice(text11, 0);
       }
     } catch (error) {
       this.logs.appendLog(
@@ -85153,13 +86333,13 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
   registerVaultEvents() {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (!this.writing && file instanceof import_obsidian48.TFile) for (const view of this.views()) view.changed(file);
+        if (!this.writing && file instanceof import_obsidian49.TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian48.TFile) this.scheduleExternalReconciliation(file.path);
-        if (!this.writing && file instanceof import_obsidian48.TFile) {
+        if (file instanceof import_obsidian49.TFile) this.scheduleExternalReconciliation(file.path);
+        if (!this.writing && file instanceof import_obsidian49.TFile) {
           for (const view of this.views()) view.deleted(file);
           if (file.path.startsWith(`${this.settings.mapsFolder}/`) || isManagedMapPath(this.settings, file.path) && file.name === "Map.md")
             this.runMutation(() => this.repo.rebuildDerivedData());
@@ -85168,7 +86348,7 @@ var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (!(file instanceof import_obsidian48.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
+        if (!(file instanceof import_obsidian49.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
         if (external) for (const view of this.views()) view.relocate(/* @__PURE__ */ new Map([[oldPath, file.path]]));
@@ -85203,7 +86383,7 @@ ${error}`;
       this.unreadableReported.set(key2, now);
       const message = t("ui.map_unreadable_skipped_0_1", path, error);
       this.logs.appendLog("warn", message);
-      new import_obsidian48.Notice(message);
+      new import_obsidian49.Notice(message);
     }
   }
   /**
@@ -85216,7 +86396,7 @@ ${error}`;
       report: (done, total2, title) => {
         const message = t("ui.organize_progress_0_1_2", done, total2, title);
         if (notice) notice.setMessage(message);
-        else notice = new import_obsidian48.Notice(message, 0);
+        else notice = new import_obsidian49.Notice(message, 0);
       },
       done: () => notice == null ? void 0 : notice.hide()
     };
@@ -85251,12 +86431,12 @@ ${error}`;
         cleaned = await this.repo.removeEmptyLegacyFolders();
       });
       const base = plan.skipped.length ? t("ui.organize_only_skipped_0", plan.skipped.length) : t("ui.organize_nothing_to_do");
-      new import_obsidian48.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
+      new import_obsidian49.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
       return;
     }
     const busyOpen = this.views().some((view) => plan.moves.some((move) => view.hasActiveAimWork(move.mapPath)));
     if (plan.busy.length || busyOpen) {
-      new import_obsidian48.Notice(t("error.organize_aim_busy"));
+      new import_obsidian49.Notice(t("error.organize_aim_busy"));
       return;
     }
     const mind = plan.moves.filter((move) => move.kind === "mind").length;
@@ -85290,7 +86470,7 @@ ${t("ui.organize_link_wait_hint")}`;
           for (const view of this.views()) view.relocate(mapping);
           this.app.workspace.requestSaveLayout();
           const cleaned = await this.repo.removeEmptyLegacyFolders();
-          new import_obsidian48.Notice(
+          new import_obsidian49.Notice(
             cleaned.length ? `${t("ui.organize_done_0", mapping.size)} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : t("ui.organize_done_0", mapping.size)
           );
         })
@@ -85303,7 +86483,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const files = (await this.repo.markedFiles("agent-map-node")).filter((file) => file.path.startsWith(prefix));
     const plan = await planMathRepair(this.app.vault, files);
     if (!plan.items.length) {
-      new import_obsidian48.Notice(t("ui.fix_math_none"));
+      new import_obsidian49.Notice(t("ui.fix_math_none"));
       return;
     }
     new ChoiceModal(
@@ -85314,10 +86494,10 @@ ${t("ui.organize_link_wait_hint")}`;
         {
           label: t("ui.fix_math_start"),
           action: () => void applyMathRepair(this.app.vault, plan).then(
-            (result) => new import_obsidian48.Notice(
+            (result) => new import_obsidian49.Notice(
               result.skipped ? t("ui.fix_math_done_0_1", result.changed, result.skipped) : t("ui.fix_math_done_0", result.changed)
             )
-          ).catch((error) => new import_obsidian48.Notice(error instanceof Error ? error.message : String(error)))
+          ).catch((error) => new import_obsidian49.Notice(error instanceof Error ? error.message : String(error)))
         }
       ]
     ).open();
@@ -85327,13 +86507,13 @@ ${t("ui.organize_link_wait_hint")}`;
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian48.Notice(t("ui.agent_workspace_is_ready"));
+    new import_obsidian49.Notice(t("ui.agent_workspace_is_ready"));
   }
   async fullRebuild() {
     await this.repo.reconcileMissingNodePaths();
     await this.repo.rebuildDerivedData();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian48.Notice(t("ui.vam_data_has_been_refreshed"));
+    new import_obsidian49.Notice(t("ui.vam_data_has_been_refreshed"));
   }
   /** Builds Coffee Tables storage and manager for the current workspace folder (CoffeeStorage fixes its folder at construction). */
   buildCoffee() {
@@ -85380,7 +86560,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const candidates = known != null ? known : await this.repo.workspaceCandidates();
     this.workspaceRecoveryCandidates = [];
     if (!candidates.length) {
-      new import_obsidian48.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
+      new import_obsidian49.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
       return;
     }
     new ChoiceModal(
@@ -85395,7 +86575,7 @@ ${t("ui.organize_link_wait_hint")}`;
           await this.rebuildCoffee();
           await this.repo.rebuildDerivedData();
           for (const view of this.views()) await view.refreshFromPlugin();
-          new import_obsidian48.Notice(t("ui.reconnected_workspace_0", root));
+          new import_obsidian49.Notice(t("ui.reconnected_workspace_0", root));
         })
       }))
     ).open();
@@ -85507,19 +86687,19 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
-      else new import_obsidian48.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+      else new import_obsidian49.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
     const state = await this.refreshModelDiscovery("codex");
-    if (state.status === "ready") new import_obsidian48.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+    if (state.status === "ready") new import_obsidian49.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
     else if (state.status === "error")
-      new import_obsidian48.Notice(
+      new import_obsidian49.Notice(
         t(
           "ui.codex_app_server_check_failed_0",
           this.recordFailure(t("log.codex_recheck_failed"), (_a2 = state.error) != null ? _a2 : "unknown error")
         )
       );
-    else new import_obsidian48.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+    else new import_obsidian49.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
   }
   isMap(file) {
     var _a2, _b2;
@@ -85532,7 +86712,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return marker5 === true || marker5 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || isManagedMapPath(this.settings, file.path));
   }
   styleNodeLeaf(leaf) {
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian48.MarkdownView)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian49.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
@@ -85554,44 +86734,44 @@ ${t("ui.organize_link_wait_hint")}`;
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   noteStylePort() {
     const folderAt = (path) => {
-      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path));
-      return found instanceof import_obsidian48.TFolder ? found : null;
+      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian49.normalizePath)(path));
+      return found instanceof import_obsidian49.TFolder ? found : null;
     };
     return {
       list: async (folder) => {
         var _a2, _b2;
-        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian48.TFile && child.extension === "md").map((child) => child.name);
+        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian49.TFile && child.extension === "md").map((child) => child.name);
       },
       read: (path) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path));
-        if (!(file instanceof import_obsidian48.TFile)) return Promise.reject(new Error(path));
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian49.normalizePath)(path));
+        if (!(file instanceof import_obsidian49.TFile)) return Promise.reject(new Error(path));
         return this.app.vault.read(file);
       },
       folderExists: (path) => folderAt(path) !== null,
       createFolder: async (path) => {
         let current = "";
-        for (const part of (0, import_obsidian48.normalizePath)(path).split("/")) {
+        for (const part of (0, import_obsidian49.normalizePath)(path).split("/")) {
           current = current ? `${current}/${part}` : part;
           if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
         }
       },
       create: async (path, content) => {
-        await this.app.vault.create((0, import_obsidian48.normalizePath)(path), content);
+        await this.app.vault.create((0, import_obsidian49.normalizePath)(path), content);
       },
       modify: async (path, content) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path));
-        if (!(file instanceof import_obsidian48.TFile)) throw new Error(path);
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian49.normalizePath)(path));
+        if (!(file instanceof import_obsidian49.TFile)) throw new Error(path);
         await this.app.vault.modify(file, content);
       },
       trash: async (path) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path));
-        if (file instanceof import_obsidian48.TFile) await this.app.fileManager.trashFile(file);
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian49.normalizePath)(path));
+        if (file instanceof import_obsidian49.TFile) await this.app.fileManager.trashFile(file);
       },
       // FileManager.renameFile (not Vault.rename): it also updates links to the file; it rejects when the target exists.
       rename: async (from, to) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(from));
-        if (!(file instanceof import_obsidian48.TFile)) throw new Error(from);
-        await this.app.fileManager.renameFile(file, (0, import_obsidian48.normalizePath)(to));
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian49.normalizePath)(from));
+        if (!(file instanceof import_obsidian49.TFile)) throw new Error(from);
+        await this.app.fileManager.renameFile(file, (0, import_obsidian49.normalizePath)(to));
       }
     };
   }
@@ -85599,8 +86779,8 @@ ${t("ui.organize_link_wait_hint")}`;
   registerNoteStyleEntrypoints() {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (file instanceof import_obsidian48.TFolder)
-          void this.noteStyles.followFolderRename((0, import_obsidian48.normalizePath)(oldPath), file.path).catch(() => void 0);
+        if (file instanceof import_obsidian49.TFolder)
+          void this.noteStyles.followFolderRename((0, import_obsidian49.normalizePath)(oldPath), file.path).catch(() => void 0);
       })
     );
     this.addLocalizedCommand("open-note-styles-folder", "ui.command_open_note_styles_folder", () => {
@@ -85612,15 +86792,15 @@ ${t("ui.organize_link_wait_hint")}`;
     var _a2, _b2, _c, _d, _e;
     try {
       const folder = await this.noteStyles.ensureBlockFolder();
-      new import_obsidian48.Notice(t("ui.note_style_folder_opened_0", folder));
-      const target = this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(folder));
+      new import_obsidian49.Notice(t("ui.note_style_folder_opened_0", folder));
+      const target = this.app.vault.getAbstractFileByPath((0, import_obsidian49.normalizePath)(folder));
       if (target) {
         const explorer = (_d = (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "file-explorer")) == null ? void 0 : _c[0]) == null ? void 0 : _d.view;
         (_e = explorer == null ? void 0 : explorer.revealInFolder) == null ? void 0 : _e.call(explorer, target);
       }
       return folder;
     } catch (error) {
-      new import_obsidian48.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian49.Notice(error instanceof Error ? error.message : String(error));
       return null;
     }
   }
@@ -85632,15 +86812,15 @@ ${t("ui.organize_link_wait_hint")}`;
   async editNotePart(category, ref) {
     try {
       const { ref: target, created } = await this.noteStyles.copyPartOnce(category, ref);
-      if (created) new import_obsidian48.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
+      if (created) new import_obsidian49.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
       await this.noteStyles.refresh();
       const path = this.noteStyles.partFilePath(category, target);
-      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian48.normalizePath)(path)) : null;
-      if (!(file instanceof import_obsidian48.TFile)) throw new Error("not a file");
+      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian49.normalizePath)(path)) : null;
+      if (!(file instanceof import_obsidian49.TFile)) throw new Error("not a file");
       await this.app.workspace.getLeaf("tab").openFile(file);
       return target;
     } catch (e) {
-      new import_obsidian48.Notice(t("ui.block_notice_open_failed"));
+      new import_obsidian49.Notice(t("ui.block_notice_open_failed"));
       return null;
     }
   }
@@ -85670,7 +86850,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const oldName = ref.slice("file:".length);
     const renamed = await this.noteStyles.renameFile(category, ref, name2);
     if (!renamed.ok) {
-      new import_obsidian48.Notice(t("ui.manage_rename_refused"));
+      new import_obsidian49.Notice(t("ui.manage_rename_refused"));
       return renamed;
     }
     if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
@@ -85721,8 +86901,8 @@ ${t("ui.organize_link_wait_hint")}`;
         failed.push(topic.path);
       }
     }
-    new import_obsidian48.Notice(t("ui.manage_rename_done_0_1_2", name2, changedTopics, styles));
-    if (failed.length) new import_obsidian48.Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
+    new import_obsidian49.Notice(t("ui.manage_rename_done_0_1_2", name2, changedTopics, styles));
+    if (failed.length) new import_obsidian49.Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
     return { ok: true, ref: next, topics: changedTopics, styles, failed };
   }
   /** Removes the entries of `noteStyleByKind` that name `ref` (those topic types go back to their built-in style); one save. Returns the kinds. */
@@ -85748,7 +86928,7 @@ ${t("ui.organize_link_wait_hint")}`;
     try {
       await this.noteStyles.trashFile(category, ref);
     } catch (e) {
-      new import_obsidian48.Notice(t("ui.manage_delete_failed"));
+      new import_obsidian49.Notice(t("ui.manage_delete_failed"));
       return false;
     }
     if (category === "recipe") await this.clearKindStyles(ref);
@@ -85779,9 +86959,9 @@ ${t("ui.organize_link_wait_hint")}`;
   /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
   async saveNoteRecipe(input2) {
     const result = await this.noteStyles.saveRecipe(input2);
-    if (result.ok) new import_obsidian48.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
+    if (result.ok) new import_obsidian49.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
     else
-      new import_obsidian48.Notice(
+      new import_obsidian49.Notice(
         t(
           result.reason === "name" ? "ui.recipe_notice_name_unavailable" : result.reason === "changed" ? "ui.recipe_notice_changed" : "ui.recipe_notice_failed"
         )
@@ -85790,6 +86970,33 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+  registerMapChatRecordWriter(writer) {
+    this.mapChatRecordWriters.add(writer);
+    writer.setEnabled(this.settings.mapChatRecords);
+    return () => {
+      this.mapChatRecordWriters.delete(writer);
+    };
+  }
+  /** The settings switch "save map AI conversations". Off: writers stop, then the owner chooses to keep or delete the saved records. */
+  async setMapChatRecords(on) {
+    if (this.settings.mapChatRecords === on) return;
+    this.settings.mapChatRecords = on;
+    await this.saveSettings();
+    const refreshViews = () => {
+      for (const view of this.views()) view.refreshChatRecordsSwitch();
+    };
+    if (on) {
+      for (const writer of this.mapChatRecordWriters) writer.setEnabled(true);
+      refreshViews();
+      return;
+    }
+    refreshViews();
+    await turnMapChatRecordsOff({
+      app: this.app,
+      writers: this.mapChatRecordWriters,
+      stillOff: () => !this.settings.mapChatRecords
+    });
   }
   async changeLanguage(value) {
     var _a2, _b2;
@@ -85804,7 +87011,7 @@ ${t("ui.organize_link_wait_hint")}`;
         await this.saveData(nextSettings);
       } catch (error) {
         this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
-        new import_obsidian48.Notice(translate(previous, "ui.language_change_save_failed"));
+        new import_obsidian49.Notice(translate(previous, "ui.language_change_save_failed"));
         return false;
       }
       Object.assign(this.settings, nextSettings);
@@ -85831,7 +87038,7 @@ ${t("ui.organize_link_wait_hint")}`;
         failures.push(error);
       }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
-      new import_obsidian48.Notice(
+      new import_obsidian49.Notice(
         failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved")
       );
       return true;
@@ -85896,10 +87103,10 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.claudeDiagnostic();
     const state = await this.refreshModelDiscovery("claude");
     if (!diagnostic.installed) {
-      new import_obsidian48.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+      new import_obsidian49.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
       return;
     }
-    new import_obsidian48.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    new import_obsidian49.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
   /** `noticeOpening` is called just before the usage notice opens (only when it really does), so a caller can say it waits for it. */
@@ -85925,7 +87132,7 @@ ${t("ui.organize_link_wait_hint")}`;
       await this.repo.rebuildDerivedData(paths ? { roots: [], paths } : void 0);
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
-      new import_obsidian48.Notice(
+      new import_obsidian49.Notice(
         t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error))
       );
     }
@@ -85957,7 +87164,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.app.workspace.getLeavesOfType("markdown").some(
       (leaf) => {
         var _a2, _b2;
-        return leaf.getRoot() === split && leaf.view instanceof import_obsidian48.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
+        return leaf.getRoot() === split && leaf.view instanceof import_obsidian49.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
       }
     );
   }
@@ -85970,7 +87177,7 @@ ${t("ui.organize_link_wait_hint")}`;
       this.detailsLeaf = (_b2 = (_a2 = markdownLeaves.filter(
         (leaf) => {
           var _a3, _b3;
-          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian48.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
+          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian49.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
         }
       ).sort(
         (a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top
@@ -85992,11 +87199,11 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   closeStaleDetails() {
     var _a2, _b2, _c, _d;
-    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian48.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
+    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian49.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian48.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
+      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian49.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
@@ -86012,7 +87219,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
   async runCoffeeRequest(request) {
-    if (!(this.app.vault.adapter instanceof import_obsidian48.FileSystemAdapter) || !this.manifest.dir)
+    if (!(this.app.vault.adapter instanceof import_obsidian49.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
     const effort = effectiveReasoningLevel(
@@ -86065,16 +87272,16 @@ ${t("ui.organize_link_wait_hint")}`;
     }
     let bytes;
     const embeddedPath = (_b2 = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src")) == null ? void 0 : _b2.split("#")[0];
-    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian48.MarkdownView && view2.containerEl.contains(image));
+    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian49.MarkdownView && view2.containerEl.contains(image));
     const file = embeddedPath ? this.app.metadataCache.getFirstLinkpathDest(
       embeddedPath,
-      view instanceof import_obsidian48.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
+      view instanceof import_obsidian49.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
     ) : null;
     const remote = image.currentSrc || image.src;
-    if (file instanceof import_obsidian48.TFile) bytes = await this.app.vault.readBinary(file);
+    if (file instanceof import_obsidian49.TFile) bytes = await this.app.vault.readBinary(file);
     else if (/^https?:\/\//i.test(remote)) {
       try {
-        bytes = (await (0, import_obsidian48.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
+        bytes = (await (0, import_obsidian49.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
       } catch (e) {
         throw new Error(t("ui.context_ai_image_download_failed"));
       }
@@ -86154,7 +87361,7 @@ ${t("ui.organize_link_wait_hint")}`;
       if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
       await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);
     } catch (error) {
-      new import_obsidian48.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian49.Notice(error instanceof Error ? error.message : String(error));
     }
   }
   async openResearchMap(path) {
@@ -86173,7 +87380,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   async loadCodexModels() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian48.FileSystemAdapter) || !this.manifest.dir)
+    if (!(adapter instanceof import_obsidian49.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Codex model discovery requires desktop Obsidian");
     const pluginDirectory = (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
@@ -86245,7 +87452,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   pluginDirectory() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian48.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
+    if (!(adapter instanceof import_obsidian49.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
     return (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
   }

@@ -750,6 +750,19 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-save { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; }
 .vam-map-chat-save.is-disabled { color: var(--text-faint); cursor: default; }
 .vam-map-chat-save.is-hidden { display: none; }
+.vam-map-chat-new { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; }
+.vam-map-chat-new.is-disabled { color: var(--text-faint); cursor: default; }
+.vam-map-chat-new.is-hidden { display: none; }
+.vam-map-chat-new:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-head.is-hero .vam-map-chat-new { display: none; }
+.vam-map-chat-restored { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-restored::before, .vam-map-chat-restored::after { content: ""; flex: 1; border-top: 1px solid var(--background-modifier-border); }
+.vam-map-chat-restored.is-hidden { display: none; }
+.vam-map-chat.is-hero .vam-map-chat-restored { display: none; }
+.vam-map-chat-plan.is-stale, .vam-map-chat-choices.is-stale, .vam-map-chat-images.is-stale { opacity: 0.62; }
+.vam-map-chat-stale-note { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat .is-stale button, .vam-map-chat button.is-stale { color: var(--text-faint); background: transparent; box-shadow: none; cursor: default; }
+.vam-map-chat button.is-stale:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-save:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-model-tag { display: none; }
 .vam-map-chat-head.is-hero { justify-content: flex-start; gap: 4px; color: var(--text-faint); font-size: var(--font-ui-smaller); }

@@ -41,6 +41,7 @@ const RING = [['a1', 't1', [0.2, 0.2]], ['a2', 't2', [0.8, 0.2]], ['a3', 't3', [
 const ringIds = RING.map(r => r[1]);
 const tree = () => [node('r', null, 80, 80), node('c1', 'r', 400, 80), node('c2', 'r', 400, 300), node('g1', 'c1', 720, 80)];
 const withRing = (kind, extra = []) => doc([...tree(), ...extra, ...ringIds.map(id => node(id, null, 5000, 5000))], [picture(RING)], kind);
+const withRingOf = (rows, kind, extra = []) => doc([...tree(), ...extra, ...rows.map(r => node(r[1], null, 5000, 5000))], [picture(rows)], kind);
 const treeOnly = (map) => map.nodes.filter(n => !ringIds.includes(n.id));
 
 test('arrange all: every arrangement keeps the ring out of the tree and the tree as it would be alone', () => {
@@ -238,4 +239,89 @@ test('tidy after resize: without rings it is the old rule (overlap only), with a
   assert.equal(view.tidyAfterResize(map, new Set(['a'])), true);
   const calm = doc([node('r', null, 80, 80), node('a', 'r', 400, 80), node('b', 'r', 400, 600)], undefined);
   assert.equal(bare(calm, {}).tidyAfterResize(calm, new Set(['a'])), false);
+});
+
+// ---- P3: arrow keys around a picture ---------------------------------------------------------------------------------------
+const keyView = map => {
+  const view = bare(map);
+  view.relevanceSortOn = () => false;
+  return view;
+};
+const MANY = Array.from({ length: 12 }, (_, i) => [`a${i}`, `m${i}`, [0.1 + 0.07 * i, 0.15 + 0.06 * ((i * 5) % 12)]]);
+const FORWARD = { top: 'ArrowRight', right: 'ArrowDown', bottom: 'ArrowLeft', left: 'ArrowUp' };
+const BACK = { ArrowRight: 'ArrowLeft', ArrowLeft: 'ArrowRight', ArrowDown: 'ArrowUp', ArrowUp: 'ArrowDown' };
+
+test('keys around a picture: from any card the forward key reaches every ring card exactly once and returns; the opposite key walks it back', () => {
+  for (const kind of ['right', 'down']) {
+    const ids = MANY.map(r => r[1]);
+    const map = withRingOf(MANY, kind, [node('r2', null, 90, 900)]);
+    bare(map).arrangeAll(map);
+    const view = keyView(map);
+    const image = imageOf(map);
+    const sideOf = id => ring.ringSide(image, rect(map.nodes.find(n => n.id === id)));
+    for (const start of ids) {
+      const seen = [start];
+      let at = start;
+      for (let step = 1; step < ids.length; step++) {
+        const here = map.nodes.find(n => n.id === at);
+        const next = view.displayedNeighbor(here, FORWARD[sideOf(at)]);
+        assert.ok(next, `${kind} ${start}: a next card after ${at}`);
+        assert.ok(ids.includes(next.id), `${kind}: stays on the ring`);
+        seen.push(next.id);
+        at = next.id;
+      }
+      assert.equal(new Set(seen).size, ids.length, `${kind} from ${start}: every card exactly once`);
+      const last = view.displayedNeighbor(map.nodes.find(n => n.id === at), FORWARD[sideOf(at)]);
+      assert.equal(last.id, start, `${kind} from ${start}: the walk closes`);
+      // And back again with the opposite key.
+      let back = at;
+      for (let step = 1; step < ids.length; step++) {
+        back = view.displayedNeighbor(map.nodes.find(n => n.id === back), BACK[FORWARD[sideOf(back)]]).id;
+        assert.equal(back, seen[ids.length - 1 - step], `${kind}: back is the same walk reversed`);
+      }
+    }
+  }
+});
+
+test('keys around a picture: the arrow points the way it moves on the screen (right on the top row, left on the bottom row, down on the right column, up on the left column)', () => {
+  const map = withRingOf(MANY, 'right');
+  bare(map).arrangeAll(map);
+  const view = keyView(map);
+  const image = imageOf(map);
+  const at = id => map.nodes.find(n => n.id === id);
+  for (const id of MANY.map(r => r[1])) {
+    const side = ring.ringSide(image, rect(at(id)));
+    const here = at(id);
+    const next = view.displayedNeighbor(here, FORWARD[side]);
+    const nextSide = ring.ringSide(image, rect(next));
+    if (nextSide !== side) continue;
+    if (side === 'top') assert.ok(next.x > here.x, 'top row: to the right');
+    if (side === 'bottom') assert.ok(next.x < here.x, 'bottom row: to the left');
+    if (side === 'right') assert.ok(next.y > here.y, 'right column: down');
+    if (side === 'left') assert.ok(next.y < here.y, 'left column: up');
+  }
+});
+
+test('keys: a ring card goes to its child with the outward arrow; other top-level topics do not walk into the ring; without a picture nothing changes', () => {
+  const map = withRing('right', [node('r2', null, 90, 400)]);
+  bare(map).arrangeAll(map);
+  const view = keyView(map);
+  const image = imageOf(map);
+  const outward = { top: 'ArrowUp', bottom: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+  for (const id of ringIds) {
+    const card = map.nodes.find(n => n.id === id);
+    map.nodes.push(node(`${id}-k`, id, 0, 0));
+    bare(map).arrangeBranch(map, id, new Set([`${id}-k`]));
+    const side = ring.ringSide(image, rect(card));
+    assert.equal(view.displayedNeighbor(card, outward[side])?.id, `${id}-k`, `${id} ${side}`);
+    assert.equal(view.displayedNeighbor(map.nodes.find(n => n.id === `${id}-k`), BACK[outward[side]])?.id, id, 'and back to the card');
+  }
+  const r = map.nodes.find(n => n.id === 'r');
+  assert.equal(view.displayedNeighbor(r, 'ArrowDown')?.id, 'r2', 'r to r2: the ring cards are not among its siblings');
+  assert.equal(view.displayedNeighbor(map.nodes.find(n => n.id === 'r2'), 'ArrowUp')?.id, 'r');
+  const plainMap = doc([node('r', null, 80, 80), node('r2', null, 90, 400), node('r3', null, 90, 700)], undefined);
+  const plainView = keyView(plainMap);
+  assert.equal(plainView.displayedNeighbor(plainMap.nodes[0], 'ArrowDown')?.id, 'r2');
+  assert.equal(plainView.displayedNeighbor(plainMap.nodes[1], 'ArrowDown')?.id, 'r3');
+  assert.equal(plainView.displayedNeighbor(plainMap.nodes[2], 'ArrowUp')?.id, 'r2');
 });

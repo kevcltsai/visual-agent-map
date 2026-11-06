@@ -148,3 +148,18 @@ test('A3 duplicate map: anchor relations point at the copied topics, anchor ids 
   assert.equal(image.note, 'plan');
   assert.deepEqual(plain(await repo.readMap(mapPath)), source, 'the source map is not changed');
 });
+
+test('image centre: duplicating a map keeps `ring: true` on the relations (and only there), pointing at the copied top-level topics', async () => {
+  const { repo } = fixture('en');
+  const mapPath = await repo.createMap('Ring');
+  const map = await repo.readMap(mapPath);
+  const a = await repo.createNote('A', 'm', map, mapPath, 'workspace'), b = await repo.createNote('B', 'm', map, mapPath, 'workspace');
+  a.parentId = null; b.parentId = null; map.nodes.push(a, b);
+  map.canvasItems = [{ id: 'g1', kind: 'annotated-image', path: 'a/b.png', x: 1, y: 2, w: 720, h: 400, anchors: [anchor('p1'), anchor('p2')], relations: [rel('related', 'p1', a.id, { ring: true }), rel('related', 'p2', b.id)] }];
+  await repo.saveMap(mapPath, map);
+  const copy = await repo.readMap(await repo.duplicateMap(mapPath, 'Ring copy'));
+  const [ca, cb] = ['A', 'B'].map(title => copy.nodes.find(n => n.path.includes(`/${title}`)));
+  assert.ok(ca && cb && ca.id !== a.id && ca.parentId === null && cb.parentId === null);
+  assert.deepEqual(plain(copy.canvasItems[0].relations), [rel('related', 'p1', ca.id, { ring: true }), rel('related', 'p2', cb.id)]);
+  assert.equal('ring' in copy.canvasItems[0].relations[1], false, 'a relation without ring gains none');
+});

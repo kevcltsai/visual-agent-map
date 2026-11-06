@@ -29760,6 +29760,32 @@ function solveRing(image, members) {
   });
   return { clearance, cards };
 }
+function placeNewMember(image, current, member, others = []) {
+  const w = cardW(member);
+  const h = cardH(member);
+  const px = image.x + clamp012(member.anchorX) * image.w;
+  const py = image.y + clamp012(member.anchorY) * image.h;
+  let best = null;
+  let bestLength = Infinity;
+  for (let k = 0; k <= 4; k++) {
+    for (const slot of ringSlotsAt(expand(image, RING_MARGIN + k * RING_GROW), { w, h })) {
+      const rect2 = ringCardRect(slot, w, h);
+      const length = Math.hypot(px - slot.ax, py - slot.ay);
+      if (length >= bestLength) continue;
+      if (others.some((o) => intersects(rect2, o))) continue;
+      const state = {
+        id: member.id,
+        ...rect2,
+        anchorX: clamp012(member.anchorX),
+        anchorY: clamp012(member.anchorY)
+      };
+      if (ringViolations(image, [...current, state], { others }).length) continue;
+      best = { id: member.id, ...rect2, side: slot.side, line: { x1: px, y1: py, x2: slot.ax, y2: slot.ay } };
+      bestLength = length;
+    }
+  }
+  return best;
+}
 function ringBounds(image, cards) {
   let x0 = image.x;
   let y0 = image.y;
@@ -63021,10 +63047,11 @@ ${request.requirements}` : preset.text,
   }
   /**
    * Writes the anchor (and, for a new topic, the topic with a "related" relation anchor -> topic) as one undo step.
-   * The new topic is a child of the map's main topic and takes the note as its title.
+   * The new topic is a top-level topic that joins the image's ring (`ring: true`) and takes the note as its title; a topic
+   * that already exists is linked as it is (no `ring`, not moved).
    */
   async commitAnchor(imageId, at, note, target) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     if (!this.map || !this.canEditCanvasItems()) return;
     const current = findAnnotatedImage((_a2 = this.map.canvasItems) != null ? _a2 : [], imageId);
     if (!current) return;
@@ -63044,25 +63071,13 @@ ${request.requirements}` : preset.text,
       if (!node) return;
     }
     const topicId = (_b2 = node == null ? void 0 : node.id) != null ? _b2 : target.kind === "existing" ? target.topicId : null;
-    const parentId = (_c = node == null ? void 0 : node.parentId) != null ? _c : null;
     const firstWithoutNote = current.anchors.length === 0 && !current.note;
     const added = node;
+    const mark2 = this.history.mark();
     await this.mapChangeSnapshots(
       (map) => {
         var _a3;
-        if (added) {
-          map.nodes.push(added);
-          const owner = parentId ? map.nodes.find((n) => n.id === parentId) : void 0;
-          if (owner) {
-            owner.collapsed = false;
-            const siblings = map.nodes.filter((n) => n.parentId === owner.id && n.id !== added.id);
-            const minTop = siblings.length ? Math.max(...siblings.map((n) => {
-              var _a4;
-              return n.y + ((_a4 = this.cardHeightOf(n.id)) != null ? _a4 : DEFAULT_CARD_HEIGHT);
-            })) + LAYOUT_GAP : void 0;
-            this.arrangeBranch(map, owner.id, /* @__PURE__ */ new Set([added.id]), minTop);
-          }
-        }
+        if (added) map.nodes.push(added);
         let items = addAnchor((_a3 = map.canvasItems) != null ? _a3 : [], imageId, {
           id: anchorId,
           at: { kind: "image-2d", x: at.x, y: at.y },
@@ -63072,21 +63087,110 @@ ${request.requirements}` : preset.text,
           items = addAnchorRelation(items, imageId, {
             kind: target.kind === "existing" && target.relationKind || "related",
             from: anchorId,
-            to: topicId
+            to: topicId,
+            ...added ? { ring: true } : {}
           });
         map.canvasItems = items;
+        if (added) this.placeRingMember(map, imageId, added.id);
       },
       !!added,
       added ? [added.path] : []
     );
+    if (added && this.map && this.ringTidyNeeded(/* @__PURE__ */ new Set([added.id]))) {
+      await this.mapChange((map) => {
+        this.tidyAfterResize(map, /* @__PURE__ */ new Set([added.id]));
+      }, false);
+      this.history.collapseSince(mark2);
+    }
     if (firstWithoutNote && !this.noteReminded.has(imageId)) {
       this.noteReminded.add(imageId);
       new import_obsidian37.Notice(t("ui.anchor_no_note_notice"));
     }
   }
-  /** A topic for a new anchor: a child of the main topic, named after the anchor note (or the default new-topic name). */
+  /**
+   * Puts the new ring member `topicId` of picture `imageId` in the ring. The first member makes the ring: the picture grows to
+   * ring size and the card goes to its place. A later one takes a free slot without moving any other card; only when no slot is
+   * free is the whole ring solved again.
+   */
+  placeRingMember(map, imageId, topicId) {
+    var _a2;
+    const items = (_a2 = map.canvasItems) != null ? _a2 : [];
+    const image = findAnnotatedImage(items, imageId);
+    const members = ringMembers(items, map.nodes).filter((member) => member.imageId === imageId);
+    const me = members.find((member) => member.topicId === topicId);
+    const node = map.nodes.find((item) => item.id === topicId);
+    if (!image || !me || !node) return;
+    const only = /* @__PURE__ */ new Set([imageId]);
+    const before = members.filter((member) => member !== me);
+    if (!before.length) {
+      this.solveRingsIn(map, { imageIds: only, enlarge: true });
+      return;
+    }
+    const rectOf = (n) => {
+      var _a3, _b2, _c;
+      return {
+        x: n.x,
+        y: n.y,
+        w: (_a3 = n.width) != null ? _a3 : CARD_WIDTH,
+        h: (_c = (_b2 = this.cardHeightOf(n.id)) != null ? _b2 : n.height) != null ? _c : DEFAULT_CARD_HEIGHT
+      };
+    };
+    const states = before.map((member) => ({
+      id: member.topicId,
+      ...rectOf(map.nodes.find((item) => item.id === member.topicId)),
+      anchorX: member.x,
+      anchorY: member.y
+    }));
+    const mine = rectOf(node);
+    const placed = placeNewMember(
+      { x: image.x, y: image.y, w: image.w, h: image.h },
+      states,
+      { id: topicId, anchorX: me.x, anchorY: me.y, w: mine.w, h: mine.h },
+      this.ringObstacles(map, imageId, new Set(before.map((member) => member.topicId)))
+    );
+    if (!placed) {
+      this.solveRingsIn(map, { imageIds: only });
+      return;
+    }
+    node.x = Math.round(placed.x);
+    node.y = Math.round(placed.y);
+  }
+  /** What a new ring card may not cover: every other card and text block shown, other pictures, and the branches of this ring's cards. */
+  ringObstacles(map, imageId, keep) {
+    var _a2, _b2, _c, _d, _e, _f;
+    const out = [];
+    const shown = visibleNodes(map.nodes);
+    const shownIds = new Set(shown.map((node) => node.id));
+    const hidden = supersededAimNodeIds(map);
+    for (const node of shown) {
+      if (keep.has(node.id) || hidden.has(node.id)) continue;
+      out.push({
+        x: node.x,
+        y: node.y,
+        w: (_a2 = node.width) != null ? _a2 : CARD_WIDTH,
+        h: (_c = (_b2 = this.cardHeightOf(node.id)) != null ? _b2 : node.height) != null ? _c : DEFAULT_CARD_HEIGHT
+      });
+    }
+    for (const item of (_d = map.canvasItems) != null ? _d : []) {
+      if (item.kind === "text") {
+        const text11 = item;
+        if (text11.parentId !== void 0 && !shownIds.has(text11.parentId)) continue;
+        out.push({
+          x: text11.x,
+          y: text11.y,
+          w: (_e = this.textWidthOf(text11.id)) != null ? _e : 160,
+          h: (_f = this.cardHeightOf(text11.id)) != null ? _f : TEXT_NODE_HEIGHT
+        });
+      } else if ((item.kind === "image" || isAnnotatedImage(item)) && item.id !== imageId) {
+        const { x, y, w, h } = item;
+        if ([x, y, w, h].every(Number.isFinite)) out.push({ x, y, w, h });
+      }
+    }
+    return out;
+  }
+  /** A topic for a new anchor: a top-level topic (it joins the picture's ring), named after the anchor note (or the default new-topic name). */
   async createAnchorTopic(note) {
-    var _a2, _b2, _c;
+    var _a2;
     if (!this.map) return null;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new import_obsidian37.Notice(t("ui.legacy_map_view_only"));
@@ -63097,8 +63201,8 @@ ${request.requirements}` : preset.text,
     const defaultName = uniqueDefaultName(
       t("ui.new_topic"),
       map.nodes.map((item) => {
-        var _a3, _b3;
-        return (_b3 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : "";
+        var _a3, _b2;
+        return (_b2 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b2 : "";
       })
     );
     const node = await this.plugin.repo.createNote(
@@ -63109,9 +63213,9 @@ ${request.requirements}` : preset.text,
       parent ? "inherited" : "workspace",
       { researchMode: "local" }
     );
-    node.parentId = (_b2 = parent == null ? void 0 : parent.id) != null ? _b2 : null;
-    node.x = parent ? parent.x + 340 : 80;
-    node.y = (_c = parent == null ? void 0 : parent.y) != null ? _c : 80;
+    node.parentId = null;
+    node.x = 80;
+    node.y = 80;
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path, { ...map, nodes: [...map.nodes, node] }));
     return node;
   }
@@ -64446,6 +64550,7 @@ ${request.requirements}` : preset.text,
       el.focus({ preventScroll: true });
       const start = { x: event.clientX, y: event.clientY }, zoom = this.map.viewport.zoom || 1, from = { x: image.x, y: image.y, w: image.w, h: image.h };
       let dx = 0, dy = 0, width = from.w, done = false;
+      const ring = !resize && isAnnotatedImage(image) ? this.ringDragPreview(image.id) : null;
       (_a2 = el.setPointerCapture) == null ? void 0 : _a2.call(el, event.pointerId);
       const move = (e) => {
         dx = (e.clientX - start.x) / zoom;
@@ -64458,6 +64563,7 @@ ${request.requirements}` : preset.text,
         } else {
           el.style.left = `${from.x + dx}px`;
           el.style.top = `${from.y + dy}px`;
+          ring == null ? void 0 : ring.update(dx, dy);
         }
       };
       const settle = () => {
@@ -64472,6 +64578,7 @@ ${request.requirements}` : preset.text,
         el.style.top = `${from.y}px`;
         el.style.width = `${from.w}px`;
         el.style.height = `${from.h}px`;
+        ring == null ? void 0 : ring.update(0, 0);
       };
       const up = () => {
         if (done) return;
@@ -64498,8 +64605,48 @@ ${request.requirements}` : preset.text,
     });
     handle.addEventListener("pointerdown", (event) => begin2(event, true));
   }
+  /**
+   * What follows a picture on screen while it is dragged: the cards of its ring and their branches, the text blocks under them,
+   * the tree edges and the anchor lines. `update(0, 0)` puts everything back. Null when the picture has no ring.
+   */
+  ringDragPreview(imageId) {
+    var _a2;
+    const map = this.map;
+    if (!map) return null;
+    const moving = this.ringFollowers(map, imageId);
+    if (!moving.size) return null;
+    const group = /* @__PURE__ */ new Map();
+    const origins = /* @__PURE__ */ new Map();
+    for (const node of map.nodes) {
+      const el = moving.has(node.id) ? this.cardEls.get(node.id) : void 0;
+      if (!el) continue;
+      group.set(node.id, el);
+      origins.set(node.id, { x: node.x, y: node.y });
+    }
+    const texts2 = [];
+    for (const item of (_a2 = map.canvasItems) != null ? _a2 : []) {
+      if (item.kind !== "text" || !moving.has(item.parentId)) continue;
+      const el = this.textEls.get(item.id);
+      if (el) texts2.push({ el, x: item.x, y: item.y });
+    }
+    const edges = this.groupDragEdges(group, imageId);
+    return {
+      update: (dx, dy) => {
+        for (const [id, el] of group) {
+          const from = origins.get(id);
+          el.style.left = `${from.x + dx}px`;
+          el.style.top = `${from.y + dy}px`;
+        }
+        for (const text11 of texts2) {
+          text11.el.style.left = `${text11.x + dx}px`;
+          text11.el.style.top = `${text11.y + dy}px`;
+        }
+        edges.update(dx, dy);
+      }
+    };
+  }
   /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
-  async changeCanvasItems(id, change2) {
+  async changeCanvasItems(id, change2, alongside) {
     var _a2;
     if (!this.map || !this.canEditCanvasItems()) return;
     if (!((_a2 = this.map.canvasItems) == null ? void 0 : _a2.some((item) => item.id === id))) return;
@@ -64515,15 +64662,45 @@ ${request.requirements}` : preset.text,
       const next = pruneBoundaries(dangling.size ? removeLinksTo(changed, dangling) : changed, [...alive]);
       if (next.length) map.canvasItems = next;
       else delete map.canvasItems;
+      alongside == null ? void 0 : alongside(map);
     }, false);
   }
-  /** Moves a free image by (dx, dy) in map units. */
-  async moveCanvasItem(id, dx, dy) {
-    await this.changeCanvasItems(id, (items) => moveItem(items, id, dx, dy));
+  /** The topics of a picture's ring and everything below them (folded branches too): what moves with the picture. */
+  ringFollowers(map, imageId) {
+    var _a2;
+    const out = /* @__PURE__ */ new Set();
+    for (const member of ringMembers((_a2 = map.canvasItems) != null ? _a2 : [], map.nodes)) {
+      if (member.imageId !== imageId) continue;
+      out.add(member.topicId);
+      for (const id of descendants(map.nodes, member.topicId)) out.add(id);
+    }
+    return out;
   }
-  /** Resizes a free image to `width`, keeping its ratio. */
+  /** Moves an image by (dx, dy) in map units; a picture with a ring takes its cards, their branches and the text blocks under them along. */
+  async moveCanvasItem(id, dx, dy) {
+    await this.changeCanvasItems(
+      id,
+      (items) => moveItem(items, id, dx, dy),
+      (map) => {
+        var _a2;
+        const moving = this.ringFollowers(map, id);
+        if (!moving.size) return;
+        map.nodes = map.nodes.map((node) => moving.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node);
+        map.canvasItems = ((_a2 = map.canvasItems) != null ? _a2 : []).map(
+          (item) => item.kind === "text" && moving.has(item.parentId) ? { ...item, x: item.x + dx, y: item.y + dy } : item
+        );
+      }
+    );
+  }
+  /** Resizes an image to `width`, keeping its ratio; a ring the new size leaves a card in the way of is solved again. */
   async resizeCanvasItem(id, width) {
-    await this.changeCanvasItems(id, (items) => resizeKeepRatio(items, id, width));
+    await this.changeCanvasItems(
+      id,
+      (items) => resizeKeepRatio(items, id, width),
+      (map) => {
+        this.tidyAfterResize(map, /* @__PURE__ */ new Set(), /* @__PURE__ */ new Set([id]));
+      }
+    );
   }
   // ---- Adding free images: drop, paste, "Insert image…" (ticket 30, decisions D5, D6, D11) ---------------------------
   /** Registers the three entries on the canvas; AIM maps and topic selection mode get none (D11). */
@@ -67917,7 +68094,7 @@ ${request.requirements}` : preset.text,
     return target && ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === target.id)) != null ? _b2 : target);
   }
   displayedNeighbor(node, key2) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key2)) return void 0;
     const shown = this.canvasNodes();
     const byY = bySiblingAxis("y");
@@ -67946,17 +68123,61 @@ ${request.requirements}` : preset.text,
       const root = (_a2 = byId.get(node.id)) != null ? _a2 : node;
       return shown.filter((item) => item.parentId === node.id && item.x < root.x === (move === "child-left")).sort(byY)[0];
     }
+    const ringMine = ringMembers((_b2 = this.map.canvasItems) != null ? _b2 : [], this.map.nodes);
+    if (!node.parentId && ringMine.length) {
+      if (ringMine.some((member) => member.topicId === node.id)) {
+        if (move === "sibling-" || move === "sibling+") return this.ringCycleNeighbor(node, key2, shown, ringMine);
+      }
+    }
     let siblings = shown.filter((item) => {
       var _a3, _b3;
       return ((_a3 = item.parentId) != null ? _a3 : null) === ((_b3 = node.parentId) != null ? _b3 : null);
     });
-    if (direction === "balanced" && node.parentId && !((_b2 = byId.get(node.parentId)) == null ? void 0 : _b2.parentId)) {
+    if (!node.parentId && ringMine.length) {
+      const around = new Set(ringMine.map((member) => member.topicId));
+      siblings = siblings.filter((item) => !around.has(item.id));
+    }
+    if (direction === "balanced" && node.parentId && !((_c = byId.get(node.parentId)) == null ? void 0 : _c.parentId)) {
       const mine = sideOf2(node);
       siblings = siblings.filter((item) => sideOf2(item) === mine);
     }
     siblings.sort(order);
     const index = siblings.findIndex((item) => item.id === node.id);
     return move === "sibling-" ? siblings[index - 1] : move === "sibling+" ? siblings[index + 1] : void 0;
+  }
+  /**
+   * The next ring card for an arrow key: the cards of one picture are walked clockwise (top row left to right, right column
+   * downwards, bottom row right to left, left column upwards) and the walk wraps, so every card is reached once from any card.
+   * The key that goes forward on a card is the one that points the way the walk runs there (right on the top row, left on the
+   * bottom row, down on the right column, up on the left column); the opposite key goes back.
+   */
+  ringCycleNeighbor(node, key2, shown, members) {
+    var _a2, _b2;
+    const mine = members.find((member) => member.topicId === node.id);
+    const image = mine && findAnnotatedImage((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], mine.imageId);
+    if (!mine || !image) return void 0;
+    const picture = { x: image.x, y: image.y, w: image.w, h: image.h };
+    const SIDES = ["top", "right", "bottom", "left"];
+    const FORWARD = { top: "ArrowRight", right: "ArrowDown", bottom: "ArrowLeft", left: "ArrowUp" };
+    const stand = (card) => {
+      var _a3, _b3, _c;
+      const rect2 = {
+        x: card.x,
+        y: card.y,
+        w: (_a3 = card.width) != null ? _a3 : CARD_WIDTH,
+        h: (_c = (_b3 = this.cardHeightOf(card.id)) != null ? _b3 : card.height) != null ? _c : DEFAULT_CARD_HEIGHT
+      };
+      const side = ringSide(picture, rect2);
+      const cx = rect2.x + rect2.w / 2, cy = rect2.y + rect2.h / 2;
+      return { side, along: side === "top" ? cx : side === "right" ? cy : side === "bottom" ? -cx : -cy };
+    };
+    const cards = shown.filter((card) => members.some((member) => member.imageId === mine.imageId && member.topicId === card.id)).map((card) => ({ card, ...stand(card) })).sort(
+      (a, b) => SIDES.indexOf(a.side) - SIDES.indexOf(b.side) || a.along - b.along || (a.card.id < b.card.id ? -1 : 1)
+    );
+    const index = cards.findIndex((item) => item.card.id === node.id);
+    if (index < 0 || cards.length < 2) return void 0;
+    const forward = key2 === FORWARD[cards[index].side];
+    return cards[(index + (forward ? 1 : cards.length - 1)) % cards.length].card;
   }
   moveKeyboardFocus(target) {
     var _a2, _b2, _c, _d, _e;
@@ -76920,7 +77141,7 @@ ${addition}` : addition });
    * The edges touching a group of cards that move by the same offset. An edge with both ends in the group moves
    * with both; an edge with one end in the group keeps the other end where it was measured.
    */
-  groupDragEdges(group) {
+  groupDragEdges(group, movingImageId) {
     var _a2, _b2, _c;
     const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
     const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction, this.ringDirections(this.map));
@@ -76951,7 +77172,8 @@ ${addition}` : addition });
     }
     const anchored = [];
     for (const [key2, line] of this.anchorLinks)
-      if (group.has(line.topicId) && boxFor(line.topicId)) anchored.push({ key: key2, line });
+      if ((group.has(line.topicId) || line.imageId === movingImageId) && boxFor(line.topicId))
+        anchored.push({ key: key2, line });
     const spineIds = /* @__PURE__ */ new Set();
     for (const id of group.keys()) {
       const parentId = (_c = nodes.find((item) => item.id === id)) == null ? void 0 : _c.parentId;
@@ -76987,7 +77209,9 @@ ${addition}` : addition });
         }
         for (const { key: key2, line } of anchored) {
           const box = shifted(line.topicId, dx, dy);
-          if (box) this.placeAnchorLine(key2, line, box);
+          if (!box) continue;
+          const from = line.imageId === movingImageId ? { ...line, point: { x: line.point.x + dx, y: line.point.y + dy } } : line;
+          this.placeAnchorLine(key2, from, box);
         }
         for (const edge of tree) {
           const path = this.edgeEls.get(edge.key);

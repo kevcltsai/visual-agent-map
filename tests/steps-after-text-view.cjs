@@ -11,12 +11,17 @@ const MAP = `${TOPICS}/map-t/Map.md`;
 const txt = (over = {}) => ({ id: 't1', kind: 'text', text: 'Hello', parentId: undefined, x: 400, y: 80, ...over });
 const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); }, appendChild(c) { this.children.push(c); } });
 
+// The text double: width is the inline width, else the text fitted (7px a character plus padding, 32..300); height is 7px plus 20px a line.
+const textBox = (text, width) => {
+  const w = width ?? Math.min(300, Math.max(32, text.length * 7 + 14));
+  return { w, h: 7 + 20 * Math.max(1, Math.ceil((text.length * 7) / Math.max(1, w - 14))) };
+};
 // Root (P) with a text block t1 and a direct child "Child"; followers are added by the tests.
-async function harness(build) {
+async function harness(build, opts = {}) {
   const { repo, app, contents } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
-  const doc = { id: 'map-t', title: 'T', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  const doc = { id: 'map-t', title: 'T', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 }, ...(opts.direction ? { layout: { direction: opts.direction } } : {}) };
   await repo.ensureTopicFolders(`${TOPICS}/map-t`);
   await app.vault.create(MAP, core.serializeMap(doc));
   const root = await repo.createNote('Root', 'gpt-6-luna', doc, MAP, 'workspace');
@@ -25,7 +30,14 @@ async function harness(build) {
   Object.assign(root, { x: 80, y: 80 });
   Object.assign(child, { x: 420, y: 80 });
   doc.nodes.push(root, child);
-  doc.canvasItems = build ? build({ root, child }) : [txt({ parentId: root.id, x: 420, y: 300 })];
+  let other;
+  if (opts.other) {
+    other = await repo.createNote('Other', 'gpt-6-luna', doc, MAP, 'workspace');
+    other.parentId = root.id;
+    Object.assign(other, { x: 420, y: 700 });
+    doc.nodes.push(other);
+  }
+  doc.canvasItems = build ? build({ root, child, other }) : [txt({ parentId: root.id, x: 420, y: 300 })];
   await repo.saveMap(MAP, doc);
   await repo.rebuildDerivedData();
   let pending = Promise.resolve();
@@ -41,14 +53,24 @@ async function harness(build) {
   view.focusNode = () => {}; view.openDetails = () => {}; view.mergeUnlocked = () => true;
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
+  // Cards are 300 x 180. A text block's size is computed from its body text and inline width AT READ TIME (also for the hidden
+  // measuring blocks the view builds and removes), the way the browser would; nothing here stubs cardHeightOf or textWidthOf.
+  const bodyOf = el => find(el, i => dom.hasCls(i, 'vam-text-node-body'));
+  const dimsOf = el => textBox(bodyOf(el)?.text ?? '', el.style.width ? parseFloat(el.style.width) : undefined);
+  const withDims = el => {
+    // A test may pin a size for the geometry checks (Object.assign(el, { offsetWidth })); otherwise the size is computed on every read.
+    Object.defineProperty(el, 'offsetWidth', { configurable: true, get() { return this.pinnedW ?? dimsOf(this).w; }, set(v) { this.pinnedW = v; } });
+    Object.defineProperty(el, 'offsetHeight', { configurable: true, get() { return this.pinnedH ?? dimsOf(this).h; }, set(v) { this.pinnedH = v; } });
+  };
   view.render = () => {
     view.stageEl.children = []; view.cardEls.clear(); view.textEls.clear();
-    for (const n of view.map.nodes) view.cardEls.set(n.id, view.stageEl.child('div', 'vam-node'));
+    for (const n of view.map.nodes) { const c = view.stageEl.child('div', 'vam-node'); c.offsetHeight = 180; c.offsetWidth = 300; view.cardEls.set(n.id, c); }
     view.renderCanvasItems();
-    for (const el of view.textEls.values()) {
-      let fitted;
-      Object.defineProperty(el, 'offsetWidth', { configurable: true, get() { return this.style.width ? parseFloat(this.style.width) : fitted; }, set(v) { fitted = v; } });
-    }
+    const layer = find(view.stageEl, i => dom.hasCls(i, 'vam-text-nodes'));
+    if (!layer) return;
+    for (const el of layer.children) withDims(el);
+    const child = layer.child;
+    layer.child = function (name, value) { const c = child.call(this, name, value); if (dom.hasCls(c, 'vam-text-node')) withDims(c); return c; };
   };
   view.render();
   const settle = async () => { await pending; await dom.tick(); await pending; };
@@ -67,18 +89,21 @@ function assertSaved(map, label = '') {
   const ids = new Set(map.nodes.map(n => n.id));
   for (const n of map.nodes) assert.ok(n.parentId === null || ids.has(n.parentId), `${label}: parentId ${n.parentId} of ${n.id} is a node id`);
 }
-// Boxes of every card (default 300x180) and every text block (width as drawn) that overlap.
-function overlaps(h) {
-  const boxes = h.view.map.nodes.map(n => ({ id: n.id, x: n.x, y: n.y, w: W, ht: 180 }));
-  for (const t of h.view.map.canvasItems ?? []) if (t.kind === 'text') boxes.push({ id: t.id, x: t.x, y: t.y, w: h.view.textWidthOf(t.id) ?? 60, ht: 28 });
-  const hits = [];
-  boxes.forEach((a, i) => boxes.slice(i + 1).forEach(b => { if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.ht && b.y < a.y + a.ht) hits.push(`${a.id}/${b.id}`); }));
+// Boxes of every card (300 x 180) and every text block (the double's size for its data) that overlap.
+function boxesOf(h) {
+  const title = n => h.view.notes.get(n.id)?.title ?? n.id;
+  const boxes = h.view.map.nodes.map(n => ({ id: title(n), x: n.x, y: n.y, w: 300, ht: 180 }));
+  for (const t of h.view.map.canvasItems ?? []) if (t.kind === 'text') { const b = textBox(t.text, t.width); boxes.push({ id: t.id, x: t.x, y: t.y, w: b.w, ht: b.h }); }
+  return boxes;
+}
+function overlaps(h, keep = () => true) {
+  const boxes = boxesOf(h), hits = [];
+  boxes.forEach((a, i) => boxes.slice(i + 1).forEach(b => { if (keep(a.id, b.id) && a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.ht && b.y < a.y + a.ht) hits.push(`${a.id}/${b.id}`); }));
   return hits;
 }
 
 test('add: a topic added after a text block follows it, sits clear and to the right, makes no note for the text, is one undo step and reopens', async () => {
   const h = await harness();
-  h.view.cardHeightOf = id => (id === 't1' ? 28 : 180);
   const files = h.noteFiles().length, past = h.view.history.past.length;
   await h.view.addNode(h.view.map.nodes[0], 'C1', true, false, 'topic', false, {}, 't1');
   await h.settle();
@@ -259,7 +284,6 @@ test('R2: coordinate-only writes (updateMap) keep the text block and the field; 
 
 test('resize and edit: a text block with followers lays them out again in the same step, so they stay clear of it', async () => {
   const h = await harness(({ root }) => [txt({ parentId: root.id, x: 420, y: 300, text: 'short' })]);
-  h.view.cardHeightOf = id => (id === 't1' ? 28 : 180);
   await h.addFollower('C1');
   const t = () => h.view.map.canvasItems[0];
   const gap = () => h.node('C1').x - (t().x + (h.view.textWidthOf('t1') ?? 60));
@@ -443,7 +467,6 @@ for (const direction of ['right', 'left', 'balanced']) {
     h.view.map.layout = { direction };
     await h.repo.saveMap(h.view.path, h.view.map);
     h.view.map = await h.repo.readMap(h.view.path);
-    h.view.cardHeightOf = id => (id === 't1' ? 28 : 180);
     const placed = [];
     for (const title of ['C1', 'C2', 'C3', 'C4']) {
       await h.addFollower(title);
@@ -490,7 +513,6 @@ test('chat: reorder_topics with a follower and a direct child, or a move_topic b
 // ledger R1: a block's followers lay out against the block; moving the topic to the top level must take the block along.
 test('move to top level: the block hanging on the moved topic and its followers land next to it, not left behind', async () => {
   const h = await harness(({ child }) => [txt({ parentId: child.id, x: 760, y: 80, text: 'hello' })]);
-  h.view.cardHeightOf = id => (id === 't1' ? 28 : 180);
   await h.view.addNode(h.child, 'C1', true, false, 'topic', false, {}, 't1');
   await h.view.addNode(h.child, 'C2', true, false, 'topic', false, {}, 't1');
   await h.view.hydrate();
@@ -501,8 +523,11 @@ test('move to top level: the block hanging on the moved topic and its followers 
   const t = h.view.map.canvasItems.find(i => i.id === 't1');
   const followers = h.view.map.nodes.filter(n => n.afterTextId === 't1');
   assert.equal(followers.length, 2);
-  assert.ok(Math.abs(t.x - child.x) <= 700 && Math.abs(t.y - child.y) <= 400, `block ${t.x},${t.y} near its topic ${child.x},${child.y}`);
-  for (const f of followers) assert.ok(f.x > t.x && Math.abs(f.y - t.y) < 600, `follower ${f.x},${f.y} right of the block ${t.x},${t.y}`);
+  // Exact (replaces a loose distance threshold): the offsets are those of the branch laid out alone by Auto layout, within 1px.
+  await h.view.hydrate();
+  const now = snap(h), alone = reference(h, ['Child', 'C1', 'C2', 't1']);
+  near(rel(now, 't1', 'Child'), rel(alone, 't1', 'Child'), 'block against its topic');
+  for (const k of ['C1', 'C2']) near(rel(now, k, 't1'), rel(alone, k, 't1'), `${k} against the block`);
   assert.deepEqual(overlaps(h).filter(pair => pair.includes('t1')), []);
   assertSaved(h.raw(), 'top level');
 });
@@ -535,7 +560,6 @@ for (const direction of ['right', 'left', 'balanced', 'down', 'up']) {
     h.view.map.layout = { direction };
     await h.repo.saveMap(h.view.path, h.view.map);
     h.view.map = await h.repo.readMap(h.view.path);
-    h.view.cardHeightOf = id => (id === 't1' ? 28 : 180);
     await h.addFollower('C1');
     await h.addFollower('C2');
     await h.settle();
@@ -547,11 +571,324 @@ for (const direction of ['right', 'left', 'balanced', 'down', 'up']) {
     await h.view.resizeText('t1', 560, from);
     await h.settle();
     assert.deepEqual(at(), anchored, `the block did not move when it was widened ${JSON.stringify(h.view.map.nodes.map(n => [n.x, n.y, n.afterTextId]))}`);
-    const widened = at();
+    const widened = at(), heightBefore = textBox('short', 560).h;
     await h.view.saveTextItem('t1', 'a much longer text '.repeat(10));
     await h.settle();
-    assert.deepEqual(at(), widened, 'the block did not move when its text changed');
+    // CONTRACT CHANGE (advisor.md rule table): in an up map the edge facing the topic is the bottom, so a taller block grows upward.
+    const grown = textBox('a much longer text '.repeat(10).trim(), 560).h;
+    assert.deepEqual(at(), direction === 'up' ? [widened[0], widened[1] + heightBefore - grown] : widened, 'the edge facing the topic did not move when its text changed');
     assert.deepEqual(overlaps(h).filter(s => s.includes('t1')), [], 'followers clear of the wider block');
     assertSaved(h.raw(), direction);
   });
 }
+
+// ---- Placement rule (advisor.md): one table-driven matrix, rule rows x 8 layouts, every case from a real Auto layout. ----------
+// Sizes come from the text double above (computed at read time), never from a stub of cardHeightOf / textWidthOf.
+const crypto = require('node:crypto');
+const layoutLib = load('map-layout.ts');
+const layoutText = load('map-layout-text.ts');
+const balancedLib = load('layouts/balanced.ts');
+const DIRS = ['right', 'left', 'balanced', 'down', 'up', 'radial', 'timeline', 'fishbone'];
+const WHOLE = ['radial', 'timeline', 'fishbone']; // these lay the whole map out again (the first root stays), see the rule table
+const LONG = 'x'.repeat(200);
+const isFollower = k => /^C\d/.test(k);
+const keyOf = (h, n) => h.view.notes.get(n.id)?.title ?? n.id;
+const snap = h => {
+  const out = {};
+  for (const n of h.view.map.nodes) out[keyOf(h, n)] = { x: n.x, y: n.y };
+  for (const t of h.view.map.canvasItems ?? []) if (t.kind === 'text') out[t.id] = { x: t.x, y: t.y };
+  return out;
+};
+const boxOf = (h, id = 't1') => { const t = h.view.map.canvasItems.find(i => i.id === id); return textBox(t.text, t.width); };
+const rel = (s, a, b) => [s[a].x - s[b].x, s[a].y - s[b].y];
+const near = (actual, expected, label, tolerance = 1) => {
+  assert.ok(actual.every((v, i) => Math.abs(v - expected[i]) <= tolerance), `${label}: ${JSON.stringify(actual)} vs ${JSON.stringify(expected)}`);
+};
+const sizeFns = items => {
+  const item = id => items.find(i => i.id === id);
+  return { heightOf: id => (item(id) ? textBox(item(id).text, item(id).width).h : 180), widthOf: id => (item(id) ? textBox(item(id).text, item(id).width).w : undefined) };
+};
+const snapOf = (h, nodes, items) => {
+  const s = {};
+  for (const n of nodes) s[keyOf(h, n)] = { x: n.x, y: n.y };
+  for (const t of items) if (t.kind === 'text') s[t.id] = { x: t.x, y: t.y };
+  return s;
+};
+// What Auto layout would give for the map as it stands now, or for one branch of it alone (`only`: node keys, the first one the root);
+// sizes come from the data, not from the view's measurers.
+function reference(h, only) {
+  let items = plain(h.view.map.canvasItems ?? []), nodes = plain(h.view.map.nodes);
+  if (only) {
+    nodes = nodes.filter(n => only.includes(keyOf(h, n)));
+    nodes.find(n => keyOf(h, n) === only[0]).parentId = null;
+    items = items.filter(i => nodes.some(n => n.id === i.parentId));
+  }
+  const { heightOf, widthOf } = sizeFns(items);
+  const out = layoutText.arrangeMapWithText(nodes, items, undefined, heightOf, h.view.map.layout ?? { direction: 'right' }, { widthOf });
+  return snapOf(h, out.nodes, out.items);
+}
+// What the engine gives for the topics that follow the block when it is told the block's true size (and nothing else): the oracle for
+// "the followers sit against the block as it is drawn now". Only `only` keys are laid out (default: every follower).
+function againstBlock(h, only) {
+  const items = plain(h.view.map.canvasItems), nodes = plain(h.view.map.nodes);
+  const ids = new Set(nodes.filter(n => n.afterTextId === 't1' && (!only || only.includes(keyOf(h, n)))).map(n => n.id));
+  const { heightOf, widthOf } = sizeFns(items);
+  const out = layoutText.arrangeNewBranchWithText(nodes, items, 't1', ids, heightOf, undefined, h.view.map.layout ?? { direction: 'right' }, widthOf);
+  return snapOf(h, out.nodes, out.items);
+}
+async function auto(h) {
+  await h.view.mapChange(m => h.view.arrangeAll(m));
+  await h.settle();
+  await h.view.hydrate();
+  h.view.render();
+}
+async function begin(direction, { text = 'hello', width, followers = ['C1'], on = 'root', other = false, wide = false } = {}) {
+  const h = await harness(({ root, child }) => [
+    txt({ parentId: (on === 'child' ? child : root).id, x: 420, y: 300, text, ...(width ? { width } : {}) }),
+    ...(wide ? [txt({ id: 't2', parentId: (wide === 'child' ? child : root).id, x: 420, y: 520, text: 'wide sibling', width: 700 })] : [])
+  ], { direction, other });
+  h.view.render();
+  const owner = () => h.view.map.nodes.find(n => n.id === (on === 'child' ? h.child.id : h.root.id));
+  for (const title of followers) { await h.view.addNode(owner(), title, true, false, 'topic', false, {}, 't1'); await h.view.hydrate(); }
+  await auto(h);
+  return Object.assign(h, { owner });
+}
+const done = async h => { await h.settle(); await h.view.hydrate(); h.view.render(); };
+// Only the pairs the feature promises: any pair with a follower, and the block against its own topic.
+const relevant = (a, b) => isFollower(a) || isFollower(b) || [a, b].sort().join() === ['Root', 't1'].join();
+const assertNoOverlap = (h, label) => assert.deepEqual(overlaps(h, relevant), [], `${label}: overlaps ${JSON.stringify(boxesOf(h))}`);
+const oneUndo = async (h, before, past, label) => {
+  assert.equal(h.view.history.past.length, past + 1, `${label}: one undo step`);
+  await h.view.travel(false);
+  await done(h);
+  assert.deepEqual(snap(h), before, `${label}: undo restores every position`);
+};
+
+// Row "change T's width / T's text": T moves by its facing edge, its followers and their subtrees are laid out against it, nothing else moves.
+function checkEdit(h, before, D, label) {
+  const after = snap(h), a = boxOf(h), b = before.box, at = after.t1, t0 = before.pos.t1;
+  if (WHOLE.includes(D)) assert.deepEqual(after.Root, before.pos.Root, `${label}: the first root stays`);
+  else {
+    for (const k of Object.keys(before.pos)) if (k !== 't1' && !isFollower(k)) assert.deepEqual(after[k], before.pos[k], `${label}: ${k} stays`);
+    const facing = D === 'balanced' ? (balancedLib.sideFromTextBox(t0.x, b.w, before.pos.Root.x)) : D;
+    if (facing === 'right') assert.deepEqual(at, t0, `${label}: right keeps x and y`);
+    if (facing === 'left') { assert.equal(at.x + a.w, t0.x + b.w, `${label}: left keeps the right edge`); assert.equal(at.y, t0.y); }
+    if (facing === 'down') { near([at.x + a.w / 2], [t0.x + b.w / 2], `${label}: down keeps the centre`, 0.5); assert.equal(at.y, t0.y, `${label}: down keeps the top`); }
+    if (facing === 'up') { near([at.x + a.w / 2], [t0.x + b.w / 2], `${label}: up keeps the centre`, 0.5); assert.equal(at.y + a.h, t0.y + b.h, `${label}: up keeps the bottom`); }
+  }
+  const kids = Object.keys(after).filter(isFollower);
+  assert.ok(kids.length >= 1);
+  if (D === 'down' || D === 'up') {
+    for (const k of kids) assert.equal(D === 'down' ? after[k].y : after[k].y + 180, D === 'down' ? at.y + a.h + 60 : at.y - 60, `${label}: ${k} one row ${D} of the block`);
+    near([(Math.min(...kids.map(k => after[k].x)) + Math.max(...kids.map(k => after[k].x)) + 300) / 2], [at.x + a.w / 2], `${label}: followers centred on the block`);
+  } else {
+    const expected = againstBlock(h);
+    for (const k of kids) near([after[k].x, after[k].y], [expected[k].x, expected[k].y], `${label}: ${k} against the block at its drawn size`);
+    if (WHOLE.includes(D)) near([at.x, at.y], [expected.t1.x, expected.t1.y], `${label}: the block as the whole layout puts it`);
+  }
+  if (D === 'right') for (const k of kids) assert.equal(after[k].x, at.x + 360 + Math.max(0, a.w - 280), `${label}: ${k} one column right of the block`);
+  if (D === 'left') for (const k of kids) assert.equal(after[k].x, at.x - 360, `${label}: ${k} one column left of the block`);
+  assertNoOverlap(h, label);
+}
+async function editCase(D, how) {
+  const opts = { long: {}, keyboard: { text: LONG, width: 500 }, drag: { text: LONG, width: 500 }, auto: { text: LONG, width: 80 }, widen: {} }[how];
+  const h = await begin(D, { ...opts, followers: ['C1', 'C2'] });
+  const before = { pos: snap(h), box: boxOf(h) }, past = h.view.history.past.length;
+  const fitted = textBox('hello').w;
+  if (how === 'long') await h.view.saveTextItem('t1', LONG);
+  if (how === 'keyboard') await h.view.resizeText('t1', 80, 500);
+  if (how === 'drag') {
+    // A pointer drag has already put the new width on the element when it commits; `from` is what was read before.
+    const el = h.view.textEls.get('t1');
+    el.style.width = '80px'; el.addClass('has-width');
+    await h.view.resizeText('t1', 80, 500);
+  }
+  if (how === 'auto') await h.view.resizeText('t1', undefined, 80);
+  if (how === 'widen') await h.view.resizeText('t1', 560, fitted);
+  await done(h);
+  checkEdit(h, before, D, `${D} ${how}`);
+  await oneUndo(h, before.pos, past, `${D} ${how}`);
+}
+for (const D of DIRS) for (const how of ['long', 'keyboard', 'drag', 'auto', 'widen'])
+  test(`placement: ${D}: change the block (${how}): the facing edge stays, the followers sit against it, nothing else moves, one undo`, () => editCase(D, how));
+
+// Row "add C": only the new topic moves.
+for (const D of DIRS)
+  test(`placement: ${D}: add a topic after the block: only the new topic moves, against the block as drawn`, async () => {
+    const h = await begin(D, { followers: [] });
+    const pos0 = snap(h), box = boxOf(h);
+    const past = h.view.history.past.length;
+    await h.view.addNode(h.owner(), 'C1', true, false, 'topic', false, {}, 't1');
+    await done(h);
+    const s1 = snap(h);
+    if (WHOLE.includes(D)) assert.deepEqual(s1.Root, pos0.Root);
+    else for (const k of Object.keys(pos0)) assert.deepEqual(s1[k], pos0[k], `${k} stays`);
+    if (D === 'down' || D === 'up') {
+      assert.equal(D === 'down' ? s1.C1.y : s1.C1.y + 180, D === 'down' ? s1.t1.y + box.h + 60 : s1.t1.y - 60, 'one row from the block');
+      near([s1.C1.x + 150], [s1.t1.x + box.w / 2], 'centred on the block', 1);
+    } else {
+      const expected = againstBlock(h, ['C1']);
+      near([s1.C1.x, s1.C1.y], [expected.C1.x, expected.C1.y], 'against the block at its drawn size');
+      if (D === 'right') assert.equal(s1.C1.x, s1.t1.x + 360 + Math.max(0, box.w - 280));
+      if (D === 'left') assert.equal(s1.C1.x, s1.t1.x - 360);
+    }
+    assert.equal(h.view.history.past.length, past + 1);
+    await h.view.addNode(h.owner(), 'C2', true, false, 'topic', false, {}, 't1');
+    await done(h);
+    const s2 = snap(h);
+    if (!WHOLE.includes(D)) for (const k of Object.keys(s1)) assert.deepEqual(s2[k], s1[k], `${k} stays when the second topic is added`);
+    assertNoOverlap(h, `${D} second`);
+    assertSaved(h.raw(), D);
+  });
+
+// Row "add C" beside a wide text block (under the same topic, or under the neighbouring topic): the obstacle is as wide as it is drawn.
+for (const D of DIRS) for (const under of ['root', 'child'])
+  test(`placement: ${D}: topics added after a block keep clear of a wide text block under the ${under === 'root' ? 'same topic' : 'neighbouring topic'}`, async () => {
+    const h = await begin(D, { followers: [], wide: under });
+    for (const title of ['C1', 'C2', 'C3', 'C4']) { await h.view.addNode(h.owner(), title, true, false, 'topic', false, {}, 't1'); await done(h); }
+    assert.deepEqual(overlaps(h, (a, b) => isFollower(a) || isFollower(b)), [], JSON.stringify(boxesOf(h)));
+  });
+
+// A wide text block lying in the row the new topics go to (down / up): they slide past it as wide as it is drawn, not as a card.
+for (const D of ['down', 'up'])
+  test(`placement: ${D}: a topic added after a block slides past a wide text block lying in its row`, async () => {
+    const h = await begin(D, { followers: [], wide: 'root' });
+    const t = snap(h).t1, y = D === 'down' ? t.y + boxOf(h).h + 60 + 20 : t.y - 60 - 180 + 20;
+    h.view.map.canvasItems = h.view.map.canvasItems.map(i => (i.id === 't2' ? { ...i, x: t.x - 200, y } : i));
+    await h.repo.saveMap(h.view.path, h.view.map);
+    h.view.render();
+    await h.view.addNode(h.owner(), 'C1', true, false, 'topic', false, {}, 't1');
+    await done(h);
+    assert.deepEqual(overlaps(h, (a, b) => isFollower(a) || isFollower(b)), [], JSON.stringify(boxesOf(h)));
+  });
+
+// Rows "move under a parent" and "move to the top level": the branch with its block and followers lands as Auto layout would place it.
+async function branchCase(D, target) {
+  const h = await begin(D, { on: 'child', other: true, followers: ['C1', 'C2'] });
+  const before = snap(h), past = h.view.history.past.length;
+  const child = h.view.map.nodes.find(n => n.id === h.child.id), dest = target ? h.view.map.nodes.find(n => keyOf(h, n) === 'Other') : null;
+  await h.view.moveBranches([child], dest);
+  await done(h);
+  const after = snap(h);
+  if (!target || !WHOLE.includes(D)) for (const k of ['Root', 'Other']) assert.deepEqual(after[k], before[k], `${k} stays`);
+  else assert.deepEqual(after.Root, before.Root);
+  // Under a parent the radial, timeline and fishbone layouts lay the whole map out again, so Auto layout of the whole map is the reference there.
+  const ref = target && WHOLE.includes(D) ? reference(h) : reference(h, target ? ['Other', 'Child', 'C1', 'C2', 't1'] : ['Child', 'C1', 'C2', 't1']);
+  near(rel(after, 't1', 'Child'), rel(ref, 't1', 'Child'), `${D}: block against its topic`);
+  for (const k of ['C1', 'C2']) near(rel(after, k, 't1'), rel(ref, k, 't1'), `${D}: ${k} against the block`);
+  if (target) near(rel(after, 'Child', 'Other'), rel(ref, 'Child', 'Other'), `${D}: branch against the new parent`);
+  assertNoOverlap(h, D);
+  assertSaved(h.raw(), D);
+  await oneUndo(h, before, past, D);
+}
+for (const D of DIRS) {
+  test(`placement: ${D}: move a branch with a block to the top level: only the branch moves, as Auto layout lays it`, () => branchCase(D, false));
+  test(`placement: ${D}: move a branch with a block under another topic: the branch, block and followers sit against it`, () => branchCase(D, true));
+}
+
+// Row "fold / unfold, Auto layout": the block may not be drawn while it is laid out; its measured size is used.
+for (const D of DIRS) {
+  test(`placement: ${D}: fold and unfold lay the block (not drawn meanwhile) out as Auto layout does`, async () => {
+    const h = await begin(D, { text: LONG, followers: ['C1'] });
+    const before = snap(h);
+    h.view.toggleCollapsed(h.view.map.nodes[0]);
+    await done(h);
+    assert.equal(h.view.textEls.has('t1'), false, 'the block is not drawn while folded');
+    const folded = snap(h);
+    for (const k of ['t1', 'C1', 'Child']) assert.deepEqual(folded[k], before[k], `${k} (hidden) keeps its place`);
+    h.view.toggleCollapsed(h.view.map.nodes[0]);
+    await done(h);
+    const after = snap(h);
+    for (const k of Object.keys(before)) near([after[k].x, after[k].y], [before[k].x, before[k].y], `${D}: ${k} back where Auto layout put it`);
+    assertNoOverlap(h, D);
+  });
+  test(`placement: ${D}: Auto layout after a long edit equals the reference layout`, async () => {
+    const h = await begin(D, { followers: ['C1'] });
+    await h.view.saveTextItem('t1', LONG);
+    await done(h);
+    await auto(h);
+    const s = snap(h), ref = reference(h);
+    for (const k of Object.keys(ref)) near([s[k].x, s[k].y], [ref[k].x, ref[k].y], `${D}: ${k}`);
+    assertNoOverlap(h, D);
+  });
+}
+
+// Rows "delete T" and "turn into a topic card": the followers and their subtrees move, nothing else.
+for (const D of DIRS) {
+  test(`placement: ${D}: delete the block: only the followers move, no overlap, one undo`, async () => {
+    const h = await begin(D, { text: LONG, followers: ['C1', 'C2'] });
+    const before = snap(h), past = h.view.history.past.length;
+    await h.view.removeTextItem('t1');
+    await done(h);
+    const s = snap(h);
+    if (WHOLE.includes(D)) assert.deepEqual(s.Root, before.Root);
+    else for (const k of ['Root', 'Child']) assert.deepEqual(s[k], before[k], `${k} stays`);
+    assert.deepEqual(overlaps(h), [], D);
+    await oneUndo(h, before, past, D);
+  });
+  test(`placement: ${D}: turn the block into a card: only the followers move, no overlap, one undo`, async () => {
+    const h = await begin(D, { text: LONG, followers: ['C1', 'C2'] });
+    const before = snap(h), past = h.view.history.past.length;
+    await h.view.promoteTextNode('t1');
+    await done(h);
+    const s = snap(h);
+    if (WHOLE.includes(D)) assert.deepEqual(s.Root, before.Root);
+    else for (const k of ['Root', 'Child']) assert.deepEqual(s[k], before[k], `${k} stays`);
+    assert.deepEqual(overlaps(h, (a, b) => a !== 't1' && b !== 't1').filter(p => !/Child/.test(p)), [], D);
+    assert.equal(h.view.history.past.length, past + 1);
+  });
+}
+
+// A block without followers keeps main's behaviour: only its own x follows textAnchoredX, nothing else is laid out.
+for (const D of ['right', 'left', 'down', 'up', 'balanced'])
+  test(`placement: ${D}: a block without followers changes only its own x (textAnchoredX), nothing else`, async () => {
+    const h = await begin(D, { followers: [] });
+    const before = snap(h), from = boxOf(h).w;
+    const x = h.view.textAnchoredX('t1', from, 560);
+    await h.view.resizeText('t1', 560, from);
+    await done(h);
+    const s = snap(h);
+    for (const k of Object.keys(before)) assert.deepEqual(s[k], k === 't1' ? { x, y: before.t1.y } : before[k], k);
+    await h.view.saveTextItem('t1', LONG);
+    await done(h);
+    assert.deepEqual(snap(h), s, 'editing the text moves nothing');
+  });
+
+// The one measurer: from the DOM when drawn, from a hidden block (built and removed in one go) for `as` or an undrawn block.
+test('measure: textBoxOf reads the drawn block, a hypothetical text or width, and a block that is not drawn, and leaves nothing behind', async () => {
+  const h = await begin('right', { text: 'hello', followers: [] });
+  const layer = find(h.view.stageEl, i => dom.hasCls(i, 'vam-text-nodes'));
+  const count = layer.children.length;
+  assert.deepEqual(plain(h.view.textBoxOf('t1')), { width: 49, height: 27 }, 'drawn');
+  assert.deepEqual(plain(h.view.textBoxOf('t1', { text: LONG })), { width: 300, height: textBox(LONG).h }, 'as: new text');
+  assert.deepEqual(plain(h.view.textBoxOf('t1', { width: 80 })), { width: 80, height: textBox('hello', 80).h }, 'as: new width');
+  assert.deepEqual(plain(h.view.textBoxOf('t1', { text: LONG, width: 80 })), { width: 80, height: textBox(LONG, 80).h }, 'as: both');
+  h.view.textEls.get('t1').style.width = '300px'; // a drag in progress: as.width still wins, and so does as: width null (automatic)
+  assert.equal(h.view.textBoxOf('t1', { width: 80 }).width, 80);
+  assert.equal(h.view.textBoxOf('t1', { width: null }).width, 49, 'as: automatic');
+  h.view.textEls.delete('t1');
+  assert.deepEqual(plain(h.view.textBoxOf('t1')), { width: 49, height: 27 }, 'not drawn: measured hidden');
+  assert.equal(h.view.cardHeightOf('t1'), 27);
+  assert.equal(h.view.textWidthOf('t1'), 49);
+  assert.equal(layer.children.length, count, 'no measuring block is left in the layer');
+});
+
+// Maps without text blocks lay out exactly as before this feature (hashes of the engine's output on the parent commit).
+test('card-only maps: arrangeMap, arrangeNewBranch and arrangeNewTree give the same positions as before in all 8 layouts', () => {
+  const n = (id, parentId, extra = {}) => ({ id, path: `${id}.md`, parentId, x: 0, y: 0, collapsed: false, ...extra });
+  const base = () => [n('r', null), n('a', 'r'), n('b', 'r', { width: 420 }), n('c', 'r'), n('a1', 'a'), n('a2', 'a'), n('b1', 'b'), n('n', 'b', { x: 5, y: 5 }), n('n1', 'n'), n('z', null), n('z1', 'z')];
+  const heights = { a: 260, b1: 300, n: 240, z1: 200 };
+  const heightOf = id => heights[id] ?? 180;
+  const pinned = { right: '05641e0d08cf', left: 'cacba427a829', balanced: '9571ccd07082', down: 'cd990e33db6f', up: '4ce910c49c0f', radial: '3d187e581d8e', timeline: '4439ca151d87', fishbone: '6bd43e5a0a98' };
+  for (const d of DIRS) {
+    const spec = { direction: d };
+    const all = layoutLib.arrangeMap(base(), undefined, heightOf, spec);
+    const branch = layoutLib.arrangeNewBranch(all, 'b', new Set(['n', 'n1']), heightOf, undefined, spec);
+    const tree = layoutLib.arrangeNewTree(all, 'z', new Set(['z', 'z1']), heightOf, spec);
+    const view = list => list.map(x => [x.id, x.x, x.y]);
+    assert.equal(crypto.createHash('sha1').update(JSON.stringify([view(all), view(branch), view(tree)])).digest('hex').slice(0, 12), pinned[d], d);
+    // The text-aware entry points are the same function when no text block is involved.
+    assert.deepEqual(plain(layoutText.arrangeMapWithText(base(), [], undefined, heightOf, spec).nodes), plain(all), `${d} arrangeMapWithText`);
+    assert.deepEqual(plain(layoutText.arrangeNewTreeWithText(all, [], 'z', new Set(['z', 'z1']), heightOf, spec).nodes), plain(tree), `${d} arrangeNewTreeWithText`);
+  }
+});

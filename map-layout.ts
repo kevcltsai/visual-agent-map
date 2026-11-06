@@ -16,6 +16,10 @@ function widthExcess(node: MapNode): number {
 function textBlockWidth(node: MapNode): number {
   return node.path === "" ? (node.width ?? CARD_WIDTH) : CARD_WIDTH;
 }
+/** The width an already placed card or block takes up when another one is placed beside it: a text block wider than a card is as wide as it is drawn. */
+function obstacleWidth(node: MapNode): number {
+  return node.path === "" ? Math.max(WIDTH, node.width ?? 0) : WIDTH;
+}
 /** The side a first-level topic stands on now: a text block by its own box, a card by its x against the root's. */
 function knownSide(topic: MapNode, root: MapNode): BalancedSide | undefined {
   return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
@@ -378,7 +382,7 @@ function arrangeVerticalBranch(
   const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
   const rootCentres = roots.map(root => placed.get(root.id)!.x + WIDTH / 2);
   const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : WIDTH / 2;
-  let shiftX = parent.x + WIDTH / 2 - middle;
+  let shiftX = parent.x + (parent.path === "" ? (parent.width ?? WIDTH) : WIDTH) / 2 - middle;
   // Row 0 of the branch is the roots; they start one row gap below the parent's bottom edge (above its top edge for up).
   const rowGap = COLUMN - WIDTH;
   const rootTop = Math.min(...roots.map(root => placed.get(root.id)!.y));
@@ -395,12 +399,12 @@ function arrangeVerticalBranch(
         const other = cardHeight(heightOf, node.id);
         const x = point.x + shiftX;
         if (
-          x < node.x + WIDTH + LAYOUT_GAP &&
+          x < node.x + obstacleWidth(node) + LAYOUT_GAP &&
           node.x < x + WIDTH + LAYOUT_GAP &&
           topY < node.y + other + LAYOUT_GAP &&
           node.y < topY + own + LAYOUT_GAP
         )
-          next = Math.max(next, node.x + WIDTH + LAYOUT_GAP - point.x);
+          next = Math.max(next, node.x + obstacleWidth(node) + LAYOUT_GAP - point.x);
       }
     }
     if (next === shiftX) break;
@@ -541,7 +545,12 @@ export function arrangeNewBranch(
       for (const node of fixed) {
         const other = cardHeight(heightOf, node.id);
         const top = point.y + offset;
-        if (Math.abs(point.x - node.x) < WIDTH && top < node.y + other + LAYOUT_GAP && node.y < top + own + LAYOUT_GAP)
+        if (
+          point.x - node.x < obstacleWidth(node) &&
+          node.x - point.x < WIDTH &&
+          top < node.y + other + LAYOUT_GAP &&
+          node.y < top + own + LAYOUT_GAP
+        )
           next = Math.max(next, node.y + other + LAYOUT_GAP - point.y);
       }
     }

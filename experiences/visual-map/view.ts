@@ -283,7 +283,12 @@ import {
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
-import { arrangeMapWithText, arrangeNewBranchWithText, type TextWidthOf } from "../../map-layout-text";
+import {
+  arrangeMapWithText,
+  arrangeNewBranchWithText,
+  arrangeNewTreeWithText,
+  type TextWidthOf
+} from "../../map-layout-text";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { sideFromOffset, sideFromTextBox } from "../../layouts/balanced";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
@@ -913,6 +918,11 @@ const RELATION_LABEL_MIN_ZOOM = 0.6;
 /** A note shown under an expanded label is cut to this many characters. */
 const RELATION_LABEL_NOTE_MAX = 60;
 /** A card's distance from its root (a root is 0); only the fishbone edge reads it. */
+/** What a layout assumes about text blocks: their widths and the heights of every card and block. */
+interface TextSizes {
+  widthOf: TextWidthOf;
+  heightOf: (id: string) => number | undefined;
+}
 /** A one-line plain text node as drawn (padding + one line); a node not drawn yet takes this so the layout leaves no gap. */
 const TEXT_NODE_HEIGHT = 28;
 /** Width guess for a text block that is not drawn yet (an automatic block is as wide as its text, at most this). */
@@ -1490,19 +1500,53 @@ export class VisualAgentMapView extends ItemView {
     this.cardEls.get(id)?.offsetHeight ||
     // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
     this.map?.nodes.find(node => node.id === id)?.height ||
-    // A text node is no card: its own rendered height, or the default while it is not drawn yet.
+    // A text node is no card: its measured height (drawn, or measured in a hidden copy), else the default.
     (this.isTextId(id)
-      ? this.textEls.get(id)?.offsetHeight || TEXT_NODE_HEIGHT
+      ? this.textBoxOf(id)?.height || TEXT_NODE_HEIGHT
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
-  /** A text block's width for the layout: as drawn, else the stored one, else a guess from its text (a block not drawn yet). */
+  /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
   private textWidthOf = (id: string): number | undefined => {
-    const drawn = this.textEls.get(id)?.offsetWidth;
-    if (drawn) return drawn;
+    const measured = this.textBoxOf(id)?.width;
+    if (measured) return measured;
     const item = (this.map?.canvasItems ?? []).find(
       (entry): entry is TextItem => entry.kind === "text" && entry.id === id
     );
     return item ? (item.width ?? estimateTextWidth(item.text)) : undefined;
   };
+  /**
+   * The one measurer of a text block: its width and height as the browser lays it out. Without `as` a drawn block is read
+   * from the DOM; with `as` (the text or width it is about to have; `width: null` = automatic) or when it is not drawn, a
+   * hidden copy is built in the text layer, read at once and removed, so nothing is painted and no extra undo step is needed.
+   * The copy never reads the drawn block, so a drag that already changed its width cannot change the answer.
+   */
+  private textBoxOf(
+    id: string,
+    as?: { text?: string; width?: number | null }
+  ): { width: number; height: number } | undefined {
+    const drawn = this.textEls.get(id);
+    if (!as && drawn?.offsetWidth && drawn.offsetHeight)
+      return { width: drawn.offsetWidth, height: drawn.offsetHeight };
+    const item = (this.map?.canvasItems ?? []).find(
+      (entry): entry is TextItem => entry.kind === "text" && entry.id === id
+    );
+    const layer = this.stageEl?.querySelector<HTMLElement>(".vam-text-nodes");
+    if (!item || !layer) return undefined;
+    const width = as?.width === undefined ? item.width : (as.width ?? undefined);
+    const probe = layer.createDiv("vam-text-node");
+    try {
+      probe.addClass("vam-text-probe");
+      probe.setAttr("aria-hidden", "true");
+      if (width !== undefined) {
+        probe.style.width = `${width}px`;
+        probe.addClass("has-width");
+      }
+      probe.createDiv({ cls: "vam-text-node-body", text: as?.text ?? item.text });
+      const box = { width: probe.offsetWidth, height: probe.offsetHeight };
+      return box.width && box.height ? box : undefined;
+    } finally {
+      probe.remove();
+    }
+  }
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
   private textEls = new Map<string, HTMLElement>();
   /** After a text block's width changed (the canvas repaints), its handle takes the keyboard focus back. */
@@ -1587,23 +1631,37 @@ export class VisualAgentMapView extends ItemView {
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
   }
-  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
+  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. `sizes` gives the text sizes the layout is to assume. */
   private arrangeBranch(
     map: MapDocument,
     parentId: string,
     newIds: Set<string>,
     minTop?: number,
-    widthOf: TextWidthOf = this.textWidthOf
+    sizes: TextSizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf }
   ): void {
     const out = arrangeNewBranchWithText(
       map.nodes,
       map.canvasItems ?? [],
       parentId,
       newIds,
-      this.cardHeightOf,
+      sizes.heightOf,
       minTop,
       layoutOf(map),
-      widthOf
+      sizes.widthOf
+    );
+    map.nodes = out.nodes;
+    if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /** A branch became a top-level tree: it is laid out below the rest; a text block with followers inside it goes with it, as it would in Auto layout. */
+  private arrangeTree(map: MapDocument, rootId: string, ids: Set<string>): void {
+    const out = arrangeNewTreeWithText(
+      map.nodes,
+      map.canvasItems ?? [],
+      rootId,
+      ids,
+      this.cardHeightOf,
+      layoutOf(map),
+      this.textWidthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -1621,21 +1679,34 @@ export class VisualAgentMapView extends ItemView {
       }
     return ids;
   }
-  /** Lays out the topics after text block `textId` again (nothing when none follow it); `widthOf` can give the width it is about to have. */
-  private relayoutFollowers(map: MapDocument, textId: string, widthOf?: TextWidthOf): void {
-    const text = (map.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === textId);
+  /**
+   * The block's own edit (its width or its text), for a block that has followers: the edge facing its topic stays (right: x;
+   * left: the right edge; down: centre and top; up: centre and bottom), and the followers are laid out against the block at
+   * its new size. The only place this rule lives; `from` and `to` are measured sizes (see `textBoxOf`). Nothing when no
+   * topic follows the block.
+   */
+  private relayoutFollowers(
+    map: MapDocument,
+    textId: string,
+    from: { width: number; height: number },
+    to: { width: number; height: number }
+  ): void {
+    const items = map.canvasItems ?? [];
+    const text = items.find((item): item is TextItem => item.kind === "text" && item.id === textId);
     const followers = this.followersOf(map, textId);
     if (!text?.parentId || !followers.size) return;
-    // Grown from the block, as the + does: the block stays where it is and only what follows it moves.
-    this.arrangeBranch(map, textId, followers, undefined, widthOf);
-  }
-  /**
-   * After a branch became a top-level tree (`arrangeNewTree` knows no text), lays out again the blocks hanging on its topics
-   * that have followers, so the line from a block to its followers does not run across the map.
-   */
-  private relayoutBlocksOf(map: MapDocument, branch: Set<string>): void {
-    const blocks = (map.canvasItems ?? []).filter((item): item is TextItem => item.kind === "text");
-    for (const block of blocks) if (block.parentId && branch.has(block.parentId)) this.relayoutFollowers(map, block.id);
+    const upward = branchDirectionResolver(map.nodes, layoutOf(map).direction)(text.parentId) === "up";
+    const anchored = {
+      ...text,
+      x: this.textAnchoredX(textId, from.width, to.width),
+      y: upward ? text.y + from.height - to.height : text.y
+    };
+    map.canvasItems = items.map(item => (item === text ? anchored : item));
+    // Grown from the block, as the + does: the block stays where its edge rule put it and only what follows it moves.
+    this.arrangeBranch(map, textId, followers, undefined, {
+      widthOf: id => (id === textId ? to.width : this.textWidthOf(id)),
+      heightOf: id => (id === textId ? to.height : this.cardHeightOf(id))
+    });
   }
   /** The map's child index while a paint draws its cards; null otherwise. */
   private paintChildIndex: Map<string, MapNode[]> | null = null;
@@ -8946,16 +9017,28 @@ export class VisualAgentMapView extends ItemView {
    * `from` is the width before the change; resetting to automatic measures the fitted width for `to`.
    */
   private async resizeText(id: string, width: number | undefined, from: number): Promise<void> {
+    // Both boxes are measured, never read from the element: a drag has already put the new width on it, a key press has not.
     const el = this.textEls.get(id);
-    const to = width ?? (el ? fittedTextWidth(el) : from);
+    const before = this.textBoxOf(id, { width: from }) ?? { width: from, height: el?.offsetHeight || TEXT_NODE_HEIGHT };
+    const after = this.textBoxOf(id, { width: width ?? null });
+    // Nothing to measure with (no text layer): the drawn block's fitted width, as before.
+    const to = width ?? after?.width ?? (el ? fittedTextWidth(el) : from);
     const x = this.textAnchoredX(id, from, to);
+    const follows = this.followersOf(this.map!, id).size > 0;
     await this.changeCanvasItems(
       id,
       items =>
         setTextNodeWidth(items, id, width).map(entry =>
-          entry.kind === "text" && (entry as TextItem).id === id ? { ...(entry as TextItem), x } : entry
+          // With followers the one rule in `relayoutFollowers` places the block.
+          entry.kind === "text" && (entry as TextItem).id === id && !follows ? { ...(entry as TextItem), x } : entry
         ),
-      map => this.relayoutFollowers(map, id, textId => (textId === id ? to : this.textWidthOf(textId)))
+      map =>
+        this.relayoutFollowers(
+          map,
+          id,
+          { width: from, height: before.height },
+          { width: to, height: after?.height ?? before.height }
+        )
     );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
@@ -9273,13 +9356,20 @@ export class VisualAgentMapView extends ItemView {
     this.focusItemId = id;
     if (cleanText(value) === null) {
       await this.removeTextItem(id);
-    } else if (cleanText(value) !== current.text)
+    } else if (cleanText(value) !== current.text) {
+      // The block may be wider or taller now: both sizes are measured here, before the DOM has the new text.
+      const text = cleanText(value) as string;
+      const before = this.textBoxOf(id);
+      const after = this.textBoxOf(id, { text });
       await this.changeCanvasItems(
         id,
         items => updateTextNode(items, id, value),
-        // The block may be wider or taller now: the topics after it are laid out again in the same step.
-        map => this.relayoutFollowers(map, id)
+        // The topics after it are laid out again against the new size in the same step.
+        map => {
+          if (before && after) this.relayoutFollowers(map, id, before, after);
+        }
       );
+    }
   }
   /**
    * Deletes a text block. The topics that follow it stay: they are direct children of the block's topic again and are laid
@@ -10575,9 +10665,7 @@ export class VisualAgentMapView extends ItemView {
         // One layout for the moved branches under the target, in the same history entry as the move.
         this.arrangeBranch(map, target.id, moved, undefined);
       } else {
-        for (const root of roots)
-          map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id)!, this.cardHeightOf, layoutOf(map));
-        for (const root of roots) this.relayoutBlocksOf(map, branchOf.get(root.id)!);
+        for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id)!);
       }
     });
     this.selection.afterMove(clearSelection);
@@ -15113,8 +15201,7 @@ export class VisualAgentMapView extends ItemView {
             parent.collapsed = false;
             this.arrangeBranch(map, parent.id, branch, undefined);
           } else {
-            map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
-            this.relayoutBlocksOf(map, branch);
+            this.arrangeTree(map, node.id, branch);
           }
         });
       });

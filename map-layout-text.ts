@@ -1,6 +1,13 @@
 // Kept apart from map-layout.ts so the share viewer, which bundles map-layout.ts, does not pull in canvas items.
 import { treeTextNodes, type CanvasItem, type TextItem } from "./experiences/visual-map/canvas-items";
-import { arrangeMap, arrangeNewBranch, type HeightOf, type LayoutKind, type MapLayout } from "./map-layout";
+import {
+  arrangeMap,
+  arrangeNewBranch,
+  arrangeNewTree,
+  type HeightOf,
+  type LayoutKind,
+  type MapLayout
+} from "./map-layout";
 import { childIndex, walkDescendants, withTextParents, type MapNode } from "./map-graph";
 
 /** Text nodes that take part in a layout: their topic exists, is shown and is not collapsed. Others keep their coordinates. */
@@ -122,6 +129,36 @@ export function arrangeNewBranchWithText(
     for (const id of below) withNew.add(id);
   }
   const placed = arrangeNewBranch(virtual, parentId, withNew, heightOf, minTop, layout);
+  const real = new Set(nodes.map(node => node.id));
+  return {
+    nodes: mergePositions(nodes, placed),
+    items: withTextPositions(
+      items,
+      texts,
+      placed.filter(node => !real.has(node.id))
+    )
+  };
+}
+
+/**
+ * `arrangeNewTree` for a branch that became a top-level tree. A text block hanging on a topic of the branch that has topics
+ * following it goes with the branch (it is laid out as the node between its topic and its followers, as Auto layout does);
+ * every other text block stays where it is. Without such a block it is exactly `arrangeNewTree`. Never lays the whole map out again.
+ */
+export function arrangeNewTreeWithText(
+  nodes: MapNode[],
+  items: readonly CanvasItem[],
+  rootId: string,
+  newIds: Set<string>,
+  heightOf?: HeightOf,
+  layout: LayoutKind | MapLayout = "right",
+  widthOf?: TextWidthOf
+): { nodes: MapNode[]; items: CanvasItem[] } {
+  const followed = new Set(nodes.flatMap(node => (node.afterTextId ? [node.afterTextId] : [])));
+  const texts = visibleTexts(nodes, items).filter(text => newIds.has(text.parentId as string) && followed.has(text.id));
+  if (!texts.length) return { nodes: arrangeNewTree(nodes, rootId, newIds, heightOf, layout), items: [...items] };
+  const withNew = new Set([...newIds, ...texts.map(text => text.id)]);
+  const placed = arrangeNewTree(virtualTree(nodes, texts, widthOf), rootId, withNew, heightOf, layout);
   const real = new Set(nodes.map(node => node.id));
   return {
     nodes: mergePositions(nodes, placed),

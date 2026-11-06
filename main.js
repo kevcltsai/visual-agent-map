@@ -20378,6 +20378,10 @@ function textBlockWidth(node) {
   var _a2;
   return node.path === "" ? (_a2 = node.width) != null ? _a2 : CARD_WIDTH : CARD_WIDTH;
 }
+function obstacleWidth(node) {
+  var _a2;
+  return node.path === "" ? Math.max(WIDTH, (_a2 = node.width) != null ? _a2 : 0) : WIDTH;
+}
 function knownSide(topic, root) {
   return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
 }
@@ -20614,11 +20618,12 @@ function rearrangeWhole(nodes, heightOf, layout) {
   });
 }
 function arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout) {
+  var _a2;
   const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
   const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
   const rootCentres = roots.map((root) => placed.get(root.id).x + WIDTH / 2);
   const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : WIDTH / 2;
-  let shiftX = parent.x + WIDTH / 2 - middle;
+  let shiftX = parent.x + (parent.path === "" ? (_a2 = parent.width) != null ? _a2 : WIDTH : WIDTH) / 2 - middle;
   const rowGap = COLUMN - WIDTH;
   const rootTop = Math.min(...roots.map((root) => placed.get(root.id).y));
   const rootBottom = Math.max(...roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id)));
@@ -20632,8 +20637,8 @@ function arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, la
       for (const node of fixed2) {
         const other = cardHeight(heightOf, node.id);
         const x = point.x + shiftX;
-        if (x < node.x + WIDTH + LAYOUT_GAP2 && node.x < x + WIDTH + LAYOUT_GAP2 && topY < node.y + other + LAYOUT_GAP2 && node.y < topY + own2 + LAYOUT_GAP2)
-          next = Math.max(next, node.x + WIDTH + LAYOUT_GAP2 - point.x);
+        if (x < node.x + obstacleWidth(node) + LAYOUT_GAP2 && node.x < x + WIDTH + LAYOUT_GAP2 && topY < node.y + other + LAYOUT_GAP2 && node.y < topY + own2 + LAYOUT_GAP2)
+          next = Math.max(next, node.x + obstacleWidth(node) + LAYOUT_GAP2 - point.x);
       }
     }
     if (next === shiftX) break;
@@ -20748,7 +20753,7 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout = "r
       for (const node of fixed2) {
         const other = cardHeight(heightOf, node.id);
         const top = point.y + offset;
-        if (Math.abs(point.x - node.x) < WIDTH && top < node.y + other + LAYOUT_GAP2 && node.y < top + own2 + LAYOUT_GAP2)
+        if (point.x - node.x < obstacleWidth(node) && node.x - point.x < WIDTH && top < node.y + other + LAYOUT_GAP2 && node.y < top + own2 + LAYOUT_GAP2)
           next = Math.max(next, node.y + other + LAYOUT_GAP2 - point.y);
       }
     }
@@ -29671,6 +29676,22 @@ function arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minT
     for (const id of below) withNew.add(id);
   }
   const placed = arrangeNewBranch(virtual, parentId, withNew, heightOf, minTop, layout);
+  const real = new Set(nodes.map((node) => node.id));
+  return {
+    nodes: mergePositions(nodes, placed),
+    items: withTextPositions(
+      items,
+      texts2,
+      placed.filter((node) => !real.has(node.id))
+    )
+  };
+}
+function arrangeNewTreeWithText(nodes, items, rootId, newIds, heightOf, layout = "right", widthOf) {
+  const followed = new Set(nodes.flatMap((node) => node.afterTextId ? [node.afterTextId] : []));
+  const texts2 = visibleTexts(nodes, items).filter((text11) => newIds.has(text11.parentId) && followed.has(text11.id));
+  if (!texts2.length) return { nodes: arrangeNewTree(nodes, rootId, newIds, heightOf, layout), items: [...items] };
+  const withNew = /* @__PURE__ */ new Set([...newIds, ...texts2.map((text11) => text11.id)]);
+  const placed = arrangeNewTree(virtualTree(nodes, texts2, widthOf), rootId, withNew, heightOf, layout);
   const real = new Set(nodes.map((node) => node.id));
   return {
     nodes: mergePositions(nodes, placed),
@@ -56045,14 +56066,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "cardHeightOf", (id) => {
       var _a2, _b2, _c, _d;
       return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
-      ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === id)) == null ? void 0 : _c.height) || // A text node is no card: its own rendered height, or the default while it is not drawn yet.
-      (this.isTextId(id) ? ((_d = this.textEls.get(id)) == null ? void 0 : _d.offsetHeight) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
+      ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === id)) == null ? void 0 : _c.height) || // A text node is no card: its measured height (drawn, or measured in a hidden copy), else the default.
+      (this.isTextId(id) ? ((_d = this.textBoxOf(id)) == null ? void 0 : _d.height) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
     });
-    /** A text block's width for the layout: as drawn, else the stored one, else a guess from its text (a block not drawn yet). */
+    /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
     __publicField(this, "textWidthOf", (id) => {
       var _a2, _b2, _c, _d;
-      const drawn = (_a2 = this.textEls.get(id)) == null ? void 0 : _a2.offsetWidth;
-      if (drawn) return drawn;
+      const measured = (_a2 = this.textBoxOf(id)) == null ? void 0 : _a2.width;
+      if (measured) return measured;
       const item = ((_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : []).find(
         (entry) => entry.kind === "text" && entry.id === id
       );
@@ -56217,6 +56238,38 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
   }
+  /**
+   * The one measurer of a text block: its width and height as the browser lays it out. Without `as` a drawn block is read
+   * from the DOM; with `as` (the text or width it is about to have; `width: null` = automatic) or when it is not drawn, a
+   * hidden copy is built in the text layer, read at once and removed, so nothing is painted and no extra undo step is needed.
+   * The copy never reads the drawn block, so a drag that already changed its width cannot change the answer.
+   */
+  textBoxOf(id, as) {
+    var _a2, _b2, _c, _d, _e;
+    const drawn = this.textEls.get(id);
+    if (!as && (drawn == null ? void 0 : drawn.offsetWidth) && drawn.offsetHeight)
+      return { width: drawn.offsetWidth, height: drawn.offsetHeight };
+    const item = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (entry) => entry.kind === "text" && entry.id === id
+    );
+    const layer = (_c = this.stageEl) == null ? void 0 : _c.querySelector(".vam-text-nodes");
+    if (!item || !layer) return void 0;
+    const width = (as == null ? void 0 : as.width) === void 0 ? item.width : (_d = as.width) != null ? _d : void 0;
+    const probe = layer.createDiv("vam-text-node");
+    try {
+      probe.addClass("vam-text-probe");
+      probe.setAttr("aria-hidden", "true");
+      if (width !== void 0) {
+        probe.style.width = `${width}px`;
+        probe.addClass("has-width");
+      }
+      probe.createDiv({ cls: "vam-text-node-body", text: (_e = as == null ? void 0 : as.text) != null ? _e : item.text });
+      const box = { width: probe.offsetWidth, height: probe.offsetHeight };
+      return box.width && box.height ? box : void 0;
+    } finally {
+      probe.remove();
+    }
+  }
   isTextId(id) {
     var _a2, _b2;
     return id.startsWith("txt-") || !!((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) == null ? void 0 : _b2.some((item) => item.kind === "text" && item.id === id));
@@ -56250,18 +56303,33 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
   }
-  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
-  arrangeBranch(map, parentId, newIds, minTop, widthOf = this.textWidthOf) {
+  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. `sizes` gives the text sizes the layout is to assume. */
+  arrangeBranch(map, parentId, newIds, minTop, sizes = { widthOf: this.textWidthOf, heightOf: this.cardHeightOf }) {
     var _a2;
     const out = arrangeNewBranchWithText(
       map.nodes,
       (_a2 = map.canvasItems) != null ? _a2 : [],
       parentId,
       newIds,
-      this.cardHeightOf,
+      sizes.heightOf,
       minTop,
       layoutOf(map),
-      widthOf
+      sizes.widthOf
+    );
+    map.nodes = out.nodes;
+    if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /** A branch became a top-level tree: it is laid out below the rest; a text block with followers inside it goes with it, as it would in Auto layout. */
+  arrangeTree(map, rootId, ids) {
+    var _a2;
+    const out = arrangeNewTreeWithText(
+      map.nodes,
+      (_a2 = map.canvasItems) != null ? _a2 : [],
+      rootId,
+      ids,
+      this.cardHeightOf,
+      layoutOf(map),
+      this.textWidthOf
     );
     map.nodes = out.nodes;
     if (map.canvasItems) map.canvasItems = out.items;
@@ -56279,22 +56347,29 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       }
     return ids;
   }
-  /** Lays out the topics after text block `textId` again (nothing when none follow it); `widthOf` can give the width it is about to have. */
-  relayoutFollowers(map, textId, widthOf) {
+  /**
+   * The block's own edit (its width or its text), for a block that has followers: the edge facing its topic stays (right: x;
+   * left: the right edge; down: centre and top; up: centre and bottom), and the followers are laid out against the block at
+   * its new size. The only place this rule lives; `from` and `to` are measured sizes (see `textBoxOf`). Nothing when no
+   * topic follows the block.
+   */
+  relayoutFollowers(map, textId, from, to) {
     var _a2;
-    const text11 = ((_a2 = map.canvasItems) != null ? _a2 : []).find((item) => item.kind === "text" && item.id === textId);
+    const items = (_a2 = map.canvasItems) != null ? _a2 : [];
+    const text11 = items.find((item) => item.kind === "text" && item.id === textId);
     const followers = this.followersOf(map, textId);
     if (!(text11 == null ? void 0 : text11.parentId) || !followers.size) return;
-    this.arrangeBranch(map, textId, followers, void 0, widthOf);
-  }
-  /**
-   * After a branch became a top-level tree (`arrangeNewTree` knows no text), lays out again the blocks hanging on its topics
-   * that have followers, so the line from a block to its followers does not run across the map.
-   */
-  relayoutBlocksOf(map, branch) {
-    var _a2;
-    const blocks = ((_a2 = map.canvasItems) != null ? _a2 : []).filter((item) => item.kind === "text");
-    for (const block of blocks) if (block.parentId && branch.has(block.parentId)) this.relayoutFollowers(map, block.id);
+    const upward = branchDirectionResolver(map.nodes, layoutOf(map).direction)(text11.parentId) === "up";
+    const anchored = {
+      ...text11,
+      x: this.textAnchoredX(textId, from.width, to.width),
+      y: upward ? text11.y + from.height - to.height : text11.y
+    };
+    map.canvasItems = items.map((item) => item === text11 ? anchored : item);
+    this.arrangeBranch(map, textId, followers, void 0, {
+      widthOf: (id) => id === textId ? to.width : this.textWidthOf(id),
+      heightOf: (id) => id === textId ? to.height : this.cardHeightOf(id)
+    });
   }
   onMapWindowFocus() {
     var _a2, _b2, _c;
@@ -63047,15 +63122,30 @@ ${request.requirements}` : preset.text,
    * `from` is the width before the change; resetting to automatic measures the fitted width for `to`.
    */
   async resizeText(id, width, from) {
+    var _a2, _b2;
     const el = this.textEls.get(id);
-    const to = width != null ? width : el ? fittedTextWidth(el) : from;
+    const before = (_a2 = this.textBoxOf(id, { width: from })) != null ? _a2 : { width: from, height: (el == null ? void 0 : el.offsetHeight) || TEXT_NODE_HEIGHT };
+    const after = this.textBoxOf(id, { width: width != null ? width : null });
+    const to = (_b2 = width != null ? width : after == null ? void 0 : after.width) != null ? _b2 : el ? fittedTextWidth(el) : from;
     const x = this.textAnchoredX(id, from, to);
+    const follows = this.followersOf(this.map, id).size > 0;
     await this.changeCanvasItems(
       id,
       (items) => setTextNodeWidth(items, id, width).map(
-        (entry) => entry.kind === "text" && entry.id === id ? { ...entry, x } : entry
+        (entry) => (
+          // With followers the one rule in `relayoutFollowers` places the block.
+          entry.kind === "text" && entry.id === id && !follows ? { ...entry, x } : entry
+        )
       ),
-      (map) => this.relayoutFollowers(map, id, (textId) => textId === id ? to : this.textWidthOf(textId))
+      (map) => {
+        var _a3;
+        return this.relayoutFollowers(
+          map,
+          id,
+          { width: from, height: before.height },
+          { width: to, height: (_a3 = after == null ? void 0 : after.height) != null ? _a3 : before.height }
+        );
+      }
     );
   }
   /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
@@ -63368,13 +63458,19 @@ ${request.requirements}` : preset.text,
     this.focusItemId = id;
     if (cleanText(value) === null) {
       await this.removeTextItem(id);
-    } else if (cleanText(value) !== current.text)
+    } else if (cleanText(value) !== current.text) {
+      const text11 = cleanText(value);
+      const before = this.textBoxOf(id);
+      const after = this.textBoxOf(id, { text: text11 });
       await this.changeCanvasItems(
         id,
         (items) => updateTextNode(items, id, value),
-        // The block may be wider or taller now: the topics after it are laid out again in the same step.
-        (map) => this.relayoutFollowers(map, id)
+        // The topics after it are laid out again against the new size in the same step.
+        (map) => {
+          if (before && after) this.relayoutFollowers(map, id, before, after);
+        }
       );
+    }
   }
   /**
    * Deletes a text block. The topics that follow it stay: they are direct children of the block's topic again and are laid
@@ -64588,9 +64684,7 @@ ${request.requirements}` : preset.text,
         map.nodes.find((node) => node.id === target.id).collapsed = false;
         this.arrangeBranch(map, target.id, moved, void 0);
       } else {
-        for (const root of roots)
-          map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id), this.cardHeightOf, layoutOf(map));
-        for (const root of roots) this.relayoutBlocksOf(map, branchOf.get(root.id));
+        for (const root of roots) this.arrangeTree(map, root.id, branchOf.get(root.id));
       }
     });
     this.selection.afterMove(clearSelection);
@@ -68686,8 +68780,7 @@ ${request.requirements}` : preset.text,
             parent2.collapsed = false;
             this.arrangeBranch(map, parent2.id, branch, void 0);
           } else {
-            map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
-            this.relayoutBlocksOf(map, branch);
+            this.arrangeTree(map, node.id, branch);
           }
         });
       });

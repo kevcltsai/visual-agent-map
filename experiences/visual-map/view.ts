@@ -4285,11 +4285,11 @@ export class VisualAgentMapView extends ItemView {
     if (!edit || !doc?.addEventListener) return;
     let disarm: (() => void) | null = null;
     const pressStarted = (event: PointerEvent): void => {
-      // Only the primary button counts as "elsewhere" (a right-click opens a menu); so does not a press on the map actions button, which opens one.
+      // Only the primary button counts as "elsewhere" (a right-click opens a menu); neither does a press on the map actions button or an Obsidian view action in the tab header (its "More options" opens one).
       if (event.button !== 0 && event.button !== undefined) return;
       const target = event.target as Element | null;
       if (!target || this.relevanceBarEl?.contains?.(target)) return;
-      if (target.closest?.(".menu, .modal-container, .prompt, .vam-map-actions-button")) return;
+      if (target.closest?.(".menu, .modal-container, .prompt, .vam-map-actions-button, .view-action")) return;
       disarm?.();
       const pressEnded = (): void => {
         disarm?.();

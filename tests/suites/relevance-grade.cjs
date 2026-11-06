@@ -1598,8 +1598,8 @@ integrationTest('goal edit (counter-example 8, no map): the map is deleted under
   assert.equal(d.count(), 0, 'no document listener left'); assert.equal(h.control.releases, 1, 'the process is stopped (one release)');
 });
 
-integrationTest('goal edit (decision #13): only a primary-button press elsewhere saves; a right or middle press on a card, and a press on the map actions button (it opens a menu), save nothing and leave the editor open', async () => {
-  for (const [what, target, event] of [['right-click on a card', null, { button: 2 }], ['middle press on a card', null, { button: 1 }], ['press on the map actions button', insideOverlay('vam-map-actions-button'), { button: 0 }]]) {
+integrationTest('goal edit (decision #13): only a primary-button press elsewhere saves; a right or middle press on a card, and a press on the map actions button or an Obsidian view action (they open a menu), save nothing and leave the editor open', async () => {
+  for (const [what, target, event] of [['right-click on a card', null, { button: 2 }], ['middle press on a card', null, { button: 1 }], ['press on the map actions button', insideOverlay('vam-map-actions-button'), { button: 0 }], ['press on an Obsidian view action (More options)', insideOverlay('view-action'), { button: 0 }]]) {
     const h = await withGoal(); const d = withDoc(h); const before = h.contents.get(MAP);
     open(h); h.input().value = 'Changed'; h.input().fire('input');
     d.press(target ?? h.cards.get(h.ids.a), event); assert.equal(d.listeners.pointerup.length + d.listeners.pointercancel.length, 0, `${what}: nothing is waiting for the press to end`);

@@ -494,7 +494,10 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
   .view-header.vam-goal-host .vam-goal-bar::after { content: ""; position: absolute; top: var(--vam-goal-bridge-top, 0); left: var(--vam-goal-bridge-left, 0); width: var(--vam-goal-bridge-width, 0); height: var(--vam-goal-bridge-height, 0); }
   /* Here the icons float over what is under the row, so they show only while the pointer is on the goal or the keyboard is in it (:focus-visible), not for the focus a mouse click leaves behind (the wide rule above, :focus-within, is turned off). */
   .view-header.vam-goal-host .vam-goal-bar:focus-within .vam-goal-actions { opacity: 0; pointer-events: none; }
+  /* The way off the goal to the icons is rarely straight down the bridge: they stay a moment after the pointer leaves, so a diagonal path still reaches them. */
+  .view-header.vam-goal-host .vam-goal-actions { transition: opacity 0s linear 300ms, pointer-events 0s linear 300ms; transition-behavior: allow-discrete; }
   .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar:has(:focus-visible) .vam-goal-actions { opacity: 1; pointer-events: auto; }
+  .view-header.vam-goal-host .vam-goal-bar:hover .vam-goal-actions, .view-header.vam-goal-host .vam-goal-bar:has(:focus-visible) .vam-goal-actions { transition-delay: 0s; }
   /* An open panel keeps the icons shown (the pointer may have left), so the panel under them never leaves a gap above it. */
   .view-header.vam-goal-host .vam-goal-bar.has-attachment .vam-goal-actions { opacity: 1; pointer-events: auto; }
   .vam-goal-bar .vam-goal-attachment { left: 8px; right: 8px; }

@@ -184,6 +184,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.multi_research_skipped": "已略过 {0} 个正在运行 AI 的议题。",
   "ui.multi_research_all_skipped": "已选议题都正在运行 AI。",
   "ui.multi_research_already_running": "这张图已有多议题研究在运行。",
+  "ui.multi_research_not_started": "地图保存失败，这批研究没有开始。",
   "ui.multi_research_finished": "研究完成：成功 {0}／{1}，{2} 个失败，{3} 个跳过。",
   "ui.multi_research_searches_0": "已联网搜索 {0} 次。",
   "ui.multi_research_no_search_0": "警示：有 {0} 个议题完成了研究，但没有任何联网搜索。",

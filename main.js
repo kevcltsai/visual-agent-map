@@ -284,6 +284,7 @@ var en = {
   "ui.multi_research_skipped": "Skipped {0} topics that are already running AI.",
   "ui.multi_research_all_skipped": "All selected topics are already running AI.",
   "ui.multi_research_already_running": "A multi-topic research is already running on this map.",
+  "ui.multi_research_not_started": "The research did not start because the map could not be saved.",
   "ui.multi_research_finished": "Research finished: {0} of {1} succeeded, {2} failed, {3} skipped.",
   "ui.multi_research_searches_0": "Web searches made: {0}.",
   "ui.multi_research_no_search_0": "Warning: topics that finished without any web search: {0}.",
@@ -2985,6 +2986,7 @@ var zhCN = {
   "ui.multi_research_skipped": "\u5DF2\u7565\u8FC7 {0} \u4E2A\u6B63\u5728\u8FD0\u884C AI \u7684\u8BAE\u9898\u3002",
   "ui.multi_research_all_skipped": "\u5DF2\u9009\u8BAE\u9898\u90FD\u6B63\u5728\u8FD0\u884C AI\u3002",
   "ui.multi_research_already_running": "\u8FD9\u5F20\u56FE\u5DF2\u6709\u591A\u8BAE\u9898\u7814\u7A76\u5728\u8FD0\u884C\u3002",
+  "ui.multi_research_not_started": "\u5730\u56FE\u4FDD\u5B58\u5931\u8D25\uFF0C\u8FD9\u6279\u7814\u7A76\u6CA1\u6709\u5F00\u59CB\u3002",
   "ui.multi_research_finished": "\u7814\u7A76\u5B8C\u6210\uFF1A\u6210\u529F {0}\uFF0F{1}\uFF0C{2} \u4E2A\u5931\u8D25\uFF0C{3} \u4E2A\u8DF3\u8FC7\u3002",
   "ui.multi_research_searches_0": "\u5DF2\u8054\u7F51\u641C\u7D22 {0} \u6B21\u3002",
   "ui.multi_research_no_search_0": "\u8B66\u793A\uFF1A\u6709 {0} \u4E2A\u8BAE\u9898\u5B8C\u6210\u4E86\u7814\u7A76\uFF0C\u4F46\u6CA1\u6709\u4EFB\u4F55\u8054\u7F51\u641C\u7D22\u3002",
@@ -5686,6 +5688,7 @@ var zhTW = {
   "ui.multi_research_skipped": "\u5DF2\u7565\u904E {0} \u500B\u6B63\u5728\u57F7\u884C AI \u7684\u8B70\u984C\u3002",
   "ui.multi_research_all_skipped": "\u5DF2\u9078\u8B70\u984C\u90FD\u6B63\u5728\u57F7\u884C AI\u3002",
   "ui.multi_research_already_running": "\u9019\u5F35\u5716\u5DF2\u6709\u591A\u8B70\u984C\u7814\u7A76\u5728\u57F7\u884C\u3002",
+  "ui.multi_research_not_started": "\u5FC3\u667A\u5716\u5B58\u4E0D\u4E86\uFF0C\u9019\u6279\u7814\u7A76\u6C92\u6709\u958B\u59CB\u3002",
   "ui.multi_research_finished": "\u7814\u7A76\u5B8C\u6210\uFF1A\u6210\u529F {0}\uFF0F{1}\uFF0C{2} \u500B\u5931\u6557\uFF0C{3} \u500B\u8DF3\u904E\u3002",
   "ui.multi_research_searches_0": "\u5DF2\u4E0A\u7DB2\u641C\u5C0B {0} \u6B21\u3002",
   "ui.multi_research_no_search_0": "\u8B66\u793A\uFF1A\u6709 {0} \u500B\u8B70\u984C\u5B8C\u6210\u4E86\u7814\u7A76\uFF0C\u4F46\u6C92\u6709\u4EFB\u4F55\u4E0A\u7DB2\u641C\u5C0B\u3002",
@@ -69393,8 +69396,16 @@ ${request.requirements}` : preset.text,
       this.modelChoices(),
       (request) => void (async () => {
         var _a3, _b2;
-        if (request.researchMode !== void 0)
-          await ((_b2 = (_a3 = this.aiModeMemory()).rememberAiMode) == null ? void 0 : _b2.call(_a3, noteAiMode(request.researchMode)));
+        const ids = [...this.selection.state.multiSelected];
+        if (request.researchMode !== void 0) {
+          try {
+            await ((_b2 = (_a3 = this.aiModeMemory()).rememberAiMode) == null ? void 0 : _b2.call(_a3, noteAiMode(request.researchMode)));
+          } catch (e) {
+            new import_obsidian37.Notice(t("ui.multi_research_not_started"));
+            return;
+          }
+        }
+        this.selection.replaceMulti(ids);
         await this.startMultiResearch(request, retryBatchKey);
       })(),
       this.fieldLinks(),

@@ -17215,9 +17215,18 @@ export class VisualAgentMapView extends ItemView {
       this.modelChoices(),
       request =>
         void (async () => {
+          // The dialog is closed while the map is written: keep the batch the dialog listed.
+          const ids = [...this.selection.state.multiSelected];
           // Remember the picked mode on the map first (a map write keeps the multi-selection), then start the batch.
-          if (request.researchMode !== undefined)
-            await this.aiModeMemory().rememberAiMode?.(noteAiMode(request.researchMode));
+          if (request.researchMode !== undefined) {
+            try {
+              await this.aiModeMemory().rememberAiMode?.(noteAiMode(request.researchMode));
+            } catch {
+              new Notice(t("ui.multi_research_not_started"));
+              return;
+            }
+          }
+          this.selection.replaceMulti(ids);
           await this.startMultiResearch(request, retryBatchKey);
         })(),
       this.fieldLinks(),

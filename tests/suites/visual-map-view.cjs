@@ -619,7 +619,7 @@ test('preview renderer receives Markdown in original order with no extra Preview
   view.showHoverCard({...element(),dataset:{nodeId:'a'},querySelector(){return null}},{title:'Topic',preview:markdown});
   assert.equal(rendered.markdown,markdown);assert.equal(rendered.path,'a.md');assert.deepEqual(created,[['strong','Topic']]);
 });
-test('multi research modal: no mode, network, image or depth fields; each row shows its mode; the request carries no mode and no style key until one is chosen (was: detailTemplateId; D2); immediate close on start', () => {
+test('multi research modal: no per-topic depth radios (the mode is one switch with two radio-role buttons); the list shows names only; the request carries no mode and no style key until one is chosen (was: detailTemplateId; D2); immediate close on start', () => {
   const element = (tag, options = {}) => ({
     tag, text: options.text ?? '', cls: options.cls ?? '', type: options.type, value: options.value ?? '', checked: false, disabled: false, children: [], listeners: {},
     createDiv(value) { const c = element('div', typeof value === 'string' ? { cls: value } : value); this.children.push(c); return c; },
@@ -637,11 +637,12 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   const live = { list: () => models, watch: fn => { changed = fn; return () => { unwatched++; }; } };
   const modal = new mod.MultiResearchModal({}, ['Alpha', 'Beta'], live, request => requests.push(request), { styles }, ['quick', 'standard']); modal.open();
   assert.ok(find(modal.contentEl, i => i.text === 'Alpha')); assert.ok(find(modal.contentEl, i => i.text === 'Beta'));
-  // D-2026-10-233 / D-2026-10-247: no web, image or depth choice; the list says which mode each topic runs in.
+  // D-2026-10-233 / D-2026-10-247: no web, image or depth choice; the mode is the single switch at the top.
   assert.equal(find(modal.contentEl, i => i.tag === 'input' && i.type === 'checkbox'), undefined);
   assert.equal(find(modal.contentEl, i => i.text === 'Search for image references' || i.text === 'Allow web search'), undefined);
-  const radios = (root) => { const out = []; const visit = n => { if (n.type === 'radio' || (n.attrs && n.attrs.role === 'radio')) out.push(n); n.children.forEach(visit); }; visit(root); return out; };
-  assert.equal(radios(modal.contentEl).length, 0, 'no depth or mode radio');
+  const radios = (root, pick) => { const out = []; const visit = n => { if (pick(n)) out.push(n); n.children.forEach(visit); }; visit(root); return out; };
+  assert.equal(radios(modal.contentEl, n => n.type === 'radio').length, 0, 'no radio inputs');
+  assert.equal(radios(modal.contentEl, n => n.role === 'radio').length, 2, 'the mode switch has two radio-role buttons');
   const rows = dom.findAll(modal.contentEl, i => i.cls === 'vam-multi-research-topic').map(row => row.children.map(c => c.text));
   assert.deepEqual(rows, [['Alpha'], ['Beta']], 'the list shows names only; the mode is one switch at the top');
   assert.equal(find(modal.contentEl, i => /vam-multi-research-mode\b(?!-note)/.test(i.cls ?? '') && !/-note/.test(i.cls)), undefined, 'no per-row mode label');

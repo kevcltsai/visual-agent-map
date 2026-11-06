@@ -184,6 +184,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.multi_research_skipped": "已略過 {0} 個正在執行 AI 的議題。",
   "ui.multi_research_all_skipped": "已選議題都正在執行 AI。",
   "ui.multi_research_already_running": "這張圖已有多議題研究在執行。",
+  "ui.multi_research_not_started": "心智圖存不了，這批研究沒有開始。",
   "ui.multi_research_finished": "研究完成：成功 {0}／{1}，{2} 個失敗，{3} 個跳過。",
   "ui.multi_research_searches_0": "已上網搜尋 {0} 次。",
   "ui.multi_research_no_search_0": "警示：有 {0} 個議題完成了研究，但沒有任何上網搜尋。",

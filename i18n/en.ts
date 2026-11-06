@@ -193,6 +193,7 @@ export const en = {
   "ui.multi_research_skipped": "Skipped {0} topics that are already running AI.",
   "ui.multi_research_all_skipped": "All selected topics are already running AI.",
   "ui.multi_research_already_running": "A multi-topic research is already running on this map.",
+  "ui.multi_research_not_started": "The research did not start because the map could not be saved.",
   "ui.multi_research_finished": "Research finished: {0} of {1} succeeded, {2} failed, {3} skipped.",
   "ui.multi_research_searches_0": "Web searches made: {0}.",
   "ui.multi_research_no_search_0": "Warning: topics that finished without any web search: {0}.",

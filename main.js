@@ -1477,6 +1477,7 @@ var en = {
   "ui.map_chat_skip_stale": "the file changed after you sent the message",
   "ui.map_chat_skip_topic_gone": "the topic is no longer on the map",
   "ui.map_chat_skip_find_failed": "the text to replace was not found exactly once",
+  "ui.map_chat_skip_unsafe_mermaid": "the edit would add a diagram that is not allowed",
   "ui.map_chat_skip_file_missing": "the file does not exist",
   "ui.map_chat_skip_merge_locked": "the topic is being merged",
   "ui.map_chat_skip_cycle": "that move would create a loop",
@@ -4262,6 +4263,7 @@ var zhCN = {
   "ui.map_chat_skip_stale": "\u53D1\u9001\u540E\u6587\u4EF6\u53C8\u88AB\u4FEE\u6539\u8FC7",
   "ui.map_chat_skip_topic_gone": "\u8BAE\u9898\u5DF2\u4E0D\u5728\u5FC3\u667A\u56FE\u4E0A",
   "ui.map_chat_skip_find_failed": "\u8981\u66FF\u6362\u7684\u6587\u5B57\u6CA1\u6709\u521A\u597D\u51FA\u73B0\u4E00\u6B21",
+  "ui.map_chat_skip_unsafe_mermaid": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u52A0\u5165\u4E0D\u88AB\u5141\u8BB8\u7684\u56FE\u8868",
   "ui.map_chat_skip_file_missing": "\u6587\u4EF6\u4E0D\u5B58\u5728",
   "ui.map_chat_skip_merge_locked": "\u8BAE\u9898\u6B63\u5728\u5408\u5E76",
   "ui.map_chat_skip_cycle": "\u8FD9\u4E2A\u79FB\u52A8\u4F1A\u9020\u6210\u5FAA\u73AF",
@@ -7047,6 +7049,7 @@ var zhTW = {
   "ui.map_chat_skip_stale": "\u9001\u51FA\u5F8C\u6A94\u6848\u53C8\u88AB\u4FEE\u6539\u904E",
   "ui.map_chat_skip_topic_gone": "\u8B70\u984C\u5DF2\u4E0D\u5728\u5FC3\u667A\u5716\u4E0A",
   "ui.map_chat_skip_find_failed": "\u8981\u53D6\u4EE3\u7684\u6587\u5B57\u6C92\u6709\u525B\u597D\u51FA\u73FE\u4E00\u6B21",
+  "ui.map_chat_skip_unsafe_mermaid": "\u9019\u500B\u4FEE\u6539\u6703\u52A0\u5165\u4E0D\u88AB\u5141\u8A31\u7684\u5716\u8868",
   "ui.map_chat_skip_file_missing": "\u6A94\u6848\u4E0D\u5B58\u5728",
   "ui.map_chat_skip_merge_locked": "\u8B70\u984C\u6B63\u5728\u5408\u4F75",
   "ui.map_chat_skip_cycle": "\u9019\u500B\u79FB\u52D5\u6703\u9020\u6210\u5FAA\u74B0",
@@ -28656,6 +28659,7 @@ function neutralizeUnsafeMermaid(markdown) {
   });
   return lines.join("\n");
 }
+var KNOWN_GOOD = "flowchart TD\n  A --> B";
 function mermaidSyntaxCheck(load) {
   return async (code) => {
     let parse;
@@ -28670,7 +28674,15 @@ function mermaidSyntaxCheck(load) {
     try {
       await parse(code);
       return "ok";
-    } catch (e) {
+    } catch (error) {
+      try {
+        await parse(KNOWN_GOOD);
+      } catch (e) {
+        console.warn(
+          `Visual Agent Map: the Mermaid parser rejects a valid diagram, so it is treated as unavailable: ${error instanceof Error ? error.message : String(error)}`
+        );
+        return "unavailable";
+      }
       return "invalid";
     }
   };
@@ -28681,9 +28693,18 @@ async function demoteUnparsableMermaid(markdown, check) {
   const at = (line) => line * 2;
   const count2 = Math.ceil(parts.length / 2);
   const demote = [];
+  let outer = null;
   for (let index = 0; index < count2; index++) {
     const fence = fenceOf(parts[at(index)]);
-    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) continue;
+    if (outer) {
+      if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
+      continue;
+    }
+    if (!fence) continue;
+    if (!/^mermaid\b/i.test(fence[2].trim())) {
+      outer = fence;
+      continue;
+    }
     const opening = parts[at(index)];
     const prefix = opening.slice(0, opening.length - core(opening).length);
     const continued = prefix.replace(
@@ -28691,7 +28712,8 @@ async function demoteUnparsableMermaid(markdown, check) {
       (marker5) => " ".repeat(marker5.length)
     );
     const body = [];
-    for (let next = index + 1; next < count2; next++) {
+    let next = index + 1;
+    for (; next < count2; next++) {
       const raw = parts[at(next)];
       const content = core(raw);
       const close = FENCE.exec(content);
@@ -28700,13 +28722,15 @@ async function demoteUnparsableMermaid(markdown, check) {
         raw.startsWith(prefix) ? raw.slice(prefix.length) : raw.startsWith(continued) ? raw.slice(continued.length) : content
       );
     }
+    const opened = index;
+    index = next;
     if (!body.some((line) => line.trim())) continue;
     const verdict = await check(body.join("\n"));
     if (verdict === "unavailable") {
       console.warn("Visual Agent Map: the Mermaid parser is unavailable; diagrams were not syntax-checked.");
       return markdown;
     }
-    if (verdict === "invalid") demote.push(index);
+    if (verdict === "invalid") demote.push(opened);
   }
   if (!demote.length) return markdown;
   for (const index of demote) parts[at(index)] = parts[at(index)].replace(/mermaid/i, "text");
@@ -76872,21 +76896,14 @@ ${note.detail.trim()}` : "",
       case "edit_topic_note": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
+        const detail = action.kind === "edit_topic_note" ? await demoteUnparsableMermaid(neutralizeUnsafeMermaid(action.detail), this.plugin.mermaidSyntax) : "";
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
         (_e = run.notes) == null ? void 0 : _e.add(node.id);
         await this.noteChange(
           node,
-          action.kind === "rename_topic" ? { title: action.title } : action.kind === "update_summary" ? { summary: action.summary } : (
-            // Model-written note body: same allow-list and parser check as an AI task result (a manual edit never comes here).
-            {
-              detail: await demoteUnparsableMermaid(
-                neutralizeUnsafeMermaid(action.detail),
-                this.plugin.mermaidSyntax
-              )
-            }
-          )
+          action.kind === "rename_topic" ? { title: action.title } : action.kind === "update_summary" ? { summary: action.summary } : { detail }
         );
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
@@ -76951,6 +76968,8 @@ ${note.detail.trim()}` : "",
         if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
         const next = applyMdEdit(source.text, action.find, action.replace);
         if (next === null) return skipped("ui.map_chat_skip_find_failed");
+        if (neutralizeUnsafeMermaid(source.text) === source.text && neutralizeUnsafeMermaid(next) !== next)
+          return skipped("ui.map_chat_skip_unsafe_mermaid");
         const verdict = guardMapChatWrite({
           kind: "edit",
           path: action.path,
@@ -76985,10 +77004,14 @@ ${note.detail.trim()}` : "",
       case "create_md_file": {
         const key2 = normalizeVaultPath(action.path);
         const exists = key2 ? !!this.app.vault.getAbstractFileByPath(key2) : false;
+        const content = await demoteUnparsableMermaid(
+          neutralizeUnsafeMermaid(action.content),
+          this.plugin.mermaidSyntax
+        );
         const verdict = guardMapChatWrite({
           kind: "create",
           path: action.path,
-          newContent: action.content,
+          newContent: content,
           exists,
           configDir
         });
@@ -76998,8 +77021,8 @@ ${note.detail.trim()}` : "",
           const folder = folders.slice(0, depth).join("/");
           if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
         }
-        await this.app.vault.create(key2, action.content);
-        this.recordChatFileCreate(key2, action.content, run);
+        await this.app.vault.create(key2, content);
+        this.recordChatFileCreate(key2, content, run);
         return done;
       }
     }
@@ -88401,7 +88424,11 @@ var SelectionAiPanel = class extends import_obsidian48.Component {
           if (!/^```mermaid[ \t]*\n(?:(?!```)[\s\S])+\n```$/.test(result.trim()) || unsafeMermaid(result.trim().split("\n").slice(1, -1)) || /(?:%%\{|@\{|\bimg\s*:|\bimage\s*:|\burl\s*\(|https?:|data:|file:|javascript:)/i.test(result))
             throw new Error(t("ui.context_ai_invalid_diagram"));
           const code = result.trim().split("\n").slice(1, -1).join("\n");
-          if (await mermaidSyntax(code) === "invalid") throw new Error(t("ui.context_ai_invalid_diagram"));
+          const verdict = await mermaidSyntax(code);
+          if (controller.signal.aborted || !this.isOpen) return;
+          if (verdict === "invalid") throw new Error(t("ui.context_ai_invalid_diagram"));
+          if (verdict === "unavailable")
+            console.warn("Visual Agent Map: the Mermaid parser is unavailable; the diagram was not syntax-checked.");
           this.previewChild = new import_obsidian48.Component();
           this.previewChild.load();
           await import_obsidian48.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);

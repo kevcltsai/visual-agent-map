@@ -643,6 +643,30 @@ integrationTest('map chat: edit_topic_note neutralizes an unsafe mermaid block a
   assert.ok(detail.includes(fine), detail);
 });
 
+integrationTest('map chat: create_md_file neutralizes an unsafe mermaid block and demotes one the parser rejects; edit_md_file never adds an unsafe block but keeps the user\'s own', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.plugin.mermaidSyntax = async code => (/^pie showTitle/.test(code) ? 'invalid' : 'ok');
+  const unsafe = '```mermaid\nflowchart TD\n  A["x"]\n  click A "https://evil.example"\n```';
+  const broken = '```mermaid\npie showTitle\n  title x\n  "a" : 3\n```';
+  const fine = '```mermaid\npie\n  title x\n  "a" : 3\n```';
+  const created = await apply(h, [{ kind: 'create_md_file', path: 'Notes/New.md', content: `${unsafe}\n\n${broken}\n\n${fine}\n` }]);
+  eq(created.map(l => l.status), ['done'], JSON.stringify(created));
+  const text = h.contents.get('Notes/New.md');
+  assert.ok(text.includes(unsafe.replace('```mermaid', '```text')), text);
+  assert.ok(text.includes(broken.replace('```mermaid', '```text')), text);
+  assert.ok(text.includes(fine), text);
+  const hashes = h.hashes('Notes/Research.md');
+  const before = h.contents.get('Notes/Research.md');
+  const refused = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: `needs\n\n${unsafe}\n` }], hashes);
+  eq(refused.map(l => l.status), ['skipped'], JSON.stringify(refused));
+  assert.equal(h.contents.get('Notes/Research.md'), before, 'an edit that adds an unsafe block writes nothing');
+  // A block the user already had is not touched, and an edit elsewhere in the file still goes through.
+  h.contents.set('Notes/Research.md', `${unsafe}\n\nSleep needs darkness.\n`);
+  const kept = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs quiet' }], h.hashes('Notes/Research.md'));
+  eq(kept.map(l => l.status), ['done'], JSON.stringify(kept));
+  assert.equal(h.contents.get('Notes/Research.md'), `${unsafe}\n\nSleep needs quiet.\n`);
+});
+
 integrationTest('map chat: F3 - two actions on the same card in one reply are not mistaken for a user edit', async () => {
   const h = await harness(); await h.view.hydrate();
   const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }, { kind: 'update_summary', nodeId: h.ids.a, summary: 'Rhythm' }, { kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'Fresh body' }]);

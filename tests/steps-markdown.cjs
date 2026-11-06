@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { load, root } = require('./support-replay.cjs');
 const { runPanel } = require('./support-selection-ai.cjs');
+const { t } = load('i18n.ts');
 
 const obsidian = { requestUrl: async () => ({ text: '{}' }) };
 const { planStep } = load('experiences/markdown-context/steps/plan/step.ts', { obsidian });
@@ -177,4 +178,29 @@ test('the diagram action accepts safe mermaid (classDiagram annotation, sequence
     const { output } = await outcome(body);
     assert.equal(output, '', `${name} is rejected`);
   }
+});
+
+test('transform and research replies: an unsafe or unparsable mermaid block comes out as text; a good one stays', async () => {
+  const parse = async text => { if (/^pie showTitle/.test(text)) throw new Error('Parse error'); };
+  const unsafe = '```mermaid\nflowchart TD\n  A --> B\n  click A "x"\n```';
+  const broken = '```mermaid\npie showTitle\n  "a" : 3\n```';
+  const fine = '```mermaid\nflowchart TD\n  A --> B\n```';
+  for (const action of ['transform', 'research']) {
+    const plan = JSON.stringify({ action, query: 'q', instruction: 'Do it', placement: 'after', captionInstruction: '' });
+    const { output } = await runPanel({ markdown: 'A.\nSelected.\nB.', selected: 'Selected.', replies: [plan, `${unsafe}\n\n${broken}\n\n${fine}`], outcome: true, parse });
+    assert.equal(output, `${unsafe.replace('mermaid', 'text')}\n\n${broken.replace('mermaid', 'text')}\n\n${fine}`, action);
+  }
+});
+
+test('the diagram action refuses a block the runtime parser rejects, and lets it through when no parser is available', async () => {
+  const plan = JSON.stringify({ action: 'diagram', query: '', instruction: 'Draw it', placement: 'after', captionInstruction: '' });
+  const reply = '```mermaid\npie showTitle\n  "a" : 3\n```';
+  const rejected = await runPanel({ markdown: 'A.\nSelected.\nB.', selected: 'Selected.', replies: [plan, reply], outcome: true, parse: async text => { if (/showTitle/.test(text)) throw new Error('Parse error'); } });
+  assert.equal(rejected.status.split('|').pop(), t('ui.context_ai_invalid_diagram'));
+  assert.notEqual(rejected.output, reply);
+  const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);
+  let unavailable;
+  try { unavailable = await runPanel({ markdown: 'A.\nSelected.\nB.', selected: 'Selected.', replies: [plan, reply], outcome: true }); } finally { console.warn = original; }
+  assert.equal(unavailable.output, reply);
+  assert.equal(warns.length, 1, 'an unusable parser is logged once');
 });

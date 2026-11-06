@@ -497,10 +497,41 @@ test('an unusable parser keeps the whole page, demotes nothing and logs once', a
   assert.equal(warns.length, 3);
 });
 
-test('mermaidSyntaxCheck: only a rejection from parse is invalid', async () => {
+test('mermaidSyntaxCheck: a rejection is invalid only when a known-good diagram still parses; a parser that rejects everything is unavailable', async () => {
   assert.equal(await mermaidSyntaxCheck(async () => ({ parse: async () => ({}) }))('x'), 'ok');
-  assert.equal(await mermaidSyntaxCheck(async () => ({ parse: async () => { throw new Error('Parse error'); } }))('x'), 'invalid');
+  const real = { parse: async text => { if (!/^(?:flowchart|pie)/.test(text)) throw new Error('Parse error'); } };
+  assert.equal(await mermaidSyntaxCheck(async () => real)('x'), 'invalid');
   assert.equal(await mermaidSyntaxCheck(async () => null)('x'), 'unavailable');
+  const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);
+  try {
+    const broken = mermaidSyntaxCheck(async () => ({ parse: async () => { throw new TypeError('engine is broken'); } }));
+    assert.equal(await broken('flowchart TD\n  A --> B'), 'unavailable');
+    assert.ok(warns.length >= 1 && String(warns[0].join(' ')).includes('engine is broken'), 'the error is logged');
+    const page = ['```mermaid', 'flowchart TD', '  A --> B', '```', '', ...BAD_PIE].join('\n');
+    assert.equal(await demoteUnparsableMermaid(page, broken), page, 'a broken parser demotes nothing');
+  } finally { console.warn = original; }
+});
+
+test('mermaidSyntaxCheck: a transient probe failure is not remembered forever', async () => {
+  let calls = 0;
+  const check = mermaidSyntaxCheck(async () => ({ parse: async text => { calls++; if (calls <= 2) throw new TypeError('warming up'); if (/bad/.test(text)) throw new Error('Parse error'); } }));
+  const warn = console.warn; console.warn = () => {};
+  try {
+    assert.equal(await check('bad'), 'unavailable');
+    assert.equal(await check('bad'), 'invalid', 'once the probe parses, a rejection is a syntax error');
+  } finally { console.warn = warn; }
+});
+
+test('demoteUnparsableMermaid leaves a mermaid fence quoted inside another code block as it is', async () => {
+  const seen = [];
+  const check = async code => { seen.push(code); return 'invalid'; };
+  const outer4 = ['````markdown', '```mermaid', 'pie showTitle', '```', '````'].join('\n');
+  const outerTilde = ['~~~md', '```mermaid', 'pie showTitle', '```', '~~~'].join('\n');
+  assert.equal(await demoteUnparsableMermaid(outer4, check), outer4);
+  assert.equal(await demoteUnparsableMermaid(outerTilde, check), outerTilde);
+  assert.equal(seen.length, 0, 'the parser never saw the quoted blocks');
+  const mixed = `${outer4}\n\n${BAD_PIE.join('\n')}`;
+  assert.equal(await demoteUnparsableMermaid(mixed, check), `${outer4}\n\n${BAD_PIE.join('\n').replace('mermaid', 'text')}`);
 });
 
 test('the pie example in the prompts is a pie the syntax rules allow: first line pie or pie showData, unquoted title on its own line', () => {

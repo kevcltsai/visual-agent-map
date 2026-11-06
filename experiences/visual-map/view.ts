@@ -23065,6 +23065,12 @@ export class VisualAgentMapView extends ItemView {
       case "edit_topic_note": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
+        // Model-written note body: same allow-list and parser check as an AI task result (a manual edit never comes here).
+        // Done before the merge and stale checks so no await sits between the stale check and the write.
+        const detail =
+          action.kind === "edit_topic_note"
+            ? await demoteUnparsableMermaid(neutralizeUnsafeMermaid(action.detail), this.plugin.mermaidSyntax)
+            : "";
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
@@ -23075,13 +23081,7 @@ export class VisualAgentMapView extends ItemView {
             ? { title: action.title }
             : action.kind === "update_summary"
               ? { summary: action.summary }
-              : // Model-written note body: same allow-list and parser check as an AI task result (a manual edit never comes here).
-                {
-                  detail: await demoteUnparsableMermaid(
-                    neutralizeUnsafeMermaid(action.detail),
-                    this.plugin.mermaidSyntax
-                  )
-                }
+              : { detail }
         );
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
@@ -23149,6 +23149,9 @@ export class VisualAgentMapView extends ItemView {
         if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
         const next = applyMdEdit(source.text, action.find, action.replace);
         if (next === null) return skipped("ui.map_chat_skip_find_failed");
+        // The edit may not turn a note without an unsafe mermaid block into one with it; what the user already had stays.
+        if (neutralizeUnsafeMermaid(source.text) === source.text && neutralizeUnsafeMermaid(next) !== next)
+          return skipped("ui.map_chat_skip_unsafe_mermaid");
         const verdict = guardMapChatWrite({
           kind: "edit",
           path: action.path,
@@ -23184,10 +23187,15 @@ export class VisualAgentMapView extends ItemView {
       case "create_md_file": {
         const key = normalizeVaultPath(action.path);
         const exists = key ? !!this.app.vault.getAbstractFileByPath(key) : false;
+        // Model-written file: same allow-list and parser check as an AI task result.
+        const content = await demoteUnparsableMermaid(
+          neutralizeUnsafeMermaid(action.content),
+          this.plugin.mermaidSyntax
+        );
         const verdict = guardMapChatWrite({
           kind: "create",
           path: action.path,
-          newContent: action.content,
+          newContent: content,
           exists,
           configDir
         });
@@ -23197,8 +23205,8 @@ export class VisualAgentMapView extends ItemView {
           const folder = folders.slice(0, depth).join("/");
           if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
         }
-        await this.app.vault.create(key, action.content);
-        this.recordChatFileCreate(key, action.content, run);
+        await this.app.vault.create(key, content);
+        this.recordChatFileCreate(key, content, run);
         return done;
       }
     }

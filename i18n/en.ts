@@ -1509,6 +1509,7 @@ export const en = {
   "ui.map_chat_skip_stale": "the file changed after you sent the message",
   "ui.map_chat_skip_topic_gone": "the topic is no longer on the map",
   "ui.map_chat_skip_find_failed": "the text to replace was not found exactly once",
+  "ui.map_chat_skip_unsafe_mermaid": "the edit would add a diagram that is not allowed",
   "ui.map_chat_skip_file_missing": "the file does not exist",
   "ui.map_chat_skip_merge_locked": "the topic is being merged",
   "ui.map_chat_skip_cycle": "that move would create a loop",

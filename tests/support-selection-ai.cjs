@@ -38,8 +38,9 @@ class Setting {
  * Select `selected` inside `markdown`, open the panel, press the first preset button and answer every model call
  * with the next entry of `replies`. Returns the prompts of the prepared steps the panel passed to `run`, in order.
  */
-async function runPanel({ markdown, selected, replies, steps = false, outcome = false, notices = [], lockDuring = null, applyAfter = null }) {
-  const obsidian = { Component, MarkdownView, MarkdownRenderer: { render: async () => {} }, Notice: class { constructor(message) { notices.push(message); } }, Setting, setIcon() {}, Platform: { isMacOS: true }, requestUrl: async () => ({ json: {} }), parseYaml: text => require('yaml').parse(text) };
+async function runPanel({ markdown, selected, replies, steps = false, outcome = false, notices = [], lockDuring = null, applyAfter = null, parse = null }) {
+  // `parse`: the runtime Mermaid parser's `parse` (Obsidian's `loadMermaid` result); without it the parser is unavailable.
+  const obsidian = { ...(parse ? { loadMermaid: async () => ({ parse }) } : {}), Component, MarkdownView, MarkdownRenderer: { render: async () => {} }, Notice: class { constructor(message) { notices.push(message); } }, Setting, setIcon() {}, Platform: { isMacOS: true }, requestUrl: async () => ({ json: {} }), parseYaml: text => require('yaml').parse(text) };
   const globals = {
     HTMLElement: FakeElement, HTMLImageElement: class {}, HTMLTextAreaElement: class {}, HTMLButtonElement: class {},
     document: { activeElement: null },

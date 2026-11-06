@@ -135,9 +135,14 @@ export function neutralizeUnsafeMermaid(markdown: string): string {
 export type MermaidVerdict = "ok" | "invalid" | "unavailable";
 export type MermaidSyntaxCheck = (code: string) => Promise<MermaidVerdict>;
 
+/** The smallest diagram every Mermaid-compatible engine accepts; used to tell a syntax error from a broken parser. */
+const KNOWN_GOOD = "flowchart TD\n  A --> B";
+
 /**
  * A syntax check on top of the parser that `load` returns (Obsidian's `loadMermaid`; the engine is not assumed).
- * A load failure or a parser without `parse` is `unavailable`; only a rejection from `parse` itself is `invalid`.
+ * A load failure or a parser without `parse` is `unavailable`. When `parse` rejects, a known-good diagram is parsed
+ * once more: if that is rejected too, the parser itself is broken (`unavailable`, logged); otherwise the block is `invalid`.
+ * The probe runs on every rejection, so a transient failure is never remembered.
  */
 export function mermaidSyntaxCheck(load: () => Promise<unknown>): MermaidSyntaxCheck {
   return async code => {
@@ -153,7 +158,17 @@ export function mermaidSyntaxCheck(load: () => Promise<unknown>): MermaidSyntaxC
     try {
       await parse(code);
       return "ok";
-    } catch {
+    } catch (error) {
+      try {
+        await parse(KNOWN_GOOD);
+      } catch {
+        console.warn(
+          `Visual Agent Map: the Mermaid parser rejects a valid diagram, so it is treated as unavailable: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+        return "unavailable";
+      }
       return "invalid";
     }
   };
@@ -174,9 +189,19 @@ export async function demoteUnparsableMermaid(
   const at = (line: number): number => line * 2;
   const count = Math.ceil(parts.length / 2);
   const demote: number[] = [];
+  // The fence of the code block the scan is inside (not mermaid): a mermaid fence quoted in it is text, never a diagram.
+  let outer: RegExpExecArray | null = null;
   for (let index = 0; index < count; index++) {
     const fence = fenceOf(parts[at(index)]);
-    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) continue;
+    if (outer) {
+      if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
+      continue;
+    }
+    if (!fence) continue;
+    if (!/^mermaid\b/i.test(fence[2].trim())) {
+      outer = fence;
+      continue;
+    }
     // The fence line's own prefix (indentation, "> ", list marker) is taken off every body line, so relative
     // indentation (mindmap, kanban) reaches the parser intact; a line without that prefix (lazy quote line) falls back to core().
     const opening = parts[at(index)];
@@ -186,7 +211,8 @@ export async function demoteUnparsableMermaid(
       " ".repeat(marker.length)
     );
     const body: string[] = [];
-    for (let next = index + 1; next < count; next++) {
+    let next = index + 1;
+    for (; next < count; next++) {
       const raw = parts[at(next)];
       const content = core(raw);
       const close = FENCE.exec(content);
@@ -199,13 +225,16 @@ export async function demoteUnparsableMermaid(
             : content
       );
     }
+    // The scan resumes after this block's closing fence, so that fence is not read as the opening of another block.
+    const opened = index;
+    index = next;
     if (!body.some(line => line.trim())) continue;
     const verdict = await check(body.join("\n"));
     if (verdict === "unavailable") {
       console.warn("Visual Agent Map: the Mermaid parser is unavailable; diagrams were not syntax-checked.");
       return markdown;
     }
-    if (verdict === "invalid") demote.push(index);
+    if (verdict === "invalid") demote.push(opened);
   }
   if (!demote.length) return markdown;
   for (const index of demote) parts[at(index)] = parts[at(index)].replace(/mermaid/i, "text");

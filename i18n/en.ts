@@ -2686,10 +2686,6 @@ export const en = {
   "error.structure_review_stopped": "Structure review stopped.",
   "error.structure_review_invalid": "The AI structure review could not be used: {0}",
   "error.structure_review_too_many": "The AI returned {0} suggestions; the limit is {1}.",
-  "error.relevance_grade_empty": "There is nothing to grade: the map has no topics below the top level.",
-  "error.relevance_grade_over_budget": "The map is too large to grade at once. Nothing was changed.",
-  "error.relevance_grade_stopped": "Grading stopped.",
-  "error.relevance_grade_invalid": "The AI grading could not be used: {0}",
   "error.goal_recommend_empty": "There is nothing to recommend from: the goal or the map is empty.",
   "error.goal_recommend_over_budget": "The map is too large to recommend at once. Nothing was changed.",
   "error.goal_recommend_stopped": "Recommending stopped.",
@@ -2715,8 +2711,6 @@ export const en = {
   "error.plain_review_context": "The structure review did not finish",
   "ui.technical_details": "Technical details",
   "ui.copy_technical_details": "Copy technical details",
-  "error.relevance_grade_unavailable":
-    "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map · read-only",
   "share.viewer_made_with": "Made with VAM",

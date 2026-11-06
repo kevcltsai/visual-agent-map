@@ -2504,10 +2504,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "error.structure_review_stopped": "結構檢視已停止。",
   "error.structure_review_invalid": "無法使用 AI 的結構檢視：{0}",
   "error.structure_review_too_many": "AI 回傳了 {0} 項建議，上限是 {1} 項。",
-  "error.relevance_grade_empty": "沒有可分級的內容：心智圖第一層以下沒有議題。",
-  "error.relevance_grade_over_budget": "心智圖太大，無法一次分級，沒有任何改變。",
-  "error.relevance_grade_stopped": "分級已停止。",
-  "error.relevance_grade_invalid": "無法使用 AI 的分級結果：{0}",
   "error.goal_recommend_empty": "沒有可推薦的內容：目標或心智圖是空的。",
   "error.goal_recommend_over_budget": "心智圖太大，無法一次推薦，沒有任何改變。",
   "error.goal_recommend_stopped": "推薦已停止。",
@@ -2532,7 +2528,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "error.plain_review_context": "結構檢視沒有完成",
   "ui.technical_details": "技術細節",
   "ui.copy_technical_details": "複製技術細節",
-  "error.relevance_grade_unavailable": "AI 目前無法為這張心智圖分級，沒有任何內容被改變，請稍後再試。",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "分享的心智圖・唯讀",
   "share.viewer_made_with": "由 VAM 製作",

@@ -2503,10 +2503,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "error.structure_review_stopped": "结构查看已停止。",
   "error.structure_review_invalid": "无法使用 AI 的结构查看：{0}",
   "error.structure_review_too_many": "AI 返回了 {0} 项建议，上限是 {1} 项。",
-  "error.relevance_grade_empty": "没有可分级的内容：心智图第一层以下没有议题。",
-  "error.relevance_grade_over_budget": "心智图太大，无法一次分级，没有任何改变。",
-  "error.relevance_grade_stopped": "分级已停止。",
-  "error.relevance_grade_invalid": "无法使用 AI 的分级结果：{0}",
   "error.goal_recommend_empty": "没有可推荐的内容：目标或心智图是空的。",
   "error.goal_recommend_over_budget": "心智图太大，无法一次推荐，没有任何改变。",
   "error.goal_recommend_stopped": "推荐已停止。",
@@ -2531,7 +2527,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "error.plain_review_context": "结构检视没有完成",
   "ui.technical_details": "技术细节",
   "ui.copy_technical_details": "复制技术细节",
-  "error.relevance_grade_unavailable": "AI 目前无法为这张心智图分级，没有任何内容被改变，请稍后再试。",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "分享的地图・只读",
   "share.viewer_made_with": "由 VAM 制作",

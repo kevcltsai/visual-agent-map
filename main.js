@@ -56787,7 +56787,9 @@ function relationPairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 var goalSuggestSeq = 0;
-var NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-actions-button", ".view-action"].join(", ");
+var NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-actions-button", ".view-action"].join(
+  ", "
+);
 var CLICKABLE_SELECTOR = ["button", "input", "textarea", "a", "[role='button']"].join(",");
 var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.ItemView {
   constructor(leaf, plugin) {

@@ -27347,6 +27347,22 @@ function pointToBoxLabelPoint(point, box, pointIsFrom) {
   const { p1, c1, c2, p2 } = pointToBoxCurve(point, box, pointIsFrom);
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
+function pointToBoxStraight(original, box, side, pointIsFrom) {
+  const end = side === "top" ? { x: box.x + box.width / 2, y: box.y + box.height } : side === "bottom" ? { x: box.x + box.width / 2, y: box.y } : side === "left" ? { x: box.x + box.width, y: box.y + box.height / 2 } : { x: box.x, y: box.y + box.height / 2 };
+  const run = Math.hypot(end.x - original.x, end.y - original.y) || 1, inset = Math.min(ANCHOR_LINE_INSET, run / 2), start = {
+    x: original.x + (end.x - original.x) / run * inset,
+    y: original.y + (end.y - original.y) / run * inset
+  };
+  return pointIsFrom ? { p1: start, p2: end } : { p1: end, p2: start };
+}
+function pointToBoxStraightPathData(point, box, side, pointIsFrom) {
+  const { p1, p2 } = pointToBoxStraight(point, box, side, pointIsFrom);
+  return `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+}
+function pointToBoxStraightLabelPoint(point, box, side, pointIsFrom) {
+  const { p1, p2 } = pointToBoxStraight(point, box, side, pointIsFrom);
+  return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+}
 function treeEdgePathData(parent, child, direction, depth = 1) {
   if (direction === "radial") return relationPathData(parent, child);
   if (direction === "timeline" && depth >= 2)
@@ -56485,6 +56501,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "anchorLinks", /* @__PURE__ */ new Map());
     /** The anchor under the pointer or focus (`imageId NUL anchorId`): its lines are highlighted like a selected topic's. */
     __publicField(this, "hoverAnchor", null);
+    /** The topic card under the pointer or keyboard focus: its anchor lines are emphasised like a selected topic's. View state only. */
+    __publicField(this, "hoverTopic", null);
+    /** The drawn anchor dots (`imageId NUL anchorId`), so a repaint can mark the ones whose lines are emphasised. */
+    __publicField(this, "anchorDots", /* @__PURE__ */ new Map());
     /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
     __publicField(this, "relationEndIds", /* @__PURE__ */ new Set());
     /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
@@ -62680,6 +62700,7 @@ ${request.requirements}` : preset.text,
         attr: { type: "button" }
       });
       dot.dataset.anchorId = anchor.id;
+      this.anchorDots.set(`${image.id}\0${anchor.id}`, dot);
       dot.tabIndex = 0;
       dot.style.left = `${Math.round(anchor.at.x * 1e6) / 1e4}%`;
       dot.style.top = `${Math.round(anchor.at.y * 1e6) / 1e4}%`;
@@ -67969,7 +67990,14 @@ ${request.requirements}` : preset.text,
         }
       }
     });
+    const aimTopic = (on) => {
+      if (on) this.hoverTopic = node.id;
+      else if (this.hoverTopic === node.id) this.hoverTopic = null;
+      else return;
+      if (this.anchorLinks.size || this.anchorDots.size) this.syncRelationClasses();
+    };
     card.addEventListener("mouseenter", () => {
+      aimTopic(true);
       this.alignCardTools(card);
       if (!note || this.selection.state.multiSelectMode || this.dragging) return;
       this.clearHoverTimer();
@@ -67977,9 +68005,13 @@ ${request.requirements}` : preset.text,
         if (!this.dragging && card.isConnected) this.showHoverCard(card, note);
       }, 700);
     });
-    card.addEventListener("mouseleave", () => this.hideHoverCardSoon());
+    card.addEventListener("mouseleave", () => {
+      aimTopic(false);
+      this.hideHoverCardSoon();
+    });
     const toolButtons = () => Array.from(card.querySelectorAll("button, .vam-card-resize, .vam-card-resize-y"));
     card.addEventListener("focusin", (event) => {
+      if (event.target === card) aimTopic(true);
       this.alignCardTools(card);
       for (const button of toolButtons()) button.tabIndex = 0;
       if (this.restoringFocus || event.target !== card || !note || this.selection.state.multiSelectMode || !card.matches(":focus-visible"))
@@ -67991,6 +68023,7 @@ ${request.requirements}` : preset.text,
     });
     card.addEventListener("focusout", (event) => {
       if (event.relatedTarget instanceof Node && card.contains(event.relatedTarget)) return;
+      aimTopic(false);
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
@@ -77210,7 +77243,11 @@ ${addition}` : addition });
         for (const { key: key2, line } of anchored) {
           const box = shifted(line.topicId, dx, dy);
           if (!box) continue;
-          const from = line.imageId === movingImageId ? { ...line, point: { x: line.point.x + dx, y: line.point.y + dy } } : line;
+          const from = line.imageId === movingImageId ? {
+            ...line,
+            point: { x: line.point.x + dx, y: line.point.y + dy },
+            ...line.image ? { image: { ...line.image, x: line.image.x + dx, y: line.image.y + dy } } : {}
+          } : line;
           this.placeAnchorLine(key2, from, box);
         }
         for (const edge of tree) {
@@ -77528,7 +77565,7 @@ ${addition}` : addition });
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(
         link.key,
-        link.anchor ? pointToBoxLabelPoint(link.anchor.point, boxOf(link.to), link.anchor.fromAnchor) : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
+        link.anchor ? this.anchorLabelPoint(link.anchor, boxOf(link.to)) : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
       );
     }
     this.selection.pruneRelation(new Set(this.relationEls.keys()));
@@ -77538,25 +77575,50 @@ ${addition}` : addition });
   /** Moves one anchor line (all its parts and its label) to meet a topic card that stands at `box`. */
   placeAnchorLine(key2, line, box) {
     var _a2, _b2, _c;
-    const d = pointToBoxPathData(line.point, box, line.fromAnchor);
+    const d = this.anchorPathData(line, box);
     (_a2 = this.relationEls.get(key2)) == null ? void 0 : _a2.setAttribute("d", d);
     (_b2 = this.relationHitEls.get(key2)) == null ? void 0 : _b2.setAttribute("d", d);
     (_c = this.relationGapEls.get(key2)) == null ? void 0 : _c.setAttribute("d", d);
-    this.placeRelationLabel(key2, pointToBoxLabelPoint(line.point, box, line.fromAnchor));
+    this.placeRelationLabel(key2, this.anchorLabelPoint(line, box));
+  }
+  /**
+   * The side of its picture a ring card stands on, or null when the line is not a ring line or the card has been dragged
+   * into the picture (the end rule does not hold there; the caller falls back to the curve). Reads only the line it is given:
+   * a drag preview passes a moved copy.
+   */
+  anchorLineSide(line, box) {
+    const image = line.image;
+    if (!image) return null;
+    const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+    if (cx > image.x && cx < image.x + image.w && cy > image.y && cy < image.y + image.h) return null;
+    return ringSide(image, { x: box.x, y: box.y, w: box.width, h: box.height });
+  }
+  anchorPathData(line, box) {
+    const side = this.anchorLineSide(line, box);
+    return side ? pointToBoxStraightPathData(line.point, box, side, line.fromAnchor) : pointToBoxPathData(line.point, box, line.fromAnchor);
+  }
+  anchorLabelPoint(line, box) {
+    const side = this.anchorLineSide(line, box);
+    return side ? pointToBoxStraightLabelPoint(line.point, box, side, line.fromAnchor) : pointToBoxLabelPoint(line.point, box, line.fromAnchor);
   }
   relationLinkPath(link, axis) {
-    return link.anchor ? pointToBoxPathData(link.anchor.point, boxOf(link.to), link.anchor.fromAnchor) : relationPathData(boxOf(link.from), boxOf(link.to), axis);
+    return link.anchor ? this.anchorPathData(link.anchor, boxOf(link.to)) : relationPathData(boxOf(link.from), boxOf(link.to), axis);
   }
   /**
    * Every anchor relation that can be drawn: its anchor has a 2D position (map units from the image's data, so a missing
    * picture file does not matter), and the other end is an id. The caller skips a topic that is not on screen.
    */
   anchorLinesToDraw() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const out = [];
-    for (const item of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []) {
+    const ringed = new Set(
+      ringMembers((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [], (_d = (_c = this.map) == null ? void 0 : _c.nodes) != null ? _d : []).map(
+        (m) => `${m.imageId}\0${m.anchorId}\0${m.topicId}`
+      )
+    );
+    for (const item of (_f = (_e = this.map) == null ? void 0 : _e.canvasItems) != null ? _f : []) {
       if (!isAnnotatedImage(item)) continue;
-      for (const relation of (_c = item.relations) != null ? _c : []) {
+      for (const relation of (_g = item.relations) != null ? _g : []) {
         const anchor = item.anchors.find((a) => a.id === relation.from || a.id === relation.to);
         if (!anchor || !isImage2dAnchor(anchor)) continue;
         const point = { x: item.x + anchor.at.x * item.w, y: item.y + anchor.at.y * item.h };
@@ -77564,7 +77626,15 @@ ${addition}` : addition });
         const fromAnchor = anchor.id === relation.from, topicId = fromAnchor ? relation.to : relation.from;
         out.push([
           anchorLineKey(item.id, anchor.id, topicId),
-          { imageId: item.id, anchorId: anchor.id, topicId, point, fromAnchor, anchorNote: (_d = anchor.note) != null ? _d : "" },
+          {
+            imageId: item.id,
+            anchorId: anchor.id,
+            topicId,
+            point,
+            fromAnchor,
+            anchorNote: (_h = anchor.note) != null ? _h : "",
+            ...ringed.has(`${item.id}\0${anchor.id}\0${topicId}`) ? { image: { x: item.x, y: item.y, w: item.w, h: item.h } } : {}
+          },
           relation
         ]);
       }
@@ -77645,19 +77715,31 @@ ${addition}` : addition });
    * hovered line; both end cards get `is-relation-end`.
    */
   syncRelationClasses() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const chosen = new Set(this.selection.state.multiSelected);
     if (this.selection.state.selected) chosen.add(this.selection.state.selected);
     const ends = /* @__PURE__ */ new Set();
+    if (this.hoverTopic && !this.cardEls.has(this.hoverTopic)) this.hoverTopic = null;
+    if (this.hoverAnchor && ((_a2 = this.anchorDots.get(this.hoverAnchor)) == null ? void 0 : _a2.isConnected) === false) this.hoverAnchor = null;
+    const aimed = new Set(chosen);
+    if (this.hoverTopic) aimed.add(this.hoverTopic);
+    const anchorsOn = /* @__PURE__ */ new Set();
     for (const [key2, path] of this.relationEls) {
       const anchored = this.anchorLinks.get(key2);
       const [fromId, toId] = anchored ? [anchored.topicId, anchored.topicId] : key2.split("\0");
       const related = chosen.has(fromId) || chosen.has(toId) || !!anchored && this.hoverAnchor === `${anchored.imageId}\0${anchored.anchorId}`, active = key2 === this.selection.state.selectedRelation || key2 === this.previewRelation;
-      path.toggleClass("is-related", related);
-      path.toggleClass("is-dimmed", chosen.size > 0 && !related);
+      if (anchored) {
+        const on = aimed.has(anchored.topicId) || this.hoverAnchor === `${anchored.imageId}\0${anchored.anchorId}`;
+        if (on) anchorsOn.add(`${anchored.imageId}\0${anchored.anchorId}`);
+        path.toggleClass("is-related", on);
+        path.toggleClass("is-dimmed", (aimed.size > 0 || !!this.hoverAnchor) && !on);
+      } else {
+        path.toggleClass("is-related", related);
+        path.toggleClass("is-dimmed", chosen.size > 0 && !related);
+      }
       path.toggleClass("is-selected", active);
       const expanded = active || key2 === this.hoverRelation;
-      (_a2 = this.relationLabelEls.get(key2)) == null ? void 0 : _a2.toggleClass("is-expanded", expanded);
+      (_b2 = this.relationLabelEls.get(key2)) == null ? void 0 : _b2.toggleClass("is-expanded", expanded);
       if (this.relationExpanded.has(key2) !== expanded || !this.relationPainted.has(key2)) {
         this.paintRelationLabel(key2, expanded);
         this.relationPainted.add(key2);
@@ -77669,8 +77751,12 @@ ${addition}` : addition });
         ends.add(toId);
       }
     }
+    for (const [ref, dot] of this.anchorDots) {
+      if (dot.isConnected === false) this.anchorDots.delete(ref);
+      else dot.toggleClass("is-related", anchorsOn.has(ref));
+    }
     for (const id of /* @__PURE__ */ new Set([...this.relationEndIds, ...ends]))
-      (_b2 = this.cardEls.get(id)) == null ? void 0 : _b2.toggleClass("is-relation-end", ends.has(id));
+      (_c = this.cardEls.get(id)) == null ? void 0 : _c.toggleClass("is-relation-end", ends.has(id));
     this.relationEndIds = ends;
   }
   /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */

@@ -132,6 +132,8 @@ import {
   relationAxisFor,
   pointToBoxLabelPoint,
   pointToBoxPathData,
+  pointToBoxStraightLabelPoint,
+  pointToBoxStraightPathData,
   relationLabelPoint,
   relationPathData,
   treeEdgePathData,
@@ -955,6 +957,8 @@ interface AnchorLine {
   fromAnchor: boolean;
   /** The anchor's note, for the label. */
   anchorNote: string;
+  /** The picture when the line belongs to a ring card (straight line, map units); absent for a curved line. */
+  image?: RingRect;
 }
 const anchorLineKey = (imageId: string, anchorId: string, topicId: string): string =>
   `anchor:${imageId}:${anchorId}:${topicId}`;
@@ -1460,6 +1464,10 @@ export class VisualAgentMapView extends ItemView {
   private anchorLinks = new Map<string, AnchorLine>();
   /** The anchor under the pointer or focus (`imageId NUL anchorId`): its lines are highlighted like a selected topic's. */
   private hoverAnchor: string | null = null;
+  /** The topic card under the pointer or keyboard focus: its anchor lines are emphasised like a selected topic's. View state only. */
+  private hoverTopic: string | null = null;
+  /** The drawn anchor dots (`imageId NUL anchorId`), so a repaint can mark the ones whose lines are emphasised. */
+  private anchorDots = new Map<string, HTMLElement>();
   /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
   private relationEndIds = new Set<string>();
   /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
@@ -8085,6 +8093,7 @@ export class VisualAgentMapView extends ItemView {
         attr: { type: "button" }
       });
       dot.dataset.anchorId = anchor.id;
+      this.anchorDots.set(`${image.id}\u0000${anchor.id}`, dot);
       dot.tabIndex = 0;
       // Only numbers reach the style: the position is clamped 0-1 by the data layer.
       dot.style.left = `${Math.round(anchor.at.x * 1e6) / 1e4}%`;
@@ -13831,7 +13840,14 @@ export class VisualAgentMapView extends ItemView {
         }
       }
     });
+    const aimTopic = (on: boolean): void => {
+      if (on) this.hoverTopic = node.id;
+      else if (this.hoverTopic === node.id) this.hoverTopic = null;
+      else return;
+      if (this.anchorLinks.size || this.anchorDots.size) this.syncRelationClasses();
+    };
     card.addEventListener("mouseenter", () => {
+      aimTopic(true);
       this.alignCardTools(card);
       if (!note || this.selection.state.multiSelectMode || this.dragging) return;
       this.clearHoverTimer();
@@ -13839,11 +13855,15 @@ export class VisualAgentMapView extends ItemView {
         if (!this.dragging && card.isConnected) this.showHoverCard(card, note);
       }, 700);
     });
-    card.addEventListener("mouseleave", () => this.hideHoverCardSoon());
+    card.addEventListener("mouseleave", () => {
+      aimTopic(false);
+      this.hideHoverCardSoon();
+    });
     // Keyboard users reach the hover preview by focusing a card; its tools join the tab order only while it is focused.
     const toolButtons = (): HTMLElement[] =>
       Array.from(card.querySelectorAll<HTMLElement>("button, .vam-card-resize, .vam-card-resize-y"));
     card.addEventListener("focusin", event => {
+      if (event.target === card) aimTopic(true);
       this.alignCardTools(card);
       for (const button of toolButtons()) button.tabIndex = 0;
       if (
@@ -13861,6 +13881,7 @@ export class VisualAgentMapView extends ItemView {
     });
     card.addEventListener("focusout", event => {
       if (event.relatedTarget instanceof Node && card.contains(event.relatedTarget)) return;
+      aimTopic(false);
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
@@ -23817,7 +23838,13 @@ export class VisualAgentMapView extends ItemView {
           const box = shifted(line.topicId, dx, dy);
           if (!box) continue;
           const from =
-            line.imageId === movingImageId ? { ...line, point: { x: line.point.x + dx, y: line.point.y + dy } } : line;
+            line.imageId === movingImageId
+              ? {
+                  ...line,
+                  point: { x: line.point.x + dx, y: line.point.y + dy },
+                  ...(line.image ? { image: { ...line.image, x: line.image.x + dx, y: line.image.y + dy } } : {})
+                }
+              : line;
           this.placeAnchorLine(key, from, box);
         }
         for (const edge of tree) {
@@ -24189,7 +24216,7 @@ export class VisualAgentMapView extends ItemView {
       this.placeRelationLabel(
         link.key,
         link.anchor
-          ? pointToBoxLabelPoint(link.anchor.point, boxOf(link.to), link.anchor.fromAnchor)
+          ? this.anchorLabelPoint(link.anchor, boxOf(link.to))
           : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
       );
     }
@@ -24200,18 +24227,43 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Moves one anchor line (all its parts and its label) to meet a topic card that stands at `box`. */
   private placeAnchorLine(key: string, line: AnchorLine, box: RelationBox): void {
-    const d = pointToBoxPathData(line.point, box, line.fromAnchor);
+    const d = this.anchorPathData(line, box);
     this.relationEls.get(key)?.setAttribute("d", d);
     this.relationHitEls.get(key)?.setAttribute("d", d);
     this.relationGapEls.get(key)?.setAttribute("d", d);
-    this.placeRelationLabel(key, pointToBoxLabelPoint(line.point, box, line.fromAnchor));
+    this.placeRelationLabel(key, this.anchorLabelPoint(line, box));
+  }
+  /**
+   * The side of its picture a ring card stands on, or null when the line is not a ring line or the card has been dragged
+   * into the picture (the end rule does not hold there; the caller falls back to the curve). Reads only the line it is given:
+   * a drag preview passes a moved copy.
+   */
+  private anchorLineSide(line: AnchorLine, box: RelationBox): ReturnType<typeof ringSide> | null {
+    const image = line.image;
+    if (!image) return null;
+    const cx = box.x + box.width / 2,
+      cy = box.y + box.height / 2;
+    if (cx > image.x && cx < image.x + image.w && cy > image.y && cy < image.y + image.h) return null;
+    return ringSide(image, { x: box.x, y: box.y, w: box.width, h: box.height });
+  }
+  private anchorPathData(line: AnchorLine, box: RelationBox): string {
+    const side = this.anchorLineSide(line, box);
+    return side
+      ? pointToBoxStraightPathData(line.point, box, side, line.fromAnchor)
+      : pointToBoxPathData(line.point, box, line.fromAnchor);
+  }
+  private anchorLabelPoint(line: AnchorLine, box: RelationBox): { x: number; y: number } {
+    const side = this.anchorLineSide(line, box);
+    return side
+      ? pointToBoxStraightLabelPoint(line.point, box, side, line.fromAnchor)
+      : pointToBoxLabelPoint(line.point, box, line.fromAnchor);
   }
   private relationLinkPath(
     link: { from: HTMLElement; to: HTMLElement; anchor?: AnchorLine },
     axis: ReturnType<typeof relationAxisFor>
   ): string {
     return link.anchor
-      ? pointToBoxPathData(link.anchor.point, boxOf(link.to), link.anchor.fromAnchor)
+      ? this.anchorPathData(link.anchor, boxOf(link.to))
       : relationPathData(boxOf(link.from), boxOf(link.to), axis);
   }
   /**
@@ -24220,6 +24272,11 @@ export class VisualAgentMapView extends ItemView {
    */
   private anchorLinesToDraw(): [string, AnchorLine, TopicRelation][] {
     const out: [string, AnchorLine, TopicRelation][] = [];
+    const ringed = new Set(
+      ringMembers(this.map?.canvasItems ?? [], this.map?.nodes ?? []).map(
+        m => `${m.imageId}\u0000${m.anchorId}\u0000${m.topicId}`
+      )
+    );
     for (const item of this.map?.canvasItems ?? []) {
       if (!isAnnotatedImage(item)) continue;
       for (const relation of item.relations ?? []) {
@@ -24231,7 +24288,17 @@ export class VisualAgentMapView extends ItemView {
           topicId = fromAnchor ? relation.to : relation.from;
         out.push([
           anchorLineKey(item.id, anchor.id, topicId),
-          { imageId: item.id, anchorId: anchor.id, topicId, point, fromAnchor, anchorNote: anchor.note ?? "" },
+          {
+            imageId: item.id,
+            anchorId: anchor.id,
+            topicId,
+            point,
+            fromAnchor,
+            anchorNote: anchor.note ?? "",
+            ...(ringed.has(`${item.id}\u0000${anchor.id}\u0000${topicId}`)
+              ? { image: { x: item.x, y: item.y, w: item.w, h: item.h } }
+              : {})
+          },
           relation
         ]);
       }
@@ -24329,6 +24396,13 @@ export class VisualAgentMapView extends ItemView {
     const chosen = new Set(this.selection.state.multiSelected);
     if (this.selection.state.selected) chosen.add(this.selection.state.selected);
     const ends = new Set<string>();
+    // A card that is gone cannot stay hovered (mouseleave never comes for a removed card).
+    if (this.hoverTopic && !this.cardEls.has(this.hoverTopic)) this.hoverTopic = null;
+    if (this.hoverAnchor && this.anchorDots.get(this.hoverAnchor)?.isConnected === false) this.hoverAnchor = null;
+    // Anchor lines are emphasised by a selected, hovered or focused card and by a hovered or focused anchor; topic lines by the selection only.
+    const aimed = new Set(chosen);
+    if (this.hoverTopic) aimed.add(this.hoverTopic);
+    const anchorsOn = new Set<string>();
     for (const [key, path] of this.relationEls) {
       const anchored = this.anchorLinks.get(key);
       const [fromId, toId] = anchored ? [anchored.topicId, anchored.topicId] : key.split("\u0000");
@@ -24337,8 +24411,15 @@ export class VisualAgentMapView extends ItemView {
           chosen.has(toId) ||
           (!!anchored && this.hoverAnchor === `${anchored.imageId}\u0000${anchored.anchorId}`),
         active = key === this.selection.state.selectedRelation || key === this.previewRelation;
-      path.toggleClass("is-related", related);
-      path.toggleClass("is-dimmed", chosen.size > 0 && !related);
+      if (anchored) {
+        const on = aimed.has(anchored.topicId) || this.hoverAnchor === `${anchored.imageId}\u0000${anchored.anchorId}`;
+        if (on) anchorsOn.add(`${anchored.imageId}\u0000${anchored.anchorId}`);
+        path.toggleClass("is-related", on);
+        path.toggleClass("is-dimmed", (aimed.size > 0 || !!this.hoverAnchor) && !on);
+      } else {
+        path.toggleClass("is-related", related);
+        path.toggleClass("is-dimmed", chosen.size > 0 && !related);
+      }
       path.toggleClass("is-selected", active);
       const expanded = active || key === this.hoverRelation;
       this.relationLabelEls.get(key)?.toggleClass("is-expanded", expanded);
@@ -24352,6 +24433,10 @@ export class VisualAgentMapView extends ItemView {
         ends.add(fromId);
         ends.add(toId);
       }
+    }
+    for (const [ref, dot] of this.anchorDots) {
+      if (dot.isConnected === false) this.anchorDots.delete(ref);
+      else dot.toggleClass("is-related", anchorsOn.has(ref));
     }
     for (const id of new Set([...this.relationEndIds, ...ends]))
       this.cardEls.get(id)?.toggleClass("is-relation-end", ends.has(id));

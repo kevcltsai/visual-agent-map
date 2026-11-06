@@ -191,6 +191,151 @@ test('selecting a topic highlights its anchor lines and dims the others; focusin
   assert.ok(toB.hasClass('is-related') && !toA.hasClass('is-related'));
 });
 
+// ---- P4 of "image as centre": straight ring lines and emphasis ------------------------------------------------------
+// img1 sits at (100,600) 200x100, so card a (400,0) lies above it ("top") and the card end is its bottom edge midpoint.
+const ringHarness = (relations, move = {}) => {
+  const h = harness({ relations });
+  for (const n of h.doc.nodes) n.parentId = null;
+  Object.assign(h.doc.nodes.find(n => n.id === 'a'), move);
+  if ('x' in move) Object.assign(h.view.cardEls.get('a'), { offsetLeft: move.x, offsetTop: move.y });
+  h.view.draw();
+  return h;
+};
+const num = d => (d.match(/-?\d+(\.\d+)?/g) || []).map(Number);
+
+test('P4 ring line: a ring card gets a straight line from the anchor to the middle of its edge facing the picture; the label sits at its midpoint', () => {
+  const h = ringHarness([rel('supports', 'p1', 'a', { ring: true })]);
+  const d = h.pathOf(KEY('img1', 'p1', 'a')).attrs.d;
+  assert.match(d, /^M [\d. -]+ L [\d. -]+$/, 'a straight path, no curve command');
+  const box = { x: 400, y: 0, width: 280, height: 100 };
+  assert.equal(d, geometry.pointToBoxStraightPathData({ x: 200, y: 650 }, box, 'top', true));
+  const [, , x2, y2] = num(d);
+  assert.deepEqual([x2, y2], [540, 100], 'ends at the bottom edge midpoint of the card above the picture');
+  const label = h.view.relationLabelAt.get(KEY('img1', 'p1', 'a')), [x1, y1] = num(d);
+  assert.deepEqual([label.x, label.y], [(x1 + x2) / 2, (y1 + 100) / 2]);
+});
+
+test('P4 ring line: all four sides end on the edge that faces the picture', () => {
+  const box = { x: 0, y: 0, width: 100, height: 40 };
+  const end = side => num(geometry.pointToBoxStraightPathData({ x: 500, y: 500 }, box, side, true)).slice(2);
+  assert.deepEqual(end('top'), [50, 40]);
+  assert.deepEqual(end('bottom'), [50, 0]);
+  assert.deepEqual(end('left'), [100, 20]);
+  assert.deepEqual(end('right'), [0, 20]);
+});
+
+test('counter-example P4: a line that is not a ring line keeps the curve (same path as before), and so does a ring card dragged into the picture', () => {
+  const plainLine = harness({ relations: [rel('supports', 'p1', 'a')] });
+  plainLine.view.draw();
+  assert.equal(plainLine.pathOf(KEY('img1', 'p1', 'a')).attrs.d, geometry.pointToBoxPathData({ x: 200, y: 650 }, { x: 400, y: 0, width: 280, height: 100 }, true));
+  assert.match(plainLine.pathOf(KEY('img1', 'p1', 'a')).attrs.d, / C /);
+  // The ring card sits on the picture: its centre is inside, the end rule does not hold, the old curve is drawn and nothing throws.
+  const inside = ringHarness([rel('supports', 'p1', 'a', { ring: true })], { x: 60, y: 580 });
+  const d = inside.pathOf(KEY('img1', 'p1', 'a')).attrs.d;
+  assert.equal(d, geometry.pointToBoxPathData({ x: 200, y: 650 }, { x: 60, y: 580, width: 280, height: 100 }, true));
+  // Dragging the card into the picture and back swaps between the two.
+  const out = ringHarness([rel('supports', 'p1', 'a', { ring: true })]);
+  out.view.dragEdges('a', out.view.cardEls.get('a')).update(60, 580);
+  assert.match(out.pathOf(KEY('img1', 'p1', 'a')).attrs.d, / C /);
+  out.view.dragEdges('a', out.view.cardEls.get('a')).update(400, 0);
+  assert.match(out.pathOf(KEY('img1', 'p1', 'a')).attrs.d, / L /);
+});
+
+test('P4 ring line: moving the picture moves the straight line with it (the preview uses the moved picture, not the stored one)', () => {
+  const h = ringHarness([rel('supports', 'p1', 'a', { ring: true })]);
+  const group = h.view.groupDragEdges(new Map([['a', h.view.cardEls.get('a')]]), 'img1');
+  group.update(0, 0);
+  assert.equal(h.pathOf(KEY('img1', 'p1', 'a')).attrs.d, geometry.pointToBoxStraightPathData({ x: 200, y: 650 }, { x: 400, y: 0, width: 280, height: 100 }, 'top', true));
+  // The picture and the card move 1000 down together: still "top", still straight.
+  group.update(0, 1000);
+  assert.equal(h.pathOf(KEY('img1', 'p1', 'a')).attrs.d, geometry.pointToBoxStraightPathData({ x: 200, y: 1650 }, { x: 400, y: 1000, width: 280, height: 100 }, 'top', true));
+});
+
+const dotOf = (h, id) => { const dot = element('button', 'vam-anchor'); dot.isConnected = true; h.view.anchorDots.set(`img1${SEP}${id}`, dot); return dot; };
+const state = (h, key) => { const p = h.pathOf(key); return `${p.hasClass('is-related') ? 'R' : '-'}${p.hasClass('is-dimmed') ? 'D' : '-'}`; };
+
+test('A11 emphasis: a selected, a hovered and a focused card (and a hovered anchor) give the same result; leaving restores', () => {
+  const h = ringHarness([rel('supports', 'p1', 'a', { ring: true }), rel('related', 'p2', 'b')]);
+  const A = KEY('img1', 'p1', 'a'), B = KEY('img1', 'p2', 'b');
+  const dotA = dotOf(h, 'p1'), dotB = dotOf(h, 'p2');
+  h.view.syncRelationClasses();
+  assert.deepEqual([state(h, A), state(h, B)], ['--', '--'], 'the lines are always shown, nothing is faded at rest');
+  const select = () => { h.view.selection.setSelected('a'); h.view.syncRelationClasses(); };
+  select();
+  const bySelect = [state(h, A), state(h, B), dotA.hasClass('is-related'), dotB.hasClass('is-related')];
+  assert.deepEqual(bySelect, ['R-', '-D', true, false]);
+  h.view.selection.setSelected(null); h.view.syncRelationClasses();
+  assert.deepEqual([state(h, A), state(h, B), dotA.hasClass('is-related')], ['--', '--', false], 'cleared');
+  h.view.hoverTopic = 'a'; h.view.syncRelationClasses();
+  assert.deepEqual([state(h, A), state(h, B), dotA.hasClass('is-related'), dotB.hasClass('is-related')], bySelect, 'card hover (and focus, which sets the same state) = selection');
+  h.view.hoverTopic = null; h.view.hoverAnchor = `img1${SEP}p1`; h.view.syncRelationClasses();
+  assert.deepEqual([state(h, A), state(h, B), dotA.hasClass('is-related'), dotB.hasClass('is-related')], bySelect, 'anchor hover/focus = card');
+  h.view.hoverAnchor = null; h.view.syncRelationClasses();
+  assert.deepEqual([state(h, A), state(h, B), dotA.hasClass('is-related')], ['--', '--', false]);
+});
+
+test('counter-example A11: selection and hover at once emphasise both; a hovered card that is deleted leaves no emphasis; multi-select works; topic lines are untouched', () => {
+  const h = ringHarness([rel('supports', 'p1', 'a', { ring: true }), rel('related', 'p2', 'b')]);
+  h.doc.topicRelations = [{ kind: 'supports', from: 'root', to: 'a' }];
+  h.view.draw();
+  const A = KEY('img1', 'p1', 'a'), B = KEY('img1', 'p2', 'b'), T = h.lines().find(k => !k.startsWith('anchor:'));
+  const topicBefore = state(h, T);
+  h.view.selection.setSelected('a'); h.view.hoverTopic = 'b'; h.view.syncRelationClasses();
+  assert.deepEqual([state(h, A), state(h, B)], ['R-', 'R-'], 'selected a plus hovered b: both stand out');
+  assert.equal(state(h, T), 'R-', 'a topic line follows the selection only (a is its end)');
+  h.view.selection.setSelected(null); h.view.hoverTopic = 'a'; h.view.syncRelationClasses();
+  assert.equal(state(h, T), topicBefore, 'a hover alone does not touch topic lines');
+  // The hovered card is deleted: no mouseleave ever comes.
+  h.view.cardEls.delete('a'); h.doc.nodes = h.doc.nodes.filter(n => n.id !== 'a'); h.doc.canvasItems[0].relations = [rel('related', 'p2', 'b')];
+  h.view.draw();
+  assert.equal(h.view.hoverTopic, null, 'the stale hover is cleared');
+  assert.equal(state(h, B), '--', 'nothing is faded or emphasised any more');
+  // Multi-select: both selected cards' lines are emphasised, others dimmed.
+  const m = ringHarness([rel('supports', 'p1', 'a', { ring: true }), rel('related', 'p2', 'b'), rel('related', 'p1', 'root')]);
+  m.view.selection.toggleMultiSelect();
+  m.view.selection.replaceMulti(['a', 'b']);
+  assert.ok(m.view.selection.state.multiSelectMode && m.view.selection.state.multiSelected.size === 2);
+  m.view.syncRelationClasses();
+  assert.deepEqual([state(m, KEY('img1', 'p1', 'a')), state(m, KEY('img1', 'p2', 'b')), state(m, KEY('img1', 'p1', 'root'))], ['R-', 'R-', '-D']);
+});
+
+test('A11 wiring: the real card events (mouseenter/leave, focusin) emphasise the lines like a selection does; a multi-select mode hover does too', () => {
+  const h = ringHarness([rel('supports', 'p1', 'a', { ring: true }), rel('related', 'p2', 'b')]);
+  Object.assign(h.view, { cardEls: new Map(), stageEl: element('div'), contentEl: element('div'), labelCard() {}, alignCardTools() {} });
+  h.view.renderNode(h.doc.nodes.find(n => n.id === 'a'));
+  const card = h.view.cardEls.get('a');
+  card.matches = () => false;
+  const fire = (name, event = {}) => card.listeners[name].forEach(fn => fn(event));
+  h.view.cardEls.set('b', h.view.cardEls.get('b') ?? element('div'));
+  h.view.draw();
+  const A = KEY('img1', 'p1', 'a'), B = KEY('img1', 'p2', 'b');
+  const states = () => [state(h, A), state(h, B)];
+  fire('mouseenter');
+  assert.deepEqual(states(), ['R-', '-D'], 'pointer');
+  fire('mouseleave');
+  assert.deepEqual(states(), ['--', '--'], 'pointer leaves');
+  fire('focusin', { target: card });
+  assert.deepEqual(states(), ['R-', '-D'], 'keyboard focus is the same as the pointer');
+  // focusout reads `instanceof Node`, which the test sandbox does not have; it calls the same one-line clear as mouseleave.
+  fire('mouseleave');
+  assert.deepEqual(states(), ['--', '--'], 'leaving restores');
+  h.view.selection.toggleMultiSelect();
+  fire('mouseenter');
+  assert.deepEqual(states(), ['R-', '-D'], 'multi-select mode');
+  fire('mouseleave');
+  assert.deepEqual(states(), ['--', '--']);
+});
+
+test('A11 map without anchor lines: classes on topic lines are as before (no hover effect, no anchor class)', () => {
+  const h = harness({ topicRelations: [{ kind: 'supports', from: 'a', to: 'b' }] });
+  h.view.draw();
+  const only = h.lines()[0];
+  h.view.hoverTopic = 'a'; h.view.syncRelationClasses();
+  assert.ok(!h.pathOf(only).hasClass('is-related') && !h.pathOf(only).hasClass('is-dimmed'));
+  h.view.hoverTopic = null; h.view.selection.setSelected('root'); h.view.syncRelationClasses();
+  assert.ok(h.pathOf(only).hasClass('is-dimmed'), 'the old selection rule still dims');
+});
+
 test('hovering or pressing a line selects it; the selected line ends mark the topic card only; a click on it opens the anchor relation editor, never the topic one (P4b)', () => {
   const h = harness({ relations: [rel('supports', 'p1', 'a')] });
   let opened = 0;

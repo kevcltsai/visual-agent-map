@@ -1174,6 +1174,35 @@ integrationTest('multi research without an explicit language answers each topic 
   assert.match(h.runs.find(r => r.title === '要如何在陽台養香草').options.task, /[\u4e00-\u9fff]/);
   h.finish.get('要如何在陽台養香草')(); h.finish.get('Balcony herbs')();
 });
+// Batches keep running after a map switch (dropMapBackground does not stop the coordinator), so a child that starts later
+// must still use the language source of the map the batch was started on.
+for (const [name, from, to, expected] of [
+  ['Chinese map, then an English map', 'pstack 技能解析', 'The Roman Empire', 'zh-TW'],
+  ['English map, then a Chinese map', 'The Roman Empire', 'pstack 技能解析', 'same-as-input']
+]) {
+  integrationTest(`card language: a multi research batch keeps the language of the map it started on (${name})`, async () => {
+    const h = await multiResearchHarness(['sharpen']);
+    const original = h.view.map; original.title = from;
+    const other = { ...original, id: 'map-b', title: to };
+    const confirm = h.plugin.confirmAiUsage;
+    h.plugin.confirmAiUsage = async (model, run) => { h.view.map = other; return confirm(model, run); }; // the user switches map before the child starts
+    h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+    await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
+    assert.equal(h.runs[0].options.outputLanguage, expected);
+    h.finish.get('sharpen')();
+  });
+  integrationTest(`card language: a shallow batch keeps the language of the map it started on (${name})`, async () => {
+    const h = await multiResearchHarness(['sharpen']);
+    const original = h.view.map; original.title = from;
+    const other = { ...original, id: 'map-b', title: to };
+    const options = { researchMode: 'research', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], requirements: '' };
+    const pending = h.view.startShallowResearch(h.nodes[0], h.nodes, options);
+    h.view.map = other; // switched before the child starts
+    await until(() => h.runs.length === 1);
+    assert.equal(h.runs[0].options.outputLanguage, expected);
+    h.finish.get('sharpen')(); await pending;
+  });
+}
 integrationTest('multi research with image search runs each topic with auto visual mode', async () => {
   const h = await multiResearchHarness(['Img']);
   h.view.selection.replaceMulti([h.nodes[0].id]);

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- A text block under a topic has its own "+": topics added there follow the block in every layout, with the line drawn from the block. Deleting the block hands those topics back to the topic above, and turning it into a topic card makes them its subtopics; older versions show them under the topic above.
 - The "+" and "Add subtopic" lists show each topic type's shape and colour next to its name, the same as the type picker.
 
 ### Mark points on a picture

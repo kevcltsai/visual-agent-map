@@ -470,7 +470,9 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       ...(start.auto === true && typeof start.remaining === "string" && start.remaining.trim()
         ? { remaining: start.remaining.slice(0, 1000) }
         : {}),
-      ...(chainEnds.has(number) || carried.has(number) ? { chainEnd: chainEnds.get(number) ?? carried.get(number) } : {})
+      ...(chainEnds.has(number) || carried.has(number)
+        ? { chainEnd: chainEnds.get(number) ?? carried.get(number) }
+        : {})
     });
   }
   return {

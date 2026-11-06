@@ -877,3 +877,51 @@ test('P5: an explicit auto_layout in the reply lays the whole map out and the ri
   assert.equal(ringClean(h).cards.length, 3);
   assert.deepEqual(plain(ringClean(h).violations), []);
 });
+
+// ---- P5b: a picture that already has a ring keeps its cards when a later reply adds members ----
+const partActions = (from, n) => [
+  ...Array.from({ length: n }, (_, i) => topChild(`t${from + i}`, `Part ${from + i}`)),
+  ...Array.from({ length: n }, (_, i) => addAnchor(`p${from + i}`, 0.1 + ((from + i) % 6) * 0.15, (from + i) < 3 ? 0.2 : 0.75, `n${from + i}`)),
+  ...Array.from({ length: n }, (_, i) => link(`anchor:p${from + i}`, `new:t${from + i}`))
+];
+const boxOf = (h, n) => ({ x: n.x, y: n.y, w: n.width ?? 280, h: h.view.cardHeightOf(n.id) ?? 120 });
+const hitBox = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+test('P5b: a ring that existed before the reply keeps its cards (one dragged by hand); only the 2 new members are placed', async () => {
+  const h = await harness();
+  assert.ok((await h.apply(partActions(0, 3))).every(l => l.status === 'done'));
+  const ringIds = (await relationsOf(h)).filter(r => r.ring === true).map(r => r.to);
+  assert.equal(ringIds.length, 3);
+  { const disk = await h.repo.readMap(MAP); const d = disk.nodes.find(n => n.id === ringIds[1]); d.y -= 40; await h.repo.saveMap(MAP, disk); h.view.map = await h.repo.readMap(MAP); }
+  const old = plain(ringIds.map(id => { const n = h.view.map.nodes.find(x => x.id === id); return [id, n.x, n.y]; }));
+  { const ls = await h.apply(partActions(3, 2)); assert.ok(ls.every(l => l.status === 'done'), JSON.stringify(ls)); }
+  const rels = (await relationsOf(h)).filter(r => r.ring === true);
+  assert.equal(rels.length, 5, 'two more ring members');
+  assert.deepEqual(plain(ringIds.map(id => { const n = h.view.map.nodes.find(x => x.id === id); return [id, n.x, n.y]; })), old, 'old members keep their x, y');
+  const image = h.view.map.canvasItems.find(i => i.id === 'img1');
+  for (const r of rels.filter(r => !ringIds.includes(r.to))) {
+    const n = h.view.map.nodes.find(x => x.id === r.to);
+    assert.ok(!hitBox(boxOf(h, n), { x: image.x, y: image.y, w: image.w, h: image.h }), 'new card does not cover the picture');
+    for (const id of ringIds) assert.ok(!hitBox(boxOf(h, n), boxOf(h, h.view.map.nodes.find(x => x.id === id))), 'new card does not cover an old member');
+  }
+});
+
+test('P5b A7/A13: a new sub-topic under a ring member lands outside that card and never covers the picture', async () => {
+  const h = await harness();
+  assert.ok((await h.apply(partActions(0, 4))).every(l => l.status === 'done'));
+  const ringIds = (await relationsOf(h)).filter(r => r.ring === true).map(r => r.to);
+  const image = h.view.map.canvasItems.find(i => i.id === 'img1');
+  const imageBox = { x: image.x, y: image.y, w: image.w, h: image.h };
+  const before = new Set(h.view.map.nodes.map(n => n.id));
+  const actions = ringIds.map((id, i) => ({ kind: 'add_child', parentId: id, title: `Sub ${i}`, ref: `s${i}` }));
+  assert.ok((await h.apply(actions)).every(l => l.status === 'done'));
+  const subs = fresh(h, before);
+  assert.equal(subs.length, ringIds.length);
+  for (const sub of subs) {
+    const parent = h.view.map.nodes.find(n => n.id === sub.parentId);
+    assert.ok(ringIds.includes(parent.id));
+    assert.ok(!hitBox(boxOf(h, sub), imageBox), 'sub-topic does not cover the picture');
+    assert.ok(!hitBox(boxOf(h, sub), boxOf(h, parent)), 'sub-topic does not cover its parent');
+    for (const id of ringIds) assert.ok(!hitBox(boxOf(h, sub), boxOf(h, h.view.map.nodes.find(x => x.id === id))), 'does not cover a ring card');
+  }
+});

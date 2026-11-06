@@ -63144,7 +63144,7 @@ ${request.requirements}` : preset.text,
    * ring size and the card goes to its place. A later one takes a free slot without moving any other card; only when no slot is
    * free is the whole ring solved again.
    */
-  placeRingMember(map, imageId, topicId) {
+  placeRingMember(map, imageId, topicId, pending2 = /* @__PURE__ */ new Set()) {
     var _a2;
     const items = (_a2 = map.canvasItems) != null ? _a2 : [];
     const image = findAnnotatedImage(items, imageId);
@@ -63153,7 +63153,7 @@ ${request.requirements}` : preset.text,
     const node = map.nodes.find((item) => item.id === topicId);
     if (!image || !me || !node) return;
     const only = /* @__PURE__ */ new Set([imageId]);
-    const before = members.filter((member) => member !== me);
+    const before = members.filter((member) => member !== me && !pending2.has(member.topicId));
     if (!before.length) {
       this.solveRingsIn(map, { imageIds: only, enlarge: true });
       return;
@@ -63178,7 +63178,7 @@ ${request.requirements}` : preset.text,
       { x: image.x, y: image.y, w: image.w, h: image.h },
       states,
       { id: topicId, anchorX: me.x, anchorY: me.y, w: mine.w, h: mine.h },
-      this.ringObstacles(map, imageId, new Set(before.map((member) => member.topicId)))
+      this.ringObstacles(map, imageId, /* @__PURE__ */ new Set([topicId, ...before.map((member) => member.topicId), ...pending2]))
     );
     if (!placed) {
       this.solveRingsIn(map, { imageIds: only });
@@ -75210,9 +75210,22 @@ ${note.detail.trim()}` : "",
               if (this.closed || this.path !== anchor.path || ((_a4 = this.map) == null ? void 0 : _a4.id) !== anchor.id) return;
               this.flushChatRender();
               await this.mapChange((map) => {
-                var _a5;
-                if (ringed) this.solveRingsIn(map, { imageIds: ringed, enlarge: true });
-                if (rough.length) map.nodes = this.placeChatCards(map.nodes, new Set(rough), (_a5 = map.canvasItems) != null ? _a5 : []);
+                var _a5, _b4;
+                if (ringed) {
+                  const fresh = /* @__PURE__ */ new Set();
+                  for (const imageId of ringed) {
+                    const added = (_a5 = run.ringAdded) == null ? void 0 : _a5.get(imageId);
+                    if (added == null ? void 0 : added.hadRing) {
+                      const pending2 = new Set(added.topicIds);
+                      for (const topicId of added.topicIds) {
+                        pending2.delete(topicId);
+                        this.placeRingMember(map, imageId, topicId, new Set(pending2));
+                      }
+                    } else fresh.add(imageId);
+                  }
+                  if (fresh.size) this.solveRingsIn(map, { imageIds: fresh, enlarge: true });
+                }
+                if (rough.length) map.nodes = this.placeChatCards(map.nodes, new Set(rough), (_b4 = map.canvasItems) != null ? _b4 : []);
               }, false);
               if (ringed && !stopped && this.map && !result.actions.some((action) => action.kind === "focus_topic")) {
                 const rings = new Set(ringed);
@@ -75807,7 +75820,7 @@ ${note.detail.trim()}` : "",
    * collide with a card or an anchor of the picture. Never on an AIM map.
    */
   async chatChangeAnchor(action, real, run) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e, _f;
     if (!this.map || !this.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const items = (_a2 = this.map.canvasItems) != null ? _a2 : [];
     const image = findAnnotatedImage(items, action.imageId);
@@ -75852,9 +75865,13 @@ ${note.detail.trim()}` : "",
       ...action.description ? { description: action.description } : {}
     };
     if (!anchorRelationAllowed(image, link)) return skipped("ui.map_chat_skip_relation_not_allowed");
-    const box = { refused: null, ring: false };
+    const box = {
+      refused: null,
+      ring: false,
+      hadRing: false
+    };
     await this.mapChange((map) => {
-      var _a3, _b3, _c2;
+      var _a3, _b3, _c2, _d2;
       const current = findAnnotatedImage((_a3 = map.canvasItems) != null ? _a3 : [], action.imageId);
       if (!current) {
         box.refused = "ui.map_chat_skip_image_gone";
@@ -75865,12 +75882,21 @@ ${note.detail.trim()}` : "",
       const marked = ring ? { ...link, ring: true } : link;
       if (!anchorRelationAllowed(current, marked)) box.refused = "ui.map_chat_skip_relation_not_allowed";
       else {
-        map.canvasItems = addAnchorRelation((_c2 = map.canvasItems) != null ? _c2 : [], action.imageId, marked);
+        box.hadRing = ringMembers((_c2 = map.canvasItems) != null ? _c2 : [], map.nodes).some((member) => member.imageId === action.imageId);
+        map.canvasItems = addAnchorRelation((_d2 = map.canvasItems) != null ? _d2 : [], action.imageId, marked);
         box.ring = ring;
       }
     }, false);
     if (box.refused) return skipped(box.refused);
-    if (box.ring) ((_d = run.ringImages) != null ? _d : run.ringImages = /* @__PURE__ */ new Set()).add(action.imageId);
+    if (box.ring) {
+      ((_d = run.ringImages) != null ? _d : run.ringImages = /* @__PURE__ */ new Set()).add(action.imageId);
+      const added = (_f = ((_e = run.ringAdded) != null ? _e : run.ringAdded = /* @__PURE__ */ new Map()).get(action.imageId)) != null ? _f : {
+        hadRing: box.hadRing,
+        topicIds: []
+      };
+      added.topicIds.push(nodeId);
+      run.ringAdded.set(action.imageId, added);
+    }
     return { status: "done" };
   }
   /**

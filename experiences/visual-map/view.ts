@@ -1083,6 +1083,8 @@ interface ChatRun {
   created: string[];
   /** Pictures whose `link_anchor` in this reply marked a new top-level topic as a ring member: their rings are placed at the end. */
   ringImages?: Set<string>;
+  /** Per picture with a ring made in this reply: whether it had ring members before the reply, and the members added. */
+  ringAdded?: Map<string, { hadRing: boolean; topicIds: string[] }>;
   /** A card was (or may have been) written without rebuilding the derived data; one rebuild at the end of the reply does it. */
   ownershipDirty?: boolean;
   /** True for a held batch (five cards or more): its cards leave the derived data to the one rebuild at the end. */
@@ -8525,7 +8527,12 @@ export class VisualAgentMapView extends ItemView {
    * ring size and the card goes to its place. A later one takes a free slot without moving any other card; only when no slot is
    * free is the whole ring solved again.
    */
-  private placeRingMember(map: MapDocument, imageId: string, topicId: string): void {
+  private placeRingMember(
+    map: MapDocument,
+    imageId: string,
+    topicId: string,
+    pending: ReadonlySet<string> = new Set()
+  ): void {
     const items = map.canvasItems ?? [];
     const image = findAnnotatedImage(items, imageId);
     const members = ringMembers(items, map.nodes).filter(member => member.imageId === imageId);
@@ -8533,7 +8540,8 @@ export class VisualAgentMapView extends ItemView {
     const node = map.nodes.find(item => item.id === topicId);
     if (!image || !me || !node) return;
     const only = new Set([imageId]);
-    const before = members.filter(member => member !== me);
+    // `pending`: members of the same reply not placed yet; their rough spots are not part of the ring so far.
+    const before = members.filter(member => member !== me && !pending.has(member.topicId));
     if (!before.length) {
       this.solveRingsIn(map, { imageIds: only, enlarge: true });
       return;
@@ -8555,7 +8563,7 @@ export class VisualAgentMapView extends ItemView {
       { x: image.x, y: image.y, w: image.w, h: image.h },
       states,
       { id: topicId, anchorX: me.x, anchorY: me.y, w: mine.w, h: mine.h },
-      this.ringObstacles(map, imageId, new Set(before.map(member => member.topicId)))
+      this.ringObstacles(map, imageId, new Set([topicId, ...before.map(member => member.topicId), ...pending]))
     );
     if (!placed) {
       this.solveRingsIn(map, { imageIds: only });
@@ -21629,7 +21637,22 @@ export class VisualAgentMapView extends ItemView {
               this.flushChatRender();
               await this.mapChange(map => {
                 // The ring first: every other new card is then placed beside it.
-                if (ringed) this.solveRingsIn(map, { imageIds: ringed, enlarge: true });
+                if (ringed) {
+                  // A picture whose ring existed before the reply keeps its cards (some may have been dragged): only the new
+                  // members are placed, one by one. A picture getting its first ring is solved whole.
+                  const fresh = new Set<string>();
+                  for (const imageId of ringed) {
+                    const added = run.ringAdded?.get(imageId);
+                    if (added?.hadRing) {
+                      const pending = new Set(added.topicIds);
+                      for (const topicId of added.topicIds) {
+                        pending.delete(topicId);
+                        this.placeRingMember(map, imageId, topicId, new Set(pending));
+                      }
+                    } else fresh.add(imageId);
+                  }
+                  if (fresh.size) this.solveRingsIn(map, { imageIds: fresh, enlarge: true });
+                }
                 if (rough.length) map.nodes = this.placeChatCards(map.nodes, new Set(rough), map.canvasItems ?? []);
               }, false);
               if (ringed && !stopped && this.map && !result.actions.some(action => action.kind === "focus_topic")) {
@@ -22357,7 +22380,11 @@ export class VisualAgentMapView extends ItemView {
       ...(action.description ? { description: action.description } : {})
     };
     if (!anchorRelationAllowed(image, link)) return skipped("ui.map_chat_skip_relation_not_allowed");
-    const box: { refused: TranslationKey | null; ring: boolean } = { refused: null, ring: false };
+    const box: { refused: TranslationKey | null; ring: boolean; hadRing: boolean } = {
+      refused: null,
+      ring: false,
+      hadRing: false
+    };
     await this.mapChange(map => {
       const current = findAnnotatedImage(map.canvasItems ?? [], action.imageId);
       if (!current) {
@@ -22374,12 +22401,21 @@ export class VisualAgentMapView extends ItemView {
       const marked: AnchorRelation = ring ? { ...link, ring: true } : link;
       if (!anchorRelationAllowed(current, marked)) box.refused = "ui.map_chat_skip_relation_not_allowed";
       else {
+        box.hadRing = ringMembers(map.canvasItems ?? [], map.nodes).some(member => member.imageId === action.imageId);
         map.canvasItems = addAnchorRelation(map.canvasItems ?? [], action.imageId, marked);
         box.ring = ring;
       }
     }, false);
     if (box.refused) return skipped(box.refused);
-    if (box.ring) (run.ringImages ??= new Set()).add(action.imageId);
+    if (box.ring) {
+      (run.ringImages ??= new Set()).add(action.imageId);
+      const added = ((run.ringAdded ??= new Map()).get(action.imageId) ?? {
+        hadRing: box.hadRing,
+        topicIds: []
+      }) as { hadRing: boolean; topicIds: string[] };
+      added.topicIds.push(nodeId);
+      run.ringAdded.set(action.imageId, added);
+    }
     return { status: "done" };
   }
   /**

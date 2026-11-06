@@ -18,12 +18,20 @@ export const MAP_CHAT_PLAN_RESEARCH_LIMIT = 10;
 /** A reply that adds this many cards or more is followed by one automatic layout and a move of the view to the new cards. */
 export const MAP_CHAT_AUTO_LAYOUT_MIN_NEW = 5;
 
+/** One expand card is at most this many outline calls: the outline call, and one more when the model leaves a summary out and is asked again. */
+export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
+
 /**
+ * `auto_round_other_actions`: a round of an automatic continuation (second round on) asked for something outside {@link CHAIN_SAFE}.
+ * Its context carries web research text, which is untrusted, so deleting, rewriting, moving, writing files, opening maps and
+ * the like are always shown as a plan.
+ *
  * `image_preview`: the reply places or links anchors and the user chose to see image changes first. `image_other_actions`: a turn
  * that sent an image also asked for something besides the image-safe actions; the picture is untrusted input, so this is
  * a plan in either mode.
  */
-export type MapChatPlanReason = "many_actions" | "many_research" | "new_map" | "image_preview" | "image_other_actions";
+export type MapChatPlanReason =
+  "many_actions" | "many_research" | "new_map" | "image_preview" | "image_other_actions" | "auto_round_other_actions";
 
 /** "AI changes to an image: show me first" or "apply at once"; the setting `mapChatImageMode`. */
 export type MapChatImageMode = "preview" | "direct";
@@ -40,6 +48,36 @@ const IMAGE_SAFE_KINDS: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatActi
   "expand_topic"
 ]);
 
+/**
+ * What an automatic round (second round on) may do without a plan: add cards and links, write summaries, types and looks, change the
+ * selection and the view, and start research or an expand. `run_map_action` is judged by its action: only `research_standard` and
+ * `expand` are safe (an integration, a merge, a rating or an image search is not).
+ */
+export const CHAIN_SAFE: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAction["kind"]>([
+  "add_child",
+  "add_relation",
+  "update_summary",
+  "set_topic_kind",
+  "set_appearance",
+  "select_topics",
+  "focus_topic",
+  "collapse_topic",
+  "expand_topic",
+  "auto_layout"
+]);
+const CHAIN_SAFE_RUN: ReadonlySet<string> = new Set(["research_standard", "expand"]);
+/** True when the action may be part of an automatic round without a plan. */
+export const isChainSafe = (action: MapChatAction): boolean =>
+  action.kind === "run_map_action" ? CHAIN_SAFE_RUN.has(action.action) : CHAIN_SAFE.has(action.kind);
+
+/** Where the reply sits in an automatic continuation. Absent = an ordinary message (or the first round). */
+export interface MapChatPlanChain {
+  /** The round this reply belongs to, from 1; only 2 and up use the chain rules. */
+  round: number;
+  /** Research targets the earlier rounds of this chain already started: splitting the work over rounds does not get around `many_research`. */
+  researchSoFar: number;
+}
+
 export interface MapChatPlan {
   /** Every condition that holds, in a fixed order. */
   reasons: MapChatPlanReason[];
@@ -48,8 +86,8 @@ export interface MapChatPlan {
    * follows the write (`options.diagrams`, on by default); a Quick research target is one call (it adds no diagram). The mode is the
    * one the action names, then `options.mapAiMode`, then Quick (a standard research that found nothing on the web is sent once
    * more, which is a retry and is not counted). Each synthesize is one integration call plus the
-   * same diagram call: B2 starts it without a dialog and without the directions step. An expand is one outline call per
-   * card it is asked for (its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each find_images up to {@link MAP_CHAT_FIND_IMAGES_LIMIT} per reply (the view skips the rest; the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
+   * same diagram call: B2 starts it without a dialog and without the directions step. An expand is {@link MAP_CHAT_EXPAND_CALLS_PER_CARD} outline calls per
+   * card it is asked for (the second is the ask-again when a summary is missing; its subtopics are added without further AI calls), one for rating by a goal, one for a merge, one for each find_images up to {@link MAP_CHAT_FIND_IMAGES_LIMIT} per reply (the view skips the rest; the loadable-image check is not an AI call). Writes to cards and notes, create_map, open_map and the view operations are 0.
    * The chat reply itself is not counted.
    */
   estimatedCalls: number;
@@ -86,7 +124,13 @@ export const mapChatCallsPerTask = (diagrams: boolean): number => (diagrams ? 2 
 export function planFor(
   actions: readonly MapChatAction[],
   context: PlanContext,
-  options: { diagrams?: boolean; mapAiMode?: MapAiMode; imageMode?: MapChatImageMode; imageAttached?: boolean } = {}
+  options: {
+    diagrams?: boolean;
+    mapAiMode?: MapAiMode;
+    imageMode?: MapChatImageMode;
+    imageAttached?: boolean;
+    chain?: MapChatPlanChain;
+  } = {}
 ): MapChatPlan | null {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons: MapChatPlanReason[] = [];
@@ -95,7 +139,10 @@ export function planFor(
     options.imageMode === "direct" &&
     options.imageAttached === true &&
     actions.every(action => IMAGE_SAFE_KINDS.has(action.kind));
-  if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly) reasons.push("many_actions");
+  // An automatic round (second round on) of only safe actions is not stopped by the number of actions; one outside the list is a plan.
+  const autoRound = (options.chain?.round ?? 1) >= 2;
+  const autoOnlySafe = autoRound && actions.every(isChainSafe);
+  if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");
   let research = 0;
   let calls = 0;
   let imageSearches = 0;
@@ -120,7 +167,7 @@ export function planFor(
             break;
           }
           case "expand":
-            calls += targetCount(action.nodeIds, selection);
+            calls += targetCount(action.nodeIds, selection) * MAP_CHAT_EXPAND_CALLS_PER_CARD;
             break;
           case "rate_by_goal":
           case "merge":
@@ -141,7 +188,7 @@ export function planFor(
         break;
     }
   }
-  if (research >= MAP_CHAT_PLAN_RESEARCH_LIMIT) reasons.push("many_research");
+  if (research + (options.chain?.researchSoFar ?? 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT) reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
   if (
     options.imageMode === "preview" &&
@@ -150,6 +197,7 @@ export function planFor(
     reasons.push("image_preview");
   if (options.imageAttached && actions.some(action => !IMAGE_SAFE_KINDS.has(action.kind)))
     reasons.push("image_other_actions");
+  if (autoRound && !autoOnlySafe) reasons.push("auto_round_other_actions");
   return reasons.length ? { reasons, estimatedCalls: calls } : null;
 }
 

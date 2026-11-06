@@ -432,8 +432,8 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({})), /"reply" is one sentence on what you will do/);
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
-test('C1: the style is not part of the action schema, and the step version is 17 (version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 17);
+test('C1: the style is not part of the action schema, and the step version is 18 (version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
+  assert.equal(mapChatStep.version, 18);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -685,15 +685,15 @@ test('B1/B2 plan: the estimate counts research and synthesis (main call plus dia
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })]), 2, 'needsWeb with no map mode: Standard, research plus diagram call');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true, mode: 'quick' })], 0, standard), 1, 'a named Quick beats needsWeb');
   assert.equal(estimate([run('research_standard', { nodeIds: ['x'], needsWeb: true })], 0, { mapAiMode: 'quick', diagrams: false }), 1, 'needsWeb with diagrams off: no diagram call');
-  assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 2, 'expand: one outline call per card');
-  assert.equal(estimate([run('expand')], 4), 4, 'no targets = the selection');
+  assert.equal(estimate([run('expand', { nodeIds: ['x', 'y'] })]), 4, 'expand: two outline calls per card (the ask-again when a summary is missing is counted, R1 L3)');
+  assert.equal(estimate([run('expand')], 4), 8, 'no targets = the selection');
   assert.equal(estimate([run('rate_by_goal')]), 1);
   assert.equal(estimate([run('merge')]), 1);
   assert.equal(estimate([run('synthesize')]), 2, 'B2: an integration starts at once, so it is a call (and its diagram call), not 0');
   assert.equal(estimate([run('synthesize', { nodeIds: ['x', 'y'] })]), 2, 'several cards are still one integration');
   assert.equal(estimate([run('synthesize')], 0, { diagrams: false }), 1);
   assert.equal(estimate([{ kind: 'collapse_topic', nodeId: 'x' }, { kind: 'auto_layout' }, { kind: 'focus_topic', nodeId: 'x' }, { kind: 'rename_topic', nodeId: 'x', title: 'T' }]), 0);
-  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('rate_by_goal'), run('merge')], 0, standard), 7);
+  assert.equal(estimate([run('research_standard', { nodeIds: ['x', 'y'] }), run('expand', { nodeIds: ['x'] }), run('rate_by_goal'), run('merge')], 0, standard), 8);
 });
 test('B1 open_map matching: exact first, then contains; case, spacing and Traditional/Simplified are ignored; none, one and many are told apart', () => {
   const maps = [{ title: 'Coffee industry' }, { title: '咖啡產業' }, { title: 'Coffee' }, { title: 'Tea' }];
@@ -780,8 +780,8 @@ test('P1 research mode order: named mode > needsWeb (Standard) > map mode > Quic
 });
 test('P1 prompt (zh and en): complete is defined, later steps are not promised, the old "building a tree needs no research" is gone, needsWeb is described', () => {
   const en = mapChatStep.render(request({ language: 'en' })), zh = mapChatStep.render(request({ language: 'zh-TW' }));
-  for (const pattern of [/Complete means complete/, /every item that the source lists must get a card/, /Never promise a later step in "reply"/, /build only the root card, add research_standard for it as the last action/, /needsWeb \(research_standard only/, /"images":false,"needsWeb":false/]) assert.match(en, pattern, String(pattern));
-  for (const pattern of [/「完整」要完整/, /來源列出的每一項都要有議題/, /不可承諾之後的步驟/, /只建根議題，並把 research_standard 放在最後一個動作/, /needsWeb（只用於 research_standard/, /"images":false,"needsWeb":false/]) assert.match(zh, pattern, String(pattern));
+  for (const pattern of [/Complete means complete/, /every item that the source lists must get a card/, /never promise any other later step/, /Continuing: "remaining"/, /"remaining":""\}/, /build only the root card, add research_standard for it as the last action/, /needsWeb \(research_standard only/, /"images":false,"needsWeb":false/]) assert.match(en, pattern, String(pattern));
+  for (const pattern of [/「完整」要完整/, /來源列出的每一項都要有議題/, /不可承諾其他之後的步驟/, /接續："remaining"/, /"remaining":""\}/, /只建根議題，並把 research_standard 放在最後一個動作/, /needsWeb（只用於 research_standard/, /"images":false,"needsWeb":false/]) assert.match(zh, pattern, String(pattern));
   for (const text of [en, zh]) assert.doesNotMatch(text, /單純建樹或擴充樹不需要|building or extending a tree on its own never needs it/);
 });
 test('D-231 mode resolution: a named mode > the map mode > Quick; the all-new-cards rule is gone', () => {
@@ -1533,8 +1533,8 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(en, /go one step only/); assert.match(en, /Never express a topic type through the title/);
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
-test('hypothesis-leaning: S21 the step version is 17 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 17);
+test('hypothesis-leaning: S21 the step version is 18 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
+  assert.equal(mapChatStep.version, 18);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [

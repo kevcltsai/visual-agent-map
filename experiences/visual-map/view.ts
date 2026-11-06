@@ -20465,6 +20465,9 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_plan_reason_image_preview");
       case "image_other_actions":
         return t("ui.map_chat_plan_reason_image_other_actions");
+      case "auto_round_other_actions":
+        // Unreachable until the chain passes `chain` to planFor (P3); P3/P4 give it its own text.
+        return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */

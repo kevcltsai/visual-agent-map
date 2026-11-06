@@ -233,6 +233,8 @@ export interface MapChatRejection {
 export interface MapChatResult {
   reply: string;
   actions: MapChatAction[];
+  /** What is still to do after this reply, one line of at most {@link MAP_CHAT_REMAINING_LIMIT} characters; "" = everything asked is done (or a reply that has no such field). The program continues on its own when it is not empty. */
+  remaining: string;
   /** Items that were dropped (never applied) or, for `no_topic_kinds`, applied without their type; shown only as a count. */
   rejected: MapChatRejection[];
 }
@@ -258,6 +260,19 @@ export interface MapChatRequest {
   reasoning: ReasoningLevel;
   /** Trusted: the selected image as a data URL, for the runtime's image input only; never serialized into a prompt, never stored. */
   imageDataUrl?: string;
+}
+
+/** Characters of `remaining` kept: it is read by the next round, it is not knowledge content. */
+export const MAP_CHAT_REMAINING_LIMIT = 500;
+/**
+ * The `remaining` of a reply: a missing field or a value that is not a string (an older reply, version 17 and before) is "" (nothing
+ * left, no continuation); a string is trimmed, squeezed to one line and cut to {@link MAP_CHAT_REMAINING_LIMIT} characters.
+ */
+export function normalizeRemaining(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const text = value.replace(/\s+/g, " ").trim();
+  const characters = [...text];
+  return characters.length > MAP_CHAT_REMAINING_LIMIT ? characters.slice(0, MAP_CHAT_REMAINING_LIMIT).join("") : text;
 }
 
 const STRING = { type: "string" };
@@ -356,9 +371,10 @@ export const MAP_CHAT_SCHEMA = {
           "note"
         ]
       }
-    }
+    },
+    remaining: STRING
   },
-  required: ["reply", "actions"]
+  required: ["reply", "actions", "remaining"]
 };
 
 const invalid = (detail: string): MapChatError => new MapChatError("invalid", `Map chat reply is not valid: ${detail}`);
@@ -812,7 +828,7 @@ export function parseMapChat(
       rejected.push({ index, code: error.code });
     }
   });
-  return { reply: body.reply, actions, rejected };
+  return { reply: body.reply, actions, rejected, remaining: normalizeRemaining(body.remaining) };
 }
 
 /**
@@ -826,7 +842,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 17,
+  version: 18,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

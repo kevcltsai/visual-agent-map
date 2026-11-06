@@ -334,10 +334,14 @@
           "note"
         ]
       }
+    },
+    "remaining": {
+      "type": "string"
     }
   },
   "required": [
     "reply",
-    "actions"
+    "actions",
+    "remaining"
   ]
 }

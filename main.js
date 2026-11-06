@@ -56871,6 +56871,7 @@ function textBlockLines(text12, boxWidth, boxHeight, lineHeight) {
   }
   return lines;
 }
+var unitStep = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1e3) / 1e3;
 var boxOf = (card) => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -57211,6 +57212,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "hoverTopic", null);
     /** The drawn anchor dots (`imageId NUL anchorId`), so a repaint can mark the ones whose lines are emphasised. */
     __publicField(this, "anchorDots", /* @__PURE__ */ new Map());
+    /** Ends the running anchor drag; `restore` puts its dot and lines back (false when the dot is already gone). */
+    __publicField(this, "anchorDragCancel", null);
+    /** The anchor that gets the keyboard focus on the next paint (set when a drag settles). */
+    __publicField(this, "focusAnchorRef", null);
     /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
     __publicField(this, "relationEndIds", /* @__PURE__ */ new Set());
     /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
@@ -58496,7 +58501,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     return true;
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     this.closeTopicLinkMenu();
     this.closed = true;
     this.closeMapSearch(false);
@@ -58563,6 +58568,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
     (_l = this.hoverCard) == null ? void 0 : _l.remove();
     (_m = this.dragCleanup) == null ? void 0 : _m.call(this);
+    (_n = this.anchorDragCancel) == null ? void 0 : _n.call(this, false);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -63677,8 +63683,9 @@ ${request.requirements}` : preset.text,
    * they paint behind the cards. A file that cannot be found shows a named placeholder; the item stays in the map.
    */
   renderCanvasItems() {
-    var _a2, _b2, _c, _d, _e;
-    const stage = this.stageEl, items = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [];
+    var _a2, _b2, _c, _d, _e, _f;
+    (_a2 = this.anchorDragCancel) == null ? void 0 : _a2.call(this, false);
+    const stage = this.stageEl, items = (_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : [];
     if (!stage || !(items == null ? void 0 : items.length) && !this.pendingSummary) {
       if (this.linkingTextId) this.cancelLinking(false);
       if (this.placing) this.cancelPlacing(false);
@@ -63695,7 +63702,7 @@ ${request.requirements}` : preset.text,
     this.canvasImageEls = /* @__PURE__ */ new Map();
     for (const item of items) {
       if (item.kind !== "image" && !isAnnotatedImage(item) || !layer) continue;
-      const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = annotated ? this.annotatedLabel(annotated, name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
+      const image = item, annotated = isAnnotatedImage(image) ? image : null, name2 = (_d = image.path.split("/").pop()) != null ? _d : image.path, label = annotated ? this.annotatedLabel(annotated, name2) : t("ui.canvas_image_label", name2), el = layer.createDiv(annotated ? "vam-canvas-image is-annotated" : "vam-canvas-image");
       el.dataset.itemId = image.id;
       this.canvasImageEls.set(image.id, el);
       el.setAttr("role", annotated ? "group" : "img");
@@ -63706,7 +63713,7 @@ ${request.requirements}` : preset.text,
       el.style.width = `${image.w}px`;
       el.style.height = `${image.h}px`;
       const file = this.app.vault.getAbstractFileByPath(image.path);
-      const source = file instanceof import_obsidian37.TFile ? (_e = (_d = this.app.vault).getResourcePath) == null ? void 0 : _e.call(_d, file) : void 0;
+      const source = file instanceof import_obsidian37.TFile ? (_f = (_e = this.app.vault).getResourcePath) == null ? void 0 : _f.call(_e, file) : void 0;
       if (annotated) this.renderAnnotatedBar(el, annotated, name2);
       let picture = null;
       const placeholder2 = () => {
@@ -63756,6 +63763,7 @@ ${request.requirements}` : preset.text,
     this.renderBoundaries(stage, items, editable);
     this.renderSummaries(stage, items);
     this.focusItemId = null;
+    this.focusAnchorRef = null;
   }
   /** The anchors of one annotated image. Only anchors with a 2D position are drawn; the others stay in the data untouched. */
   renderAnchors(el, image, editable) {
@@ -63800,7 +63808,13 @@ ${request.requirements}` : preset.text,
         ["blur", false]
       ])
         dot.addEventListener(name2, () => mark2(on));
+      if (this.focusAnchorRef === ref) {
+        this.focusAnchorRef = null;
+        dot.focus({ preventScroll: true });
+      }
       if (!editable) continue;
+      dot.addClass("is-draggable");
+      this.enableAnchorDrag(dot, el, image, anchor.id, anchor.at, ref);
       dot.addEventListener("keydown", (event) => {
         if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
         if (event.key === "Enter") {
@@ -63815,6 +63829,95 @@ ${request.requirements}` : preset.text,
       });
     }
     this.paintAnchorPreview(el, image, image.note || ((_b2 = image.path.split("/").pop()) != null ? _b2 : image.path));
+  }
+  /**
+   * Drags an existing anchor with the mouse. The dot and the lines that leave it follow the pointer on screen only; Map.md is
+   * written once on release (one undo step). Esc, pointercancel, lostpointercapture, a repaint or closing the view drop the
+   * drag without writing. A press that moves less than 3px is a click.
+   */
+  enableAnchorDrag(dot, el, image, anchorId, origin, ref) {
+    dot.addEventListener("pointerdown", (event) => {
+      var _a2, _b2, _c;
+      if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
+      event.preventDefault();
+      dot.focus({ preventScroll: true });
+      if (dot.isConnected === false) return;
+      (_a2 = this.anchorDragCancel) == null ? void 0 : _a2.call(this, true);
+      const start = { x: event.clientX, y: event.clientY }, doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
+      let active = false, done = false, to = { x: origin.x, y: origin.y };
+      const lines = () => [...this.anchorLinks].filter(([, line]) => line.imageId === image.id && line.anchorId === anchorId);
+      const paint = (at) => {
+        dot.style.left = `${Math.round(at.x * 1e6) / 1e4}%`;
+        dot.style.top = `${Math.round(at.y * 1e6) / 1e4}%`;
+        for (const [key2, line] of lines()) {
+          const end = this.lineEndEl(line.topicId);
+          if (end)
+            this.placeAnchorLine(
+              key2,
+              { ...line, point: { x: image.x + at.x * image.w, y: image.y + at.y * image.h } },
+              boxOf(end)
+            );
+        }
+      };
+      const move = (e) => {
+        if (done) return;
+        if (!active && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
+        const rect2 = el.getBoundingClientRect();
+        if (!(rect2.width > 0 && rect2.height > 0)) return;
+        if (!active) {
+          active = true;
+          dot.addClass("is-dragging");
+          this.hoverAnchor = ref;
+          this.syncRelationClasses();
+        }
+        const clamp2 = (n) => Math.min(1, Math.max(0, n));
+        to = { x: clamp2((e.clientX - rect2.left) / rect2.width), y: clamp2((e.clientY - rect2.top) / rect2.height) };
+        paint(to);
+      };
+      const settle = () => {
+        done = true;
+        if (this.anchorDragCancel === cancelRef) this.anchorDragCancel = null;
+        dot.removeEventListener("pointermove", move);
+        dot.removeEventListener("pointerup", up);
+        dot.removeEventListener("pointercancel", cancel);
+        dot.removeEventListener("lostpointercapture", cancel);
+        doc == null ? void 0 : doc.removeEventListener("keydown", esc, true);
+        dot.removeClass("is-dragging");
+      };
+      const cancelRef = (restore) => {
+        if (done) return;
+        settle();
+        if (restore && active) paint(origin);
+        if (!restore && this.hoverAnchor === ref) this.hoverAnchor = null;
+      };
+      const cancel = () => cancelRef(dot.isConnected !== false);
+      const esc = (e) => {
+        if (e.key !== "Escape" || !active) return;
+        e.preventDefault();
+        e.stopPropagation();
+        cancelRef(true);
+      };
+      const up = () => {
+        if (done) return;
+        const at = { x: unitStep(to.x), y: unitStep(to.y) };
+        const write = active && dot.isConnected !== false && this.canEditCanvasItems() && (at.x !== origin.x || at.y !== origin.y);
+        settle();
+        if (!write) {
+          if (active) paint(origin);
+          return;
+        }
+        this.focusAnchorRef = ref;
+        dot.focus({ preventScroll: true });
+        this.enqueue(() => this.changeCanvasItems(image.id, (items) => updateAnchor(items, image.id, anchorId, { at })));
+      };
+      this.anchorDragCancel = cancelRef;
+      (_c = dot.setPointerCapture) == null ? void 0 : _c.call(dot, event.pointerId);
+      dot.addEventListener("pointermove", move);
+      dot.addEventListener("pointerup", up);
+      dot.addEventListener("pointercancel", cancel);
+      dot.addEventListener("lostpointercapture", cancel);
+      doc == null ? void 0 : doc.addEventListener("keydown", esc, true);
+    });
   }
   /** The anchors the pending plan would place on this image (none once the plan is settled or replaced). */
   previewAnchorsOf(imageId) {
@@ -63928,7 +64031,7 @@ ${request.requirements}` : preset.text,
       var _a3;
       return target === imageEl || !!((_a3 = imageEl.contains) == null ? void 0 : _a3.call(imageEl, target));
     };
-    const clamp2 = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1e3) / 1e3;
+    const clamp2 = unitStep;
     const key2 = (event) => {
       const e = event;
       if (e.isComposing) return;
@@ -68064,7 +68167,7 @@ ${request.requirements}` : preset.text,
     this.settleCardHeights();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L;
     if (!this.closed && this.hiddenTab()) this.renderWhenShown = true;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
@@ -68074,10 +68177,11 @@ ${request.requirements}` : preset.text,
       (_a2 = this.dragCleanup) == null ? void 0 : _a2.call(this);
       this.renderAfterDrag = false;
     }
+    (_b2 = this.anchorDragCancel) == null ? void 0 : _b2.call(this, false);
     this.paintCount++;
     this.emptyMapEl = null;
     this.aimProgressEls.clear();
-    (_b2 = this.dragCleanup) == null ? void 0 : _b2.call(this);
+    (_c = this.dragCleanup) == null ? void 0 : _c.call(this);
     if (this.suspendTextEdit) this.textEditDraft = this.suspendTextEdit();
     if (this.closed) return;
     this.plugin.syncOutline(this.map, this.notes, this);
@@ -68085,7 +68189,7 @@ ${request.requirements}` : preset.text,
       window.clearTimeout(this.hoverTimer);
       this.hoverTimer = null;
     }
-    (_c = this.hoverCard) == null ? void 0 : _c.remove();
+    (_d = this.hoverCard) == null ? void 0 : _d.remove();
     this.hoverCard = null;
     const title = this.getDisplayText();
     if (title !== this.headerTitle) {
@@ -68096,34 +68200,34 @@ ${request.requirements}` : preset.text,
         void this.leaf.setViewState({ type: VIEW_TYPE, state: this.getState() });
       }, 0);
     }
-    const focusedCard = (_d = activeDocument.activeElement) == null ? void 0 : _d.closest(".vam-node");
+    const focusedCard = (_e = activeDocument.activeElement) == null ? void 0 : _e.closest(".vam-node");
     if (focusedCard && this.contentEl.contains(focusedCard)) {
       const focused = activeDocument.activeElement;
       if ((focused == null ? void 0 : focused.classList.contains("vam-card-resize")) || (focused == null ? void 0 : focused.classList.contains("vam-card-resize-y"))) {
         if (!this.focusResizeNodeId) {
-          this.focusResizeNodeId = (_e = focusedCard.dataset.nodeId) != null ? _e : null;
+          this.focusResizeNodeId = (_f = focusedCard.dataset.nodeId) != null ? _f : null;
           this.focusResizeAxis = focused.classList.contains("vam-card-resize-y") ? "height" : "width";
         }
-      } else (_g = this.focusNodeId) != null ? _g : this.focusNodeId = (_f = focusedCard.dataset.nodeId) != null ? _f : null;
+      } else (_h = this.focusNodeId) != null ? _h : this.focusNodeId = (_g = focusedCard.dataset.nodeId) != null ? _g : null;
     }
     const keepMapFocus = this.holdMapFocus();
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const restoreSearch = this.holdMapSearch();
     this.captureGoalEdit();
-    (_h = this.mapSourcesPanelCleanup) == null ? void 0 : _h.call(this);
+    (_i = this.mapSourcesPanelCleanup) == null ? void 0 : _i.call(this);
     this.mapSourcesPanelCleanup = null;
     this.mapSourcesPanelEl = null;
-    (_i = this.suspendInlineName) == null ? void 0 : _i.call(this);
-    if (((_j = this.inlineName) == null ? void 0 : _j.target) === "card" && !((_k = this.map) == null ? void 0 : _k.nodes.some((node) => {
+    (_j = this.suspendInlineName) == null ? void 0 : _j.call(this);
+    if (((_k = this.inlineName) == null ? void 0 : _k.target) === "card" && !((_l = this.map) == null ? void 0 : _l.nodes.some((node) => {
       var _a3;
       return node.id === ((_a3 = this.inlineName) == null ? void 0 : _a3.id);
     })))
       this.inlineName = null;
-    if (((_l = this.inlineName) == null ? void 0 : _l.target) === "map" && !this.map) this.inlineName = null;
+    if (((_m = this.inlineName) == null ? void 0 : _m.target) === "map" && !this.map) this.inlineName = null;
     this.inlineNameInput = null;
-    (_m = this.suspendInlineSummary) == null ? void 0 : _m.call(this);
-    if (this.inlineSummary && !((_n = this.map) == null ? void 0 : _n.nodes.some((node) => {
+    (_n = this.suspendInlineSummary) == null ? void 0 : _n.call(this);
+    if (this.inlineSummary && !((_o = this.map) == null ? void 0 : _o.nodes.some((node) => {
       var _a3;
       return node.id === ((_a3 = this.inlineSummary) == null ? void 0 : _a3.id);
     })))
@@ -68133,8 +68237,8 @@ ${request.requirements}` : preset.text,
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createDiv({ cls: "vam-map-switcher" });
-    const mapName = (_p = (_o = this.map) == null ? void 0 : _o.title) != null ? _p : "Visual Agent Map";
-    if (this.map && ((_q = this.inlineName) == null ? void 0 : _q.target) === "map") {
+    const mapName = (_q = (_p = this.map) == null ? void 0 : _p.title) != null ? _q : "Visual Agent Map";
+    if (this.map && ((_r = this.inlineName) == null ? void 0 : _r.target) === "map") {
       const field = this.createInlineNameInput(switcher, "vam-map-title-input", t("ui.rename_mind_map"), (value) => {
         var _a3;
         const name2 = sanitizeGeneratedTitle(value != null ? value : "").trim();
@@ -68190,8 +68294,8 @@ ${request.requirements}` : preset.text,
         (event) => this.openMapActions(event)
       ).addClass("vam-map-actions-button");
     }
-    const selectedNode = (_r = this.map) == null ? void 0 : _r.nodes.find((node) => node.id === this.selection.state.selected);
-    if (aimEnabled() && ((_s = this.map) == null ? void 0 : _s.aim)) {
+    const selectedNode = (_s = this.map) == null ? void 0 : _s.nodes.find((node) => node.id === this.selection.state.selected);
+    if (aimEnabled() && ((_t = this.map) == null ? void 0 : _t.aim)) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
       const data = this.map.aim;
@@ -68207,19 +68311,19 @@ ${request.requirements}` : preset.text,
       let stateText;
       let stateClass;
       if (this.aimBusy) {
-        const activeTitle = (_v = (_u = this.notes.get((_t = this.aimActiveQuestionNodeId) != null ? _t : "")) == null ? void 0 : _u.title) != null ? _v : this.map.title;
+        const activeTitle = (_w = (_v = this.notes.get((_u = this.aimActiveQuestionNodeId) != null ? _u : "")) == null ? void 0 : _v.title) != null ? _w : this.map.title;
         const planning = this.aimActivityKind === "planning";
         stateText = this.aimActivityKind === "clarifying" ? t("ui.aim_preparing_clarification") : this.aimProgress ? this.aimStageText() : t(planning ? "ui.aim_status_planning_0" : "ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (runningBranch) {
-        const activeTitle = (_x = (_w = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _w.title) != null ? _x : this.map.title;
+        const activeTitle = (_y = (_x = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _x.title) != null ? _y : this.map.title;
         stateText = t("ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (!questions.length) {
         stateText = t("ui.aim_status_ready");
         stateClass = "idea";
       } else if (pendingQuestion) {
-        stateText = t("ui.aim_status_waiting_answer_0", (_z = (_y = this.notes.get(pendingQuestion.id)) == null ? void 0 : _y.title) != null ? _z : "");
+        stateText = t("ui.aim_status_waiting_answer_0", (_A = (_z = this.notes.get(pendingQuestion.id)) == null ? void 0 : _z.title) != null ? _A : "");
         stateClass = "idea";
       } else if (data.branches.some((branch) => branch.results.some((result) => result.kind === "conclusion"))) {
         stateText = t("ui.aim_status_complete");
@@ -68239,7 +68343,7 @@ ${request.requirements}` : preset.text,
           var _a3;
           (_a3 = this.aimController) == null ? void 0 : _a3.abort();
         });
-        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_B = (_A = this.aimProgress) == null ? void 0 : _A.branchId) != null ? _B : null };
+        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_C = (_B = this.aimProgress) == null ? void 0 : _B.branchId) != null ? _C : null };
         const steer = this.button(
           statusbar,
           t("ui.aim_steer"),
@@ -68260,9 +68364,9 @@ ${request.requirements}` : preset.text,
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if (!aimEnabled() && ((_C = this.map) == null ? void 0 : _C.aim))
+    if (!aimEnabled() && ((_D = this.map) == null ? void 0 : _D.aim))
       this.contentEl.createDiv({ cls: "vam-aim-attribution", text: t("ui.aim_paused_notice"), attr: { role: "note" } });
-    if (aimEnabled() && ((_D = this.map) == null ? void 0 : _D.aim)) {
+    if (aimEnabled() && ((_E = this.map) == null ? void 0 : _E.aim)) {
       const data = this.map.aim;
       const isAnswered = (node) => data.branches.some((branch) => branch.questionNodeId === node.id);
       const pending2 = this.map.nodes.find((node) => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -68316,10 +68420,10 @@ ${request.requirements}` : preset.text,
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
     }
-    if ((_E = this.deletedMap) == null ? void 0 : _E.deleted)
+    if ((_F = this.deletedMap) == null ? void 0 : _F.deleted)
       this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
     const startingSelection = this.startingTasks.get(this.selectionTaskKey());
-    if (startingSelection && !(((_F = this.integrationTask) == null ? void 0 : _F.mapPath) === this.path && this.integrationTask.state === "running")) {
+    if (startingSelection && !(((_G = this.integrationTask) == null ? void 0 : _G.mapPath) === this.path && this.integrationTask.state === "running")) {
       const state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
@@ -68370,7 +68474,7 @@ ${request.requirements}` : preset.text,
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       if (aimEnabled()) this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
-      if ((_G = this.deletedMap) == null ? void 0 : _G.deleted)
+      if ((_H = this.deletedMap) == null ? void 0 : _H.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       this.dropGoalEdit();
       return;
@@ -68382,7 +68486,7 @@ ${request.requirements}` : preset.text,
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    if (((_H = this.map) == null ? void 0 : _H.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
+    if (((_I = this.map) == null ? void 0 : _I.aim) && !aimEnabled()) this.renderHiddenAimMapTools(tools);
     else this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
@@ -68405,7 +68509,7 @@ ${request.requirements}` : preset.text,
     }) : null;
     const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
     const zoom = controls.createDiv("vam-zoom-controls");
-    (_I = this.usageControl) == null ? void 0 : _I.mount(zoom, controls);
+    (_J = this.usageControl) == null ? void 0 : _J.mount(zoom, controls);
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
       var _a3;
       this.markCanvasHintSeen();
@@ -68478,7 +68582,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_J = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _J.focus({ preventScroll: true });
+        (_K = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _K.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -68488,9 +68592,9 @@ ${request.requirements}` : preset.text,
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_K = this.stageEl.querySelector(
+        (_L = this.stageEl.querySelector(
           `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
-        )) == null ? void 0 : _K.focus({ preventScroll: true });
+        )) == null ? void 0 : _L.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }

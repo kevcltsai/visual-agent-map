@@ -935,6 +935,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.relevance_goal_placeholder": "你想用这张图达成什么？",
   "ui.relevance_context_label": "补充说明",
   "ui.relevance_context_placeholder": "补充（选填）：已经会什么、条件或限制",
+  "ui.goal_add_context": "＋ 补充",
   "ui.relevance_grade_button": "依此分级",
   "ui.relevance_running": "依目标分级中…",
   "ui.relevance_awaiting_usage": "等待确认 AI 用量…",

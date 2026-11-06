@@ -33,7 +33,7 @@ async function harness({ language = 'en' } = {}) {
   await app.vault.create(MAP, require('./support.cjs').core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   await repo.writeRelevanceGoal(MAP, 'Sleep better');
-  const notices = [], ctx = {}, listeners = { pointerdown: [] };
+  const notices = [], ctx = {}, listeners = { pointerdown: [], pointerup: [], pointercancel: [] };
   const control = {
     decline: false, usageAsks: 0, suggestCalls: [], gradeCalls: [], gradeGate: null,
     suggest: async () => JSON.stringify({ suggestions: TWO }),
@@ -97,7 +97,7 @@ async function harness({ language = 'en' } = {}) {
 }
 const BASE = ['Body', 'Dreams', 'Mind', 'REM', 'Sleep'];
 
-test('goal suggest: the spark asks for the usage confirmation, shows "Suggesting…" with Stop and four disabled icons, then the list', async () => {
+test('goal suggest: the spark asks for the usage confirmation, shows "Suggesting…" with Stop and three disabled icons, then the list', async () => {
   const h = await harness();
   assert.equal(h.spark().disabled, false);
   const gate = deferred(); h.control.suggest = async () => { await gate.promise; return JSON.stringify({ suggestions: TWO }); };
@@ -106,7 +106,7 @@ test('goal suggest: the spark asks for the usage confirmation, shows "Suggesting
   await until(() => h.stopBtn());
   assert.equal(find(h.panel(), i => i.attrs.role === 'status').text, 'Suggesting…');
   assert.equal(h.stopBtn().text, 'Stop'); assert.equal(h.stopBtn().focused, true, 'the keyboard stays in the panel');
-  assert.ok(h.icons().length === 4 && h.icons().every(b => b.disabled), 'the four goal icons are disabled while asking');
+  assert.ok(h.icons().length === 3 && h.icons().every(b => b.disabled), 'the three goal icons are disabled while asking');
   gate.resolve(); await until(() => !h.stopBtn() && h.rows().length);
   assert.deepEqual(h.titles(), ['Sleep stages', 'Stress habits']);
   assert.deepEqual(h.whys(), ['Goes under “Body”', 'Goes under “Mind”']);
@@ -116,8 +116,8 @@ test('goal suggest: the spark asks for the usage confirmation, shows "Suggesting
   assert.equal(h.addBtn().text, 'Add 2'); assert.equal(h.skipBtn().text, 'Skip');
   assert.equal(h.boxes()[0].focused, true, 'focus moves into the list');
   const others = h.icons().filter(b => b.attrs['data-goal-action'] !== 'suggest');
-  assert.equal(others.length, 3);
-  for (const label of ['Grade with this', 'Sort by relevance', 'Edit goal']) {
+  assert.equal(others.length, 2);
+  for (const label of ['Grade with this', 'Sort by relevance']) {
     const icon = others.find(b => b.attrs['aria-label'] === label);
     assert.ok(icon, `the ${label} icon exists`); assert.equal(icon.disabled, false, `${label} is enabled while the list is ready`);
   }
@@ -408,11 +408,14 @@ const cssRule = (selector, has) => { const hits = [...STYLES.matchAll(new RegExp
 const cssPx = (body, prop) => { const m = body.match(new RegExp(`(?:^|[\\s;])${prop}:\\s*(-?[\\d.]+)px`)); assert.ok(m, `${prop} in ${body}`); return Number(m[1]); };
 const ICON = cssRule('.vam-goal-icon', /width:/), ICON_W = cssPx(ICON, 'width'), ICON_H = cssPx(ICON, 'height');
 const ACTIONS_BASE = cssRule('.vam-goal-actions', /display: flex/), ACTIONS_FLOAT = cssRule('.vam-goal-actions', /position: absolute/);
-const ICON_GAP = cssPx(ACTIONS_BASE, 'gap'), ICON_COUNT = 4;
+const ICON_GAP = cssPx(ACTIONS_BASE, 'gap'), ICON_COUNT = 3; // three icons since P3 (the pencil is gone): the narrow icon box is 82 wide, not 108, and the wide slot 84, not 108; both are computed from these CSS values below
 const FLOAT_PAD = cssPx(ACTIONS_FLOAT, 'padding'), FLOAT_BORDER = cssPx(ACTIONS_FLOAT, 'border'), FLOAT_GAP = Number(ACTIONS_FLOAT.match(/top: calc\(100% \+ (\d+)px\)/)[1]), FLOAT_RIGHT = cssPx(ACTIONS_FLOAT, 'right');
 // In the bar: the icons plus the left padding. Floating under the row: the icons in a bordered chip.
 const INLINE_W = ICON_COUNT * ICON_W + (ICON_COUNT - 1) * ICON_GAP + cssPx(ACTIONS_BASE, 'padding-left'), INLINE_H = ICON_H;
 const FLOAT_W = ICON_COUNT * ICON_W + (ICON_COUNT - 1) * ICON_GAP + 2 * FLOAT_PAD + 2 * FLOAT_BORDER, FLOAT_H = ICON_H + 2 * FLOAT_PAD + 2 * FLOAT_BORDER;
+// While editing the slot holds "+ Context" (at most as wide as the icons' content) and keeps the icons' width in the wide bar; narrow it floats in the same kind of box.
+const EDIT_SLOT_W = cssPx(cssRule('.vam-goal-bar.is-editing .vam-goal-actions', /width: \d+px/), 'width'), CHIP_H = cssPx(cssRule('.vam-goal-add-context', /height:/), 'height');
+assert.equal(EDIT_SLOT_W, INLINE_W, 'the editing slot is as wide as the idle icon slot (the text wraps the same)'); assert.equal(CHIP_H, ICON_H, 'the chip is as high as an icon');
 const ATTACH_GAP = Number(cssRule('.vam-goal-attachment').match(/top: calc\(100% \+ (\d+)px \+ var\(--vam-goal-attach-clear, 0px\)\)/)[1]);
 // MEASURED, not derived (vam-tester's CDP run on the real view, 2026-11-06, ui-evidence-p1.md; screen coordinates of that window): the pane
 // (.workspace-leaf-content) starts at x 44, y 40 and ends at y 800; the canvas starts CHAT_COLUMN right of the pane's left edge (the chat
@@ -466,8 +469,14 @@ const STATES = [
   { name: 'suggest list, long goal', attachment: 'suggest', content: 900, goalHeight: 120 },
   { name: 'suggest list running', attachment: 'suggest', content: 40, running: true },
   { name: 'suggest list + tools hover', attachment: 'suggest', content: 900, hover: true },
-  { name: 'old edit panel', attachment: 'edit', content: 110 },
-  { name: 'old edit panel + tools hover', attachment: 'edit', content: 110, hover: true },
+  // Edit in place (P3): the slot holds "+ Context" once the goal has text (empty: nothing in it), and the context row is a one-line attachment. The textarea always matches :focus-visible.
+  { name: 'editing, empty goal (nothing in the slot)', edit: 'empty' },
+  { name: 'editing, empty goal + tools hover', edit: 'empty', hover: true },
+  { name: 'editing + "+ Context"', edit: 'chip' },
+  { name: 'editing + "+ Context" + tools hover', edit: 'chip', hover: true },
+  { name: 'editing, long goal + "+ Context"', edit: 'chip', goalHeight: 120 },
+  { name: 'editing + context row', edit: 'context', attachment: 'context', content: 36 },
+  { name: 'editing + context row + tools hover', edit: 'context', attachment: 'context', content: 36, hover: true },
   { name: 'sources panel', sources: 500 },
   { name: 'tools hover', hover: true },
   { name: 'sources panel + tools hover', sources: 500, hover: true }
@@ -514,7 +523,11 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   view.viewportEl = { getBoundingClientRect: () => canvas };
   view.chat = chat ? { isOverlay: true, overlayWidth: 44 + chat } : null;
   if (state.attachment === 'suggest') await h.open();
-  else if (state.attachment === 'edit') view.editRelevanceGoal();
+  if (state.edit) {
+    view.startGoalEdit({});
+    if (state.edit === 'empty') { const area = find(h.rootEl, i => i.tag === 'textarea'); area.value = ''; area.fire('input'); }
+    if (state.edit === 'context') find(h.rootEl, i => hasCls(i, 'vam-goal-add-context')).click();
+  }
   if (state.running) { const task = view.goalSuggestTask; task.state = 'running'; task.focus = null; view.render(); }
   h.rootEl.appendChild(overlay);
   const bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar'));
@@ -525,12 +538,16 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   const barRect = () => R(barLeft, barTop, barLeft + barW, barTop + barH);
   bar.getBoundingClientRect = barRect;
   const actions = find(h.rootEl, i => hasCls(i, 'vam-goal-actions'));
-  assert.equal(findAll(actions, i => i.tag === 'button').length, ICON_COUNT, 'the icon count the rig assumes');
+  assert.equal(findAll(actions, i => i.tag === 'button').length, state.edit ? (state.edit === 'context' ? 0 : 1) : ICON_COUNT, 'the icon count the rig assumes (editing: no icons, only "+ Context" until the context row replaces it)');
+  if (state.edit) {
+    assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-goal-icon')).length, 0, 'no icons are drawn while editing');
+    assert.equal(actions.hasClass('is-vacant'), state.edit !== 'chip', 'the slot is vacant exactly when "+ Context" is not on offer');
+  }
   // Wide: in the bar's own row. Narrow: FLOAT_GAP under the row (from the host's padding box, HOST_BORDER above its border-box bottom), right-aligned (styles.css, container query).
-  const actionsRect = () => narrow ? R(paneRight - FLOAT_RIGHT - FLOAT_W, hostBottom - HOST_BORDER + FLOAT_GAP, paneRight - FLOAT_RIGHT, hostBottom - HOST_BORDER + FLOAT_GAP + FLOAT_H) : R(barLeft + barW - 8 - INLINE_W, barTop + (barH - INLINE_H) / 2, barLeft + barW - 8, barTop + (barH - INLINE_H) / 2 + INLINE_H);
+  const actionsRect = () => narrow && actions.hasClass('is-vacant') ? R(0, 0, 0, 0) : narrow ? R(paneRight - FLOAT_RIGHT - FLOAT_W, hostBottom - HOST_BORDER + FLOAT_GAP, paneRight - FLOAT_RIGHT, hostBottom - HOST_BORDER + FLOAT_GAP + FLOAT_H) : R(barLeft + barW - 8 - INLINE_W, barTop + (barH - INLINE_H) / 2, barLeft + barW - 8, barTop + (barH - INLINE_H) / 2 + INLINE_H);
   actions.getBoundingClientRect = actionsRect;
   // What shows the icons comes from the stylesheet (actionsStyle): hover, keyboard focus (focus-visible), focus a mouse press left (focus-within only), an open panel.
-  const conditions = { hover: !!state.goalHover, focusVisible: !!state.goalFocus, focusWithin: !!state.goalFocus || !!state.mouseFocus || !!state.attachment, // a list opened from the spark leaves focus in the bar
+  const conditions = { hover: !!state.goalHover, focusVisible: !!state.goalFocus || !!state.edit, focusWithin: !!state.goalFocus || !!state.mouseFocus || !!state.attachment || !!state.edit, // a list opened from the spark leaves focus in the bar
      attachment: !!state.attachment };
   const shownStyle = actionsStyle(narrow, conditions);
   const actionsShown = shownStyle.opacity !== '0';
@@ -573,7 +590,7 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   view.placeMapTools();
   // What is on screen. The idle icons are invisible (opacity 0), so they are not a layer then.
   const labelled = [['tools', toolsRect()], ['zoom', zoom.getBoundingClientRect()], ['hint', hint.getBoundingClientRect()]];
-  if (actionsShown) labelled.push(['actions', actionsRect()]);
+  if (actionsShown && actionsRect().right > actionsRect().left) labelled.push(['actions', actionsRect()]);
   if (state.attachment) labelled.push(['attachment', attachment.getBoundingClientRect()]);
   if (sources) labelled.push(['sources panel', sources.getBoundingClientRect()]);
   return { h, view, bar, tools, canvas, pane, labelled, attachment, sources, actionsShown, actions, narrow, hostBottom, actionsRect, toolsRect, infoButtons, conditions, barW, inHeader };
@@ -582,7 +599,9 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
 test('goal stack: in every host, state and width the layers around the goal do not overlap, the tool group never moves, and the list stops above the bottom controls', async () => {
   const { rectsIntersect } = load('experiences/visual-map/viewport-inset.ts');
   const parentChild = new Set(['tools|sources panel']);
+  let cells = 0;
   for (const host of HOSTS) for (const w of WIDTHS) for (const state of STATES) {
+    cells++;
     const where = `${host} / ${w.name} / ${state.name}`;
     const { view, canvas, labelled, tools, actionsShown, bar, attachment, narrow, hostBottom, actionsRect, toolsRect, infoButtons, conditions, barW, inHeader } = await stackRig(w.width, w.chat, state, host);
     assert.ok(!tools.style.top, `${where}: the tool group keeps the stylesheet top (style.top is empty)`);
@@ -595,7 +614,8 @@ test('goal stack: in every host, state and width the layers around the goal do n
     if (attachment) {
       const clear = px(attachment.style['--vam-goal-attach-clear']);
       assert.equal(clear, narrow ? Math.max(0, actionsRect().bottom - hostBottom) : 0, `${where}: the panel clears exactly the part of the icons that hangs below its box (0 when they are in the bar)`);
-      if (narrow) assert.ok(clear > 0, `${where}: narrow icons hang below the row`);
+      if (state.edit) assert.equal(clear, 0, `${where}: no icons are drawn while editing, so nothing hangs below the box (narrow and wide)`);
+      else if (narrow) assert.ok(clear > 0, `${where}: narrow icons hang below the row`);
       assert.ok(px(attachment.style['--vam-goal-attach-max']) > 0, `${where}: the list has room`);
     }
     // Narrow, the icons float over the info row's buttons: they show only while the pointer is on the goal, the keyboard is in the bar (:focus-visible) or a panel is
@@ -633,6 +653,8 @@ test('goal stack: in every host, state and width the layers around the goal do n
     const limit = Math.min(...labelled.filter(([l]) => l === 'zoom' || l === 'hint').map(([, r]) => r.top)) - INSET_GAP;
     for (const [label, rect] of labelled.filter(([l]) => ['attachment', 'sources panel'].includes(l))) assert.ok(rect.bottom <= limit, `${where}: ${label} bottom ${rect.bottom} clears the bottom controls (limit ${limit})`);
   }
+  assert.equal(cells, HOSTS.length * WIDTHS.length * STATES.length, 'every cell of the matrix ran');
+  assert.ok(STATES.filter(x => x.edit).length >= 7 && cells >= 168, `the matrix covers the editing states (${cells} cells)`);
 });
 
 test('goal stack: the tool group sits at the stylesheet top whatever the goal does, and the layer list is complete: every absolutely positioned layer the overlay and the goal bar draw is in FLOATING_LAYER_SELECTORS', async () => {
@@ -661,19 +683,25 @@ test('goal stack: the tool group sits at the stylesheet top whatever the goal do
     }
   }
   // Every goal-bar attachment is also marked as one.
-  for (const [cls, state] of [['vam-goal-suggest', STATES.find(x => x.attachment === 'suggest')], ['vam-relevance-panel', STATES.find(x => x.attachment === 'edit')]]) {
+  for (const [cls, state] of [['vam-goal-suggest', STATES.find(x => x.attachment === 'suggest')], ['vam-goal-context', STATES.find(x => x.attachment === 'context')]]) {
     const { h } = await stackRig(936, 0, state);
     assert.ok(find(h.rootEl, i => hasCls(i, cls) && hasCls(i, 'vam-goal-attachment')), `.${cls} is a vam-goal-attachment`);
   }
 });
 
-test('goal stack: only one attachment is open at a time (opening the list closes the editor)', async () => {
+test('goal stack: only one attachment is open at a time (the list and the editor close each other)', async () => {
   const h = await harness();
-  h.view.editRelevanceGoal();
-  assert.ok(find(h.rootEl, i => hasCls(i, 'vam-relevance-panel')), 'the editor is open');
-  await h.open();
-  assert.ok(!find(h.rootEl, i => hasCls(i, 'vam-relevance-panel')), 'the editor closed');
+  const textarea = () => find(h.rootEl, i => i.tag === 'textarea');
+  h.view.startGoalEdit({}); find(h.rootEl, i => hasCls(i, 'vam-goal-add-context')).click();
+  assert.ok(textarea() && find(h.rootEl, i => hasCls(i, 'vam-goal-context')), 'the editor with its context row is open');
+  assert.equal(h.icons().length, 0, 'no icons while editing, so the spark cannot open the list; startGoalSuggest is the only way in');
+  await h.view.startGoalSuggest(); await until(() => h.panel() && !h.stopBtn());
+  assert.equal(textarea(), undefined, 'opening the list drops the editor'); assert.equal(h.view.goalEdit, null);
   assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-goal-attachment')).length, 1);
+  find(h.rootEl, i => hasCls(i, 'vam-goal-text')).click();
+  assert.ok(textarea(), 'a press on the goal opens the editor'); assert.equal(h.panel(), undefined, 'and closes the list'); assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-goal-attachment')).length, 0, 'the editor has no attachment until its context row is asked for');
+  assert.equal(h.control.gradeCalls.length, 0);
 });
 
 test('goal stack: the one z rule is on the goal host (above the overlay chat 12 and the hover card 10); the bar and its panels set none; the sources panel and its bounds stay', () => {
@@ -688,15 +716,14 @@ test('goal stack: the one z rule is on the goal host (above the overlay chat 12 
   assert.ok(z(rule('.vam-map-tools.has-panel')) > mini, 'the tool group with a panel is above .vam-tools-mini');
   assert.doesNotMatch(css, /--vam-goal-inset/, 'the chat inset is gone');
   assert.doesNotMatch(css, /\.vam-goal-bar\.has-attachment \{/, 'the bar-raising rule (z-index 4) is gone; has-attachment only shows the icons');
-  assert.match(rule('.vam-relevance-panel'), /max-height:\s*var\(--vam-goal-attach-max, none\)/);
-  assert.match(rule('.vam-relevance-panel'), /overflow-y:\s*auto/);
+  assert.match(rule('.vam-goal-context'), /position: absolute/); assert.doesNotMatch(css, /\.vam-relevance-panel|\.vam-relevance-setup|\.vam-relevance-goal-input|\.vam-relevance-pins-row|\.vam-relevance-unpin-all/, 'the old panel rules are gone');
   assert.match(rule('.vam-goal-suggest'), /max-height:\s*var\(--vam-goal-attach-max, none\)/);
   assert.match(rule('.vam-map-sources-panel'), /max-height:\s*var\(--vam-sources-max, none\)/);
   assert.match(rule('.vam-map-sources-panel'), /overflow-y:\s*auto/);
   // Children of the attachment never outrank layers outside the host: its stacking context decides, so no z-index inside it.
-  for (const cls of ['vam-relevance-panel', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /z-index/, `.${cls} sets no z-index of its own`);
+  for (const cls of ['vam-goal-context', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /z-index/, `.${cls} sets no z-index of its own`);
   // Only .vam-goal-attachment places a panel under the goal; the panels set no top of their own.
-  for (const cls of ['vam-relevance-panel', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /(^|[\s;])top:/, `.${cls} sets no top (.vam-goal-attachment does)`);
+  for (const cls of ['vam-goal-context', 'vam-goal-suggest']) assert.doesNotMatch(rule(`.${cls}`), /(^|[\s;])top:/, `.${cls} sets no top (.vam-goal-attachment does)`);
   assert.match(rule('.vam-map-tools'), /--vam-tools-max: 100%; max-width: min\(calc\(100% - 24px\), var\(--vam-tools-max\)\)/, 'the tool group is capped by --vam-tools-max (default: no cap), which the view sets when the icons float over its row');
   assert.match(rule('.vam-goal-attachment'), /top: calc\(100% \+ 6px \+ var\(--vam-goal-attach-clear, 0px\)\)/);
   // The narrow layout: the attachment's side margins and the icons kept shown while a panel is open, without any z-index.
@@ -704,6 +731,8 @@ test('goal stack: the one z rule is on the goal host (above the overlay chat 12 
   assert.ok(narrowBlock, 'the narrow container block exists');
   assert.match(narrowBlock, /\.vam-goal-bar \.vam-goal-attachment \{ left: 8px; right: 8px; \}/);
   assert.match(narrowBlock, /\.vam-goal-bar\.has-attachment \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}/);
+  assert.match(narrowBlock, /\.vam-goal-actions\.is-vacant \{ display: none; \}/, 'narrow: an empty slot is not drawn (no empty box floats under the goal)');
+  assert.match(narrowBlock, /\.vam-goal-bar\.is-editing \.vam-goal-actions \{ width: auto; \}/, 'narrow: the editing slot is as wide as its content');
   assert.match(narrowBlock, /\.vam-goal-bar:focus-within \.vam-goal-actions \{ opacity: 0; pointer-events: none; \}/, 'narrow: the focus a mouse click leaves does not show the icons');
   assert.match(narrowBlock, /\.vam-goal-bar:hover \.vam-goal-actions, \.vam-goal-bar:has\(:focus-visible\) \.vam-goal-actions \{ opacity: 1; pointer-events: auto; \}/);
   assert.match(rule('.vam-toolbar > .vam-goal-bar'), /flex-basis: 280px/);

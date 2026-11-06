@@ -996,6 +996,7 @@ export const en = {
   "ui.relevance_goal_placeholder": "What do you want to achieve with this map?",
   "ui.relevance_context_label": "Extra context",
   "ui.relevance_context_placeholder": "Optional: what you already know, conditions or limits",
+  "ui.goal_add_context": "+ Context",
   "ui.relevance_grade_button": "Grade with this",
   "ui.relevance_running": "Grading by goal…",
   "ui.relevance_awaiting_usage": "Waiting for AI usage confirmation…",

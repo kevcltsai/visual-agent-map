@@ -84,7 +84,7 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
     goalBar: () => find(rootEl, i => hasCls(i, 'vam-goal-bar')),
     icons: () => findAll(rootEl, i => i.tag === 'button' && hasCls(i, 'vam-goal-icon')),
     icon: label => findAll(rootEl, i => i.tag === 'button' && hasCls(i, 'vam-goal-icon')).find(b => b.attrs['aria-label'] === label),
-    input: () => find(rootEl, i => hasCls(i, 'vam-relevance-goal-input')),
+    input: () => find(rootEl, i => i.tag === 'textarea' && hasCls(i, 'vam-goal-input')),
     bar: () => find(rootEl, i => hasCls(i, 'vam-relevance-statusbar')),
     barText: () => find(h.bar(), i => hasCls(i, 'vam-aim-status-value')).text,
     barButtons: () => findAll(h.bar() ?? element('div'), i => i.tag === 'button').map(b => b.text || b.attrs['aria-label']),
@@ -103,6 +103,10 @@ async function harness({ language = 'en', mapTitle = 'Sleep map' } = {}) {
   };
   return h;
 }
+// The accessible name of an element named through aria-labelledby (the goal bar uses hidden labels: aria-label would show as a tooltip).
+const nameOf = (h, el) => find(h.rootEl, i => i.attrs.id === el.attrs['aria-labelledby'])?.text;
+// The recalibrate / grade icon: the second one.
+const refreshIcon = h => h.icons()[1];
 const frontmatterOf = h => h.contents.get(MAP).match(/^---\n([\s\S]*?)\n---/)[1];
 // The Undo button pops the history entry first and restores notes afterwards, so wait for the work as well.
 const afterTravel = async h => { await until(() => h.view.history.canRedo); for (let i = 0; i < 12; i++) await tick(); };
@@ -113,9 +117,9 @@ integrationTest('relevance: Prioritize by goal -> field -> Enter writes the goal
   assert.equal(h.chip().text, 'What do you want to achieve with this map?'); assert.ok(hasCls(h.goalBar(), 'is-empty')); assert.equal(h.bar(), undefined, 'no status bar before any run');
   h.chip().click();
   const input = h.input();
-  assert.equal(input.attrs['aria-label'], 'Map goal'); assert.equal(input.focused, true); assert.equal(h.chip().attrs['aria-expanded'], 'true', 'the panel opens under the toolbar button, which stays');
+  assert.equal(nameOf(h, input), 'Map goal'); assert.equal(input.focused, true); assert.equal(h.chip(), undefined, 'the goal text becomes the field in the same place; there is no panel and no key hint');
   input.value = 'Sleep better\nthrough the night'; input.fire('keydown', { key: 'Enter' });
-  assert.equal(h.run().status, 'running'); assert.ok(h.icons().length === 4 && h.icons().every(b => b.disabled), 'the four goal icons are disabled while grading');
+  assert.equal(h.run().status, 'running'); assert.ok(h.icons().length === 3 && h.icons().every(b => b.disabled), 'the three goal icons are disabled while grading');
   assert.equal(h.bar().attrs['aria-live'], 'polite'); assert.equal(h.barText(), 'Grading by goal…'); assert.deepEqual(h.barButtons(), ['Stop']);
   await h.settled();
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better through the night', 'newlines are removed');
@@ -132,7 +136,7 @@ integrationTest('relevance: Prioritize by goal -> field -> Enter writes the goal
   assert.equal(h.view.notes.get(h.ids.a).relevance.tier, 'core', 'the view reads the new grade');
   assert.equal(h.barText(), 'Graded 4 topics, 4 changed (0 skipped)');
   assert.deepEqual(h.barButtons(), ['View changes', 'Undo', 'Dismiss']);
-  assert.equal(h.chip().text, 'Sleep better through the night'); assert.equal(h.icon('Edit goal').disabled, false);
+  assert.equal(h.chip().text, 'Sleep better through the night'); assert.equal(h.icon('Sort by relevance').disabled, false);
   assert.equal(h.control.usageAsks, 1);
   assert.equal(h.view.history.past.length, 2, 'goal and grading are two undo steps');
 });
@@ -174,12 +178,14 @@ integrationTest('relevance: changing the goal appends history and regrades; the 
   assert.equal([...h.cards.values()].filter(card => hasCls(card, 'vam-structure-suggested')).length, 0, 'closing clears the marks');
 });
 
-integrationTest('relevance: a first grade shows "Not graded" as the old tag; Enter on an unchanged setup recalibrates with no history entry and nothing to change', async () => {
+integrationTest('relevance: a first grade shows "Not graded" as the old tag; Enter on an unchanged setup asks nothing (decision #2), the recalibrate icon recalibrates with no history entry and nothing to change', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   button(h.bar(), 'View changes').click();
   assert.equal(find(h.opened.at(-1).contentEl, i => hasCls(i, 'vam-relevance-ungraded')).text, 'Not graded');
-  await h.enter('Goal'); await h.settled();
+  await h.enter('Goal'); await tick(); await tick();
+  assert.equal(h.control.calls.length, 1, 'the same text again: Enter does not grade, the recalibrate icon does'); assert.equal(h.control.usageAsks, 1);
+  refreshIcon(h).click(); await h.settled();
   assert.equal(h.control.calls.length, 2, 'asked again');
   assert.equal(h.control.calls[1].step, 'relevance-recalibrate', 'same goal, level and context after an AI grade: recalibrate, not a full grade');
   assert.equal(h.control.calls[1].request.previous.length, 4, 'the current AI tiers are sent');
@@ -305,7 +311,7 @@ integrationTest('relevance: declining the AI usage notice keeps the goal, calls 
   assert.equal(h.control.calls.length, 0); assert.equal(h.run().status, 'declined');
   assert.equal(h.barText(), 'Grading did not start. The goal was saved; no topic was changed.');
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Goal'); assert.deepEqual(await graded(h), []);
-  assert.equal(h.icon('Edit goal').disabled, false, 'the icons can be used again');
+  assert.equal(h.icon('Sort by relevance').disabled, false, 'the icons can be used again');
 });
 
 integrationTest('relevance: closing the view or leaving the map while grading aborts the call; the late result is never written', async () => {
@@ -378,17 +384,17 @@ integrationTest('relevance: only one run per map; a second Enter, or a second vi
   gate.resolve(); await h.settled();
 });
 
-integrationTest('relevance: Esc and focus leaving the group cancel, an empty Enter never reaches the AI, and Esc returns focus to the chip', async () => {
+integrationTest('relevance: Esc cancels and returns focus to the goal text, an empty Enter never reaches the AI, and focus events never cancel or save', async () => {
   const h = await harness();
   h.chip().click(); h.input().value = 'ignored'; h.input().fire('keydown', { key: 'Escape' }); await tick();
   assert.equal(h.input(), undefined); assert.equal(h.chip().focused, true); assert.equal(h.chip().text, 'What do you want to achieve with this map?');
-  h.chip().click(); h.input().value = 'ignored too'; h.input().fire('focusout', { relatedTarget: element('button') }); await tick();
-  assert.equal(h.input(), undefined); assert.equal(h.chip().text, 'What do you want to achieve with this map?');
-  h.chip().click(); h.input().value = '   '; h.input().fire('keydown', { key: 'Enter' }); await tick();
+  h.chip().click(); h.input().value = 'still open'; h.input().fire('focusout', { relatedTarget: element('button') }); h.input().fire('blur', { relatedTarget: null }); await tick();
+  assert.equal(h.input().value, 'still open', 'leaving the field with the keyboard is not an exit'); assert.equal(h.control.calls.length, 0);
+  h.input().value = '   '; h.input().fire('keydown', { key: 'Enter' }); await tick();
   assert.equal(h.input(), undefined, 'the field closes'); assert.equal(h.chip().focused, true);
   assert.equal(h.control.calls.length, 0); assert.equal(h.control.usageAsks, 0); assert.equal(h.run(), undefined);
   assert.equal(await h.repo.readRelevanceGoal(MAP), undefined, 'no goal written either');
-  // A blur after Enter must not cancel the run that Enter started.
+  // A focus event after Enter must not cancel the run that Enter started.
   h.chip().click(); const input = h.input(); input.value = 'Real goal'; input.fire('keydown', { key: 'Enter' }); input.fire('focusout', { relatedTarget: null }); await h.settled();
   assert.equal(h.control.calls.length, 1);
 });
@@ -441,11 +447,11 @@ integrationTest('relevance: the suggested-card ring outranks every status rule t
   for (const rule of statusRules) assert.ok(ringSpec > Math.max(...rule.selectors.map(specificity)), `ring beats ${rule.selectors[0]}`);
 });
 
-integrationTest('relevance: the goal chip is named "Goal: <goal>" for assistive tech, and "Prioritize by goal" when empty (zh too)', async () => {
+integrationTest('relevance: the goal text is named "Goal: <goal>" for assistive tech through a hidden label, and by the placeholder when empty (zh too)', async () => {
   const h = await harness();
-  assert.equal(h.chip().attrs['aria-label'], 'What do you want to achieve with this map?');
+  assert.equal(nameOf(h, h.chip()), 'What do you want to achieve with this map?'); assert.equal(h.chip().attrs['aria-label'], undefined);
   await h.enter('Sleep better'); await h.settled();
-  assert.equal(h.chip().attrs['aria-label'], 'Goal: Sleep better');
+  assert.equal(nameOf(h, h.chip()), 'Goal: Sleep better'); assert.equal(h.chip().attrs['aria-label'], undefined);
   // The view builds the name from these two keys; each bundle has its own language, so check the zh strings directly.
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.relevance_goal_0', '睡得更好'), '目標：睡得更好');
@@ -479,9 +485,11 @@ integrationTest('relevance: focus inside the status bar survives a repaint (Stop
 // ---- Phase 4: context in the same inline group ----------------------------------------------------------
 // An old map carrying the retired `relevance-level` key (decision 2026-11-05-goal-banner#1: read-but-ignore, never write or delete).
 const withOldLevel = (h, value = 'beginner') => { h.contents.set(MAP, h.contents.get(MAP).replace(/^---\n/, `---\nrelevance-level: "${value}"\n`)); };
-const contextInput = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-context-input'));
-const group = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-setup'));
+const contextInput = h => find(h.rootEl, i => i.tag === 'input' && hasCls(i, 'vam-goal-context-input'));
+const addContext = h => find(h.rootEl, i => hasCls(i, 'vam-goal-add-context'));
 const open = h => { h.chip().click(); return h.input(); };
+// Opens the editor (typing `goal` when given, as the "+ Context" chip needs text) and the context row; returns the context field.
+const openWithContext = (h, goal) => { const area = open(h); if (goal !== undefined) { area.value = goal; area.fire('input'); } if (!contextInput(h)) addContext(h).click(); return contextInput(h); };
 
 integrationTest('goal bar: the group is named by a hidden label, not aria-label (Obsidian would show that as a tooltip over the whole bar)', async () => {
   const h = await harness();
@@ -491,21 +499,32 @@ integrationTest('goal bar: the group is named by a hidden label, not aria-label 
   assert.ok(label); assert.equal(label.text, 'Map goal'); assert.equal(bar.attrs['aria-labelledby'], label.attrs.id);
 });
 
-integrationTest('relevance: the edit popover is one group with exactly two fields, goal and an optional context, and no button (en)', async () => {
+integrationTest('relevance: editing happens in place: one field replaces the goal text, no dialog, no hint, no button but "+ Context", and the context row opens on request (en)', async () => {
   const h = await harness();
-  open(h);
-  assert.equal(group(h).attrs.role, 'group'); assert.equal(group(h).attrs['aria-label'], 'Map goal');
-  assert.equal(findAll(h.rootEl, i => i.tag === 'select').length, 0, 'no level dropdown any more');
-  assert.equal(contextInput(h).attrs.placeholder, 'Optional: what you already know, conditions or limits'); assert.equal(contextInput(h).attrs['aria-label'], 'Extra context');
-  assert.equal(contextInput(h).maxLength, 200);
-  assert.equal(findAll(h.rootEl, i => i.tag === 'input').length, 2, 'exactly two fields: the goal and the context');
-  assert.equal(findAll(panelOf(h), i => i.tag === 'button').length, 0, 'no submit button and no sort row in the popover (Enter submits)');
-  assert.equal(h.input().focused, true, 'focus starts on the goal');
+  const area = open(h);
+  assert.equal(area.tag, 'textarea'); assert.equal(area.attrs.rows, '1'); assert.equal(area.attrs.dir, 'auto'); assert.equal(area.maxLength, 200);
+  assert.equal(area.attrs.placeholder, 'What do you want to achieve with this map?'); assert.equal(nameOf(h, area), 'Map goal');
+  assert.equal(h.chip(), undefined, 'the shown goal is replaced by the field, not kept beside it');
+  assert.equal(findAll(h.rootEl, i => i.attrs.role === 'dialog').length, 0, 'no dialog'); assert.equal(h.goalBar().attrs.role, 'group');
+  assert.equal(h.icons().length, 0, 'no icons are drawn while editing'); assert.equal(contextInput(h), undefined, 'the context row is closed until asked for');
+  assert.deepEqual(findAll(h.goalBar(), i => i.tag === 'button').map(b => b.text), ['+ Context'], 'the only button is "+ Context"');
+  assert.equal(addContext(h).attrs['aria-expanded'], 'false');
+  const slot = () => find(h.goalBar(), i => hasCls(i, 'vam-goal-actions'));
+  assert.ok(hasCls(slot(), 'is-vacant'), 'no text yet: nothing on offer, the slot stays');
+  area.value = 'Grow herbs'; area.fire('input'); assert.ok(!hasCls(slot(), 'is-vacant'), 'text: "+ Context" is on offer');
+  addContext(h).click();
+  assert.equal(addContext(h), undefined, 'the chip is replaced by the row');
+  const row = contextInput(h);
+  assert.equal(row.attrs.placeholder, 'Optional: what you already know, conditions or limits'); assert.equal(nameOf(h, row), 'Extra context'); assert.equal(row.maxLength, 200);
+  assert.ok(hasCls(find(h.goalBar(), i => hasCls(i, 'vam-goal-context')), 'vam-goal-attachment'), 'the row is an attachment, not part of the bar');
+  assert.equal(row.focused, true, 'the keyboard moves to the context row'); assert.equal(h.input().value, 'Grow herbs', 'the draft survives the redraw');
+  assert.equal(findAll(h.goalBar(), i => i.tag === 'input' || i.tag === 'textarea').length, 2, 'exactly two fields: the goal and the context');
+  assert.equal(h.control.calls.length, 0);
 });
 
 integrationTest('relevance: goal and context are saved in one write, sent to the AI (level null), and are one undo step; grading stays its own step', async () => {
   const h = await harness();
-  open(h); h.input().value = 'Grow herbs'; contextInput(h).value = '  Half a day\nof sun  ';
+  openWithContext(h, 'Grow herbs').value = '  Half a day\nof sun  ';
   contextInput(h).fire('keydown', { key: 'Enter' }); await h.settled();
   assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"\nrelevance-context: "Half a day of sun"/);
   assert.doesNotMatch(frontmatterOf(h), /relevance-level/, 'no level key is written');
@@ -513,7 +532,7 @@ integrationTest('relevance: goal and context are saved in one write, sent to the
   assert.equal(request.goal, 'Grow herbs'); assert.equal(request.level, undefined); assert.equal(request.context, 'Half a day of sun');
   assert.match(load('core/relevance-grade-service.ts').buildRelevanceGradePrompt(request), /Learner level \(JSON string[^\n]*: null\nLearner context \(JSON string, or null\): "Half a day of sun"\n/);
   assert.equal(h.view.history.past.length, 2, 'one setup step plus one grading step');
-  assert.equal(h.chip().text, 'Grow herbs'); assert.equal(h.chip().attrs['aria-label'], 'Goal: Grow herbs');
+  assert.equal(h.chip().text, 'Grow herbs'); assert.equal(nameOf(h, h.chip()), 'Goal: Grow herbs');
   const history = h.contents.get(MAP).match(/^  - "/gm); assert.equal(history.length, 1, 'the history records the goal only');
   assert.doesNotMatch(h.contents.get(MAP), /relevance-goal-history:[\s\S]*Half a day/);
   button(h.bar(), 'Undo').click(); await afterTravel(h);
@@ -523,64 +542,70 @@ integrationTest('relevance: goal and context are saved in one write, sent to the
   assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"\nrelevance-context: "Half a day of sun"/);
 });
 
-integrationTest('relevance: only a context change is one undo step without a new history entry; an unchanged setup regrades with none', async () => {
+integrationTest('relevance: only a context change is one undo step without a new history entry; the same text again asks nothing, the recalibrate icon regrades with no new step', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   assert.equal(h.view.history.past.length, 2);
-  open(h); contextInput(h).value = 'Half a day'; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  openWithContext(h).value = 'Half a day'; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
   assert.equal(h.view.history.past.length, 3, 'a context change adds one setup step; the regrade changed no card, so no grading step');
   assert.equal(h.contents.get(MAP).match(/^  - "/gm).length, 1, 'no history entry: the goal is the same');
   assert.equal(h.control.calls.at(-1).request.level, undefined); assert.equal(h.control.calls.at(-1).request.context, 'Half a day');
-  open(h); assert.equal(contextInput(h).value, 'Half a day', 'the saved context is preselected'); h.input().fire('keydown', { key: 'Enter' }); await h.settled();
-  assert.equal(h.control.calls.length, 3, 'regraded'); assert.equal(h.view.history.past.length, 3, 'nothing changed: no setup step, no grading step');
+  open(h); assert.equal(contextInput(h).value, 'Half a day', 'the saved context is shown straight away'); assert.equal(addContext(h), undefined, 'and "+ Context" is not offered');
+  h.input().fire('keydown', { key: 'Enter' }); await tick(); await tick();
+  assert.equal(h.control.calls.length, 2, 'nothing changed: Enter asks nothing'); assert.equal(h.control.usageAsks, 2); assert.equal(h.input(), undefined, 'and the editor closes');
+  refreshIcon(h).click(); await h.settled();
+  assert.equal(h.control.calls.length, 3, 'the recalibrate icon regrades'); assert.equal(h.view.history.past.length, 3, 'nothing changed: no setup step, no grading step');
   // Clearing the context removes its key.
   open(h); contextInput(h).value = '   '; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
   assert.doesNotMatch(h.contents.get(MAP), /relevance-context/); assert.equal(h.chip().text, 'Goal');
   assert.equal(h.control.calls.at(-1).request.level, undefined);
 });
 
-integrationTest('relevance: Enter in the context field confirms; Tab between the fields does not cancel; leaving the group does', async () => {
+integrationTest('relevance: Enter in the context field saves; Tab between the fields does not; Tab out of the last field (Shift+Tab out of the first) does, once the browser moved the keyboard; no focus event saves', async () => {
   const h = await harness();
-  open(h); h.input().value = 'Via enter';
-  // Tab from the goal to the context: focus stays inside the group.
-  h.input().fire('focusout', { relatedTarget: contextInput(h) });
-  assert.ok(group(h), 'still open'); assert.equal(h.control.calls.length, 0);
+  openWithContext(h, 'Via enter');
+  // Tab from the goal to the context row stays inside: nothing is asked, even after the timers ran.
+  h.input().fire('keydown', { key: 'Tab' }); h.input().fire('focusin'); await new Promise(r => setTimeout(r, 5));
+  assert.ok(h.input() && contextInput(h), 'still open'); assert.equal(h.control.calls.length, 0);
   contextInput(h).fire('keydown', { key: 'Enter' }); await h.settled();
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Via enter'); assert.equal(h.control.calls.length, 1);
-  // Leaving to somewhere outside (or to nowhere) cancels, from either field.
-  const outside = element('button');
-  for (const [name, pick] of [['goal', h.input], ['context', contextInput]]) {
-    open(h); assert.ok(group(h)); pick(h).fire('focusout', { relatedTarget: outside }); await tick();
-    assert.equal(group(h), undefined, `${name}: focus left the group`); assert.equal(h.control.calls.length, 1);
+  for (const [name, pick, shiftKey] of [['Tab out of the context row', contextInput, false], ['Shift+Tab out of the goal field', g => g.input(), true]]) {
+    const g = await harness();
+    openWithContext(g, `Goal for ${name}`);
+    const field = pick(g);
+    field.fire('keydown', { key: 'Tab', shiftKey });
+    assert.equal(g.control.calls.length, 0, `${name}: not at once, the browser moves the keyboard first`);
+    await until(() => g.control.calls.length); await g.settled();
+    assert.equal(await g.repo.readRelevanceGoal(MAP), `Goal for ${name}`);
   }
 });
 
-integrationTest('relevance: Esc cancels from any control, an IME-confirming Enter in either text field is ignored, and an empty goal never reaches the AI', async () => {
+integrationTest('relevance: Esc cancels from either field, an IME-confirming Enter or Esc is ignored, and an empty goal never reaches the AI', async () => {
   const h = await harness();
   for (const pick of [h.input, contextInput]) {
-    open(h); pick(h).fire('keydown', { key: 'Escape' }); await tick();
-    assert.equal(group(h), undefined); assert.equal(h.chip().focused, true, 'focus returns to the chip');
+    openWithContext(h, 'Draft'); pick(h).fire('keydown', { key: 'Escape' }); await tick();
+    assert.equal(h.input(), undefined); assert.equal(h.chip().focused, true, 'focus returns to the goal text'); assert.equal(h.chip().text, 'What do you want to achieve with this map?');
   }
-  open(h); h.input().value = 'Goal'; h.input().fire('keydown', { key: 'Enter', isComposing: true }); contextInput(h).fire('keydown', { key: 'Enter', isComposing: true });
-  assert.ok(group(h), 'composition Enter does nothing'); assert.equal(h.control.calls.length, 0);
+  openWithContext(h, 'Goal'); h.input().fire('keydown', { key: 'Enter', isComposing: true }); contextInput(h).fire('keydown', { key: 'Enter', isComposing: true }); h.input().fire('keydown', { key: 'Escape', isComposing: true });
+  assert.ok(h.input(), 'composition Enter and Esc do nothing: not saved, not cancelled'); assert.equal(h.control.calls.length, 0);
   h.input().value = '  '; contextInput(h).value = 'only context'; contextInput(h).fire('keydown', { key: 'Enter' }); await tick();
-  assert.equal(group(h), undefined); assert.equal(h.control.calls.length, 0); assert.equal(h.control.usageAsks, 0);
+  assert.equal(h.input(), undefined); assert.equal(h.control.calls.length, 0); assert.equal(h.control.usageAsks, 0);
   assert.equal(await h.repo.readRelevanceGoal(MAP), undefined, 'nothing written for a blank goal');
 });
 
-integrationTest('relevance: while a run is going the four goal icons are disabled and no group opens', async () => {
+integrationTest('relevance: while a run is going the three goal icons are disabled and the goal text opens no editor (it says why)', async () => {
   const h = await harness();
   const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
   await h.enter('Goal'); await until(() => h.control.calls.length);
-  assert.ok(h.icons().every(b => b.disabled)); const before = h.renders();
-  h.view.editRelevanceGoal(h.rootEl); assert.equal(group(h), undefined, 'a running map opens no group');
+  assert.ok(h.icons().length === 3 && h.icons().every(b => b.disabled)); const before = h.renders();
+  h.chip().click(); assert.equal(h.input(), undefined, 'a running map opens no editor'); assert.deepEqual(h.notices, ['Grading is still running; try again when it finishes.']);
   assert.equal(h.renders(), before);
   gate.resolve(); await h.settled();
 });
 
 integrationTest('relevance: the context key survives map saves and is capped at 200; an old level key is neither read nor changed', async () => {
   const h = await harness();
-  open(h); h.input().value = 'Goal'; contextInput(h).value = 'c'.repeat(260); h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  openWithContext(h, 'Goal').value = 'c'.repeat(260); h.input().fire('keydown', { key: 'Enter' }); await h.settled();
   assert.equal((await h.repo.readRelevanceSetup(MAP)).context.length, 200);
   const map = await h.repo.readMap(MAP); map.viewport = { x: 1, y: 2, zoom: 1.5 }; await h.repo.saveMap(MAP, map);
   assert.deepEqual({ ...(await h.repo.readRelevanceSetup(MAP)), context: '' }, { goal: 'Goal', context: '' });
@@ -592,7 +617,7 @@ integrationTest('relevance: an old relevance-level key stays unchanged through g
   withOldLevel(h);
   assert.deepEqual(Object.keys(await h.repo.readRelevanceSetup(MAP)).sort(), ['context', 'goal'], 'the level is not part of the setup');
   await h.view.hydrate();
-  open(h); h.input().value = 'Grow herbs'; contextInput(h).value = 'Half a day of sun'; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  openWithContext(h, 'Grow herbs').value = 'Half a day of sun'; h.input().fire('keydown', { key: 'Enter' }); await h.settled();
   assert.match(frontmatterOf(h), /^relevance-level: "beginner"$/m, 'the old key is still there, unchanged');
   assert.match(frontmatterOf(h), /relevance-goal: "Grow herbs"/);
   assert.equal(h.control.calls[0].request.level, undefined);
@@ -715,22 +740,23 @@ integrationTest('relevance sort: adding a child while sorted saves coordinates f
 });
 
 // ---- Phase 6: one toolbar button + popover panel ------------------------------------------------------------------
-const panelOf = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-panel'));
 const fakeDoc = () => { const doc = { activeElement: null, listeners: {}, addEventListener(n, f) { (this.listeners[n] ??= []).push(f); }, removeEventListener(n, f) { this.listeners[n] = (this.listeners[n] ?? []).filter(x => x !== f); } }; return doc; };
 
-integrationTest('relevance goal bar: the text is one tab stop with aria-expanded and aria-controls; four named icons; no separate goal line or sort chip', async () => {
+integrationTest('relevance goal bar: the text is one tab stop named by a hidden label (no aria-expanded, aria-haspopup, aria-controls or aria-label); three named icons; no separate goal line or sort chip', async () => {
   const h = await harness();
   const chip = h.chip();
-  assert.equal(chip.text, 'What do you want to achieve with this map?'); assert.equal(chip.attrs['aria-expanded'], 'false'); assert.ok(chip.attrs['aria-controls']);
+  assert.equal(chip.text, 'What do you want to achieve with this map?');
+  for (const attr of ['aria-expanded', 'aria-haspopup', 'aria-controls', 'aria-label']) assert.equal(chip.attrs[attr], undefined, `no ${attr} on the goal text`);
+  assert.equal(nameOf(h, chip), 'What do you want to achieve with this map?');
   assert.equal(chip.attrs.tabindex, '0'); assert.equal(chip.attrs.role, 'button');
-  assert.deepEqual(h.icons().map(b => b.attrs['aria-label']), ['Suggest new topics for this goal', 'Grade with this', 'Sort by relevance', 'Edit goal'], 'four icons, each with an accessible name');
+  assert.deepEqual(h.icons().map(b => b.attrs['aria-label']), ['Suggest new topics for this goal', 'Grade with this', 'Sort by relevance'], 'three icons, each with an accessible name');
   assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-relevance-goal-slot')).length, 0);
   chip.click();
-  assert.equal(h.chip().attrs['aria-expanded'], 'true'); assert.equal(panelOf(h).attrs.id, h.chip().attrs['aria-controls']);
-  h.chip().click();
-  assert.equal(panelOf(h), undefined, 'a second click closes it'); assert.equal(h.chip().attrs['aria-expanded'], 'false'); assert.equal(h.chip().focused, true);
+  assert.ok(h.input(), 'a click turns the text into the field'); assert.equal(h.chip(), undefined);
+  h.input().fire('keydown', { key: 'Escape' });
+  assert.equal(h.input(), undefined, 'Esc closes it'); assert.equal(h.chip().focused, true);
   h.view.relevanceGoal = 'Sleep better'; h.view.relevanceContext = 'Night shifts'; h.view.render();
-  assert.equal(h.chip().text, 'Sleep better', 'the goal text is shown whole, not "Goal: ..." and not cut'); assert.equal(h.chip().attrs['aria-label'], 'Goal: Sleep better');
+  assert.equal(h.chip().text, 'Sleep better', 'the goal text is shown whole, not "Goal: ..." and not cut'); assert.equal(nameOf(h, h.chip()), 'Goal: Sleep better');
   assert.equal(h.chip().attrs['aria-description'], 'Change the goal and grade again');
   assert.equal(h.icon('Sort by relevance').attrs['aria-pressed'], 'false');
   const long = 'x'.repeat(200); h.view.relevanceGoal = long; h.view.render();
@@ -741,7 +767,7 @@ integrationTest('relevance goal bar: the text is one tab stop with aria-expanded
   assert.equal(h.icon('Suggest new topics for this goal').disabled, true, 'no goal: nothing to suggest for');
 });
 
-integrationTest('relevance goal bar: the recalibrate icon is named by its mode and runs the grade it names; edit opens the popover; Enter on the text opens it too', async () => {
+integrationTest('relevance goal bar: the recalibrate icon is named by its mode and runs the grade it names; Enter and Space on the goal text open the field and Esc closes it', async () => {
   const h = await harness();
   await h.enter('Goal'); await h.settled();
   assert.equal(h.icon('Grade with this'), undefined, 'the map holds an AI grade now, so the icon says Recalibrate');
@@ -749,48 +775,22 @@ integrationTest('relevance goal bar: the recalibrate icon is named by its mode a
   const grade = h.icon('Recalibrate');
   grade.click(); await h.settled();
   assert.equal(h.control.calls.length, calls + 1, 'the icon runs one grade with the saved goal');
-  h.icon('Edit goal').click(); assert.ok(panelOf(h), 'the pencil opens the popover');
-  h.chip().fire('keydown', { key: 'Escape', stopPropagation() {} }); assert.equal(panelOf(h), undefined);
-  h.chip().fire('keydown', { key: 'Enter', preventDefault() {}, stopPropagation() {} }); assert.ok(panelOf(h), 'Enter on the goal text opens it');
+  h.chip().fire('keydown', { key: 'Enter', preventDefault() {}, stopPropagation() {} }); assert.ok(h.input(), 'Enter on the goal text opens the field'); assert.equal(h.input().focused, true);
+  h.input().fire('keydown', { key: 'Escape' }); assert.equal(h.input(), undefined);
+  h.chip().fire('keydown', { key: ' ', preventDefault() {}, stopPropagation() {} }); assert.ok(h.input(), 'Space opens it too');
+  h.input().fire('keydown', { key: 'Escape' });
+  h.chip().fire('keydown', { key: 'Escape', stopPropagation() {} }); assert.equal(h.input(), undefined, 'Esc on the shown goal does nothing');
 });
 
-integrationTest('relevance goal bar: the popover holds the goal and context fields only (no grade button, divider or sort row)', async () => {
-  const h = await harness();
-  open(h);
-  const kids = panelOf(h).children;
-  assert.deepEqual(kids.map(c => c.cls.split(' ')[0]), ['vam-relevance-setup']);
-  assert.deepEqual(group(h).children.map(c => c.cls.split(' ')[0]), ['vam-relevance-goal-input', 'vam-relevance-context-input']);
-  assert.equal(findAll(panelOf(h), i => i.tag === 'input').length, 2);
-  assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-relevance-sort') || hasCls(i, 'vam-relevance-grade-button') || hasCls(i, 'vam-relevance-level')).length, 0);
-});
 const texts = root => findAll(root, i => i.text).map(i => i.text);
 
-integrationTest('relevance toolbar: Esc, an outside press and focus leaving each close the panel without submitting; the outside press and focus leaving do not steal focus', async () => {
-  const h = await harness();
-  const doc = fakeDoc(); h.rootEl.ownerDocument = doc; h.rootEl.root = doc;
-  open(h); h.input().value = 'Not submitted';
-  h.input().fire('keydown', { key: 'Escape' });
-  assert.equal(panelOf(h), undefined); assert.equal(h.chip().focused, true); assert.equal(doc.listeners.pointerdown.length, 0, 'the document listener is removed');
-  assert.equal(h.control.calls.length, 0); assert.equal(h.chip().attrs['aria-expanded'], 'false');
-  h.chip().focused = false;
-  open(h); assert.equal(doc.listeners.pointerdown.length, 1);
-  doc.listeners.pointerdown[0]({ target: panelOf(h) }); assert.ok(panelOf(h), 'a press inside the panel keeps it open');
-  doc.listeners.pointerdown[0]({ target: h.chip() }); assert.ok(panelOf(h), 'the toolbar button toggles it itself');
-  doc.listeners.pointerdown[0]({ target: element('div', 'vam-viewport') });
-  assert.equal(panelOf(h), undefined, 'a press on the canvas closes it'); assert.equal(h.chip().focused, false);
-  open(h); contextInput(h).fire('focusout', { relatedTarget: h.chip() }); assert.ok(panelOf(h), 'focus moving to the button is not leaving');
-  contextInput(h).fire('focusout', { relatedTarget: null }); assert.ok(panelOf(h), '0.25: focus to nowhere (a repaint, a dialog giving focus back) keeps it open');
-  contextInput(h).fire('focusout', { relatedTarget: element('button') }); assert.equal(panelOf(h), undefined, 'focus to another element closes it');
-  assert.equal(h.control.calls.length, 0); assert.equal(h.control.usageAsks, 0); assert.equal(await h.repo.readRelevanceGoal(MAP), undefined, 'nothing was written');
-});
-
-integrationTest('relevance goal bar: Enter closes the popover, disables the icons while grading and submits once', async () => {
+integrationTest('relevance goal bar: Enter closes the editor, disables the icons while grading and submits once', async () => {
   const h = await harness();
   const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
-  open(h); h.input().value = 'Goal via panel'; h.input().fire('keydown', { key: 'Enter' });
-  assert.equal(panelOf(h), undefined); assert.ok(h.icons().every(b => b.disabled)); assert.equal(h.chip().attrs['aria-expanded'], 'false');
+  open(h); h.input().value = 'Goal via editor'; h.input().fire('keydown', { key: 'Enter' });
+  assert.equal(h.input(), undefined); assert.ok(h.icons().every(b => b.disabled)); assert.equal(h.chip().attrs['aria-expanded'], undefined);
   await until(() => h.control.calls.length); assert.equal(h.control.calls.length, 1);
-  gate.resolve(); await h.settled(); assert.equal(h.chip().text, 'Goal via panel');
+  gate.resolve(); await h.settled(); assert.equal(h.chip().text, 'Goal via editor');
 });
 
 integrationTest('relevance goal bar: the sort icon toggles aria-pressed and the on style, keeps the goal text, and writes nothing', async () => {
@@ -803,10 +803,10 @@ integrationTest('relevance goal bar: the sort icon toggles aria-pressed and the 
   assert.equal(h.icon('Sort by relevance').attrs['aria-pressed'], 'false'); assert.ok(!hasCls(h.icon('Sort by relevance'), 'on'));
   h.icon('Sort by relevance').click();
   assert.equal(h.icon('Sort by relevance').attrs['aria-pressed'], 'true'); assert.ok(hasCls(h.icon('Sort by relevance'), 'on'));
-  assert.equal(h.chip().attrs['aria-label'], 'What do you want to achieve with this map? (sorted by relevance)');
+  assert.equal(nameOf(h, h.chip()), 'What do you want to achieve with this map? (sorted by relevance)');
   assert.equal(h.contents.get(MAP), before); assert.deepEqual(writes, [], 'no file write');
   h.icon('Sort by relevance').click(); assert.equal(h.icon('Sort by relevance').attrs['aria-pressed'], 'false');
-  assert.equal(h.chip().attrs['aria-label'], 'What do you want to achieve with this map?');
+  assert.equal(nameOf(h, h.chip()), 'What do you want to achieve with this map?');
   assert.equal(view.relevanceSortOn(), false); assert.deepEqual(writes, []);
   h.app.vault.create = create; h.app.vault.modify = modify;
 });
@@ -817,10 +817,7 @@ integrationTest('relevance toolbar: the zh-TW strings for the sorted state and t
   assert.equal(translate('en', 'ui.relevance_sorted_suffix'), ' (sorted by relevance)');
 });
 
-integrationTest('relevance toolbar: the panel is a dialog; the sort hint uses the same tier words as the card tags (en and zh)', async () => {
-  const h = await harness();
-  assert.equal(h.chip().attrs['aria-haspopup'], 'dialog'); open(h);
-  assert.equal(panelOf(h).attrs.role, 'dialog'); assert.equal(panelOf(h).attrs['aria-label'], 'Goal');
+integrationTest('relevance toolbar: the sort hint uses the same tier words as the card tags (en and zh)', async () => {
   const { translate } = load('i18n.ts');
   for (const [lang, words] of [['en', ['Must learn', 'Learn when needed', 'Skippable']], ['zh-TW', ['必學', '需要時學', '可跳過']]]) {
     const hint = translate(lang, 'ui.relevance_sort_hint');
@@ -828,29 +825,7 @@ integrationTest('relevance toolbar: the panel is a dialog; the sort hint uses th
     let at = -1; for (const w of words) { const i = hint.indexOf(w); assert.ok(i > at, `${lang}: "${w}" in order`); at = i; }
     assert.doesNotMatch(hint, /核心|支援|旁支|core topics|supporting|side topics/);
   }
-  assert.equal(translate('zh-TW', 'ui.relevance_panel_label'), '目標');
-});
-
-integrationTest('relevance toolbar: focus leaving the button to outside both closes the panel without submitting', async () => {
-  const h = await harness();
-  open(h); h.input().value = 'Not submitted';
-  h.chip().fire('focusout', { relatedTarget: contextInput(h) }); assert.ok(panelOf(h), 'moving into the panel keeps it open');
-  h.chip().fire('focusout', { relatedTarget: h.chip() }); assert.ok(panelOf(h), 'staying on the button keeps it open');
-  h.chip().fire('focusout', { relatedTarget: element('button') });
-  assert.equal(panelOf(h), undefined); assert.equal(h.chip().attrs['aria-expanded'], 'false');
-  assert.equal(h.control.calls.length, 0); assert.equal(await h.repo.readRelevanceGoal(MAP), undefined);
-  open(h); h.chip().fire('focusout', { relatedTarget: null }); assert.equal(panelOf(h), undefined, 'focus to nowhere closes it too');
-  h.chip().fire('focusout', { relatedTarget: null }); assert.equal(panelOf(h), undefined, 'nothing happens when it is already closed');
-});
-
-integrationTest('relevance toolbar: Esc on the button closes the panel without submitting and keeps focus on the button', async () => {
-  const h = await harness();
-  open(h); h.input().value = 'Not submitted'; h.chip().focused = false;
-  let stopped = 0; h.chip().fire('keydown', { key: 'Escape', stopPropagation() { stopped++; } });
-  assert.equal(panelOf(h), undefined); assert.equal(h.chip().focused, true); assert.equal(stopped, 1);
-  assert.equal(h.control.calls.length, 0); assert.equal(await h.repo.readRelevanceGoal(MAP), undefined);
-  let stoppedAgain = 0; h.chip().fire('keydown', { key: 'Escape', stopPropagation() { stoppedAgain++; } });
-  assert.equal(stoppedAgain, 0, 'Esc on a closed panel is left to Obsidian');
+  for (const [lang, text] of [['en', '+ Context'], ['zh-TW', '＋ 補充'], ['zh-CN', '＋ 补充']]) assert.equal(translate(lang, 'ui.goal_add_context'), text);
 });
 
 // ---- Phase 7: change a tier by hand from the card tag ----------------------------------------------------------------
@@ -1023,23 +998,21 @@ const pinNote = async (h, key, tier) => { await h.repo.writeRelevance(pathOfKey(
 const marked = h => [...h.cards].filter(([, card]) => hasCls(card, 'vam-structure-suggested')).map(([id]) => id).sort();
 const keyOfId = (h, id) => Object.entries(h.ids).find(([, value]) => value === id)[0];
 const pinsRow = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-pins-row'));
-const reopen = h => { h.view.closeRelevancePanel(false); return open(h); };
+// The old hand-back row of the edit panel is gone with the panel; the More menu carries the entry (tested below).
 
-integrationTest('relevance recalibrate: the recalibrate icon is named by the mode (saved setup + AI grades); the pinned count and "Hand all back to AI" show in the popover only when cards are pinned (en)', async () => {
+integrationTest('relevance recalibrate: the recalibrate icon is named by the mode (saved setup + AI grades); the editor shows neither a pinned count nor a hand-back button (en)', async () => {
   const h = await harness();
   assert.equal(h.icon('Grade with this').disabled, true, 'no goal yet: the full-grade icon is disabled');
   await h.enter('Goal'); await h.settled();
   assert.equal(h.icon('Recalibrate').disabled, false, 'the saved setup is unchanged and the map holds an AI grade');
   assert.equal(h.icon('Grade with this'), undefined);
-  open(h); assert.equal(pinsRow(h), undefined, 'no pins: no line and no hand-back button');
+  open(h); assert.equal(pinsRow(h), undefined, 'no pins: no line and no hand-back button'); h.input().fire('keydown', { key: 'Escape' });
   await pinNote(h, 'a', 'side');
   h.view.render();
   assert.equal(h.icon('Recalibrate').disabled, false);
-  reopen(h);
-  assert.equal(find(pinsRow(h), i => i.tag === 'span').text, 'Keeping the 1 you set');
-  assert.ok(button(pinsRow(h), 'Hand all back to AI'));
-  assert.deepEqual(panelOf(h).children.map(c => c.cls.split(' ')[0]), ['vam-relevance-setup', 'vam-relevance-pins-row'], 'the hand-back row sits below the two fields');
-  assert.equal(findAll(panelOf(h), i => i.tag === 'input').length, 2);
+  open(h);
+  assert.equal(pinsRow(h), undefined, 'pins: the old "Keeping the N you set" row is gone with the panel');
+  assert.deepEqual(findAll(h.goalBar(), i => i.tag === 'button').map(b => b.text), ['+ Context'], 'the editor has no hand-back button; the More menu has the entry');
   // Only pinned cards graded by hand: nothing for the AI to recalibrate from, so the icon grades in full.
   const empty = await harness();
   await pinNote(empty, 'a', 'core'); await pinNote(empty, 'b', 'core'); await pinNote(empty, 'c', 'core'); await pinNote(empty, 'd', 'core');
@@ -1054,7 +1027,7 @@ integrationTest('relevance recalibrate: the AI gets the pins, the current tiers 
   const rawBefore = Object.fromEntries(['a', 'b', 'c', 'd'].map(k => [k, rawNote(h, k)]));
   const past = h.view.history.past.length;
   h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.d), tier: 'side', anchor: labelOf(request, h.ids.b) }] });
-  await h.enter('Goal'); await h.settled();
+  await refreshIcon(h).click(); await h.settled();
   const call = h.control.calls.at(-1);
   assert.equal(call.step, 'relevance-recalibrate'); assert.equal(h.control.calls.length, 2);
   assert.deepEqual(JSON.parse(JSON.stringify(call.request.pins)), [{ id: h.ids.b, tier: 'side' }]);
@@ -1093,7 +1066,7 @@ integrationTest('relevance recalibrate: an answer that leaves a card outside a p
     next.changes.forEach(change => { change.id = labelOf(request, h.ids.d); change.anchor = labelOf(request, h.ids.b); });
     return next;
   };
-  await h.enter('Goal'); await h.settled();
+  await refreshIcon(h).click(); await h.settled();
   assert.deepEqual(h.control.calls.slice(1).map(c => c.step), ['relevance-recalibrate', 'relevance-recalibrate-repair']);
   assert.ok(h.control.calls.at(-1).prompt.includes('A pinned card cannot move'));
   assert.equal(await h.relevanceOf('d'), 'side');
@@ -1106,12 +1079,12 @@ integrationTest('relevance recalibrate: nothing to adjust says so; an entry for 
   await pinNote(h, 'a', 'side');
   const rawBefore = Object.fromEntries(['a', 'b', 'c', 'd'].map(k => [k, rawNote(h, k)]));
   h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.a), tier: 'core', anchor: null }] });
-  await h.enter('Goal'); await h.settled();
+  await refreshIcon(h).click(); await h.settled();
   assert.equal(h.barText(), 'No topics needed adjusting'); assert.deepEqual(h.barButtons(), ['Dismiss']);
   for (const key of ['a', 'b', 'c', 'd']) assert.equal(rawNote(h, key), rawBefore[key], `${key} byte-identical`);
   const past = h.view.history.past.length;
   h.control.reply = async () => ({ items: [] });
-  await h.enter('Goal'); await h.settled();
+  await refreshIcon(h).click(); await h.settled();
   assert.equal(h.run().status, 'failed'); assert.match(h.barText(), /^Grading failed\. No topic was changed\./);
   for (const key of ['a', 'b', 'c', 'd']) assert.equal(rawNote(h, key), rawBefore[key]);
   assert.equal(h.view.history.past.length, past, 'a failed run adds no history');
@@ -1122,14 +1095,14 @@ integrationTest('relevance recalibrate: a card that has no tier yet must be grad
   await h.enter('Goal'); await h.settled();
   await h.repo.writeRelevance(pathOfKey(h, 'c'), null); await h.view.hydrate();   // REM handed back
   h.control.reply = async request => ({ changes: [{ id: labelOf(request, h.ids.c), tier: 'support', anchor: null }] });
-  await h.enter('Goal'); await h.settled();
+  await refreshIcon(h).click(); await h.settled();
   assert.equal(await h.relevanceOf('c'), 'support');
   assert.equal(h.barText(), 'Graded 1 topics, 1 changed (0 skipped)', 'no pins: the plain wording');
   const missing = await harness();
   await missing.enter('Goal'); await missing.settled();
   await missing.repo.writeRelevance(pathOfKey(missing, 'c'), null); await missing.view.hydrate();
   missing.control.reply = async () => ({ changes: [] });
-  await missing.enter('Goal'); await missing.settled();
+  await refreshIcon(missing).click(); await missing.settled();
   assert.equal(missing.run().status, 'failed'); assert.equal(await missing.relevanceOf('c'), undefined);
 });
 
@@ -1182,7 +1155,7 @@ integrationTest('relevance pins: a conflict between two pins is told even when t
   await h.enter('Goal'); await h.settled();
   await pinNote(h, 'a', 'side'); await pinNote(h, 'c', 'core');
   h.control.reply = async () => ({ changes: [] });
-  await h.enter('Goal'); await h.settled();
+  await refreshIcon(h).click(); await h.settled();
   assert.equal(h.barText(), 'No topics needed adjusting');
   assert.deepEqual(h.barButtons(), ['View changes', 'Dismiss'], 'the window is offered for the notice; there is nothing to undo');
   button(h.bar(), 'View changes').click();
@@ -1219,7 +1192,7 @@ integrationTest('relevance pins: the More menu offers "Hand all back to AI (N ca
   const real = h.view.map; h.view.map = { ...real, aim: { runs: [] } };
   assert.ok(!titles().some(x => entry.test(x)), 'AIM map: no entry');
   h.view.map = real;
-  // Choosing it: one mutation, one undo step, no AI call; the old popover row is still there until P3.
+  // Choosing it: one mutation, one undo step, no AI call (the only hand-back entry since the edit panel went).
   const past = h.view.history.past.length, calls = h.control.calls.length;
   h.view.openMapActions();
   h.menus.at(-1).items.find(i => entry.test(i.title)).click(); await afterWrite();
@@ -1242,9 +1215,8 @@ integrationTest('relevance pins: Hand all back to AI removes every pin in one mu
   const pinned = { a: rawNote(h, 'a'), c: rawNote(h, 'c') };
   const aiKept = { b: rawNote(h, 'b'), d: rawNote(h, 'd') };
   const past = h.view.history.past.length;
-  open(h);
-  button(pinsRow(h), 'Hand all back to AI').click(); await afterWrite();
-  assert.equal(panelOf(h), undefined, 'the panel closes');
+  h.view.openMapActions();
+  h.menus.at(-1).items.find(i => /^Hand all back to AI/.test(i.title)).click(); await afterWrite();
   for (const key of ['a', 'c']) { assert.doesNotMatch(rawNote(h, key), /relevance-(tier|reason|manual)/); assert.equal(await h.relevanceOf(key), undefined); }
   for (const key of ['b', 'd']) assert.equal(rawNote(h, key), aiKept[key], `${key} untouched`);
   assert.equal(h.view.history.past.length, past + 1, 'one undo step');
@@ -1255,7 +1227,8 @@ integrationTest('relevance pins: Hand all back to AI removes every pin in one mu
   await h.view.travel(true); await afterWrite();
   for (const key of ['a', 'c']) assert.equal(await h.relevanceOf(key), undefined, 'redo hands them back again');
   // The next recalibration must grade them (they have no tier now).
-  open(h); assert.equal(pinsRow(h), undefined);
+  h.view.openMapActions();
+  assert.ok(!h.menus.at(-1).items.some(i => /^Hand all back to AI/.test(i.title)), 'no pins left: no entry');
 });
 
 integrationTest('relevance pins: handing one card back (the tag menu) leaves it ungraded so the next run grades it; the hint is on the item where the host allows', async () => {
@@ -1325,7 +1298,7 @@ integrationTest('relevance: one run repaints the map at most twice when the usag
   assert.equal(withMap.length, h.view.map.nodes.length, 'one read per card carries the map'); assert.ok(withMap.every(map => map === h.view.map));
   // A recalibrate that changes nothing repaints twice too: the start and the end.
   const second = h.renders();
-  await h.enter('Goal'); await h.settled();
+  await refreshIcon(h).click(); await h.settled();
   assert.ok(h.renders() - second <= 2, `a recalibrate with nothing to change repaints ${h.renders() - second} times`);
   // The notice still shows its own state when it really opens.
   const waiting = await harness();
@@ -1334,29 +1307,30 @@ integrationTest('relevance: one run repaints the map at most twice when the usag
   assert.equal(waiting.barText(), 'Waiting for AI usage confirmation…');
 });
 
-integrationTest('relevance: opening the panel pre-starts the CLI for the grade it would run, switching to a recalibration starts the other schema, and closing without sending kills it', async () => {
+integrationTest('relevance: opening the goal pre-starts nothing; the first edit that differs from the saved setup pre-starts the grade once; Esc kills it; sending keeps it (decision #4)', async () => {
   const h = await harness();
   h.plugin.settings.cliReasoning = 'auto';
-  h.chip().click();
   const mode = () => h.control.prewarms.map(([model, reasoning, schema]) => [model, reasoning, schema.properties.changes ? 'recalibrate' : schema.properties.items ? 'grade' : 'other']);
-  assert.deepEqual(mode(), [['gpt-6-luna', 'auto', 'grade']], 'one pre-start on open, with the grade schema');
-  // Nothing graded yet: typing cannot change the mode. After a grade, the same setup is a recalibration.
+  h.chip().click();
+  assert.deepEqual(mode(), [], 'a click on the goal starts no process');
   h.input().value = 'Goal'; h.input().fire('input');
-  assert.equal(h.control.prewarms.length, 1, 'same mode: no second start');
+  assert.deepEqual(mode(), [['gpt-6-luna', 'auto', 'grade']], 'the first edit that differs pre-starts the grade');
+  h.input().value = 'Goal two'; h.input().fire('input');
+  assert.equal(h.control.prewarms.length, 1, 'one start per edit, however many keystrokes');
   h.input().fire('keydown', { key: 'Escape' });
-  assert.equal(h.control.releases, 1, 'Escape closes the panel and kills the waiting process');
-  await h.enter('Goal'); await h.settled();
-  assert.equal(h.control.releases, 1, 'sending keeps the pre-started process for the run');
+  assert.equal(h.control.releases, 1, 'Escape kills the waiting process');
   h.control.prewarms.length = 0;
-  h.chip().click();
-  assert.deepEqual(mode(), [['gpt-6-luna', 'auto', 'recalibrate']], 'an unchanged setup after a grade pre-starts the recalibration');
-  h.input().value = 'Another goal'; h.input().fire('input');
-  assert.deepEqual(mode(), [['gpt-6-luna', 'auto', 'recalibrate'], ['gpt-6-luna', 'auto', 'grade']], 'a new goal needs a full grade: the other schema starts');
-  h.chip().click();
-  assert.equal(h.control.releases, 2, 'toggling the panel shut kills it too');
+  h.chip().click(); h.input().value = 'Goal'; h.input().fire('input'); h.input().fire('keydown', { key: 'Enter' }); await h.settled();
+  assert.equal(h.control.prewarms.length, 1); assert.equal(h.control.releases, 1, 'sending keeps the pre-started process for the run (the Escape above was the only release)');
+  // A changed setup is always a full grade, so the grade schema is what starts, also after an AI grade.
+  h.control.prewarms.length = 0;
+  h.chip().click(); h.input().value = 'Another goal'; h.input().fire('input');
+  assert.deepEqual(mode(), [['gpt-6-luna', 'auto', 'grade']], 'a new goal needs a full grade');
+  h.input().fire('keydown', { key: 'Escape' });
+  assert.equal(h.control.releases, 2);
 });
 
-integrationTest('relevance: Stop, a declined notice, a failed run and closing the view with the panel open each leave no pre-started process; a run that finishes does not kill another', async () => {
+integrationTest('relevance: Stop, a declined notice, a failed run and closing the view with an edit open each leave no pre-started process; a run that finishes does not kill another', async () => {
   const stopped = await harness();
   const gate = deferred(); stopped.control.reply = request => gate.promise.then(() => gradeAll(request));
   await stopped.enter('Goal'); await until(() => stopped.control.calls.length);
@@ -1371,9 +1345,9 @@ integrationTest('relevance: Stop, a declined notice, a failed run and closing th
   await failed.enter('Goal'); await failed.settled();
   assert.equal(failed.run().status, 'failed'); assert.ok(failed.control.releases >= 1, 'a failed run');
   const closing = await harness();
-  closing.chip().click(); const open = closing.control.releases;
+  closing.chip().click(); closing.input().value = 'Typed'; closing.input().fire('input'); const open = closing.control.releases;
   await closing.view.onClose();
-  assert.equal(closing.control.releases, open + 1, 'closing the view while the panel is open');
+  assert.equal(closing.control.releases, open + 1, 'closing the view while an edit with a pre-started process is open');
   const quiet = await harness();
   await quiet.enter('Goal'); await quiet.settled();
   assert.equal(quiet.control.releases, 0, 'a run that finishes leaves the pool alone (it took its process)');
@@ -1446,7 +1420,7 @@ integrationTest('relevance: a recalibration counts changes received, without a t
   const h = await progressHarness();
   await h.enter('Goal'); await h.settled();
   const gate = deferred(); h.control.reply = request => gate.promise.then(() => recalibrateNew(request));
-  await h.enter('Goal'); await until(() => h.control.calls.length === 2);
+  refreshIcon(h).click(); await until(() => h.control.calls.length === 2);
   assert.equal(h.run().mode ?? 'recalibrate', 'recalibrate');
   h.control.calls[1].onJson('');
   h.advance(300); h.control.calls[1].onJson('{"changes":[{"id":"c2","tier":"core","anchor":null},{"id":"c3","tier":"side","anchor":null}');
@@ -1458,16 +1432,15 @@ integrationTest('relevance: a recalibration counts changes received, without a t
   assert.equal(receivedEl(waiting), undefined); assert.equal(elapsedEl(waiting), undefined);
 });
 
-// Goal-grading entry and its panel: named for what it does, and the panel survives a repaint or a dialog handing focus back (a null
-// relatedTarget) instead of closing the instant it opens. Unit layer (`test`): real view with the tests/support-dom.cjs stand-in, no vault or repository.
+// Goal editing in place on the bare view (no repository): the unset bar, a repaint under an open edit. Unit layer (`test`): the tests/support-dom.cjs stand-in.
 const PANEL_MAP_PATH = 'Agent Workspace/Topics/m/Map.md';
 
-function panelFocusFixture(language = 'en') {
-  const notices = [];
+function goalEditFixture(language = 'en') {
+  const notices = [], prewarms = [], counts = { releases: 0 };
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } }, setTooltip() {} } }, { createSvg: tag => ({ tag, attrs: {}, children: [], setAttribute(n, v) { this.attrs[n] = v; }, appendChild(c) { this.children.push(c); } }) });
-  const docListeners = new Map();
-  const doc = { activeElement: null, addEventListener(name, fn) { docListeners.set(name, fn); }, removeEventListener(name, fn) { if (docListeners.get(name) === fn) docListeners.delete(name); } };
-  const plugin = { settings: { ...DEFAULT_SETTINGS, language }, relevanceGrades: new Map(), releaseOutline() {} };
+  const docListeners = { pointerdown: [], pointerup: [], pointercancel: [] };
+  const doc = { activeElement: null, addEventListener(name, fn) { (docListeners[name] ??= []).push(fn); }, removeEventListener(name, fn) { docListeners[name] = (docListeners[name] ?? []).filter(f => f !== fn); } };
+  const plugin = { settings: { ...DEFAULT_SETTINGS, language }, relevanceGrades: new Map(), releaseOutline() {}, prewarmClaudeStep: (...args) => prewarms.push(args), releaseWarmClaude: () => { counts.releases++; } };
   plugin.currentModelChoice = () => ({ model: plugin.settings.cliModel, reasoning: plugin.settings.cliReasoning });
   const view = new VisualAgentMapView({ app: {} }, plugin);
   const root = node('root'), child = node('child', 'root');
@@ -1475,91 +1448,293 @@ function panelFocusFixture(language = 'en') {
   view.notes = new Map([[root.id, { title: 'Root' }], [child.id, { title: 'Child' }]]);
   const content = element('div'); content.ownerDocument = doc; content.root = doc;
   view.contentEl = content;
-  const paint = () => view.renderGoalBar(content);
+  // What render() does: the old DOM goes (after the editor's fields were read back), the bar is drawn again.
+  const paint = () => { view.captureGoalEdit(); content.empty(); view.renderGoalBar(content); view.focusGoalEdit(); };
   paint();
   const chip = () => find(content, i => hasCls(i, 'vam-goal-text'));
-  const input = () => find(content, i => hasCls(i, 'vam-relevance-goal-input'));
-  const panel = () => find(content, i => hasCls(i, 'vam-relevance-panel'));
-  return { view, plugin, content, doc, docListeners, notices, paint, chip, input, panel, translate: load('i18n.ts').translate };
+  const input = () => find(content, i => i.tag === 'textarea');
+  const label = el => find(content, i => i.attrs.id === el.attrs['aria-labelledby'])?.text;
+  return { view, plugin, content, doc, docListeners, notices, prewarms, counts, paint, chip, input, label, translate: load('i18n.ts').translate };
 }
 
 test('the unset goal bar shows the placeholder as its name, with a hint that says what AI does; the new icon names are translated', () => {
-  const f = panelFocusFixture();
+  const f = goalEditFixture();
   assert.equal(f.chip().text, 'What do you want to achieve with this map?', 'an unset goal shows the placeholder');
-  assert.equal(f.chip().attrs['aria-label'], 'What do you want to achieve with this map?', 'the accessible name is the placeholder');
+  assert.equal(f.chip().attrs['aria-label'], undefined, 'no aria-label (Obsidian would show it as a tooltip)');
+  assert.equal(f.label(f.chip()), 'What do you want to achieve with this map?', 'the accessible name is the placeholder, from a hidden label');
   for (const [language, hint] of [['en', /Must learn.*Learn when needed.*Skippable/], ['zh-TW', /必學.*需要時學.*可跳過/]])
     assert.match(f.translate(language, 'ui.relevance_goal_set_hint'), hint);
-  for (const [language, name] of [['en', 'Edit goal'], ['zh-TW', '編輯目標'], ['zh-CN', '编辑目标']]) assert.equal(f.translate(language, 'ui.goal_edit'), name);
   assert.equal(f.translate('zh-TW', 'ui.goal_suggest_topics'), '依目標建議新議題');
-  assert.doesNotMatch(f.translate('zh-TW', 'ui.goal_suggest_topics') + f.translate('zh-TW', 'ui.goal_edit'), /地圖/);
+  assert.doesNotMatch(f.translate('zh-TW', 'ui.goal_suggest_topics'), /地圖/);
 });
 
-test('an old field losing focus with no next element (a repaint, a dialog giving focus back) keeps the panel open', () => {
-  const f = panelFocusFixture();
+test('counter-example 7: a repaint rebuilds the open editor from its state; draft, caret and the keyboard survive three repaints, nothing is asked and nothing is pre-started again', () => {
+  const f = goalEditFixture();
   f.chip().click();
-  assert.ok(f.panel(), 'the panel opens'); const old = f.input(); assert.equal(old.focused, true);
-  old.fire('focusout', { relatedTarget: null });
-  assert.ok(f.panel(), 'focusout(null) does not close it'); assert.equal(f.view.relevancePanelOpen, true);
-  assert.equal(f.chip().attrs['aria-expanded'], 'true');
+  const first = f.input(); first.value = 'A draft'; first.fire('input'); first.selectionStart = 4; first.focus(); f.doc.activeElement = first;
+  assert.equal(f.prewarms.length, 1, 'the first differing keystroke pre-started once');
+  const seen = [first];
+  for (let n = 0; n < 3; n++) {
+    f.paint();
+    const now = f.input();
+    assert.ok(now && !seen.includes(now), `repaint ${n + 1}: a new field`); seen.push(now);
+    assert.equal(now.value, 'A draft', `repaint ${n + 1}: the draft stays`); assert.equal(f.view.goalEdit.caret, 4, `repaint ${n + 1}: the caret is kept in the state`);
+    assert.equal(now.focused, true, `repaint ${n + 1}: the keyboard is back in the field`); f.doc.activeElement = now;
+  }
+  assert.equal(f.prewarms.length, 1, 'repainting pre-starts nothing'); assert.equal(f.counts.releases, 0); assert.equal(f.plugin.relevanceGrades.size, 0, 'and asks nothing');
+  assert.equal(f.docListeners.pointerdown.length, 1, 'one outside listener, however often it was repainted');
 });
 
-test('a repaint redraws the open panel, and the removed field\'s late focusout cannot close the new one', () => {
-  const f = panelFocusFixture();
-  f.chip().click();
-  const old = f.input(), outside = element('button');
-  f.paint(); // what render() does after emptying the old DOM
-  const fresh = find(f.content, i => hasCls(i, 'vam-relevance-panel') && i !== old);
-  assert.ok(fresh && f.view.relevancePanelOpen, 'the panel is drawn again after the repaint');
-  const panels = () => f.content.children.flatMap(c => c.children).filter(c => hasCls(c, 'vam-relevance-panel'));
-  const current = panels().at(-1);
-  old.fire('focusout', { relatedTarget: outside }); // late event from the discarded DOM
-  assert.equal(f.view.relevancePanelOpen, true, 'a stale field cannot close the new panel'); assert.ok(panels().includes(current));
-});
-
-test('render() invalidates the panel before it empties the DOM (source order)', () => {
+test('the editor reads its fields back before a repaint empties the view (source order in render())', () => {
   const source = fs.readFileSync(path.join(projectRoot, 'experiences/visual-map/view.ts'), 'utf8');
   const body = source.slice(source.indexOf('  private render(): void {'));
-  const bump = body.indexOf('this.relevancePanelGen++'), cleanup = body.indexOf('this.relevancePanelCleanup?.()'), empty = body.indexOf('this.contentEl.empty()');
-  assert.ok(bump > 0 && cleanup > 0 && empty > 0 && bump < empty && cleanup < empty, 'gen bump and listener cleanup come before contentEl.empty()');
+  const capture = body.indexOf('this.captureGoalEdit()'), remove = body.indexOf('this.removeGoalBar()'), empty = body.indexOf('this.contentEl.empty()'), refocus = body.indexOf('this.focusGoalEdit()');
+  assert.ok(capture > 0 && remove > capture && empty > remove, 'capture, then the bar goes, then the view is emptied');
+  assert.ok(refocus > empty, 'the keyboard is given back after the repaint');
+  assert.match(source, /this\.relevanceBarEl = null;\s*this\.dropGoalEdit\(\);/, 'a render that finds nothing to grade (empty map, AIM, no map) drops an open edit');
 });
 
-test('focus moving to a real element outside the panel closes it; the outside press and Escape still close it', () => {
-  const f = panelFocusFixture();
-  f.chip().click();
-  f.input().fire('focusout', { relatedTarget: element('button') });
-  assert.equal(f.view.relevancePanelOpen, false); assert.equal(f.panel(), undefined);
-  // Outside pointerdown.
-  f.chip().click(); assert.ok(f.panel());
-  f.docListeners.get('pointerdown')({ target: element('div') });
-  assert.equal(f.view.relevancePanelOpen, false); assert.equal(f.panel(), undefined);
-  // A press inside the panel does not close it.
-  f.chip().click(); const inside = f.input();
-  f.docListeners.get('pointerdown')({ target: inside });
-  assert.ok(f.panel());
-  // Escape closes and returns focus to the button.
-  inside.fire('keydown', { key: 'Escape' });
-  assert.equal(f.view.relevancePanelOpen, false); assert.equal(f.panel(), undefined);
-  assert.equal(f.chip().focused, true); assert.equal(f.doc.activeElement, f.chip(), 'focus returns to the button');
-  assert.equal(f.chip().attrs['aria-expanded'], 'false');
-});
-
-test('a click that cannot open the panel says why', () => {
-  const f = panelFocusFixture();
+test('a click on the goal while a grade runs says why and opens nothing; an AIM map opens no editor either', () => {
+  const f = goalEditFixture();
   f.plugin.relevanceGrades.set(PANEL_MAP_PATH, { status: 'running' });
-  f.chip().fire('click'); // the button is disabled while grading; the handler still explains if it is reached
-  assert.equal(f.panel(), undefined);
-  assert.deepEqual(f.notices, [f.translate('en', 'ui.relevance_goal_unavailable_grading')]);
-  f.plugin.relevanceGrades.clear(); f.notices.length = 0;
-  f.view.relevanceBarEl = null;
   f.chip().fire('click');
-  assert.deepEqual(f.notices, [f.translate('en', 'ui.relevance_goal_unavailable_toolbar')]);
-  for (const key of ['ui.relevance_goal_unavailable_grading', 'ui.relevance_goal_unavailable_toolbar'])
-    assert.notEqual(f.translate('zh-TW', key), f.translate('en', key), `${key} is translated`);
+  assert.equal(f.input(), undefined); assert.deepEqual(f.notices, [f.translate('en', 'ui.relevance_goal_unavailable_grading')]);
+  assert.notEqual(f.translate('zh-TW', 'ui.relevance_goal_unavailable_grading'), f.translate('en', 'ui.relevance_goal_unavailable_grading'), 'translated');
+  f.plugin.relevanceGrades.clear();
+  f.view.map.aim = { runs: [] }; f.view.startGoalEdit({});
+  assert.equal(f.view.goalEdit, null, 'not gradable: no editor'); assert.equal(f.docListeners.pointerdown.length, 0);
 });
 
-test('a stale "open" flag without a panel on screen opens the panel instead of toggling it shut', () => {
-  const f = panelFocusFixture();
-  f.view.relevancePanelOpen = true; f.view.relevancePanelEl = null;
-  f.chip().click();
-  assert.ok(f.panel(), 'the click opens it');
+// ---- Goal edit in place: when it saves and when it never does (plan section 6, counter-examples 1-18) --------------------
+// A document stand-in for the editor's listeners: a press outside saves once it is over.
+function withDoc(h) {
+  const listeners = { pointerdown: [], pointerup: [], pointercancel: [] };
+  const doc = { listeners, get activeElement() { return dom.focusedNow(); }, addEventListener(n, f) { (listeners[n] ??= []).push(f); }, removeEventListener(n, f) { listeners[n] = (listeners[n] ?? []).filter(x => x !== f); } };
+  h.rootEl.ownerDocument = doc;
+  const fire = (name, event) => [...(listeners[name] ?? [])].forEach(f => f(event));
+  return { doc, listeners, count: () => Object.values(listeners).reduce((n, a) => n + a.length, 0), press: (target, event = {}) => fire('pointerdown', { target, ...event }), release: () => fire('pointerup', {}), cancel: () => fire('pointercancel', {}) };
+}
+const later = () => new Promise(r => setTimeout(r, 5));
+const noAi = (h, where) => { assert.equal(h.control.calls.length, 0, `${where}: no grading call`); assert.equal(h.control.usageAsks, 0, `${where}: no usage confirmation`); assert.equal(h.plugin.relevanceGrades.size, 0, `${where}: no run`); };
+const withGoal = async (goal = 'Sleep better') => { const h = await harness(); await h.repo.writeRelevanceGoal(MAP, goal); await h.view.hydrate(); h.view.render(); return h; };
+// A target the way Obsidian's own overlays look to the editor: `closest` finds the overlay.
+const insideOverlay = cls => { const overlay = element('div', cls), inner = element('span'); overlay.appendChild(inner); inner.closest = selector => selector.split(',').some(part => part.trim() === `.${cls}`) ? overlay : null; return inner; };
+
+integrationTest('goal edit (counter-examples 1 and 2): the same text, or only its spaces changed, saves nothing and never reaches the AI, whether Enter, a press elsewhere or Tab ends it', async () => {
+  for (const edit of ['same', 'spaces']) for (const how of ['enter', 'outside', 'tab']) {
+    const h = await withGoal(); const d = withDoc(h); const where = `${edit} / ${how}`;
+    const before = h.contents.get(MAP), past = h.view.history.past.length;
+    open(h);
+    if (edit === 'spaces') { h.input().value = '  Sleep   better '; h.input().fire('input'); }
+    if (how === 'enter') h.input().fire('keydown', { key: 'Enter' });
+    else if (how === 'tab') addContext(h).fire('keydown', { key: 'Tab' });
+    else { d.press(element('div', 'vam-viewport')); d.release(); }
+    await later();
+    noAi(h, where); assert.equal(h.contents.get(MAP), before, `${where}: nothing written`); assert.equal(h.view.history.past.length, past, `${where}: no undo step`);
+    assert.equal(h.input(), undefined, `${where}: the editor closed`); assert.equal(h.chip().text, 'Sleep better', `${where}: the goal is shown again`);
+    assert.equal(h.control.prewarms.length, 0, `${where}: nothing was pre-started`); assert.equal(d.count(), 0, `${where}: the document listeners are gone`);
+  }
+});
+
+integrationTest('goal edit (counter-example 3): clearing the goal then Enter or a press elsewhere keeps the original goal and calls nothing', async () => {
+  for (const how of ['enter', 'outside']) {
+    const h = await withGoal(); const d = withDoc(h);
+    const before = h.contents.get(MAP);
+    open(h); h.input().value = ''; h.input().fire('input');
+    assert.ok(hasCls(find(h.goalBar(), i => hasCls(i, 'vam-goal-actions')), 'is-vacant'), `${how}: an empty goal offers no "+ Context"`);
+    if (how === 'enter') h.input().fire('keydown', { key: 'Enter' }); else { d.press(element('div')); d.release(); }
+    await later();
+    noAi(h, how); assert.equal(h.contents.get(MAP), before, `${how}: nothing written`); assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better'); assert.equal(h.chip().text, 'Sleep better');
+    assert.equal(d.count(), 0);
+  }
+});
+
+integrationTest('goal edit (counter-example 4): Enter and Esc while an IME composes neither save nor cancel, even with a changed text and after the timers ran', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  open(h); h.input().value = 'A different goal'; h.input().fire('input');
+  h.input().fire('keydown', { key: 'Enter', isComposing: true }); h.input().fire('keydown', { key: 'Escape', isComposing: true });
+  await later();
+  noAi(h, 'composing'); assert.ok(h.input(), 'still editing'); assert.equal(h.input().value, 'A different goal'); assert.equal(h.control.releases, 0); assert.ok(d.count() > 0);
+  h.input().fire('keydown', { key: 'Enter', isComposing: false }); await h.settled();
+  assert.equal(await h.repo.readRelevanceGoal(MAP), 'A different goal', 'the same Enter after the composition ended saves');
+});
+
+integrationTest('goal edit (counter-example 5): Esc discards a changed draft, saves nothing, calls nothing and kills the pre-started process', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  const before = h.contents.get(MAP);
+  open(h); h.input().value = 'Not this one'; h.input().fire('input');
+  assert.equal(h.control.prewarms.length, 1);
+  h.input().fire('keydown', { key: 'Escape' }); await later();
+  noAi(h, 'Esc'); assert.equal(h.contents.get(MAP), before); assert.equal(h.control.releases, 1, 'the waiting process is stopped'); assert.equal(d.count(), 0);
+  assert.equal(h.chip().text, 'Sleep better'); assert.equal(h.chip().focused, true, 'focus returns to the goal text');
+  open(h); assert.equal(h.input().value, 'Sleep better', 'the discarded draft does not come back');
+});
+
+integrationTest('goal edit (counter-example 6): blur and focusout (to nowhere, to something outside, window blur) save nothing; the editor stays open; the code does not listen to them at all', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  open(h); h.input().value = 'Typed'; h.input().fire('input');
+  const bar = h.goalBar();
+  for (const target of [h.input(), bar, h.rootEl]) for (const name of ['blur', 'focusout', 'focusin']) for (const relatedTarget of [null, element('button'), h.input()]) target.fire(name, { relatedTarget });
+  addContext(h).click(); const row = contextInput(h);
+  for (const name of ['blur', 'focusout']) for (const relatedTarget of [null, element('button')]) { row.fire(name, { relatedTarget }); h.input().fire(name, { relatedTarget }); }
+  await later();
+  noAi(h, 'blur'); assert.ok(h.input() && contextInput(h), 'both fields are still there'); assert.equal(h.view.goalEdit.warmed, true); assert.equal(h.control.releases, 0); assert.equal(h.control.prewarms.length, 1);
+  assert.deepEqual(Object.keys(d.listeners).filter(name => d.listeners[name].length).sort(), ['pointerdown'], 'the only document listener is the press');
+  // Nothing in the goal-bar code listens to blur or focusout (the rule of plan section 6).
+  const source = fs.readFileSync(path.join(projectRoot, 'experiences/visual-map/view.ts'), 'utf8');
+  const section = source.slice(source.indexOf('  private renderGoalBar('), source.indexOf('  // ---- Suggest new topics for the goal'));
+  assert.ok(section.length > 8000 && /commitGoalEdit/.test(section), 'the scanned section is the goal bar and its editor');
+  assert.doesNotMatch(section, /blur|focusout/i);
+});
+
+integrationTest('goal edit (counter-example 8): a map switch or closing the view drops the edit: nothing is asked, the process is stopped, the document listeners are gone', async () => {
+  for (const how of ['close', 'switch']) {
+    const h = await withGoal(); const d = withDoc(h);
+    openWithContext(h, 'Half typed');
+    assert.ok(d.count() > 0 && h.control.prewarms.length === 1, how);
+    if (how === 'close') await h.view.onClose();
+    else await h.view.openMapInMutation('Agent Workspace/Topics/other/Map.md').catch(() => {});
+    noAi(h, how); assert.equal(h.view.goalEdit, null, `${how}: the edit is gone`); assert.equal(h.control.releases, 1, `${how}: the process is stopped`); assert.equal(d.count(), 0, `${how}: no document listener left`);
+    assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better', `${how}: the saved goal is untouched`);
+  }
+});
+
+integrationTest('goal edit (counter-example 9): a press elsewhere that ends after the view closed or the map changed saves nothing (checked again when it runs)', async () => {
+  for (const [when, how] of [['before the release', 'close'], ['before the release', 'switch'], ['after the release, before the timer', 'close'], ['after the release, before the timer', 'switch']]) {
+    const h = await withGoal(); const d = withDoc(h); const where = `${how} ${when}`;
+    open(h); h.input().value = 'Changed but never saved'; h.input().fire('input');
+    d.press(element('div', 'vam-viewport'));
+    if (when.startsWith('after')) d.release();
+    if (how === 'close') await h.view.onClose(); else { h.view.path = 'Agent Workspace/Topics/elsewhere/Map.md'; h.view.dropGoalEdit(); }
+    if (!when.startsWith('after')) d.release();
+    await later();
+    noAi(h, where); assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better', where); assert.equal(d.count(), 0, where);
+  }
+  // The fence inside the commit itself: an edit that survived on another map is not saved either.
+  const h = await withGoal(); open(h); h.input().value = 'Stale'; h.view.path = 'Agent Workspace/Topics/elsewhere/Map.md';
+  h.view.commitGoalEdit('outside'); await later(); noAi(h, 'stale path'); assert.equal(await h.repo.readRelevanceGoal(MAP), 'Sleep better');
+  const h2 = await withGoal(); open(h2); h2.input().value = 'Stale'; h2.view.closed = true; h2.view.commitGoalEdit('enter'); await later(); noAi(h2, 'closed view');
+});
+
+integrationTest('goal edit (counter-example 10): a press inside Obsidian\'s .menu, .modal-container or .prompt is not "elsewhere"; any other press is', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  open(h); h.input().value = 'Changed'; h.input().fire('input');
+  for (const cls of ['menu', 'modal-container', 'prompt']) { d.press(insideOverlay(cls)); d.release(); await later(); assert.ok(h.input(), `.${cls}: the editor stays`); noAi(h, cls); }
+  d.press(h.input()); d.release(); d.press(addContext(h)); d.release(); await later();
+  assert.ok(h.input(), 'a press inside the bar (the field, "+ Context") is not elsewhere'); noAi(h, 'inside the bar');
+  const plain = element('div'); plain.closest = () => null;
+  d.press(plain); d.release(); await h.settled();
+  assert.equal(await h.repo.readRelevanceGoal(MAP), 'Changed', 'a press anywhere else saves');
+  assert.equal(h.control.calls.length, 1);
+});
+
+integrationTest('goal edit (counter-example 11): two Enters in a row, or Enter then a press elsewhere, run the grade once', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
+  open(h); const field = h.input(); field.value = 'Enter twice'; field.fire('input');
+  field.fire('keydown', { key: 'Enter' }); field.fire('keydown', { key: 'Enter' });
+  d.press(element('div')); d.release(); await later();
+  await until(() => h.control.calls.length);
+  assert.equal(h.control.calls.length, 1); assert.equal(h.control.usageAsks, 1); assert.equal(d.count(), 0);
+  // The same for a press elsewhere followed by Enter before the timer ran.
+  const g = await withGoal(); const e = withDoc(g); g.control.reply = request => gate.promise.then(() => gradeAll(request));
+  open(g); const f = g.input(); f.value = 'Press then Enter'; f.fire('input');
+  e.press(element('div')); e.release(); f.fire('keydown', { key: 'Enter' }); await later(); await until(() => g.control.calls.length);
+  assert.equal(g.control.calls.length, 1); assert.equal(g.control.usageAsks, 1);
+  gate.resolve(); await h.settled(); await g.settled();
+});
+
+integrationTest('goal edit (counter-example 12): a grade started from the chat while the editor is open cancels the edit; only the chat\'s run goes out, and the typed text is never saved', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  const gate = deferred(); h.control.reply = request => gate.promise.then(() => gradeAll(request));
+  open(h); h.input().value = 'Typed in the editor'; h.input().fire('input');
+  assert.equal(h.control.prewarms.length, 1);
+  void h.view.submitRelevanceGoal('Goal from the chat');
+  await until(() => h.control.calls.length);
+  assert.equal(h.view.goalEdit, null, 'the editor was cancelled by the run'); assert.equal(h.input(), undefined); assert.equal(d.count(), 0); assert.ok(h.control.releases >= 1, 'its pre-started process is stopped');
+  assert.equal(h.control.calls.length, 1); assert.equal(h.control.calls[0].request.goal, 'Goal from the chat');
+  gate.resolve(); await h.settled();
+  assert.equal(await h.repo.readRelevanceGoal(MAP), 'Goal from the chat'); assert.equal(h.control.calls.length, 1, 'the editor\'s text was not graded');
+});
+
+integrationTest('goal edit (counter-example 13): a click without typing pre-starts nothing; typing back to the saved text and pressing Esc stops what the typing started', async () => {
+  const h = await withGoal();
+  h.chip().click(); h.input().fire('keydown', { key: 'Escape' });
+  assert.equal(h.control.prewarms.length, 0, 'a click alone starts no process'); assert.equal(h.control.releases, 0, 'and stops none');
+  open(h); h.input().value = 'Sleep better!'; h.input().fire('input'); assert.equal(h.control.prewarms.length, 1);
+  h.input().value = 'Sleep better'; h.input().fire('input'); h.input().fire('keydown', { key: 'Escape' });
+  assert.equal(h.control.releases, 1, 'Esc stops it'); noAi(h, 'typed back');
+});
+
+integrationTest('goal edit (counter-example 14): "+ Context" is not "elsewhere": no save, no AI, and the keyboard moves to the context row', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  open(h); h.input().value = 'Changed first'; h.input().fire('input');
+  d.press(addContext(h)); d.release(); addContext(h).click(); await later();
+  noAi(h, '+ Context'); assert.ok(contextInput(h)); assert.equal(contextInput(h).focused, true); assert.equal(h.input().value, 'Changed first');
+  assert.equal(h.view.goalEdit.warmed, true); assert.equal(h.control.releases, 0, 'the pre-started process stays');
+});
+
+integrationTest('goal edit (counter-example 15): a goal that looks like HTML is text everywhere: the shown goal, the field and the context row', async () => {
+  const evil = '<img src=x onerror=alert(1)>';
+  const h = await withGoal(evil);
+  assert.equal(h.chip().text, evil); open(h); assert.equal(h.input().value, evil);
+  h.input().value = evil; h.input().fire('input'); addContext(h).click(); contextInput(h).value = evil; assert.equal(findAll(h.rootEl, i => i.tag === 'img').length, 0);
+  const source = fs.readFileSync(path.join(projectRoot, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.doesNotMatch(source.slice(source.indexOf('  private renderGoalBar('), source.indexOf('  // ---- Suggest new topics for the goal')), /innerHTML|outerHTML|insertAdjacentHTML/);
+});
+
+integrationTest('goal edit (counter-example 17): the bar moving to the other row during an edit keeps the draft, asks nothing and gives the keyboard back to the field', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  const hostA = element('div'), hostB = element('div'); h.rootEl.appendChild(hostA); h.rootEl.appendChild(hostB);
+  let host = hostA; h.view.goalHostTarget = () => ({ host, before: null });
+  h.rootEl.empty(); h.rootEl.appendChild(hostA); h.rootEl.appendChild(hostB);
+  h.view.renderGoalBar(hostA);
+  h.view.goalEdit = null; h.view.startGoalEdit({});
+  const field = h.input(); field.value = 'Draft across rows'; field.fire('input'); d.doc.activeElement; field.focus();
+  const bar = h.view.relevanceBarEl; Object.defineProperty(bar, 'parentElement', { get() { return this.parent; } }); bar.ownerDocument = d.doc;
+  let refocused = 0; const realFocus = field.focus; field.focus = (...args) => { refocused++; return realFocus.apply(field, args); };
+  host = hostB; h.view.placeGoalBar();
+  assert.equal(bar.parent, hostB, 'the bar moved'); assert.equal(h.input(), field, 'the same field, with its draft'); assert.equal(field.value, 'Draft across rows');
+  assert.equal(refocused, 1, 'the keyboard is given back to it');
+  noAi(h, 'host switch'); assert.ok(h.view.goalEdit); assert.equal(h.control.releases, 0);
+});
+
+integrationTest('goal edit (S5, as far as the fake DOM goes): a card pressed while editing still gets its click first, the text is saved afterwards, and the press is neither stopped nor prevented', async () => {
+  const h = await withGoal(); const d = withDoc(h);
+  const order = [];
+  const card = h.cards.get(h.ids.a); card.addEventListener('click', () => order.push('card click'));
+  h.control.reply = async request => { order.push('grade'); return gradeAll(request); };
+  open(h); h.input().value = 'Saved by a card press'; h.input().fire('input');
+  let prevented = 0, stopped = 0;
+  d.press(card, { preventDefault() { prevented++; }, stopPropagation() { stopped++; } });
+  order.push('press'); assert.ok(h.input(), 'nothing happens at the press itself'); noAi(h, 'at the press');
+  d.release(); order.push('release'); assert.ok(h.input(), 'nor at the release: the click is still to come'); noAi(h, 'at the release');
+  card.fire('click'); order.push('after click');
+  await h.settled();
+  assert.deepEqual(order, ['press', 'release', 'card click', 'after click', 'grade'], 'the card got its click before the grade started');
+  assert.equal(prevented + stopped, 0, 'the press was not touched'); assert.equal(await h.repo.readRelevanceGoal(MAP), 'Saved by a card press'); assert.equal(h.control.calls.length, 1);
+  // A press that is cancelled (pointercancel) ends the same way.
+  const g = await withGoal(); const e = withDoc(g);
+  open(g); g.input().value = 'Saved after a cancel'; g.input().fire('input'); e.press(element('div')); e.cancel(); await g.settled();
+  assert.equal(await g.repo.readRelevanceGoal(MAP), 'Saved after a cancel');
+  // Another press starts over: only the last press ends the edit, once.
+  const k = await withGoal(); const f = withDoc(k);
+  open(k); k.input().value = 'Two presses'; k.input().fire('input'); f.press(element('div')); f.press(element('div')); f.release(); f.release(); await k.settled(); await later();
+  assert.equal(k.control.calls.length, 1);
+});
+
+integrationTest('goal edit: a save from a press elsewhere or Tab leaves the keyboard where the user went; Enter sends it to the Stop button; pasted line breaks become spaces; the saved context goes with the goal', async () => {
+  const seen = [];
+  for (const how of ['enter', 'outside', 'tab']) {
+    const h = await withGoal(); const d = withDoc(h);
+    const real = h.view.refreshRelevance.bind(h.view); h.view.refreshRelevance = focusBar => { seen.push([how, focusBar, h.view.holdFocusOnGrade]); return real(focusBar); };
+    openWithContext(h, 'First line\nsecond line');
+    h.input().fire('input'); assert.equal(h.input().value, 'First line second line', 'pasted breaks became spaces');
+    contextInput(h).value = 'Night shifts';
+    if (how === 'enter') h.input().fire('keydown', { key: 'Enter' }); else if (how === 'tab') contextInput(h).fire('keydown', { key: 'Tab' }); else { d.press(element('div')); d.release(); }
+    await until(() => h.control.calls.length); await h.settled();
+    assert.equal(await h.repo.readRelevanceGoal(MAP), 'First line second line'); assert.equal((await h.repo.readRelevanceSetup(MAP)).context, 'Night shifts');
+    assert.equal(h.view.holdFocusOnGrade, false, 'the hold ends with the save');
+  }
+  assert.deepEqual(seen.filter(s => s[1] === true).map(s => s.slice(0, 1).concat([s[2]])), [['enter', false], ['outside', true], ['tab', true]], 'the first refresh of each save asked for the Stop button; only Enter lets it have the keyboard');
 });

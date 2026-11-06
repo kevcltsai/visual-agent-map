@@ -484,6 +484,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-goal-icon:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); }
 .vam-goal-icon.on { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent); color: var(--text-accent); }
 .vam-goal-icon:disabled { opacity: .4; cursor: default; }
+/* While editing the icons' slot holds "+ Context" and keeps the width the three icons take, so the text wraps the same in all three states. */
+.vam-goal-bar.is-editing .vam-goal-actions { box-sizing: border-box; width: 84px; justify-content: flex-end; }
 /* A narrow row (the same 600px as the toolbar): the title goes, the icons float under the goal so the row never grows when the pointer passes, and the panels under the goal are measured from the row, almost its full width. */
 @container vam-goal-host (max-width: 600px) {
   .view-header.vam-goal-host > .view-header-title-container { display: none; }
@@ -497,14 +499,27 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
   /* An open panel keeps the icons shown (the pointer may have left), so the panel under them never leaves a gap above it. */
   .vam-goal-bar.has-attachment .vam-goal-actions { opacity: 1; pointer-events: auto; }
   .vam-goal-bar .vam-goal-attachment { left: 8px; right: 8px; }
+  /* Editing: the slot floats like the icons and is as wide as what is in it; with nothing in it (no text yet, or the context row is open) it is not there at all. */
+  .vam-goal-bar.is-editing .vam-goal-actions { width: auto; }
+  .vam-goal-actions.is-vacant { display: none; }
 }
 /* Every panel under the goal starts here: 6px under whatever box it is positioned in, plus the part of the floating icons that hangs below that box (--vam-goal-attach-clear, measured by the view; 0 when the icons are in the bar). */
 .vam-goal-attachment { top: calc(100% + 6px + var(--vam-goal-attach-clear, 0px)); }
-/* The edit popover opens under the bar, on the same surface. */
-.vam-relevance-panel { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); max-height: var(--vam-goal-attach-max, none); overflow-y: auto; animation: vam-relevance-panel-in 150ms ease-out; }
-@keyframes vam-relevance-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes vam-goal-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Editing the goal in place: the same box as the shown goal (a 2px border and 1px less padding make up the 1px border), the text a field with no frame of its own. */
+.vam-goal-bar.is-editing { padding: 3px 7px; border-width: 2px; border-color: var(--interactive-accent); background: var(--background-secondary); }
+.vam-goal-bar .vam-goal-input, .vam-goal-bar .vam-goal-input:focus, .vam-goal-bar .vam-goal-input:focus-visible { flex: 1 1 auto; min-width: 0; box-sizing: border-box; height: var(--vam-goal-edit-height, auto); margin: 0; padding: 1px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; resize: none; overflow: hidden; color: var(--text-normal); font: inherit; line-height: inherit; overflow-wrap: anywhere; }
+.vam-goal-bar .vam-goal-input::placeholder { color: var(--text-muted); font-weight: 500; opacity: 1; }
+.vam-goal-add-context { height: 24px; padding: 0 7px; border-radius: 6px; background: transparent; box-shadow: none; color: var(--text-muted); font-size: 11.5px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.vam-goal-add-context:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.vam-goal-add-context:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-goal-actions.is-vacant .vam-goal-add-context { display: none; }
+/* The context row: one line under the goal, over the canvas like the list, so the row does not grow. */
+.vam-goal-context { position: absolute; left: 0; right: 0; box-sizing: border-box; padding: 6px 10px; border: 2px solid var(--interactive-accent); border-radius: 8px; background: var(--background-secondary); font-size: var(--font-ui-small); font-weight: 400; animation: vam-goal-panel-in 150ms ease-out; }
+.vam-goal-bar .vam-goal-context-input, .vam-goal-bar .vam-goal-context-input:focus, .vam-goal-bar .vam-goal-context-input:focus-visible { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; color: var(--text-normal); font: inherit; }
+.vam-goal-bar .vam-goal-context-input::placeholder { color: var(--text-muted); opacity: 1; }
 /* Suggested new topics: a card under the bar, same width, with one checkable row per suggestion. */
-.vam-goal-suggest { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; gap: 7px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); max-height: var(--vam-goal-attach-max, none); font-size: var(--font-ui-small); animation: vam-relevance-panel-in 150ms ease-out; }
+.vam-goal-suggest { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; gap: 7px; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); box-shadow: 0 6px 18px rgb(0 0 0 / .16); max-height: var(--vam-goal-attach-max, none); font-size: var(--font-ui-small); animation: vam-goal-panel-in 150ms ease-out; }
 .vam-goal-suggest.is-running { flex-direction: row; align-items: center; justify-content: space-between; color: var(--text-muted); }
 .vam-goal-suggest-rows { display: flex; flex-direction: column; gap: 7px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .vam-goal-suggest-foot { flex: none; }
@@ -515,10 +530,6 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-goal-suggest-why { color: var(--text-muted); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-goal-suggest-foot { display: flex; justify-content: flex-end; gap: 6px; padding-top: 7px; border-top: 1px solid var(--background-modifier-border); }
 .vam-goal-suggest button:focus-visible, .vam-goal-suggest input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-.vam-relevance-setup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.vam-relevance-goal-input, .vam-relevance-context-input { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; font-size: var(--font-ui-small); }
-.vam-relevance-goal-input::placeholder, .vam-relevance-context-input::placeholder { color: var(--text-muted); opacity: 1; }
-.vam-relevance-goal-input:focus-visible, .vam-relevance-context-input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-relevance-changes { margin: 0; padding: 0; list-style: none; }
 .vam-relevance-change { padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .vam-relevance-change:last-child { border-bottom: 0; }
@@ -530,11 +541,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-relevance-anchor-title, .vam-relevance-other-title, .vam-relevance-conflicts-title { margin: 12px 0 0; font-size: var(--font-ui-small); font-weight: 600; color: var(--text-muted); }
 .vam-relevance-conflicts { margin: 4px 0 0; padding: 0; list-style: none; }
 .vam-relevance-conflict { padding: 6px 0; font-size: var(--font-ui-small); color: var(--text-muted); overflow-wrap: anywhere; }
-.vam-relevance-pins-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; font-size: var(--font-ui-small); color: var(--text-muted); }
-.vam-relevance-unpin-all { font-size: var(--font-ui-small); }
-.vam-relevance-unpin-all:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) {
-  .vam-relevance-panel, .vam-goal-suggest { animation: none; }
+  .vam-goal-suggest, .vam-goal-context { animation: none; }
   /* Same selector weight as the scan animation rule above, otherwise that rule keeps winning. */
   .vam-status-running::before, .vam-node:not([data-aim-kind])[data-status="running"]::after { animation: none; }
   .vam-node:not([data-aim-kind])[data-status="running"]::after { background: var(--interactive-accent); }
@@ -926,7 +934,7 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-sources-button-label { overflow: hidden; text-overflow: ellipsis; }
 .vam-map-sources-warning { display: inline-flex; flex: 0 0 auto; color: var(--text-error); }
 .vam-map-sources-warning .svg-icon { width: 14px; height: 14px; }
-.vam-map-sources-panel { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-width: min(440px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); max-height: var(--vam-sources-max, none); overflow-y: auto; animation: vam-relevance-panel-in 150ms ease-out; }
+.vam-map-sources-panel { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-width: min(440px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); max-height: var(--vam-sources-max, none); overflow-y: auto; animation: vam-goal-panel-in 150ms ease-out; }
 .vam-map-sources-title { margin: 0; font-size: var(--font-ui-medium); }
 .vam-map-sources-panel p { margin: 0; }
 .vam-map-sources-drop { display: grid; gap: 4px; justify-items: center; box-sizing: border-box; padding: 18px 12px; border: 2px dashed var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); text-align: center; }

@@ -936,6 +936,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.relevance_goal_placeholder": "你想用這張圖達成什麼？",
   "ui.relevance_context_label": "補充說明",
   "ui.relevance_context_placeholder": "補充（選填）：已經會什麼、條件或限制",
+  "ui.goal_add_context": "＋ 補充",
   "ui.relevance_grade_button": "依此分級",
   "ui.relevance_running": "依目標分級中…",
   "ui.relevance_awaiting_usage": "等待確認 AI 用量…",

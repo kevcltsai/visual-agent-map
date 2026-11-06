@@ -1116,6 +1116,23 @@ interface GoalSuggestTask {
   focus: "stop" | "list" | null;
 }
 
+/**
+ * The goal being edited in place. The state is the edit; the DOM is drawn from it, so a repaint rebuilds the fields from here
+ * (draft and caret kept). `warmed`: the Claude CLI was pre-started for the grade this edit would run.
+ */
+interface GoalEditState {
+  path: string;
+  goal: string;
+  context: string;
+  showContext: boolean;
+  caret: number | null;
+  contextCaret: number | null;
+  field: "goal" | "context";
+  /** The keyboard was in the editor when it was last drawn: give it back to the new field. */
+  refocus: boolean;
+  warmed: boolean;
+}
+
 /** One follow-up typed while a map-chat turn works, and where it is: not yet handed over, being handed over, taken in, or waiting. */
 interface ChatSteerEntry {
   text: string;
@@ -1169,19 +1186,25 @@ export class VisualAgentMapView extends ItemView {
   /** True once this view has started a relevance grading run (so closing it has a run to abort). */
   private startedRelevance = false;
   private readonly relevancePanelId = `vam-relevance-panel-${++relevancePanelSeq}`;
-  private relevancePanelOpen = false;
-  private relevanceDraft: { goal: string; context: string } | null = null;
+  /** The goal being edited in place (null when the goal is just shown). Changes only through startGoalEdit / closeGoalEdit. */
+  private goalEdit: GoalEditState | null = null;
+  private goalEditInput: HTMLTextAreaElement | null = null;
+  private goalEditContextInput: HTMLInputElement | null = null;
+  private goalEditChip: HTMLButtonElement | null = null;
+  private goalEditActions: HTMLElement | null = null;
+  /** Removes the document listeners of the open edit (a press outside it saves). */
+  private goalEditCleanup: (() => void) | null = null;
+  /** True while a goal save started by a press elsewhere or Tab runs: the grading must not take the keyboard from where the user went. */
+  private holdFocusOnGrade = false;
   private relevanceBarEl: HTMLElement | null = null;
+  /** The element the bar was last drawn into (the header row or the toolbar); redrawing in place needs it. */
+  private goalBarHost: HTMLElement | null = null;
   /** The row the goal bar sits in (Obsidian's header row, or the toolbar when that row is hidden); it carries `vam-goal-host`. */
   private goalHostEl: HTMLElement | null = null;
   /** The "suggest new topics for the goal" task: one at a time; it owns the AI call, the list and the Add press. */
   private goalSuggestTask: GoalSuggestTask | null = null;
   private goalSuggestCleanup: (() => void) | null = null;
   private goalSuggestPanelEl: HTMLElement | null = null;
-  private relevanceButtonEl: HTMLElement | null = null;
-  private relevancePanelEl: HTMLElement | null = null;
-  private relevancePanelGen = 0;
-  private relevancePanelCleanup: (() => void) | null = null;
   /** This map's saved data sources (`map-sources`), loaded with the map; the toolbar button and its panel draw from it. */
   private mapSources: MapSource[] = [];
   private readonly mapSourcesPanelId = `vam-map-sources-panel-${++relevancePanelSeq}`;
@@ -2553,14 +2576,12 @@ export class VisualAgentMapView extends ItemView {
     if (this.chat?.hasUnsavedTurns) new Notice(t("ui.map_chat_unsaved_on_close"));
     this.abortMapChat();
     this.chat?.dispose();
-    this.relevancePanelCleanup?.();
-    this.relevancePanelCleanup = null;
     this.goalSuggestCleanup?.();
     this.goalSuggestCleanup = null;
     this.mapSourcesPanelCleanup?.();
     this.mapSourcesPanelCleanup = null;
-    // An open panel pre-started the CLI for a grade that will never be sent.
-    if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
+    // An open goal edit pre-started the CLI for a grade that will never be sent: it is dropped, nothing is saved.
+    this.dropGoalEdit();
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -2946,7 +2967,7 @@ export class VisualAgentMapView extends ItemView {
     if (path !== this.path) {
       this.stopAimProgress();
       this.mapSourcesOpen = false;
-      if (this.relevancePanelOpen) this.plugin.releaseWarmClaude?.();
+      this.dropGoalEdit();
       this.abortRelevanceGrade();
     }
     let map = await this.plugin.repo.readMap(path);
@@ -3564,19 +3585,23 @@ export class VisualAgentMapView extends ItemView {
   }
   /**
    * The goal bar: the goal as a title in the middle of the row above the map (Obsidian's header row, or the toolbar when
-   * that row is hidden). It wraps and is never cut off; the four icons (suggest topics, recalibrate, sort, edit) show on
-   * hover or keyboard focus. Editing opens a popover under the bar with the goal and the extra context.
-   * `before` is the sibling the bar goes in front of (the row's action group); without it the bar is appended.
+   * that row is hidden). It wraps and is never cut off; the three icons (suggest topics, recalibrate, sort) show on hover or
+   * keyboard focus. A click on the goal turns it into a field in the same place (see startGoalEdit); no icons are drawn while
+   * it is edited. `before` is the sibling the bar goes in front of (the row's action group); without it the bar is appended.
    */
   private renderGoalBar(host: HTMLElement, before?: HTMLElement | null): void {
-    // A repaint drops the old DOM: stop its listeners and make sure its late focus events cannot close the new panel.
-    this.relevancePanelGen++;
-    this.relevancePanelCleanup?.();
-    this.relevancePanelCleanup = null;
-    this.relevancePanelEl = null;
+    // A repaint drops the old DOM: the draft in its fields is kept in the edit state first, and the fields are drawn again from it.
+    this.captureGoalEdit();
     this.goalSuggestCleanup?.();
     this.goalSuggestCleanup = null;
     this.goalSuggestPanelEl = null;
+    // The map changed under the edit, or a grading started (the chat can start one): there is nothing left to save.
+    if (
+      this.goalEdit &&
+      (this.goalEdit.path !== this.path || this.plugin.relevanceGrades.get(this.path)?.status === "running")
+    )
+      this.dropGoalEdit();
+    this.goalBarHost = host;
     const bar = host.createDiv({
       cls: "vam-goal-bar",
       attr: { role: "group", "aria-labelledby": `${this.relevancePanelId}-name` }
@@ -3601,14 +3626,6 @@ export class VisualAgentMapView extends ItemView {
     this.relevanceBarEl = bar;
     this.drawGoalBar(bar);
     this.drawGoalSuggest(bar);
-    if (!this.relevancePanelOpen) return;
-    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
-      this.relevancePanelOpen = false;
-      this.relevanceDraft = null;
-      this.relevanceButtonEl?.setAttr("aria-expanded", "false");
-      return;
-    }
-    this.drawRelevancePanel(false);
   }
   /** Display-only toggle: within each sibling group show core, support, side, then ungraded. */
   private relevanceSortOn(): boolean {
@@ -3622,42 +3639,36 @@ export class VisualAgentMapView extends ItemView {
     const target = bar.createSpan("vam-goal-target");
     target.setAttr("aria-hidden", "true");
     appendGoalSvg(target, "target");
-    // The text is the bar's one tab stop (always visible, so focus can always return to it). Enter or a click opens the
-    // editor (as the pencil does); pressing it again closes it.
-    const text = bar.createDiv({ cls: "vam-goal-text", attr: { role: "button", tabindex: "0" } });
+    if (this.goalEdit) {
+      bar.addClass("is-editing");
+      this.drawGoalEdit(bar, this.goalEdit);
+      return;
+    }
+    // The text is the bar's one tab stop (always visible, so focus can always return to it). A click, Enter or Space turns
+    // it into a field in the same place. Its name is a hidden label, not aria-label (that would show as a tooltip).
+    const textName = `${this.relevancePanelId}-text`;
+    const text = bar.createDiv({
+      cls: "vam-goal-text",
+      attr: { role: "button", tabindex: "0", "aria-labelledby": textName }
+    });
     text.setText(goal ?? t("ui.relevance_goal_placeholder"));
     const label = goal ? t("ui.relevance_goal_0", goal) : t("ui.relevance_goal_placeholder");
-    text.setAttr("aria-label", sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label);
-    text.setAttr("aria-haspopup", "dialog");
-    text.setAttr("aria-expanded", String(this.relevancePanelOpen));
-    text.setAttr("aria-controls", this.relevancePanelId);
+    bar.createSpan({
+      cls: "vam-sr-only",
+      text: sorted ? `${label}${t("ui.relevance_sorted_suffix")}` : label,
+      attr: { id: textName }
+    });
     text.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
-    const toggleEditor = (): void => {
-      if (this.relevancePanelOpen && this.relevancePanelEl) this.closeRelevancePanel(true);
-      else this.editRelevanceGoal();
-    };
-    text.addEventListener("click", toggleEditor);
+    text.addEventListener("click", event =>
+      this.startGoalEdit({ caret: this.caretOffsetAt(text, event.clientX, event.clientY) })
+    );
     text.addEventListener("keydown", event => {
-      if (event.key === "Escape" && this.relevancePanelOpen) {
+      if ((event.key === "Enter" || event.key === " ") && !event.isComposing) {
         event.preventDefault();
         event.stopPropagation();
-        this.closeRelevancePanel(true);
-      } else if ((event.key === "Enter" || event.key === " ") && !event.isComposing) {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleEditor();
+        this.startGoalEdit({});
       }
     });
-    // Pressing the text must not move focus out of an open panel (that would count as leaving it).
-    text.addEventListener("mousedown", event => event.preventDefault());
-    // Focus leaving the text (Shift+Tab off it, or a click elsewhere) to outside the panel closes the panel too.
-    text.addEventListener("focusout", (event: FocusEvent) => {
-      if (!this.relevancePanelOpen || this.relevanceButtonEl !== text) return;
-      const next = event.relatedTarget as Node | null;
-      if (next && (next === text || this.relevancePanelEl?.contains(next))) return;
-      this.closeRelevancePanel(false);
-    });
-    this.relevanceButtonEl = text;
     const actions = bar.createDiv({ cls: "vam-goal-actions" });
     const icon = (kind: GoalIcon, name: string, run: () => void, disabled: boolean): HTMLButtonElement => {
       const button = actions.createEl("button", { cls: "vam-goal-icon" });
@@ -3672,7 +3683,7 @@ export class VisualAgentMapView extends ItemView {
       });
       return button;
     };
-    // Busy (confirming, asking, writing): all four icons are off. A shown list leaves them on; the spark then closes it.
+    // Busy (confirming, asking, writing): all three icons are off. A shown list leaves them on; the spark then closes it.
     const suggestTask = this.goalSuggestTask;
     const busy = !!suggestTask && suggestTask.state !== "ready";
     const spark = icon(
@@ -3711,7 +3722,306 @@ export class VisualAgentMapView extends ItemView {
     );
     sort.setAttr("aria-pressed", String(sorted));
     sort.toggleClass("on", sorted);
-    icon("edit", t("ui.goal_edit"), () => toggleEditor(), running || busy);
+  }
+  // ---- Goal: edit in place ---------------------------------------------------------------------------------------
+  /**
+   * The goal editor, drawn into the bar in place of the goal text. What saves is decided here and only here: Enter (not while
+   * an IME composes), a press outside the bar (saved once the press ends, so the thing pressed still gets its click), and Tab
+   * leaving the last field (or Shift+Tab the first). Esc cancels. Nothing else saves: not a window or focus change, not a repaint,
+   * not opening a menu or dialog. Unchanged or empty never reaches the AI.
+   */
+  private drawGoalEdit(bar: HTMLElement, edit: GoalEditState): void {
+    const area = bar.createEl("textarea", { cls: "vam-goal-input" });
+    area.setAttr("rows", "1");
+    area.setAttr("dir", "auto");
+    area.setAttr("aria-labelledby", `${this.relevancePanelId}-name`);
+    area.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
+    area.maxLength = RELEVANCE_GOAL_MAX_LENGTH;
+    area.value = edit.goal;
+    this.goalEditInput = area;
+    // The one slot icons use: "+ Context" while the goal has text and the context row is closed.
+    const actions = bar.createDiv({ cls: "vam-goal-actions" });
+    this.goalEditActions = actions;
+    this.goalEditChip = null;
+    this.goalEditContextInput = null;
+    if (!edit.showContext) {
+      const chip = actions.createEl("button", { cls: "vam-goal-add-context", text: t("ui.goal_add_context") });
+      chip.setAttr("aria-expanded", "false");
+      // Pressing it must not take the keyboard out of the goal field.
+      chip.addEventListener("mousedown", event => event.preventDefault());
+      chip.addEventListener("click", event => {
+        event.stopPropagation();
+        this.showGoalContext();
+      });
+      chip.addEventListener("keydown", event => this.goalEditKeys(event, false));
+      this.goalEditChip = chip;
+    }
+    this.syncGoalChip();
+    if (edit.showContext) {
+      const box = bar.createDiv({ cls: "vam-goal-context vam-goal-attachment" });
+      const labelId = `${this.relevancePanelId}-context`;
+      box.createSpan({ cls: "vam-sr-only", text: t("ui.relevance_context_label"), attr: { id: labelId } });
+      const context = box.createEl("input", { cls: "vam-goal-context-input", type: "text" });
+      context.setAttr("aria-labelledby", labelId);
+      context.setAttr("placeholder", t("ui.relevance_context_placeholder"));
+      context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
+      context.value = edit.context;
+      context.addEventListener("input", () => {
+        edit.context = context.value;
+        this.warmGoalEdit(edit);
+      });
+      context.addEventListener("keydown", event => this.goalEditKeys(event, true));
+      this.goalEditContextInput = context;
+    }
+    area.addEventListener("input", () => {
+      // Pasted line breaks become spaces (a goal is one line); the caret stays where it was.
+      if (/[\r\n]/.test(area.value)) {
+        const at = area.selectionStart ?? area.value.length;
+        const kept = area.value.slice(0, at).replace(/[\r\n]+/g, " ").length;
+        area.value = area.value.replace(/[\r\n]+/g, " ");
+        area.setSelectionRange?.(kept, kept);
+      }
+      edit.goal = area.value;
+      this.growGoalInput(area);
+      this.syncGoalChip();
+      this.warmGoalEdit(edit);
+    });
+    area.addEventListener("keydown", event => this.goalEditKeys(event, true));
+    // A press on the bar that is not a field must not take the keyboard out of the field either.
+    bar.addEventListener("mousedown", event => {
+      if (event.target !== this.goalEditInput && event.target !== this.goalEditContextInput) event.preventDefault();
+    });
+    this.growGoalInput(area);
+  }
+  /** The field grows with its text: a goal wraps like the shown one and the row grows with it. */
+  private growGoalInput(area: HTMLTextAreaElement): void {
+    area.setCssProps?.({ "--vam-goal-edit-height": "auto" });
+    area.setCssProps?.({ "--vam-goal-edit-height": `${area.scrollHeight}px` });
+  }
+  /** "+ Context" is there once the goal has text and the context row is closed; otherwise its slot stays, empty. */
+  private syncGoalChip(): void {
+    const show = !!this.goalEditChip && !!normalizeRelevanceGoal(this.goalEditInput?.value ?? "");
+    this.goalEditActions?.toggleClass("is-vacant", !show);
+  }
+  /** The setup the editor would save: normalised the way the repository stores it, and whether it differs from what is saved. */
+  private goalEditSetup(edit: GoalEditState): { goal: string; context: string | undefined; changed: boolean } {
+    const goal = normalizeRelevanceGoal(this.goalEditInput?.value ?? edit.goal);
+    const context = normalizeRelevanceContext(this.goalEditContextInput?.value ?? edit.context);
+    const changed =
+      !!goal &&
+      (goal !== normalizeRelevanceGoal(this.relevanceGoal ?? "") ||
+        context !== normalizeRelevanceContext(this.relevanceContext ?? ""));
+    return { goal, context, changed };
+  }
+  /** Pre-starts the CLI once the text really differs from the saved setup (a click on the goal alone starts nothing). */
+  private warmGoalEdit(edit: GoalEditState): void {
+    if (edit.warmed || !this.relevanceGradeable() || !this.goalEditSetup(edit).changed) return;
+    edit.warmed = true;
+    this.prewarmRelevance("full");
+  }
+  /** Reads the fields back into the edit state, ahead of a repaint that drops them; remembers whether the keyboard was in them. */
+  private captureGoalEdit(): void {
+    const edit = this.goalEdit;
+    const goal = this.goalEditInput;
+    const context = this.goalEditContextInput;
+    this.goalEditInput = null;
+    this.goalEditContextInput = null;
+    this.goalEditChip = null;
+    this.goalEditActions = null;
+    if (!edit) return;
+    const active = this.goalLayerRoot()?.ownerDocument?.activeElement ?? null;
+    if (goal) {
+      edit.goal = goal.value;
+      edit.caret = goal.selectionStart ?? edit.caret;
+      if (active && active === goal) {
+        edit.field = "goal";
+        edit.refocus = true;
+      }
+    }
+    if (context) {
+      edit.context = context.value;
+      edit.contextCaret = context.selectionStart ?? edit.contextCaret;
+      if (active && active === context) {
+        edit.field = "context";
+        edit.refocus = true;
+      }
+    }
+  }
+  /** After a repaint or a redraw: the field the keyboard was in takes it back, caret where it was (the end when it is not known). */
+  private focusGoalEdit(): void {
+    const edit = this.goalEdit;
+    if (!edit?.refocus || this.closed || !this.mapWindowIsActive()) return;
+    const goal = this.goalEditInput;
+    const context = this.goalEditContextInput;
+    const field = edit.field === "context" && context ? context : goal;
+    if (!field) return;
+    edit.refocus = false;
+    field.focus({ preventScroll: true });
+    const caret = field === context ? edit.contextCaret : edit.caret;
+    const at = Math.min(caret ?? field.value.length, field.value.length);
+    field.setSelectionRange?.(at, at);
+  }
+  /** Draws the bar again in the same row from the current state (an edit opened, closed, or got its context row). */
+  private redrawGoalBar(): void {
+    const old = this.relevanceBarEl;
+    const host = this.goalBarHost;
+    if (this.closed || !old || !host) return;
+    this.captureGoalEdit();
+    const target = this.goalHostTarget();
+    const before = target && target.host === host ? target.before : null;
+    old.remove();
+    this.renderGoalBar(host, before);
+    this.placeMapTools();
+    this.focusGoalEdit();
+  }
+  /** The goal text becomes a field, caret where it was clicked (the end for the keyboard). */
+  private startGoalEdit(at: { caret?: number | null }): void {
+    if (this.closed || this.goalEdit || !this.relevanceGradeable() || !this.relevanceBarEl || !this.goalBarHost) return;
+    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
+      new Notice(t("ui.relevance_goal_unavailable_grading"));
+      return;
+    }
+    // The suggestions and the editor share the spot under the bar: opening the editor closes them.
+    if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
+    const context = this.relevanceContext ?? "";
+    this.goalEdit = {
+      path: this.path,
+      goal: this.relevanceGoal ?? "",
+      context,
+      showContext: !!context,
+      caret: at.caret ?? null,
+      contextCaret: null,
+      field: "goal",
+      refocus: true,
+      warmed: false
+    };
+    this.bindGoalEditOutside();
+    this.redrawGoalBar();
+  }
+  /** The "+ Context" slot: a second row appears under the goal and takes the keyboard. */
+  private showGoalContext(): void {
+    const edit = this.goalEdit;
+    if (!edit || edit.showContext) return;
+    this.captureGoalEdit();
+    edit.showContext = true;
+    edit.field = "context";
+    edit.refocus = true;
+    this.redrawGoalBar();
+  }
+  /**
+   * Closes the edit without saving what is typed (Esc, a map switch, closing the view, a grading that started elsewhere) or after
+   * its draft was handed over (`keepWarm`: the grade takes the pre-started CLI). A CLI started for a grade that will never be sent is stopped.
+   */
+  private closeGoalEdit(options: { keepWarm?: boolean; refocus?: boolean; redraw?: boolean } = {}): void {
+    const edit = this.goalEdit;
+    if (!edit) return;
+    this.goalEdit = null;
+    this.goalEditCleanup?.();
+    this.goalEditCleanup = null;
+    this.goalEditInput = null;
+    this.goalEditContextInput = null;
+    this.goalEditChip = null;
+    this.goalEditActions = null;
+    if (edit.warmed && !options.keepWarm) this.plugin.releaseWarmClaude?.();
+    if (options.redraw !== false) this.redrawGoalBar();
+    if (options.refocus) this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-text")?.focus();
+  }
+  /** Drops the edit where a repaint follows anyway (or nothing is shown any more). */
+  private dropGoalEdit(): void {
+    this.closeGoalEdit({ redraw: false });
+  }
+  /**
+   * Saves or cancels, by what the editor holds against what is saved. Empty: cancelled, the goal stays. Unchanged: cancelled,
+   * no file written and no AI. Changed: the edit hands its draft over and closes first (so a second Enter finds nothing to
+   * save), then the usual grade runs. Checked again when it runs: the view still open, still on the map the edit was opened on.
+   */
+  private commitGoalEdit(how: "enter" | "outside" | "tab"): void {
+    const edit = this.goalEdit;
+    if (!edit || this.closed || edit.path !== this.path) return;
+    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
+      this.closeGoalEdit();
+      return;
+    }
+    const setup = this.goalEditSetup(edit);
+    if (!setup.changed) {
+      this.closeGoalEdit({ refocus: how === "enter" });
+      return;
+    }
+    this.closeGoalEdit({ keepWarm: true, redraw: false });
+    // A save started by a press elsewhere or Tab leaves the keyboard where the user went; Enter sends it to the Stop button.
+    this.holdFocusOnGrade = how !== "enter";
+    try {
+      // A changed setup is always graded in full; "recalibrate" is the icon's job.
+      void this.submitRelevanceGoal(setup.goal, setup.context ?? "", "full");
+    } finally {
+      this.holdFocusOnGrade = false;
+    }
+    // Nothing started (the grade refused): the bar must not keep showing the closed editor.
+    if (!this.goalEdit && this.relevanceBarEl?.hasClass?.("is-editing")) this.redrawGoalBar();
+  }
+  private goalEditKeys(event: KeyboardEvent, enterSaves: boolean): void {
+    event.stopPropagation();
+    if (event.key === "Enter" && enterSaves) {
+      // Enter that confirms an IME composition (Chinese input) is not the field's Enter.
+      if (event.isComposing) return;
+      event.preventDefault();
+      this.commitGoalEdit("enter");
+    } else if (event.key === "Escape") {
+      if (event.isComposing) return;
+      event.preventDefault();
+      this.closeGoalEdit({ refocus: true });
+    } else if (event.key === "Tab") {
+      const chip = this.goalEditActions?.hasClass("is-vacant") ? null : this.goalEditChip;
+      const stops: HTMLElement[] = [this.goalEditInput, chip, this.goalEditContextInput].flatMap(el =>
+        el ? [el] : []
+      );
+      const at = stops.indexOf(event.target as HTMLElement);
+      const leaving = !stops.length || (event.shiftKey ? at === 0 : at === stops.length - 1);
+      if (!leaving) return;
+      // The browser moves the keyboard first; the save follows.
+      const edit = this.goalEdit;
+      window.setTimeout(() => {
+        if (this.goalEdit === edit) this.commitGoalEdit("tab");
+      }, 0);
+    }
+  }
+  /**
+   * A press outside the bar saves, but only once the press is over (pointerup, or pointercancel) and the click it makes has been
+   * delivered: saving at pointerdown would repaint the map under the pointer and the card pressed would never get its click.
+   * Presses on Obsidian's menus, dialogs and command palette are not "elsewhere". Another press starts over; if the window is
+   * left before the press ends, nothing saves. The edit may be gone by then (closed, map switched): the check is made again.
+   */
+  private bindGoalEditOutside(): void {
+    this.goalEditCleanup?.();
+    this.goalEditCleanup = null;
+    const edit = this.goalEdit;
+    const doc = this.goalLayerRoot()?.ownerDocument;
+    if (!edit || !doc?.addEventListener) return;
+    let disarm: (() => void) | null = null;
+    const pressStarted = (event: Event): void => {
+      const target = event.target as Element | null;
+      if (!target || this.relevanceBarEl?.contains?.(target)) return;
+      if (target.closest?.(".menu, .modal-container, .prompt")) return;
+      disarm?.();
+      const pressEnded = (): void => {
+        disarm?.();
+        window.setTimeout(() => {
+          if (this.goalEdit === edit) this.commitGoalEdit("outside");
+        }, 0);
+      };
+      doc.addEventListener("pointerup", pressEnded, true);
+      doc.addEventListener("pointercancel", pressEnded, true);
+      disarm = () => {
+        doc.removeEventListener("pointerup", pressEnded, true);
+        doc.removeEventListener("pointercancel", pressEnded, true);
+        disarm = null;
+      };
+    };
+    doc.addEventListener("pointerdown", pressStarted, true);
+    this.goalEditCleanup = () => {
+      disarm?.();
+      doc.removeEventListener("pointerdown", pressStarted, true);
+    };
   }
   // ---- Suggest new topics for the goal --------------------------------------------------------------------------
   /** A result, a stop or a failure only counts while this is true: the task is still the view's own, on the same map. */
@@ -3757,7 +4067,8 @@ export class VisualAgentMapView extends ItemView {
     if (!goal || !this.map || !this.map.nodes.length || !this.relevanceGradeable() || this.presentation) return;
     if (this.outlineImportTarget().map !== "editable") return;
     if (this.goalSuggestTask || this.plugin.relevanceGrades.get(this.path)?.status === "running") return;
-    if (this.relevancePanelOpen) this.closeRelevancePanel(false);
+    // A goal edit is dropped: the list takes its place (its draft was never saved).
+    this.dropGoalEdit();
     const task: GoalSuggestTask = {
       mapPath: this.path,
       token: ++goalSuggestSeq,
@@ -4020,7 +4331,7 @@ export class VisualAgentMapView extends ItemView {
     return !!this.map?.nodes.some(node => goalTopicTitleKey(this.notes.get(node.id)?.title ?? "") === key);
   }
   /**
-   * Starts the Claude CLI for the grade the open panel would run (no model call; a Codex model starts nothing). The
+   * Starts the Claude CLI for the grade an edited goal would run (no model call; a Codex model starts nothing). The
    * very same command the run uses, so sending only has to write the prompt.
    */
   private prewarmRelevance(mode: RelevanceMode): void {
@@ -4030,166 +4341,6 @@ export class VisualAgentMapView extends ItemView {
       reasoning,
       mode === "recalibrate" ? RELEVANCE_RECALIBRATE_SCHEMA : RELEVANCE_GRADE_SCHEMA
     );
-  }
-  /** `keepWarm`: the panel closes to send, so the pre-started process stays for that run; otherwise it is killed. */
-  private closeRelevancePanel(refocus: boolean, keepWarm = false): void {
-    if (!keepWarm) this.plugin.releaseWarmClaude?.();
-    this.relevancePanelGen++;
-    this.relevancePanelCleanup?.();
-    this.relevancePanelCleanup = null;
-    this.relevancePanelEl?.remove();
-    this.relevancePanelEl = null;
-    this.relevancePanelOpen = false;
-    this.relevanceDraft = null;
-    this.relevanceButtonEl?.setAttr("aria-expanded", "false");
-    this.placeMapTools();
-    if (refocus) this.relevanceButtonEl?.focus();
-  }
-  /** Open the goal panel under the toolbar button (no-op while a grading run is going). */
-  private editRelevanceGoal(): void {
-    if (this.plugin.relevanceGrades.get(this.path)?.status === "running") {
-      new Notice(t("ui.relevance_goal_unavailable_grading"));
-      return;
-    }
-    if (!this.relevanceBarEl) {
-      new Notice(t("ui.relevance_goal_unavailable_toolbar"));
-      return;
-    }
-    // The suggestions and the editor share the spot under the bar: opening the editor closes them.
-    if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
-    this.relevancePanelOpen = true;
-    this.relevanceDraft = {
-      goal: this.relevanceGoal ?? "",
-      context: this.relevanceContext ?? ""
-    };
-    this.relevanceButtonEl?.setAttr("aria-expanded", "true");
-    this.drawRelevancePanel(true);
-  }
-  /**
-   * The popover under the goal bar holds exactly two fields: the goal and the extra context (plus "hand all back to AI"
-   * while the user has pinned grades). Enter in a field saves the goal and grades; Esc, a press outside, or focus
-   * leaving the panel closes it without submitting. Tab inside the panel does not.
-   */
-  private drawRelevancePanel(focus: boolean): void {
-    const tools = this.relevanceBarEl;
-    if (!tools) return;
-    this.relevancePanelEl?.remove();
-    const gen = ++this.relevancePanelGen;
-    const draft = (this.relevanceDraft ??= {
-      goal: this.relevanceGoal ?? "",
-      context: this.relevanceContext ?? ""
-    });
-    const panel = tools.createDiv({
-      cls: "vam-relevance-panel vam-goal-attachment",
-      attr: { id: this.relevancePanelId, role: "dialog", "aria-label": t("ui.relevance_panel_label") }
-    });
-    this.relevancePanelEl = panel;
-    const group = panel.createDiv({
-      cls: "vam-relevance-setup",
-      attr: { role: "group", "aria-label": t("ui.relevance_goal_label") }
-    });
-    const input = group.createEl("input", { cls: "vam-relevance-goal-input", type: "text" });
-    input.value = draft.goal;
-    input.maxLength = RELEVANCE_GOAL_MAX_LENGTH;
-    input.setAttr("aria-label", t("ui.relevance_goal_label"));
-    input.setAttr("placeholder", t("ui.relevance_goal_placeholder"));
-    const context = group.createEl("input", { cls: "vam-relevance-context-input", type: "text" });
-    context.value = draft.context;
-    context.maxLength = RELEVANCE_CONTEXT_MAX_LENGTH;
-    context.setAttr("aria-label", t("ui.relevance_context_label"));
-    context.setAttr("placeholder", t("ui.relevance_context_placeholder"));
-    // The mode Enter would run in (the same pure check the run uses): it only decides which CLI schema to pre-start.
-    const pinCount = this.relevancePinList().length;
-    const planMode = (): RelevanceMode =>
-      relevanceMode(
-        { goal: input.value, context: context.value },
-        { goal: this.relevanceGoal, context: this.relevanceContext },
-        this.relevanceAiGrades().length > 0
-      );
-    // Opening the panel pre-starts the CLI for the grade it would run; changing the mode (full or recalibrate) changes
-    // the schema, so the process is started again for the new mode.
-    let warmedMode = planMode();
-    if (focus && this.relevanceGradeable()) this.prewarmRelevance(warmedMode);
-    const showMode = (): void => {
-      const mode = planMode();
-      if (mode !== warmedMode) {
-        warmedMode = mode;
-        if (this.relevanceGradeable()) this.prewarmRelevance(mode);
-      }
-    };
-    input.addEventListener("input", () => {
-      draft.goal = input.value;
-      showMode();
-    });
-    context.addEventListener("input", () => {
-      draft.context = context.value;
-      showMode();
-    });
-    let unpinAllButton: HTMLButtonElement | undefined;
-    if (pinCount) {
-      const pinsRow = panel.createDiv("vam-relevance-pins-row");
-      pinsRow.createSpan({ text: t("ui.relevance_pins_note_0", pinCount) });
-      unpinAllButton = pinsRow.createEl("button", {
-        cls: "vam-relevance-unpin-all",
-        text: t("ui.relevance_unpin_all")
-      });
-    }
-    let finished = false;
-    const alive = (): boolean => !finished && gen === this.relevancePanelGen;
-    // Confirm, Esc and leaving the panel close it; an empty goal never reaches the AI.
-    const finish = (submit: boolean, refocus: boolean): void => {
-      if (!alive()) return;
-      finished = true;
-      const value = input.value;
-      const extra = context.value;
-      const planned = planMode();
-      this.closeRelevancePanel(refocus, submit && !!normalizeRelevanceGoal(value));
-      if (submit) void this.submitRelevanceGoal(value, extra, planned);
-    };
-    const confirm = (): void => finish(true, !normalizeRelevanceGoal(input.value));
-    const keys = (event: KeyboardEvent, enterConfirms: boolean): void => {
-      event.stopPropagation();
-      if (event.key === "Enter" && enterConfirms) {
-        // Enter that confirms an IME composition (Chinese input) is not the field's Enter.
-        if (event.isComposing) return;
-        event.preventDefault();
-        confirm();
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        finish(false, true);
-      }
-    };
-    input.addEventListener("keydown", event => keys(event, true));
-    context.addEventListener("keydown", event => keys(event, true));
-    unpinAllButton?.addEventListener("keydown", event => keys(event, false));
-    unpinAllButton?.addEventListener("click", event => {
-      event.stopPropagation();
-      finish(false, true);
-      this.unpinAllRelevance();
-    });
-    unpinAllButton?.addEventListener("mousedown", event => event.preventDefault());
-    for (const control of [input, context, ...(unpinAllButton ? [unpinAllButton] : [])])
-      control.addEventListener("focusout", (event: FocusEvent) => {
-        // Only focus moving to a real element outside the panel closes it; null (a repaint, a dialog closing) does not.
-        const next = event.relatedTarget as Node | null;
-        if (next && !panel.contains(next) && next !== this.relevanceButtonEl) finish(false, false);
-      });
-    // A press anywhere else (the canvas, another card, a bar icon) closes it too; the bar's text toggles it itself.
-    const doc = this.contentEl?.ownerDocument;
-    if (doc?.addEventListener) {
-      const outside = (event: Event): void => {
-        const target = event.target as Node | null;
-        if (target && (panel.contains(target) || this.relevanceButtonEl?.contains(target))) return;
-        finish(false, false);
-      };
-      doc.addEventListener("pointerdown", outside, true);
-      this.relevancePanelCleanup = () => doc.removeEventListener("pointerdown", outside, true);
-    }
-    this.placeMapTools();
-    if (focus) {
-      input.focus();
-      input.select();
-    }
   }
   // ---- Map data sources: toolbar button and panel ---------------------------------------------------------------
   /**
@@ -4432,7 +4583,8 @@ export class VisualAgentMapView extends ItemView {
     const bar = this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar");
     const hadFocus = !!bar && !!bar.contains?.(this.contentEl.ownerDocument?.activeElement ?? null);
     this.render();
-    if (focusBar || hadFocus) this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar button")?.focus();
+    if ((focusBar && !this.holdFocusOnGrade) || hadFocus)
+      this.contentEl?.querySelector?.<HTMLElement>(".vam-relevance-statusbar button")?.focus();
   }
   /**
    * Enter in the goal field. The goal is saved first (its own undo step), then, after the usage confirmation, the
@@ -12253,11 +12405,8 @@ export class VisualAgentMapView extends ItemView {
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const restoreSearch = this.holdMapSearch();
-    // The repaint removes the focused panel field first; its late focusout must not close the panel that is redrawn below.
-    this.relevancePanelGen++;
-    this.relevancePanelCleanup?.();
-    this.relevancePanelCleanup = null;
-    this.relevancePanelEl = null;
+    // The goal editor's fields go with the repaint: their draft, caret and keyboard are kept in the edit state, which draws them again.
+    this.captureGoalEdit();
     this.mapSourcesPanelCleanup?.();
     this.mapSourcesPanelCleanup = null;
     this.mapSourcesPanelEl = null;
@@ -12561,12 +12710,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.relevanceGradeable() && this.map.nodes.length) this.mountGoalBar();
     else {
       this.relevanceBarEl = null;
-      this.relevanceButtonEl = null;
-      if (this.relevancePanelOpen) {
-        this.relevancePanelOpen = false;
-        this.relevanceDraft = null;
-        this.plugin.releaseWarmClaude?.();
-      }
+      this.dropGoalEdit();
     }
     this.mountMapChat(workspace, overlay);
     this.placeGoalBar();
@@ -12688,6 +12832,7 @@ export class VisualAgentMapView extends ItemView {
     keepMapFocus();
     this.focusInlineName();
     this.focusInlineSummary();
+    this.focusGoalEdit();
     this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
@@ -19156,6 +19301,8 @@ export class VisualAgentMapView extends ItemView {
     // The canvas starts after the 44px edge the laid-over window leaves in place.
     const left = this.chat?.isOverlay ? this.chat.overlayWidth - CHAT_RAIL_WIDTH + CHAT_TOOLS_GAP : 0;
     tools.style.left = left > 0 ? `${left}px` : "";
+    // The goal field follows its width (a wrap changes its height); the stack below reads the result.
+    if (this.goalEditInput?.isConnected) this.growGoalInput(this.goalEditInput);
     // Last: the stack reads where the bar and the tools are horizontally.
     this.layoutTopStack(bar);
   }
@@ -19169,8 +19316,13 @@ export class VisualAgentMapView extends ItemView {
     if (bar) {
       const target = this.goalHostTarget();
       if (target && bar.parentElement !== target.host) {
+        // Moving the field to the other row takes the keyboard out of it; it goes back in (draft and caret stay with the field).
+        const active = bar.ownerDocument?.activeElement ?? null;
+        const held = this.goalEdit && active && bar.contains?.(active) ? (active as HTMLElement) : null;
         target.host.insertBefore(bar, target.before);
         this.markGoalHost(target.host);
+        this.goalBarHost = target.host;
+        held?.focus?.({ preventScroll: true });
       }
     }
     this.watchToolPlacement(bar);

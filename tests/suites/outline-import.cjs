@@ -303,6 +303,7 @@ integrationTest('importOutline creates the map, opens it, and starts shallow res
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {};
   view.enqueue = work => work();
   view.openMapInMutation = async path => { opened.push(path); view.path = path; view.map = await repo.readMap(path); };
+  plugin.openMapInNewTab = async path => { await view.openMapInMutation(path); return view; }; // a map is already open from the earlier import: the new one opens in a new tab (here the same stub view)
   view.startShallowResearch = async (parent, children, options) => { researched.push({ parent: parent.id, children: children.length, options }); };
   const nodes = api.parseOutline('# R\n## A\n### B').nodes;
   await view.importOutline({ nodes, source: null, shallowResearch: false });
@@ -325,6 +326,7 @@ integrationTest('importOutline with research: a model equal to cliModel stays wo
   const opened = [];
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
   view.openMapInMutation = async path => { opened.push(path); view.path = path; view.map = await repo.readMap(path); };
+  plugin.openMapInNewTab = async path => { await view.openMapInMutation(path); return view; }; // a map is already open from the earlier import: the new one opens in a new tab (here the same stub view)
   view.startShallowResearch = async () => {};
   const nodes = api.parseOutline('# R\n## A\n### B').nodes;
   const notesOf = async path => { const map = await repo.readMap(path); return Promise.all(map.nodes.map(async item => ({ parentId: item.parentId, note: await repo.readNote(item.path, map) }))); };
@@ -1067,6 +1069,7 @@ integrationTest('importOutline: a chosen style never becomes a map default, with
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
   view.openMapInMutation = async path => { opened.push(path); view.path = path; view.map = await repo.readMap(path); };
+  plugin.openMapInNewTab = async path => { await view.openMapInMutation(path); return view; }; // a map is already open from the earlier import: the new one opens in a new tab (here the same stub view)
   view.startShallowResearch = async () => {};
   const nodes = api.parseOutline('# R\n## A').nodes;
   for (const request of [{ shallowResearch: true, noteStyle: 'builtin:textbook' }, { shallowResearch: true, noteStyle: 'builtin:atomic' }, { shallowResearch: false }]) {

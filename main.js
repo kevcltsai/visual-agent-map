@@ -56041,6 +56041,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
     __publicField(this, "menuClosedByKey", false);
     __publicField(this, "closed", false);
+    /** The map a state change is opening: a new tab's default map must not race it (see onOpen). */
+    __publicField(this, "requestedFile", null);
     __publicField(this, "aimViewEpoch", 0);
     __publicField(this, "mapOpenEpoch", 0);
     __publicField(this, "headerTitle", "");
@@ -56210,9 +56212,42 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
   getState() {
     return { file: this.path };
   }
+  /** The map this tab shows, or the one a state change has asked it to open and has not finished opening. */
+  targetPath() {
+    var _a2;
+    return (_a2 = this.requestedFile) != null ? _a2 : this.path;
+  }
+  /**
+   * Whether replacing this tab's map now would stop something: closing or switching a map aborts these (see
+   * {@link dropMapBackground}, abortRelevanceGrade, abortMapChat and the map-change branch of the chat mount).
+   */
+  hasRunningWork() {
+    var _a2, _b2;
+    if (this.chatController || this.chatApplying || this.chatImageSearches.size) return true;
+    for (const task of this.synthesisTasks.values()) if (task.state === "running") return true;
+    if (this.startingTasks.size || this.startingExpand.size || this.mergeTasks.size) return true;
+    if (this.aimBusy || this.aimController) return true;
+    if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
+    if (this.startedRelevance && this.path) {
+      const run = this.plugin.relevanceGrades.get(this.path);
+      if ((run == null ? void 0 : run.owner) === this && run.status === "running") return true;
+    }
+    const runs = this.plugin.topicRuns, batches = this.plugin.expansionCoordinator;
+    return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []).some(
+      (node) => {
+        var _a3;
+        return runs.isBusy(node.path) || ((_a3 = this.plugin.quickExpandPending) == null ? void 0 : _a3.has(node.path)) || batches.isRunning(node.path) || batches.isQueued(node.path);
+      }
+    );
+  }
   async setState(state, result) {
     if (typeof state.file === "string" && state.file !== this.path) {
-      await this.openMap(state.file);
+      this.requestedFile = state.file;
+      try {
+        await this.openMap(state.file);
+      } finally {
+        this.requestedFile = null;
+      }
       result.layout = true;
     }
     if (this.titleRefresh) {
@@ -56297,7 +56332,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.registerDomEvent(this.contentEl, "focusin", (event) => this.trackMapFocus(event.target));
     await this.plugin.ready;
     if (this.closed || this.aimViewEpoch !== epoch) return;
-    if (!this.path) {
+    if (!this.path && !this.requestedFile) {
       if (!this.plugin.repo.workspaceExists()) this.render();
       else {
         const files = await this.plugin.repo.mapFiles();
@@ -56312,11 +56347,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
               continue;
             }
             if (this.closed || this.aimViewEpoch !== epoch) return;
+            if (this.requestedFile) return;
             if (!candidate.aim) {
               defaultPath = file.path;
               break;
             }
           }
+          if (this.requestedFile || this.path) return;
           await this.openMap(defaultPath);
         } else this.render();
       }
@@ -57538,20 +57575,36 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     }));
     new AimStartModal(
       this.app,
-      (input2) => this.plugin.mutate(async () => {
+      async (input2) => {
         var _a3;
-        if (!isCurrent()) return;
-        await this.plugin.repo.ensureWorkspace();
-        if (!isCurrent()) return;
-        const created = await createAimMap(this.plugin.repo, input2.model, input2);
-        await this.plugin.rebuildDerivedData();
-        if (!isCurrent()) return;
-        await this.openMapInMutation(created.mapPath);
-        if (!isCurrent() || this.path !== created.mapPath || ((_a3 = this.map) == null ? void 0 : _a3.id) !== created.map.id) return;
-        this.selection.setSelected(created.root.id);
-        this.render();
-        this.focusNode(created.root);
-      }),
+        const pending2 = { created: null };
+        await this.plugin.mutate(async () => {
+          var _a4;
+          if (!isCurrent()) return;
+          await this.plugin.repo.ensureWorkspace();
+          if (!isCurrent()) return;
+          const created2 = await createAimMap(this.plugin.repo, input2.model, input2);
+          await this.plugin.rebuildDerivedData();
+          if (!isCurrent()) return;
+          const hasMap = Boolean(this.map);
+          if (hasMap) {
+            pending2.created = created2;
+            return;
+          }
+          await this.openMapInMutation(created2.mapPath);
+          if (!isCurrent() || this.path !== created2.mapPath || ((_a4 = this.map) == null ? void 0 : _a4.id) !== created2.map.id) return;
+          this.selection.setSelected(created2.root.id);
+          this.render();
+          this.focusNode(created2.root);
+        });
+        const created = pending2.created;
+        if (!created) return;
+        const view = await this.plugin.openMapInNewTab(created.mapPath);
+        if (!view || view.closed || view.path !== created.mapPath || ((_a3 = view.map) == null ? void 0 : _a3.id) !== created.map.id) return;
+        view.selection.setSelected(created.root.id);
+        view.render();
+        view.focusNode(created.root);
+      },
       modelChoices,
       configuredModel,
       defaultReasoning,
@@ -59911,12 +59964,26 @@ ${request.requirements}` : preset.text,
       return;
     }
     let opened = true;
+    let newTabView = null;
     try {
+      let inNewTab = false;
       await this.plugin.mutate(async () => {
         await this.plugin.rebuildDerivedData();
+        if (this.map) {
+          inNewTab = true;
+          return;
+        }
         await this.openMapInMutation(result.mapPath);
         if (!this.closed && this.path === result.mapPath) this.fit();
       });
+      if (inNewTab) {
+        const view = await this.plugin.openMapInNewTab(result.mapPath);
+        if (!view) opened = false;
+        else {
+          newTabView = view;
+          if (!view.closed && view.path === result.mapPath) view.fit();
+        }
+      }
     } catch (e) {
       opened = false;
     }
@@ -59924,12 +59991,13 @@ ${request.requirements}` : preset.text,
     if (result.failure || !opened || !request.shallowResearch || result.nodes.length < 2) return;
     const root = result.nodes.find((node) => node.parentId === null);
     if (!root) return;
+    const target = newTabView != null ? newTabView : this;
     const children = result.nodes.filter((node) => node.parentId !== null);
     void this.plugin.confirmAiUsage(
       model,
       () => {
         var _a3;
-        return this.startShallowResearch(
+        return target.startShallowResearch(
           root,
           children,
           {
@@ -60117,10 +60185,14 @@ ${request.requirements}` : preset.text,
   }
   /** "New map": an untitled empty map opens at once (no name is asked); the first message names it, the title renames it. */
   openNewMindMapModal() {
-    this.enqueue(async () => {
+    let created = "";
+    void this.plugin.mutate(async () => {
       const titles = (await this.plugin.repo.topics()).map((topic) => topic.title);
       const title = uniqueDefaultName(t("ui.untitled_mind_map"), titles);
-      await this.openMapInMutation(await this.plugin.repo.createMap(title));
+      const mapPath = await this.plugin.repo.createMap(title);
+      if (this.map) created = mapPath;
+      else await this.openMapInMutation(mapPath);
+    }).then(() => created ? this.plugin.openMapInNewTab(created) : void 0).catch(() => {
     });
   }
   async planAimQuestion(parentNodeId, requestId, parentBranchId = null, signal) {
@@ -60756,15 +60828,19 @@ ${request.requirements}` : preset.text,
   openMapSwitcher() {
     this.enqueue(async () => {
       const items = await this.plugin.repo.mapSwitcherItems();
-      this.openMapModal(
-        new MapSwitcherModal(
-          this.app,
-          items,
-          this.path,
-          (item) => this.enqueue(() => this.openMapInMutation(item.mapPath))
-        )
-      );
+      this.openMapModal(new MapSwitcherModal(this.app, items, this.path, (item) => this.switchToMap(item.mapPath)));
     });
+  }
+  /**
+   * Choosing a map in the switcher: a map that is open in another tab is shown there; while this tab has running work the map
+   * opens in a new tab (swapping would stop that work); otherwise it replaces this tab's map.
+   */
+  switchToMap(path) {
+    const open = path === this.path ? void 0 : this.plugin.findMapLeaf(path);
+    if (open) void this.app.workspace.revealLeaf(open);
+    else if (path !== this.path && this.hasRunningWork())
+      void this.plugin.openMapInNewTab(path).catch((error) => errorNotice(error));
+    else this.enqueue(() => this.openMapInMutation(path));
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   openNewMapMenu(event) {
@@ -65899,16 +65975,17 @@ ${request.requirements}` : preset.text,
   duplicateCurrentMap() {
     if (!this.map) return;
     const source = this.path;
-    this.enqueue(async () => {
+    let copy = "";
+    void this.plugin.mutate(async () => {
       if (!this.map || this.path !== source) return;
       try {
         const titles = (await this.plugin.repo.topics()).map((topic) => topic.title);
         const title = uniqueDefaultName(t("ui.duplicate_map_title", this.map.title), titles);
-        await this.openMapInMutation(await this.plugin.repo.duplicateMap(source, title));
+        copy = await this.plugin.repo.duplicateMap(source, title);
       } catch (error) {
         errorNotice(error);
       }
-    });
+    }).then(() => copy ? this.plugin.openMapInNewTab(copy) : void 0).catch((error) => errorNotice(error));
   }
   /** Renames the open map (Map.md title and folder) as one undo step; shared by the dialog, the title field and the chat. */
   async renameMapTo(title) {
@@ -88036,9 +88113,40 @@ ${t("ui.organize_link_wait_hint")}`;
   async openResearchMap(path) {
     await this.activateView(path);
   }
+  /** The map tab that already shows (or is about to show) `path`, so one map is never opened twice. */
+  findMapLeaf(path) {
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE).find((leaf) => {
+      var _a2;
+      if (leaf.view instanceof VisualAgentMapView) return leaf.view.targetPath() === path;
+      const state = (_a2 = leaf.getViewState) == null ? void 0 : _a2.call(leaf).state;
+      return (state == null ? void 0 : state.file) === path;
+    });
+  }
+  /**
+   * Shows `path` in its own tab (or jumps to the tab that has it) and leaves every other map tab as it is. Never call this
+   * inside `mutate`: the new tab opens its map through `mutate`, so waiting for it there would block the queue for good.
+   */
+  async openMapInNewTab(path) {
+    const workspace = this.app.workspace;
+    let leaf = this.findMapLeaf(path);
+    if (!leaf) {
+      leaf = workspace.getLeaf("tab");
+      await leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true });
+    }
+    await workspace.revealLeaf(leaf);
+    return leaf.view instanceof VisualAgentMapView ? leaf.view : null;
+  }
   async activateView(path) {
     await this.ready;
+    if (path) {
+      const open = this.findMapLeaf(path);
+      if (open) {
+        await this.app.workspace.revealLeaf(open);
+        return;
+      }
+    }
     let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+    if (path && (leaf == null ? void 0 : leaf.view) instanceof VisualAgentMapView && leaf.view.hasRunningWork()) leaf = void 0;
     if (!leaf) leaf = this.app.workspace.getLeaf("tab");
     await leaf.setViewState({
       type: VIEW_TYPE,

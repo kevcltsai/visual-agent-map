@@ -2160,9 +2160,40 @@ export default class VisualAgentMapPlugin extends Plugin {
   async openResearchMap(path: string): Promise<void> {
     await this.activateView(path);
   }
+  /** The map tab that already shows (or is about to show) `path`, so one map is never opened twice. */
+  findMapLeaf(path: string): WorkspaceLeaf | undefined {
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE).find(leaf => {
+      if (leaf.view instanceof VisualAgentMapView) return leaf.view.targetPath() === path;
+      const state = leaf.getViewState?.().state as { file?: unknown } | undefined;
+      return state?.file === path;
+    });
+  }
+  /**
+   * Shows `path` in its own tab (or jumps to the tab that has it) and leaves every other map tab as it is. Never call this
+   * inside `mutate`: the new tab opens its map through `mutate`, so waiting for it there would block the queue for good.
+   */
+  async openMapInNewTab(path: string): Promise<VisualAgentMapView | null> {
+    const workspace = this.app.workspace;
+    let leaf = this.findMapLeaf(path);
+    if (!leaf) {
+      leaf = workspace.getLeaf("tab");
+      await leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true });
+    }
+    await workspace.revealLeaf(leaf);
+    return leaf.view instanceof VisualAgentMapView ? leaf.view : null;
+  }
   private async activateView(path?: string): Promise<void> {
     await this.ready;
-    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+    if (path) {
+      const open = this.findMapLeaf(path);
+      if (open) {
+        await this.app.workspace.revealLeaf(open);
+        return;
+      }
+    }
+    let leaf: WorkspaceLeaf | undefined = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
+    // Replacing the map in a tab stops its running work, so a tab that is busy keeps its map and the target gets a new tab.
+    if (path && leaf?.view instanceof VisualAgentMapView && leaf.view.hasRunningWork()) leaf = undefined;
     if (!leaf) leaf = this.app.workspace.getLeaf("tab");
     await leaf.setViewState({
       type: VIEW_TYPE,

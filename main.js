@@ -59436,9 +59436,11 @@ ${request.requirements}` : preset.text,
     if (!bar || !active || !((_f = bar.contains) == null ? void 0 : _f.call(bar, active))) return () => {
     };
     return () => {
-      var _a3, _b3, _c2, _d2, _e2, _f2, _g;
+      var _a3, _b3, _c2, _d2, _e2, _f2, _g, _h, _i, _j, _k, _l;
       if (!this.mapWindowIsActive()) return;
-      const target = (_g = (_d2 = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.querySelector) == null ? void 0 : _b3.call(_a3, ".vam-relevance-statusbar")) == null ? void 0 : _c2.querySelector) == null ? void 0 : _d2.call(_c2, "button")) != null ? _g : (_f2 = (_e2 = this.goalLayerRoot()) == null ? void 0 : _e2.querySelector) == null ? void 0 : _f2.call(_e2, ".vam-goal-text");
+      const now = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.ownerDocument) == null ? void 0 : _b3.activeElement) != null ? _c2 : null;
+      if (now && ((_e2 = (_d2 = this.goalSuggestPanelEl) == null ? void 0 : _d2.contains) == null ? void 0 : _e2.call(_d2, now))) return;
+      const target = (_l = (_i = (_h = (_g = (_f2 = this.contentEl) == null ? void 0 : _f2.querySelector) == null ? void 0 : _g.call(_f2, ".vam-relevance-statusbar")) == null ? void 0 : _h.querySelector) == null ? void 0 : _i.call(_h, "button")) != null ? _l : (_k = (_j = this.goalLayerRoot()) == null ? void 0 : _j.querySelector) == null ? void 0 : _k.call(_j, ".vam-goal-text");
       target == null ? void 0 : target.focus();
     };
   }
@@ -59641,7 +59643,8 @@ ${request.requirements}` : preset.text,
       pinned: 0,
       scope: meta.scope,
       raised: 0,
-      recommended: graded.suggestions.length,
+      // The list drops cards under a locked parent, so only the ones it will show are counted.
+      recommended: graded.suggestions.filter((item) => !this.aiLockReason("addChild", [item.parentId])).length,
       pins: meta.pins.map((pin) => {
         var _a3;
         return { id: pin.id, title: (_a3 = titleOf.get(pin.id)) != null ? _a3 : "", tier: pin.tier };
@@ -73535,6 +73538,7 @@ ${note.detail.trim()}` : "",
       bar,
       this.goalHeaderEl(),
       this.goalAttachmentEl(),
+      q(".vam-relevance-statusbar"),
       q(".vam-map-tools"),
       (sources == null ? void 0 : sources.isConnected) === false ? null : sources,
       this.viewportEl,
@@ -73559,7 +73563,7 @@ ${note.detail.trim()}` : "",
    * limited). The tool group itself never moves: it keeps the stylesheet's top.
    */
   layoutTopStack(bar) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
     const tools = (_a2 = this.contentEl) == null ? void 0 : _a2.querySelector(".vam-map-tools");
     if (!(tools == null ? void 0 : tools.style)) return;
     const attachment = bar ? this.goalAttachmentEl() : null;
@@ -73569,15 +73573,20 @@ ${note.detail.trim()}` : "",
     if (bar && attachment) {
       const box = (_f = attachment.offsetParent) != null ? _f : bar;
       const boxBottom = (_i = (_h = (_g = box.getBoundingClientRect) == null ? void 0 : _g.call(box)) == null ? void 0 : _h.bottom) != null ? _i : 0;
-      const clear = actionsRect ? Math.max(0, actionsRect.bottom - boxBottom) : 0;
-      if (typeof ((_j = attachment.style) == null ? void 0 : _j.setProperty) === "function") {
+      let clear = actionsRect ? Math.max(0, actionsRect.bottom - boxBottom) : 0;
+      if ((_j = attachment.hasClass) == null ? void 0 : _j.call(attachment, "vam-goal-suggest")) {
+        const status = (_k = this.contentEl) == null ? void 0 : _k.querySelector(".vam-relevance-statusbar");
+        const statusBottom = (_m = (_l = status == null ? void 0 : status.getBoundingClientRect) == null ? void 0 : _l.call(status)) == null ? void 0 : _m.bottom;
+        if (typeof statusBottom === "number" && statusBottom > 0) clear = Math.max(clear, statusBottom - boxBottom);
+      }
+      if (typeof ((_n = attachment.style) == null ? void 0 : _n.setProperty) === "function") {
         attachment.style.setProperty("--vam-goal-attach-clear", `${clear}px`);
         const room2 = this.attachRoom(boxBottom + GOAL_SUGGEST_GAP + clear);
         if (room2 !== null) attachment.style.setProperty("--vam-goal-attach-max", `${room2}px`);
       }
     }
     this.layoutGoalBridge(bar, actions, actionsRect);
-    const toolsRect = (_k = tools.getBoundingClientRect) == null ? void 0 : _k.call(tools);
+    const toolsRect = (_o = tools.getBoundingClientRect) == null ? void 0 : _o.call(tools);
     if (actionsRect && toolsRect && actionsRect.bottom > toolsRect.top && actionsRect.left > toolsRect.left) {
       tools.style.setProperty("--vam-tools-max", `${actionsRect.left - toolsRect.left - INSET_GAP}px`);
     } else {
@@ -73585,11 +73594,11 @@ ${note.detail.trim()}` : "",
     }
     const sources = this.mapSourcesPanelEl;
     const open = !!sources && sources.isConnected !== false;
-    (_l = tools.toggleClass) == null ? void 0 : _l.call(tools, "has-panel", open);
+    (_p = tools.toggleClass) == null ? void 0 : _p.call(tools, "has-panel", open);
     if (!open || !sources) return;
     this.placeMapSourcesPanel(sources);
     const room = this.sourcesRoom(tools);
-    if (room !== null && typeof ((_m = sources.style) == null ? void 0 : _m.setProperty) === "function") {
+    if (room !== null && typeof ((_q = sources.style) == null ? void 0 : _q.setProperty) === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
     }
   }

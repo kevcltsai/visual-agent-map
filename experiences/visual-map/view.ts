@@ -4924,6 +4924,9 @@ export class VisualAgentMapView extends ItemView {
     if (!bar || !active || !bar.contains?.(active)) return () => {};
     return () => {
       if (!this.mapWindowIsActive()) return;
+      // The repaint may have opened the recommendation list and put the keyboard on its first box: that stays.
+      const now = this.contentEl?.ownerDocument?.activeElement ?? null;
+      if (now && this.goalSuggestPanelEl?.contains?.(now)) return;
       const target =
         this.contentEl?.querySelector?.(".vam-relevance-statusbar")?.querySelector?.<HTMLElement>("button") ??
         this.goalLayerRoot()?.querySelector?.<HTMLElement>(".vam-goal-text");
@@ -5138,7 +5141,8 @@ export class VisualAgentMapView extends ItemView {
       pinned: 0,
       scope: meta.scope,
       raised: 0,
-      recommended: graded.suggestions.length,
+      // The list drops cards under a locked parent, so only the ones it will show are counted.
+      recommended: graded.suggestions.filter(item => !this.aiLockReason("addChild", [item.parentId])).length,
       pins: meta.pins.map(pin => ({ id: pin.id, title: titleOf.get(pin.id) ?? "", tier: pin.tier })),
       conflicts: (graded.conflicts ?? []).map(conflict => ({
         ancestor: titleOf.get(conflict.ancestorId) ?? "",
@@ -20213,6 +20217,7 @@ export class VisualAgentMapView extends ItemView {
       bar,
       this.goalHeaderEl(),
       this.goalAttachmentEl(),
+      q(".vam-relevance-statusbar"),
       q(".vam-map-tools"),
       sources?.isConnected === false ? null : sources,
       this.viewportEl,
@@ -20253,7 +20258,15 @@ export class VisualAgentMapView extends ItemView {
       // that box (narrow pane) push the panel down by the part that hangs out; measured, so no breakpoint or constant is kept.
       const box: Element = attachment.offsetParent ?? bar;
       const boxBottom = box.getBoundingClientRect?.()?.bottom ?? 0;
-      const clear = actionsRect ? Math.max(0, actionsRect.bottom - boxBottom) : 0;
+      let clear = actionsRect ? Math.max(0, actionsRect.bottom - boxBottom) : 0;
+      // The suggestion list never covers the status bar (its View changes / Undo / Dismiss stay clickable): it starts below it.
+      // Measured, like the icons above; the context box keeps its place.
+      if (attachment.hasClass?.("vam-goal-suggest")) {
+        const status = this.contentEl?.querySelector<HTMLElement>(".vam-relevance-statusbar");
+        const statusBottom = status?.getBoundingClientRect?.()?.bottom;
+        // The list's top is boxBottom + gap + clear; it must be at least gap below the status bar.
+        if (typeof statusBottom === "number" && statusBottom > 0) clear = Math.max(clear, statusBottom - boxBottom);
+      }
       if (typeof attachment.style?.setProperty === "function") {
         attachment.style.setProperty("--vam-goal-attach-clear", `${clear}px`);
         const room = this.attachRoom(boxBottom + GOAL_SUGGEST_GAP + clear);

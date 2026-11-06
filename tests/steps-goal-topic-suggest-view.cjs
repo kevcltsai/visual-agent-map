@@ -912,3 +912,77 @@ test('goal recommend: the list tier is not kept: the next run rates an added car
   assert.equal(h.control.calls.length, 2, 'Add asked nothing; the explicit second run asked once');
   assert.equal(await h.tierOf('Stress habits'), 'side', 'the next run is not floored');
 });
+
+// Tester bugs (live, 2026-11-06): the list covered the status bar, the status bar counted cards the list had dropped, and the keyboard stayed on the status bar.
+const statusValue = h => find(h.rootEl, i => hasCls(i, 'vam-aim-status-value'))?.text ?? '';
+const statusBarEl = h => find(h.rootEl, i => hasCls(i, 'vam-relevance-statusbar'));
+
+test('goal recommend: the list starts below the status bar, so View changes, Undo and Dismiss stay clickable; a bar above it changes nothing (bug 1)', async () => {
+  const h = await harness();
+  await h.open();
+  const panel = h.panel(), bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar')), status = statusBarEl(h);
+  const rect = (left, top, right, bottom) => ({ left, top, right, bottom, width: right - left, height: bottom - top });
+  const canvas = rect(0, 100, 360, 874);
+  const tools = element('div'); tools.addClass('vam-map-tools'); h.rootEl.appendChild(tools);
+  const overlay = element('div'); overlay.addClass('vam-canvas-overlay'); overlay.clientHeight = 774; overlay.getBoundingClientRect = () => canvas; h.rootEl.appendChild(overlay);
+  h.view.viewportEl = { getBoundingClientRect: () => canvas };
+  bar.getBoundingClientRect = () => rect(12, 4, 348, 40);
+  // The header row ends at 40; the status bar (42 high) sits at 40..82 under it, where the list would start (40 + 6).
+  status.getBoundingClientRect = () => rect(0, 40, 360, 82);
+  h.view.layoutTopStack(bar);
+  const clear = Number(panel.style['--vam-goal-attach-clear'].replace('px', ''));
+  assert.ok(40 + 6 + clear >= 82 + 6, `the list top ${40 + 6 + clear} is at least 6px below the status bar bottom 82`);
+  assert.equal(panel.style['--vam-goal-attach-max'], `${874 - 8 - (40 + 6 + clear)}px`, 'the list shrinks by what it was pushed down (it scrolls inside)');
+  status.getBoundingClientRect = () => rect(0, 0, 360, 30);
+  h.view.layoutTopStack(bar);
+  assert.equal(panel.style['--vam-goal-attach-clear'], '0px', 'a status bar that ends above the list pushes nothing');
+  assert.equal(h.control.calls.length, 1, 'one AI call');
+  // The stylesheet still places the list from the box bottom plus the measured clearance, and the status bar is watched for size changes.
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-goal-attachment \{ top: calc\(100% \+ 6px \+ var\(--vam-goal-attach-clear, 0px\)\)/);
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /q\("\.vam-relevance-statusbar"\),/, 'a status bar resize re-places the list');
+});
+
+test('goal recommend: the status bar counts only the cards the list shows (bug 2)', async () => {
+  const h = await harness();
+  const original = h.view.hydrate; h.view.hydrate = async () => { await original(); h.view.notes.set(h.ids.b, { ...h.view.notes.get(h.ids.b), aiLocked: true }); };
+  await h.view.hydrate();
+  await h.open();
+  assert.equal(h.rows().length, 1);
+  assert.match(statusValue(h), /, 1 new topics recommended$/, 'one card is shown, the status bar says one');
+  assert.doesNotMatch(statusValue(h), /2 new topics/);
+  assert.equal(h.addBtn().text, 'Add 1');
+  assert.ok(h.notices.some(m => /^1 suggestions touch locked topics/.test(m)), 'the dropped one is still reported as before');
+  assert.equal(h.control.calls.length, 1);
+  const all = await harness();
+  const orig2 = all.view.hydrate; all.view.hydrate = async () => { await orig2(); for (const id of [all.ids.a, all.ids.b]) all.view.notes.set(id, { ...all.view.notes.get(id), aiLocked: true }); };
+  await all.view.hydrate();
+  all.spark().click(); await all.settled();
+  for (let i = 0; i < 6; i++) await tick();
+  assert.equal(all.panel(), undefined, 'every parent is locked: no list');
+  assert.doesNotMatch(statusValue(all), /recommend/i, 'no recommendation is mentioned when none is shown');
+  assert.equal(all.control.calls.length, 1);
+});
+
+test('goal recommend: when the keyboard was on the status bar the finished run moves it to the first box, and a repaint does not take it back; when it was elsewhere it stays (bug 3)', async () => {
+  for (const where of ['status', 'elsewhere']) {
+    const h = await harness();
+    // The real render also restores the keyboard to the status bar when it was there before the repaint (keepRelevanceBarFocus).
+    const simple = h.view.render;
+    h.view.render = () => { const restore = h.view.keepRelevanceBarFocus(); simple(); restore(); };
+    Object.defineProperty(h.rootEl.ownerDocument, 'activeElement', { get: () => dom.focusedNow() ?? null, configurable: true });
+    const outside = element('button');
+    const gate = deferred(); h.control.reply = async request => { await gate.promise; return { items: gradeAll(request), suggestions: TWO }; };
+    h.spark().click();
+    await until(() => h.control.calls.length);
+    h.view.render();
+    if (where === 'status') h.stopBtn().focus(); else outside.focus();
+    gate.resolve(); await until(() => h.panel());
+    for (let i = 0; i < 4; i++) await tick();
+    if (where === 'status') {
+      assert.equal(h.boxes()[0].focused, true, 'the first box was focused');
+      assert.equal(dom.focusedNow(), h.boxes()[0], 'and it still holds the keyboard after the repaint finished');
+    } else assert.equal(dom.focusedNow(), outside, 'a run started elsewhere does not take the keyboard');
+    assert.equal(h.control.calls.length, 1, where);
+  }
+});

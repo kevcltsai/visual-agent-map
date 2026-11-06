@@ -172,6 +172,67 @@ test('Bug bash E #24: Show all says so when the 25% floor keeps cards off screen
   assert.equal(inset.fitViewport({ minX: 0, minY: 0, maxX: 9000, maxY: 9000 }, { width: 1000, height: 600 }, 0).zoom, 0.25);
 });
 
+
+// Show all frames annotated images too, anchors or not: right-clicking the picture is the only way to place the first anchor.
+const annotatedImage = (id, x, y, w = 320, h = 237) => ({ kind: 'annotated-image', id, path: 'p.png', x, y, w, h, anchors: [], relations: [] });
+const inCanvas = (box, vp, size = { width: 1000, height: 600 }) =>
+  box.x * vp.zoom + vp.x >= 0 && (box.x + box.w) * vp.zoom + vp.x <= size.width &&
+  box.y * vp.zoom + vp.y >= 0 && (box.y + box.h) * vp.zoom + vp.y <= size.height;
+
+test('Show all takes in an annotated image with no anchors, far to the left of the cards', () => {
+  const { view, nodes } = makeView();
+  nodes[0].x = 500; nodes[0].y = 0;
+  nodes[1].x = 500; nodes[1].y = 200;
+  const image = annotatedImage('i', -200, 0);
+  view.map.canvasItems = [image];
+  view.fit();
+  assert.ok(inCanvas(image, view.map.viewport), `image inside the canvas at ${JSON.stringify(view.map.viewport)}`);
+  assert.ok(view.map.viewport.y + image.y * view.map.viewport.zoom >= 50, 'its top stays below the toolbar');
+});
+
+test('Show all frames a map that has only an annotated image, and leaves a map with neither alone', () => {
+  const only = makeView();
+  only.nodes.length = 0;
+  const image = annotatedImage('i', 900, 700);
+  only.view.map.canvasItems = [image];
+  only.view.fit();
+  assert.ok(inCanvas(image, only.view.map.viewport), `image inside the canvas at ${JSON.stringify(only.view.map.viewport)}`);
+  const empty = makeView();
+  empty.nodes.length = 0;
+  empty.view.map.canvasItems = [];
+  const before = { ...empty.view.map.viewport };
+  empty.view.fit();
+  assert.deepEqual({ ...empty.view.map.viewport }, before, 'nothing to frame: the camera stays');
+});
+
+test('framing a ring leaves out annotated images that are not part of it', () => {
+  const plain = makeView(), withImage = makeView();
+  for (const each of [plain, withImage]) {
+    each.nodes[1].y = 300;
+    each.view.fitOnly = new Set(['a', 'b']);
+  }
+  withImage.view.map.canvasItems = [annotatedImage('other', -3000, -3000)];
+  plain.view.fit(); withImage.view.fit();
+  assert.deepEqual({ ...withImage.view.map.viewport }, { ...plain.view.map.viewport });
+  const lone = makeView();
+  lone.nodes.length = 0;
+  lone.view.fitOnly = new Set(['a']);
+  lone.view.map.canvasItems = [annotatedImage('other', 900, 700)];
+  const before = { ...lone.view.map.viewport };
+  lone.view.fit();
+  assert.deepEqual({ ...lone.view.map.viewport }, before, 'a ring with no cards frames nothing');
+});
+
+test('an annotated image too far from the cards for the zoom floor gets the off-screen notice', () => {
+  const { translate } = load('i18n.ts');
+  const { view, nodes } = makeView();
+  nodes[1].y = 300;
+  view.map.canvasItems = [annotatedImage('far', -6000, 0)];
+  notices.length = 0;
+  view.fit();
+  assert.equal(view.map.viewport.zoom, 0.25);
+  assert.deepEqual(notices, [translate('en', 'ui.fit_clamped')]);
+});
 test('Persona 13: the off-screen notice judges the real canvas, so cards only the toolbar insets squeeze do not trigger it', () => {
   const { view, nodes } = makeView(); nodes[1].y = 1900; // 2080px tall: the inset-reduced fit area needs < 25%, but the whole canvas holds it at 25%
   notices.length = 0;

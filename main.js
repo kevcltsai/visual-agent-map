@@ -74409,7 +74409,8 @@ ${note.detail.trim()}` : "",
     const only = this.fitOnly;
     if (this.holdCamera(() => only ? this.fitCards(only) : this.fit())) return;
     const nodes = this.canvasNodes().filter((n) => !only || only.has(n.id));
-    if (!nodes.length) return;
+    const annotatedImages = ((_a2 = this.map.canvasItems) != null ? _a2 : []).filter(isAnnotatedImage);
+    if (!nodes.length && (only || !annotatedImages.length)) return;
     const boxes = nodes.map((n) => {
       var _a3, _b3, _c2, _d2;
       return {
@@ -74419,13 +74420,11 @@ ${note.detail.trim()}` : "",
         h: (_d2 = (_c2 = (_b3 = this.stageEl) == null ? void 0 : _b3.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)) == null ? void 0 : _c2.offsetHeight) != null ? _d2 : 180
       };
     });
-    if (only) {
-      const imageIds = new Set(
-        ringMembers((_a2 = this.map.canvasItems) != null ? _a2 : [], this.map.nodes).filter((member) => only.has(member.topicId)).map((member) => member.imageId)
-      );
-      for (const item of (_b2 = this.map.canvasItems) != null ? _b2 : [])
-        if (isAnnotatedImage(item) && imageIds.has(item.id)) boxes.push({ x: item.x, y: item.y, w: item.w, h: item.h });
-    }
+    const ringImageIds = only ? new Set(
+      ringMembers((_b2 = this.map.canvasItems) != null ? _b2 : [], this.map.nodes).filter((member) => only.has(member.topicId)).map((member) => member.imageId)
+    ) : null;
+    for (const item of annotatedImages)
+      if (!ringImageIds || ringImageIds.has(item.id)) boxes.push({ x: item.x, y: item.y, w: item.w, h: item.h });
     for (const item of only ? [] : (_c = this.map.canvasItems) != null ? _c : []) {
       if (item.kind !== "text") continue;
       const text12 = item;

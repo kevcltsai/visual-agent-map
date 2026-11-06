@@ -2017,6 +2017,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-anchor:hover .vam-anchor-tip, .vam-view .vam-anchor:focus-visible .vam-anchor-tip { display: flex; }
 .vam-view .vam-anchor.is-draggable { cursor: grab; touch-action: none; }
 .vam-view .vam-anchor.is-draggable.is-dragging { cursor: grabbing; }
+.vam-view .is-placing .vam-anchor.is-draggable { cursor: crosshair; }
 .vam-view .vam-anchor.is-dragging .vam-anchor-tip { display: none; }
 .vam-view .vam-anchor-tip-links { color: var(--text-muted); }
 .vam-view .vam-anchor-crosshair { position: absolute; z-index: 2; width: 28px; height: 28px; margin: -14px 0 0 -14px; pointer-events: none; border: 2px solid var(--interactive-accent); border-radius: 50%; background: linear-gradient(var(--interactive-accent), var(--interactive-accent)) center / 2px 100% no-repeat, linear-gradient(var(--interactive-accent), var(--interactive-accent)) center / 100% 2px no-repeat; }

@@ -1028,6 +1028,8 @@ function textBlockLines(text: string, boxWidth: number, boxHeight: number, lineH
   }
   return lines;
 }
+/** A 0-1 position clamped and rounded to the nearest 0.001 (anchor place mode and anchor drag). */
+const unitStep = (v: number): number => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -8734,6 +8736,8 @@ export class VisualAgentMapView extends ItemView {
     dot.addEventListener("pointerdown", event => {
       if (event.button !== 0 || !this.canEditCanvasItems() || this.placing) return;
       event.preventDefault();
+      // preventDefault keeps the browser from focusing the button, so a plain click still leaves it focused for Enter / Delete.
+      dot.focus({ preventScroll: true });
       this.anchorDragCancel?.(true);
       const start = { x: event.clientX, y: event.clientY },
         doc = this.contentEl?.ownerDocument;
@@ -8785,17 +8789,21 @@ export class VisualAgentMapView extends ItemView {
         if (done) return;
         settle();
         if (restore && active) paint(origin);
+        // The repaint that dropped this drag must not inherit its line emphasis.
+        if (!restore && this.hoverAnchor === ref) this.hoverAnchor = null;
       };
       const cancel = (): void => cancelRef(dot.isConnected !== false);
       const esc = (e: KeyboardEvent): void => {
-        if (e.key !== "Escape") return;
+        if (e.key !== "Escape" || !active) return;
         e.preventDefault();
         e.stopPropagation();
         cancelRef(true);
       };
       const up = (): void => {
         if (done) return;
-        const write = active && dot.isConnected !== false && this.canEditCanvasItems();
+        const at = { x: unitStep(to.x), y: unitStep(to.y) };
+        const write =
+          active && dot.isConnected !== false && this.canEditCanvasItems() && (at.x !== origin.x || at.y !== origin.y);
         settle();
         if (!write) {
           if (active) paint(origin);
@@ -8803,7 +8811,6 @@ export class VisualAgentMapView extends ItemView {
         }
         this.focusAnchorRef = ref;
         dot.focus({ preventScroll: true });
-        const at = { x: to.x, y: to.y };
         this.enqueue(() => this.changeCanvasItems(image.id, items => updateAnchor(items, image.id, anchorId, { at })));
       };
       this.anchorDragCancel = cancelRef;
@@ -8922,7 +8929,7 @@ export class VisualAgentMapView extends ItemView {
     hint.setText(t("ui.anchor_place_hint"));
     stage.addClass("is-placing");
     const inside = (target: EventTarget | null): boolean => target === imageEl || !!imageEl.contains?.(target as Node);
-    const clamp = (v: number): number => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
+    const clamp = unitStep;
     const key = (event: Event): void => {
       const e = event as KeyboardEvent;
       if (e.isComposing) return;
@@ -13373,6 +13380,7 @@ export class VisualAgentMapView extends ItemView {
       this.dragCleanup?.();
       this.renderAfterDrag = false;
     }
+    this.anchorDragCancel?.(false);
     this.paintCount++;
     this.emptyMapEl = null;
     this.aimProgressEls.clear();

@@ -713,6 +713,12 @@ editMdCase('a text block turned into an unsafe mermaid block is refused', async 
   const r = await run(userStyle + '\n\n```text\nflowchart TD\n  A["x"]\n  click A "https://evil.example"\n```\n', '```mermaid', { find: '```text' });
   eq(status(r), ['skipped'], JSON.stringify(r.lines));
 });
+editMdCase('an info-string-only change (mermaid-example to mermaid) adds a block and is refused, note unchanged', async ({ unsafe, run, status }) => {
+  const example = unsafe.replace('```mermaid', '```mermaid-example');
+  const original = `${example}\n\nSleep needs darkness.\n`;
+  const r = await run(original, '```mermaid', { find: '```mermaid-example' });
+  eq(status(r), ['skipped'], JSON.stringify(r.lines)); assert.equal(r.after, original);
+});
 for (const editor of [false, true]) {
   editMdCase(`a block the parser rejects is refused, note unchanged (editor ${editor})`, async ({ broken, run, status }) => {
     const r = await run('Sleep needs darkness.\n', `needs\n\n${broken}\n`, { editor, parser: code => (/^pie showTitle/.test(code) ? 'invalid' : 'ok') });

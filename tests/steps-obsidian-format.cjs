@@ -562,4 +562,7 @@ test('addedMermaidBlocks: only the blocks the after text has beyond the before t
   assert.equal(added[0].code, 'mindmap\n  root((r))\n    child');
   assert.equal(addedMermaidBlocks('text', style)[0].unsafe, true);
   assert.equal(addedMermaidBlocks('a', 'a b').length, 0);
+  const foo = style.replace('```mermaid', '```mermaid.foo');
+  assert.equal(addedMermaidBlocks(style, foo).length, 1, 'only the info string changed: still a new block');
+  assert.equal(addedMermaidBlocks(`${foo}\n\ntext`, `${foo}\n\nother`).length, 0, 'same body and same info: not new');
 });

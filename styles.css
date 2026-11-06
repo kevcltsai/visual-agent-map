@@ -861,6 +861,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-chat-skeleton { display: flex; gap: 12px; }
 .vam-chat-skeleton-card { width: 120px; height: 56px; border: 1px dashed var(--background-modifier-border); border-radius: var(--radius-m); }
 .vam-map-chat-msg.is-user { background: var(--background-modifier-hover); }
+.vam-map-chat-msg.is-auto { display: none; }
 .vam-map-chat-steer { align-self: flex-end; display: flex; flex-direction: column; gap: 1px; max-width: 85%; margin-top: 4px; padding: 4px 8px; border-radius: var(--radius-s); background: var(--background-modifier-hover); border: 1px solid var(--background-modifier-border); }
 .vam-map-chat-steer-tag { font-size: var(--font-ui-smaller); color: var(--text-accent); }
 .vam-map-chat-steer.is-queued { border-style: dashed; }

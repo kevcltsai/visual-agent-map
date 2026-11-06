@@ -6807,3 +6807,234 @@ integrationTest('map chat records: json-fallback requeue leaves a re-delivered s
   r.clock.advance(20_000); resendButton(rc).click(); await again; await recordIdle(r);
   eq(recordLines(r, recordFiles(r)[0]).filter(l => l.type === 'turn_end').map(l => l.steers), [['extra']]);
 });
+
+// ---- automatic continuation of a chat message: the chain wired into the view (packet P3) --------------------------------
+// The pure state machine is tested in tests/steps-map-chat-chain.cjs; these drive the view: rounds, waiting for research and
+// expansions, Stop, a new message, map switches, plans, undo and the record. The research is a stub that tells its outcome
+// when the test says so, through the same `onOutcome` the real startMultiResearch calls.
+const CHAIN_WAIT_MS = 30 * 60 * 1000;
+const chainSpy = chat => {
+  const calls = [];
+  for (const name of ['beginAutoRound', 'setChainWaiting', 'endChain']) { const real = chat[name].bind(chat); chat[name] = (...args) => { calls.push([name, ...args]); return real(...args); }; }
+  return { calls, ends: () => calls.filter(c => c[0] === 'endChain').map(c => c.slice(1)), reasons: () => calls.filter(c => c[0] === 'endChain').map(c => c[1]), rounds: () => calls.filter(c => c[0] === 'beginAutoRound').map(c => c[1]), waits: () => calls.filter(c => c[0] === 'setChainWaiting').map(c => c[1]) };
+};
+const researchStub = h => { const runs = []; h.view.startMultiResearch = async (request, _key, _onSettled, onOutcome, signal) => { runs.push({ request, onOutcome, signal, ids: [...h.view.selection.state.multiSelected] }); }; return runs; };
+const workOutcome = (ids, status = 'succeeded', error) => ({ kind: 'settled', succeeded: status === 'succeeded' ? ids.length : 0, failed: status === 'failed' ? ids.length : 0, stopped: status === 'stopped' ? ids.length : 0, topics: ids.map(id => ({ id, title: `Card ${id.slice(0, 4)}`, status, ...(error ? { error } : {}) })) });
+const settleRun = (run, status, error) => run.onOutcome(workOutcome(run.ids, status, error));
+const chainReplies = (h, ...replies) => { h.control.reply = async (request, ...rest) => { const next = replies.shift(); if (!next) throw new Error('unexpected request'); return typeof next === 'function' ? next(request, ...rest) : next; }; };
+const say = (reply, actions = [], remaining = '') => ({ reply, actions, rejected: [], remaining });
+const contextOf = request => JSON.parse(request.context.json);
+const chainEnded = (spy, count = 1) => until(() => spy.ends().length >= count);
+/** Round 1 of a chain that builds a root card and researches it (stubbed), then waits for the research. */
+async function researchChain(h, { remaining = 'Add the subtopics from the research', second, actions } = {}) {
+  const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h);
+  chainReplies(h, say('Built the root and started the research.', actions ?? [addRoot('r', 'Pstack'), researchAct({ nodeIds: ['new:r'] })], remaining), ...(second ? [second] : []));
+  h.type('make the full knowledge tree'); await h.view.sendMapChat();
+  return { chat, spy, runs };
+}
+const textOf = async (h, id) => { const node = h.view.map.nodes.find(n => n.id === id); return h.repo.readNote(node.path); };
+
+integrationTest('P3 e2e: one message builds a root and researches it, the research settles, round 2 sees the whole research text and builds the subtopics, and the chain is done without a user message', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const { chat, spy, runs } = await researchChain(h, { second: undefined });
+  assert.equal(runs.length, 1); assert.equal(h.control.requests.length, 1); assert.equal(h.view.chatChain.state.phase, 'waiting');
+  eq(spy.waits(), [{ kinds: ['research'], total: 1, settled: 0 }]);
+  const rootId = runs[0].ids[0]; assert.equal((await textOf(h, rootId)).title, 'Pstack');
+  await h.repo.updateNote(h.view.map.nodes.find(n => n.id === rootId).path, { detail: 'RESEARCH TEXT: the pstack list is alpha, beta, gamma.' });
+  chainReplies(h, say('Added the subtopics.', [{ kind: 'add_child', parentId: rootId, title: 'Alpha', summary: 'a' }, { kind: 'add_child', parentId: rootId, title: 'Beta', summary: 'b' }], ''));
+  h.view.chatSelect([h.ids.a]); // the research target is no longer selected, so its text comes in the research list
+  settleRun(runs[0]); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
+  const second = contextOf(h.control.requests[1]);
+  eq(second.researchNotes.map(n => [n.id, n.detail]), [[rootId, 'RESEARCH TEXT: the pstack list is alpha, beta, gamma.']]);
+  eq(second.continuation.round, 2); assert.equal(second.continuation.remaining, 'Add the subtopics from the research'); assert.equal(h.control.requests[1].message, 'make the full knowledge tree');
+  eq(spy.rounds(), [2]); eq(spy.ends(), [], 'done is not told as an end'); assert.equal(spy.waits().at(-1), null, 'the waiting state is cleared');
+  const turns = chat.transcript(); eq(turns.map(m => m.role), ['user', 'assistant', 'user', 'assistant']); eq(turns.map(m => !!m.auto), [false, false, true, false]);
+  eq(turns.at(-1).lines.map(l => l.basis?.kind), ['research', 'research']); eq(turns.at(-1).lines[0].basis.sources, [{ id: rootId, title: 'Pstack' }]);
+  eq(h.view.map.nodes.filter(n => n.parentId === rootId).length, 2); assert.equal(h.control.requests.length, 2, 'two requests, one message');
+  eq(chat.turns().map(t => t.role), ['user', 'assistant', 'user', 'assistant']); assert.equal(chat.turns()[2].text, 'Automatic continuation', 'history records the round as an automatic continuation, not as the user\'s words');
+});
+integrationTest('P3 A5: partial research failure carries on and tells the failure in continuation.research; all failed, all stopped and not started each end the chain without hanging', async () => {
+  for (const [label, run, reason] of [['all failed', run => settleRun(run, 'failed', 'quota'), 'research_failed'], ['all stopped', run => settleRun(run, 'stopped'), 'research_stopped'], ['never started', run => run.onOutcome({ kind: 'not_started' }), 'research_not_started']]) {
+    const h = await harness(); await h.view.hydrate(); const { spy, runs } = await researchChain(h, reason === 'research_not_started' ? { actions: [researchAct({ nodeIds: [h.ids.a] })] } : {});
+    run(runs[0]); await chainEnded(spy); eq(spy.reasons(), [reason], label); assert.equal(h.control.requests.length, 1, `${label}: no second round`); assert.equal(h.view.chatChain, null);
+    assert.equal(spy.ends()[0][1], 'Add the subtopics from the research', `${label}: what was left is told`);
+    if (reason === 'research_failed') eq(spy.ends()[0][2], ['Card ' + runs[0].ids[0].slice(0, 4) + ': quota']);
+  }
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h);
+  chainReplies(h, say('Two roots.', [addRoot('a', 'One'), addRoot('b', 'Two'), researchAct({ nodeIds: ['new:a', 'new:b'] })], 'Build under both'), say('Under the good one.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); const [first, second] = runs[0].ids;
+  runs[0].onOutcome({ kind: 'settled', succeeded: 1, failed: 1, stopped: 0, topics: [{ id: first, title: 'One', status: 'succeeded' }, { id: second, title: 'Two', status: 'failed', error: 'no connection' }] });
+  await until(() => h.control.requests.length === 2);
+  eq(contextOf(h.control.requests[1]).continuation.research, [{ id: first, title: 'One', status: 'succeeded' }, { id: second, title: 'Two', status: 'failed', error: 'no connection' }]);
+});
+integrationTest('P3 A4: no_progress, max_rounds (the eighth round is the last) and done end the chain with their reason and what was left', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat);
+  chainReplies(h, say('Nothing I can do.', [], 'Build the rest'));
+  h.type('go'); await h.view.sendMapChat(); await chainEnded(spy); eq(spy.ends(), [['no_progress', 'Build the rest', undefined]]); assert.equal(h.control.requests.length, 1);
+  const g = await harness(); await g.view.hydrate(); const gchat = g.open(); const gspy = chainSpy(gchat); let n = 0;
+  g.control.reply = async () => say(`Round ${++n}.`, [{ kind: 'add_child', parentId: g.ids.root, title: `Card ${n}`, summary: '' }], 'More to add');
+  g.type('go'); await g.view.sendMapChat(); await chainEnded(gspy);
+  eq(gspy.reasons(), ['max_rounds']); assert.equal(g.control.requests.length, 8, 'eight rounds, the first included, and no ninth'); eq(gspy.rounds(), [2, 3, 4, 5, 6, 7, 8]); eq(gspy.ends()[0][1], 'More to add');
+  const d = await harness(); await d.view.hydrate(); const dchat = d.open(); const dspy = chainSpy(dchat);
+  d.control.reply = async () => say('All done.', [{ kind: 'add_child', parentId: d.ids.root, title: 'Only', summary: '' }], '');
+  d.type('go'); await d.view.sendMapChat(); await tick(); assert.equal(dspy.calls.length, 0, 'a reply with nothing left is one round and says nothing about a chain'); assert.equal(d.view.chatChain, null);
+});
+integrationTest('P3 A4: Stop during a round and Stop while waiting both end the chain as stopped; a late research outcome starts nothing; what Stop reaches is the work the chain started', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat); const gate = deferred();
+  chainReplies(h, say('One.', [addRoot('x', 'X')], 'Then more'), async () => { await gate.promise; return say('Late.', [addRoot('y', 'LATE')], 'never'); });
+  h.type('go'); const sending = h.view.sendMapChat(); await until(() => h.control.requests.length === 2 && chat.isBusy);
+  h.view.stopMapChat(); gate.resolve(); await sending; await chainEnded(spy); eq(spy.ends(), [['stopped', 'Then more', undefined]]); assert.equal(h.view.map.nodes.some(n => n.path && false), false);
+  assert.equal(h.control.requests.length, 2, 'no third round'); eq((await h.saved()).map(n => n.id).length, 5, 'only the first round wrote its card');
+  const w = await harness(); await w.view.hydrate(); const { spy: wspy, runs } = await researchChain(w); const stops = []; const rawStop = w.plugin.expansionCoordinator.stop.bind(w.plugin.expansionCoordinator); w.plugin.expansionCoordinator.stop = key => { stops.push(key); return rawStop(key); };
+  w.view.stopMapChat(); await chainEnded(wspy); eq(wspy.reasons(), ['stopped']); assert.equal(runs[0].signal.aborted, true, 'the research that was not started yet is told to stop'); eq(stops, [`multi-research:${MAP}`]);
+  settleRun(runs[0]); await tick(); await tick(); assert.equal(w.control.requests.length, 1); eq(wspy.reasons(), ['stopped'], 'the late outcome changes nothing');
+});
+integrationTest('P3 race: the research ends and Stop is pressed in the same tick, in either order: one ending, no round', async () => {
+  const a = await harness(); await a.view.hydrate(); const { spy: aspy, runs: aruns } = await researchChain(a);
+  settleRun(aruns[0]); a.view.stopMapChat(); await tick(); await tick(); eq(aspy.reasons(), ['stopped']); assert.equal(a.control.requests.length, 1);
+  const b = await harness(); await b.view.hydrate(); const { spy: bspy, runs: bruns } = await researchChain(b); const gate = deferred();
+  chainReplies(b, async () => { await gate.promise; return say('late', [addRoot('z', 'Z')], ''); });
+  settleRun(bruns[0]); await until(() => b.control.requests.length === 2); b.view.stopMapChat(); gate.resolve(); await chainEnded(bspy);
+  eq(bspy.reasons(), ['stopped']); assert.equal(b.control.requests.length, 2); assert.equal(b.view.map.nodes.some(n => n.path.includes('Z')), false);
+});
+integrationTest('P3 race: the research ends and the user sends a message in the same tick: the old chain ends as user_took_over, the message is a new one that keeps the research list, and no automatic round starts', async () => {
+  const h = await harness(); await h.view.hydrate(); const { chat, spy, runs } = await researchChain(h);
+  await h.repo.updateNote(h.view.map.nodes.find(n => n.id === runs[0].ids[0]).path, { detail: 'FOUND: alpha.' });
+  chainReplies(h, say('Answering the new question.', [], ''));
+  h.view.chatSelect([h.ids.a]); settleRun(runs[0]); h.type('actually, only the first one'); await h.view.sendMapChat(); await tick();
+  eq(spy.reasons(), ['user_took_over']); eq(spy.ends()[0][1], 'Add the subtopics from the research'); assert.equal(h.control.requests.length, 2); eq(spy.rounds(), []);
+  const asked = h.control.requests[1]; assert.equal(asked.message, 'actually, only the first one'); const context = contextOf(asked); assert.equal(context.continuation, undefined, 'a new message is round 1 again');
+  eq(context.researchNotes.map(n => n.detail), ['FOUND: alpha.']); eq(chat.transcript().map(m => !!m.auto), [false, false, false, false]);
+});
+integrationTest('P3 race: a message typed while the chain waits is the user taking over; so is a follow-up that waited for the round to end', async () => {
+  const h = await harness(); await h.view.hydrate(); const { spy } = await researchChain(h);
+  chainReplies(h, say('ok', [], '')); h.type('wait, something else'); await h.view.sendMapChat(); eq(spy.reasons(), ['user_took_over']);
+  const q = await harness(); await q.view.hydrate(); const chat = q.open(); const qspy = chainSpy(chat); const s = steerReply(q, { reject: true, result: say('One.', [addRoot('x', 'X')], 'More') });
+  q.type('go'); const sending = q.view.sendMapChat(); await requestOut(chat); q.type('and also this'); pressEnter(chat); await tick(); s.gate.resolve(); q.control.reply = async () => say('Fine.', [], ''); await sending; await chainEnded(qspy);
+  eq(qspy.reasons(), ['user_took_over']); await until(() => q.control.requests.length === 2); assert.equal(q.control.requests.length, 2, 'the follow-up is sent once as the next message'); assert.equal(q.control.requests[1].message, 'and also this'); eq(qspy.rounds(), []);
+});
+integrationTest('P3 race: switching maps while the chain waits ends it; the research that goes on is not recorded in the conversation that comes back', async () => {
+  const h = await harness(); await h.view.hydrate(); const { spy, runs } = await researchChain(h);
+  h.view.map.id = 'another-map'; h.repaint(); eq(spy.reasons(), ['map_changed']); assert.equal(runs[0].signal.aborted, false, 'a map switch does not stop the research');
+  h.view.map.id = 'map-a'; h.repaint(); settleRun(runs[0]); await tick(); await tick(); assert.equal(h.control.requests.length, 1); eq(spy.reasons(), ['map_changed']); eq([...h.view.chatResearched], []);
+  chainReplies(h, say('fresh', [], '')); h.type('hello again'); await h.view.sendMapChat(); assert.equal(contextOf(h.control.requests.at(-1)).researchNotes, undefined, 'a new conversation has no research list');
+});
+integrationTest('P3 race: a reply that arrives from an attempt that was replaced writes nothing and starts no round', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat); const attempts = [];
+  h.control.reply = (request, signal) => new Promise((resolve, reject) => { attempts.push({ signal, resolve, reject }); });
+  h.type('slow one'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2);
+  attempts[0].resolve(say('Old attempt.', [addRoot('late', 'LATE')], 'would continue')); await tick(); attempts[1].resolve(say('Second try.', [], '')); await sending; await tick();
+  assert.equal(h.view.map.nodes.length, 4, 'the old attempt wrote nothing'); eq(spy.rounds(), []); eq(spy.calls.filter(c => c[0] === 'endChain'), []); assert.equal(h.control.requests.length, 2); assert.equal(h.view.chatChain, null);
+});
+integrationTest('P3 race: the plan card of round 1 waits while research of an earlier turn settles: the chain stays paused, then Apply carries on', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h);
+  chainReplies(h, say('Researching.', [researchAct({ nodeIds: [h.ids.a] })], ''));
+  h.type('research body'); await h.view.sendMapChat(); assert.equal(runs.length, 1); assert.equal(h.view.chatChain, null);
+  chainReplies(h, say('Many cards.', Array.from({ length: 20 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), 'Then the rest'), say('The rest.', [{ kind: 'add_child', parentId: h.ids.root, title: 'Rest', summary: '' }], ''));
+  h.type('add many'); await h.view.sendMapChat(); assert.ok(chat.pendingPlan()); assert.equal(h.view.chatChain.state.phase, 'plan');
+  settleRun(runs[0]); await tick(); await tick(); assert.equal(h.view.chatChain.state.phase, 'plan', 'the earlier research changes nothing about the paused chain'); assert.equal(h.control.requests.length, 2);
+  planButton(h, 'apply').click(); await until(() => h.control.requests.length === 3 && h.view.chatChain === null); eq(spy.rounds(), [2]); eq(spy.ends(), []);
+  assert.equal(h.view.chatResearched.get(h.ids.a).status, 'succeeded');
+});
+integrationTest('P3 never told: research that never reports ends the wait after 30 minutes, only the chain ends and the research is not stopped; a repeated report changes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const { spy, runs } = await researchChain(h);
+  h.clock.advance(CHAIN_WAIT_MS - 1); eq(spy.reasons(), []); h.clock.advance(1); await chainEnded(spy);
+  eq(spy.reasons(), ['wait_timeout']); eq(spy.ends()[0][1], 'Add the subtopics from the research'); assert.equal(runs[0].signal.aborted, false, 'the research goes on'); assert.equal(h.view.chatChain, null);
+  settleRun(runs[0]); await tick(); assert.equal(h.control.requests.length, 1);
+  const d = await harness(); await d.view.hydrate(); const { spy: dspy, runs: druns } = await researchChain(d);
+  chainReplies(d, say('Next.', [], '')); settleRun(druns[0]); settleRun(druns[0]); settleRun(druns[0], 'failed'); await until(() => d.control.requests.length === 2); await tick(); await tick();
+  assert.equal(d.control.requests.length, 2, 'three reports start one round'); eq(dspy.rounds(), [2]);
+});
+integrationTest('P3 startMultiResearch tells exactly one outcome on every path, and nothing changes without the callback', async () => {
+  const told = async (setup, { select = ['a', 'b'], signal } = {}) => {
+    const h = await harness(); await h.view.hydrate(); const ran = [];
+    h.view.researchChild = async (child, batchSignal, accepted, choices, charts, done) => { ran.push(child.id); if (h.view.research?.hold) await h.view.research.hold(batchSignal, child); accepted(); done?.({ retrievals: 1 }); };
+    setup?.(h, ran); h.view.chatSelect(select.map(k => h.ids[k]));
+    const outcomes = []; await h.view.startMultiResearch({ requirements: '', researchMode: 'research', researchDepth: 'normal', imageSearch: false }, undefined, undefined, o => outcomes.push(o), signal);
+    await until(() => outcomes.length > 0 || h.plugin.expansionCoordinator.isRunning(h.view.multiResearchKey())); for (let i = 0; i < 20; i++) await tick();
+    return { h, outcomes, ran };
+  };
+  let r = await told(); eq(r.outcomes.map(o => [o.kind, o.succeeded, o.failed, o.stopped]), [['settled', 2, 0, 0]]); eq(r.outcomes[0].topics.map(t => t.status), ['succeeded', 'succeeded']);
+  r = await told(h => { const rawStart = h.view.researchChild; h.view.researchChild = async (child, ...rest) => { if (child.id === h.ids.b) throw new Error('quota'); return rawStart(child, ...rest); }; });
+  eq(r.outcomes.map(o => [o.kind, o.succeeded, o.failed, o.stopped]), [['settled', 1, 1, 0]]); eq(r.outcomes[0].topics.map(t => [t.status, t.error ?? null]).sort(), [['failed', 'quota'], ['succeeded', null]]);
+  r = await told(h => { h.control.decline = true; }); eq(r.outcomes, [{ kind: 'not_started' }]); assert.equal(r.ran.length, 0);
+  r = await told(h => { h.plugin.quickExpandPending.add(h.node('a').path); h.plugin.quickExpandPending.add(h.node('b').path); }); eq(r.outcomes, [{ kind: 'not_started' }], 'every card busy');
+  r = await told(h => { h.plugin.expansionCoordinator.isRunning = () => true; }); eq(r.outcomes, [{ kind: 'not_started' }], 'a batch already running');
+  const stopped = new AbortController(); stopped.abort(); r = await told(null, { signal: stopped.signal }); eq(r.outcomes, [{ kind: 'not_started' }], 'stopped before the start'); assert.equal(r.ran.length, 0);
+  r = await told(h => { h.view.research = { hold: (signal) => new Promise((_, reject) => { signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }); h.view.researchStarted = () => h.view.stopMultiResearch(); setImmediate(() => h.view.stopMultiResearch()); }) }; });
+  eq(r.outcomes.map(o => [o.kind, o.succeeded, o.failed]), [['settled', 0, 0]]); assert.equal(r.outcomes[0].stopped >= 1, true); eq(new Set(r.outcomes[0].topics.map(t => t.status)), new Set(['stopped']));
+  const h = await harness(); await h.view.hydrate(); h.view.chatSelect([h.ids.a]); h.view.researchChild = async (child, _s, accepted) => { accepted(); };
+  await h.view.startMultiResearch({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false }); // no callback: the call is as it was
+});
+integrationTest('P3 A9: from round 2 a reply of only safe actions is applied without a card however long, one with a delete asks first (Apply carries on, Cancel ends), and research counted over the rounds asks at 10', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat);
+  const cards = n => Array.from({ length: n }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' }));
+  chainReplies(h, say('Start.', [addRoot('s', 'Start')], 'Many more'), say('Twenty.', cards(20), 'Delete one'), say('Delete.', [{ kind: 'delete_topic', nodeId: h.ids.c }], 'And more'), say('Last.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => chat.pendingPlan()); assert.equal(h.control.requests.length, 3); assert.equal(h.view.map.nodes.length, 4 + 1 + 20, 'twenty safe cards went in without a card');
+  const before = h.view.map.nodes.length; assert.ok(h.view.map.nodes.some(n => n.id === h.ids.c)); assert.equal(h.view.chatChain.state.phase, 'plan');
+  assert.match(visibleText(planCard(h)[0]), /./); planButton(h, 'apply').click(); await until(() => h.control.requests.length === 4); await until(() => h.view.chatChain === null);
+  assert.equal(h.view.map.nodes.some(n => n.id === h.ids.c), false, 'the delete ran after Apply'); assert.ok(h.view.map.nodes.length < before); eq(spy.reasons(), [], 'no ending was told; the last round had nothing left');
+  const c = await harness(); await c.view.hydrate(); const cchat = c.open(); const cspy = chainSpy(cchat);
+  chainReplies(c, say('Start.', [addRoot('s', 'Start')], 'Delete'), say('Delete.', [{ kind: 'delete_topic', nodeId: c.ids.c }], 'More'));
+  c.type('go'); await c.view.sendMapChat(); await until(() => cchat.pendingPlan()); const cancelled = cchat.pendingPlan(); cancelled.cancel(); await chainEnded(cspy);
+  eq(cspy.ends(), [['plan_cancelled', 'More', undefined]]); assert.ok(c.view.map.nodes.some(n => n.id === c.ids.c), 'nothing was deleted'); assert.equal(c.control.requests.length, 2);
+  const r = await harness(); await r.view.hydrate(); const rchat = r.open(); const runs = researchStub(r); const rspy = chainSpy(rchat);
+  const six = Array.from({ length: 6 }, (_, i) => `a${i}`); const five = Array.from({ length: 5 }, (_, i) => `b${i}`);
+  chainReplies(r, say('Six.', [...six.map(ref => addRoot(ref, ref)), researchAct({ nodeIds: six.map(ref => `new:${ref}`) })], 'Five more'), say('Five.', [...five.map(ref => addRoot(ref, ref)), researchAct({ nodeIds: five.map(ref => `new:${ref}`) })], ''));
+  r.type('go'); await r.view.sendMapChat(); settleRun(runs[0]); await until(() => rchat.pendingPlan());
+  assert.match(visibleText(planCard(r)[0]), /Starts research/, 'five targets alone would not ask: the six of round 1 are counted'); assert.equal(runs.length, 1, 'the second research waits for the card'); eq(rspy.rounds(), [2]);
+});
+integrationTest('P3 A10: every round is one undo step and Undo takes back the newest round only; the follow-up goes into the chain\'s message; the image is for round 1 only; nothing is written twice', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const s = steerReply(h); const base = h.view.map.nodes.length;
+  let n = 0; const rounds = [say('First.', [addRoot('p', 'FirstCard')], 'More'), say('Second.', [addRoot('q', 'SecondCard')], '')];
+  h.control.reply = async (request, signal, onReply, onProgress, onSteer) => { n++; if (n === 1) { onSteer?.(async text => { s.handled.push(text); }); await s.gate.promise; } return rounds.shift(); };
+  h.type('build it'); const sending = h.view.sendMapChat(); await requestOut(chat); h.type('and cover X'); pressEnter(chat); await tick(); await tick(); s.gate.resolve(); await sending; await until(() => h.view.chatChain === null && n === 2);
+  eq(s.handled, ['and cover X']); assert.equal(h.control.requests[1].message, 'build it\n\nand cover X', 'round 2 asks the message with the follow-up'); eq(chat.transcript().map(m => m.steers?.length ?? 0), [1, 0, 0, 0]);
+  assert.equal(chat.transcript()[2].origin.imageId, undefined); assert.equal(h.control.requests[1].imageDataUrl, undefined);
+  assert.equal(h.view.map.nodes.length, base + 2, 'two cards, each written once');
+  const titles = async () => Promise.all(h.view.map.nodes.map(async node => (await h.repo.readNote(node.path)).title));
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply'); await h.view.travel(false); await h.view.hydrate();
+  assert.equal((await titles()).includes('SecondCard'), false, 'Undo takes back round 2'); assert.equal((await titles()).includes('FirstCard'), true, 'and leaves round 1');
+  assert.equal(h.view.history.undoEntry.label, 'AI chat reply', 'round 1 is its own step, still there'); await h.view.travel(false); await h.view.hydrate();
+  assert.equal((await titles()).includes('FirstCard'), false, 'the second Undo takes back round 1'); assert.equal(h.view.map.nodes.length, base);
+});
+integrationTest('P3 retry: a failed automatic round is retried from that round with the chain it had, without counting the round twice', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat); let calls = 0;
+  h.control.reply = async () => { calls++; if (calls === 1) return say('One.', [addRoot('x', 'X')], 'Then more'); if (calls === 2) throw new Error('model exploded'); if (calls === 3) return say('Two.', [addRoot('y', 'Y')], 'Still more'); return say('Three.', [], ''); };
+  h.type('go'); await h.view.sendMapChat(); await until(() => spy.reasons().length === 1); eq(spy.reasons(), ['failed']); assert.equal(h.view.chatChain, null);
+  const failed = chat.transcript().at(-1); assert.equal(failed.error, true); const retryOrigin = chat.transcript().at(-2).origin; assert.equal(retryOrigin.chain.state.round, 2); assert.equal(retryOrigin.chain.continuation.round, 2);
+  h.view.chat.host?.retry; await h.view.sendMapChat(retryOrigin); await until(() => h.view.chatChain === null && calls === 4);
+  eq(spy.rounds(), [2, 2, 3], 'the retry is round 2 again and the next one is round 3'); eq(contextOf(h.control.requests[2]).continuation.round, 2); eq(contextOf(h.control.requests[3]).continuation.round, 3);
+});
+integrationTest('P3 expand: a chat expansion that fails (including note_too_long) is a failed result line and counts in the chain; one that succeeds carries the chain on; the lines carry the basis', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat);
+  await h.repo.updateNote(h.node('a').path, { detail: 'The note of Body.' }); await h.view.hydrate();
+  const expandAct = key => ({ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids[key]], title: '', goal: '', direction: '', mode: '', images: false });
+  h.view.chatExpand = async () => ({ status: 'failed', reason: 'The topic and preset are too long to send; shorten them.' });
+  chainReplies(h, say('Expanding.', [expandAct('a')], 'Then the rest'));
+  h.type('expand body'); await h.view.sendMapChat(); await chainEnded(spy); eq(spy.reasons(), ['no_progress']);
+  const lines = chat.transcript().at(-1).lines.filter(l => l.text !== NOT_UNDOABLE); eq(lines.map(l => l.status), ['done', 'failed']); assert.match(lines[1].text, /Failed: .*Body.*too long/);
+  eq(lines[0].basis, { kind: 'note', sources: [{ id: h.ids.a, title: 'Body' }], existingChildren: 1 });
+  const ok = await harness(); await ok.view.hydrate(); const ochat = ok.open(); const ospy = chainSpy(ochat);
+  ok.view.chatExpand = async () => ({ status: 'succeeded' }); chainReplies(ok, say('Expanding.', [{ kind: 'run_map_action', action: 'expand', nodeIds: [ok.ids.c], title: '', goal: '', direction: '', mode: '', images: false }], 'Then more'), say('Done.', [], ''));
+  ok.type('expand rem'); await ok.view.sendMapChat(); await until(() => ok.control.requests.length === 2 && ok.view.chatChain === null); eq(ospy.rounds(), [2]); eq(ochat.transcript()[1].lines[0].basis, { kind: 'outline_only', alsoRead: [], existingChildren: 0 });
+  const t = await harness(); await t.view.hydrate(); t.open(); const { OutlineGenerateError } = load('core/steps/outline-generate/step.ts', { obsidian }); await t.repo.updateNote(t.node('a').path, { detail: 'x' });
+  t.view.quickOutline = () => ({ generate: async () => { throw new OutlineGenerateError('note_too_long', 'too long to send'); }, create: async () => { throw new Error('not reached'); } });
+  const result = await t.view.chatExpand(t.node('a'), ''); eq(result, { status: 'failed', reason: 'too long to send' });
+  t.view.quickOutline = () => ({ generate: async (_r, signal) => { await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })); return []; }, create: async () => {} });
+  const stopper = new AbortController(); const running = t.view.chatExpand(t.node('a'), '', stopper.signal); await tick(); t.plugin.activeTasks.get(t.node('a').path).abort(); eq(await running, { status: 'stopped' });
+});
+integrationTest('P3 records: an automatic round is written with auto and its round, lines keep their basis, an unfinished chain writes its end as an event, and reopening restores only finished turns and no chain', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const { chat, runs } = await researchChain(h, { remaining: 'Add the subtopics' });
+  const rootId = runs[0].ids[0]; await h.repo.updateNote(h.view.map.nodes.find(n => n.id === rootId).path, { detail: 'R' });
+  chainReplies(h, say('Added.', [{ kind: 'add_child', parentId: rootId, title: 'Alpha', summary: '' }], 'Still more'), async () => { throw new Error('boom'); });
+  settleRun(runs[0]); await until(() => h.control.requests.length === 3 && h.view.chatChain === null); await recordIdle(h);
+  const [file] = recordFiles(h); const lines = recordLines(h, file);
+  eq(lineKinds(lines), ['conversation', 'turn_start', 'end:done', 'turn_start', 'end:done', 'turn_start', 'end:failed', 'event:chain_end']);
+  const starts = lines.filter(l => l.type === 'turn_start'); eq(starts.map(s => [s.auto ?? false, s.round ?? 0]), [[false, 0], [true, 2], [true, 3]]);
+  eq(lines.filter(l => l.type === 'turn_end')[1].lines[0].basis.kind, 'research'); eq(lines.at(-1).reason, 'failed'); eq(lines.at(-1).remaining, 'Still more');
+  const again = await harness({ records: true }); const { restoreConversation } = load('core/map-chat-records.ts'); const restored = restoreConversation('x', lines);
+  eq(restored.turns.map(t => [t.auto, t.status]), [[false, 'done'], [true, 'done']]); eq(restored.turns[1].lines[0].basis.sources, [{ id: rootId, title: 'Pstack' }]);
+  const forged = restoreConversation('x', [{ v: 1, type: 'turn_start', turn: 1, at: 'a', message: 'm' }, { v: 1, type: 'turn_end', turn: 1, at: 'a', status: 'done', raw: null, reply: 'r', modelLabel: '', lines: [{ status: 'done', text: 't', basis: { kind: 'research', sources: [{ id: 1, title: 'ok' }, { id: 'a', title: 'good' }], extra: '<script>' } }, { status: 'done', text: 'u', basis: { kind: 'evil' } }] }]);
+  eq(forged.turns[0].lines.map(l => l.basis), [{ kind: 'research', sources: [{ id: 'a', title: 'good' }] }, undefined], 'a basis read back from a file keeps only its known shape');
+});

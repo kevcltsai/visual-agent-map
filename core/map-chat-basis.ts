@@ -84,3 +84,53 @@ export function expandBasis(card: {
     ? { kind: "note", sources: [{ id: card.id, title: card.title }], existingChildren: card.existingChildren }
     : { kind: "outline_only", alsoRead: [], existingChildren: card.existingChildren };
 }
+
+const BASIS_TEXT_LIMIT = 200;
+const BASIS_LIST_LIMIT = 50;
+const text = (value: unknown): string | null =>
+  typeof value === "string" ? [...value].slice(0, BASIS_TEXT_LIMIT).join("") : null;
+const count = (value: unknown): { existingChildren?: number } =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0 ? { existingChildren: value } : {};
+
+/** A basis read back from a saved conversation (a file somebody may have edited): only the known shape comes through, else undefined. */
+export function parseChatBasis(value: unknown): MapChatBasis | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  if (raw.kind === "research" || raw.kind === "note") {
+    if (!Array.isArray(raw.sources)) return undefined;
+    const sources = raw.sources.slice(0, BASIS_LIST_LIMIT).flatMap(item => {
+      const entry = (item ?? {}) as Record<string, unknown>;
+      const id = text(entry.id);
+      const title = text(entry.title);
+      return id !== null && title !== null ? [{ id, title }] : [];
+    });
+    return { kind: raw.kind, sources, ...count(raw.existingChildren) };
+  }
+  if (raw.kind === "outline_only") {
+    const alsoRead = (Array.isArray(raw.alsoRead) ? raw.alsoRead : []).slice(0, BASIS_LIST_LIMIT).flatMap(item => {
+      const entry = (item ?? {}) as Record<string, unknown>;
+      const path = text(entry.path);
+      const title = text(entry.title);
+      return path !== null && title !== null ? [{ path, title }] : [];
+    });
+    return { kind: "outline_only", alsoRead, ...count(raw.existingChildren) };
+  }
+  return undefined;
+}
+
+/** Fixed words of {@link basisSummary} (`{0}` is the titles); the view hands over the interface language's. */
+export interface BasisLabels {
+  research: string;
+  note: string;
+  outline: string;
+}
+/**
+ * One plain line for the basis of a result (the saved note's version): "read", never "checked". The titles are untrusted text and
+ * are left unescaped here; the caller escapes the whole line.
+ */
+export function basisSummary(basis: MapChatBasis, labels: BasisLabels, titleLimit = 5): string {
+  if (basis.kind === "outline_only") return labels.outline;
+  const titles = basis.sources.map(source => source.title.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const shown = titles.slice(0, titleLimit).join(", ") + (titles.length > titleLimit ? ", …" : "");
+  return (basis.kind === "research" ? labels.research : labels.note).replace(/\{0\}/g, () => shown);
+}

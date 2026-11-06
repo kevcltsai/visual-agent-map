@@ -383,6 +383,7 @@ import {
   type MapChatChip,
   type MapChatHost,
   type MapChatImageItem,
+  type MapChatChainOrigin,
   type MapChatImages,
   type MapChatInsertResult,
   type MapChatLine,
@@ -403,7 +404,32 @@ import {
 } from "../../core/map-chat-transcript";
 import { loadableImages } from "../../ui/image-candidates";
 import {
+  MAP_CHAT_CHAIN_WAIT_MS,
+  chainEndNeedsNotice,
+  finishRound,
+  finishWait,
+  interrupt as interruptChainState,
+  pauseForPlan,
+  planChainOf,
+  startChain,
+  type MapChatChainDecision,
+  type MapChatChainEndReason,
+  type MapChatChainInterrupt,
+  type MapChatChainState,
+  type MapChatWaitEnd
+} from "../../core/map-chat-chain";
+import {
+  chatBasisFor,
+  createdParentsOf,
+  expandBasis,
+  basisSummary,
+  type MapChatBasis
+} from "../../core/map-chat-basis";
+import {
   buildMapChatContext,
+  pendingResearchCount,
+  type MapChatContinuationInput,
+  type MapChatResearchNote,
   type MapChatSummary,
   type MapChatUserText,
   contentHash,
@@ -1043,6 +1069,80 @@ interface ResearchWebTally {
   counted: number;
   withoutSearch: number;
 }
+/** One card of research or expansion work a continuation waited for, and how it came out. */
+interface ChatWorkTopic {
+  id: string;
+  title: string;
+  status: "succeeded" | "failed" | "stopped";
+  error?: string;
+}
+/** How a research batch that the chat started came out. Told exactly once, whichever way the batch ends (or never starts). */
+export type ChatResearchOutcome =
+  | { kind: "not_started" }
+  | { kind: "settled"; succeeded: number; failed: number; stopped: number; topics: ChatWorkTopic[] };
+/** How one expansion the chat started came out. */
+type ChatExpandOutcome = { status: "succeeded" } | { status: "failed"; reason: string } | { status: "stopped" };
+/** The work one reply started that a continuation may wait for, and the handle that stops it. */
+interface ChatRoundWork {
+  /** Aborted by Stop: work not started yet is not started, and a running expansion stops. */
+  controller: AbortController;
+  /** One promise per research action, each settling once. */
+  research: Promise<ChatResearchOutcome>[];
+  researchTargets: number;
+  /** The batch keys (one per map) of the research, to stop what is running. */
+  researchKeys: Set<string>;
+  expand: { id: string; title: string; path: string; done: Promise<ChatExpandOutcome> }[];
+  /** An integration, a merge or a rating started: a continuation does not wait for these and ends. */
+  otherBackground: boolean;
+}
+const newChatWork = (): ChatRoundWork => ({
+  controller: new AbortController(),
+  research: [],
+  researchTargets: 0,
+  researchKeys: new Set(),
+  expand: [],
+  otherBackground: false
+});
+/** What `applyMapChatActions` is given beyond the reply: the context the basis is judged by and where the started work is collected. */
+interface ChatApplyOptions {
+  context?: Pick<MapChatContext, "basis" | "parents">;
+  work?: ChatRoundWork;
+}
+/** What a finished round hands to its chain: the reply, what was applied, and the work it started. */
+interface ChatRoundEnd {
+  result: MapChatResult;
+  context: Pick<MapChatContext, "research">;
+  lines: MapChatLine[];
+  work: ChatRoundWork;
+  anchor: { path: string; id: string | undefined };
+}
+/** One automatic continuation of a chat message, owned by the view (at most one). Lives in memory only. */
+interface ChatChainRun {
+  /** Tells this chain from an earlier one in a late event or a retry. */
+  seq: number;
+  state: MapChatChainState;
+  /** The map the chain belongs to; a create or open the chain performs moves it. */
+  anchor: { path: string; id: string | undefined };
+  /** The message every round asks: the user's words plus the follow-ups that went into earlier rounds. */
+  message: string;
+  /** The turn of the round in flight, or of the last one. */
+  turn: MapChatTurnHandle | null;
+  record: MapChatTurnRecord | null;
+  /** What the latest reply said was still to do (known before the round has ended). */
+  replyRemaining: string;
+  lastResults: MapChatContinuationInput["lastResults"];
+  /** What the work waited for came to, for the next round. */
+  waited: MapChatContinuationInput["research"];
+  /** Lines about failed work, for the notice at the end. */
+  details: string[];
+  work: ChatRoundWork | null;
+  timer: number | null;
+  /** The panel was told that the chain waits (and must be told that it does not). */
+  waitShown: boolean;
+}
+/** The lines of research and expansions that did not work out, one line each, for the end notice of a chain. */
+const chainWorkDetail = (item: { title: string; status: string; error?: string }): string =>
+  item.error ? `${item.title}: ${item.error}` : item.title;
 /** The lines that say how many web searches a research batch made; a topic with none is a warning of its own. */
 function researchWebLines(web: ResearchWebTally): MapChatLine[] {
   if (!web.counted) return [];
@@ -1052,7 +1152,7 @@ function researchWebLines(web: ResearchWebTally): MapChatLine[] {
 }
 /** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
 type ChatOutcome =
-  | { status: "done"; images?: MapChatImages; skippedCards?: number }
+  | { status: "done"; images?: MapChatImages; skippedCards?: number; basis?: MapChatBasis }
   | { status: "skipped" | "failed"; reason: string; created?: boolean };
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 interface ChatRun {
@@ -1244,6 +1344,15 @@ export class VisualAgentMapView extends ItemView {
   private chatCarryOver = false;
   /** True while a confirmed plan is being applied; no new message is sent meanwhile. */
   private chatApplying = false;
+  /** The automatic continuation of the latest message (running, waiting for work or for a plan); null when there is none. */
+  private chatChain: ChatChainRun | null = null;
+  private chatChainSeq = 0;
+  /** Cards this conversation researched (a `research_standard` that really started) and how each came out; reset with the conversation. */
+  private chatResearched = new Map<string, { title: string; status: "succeeded" | "failed" | "stopped" }>();
+  /** Research notes an earlier round already sent whole (they go last when the budget is short). */
+  private chatResearchSent = new Set<string>();
+  /** Counts conversations: the result of research another conversation started is not recorded in this one. */
+  private chatConversation = 0;
   /** The follow-ups of the turn that is running (or ran last). */
   private chatSteer: ChatSteerState | null = null;
   /** Picture searches the chat started and that have not ended; the view owns them, so closing it or leaving the map stops them. */
@@ -17404,11 +17513,46 @@ export class VisualAgentMapView extends ItemView {
   /**
    * `onSettled` (the chat's research) hears once how the batch's web activity came out, when the batch has ended: searches made,
    * topics that were counted, and how many of those made none.
+   *
+   * `onOutcome` (a continuation waiting for the research) hears exactly once, on every path: `not_started` (the usage notice was
+   * refused, nothing was left to run, a batch was already running, `signal` was aborted before the start, or the start failed) or
+   * `settled` when the batch has ended. Without it nothing changes. `signal` stops a batch that has not started yet (a batch that
+   * runs is stopped through its key, see `stopMultiResearch`).
    */
   async startMultiResearch(
     request: MultiResearchRequest,
     retryBatchKey?: string,
-    onSettled?: (web: ResearchWebTally) => void
+    onSettled?: (web: ResearchWebTally) => void,
+    onOutcome?: (outcome: ChatResearchOutcome) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    let told = false;
+    const tell = (outcome: ChatResearchOutcome): void => {
+      if (told) return;
+      told = true;
+      try {
+        onOutcome?.(outcome);
+      } catch (error) {
+        errorNotice(error);
+      }
+    };
+    let batchStarted = false;
+    try {
+      await this.runMultiResearch(request, retryBatchKey, onSettled, tell, signal, () => {
+        batchStarted = true;
+      });
+    } finally {
+      // Every way out that never started a batch tells it; a started one tells itself when it ends.
+      if (!batchStarted) tell({ kind: "not_started" });
+    }
+  }
+  private async runMultiResearch(
+    request: MultiResearchRequest,
+    retryBatchKey: string | undefined,
+    onSettled: ((web: ResearchWebTally) => void) | undefined,
+    tell: (outcome: ChatResearchOutcome) => void,
+    signal: AbortSignal | undefined,
+    markStarted: () => void
   ): Promise<void> {
     if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const languageSource = this.batchLanguageSource();
@@ -17445,6 +17589,8 @@ export class VisualAgentMapView extends ItemView {
           new Notice(t("ui.multi_research_already_running"));
           return;
         }
+        // Stop pressed on the continuation while the usage notice was open: nothing is started.
+        if (signal?.aborted) return;
         const busy = (node: MapNode): boolean =>
           this.plugin.topicRuns.isBusy(node.path) ||
           this.plugin.quickExpandPending.has(node.path) ||
@@ -17487,10 +17633,13 @@ export class VisualAgentMapView extends ItemView {
           this.plugin.expansionBatches.delete(retryBatchKey);
         let reported = false;
         let skipped = 0;
+        // How each card of the batch came out (the cards that never ran when the batch was stopped are filled in at the end).
+        const topics = new Map<string, ChatWorkTopic>();
         // Web activity of the topics that finished: Research mode only (a local run searches nothing, so it has nothing to report).
         const web: ResearchWebTally = { searches: 0, counted: 0, withoutSearch: 0 };
         try {
           const gate = { shown: false };
+          markStarted();
           await this.plugin.expansionCoordinator.start(
             key,
             nodes,
@@ -17500,22 +17649,38 @@ export class VisualAgentMapView extends ItemView {
                 accepted();
                 return "skipped";
               }
-              const choices = choicesFor(await this.plugin.repo.readNote(child.path, this.map ?? undefined));
-              await this.researchChild(
-                child,
-                batchSignal,
-                accepted,
-                choices,
-                choices.mapAiMode !== "quick",
-                result => {
-                  if (choices.researchMode !== "research" || result.retrievals === undefined) return;
-                  web.counted++;
-                  web.searches += result.retrievals;
-                  if (!result.retrievals) web.withoutSearch++;
-                },
-                gate,
-                languageSource
-              );
+              const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
+              const choices = choicesFor(note);
+              try {
+                await this.researchChild(
+                  child,
+                  batchSignal,
+                  accepted,
+                  choices,
+                  choices.mapAiMode !== "quick",
+                  result => {
+                    if (choices.researchMode !== "research" || result.retrievals === undefined) return;
+                    web.counted++;
+                    web.searches += result.retrievals;
+                    if (!result.retrievals) web.withoutSearch++;
+                  },
+                  gate,
+                  languageSource
+                );
+              } catch (error) {
+                topics.set(child.id, {
+                  id: child.id,
+                  title: note.title,
+                  status: batchSignal.aborted ? "stopped" : "failed",
+                  error: errorMessage(error)
+                });
+                throw error;
+              }
+              topics.set(child.id, {
+                id: child.id,
+                title: note.title,
+                status: batchSignal.aborted ? "stopped" : "succeeded"
+              });
               return undefined;
             },
             () => {
@@ -17535,12 +17700,30 @@ export class VisualAgentMapView extends ItemView {
                   ].join(" ")
                 );
                 onSettled?.(web);
+                const stopped = state.status === "stopped";
+                for (const node of nodes)
+                  if (stopped && !topics.has(node.id))
+                    topics.set(node.id, {
+                      id: node.id,
+                      title: this.notes.get(node.id)?.title ?? node.path,
+                      status: "stopped"
+                    });
+                tell({
+                  kind: "settled",
+                  succeeded: state.succeeded,
+                  failed: state.failures.length,
+                  stopped: stopped ? Math.max(0, state.total - state.succeeded - state.failures.length - skipped) : 0,
+                  topics: [...topics.values()]
+                });
               }
               if (!this.closed) this.render();
-            }
+            },
+            signal
           );
         } catch {
-          // Launch rejection from the coordinator (stopped or all failed) is reported by the summary Notice.
+          // Launch rejection from the coordinator (stopped or all failed) is reported by the summary Notice. A start that failed
+          // before the batch existed has not told its outcome yet (a batch that ran has: telling twice changes nothing).
+          tell({ kind: "not_started" });
         }
       });
     } catch (error) {
@@ -19241,6 +19424,7 @@ export class VisualAgentMapView extends ItemView {
         this.chatPlanToken++;
         this.clearChatPreview();
         this.chat.reset();
+        this.resetChatResearch();
         this.chatMapId = this.map.id;
         this.startChatRecords();
       }
@@ -19886,6 +20070,7 @@ export class VisualAgentMapView extends ItemView {
     origin: MapChatOrigin,
     signal: AbortSignal = new AbortController().signal
   ): Promise<MapChatRequest> {
+    const continuation = origin.chain?.continuation;
     const map = this.map!;
     const settings = this.plugin.settings;
     const byId = new Map(map.nodes.map(node => [node.id, node]));
@@ -19937,6 +20122,29 @@ export class VisualAgentMapView extends ItemView {
         ...failureOf(node.id)
       };
     });
+    // The whole text of the research this conversation ran, as the notes are now (never `this.notes`: a card may have been written
+    // since), so a message after the research (or the next round of a continuation) builds on what it found.
+    const researchNotes: MapChatResearchNote[] = [];
+    // A researched card that is also selected is sent from the same fresh read (the view's own copy may not have caught up with the
+    // research that just wrote it), so its text is never lost to a stale empty one.
+    const freshDetail = new Map<string, string>();
+    for (const [id, info] of this.chatResearched) {
+      const node = info.status === "succeeded" ? byId.get(id) : undefined;
+      if (!node) continue;
+      try {
+        const note = await this.plugin.repo.readNote(node.path, map);
+        freshDetail.set(id, note.detail);
+        researchNotes.push({
+          id,
+          title: titleOf(node),
+          path: node.path,
+          detail: note.detail,
+          sentBefore: this.chatResearchSent.has(id)
+        });
+      } catch {
+        // The note cannot be read now: it is left out like a card that is gone.
+      }
+    }
     const ref = (id: string): MapChatTopicRef | null => {
       const node = byId.get(id);
       return node
@@ -19944,7 +20152,7 @@ export class VisualAgentMapView extends ItemView {
             id,
             title: titleOf(node),
             summary: summaryOf(id),
-            detail: this.notes.get(id)?.detail ?? "",
+            detail: freshDetail.get(id) ?? this.notes.get(id)?.detail ?? "",
             path: node.path,
             ...failureOf(id)
           }
@@ -20004,7 +20212,9 @@ export class VisualAgentMapView extends ItemView {
       relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns(),
-      ...(picture ? { selectedImage: picture.selected } : {})
+      ...(picture ? { selectedImage: picture.selected } : {}),
+      ...(researchNotes.length ? { researchNotes } : {}),
+      ...(continuation ? { continuation } : {})
     });
     return {
       message,
@@ -20044,6 +20254,9 @@ export class VisualAgentMapView extends ItemView {
     // A retry sends the same question with the same references again, after a failure; a normal send reads the draft.
     const message = again ? again.text : chat.draft.trim();
     if (!message) return;
+    // The user speaking ends the continuation that is running, waiting for work or waiting for a plan: the text is a new message.
+    const autoOrigin = again?.chain;
+    if (!autoOrigin) this.interruptChain(this.chatChain, "user_took_over");
     // The turn has its own copy: follow-ups that go in are added to it, and a copy keeps the earlier turn's retry as it was.
     const origin: MapChatOrigin = again
       ? { ...again }
@@ -20056,23 +20269,31 @@ export class VisualAgentMapView extends ItemView {
         };
     // Where this turn is anchored. A create_map / open_map of the turn itself moves it (see applyMapChatActions).
     const anchor = { path: this.path, id: this.map.id as string | undefined };
+    // The continuation this round belongs to: a message of the user's starts a new one; an automatic round (or the retry of one)
+    // goes on with the chain it came from, at the round it was.
+    const run = this.chainForRound(autoOrigin, anchor, message);
     // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
     // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
     const draft = chat.draft;
-    const turn = chat.begin(message, origin, Boolean(again), "preparing");
+    const turn = autoOrigin
+      ? chat.beginAutoRound(run.state.round, run.state.maxRounds, run.state.remaining, origin)
+      : chat.begin(message, origin, Boolean(again), "preparing");
+    run.turn = turn;
     let sent = false;
     // Takes the turn back and puts the draft into the field again (a retry has no draft to put back). `reason`
     // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
-    const abandon = (reason?: string): void => {
+    // `ends` is why the continuation (if one was running) ends with it.
+    const abandon = (reason?: string, ends: MapChatChainInterrupt = "map_changed"): void => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+      this.interruptChain(run, ends);
       if (!chat.retract(turn, again ? restore : draft)) return;
-      if (reason !== undefined) new Notice(reason);
+      if (reason !== undefined && (!autoOrigin || ends === "failed")) new Notice(reason);
     };
     // Stop while preparing is the user's own act: the send is taken back like any early end, without a Notice.
     const preparing = new AbortController();
     const stopPreparing = (): void => {
       preparing.abort();
-      abandon();
+      abandon(undefined, "stopped");
     };
     this.chatPrepAbandon = stopPreparing;
     const steerState: ChatSteerState = {
@@ -20092,7 +20313,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       request = { ...(await this.buildChatRequest(message, chat, origin, preparing.signal)), ...this.usageMapField() };
     } catch (error) {
-      abandon(this.closed ? undefined : errorMessage(error));
+      abandon(this.closed ? undefined : errorMessage(error), "failed");
       return;
     }
     // Stop, closing the view or a map switch while the request was being built: no usage notice, no setup guide.
@@ -20118,8 +20339,11 @@ export class VisualAgentMapView extends ItemView {
           }
           sent = true;
           if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+          // The research notes this request carries are "sent before" for the next round (they go last when the budget is short).
+          for (const id of request.context.research?.sent ?? []) this.chatResearchSent.add(id);
           // Conversation record (switch on): the turn is written from here, not before (a send taken back leaves no trace).
           const record = this.beginChatRecord(chat, turn, request, origin);
+          run.record = record;
           // The follow-ups that went into this turn are written with its end (queued ones become the next turn).
           if (record)
             record.steerTexts = () => steerState.entries.filter(e => e.status === "delivered").map(e => e.text);
@@ -20236,12 +20460,16 @@ export class VisualAgentMapView extends ItemView {
               await this.closeSteers(steerState);
               if (!alive()) return;
               const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
+              // The follow-ups that went into this round are part of the message every later round asks.
+              run.message = fullMessage;
+              run.replyRemaining = result.remaining;
               const plan = result.actions.length
                 ? planFor(result.actions, request.context, {
                     diagrams: this.plugin.settings.addDiagramsAfterResearch,
                     mapAiMode: this.map?.aiMode,
                     imageMode: this.chatImageMode(),
-                    imageAttached: !!request.imageDataUrl
+                    imageAttached: !!request.imageDataUrl,
+                    chain: planChainOf(run.state)
                   })
                 : null;
               if (plan) {
@@ -20249,13 +20477,16 @@ export class VisualAgentMapView extends ItemView {
                 if (chat.isBusy) {
                   chat.finish(result.reply, []);
                   this.markChatTurn(origin, request);
+                  // The continuation stops where it is until the plan is applied (it goes on) or cancelled (it ends).
+                  run.state = pauseForPlan(run.state);
                   this.offerChatPlan(
                     result,
                     plan,
                     request.context,
                     { path: anchor.path, id: anchor.id },
                     fullMessage,
-                    record
+                    record,
+                    run
                   );
                   if (record?.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
                     this.chatRecordLogged.add(turn.assistant);
@@ -20266,11 +20497,14 @@ export class VisualAgentMapView extends ItemView {
               }
               // A pure answer has nothing to apply: the reader is not told "applying" for it.
               if (result.actions.length) chat.setStage("applying");
+              const work = newChatWork();
+              run.work = work;
               const lines = await this.applyMapChatActions(
                 { ...result, message: fullMessage },
                 request.context,
                 alive,
-                anchor
+                anchor,
+                { context: request.context, work }
               );
               if (alive() && chat.isBusy) {
                 // Read at once: the next reply's step replaces `chatReplyEntry`.
@@ -20279,8 +20513,8 @@ export class VisualAgentMapView extends ItemView {
                 this.markChatTurn(origin, request, entry);
                 if (record?.end("done", { reply: result.reply, lines, rejected: result.rejected }))
                   this.chatRecordLogged.add(turn.assistant);
-                // Waiting follow-ups are the next message, sent once.
-                this.flushSteers(true);
+                // The round is over: the continuation goes on, waits or ends; follow-ups that waited are the next message instead.
+                this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
               }
               return;
             } catch (error) {
@@ -20297,6 +20531,7 @@ export class VisualAgentMapView extends ItemView {
                   error: { text: failure.text, technical: failure.technical ?? "" }
                 });
                 this.returnSteers(steerState);
+                this.interruptChain(run, "failed");
               }
               return;
             } finally {
@@ -20314,11 +20549,11 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       // Only a failure before the request went out is taken back; once sent, the turn reports its own failures.
       if (sent) throw error;
-      abandon(this.closed ? undefined : errorMessage(error));
+      abandon(this.closed ? undefined : errorMessage(error), "failed");
       return;
     }
     // The AI is not ready (it said why itself) or the usage notice was declined.
-    if (!went && !sent) abandon(this.closed ? undefined : notSent());
+    if (!went && !sent) abandon(this.closed ? undefined : notSent(), "not_ready");
   }
   /** Enter with text while the AI works: the text goes into the running turn, or waits for the turn to end. */
   private steerMapChat(): void {
@@ -20440,6 +20675,239 @@ export class VisualAgentMapView extends ItemView {
       texts.join("\n")
     );
   }
+  // ---- automatic continuation (the chain) ---------------------------------------------------------------------------------
+
+  /**
+   * The chain a round belongs to. A message of the user's starts a new one (round 1); an automatic round goes on with the chain it
+   * came from. A retry of a failed automatic round finds no live chain (it ended as `failed`) and takes the round again from the
+   * state saved in its origin, without counting it twice.
+   */
+  private chainForRound(
+    origin: MapChatChainOrigin | undefined,
+    anchor: { path: string; id: string | undefined },
+    message: string
+  ): ChatChainRun {
+    const live = this.chatChain;
+    if (origin && live && live.seq === origin.seq && live.state.phase === "round") {
+      live.anchor = anchor;
+      live.message = message;
+      live.replyRemaining = origin.continuation.remaining;
+      return live;
+    }
+    const run: ChatChainRun = {
+      seq: ++this.chatChainSeq,
+      state: origin ? { ...origin.state, phase: "round" } : startChain(),
+      anchor,
+      message,
+      turn: null,
+      record: null,
+      replyRemaining: origin?.continuation.remaining ?? "",
+      lastResults: origin?.continuation.lastResults ?? [],
+      waited: origin?.continuation.research ?? [],
+      details: [],
+      work: null,
+      timer: null,
+      waitShown: false
+    };
+    this.chatChain = run;
+    return run;
+  }
+  /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
+  private chainShows(run: ChatChainRun): boolean {
+    return run.state.round >= 2 || !!run.replyRemaining || !!run.state.remaining;
+  }
+  /** Ends the chain from the outside (Stop, a new message, a failure, a map change): the first ending wins, a later one changes nothing. */
+  private interruptChain(run: ChatChainRun | null, reason: MapChatChainInterrupt): void {
+    if (!run) return;
+    const step = interruptChainState(run.state, reason);
+    if (step.decision.kind !== "end") return;
+    run.state = step.state;
+    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining);
+  }
+  /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
+  private endChatChain(run: ChatChainRun, reason: MapChatChainEndReason, remaining: string): void {
+    if (this.chatChain === run) this.chatChain = null;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    run.timer = null;
+    run.state = { ...run.state, phase: "ended" };
+    if (this.closed) return;
+    const chat = this.chat;
+    if (run.waitShown) chat?.setChainWaiting(null);
+    run.waitShown = false;
+    if (!this.chainShows(run)) return;
+    this.chatLastRecord?.event("chain_end", { reason, round: run.state.round, remaining });
+    if (chat && chainEndNeedsNotice(reason))
+      chat.endChain(reason, remaining, run.details.length ? run.details : undefined);
+  }
+  /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
+  private stopChainWork(run: ChatChainRun): void {
+    const work = run.work;
+    if (!work) return;
+    work.controller.abort();
+    for (const key of work.researchKeys) this.plugin.expansionCoordinator.stop(key);
+    for (const item of work.expand) this.plugin.activeTasks.get(item.path)?.abort();
+  }
+  /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
+  private finishChatRound(run: ChatChainRun, round: ChatRoundEnd): void {
+    // Follow-ups that waited are the user speaking: the chain ends and they are sent once as the next message.
+    if (this.chat?.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
+    else this.advanceChain(run, round);
+    this.flushSteers(true);
+  }
+  private advanceChain(run: ChatChainRun, round: ChatRoundEnd): void {
+    if (this.chatChain !== run || run.state.phase === "ended") return;
+    run.lastResults = round.lines.map(line => ({ text: line.text, status: line.status }));
+    run.anchor = { path: round.anchor.path, id: round.anchor.id };
+    const step = finishRound(run.state, {
+      remaining: round.result.remaining,
+      researchDeferred: pendingResearchCount(round.context),
+      actions: round.result.actions.map((action, index) => ({
+        kind: action.kind,
+        done: round.lines[index]?.status === "done"
+      })),
+      started: {
+        research: round.work.researchTargets,
+        expand: round.work.expand.length,
+        otherBackground: round.work.otherBackground
+      }
+    });
+    run.state = step.state;
+    this.followChainDecision(run, step.decision, round.work);
+  }
+  private followChainDecision(run: ChatChainRun, decision: MapChatChainDecision, work: ChatRoundWork | null): void {
+    if (decision.kind === "end") this.endChatChain(run, decision.reason, decision.remaining);
+    else if (decision.kind === "wait" && work) this.waitForChain(run, decision.waitFor, work);
+    else if (decision.kind === "next") this.startNextRound(run, decision.round, decision.remaining);
+  }
+  /** Waits for the research and expansions the round started; the 30 minutes only end the chain, never the work. */
+  private waitForChain(run: ChatChainRun, waitFor: ("research" | "expand")[], work: ChatRoundWork): void {
+    const chat = this.chat;
+    const research = waitFor.includes("research") ? work.research : [];
+    const expand = waitFor.includes("expand") ? work.expand : [];
+    const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand.length, settled: 0 };
+    chat?.setChainWaiting(waiting);
+    run.waitShown = true;
+    const progress = (by: number): void => {
+      if (this.chatChain !== run || run.state.phase !== "waiting") return;
+      waiting.settled = Math.min(waiting.total, waiting.settled + by);
+      this.chat?.setChainWaiting(waiting);
+    };
+    run.timer = window.setTimeout(() => {
+      run.timer = null;
+      this.settleChainWait(run, { timedOut: true }, []);
+    }, MAP_CHAT_CHAIN_WAIT_MS);
+    let researched: ChatResearchOutcome | undefined;
+    const waited: ChatWorkTopic[] = [];
+    let expandSucceeded = 0;
+    let expandFailed = 0;
+    const pending: Promise<void>[] = [];
+    if (research.length)
+      pending.push(
+        Promise.all(research).then(outcomes => {
+          const settled = outcomes.flatMap(outcome => (outcome.kind === "settled" ? [outcome] : []));
+          researched = settled.length
+            ? {
+                kind: "settled",
+                succeeded: settled.reduce((sum, outcome) => sum + outcome.succeeded, 0),
+                failed: settled.reduce((sum, outcome) => sum + outcome.failed, 0),
+                stopped: settled.reduce((sum, outcome) => sum + outcome.stopped, 0),
+                topics: settled.flatMap(outcome => outcome.topics)
+              }
+            : { kind: "not_started" };
+          if (researched.kind === "settled") waited.push(...researched.topics);
+          progress(work.researchTargets);
+        })
+      );
+    for (const item of expand)
+      pending.push(
+        item.done.then(outcome => {
+          if (outcome.status === "succeeded") expandSucceeded++;
+          else if (outcome.status === "failed") expandFailed++;
+          waited.push({
+            id: item.id,
+            title: item.title,
+            status: outcome.status,
+            ...(outcome.status === "failed" ? { error: outcome.reason } : {})
+          });
+          progress(1);
+        })
+      );
+    void Promise.all(pending).then(() =>
+      this.settleChainWait(
+        run,
+        {
+          ...(researched ? { research: researched } : {}),
+          ...(expand.length ? { expand: { succeeded: expandSucceeded, failed: expandFailed } } : {})
+        },
+        waited
+      )
+    );
+  }
+  /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
+  private settleChainWait(run: ChatChainRun, end: MapChatWaitEnd, waited: ChatWorkTopic[]): void {
+    if (this.chatChain !== run || run.state.phase !== "waiting") return;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    run.timer = null;
+    const chat = this.chat;
+    if (
+      this.closed ||
+      !chat ||
+      this.path !== run.anchor.path ||
+      this.map?.id !== run.anchor.id ||
+      (run.turn !== null && !chat.hasTurn(run.turn))
+    ) {
+      this.interruptChain(run, "map_changed");
+      return;
+    }
+    chat.setChainWaiting(null);
+    run.waitShown = false;
+    run.waited = waited.map(item => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      ...(item.error ? { error: item.error } : {})
+    }));
+    run.details = waited.filter(item => item.status !== "succeeded").map(chainWorkDetail);
+    const step = finishWait(run.state, end);
+    run.state = step.state;
+    this.followChainDecision(run, step.decision, null);
+  }
+  /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
+  private startNextRound(run: ChatChainRun, round: number, remaining: string): void {
+    const chat = this.chat;
+    if (
+      this.closed ||
+      !chat ||
+      this.path !== run.anchor.path ||
+      this.map?.id !== run.anchor.id ||
+      (run.turn !== null && !chat.hasTurn(run.turn))
+    ) {
+      this.interruptChain(run, "map_changed");
+      return;
+    }
+    if (chat.isBusy || this.chatApplying) {
+      this.interruptChain(run, "user_took_over");
+      return;
+    }
+    const origin: MapChatOrigin = {
+      text: run.message,
+      chips: [],
+      selectedIds: this.chatSelectionIds(),
+      chain: {
+        seq: run.seq,
+        state: run.state,
+        continuation: {
+          round,
+          maxRounds: run.state.maxRounds,
+          remaining,
+          lastResults: run.lastResults,
+          research: run.waited
+        }
+      }
+    };
+    run.work = null;
+    void this.sendMapChat(origin).catch(error => errorNotice(error));
+  }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   private supersedeChatPlan(): void {
     const pending = this.chat?.pendingPlan() ?? null;
@@ -20468,7 +20936,7 @@ export class VisualAgentMapView extends ItemView {
       case "image_other_actions":
         return t("ui.map_chat_plan_reason_image_other_actions");
       case "auto_round_other_actions":
-        // Unreachable until the chain passes `chain` to planFor (P3); P3/P4 give it its own text.
+        // Reachable from round 2 of a continuation. Own wording comes with P4; until then it reads as the action-count reason.
         return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
     }
   }
@@ -20476,12 +20944,14 @@ export class VisualAgentMapView extends ItemView {
   private offerChatPlan(
     result: MapChatResult,
     plan: MapChatPlan,
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "selectedCount">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research">,
     anchor: { path: string; id: string | undefined },
     /** The user's message: an integration in the plan takes it as its direction when the plan is applied, as it would have at once. */
     message: string,
     /** The turn's conversation record (switch on): what becomes of the card is written to it. */
-    record: MapChatTurnRecord | null = null
+    record: MapChatTurnRecord | null = null,
+    /** The continuation the round belongs to: it goes on after Apply and ends when the card is cancelled. */
+    run: ChatChainRun | null = null
   ): void {
     const chat = this.chat;
     if (!chat) return;
@@ -20522,13 +20992,14 @@ export class VisualAgentMapView extends ItemView {
       // Undo takes the plan's changes back; only the AI work it starts is said to stay.
       aiWork: result.actions.some(action => action.kind === "run_map_action"),
       state: "pending",
-      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor),
+      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
       cancel: () => {
         if (token !== this.chatPlanToken) return;
         this.chatPlanToken++;
         this.clearChatPreview();
         this.chat?.settlePlan(card, "cancelled");
         this.chatPlanRecords.get(card)?.plan("cancelled");
+        this.interruptChain(run, "plan_cancelled");
       }
     };
     if (record) this.chatPlanRecords.set(card, record);
@@ -20538,8 +21009,9 @@ export class VisualAgentMapView extends ItemView {
     card: MapChatPlanCard,
     token: number,
     result: MapChatResult & { message?: string },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
-    anchor: { path: string; id: string | undefined }
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "basis" | "parents" | "research">,
+    anchor: { path: string; id: string | undefined },
+    run: ChatChainRun | null = null
   ): Promise<void> {
     const chat = this.chat;
     if (!chat || this.closed || token !== this.chatPlanToken || chat.isBusy || this.chatApplying) return;
@@ -20547,6 +21019,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.path !== anchor.path || this.map.id !== anchor.id) {
       this.chatPlanToken++;
       this.clearChatPreview();
+      this.interruptChain(run, "map_changed");
       const skip: MapChatLine[] = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
       chat.settlePlan(card, "cancelled", skip);
       this.chatPlanRecords.get(card)?.plan("cancelled", skip);
@@ -20561,10 +21034,13 @@ export class VisualAgentMapView extends ItemView {
     chat.setApplying(true);
     const stopped = (): boolean => token !== this.chatPlanToken;
     let lines: MapChatLine[];
+    const work = newChatWork();
+    if (run) run.work = work;
+    const live = { path: anchor.path, id: anchor.id };
     try {
-      lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, {
-        path: anchor.path,
-        id: anchor.id
+      lines = await this.applyMapChatActions(result, baseline, () => token === this.chatPlanToken, live, {
+        context: baseline,
+        work
       });
     } catch (error) {
       lines = [{ status: "failed", text: errorMessage(error) }];
@@ -20575,6 +21051,14 @@ export class VisualAgentMapView extends ItemView {
     if (!this.closed) {
       chat.settlePlan(card, "applied", lines);
       this.chatPlanRecords.get(card)?.plan(this.chatPlanStopped ? "stopped" : "applied", lines);
+      if (run) {
+        // Stop ends the continuation (and the work it started); otherwise the round is over like any other.
+        if (stopped()) {
+          if (this.chainShows(run)) this.stopChainWork(run);
+          this.interruptChain(run, "stopped");
+        } else if (chat.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
+        else this.advanceChain(run, { result, context: baseline, lines, work, anchor: live });
+      }
       // Follow-ups typed while the plan was applied: sent once, unless Stop ended it.
       this.flushSteers(!stopped());
     }
@@ -20681,6 +21165,7 @@ export class VisualAgentMapView extends ItemView {
         type: "turn_start",
         turn: number,
         message: origin.text,
+        ...(origin.chain ? { auto: true as const, round: origin.chain.state.round } : {}),
         origin: { chips, selectedIds: [...origin.selectedIds] },
         request: {
           step: { id: mapChatStep.id, version: mapChatStep.version },
@@ -20699,6 +21184,12 @@ export class VisualAgentMapView extends ItemView {
       return null;
     }
   }
+  /** A new conversation (another map, "New conversation"): the research of the old one is no longer this one's, and results still to come are not recorded. */
+  private resetChatResearch(): void {
+    this.chatConversation++;
+    this.chatResearched.clear();
+    this.chatResearchSent.clear();
+  }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
     this.chatRecordEpoch++;
@@ -20713,6 +21204,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {
+    this.interruptChain(this.chatChain, "user_took_over");
+    this.resetChatResearch();
     this.chatPlanToken++;
     this.chatRecordEpoch++;
     this.chatRecordTurnSeq = 0;
@@ -20804,10 +21297,20 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   private stopMapChat(): void {
+    const run = this.chatChain;
+    // Waiting for the research or expansions of a continuation: no request runs. Stop ends the wait and the work the chain started;
+    // what was written stays.
+    if (run?.state.phase === "waiting") {
+      this.stopChainWork(run);
+      this.interruptChain(run, "stopped");
+      this.chat?.focusInput();
+      return;
+    }
     // A plan being applied has no request to abort: the plan's number moves on, what is done stays and the rest is skipped.
     if (this.chatApplying && !this.chatController) {
       this.chatPlanToken++;
       this.chatPlanStopped = true;
+      if (run && this.chainShows(run)) this.stopChainWork(run);
       this.chat?.focusInput();
       return;
     }
@@ -20817,17 +21320,22 @@ export class VisualAgentMapView extends ItemView {
       this.chat?.focusInput();
       return;
     }
+    // A reply of a continuation that already started research or expansions: Stop stops those too.
+    if (run && this.chainShows(run)) this.stopChainWork(run);
     this.releaseChatTask();
     controller.abort();
     // Before the panel marks the answer stopped: the record keeps the text that had streamed in.
     this.endChatRecord("stopped");
     this.chat?.markStopped();
+    this.interruptChain(run, "stopped");
     // Follow-ups that did not go in are not sent after a stop: they are in the field again.
     if (this.chatSteer) this.returnSteers(this.chatSteer);
     this.chat?.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
   private abortMapChat(): void {
+    // The continuation ends; the research and expansions it started go on (a map switch or a close is not a Stop).
+    this.interruptChain(this.chatChain, "map_changed");
     this.chatPlanToken++;
     this.clearChatPreview();
     const controller = this.chatController;
@@ -21058,6 +21566,7 @@ export class VisualAgentMapView extends ItemView {
     if (outcome.status === "done")
       return {
         status: "done",
+        ...(outcome.basis ? { basis: outcome.basis } : {}),
         text:
           t("ui.map_chat_line_done_0", label) +
           (outcome.skippedCards
@@ -21149,7 +21658,9 @@ export class VisualAgentMapView extends ItemView {
     },
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes">,
     alive: () => boolean = () => true,
-    anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id }
+    anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id },
+    /** A continuation's round: the context the basis of new cards is judged by, and where the work the reply starts is collected. */
+    options: ChatApplyOptions = {}
   ): Promise<MapChatLine[]> {
     const touched = new Set<string>([anchor.path]);
     // The turn this reply belongs to (switch on): undo and redo of its writes are noted in that turn's conversation.
@@ -21410,8 +21921,15 @@ export class VisualAgentMapView extends ItemView {
               };
             }
             outcome = resolved
-              ? await this.runChatSelection(resolved.action, result.message ?? "", laterBatch, asked)
+              ? await this.runChatSelection(resolved.action, result.message ?? "", laterBatch, asked, options.work)
               : skipped("ui.map_chat_skip_parent_missing");
+            if (
+              options.work &&
+              outcome.status === "done" &&
+              resolved?.action.kind === "run_map_action" &&
+              ["synthesize", "merge", "rate_by_goal"].includes(resolved.action.action)
+            )
+              options.work.otherBackground = true;
             // A merge that did not happen leaves the cards where they are: they get the colour after all.
             if (outcome.status !== "done" && mine.length && same()) {
               const merged = new Set(mine.flatMap(entry => entry.ids));
@@ -21431,6 +21949,15 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       lines[index] = this.chatLine(label, outcome);
+    }
+    // What each new card was built from, judged from what this round was shown (never asked of the model).
+    if (options.context) {
+      const created = createdParentsOf(result.actions);
+      for (const [index, action] of result.actions.entries()) {
+        const line = lines[index];
+        if (action.kind === "add_child" && line?.status === "done")
+          line.basis = chatBasisFor(options.context.basis, action.parentId || null, options.context.parents, created);
+      }
     }
     const all = [...lines];
     if (result.rejected.length)
@@ -22231,7 +22758,9 @@ export class VisualAgentMapView extends ItemView {
     /** What the later actions of this reply have started so far. */
     batch: { imageSearches: number } = { imageSearches: 0 },
     /** The appearance the reply asked for the cards this merge takes: it goes to the merged card. */
-    held?: TopicAppearanceChange
+    held?: TopicAppearanceChange,
+    /** Where the research and expansions this action starts are collected, for a continuation to wait for. */
+    work?: ChatRoundWork
   ): Promise<ChatOutcome> {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
@@ -22279,20 +22808,48 @@ export class VisualAgentMapView extends ItemView {
               )
             )
           : null;
-        launch(
-          this.startMultiResearch(
-            {
-              ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
-              ...(retryModel ? { model: retryModel } : {})
-            },
-            undefined,
-            web => {
-              const lines = researchWebLines(web);
-              if (lines.length && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
-                chat.appendLines(lines);
-            }
-          )
-        );
+        const researchIds = [...this.selection.state.multiSelected];
+        const conversation = this.chatConversation;
+        const key = this.multiResearchKey();
+        // Told once (see startMultiResearch), whichever way the batch ends or never starts; the conversation remembers what
+        // it researched, and the continuation (if any) waits on the same promise.
+        const outcome = new Promise<ChatResearchOutcome>(resolve => {
+          const settle = (result: ChatResearchOutcome): void => {
+            if (result.kind === "settled" && conversation === this.chatConversation)
+              for (const topic of result.topics) {
+                // A later attempt that did not work out does not undo the research that did (its text is still in the note).
+                if (topic.status !== "succeeded" && this.chatResearched.get(topic.id)?.status === "succeeded") continue;
+                // Newest research last: a card researched again moves to the end.
+                this.chatResearched.delete(topic.id);
+                this.chatResearched.set(topic.id, { title: topic.title, status: topic.status });
+              }
+            resolve(result);
+          };
+          Promise.resolve(
+            this.startMultiResearch(
+              {
+                ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
+                ...(retryModel ? { model: retryModel } : {})
+              },
+              undefined,
+              web => {
+                const lines = researchWebLines(web);
+                if (lines.length && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
+                  chat.appendLines(lines);
+              },
+              settle,
+              work?.controller.signal
+            )
+          ).catch(error => {
+            errorNotice(error);
+            settle({ kind: "not_started" });
+          });
+        });
+        if (work) {
+          work.research.push(outcome);
+          work.researchTargets += researchIds.length;
+          work.researchKeys.add(key);
+        }
         return { status: "done" };
       }
       case "expand": {
@@ -22303,13 +22860,73 @@ export class VisualAgentMapView extends ItemView {
         if (!parents.length) return skipped("ui.map_chat_skip_unavailable");
         // The chat request is the confirmation of the changes, not of the AI call: each parent asks for its own model's
         // usage notice first, like the expand button. The subtopics are then added without the review window.
-        for (const parent of parents)
-          launch(
-            this.plugin.repo
-              .readNote(parent.path, this.map ?? undefined)
-              .then(note => this.plugin.confirmAiUsage(note.model, () => this.chatExpand(parent, action.direction)))
-          );
-        return { status: "done" };
+        const infos = await Promise.all(
+          parents.map(async parent => ({
+            parent,
+            note: await this.plugin.repo.readNote(parent.path, this.map ?? undefined)
+          }))
+        );
+        const expandChat = this.chat;
+        const expandTurns = expandChat?.transcript().length ?? 0;
+        const sources: { id: string; title: string }[] = [];
+        let existing = 0;
+        for (const { parent, note } of infos) {
+          const count = map.nodes.filter(node => node.parentId === parent.id).length;
+          const basis = expandBasis({
+            id: parent.id,
+            title: note.title,
+            hasNote: !!note.detail.trim(),
+            existingChildren: count
+          });
+          existing += count;
+          if (basis.kind === "note") sources.push(...basis.sources);
+        }
+        for (const { parent, note } of infos) {
+          const done = new Promise<ChatExpandOutcome>(resolve => {
+            Promise.resolve(
+              this.plugin.confirmAiUsage(note.model, async () => {
+                if (work?.controller.signal.aborted) {
+                  resolve({ status: "stopped" });
+                  return;
+                }
+                const outcome = (await this.chatExpand(parent, action.direction, work?.controller.signal)) ?? {
+                  status: "succeeded" as const
+                };
+                resolve(outcome);
+              })
+            ).then(
+              went => {
+                // Declined or not ready: nothing started (a started run has already told its own outcome).
+                if (!went) resolve({ status: "failed", reason: t("ui.map_chat_skip_not_started") });
+              },
+              error => {
+                errorNotice(error);
+                resolve({ status: "failed", reason: errorMessage(error) });
+              }
+            );
+          }).then(outcome => {
+            // A failure of an expansion that started with this reply is a result line of it, like the search count of research.
+            if (
+              outcome.status === "failed" &&
+              expandChat &&
+              this.chat === expandChat &&
+              !this.closed &&
+              expandChat.transcript().length === expandTurns
+            )
+              expandChat.appendLines([
+                {
+                  status: "failed",
+                  text: t("ui.map_chat_line_failed_0_1", t("ui.map_chat_do_expand_0", note.title), outcome.reason)
+                }
+              ]);
+            return outcome;
+          });
+          work?.expand.push({ id: parent.id, title: note.title, path: parent.path, done });
+        }
+        const basis: MapChatBasis = sources.length
+          ? { kind: "note", sources, existingChildren: existing }
+          : { kind: "outline_only", alsoRead: [], existingChildren: existing };
+        return { status: "done", basis };
       }
       case "synthesize":
         return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message);
@@ -22591,8 +23208,19 @@ export class VisualAgentMapView extends ItemView {
       else refs.push({ kind: "snippet", path: chip.path, title: "", text: chip.text });
     }
     for (const id of question.origin?.selectedIds ?? []) topic(id);
+    // What the cards of the turn were built from: one plain line per distinct basis (escaped when the note is written).
+    const basisLabels = {
+      research: t("ui.map_chat_note_basis_research_0", "{0}"),
+      note: t("ui.map_chat_note_basis_note_0", "{0}"),
+      outline: t("ui.map_chat_note_basis_outline")
+    };
+    const basis = [
+      ...new Set(answer.lines.flatMap(line => (line.basis ? [basisSummary(line.basis, basisLabels)] : [])))
+    ];
     return {
       question: question.text,
+      ...(question.auto ? { auto: true } : {}),
+      ...(basis.length ? { basis } : {}),
       steers: (question.steers ?? []).filter(steer => steer.state === "live").map(steer => steer.text),
       refs,
       answer: answer.text,
@@ -22634,6 +23262,7 @@ export class VisualAgentMapView extends ItemView {
         map: t("ui.map_chat_note_map"),
         saved: t("ui.map_chat_note_saved"),
         you: t("ui.map_chat_role_you"),
+        auto: t("ui.map_chat_role_auto"),
         steer: t("ui.map_chat_note_steer"),
         ai: t("ui.map_chat_role_ai"),
         references: t("ui.map_chat_note_references"),
@@ -22681,12 +23310,16 @@ export class VisualAgentMapView extends ItemView {
    * written without a research (`research-mode: local`, no task text). Like the dialog's run, the card shows running and Stop
    * while the outline is generated.
    */
-  private async chatExpand(parent: MapNode, direction: string): Promise<void> {
+  private async chatExpand(parent: MapNode, direction: string, signal?: AbortSignal): Promise<ChatExpandOutcome> {
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
       new Notice(t("ui.ai_running_ai"));
-      return;
+      return { status: "failed", reason: t("ui.ai_running_ai") };
     }
+    if (signal?.aborted) return { status: "stopped" };
     const controller = new AbortController();
+    // Stop on a continuation reaches the expansion it started.
+    const stopWithOwner = (): void => controller.abort();
+    signal?.addEventListener("abort", stopWithOwner, { once: true });
     this.plugin.running.add(parent.path);
     this.plugin.quickExpandPending.add(parent.path);
     this.plugin.activeTasks.set(parent.path, controller);
@@ -22695,7 +23328,7 @@ export class VisualAgentMapView extends ItemView {
       const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
       if (note.aiLocked) {
         new Notice(t("ui.ai_locked_notice"));
-        return;
+        return { status: "failed", reason: t("ui.ai_locked_notice") };
       }
       const outline = this.quickOutline(parent);
       const limits = { levels: CHAT_EXPAND_LEVELS, maxTopics: CHAT_EXPAND_MAX_TOPICS };
@@ -22714,12 +23347,12 @@ export class VisualAgentMapView extends ItemView {
         },
         controller.signal
       );
-      if (controller.signal.aborted || this.closed) return;
+      if (controller.signal.aborted || this.closed) return { status: "stopped" };
       const { nodes } = limitOutline(generated, limits);
       const items = outlineProposals(nodes);
       if (!items.length) {
         new Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
-        return;
+        return { status: "failed", reason: t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to") };
       }
       // The parent may have been removed while the AI worked; the writer then refuses and says so.
       await outline.create(proposalOutline(items), {
@@ -22734,9 +23367,13 @@ export class VisualAgentMapView extends ItemView {
           this.map?.title
         )
       });
+      return { status: "succeeded" };
     } catch (error) {
-      if (!controller.signal.aborted) new Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
+      if (controller.signal.aborted) return { status: "stopped" };
+      new Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
+      return { status: "failed", reason: errorMessage(error) };
     } finally {
+      signal?.removeEventListener("abort", stopWithOwner);
       if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
       this.plugin.running.delete(parent.path);
       this.plugin.quickExpandPending.delete(parent.path);

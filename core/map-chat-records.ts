@@ -4,6 +4,8 @@
  * The writer lives in experiences/visual-map/map-chat-record-writer.ts; this file has the format, the path whitelist and the reading.
  */
 
+import { parseChatBasis, type MapChatBasis } from "./map-chat-basis";
+
 export const RECORD_VERSION = 1;
 export const RECORDS_SUBPATH = "Chats/records";
 
@@ -11,6 +13,8 @@ export type RecordTurnStatus = "done" | "plan" | "failed" | "stopped" | "aborted
 export interface RecordLineItem {
   status: string;
   text: string;
+  /** What a new or expanded card was built from (read back through `parseChatBasis`; added fields only, the schema stays v1). */
+  basis?: MapChatBasis;
 }
 export interface RecordOriginChip {
   kind: string;
@@ -47,6 +51,10 @@ export interface RecordTurnStartLine extends RecordLineBase {
     context?: unknown;
   };
   backfilled?: true;
+  /** An automatic round of a continuation (its `message` is the user's original message, not something said again). */
+  auto?: true;
+  /** The round of the continuation, from 1 (present on an automatic round). */
+  round?: number;
 }
 export interface RecordTurnEndLine extends RecordLineBase {
   type: "turn_end";
@@ -75,11 +83,15 @@ export interface RecordImagesLine extends RecordLineBase {
   items: { title: string; sourceUrl: string }[];
   inserted: number[];
 }
-export type RecordEventKind = "resend" | "undo" | "redo" | "undo_refused";
+export type RecordEventKind = "resend" | "undo" | "redo" | "undo_refused" | "chain_end";
 export interface RecordEventLine extends RecordLineBase {
   type: "event";
   turn: number;
   kind: RecordEventKind;
+  /** `chain_end`: why the continuation ended, the round it ended in and what was still to do. */
+  reason?: string;
+  round?: number;
+  remaining?: string;
 }
 export interface RecordMovedLine extends RecordLineBase {
   type: "moved";
@@ -317,6 +329,8 @@ export interface RestoredTurn {
   /** The reply was undone and not redone (it still shows, like it does in memory). */
   undone: boolean;
   backfilled: boolean;
+  /** An automatic round: shown as one, not as something the user said. */
+  auto: boolean;
 }
 export interface RestoredConversation {
   id: string;
@@ -325,6 +339,17 @@ export interface RestoredConversation {
   turns: RestoredTurn[];
   /** The time of the last finished turn, for "restored <M/D HH:mm>" (the UI formats it); null with no turn. */
   restoredAt: string | null;
+}
+
+/** Result lines read back from a file: the basis keeps its known shape only (a hand-edited file cannot put anything else on screen). */
+function restoredItems(items: unknown): RecordLineItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((item: RecordLineItem) => {
+    const basis = parseChatBasis(item?.basis);
+    const copy = { ...item };
+    delete copy.basis;
+    return basis ? { ...copy, basis } : copy;
+  });
 }
 
 /** The turns a conversation can show again: only `turn_end` with status done or plan. Failed, stopped and aborted turns stay in the file only. */
@@ -368,17 +393,18 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       message: start.message,
       origin: start.origin,
       reply: typeof end.reply === "string" ? end.reply : "",
-      lines: Array.isArray(end.lines) ? end.lines : [],
+      lines: restoredItems(end.lines),
       modelLabel: typeof end.modelLabel === "string" ? end.modelLabel : "",
       status: end.status,
       stalePlan: end.status === "plan",
       planState: plans.get(number)?.state,
-      planLines: plans.get(number)?.lines,
+      planLines: plans.get(number) ? restoredItems(plans.get(number)?.lines) : undefined,
       rejected: end.rejected,
       steers: Array.isArray(end.steers) ? end.steers.filter((item): item is string => typeof item === "string") : [],
       images: images.get(number),
       undone: undone.get(number) === true,
-      backfilled: start.backfilled === true
+      backfilled: start.backfilled === true,
+      auto: start.auto === true
     });
   }
   return { id, mapPath, mapId, turns, restoredAt: turns.length ? turns[turns.length - 1].at : null };

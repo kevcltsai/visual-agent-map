@@ -1,4 +1,4 @@
-import type { RecordEventKind, RecordLineInput, RecordTurnStatus } from "../../core/map-chat-records";
+import type { RecordEventKind, RecordLineInput, RecordLineItem, RecordTurnStatus } from "../../core/map-chat-records";
 import type { MapChatImages, MapChatLine, MapChatMessage } from "./map-chat";
 import { settledLine } from "./map-chat";
 import type { MapChatRecordWriter } from "./map-chat-record-writer";
@@ -12,10 +12,10 @@ export interface TurnEndFields {
   error?: { text: string; technical: string };
 }
 
-const plainLines = (lines: MapChatLine[]): { status: string; text: string }[] =>
+const plainLines = (lines: MapChatLine[]): RecordLineItem[] =>
   lines.map(line => {
     const settled = settledLine(line);
-    return { status: settled.status, text: settled.text };
+    return { status: settled.status, text: settled.text, ...(settled.basis ? { basis: settled.basis } : {}) };
   });
 
 /**
@@ -54,8 +54,8 @@ export class MapChatTurnRecord {
       this.log(error instanceof Error ? error.message : String(error));
     }
   }
-  event(kind: RecordEventKind): void {
-    this.write({ type: "event", turn: this.turn, kind });
+  event(kind: RecordEventKind, extra: { reason?: string; round?: number; remaining?: string } = {}): void {
+    this.write({ type: "event", turn: this.turn, kind, ...extra });
   }
   /** The turn ended. Only the first call writes (a late result of a stopped, replaced or closed attempt finds it ended). */
   end(status: RecordTurnStatus, fields: TurnEndFields = {}): boolean {

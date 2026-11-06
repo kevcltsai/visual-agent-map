@@ -1,7 +1,14 @@
 import { Keymap, setIcon } from "obsidian";
 import { t } from "../../i18n";
 import type { ImageCandidate } from "../../core/image-candidates";
-import type { MapChatTurn } from "../../core/map-chat-context";
+import type { MapChatBasis } from "../../core/map-chat-basis";
+import type { MapChatContinuationInput, MapChatTurn } from "../../core/map-chat-context";
+import type {
+  MapChatChainEndReason,
+  MapChatChainPanel,
+  MapChatChainState,
+  MapChatChainWaiting
+} from "../../core/map-chat-chain";
 import { renderChatMarkdown } from "../../core/map-chat-render";
 import { hasUnsavedChat } from "../../core/map-chat-transcript";
 import {
@@ -30,6 +37,11 @@ export interface MapChatLine {
    * claims a result the candidate block above does not show.
    */
   images?: MapChatImages;
+  /**
+   * What the card or cards this line stands for were built from (decided by the program; "read", never "checked"). Kept with the
+   * line in memory and in the conversation record. The panel shows it from P4 on.
+   */
+  basis?: MapChatBasis;
 }
 
 /** How many candidates of a search can still be picked (the pictures whose thumbnail does not load do not count). */
@@ -72,6 +84,14 @@ export interface MapChatOrigin {
   selectedIds: string[];
   /** The canvas image that was selected when the message was sent (a retry reads it again); never the picture itself. */
   imageId?: string;
+  /** An automatic round of a continuation: the chain it belongs to and what the round is told about the one before. A retry starts from here. */
+  chain?: MapChatChainOrigin;
+}
+/** Where an automatic round stands in its chain. `state` is the chain as it was when the round began (a retry takes the round again, not a new count). */
+export interface MapChatChainOrigin {
+  seq: number;
+  state: MapChatChainState;
+  continuation: MapChatContinuationInput;
 }
 
 /** A reply that waits for the user's yes: what it would do, what it costs, and the two buttons. */
@@ -173,6 +193,8 @@ export interface MapChatSteer {
 
 export interface MapChatMessage {
   role: "user" | "assistant";
+  /** On a user message: an automatic round of a continuation, not something the user said. Its `text` is only the label that history and notes show. */
+  auto?: true;
   /** On a user message: the question and references it was sent with. */
   origin?: MapChatOrigin;
   /** On a user message: the follow-ups typed while its reply was being made, oldest first (shown under the question). */
@@ -208,11 +230,13 @@ export interface MapChatRestoredConversation {
   turns: {
     message: string;
     reply: string;
-    lines: { status: string; text: string }[];
+    lines: { status: string; text: string; basis?: MapChatBasis }[];
     modelLabel: string;
     stalePlan: boolean;
     /** The follow-ups that went into the turn (shown as live ones, so the next request carries them too). */
     steers?: string[];
+    /** An automatic round of a continuation. */
+    auto?: boolean;
     /** What became of the plan card: no line (undefined) = it was still waiting; stopped counts as applied. */
     planState?: "applied" | "cancelled" | "stopped";
     /** The result lines the applied plan wrote. */
@@ -343,7 +367,7 @@ let panelSequence = 0;
  * The map's AI chat window: messages, draft, reference chips and the open or collapsed state. It lives on the view, builds
  * its elements once, and is put back into each repaint of the map (see {@link mount}); nothing here talks to the AI.
  */
-export class MapChatPanel {
+export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTurnHandle> {
   private readonly id = `vam-map-chat-${++panelSequence}`;
   private messages: MapChatMessage[] = [];
   /** Finished turns already written by "save as a note"; reset with the conversation. */
@@ -359,6 +383,7 @@ export class MapChatPanel {
   private unread = false;
   private width = MAP_CHAT_WIDTH_DEFAULT;
   private busy = false;
+  private chainWaitingState: MapChatChainWaiting | null = null;
   /** A confirmed plan is being applied: the window shows it is working and can stop it. */
   private applying = false;
   private composing = false;
@@ -736,14 +761,21 @@ export class MapChatPanel {
     userText: string,
     origin?: MapChatOrigin,
     keepDraft = false,
-    stage: MapChatStage = "waiting"
+    stage: MapChatStage = "waiting",
+    auto = false
   ): MapChatTurnHandle {
     // A list of maps to pick from belongs to the message before; a new message ends its choices.
     const retired = this.messages.flatMap(message =>
       message.choices && !message.choices.picked ? [message.choices] : []
     );
     this.retireChoices();
-    const user: MapChatMessage = { role: "user", text: userText, lines: [], ...(origin ? { origin } : {}) };
+    const user: MapChatMessage = {
+      role: "user",
+      text: userText,
+      lines: [],
+      ...(origin ? { origin } : {}),
+      ...(auto ? { auto: true as const } : {})
+    };
     const modelLabel = this.replyModelLabel();
     const assistant: MapChatMessage = {
       role: "assistant",
@@ -763,6 +795,30 @@ export class MapChatPanel {
     this.startStageTimer();
     this.speakStage();
     return { user, assistant, retired };
+  }
+  /**
+   * An automatic round of a continuation begins: the same turn as {@link begin} (preparing, busy, an answer to fill), but its
+   * question is not the user's. The question row is not shown and its text is the label history and notes use. The round number,
+   * limit and what is left are for the presentation of P4; nothing new is shown yet.
+   */
+  beginAutoRound(_round: number, _maxRounds: number, _remaining: string, origin: MapChatOrigin): MapChatTurnHandle {
+    return this.begin(t("ui.map_chat_role_auto"), origin, true, "preparing", true);
+  }
+  /** The chain waits for the research and expands it started (null: it does not). Stored for P4; shows nothing yet. */
+  setChainWaiting(state: MapChatChainWaiting | null): void {
+    this.chainWaitingState = state ? { ...state, kinds: [...state.kinds] } : null;
+  }
+  /** What the chain waits for now, or null. */
+  get chainWaiting(): MapChatChainWaiting | null {
+    return this.chainWaitingState;
+  }
+  /** The chain ended for a reason other than being done: P4 tells the user why and what was left. Nothing is shown yet. */
+  endChain(_reason: MapChatChainEndReason, _remaining: string, _details?: string[]): void {
+    this.chainWaitingState = null;
+  }
+  /** Follow-ups of the latest question wait for the turn to end (a continuation hands over to them). */
+  hasQueuedSteers(): boolean {
+    return this.lastQuestion()?.steers?.some(steer => steer.state === "queued") ?? false;
   }
   /** Whether the messages of `turn` are still in the conversation (a reset, such as a map switch, takes them away). */
   hasTurn(turn: MapChatTurnHandle): boolean {
@@ -1204,6 +1260,7 @@ export class MapChatPanel {
     this.noteChip = null;
     this.busy = false;
     this.applying = false;
+    this.chainWaitingState = null;
     this.clearStage();
     this.unread = false;
     // A stage name said for the turn that is gone must not stay in the live region.
@@ -1235,15 +1292,21 @@ export class MapChatPanel {
     this.unread = false;
     this.conversationId = conversation.id;
     for (const turn of conversation.turns) {
-      const question: MapChatMessage = { role: "user", text: turn.message, lines: [] };
+      const question: MapChatMessage = {
+        role: "user",
+        text: turn.auto ? t("ui.map_chat_role_auto") : turn.message,
+        lines: [],
+        ...(turn.auto ? { auto: true as const } : {})
+      };
       if (turn.steers?.length) question.steers = turn.steers.map((text): MapChatSteer => ({ text, state: "live" }));
       this.messages.push(question);
       const answer: MapChatMessage = {
         role: "assistant",
         text: turn.reply,
-        lines: turn.lines.map(line => ({
+        lines: turn.lines.map((line): MapChatLine => ({
           status: line.status === "skipped" || line.status === "failed" ? line.status : "done",
-          text: line.text
+          text: line.text,
+          ...(line.basis ? { basis: line.basis } : {})
         })),
         modelLabel: turn.modelLabel || undefined,
         stale: true
@@ -2018,6 +2081,7 @@ export class MapChatPanel {
     const asked = this.messages[this.messages.indexOf(message) - 1];
     return [
       message.role,
+      message.auto ? "auto" : "",
       message.stale ? "x" : "",
       t("ui.map_chat_record_stale"),
       t("ui.map_chat_record_stale_short"),
@@ -2111,8 +2175,13 @@ export class MapChatPanel {
     more: HTMLButtonElement | null;
   } {
     const row = this.logEl.createDiv({
-      cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}`
+      cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}${message.auto ? " is-auto" : ""}`
     });
+    // The question of an automatic round is not something the user said: its row is kept (rows follow the messages) but empty and hidden.
+    if (message.auto) {
+      row.hidden = true;
+      return { row, body: row.createDiv(), more: null };
+    }
     row.createSpan({
       cls: "vam-map-chat-role",
       text: message.role === "user" ? t("ui.map_chat_role_you") : message.modelLabel || t("ui.map_chat_role_ai")

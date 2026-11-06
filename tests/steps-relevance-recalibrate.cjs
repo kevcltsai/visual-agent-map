@@ -422,7 +422,7 @@ test('recalibrate: goal shift is not part of this version (no field in the schem
 });
 
 test('i18n: the new relevance strings exist in English and Traditional Chinese with the same placeholders', () => {
-  const keys = ['ui.relevance_clear', 'ui.relevance_clear_hint', 'ui.relevance_recalibrate_button', 'ui.relevance_pins_note_0', 'ui.relevance_unpin_all', 'ui.relevance_unpin_all_history_label', 'ui.relevance_recalibrated_0_1', 'ui.relevance_recalibrate_none', 'ui.relevance_anchor_group_0_1', 'ui.relevance_other_changes', 'ui.relevance_conflicts_title', 'ui.relevance_conflict_0_1_2_3'];
+  const keys = ['ui.relevance_clear', 'ui.relevance_clear_hint', 'ui.relevance_recalibrate_button', 'ui.relevance_unpin_all_history_label', 'ui.relevance_recalibrated_0_1', 'ui.relevance_recalibrate_none', 'ui.relevance_anchor_group_0_1', 'ui.relevance_other_changes', 'ui.relevance_conflicts_title', 'ui.relevance_conflict_0_1_2_3'];
   const holes = text => (text.match(/\{\d\}/g) ?? []).sort().join();
   for (const key of keys) {
     const en = translate('en', key), zh = translate('zh-TW', key);
@@ -432,10 +432,9 @@ test('i18n: the new relevance strings exist in English and Traditional Chinese w
   }
   assert.equal(translate('zh-TW', 'ui.relevance_recalibrate_button'), '重新校準');
   assert.equal(translate('zh-TW', 'ui.relevance_clear'), '交還 AI');
-  assert.equal(translate('zh-TW', 'ui.relevance_pins_note_0').replace('{0}', '2'), '保留你設定的 2 張');
   assert.equal(translate('zh-TW', 'ui.relevance_recalibrated_0_1').replace('{0}', '2').replace('{1}', '5'), '依你的 2 個設定調整了 5 張');
   assert.equal(translate('zh-TW', 'ui.relevance_recalibrate_none'), '沒有需要調整的卡');
-  assert.equal(translate('zh-TW', 'ui.relevance_unpin_all'), '全部交還 AI');
+  for (const gone of ['ui.relevance_pins_note_0', 'ui.relevance_unpin_all', 'ui.goal_edit', 'ui.relevance_panel_label', 'ui.relevance_goal_unavailable_toolbar']) assert.equal(translate('en', gone), gone, `${gone} is gone with the edit panel`);
   assert.equal(translate('zh-TW', 'ui.relevance_anchor_group_0_1').replace('{0}', '香草').replace('{1}', '必學'), '因為你把「香草」設為必學');
   assert.equal(translate('zh-TW', 'ui.relevance_other_changes'), '其他調整');
   assert.equal(translate('en', 'ui.relevance_reverted_title'), 'ui.relevance_reverted_title', 'the dead "changed back" strings are gone');

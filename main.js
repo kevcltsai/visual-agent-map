@@ -1013,8 +1013,6 @@ var en = {
   "ui.goal_suggest_skipped_0": "{0} suggestions no longer fit the map and were skipped",
   "ui.goal_suggest_added_0": "Added {0} topics",
   "ui.goal_suggest_history_label": "Add suggested topics",
-  "ui.goal_edit": "Edit goal",
-  "ui.relevance_panel_label": "Goal",
   "ui.relevance_goal_placeholder": "What do you want to achieve with this map?",
   "ui.relevance_context_label": "Extra context",
   "ui.relevance_context_placeholder": "Optional: what you already know, conditions or limits",
@@ -1045,8 +1043,6 @@ var en = {
   "ui.relevance_clear_hint": "The AI decides the next time you grade",
   "ui.relevance_manual_reason": "You set this",
   "ui.relevance_recalibrate_button": "Recalibrate",
-  "ui.relevance_pins_note_0": "Keeping the {0} you set",
-  "ui.relevance_unpin_all": "Hand all back to AI",
   "ui.relevance_unpin_all_0": "Hand all back to AI ({0} cards)",
   "ui.relevance_unpin_all_history_label": "Hand back to AI",
   "ui.relevance_recalibrated_0_1": "Adjusted {1} topics based on your {0} settings",
@@ -1237,7 +1233,6 @@ var en = {
   "ui.remove_entire_branch": "Remove entire branch",
   "ui.removed_0_undo_available": 'Removed "{0}". Undo to bring it back.',
   "ui.relevance_goal_unavailable_grading": "Grading is still running; try again when it finishes.",
-  "ui.relevance_goal_unavailable_toolbar": "The goal panel is not available on this map.",
   "ui.no_topics_with_a_missing_map_md": "No topics with a missing Map.md.",
   "ui.repair_missing_map": "Repair missing map",
   "ui.choose_a_topic_to_repair": "Choose a topic to repair",
@@ -2481,7 +2476,7 @@ var en = {
   "ui.technical_details": "Technical details",
   "ui.copy_technical_details": "Copy technical details",
   "error.relevance_grade_unavailable": "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
-  "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
+  "error.relevance_grade_hierarchy": "The AI's parent-child tiers were still inconsistent. Click Recalibrate next to the goal to try again.",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map \xB7 read-only",
   "share.viewer_made_with": "Made with VAM",
@@ -3715,8 +3710,6 @@ var zhCN = {
   "ui.goal_suggest_skipped_0": "{0} \u6761\u5EFA\u8BAE\u5DF2\u4E0D\u9002\u7528\u4E8E\u5F53\u524D\u7684\u5FC3\u667A\u56FE\uFF0C\u5DF2\u8DF3\u8FC7",
   "ui.goal_suggest_added_0": "\u5DF2\u52A0\u5165 {0} \u4E2A\u8BAE\u9898",
   "ui.goal_suggest_history_label": "\u52A0\u5165\u5EFA\u8BAE\u7684\u8BAE\u9898",
-  "ui.goal_edit": "\u7F16\u8F91\u76EE\u6807",
-  "ui.relevance_panel_label": "\u76EE\u6807",
   "ui.relevance_goal_placeholder": "\u4F60\u60F3\u7528\u8FD9\u5F20\u56FE\u8FBE\u6210\u4EC0\u4E48\uFF1F",
   "ui.relevance_context_label": "\u8865\u5145\u8BF4\u660E",
   "ui.relevance_context_placeholder": "\u8865\u5145\uFF08\u9009\u586B\uFF09\uFF1A\u5DF2\u7ECF\u4F1A\u4EC0\u4E48\u3001\u6761\u4EF6\u6216\u9650\u5236",
@@ -3747,8 +3740,6 @@ var zhCN = {
   "ui.relevance_clear_hint": "\u4E0B\u6B21\u5206\u7EA7\u7531 AI \u5224\u65AD",
   "ui.relevance_manual_reason": "\u4F60\u624B\u52A8\u8BBE\u7F6E",
   "ui.relevance_recalibrate_button": "\u91CD\u65B0\u6821\u51C6",
-  "ui.relevance_pins_note_0": "\u4FDD\u7559\u4F60\u8BBE\u7F6E\u7684 {0} \u5F20",
-  "ui.relevance_unpin_all": "\u5168\u90E8\u4EA4\u8FD8 AI",
   "ui.relevance_unpin_all_0": "\u5168\u90E8\u4EA4\u8FD8 AI\uFF08{0} \u5F20\uFF09",
   "ui.relevance_unpin_all_history_label": "\u4EA4\u8FD8 AI",
   "ui.relevance_recalibrated_0_1": "\u4F9D\u4F60\u7684 {0} \u4E2A\u8BBE\u7F6E\u8C03\u6574\u4E86 {1} \u5F20",
@@ -3939,7 +3930,6 @@ var zhCN = {
   "ui.remove_entire_branch": "\u79FB\u9664\u6574\u4E2A\u5206\u652F",
   "ui.removed_0_undo_available": "\u5DF2\u79FB\u9664\u201C{0}\u201D\uFF0C\u53EF\u64A4\u9500",
   "ui.relevance_goal_unavailable_grading": "\u6B63\u5728\u4F9D\u76EE\u6807\u5206\u7EA7\uFF0C\u5B8C\u6210\u540E\u518D\u8BD5\u3002",
-  "ui.relevance_goal_unavailable_toolbar": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u5F53\u524D\u65E0\u6CD5\u8BBE\u7F6E\u76EE\u6807\u3002",
   "ui.no_topics_with_a_missing_map_md": "\u6CA1\u6709\u7F3A\u5C11 Map.md \u7684\u4E3B\u9898\u3002",
   "ui.repair_missing_map": "\u4FEE\u590D\u9057\u5931\u7684\u5FC3\u667A\u56FE",
   "ui.choose_a_topic_to_repair": "\u9009\u62E9\u8981\u4FEE\u590D\u7684\u4E3B\u9898",
@@ -5183,7 +5173,7 @@ var zhCN = {
   "ui.technical_details": "\u6280\u672F\u7EC6\u8282",
   "ui.copy_technical_details": "\u590D\u5236\u6280\u672F\u7EC6\u8282",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u65E0\u6CD5\u4E3A\u8FD9\u5F20\u5FC3\u667A\u56FE\u5206\u7EA7\uFF0C\u6CA1\u6709\u4EFB\u4F55\u5185\u5BB9\u88AB\u6539\u53D8\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
-  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u70B9\u201C\u76EE\u6807\u201D\u518D\u6309 Enter \u91CD\u8BD5",
+  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C42\u5206\u7EA7\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8BF7\u6309\u76EE\u6807\u65C1\u7684\u201C\u91CD\u65B0\u6821\u51C6\u201D\u91CD\u8BD5",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5730\u56FE\u30FB\u53EA\u8BFB",
   "share.viewer_made_with": "\u7531 VAM \u5236\u4F5C",
@@ -6417,8 +6407,6 @@ var zhTW = {
   "ui.goal_suggest_skipped_0": "{0} \u5247\u5EFA\u8B70\u5DF2\u4E0D\u9069\u7528\u65BC\u76EE\u524D\u7684\u5FC3\u667A\u5716\uFF0C\u5DF2\u7565\u904E",
   "ui.goal_suggest_added_0": "\u5DF2\u52A0\u5165 {0} \u500B\u8B70\u984C",
   "ui.goal_suggest_history_label": "\u52A0\u5165\u5EFA\u8B70\u7684\u8B70\u984C",
-  "ui.goal_edit": "\u7DE8\u8F2F\u76EE\u6A19",
-  "ui.relevance_panel_label": "\u76EE\u6A19",
   "ui.relevance_goal_placeholder": "\u4F60\u60F3\u7528\u9019\u5F35\u5716\u9054\u6210\u4EC0\u9EBC\uFF1F",
   "ui.relevance_context_label": "\u88DC\u5145\u8AAA\u660E",
   "ui.relevance_context_placeholder": "\u88DC\u5145\uFF08\u9078\u586B\uFF09\uFF1A\u5DF2\u7D93\u6703\u4EC0\u9EBC\u3001\u689D\u4EF6\u6216\u9650\u5236",
@@ -6449,8 +6437,6 @@ var zhTW = {
   "ui.relevance_clear_hint": "\u4E0B\u6B21\u5206\u7D1A\u7531 AI \u5224\u65B7",
   "ui.relevance_manual_reason": "\u4F60\u624B\u52D5\u8A2D\u5B9A",
   "ui.relevance_recalibrate_button": "\u91CD\u65B0\u6821\u6E96",
-  "ui.relevance_pins_note_0": "\u4FDD\u7559\u4F60\u8A2D\u5B9A\u7684 {0} \u5F35",
-  "ui.relevance_unpin_all": "\u5168\u90E8\u4EA4\u9084 AI",
   "ui.relevance_unpin_all_0": "\u5168\u90E8\u4EA4\u9084 AI\uFF08{0} \u5F35\uFF09",
   "ui.relevance_unpin_all_history_label": "\u4EA4\u9084 AI",
   "ui.relevance_recalibrated_0_1": "\u4F9D\u4F60\u7684 {0} \u500B\u8A2D\u5B9A\u8ABF\u6574\u4E86 {1} \u5F35",
@@ -6641,7 +6627,6 @@ var zhTW = {
   "ui.remove_entire_branch": "\u79FB\u9664\u6574\u500B\u5206\u652F",
   "ui.removed_0_undo_available": "\u5DF2\u79FB\u9664\u300C{0}\u300D\uFF0C\u53EF\u5FA9\u539F",
   "ui.relevance_goal_unavailable_grading": "\u6B63\u5728\u4F9D\u76EE\u6A19\u5206\u7D1A\uFF0C\u5B8C\u6210\u5F8C\u518D\u8A66\u3002",
-  "ui.relevance_goal_unavailable_toolbar": "\u9019\u5F35\u5FC3\u667A\u5716\u76EE\u524D\u7121\u6CD5\u8A2D\u5B9A\u76EE\u6A19\u3002",
   "ui.no_topics_with_a_missing_map_md": "\u6C92\u6709\u7F3A\u5C11 Map.md \u7684\u4E3B\u984C\u3002",
   "ui.repair_missing_map": "\u4FEE\u5FA9\u907A\u5931\u7684\u5FC3\u667A\u5716",
   "ui.choose_a_topic_to_repair": "\u9078\u64C7\u8981\u4FEE\u5FA9\u7684\u4E3B\u984C",
@@ -7885,7 +7870,7 @@ var zhTW = {
   "ui.technical_details": "\u6280\u8853\u7D30\u7BC0",
   "ui.copy_technical_details": "\u8907\u88FD\u6280\u8853\u7D30\u7BC0",
   "error.relevance_grade_unavailable": "AI \u76EE\u524D\u7121\u6CD5\u70BA\u9019\u5F35\u5FC3\u667A\u5716\u5206\u7D1A\uFF0C\u6C92\u6709\u4EFB\u4F55\u5167\u5BB9\u88AB\u6539\u8B8A\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
-  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u9EDE\u300C\u76EE\u6A19\u300D\u518D\u6309 Enter \u91CD\u8A66",
+  "error.relevance_grade_hierarchy": "AI \u7684\u4E0A\u4E0B\u5C64\u5206\u7D1A\u4ECD\u4E0D\u4E00\u81F4\uFF0C\u8ACB\u6309\u76EE\u6A19\u65C1\u7684\u300C\u91CD\u65B0\u6821\u6E96\u300D\u91CD\u8A66",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "\u5206\u4EAB\u7684\u5FC3\u667A\u5716\u30FB\u552F\u8B80",
   "share.viewer_made_with": "\u7531 VAM \u88FD\u4F5C",
@@ -54259,7 +54244,7 @@ function appendGoalSvg(parent, kind) {
       "stroke-linecap": "round",
       d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
     });
-  else if (kind === "select") {
+  else {
     add("rect", { ...line, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
     add("rect", {
       ...line,
@@ -54272,7 +54257,7 @@ function appendGoalSvg(parent, kind) {
       rx: "1.5"
     });
     add("path", { ...line, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
-  } else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
+  }
   parent.appendChild(svg);
 }
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
@@ -71365,7 +71350,7 @@ ${note.detail.trim()}` : "",
     (_g = (_f = this.goalHostEl) == null ? void 0 : _f.removeClass) == null ? void 0 : _g.call(_f, "vam-goal-host");
     this.goalHostEl = null;
   }
-  /** The panel hanging under the goal bar (edit panel or suggestion list; at most one is open), if it is on screen. */
+  /** The panel hanging under the goal bar (the suggestion list), if it is on screen. */
   goalAttachmentEl() {
     var _a2, _b2;
     const el = (_b2 = (_a2 = this.relevanceBarEl) == null ? void 0 : _a2.querySelector(".vam-goal-attachment")) != null ? _b2 : null;

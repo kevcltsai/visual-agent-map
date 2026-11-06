@@ -991,8 +991,6 @@ export const en = {
   "ui.goal_suggest_skipped_0": "{0} suggestions no longer fit the map and were skipped",
   "ui.goal_suggest_added_0": "Added {0} topics",
   "ui.goal_suggest_history_label": "Add suggested topics",
-  "ui.goal_edit": "Edit goal",
-  "ui.relevance_panel_label": "Goal",
   "ui.relevance_goal_placeholder": "What do you want to achieve with this map?",
   "ui.relevance_context_label": "Extra context",
   "ui.relevance_context_placeholder": "Optional: what you already know, conditions or limits",
@@ -1023,8 +1021,6 @@ export const en = {
   "ui.relevance_clear_hint": "The AI decides the next time you grade",
   "ui.relevance_manual_reason": "You set this",
   "ui.relevance_recalibrate_button": "Recalibrate",
-  "ui.relevance_pins_note_0": "Keeping the {0} you set",
-  "ui.relevance_unpin_all": "Hand all back to AI",
   "ui.relevance_unpin_all_0": "Hand all back to AI ({0} cards)",
   "ui.relevance_unpin_all_history_label": "Hand back to AI",
   "ui.relevance_recalibrated_0_1": "Adjusted {1} topics based on your {0} settings",
@@ -1238,7 +1234,6 @@ export const en = {
   "ui.remove_entire_branch": "Remove entire branch",
   "ui.removed_0_undo_available": 'Removed "{0}". Undo to bring it back.',
   "ui.relevance_goal_unavailable_grading": "Grading is still running; try again when it finishes.",
-  "ui.relevance_goal_unavailable_toolbar": "The goal panel is not available on this map.",
   "ui.no_topics_with_a_missing_map_md": "No topics with a missing Map.md.",
   "ui.repair_missing_map": "Repair missing map",
   "ui.choose_a_topic_to_repair": "Choose a topic to repair",
@@ -2644,7 +2639,7 @@ export const en = {
   "error.relevance_grade_unavailable":
     "The AI could not grade this map right now. Nothing was changed; try again in a moment.",
   "error.relevance_grade_hierarchy":
-    "The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.",
+    "The AI's parent-child tiers were still inconsistent. Click Recalibrate next to the goal to try again.",
   // Share viewer (shipped inside the exported HTML file)
   "share.viewer_read_only": "Shared map · read-only",
   "share.viewer_made_with": "Made with VAM",

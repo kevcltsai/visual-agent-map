@@ -283,7 +283,7 @@ integrationTest('relevance: a reply that is not exactly one valid grade per card
     await h.enter('Goal'); await h.settled();
     assert.equal(h.run().status, 'failed', name);
     // A hierarchy-only failure that survives both repair rounds shows a plain message instead of card ids.
-    if (name === 'a child above its parent') assert.equal(h.barText(), "Grading failed. No topic was changed. The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.", name);
+    if (name === 'a child above its parent') assert.equal(h.barText(), "Grading failed. No topic was changed. The AI's parent-child tiers were still inconsistent. Click Recalibrate next to the goal to try again.", name);
     else assert.match(h.barText(), /^Grading failed\. No topic was changed\. The AI grading could not be used: /, name);
     assert.deepEqual(await graded(h), [], `${name}: no note written`);
     assert.deepEqual(h.barButtons(), ['Dismiss'], name);
@@ -676,7 +676,7 @@ integrationTest('relevance repair: still violating after TWO repair rounds write
   await h.enter('Goal'); await h.settled();
   assert.deepEqual(h.control.calls.map(c => c.step), ['relevance-grade', 'relevance-grade-repair', 'relevance-grade-repair'], 'at most two repair rounds');
   assert.equal(h.run().status, 'failed');
-  assert.equal(h.barText(), "Grading failed. No topic was changed. The AI's parent-child tiers were still inconsistent. Click Goal, then press Enter to try again.");
+  assert.equal(h.barText(), "Grading failed. No topic was changed. The AI's parent-child tiers were still inconsistent. Click Recalibrate next to the goal to try again.");
   assert.doesNotMatch(h.barText(), /hierarchy|[0-9a-f]{8}-[0-9a-f]{4}/, 'no card id or UUID in the user-facing text');
   assert.deepEqual(await graded(h), [], 'nothing written'); assert.equal(h.view.history.past.length, 1, 'only the goal step');
 });
@@ -1204,8 +1204,6 @@ integrationTest('relevance pins: the More menu offers "Hand all back to AI (N ca
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.relevance_unpin_all_0', 3), '全部交還 AI（3 張）');
   assert.equal(translate('zh-CN', 'ui.relevance_unpin_all_0', 3), '全部交还 AI（3 张）');
-  assert.equal(translate('en', 'ui.relevance_unpin_all'), 'Hand all back to AI', 'the existing wording is unchanged');
-  assert.equal(translate('zh-TW', 'ui.relevance_unpin_all'), '全部交還 AI');
 });
 
 integrationTest('relevance pins: Hand all back to AI removes every pin in one mutation and one undo step; the AI grades stay', async () => {

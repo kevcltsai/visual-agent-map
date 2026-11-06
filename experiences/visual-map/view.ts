@@ -763,7 +763,7 @@ const cardAiLockButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
-type GoalIcon = "target" | "spark" | "refresh" | "sort" | "edit" | "select";
+type GoalIcon = "target" | "spark" | "refresh" | "sort" | "select";
 /** The goal bar's own inline icons (drawn like the approved mock-up); colour follows `currentColor`. */
 function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
   const svg = createSvg("svg");
@@ -798,7 +798,7 @@ function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
       "stroke-linecap": "round",
       d: ["M4 6h10M4 12h7M4 18h4", "M17 5v14m0 0l-3-3m3 3l3-3"].join("")
     });
-  else if (kind === "select") {
+  else {
     // The multi-select icon of the approved mock-up: a ticked box and a dashed one.
     add("rect", { ...line, "stroke-linejoin": "round", x: "3", y: "3", width: "8", height: "8", rx: "1.5" });
     add("rect", {
@@ -812,7 +812,7 @@ function appendGoalSvg(parent: HTMLElement, kind: GoalIcon): void {
       rx: "1.5"
     });
     add("path", { ...line, "stroke-linejoin": "round", d: "M5 7l1.5 1.5L9.5 5" });
-  } else add("path", { ...line, "stroke-linejoin": "round", d: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4" });
+  }
   parent.appendChild(svg);
 }
 /** Maps whose cards are displayed sorted by relevance. Memory only: never written to a note or Map.md. */
@@ -19373,7 +19373,7 @@ export class VisualAgentMapView extends ItemView {
     this.goalHostEl?.removeClass?.("vam-goal-host");
     this.goalHostEl = null;
   }
-  /** The panel hanging under the goal bar (edit panel or suggestion list; at most one is open), if it is on screen. */
+  /** The panel hanging under the goal bar (the suggestion list), if it is on screen. */
   private goalAttachmentEl(): HTMLElement | null {
     const el = this.relevanceBarEl?.querySelector<HTMLElement>(".vam-goal-attachment") ?? null;
     return el && el.isConnected !== false ? el : null;

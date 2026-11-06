@@ -4,6 +4,14 @@
 
 - The "+" and "Add subtopic" lists show each topic type's shape and colour next to its name, the same as the type picker.
 
+### Edit the goal in place
+
+The goal now sits in the row above the map, in small text with no frame, and the map no longer sits under it.
+
+- Click the goal to type in it. Enter, or a click elsewhere, saves; Esc cancels. Hover it for the three icons: suggest new topics, recalibrate, and sort.
+- Saving grades again only when the text changed. Press Recalibrate to grade again with the same goal.
+- "Hand all back to AI" moved to the map's "..." menu.
+
 ### Mark points on a picture
 
 Turn a picture on the canvas into an annotated image, drop anchors on it such as "the cow's back", and link each anchor to a topic.

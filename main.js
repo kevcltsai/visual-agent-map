@@ -284,6 +284,7 @@ var en = {
   "ui.multi_research_skipped": "Skipped {0} topics that are already running AI.",
   "ui.multi_research_all_skipped": "All selected topics are already running AI.",
   "ui.multi_research_already_running": "A multi-topic research is already running on this map.",
+  "ui.multi_research_not_started": "The research did not start because the map could not be saved.",
   "ui.multi_research_finished": "Research finished: {0} of {1} succeeded, {2} failed, {3} skipped.",
   "ui.multi_research_searches_0": "Web searches made: {0}.",
   "ui.multi_research_no_search_0": "Warning: topics that finished without any web search: {0}.",
@@ -1329,6 +1330,7 @@ var en = {
   "ui.title_problem_fence": "A title cannot contain three backticks (```); they would turn the note into a code block.",
   "ui.title_problem_brackets": "A title cannot contain [[ or ]]; they would break the note's links.",
   "ui.multi_research_start_0": "Start research ({0})",
+  "ui.multi_research_mode_downgrade_0": "{0} of these topics last used Standard and will use Quick this time.",
   "ui.topic_0": "Topic: {0}",
   "ui.moved_under_0": "Moved under \u201C{0}\u201D.",
   "ui.became_root_topic": "Now a root topic.",
@@ -2997,6 +2999,7 @@ var zhCN = {
   "ui.multi_research_skipped": "\u5DF2\u7565\u8FC7 {0} \u4E2A\u6B63\u5728\u8FD0\u884C AI \u7684\u8BAE\u9898\u3002",
   "ui.multi_research_all_skipped": "\u5DF2\u9009\u8BAE\u9898\u90FD\u6B63\u5728\u8FD0\u884C AI\u3002",
   "ui.multi_research_already_running": "\u8FD9\u5F20\u56FE\u5DF2\u6709\u591A\u8BAE\u9898\u7814\u7A76\u5728\u8FD0\u884C\u3002",
+  "ui.multi_research_not_started": "\u5730\u56FE\u4FDD\u5B58\u5931\u8D25\uFF0C\u8FD9\u6279\u7814\u7A76\u6CA1\u6709\u5F00\u59CB\u3002",
   "ui.multi_research_finished": "\u7814\u7A76\u5B8C\u6210\uFF1A\u6210\u529F {0}\uFF0F{1}\uFF0C{2} \u4E2A\u5931\u8D25\uFF0C{3} \u4E2A\u8DF3\u8FC7\u3002",
   "ui.multi_research_searches_0": "\u5DF2\u8054\u7F51\u641C\u7D22 {0} \u6B21\u3002",
   "ui.multi_research_no_search_0": "\u8B66\u793A\uFF1A\u6709 {0} \u4E2A\u8BAE\u9898\u5B8C\u6210\u4E86\u7814\u7A76\uFF0C\u4F46\u6CA1\u6709\u4EFB\u4F55\u8054\u7F51\u641C\u7D22\u3002",
@@ -4042,6 +4045,7 @@ var zhCN = {
   "ui.title_problem_fence": "\u6807\u9898\u4E0D\u80FD\u5305\u542B\u4E09\u4E2A\u53CD\u5F15\u53F7\uFF08```\uFF09\uFF0C\u5426\u5219\u6574\u4EFD\u7B14\u8BB0\u4F1A\u53D8\u6210\u4EE3\u7801\u5757\u3002",
   "ui.title_problem_brackets": "\u6807\u9898\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5219\u4F1A\u5F04\u574F\u7B14\u8BB0\u7684\u94FE\u63A5\u3002",
   "ui.multi_research_start_0": "\u5F00\u59CB\u7814\u7A76 {0} \u4E2A\u8BAE\u9898",
+  "ui.multi_research_mode_downgrade_0": "\u5176\u4E2D {0} \u4E2A\u8BAE\u9898\u4E0A\u6B21\u7528\u6807\u51C6\uFF0C\u8FD9\u6B21\u4F1A\u6539\u7528\u5FEB\u901F\u3002",
   "ui.topic_0": "\u8BAE\u9898\uFF1A{0}",
   "ui.moved_under_0": "\u5DF2\u79FB\u5230\u201C{0}\u201D\u5E95\u4E0B\u3002",
   "ui.became_root_topic": "\u5DF2\u6210\u4E3A\u6839\u8BAE\u9898\u3002",
@@ -5710,6 +5714,7 @@ var zhTW = {
   "ui.multi_research_skipped": "\u5DF2\u7565\u904E {0} \u500B\u6B63\u5728\u57F7\u884C AI \u7684\u8B70\u984C\u3002",
   "ui.multi_research_all_skipped": "\u5DF2\u9078\u8B70\u984C\u90FD\u6B63\u5728\u57F7\u884C AI\u3002",
   "ui.multi_research_already_running": "\u9019\u5F35\u5716\u5DF2\u6709\u591A\u8B70\u984C\u7814\u7A76\u5728\u57F7\u884C\u3002",
+  "ui.multi_research_not_started": "\u5FC3\u667A\u5716\u5B58\u4E0D\u4E86\uFF0C\u9019\u6279\u7814\u7A76\u6C92\u6709\u958B\u59CB\u3002",
   "ui.multi_research_finished": "\u7814\u7A76\u5B8C\u6210\uFF1A\u6210\u529F {0}\uFF0F{1}\uFF0C{2} \u500B\u5931\u6557\uFF0C{3} \u500B\u8DF3\u904E\u3002",
   "ui.multi_research_searches_0": "\u5DF2\u4E0A\u7DB2\u641C\u5C0B {0} \u6B21\u3002",
   "ui.multi_research_no_search_0": "\u8B66\u793A\uFF1A\u6709 {0} \u500B\u8B70\u984C\u5B8C\u6210\u4E86\u7814\u7A76\uFF0C\u4F46\u6C92\u6709\u4EFB\u4F55\u4E0A\u7DB2\u641C\u5C0B\u3002",
@@ -6755,6 +6760,7 @@ var zhTW = {
   "ui.title_problem_fence": "\u6A19\u984C\u4E0D\u80FD\u5305\u542B\u4E09\u500B\u53CD\u5F15\u865F\uFF08```\uFF09\uFF0C\u5426\u5247\u6574\u4EFD\u7B46\u8A18\u6703\u8B8A\u6210\u7A0B\u5F0F\u78BC\u5340\u584A\u3002",
   "ui.title_problem_brackets": "\u6A19\u984C\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5247\u6703\u5F04\u58DE\u7B46\u8A18\u7684\u9023\u7D50\u3002",
   "ui.multi_research_start_0": "\u958B\u59CB\u7814\u7A76 {0} \u500B\u8B70\u984C",
+  "ui.multi_research_mode_downgrade_0": "\u5176\u4E2D {0} \u500B\u8B70\u984C\u4E0A\u6B21\u7528\u6A19\u6E96\uFF0C\u9019\u6B21\u6703\u6539\u7528\u5FEB\u901F\u3002",
   "ui.topic_0": "\u8B70\u984C\uFF1A{0}",
   "ui.moved_under_0": "\u5DF2\u79FB\u5230\u300C{0}\u300D\u5E95\u4E0B\u3002",
   "ui.became_root_topic": "\u5DF2\u6210\u70BA\u6839\u8B70\u984C\u3002",
@@ -44970,31 +44976,40 @@ async function exportMapWithNotice(vault, request) {
 // experiences/visual-map/multi-research-modal.ts
 var import_obsidian27 = require("obsidian");
 var MultiResearchModal = class extends import_obsidian27.Modal {
-  constructor(app, names3, models, submit, links = {}, modes = []) {
+  constructor(app, names3, models, submit, links = {}, modes = [], initialMode = DEFAULT_MAP_AI_MODE) {
     super(app);
     this.names = names3;
     this.models = models;
     this.submit = submit;
     this.links = links;
     this.modes = modes;
+    this.initialMode = initialMode;
     __publicField(this, "submitted", false);
     __publicField(this, "unwatch");
   }
   onOpen() {
     this.titleEl.setText(t("ui.multi_research_title"));
     this.contentEl.createEl("p", { text: t("ui.multi_research_intro", this.names.length), cls: "vam-modal-intro" });
+    let mode = this.initialMode;
+    const standardTopics = this.modes.filter((item) => item === "standard").length;
+    let paintNote = () => {
+    };
+    aiModeField(this.contentEl, {
+      initial: mode,
+      onChange: (next) => {
+        mode = next;
+        paintNote();
+      }
+    });
+    const note = this.contentEl.createEl("p", { cls: "vam-multi-research-mode-note" });
+    paintNote = () => {
+      note.setText(t("ui.multi_research_mode_downgrade_0", standardTopics));
+      note.hidden = !(mode === "quick" && standardTopics > 0);
+    };
+    paintNote();
     const topics = this.contentEl.createDiv("vam-integration-sources");
     topics.createEl("strong", { text: t("ui.multi_research_topics") });
-    this.names.forEach((name2, index) => {
-      const row = topics.createDiv({ cls: "vam-multi-research-topic" });
-      row.createSpan({ text: name2 });
-      const mode = this.modes[index];
-      if (mode)
-        row.createSpan({
-          cls: "vam-multi-research-mode",
-          text: t(mode === "quick" ? "ui.quick" : "ui.standard")
-        });
-    });
+    for (const name2 of this.names) topics.createDiv({ cls: "vam-multi-research-topic" }).createSpan({ text: name2 });
     const model = modelField(this.contentEl, this.models, t("ui.multi_research_current_model"), this.links.repair);
     this.unwatch = model.dispose;
     const style = styleChoiceField(this.contentEl, {
@@ -45017,7 +45032,11 @@ var MultiResearchModal = class extends import_obsidian27.Modal {
     start.addEventListener("click", () => {
       if (this.submitted) return;
       this.submitted = true;
+      const options = aiModeOptions(mode, "research");
       const request = {
+        researchMode: options.researchMode,
+        researchDepth: options.researchDepth,
+        imageSearch: mode === "standard",
         requirements: requirements.value.trim(),
         ...model.value() ? { model: model.value() } : {},
         ...style.style() ? { noteStyle: style.style() } : {}
@@ -70196,19 +70215,35 @@ ${request.requirements}` : preset.text,
     return `multi-research:${this.path}`;
   }
   openMultiResearch(retryBatchKey) {
+    var _a2;
     if (!this.map || this.aimLive() || !this.selection.state.multiSelected.size) return;
     const shown = [...this.selection.state.multiSelected].flatMap((id) => {
       const note = this.notes.get(id);
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
     });
+    const initialMode = (_a2 = this.map.aiMode) != null ? _a2 : DEFAULT_MAP_AI_MODE;
     const names3 = shown.map((item) => item.name);
     const dialog = new MultiResearchModal(
       this.app,
       names3,
       this.modelChoices(),
-      (request) => void this.startMultiResearch(request, retryBatchKey),
+      (request) => void (async () => {
+        var _a3, _b2;
+        const ids = [...this.selection.state.multiSelected];
+        if (request.researchMode !== void 0) {
+          try {
+            await ((_b2 = (_a3 = this.aiModeMemory()).rememberAiMode) == null ? void 0 : _b2.call(_a3, noteAiMode(request.researchMode)));
+          } catch (e) {
+            new import_obsidian37.Notice(t("ui.multi_research_not_started"));
+            return;
+          }
+        }
+        this.selection.replaceMulti(ids);
+        await this.startMultiResearch(request, retryBatchKey);
+      })(),
       this.fieldLinks(),
-      shown.map((item) => item.mode)
+      shown.map((item) => item.mode),
+      initialMode
     );
     this.openMapModal(dialog);
   }

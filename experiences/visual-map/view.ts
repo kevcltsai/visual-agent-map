@@ -516,7 +516,7 @@ import {
 import { renderTopicTree } from "../../ui/topic-tree";
 import { TopicTreeModal } from "../../ui/modals/topic-tree-modal";
 import type { FieldLinks, ModelChoices } from "./research-fields";
-import { aiModeOptions, hasKnowledgeGapMarker, noteAiMode, type MapAiMode } from "./ai-mode";
+import { aiModeOptions, DEFAULT_MAP_AI_MODE, hasKnowledgeGapMarker, noteAiMode, type MapAiMode } from "./ai-mode";
 import type { ResearchObserver } from "../../ai/research-observer";
 import type { ResearchProgress } from "./research-progress";
 import type { ExpansionBatchState } from "./expansion-batch";
@@ -17240,14 +17240,31 @@ export class VisualAgentMapView extends ItemView {
       const note = this.notes.get(id);
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
     });
+    const initialMode = this.map.aiMode ?? DEFAULT_MAP_AI_MODE;
     const names = shown.map(item => item.name);
     const dialog = new MultiResearchModal(
       this.app,
       names,
       this.modelChoices(),
-      request => void this.startMultiResearch(request, retryBatchKey),
+      request =>
+        void (async () => {
+          // The dialog is closed while the map is written: keep the batch the dialog listed.
+          const ids = [...this.selection.state.multiSelected];
+          // Remember the picked mode on the map first (a map write keeps the multi-selection), then start the batch.
+          if (request.researchMode !== undefined) {
+            try {
+              await this.aiModeMemory().rememberAiMode?.(noteAiMode(request.researchMode));
+            } catch {
+              new Notice(t("ui.multi_research_not_started"));
+              return;
+            }
+          }
+          this.selection.replaceMulti(ids);
+          await this.startMultiResearch(request, retryBatchKey);
+        })(),
       this.fieldLinks(),
-      shown.map(item => item.mode)
+      shown.map(item => item.mode),
+      initialMode
     );
     this.openMapModal(dialog);
   }
@@ -17322,8 +17339,8 @@ export class VisualAgentMapView extends ItemView {
           ...(request.model ? { runOnce: { model: request.model } } : {}),
           ...(request.noteStyle ? { noteStyle: request.noteStyle } : {})
         };
-        // The map chat may set the research choices for the whole batch (as before); the dialog never does, so each topic then
-        // runs in the mode its own note stores: Quick without the web and without charts, Standard with both.
+        // The dialog and the map chat set the research choices for the whole batch; only "retry with another provider" does
+        // not, so each topic then runs in the mode its own note stores: Quick without the web and without charts, Standard with both.
         const choicesFor = (note: Note): TaskOptions =>
           request.researchMode !== undefined
             ? {

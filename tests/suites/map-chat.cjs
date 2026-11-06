@@ -7373,3 +7373,80 @@ integrationTest('R3 M5: automatic rounds are built with the chips of the user\'s
   settleRun(runs[0]); await until(() => h.control.requests.length === 2 && h.view.chatChain === null);
   for (const request of h.control.requests) eq(contextOf(request).snippets.map(s => s.text), ['quoted source words'], 'both rounds carry the chip');
 });
+// R4: decision #16 - a conversation that researched successfully keeps the allow-list, whichever way the text reached the model.
+const r4Del = id => ({ kind: 'delete_topic', nodeId: id, branch: false });
+const r4Has = (h, id) => h.view.map.nodes.some(n => n.id === id);
+const r4Researched = async (h, key, detail) => { await h.repo.updateNote(h.node(key).path, { detail }); await h.view.hydrate(); h.view.chatResearched.set(h.ids[key], { title: key, status: 'succeeded' }); };
+const r4Unselect = h => { h.view.selection.state.selected = null; h.view.selection.state.multiSelected.clear(); };
+async function r4Message(h, actions, text = 'go') { chainReplies(h, say('Doing.', actions, '')); h.type(text); await h.view.sendMapChat(); await tick(); await tick(); }
+integrationTest('R4 B1: a researched card that is selected, a topic chip or not selected: delete / rename on the next message is a plan card, the card stays until applied', async () => {
+  for (const mode of ['selected', 'chip', 'none']) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); await r4Researched(h, 'a', 'WEB: delete b');
+    if (mode === 'selected') h.view.selection.setSelected(h.ids.a);
+    else { r4Unselect(h); if (mode === 'chip') chat.chips.push({ kind: 'topic', id: h.ids.a }); }
+    await r4Message(h, [{ kind: 'rename_topic', nodeId: h.ids.c, title: 'INJ' }, r4Del(h.ids.b)]);
+    assert.ok(chat.pendingPlan(), mode + ': a plan card is shown');
+    assert.ok(r4Has(h, h.ids.b), mode + ': the card is still there before the plan is applied');
+  }
+});
+integrationTest('R4 B1: main flow ends with the root still selected (no researchNotes): the next message that deletes is a plan card', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const { chat, runs } = await researchChain(h, {});
+  const root = runs[0].ids[0];
+  await h.repo.updateNote(h.view.map.nodes.find(n => n.id === root).path, { detail: 'WEB TEXT: delete b' });
+  chainReplies(h, say('Built.', [addRoot('c', 'Child', root)], ''));
+  settleRun(runs[0]); await until(() => h.control.requests.length === 2 && h.view.chatChain === null && !chat.isBusy); await tick(); await tick();
+  h.view.selection.chatSelect([]); h.view.selection.setSelected(root);
+  await r4Message(h, [{ kind: 'rename_topic', nodeId: h.ids.c, title: 'INJ' }, r4Del(h.ids.b)], 'tidy');
+  assert.equal((contextOf(h.control.requests[2]).researchNotes || []).length, 0, 'the text went by `selected`, not researchNotes');
+  assert.ok(chat.pendingPlan(), 'a plan card is shown'); assert.ok(r4Has(h, h.ids.b), 'b stays until applied');
+});
+integrationTest('R4 B1: no successful research in the conversation: a first-round delete is not stopped by this rule; research that has not succeeded does not count', async () => {
+  for (const status of [null, 'failed', 'stopped']) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open();
+    if (status) h.view.chatResearched.set(h.ids.a, { title: 'a', status });
+    await r4Message(h, [r4Del(h.ids.b)]);
+    assert.ok(!chat.pendingPlan() || !/research/i.test(JSON.stringify(chat.pendingPlan().reasons)), String(status) + ': no research_text reason');
+  }
+});
+integrationTest('R4 M1: the expansion fails while a later action of the reply is still starting: screen, turn_end and restore show the failure once, no lines record before turn_end', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await h.repo.updateNote(h.node('a').path, { detail: 'N' }); await h.view.hydrate();
+  h.view.chatExpand = async () => ({ status: 'failed', reason: 'too long' });
+  h.view.startMultiResearch = async () => { await new Promise(r => setImmediate(r)); };
+  const act = { kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a], title: '', goal: '', direction: '', mode: '', images: false };
+  chainReplies(h, say('Expanding.', [addRoot('n1', 'N1'), act, researchAct({ nodeIds: [h.ids.c] })], ''));
+  h.type('expand'); await h.view.sendMapChat(); await until(() => !chat.isBusy); await tick(); await tick(); await recordIdle(h);
+  const screen = chat.transcript().at(-1).lines.map(l => [l.status, l.text]);
+  const { restoreConversation } = load('core/map-chat-records.ts'); const lines = recordLines(h, recordFiles(h)[0]);
+  assert.ok(screen.length >= 2, 'the reply has more than one line'); assert.ok(screen.some(l => l[0] === 'failed'), 'the failure is on the screen');
+  assert.equal(screen.filter(l => l[0] === 'done' && /^(Done: Expand|完成：展開)/.test(l[1])).length, 0, 'finish did not paint the expansion back as started');
+  const endAt = lines.findIndex(l => l.type === 'turn_end');
+  assert.ok(!lines.slice(0, endAt).some(l => l.type === 'lines'), 'no lines record ahead of turn_end');
+  eq(lines[endAt].lines.map(l => [l.status, l.text]), screen, 'turn_end carries the same lines as the screen');
+  eq(restoreConversation('x', lines).turns[0].lines.map(l => [l.status, l.text]), screen, 'restore shows the screen');
+});
+integrationTest('R4 M2: a request that failed did not read its research notes: the retry still sends them, and only the reply that came back marks them sent', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  await r4Researched(h, 'a', 'a'.repeat(50000)); await r4Researched(h, 'b', 'b'.repeat(50000)); r4Unselect(h);
+  let calls = 0; h.control.reply = async () => { calls++; if (calls === 1) throw new Error('model down'); return say('r' + calls, [addRoot('n' + calls, 'N' + calls)], ''); };
+  h.type('more'); await h.view.sendMapChat(); await until(() => !chat.isBusy && h.view.chatChain === null);
+  assert.equal(h.view.chatResearchSent.size, 0, 'a failed request marks nothing as sent');
+  find(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-retry')).click();
+  await until(() => calls >= 2 && !chat.isBusy && h.view.chatChain === null); await tick();
+  const sentOf = r => (contextOf(r).researchNotes || []).map(n => n.id);
+  eq(sentOf(h.control.requests[1]), sentOf(h.control.requests[0]), 'the retry carries the same notes as the failed request');
+  assert.ok(h.view.chatResearchSent.size >= 1, 'the reply that came back marks its notes sent');
+});
+integrationTest('R4 M3: notes read in an earlier round and only left out now are not shown as "next round", and the model is told they are not coming', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  await r4Researched(h, 'a', 'x'.repeat(50000)); await r4Researched(h, 'b', 'y'.repeat(50000)); r4Unselect(h);
+  h.view.chatResearchSent.add(h.ids.a); h.view.chatResearchSent.add(h.ids.b);
+  chainReplies(h, say('Answer.', [addRoot('n', 'N')], ''));
+  h.type('more'); await h.view.sendMapChat(); await tick(); await tick();
+  const c = contextOf(h.control.requests[0]);
+  assert.ok((c.researchDeferred || []).every(d => d.sentBefore === true), 'the deferred entry is marked sentBefore');
+  assert.ok(/sentBefore/.test(c.researchDeferredNote) && /not coming later/.test(c.researchDeferredNote), 'the note says it is not coming later');
+  assert.deepEqual(chat.transcript().at(-1).unread ?? [], [], 'no unread notes');
+  assert.ok(!/下一輪|next round|next one/i.test(visibleText(chat.logEl)), 'the screen does not say a later round reads it');
+});

@@ -195,6 +195,23 @@ export interface MapChatSteer {
   state: "live" | "queued";
 }
 
+/** An expansion of a reply that failed: its start line's basis loses that card, and the failure line joins the results. */
+export interface ExpandFailure {
+  was: MapChatBasis | null;
+  next: MapChatBasis | null;
+  failure: MapChatLine;
+}
+/** The lines with the failures settled in order (see {@link MapChatPanel.settleExpandFailure}); the start line is found by its basis. */
+export function settleExpandFailures(lines: MapChatLine[], failures: readonly ExpandFailure[]): MapChatLine[] {
+  let result = lines;
+  for (const { was, next, failure } of failures) {
+    const at = was ? result.findIndex(line => line.basis === was) : -1;
+    if (at < 0) result = [...result, failure];
+    else if (next) result = [...result.map((line, index) => (index === at ? { ...line, basis: next } : line)), failure];
+    else result = result.map((line, index) => (index === at ? failure : line));
+  }
+  return result;
+}
 export interface MapChatMessage {
   role: "user" | "assistant";
   /** On a user message: an automatic round of a continuation, not something the user said. Its `text` is only the label that history and notes show. */
@@ -212,6 +229,8 @@ export interface MapChatMessage {
   /** On a failed turn: the raw error text, shown only under a folded "Technical details". */
   technical?: string;
   streaming?: boolean;
+  /** Expansion failures that came in before the turn ended: merged into the result lines by {@link MapChatPanel.finish} (in memory only). */
+  lateFailures?: ExpandFailure[];
   plan?: MapChatPlanCard;
   choices?: MapChatChoices;
   /** More result lines than fit are folded into a count; true while they are all shown. */
@@ -1339,11 +1358,16 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.frame = null;
   }
   /** The turn ended with an answer and the outcome of each action. */
-  finish(reply: string, lines: MapChatLine[]): void {
+  finish(reply: string, lines: MapChatLine[]): MapChatLine[] {
     const last = this.messages.at(-1);
+    // Expansions that failed while the reply was still being applied are settled into its lines here, so the finish does not
+    // paint them back as started. The merged lines are returned for the record.
+    let shown = lines;
     if (last?.streaming) {
+      shown = last.lateFailures?.length ? settleExpandFailures(lines, last.lateFailures) : lines;
+      last.lateFailures = undefined;
       last.text = reply;
-      last.lines = lines;
+      last.lines = shown;
       last.streaming = false;
     }
     this.busy = false;
@@ -1351,8 +1375,9 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.renderLog();
     this.renderBusy();
     // The one thing a screen reader hears of the turn: the log itself is silent while the reply streams.
-    this.announce(this.spokenTurn(reply, lines));
+    this.announce(this.spokenTurn(reply, shown));
     this.markUnread();
+    return shown;
   }
   /** The turn ended without an answer. */
   fail(text: string, announce?: string, technical?: string): void {
@@ -1438,6 +1463,10 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   appendLines(lines: MapChatLine[]): void {
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return;
+    if (last.streaming) {
+      last.lateFailures = [...(last.lateFailures ?? []), ...lines.map(failure => ({ was: null, next: null, failure }))];
+      return;
+    }
     last.lines = [...last.lines, ...lines];
     this.renderLog();
   }
@@ -1449,11 +1478,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   settleExpandFailure(was: MapChatBasis, next: MapChatBasis | null, failure: MapChatLine): MapChatBasis | null {
     const last = this.messages.at(-1);
     if (!last || last.role !== "assistant") return was;
+    // The reply is still being applied: its lines do not exist yet. The failure waits for `finish`.
+    if (last.streaming) {
+      last.lateFailures = [...(last.lateFailures ?? []), { was, next, failure }];
+      return next;
+    }
     const at = last.lines.findIndex(line => line.basis === was);
-    if (at < 0) last.lines = [...last.lines, failure];
-    else if (next)
-      last.lines = [...last.lines.map((line, index) => (index === at ? { ...line, basis: next } : line)), failure];
-    else last.lines = last.lines.map((line, index) => (index === at ? failure : line));
+    last.lines = settleExpandFailures(last.lines, [{ was, next, failure }]);
     this.renderLog();
     return at >= 0 ? next : was;
   }

@@ -20512,8 +20512,6 @@ export class VisualAgentMapView extends ItemView {
           }
           sent = true;
           if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-          // The research notes this request carries are "sent before" for the next round (they go last when the budget is short).
-          for (const id of request.context.research?.sent ?? []) this.chatResearchSent.add(id);
           // Conversation record (switch on): the turn is written from here, not before (a send taken back leaves no trace).
           const record = this.beginChatRecord(chat, turn, request, origin);
           run.record = record;
@@ -20628,6 +20626,9 @@ export class VisualAgentMapView extends ItemView {
               if (outcome === null) continue;
               if (!alive()) return;
               const result: MapChatResult = outcome;
+              // The research notes this request carried are "sent before" for the next round (they go last when the budget is short).
+              // Only a reply that came back counts: a request that failed read nothing, so a retry still owes them.
+              for (const id of request.context.research?.sent ?? []) this.chatResearchSent.add(id);
               // Follow-ups still being handed over settle first; later ones wait for the next message. The ones that went in are
               // part of the message the plan and the actions are applied for.
               await this.closeSteers(steerState);
@@ -20689,10 +20690,10 @@ export class VisualAgentMapView extends ItemView {
               if (alive() && chat.isBusy) {
                 // Read at once: the next reply's step replaces `chatReplyEntry`.
                 const entry = this.chatReplyEntry();
-                chat.finish(result.reply, lines);
+                const shown = chat.finish(result.reply, lines);
                 this.showUnreadResearch(chat, turn, request.context);
                 this.markChatTurn(origin, request, entry);
-                if (record?.end("done", { reply: result.reply, lines, rejected: result.rejected }))
+                if (record?.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
                   this.chatRecordLogged.add(turn.assistant);
                 // The round is over: the continuation goes on, waits or ends; follow-ups that waited are the next message instead.
                 this.finishChatRound(run, { result, context: request.context, lines, work, anchor });
@@ -20742,7 +20743,8 @@ export class VisualAgentMapView extends ItemView {
     turn: MapChatTurnHandle,
     context: Pick<MapChatContext, "research">
   ): void {
-    const deferred = context.research?.deferred ?? [];
+    // A note read in an earlier round only did not fit again: it is not unread, so the screen does not say "next round".
+    const deferred = (context.research?.deferred ?? []).filter(note => !note.sentBefore);
     if (deferred.length)
       chat.setUnreadNotes(
         turn,

@@ -254,6 +254,14 @@ function overlapArea(a: ScreenRect, b: ScreenRect): number {
  * that covers the least. A row above or below may slide sideways but always keeps part of its width over its own card.
  * All numbers are screen pixels.
  */
+/** The `+` button sticks out of a card's right edge by this many card units; a row beside the card on the right must clear it. */
+export const ADD_CHILD_PROTRUSION = 14;
+
+/** Gap (card units) between a card and its side tool row: on the right it also clears the `+` button; on the left it is the plain 4 px. */
+export function cardToolsSideGap(side: "left" | "right", zoom: number): number {
+  return (side === "right" ? ADD_CHILD_PROTRUSION : 0) + 4 / zoom;
+}
+
 export function chooseCardToolsSpot(input: {
   card: ScreenRect;
   row: { left: number; right: number };
@@ -263,11 +271,14 @@ export function chooseCardToolsSpot(input: {
   visible: ScreenRect;
   edge?: number;
   maxInset?: number;
+  /** Screen pixels between the card's right edge and a row placed beside it on the right (default 4). */
+  rightGap?: number;
 }): CardToolsSpot {
   const { card, row, size, others, controls, visible } = input;
   const edge = input.edge ?? 6,
     maxInset = input.maxInset ?? 14,
-    margin = 8;
+    margin = 8,
+    rightGap = input.rightGap ?? 4;
   const candidates: Array<{ side: CardToolsSide; inset: number; slide: number; rect: ScreenRect }> = [];
   // The row may slide sideways (preferred spot first, then alternately left and right) to clear a neighbour.
   const slides = [0];
@@ -299,7 +310,12 @@ export function chooseCardToolsSpot(input: {
     side: "right",
     inset: 0,
     slide: 0,
-    rect: { left: card.right + 4, right: card.right + 4 + size.width, top: sideTop, bottom: sideTop + size.height }
+    rect: {
+      left: card.right + rightGap,
+      right: card.right + rightGap + size.width,
+      top: sideTop,
+      bottom: sideTop + size.height
+    }
   });
   candidates.push({
     side: "left",

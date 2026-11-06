@@ -186,6 +186,55 @@ export function pointToBoxLabelPoint(
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
 
+/** Which side of the picture a ring card lies on; the line meets the card's edge that faces the picture. */
+export type AnchorLineSide = "top" | "bottom" | "left" | "right";
+
+/** The straight line of a ring card: from the anchor (pulled `ANCHOR_LINE_INSET` px towards the card) to the middle of the card's edge that faces the picture. */
+function pointToBoxStraight(
+  original: { x: number; y: number },
+  box: RelationBox,
+  side: AnchorLineSide,
+  pointIsFrom: boolean
+): { p1: { x: number; y: number }; p2: { x: number; y: number } } {
+  const end =
+    side === "top"
+      ? { x: box.x + box.width / 2, y: box.y + box.height }
+      : side === "bottom"
+        ? { x: box.x + box.width / 2, y: box.y }
+        : side === "left"
+          ? { x: box.x + box.width, y: box.y + box.height / 2 }
+          : { x: box.x, y: box.y + box.height / 2 };
+  const run = Math.hypot(end.x - original.x, end.y - original.y) || 1,
+    inset = Math.min(ANCHOR_LINE_INSET, run / 2),
+    start = {
+      x: original.x + ((end.x - original.x) / run) * inset,
+      y: original.y + ((end.y - original.y) / run) * inset
+    };
+  return pointIsFrom ? { p1: start, p2: end } : { p1: end, p2: start };
+}
+
+/** A straight line between an anchor and the facing edge midpoint of a ring card (see `pointToBoxStraight`). */
+export function pointToBoxStraightPathData(
+  point: { x: number; y: number },
+  box: RelationBox,
+  side: AnchorLineSide,
+  pointIsFrom: boolean
+): string {
+  const { p1, p2 } = pointToBoxStraight(point, box, side, pointIsFrom);
+  return `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+}
+
+/** The label of a straight anchor line sits at its midpoint. */
+export function pointToBoxStraightLabelPoint(
+  point: { x: number; y: number },
+  box: RelationBox,
+  side: AnchorLineSide,
+  pointIsFrom: boolean
+): { x: number; y: number } {
+  const { p1, p2 } = pointToBoxStraight(point, box, side, pointIsFrom);
+  return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+}
+
 /**
  * The curve from a parent card to its child in a tree laid out in `direction`. "right" runs from the parent's right edge
  * to the child's left edge, exactly as `edgePathData` in view.ts; "left" mirrors it, from the parent's left edge to the

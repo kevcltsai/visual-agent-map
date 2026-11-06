@@ -483,6 +483,17 @@ test('M3 a camera request made while hidden is not saved then, and runs once whe
   await w.flush(); assert.equal(w.counts.transform, transforms + 1, 'not replayed again');
 });
 
+test('a ring fit asked while the tab is hidden still frames only the ring when the tab is shown', async () => {
+  const w = makeWorld({ focusNewTab: false }); const { view } = await w.hiddenTab();
+  view.map.nodes.push({ id: 'n1', x: 100, y: 100 }, { id: 'n2', x: 900, y: 700 });
+  const ring = new Set(['n1']);
+  view.fitCards(ring);
+  assert.equal(view.fitOnly, undefined, 'the limit is not left on the view while waiting');
+  const framed = []; view.fitCards = ids => framed.push(ids);
+  view.cameraWhenShown();
+  assert.deepEqual(framed, [ring]);
+});
+
 test('M3 a camera request for a map the tab has since left is dropped', async () => {
   const w = makeWorld({ focusNewTab: false }); const { view, leaf } = await w.hiddenTab();
   // The real openMapInMutation (the stub on the view is bypassed): it is the code that drops the request when the path changes.

@@ -490,8 +490,8 @@ test('dialog: new topic is the default; Done writes one anchor, one topic, one r
   assert.deepEqual(img.anchors[0].at, { kind: 'image-2d', x: 0.52, y: 0.5 });
   assert.match(img.anchors[0].id, /^[A-Za-z0-9_-]{1,64}$/);
   assert.ok(!disk.nodes.some(n => n.id === img.anchors[0].id), 'anchor id never equals a node id');
-  assert.deepEqual(img.relations, [{ kind: 'related', from: img.anchors[0].id, to: created.id }]);
-  assert.equal(created.parentId, disk.nodes.find(n => !n.parentId).id);
+  assert.deepEqual(img.relations, [{ kind: 'related', from: img.anchors[0].id, to: created.id, ring: true }]);
+  assert.equal(created.parentId, null, 'image-centre: a new topic is top level, not a child of the main topic');
   await h.view.history.undoEntry.undo();
   const back = await h.repo.readMap(MAP);
   assert.equal(back.nodes.length, nodes);
@@ -680,4 +680,319 @@ test('anchor aria name: the joiner is localised (". " in English, "。" in Chine
       if (lang !== 'en') assert.ok(!label.includes('. '), `${lang} has no ASCII joiner: ${label}`);
     }
   }
+});
+
+// ---- Image centre P3: a ring of topics around the picture (new topic, move, resize, delete, drag preview) -----------------------
+const replay = require('./support-replay.cjs');
+const ringLib = replay.load('experiences/visual-map/image-ring.ts');
+const ringLayout = replay.load('map-layout-text.ts');
+const rectOfNode = (n, h = 120) => ({ x: n.x, y: n.y, w: n.width ?? 280, h });
+const statesOf = (map, img = map.canvasItems.find(i => i.kind === 'annotated-image')) => ringLib.ringMembers(map.canvasItems, map.nodes)
+  .map(m => ({ id: m.topicId, ...rectOfNode(map.nodes.find(n => n.id === m.topicId)), anchorX: m.x, anchorY: m.y }));
+const addTopic = async (h, title, parentId, x, y) => {
+  const n = await h.repo.createNote(title, 'gpt-6-luna', h.view.map, MAP, 'workspace');
+  n.parentId = parentId; n.x = x; n.y = y; h.view.map.nodes.push(n);
+  return n;
+};
+const reload = async h => { await h.repo.saveMap(MAP, h.view.map); await h.repo.rebuildDerivedData(); h.view.map = await h.repo.readMap(MAP); await h.view.hydrate(); };
+const BIG = { x: 1000, y: 1000, w: 720, h: 360 };
+/** A picture with three ring cards (one has a folded child and a text block), an unrelated card and a text block beside them. */
+async function ringHarness() {
+  const h = await harness([]);
+  const root = h.view.map.nodes[0];
+  root.x = 80; root.y = 80;
+  const t1 = await addTopic(h, 'T1', null, 400, 500), t2 = await addTopic(h, 'T2', null, 900, 500), t3 = await addTopic(h, 'T3', null, 1500, 500);
+  const kid = await addTopic(h, 'Kid', t1.id, 400, 700); t1.collapsed = true;
+  const far = await addTopic(h, 'Far', root.id, 400, 80);
+  h.view.map.canvasItems = [
+    annotated({ ...BIG, anchors: [at('a1', 0.2, 0.5), at('a2', 0.5, 0.5), at('a3', 0.8, 0.5)], relations: [
+      { kind: 'related', from: 'a1', to: t1.id, ring: true }, { kind: 'related', from: 'a2', to: t2.id, ring: true }, { kind: 'related', from: 'a3', to: t3.id, ring: true }] }),
+    { id: 'tx-kid', kind: 'text', text: 'under kid', parentId: kid.id, x: 450, y: 750 },
+    { id: 'tx-t2', kind: 'text', text: 'under t2', parentId: t2.id, x: 950, y: 560 },
+    { id: 'tx-far', kind: 'text', text: 'far', parentId: far.id, x: 450, y: 130 }
+  ];
+  await reload(h);
+  h.view.render();
+  return Object.assign(h, { ids: { root: root.id, t1: t1.id, t2: t2.id, t3: t3.id, kid: kid.id, far: far.id } });
+}
+const nodeIn = (map, id) => map.nodes.find(n => n.id === id);
+const textIn = (map, id) => map.canvasItems.find(i => i.id === id);
+
+test('P3 moving the picture: cards of the ring, their branches (folded too) and the text under them go along in one undo step; nothing else moves', async () => {
+  const h = await ringHarness();
+  const before = plain(await h.repo.readMap(MAP));
+  const entries = h.view.history.past.length;
+  await h.view.moveCanvasItem('img1', 30, -20);
+  const after = await h.repo.readMap(MAP);
+  assert.equal(h.view.history.past.length, entries + 1, 'one undo step');
+  const pic = after.canvasItems.find(i => i.id === 'img1');
+  assert.deepEqual([pic.x, pic.y], [1030, 980]);
+  for (const id of [h.ids.t1, h.ids.t2, h.ids.t3, h.ids.kid]) {
+    const was = nodeIn(before, id), now = nodeIn(after, id);
+    assert.deepEqual([now.x, now.y], [was.x + 30, was.y - 20], id);
+  }
+  assert.deepEqual([textIn(after, 'tx-kid').x, textIn(after, 'tx-kid').y], [480, 730], 'text under a folded branch');
+  assert.deepEqual([textIn(after, 'tx-t2').x, textIn(after, 'tx-t2').y], [980, 540]);
+  for (const id of [h.ids.root, h.ids.far]) assert.deepEqual(plain(nodeIn(after, id)), plain(nodeIn(before, id)), 'unrelated card');
+  assert.deepEqual(plain(textIn(after, 'tx-far')), plain(textIn(before, 'tx-far')));
+  await h.view.history.undoEntry.undo();
+  assert.deepEqual(plain(await h.repo.readMap(MAP)), before, 'undo restores every coordinate');
+  await h.view.history.undoEntry.redo?.();
+});
+
+test('counter-example (plain picture): moving a picture without a ring (or with a relation that is not a ring one) moves only the picture', async () => {
+  const h = await ringHarness();
+  const t4 = await addTopic(h, 'T4', null, 5000, 5000);
+  h.view.map.canvasItems = [annotated({ ...BIG, anchors: [at('a1', 0.2, 0.5)], relations: [{ kind: 'related', from: 'a1', to: h.ids.t1 }] }), image({ id: 'plain', x: 10, y: 10 })];
+  await reload(h);
+  const before = plain((await h.repo.readMap(MAP)).nodes);
+  await h.view.moveCanvasItem('img1', 50, 50);
+  await h.view.moveCanvasItem('plain', 5, 5);
+  const after = await h.repo.readMap(MAP);
+  assert.deepEqual(plain(after.nodes), before);
+  assert.deepEqual(plain(after.canvasItems.map(i => [i.id, i.x, i.y])), [['img1', 1050, 1050], ['plain', 15, 15]]);
+  assert.ok(t4);
+});
+
+test('resize: a picture that grows over its ring cards solves the ring again against the new size; a plain picture changes nothing else', async () => {
+  const h = await ringHarness();
+  // Put the ring in a valid state first.
+  await h.view.mapChange(map => h.view.solveRingsIn(map, { imageIds: new Set(['img1']) }), false);
+  const before = await h.repo.readMap(MAP);
+  assert.deepEqual(plain(ringLib.ringViolations(before.canvasItems[0], statesOf(before))), [], 'setup: a clean ring');
+  const entries = h.view.history.past.length;
+  await h.view.resizeCanvasItem('img1', 1500);
+  const after = await h.repo.readMap(MAP);
+  assert.equal(h.view.history.past.length, entries + 1);
+  const pic = after.canvasItems.find(i => i.id === 'img1');
+  assert.equal(pic.w, 1500);
+  assert.deepEqual(plain(ringLib.ringViolations(pic, statesOf(after), { memberCount: 3 })), [], 'no card on the bigger picture');
+  const plainMap = await harness([image()]);
+  plainMap.view.render();
+  const nodes = plain((await plainMap.repo.readMap(MAP)).nodes);
+  await plainMap.view.resizeCanvasItem('img1', 300);
+  assert.deepEqual(plain((await plainMap.repo.readMap(MAP)).nodes), nodes);
+});
+
+test('delete the picture: the cards stay, stay top-level, lay out as plain topics; one undo brings picture, anchors, relations, ring and coordinates back', async () => {
+  const h = await ringHarness();
+  const before = plain(await h.repo.readMap(MAP));
+  const entries = h.view.history.past.length;
+  await h.view.removeCanvasItem('img1');
+  const after = await h.repo.readMap(MAP);
+  assert.equal(h.view.history.past.length, entries + 1);
+  assert.equal(after.canvasItems.some(i => i.kind === 'annotated-image'), false);
+  for (const id of [h.ids.t1, h.ids.t2, h.ids.t3]) {
+    assert.deepEqual([nodeIn(after, id).x, nodeIn(after, id).y, nodeIn(after, id).parentId], [nodeIn(before, id).x, nodeIn(before, id).y, null], 'stays where it was');
+  }
+  assert.equal(ringLayout.ringMemberIds(after.nodes, after.canvasItems).size, 0);
+  // Laid out afterwards they are ordinary top-level topics: the same as arranging the map without any picture.
+  h.view.map = after;
+  h.view.arrangeAll(h.view.map);
+  const alone = replay.load('map-layout.ts').arrangeMap(after.nodes.map(n => ({ ...n })), new Set(), h.view.cardHeightOf, 'right');
+  const arranged = h.view.map.nodes.filter(n => [h.ids.t1, h.ids.t2, h.ids.t3].includes(n.id));
+  assert.equal(new Set(arranged.map(n => n.x)).size, 1, 'one column, as plain roots');
+  assert.ok(alone.length);
+  h.view.map = await h.repo.readMap(MAP);
+  await h.view.history.undoEntry.undo();
+  assert.deepEqual(plain(await h.repo.readMap(MAP)), before);
+});
+
+test('delete an anchor: its card stays where it was and leaves the ring (the other cards stay in it)', async () => {
+  const h = await ringHarness();
+  const before = await h.repo.readMap(MAP);
+  await h.view.deleteAnchor('img1', 'a2');
+  const after = await h.repo.readMap(MAP);
+  assert.deepEqual([nodeIn(after, h.ids.t2).x, nodeIn(after, h.ids.t2).y, nodeIn(after, h.ids.t2).parentId], [nodeIn(before, h.ids.t2).x, nodeIn(before, h.ids.t2).y, null]);
+  assert.deepEqual([...ringLayout.ringMemberIds(after.nodes, after.canvasItems)].sort(), [h.ids.t1, h.ids.t3].sort());
+});
+
+test('counter-example (drag a card onto another card): it gets that parent and leaves the ring; the other cards do not move', async () => {
+  const h = await ringHarness();
+  const before = await h.repo.readMap(MAP);
+  await h.view.moveBranches([nodeIn(h.view.map, h.ids.t3)], nodeIn(h.view.map, h.ids.far));
+  const after = await h.repo.readMap(MAP);
+  assert.equal(nodeIn(after, h.ids.t3).parentId, h.ids.far);
+  assert.deepEqual([...ringLayout.ringMemberIds(after.nodes, after.canvasItems)].sort(), [h.ids.t1, h.ids.t2].sort());
+  for (const id of [h.ids.t1, h.ids.t2]) assert.deepEqual([nodeIn(after, id).x, nodeIn(after, id).y], [nodeIn(before, id).x, nodeIn(before, id).y], id);
+});
+
+/** The preview of a drag needs what a paint made: card elements, edge paths and anchor lines. */
+function previewParts(h) {
+  const card = (n, w = 280, hh = 120) => Object.assign(element('div', 'vam-node'), { offsetLeft: n.x, offsetTop: n.y, offsetWidth: w, offsetHeight: hh });
+  const path = () => ({ d: '', setAttribute(k, v) { this[k] = v; } });
+  const map = h.view.map;
+  h.view.cardEls = new Map(map.nodes.map(n => [n.id, card(n)]));
+  h.view.textEls = new Map();
+  h.view.edgeEls = new Map([[`${h.ids.t1}\u0000${h.ids.kid}`, path()], [`${h.ids.root}\u0000${h.ids.far}`, path()]]);
+  h.view.relationEls = new Map();
+  h.view.anchorLinks = new Map();
+  const pic = map.canvasItems.find(i => i.id === 'img1');
+  for (const [anchor, topic] of [['a1', h.ids.t1], ['a2', h.ids.t2], ['a3', h.ids.t3]]) {
+    const a = pic.anchors.find(x => x.id === anchor);
+    const key = `anchor:img1:${anchor}:${topic}`;
+    h.view.anchorLinks.set(key, { imageId: 'img1', anchorId: anchor, topicId: topic, point: { x: pic.x + a.at.x * pic.w, y: pic.y + a.at.y * pic.h }, fromAnchor: true, anchorNote: '' });
+    h.view.relationEls.set(key, path());
+    const n = nodeIn(map, topic);
+    h.view.placeAnchorLine(key, h.view.anchorLinks.get(key), { x: n.x, y: n.y, width: 280, height: 120 });
+  }
+  const textEl = Object.assign(element('div', 'vam-text-node'), { offsetLeft: 950, offsetTop: 560 });
+  h.view.textEls.set('tx-t2', textEl);
+  return { path };
+}
+
+test('drag preview: the cards, the tree edge, the text and the anchor lines follow the picture at once; a cancelled drag puts all of it back', async () => {
+  const h = await ringHarness();
+  previewParts(h);
+  const lines = () => [...h.view.relationEls.values()].map(p => p.d);
+  const first = lines();
+  h.view.render();
+  const el = h.imageEl();
+  const cardOf = id => h.view.cardEls.get(id);
+  const edge = h.view.edgeEls.get(`${h.ids.t1}\u0000${h.ids.kid}`);
+  const other = h.view.edgeEls.get(`${h.ids.root}\u0000${h.ids.far}`);
+  const farBefore = cardOf(h.ids.far).style.left;
+  el.fire('pointerdown', { button: 0, clientX: 0, clientY: 0, pointerId: 1 });
+  el.fire('pointermove', { clientX: 40, clientY: 25 });
+  assert.equal(cardOf(h.ids.t2).style.left, '940px');
+  assert.equal(cardOf(h.ids.t2).style.top, '525px');
+  assert.equal(cardOf(h.ids.t1).style.left, '440px');
+  assert.equal(h.view.textEls.get('tx-t2').style.left, '990px');
+  assert.equal(cardOf(h.ids.far).style.left, farBefore, 'a card that is not part of the ring stays');
+  assert.notEqual(edge.d, '', 'the tree edge below a ring card follows');
+  assert.equal(other.d, '', 'an edge of another tree is not touched');
+  const moved = lines();
+  assert.ok(moved.every((d, i) => d && d !== first[i]), 'every anchor line moved');
+  // The cards moved with the picture, so a line keeps its length: the start moves by (40, 25) and so does the card end.
+  const num = d => d.match(/-?\d+(\.\d+)?/g).map(Number);
+  const m0 = num(moved[1]), f0 = num(first[1]);
+  assert.ok(Math.abs((m0[0] - f0[0]) - 40) < 1e-6 && Math.abs((m0[1] - f0[1]) - 25) < 1e-6, 'the line starts on the moved anchor');
+  el.fire('pointercancel', {});
+  assert.equal(cardOf(h.ids.t2).style.left, '900px');
+  assert.equal(cardOf(h.ids.t2).style.top, '500px');
+  assert.equal(h.view.textEls.get('tx-t2').style.left, '950px');
+  assert.deepEqual(lines(), first, 'every anchor line is where it was');
+  assert.equal(el.style.left, '1000px');
+  assert.equal((await h.repo.readMap(MAP)).canvasItems[0].x, 1000, 'nothing written');
+  assert.equal(h.view.history.past.length, 0);
+});
+
+test('drag preview: releasing writes the move once; a picture without a ring previews only itself', async () => {
+  const h = await ringHarness();
+  previewParts(h);
+  h.view.render();
+  const el = h.imageEl();
+  el.fire('pointerdown', { button: 0, clientX: 0, clientY: 0, pointerId: 1 });
+  el.fire('pointermove', { clientX: 40, clientY: 25 });
+  el.fire('pointerup', {});
+  await h.settle();
+  const after = await h.repo.readMap(MAP);
+  assert.deepEqual([after.canvasItems[0].x, nodeIn(after, h.ids.t2).x], [1040, 940]);
+  assert.equal(h.view.history.past.length, 1);
+
+  const p = await harness([image({ id: 'p1', x: 10, y: 10 })]);
+  p.view.render();
+  p.view.cardEls = new Map([[p.view.map.nodes[0].id, Object.assign(element('div'), { offsetLeft: 5, offsetTop: 5, offsetWidth: 5, offsetHeight: 5 })]]);
+  const pe = p.imageEl();
+  pe.fire('pointerdown', { button: 0, clientX: 0, clientY: 0, pointerId: 1 });
+  pe.fire('pointermove', { clientX: 40, clientY: 25 });
+  assert.equal(pe.style.left, '50px');
+  assert.equal(p.view.cardEls.get(p.view.map.nodes[0].id).style.left, undefined, 'a card is not previewed');
+  pe.fire('pointercancel', {});
+  assert.equal(pe.style.left, '10px');
+});
+
+// ---- new topic from the anchor dialog: top level, ring, free slot first, then the whole ring ------------------------------------
+const newAnchor = (h, x, y, note = 'New') => h.view.commitAnchor('img1', { x, y }, note, { kind: 'new' });
+
+test('new topic: a top-level topic with ring true; the picture grows to ring size once; the card is outside it; one undo step', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  const entries = h.view.history.past.length, before = plain(await h.repo.readMap(MAP));
+  await newAnchor(h, 0.3, 0.4, 'Cow back');
+  const disk = await h.repo.readMap(MAP);
+  const created = disk.nodes.at(-1);
+  assert.equal(created.parentId, null);
+  const pic = disk.canvasItems[0];
+  assert.deepEqual(plain(pic.relations), [{ kind: 'related', from: pic.anchors[0].id, to: created.id, ring: true }]);
+  assert.equal(Math.max(pic.w, pic.h), 720, 'long side 720, centre and ratio kept');
+  assert.equal(pic.w / pic.h, 2, 'ratio kept');
+  assert.deepEqual(plain(ringLib.ringViolations(pic, statesOf(disk), { memberCount: 1 })), []);
+  assert.equal(h.view.history.past.length, entries + 1);
+  await h.view.history.undoEntry.undo();
+  assert.deepEqual(plain(await h.repo.readMap(MAP)), before);
+});
+
+test('new topic: a second one takes a free slot, no other card moves and the picture is not resized again', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  await newAnchor(h, 0.3, 0.4, 'One');
+  const one = await h.repo.readMap(MAP);
+  const first = plain(nodeIn(one, one.nodes.at(-1).id));
+  h.view.map = one; await h.view.hydrate();
+  await newAnchor(h, 0.7, 0.6, 'Two');
+  const two = await h.repo.readMap(MAP);
+  assert.deepEqual(plain(nodeIn(two, first.id)), first, 'the first card did not move');
+  assert.deepEqual(plain(two.canvasItems[0]).w, one.canvasItems[0].w);
+  assert.equal(ringLayout.ringMemberIds(two.nodes, two.canvasItems).size, 2);
+  assert.deepEqual(plain(ringLib.ringViolations(two.canvasItems[0], statesOf(two), { memberCount: 2 })), []);
+});
+
+test('counter-example (no free slot): when a big obstacle leaves no qualified slot the ring is solved again around it', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  h.view.render();
+  await newAnchor(h, 0.3, 0.4, 'One');
+  const one = await h.repo.readMap(MAP);
+  // A huge picture over everything: no slot around the ring is free.
+  one.canvasItems.push({ id: 'wall', kind: 'image', path: 'attachments/wall.png', x: -3000, y: -3000, w: 7000, h: 7000 });
+  await h.repo.saveMap(MAP, one); h.view.map = await h.repo.readMap(MAP); await h.view.hydrate();
+  await newAnchor(h, 0.7, 0.6, 'Two');
+  const two = await h.repo.readMap(MAP);
+  const pic = two.canvasItems.find(i => i.id === 'img1'), wall = two.canvasItems.find(i => i.id === 'wall');
+  assert.equal(ringLayout.ringMemberIds(two.nodes, two.canvasItems).size, 2);
+  assert.deepEqual(plain(ringLib.ringViolations(pic, statesOf(two), { memberCount: 2, others: [wall] })), [], 'the whole ring is clean and clear of the wall');
+  assert.ok(pic.x + pic.w <= wall.x || pic.x >= wall.x + wall.w || pic.y + pic.h <= wall.y || pic.y >= wall.y + wall.h, 'the ring moved off the wall');
+});
+
+test('counter-example (existing topics): linking an existing topic (a top-level one too) sets no ring and moves nothing', async () => {
+  const h = await ringHarness();
+  const topTopic = h.ids.far, child = h.ids.kid;
+  const t5 = await addTopic(h, 'T5', null, 3000, 3000);
+  await reload(h);
+  const before = plain(await h.repo.readMap(MAP));
+  for (const id of [t5.id, topTopic, child])
+    await h.view.commitAnchor('img1', { x: 0.1, y: 0.1 }, '', { kind: 'existing', topicId: id });
+  const after = await h.repo.readMap(MAP);
+  assert.deepEqual(plain(after.nodes), before.nodes, 'no card moved');
+  const pic = after.canvasItems.find(i => i.id === 'img1');
+  assert.deepEqual([pic.x, pic.y, pic.w, pic.h], [BIG.x, BIG.y, BIG.w, BIG.h], 'the picture stayed');
+  const added = pic.relations.slice(3);
+  assert.equal(added.length, 3);
+  assert.ok(added.every(r => !('ring' in r)));
+});
+
+test('counter-example (card height not measured yet): the first place uses the default height; after the card is drawn the ring is placed once more in the same undo step', async () => {
+  const h = await harness([annotated({ note: 'n' })]);
+  const heights = {};
+  h.view.cardHeightOf = id => heights[id];
+  let tidied = 0;
+  const tidy = h.view.tidyAfterResize.bind(h.view);
+  h.view.tidyAfterResize = (...a) => { tidied++; return tidy(...a); };
+  h.view.render = () => { for (const n of h.view.map.nodes.slice(1)) heights[n.id] = 700; };
+  const entries = h.view.history.past.length;
+  await newAnchor(h, 0.5, 0.02, 'Tall');
+  const disk = await h.repo.readMap(MAP);
+  const created = disk.nodes.at(-1);
+  assert.equal(tidied, 1, 'placed again after measuring');
+  assert.equal(h.view.history.past.length, entries + 1, 'one undo step for both');
+  const state = { id: created.id, x: created.x, y: created.y, w: 280, h: 700, anchorX: 0.5, anchorY: 0.02 };
+  assert.deepEqual(plain(ringLib.ringViolations(disk.canvasItems[0], [state], { memberCount: 1 })), [], 'clean with the real height');
+  // The same card that is as tall as expected is not touched again.
+  const g = await harness([annotated({ note: 'n' })]);
+  let again = 0;
+  const gt = g.view.tidyAfterResize.bind(g.view);
+  g.view.tidyAfterResize = (...a) => { again++; return gt(...a); };
+  g.view.render();
+  await g.view.commitAnchor('img1', { x: 0.5, y: 0.02 }, 'Short', { kind: 'new' });
+  assert.equal(again, 0);
 });

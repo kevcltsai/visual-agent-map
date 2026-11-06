@@ -88,3 +88,19 @@ test('19 i18n: the new text exists in en, zh-TW and zh-CN', () => {
     for (const key of ['ui.duplicate_current_mind_map', 'ui.duplicate_map_title', 'error.duplicate_map_unsupported']) assert.ok(table[key], `${file} ${key}`);
   }
 });
+
+test('P6 A15 duplicateMap: the ring flag and the top-level topics of an annotated image survive, anchor relations follow the new topic ids', async () => {
+  const { repo, mapPath, map, root, child } = await sourceMap();
+  map.canvasItems = [{
+    id: 'img1', kind: 'annotated-image', path: 'Pics/a.png', x: 0, y: 0, w: 200, h: 100, note: '',
+    anchors: [{ id: 'a1', at: { kind: 'image-2d', x: 0.2, y: 0.2 } }, { id: 'a2', at: { kind: 'image-2d', x: 0.8, y: 0.2 } }],
+    relations: [{ kind: 'related', from: 'a1', to: root.id, ring: true }, { kind: 'related', from: 'a2', to: child.id }]
+  }];
+  for (const n of map.nodes) n.parentId = null;
+  await repo.saveMap(mapPath, map);
+  const copy = await repo.readMap(await repo.duplicateMap(mapPath, 'Trip copy'));
+  const [r1, r2] = copy.nodes;
+  assert.equal(r1.parentId, null); assert.equal(r2.parentId, null);
+  const rels = JSON.parse(JSON.stringify(copy.canvasItems.find(i => i.kind === 'annotated-image').relations));
+  assert.deepEqual(rels, [{ kind: 'related', from: 'a1', to: r1.id, ring: true }, { kind: 'related', from: 'a2', to: r2.id }]);
+});

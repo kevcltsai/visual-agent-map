@@ -310,6 +310,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node > .vam-node-tools.is-side-left::after { left: 100%; }
 .vam-node > .vam-node-tools.is-side-right::after { right: 100%; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
+.vam-node > .vam-node-tools.is-side-right ~ .vam-add-child { z-index: 4; }
 /* In select mode every picked card is selected, so only hover and focus show a card's tools there. */
 .vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 /* The row hides a moment after the pointer leaves its card (it stays clickable meanwhile), so a pointer crossing bare canvas to reach a row beside or above the card still gets there. */
@@ -1907,6 +1908,16 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-anchor-pick-row { display: flex; align-items: center; gap: 10px; }
 .vam-anchor-pick-row button { flex: 1 1 auto; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vam-anchor-pick-taken { flex: 0 0 auto; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-view .vam-relation[data-anchor-relation] { transition: opacity 0.12s ease, stroke-width 0.12s ease; }
+/* Anchor lines are the first thing seen on a picture: heavier than a topic line and in the accent colour, so they hold on a light picture. */
+.vam-view .vam-relation[data-anchor-relation]:not(.vam-relation-derives_from) { --vam-relation-width: 2.25px; }
+.vam-view .vam-relation[data-anchor-relation]:not(.is-selected) { stroke: var(--interactive-accent); }
+/* A ring line of the plain "related" kind says nothing the line does not: its name shows only when the line is hovered or selected. */
+.vam-view .vam-relation-label.is-ring-quiet:not(.is-expanded) { display: none; }
+.vam-view .vam-relation[data-anchor-relation].is-related { stroke-width: calc(var(--vam-relation-width, 1.75px) + 2px); opacity: 1; }
+.vam-view .vam-relation[data-anchor-relation].is-dimmed { opacity: 0.25; }
+.vam-view .vam-anchor.is-related { transform: scale(1.35); box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
+@media (prefers-reduced-motion: reduce) { .vam-view .vam-relation[data-anchor-relation] { transition: none; } }
 @media (prefers-reduced-motion: reduce) { .vam-view .vam-text-node > .vam-text-add.vam-text-add { transition: none; } }
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-map-search { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); padding: 4px 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }

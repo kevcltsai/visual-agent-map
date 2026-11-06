@@ -1469,6 +1469,8 @@ export const en = {
   "ui.map_chat_chain_end_plan_cancelled": "The plan was cancelled, so the automatic continuation ends here.",
   "ui.map_chat_plan_reason_auto_round_other_actions":
     "The automatic continuation wants to delete or rewrite things; it waits for your confirmation",
+  "ui.map_chat_plan_reason_research_text_other_actions":
+    "The AI read the full web research text and now wants to delete or rewrite things; it waits for your confirmation",
   "ui.map_chat_research_deferred_0": "“{0}” did not fit this round and is read in the next one.",
   "ui.map_chat_research_oversize_0": "“{0}” is too long, so it was not read.",
   "ui.map_chat_basis_quote_0": "“{0}”",

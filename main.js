@@ -1440,6 +1440,7 @@ var en = {
   "ui.map_chat_chain_end_failed_retry": "Retry picks up from this round.",
   "ui.map_chat_chain_end_plan_cancelled": "The plan was cancelled, so the automatic continuation ends here.",
   "ui.map_chat_plan_reason_auto_round_other_actions": "The automatic continuation wants to delete or rewrite things; it waits for your confirmation",
+  "ui.map_chat_plan_reason_research_text_other_actions": "The AI read the full web research text and now wants to delete or rewrite things; it waits for your confirmation",
   "ui.map_chat_research_deferred_0": "\u201C{0}\u201D did not fit this round and is read in the next one.",
   "ui.map_chat_research_oversize_0": "\u201C{0}\u201D is too long, so it was not read.",
   "ui.map_chat_basis_quote_0": "\u201C{0}\u201D",
@@ -4226,6 +4227,7 @@ var zhCN = {
   "ui.map_chat_chain_end_failed_retry": "\u6309\u91CD\u8BD5\u4F1A\u4ECE\u8FD9\u4E00\u8F6E\u63A5\u7740\u505A\u3002",
   "ui.map_chat_chain_end_plan_cancelled": "\u8BA1\u5212\u5DF2\u53D6\u6D88\uFF0C\u81EA\u52A8\u63A5\u7EED\u5230\u6B64\u7ED3\u675F\u3002",
   "ui.map_chat_plan_reason_auto_round_other_actions": "\u81EA\u52A8\u63A5\u7EED\u8981\u505A\u5220\u9664\u6216\u6539\u5199\uFF0C\u7B49\u4F60\u786E\u8BA4",
+  "ui.map_chat_plan_reason_research_text_other_actions": "\u8FD9\u6B21 AI \u8BFB\u4E86\u7F51\u7EDC\u7814\u7A76\u5168\u6587\uFF0C\u8981\u505A\u5220\u9664\u6216\u6539\u5199\uFF0C\u7B49\u4F60\u786E\u8BA4",
   "ui.map_chat_research_deferred_0": "\u201C{0}\u201D\u8FD9\u8F6E\u653E\u4E0D\u4E0B\uFF0C\u4E0B\u4E00\u8F6E\u8BFB\u3002",
   "ui.map_chat_research_oversize_0": "\u201C{0}\u201D\u592A\u957F\uFF0C\u6CA1\u6709\u8BFB\u3002",
   "ui.map_chat_basis_quote_0": "\u201C{0}\u201D",
@@ -7012,6 +7014,7 @@ var zhTW = {
   "ui.map_chat_chain_end_failed_retry": "\u6309\u91CD\u8A66\u6703\u5F9E\u9019\u4E00\u8F2A\u63A5\u8457\u505A\u3002",
   "ui.map_chat_chain_end_plan_cancelled": "\u8A08\u756B\u5DF2\u53D6\u6D88\uFF0C\u81EA\u52D5\u63A5\u7E8C\u5230\u6B64\u7D50\u675F\u3002",
   "ui.map_chat_plan_reason_auto_round_other_actions": "\u81EA\u52D5\u63A5\u7E8C\u8981\u505A\u522A\u9664\u6216\u6539\u5BEB\uFF0C\u7B49\u4F60\u78BA\u8A8D",
+  "ui.map_chat_plan_reason_research_text_other_actions": "\u9019\u6B21 AI \u8B80\u4E86\u7DB2\u8DEF\u7814\u7A76\u5168\u6587\uFF0C\u8981\u505A\u522A\u9664\u6216\u6539\u5BEB\uFF0C\u7B49\u4F60\u78BA\u8A8D",
   "ui.map_chat_research_deferred_0": "\u300C{0}\u300D\u9019\u8F2A\u653E\u4E0D\u4E0B\uFF0C\u4E0B\u4E00\u8F2A\u8B80\u3002",
   "ui.map_chat_research_oversize_0": "\u300C{0}\u300D\u592A\u9577\uFF0C\u6C92\u6709\u8B80\u3002",
   "ui.map_chat_basis_quote_0": "\u300C{0}\u300D",
@@ -24292,7 +24295,10 @@ function buildMapChatContext(input2) {
       })),
       researchNotesNote: MAP_CHAT_RESEARCH_NOTES_NOTE
     } : {},
-    ...research.deferred.length ? { researchDeferred: research.deferred, researchDeferredNote: MAP_CHAT_RESEARCH_DEFERRED_NOTE } : {},
+    ...research.deferred.length ? {
+      researchDeferred: research.deferred.map(({ sentBefore: _sentBefore, ...told }) => told),
+      researchDeferredNote: MAP_CHAT_RESEARCH_DEFERRED_NOTE
+    } : {},
     ...image ? { selectedImage: image.sent, selectedImageNote: image.note } : {},
     activeFile: active,
     earlierTurns: history2.map((turn) => ({ role: turn.role, text: turn.text })),
@@ -24326,13 +24332,19 @@ function planResearchNotes(notes, budget, alreadySent) {
     else if (chars <= left) {
       sent.push(note);
       left -= chars;
-    } else deferred.push({ id: note.id, title: clip(note.title, TITLE_LIMIT), chars });
+    } else
+      deferred.push({
+        id: note.id,
+        title: clip(note.title, TITLE_LIMIT),
+        chars,
+        ...note.sentBefore ? { sentBefore: true } : {}
+      });
   }
   return { sent, deferred };
 }
 function pendingResearchCount(context) {
   var _a2, _b2;
-  return ((_b2 = (_a2 = context.research) == null ? void 0 : _a2.deferred) != null ? _b2 : []).filter((note) => !note.oversize).length;
+  return ((_b2 = (_a2 = context.research) == null ? void 0 : _a2.deferred) != null ? _b2 : []).filter((note) => !note.oversize && !note.sentBefore).length;
 }
 function continuationFields(input2) {
   const lines = input2.lastResults.slice(0, MAP_CHAT_CONTINUATION_LINES);
@@ -35774,7 +35786,7 @@ function finishWait(state, end) {
       if (research.stopped > 0) return ended(state, "research_stopped");
       if (research.failed > 0) return ended(state, "research_failed");
     }
-    if ((research.kind === "not_started" || researchSucceeded + research.failed + research.stopped === 0) && !state.wrote && expandSucceeded === 0)
+    if ((research.kind === "not_started" || researchSucceeded + research.failed + research.stopped === 0) && expandSucceeded === 0)
       return ended(state, "research_not_started");
   }
   if (!state.wrote && researchSucceeded === 0 && expandSucceeded === 0) return ended(state, "no_progress");
@@ -43190,7 +43202,7 @@ function restoredItems(items) {
   });
 }
 function restoreConversation(id, lines) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e;
   let mapPath = null;
   let mapId = null;
   const starts = /* @__PURE__ */ new Map();
@@ -43198,6 +43210,7 @@ function restoreConversation(id, lines) {
   const ends = /* @__PURE__ */ new Map();
   const plans = /* @__PURE__ */ new Map();
   const images = /* @__PURE__ */ new Map();
+  const current = /* @__PURE__ */ new Map();
   const undone = /* @__PURE__ */ new Map();
   for (const line of lines) {
     if (line.type === "conversation") {
@@ -43212,6 +43225,8 @@ function restoreConversation(id, lines) {
       ends.set(line.turn, line);
     } else if (line.type === "plan") {
       plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
+    } else if (line.type === "lines") {
+      if (Array.isArray(line.lines)) current.set(line.turn, line.lines);
     } else if (line.type === "images") {
       images.set(line.turn, { state: line.state, items: (_a2 = line.items) != null ? _a2 : [], inserted: (_b2 = line.inserted) != null ? _b2 : [] });
     } else if (line.type === "event") {
@@ -43230,12 +43245,12 @@ function restoreConversation(id, lines) {
       message: start.message,
       origin: start.origin,
       reply: typeof end.reply === "string" ? end.reply : "",
-      lines: restoredItems(end.lines),
+      lines: restoredItems((_c = current.get(number)) != null ? _c : end.lines),
       modelLabel: typeof end.modelLabel === "string" ? end.modelLabel : "",
       status: end.status,
       stalePlan: end.status === "plan",
-      planState: (_c = plans.get(number)) == null ? void 0 : _c.state,
-      planLines: plans.get(number) ? restoredItems((_d = plans.get(number)) == null ? void 0 : _d.lines) : void 0,
+      planState: (_d = plans.get(number)) == null ? void 0 : _d.state,
+      planLines: plans.get(number) ? restoredItems((_e = plans.get(number)) == null ? void 0 : _e.lines) : void 0,
       rejected: end.rejected,
       steers: Array.isArray(end.steers) ? end.steers.filter((item) => typeof item === "string") : [],
       images: images.get(number),
@@ -43626,6 +43641,10 @@ var MapChatTurnRecord = class {
   plan(state, lines = []) {
     this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
   }
+  /** The result lines of the turn changed after its end (an expansion that failed): the answer's lines as they are now. */
+  relines() {
+    this.write({ type: "lines", turn: this.turn, lines: plainLines(this.answer.lines) });
+  }
   /** The state of a picture search of this turn (`extraInserted`: the candidate being inserted right now). */
   images(block, extraInserted) {
     this.write({
@@ -43671,6 +43690,31 @@ var CHAIN_SAFE = /* @__PURE__ */ new Set([
 ]);
 var CHAIN_SAFE_RUN = /* @__PURE__ */ new Set(["research_standard", "expand"]);
 var isChainSafe = (action) => action.kind === "run_map_action" ? CHAIN_SAFE_RUN.has(action.action) : CHAIN_SAFE.has(action.kind);
+function isChainSafeFor(action, trusted = {}) {
+  var _a2, _b2;
+  if (!isChainSafe(action)) return false;
+  const made = (id) => {
+    var _a3, _b3;
+    return id.startsWith(MAP_CHAT_NEW_PREFIX) || ((_b3 = (_a3 = trusted.createdIds) == null ? void 0 : _a3.has(id)) != null ? _b3 : false);
+  };
+  const every = (ids, ok) => ids.length > 0 && ids.every(ok);
+  switch (action.kind) {
+    case "update_summary":
+      return made(action.nodeId) || ((_b2 = (_a2 = trusted.researchedIds) == null ? void 0 : _a2.has(action.nodeId)) != null ? _b2 : false);
+    case "set_topic_kind":
+      return every(action.nodeIds, (id) => {
+        var _a3, _b3;
+        return made(id) || ((_b3 = (_a3 = trusted.researchedIds) == null ? void 0 : _a3.has(id)) != null ? _b3 : false);
+      });
+    case "run_map_action":
+      return action.action !== "research_standard" || every(action.nodeIds, (id) => {
+        var _a3;
+        return made(id) && !((_a3 = trusted.researchedIds) == null ? void 0 : _a3.has(id));
+      });
+    default:
+      return true;
+  }
+}
 function targetCount(nodeIds, selection) {
   return nodeIds.length ? nodeIds.length : selection;
 }
@@ -43688,12 +43732,14 @@ function researchTargetsOf(actions, selectedCount) {
 }
 var mapChatCallsPerTask = (diagrams) => diagrams ? 2 : 1;
 function planFor(actions, context, options = {}) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e, _f;
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
   const reasons = [];
   const imageAddsOnly = options.imageMode === "direct" && options.imageAttached === true && actions.every((action) => IMAGE_SAFE_KINDS.has(action.kind));
   const autoRound = ((_b2 = (_a2 = options.chain) == null ? void 0 : _a2.round) != null ? _b2 : 1) >= 2;
-  const autoOnlySafe = autoRound && actions.every(isChainSafe);
+  const readsResearch = autoRound || ((_d = (_c = context.research) == null ? void 0 : _c.sent.length) != null ? _d : 0) > 0;
+  const onlySafe = readsResearch && actions.every((action) => isChainSafeFor(action, options.trusted));
+  const autoOnlySafe = autoRound && onlySafe;
   if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");
   let research = 0;
   let calls = 0;
@@ -43739,13 +43785,14 @@ function planFor(actions, context, options = {}) {
         break;
     }
   }
-  if (research + ((_d = (_c = options.chain) == null ? void 0 : _c.researchSoFar) != null ? _d : 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT) reasons.push("many_research");
+  if (research > 0 && research + ((_f = (_e = options.chain) == null ? void 0 : _e.researchSoFar) != null ? _f : 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
+    reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
   if (options.imageMode === "preview" && actions.some((action) => action.kind === "add_anchor" || action.kind === "link_anchor"))
     reasons.push("image_preview");
   if (options.imageAttached && actions.some((action) => !IMAGE_SAFE_KINDS.has(action.kind)))
     reasons.push("image_other_actions");
-  if (autoRound && !autoOnlySafe) reasons.push("auto_round_other_actions");
+  if (readsResearch && !onlySafe) reasons.push(autoRound ? "auto_round_other_actions" : "research_text_other_actions");
   return reasons.length ? { reasons, estimatedCalls: calls } : null;
 }
 var fold = (value) => toSimplifiedFold(value.normalize("NFKC")).replace(/\s+/g, " ").trim().toLowerCase();
@@ -56491,6 +56538,7 @@ var newChatWork = () => ({
   research: [],
   researchTargets: 0,
   researchKeys: /* @__PURE__ */ new Set(),
+  created: [],
   expand: [],
   otherBackground: false
 });
@@ -74308,14 +74356,16 @@ ${note.detail.trim()}` : "",
     };
     const anchor = { path: this.path, id: this.map.id };
     const run = this.chainForRound(autoOrigin, anchor, message);
+    run.chips = [...origin.chips];
     const draft = chat.draft;
     const turn = autoOrigin ? chat.beginAutoRound(run.state.round, run.state.maxRounds, run.state.remaining, origin, (_a2 = run.partial) != null ? _a2 : void 0) : chat.begin(message, origin, Boolean(again), "preparing");
     run.turn = turn;
     let sent = false;
     const abandon = (reason, ends = "map_changed") => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+      const retracted = chat.retract(turn, again ? restore : draft);
       this.interruptChain(run, ends);
-      if (!chat.retract(turn, again ? restore : draft)) return;
+      if (!retracted) return;
       if (reason !== void 0 && (!autoOrigin || ends === "failed")) new import_obsidian37.Notice(reason);
     };
     const preparing = new AbortController();
@@ -74461,7 +74511,13 @@ ${note.detail.trim()}` : "",
                 mapAiMode: (_d = this.map) == null ? void 0 : _d.aiMode,
                 imageMode: this.chatImageMode(),
                 imageAttached: !!request.imageDataUrl,
-                chain: planChainOf(run.state)
+                chain: planChainOf(run.state),
+                trusted: {
+                  createdIds: run.createdIds,
+                  researchedIds: new Set(
+                    [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
+                  )
+                }
               }) : null;
               if (plan) {
                 if (chat.isBusy) {
@@ -74676,7 +74732,7 @@ ${note.detail.trim()}` : "",
    * state saved in its origin, without counting it twice.
    */
   chainForRound(origin, anchor, message) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const live = this.chatChain;
     if (origin && live && live.seq === origin.seq && live.state.phase === "round") {
       live.anchor = anchor;
@@ -74684,6 +74740,7 @@ ${note.detail.trim()}` : "",
       live.replyRemaining = origin.continuation.remaining;
       return live;
     }
+    if (live) this.interruptChain(live, "user_took_over");
     const run = {
       seq: ++this.chatChainSeq,
       state: origin ? { ...origin.state, phase: "round" } : startChain(),
@@ -74693,7 +74750,9 @@ ${note.detail.trim()}` : "",
       record: null,
       replyRemaining: (_a2 = origin == null ? void 0 : origin.continuation.remaining) != null ? _a2 : "",
       lastResults: (_b2 = origin == null ? void 0 : origin.continuation.lastResults) != null ? _b2 : [],
-      waited: (_c = origin == null ? void 0 : origin.continuation.research) != null ? _c : [],
+      createdIds: new Set((_c = origin == null ? void 0 : origin.createdIds) != null ? _c : []),
+      chips: [],
+      waited: (_d = origin == null ? void 0 : origin.continuation.research) != null ? _d : [],
       details: [],
       partial: null,
       work: null,
@@ -74748,6 +74807,7 @@ ${note.detail.trim()}` : "",
   advanceChain(run, round3) {
     if (this.chatChain !== run || run.state.phase === "ended") return;
     run.partial = null;
+    for (const id of round3.work.created) run.createdIds.add(id);
     run.lastResults = chatResultLines(round3.lines).map((line) => ({ text: line.text, status: line.status }));
     run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
     const step = finishRound(run.state, {
@@ -74876,11 +74936,14 @@ ${note.detail.trim()}` : "",
     }
     const origin = {
       text: run.message,
-      chips: [],
+      // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
+      // a picture is sent with the first round only and a follow-up adds no chip.
+      chips: [...run.chips],
       selectedIds: this.chatSelectionIds(),
       chain: {
         seq: run.seq,
         state: run.state,
+        createdIds: [...run.createdIds],
         continuation: {
           round: round3,
           maxRounds: run.state.maxRounds,
@@ -74921,6 +74984,8 @@ ${note.detail.trim()}` : "",
         return t("ui.map_chat_plan_reason_image_other_actions");
       case "auto_round_other_actions":
         return t("ui.map_chat_plan_reason_auto_round_other_actions");
+      case "research_text_other_actions":
+        return t("ui.map_chat_plan_reason_research_text_other_actions");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
@@ -75568,7 +75633,7 @@ ${note.detail.trim()}` : "",
    * automatic layout and a move of the view to the new cards.
    */
   async applyMapChatActions(result, baseline, alive = () => true, anchor = { path: this.path, id: ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)() }, options = {}) {
-    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
     const touched = /* @__PURE__ */ new Set([anchor.path]);
     const record = this.chatLastRecord;
     const same = () => {
@@ -75580,7 +75645,8 @@ ${note.detail.trim()}` : "",
     const later = [];
     const run = {
       refs: /* @__PURE__ */ new Map(),
-      created: [],
+      // Shared with the round's work, which hands the ids to its chain.
+      created: (_b2 = (_a3 = options.work) == null ? void 0 : _a3.created) != null ? _b2 : [],
       notes: /* @__PURE__ */ new Set(),
       files: /* @__PURE__ */ new Set(),
       parked: /* @__PURE__ */ new Set(),
@@ -75700,7 +75766,7 @@ ${note.detail.trim()}` : "",
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
       if (!same()) stopped = true;
       const rough = batched && !arranged && (stopped || layoutDone) ? run.created.slice(laidOutCount) : [];
-      if (rough.length && !this.closed && this.path === anchor.path && ((_a3 = this.map) == null ? void 0 : _a3.id) === anchor.id) {
+      if (rough.length && !this.closed && this.path === anchor.path && ((_c = this.map) == null ? void 0 : _c.id) === anchor.id) {
         try {
           await this.plugin.mutate(
             () => this.history.ownWrites(async () => {
@@ -75725,9 +75791,9 @@ ${note.detail.trim()}` : "",
             this.chatReplyStep = await this.pushChatReplyEntry(
               entries,
               anchor.path,
-              (_b2 = run.notes) != null ? _b2 : /* @__PURE__ */ new Set(),
-              (_c = run.files) != null ? _c : /* @__PURE__ */ new Set(),
-              (_d = run.parked) != null ? _d : /* @__PURE__ */ new Set(),
+              (_d = run.notes) != null ? _d : /* @__PURE__ */ new Set(),
+              (_e = run.files) != null ? _e : /* @__PURE__ */ new Set(),
+              (_f = run.parked) != null ? _f : /* @__PURE__ */ new Set(),
               record
             );
         } catch (e) {
@@ -75766,25 +75832,25 @@ ${note.detail.trim()}` : "",
               run
             );
             const mergeIds = (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && resolved.action.action === "merge" ? new Set(resolved.action.nodeIds) : void 0;
-            const mine = mergeIds ? ((_e = run.held) != null ? _e : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
+            const mine = mergeIds ? ((_g = run.held) != null ? _g : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
             let asked;
             for (const entry of mine) {
               const change2 = chatAppearanceChange(entry.action);
               asked = {
                 ...asked,
                 ...change2,
-                addMarkers: [...(_f = asked == null ? void 0 : asked.addMarkers) != null ? _f : [], ...(_g = change2.addMarkers) != null ? _g : []],
-                removeMarkers: [...(_h = asked == null ? void 0 : asked.removeMarkers) != null ? _h : [], ...(_i = change2.removeMarkers) != null ? _i : []],
-                addStyles: [...(_j = asked == null ? void 0 : asked.addStyles) != null ? _j : [], ...(_k = change2.addStyles) != null ? _k : []],
-                removeStyles: [...(_l = asked == null ? void 0 : asked.removeStyles) != null ? _l : [], ...(_m = change2.removeStyles) != null ? _m : []]
+                addMarkers: [...(_h = asked == null ? void 0 : asked.addMarkers) != null ? _h : [], ...(_i = change2.addMarkers) != null ? _i : []],
+                removeMarkers: [...(_j = asked == null ? void 0 : asked.removeMarkers) != null ? _j : [], ...(_k = change2.removeMarkers) != null ? _k : []],
+                addStyles: [...(_l = asked == null ? void 0 : asked.addStyles) != null ? _l : [], ...(_m = change2.addStyles) != null ? _m : []],
+                removeStyles: [...(_n = asked == null ? void 0 : asked.removeStyles) != null ? _n : [], ...(_o = change2.removeStyles) != null ? _o : []]
               };
             }
-            outcome = resolved ? await this.runChatSelection(resolved.action, (_n = result.message) != null ? _n : "", laterBatch, asked, options.work) : skipped("ui.map_chat_skip_parent_missing");
+            outcome = resolved ? await this.runChatSelection(resolved.action, (_p = result.message) != null ? _p : "", laterBatch, asked, options.work) : skipped("ui.map_chat_skip_parent_missing");
             if (options.work && outcome.status === "done" && (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && ["synthesize", "merge", "rate_by_goal"].includes(resolved.action.action))
               options.work.otherBackground = true;
             if (outcome.status !== "done" && mine.length && same()) {
               const merged = new Set(mine.flatMap((entry) => entry.ids));
-              run.mergeSourceIds = new Set([...(_o = run.mergeSourceIds) != null ? _o : []].filter((id) => !merged.has(id)));
+              run.mergeSourceIds = new Set([...(_q = run.mergeSourceIds) != null ? _q : []].filter((id) => !merged.has(id)));
               for (const entry of mine) {
                 const keep = entry.ids;
                 await this.plugin.mutate(async () => {
@@ -76617,6 +76683,7 @@ ${note.detail.trim()}` : "",
         );
         const expandChat = this.chat;
         const expandTurns = (_b2 = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _b2 : 0;
+        const expandRecord = this.chatLastRecord;
         const cards = infos.map(({ parent, note }) => ({
           id: parent.id,
           title: note.title,
@@ -76659,6 +76726,7 @@ ${note.detail.trim()}` : "",
                   expandFailureLine(note.title, outcome.reason)
                 );
               else expandChat.appendLines([expandFailureLine(note.title, outcome.reason)]);
+              expandRecord == null ? void 0 : expandRecord.relines();
             }
             return outcome;
           });

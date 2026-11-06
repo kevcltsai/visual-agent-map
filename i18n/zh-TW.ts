@@ -1388,6 +1388,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_chain_end_failed_retry": "按重試會從這一輪接著做。",
   "ui.map_chat_chain_end_plan_cancelled": "計畫已取消，自動接續到此結束。",
   "ui.map_chat_plan_reason_auto_round_other_actions": "自動接續要做刪除或改寫，等你確認",
+  "ui.map_chat_plan_reason_research_text_other_actions": "這次 AI 讀了網路研究全文，要做刪除或改寫，等你確認",
   "ui.map_chat_research_deferred_0": "「{0}」這輪放不下，下一輪讀。",
   "ui.map_chat_research_oversize_0": "「{0}」太長，沒有讀。",
   "ui.map_chat_basis_quote_0": "「{0}」",

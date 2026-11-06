@@ -94,6 +94,8 @@ export interface MapChatChainOrigin {
   seq: number;
   state: MapChatChainState;
   continuation: MapChatContinuationInput;
+  /** Cards the chain created so far (real ids); a retry of the round starts from them. */
+  createdIds?: string[];
 }
 
 /** A reply that waits for the user's yes: what it would do, what it costs, and the two buttons. */

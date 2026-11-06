@@ -181,7 +181,7 @@ export interface MapChatWaitEnd {
 }
 /**
  * The waited-for work is over. Research that all failed or was all stopped ends the chain (building on no research is the problem
- * this chain exists to avoid); research that never started ends it only when the round did nothing else; some success carries on,
+ * this chain exists to avoid); research that never started ends it, written cards or not, unless an expand of the round succeeded; some success carries on,
  * the failed ones are told to the next round. A round with no success and no write is no progress.
  */
 export function finishWait(state: MapChatChainState, end: MapChatWaitEnd): Step {
@@ -195,9 +195,10 @@ export function finishWait(state: MapChatChainState, end: MapChatWaitEnd): Step 
       if (research.stopped > 0) return ended(state, "research_stopped");
       if (research.failed > 0) return ended(state, "research_failed");
     }
+    // Research that never started ends the chain whatever the round wrote (the cards it wrote were to be built on that research,
+    // decision #15), unless an expand of the same round succeeded.
     if (
       (research.kind === "not_started" || researchSucceeded + research.failed + research.stopped === 0) &&
-      !state.wrote &&
       expandSucceeded === 0
     )
       return ended(state, "research_not_started");

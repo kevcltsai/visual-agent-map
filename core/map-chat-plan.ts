@@ -1,7 +1,7 @@
 import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapAiMode, ResearchDepth, ResearchMode } from "../ai/types";
 import type { MapChatContext } from "./map-chat-context";
-import type { MapChatAction } from "./steps/map-chat/step";
+import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "./steps/map-chat/step";
 
 /**
  * Plan confirmation. Most replies are applied at once; a reply that can do a lot of damage or cost a lot is shown as a plan
@@ -26,12 +26,21 @@ export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
  * Its context carries web research text, which is untrusted, so deleting, rewriting, moving, writing files, opening maps and
  * the like are always shown as a plan.
  *
+ * `research_text_other_actions`: the same rule for a first round whose context carried the full text of web research (B1): the
+ * text is untrusted wherever it is read, so it does not matter that this is not an automatic round.
+ *
  * `image_preview`: the reply places or links anchors and the user chose to see image changes first. `image_other_actions`: a turn
  * that sent an image also asked for something besides the image-safe actions; the picture is untrusted input, so this is
  * a plan in either mode.
  */
 export type MapChatPlanReason =
-  "many_actions" | "many_research" | "new_map" | "image_preview" | "image_other_actions" | "auto_round_other_actions";
+  | "many_actions"
+  | "many_research"
+  | "new_map"
+  | "image_preview"
+  | "image_other_actions"
+  | "auto_round_other_actions"
+  | "research_text_other_actions";
 
 /** "AI changes to an image: show me first" or "apply at once"; the setting `mapChatImageMode`. */
 export type MapChatImageMode = "preview" | "direct";
@@ -66,9 +75,41 @@ export const CHAIN_SAFE: ReadonlySet<MapChatAction["kind"]> = new Set<MapChatAct
   "auto_layout"
 ]);
 const CHAIN_SAFE_RUN: ReadonlySet<string> = new Set(["research_standard", "expand"]);
-/** True when the action may be part of an automatic round without a plan. */
+/** True when the kind of action may be part of an automatic round without a plan (its targets are judged by {@link isChainSafeFor}). */
 export const isChainSafe = (action: MapChatAction): boolean =>
   action.kind === "run_map_action" ? CHAIN_SAFE_RUN.has(action.action) : CHAIN_SAFE.has(action.kind);
+
+/** The cards a reply that read web research text may rewrite or research without a plan (decision #14). */
+export interface MapChatTrusted {
+  /** Cards this chain created (real ids). A `new:<ref>` card of the reply itself counts too. */
+  createdIds?: ReadonlySet<string>;
+  /** Cards this conversation researched successfully (real ids). */
+  researchedIds?: ReadonlySet<string>;
+}
+/**
+ * {@link isChainSafe}, and for the three actions that change what a card says or runs the web on it (`update_summary`,
+ * `set_topic_kind`, `research_standard`) only on a card this chain made, or (not for research) one this conversation already
+ * researched. Injected text could otherwise rewrite any existing card. No target (the selection) is not known here: not safe.
+ */
+export function isChainSafeFor(action: MapChatAction, trusted: MapChatTrusted = {}): boolean {
+  if (!isChainSafe(action)) return false;
+  const made = (id: string): boolean => id.startsWith(MAP_CHAT_NEW_PREFIX) || (trusted.createdIds?.has(id) ?? false);
+  const every = (ids: readonly string[], ok: (id: string) => boolean): boolean => ids.length > 0 && ids.every(ok);
+  switch (action.kind) {
+    case "update_summary":
+      return made(action.nodeId) || (trusted.researchedIds?.has(action.nodeId) ?? false);
+    case "set_topic_kind":
+      return every(action.nodeIds, id => made(id) || (trusted.researchedIds?.has(id) ?? false));
+    case "run_map_action":
+      // Research: a card researched before is not repeated without asking (Medium 4).
+      return (
+        action.action !== "research_standard" ||
+        every(action.nodeIds, id => made(id) && !trusted.researchedIds?.has(id))
+      );
+    default:
+      return true;
+  }
+}
 
 /** Where the reply sits in an automatic continuation. Absent = an ordinary message (or the first round). */
 export interface MapChatPlanChain {
@@ -93,7 +134,7 @@ export interface MapChatPlan {
   estimatedCalls: number;
 }
 
-type PlanContext = Pick<MapChatContext, "parents" | "selectedCount">;
+type PlanContext = Pick<MapChatContext, "parents" | "selectedCount"> & Partial<Pick<MapChatContext, "research">>;
 
 /** Number of cards a research or expand action works on: its own targets, or the selection at that point of the reply. */
 function targetCount(nodeIds: string[], selection: number): number {
@@ -130,6 +171,8 @@ export function planFor(
     imageMode?: MapChatImageMode;
     imageAttached?: boolean;
     chain?: MapChatPlanChain;
+    /** Cards that may be rewritten or researched without a plan when the reply read research text or is an automatic round. */
+    trusted?: MapChatTrusted;
   } = {}
 ): MapChatPlan | null {
   const perTask = mapChatCallsPerTask(options.diagrams !== false);
@@ -139,9 +182,13 @@ export function planFor(
     options.imageMode === "direct" &&
     options.imageAttached === true &&
     actions.every(action => IMAGE_SAFE_KINDS.has(action.kind));
-  // An automatic round (second round on) of only safe actions is not stopped by the number of actions; one outside the list is a plan.
+  // A reply that reads web research text (an automatic round, or any turn whose context carried the full text) does not do what
+  // that text could have injected: only safe actions on safe cards go without a plan. An automatic round of only such actions is
+  // also not stopped by the number of actions (the first round keeps the rule).
   const autoRound = (options.chain?.round ?? 1) >= 2;
-  const autoOnlySafe = autoRound && actions.every(isChainSafe);
+  const readsResearch = autoRound || (context.research?.sent.length ?? 0) > 0;
+  const onlySafe = readsResearch && actions.every(action => isChainSafeFor(action, options.trusted));
+  const autoOnlySafe = autoRound && onlySafe;
   if (actions.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");
   let research = 0;
   let calls = 0;
@@ -188,7 +235,8 @@ export function planFor(
         break;
     }
   }
-  if (research + (options.chain?.researchSoFar ?? 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT) reasons.push("many_research");
+  if (research > 0 && research + (options.chain?.researchSoFar ?? 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
+    reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
   if (
     options.imageMode === "preview" &&
@@ -197,7 +245,7 @@ export function planFor(
     reasons.push("image_preview");
   if (options.imageAttached && actions.some(action => !IMAGE_SAFE_KINDS.has(action.kind)))
     reasons.push("image_other_actions");
-  if (autoRound && !autoOnlySafe) reasons.push("auto_round_other_actions");
+  if (readsResearch && !onlySafe) reasons.push(autoRound ? "auto_round_other_actions" : "research_text_other_actions");
   return reasons.length ? { reasons, estimatedCalls: calls } : null;
 }
 

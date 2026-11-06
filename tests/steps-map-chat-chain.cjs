@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
 const { parseMapChat, MAP_CHAT_SCHEMA, mapChatStep, normalizeRemaining, MAP_CHAT_REMAINING_LIMIT } = load('core/steps/map-chat/step.ts');
 const { buildMapChatContext, pendingResearchCount, MAP_CHAT_RESEARCH_BUDGET, MAP_CHAT_CONTINUATION_LINES } = load('core/map-chat-context.ts');
-const { planFor, isChainSafe, CHAIN_SAFE, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_PLAN_ACTION_LIMIT } = load('core/map-chat-plan.ts');
+const { planFor, isChainSafe, isChainSafeFor, CHAIN_SAFE, MAP_CHAT_PLAN_RESEARCH_LIMIT, MAP_CHAT_PLAN_ACTION_LIMIT } = load('core/map-chat-plan.ts');
 const chain = load('core/map-chat-chain.ts');
 const { chatBasisFor, createdParentsOf, expandBasis } = load('core/map-chat-basis.ts');
 
@@ -73,7 +73,11 @@ test('research budget: all or nothing, never a part; unsent first then newest fi
   const rotate = notes.map(n => ({ ...n, sentBefore: ['a1', 'a'].includes(n.id) }));
   const next = context({ researchNotes: rotate, researchBudget: budget });
   assert.deepEqual(json(next).researchNotes.map(n => n.id), ['r', 'a1']);
-  assert.equal(pendingResearchCount(next), 1, 'a was left out this time');
+  assert.equal(pendingResearchCount(next), 0, 'a was left out this time but was sent before: rotating it out keeps nothing going (B3 fix; it was 1)');
+  // A note never sent that is left out still keeps the chain going.
+  const fresh = context({ researchNotes: [note('r', 400), note('a', 400), note('a1', 400)], researchBudget: budget });
+  assert.equal(pendingResearchCount(fresh), 1, 'never sent, left out');
+  assert.equal(json(fresh).researchDeferred.every(item => !('sentBefore' in item)), true, 'the flag is not told to the model');
   // One note of 80,001 characters never fits the real budget; 80,000 does.
   const real = context({ researchNotes: [note('a', MAP_CHAT_RESEARCH_BUDGET + 1), note('b', MAP_CHAT_RESEARCH_BUDGET)] });
   assert.deepEqual(json(real).researchNotes.map(n => n.id), ['b']);
@@ -133,7 +137,7 @@ test('A9 plan counterexample: from the second round on any action outside CHAIN_
     assert.equal(plan([action], { round: 1, researchSoFar: 0 }), null, 'the first round keeps the old rules');
     assert.equal(plan([action]), null, 'an ordinary message too');
   }
-  assert.equal(plan(SAFE.slice(0, 5), { round: 2, researchSoFar: 0 }), null, 'only safe actions: no plan');
+  assert.equal(plan(SAFE.slice(0, 5), { round: 2, researchSoFar: 0 }, { trusted: { researchedIds: new Set(['a']) } }), null, 'only safe actions on safe cards: no plan');
 });
 test('A9 plan: from the second round on, safe actions are not stopped by their number; the first round still is; unsafe ones still count', () => {
   const many = Array.from({ length: MAP_CHAT_PLAN_ACTION_LIMIT + 5 }, (_, i) => add(i));
@@ -146,10 +150,45 @@ test('A9 plan counterexample: splitting research over rounds does not get around
   const research = n => [run('research_standard', { nodeIds: Array.from({ length: n }, (_, i) => `c${i}`) })];
   assert.equal(plan(research(MAP_CHAT_PLAN_RESEARCH_LIMIT - 1)), null);
   assert.ok(reasons(research(MAP_CHAT_PLAN_RESEARCH_LIMIT)).includes('many_research'));
-  assert.equal(plan(research(4), { round: 2, researchSoFar: 5 }), null, '4 + 5 = 9');
-  assert.deepEqual(reasons(research(4), { round: 2, researchSoFar: 6 }), ['many_research'], '4 + 6 = 10');
-  assert.deepEqual(reasons(research(1), { round: 3, researchSoFar: 9 }), ['many_research']);
-  assert.deepEqual(reasons(research(1), { round: 1, researchSoFar: 9 }), ['many_research']);
+  const trusted = { trusted: { createdIds: new Set(Array.from({ length: 12 }, (_, i) => `c${i}`)) } };
+  assert.equal(plan(research(4), { round: 2, researchSoFar: 5 }, trusted), null, '4 + 5 = 9');
+  assert.deepEqual(reasons(research(4), { round: 2, researchSoFar: 6 }, trusted), ['many_research'], '4 + 6 = 10');
+  assert.deepEqual(reasons(research(1), { round: 3, researchSoFar: 9 }, trusted), ['many_research']);
+  assert.deepEqual(reasons(research(1), { round: 1, researchSoFar: 9 }, trusted), ['many_research']);
+  // M1: the total only matters for a round that researches; after 10 a round of cards alone is not a plan.
+  assert.equal(plan([add(1)], { round: 4, researchSoFar: 10 }), null, 'cumulative 10 and only add_child: no card');
+});
+test('R3 B1 plan counterexample: a first round whose context carried research text also asks before delete and rewrite, with its own reason; an ordinary message and the first round without research do not', () => {
+  const withResearch = { parents: {}, selectedCount: 0, research: { sent: ['a'], deferred: [] } };
+  const r1 = { chain: { round: 1, researchSoFar: 0 } };
+  for (const action of UNSAFE) assert.deepEqual(plain(planFor([action], withResearch, r1)?.reasons ?? []).filter(r => r.endsWith('_other_actions') && r !== 'image_other_actions'), ['research_text_other_actions'], `${action.kind} ${action.action ?? ''}`);
+  assert.deepEqual(plain(planFor([UNSAFE[0]], withResearch)?.reasons), ['research_text_other_actions'], 'a message after the research, no chain at all');
+  assert.equal(planFor([UNSAFE[0]], { parents: {}, selectedCount: 0 }, r1), null, 'no research text, no change');
+  assert.equal(planFor([add(1)], withResearch, r1), null, 'adding cards is safe');
+  const many = Array.from({ length: MAP_CHAT_PLAN_ACTION_LIMIT + 1 }, (_, i) => add(i));
+  assert.deepEqual(plain(planFor(many, withResearch, r1).reasons), ['many_actions'], 'the first round keeps the action count rule');
+  assert.deepEqual(plain(planFor([UNSAFE[0]], withResearch, { chain: { round: 2, researchSoFar: 0 } }).reasons), ['auto_round_other_actions'], 'round 2 keeps its own reason');
+});
+test('R3 B2 plan counterexample: update_summary, set_topic_kind and research_standard are safe only on cards this chain made or this conversation researched', () => {
+  const sixteen = target => Array.from({ length: 16 }, () => ({ kind: 'update_summary', nodeId: target, summary: 's' }));
+  const r2 = { round: 2, researchSoFar: 0 };
+  const created = { trusted: { createdIds: new Set(['c1']) } };
+  assert.deepEqual(reasons(sixteen('a'), r2, created), ['many_actions', 'auto_round_other_actions'], '16 summaries of an existing card');
+  assert.equal(plan(sixteen('c1'), r2, created), null, 'the chain\'s own card');
+  assert.equal(plan(sixteen('new:n1'), r2), null, 'a card of this reply');
+  assert.equal(plan([{ kind: 'update_summary', nodeId: 'a', summary: 's' }], r2, { trusted: { researchedIds: new Set(['a']) } }), null, 'a researched card');
+  const kind = ids => ({ kind: 'set_topic_kind', nodeIds: ids, topicKind: 'topic' });
+  assert.ok(reasons([kind(['a'])], r2, created).includes('auto_round_other_actions'));
+  assert.ok(reasons([kind([])], r2, created).includes('auto_round_other_actions'), 'the selection is not known');
+  assert.ok(reasons([kind(['c1', 'a'])], r2, created).includes('auto_round_other_actions'), 'one existing target is enough');
+  assert.equal(plan([kind(['c1', 'new:n1'])], r2, created), null);
+  assert.ok(reasons([run('research_standard', { nodeIds: ['a'] })], r2, created).includes('auto_round_other_actions'), 'research of an existing card');
+  assert.equal(plan([run('research_standard', { nodeIds: ['new:n1'] })], r2, created), null, 'research of a card of this reply');
+  assert.equal(plan([run('research_standard', { nodeIds: ['c1'] })], r2, created), null, 'research of the chain\'s own card');
+  assert.ok(reasons([run('research_standard', { nodeIds: ['c1'] })], r2, { trusted: { createdIds: new Set(['c1']), researchedIds: new Set(['c1']) } }).includes('auto_round_other_actions'), 'already researched: again asks');
+  assert.ok(reasons([run('research_standard', { nodeIds: [] })], r2, created).includes('auto_round_other_actions'));
+  assert.equal(plan([{ kind: 'set_appearance', nodeIds: ['a'] }, run('expand', { nodeIds: ['a'] })], r2), null, 'appearance and expand stay safe');
+  assert.equal(isChainSafeFor(add(1)), true);
 });
 test('R1 L3 plan: an expand counts the ask-again, two outline calls per card', () => {
   assert.equal(plan([run('expand', { nodeIds: ['x', 'y', 'z'] }), { kind: 'create_map', title: 'M' }]).estimatedCalls, 6);
@@ -238,7 +277,7 @@ test('A5 chain research results: all succeeded or some succeeded continues; all 
   end(chain.finishWait(waiting().state, settled(0, 0, 2)), 'research_stopped');
   end(chain.finishWait(waiting({ actions: text }).state, { research: { kind: 'not_started' } }), 'research_not_started');
   end(chain.finishWait(waiting({ actions: text }).state, settled(0, 0, 0)), 'research_not_started');
-  next(chain.finishWait(waiting().state, { research: { kind: 'not_started' } }), 3);
+  end(chain.finishWait(waiting().state, { research: { kind: 'not_started' } }), 'research_not_started', 'build the rest'); // decision 15: written cards no longer save it
   for (const waitFor of [waiting(), waiting({ started: started(0, 1) })]) end(chain.finishWait(waitFor.state, { timedOut: true, ...settled(2) }), 'wait_timeout', 'build the rest');
 });
 test('A5 chain expand results: a success is progress; all failed with nothing written is no progress', () => {
@@ -247,6 +286,24 @@ test('A5 chain expand results: a success is progress; all failed with nothing wr
   end(chain.finishWait(onlyExpand, { expand: { succeeded: 0, failed: 2 } }), 'no_progress');
   assert.equal(chain.finishWait(waiting({ started: started(0, 2), actions: wrote }).state, { expand: { succeeded: 0, failed: 2 } }).decision.kind, 'next', 'a write in the round is progress');
   assert.equal(chain.finishWait(waiting({ started: started(2, 1), actions: text }).state, { ...settled(0, 0, 0), research: { kind: 'not_started' }, expand: { succeeded: 1, failed: 0 } }).decision.kind, 'next', 'research not started but the expand worked');
+});
+test('R3 B3 chain: notes that were all sent before and only rotate do not run the chain to the round limit; a note never sent keeps it going until it is sent, then it converges', () => {
+  const budget = 60000;
+  // Two notes of 50k, both sent before: one fits, the other rotates out. Nothing is left to do: one round, done.
+  const sentBefore = ['a', 'b'].map(id => note(id, 50000, { sentBefore: true }));
+  const rotated = context({ researchNotes: sentBefore, researchBudget: budget });
+  assert.equal(rotated.research.deferred.length, 1, 'one note was left out'); assert.equal(pendingResearchCount(rotated), 0);
+  end(chain.finishRound(at(1), roundEnd({ remaining: '', researchDeferred: pendingResearchCount(rotated) })), 'done', '');
+  // Never sent: it leads the next round until it has been sent, then the chain converges.
+  let notes = ['a', 'b'].map(id => note(id, 50000)); let state = at(1); let rounds = 0;
+  for (; rounds < 8; rounds++) {
+    const ctx = context({ researchNotes: notes, researchBudget: budget });
+    const sentIds = ctx.research.sent; notes = notes.map(n => ({ ...n, sentBefore: n.sentBefore || sentIds.includes(n.id) }));
+    const step = chain.finishRound(state, roundEnd({ remaining: '', researchDeferred: pendingResearchCount(ctx) }));
+    if (step.decision.kind === 'end') { assert.equal(step.decision.reason, 'done'); break; }
+    state = step.state;
+  }
+  assert.equal(rounds, 1, 'round 1 sends one, round 2 sends the other, round 2 ends (not 8 rounds)');
 });
 test('chain other background work: an integration, a merge or a rating ends the chain when more was to come; max rounds is checked before waiting', () => {
   end(chain.finishRound(at(2), roundEnd({ started: started(0, 0, true) })), 'other_background_work', 'build the rest');

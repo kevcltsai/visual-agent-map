@@ -82,6 +82,10 @@ export class MapChatTurnRecord {
   plan(state: "applied" | "cancelled" | "stopped", lines: MapChatLine[] = []): void {
     this.write({ type: "plan", turn: this.turn, state, lines: plainLines(lines) });
   }
+  /** The result lines of the turn changed after its end (an expansion that failed): the answer's lines as they are now. */
+  relines(): void {
+    this.write({ type: "lines", turn: this.turn, lines: plainLines(this.answer.lines) });
+  }
   /** The state of a picture search of this turn (`extraInserted`: the candidate being inserted right now). */
   images(block: MapChatImages, extraInserted?: unknown): void {
     this.write({

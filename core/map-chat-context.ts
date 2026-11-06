@@ -182,6 +182,8 @@ export interface MapChatResearchDeferred {
   title: string;
   chars: number;
   oversize?: true;
+  /** The note was sent in an earlier turn and only rotated out this time; it is not told to the model and does not keep a chain going. */
+  sentBefore?: true;
 }
 /** What the next round is told about the one before it (second round on). All of it is untrusted text. */
 export interface MapChatContinuationInput {
@@ -591,7 +593,10 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
         }
       : {}),
     ...(research.deferred.length
-      ? { researchDeferred: research.deferred, researchDeferredNote: MAP_CHAT_RESEARCH_DEFERRED_NOTE }
+      ? {
+          researchDeferred: research.deferred.map(({ sentBefore: _sentBefore, ...told }) => told),
+          researchDeferredNote: MAP_CHAT_RESEARCH_DEFERRED_NOTE
+        }
       : {}),
     ...(image ? { selectedImage: image.sent, selectedImageNote: image.note } : {}),
     activeFile: active,
@@ -639,14 +644,23 @@ function planResearchNotes(
     else if (chars <= left) {
       sent.push(note);
       left -= chars;
-    } else deferred.push({ id: note.id, title: clip(note.title, TITLE_LIMIT), chars });
+    } else
+      deferred.push({
+        id: note.id,
+        title: clip(note.title, TITLE_LIMIT),
+        chars,
+        ...(note.sentBefore ? { sentBefore: true as const } : {})
+      });
   }
   return { sent, deferred };
 }
 
-/** The research notes the next round must still be sent: the deferred ones that are not oversize (an oversize note can never be). */
+/**
+ * The research notes the next round must still be sent: the deferred ones never sent before. An oversize note can never be sent,
+ * and one that was sent before and only rotated out would keep the chain going for nothing (B3).
+ */
 export function pendingResearchCount(context: Pick<MapChatContext, "research">): number {
-  return (context.research?.deferred ?? []).filter(note => !note.oversize).length;
+  return (context.research?.deferred ?? []).filter(note => !note.oversize && !note.sentBefore).length;
 }
 
 /** `continuation` and its fixed note, as put in the context JSON. */

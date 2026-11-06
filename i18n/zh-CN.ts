@@ -1386,6 +1386,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_chain_end_failed_retry": "按重试会从这一轮接着做。",
   "ui.map_chat_chain_end_plan_cancelled": "计划已取消，自动接续到此结束。",
   "ui.map_chat_plan_reason_auto_round_other_actions": "自动接续要做删除或改写，等你确认",
+  "ui.map_chat_plan_reason_research_text_other_actions": "这次 AI 读了网络研究全文，要做删除或改写，等你确认",
   "ui.map_chat_research_deferred_0": "“{0}”这轮放不下，下一轮读。",
   "ui.map_chat_research_oversize_0": "“{0}”太长，没有读。",
   "ui.map_chat_basis_quote_0": "“{0}”",

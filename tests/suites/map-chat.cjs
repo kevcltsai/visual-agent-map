@@ -7017,8 +7017,8 @@ integrationTest('P3 expand: a chat expansion that fails (including note_too_long
   h.view.chatExpand = async () => ({ status: 'failed', reason: 'The topic and preset are too long to send; shorten them.' });
   chainReplies(h, say('Expanding.', [expandAct('a')], 'Then the rest'));
   h.type('expand body'); await h.view.sendMapChat(); await chainEnded(spy); eq(spy.reasons(), ['no_progress']);
-  const lines = chat.transcript().at(-1).lines.filter(l => l.text !== NOT_UNDOABLE); eq(lines.map(l => l.status), ['done', 'failed']); assert.match(lines[1].text, /Failed: .*Body.*too long/);
-  eq(lines[0].basis, { kind: 'note', sources: [{ id: h.ids.a, title: 'Body' }], existingChildren: 1 });
+  const lines = chat.transcript().at(-1).lines.filter(l => l.text !== NOT_UNDOABLE); eq(lines.map(l => l.status), ['failed']); assert.match(lines[0].text, /Failed: .*Body.*too long/); // R3: with no expansion left the failure takes the place of the start line (P6 F1), so there is no basis either
+  assert.equal(lines[0].basis, undefined);
   const ok = await harness(); await ok.view.hydrate(); const ochat = ok.open(); const ospy = chainSpy(ochat);
   ok.view.chatExpand = async () => ({ status: 'succeeded' }); chainReplies(ok, say('Expanding.', [{ kind: 'run_map_action', action: 'expand', nodeIds: [ok.ids.c], title: '', goal: '', direction: '', mode: '', images: false }], 'Then more'), say('Done.', [], ''));
   ok.type('expand rem'); await ok.view.sendMapChat(); await until(() => ok.control.requests.length === 2 && ok.view.chatChain === null); eq(ospy.rounds(), [2]); eq(ochat.transcript()[1].lines[0].basis, { kind: 'outline_only', alsoRead: [], existingChildren: 0 });
@@ -7283,4 +7283,93 @@ test('P6 F4: result lines for the next round leave out the explanation notes', (
   const { chatResultLines } = loadPanelModule(); const { t } = load('i18n.ts');
   const lines = [{ status: 'done', text: 'Added A' }, { status: 'failed', text: 'Failed: x' }, { status: 'done', text: t('ui.map_chat_not_undoable') }, { status: 'done', text: t('ui.map_chat_auto_layout_added') }];
   eq(chatResultLines(lines).map(l => l.text), ['Added A', 'Failed: x']);
+});
+
+// ---- R3: integration review findings, wired through the view ---------------------------------------------------------------
+const planReasons = h => visibleText(planCard(h)[0]);
+integrationTest('R3 B5: research that never starts ends the chain even though the round built the root card; there is no second round (decision 15)', async () => {
+  const h = await harness(); await h.view.hydrate(); const { chat, spy, runs } = await researchChain(h);
+  assert.equal((await textOf(h, runs[0].ids[0])).title, 'Pstack', 'the round did write the root card');
+  runs[0].onOutcome({ kind: 'not_started' }); await chainEnded(spy);
+  eq(spy.reasons(), ['research_not_started']); assert.equal(h.control.requests.length, 1, 'no second round'); eq(spy.rounds(), []); assert.equal(h.view.chatChain, null);
+  assert.match(noteOf({ parts: { log: () => chat.logEl } })[0], /The research did not start, so it did not go on/);
+});
+integrationTest('R3 B4: round 2 is refused (usage notice) or stopped while it is preparing: the sentence and what was left are on screen under the first reply', async () => {
+  const left = 'Add the subtopics from the research';
+  // The usage notice is declined for the automatic round.
+  const d = await harness(); await d.view.hydrate(); const { chat: dchat, spy: dspy, runs: druns } = await researchChain(d);
+  d.control.decline = true; settleRun(druns[0]); await chainEnded(dspy);
+  eq(dspy.reasons(), ['not_ready']); eq(dchat.transcript().map(m => m.role), ['user', 'assistant'], 'the refused round was taken back');
+  const dnote = noteOf({ parts: { log: () => dchat.logEl } }); eq(dnote.length, 1); assert.match(dnote[0], new RegExp(left)); assert.match(dnote[0], /not ready|not start|did not/i);
+  // Stop pressed while the round is preparing (the usage notice is open).
+  const s = await harness(); await s.view.hydrate(); const { chat: schat, spy: sspy, runs: sruns } = await researchChain(s);
+  const gate = deferred(); const confirm = s.plugin.confirmAiUsage; s.plugin.confirmAiUsage = async (model, run) => { await gate.promise; return confirm(model, run); };
+  settleRun(sruns[0]); await until(() => schat.stage?.kind === 'preparing'); schat.stopEl.click(); await chainEnded(sspy); gate.resolve(); await tick();
+  eq(sspy.reasons(), ['stopped']); eq(schat.transcript().map(m => m.role), ['user', 'assistant']);
+  const snote = noteOf({ parts: { log: () => schat.logEl } }); eq(snote.length, 1); assert.match(snote[0], /Stopped/); assert.equal(s.control.requests.length, 1);
+});
+integrationTest('R3 M6: a round that starts an integration ends the chain when more was to come, and says so (other_background_work)', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat);
+  h.view.startSynthesis = async (_node, _options, _direction, _failed, accepted) => { accepted(); };
+  await h.repo.updateNote(h.node('a').path, { detail: 'x' }); await h.view.hydrate();
+  chainReplies(h, say('Integrating Body.', [ms03Act('synthesize', [h.ids.a])], 'Then rate the cards'));
+  h.type('integrate and go on'); await h.view.sendMapChat(); await chainEnded(spy);
+  eq(spy.reasons(), ['other_background_work']); assert.equal(h.control.requests.length, 1, 'no second round'); assert.equal(h.view.chatChain, null);
+  const note = noteOf({ parts: { log: () => chat.logEl } }); eq(note.length, 1); assert.match(note[0], /started an integration, merge or prioritizing/); assert.match(note[0], /Then rate the cards/);
+});
+integrationTest('R3 B1: a first round whose context carried research text asks before deleting; its own reason, not "automatic continuation"; without research text the delete goes at once', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  await h.repo.updateNote(h.node('a').path, { detail: 'RESEARCH TEXT' }); await h.view.hydrate(); h.view.chatResearched.set(h.ids.a, { title: 'Body', status: 'succeeded' });
+  h.control.reply = async () => ({ reply: 'Deleting.', actions: [{ kind: 'delete_topic', nodeId: h.ids.b, branch: false }], rejected: [], remaining: '' });
+  h.type('delete the mind card'); await h.view.sendMapChat();
+  assert.ok(chat.pendingPlan(), 'a plan card'); assert.match(planReasons(h), /read the full web research text/i); assert.doesNotMatch(planReasons(h), /automatic continuation/i);
+  assert.ok(h.view.map.nodes.some(n => n.id === h.ids.b), 'nothing was deleted');
+  const n = await harness(); await n.view.hydrate(); const nchat = n.open();
+  n.control.reply = async () => ({ reply: 'Deleting.', actions: [{ kind: 'delete_topic', nodeId: n.ids.b, branch: false }], rejected: [], remaining: '' });
+  n.type('delete the mind card'); await n.view.sendMapChat(); assert.equal(nchat.pendingPlan(), null, 'no research text, the old rule');
+});
+integrationTest('R3 B2: from round 2 on, update_summary of an existing card is a plan; of a card the chain made it is applied at once', async () => {
+  const two = async target => {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h);
+    chainReplies(h, say('Two roots.', [addRoot('a', 'One'), addRoot('b', 'Two'), researchAct({ nodeIds: ['new:a', 'new:b'] })], 'Fill them in'));
+    h.type('go'); await h.view.sendMapChat(); const [first, second] = runs[0].ids;
+    const reply = target(h, second); chainReplies(h, say('Writing.', Array.from({ length: 16 }, (_, i) => ({ kind: 'update_summary', nodeId: reply, summary: `S${i}` })), ''));
+    runs[0].onOutcome({ kind: 'settled', succeeded: 1, failed: 1, stopped: 0, topics: [{ id: first, title: 'One', status: 'succeeded' }, { id: second, title: 'Two', status: 'failed', error: 'no connection' }] });
+    await until(() => h.control.requests.length === 2 && !chat.isBusy); await tick(); return { h, chat, spy, first, second };
+  };
+  const existing = await two(h => h.ids.a);
+  assert.ok(existing.chat.pendingPlan(), 'sixteen rewrites of an existing card ask first'); assert.match(planReasons(existing.h), /automatic continuation/i); eq(existing.spy.reasons(), []);
+  const own = await two((_h, second) => second);
+  assert.equal(own.chat.pendingPlan(), null, 'a card of the chain needs no plan (the failed one: it was created, not researched)'); eq(own.spy.reasons(), ['done']);
+});
+integrationTest('R3 M2: retrying an old failed automatic round while another chain waits ends that chain (user took over), its timer is cleared', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const spy = chainSpy(chat); const runs = researchStub(h); let calls = 0;
+  h.control.reply = async () => { calls++; if (calls === 1) return say('One.', [addRoot('x', 'X')], 'Then more'); if (calls === 2) throw new Error('model exploded'); if (calls === 3) return say('Root and research.', [addRoot('r', 'Pstack'), researchAct({ nodeIds: ['new:r'] })], 'Fill in'); return say('Retried.', [], ''); };
+  h.type('go'); await h.view.sendMapChat(); await until(() => spy.reasons().length === 1); eq(spy.reasons(), ['failed']);
+  const retryOrigin = chat.transcript().at(-2).origin;
+  h.type('second topic'); await h.view.sendMapChat(); const waiting = h.view.chatChain; assert.equal(waiting.state.phase, 'waiting'); assert.notEqual(waiting.timer, null);
+  await h.view.sendMapChat(retryOrigin); await until(() => calls === 4);
+  assert.equal(waiting.timer, null, 'the old chain\'s timer is cleared'); assert.equal(waiting.state.phase, 'ended'); eq(spy.reasons().slice(0, 2), ['failed', 'user_took_over']);
+  assert.ok(chat.logEl && noteOf({ parts: { log: () => chat.logEl } }).some(t => /Now following your new message/.test(t)), 'the sentence is on screen');
+});
+integrationTest('R3 M3: an expansion that fails after the reply is saved in the record too: restoring the conversation shows the same lines as the screen', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await h.repo.updateNote(h.node('a').path, { detail: 'The note of Body.' }); await h.view.hydrate();
+  h.view.chatExpand = async parent => parent.id === h.ids.a ? { status: 'failed', reason: 'The topic and preset are too long to send; shorten them.' } : { status: 'succeeded' };
+  const expandAct = key => ({ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids[key]], title: '', goal: '', direction: '', mode: '', images: false });
+  chainReplies(h, say('Expanding.', [expandAct('a')], ''));
+  h.type('expand body'); await h.view.sendMapChat(); await until(() => chat.transcript().at(-1).lines.some(l => l.status === 'failed')); await recordIdle(h);
+  const screen = chat.transcript().at(-1).lines; assert.equal(screen.some(l => l.status === 'done' && l.basis), false, 'no start line with a basis is left for the failed expansion');
+  const { restoreConversation } = load('core/map-chat-records.ts'); const lines = recordLines(h, recordFiles(h)[0]);
+  eq(restoreConversation('x', lines).turns[0].lines.map(l => [l.status, l.text]), screen.map(l => [l.status, l.text]));
+  assert.ok(lines.some(l => l.type === 'lines'), 'the change is a line of the record');
+});
+integrationTest('R3 M5: automatic rounds are built with the chips of the user\'s message; a picture goes with round 1 only', async () => {
+  const h = await harness(); await h.view.hydrate(); const { runs } = await (async () => {
+    const chat = h.open(); const runs = researchStub(h); chat.addSnippet('quoted source words', 'Notes/Active.md', false);
+    chainReplies(h, say('Root and research.', [addRoot('r', 'Pstack'), researchAct({ nodeIds: ['new:r'] })], 'Fill in'), say('Added.', [], ''));
+    h.type('build from the quote'); await h.view.sendMapChat(); return { runs };
+  })();
+  settleRun(runs[0]); await until(() => h.control.requests.length === 2 && h.view.chatChain === null);
+  for (const request of h.control.requests) eq(contextOf(request).snippets.map(s => s.text), ['quoted source words'], 'both rounds carry the chip');
 });

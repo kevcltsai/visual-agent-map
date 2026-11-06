@@ -1093,6 +1093,8 @@ interface ChatRoundWork {
   researchTargets: number;
   /** The batch keys (one per map) of the research, to stop what is running. */
   researchKeys: Set<string>;
+  /** Ids of the cards the round created (the chain keeps them: its later rounds may rewrite and research those without a plan). */
+  created: string[];
   expand: { id: string; title: string; path: string; done: Promise<ChatExpandOutcome> }[];
   /** An integration, a merge or a rating started: a continuation does not wait for these and ends. */
   otherBackground: boolean;
@@ -1102,6 +1104,7 @@ const newChatWork = (): ChatRoundWork => ({
   research: [],
   researchTargets: 0,
   researchKeys: new Set(),
+  created: [],
   expand: [],
   otherBackground: false
 });
@@ -1133,6 +1136,10 @@ interface ChatChainRun {
   /** What the latest reply said was still to do (known before the round has ended). */
   replyRemaining: string;
   lastResults: MapChatContinuationInput["lastResults"];
+  /** Cards the chain's rounds created so far (real ids). */
+  createdIds: Set<string>;
+  /** The chips of the user's message (not the follow-ups'): every round of the chain is built with them. */
+  chips: MapChatChip[];
   /** What the work waited for came to, for the next round. */
   waited: MapChatContinuationInput["research"];
   /** Lines about failed work, for the notice at the end. */
@@ -20434,6 +20441,7 @@ export class VisualAgentMapView extends ItemView {
     // The continuation this round belongs to: a message of the user's starts a new one; an automatic round (or the retry of one)
     // goes on with the chain it came from, at the round it was.
     const run = this.chainForRound(autoOrigin, anchor, message);
+    run.chips = [...origin.chips];
     // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
     // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
     const draft = chat.draft;
@@ -20447,8 +20455,11 @@ export class VisualAgentMapView extends ItemView {
     // `ends` is why the continuation (if one was running) ends with it.
     const abandon = (reason?: string, ends: MapChatChainInterrupt = "map_changed"): void => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+      // Take the turn back first: the end sentence goes under the last reply, which must be the one before this round, not the
+      // round that is being taken back (its sentence would go with it).
+      const retracted = chat.retract(turn, again ? restore : draft);
       this.interruptChain(run, ends);
-      if (!chat.retract(turn, again ? restore : draft)) return;
+      if (!retracted) return;
       if (reason !== undefined && (!autoOrigin || ends === "failed")) new Notice(reason);
     };
     // Stop while preparing is the user's own act: the send is taken back like any early end, without a Notice.
@@ -20631,7 +20642,13 @@ export class VisualAgentMapView extends ItemView {
                     mapAiMode: this.map?.aiMode,
                     imageMode: this.chatImageMode(),
                     imageAttached: !!request.imageDataUrl,
-                    chain: planChainOf(run.state)
+                    chain: planChainOf(run.state),
+                    trusted: {
+                      createdIds: run.createdIds,
+                      researchedIds: new Set(
+                        [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
+                      )
+                    }
                   })
                 : null;
               if (plan) {
@@ -20871,6 +20888,8 @@ export class VisualAgentMapView extends ItemView {
       live.replyRemaining = origin.continuation.remaining;
       return live;
     }
+    // A retry of an old failed round while another chain is still alive (waiting, with its timer): that chain ends first.
+    if (live) this.interruptChain(live, "user_took_over");
     const run: ChatChainRun = {
       seq: ++this.chatChainSeq,
       state: origin ? { ...origin.state, phase: "round" } : startChain(),
@@ -20880,6 +20899,8 @@ export class VisualAgentMapView extends ItemView {
       record: null,
       replyRemaining: origin?.continuation.remaining ?? "",
       lastResults: origin?.continuation.lastResults ?? [],
+      createdIds: new Set(origin?.createdIds ?? []),
+      chips: [],
       waited: origin?.continuation.research ?? [],
       details: [],
       partial: null,
@@ -20936,6 +20957,7 @@ export class VisualAgentMapView extends ItemView {
   private advanceChain(run: ChatChainRun, round: ChatRoundEnd): void {
     if (this.chatChain !== run || run.state.phase === "ended") return;
     run.partial = null;
+    for (const id of round.work.created) run.createdIds.add(id);
     run.lastResults = chatResultLines(round.lines).map(line => ({ text: line.text, status: line.status }));
     run.anchor = { path: round.anchor.path, id: round.anchor.id };
     const step = finishRound(run.state, {
@@ -21079,11 +21101,14 @@ export class VisualAgentMapView extends ItemView {
     }
     const origin: MapChatOrigin = {
       text: run.message,
-      chips: [],
+      // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
+      // a picture is sent with the first round only and a follow-up adds no chip.
+      chips: [...run.chips],
       selectedIds: this.chatSelectionIds(),
       chain: {
         seq: run.seq,
         state: run.state,
+        createdIds: [...run.createdIds],
         continuation: {
           round,
           maxRounds: run.state.maxRounds,
@@ -21131,6 +21156,8 @@ export class VisualAgentMapView extends ItemView {
       case "auto_round_other_actions":
         // Reachable from round 2 of a continuation.
         return t("ui.map_chat_plan_reason_auto_round_other_actions");
+      case "research_text_other_actions":
+        return t("ui.map_chat_plan_reason_research_text_other_actions");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
@@ -21868,7 +21895,8 @@ export class VisualAgentMapView extends ItemView {
     const later: number[] = [];
     const run: ChatRun = {
       refs: new Map(),
-      created: [],
+      // Shared with the round's work, which hands the ids to its chain.
+      created: options.work?.created ?? [],
       notes: new Set(),
       files: new Set(),
       parked: new Set(),
@@ -23063,6 +23091,7 @@ export class VisualAgentMapView extends ItemView {
         );
         const expandChat = this.chat;
         const expandTurns = expandChat?.transcript().length ?? 0;
+        const expandRecord = this.chatLastRecord;
         const cards = infos.map(({ parent, note }) => ({
           id: parent.id,
           title: note.title,
@@ -23114,6 +23143,8 @@ export class VisualAgentMapView extends ItemView {
                   expandFailureLine(note.title, outcome.reason)
                 );
               else expandChat.appendLines([expandFailureLine(note.title, outcome.reason)]);
+              // The record keeps the turn's lines as they are on screen now (a restore shows the same).
+              expandRecord?.relines();
             }
             return outcome;
           });

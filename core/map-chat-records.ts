@@ -76,6 +76,12 @@ export interface RecordPlanLine extends RecordLineBase {
   state: "applied" | "cancelled" | "stopped";
   lines: RecordLineItem[];
 }
+/** The result lines of the turn as they are now: later work changed them (an expansion that failed replaces its start line). The last one wins over `turn_end.lines`. */
+export interface RecordLinesLine extends RecordLineBase {
+  type: "lines";
+  turn: number;
+  lines: RecordLineItem[];
+}
 export interface RecordImagesLine extends RecordLineBase {
   type: "images";
   turn: number;
@@ -104,6 +110,7 @@ export type RecordLine =
   | RecordTurnEndLine
   | RecordPlanLine
   | RecordImagesLine
+  | RecordLinesLine
   | RecordEventLine
   | RecordMovedLine;
 /** A line as the caller hands it over: no `v`, and `at` is filled in by the writer. */
@@ -363,6 +370,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   const ends = new Map<number, RecordTurnEndLine>();
   const plans = new Map<number, { state: RecordPlanLine["state"]; lines: RecordLineItem[] }>();
   const images = new Map<number, RestoredImages>();
+  const current = new Map<number, RecordLineItem[]>();
   const undone = new Map<number, boolean>();
   for (const line of lines) {
     if (line.type === "conversation") {
@@ -377,6 +385,8 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       ends.set(line.turn, line);
     } else if (line.type === "plan") {
       plans.set(line.turn, { state: line.state, lines: Array.isArray(line.lines) ? line.lines : [] });
+    } else if (line.type === "lines") {
+      if (Array.isArray(line.lines)) current.set(line.turn, line.lines);
     } else if (line.type === "images") {
       images.set(line.turn, { state: line.state, items: line.items ?? [], inserted: line.inserted ?? [] });
     } else if (line.type === "event") {
@@ -395,7 +405,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       message: start.message,
       origin: start.origin,
       reply: typeof end.reply === "string" ? end.reply : "",
-      lines: restoredItems(end.lines),
+      lines: restoredItems(current.get(number) ?? end.lines),
       modelLabel: typeof end.modelLabel === "string" ? end.modelLabel : "",
       status: end.status,
       stalePlan: end.status === "plan",

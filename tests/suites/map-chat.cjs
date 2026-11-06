@@ -637,6 +637,122 @@ integrationTest('map chat: F3 - a changed title or parent makes rename, move and
   assert.equal(h.node('c').parentId, h.ids.b);
 });
 
+integrationTest('map chat: edit_topic_note neutralizes an unsafe mermaid block and demotes one the parser rejects; a block that parses is written as is', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.plugin.mermaidSyntax = async code => (/^pie showTitle/.test(code) ? 'invalid' : 'ok');
+  const unsafe = '```mermaid\nflowchart TD\n  A["x"]\n  click A "https://evil.example"\n```';
+  const broken = '```mermaid\npie showTitle\n  title x\n  "a" : 3\n```';
+  const fine = '```mermaid\npie\n  title x\n  "a" : 3\n```';
+  const lines = await apply(h, [{ kind: 'edit_topic_note', nodeId: h.ids.a, detail: `${unsafe}\n\n${broken}\n\n${fine}` }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const detail = (await h.note('a')).detail;
+  assert.ok(detail.includes(unsafe.replace('```mermaid', '```text')), detail);
+  assert.ok(detail.includes(broken.replace('```mermaid', '```text')), detail);
+  assert.ok(detail.includes(fine), detail);
+});
+
+integrationTest('map chat: create_md_file neutralizes an unsafe mermaid block and demotes one the parser rejects; edit_md_file never adds an unsafe block but keeps the user\'s own', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.plugin.mermaidSyntax = async code => (/^pie showTitle/.test(code) ? 'invalid' : 'ok');
+  const unsafe = '```mermaid\nflowchart TD\n  A["x"]\n  click A "https://evil.example"\n```';
+  const broken = '```mermaid\npie showTitle\n  title x\n  "a" : 3\n```';
+  const fine = '```mermaid\npie\n  title x\n  "a" : 3\n```';
+  const created = await apply(h, [{ kind: 'create_md_file', path: 'Notes/New.md', content: `${unsafe}\n\n${broken}\n\n${fine}\n` }]);
+  eq(created.map(l => l.status), ['done'], JSON.stringify(created));
+  const text = h.contents.get('Notes/New.md');
+  assert.ok(text.includes(unsafe.replace('```mermaid', '```text')), text);
+  assert.ok(text.includes(broken.replace('```mermaid', '```text')), text);
+  assert.ok(text.includes(fine), text);
+  const hashes = h.hashes('Notes/Research.md');
+  const before = h.contents.get('Notes/Research.md');
+  const refused = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: `needs\n\n${unsafe}\n` }], hashes);
+  eq(refused.map(l => l.status), ['skipped'], JSON.stringify(refused));
+  assert.equal(h.contents.get('Notes/Research.md'), before, 'an edit that adds an unsafe block writes nothing');
+  // A block the user already had is not touched, and an edit elsewhere in the file still goes through.
+  h.contents.set('Notes/Research.md', `${unsafe}\n\nSleep needs darkness.\n`);
+  const kept = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs quiet' }], h.hashes('Notes/Research.md'));
+  eq(kept.map(l => l.status), ['done'], JSON.stringify(kept));
+  assert.equal(h.contents.get('Notes/Research.md'), `${unsafe}\n\nSleep needs quiet.\n`);
+});
+
+const EDIT_MD = (() => {
+  const unsafe = '```mermaid\nflowchart TD\n  A["x"]\n  click A "https://evil.example"\n```';
+  const userStyle = '```mermaid\nflowchart TD\n  A --> B\n  style A fill:#f00\n```';
+  const broken = '```mermaid\npie showTitle\n  title x\n  "a" : 3\n```';
+  const fine = '```mermaid\npie\n  title x\n  "a" : 3\n```';
+  const mindmap = '```mermaid\nmindmap\n  root((r))\n    child\n      leaf\n```';
+  const run = async (original, edit, { editor = false, parser, find = 'needs darkness' } = {}) => {
+    const h = await harness(); await h.view.hydrate();
+    const seen = [];
+    h.plugin.mermaidSyntax = async code => { seen.push(code); return parser ? parser(code, h) : 'ok'; };
+    h.contents.set('Notes/Research.md', original);
+    const replaced = [];
+    if (editor) h.setActive('Notes/Research.md', original, { getValue: () => h.contents.get('Notes/Research.md'), offsetToPos: o => ({ ch: o, line: 0 }), replaceRange: (r) => replaced.push(r) });
+    const lines = await apply(h, [{ kind: 'edit_md_file', path: 'Notes/Research.md', find, replace: edit }], h.hashes('Notes/Research.md'));
+    return { h, lines, seen, replaced, after: h.contents.get('Notes/Research.md') };
+  };
+  const status = r => r.lines.map(l => l.status);
+  return { unsafe, userStyle, broken, fine, mindmap, run, status };
+})();
+
+const editMdCase = (name, body) => integrationTest(`map chat: edit_md_file only judges the blocks the edit adds - ${name}`, async () => body(EDIT_MD));
+editMdCase('the user\'s own style block does not let a new unsafe block through', async ({ unsafe, userStyle, run, status }) => {
+  const r = await run(`${userStyle}\n\nSleep needs darkness.\n`, `needs\n\n${unsafe}\n`);
+  eq(status(r), ['skipped'], JSON.stringify(r.lines)); assert.equal(r.after, `${userStyle}\n\nSleep needs darkness.\n`);
+});
+editMdCase('an unsafe mermaid example quoted in another code block does not either', async ({ unsafe, run, status }) => {
+  const quoted = '````md\n```mermaid\nflowchart TD\n  style A fill:#f00\n```\n````';
+  const r = await run(`${quoted}\n\nSleep needs darkness.\n`, `needs\n\n${unsafe}\n`);
+  eq(status(r), ['skipped'], JSON.stringify(r.lines));
+});
+editMdCase('a CRLF note (no editor) still refuses a new unsafe block', async ({ unsafe, run, status }) => {
+  const r = await run('# R\r\n\r\nSleep needs darkness.\r\n', `needs\n\n${unsafe}\n`);
+  eq(status(r), ['skipped'], JSON.stringify(r.lines)); assert.equal(r.after, '# R\r\n\r\nSleep needs darkness.\r\n');
+});
+editMdCase('a CRLF in the replacement with no mermaid is no reason to refuse', async ({ run, status }) => {
+  const r = await run('Sleep needs darkness.\n', 'needs\r\nquiet');
+  eq(status(r), ['done'], JSON.stringify(r.lines)); assert.equal(r.seen.length, 0);
+});
+editMdCase('the same unsafe block already in the note: a second copy is still an added block (multiset)', async ({ unsafe, run, status }) => {
+  const r = await run(`${unsafe}\n\nSleep needs darkness.\n`, `needs\n\n${unsafe}\n`);
+  eq(status(r), ['skipped'], JSON.stringify(r.lines)); assert.equal(r.after, `${unsafe}\n\nSleep needs darkness.\n`);
+});
+editMdCase('a text block turned into an unsafe mermaid block is refused', async ({ userStyle, run, status }) => {
+  const r = await run(userStyle + '\n\n```text\nflowchart TD\n  A["x"]\n  click A "https://evil.example"\n```\n', '```mermaid', { find: '```text' });
+  eq(status(r), ['skipped'], JSON.stringify(r.lines));
+});
+editMdCase('an info-string-only change (mermaid-example to mermaid) adds a block and is refused, note unchanged', async ({ unsafe, run, status }) => {
+  const example = unsafe.replace('```mermaid', '```mermaid-example');
+  const original = `${example}\n\nSleep needs darkness.\n`;
+  const r = await run(original, '```mermaid', { find: '```mermaid-example' });
+  eq(status(r), ['skipped'], JSON.stringify(r.lines)); assert.equal(r.after, original);
+});
+for (const editor of [false, true]) {
+  editMdCase(`a block the parser rejects is refused, note unchanged (editor ${editor})`, async ({ broken, run, status }) => {
+    const r = await run('Sleep needs darkness.\n', `needs\n\n${broken}\n`, { editor, parser: code => (/^pie showTitle/.test(code) ? 'invalid' : 'ok') });
+    eq(status(r), ['skipped'], JSON.stringify(r.lines)); assert.match(r.lines[0].text, /syntax error/);
+    assert.equal(r.after, 'Sleep needs darkness.\n'); assert.equal(r.replaced.length, 0);
+  });
+  editMdCase(`the file moves on while the parser is awaited: skipped stale, nothing written (editor ${editor})`, async ({ fine, run, status }) => {
+    const r = await run('Sleep needs darkness.\n', `needs\n\n${fine}\n`, { editor, parser: (code, h) => { h.contents.set('Notes/Research.md', 'Changed meanwhile.\n'); return 'ok'; } });
+    eq(status(r), ['skipped'], JSON.stringify(r.lines)); assert.match(r.lines[0].text, /changed after you sent/);
+    assert.equal(r.after, 'Changed meanwhile.\n'); assert.equal(r.replaced.length, 0);
+  });
+}
+editMdCase('parser unavailable: the edit is written and one line is logged', async ({ fine, run, status }) => {
+  const warns = []; const warn = console.warn; console.warn = (...a) => warns.push(a.join(' '));
+  let r; try { r = await run('Sleep needs darkness.\n', `needs\n\n${fine}\n`, { parser: () => 'unavailable' }); } finally { console.warn = warn; }
+  eq(status(r), ['done'], JSON.stringify(r.lines)); assert.ok(r.after.includes(fine)); assert.ok(warns.some(w => /mermaid unchecked/.test(w)), warns.join('|'));
+});
+editMdCase('an indentation-sensitive valid diagram reaches the parser with its relative indentation', async ({ mindmap, run, status }) => {
+  const r = await run('Sleep needs darkness.\n', `needs\n\n${mindmap}\n`);
+  eq(status(r), ['done'], JSON.stringify(r.lines)); assert.deepEqual(r.seen, ['mindmap\n  root((r))\n    child\n      leaf']);
+});
+editMdCase('the user\'s own unsafe block stays byte for byte, an edit elsewhere goes through, parser not called', async ({ userStyle, run, status }) => {
+  const r = await run(`${userStyle}\n\nSleep needs darkness.\n`, 'needs quiet');
+  eq(status(r), ['done'], JSON.stringify(r.lines)); assert.equal(r.after, `${userStyle}\n\nSleep needs quiet.\n`); assert.equal(r.seen.length, 0);
+});
+
 integrationTest('map chat: F3 - two actions on the same card in one reply are not mistaken for a user edit', async () => {
   const h = await harness(); await h.view.hydrate();
   const lines = await apply(h, [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'Body clock' }, { kind: 'update_summary', nodeId: h.ids.a, summary: 'Rhythm' }, { kind: 'edit_topic_note', nodeId: h.ids.a, detail: 'Fresh body' }]);

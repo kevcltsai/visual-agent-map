@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { demoteUnparsableMermaid, type MermaidSyntaxCheck } from "../ai/mermaid-safety";
 import {
   packReferenceChunks,
   referenceBatches,
@@ -84,6 +85,8 @@ export interface AiTaskServiceOptions {
   claudeRuntime: (directory: string) => ClaudeCodeCliRuntime;
   /** True when Obsidian's mermaid parses the diagram. Absent: the chart step skips the parse check. */
   mermaidParses?: (code: string) => Promise<boolean>;
+  /** Syntax check of each mermaid block in a model-written detail: a block the parser rejects is written as plain code. Absent: no check. */
+  mermaidSyntax?: MermaidSyntaxCheck;
   /** The "Add diagrams after research" setting. Absent: diagrams are on. */
   diagramsEnabled?: () => boolean;
 }
@@ -306,6 +309,8 @@ export class AiTaskService {
       // Runs without sources too, so a source footnote kept from the previous detail keeps its definition.
       if (referenceGroups.length || /\[\^/.test(result.detail))
         result.detail = resolveDetailReferences(result.detail, referenceGroups, input.detail, input.detailTemplate);
+      // Every reply of execute passes here (task run, AIM steps, the count repair's own run), before anything is written.
+      result.detail = await demoteUnparsableMermaid(result.detail, this.options.mermaidSyntax);
       if (this.options.exchangeLoggingEnabled()) exchanges?.parsed(exchangeId);
       const template = input.detailTemplate;
       if (

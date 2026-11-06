@@ -1697,6 +1697,17 @@ export function renderProposalList(
   suggestions = suggestions.map(item =>
     options.rootTitle && item.parentTitle === options.rootTitle ? { ...item, parentTitle: "" } : item
   );
+  // An untyped suggestion whose parent is itself or names no suggestion in this batch (the AI invented it) is
+  // first-level, so it neither shows a parent hint nor blocks creation. Keyed and typed rows are left alone.
+  const batchTitles = new Set(suggestions.map(item => item.title));
+  suggestions = suggestions.map(item =>
+    item.key === undefined &&
+    !item.kind &&
+    item.parentTitle &&
+    (item.parentTitle === item.title || !batchTitles.has(item.parentTitle))
+      ? { ...item, parentTitle: "" }
+      : item
+  );
   const keyOf = (item: ProposalItem): string => item.key ?? item.title;
   const parentOf = (item: ProposalItem): string => (item.key !== undefined ? item.parentKey : item.parentTitle) ?? "";
   const review = !!options.apply;

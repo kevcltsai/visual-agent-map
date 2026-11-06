@@ -207,6 +207,7 @@ import {
   setIcon,
   setTooltip
 } from "obsidian";
+import { addedMermaidBlocks, demoteUnparsableMermaid, neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
 import { type ReferenceGroup } from "../../ai/reference-materials";
 import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
 import {
@@ -23431,6 +23432,12 @@ export class VisualAgentMapView extends ItemView {
       case "edit_topic_note": {
         const node = nodeOf(action.nodeId);
         if (!node) return gone;
+        // Model-written note body: same allow-list and parser check as an AI task result (a manual edit never comes here).
+        // Done before the merge and stale checks so no await sits between the stale check and the write.
+        const detail =
+          action.kind === "edit_topic_note"
+            ? await demoteUnparsableMermaid(neutralizeUnsafeMermaid(action.detail), this.plugin.mermaidSyntax)
+            : "";
         if (this.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
@@ -23441,7 +23448,7 @@ export class VisualAgentMapView extends ItemView {
             ? { title: action.title }
             : action.kind === "update_summary"
               ? { summary: action.summary }
-              : { detail: action.detail }
+              : { detail }
         );
         await this.chatTopicAccept(node.id, baseline.topicHashes);
         return done;
@@ -23504,11 +23511,32 @@ export class VisualAgentMapView extends ItemView {
           configDir
         });
         if (!early.ok) return guardSkipped(early.code);
-        const source = await this.readChatFile(action.path);
+        let source = await this.readChatFile(action.path);
         if (!source) return skipped("ui.map_chat_skip_file_missing");
         if (isMdStale(hashes, action.path, source.text)) return skipped("ui.map_chat_skip_stale");
         const next = applyMdEdit(source.text, action.find, action.replace);
         if (next === null) return skipped("ui.map_chat_skip_find_failed");
+        // Only the mermaid blocks the edit adds are judged (allow-list, then parser); what the note already had stays as it is.
+        const added = addedMermaidBlocks(source.text, next);
+        if (added.some(block => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
+        const check = this.plugin.mermaidSyntax;
+        const codes = added.flatMap(block => (block.code?.trim() ? [block.code] : []));
+        if (check && codes.length) {
+          for (const code of codes) {
+            const syntax = await check(code);
+            if (syntax === "invalid") return skipped("ui.map_chat_skip_invalid_mermaid");
+            if (syntax === "unavailable") {
+              console.warn("Visual Agent Map edit mermaid unchecked");
+              break;
+            }
+          }
+          // The editor branch has no race check at the write, so the file is read again after the wait.
+          const again = await this.readChatFile(action.path);
+          if (!again || again.text !== source.text) return skipped("ui.map_chat_skip_stale");
+          source = again;
+        } else if (added.some(block => block.code?.trim())) {
+          console.warn("Visual Agent Map edit mermaid unchecked");
+        }
         const verdict = guardMapChatWrite({
           kind: "edit",
           path: action.path,
@@ -23544,10 +23572,15 @@ export class VisualAgentMapView extends ItemView {
       case "create_md_file": {
         const key = normalizeVaultPath(action.path);
         const exists = key ? !!this.app.vault.getAbstractFileByPath(key) : false;
+        // Model-written file: same allow-list and parser check as an AI task result.
+        const content = await demoteUnparsableMermaid(
+          neutralizeUnsafeMermaid(action.content),
+          this.plugin.mermaidSyntax
+        );
         const verdict = guardMapChatWrite({
           kind: "create",
           path: action.path,
-          newContent: action.content,
+          newContent: content,
           exists,
           configDir
         });
@@ -23557,8 +23590,8 @@ export class VisualAgentMapView extends ItemView {
           const folder = folders.slice(0, depth).join("/");
           if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
         }
-        await this.app.vault.create(key, action.content);
-        this.recordChatFileCreate(key, action.content, run);
+        await this.app.vault.create(key, content);
+        this.recordChatFileCreate(key, content, run);
         return done;
       }
     }

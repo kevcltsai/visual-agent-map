@@ -20,6 +20,7 @@
 - mermaid 欄位只放圖本身，不加 ``` 圍欄；第一行是圖型名稱（xychart-beta 要寫完整）。
 - 標籤用 detail 的語言。每張圖最多 12 個節點、資料點或項目（pie 最多 8 塊）。
 - 方括號裡的文字一律加雙引號，例如 flowchart 的 A["中文標籤"]；mindmap 每個項目（包括根）都寫成 代號["文字"]；pie 的每一塊，以及 xychart-beta 的標題、類別與軸標題，也加雙引號。
+- pie 的第一行只能是 `pie` 或 `pie showData`，`title` 另起一行且不加引號，例如依序四行：`pie`、`  title 標題`、`  "甲" : 6`、`  "乙" : 4`。
 - pie 與 timeline 的 title 行，以及 timeline 的文字，不加雙引號；timeline 的文字裡不要有半形冒號。
 - 不要寫以 click、link、callback、class、style、classDef 開頭的行，也不要用 :::、<<…>>、<br> 等 HTML 標籤、%%{}%% 或 --- 設定、URL、圖片與 ::icon 圖示。
 

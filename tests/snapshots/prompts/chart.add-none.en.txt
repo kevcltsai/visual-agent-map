@@ -20,6 +20,7 @@ Syntax:
 - The mermaid field holds the diagram only, without ``` fences; its first line names the type (write xychart-beta in full).
 - Labels use the detail's language. Each diagram has at most 12 nodes, data points or items (pie at most 8 slices).
 - Always double-quote text inside square brackets, for example A["label"] in a flowchart; write every mindmap item, including the root, as id["text"]; also double-quote pie slices and xychart-beta titles, categories and axis titles.
+- A pie starts with `pie` or `pie showData` alone on the first line, with `title` on its own next line and unquoted, for example these four lines in order: `pie`, `  title Heading`, `  "A" : 6`, `  "B" : 4`.
 - Do not quote the title line of pie or timeline, or timeline text; timeline text contains no ASCII colon.
 - Never write lines that start with click, link, callback, class, style or classDef, and never use :::, <<…>>, HTML tags such as <br>, %%{}%% or --- configuration, URLs, images or ::icon icons.
 

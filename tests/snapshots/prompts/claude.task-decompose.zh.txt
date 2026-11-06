@@ -8,7 +8,7 @@
 
 優先使用這次選取的本機 Markdown 資料；只有在補足缺漏、查證會變動的事實或加入明確補充資訊時才使用網路。讓本機與網路證據可辨識，並在本機資料支持的主張旁引用來源檔案。
 
-只回傳 JSON，不要使用 Markdown code fence。格式必須符合：{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}。若沒有視覺參考，visualReferences 回傳空陣列。
+只回傳 JSON，不要使用 Markdown code fence。格式必須符合：{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}。若沒有視覺參考，visualReferences 回傳空陣列；parentTitle 只能填同一批另一筆建議的 title，否則留空字串。
 完成時直接呼叫 StructuredOutput 工具回傳結果；不要先用文字寫出答案或 JSON。
 
 共同寫作底線（不論口吻都適用）：不要用「首先」「其次」「總之」「綜上所述」這類套話串場或收尾；不誇飾，不用「驚人」「顛覆」「史無前例」這類形容；數字要具體，寫出數值、單位、年份與範圍，不寫「很多」「大幅」「近年」。用台灣用語，例如「軟體」「資料」「品質」，不用中國大陸用語。

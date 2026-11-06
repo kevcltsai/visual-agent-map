@@ -1,11 +1,13 @@
 /**
  * Mermaid blocks in a model-written detail are rendered by Obsidian, so the prompt's limits are enforced here too:
- * only flowchart/graph or a type in DIAGRAM_TYPES, with text labels. A block that breaks a limit (click, link,
+ * only flowchart/graph or a type in DIAGRAM_TYPES, with text labels. `demoteUnparsableMermaid` then asks the runtime
+ * parser (Obsidian's `loadMermaid`, Mermaid or Pele depending on the version) about each remaining block. A block that breaks a limit (click, link,
  * callback or cssClass directives, HTML tags, init/config, URLs, images, icons, styles, sequence actor menus,
  * mindmap icons, C4 links/sprites/tags/styling, quadrant point styling) keeps its text but loses the `mermaid` info
- * string, so Obsidian shows it as plain code and never renders it. An unknown header is neutralized too.
+ * string, so Obsidian shows it as plain code and never renders it. An unknown header is neutralized too; so is a
+ * block the parser rejects (a syntax error would otherwise show as red error text in the note).
  */
-/** Diagram types the mermaid in Obsidian 1.14.4 (11.13.0) detects and draws offline; checked against the bundle 2026-10-19. */
+/** Diagram types the mermaid in Obsidian 1.14.4 (11.13.0) detects and draws offline; checked against the bundle 2026-10-19. Obsidian 1.15 ships Pele instead; the runtime parser check is what guards syntax there. */
 export const DIAGRAM_TYPES: readonly string[] = [
   "sequenceDiagram",
   "classDiagram",
@@ -127,4 +129,197 @@ export function neutralizeUnsafeMermaid(markdown: string): string {
     if (unsafeMermaid(body)) lines[index] = line.replace(/mermaid/i, "text");
   });
   return lines.join("\n");
+}
+
+/** `ok` parses; `invalid` is a real syntax failure; `unavailable` means no parser could be used (nothing is known about the block). */
+export type MermaidVerdict = "ok" | "invalid" | "unavailable";
+export type MermaidSyntaxCheck = (code: string) => Promise<MermaidVerdict>;
+
+/** The smallest diagram every Mermaid-compatible engine accepts; used to tell a syntax error from a broken parser. */
+const KNOWN_GOOD = "flowchart TD\n  A --> B";
+
+/**
+ * A syntax check on top of the parser that `load` returns (Obsidian's `loadMermaid`; the engine is not assumed).
+ * A load failure or a parser without `parse` is `unavailable`. When `parse` rejects, a known-good diagram is parsed
+ * once more: if that is rejected too, the parser itself is broken (`unavailable`, logged); otherwise the block is `invalid`.
+ * The probe runs on every rejection, so a transient failure is never remembered.
+ */
+export function mermaidSyntaxCheck(load: () => Promise<unknown>): MermaidSyntaxCheck {
+  return async code => {
+    let parse: (text: string) => Promise<unknown>;
+    try {
+      const engine = (await load()) as { parse?: unknown } | null | undefined;
+      if (!engine || typeof engine.parse !== "function") return "unavailable";
+      const method = engine.parse as (this: unknown, text: string) => Promise<unknown>;
+      parse = async text => (await method.call(engine, text)) as unknown;
+    } catch {
+      return "unavailable";
+    }
+    try {
+      await parse(code);
+      return "ok";
+    } catch (error) {
+      try {
+        await parse(KNOWN_GOOD);
+      } catch {
+        console.warn(
+          `Visual Agent Map: the Mermaid parser rejects a valid diagram, so it is treated as unavailable: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+        return "unavailable";
+      }
+      return "invalid";
+    }
+  };
+}
+
+/**
+ * Turns each mermaid block the parser rejects into a plain `text` block (only its info string changes; every other
+ * character, line break and block stays). The code handed to the parser has the callout, quote and list prefixes removed.
+ * When the parser cannot be used the markdown is returned as it is and one log line is written; no block is demoted.
+ */
+export async function demoteUnparsableMermaid(
+  markdown: string,
+  check: MermaidSyntaxCheck | undefined
+): Promise<string> {
+  if (!check || !/mermaid/i.test(markdown)) return markdown;
+  // Keep every line break as it is: split with the separators kept, and work on the text parts only.
+  const parts = markdown.split(/(\r\n?|\n)/);
+  const at = (line: number): number => line * 2;
+  const count = Math.ceil(parts.length / 2);
+  const demote: number[] = [];
+  // The fence of the code block the scan is inside (not mermaid): a mermaid fence quoted in it is text, never a diagram.
+  let outer: RegExpExecArray | null = null;
+  for (let index = 0; index < count; index++) {
+    const fence = fenceOf(parts[at(index)]);
+    if (outer) {
+      if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
+      continue;
+    }
+    if (!fence) continue;
+    if (!/^mermaid\b/i.test(fence[2].trim())) {
+      outer = fence;
+      continue;
+    }
+    // The fence line's own prefix (indentation, "> ", list marker) is taken off every body line, so relative
+    // indentation (mindmap, kanban) reaches the parser intact; a line without that prefix (lazy quote line) falls back to core().
+    const opening = parts[at(index)];
+    const prefix = opening.slice(0, opening.length - core(opening).length);
+    // A list marker is continued by spaces of the same width.
+    const continued = prefix.replace(/(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t])/g, marker =>
+      " ".repeat(marker.length)
+    );
+    const body: string[] = [];
+    let next = index + 1;
+    for (; next < count; next++) {
+      const raw = parts[at(next)];
+      const content = core(raw);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(
+        raw.startsWith(prefix)
+          ? raw.slice(prefix.length)
+          : raw.startsWith(continued)
+            ? raw.slice(continued.length)
+            : content
+      );
+    }
+    // The scan resumes after this block's closing fence, so that fence is not read as the opening of another block.
+    const opened = index;
+    index = next;
+    if (!body.some(line => line.trim())) continue;
+    const verdict = await check(body.join("\n"));
+    if (verdict === "unavailable") {
+      console.warn("Visual Agent Map: the Mermaid parser is unavailable; diagrams were not syntax-checked.");
+      return markdown;
+    }
+    if (verdict === "invalid") demote.push(opened);
+  }
+  if (!demote.length) return markdown;
+  for (const index of demote) parts[at(index)] = parts[at(index)].replace(/mermaid/i, "text");
+  return parts.join("");
+}
+
+/** A mermaid block of a note: `unsafe` by the allow-list; `code` is what the parser gets (null when the block is only a quoted example inside another code block, which is never rendered). */
+export interface MermaidBlock {
+  unsafe: boolean;
+  code: string | null;
+}
+
+/** Every mermaid block of the text, read the way `neutralizeUnsafeMermaid` (allow-list) and `demoteUnparsableMermaid` (parser code) read them. Line breaks are normalized to LF first. */
+function mermaidBlocks(markdown: string): Array<MermaidBlock & { key: string }> {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  // Parser code per opening line, with the same scan and prefix removal as demoteUnparsableMermaid.
+  const codes = new Map<number, string>();
+  let outer: RegExpExecArray | null = null;
+  for (let index = 0; index < lines.length; index++) {
+    const fence = fenceOf(lines[index]);
+    if (outer) {
+      if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
+      continue;
+    }
+    if (!fence) continue;
+    if (!/^mermaid\b/i.test(fence[2].trim())) {
+      outer = fence;
+      continue;
+    }
+    const opening = lines[index];
+    const prefix = opening.slice(0, opening.length - core(opening).length);
+    const continued = prefix.replace(/(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t])/g, marker =>
+      " ".repeat(marker.length)
+    );
+    const body: string[] = [];
+    let next = index + 1;
+    for (; next < lines.length; next++) {
+      const raw = lines[next];
+      const content = core(raw);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(
+        raw.startsWith(prefix)
+          ? raw.slice(prefix.length)
+          : raw.startsWith(continued)
+            ? raw.slice(continued.length)
+            : content
+      );
+    }
+    codes.set(index, body.join("\n"));
+    index = next;
+  }
+  const blocks: Array<MermaidBlock & { key: string }> = [];
+  lines.forEach((line, index) => {
+    const fence = fenceOf(line);
+    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
+    const body: string[] = [];
+    for (let next = index + 1; next < lines.length; next++) {
+      const content = core(lines[next]);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(content);
+    }
+    const code = codes.get(index) ?? null;
+    blocks.push({
+      unsafe: unsafeMermaid(body),
+      code,
+      key: `${fence[2].trim()}\u0002${body.join("\n")}\u0000${code ?? "\u0001"}`
+    });
+  });
+  return blocks;
+}
+
+/**
+ * The mermaid blocks `after` has beyond those of `before` (a multiset difference, so a second copy of a block the note
+ * already had counts as added). Blocks the note already had are never returned, whatever they look like.
+ */
+export function addedMermaidBlocks(before: string, after: string): MermaidBlock[] {
+  const had = new Map<string, number>();
+  for (const block of mermaidBlocks(before)) had.set(block.key, (had.get(block.key) ?? 0) + 1);
+  const added: MermaidBlock[] = [];
+  for (const { key, unsafe, code } of mermaidBlocks(after)) {
+    const left = had.get(key) ?? 0;
+    if (left > 0) had.set(key, left - 1);
+    else added.push({ unsafe, code });
+  }
+  return added;
 }

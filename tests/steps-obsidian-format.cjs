@@ -6,7 +6,7 @@ const { load, promptsFor, makeService } = require('./support-replay.cjs');
 const support = require('./support.cjs');
 
 const { parseAiResult } = load('core/steps/task/parse.ts');
-const { neutralizeUnsafeMermaid } = load('ai/mermaid-safety.ts');
+const { neutralizeUnsafeMermaid, addedMermaidBlocks } = load('ai/mermaid-safety.ts');
 const { canonicalDetail } = load('ai/result-utils.ts');
 const { resolveDetailReferences } = load('ai/reference-materials.ts');
 
@@ -455,4 +455,114 @@ test('classDiagram class declarations stay mermaid; class directives and injecte
     ['classDiagram', '  class A;click A "x"']
   ];
   for (const lines of reject) assert.equal(neutralizeUnsafeMermaid(block(lines)), block(lines).replace('```mermaid', '```text'), lines.join(' / '));
+});
+
+// demoteUnparsableMermaid: the runtime parser decides; only a rejected block's info string changes.
+const { demoteUnparsableMermaid, mermaidSyntaxCheck } = load('ai/mermaid-safety.ts');
+const BAD_PIE = ['```mermaid', 'pie showTitle', '    title "台北市都更案件狀態（2026年）"', '    "已核定" : 718', '```'];
+const GOOD_PIE = ['```mermaid', 'pie showData', '  title Status', '  "A" : 6', '```'];
+const stub = async code => (/^pie showTitle/.test(code) ? 'invalid' : 'ok');
+
+test('a pie showTitle block is demoted to text; the rest of the page is byte-identical', async () => {
+  const page = ['前言\r', '', ...BAD_PIE.map(l => l + '\r'), '', ...GOOD_PIE.map(l => l + '\r'), '尾巴'].join('\n');
+  const out = await demoteUnparsableMermaid(page, stub);
+  assert.equal(out, page.replace('```mermaid', '```text'), 'only the first fence changes, CRLF kept');
+});
+
+test('a block that parses, and a page with no mermaid, come back identical', async () => {
+  const page = ['x', ...GOOD_PIE, 'y'].join('\n');
+  assert.equal(await demoteUnparsableMermaid(page, stub), page);
+  assert.equal(await demoteUnparsableMermaid('plain', async () => assert.fail('no block, no parse')), 'plain');
+  assert.equal(await demoteUnparsableMermaid(page, undefined), page);
+});
+
+test('a failing block inside a callout or a list is demoted alone, with the prefix stripped before parsing', async () => {
+  const seen = [];
+  const check = async code => { seen.push(code); return stub(code); };
+  const page = ['> [!note]', ...BAD_PIE.map(l => '> ' + l), '', '- item', ...GOOD_PIE.map(l => '  ' + l)].join('\n');
+  const out = await demoteUnparsableMermaid(page, check);
+  assert.equal(out, page.replace('> ```mermaid', '> ```text'));
+  assert.equal(seen[0], BAD_PIE.slice(1, -1).join('\n'), 'no "> " prefix reaches the parser');
+  assert.equal(seen[1], GOOD_PIE.slice(1, -1).join('\n'), 'list indentation is stripped');
+});
+
+test('an unusable parser keeps the whole page, demotes nothing and logs once', async () => {
+  const page = ['```mermaid', 'pie showTitle', '```', '', ...BAD_PIE].join('\n');
+  const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);
+  try {
+    assert.equal(await demoteUnparsableMermaid(page, async () => 'unavailable'), page);
+    assert.equal(await demoteUnparsableMermaid(page, mermaidSyntaxCheck(async () => { throw new Error('no engine'); })), page);
+    assert.equal(await demoteUnparsableMermaid(page, mermaidSyntaxCheck(async () => ({}))), page);
+  } finally { console.warn = original; }
+  assert.equal(warns.length, 3);
+});
+
+test('mermaidSyntaxCheck: a rejection is invalid only when a known-good diagram still parses; a parser that rejects everything is unavailable', async () => {
+  assert.equal(await mermaidSyntaxCheck(async () => ({ parse: async () => ({}) }))('x'), 'ok');
+  const real = { parse: async text => { if (!/^(?:flowchart|pie)/.test(text)) throw new Error('Parse error'); } };
+  assert.equal(await mermaidSyntaxCheck(async () => real)('x'), 'invalid');
+  assert.equal(await mermaidSyntaxCheck(async () => null)('x'), 'unavailable');
+  const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);
+  try {
+    const broken = mermaidSyntaxCheck(async () => ({ parse: async () => { throw new TypeError('engine is broken'); } }));
+    assert.equal(await broken('flowchart TD\n  A --> B'), 'unavailable');
+    assert.ok(warns.length >= 1 && String(warns[0].join(' ')).includes('engine is broken'), 'the error is logged');
+    const page = ['```mermaid', 'flowchart TD', '  A --> B', '```', '', ...BAD_PIE].join('\n');
+    assert.equal(await demoteUnparsableMermaid(page, broken), page, 'a broken parser demotes nothing');
+  } finally { console.warn = original; }
+});
+
+test('mermaidSyntaxCheck: a transient probe failure is not remembered forever', async () => {
+  let calls = 0;
+  const check = mermaidSyntaxCheck(async () => ({ parse: async text => { calls++; if (calls <= 2) throw new TypeError('warming up'); if (/bad/.test(text)) throw new Error('Parse error'); } }));
+  const warn = console.warn; console.warn = () => {};
+  try {
+    assert.equal(await check('bad'), 'unavailable');
+    assert.equal(await check('bad'), 'invalid', 'once the probe parses, a rejection is a syntax error');
+  } finally { console.warn = warn; }
+});
+
+test('demoteUnparsableMermaid leaves a mermaid fence quoted inside another code block as it is', async () => {
+  const seen = [];
+  const check = async code => { seen.push(code); return 'invalid'; };
+  const outer4 = ['````markdown', '```mermaid', 'pie showTitle', '```', '````'].join('\n');
+  const outerTilde = ['~~~md', '```mermaid', 'pie showTitle', '```', '~~~'].join('\n');
+  assert.equal(await demoteUnparsableMermaid(outer4, check), outer4);
+  assert.equal(await demoteUnparsableMermaid(outerTilde, check), outerTilde);
+  assert.equal(seen.length, 0, 'the parser never saw the quoted blocks');
+  const mixed = `${outer4}\n\n${BAD_PIE.join('\n')}`;
+  assert.equal(await demoteUnparsableMermaid(mixed, check), `${outer4}\n\n${BAD_PIE.join('\n').replace('mermaid', 'text')}`);
+});
+
+test('the pie example in the prompts is a pie the syntax rules allow: first line pie or pie showData, unquoted title on its own line', () => {
+  const fs = require('node:fs');
+  for (const file of ['core/steps/_shared/obsidian-format.zh.md', 'core/steps/_shared/obsidian-format.en.md', 'core/steps/chart/chart.zh.md', 'core/steps/chart/chart.en.md']) {
+    const text = fs.readFileSync(require('node:path').join(__dirname, '..', file), 'utf8');
+    assert.match(text, /`pie` or `pie showData`|`pie` 或 `pie showData`/, file);
+    assert.match(text, /`pie`[、,][^\n]*`  title [^"`]+`/, file);
+  }
+});
+
+test('indentation inside a diagram reaches the parser: a mindmap in a list item keeps its levels', async () => {
+  const seen = [];
+  const page = ['- item', '  ```mermaid', '  mindmap', '    root["a"]', '      b["c"]', '  ```'].join('\n');
+  assert.equal(await demoteUnparsableMermaid(page, async code => { seen.push(code); return 'ok'; }), page);
+  assert.equal(seen[0], 'mindmap\n  root["a"]\n    b["c"]');
+});
+
+test('addedMermaidBlocks: only the blocks the after text has beyond the before text (multiset, LF-normalized, parser code keeps relative indentation)', () => {
+  const style = '```mermaid\nflowchart TD\n  A --> B\n  style A fill:#f00\n```';
+  const mind = '```mermaid\nmindmap\n  root((r))\n    child\n```';
+  assert.equal(addedMermaidBlocks(`${style}\n\ntext\n`, `${style}\n\nother\n`).length, 0);
+  assert.equal(addedMermaidBlocks(`${style}\r\n\r\ntext\r\n`, `${style}\n\nother\n`).length, 0, 'CRLF vs LF is the same block');
+  assert.equal(addedMermaidBlocks(style, `${style}\n\n${style}`).length, 1, 'a second copy counts');
+  const added = addedMermaidBlocks('text', `> - ${mind.replace(/\n/g, '\n>   ')}`);
+  assert.equal(added.length, 1);
+  assert.equal(added[0].unsafe, false);
+  assert.equal(added[0].code, 'mindmap\n  root((r))\n    child');
+  assert.equal(addedMermaidBlocks('text', style)[0].unsafe, true);
+  assert.equal(addedMermaidBlocks('a', 'a b').length, 0);
+  const foo = style.replace('```mermaid', '```mermaid.foo');
+  assert.equal(addedMermaidBlocks(style, foo).length, 1, 'only the info string changed: still a new block');
+  assert.equal(addedMermaidBlocks(`${foo}\n\ntext`, `${foo}\n\nother`).length, 0, 'same body and same info: not new');
 });

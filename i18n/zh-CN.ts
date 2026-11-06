@@ -1415,6 +1415,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_skip_stale": "发送后文件又被修改过",
   "ui.map_chat_skip_topic_gone": "议题已不在心智图上",
   "ui.map_chat_skip_find_failed": "要替换的文字没有刚好出现一次",
+  "ui.map_chat_skip_unsafe_mermaid": "这个修改会加入不被允许的图表",
+  "ui.map_chat_skip_invalid_mermaid": "这个修改会加入语法错误的图表",
   "ui.map_chat_skip_file_missing": "文件不存在",
   "ui.map_chat_skip_merge_locked": "议题正在合并",
   "ui.map_chat_skip_cycle": "这个移动会造成循环",

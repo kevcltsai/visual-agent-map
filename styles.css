@@ -310,6 +310,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-node > .vam-node-tools.is-side-left::after { left: 100%; }
 .vam-node > .vam-node-tools.is-side-right::after { right: 100%; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
+.vam-node:has(> .vam-node-tools.is-side-right) > .vam-add-child { z-index: 4; }
 /* In select mode every picked card is selected, so only hover and focus show a card's tools there. */
 .vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 /* The row hides a moment after the pointer leaves its card (it stays clickable meanwhile), so a pointer crossing bare canvas to reach a row beside or above the card still gets there. */

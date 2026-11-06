@@ -803,3 +803,12 @@ test('M3: fitCards on ring cards frames the picture as well, not only the cards 
   const o = other.view.map.viewport;
   assert.ok(Math.abs(o.zoom - 1) < 1e-9 || o.zoom > v.zoom, 'the picture is not part of this frame');
 });
+
+test('F5: a tool row beside the card never covers the + button: the + sits above the row and its hover bridge', () => {
+  const number = rule => Number((rule && rule[1]) || NaN);
+  const row = css.match(/\.vam-node > \.vam-node-tools \{[^}]*z-index: (\d+)/);
+  const plus = css.match(/\.vam-node:has\(> \.vam-node-tools\.is-side-right\) > \.vam-add-child \{[^}]*z-index: (\d+)/);
+  assert.ok(row, 'the row has a stacking order');
+  assert.ok(plus, 'a row on the right lifts the + button');
+  assert.ok(number(plus) > number(row), 'the + is above the row');
+});
